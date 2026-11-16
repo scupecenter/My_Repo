@@ -319,7 +319,7 @@ export class DashboardExtrasService {
   }
 
   /**
-   * F20 (migration 0113, contract 0.15.27): the sources of the seven counters that had none before. Each reads the existing tables; the B3
+   * F20 (migration 0113, contract 0.15.29): the sources of the seven counters that had none before. Each reads the existing tables; the B3
    * scope applies (the regions of the caller; the site-based ones also the cluster and scenario filters). A count with no base answers null.
    *  - vehicle_ready: approved field assignments (assignment_readiness) whose vehicle is ready (ready_to_mobilize or awaiting_advance), in % of all.
    *  - advances_open_after_close: approved advances still open (approved for disbursement, disbursed, settlement in progress) of an assignment
@@ -448,7 +448,7 @@ export class DashboardExtrasService {
   }
 
   /**
-   * F20 (migration 0113, contract 0.15.27): the sites per SITE 360 menu. The menus are the views of the workflow (workflow_views, migration 0023:
+   * F20 (migration 0113, contract 0.15.29): the sites per SITE 360 menu. The menus are the views of the workflow (workflow_views, migration 0023:
    * CW, TE, OM); a site is in a view when it has a task of the view that is not n/a or skipped. "All sites" is sites_total of the counters.
    * Design & Acquisition, Handover & Closure and Dismantle have no view in the schema, so they are not counted.
    */

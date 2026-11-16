@@ -7,7 +7,7 @@ import { startApp, superDbF20K } from "./helpers";
 import { actor, plainAdmin, type Actor } from "./wf-helpers";
 
 /**
- * F20 counters (contract 0.15.27, migration 0113): the sources of the seven counters that had none before, the sites per SITE 360 view, and the
+ * F20 counters (contract 0.15.29, migration 0113): the sources of the seven counters that had none before, the sites per SITE 360 view, and the
  * stale-task idle limit of the dashboard settings. The data is synthetic and written as the superuser into its own database (TEST_DATABASE_URL_F20K),
  * with the triggers off, so the expected figures are the ones computed by hand below:
  *   Tripoli (region 1): site A (active, On-Air this month, TE PAC done, As-Built submitted), site C (cancelled, never counted)
@@ -225,7 +225,7 @@ afterAll(async () => {
   await app.close();
 });
 
-describe("F20 counters: the seven former gaps and the SITE 360 counts (contract 0.15.27)", () => {
+describe("F20 counters: the seven former gaps and the SITE 360 counts (contract 0.15.29)", () => {
   it("the administrator sees a value for every counter that had no source, and none is pending", async () => {
     const res = await admin.api.call("get", "/dashboard/extras");
     expect(res.status).toBe(200);

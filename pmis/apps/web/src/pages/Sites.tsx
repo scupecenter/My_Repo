@@ -1,6 +1,9 @@
 import type { SiteListItem, SitesExportColumnCode } from '@/api/types';
+import { errText } from '@/components/FormDialog';
+import { Site360Grid, type Site360GridRow } from '@/components/Site360Grid';
+import { useSaveSite360Cell, useSite360RowsPaged, useSite360Sections } from '@/api/site360';
 import { Download, FileDown, FilePlus2, FileUp, Map as MapIcon, RotateCcw, Table2 } from 'lucide-react';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMe } from '@/api/hooks';
@@ -55,6 +58,33 @@ export function Sites() {
   const [sp, setSp] = useSearchParams();
   const stream = sp.get('stream') ?? '';
   const view = sp.get('view') ?? '';
+  // SITE 360 menus (F15): ?section= picks a menu; ?layout=vertical shows the list, the default is the Grid.
+  const section = sp.get('section') ?? '';
+  const layout = sp.get('layout') === 'vertical' ? 'vertical' : 'grid';
+  const site360Q = useSite360Sections();
+  const menu = section ? site360Q.data?.items.find((m) => m.key === section) : undefined;
+  // The grid reads its rows from GET /site360/{menu}/rows (one page, the same URL filters as the list), so the grid and the list share the source.
+  // Multi Site ID search (paste a list, comma or newline separated) is kept in the URL as site_code, like the other filters.
+  const gridQuery = {
+    site_code: sp.get('site_code') || undefined,
+    region_id: sp.get('region_id') || undefined,
+    scenario: sp.get('scenario') || undefined,
+    overall_status: sp.get('overall_status') || undefined,
+    sort: 'site_code',
+  };
+  const gridRowsQ = useSite360RowsPaged(menu ? section : undefined, gridQuery);
+  const saveCell = useSaveSite360Cell(menu ? section : undefined, gridQuery);
+  const gridPages = gridRowsQ.data?.pages ?? [];
+  const gridTotal = gridPages[0]?.total;
+  const gridFiltered = gridPages[0]?.filtered;
+  const gridRows = gridPages.flatMap((p) => p.rows);
+  // Stable identity per fetched page: Site360Grid reports its selection from an effect keyed on `rows`, so a new array on every render loops forever.
+  const grid360Rows = useMemo(() => gridRows.map((r) => ({ id: r.site_id, site_code: r.site_code, row_no: r.row_no, values: r.values, cells: r.cells })), [gridRowsQ.data]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [siteIdsDraft, setSiteIdsDraft] = useState(() => (sp.get('site_code') ?? '').split(',').join('\n'));
+  const applySiteIds = () => {
+    const codes = siteIdsDraft.split(/[\s,]+/).map((x) => x.trim()).filter(Boolean);
+    setSp((prev) => { const n = new URLSearchParams(prev); if (codes.length) n.set('site_code', codes.join(',')); else n.delete('site_code'); return n; }, { replace: true });
+  };
   const [exp, setExp] = useState(false);
   const [showNa, setShowNa] = useState(false);
   // Filters, quick filter and the selected row live in the URL, so Back and shared links restore them (plan F9).
@@ -70,6 +100,7 @@ export function Sites() {
   const siteCodes = sp.get('site_codes') ?? '';
   const extra = { ...(locks ? { workflow_locks: locks } : {}), ...(gaps ? { data_gaps: gaps } : {}), ...(siteCodes ? { site_codes: siteCodes } : {}) };
   const [locksDlg, setLocksDlg] = useState<null | boolean>(null);
+  const [gridSel, setGridSel] = useState<Site360GridRow[]>([]);
   const sel = sp.get('sel') ?? '';
   const activeFilters = Object.values(f).filter(Boolean).length + (bucket ? 1 : 0) + (coordinates ? 1 : 0) + (locks ? 1 : 0) + (gaps ? 1 : 0);
   const setParams = (kv: Record<string, string>) => setSp((p) => { const n = new URLSearchParams(p); for (const [k, v] of Object.entries(kv)) { if (v) n.set(k, v); else n.delete(k); } return n; }, { replace: true });
@@ -186,13 +217,17 @@ export function Sites() {
 
   return (
     <div data-testid="page-sites">
-      <PageHeader title={subMenu ? `${t('sites.title')}: ${subMenu}` : t('sites.title')} subtitle={t('sites.subtitle')} context={(canCreate || newTpl) && (
+      <PageHeader title={subMenu ? `${t('sites.title')}: ${subMenu}` : t('sites.title')} subtitle={t('sites.subtitle')} context={<>{menu && (
+        <span className="inline-flex gap-1" role="group" aria-label={t('site360.layout')} data-testid="site360-layout">
+          <button type="button" aria-pressed={layout === 'grid'} data-testid="site360-layout-grid" onClick={() => setParams({ layout: 'grid' })} className={`btn px-2 py-1 text-xs ${layout === 'grid' ? 'btn-primary' : ''}`}>{t('site360.grid')}</button>
+          <button type="button" aria-pressed={layout === 'vertical'} data-testid="site360-layout-vertical" onClick={() => setParams({ layout: 'vertical' })} className={`btn px-2 py-1 text-xs ${layout === 'vertical' ? 'btn-primary' : ''}`}>{t('site360.vertical')}</button>
+        </span>)}{(canCreate || newTpl) && (
         <span className="ms-auto flex flex-wrap gap-1" data-testid="sites-create-actions">
           {canCreate && <Link className="btn btn-primary px-2 py-1 text-xs" to="/sites/new" data-testid="sites-new"><FilePlus2 size={14} />{t('sites.new_site')}</Link>}
           {newTpl && <><button type="button" className="btn px-2 py-1 text-xs" data-testid="sites-template-download"
             onClick={() => downloadTemplate(newTpl.template_id).then((n) => toast(t('grid.downloaded', { name: n })), (e) => toast(registerErrorMessage(t, e), 'err'))}><FileDown size={14} />{t('sites.download_template')}</button>
           <button type="button" className="btn px-2 py-1 text-xs" data-testid="sites-template-upload" onClick={() => setUpSites(true)}><FileUp size={14} />{t('sites.upload_template')}</button></>}
-        </span>)} />
+        </span>)}</>} />
       <Toolbar activeFilters={activeFilters} activeLabel={t('states.filters')}
         filters={<>
         <SavedViews screen={real ? 'sites-stream' : 'sites'} value={{ ...f, bucket }} empty={VIEW_EMPTY} table={tbl}
@@ -232,6 +267,24 @@ export function Sites() {
       ) : asMap ? (
         // SC-10: the same map as the dashboard; a stream sub-menu shows the sites whose current stream it is
         <SiteMap testid="sites-map" height={560} outer={{ region_id: f.region_id, scenario: f.scenario, ...(real ? { stream } : {}) }} />
+      ) : menu && layout === 'grid' ? (
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-start gap-2">
+            <textarea rows={2} className="input min-w-[240px] font-mono text-xs" value={siteIdsDraft} onChange={(e) => setSiteIdsDraft(e.target.value)} placeholder={t('site360.site_ids_placeholder')} aria-label={t('site360.site_ids')} data-testid="site360-site-ids" />
+            <button type="button" className="btn" data-testid="site360-site-ids-apply" onClick={applySiteIds}>{t('site360.site_ids_apply')}</button>
+          </div>
+          {saveCell.isError && <p role="alert" className="text-sm text-red-600" data-testid="site360-cell-error">{errText(saveCell.error, t)}</p>}
+          <div className="flex flex-wrap items-center gap-2" data-testid="site360-toolbar">
+            <ExportViewButton testid="site360-export-view" source="sites" filters={Object.fromEntries(Object.entries({ ...f, ...(bucket ? { bucket } : {}), ...(real ? { stream } : {}) }).filter(([, x]) => x))} columns={SITE_COLUMNS} />
+            <Link className="btn px-2 py-1 text-xs" to="/templates" data-testid="site360-template-link">{t('site360.template_upload')}</Link>
+            {canUnlock && gridSel.length > 0 && <>
+              <button type="button" className="btn" data-testid="site360-locks-open" onClick={() => setLocksDlg(false)}>{t('locks.bulk_open')}</button>
+              <button type="button" className="btn" data-testid="site360-locks-lock" onClick={() => setLocksDlg(true)}>{t('locks.bulk_lock')}</button>
+            </>}
+          </div>
+          <Site360Grid menu={menu} testid="site360-grid" onSelectRows={setGridSel} total={gridTotal} filtered={gridFiltered} rows={grid360Rows} onEditCell={(e) => saveCell.mutate({ task_id: e.target.task_id, version: e.target.version, field: e.target.field, values: e.target.values, value: e.value })} />
+          {gridRowsQ.hasNextPage ? <button type="button" className="btn" data-testid="site360-more" disabled={gridRowsQ.isFetchingNextPage} onClick={() => void gridRowsQ.fetchNextPage()}>{t('site360.more')}</button> : null}
+        </div>
       ) : (
         <div className="card gx overflow-hidden" data-stream={stream || 'ALL'} data-density={tbl.density}>
           <div ref={scroller} data-testid="sites-scroll" className="relative overflow-auto" style={{ height: viewport }} onScroll={(e) => { v.onScroll(e); sessionStorage.setItem(scrollKey, String(e.currentTarget.scrollTop)); }}>
@@ -264,7 +317,7 @@ export function Sites() {
         <button type="button" className="btn" data-testid="sites-bulk-copy" onClick={() => { void navigator.clipboard?.writeText([...picked].join('\n')); toast(t('table.copied', { count: picked.size })); }}>{t('table.copy_codes')}</button>
       </BulkBar>
       <ExportDialog open={exp} onClose={() => setExp(false)} />
-      {locksDlg !== null && <LocksDialog target={{ site_ids: items.filter((x) => picked.has(x.site_code)).map((x) => x.id) }} locked={locksDlg} count={picked.size} testid="sites-locks-dialog"
+      {locksDlg !== null && <LocksDialog target={{ site_ids: menu && layout === 'grid' ? gridSel.map((r) => r.id) : items.filter((x) => picked.has(x.site_code)).map((x) => x.id) }} locked={locksDlg} count={menu && layout === 'grid' ? gridSel.length : picked.size} testid="sites-locks-dialog"
         onClose={() => { setLocksDlg(null); setPicked(new Set()); }} />}
       {upSites && newTpl && <TemplateUploadDialog open onClose={() => setUpSites(false)} templateId={newTpl.template_id} templateName={`${(i18n.language === 'ar' && newTpl.name_ar) || newTpl.name_en} · v${newTpl.current_version}`}
         kind="sites" onDone={(b) => { setUpSites(false); toast(t('grid.uploaded')); nav(batchPath(b)); }} />}

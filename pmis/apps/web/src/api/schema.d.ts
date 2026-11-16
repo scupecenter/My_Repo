@@ -5290,6 +5290,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/site360/sections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The SITE 360 menus and the Master columns of each (0.15.21, F15)
+         * @description 0.15.21. The seven menus of SITE 360 in the order of the menu. Each menu lists the Master columns of its section, in Master order, and the status columns (in every menu). `bands` is the 3-level grid header: a phase band, its groups, and the Master column ords of each group. `frozen_ords` are the identity columns that stay on screen when the grid scrolls (# to Site Name by default; the user can change them on screen). `can_move` is true for a System Admin, who may move a column with `PATCH /site360/columns/{ord}/section`. Needs the `sites` view in a region.
+         */
+        get: operations["getSite360Sections"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/site360/{menu}/rows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The grid rows of one SITE 360 menu, one page at a time (0.15.21, F15)
+         * @description 0.15.21. The rows of one menu (`master`, `design_acq`, `sow`, `cw`, `te`, `hoto`, `dismantle`, `om`) with the Master values of its columns, read from the set-based view `site360_master_values` (one query per page, no per-site path). `menu` gives the columns, bands and frozen columns as `GET /site360/sections`. Each row has `row_no`, the running number of the rows in view (the # column), and `values` keyed by the Master column order (ord); a value is `null` when the column has no source yet. `total` counts the sites the caller may see (region scope, B3); `filtered` counts the sites that match the filters. Filters are multi-value (comma-separated): Site ID, region, sub region, phase, batch, scenario, delivery model, status, milestone. The contractor filter (`contractor`) is in 0.15.21 item (5). `sort` takes a site field or `ord:<n>` of a column of the menu. Needs the `sites` view in a region; reading only, every value is written through the site and task paths.
+         */
+        get: operations["getSite360Rows"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/site360/columns/{ord}/sections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Replace the SITE 360 menus of one Master column (0.15.21, F15)
+         * @description 0.15.21. Only a System Admin (`admin.settings` edit, checked in the database) may change the menus of a column. The body replaces the whole set; a column may be in several menus. The step-up is required and the reason is mandatory. The status columns are in every menu and cannot be changed (422 `validation_failed`, `/sections`). Audited with the menus before and after.
+         */
+        patch: operations["setSite360ColumnSections"];
+        trace?: never;
+    };
     "/settings/gecol-order-warnings": {
         parameters: {
             query?: never;
@@ -8094,7 +8154,7 @@ export interface paths {
          *     critical 20 to 25. Only open and in-progress risks are counted. Closed and N/A risks are left out.
          *     **Decisions.** `act_now` is an open risk in band high or critical; `watch` is any other open risk. The tags change no status, owner or date.
          *     **Data quality.** The gaps of each site as `site_data_gaps` reports them (a task without its actual date, a missing delivery scenario). Cancelled sites are left out.
-         *     **Counters (0.15.24).** `counters` holds the SLA breaches and at-risk tasks of the open tasks (task states open, entry, in review, in approval and rejected), by stage, using the SLA status of each task (red past the maximum, amber past the warning share); the data quality KPI (sites with a gap of the sites checked); and every KPI of the dashboard catalogue with its value, its saved thresholds and its colour. A KPI with no value (no base, or no monthly target) is listed in `pending_kpis` and has a null value; since 0.15.27 all seven former gaps have a source, and `site360_menus` counts the sites per SITE 360 view. The same B3 scope applies (sites of the caller's regions; `available: false` without `sites.view`).
+         *     **Counters (0.15.24).** `counters` holds the SLA breaches and at-risk tasks of the open tasks (task states open, entry, in review, in approval and rejected), by stage, using the SLA status of each task (red past the maximum, amber past the warning share); the data quality KPI (sites with a gap of the sites checked); and every KPI of the dashboard catalogue with its value, its saved thresholds and its colour. A KPI with no value (no base, or no monthly target) is listed in `pending_kpis` and has a null value; since 0.15.29 all seven former gaps have a source, and `site360_menus` counts the sites per SITE 360 view. The same B3 scope applies (sites of the caller's regions; `available: false` without `sites.view`).
          */
         get: operations["getDashboardExtras"];
         put?: never;
@@ -8524,6 +8584,89 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * @description The section of a Master column. `status` columns are in every menu.
+         * @enum {string}
+         */
+        Site360Section: "design_acq" | "sow" | "cw" | "te" | "hoto" | "dismantle" | "om" | "status";
+        /** @enum {string} */
+        Site360Menu: "master" | "design_acq" | "sow" | "cw" | "te" | "hoto" | "dismantle" | "om";
+        Site360Column: {
+            ord: number;
+            /** @description The column letter in the Master sheet (A to GE). */
+            letter: string;
+            /** @description The phase band (row 1 of the Master sheet). */
+            group_top: string | null;
+            /** @description The group (row 2 of the Master sheet). */
+            group_mid: string | null;
+            /** @description The field (row 3 of the Master sheet). */
+            header: string;
+            /** @description The SITE 360 menus of the column (a set). `status` means every menu. */
+            sections: components["schemas"]["Site360Section"][];
+            /** @description True for a Phase Gate column (highlighted in the grid). */
+            is_phase_gate: boolean;
+        };
+        Site360Band: {
+            name: string | null;
+            is_phase_gate: boolean;
+            groups: {
+                name: string | null;
+                ords: number[];
+            }[];
+        };
+        Site360MenuItem: {
+            key: components["schemas"]["Site360Menu"];
+            name_en: string;
+            name_ar: string;
+            /** @description The columns of the menu in Master order (status columns included). */
+            columns: components["schemas"]["Site360Column"][];
+            /** @description The 3-level header of the menu (phase band, group, field). */
+            bands: components["schemas"]["Site360Band"][];
+            /** @description The identity columns frozen by default (# to Site Name, ords 1 to 4). */
+            frozen_ords: number[];
+        };
+        Site360Sections: {
+            items: components["schemas"]["Site360MenuItem"][];
+            /** @description True for a System Admin. */
+            can_move: boolean;
+        };
+        Site360ColumnSectionsRequest: {
+            sections: ("design_acq" | "sow" | "cw" | "te" | "hoto" | "dismantle" | "om")[];
+            reason: string;
+        };
+        Site360Rows: {
+            menu: components["schemas"]["Site360MenuItem"];
+            /** @description Sites the caller may see. */
+            total: number;
+            /** @description Sites that match the filters. */
+            filtered: number;
+            offset: number;
+            limit: number;
+            rows: {
+                /** Format: uuid */
+                site_id: string;
+                site_code: string;
+                /** @description Running number of the row in view (the # column). */
+                row_no: number;
+                /** @description Master value of each column of the menu, keyed by the column order (ord) as a string; null when the column has no source yet. */
+                values: {
+                    [key: string]: string | null;
+                };
+                /** @description Task-backed columns only (0.15.21 item 3), keyed by ord. Edit a cell with PATCH /tasks/{task_id} (If-Match the version; body planned_date, actual_date or actual_start, or values with the key). A locked or N/A task, or a task that is not the only source of its column, is read-only (editable false). */
+                cells: {
+                    [key: string]: {
+                        /** Format: uuid */
+                        task_id: string;
+                        version: number;
+                        editable: boolean;
+                        /** @enum {string} */
+                        field?: "planned_date" | "actual_date" | "actual_start";
+                        /** @description The key of the task values map (a typed field). */
+                        values?: string;
+                    };
+                };
+            }[];
+        };
         /** @enum {string} */
         SearchType: "sites" | "registers" | "documents" | "meetings" | "people" | "contractors";
         SearchHit: {
@@ -13213,7 +13356,7 @@ export interface components {
                 cw: components["schemas"]["DashboardTabLayout"];
                 te: components["schemas"]["DashboardTabLayout"];
             };
-            /** @description 0.15.27 (migration 0113): the working days a task may stay idle before the stale-task counter counts it (default 2). Optional on a save; absent keeps the stored value. */
+            /** @description 0.15.29 (migration 0113): the working days a task may stay idle before the stale-task counter counts it (default 2). Optional on a save; absent keeps the stored value. */
             stale_idle_days?: number;
         };
         /** @description 0.15.24 (F20). Seed: no targets; thresholds are the defaults of the catalogue (owner to confirm); every card shown in its default order. */
@@ -16250,7 +16393,7 @@ export interface components {
             sla_by_stage: components["schemas"]["DashboardSlaStage"][] | null;
             /** @description Active sites in scope (cancelled sites left out). */
             sites_total: number | null;
-            /** @description 0.15.27: the sites per SITE 360 view (workflow views CW, TE, OM), in view order. A site counts once per view when it has a task of the view that is not n/a or skipped. Null without sites.view. */
+            /** @description 0.15.29: the sites per SITE 360 view (workflow views CW, TE, OM), in view order. A site counts once per view when it has a task of the view that is not n/a or skipped. Null without sites.view. */
             site360_menus: {
                 code: string;
                 name_en: string;
@@ -25967,6 +26110,110 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    getSite360Sections: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The menus. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Site360Sections"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getSite360Rows: {
+        parameters: {
+            query?: {
+                /** @description Site IDs, comma-separated (multi Site ID search, exact match). */
+                site_code?: string;
+                /** @description Region numbers 1 to 7, comma-separated. */
+                region_id?: string;
+                sub_region?: string;
+                /** @description Project phase, comma-separated. */
+                phase?: string;
+                /** @description Delivery batch, comma-separated. */
+                batch?: string;
+                scenario?: string;
+                /** @description CW delivery model (outsourced or internal). */
+                delivery_model?: string;
+                /** @description Overall status, comma-separated. */
+                status?: string;
+                /** @description Current milestone, comma-separated. */
+                milestone?: string;
+                /** @description Contractor Name (Master AJ) of the first active CW procurement order, comma-separated. A caller without the procurement view matches no site. */
+                contractor?: string;
+                /** @description site_code (default), name, region, status, milestone, phase, or ord:<n> of a column of the menu. */
+                sort?: string;
+                dir?: "asc" | "desc";
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                /** @description The SITE 360 menu. */
+                menu: "master" | "design_acq" | "sow" | "cw" | "te" | "hoto" | "dismantle" | "om";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The page of rows with the menu's columns and the counts. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Site360Rows"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    setSite360ColumnSections: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The Master column order (1 to 187, A = 1). */
+                ord: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Site360ColumnSectionsRequest"];
+            };
+        };
+        responses: {
+            /** @description The column with its new menus; the menus are read again with `GET /site360/sections`. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Site360Column"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     getGecolOrderWarnings: {
