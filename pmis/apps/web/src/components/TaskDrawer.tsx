@@ -18,6 +18,7 @@ import { BlockedByPanel, TimeInStatePanel } from './InsightPanels';
 import { AdminTaskOverride } from './AdminTaskOverride';
 import { OverrideBadge } from './OverrideBadge';
 import { TaskRegisterFields } from './TaskRegisterFields';
+import { BallSince, ExternalParty, SlaOverrun, StaleBadge } from './TaskTiming';
 import { FieldHistory } from './logs/FieldHistory';
 import { RejectDialog } from './RejectDialog';
 import { useToast } from './Toast';
@@ -102,6 +103,8 @@ function Body({ task, regFields }: { task: TaskDetail; regFields: TaskRegisterFi
         <section aria-label={t('grid.ball')}>
           <div className="mb-1 text-sm text-mute">{t('grid.ball')}</div>
           <Holders holders={task.ball_in_court?.holders ?? []} />
+          {/* F2 (0.15.30): the external party responsible, since when the ball is held (working days), and the stale badge */}
+          <div className="mt-1 flex flex-wrap items-center gap-2" data-testid="drawer-ball-timing"><ExternalParty task={task} /><BallSince task={task} testid="drawer-ball-since" /><StaleBadge task={task} testid="drawer-stale" /></div>
           {claimedBy && <p className="mt-1 text-sm text-openInk" data-testid="drawer-claimed-by">{t('drawer.claimed_by', { name: claimedBy.display_name })}</p>}
           <ol className="mt-2 flex flex-wrap gap-2 text-sm" data-testid="approval-path">
             {task.approval_path.map((l) => <li key={l.level} data-status={l.status} className={`chip ${l.status === 'current' ? 'bg-openBg text-openInk' : l.status === 'done' ? 'bg-doneBg text-doneInk' : 'bg-lockBg text-lockInk'}`}>{l.level}. {t(`level.${l.kind}`)}{l.will_skip ? ` · ${t('drawer.will_skip')}` : ''}</li>)}
@@ -120,7 +123,8 @@ function Body({ task, regFields }: { task: TaskDetail; regFields: TaskRegisterFi
           <div><span className="text-mute">{t('grid.sla')}</span>{task.sla?.measured === false
             ? <div className="font-semibold" data-testid="drawer-sla-not-measured">{t('sla.not_measured')}</div>
             : <div className="font-semibold">{task.sla?.min_wd ?? '–'}–{task.sla?.max_wd ?? '–'} {t('approvals.wd')} <span className={`chip ${task.sla?.colour === 'red' ? 'bg-lateBg text-lateInk' : 'bg-doneBg text-doneInk'}`}>{task.sla?.elapsed_wd ?? 0}</span>
-              {task.sla?.pending_confirmation && <span className="chip ms-1 bg-waitBg text-waitInk" data-testid="drawer-sla-pending">{t('sla.pending_confirmation')}</span>}</div>}</div>
+              {task.sla?.pending_confirmation && <span className="chip ms-1 bg-waitBg text-waitInk" data-testid="drawer-sla-pending">{t('sla.pending_confirmation')}</span>}
+              <span className="ms-1"><SlaOverrun task={task} testid="drawer-overrun" /></span></div>}</div>
           {task.sla?.due_date && <div><span className="text-mute">{t('sla.due_date')}</span><div className="mono font-semibold" data-testid="drawer-due-date">{task.sla.due_date}
             {task.sla.due_date_tentative && <span className="chip ms-1 bg-waitBg text-waitInk" data-testid="drawer-due-tentative" title={t('sla.tentative_title', { dates: (task.sla.tentative_holidays ?? []).join(', ') })}>{t('sla.tentative_date')}</span>}</div></div>}
           {task.task_code === 'B6' && (

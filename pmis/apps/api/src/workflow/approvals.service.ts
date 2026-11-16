@@ -12,7 +12,7 @@ import { TS_TEXT, boolParam, oneParam } from '../common/query';
 import { parse } from '../common/zod';
 import { DbService } from '../db/db.service';
 import { setVia, viaSchema } from '../common/via';
-import { TaskViewService, UserRefDto, taskSelect } from './task-view.service';
+import { TaskViewService, UserRefDto, taskSelect, timingFilters } from './task-view.service';
 import { WorkflowService } from './workflow.service';
 
 const bulkSchema = z
@@ -84,6 +84,7 @@ export class ApprovalsService {
     if (stage) conds.push(Prisma.sql`st.code = ${stage}`);
     if (text) conds.push(Prisma.sql`(s.site_code ILIKE ${likePattern(text)} OR s.name ILIKE ${likePattern(text)} OR td.name_en ILIKE ${likePattern(text)} OR td.code ILIKE ${likePattern(text)})`);
     if (tab !== 'all') conds.push(Prisma.sql`k.kind = ${tab}`);
+    conds.push(...timingFilters(q)); // F2: sla_colour and stale
     conds.push(Prisma.sql`(
       (k.rule::text = 'all_members' AND EXISTS (SELECT 1 FROM task_level_voters v WHERE v.task_id = t.id AND v.level = t.current_level AND v.round = t.level_round
                                                AND v.user_id = ${me}::uuid AND v.voted_at IS NULL))

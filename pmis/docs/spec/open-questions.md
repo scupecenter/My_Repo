@@ -498,3 +498,9 @@ Built from the owner answers of 2026-11-04 (Q2, Q3, Q9, Q13, Q14, Q15, Q135, Q13
 | Q520 | **Decided 2026-11-08 by the product owner.** **MOB tasks on existing sites.** They stay locked until the admin opens them. | None: decided. |
 | Q521 | **Decided 2026-11-08 by the product owner.** **Product name.** The system is named **GSDN Workspace** (was GSDN Workspace). Display names only; folders, code identifiers, database roles and service names keep `pmis`. | None: decided. |
 | Q522 | **Decided 2026-11-08 by the product owner.** **SITE 360.** The Site Register main menu is named **SITE 360**; its first entry is "All sites" and its sub-sections carry no "Register" in their names (CW view: Civil Works, TE view: Installation (TE)). Registers & Logs keeps every other register as a sub-menu. | None: decided. |
+
+## F2: ball in court, SLA overrun in working days and the stale flag (migration 0114, contract 0.15.30)
+
+| # | Gap | Proposed default (built, configurable) |
+|---|---|---|
+| Q523 | **What counts as activity for the stale flag, and one limit for every task.** CLAUDE.md B12b says a task idle for N working days (default 2, a setting) alerts the lead, but not what "idle" means nor whether N differs by stage or level. | Built: the last action of a person on the open task (an audit row with an actor, a workflow step, a comment, a document upload, or the opening of its current level); a system recalculation is not activity. One limit for all tasks: the existing setting `stale_idle_days` of the dashboard settings (1 to 30, default 2), counted in working days on the task's SLA calendar. The dashboard counter uses the same rule. The lead alert itself is not sent yet (badge, filter and counter only). Confirm, or name the activities to exclude and any per-stage limit. |

@@ -161,3 +161,11 @@ SET app.user_id = '00000000-0000-4000-8000-00000000a001';
 INSERT INTO secsuite_ids SELECT 'XF_UPDATE', x_status_post('region', 5, NULL, 'on_track', 'Synthetic status update for Benghazi')::text;
 
 RESET app.user_id;
+
+-- F2 (migration 0116): one open task on each fixture site (A1 at Data Entry, its level opened three days ago), for the activity door.
+INSERT INTO task_instances (site_id, region_id, task_def_id, state, current_level, levels_required, level_opened_at, level_round, updated_at)
+SELECT s.id, s.region_id, td.id, 'entry', 1, 2, now() - interval '3 days', 1, now()
+FROM sites s JOIN task_definitions td ON td.workflow_id = s.workflow_version_id AND td.code = 'A1'
+WHERE s.site_code IN ('SEC-TRI-S1', 'SEC-BEN-S1');
+INSERT INTO secsuite_ids SELECT 'TASK_TRI', t.id::text FROM task_instances t JOIN sites s ON s.id = t.site_id WHERE s.site_code = 'SEC-TRI-S1';
+INSERT INTO secsuite_ids SELECT 'TASK_BEN', t.id::text FROM task_instances t JOIN sites s ON s.id = t.site_id WHERE s.site_code = 'SEC-BEN-S1';

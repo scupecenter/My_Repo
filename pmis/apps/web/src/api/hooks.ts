@@ -24,8 +24,12 @@ export const useMe = (enabled: boolean) => useQuery({ queryKey: ['me'], enabled,
 export const useMyTasks = (bucket: 'late' | 'do_now' | 'waiting') =>
   useQuery({ queryKey: ['my-work', bucket], queryFn: () => api.get<Page<TaskSummary>>('/me/tasks', { query: { bucket } }) });
 
-export const useApprovals = (tab: string, q: string) =>
-  useQuery({ queryKey: ['approvals', tab, q], queryFn: () => api.get<Page<ApprovalItem>>('/approvals', { query: { tab, q } }) });
+/** F2 (0.15.30): `colours` and `stale` filter the inbox on the server (sla_colour, stale). */
+export const useApprovals = (tab: string, q: string, f: { colours?: string[]; stale?: boolean } = {}) =>
+  useQuery({
+    queryKey: ['approvals', tab, q, f.colours?.join(',') ?? '', f.stale ?? null],
+    queryFn: () => api.get<Page<ApprovalItem>>('/approvals', { query: { tab, q, ...(f.colours?.length ? { sla_colour: f.colours.join(',') } : {}), ...(f.stale ? { stale: 'true' } : {}) } }),
+  });
 
 export const useTask = (id: string | null) =>
   useQuery({ queryKey: ['task', id], enabled: !!id, queryFn: () => api.get<TaskDetail>(`/tasks/${id}`) });

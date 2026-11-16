@@ -916,7 +916,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** My Work (tasks where I am an eligible holder or the claimant) */
+        /**
+         * My Work (tasks where I am an eligible holder or the claimant)
+         * @description 0.15.30 (F2): served by the API. Needs `sites.view` (the region scope of the Sites module applies). do_now and late are the open tasks at a level the caller may act on now (an eligible holder not blocked by another claim, the claimant, or an all-members voter who has not voted); waiting are those the caller submitted last that now sit at a level the caller does not hold. Without a bucket: do_now and late together. Oldest level first.
+         */
         get: operations["listMyTasks"];
         put?: never;
         post?: never;
@@ -9845,6 +9848,13 @@ export interface components {
             matrix_row?: string;
             external_party?: components["schemas"]["ExternalPartyRef"];
             no_eligible_holder?: boolean;
+            /**
+             * Format: date-time
+             * @description 0.15.30 (F2). When the current level opened: the ball has been with these holders since then.
+             */
+            since?: string | null;
+            /** @description 0.15.30 (F2). Working days from `since` to today (weekend Friday and Saturday and the holidays table of the task's SLA calendar; the default calendar for a register record). Never calendar days. */
+            held_wd?: number | null;
         };
         ExternalPartyRef: {
             /** Format: uuid */
@@ -9893,6 +9903,10 @@ export interface components {
             tentative_holidays?: string[];
             /** @description 0.12.0 (D4b). True when `tentative_holidays` is not empty: the due date shows a "tentative date" badge. */
             due_date_tentative?: boolean;
+            /** @description 0.15.30 (F2). Working days past the SLA maximum ("+N wd late"); 0 when not late; null without a measured clock (no rule, no start or not measured on the site). An approved task keeps the value of its closed clock. */
+            late_wd?: number | null;
+            /** @description 0.15.30 (F2). Working days left to the SLA maximum of a running task ("N wd left"); 0 when late; null once approved or without a measured clock. */
+            left_wd?: number | null;
         };
         TaskSummary: {
             /** Format: uuid */
@@ -9932,8 +9946,17 @@ export interface components {
             /** @description The holder has an active absence ("absent" badge, B12b). */
             holder_absent?: boolean;
             holder_account_status?: components["schemas"]["UserAccountStatus"];
-            /** @description Working days without activity; alerts the lead at the idle-task setting. */
+            /** @description Working days without activity; alerts the lead at the idle-task setting. 0.15.30 (F2): filled for an open task (open, entry, in review, in approval, returned): working days since `last_activity_at`, on the task's SLA calendar; null otherwise. */
             idle_working_days?: number | null;
+            /**
+             * Format: date-time
+             * @description 0.15.30 (F2). The last action of a person on the open task: an audit row with an actor (entry save, transition, override, reassignment), a workflow step, a comment, a document file upload, or the opening of its current level. A system recalculation (for example of the due dates after a holiday change) is not an activity. Null when the task is not open.
+             */
+            last_activity_at?: string | null;
+            /** @description 0.15.30 (F2). The "stale" badge: `idle_working_days` is at least `stale_after_wd`. */
+            stale?: boolean;
+            /** @description 0.15.30 (F2). The idle limit in force: the setting `stale_idle_days` of the dashboard settings (default 2, CLAUDE.md B12b). */
+            stale_after_wd?: number;
             /** @description Why the task is locked (empty when it is not), so "Why locked?" needs no extra call. */
             lock_reasons?: components["schemas"]["LockReason"][];
             /** @description 0.4.9. Only in the Site Register task grid. Register-owned fields shown read-through; edit them in the source register (Q73, Q99). */
@@ -16707,6 +16730,10 @@ export interface components {
         };
     };
     parameters: {
+        /** @description 0.15.30 (F2). Only tasks whose SLA colour is one of these: green (within the minimum), amber (between the minimum and the maximum), red (past the maximum), none (no measured clock). Repeat the parameter or separate with commas. */
+        SlaColourFilter: ("green" | "amber" | "red" | "none")[];
+        /** @description 0.15.30 (F2). true = only stale tasks (idle for at least `stale_after_wd` working days); false = only tasks that are not stale. */
+        StaleFilter: boolean;
         Limit: number;
         /** @description Opaque cursor from `page.next_cursor`. */
         Cursor: string;
@@ -18095,6 +18122,10 @@ export interface operations {
             query?: {
                 /** @description late = over SLA max; do_now = at my level; waiting = submitted by me, at a later level. */
                 bucket?: "late" | "do_now" | "waiting";
+                /** @description 0.15.30 (F2). Only tasks whose SLA colour is one of these: green (within the minimum), amber (between the minimum and the maximum), red (past the maximum), none (no measured clock). Repeat the parameter or separate with commas. */
+                sla_colour?: components["parameters"]["SlaColourFilter"];
+                /** @description 0.15.30 (F2). true = only stale tasks (idle for at least `stale_after_wd` working days); false = only tasks that are not stale. */
+                stale?: components["parameters"]["StaleFilter"];
                 limit?: components["parameters"]["Limit"];
                 /** @description Opaque cursor from `page.next_cursor`. */
                 cursor?: components["parameters"]["Cursor"];
@@ -21397,6 +21428,10 @@ export interface operations {
                 stage_code?: string;
                 q?: string;
                 group_only?: boolean;
+                /** @description 0.15.30 (F2). Only tasks whose SLA colour is one of these: green (within the minimum), amber (between the minimum and the maximum), red (past the maximum), none (no measured clock). Repeat the parameter or separate with commas. */
+                sla_colour?: components["parameters"]["SlaColourFilter"];
+                /** @description 0.15.30 (F2). true = only stale tasks (idle for at least `stale_after_wd` working days); false = only tasks that are not stale. */
+                stale?: components["parameters"]["StaleFilter"];
                 limit?: components["parameters"]["Limit"];
                 /** @description Opaque cursor from `page.next_cursor`. */
                 cursor?: components["parameters"]["Cursor"];
