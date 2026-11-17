@@ -93,6 +93,7 @@ export function Site360Grid({
   testid = "site360-grid",
   onEditCell,
   onSelectRows,
+  onOpenCell,
 }: {
   menu: Site360MenuItem;
   rows: Site360GridRow[];
@@ -105,6 +106,8 @@ export function Site360Grid({
   onEditCell?: (edit: Site360CellEdit) => void;
   /** The rows of the selected rectangle (empty when none), so a toolbar can act on those sites (lock, unlock). */
   onSelectRows?: (rows: Site360GridRow[]) => void;
+  /** A click on one Master cell (not #): the page shows the cell's source (0.15.35, P1 Master). */
+  onOpenCell?: (row: Site360GridRow, ord: number) => void;
 }) {
   const { i18n, t } = useTranslation();
   const ar = i18n.language === "ar";
@@ -557,6 +560,17 @@ export function Site360Grid({
   );
 
   const renderCell = (ord: number, text: string) => {
+    // a column with no source in the system shows a visible marker, not an empty cell that looks like missing data (0.15.35)
+    if (text === "" && byOrd.get(ord)?.source_kind === "not_tracked")
+      return (
+        <span
+          className="italic text-mute"
+          title={t("site360.not_tracked_hint")}
+          data-testid={`${testid}-not-tracked`}
+        >
+          {t("site360.not_tracked")}
+        </span>
+      );
     if (text === "") return <span className="text-mute">-</span>;
     if (ord === STATUS_ORD) {
       return (
@@ -679,7 +693,10 @@ export function Site360Grid({
                         if (e.button !== 0 || isEditing) return;
                         if (e.shiftKey && sel)
                           setSel({ a: sel.a, b: { r, c } });
-                        else setSel({ a: { r, c }, b: { r, c } });
+                        else {
+                          setSel({ a: { r, c }, b: { r, c } });
+                          if (onOpenCell && ord !== 1) onOpenCell(row, ord);
+                        }
                       }}
                       onDoubleClick={
                         target?.editable && onEditCell && !isEditing

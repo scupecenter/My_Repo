@@ -44,7 +44,47 @@
     "show_hidden": "{{count}} hidden column(s): show all",
     "resize": "Drag to resize; double-click to fit the text",
     "selection": "{{count}} cells selected, {{numbers}} numeric, sum {{sum}}",
-    "template_upload": "Template upload"
+    "template_upload": "Template upload",
+    "not_tracked": "Not tracked",
+    "not_tracked_hint": "No source in the system for this column yet",
+    "src": {
+      "title": "Source of the cell",
+      "tab": "Master",
+      "hint": "Click a cell to see where its value comes from.",
+      "close": "Close",
+      "column": "Column",
+      "value": "Value",
+      "source": "Source",
+      "open": "Open the source",
+      "no_value": "No value for this site",
+      "hidden": "Hidden by your permissions",
+      "loading": "Loading the source…",
+      "error": "The source could not be loaded.",
+      "field": "Field",
+      "record": "Record {{key}}, version {{version}}",
+      "task": "Task {{code}} {{name}}",
+      "baseline": "Baseline version {{version}}",
+      "fed_by": "Written by the approved {{key}} record",
+      "rule": "Rule",
+      "kind": {
+        "site": "Site field",
+        "task": "Task",
+        "milestone": "Milestone",
+        "register": "Register record",
+        "baseline": "Baseline",
+        "derived": "Calculated",
+        "custom_field": "Custom field",
+        "not_tracked": "Not tracked"
+      },
+      "origin": {
+        "approved_record": "Approved register record",
+        "pending_record": "Register record not yet approved",
+        "workflow": "Workflow",
+        "historical_import": "Historical import",
+        "manual": "Manual entry",
+        "calculated": "Formula"
+      }
+    }
   },
   "nav": {
     "group_work": "Work",

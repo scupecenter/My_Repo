@@ -44,7 +44,47 @@
     "show_hidden": "{{count}} عمود مخفي: إظهار الكل",
     "resize": "اسحب لتغيير العرض؛ انقر مرتين للملاءمة مع النص",
     "selection": "{{count}} خلية محددة، {{numbers}} رقمية، المجموع {{sum}}",
-    "template_upload": "رفع قالب"
+    "template_upload": "رفع قالب",
+    "not_tracked": "غير متتبَّع",
+    "not_tracked_hint": "لا يوجد مصدر لهذا العمود في النظام بعد",
+    "src": {
+      "title": "مصدر الخلية",
+      "tab": "الماستر",
+      "hint": "انقر خلية لترى من أين جاءت قيمتها.",
+      "close": "إغلاق",
+      "column": "العمود",
+      "value": "القيمة",
+      "source": "المصدر",
+      "open": "فتح المصدر",
+      "no_value": "لا قيمة لهذا الموقع",
+      "hidden": "مخفي حسب صلاحياتك",
+      "loading": "جارٍ تحميل المصدر…",
+      "error": "تعذّر تحميل المصدر.",
+      "field": "الحقل",
+      "record": "سجل {{key}}، الإصدار {{version}}",
+      "task": "المهمة {{code}} {{name}}",
+      "baseline": "إصدار خط الأساس {{version}}",
+      "fed_by": "كُتب من سجل {{key}} المعتمد",
+      "rule": "القاعدة",
+      "kind": {
+        "site": "حقل الموقع",
+        "task": "مهمة",
+        "milestone": "معلم رئيسي",
+        "register": "سجل",
+        "baseline": "خط الأساس",
+        "derived": "محسوب",
+        "custom_field": "حقل مخصص",
+        "not_tracked": "غير متتبَّع"
+      },
+      "origin": {
+        "approved_record": "سجل معتمد",
+        "pending_record": "سجل لم يُعتمد بعد",
+        "workflow": "سير العمل",
+        "historical_import": "استيراد تاريخي",
+        "manual": "إدخال يدوي",
+        "calculated": "معادلة"
+      }
+    }
   },
   "nav": {
     "group_work": "العمل",

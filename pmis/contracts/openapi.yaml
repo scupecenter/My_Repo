@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.34
+  version: 0.15.35
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -30,6 +30,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.35 (2026-11-17): P1 Master of the read-only audit of 2026-11-17: the source of each Master cell, drill-down and sources for the blank columns (migration 0121; CHANGELOG 160). Additive. Numbered 0.15.35 because 0.15.34 is reserved for the export work. (1) `GET /site360/sites/{site_id}/sources` (`getSite360SiteSources`): for one site, every Master column (or the columns of `menu`) with its value and its source (`Site360CellSource`): `kind` (`site`, `task`, `milestone`, `register`, `baseline`, `derived`, `custom_field`, `not_tracked`), `origin` (`approved_record`, `pending_record`, `workflow`, `historical_import`, `manual`, `calculated`) and the ids to open it (register record id and version, task id and code, baseline version, the register record that fed a site field). Per site so a page of 1000 sites stays light; the source is read from the same branch of the view that computes the value, with the caller's rights: a site outside the caller's regions answers 404, a value the caller may not see (register module view, B3, or a hidden custom field) gives `hidden: true` with the kind and no value or id. (2) `Site360Column` gains `source_kind` and `source_note` (in `GET /site360/sections`, the `menu` of `GET /site360/{menu}/rows` and the column of `PATCH /site360/columns/{ord}/sections`); `not_tracked` marks a column with no source in the system (Dismantle planned and RN dates), shown in the grid as "not tracked" instead of an empty cell. (3) `GET /site360/{menu}/rows` values: 30 columns that were always blank now have a source (Baselines U, AV, BO, BY, CT, DO, EK, ER, EX, FL; AR / AS; CB; CE; CZ; DG; DH; DI; EN; EQ; EW; FK; FA, FB, FF, FG; FN, FQ, FS, FV), each from its workbook formula; FP, FU, FR, FW stay empty (not tracked).
     - 0.15.34 (2026-11-17): the Master-format export is built (P1 of the 2026-11-17 audit; no migration; CHANGELOG 159). 0.15.33 is the P0 value fixes. (1) `GET /exports/parts`, `POST /exports/master`, `GET /exports/master` and `GET /exports/master/{export_id}/download` are served by the API (module `exports`). (2) `ExportPartKey` gains `rf_design` and `acquisition` (Master sheets RF & Design and Acquisition). `car_dispatcher` and `financial_advances` stay in the enum but are never offered and answer 422 `validation_failed` with item code `not_in_master` (not part of the Master, 0.15.0). (3) Parts: `sites`, `milestones` and `tasks` need `export` on module `sites`, `project_status` on `dashboard`, a register (and `dismantle`) on its register module; the regions of the `export` grant limit the rows (B3). A denied part is 403 with `errors[]` items `{path: /parts/<key>, code: export_denied}`; a requested region outside every export region is 422 `out_of_scope`. (4) The Master sheet keeps all 187 columns and the three header rows of the Site Master (top group, middle group, name; data from row 5) plus site custom fields with a Master export column; a part not chosen keeps its columns empty. Columns belong to parts: A:B every part, the milestone and gate columns `milestones`, the workflow task columns `tasks`, FN:FW `dismantle`, the rest `sites`. Values are those of SITE 360 (`site360_master_values`); a register-owned value needs that register's view grant. Register sheets follow the register maps of the Master import (header and data rows, Master headers) or, without a map, the template columns; personal columns (landlord, contact) stay empty (Q469). A last sheet `Export Info` names the parts, filters, regions, author and row counts. (5) `ExportView`: `filters` are passed to the list endpoint of the source (the F3 `filter` tree included); `tasks` needs `filters.site_id`; the column codes are those of `GET /exports/parts?include_columns=true` (`sites`: the six fixed codes plus `m_<letter>` per Master column and `cf:<code>`; `progress_pct` and `health_index` are not offered: no Master column and no list value). (6) `as_of`: only today (Africa/Tripoli) is accepted; a past date answers 422 `as_of_unsupported` (the Master values are a live read model, no history is kept). (7) `MasterExport` gains `progress` and `error`; `row_count` is the Master sheet rows (or all rows when there is no Master sheet). The list and the download are the requester's own only: another user, a System Admin included, gets 404. Retention is 7 days (the job table's fixed expiry; the setting `master_export.retention_days` is not read yet). (8) `GET /jobs/{job_id}` answers for a `master_export` job with `result.download_path`. Audit actions `master_export.start`, `master_export.done` (row counts per sheet) and `master_export.download`.
     - 0.15.33 (2026-11-17): the P0 value fixes of the read-only audit of 2026-11-17 (migration 0119; CHANGELOG 158). Additive. (1) `GET /sites` takes `dashboard_status` (an `OverallStatus`: the sites whose derived status, as the dashboard counts it in `headline.by_overall_status`, is that one), `milestone_reached` (a milestone stage code: the sites, not cancelled, whose milestone is done, as `milestones[].completed` and the RFI, On-Air, HOTO and Final Closure cards count them) and `ref_date` (the reference date of these two, default today; a past date reads its snapshot when one exists; a future date answers 422 `in_future`). The set is computed with the engine of `GET /dashboard` (the caller's `dashboard.view` regions, the filters `region_id` (one region), `cluster_code`, `scenario`, `stream`, `view`), so a dashboard card and the list it opens give the same count. Only one of the two per request (422); `ref_date` alone answers 422. The web dashboard now links its cards and status chips through them and keeps `cluster_code` and `ref_date`. (2) `GET /site360/{menu}/rows`: values only. BW (GECOL Status) is the workbook formula over the GECOL scope and the approved GECOL record (N/A when the scope is N/A; Done when the scope is Yes and the Power-On Date is set; else Pending); AJ / AK (Contractor Name / Team) take the first order of scope CW, Tower Erection or Site Adaption that is neither cancelled nor rejected (the `contractor` filter follows); R (Configuration) is the `configuration` of the site's approved As-Built TE part (empty when none). The web grid now sends the status filter as `status` (it sent `overall_status`, which was ignored). (3) `vehicle_reservations` gains the state `cancelled` (a vehicle voided with no approved version in force cancels its reservations that have not started; audited); no HTTP change.
     - 0.15.32 (2026-11-16): sites board by milestone and tasks board by approval state (F5 of the features build plan of 2026-11-14; migration 0118; CHANGELOG 156). Additive and read only. (1) `GET /boards/sites` (`getSitesBoard`): one column per milestone plus `closed`, swimlanes by region or contractor, ageing in working days, WIP warnings, the filters of `GET /sites` with the F3 tree. (2) `GET /boards/tasks` (`getTasksBoard`): columns entry, review, rejected and approved with `TaskSummary` cards; a drop in the web app only opens the task's existing action (no new write endpoint). (3) `GET`/`PUT /settings/kanban-wip` (`getKanbanWip`, `setKanbanWip`): the WIP limits per milestone (default none; a warning, never a block; reason, If-Match, audited). (4) `SavedViewScreenKey` gains `tasks-board` (module sites, the filter whitelist of `site-tasks`).
@@ -8528,6 +8529,32 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '422': { $ref: '#/components/responses/Unprocessable' }
+  /site360/sites/{site_id}/sources:
+    get:
+      tags: [sites]
+      operationId: getSite360SiteSources
+      summary: The value and the source of each Master cell of one site (0.15.35, P1 Master)
+      description: |
+        0.15.35 (migration 0121). For one site, every Master column of `menu` (default `master`, all 187) in Master order with its value and its source:
+        the kind of source, how the value got in (`origin`) and the ids to open the source record (the register record drawer `/registers/{register_key}?record={record_id}`,
+        the task drawer of the site page, the baseline version). The source is read from the same branch of `site360_master_values` that computes the value,
+        with the caller's rights (row security of every table). Per site, not per page: the grid asks for it when a cell is opened.
+        A site outside the caller's `sites` view regions, or an unknown id, answers 404. A value the caller may not see (the register's module view, B3, or a
+        site custom field hidden by a field rule) answers `hidden: true` with the kind and no value, record or task id. A column with no source in the
+        system is `not_tracked`; a column with a source but no value for this site has the column's kind and a null value.
+      parameters:
+        - { name: site_id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: menu, in: query, required: false, description: 'Limit the cells to the columns of one SITE 360 menu.', schema: { $ref: '#/components/schemas/Site360Menu' } }
+      responses:
+        '200':
+          description: The cells of the site.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Site360SiteSources' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
   /site360/columns/{ord}/sections:
     patch:
       tags: [settings]
@@ -14042,6 +14069,57 @@ components:
           description: 'The SITE 360 menus of the column (a set). `status` means every menu.'
           items: { $ref: '#/components/schemas/Site360Section' }
         is_phase_gate: { type: boolean, description: 'True for a Phase Gate column (highlighted in the grid).' }
+        source_kind: { $ref: '#/components/schemas/Site360SourceKind' }
+        source_note: { type: [string, 'null'], description: '0.15.35. A short English note of the rule of the column.' }
+    Site360SourceKind:
+      type: string
+      description: |
+        0.15.35. The kind of source of a Master column or cell: `site` (a field of the site), `task` (a task field), `milestone` (a milestone task, or a gate
+        column that shows the date of the milestone before it), `register` (a field of a register record), `baseline` (the latest approved baseline version),
+        `derived` (a workbook formula over other values), `custom_field` (a site custom field carrying the column), `not_tracked` (no source in the system).
+      enum: [site, task, milestone, register, baseline, derived, custom_field, not_tracked]
+    Site360CellSource:
+      type: object
+      additionalProperties: false
+      required: [ord, letter, header, kind, note, value, hidden, origin]
+      properties:
+        ord: { type: integer, minimum: 1, maximum: 187 }
+        letter: { type: string }
+        header: { type: string }
+        kind: { $ref: '#/components/schemas/Site360SourceKind' }
+        note: { type: [string, 'null'], description: 'The rule of the column (source_note).' }
+        value: { type: [string, 'null'], description: 'The value shown in the grid; null when there is none or when hidden.' }
+        hidden: { type: boolean, description: 'True when the caller may not see the value (register module view or a field rule): no value, no id.' }
+        origin:
+          type: [string, 'null']
+          description: 'How the value got in: an approved register record, a register record not yet approved, the workflow (task approval path), the historical Master import, a manual or admin entry (site field, admin override, custom field), or a formula. Null without a value.'
+          enum: [approved_record, pending_record, workflow, historical_import, manual, calculated, null]
+        field: { type: string, description: 'The field read: a site column, a task field, a register data key or a milestone code.' }
+        register_key: { type: string, description: 'The register of the record (or of a formula over a register).' }
+        record_id: { type: string, format: uuid, description: 'The register record version that holds the value; open it with /registers/{register_key}?record={record_id}.' }
+        record_version: { type: integer, minimum: 1 }
+        task_id: { type: string, format: uuid, description: 'The task instance behind the value (open it on the site page).' }
+        task_code: { type: string }
+        task_name_en: { type: string }
+        task_name_ar: { type: [string, 'null'] }
+        baseline_version: { type: integer, description: 'The approved baseline version the date comes from.' }
+        fed_by:
+          type: object
+          additionalProperties: false
+          required: [register_key, record_id]
+          description: 'For a site field written by the approval of a register record (RF & Design for C:Q and S, Acquisition for T): that record, when the caller may read it.'
+          properties:
+            register_key: { type: string }
+            record_id: { type: string, format: uuid }
+    Site360SiteSources:
+      type: object
+      additionalProperties: false
+      required: [site_id, site_code, menu, cells]
+      properties:
+        site_id: { type: string, format: uuid }
+        site_code: { type: string }
+        menu: { $ref: '#/components/schemas/Site360Menu' }
+        cells: { type: array, items: { $ref: '#/components/schemas/Site360CellSource' } }
     Site360Band:
       type: object
       additionalProperties: false

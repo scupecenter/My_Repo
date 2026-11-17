@@ -5,21 +5,22 @@ import { API_BASE } from '@/api/client';
  * Synthetic SITE 360 menus (contract 0.15.21). A small subset of the 187 Master columns, with the same sections as the
  * API's defaults, so the grid can be tested. The real columns come from master_columns.
  */
-type Col = { ord: number; letter: string; group_top: string | null; group_mid: string | null; header: string; sections: string[] };
+type Col = { ord: number; letter: string; group_top: string | null; group_mid: string | null; header: string; sections: string[]; source_kind: string; source_note?: string | null };
 const COLS: Col[] = [
-  { ord: 1, letter: 'A', group_top: '#', group_mid: null, header: '#', sections: ['design_acq'] },
-  { ord: 2, letter: 'B', group_top: 'RF & DESIGN', group_mid: 'Identification', header: 'Site ID', sections: ['design_acq'] },
-  { ord: 4, letter: 'D', group_top: 'RF & DESIGN', group_mid: 'Identification', header: 'Site Name', sections: ['design_acq'] },
-  { ord: 5, letter: 'E', group_top: 'RF & DESIGN', group_mid: 'Identification', header: 'Region', sections: ['design_acq'] },
-  { ord: 23, letter: 'W', group_top: 'Phase Gate', group_mid: 'Pre-CW Readiness', header: 'Pre-CW Readiness', sections: ['cw'] },
-  { ord: 24, letter: 'X', group_top: 'PRE-CW', group_mid: 'Project', header: 'Project Phase', sections: ['sow'] },
-  { ord: 33, letter: 'AG', group_top: 'PRE-CW', group_mid: 'CW Procurement', header: 'CW Delivery Model', sections: ['cw'] },
-  { ord: 78, letter: 'BZ', group_top: 'TE INSTALLATION', group_mid: 'TE Access', header: 'TE Access Date', sections: ['te'] },
-  { ord: 144, letter: 'EN', group_top: 'CLUSTER OPTIMIZATION', group_mid: 'Cluster', header: 'Cluster ID', sections: ['hoto'] },
-  { ord: 157, letter: 'FA', group_top: 'FINAL CLOSURE', group_mid: 'CW DLP / FAC', header: 'CW DLP Start Date', sections: ['om'] },
-  { ord: 170, letter: 'FN', group_top: 'DISMANTLE', group_mid: 'CW Dismantle (RN)', header: 'Site CW RFD', sections: ['dismantle'] },
-  { ord: 180, letter: 'FX', group_top: 'Progress', group_mid: null, header: 'Current Milestone', sections: ['status'] },
-  { ord: 187, letter: 'GE', group_top: 'Issue & Remark', group_mid: null, header: 'Remark', sections: ['status'] },
+  { ord: 1, letter: 'A', group_top: '#', group_mid: null, header: '#', sections: ['design_acq'], source_kind: 'derived' },
+  { ord: 2, letter: 'B', group_top: 'RF & DESIGN', group_mid: 'Identification', header: 'Site ID', sections: ['design_acq'], source_kind: 'site' },
+  { ord: 4, letter: 'D', group_top: 'RF & DESIGN', group_mid: 'Identification', header: 'Site Name', sections: ['design_acq'], source_kind: 'site' },
+  { ord: 5, letter: 'E', group_top: 'RF & DESIGN', group_mid: 'Identification', header: 'Region', sections: ['design_acq'], source_kind: 'site' },
+  { ord: 23, letter: 'W', group_top: 'Phase Gate', group_mid: 'Pre-CW Readiness', header: 'Pre-CW Readiness', sections: ['cw'], source_kind: 'milestone' },
+  { ord: 24, letter: 'X', group_top: 'PRE-CW', group_mid: 'Project', header: 'Project Phase', sections: ['sow'], source_kind: 'site' },
+  { ord: 33, letter: 'AG', group_top: 'PRE-CW', group_mid: 'CW Procurement', header: 'CW Delivery Model', sections: ['cw'], source_kind: 'site' },
+  { ord: 78, letter: 'BZ', group_top: 'TE INSTALLATION', group_mid: 'TE Access', header: 'TE Access Date', sections: ['te'], source_kind: 'register' },
+  { ord: 144, letter: 'EN', group_top: 'CLUSTER OPTIMIZATION', group_mid: 'Cluster', header: 'Cluster ID', sections: ['hoto'], source_kind: 'derived', source_note: 'Cluster ID of the site (= G).' },
+  { ord: 157, letter: 'FA', group_top: 'FINAL CLOSURE', group_mid: 'CW DLP / FAC', header: 'CW DLP Start Date', sections: ['om'], source_kind: 'derived', source_note: 'CW PAC Actual Date (BV).' },
+  { ord: 170, letter: 'FN', group_top: 'DISMANTLE', group_mid: 'CW Dismantle (RN)', header: 'Site CW RFD', sections: ['dismantle'], source_kind: 'register' },
+  { ord: 172, letter: 'FP', group_top: 'DISMANTLE', group_mid: 'CW Dismantle (RN)', header: 'Planned Date', sections: ['dismantle'], source_kind: 'not_tracked', source_note: 'Not tracked: the Dismantle register has no planned date (owner question U4).' },
+  { ord: 180, letter: 'FX', group_top: 'Progress', group_mid: null, header: 'Current Milestone', sections: ['status'], source_kind: 'site' },
+  { ord: 187, letter: 'GE', group_top: 'Issue & Remark', group_mid: null, header: 'Remark', sections: ['status'], source_kind: 'register' },
 ];
 const MENUS = [
   ['master', 'Master', 'الماستر'], ['design_acq', 'Design & Acquisition', 'التصميم والاستحواذ'], ['sow', 'SOW', 'نطاق العمل'],
@@ -77,7 +78,30 @@ function rowsFor(key: string, offset: number, limit: number) {
   };
 }
 
+/** The cells of GET /site360/sites/{site_id}/sources for a synthetic site: value, kind, origin and the ids to open the source. */
+function sourcesFor(site: (typeof SITES)[number], key: string) {
+  const cols = COLS.filter((c) => key === 'master' || c.sections.includes(key) || c.sections.includes('status') || IDENT.includes(c.ord));
+  const vals = rowsFor(key, SITES.indexOf(site), 1).rows[0]!.values;
+  return cols.map((c) => {
+    const base = { ord: c.ord, letter: c.letter, header: c.header, kind: c.source_kind, note: c.source_note ?? null, value: vals[String(c.ord)] ?? null, hidden: false, origin: null as string | null };
+    if (c.ord === 1) return { ...base, origin: 'calculated' };
+    if (c.ord === 2) return { ...base, value: site.code, field: 'site_code', origin: 'manual' };
+    if (c.ord === 78) return { ...base, field: 'valid_from', register_key: 'permits_hse', record_id: 'b0000000-0000-4000-8000-000000000078', record_version: 2, origin: 'approved_record' };
+    if (c.ord === 170) return { ...base, hidden: true, register_key: 'dismantle' };
+    if (c.ord === 23) return { ...base, value: '2026-02-01', task_id: 'c0000000-0000-4000-8000-000000000023', task_code: 'MS1', task_name_en: 'Site Release', task_name_ar: 'تحرير الموقع', field: 'actual_date', origin: 'workflow' };
+    if (base.value !== null && c.source_kind === 'site') return { ...base, origin: 'manual' };
+    return base;
+  });
+}
+
 export const site360Handlers = [
+  // 0.15.35 (P1 Master): the source of every Master cell of one synthetic site
+  http.get(`${API_BASE}/site360/sites/:siteId/sources`, ({ params, request }) => {
+    const site = SITES.find((x) => x.id === params.siteId);
+    if (!site) return HttpResponse.json({ type: 'about:blank', title: 'Not found', status: 404, code: 'not_found' }, { status: 404 });
+    const key = new URL(request.url).searchParams.get('menu') ?? 'master';
+    return HttpResponse.json({ site_id: site.id, site_code: site.code, menu: key, cells: sourcesFor(site, key) });
+  }),
   http.get(`${API_BASE}/site360/sections`, () =>
     HttpResponse.json({ items: MENUS.map(([k, en, ar]) => menu(k, en, ar)), can_move: false })),
   http.get(`${API_BASE}/site360/:menu/rows`, ({ params, request }) => {

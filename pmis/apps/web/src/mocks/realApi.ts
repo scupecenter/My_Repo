@@ -400,6 +400,7 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/site360/sections'],
   ['get', '/site360/:menu/rows'],
   ['patch', '/site360/columns/:ord/sections'],
+  ['get', '/site360/sites/:siteId/sources'],
   ['post', '/sites/:id/admin-edits'],
   ['get', '/sites/:id/admin-edits'],
   ['get', '/settings/sla-rules'],

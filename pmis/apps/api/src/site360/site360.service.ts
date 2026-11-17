@@ -8,7 +8,7 @@ import { parse } from '../common/zod';
 import { AccessService } from '../access/access.service';
 import { DbService } from '../db/db.service';
 import { FilterCatalogService } from '../views/filter-catalog.service';
-import { buildMenu, buildSite360, SITE360_MOVABLE, type Site360ColumnRow, type Site360Menu, type Site360MenuItem } from './site360-sections';
+import { buildMenu, buildSite360, SITE360_MOVABLE, type Site360ColumnRow, type Site360Menu, type Site360MenuItem, type Site360SourceKind } from './site360-sections';
 
 const setSchema = z.object({
   sections: z.array(z.enum(SITE360_MOVABLE)).min(1).max(7),
@@ -26,8 +26,7 @@ export class Site360Service {
 
   async sections(): Promise<{ items: Site360MenuItem[]; can_move: boolean }> {
     const rows = await this.db.tx.$queryRaw<Site360ColumnRow[]>`
-      SELECT ord, letter, group_top, group_mid, header, site360_sections AS sections
-      FROM master_columns WHERE is_active ORDER BY ord`;
+      ${COLUMNS_SQL} WHERE mc.is_active ORDER BY mc.ord`;
     const admin = await this.db.tx.$queryRaw<{ ok: boolean }[]>`
       SELECT coalesce(app_actor_is_admin('admin.settings', 'edit'), false) AS ok`;
     return { items: buildSite360(rows), can_move: admin[0]?.ok ?? false };
@@ -44,7 +43,7 @@ export class Site360Service {
     await this.db.tx.$queryRaw(Prisma.sql`
       SELECT site360_set_sections(${ord}::integer, ${b.sections}::text[], ${b.reason}::text) AS j`);
     const rows = await this.db.tx.$queryRaw<Site360ColumnRow[]>`
-      SELECT ord, letter, group_top, group_mid, header, site360_sections AS sections FROM master_columns WHERE ord = ${ord}`;
+      ${COLUMNS_SQL} WHERE mc.ord = ${ord}`;
     const r = rows[0]!;
     return { ...r, is_phase_gate: r.group_top === 'Phase Gate' };
   }
@@ -65,7 +64,7 @@ export class Site360Service {
     const sortKey = oneString(q, 'sort') ?? 'site_code';
 
     const colRows = await this.db.tx.$queryRaw<Site360ColumnRow[]>`
-      SELECT ord, letter, group_top, group_mid, header, site360_sections AS sections FROM master_columns WHERE is_active ORDER BY ord`;
+      ${COLUMNS_SQL} WHERE mc.is_active ORDER BY mc.ord`;
     const menuItem = buildMenu(menu, colRows);
     const menuOrds = menuItem.columns.map((c) => c.ord);
 
@@ -77,9 +76,17 @@ export class Site360Service {
     const sortSql = ordSort
       ? Prisma.sql`sv.value`
       : Prisma.raw(sortField!);
-    const sortJoin = ordSort
-      ? Prisma.sql`LEFT JOIN LATERAL (SELECT v.value FROM site360_master_values v WHERE v.site_id = s.id AND v.ord = ${Number(ordSort[1])}) sv ON true`
-      : Prisma.empty;
+    // sorting on a Master column reads only the values the caller may see (register view B3, field rules), so the order is no oracle for a hidden value
+    let sortJoin = Prisma.empty;
+    if (ordSort) {
+      const allKeys = (await this.db.tx.$queryRaw<{ register_key: string }[]>(Prisma.sql`SELECT register_key FROM register_definitions`)).map((r) => r.register_key);
+      const vis = await this.registerVisibility(auth, allKeys);
+      const visibleKeys = allKeys.filter((k) => vis.get(k) === true);
+      const hiddenOrds = [...(await this.hiddenCustomFieldOrds(auth))];
+      sortJoin = Prisma.sql`LEFT JOIN LATERAL (SELECT v.value FROM site360_master_values v WHERE v.site_id = s.id AND v.ord = ${Number(ordSort[1])}
+        AND (v.register_key IS NULL OR v.register_key = ANY(${visibleKeys}::text[]))
+        AND NOT (v.src_kind = 'custom_field' AND v.ord = ANY(${hiddenOrds}::int[]))) sv ON true`;
+    }
 
     const where: Prisma.Sql[] = [Prisma.sql`s.is_active`];
     if (regs !== null) where.push(Prisma.sql`s.region_id = ANY(${regs}::int[])`);
@@ -132,20 +139,16 @@ export class Site360Service {
     const values = new Map<string, Record<string, string | null>>();
     if (page.length) {
       const ids = page.map((r) => r.id);
-      const vals = await this.db.tx.$queryRaw<{ site_id: string; ord: number; value: string | null; register_key: string | null }[]>(Prisma.sql`
-        SELECT v.site_id::text AS site_id, v.ord, v.value, v.register_key FROM site360_master_values v
+      const vals = await this.db.tx.$queryRaw<{ site_id: string; ord: number; value: string | null; kind: string; register_key: string | null }[]>(Prisma.sql`
+        SELECT v.site_id::text AS site_id, v.ord, v.value, v.kind, v.register_key FROM site360_master_values v
         WHERE v.site_id = ANY(${ids}::uuid[]) AND v.ord = ANY(${menuOrds}::int[])`);
-      // a register-owned value is shown only to a user who may view that register (its module, B3), as the Master export does
-      const keys = [...new Set(vals.map((v) => v.register_key).filter((k): k is string => k !== null))];
-      const visible = new Map<string, boolean>();
-      if (keys.length) {
-        const modules = await this.db.tx.$queryRaw<{ register_key: string; module_key: string }[]>(Prisma.sql`
-          SELECT register_key, module_key FROM register_definitions WHERE register_key = ANY(${keys}::text[])`);
-        for (const m of modules) visible.set(m.register_key, await this.access.hasGrant(auth, m.module_key, 'view'));
-      }
+      // a register-owned value is shown only to a user who may view that register (its module, B3), as the Master export does;
+      // a custom-field value (0.15.35) only to a user for whom the field is not hidden
+      const visible = await this.registerVisibility(auth, vals.map((v) => v.register_key));
+      const hiddenFieldOrds = vals.some((v) => v.kind === 'custom_field') ? await this.hiddenCustomFieldOrds(auth) : new Set<number>();
       for (const id of ids) values.set(id, {});
       for (const v of vals) {
-        const hidden = v.register_key !== null && visible.get(v.register_key) !== true;
+        const hidden = (v.register_key !== null && visible.get(v.register_key) !== true) || (v.kind === 'custom_field' && hiddenFieldOrds.has(v.ord));
         values.get(v.site_id)![String(v.ord)] = hidden ? null : v.value;
       }
     }
@@ -192,6 +195,130 @@ export class Site360Service {
       }),
     };
   }
+
+  /** Whether the caller may view each register (its module, B3); a register key with no definition is not visible. */
+  private async registerVisibility(auth: AuthContext, rawKeys: (string | null)[]): Promise<Map<string, boolean>> {
+    const keys = [...new Set(rawKeys.filter((k): k is string => k !== null))];
+    const visible = new Map<string, boolean>();
+    if (!keys.length) return visible;
+    const modules = await this.db.tx.$queryRaw<{ register_key: string; module_key: string }[]>(Prisma.sql`
+      SELECT register_key, module_key FROM register_definitions WHERE register_key = ANY(${keys}::text[])`);
+    for (const m of modules) visible.set(m.register_key, await this.access.hasGrant(auth, m.module_key, 'view'));
+    return visible;
+  }
+
+  /** The Master columns filled by a site custom field that is hidden for the caller (field-level rules). */
+  private async hiddenCustomFieldOrds(auth: AuthContext): Promise<Set<number>> {
+    const rows = await this.db.tx.$queryRaw<{ ord: number }[]>(Prisma.sql`
+      SELECT mc.ord FROM field_definitions fd JOIN master_columns mc ON mc.letter = fd.master_export_column
+      WHERE fd.entity_type::text = 'site' AND fd.is_active
+        AND coalesce(app_resolve_field_access(${auth.user.id}::uuid, fd.id)::text, 'edit') = 'hidden'`);
+    return new Set(rows.map((r) => r.ord));
+  }
+
+  /**
+   * GET /site360/sites/{site_id}/sources (contract 0.15.35, migration 0121): the value and the source of every Master column of one site (or of one
+   * menu's columns). Per site, not per page, so a page of 1000 sites stays light: the grid asks for it when a cell is opened. The source comes from
+   * the same branch of site360_master_values that computes the value, read with the caller's rights (row security): a site outside the caller's
+   * regions answers 404, and a value hidden by the register's module view (B3) or by a field rule gives the source kind without value or id.
+   */
+  async sources(auth: AuthContext, siteId: string, q: Record<string, unknown>): Promise<Site360SourcesDto> {
+    if (!UUID_RE.test(siteId)) throw new ProblemException(404, 'not_found', { detail: 'Site not found.' });
+    const menu = oneOf(q, 'menu', SITE360_MENU_KEYS, 'master') as Site360Menu;
+    const regs = await this.access.requireRegions('sites', 'view');
+    const site = await this.db.tx.$queryRaw<{ id: string; site_code: string }[]>(Prisma.sql`
+      SELECT s.id::text AS id, s.site_code FROM sites s
+      WHERE s.id = ${siteId}::uuid AND s.is_active ${regs !== null ? Prisma.sql`AND s.region_id = ANY(${regs}::int[])` : Prisma.empty}`);
+    if (!site[0]) throw new ProblemException(404, 'not_found', { detail: 'Site not found.' });
+    const colRows = await this.db.tx.$queryRaw<Site360ColumnRow[]>`
+      ${COLUMNS_SQL} WHERE mc.is_active ORDER BY mc.ord`;
+    const cols = buildMenu(menu, colRows).columns;
+    const ords = cols.map((c) => c.ord);
+    const vals = await this.db.tx.$queryRaw<SourceRow[]>(Prisma.sql`
+      SELECT v.ord, v.value, v.kind, v.register_key, v.src_kind, v.src_ref, v.src_id::text AS src_id, v.src_field
+      FROM site360_master_values v WHERE v.site_id = ${siteId}::uuid AND v.ord = ANY(${ords}::int[])`);
+    const byOrd = new Map(vals.map((v) => [v.ord, v]));
+    const visible = await this.registerVisibility(auth, vals.map((v) => v.register_key));
+    const hiddenFieldOrds = vals.some((v) => v.kind === 'custom_field') ? await this.hiddenCustomFieldOrds(auth) : new Set<number>();
+
+    // the rows behind the ids, read again with the caller's rights (a row the caller may not read is simply not found)
+    const idsOf = (ref: string) => [...new Set(vals.filter((v) => v.src_ref === ref && v.src_id).map((v) => v.src_id!))];
+    const tasks = new Map<string, TaskRef>();
+    const taskIds = idsOf('task');
+    if (taskIds.length) {
+      const rows = await this.db.tx.$queryRaw<TaskRef[]>(Prisma.sql`
+        SELECT ti.id::text AS id, td.code, td.name_en, td.name_ar, ti.state::text AS state,
+               (ti.historical_direct_approved OR ti.historical_batch_id IS NOT NULL) AS historical, (ti.admin_override OR ti.admin_approved_as_is) AS override
+        FROM task_instances ti JOIN task_definitions td ON td.id = ti.task_def_id WHERE ti.id = ANY(${taskIds}::uuid[])`);
+      for (const r of rows) tasks.set(r.id, r);
+    }
+    const records = new Map<string, RecordRef>();
+    const recIds = idsOf('register');
+    if (recIds.length) {
+      const rows = await this.db.tx.$queryRaw<RecordRef[]>(Prisma.sql`
+        SELECT rr.id::text AS id, rr.register_key, rr.version_no, rr.state, rr.historical_direct_approved AS historical
+        FROM register_records rr WHERE rr.id = ANY(${recIds}::uuid[])`);
+      for (const r of rows) records.set(r.id, r);
+    }
+    const baselines = new Map<string, { id: string; version: number }>();
+    const blIds = idsOf('baseline');
+    if (blIds.length) {
+      const rows = await this.db.tx.$queryRaw<{ id: string; version: number }[]>(Prisma.sql`
+        SELECT id::text AS id, version FROM baseline_versions WHERE id = ANY(${blIds}::uuid[])`);
+      for (const r of rows) baselines.set(r.id, r);
+    }
+    // the approved register record that feeds the site's RF & Design columns (C:Q, S) and the acquisition date (T), when the caller may read it
+    const feeds = new Map<string, string>();
+    const feedRows = await this.db.tx.$queryRaw<{ register_key: string; id: string }[]>(Prisma.sql`
+      SELECT DISTINCT ON (rr.register_key) rr.register_key, rr.id::text AS id FROM register_records rr
+      WHERE rr.site_id = ${siteId}::uuid AND rr.register_key IN ('rf_design', 'acquisition') AND rr.state = 'approved' AND rr.voided_at IS NULL
+      ORDER BY rr.register_key, rr.is_current DESC, rr.version_no DESC`);
+    const feedVisible = await this.registerVisibility(auth, feedRows.map((r) => r.register_key));
+    for (const r of feedRows) if (feedVisible.get(r.register_key)) feeds.set(r.register_key, r.id);
+
+    const cells: Site360CellSource[] = cols.map((c) => {
+      const v = byOrd.get(c.ord);
+      const colKind = c.source_kind ?? 'derived';
+      const base: Site360CellSource = { ord: c.ord, letter: c.letter, header: c.header, kind: colKind, note: c.source_note ?? null, value: null, hidden: false, origin: null };
+      if (c.ord === 1) return { ...base, kind: 'derived', origin: 'calculated' };
+      if (!v) return base;
+      const kind = v.src_kind as Site360SourceKind;
+      const hidden = (v.register_key !== null && visible.get(v.register_key) !== true) || (v.kind === 'custom_field' && hiddenFieldOrds.has(v.ord));
+      if (hidden) return { ...base, kind, hidden: true, ...(v.register_key ? { register_key: v.register_key } : {}) };
+      const cell: Site360CellSource = { ...base, kind, value: v.value };
+      if (v.src_field) cell.field = v.src_field;
+      if (v.register_key) cell.register_key = v.register_key;
+      if (v.src_ref === 'task' && v.src_id) {
+        const t = tasks.get(v.src_id);
+        if (t) {
+          Object.assign(cell, { task_id: t.id, task_code: t.code, task_name_en: t.name_en, task_name_ar: t.name_ar });
+          cell.origin = kind === 'derived' ? 'calculated' : t.historical ? 'historical_import' : t.override ? 'manual' : 'workflow';
+        } else if (kind === 'derived') cell.origin = 'calculated';
+      } else if (v.src_ref === 'register' && v.src_id) {
+        const r = records.get(v.src_id);
+        if (r) {
+          Object.assign(cell, { record_id: r.id, record_version: r.version_no, register_key: r.register_key });
+          cell.origin = kind === 'derived' ? 'calculated' : r.historical ? 'historical_import' : r.state === 'approved' ? 'approved_record' : 'pending_record';
+        } else if (kind === 'derived') cell.origin = 'calculated';
+      } else if (v.src_ref === 'baseline' && v.src_id) {
+        const b = baselines.get(v.src_id);
+        if (b) cell.baseline_version = b.version;
+        cell.origin = 'approved_record';
+      } else if (v.src_ref === 'custom_field') {
+        cell.origin = 'manual';
+      } else if (kind === 'derived') {
+        cell.origin = 'calculated';
+      } else if (kind === 'site') {
+        const fedBy = RF_FED_ORDS.has(c.ord) ? 'rf_design' : c.ord === 20 ? 'acquisition' : null;
+        const rec = fedBy ? feeds.get(fedBy) : undefined;
+        cell.origin = STORED_STATUS_ORDS.has(c.ord) ? 'calculated' : rec ? 'approved_record' : 'manual';
+        if (fedBy && rec) cell.fed_by = { register_key: fedBy, record_id: rec };
+      }
+      return cell;
+    });
+    return { site_id: site[0].id, site_code: site[0].site_code, menu, cells };
+  }
+
 }
 
 /** Task states in which the L1 holder may still change the entry values (the task screen's own rule is checked again on save). */
@@ -256,4 +383,69 @@ function csvParam(q: Record<string, unknown>, key: string, max: number): string[
   const parts = v.split(',').map((x) => x.trim()).filter((x) => x.length > 0);
   if (parts.length > max || parts.some((x) => x.length > 100)) throw new ProblemException(422, 'validation_failed', { detail: `${key} has too many values.`, errors: [{ path: `/${key}`, code: 'invalid' }] });
   return parts;
+}
+
+/** The Master columns, with the effective kind of source (0.15.35): a not-tracked column takes the kind of a mapping an admin added later. */
+const COLUMNS_SQL = Prisma.sql`
+  SELECT mc.ord, mc.letter, mc.group_top, mc.group_mid, mc.header, mc.site360_sections AS sections,
+    CASE
+      WHEN mc.source_kind <> 'not_tracked' THEN mc.source_kind
+      WHEN EXISTS (SELECT 1 FROM field_definitions fd WHERE fd.entity_type::text = 'site' AND fd.is_active AND fd.master_export_column = mc.letter) THEN 'custom_field'
+      WHEN EXISTS (SELECT 1 FROM template_task_fields tf WHERE tf.is_active AND tf.master_col = mc.letter) THEN 'task'
+      WHEN EXISTS (SELECT 1 FROM task_field_sources x WHERE x.is_active AND x.master_col = mc.letter) THEN 'register'
+      ELSE 'not_tracked'
+    END AS source_kind,
+    mc.source_note
+  FROM master_columns mc`;
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** Site columns written by the approval of the RF & Design record (C:Q and S, feed of 0072); T is fed by Acquisition. */
+const RF_FED_ORDS = new Set([3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 19]);
+/** FX:FZ, the stored derived status of the site. */
+const STORED_STATUS_ORDS = new Set([180, 181, 182]);
+
+interface SourceRow {
+  ord: number;
+  value: string | null;
+  kind: string;
+  register_key: string | null;
+  src_kind: string;
+  src_ref: string | null;
+  src_id: string | null;
+  src_field: string | null;
+}
+
+interface TaskRef { id: string; code: string; name_en: string; name_ar: string | null; state: string; historical: boolean; override: boolean }
+interface RecordRef { id: string; register_key: string; version_no: number; state: string; historical: boolean }
+
+/** How a value got into the system: an approved register record (or one still in review), the workflow, the historical import, a manual or admin entry, a formula. */
+export type Site360Origin = 'approved_record' | 'pending_record' | 'workflow' | 'historical_import' | 'manual' | 'calculated';
+
+/** The source of one Master cell (contract Site360CellSource). */
+export interface Site360CellSource {
+  ord: number;
+  letter: string;
+  header: string;
+  kind: Site360SourceKind;
+  note: string | null;
+  value: string | null;
+  hidden: boolean;
+  origin: Site360Origin | null;
+  field?: string;
+  register_key?: string;
+  record_id?: string;
+  record_version?: number;
+  task_id?: string;
+  task_code?: string;
+  task_name_en?: string;
+  task_name_ar?: string | null;
+  baseline_version?: number;
+  fed_by?: { register_key: string; record_id: string };
+}
+
+export interface Site360SourcesDto {
+  site_id: string;
+  site_code: string;
+  menu: Site360Menu;
+  cells: Site360CellSource[];
 }
