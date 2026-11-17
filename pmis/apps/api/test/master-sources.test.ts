@@ -238,3 +238,36 @@ describe('access: the source obeys the region and the register view of the value
     expect(menu.status).toBe(422);
   });
 });
+
+describe('a not-tracked column filled by a hidden site custom field', () => {
+  it('is hidden in the sources, and sorting on it does not follow the hidden values', async () => {
+    const a = await site(1);
+    const b = await site(1);
+    const ord = (await db.query(`SELECT ord FROM master_columns WHERE letter = 'FP'`)).rows[0].ord as number;
+    const code = `msfp_${TAG.toLowerCase()}`;
+    const f = await db.query(`INSERT INTO field_definitions (entity_type, code, label_en, data_type, master_export_column) VALUES ('site', $1, 'FP planned', 'text', 'FP') RETURNING id`, [code]);
+    try {
+      await db.query(`UPDATE sites SET custom = coalesce(custom, '{}'::jsonb) || jsonb_build_object($1::text, $2::text) WHERE id = $3`, [code, 'zzz', a.id]);
+      await db.query(`UPDATE sites SET custom = coalesce(custom, '{}'::jsonb) || jsonb_build_object($1::text, $2::text) WHERE id = $3`, [code, 'aaa', b.id]);
+      const reader = await actor(app, db, { regions: [1], grants: [['sites', 'view']] });
+      await db.query(`INSERT INTO field_permissions (field_id, role_id, access) VALUES ($1, $2, 'hidden')`, [f.rows[0].id, reader.roleId]);
+      const lead = await actor(app, db, { regions: [1], grants: [['sites', 'view']] });
+
+      expect((await sources(lead.api, a)).get('FP')).toMatchObject({ kind: 'custom_field', value: 'zzz', hidden: false });
+      const hid = (await sources(reader.api, a)).get('FP')!;
+      expect(hid).toMatchObject({ kind: 'custom_field', hidden: true, value: null });
+
+      const order = async (api: Api, dir: string): Promise<string[]> => {
+        const res = await api.call('get', `/site360/master/rows?site_code=${a.code},${b.code}&sort=ord:${ord}&dir=${dir}&limit=200`);
+        expect(res.status).toBe(200);
+        return res.body.rows.map((r: { site_code: string }) => r.site_code);
+      };
+      // the lead's order follows the values; the reader's order is the same both ways (no oracle)
+      expect(await order(lead.api, 'asc')).toEqual([b.code, a.code]);
+      expect(await order(lead.api, 'desc')).toEqual([a.code, b.code]);
+      expect(await order(reader.api, 'asc')).toEqual(await order(reader.api, 'desc'));
+    } finally {
+      await db.query(`UPDATE field_definitions SET is_active = false, master_export_column = NULL WHERE id = $1`, [f.rows[0].id]);
+    }
+  });
+});

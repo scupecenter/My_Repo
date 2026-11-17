@@ -491,9 +491,16 @@ export class MasterExportService {
   // ------------------------------------------------------------------ the Master sheet
   /** The values of the Master columns of some sites, from the read model of SITE 360 (site360_master_values); register-owned values need the register's view grant in the site's region. */
   private async masterValues(auth: AuthContext, ids: string[], ords: number[], siteRegion: Map<string, number>): Promise<Map<string, Map<number, string | null>>> {
-    const vals = await this.db.tx.$queryRaw<{ site_id: string; ord: number; value: string | null; register_key: string | null }[]>(Prisma.sql`
-      SELECT v.site_id::text AS site_id, v.ord, v.value, v.register_key FROM site360_master_values v
+    const vals = await this.db.tx.$queryRaw<{ site_id: string; ord: number; value: string | null; register_key: string | null; kind: string | null }[]>(Prisma.sql`
+      SELECT v.site_id::text AS site_id, v.ord, v.value, v.register_key, v.src_kind AS kind FROM site360_master_values v
       WHERE v.site_id = ANY(${ids}::uuid[]) AND v.ord = ANY(${ords}::int[])`);
+    // a not-tracked column filled by a site custom field follows that field's rule for the caller (hidden = left empty)
+    const hiddenOrds = vals.some((v) => v.kind === 'custom_field')
+      ? new Set((await this.db.tx.$queryRaw<{ ord: number }[]>(Prisma.sql`
+          SELECT mc.ord FROM field_definitions fd JOIN master_columns mc ON mc.letter = fd.master_export_column
+          WHERE fd.entity_type::text = 'site' AND fd.is_active
+            AND coalesce(app_resolve_field_access(${auth.user.id}::uuid, fd.id)::text, 'edit') = 'hidden'`)).map((r) => r.ord))
+      : new Set<number>();
     const keys = [...new Set(vals.map((v) => v.register_key).filter((k): k is string => k !== null))];
     const regs = new Map<string, number[] | null | false>();
     if (keys.length) {
@@ -502,6 +509,7 @@ export class MasterExportService {
     }
     const out = new Map<string, Map<number, string | null>>();
     for (const v of vals) {
+      if (v.kind === 'custom_field' && hiddenOrds.has(v.ord)) continue;
       if (v.register_key !== null) {
         const r = regs.get(v.register_key);
         if (r === undefined || r === false || (r !== null && !r.includes(siteRegion.get(v.site_id) ?? -1))) continue;
@@ -510,7 +518,6 @@ export class MasterExportService {
       if (m.get(v.ord) == null) m.set(v.ord, v.value);
       out.set(v.site_id, m);
     }
-    void auth;
     return out;
   }
 

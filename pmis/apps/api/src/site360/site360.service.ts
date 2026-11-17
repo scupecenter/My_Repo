@@ -76,9 +76,17 @@ export class Site360Service {
     const sortSql = ordSort
       ? Prisma.sql`sv.value`
       : Prisma.raw(sortField!);
-    const sortJoin = ordSort
-      ? Prisma.sql`LEFT JOIN LATERAL (SELECT v.value FROM site360_master_values v WHERE v.site_id = s.id AND v.ord = ${Number(ordSort[1])}) sv ON true`
-      : Prisma.empty;
+    // sorting on a Master column reads only the values the caller may see (register view B3, field rules), so the order is no oracle for a hidden value
+    let sortJoin = Prisma.empty;
+    if (ordSort) {
+      const allKeys = (await this.db.tx.$queryRaw<{ register_key: string }[]>(Prisma.sql`SELECT register_key FROM register_definitions`)).map((r) => r.register_key);
+      const vis = await this.registerVisibility(auth, allKeys);
+      const visibleKeys = allKeys.filter((k) => vis.get(k) === true);
+      const hiddenOrds = [...(await this.hiddenCustomFieldOrds(auth))];
+      sortJoin = Prisma.sql`LEFT JOIN LATERAL (SELECT v.value FROM site360_master_values v WHERE v.site_id = s.id AND v.ord = ${Number(ordSort[1])}
+        AND (v.register_key IS NULL OR v.register_key = ANY(${visibleKeys}::text[]))
+        AND NOT (v.src_kind = 'custom_field' AND v.ord = ANY(${hiddenOrds}::int[]))) sv ON true`;
+    }
 
     const where: Prisma.Sql[] = [Prisma.sql`s.is_active`];
     if (regs !== null) where.push(Prisma.sql`s.region_id = ANY(${regs}::int[])`);
