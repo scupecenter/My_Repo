@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.33
+  version: 0.15.34
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -30,6 +30,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.34 (2026-11-17): the Master-format export is built (P1 of the 2026-11-17 audit; no migration; CHANGELOG 159). 0.15.33 is the P0 value fixes. (1) `GET /exports/parts`, `POST /exports/master`, `GET /exports/master` and `GET /exports/master/{export_id}/download` are served by the API (module `exports`). (2) `ExportPartKey` gains `rf_design` and `acquisition` (Master sheets RF & Design and Acquisition). `car_dispatcher` and `financial_advances` stay in the enum but are never offered and answer 422 `validation_failed` with item code `not_in_master` (not part of the Master, 0.15.0). (3) Parts: `sites`, `milestones` and `tasks` need `export` on module `sites`, `project_status` on `dashboard`, a register (and `dismantle`) on its register module; the regions of the `export` grant limit the rows (B3). A denied part is 403 with `errors[]` items `{path: /parts/<key>, code: export_denied}`; a requested region outside every export region is 422 `out_of_scope`. (4) The Master sheet keeps all 187 columns and the three header rows of the Site Master (top group, middle group, name; data from row 5) plus site custom fields with a Master export column; a part not chosen keeps its columns empty. Columns belong to parts: A:B every part, the milestone and gate columns `milestones`, the workflow task columns `tasks`, FN:FW `dismantle`, the rest `sites`. Values are those of SITE 360 (`site360_master_values`); a register-owned value needs that register's view grant. Register sheets follow the register maps of the Master import (header and data rows, Master headers) or, without a map, the template columns; personal columns (landlord, contact) stay empty (Q469). A last sheet `Export Info` names the parts, filters, regions, author and row counts. (5) `ExportView`: `filters` are passed to the list endpoint of the source (the F3 `filter` tree included); `tasks` needs `filters.site_id`; the column codes are those of `GET /exports/parts?include_columns=true` (`sites`: the six fixed codes plus `m_<letter>` per Master column and `cf:<code>`; `progress_pct` and `health_index` are not offered: no Master column and no list value). (6) `as_of`: only today (Africa/Tripoli) is accepted; a past date answers 422 `as_of_unsupported` (the Master values are a live read model, no history is kept). (7) `MasterExport` gains `progress` and `error`; `row_count` is the Master sheet rows (or all rows when there is no Master sheet). The list and the download are the requester's own only: another user, a System Admin included, gets 404. Retention is 7 days (the job table's fixed expiry; the setting `master_export.retention_days` is not read yet). (8) `GET /jobs/{job_id}` answers for a `master_export` job with `result.download_path`. Audit actions `master_export.start`, `master_export.done` (row counts per sheet) and `master_export.download`.
     - 0.15.33 (2026-11-17): the P0 value fixes of the read-only audit of 2026-11-17 (migration 0119; CHANGELOG 158). Additive. (1) `GET /sites` takes `dashboard_status` (an `OverallStatus`: the sites whose derived status, as the dashboard counts it in `headline.by_overall_status`, is that one), `milestone_reached` (a milestone stage code: the sites, not cancelled, whose milestone is done, as `milestones[].completed` and the RFI, On-Air, HOTO and Final Closure cards count them) and `ref_date` (the reference date of these two, default today; a past date reads its snapshot when one exists; a future date answers 422 `in_future`). The set is computed with the engine of `GET /dashboard` (the caller's `dashboard.view` regions, the filters `region_id` (one region), `cluster_code`, `scenario`, `stream`, `view`), so a dashboard card and the list it opens give the same count. Only one of the two per request (422); `ref_date` alone answers 422. The web dashboard now links its cards and status chips through them and keeps `cluster_code` and `ref_date`. (2) `GET /site360/{menu}/rows`: values only. BW (GECOL Status) is the workbook formula over the GECOL scope and the approved GECOL record (N/A when the scope is N/A; Done when the scope is Yes and the Power-On Date is set; else Pending); AJ / AK (Contractor Name / Team) take the first order of scope CW, Tower Erection or Site Adaption that is neither cancelled nor rejected (the `contractor` filter follows); R (Configuration) is the `configuration` of the site's approved As-Built TE part (empty when none). The web grid now sends the status filter as `status` (it sent `overall_status`, which was ignored). (3) `vehicle_reservations` gains the state `cancelled` (a vehicle voided with no approved version in force cancels its reservations that have not started; audited); no HTTP change.
     - 0.15.32 (2026-11-16): sites board by milestone and tasks board by approval state (F5 of the features build plan of 2026-11-14; migration 0118; CHANGELOG 156). Additive and read only. (1) `GET /boards/sites` (`getSitesBoard`): one column per milestone plus `closed`, swimlanes by region or contractor, ageing in working days, WIP warnings, the filters of `GET /sites` with the F3 tree. (2) `GET /boards/tasks` (`getTasksBoard`): columns entry, review, rejected and approved with `TaskSummary` cards; a drop in the web app only opens the task's existing action (no new write endpoint). (3) `GET`/`PUT /settings/kanban-wip` (`getKanbanWip`, `setKanbanWip`): the WIP limits per milestone (default none; a warning, never a block; reason, If-Match, audited). (4) `SavedViewScreenKey` gains `tasks-board` (module sites, the filter whitelist of `site-tasks`).
     - 0.15.31 (2026-11-16): AND/OR filter builder in saved views and views shared with a region (F3 of the features build plan of 2026-11-14; migration 0117; CHANGELOG 154). Additive. (1) `GET /saved-views/filter-fields` (`listFilterFields`): the whitelist of filter fields of `sites`, `sites-stream`, `site-tasks` and `register-<key>` for the caller (hidden fields left out), with the operators per type and the limits. (2) The query parameter `filter` (a `FilterTree` as JSON) on `GET /sites`, `GET /site360/{menu}/rows`, `GET /sites/{site_id}/tasks` and `GET /registers/{register_key}/records`: compiled on the server to parameterised SQL, two levels, at most 20 items per group, 10 groups and 50 conditions; the caller's regions and row security still apply. (3) A saved view may keep the tree in `filters.advanced` (checked on save; stripped condition by condition for a reader who may not see a field, counted in `stripped_columns`). (4) `audience.region_ids` and `audience.regions`: a view shared with regions reaches the users whose own view right covers them; recipients read only. Numbered 0.15.31 because 0.15.30 is reserved for F2.
@@ -6160,6 +6161,7 @@ paths:
       tags: [exports]
       operationId: listMasterExports
       summary: The caller's recent Master exports (within the retention window)
+      description: Only the caller's own exports (0.15.34), newest first; an expired file shows `status` = `expired` for one day after it expires.
       parameters:
         - $ref: '#/components/parameters/Limit'
         - $ref: '#/components/parameters/Cursor'
@@ -6201,6 +6203,7 @@ paths:
       tags: [exports]
       operationId: downloadMasterExport
       summary: Download a finished export (audited before streaming)
+      description: Only the user who started the export downloads it; anyone else (a System Admin included) gets 404 (0.15.34). 409 while the job is not done, 410 `export_expired` after 7 days.
       parameters:
         - name: export_id
           in: path
@@ -14400,11 +14403,11 @@ components:
           uniqueItems: true
           items: { $ref: '#/components/schemas/RegionId' }
           description: Subset of the caller's regions (B3). A region outside the caller's scope is 422 `validation_failed`. Default is all of the caller's regions.
-        as_of: { type: string, format: date, description: 'Data as of this date (end of day). Default is now; a future date is 422 `validation_failed`.' }
+        as_of: { type: string, format: date, description: 'Data as of this date (end of day). Default is now; a future date is 422 `validation_failed`. 0.15.34: only today is accepted, a past date is 422 with item code `as_of_unsupported`.' }
     ExportPartKey:
       type: string
       description: Part key. Every register key used by `/registers` (including `dismantle`), plus the four non-register parts.
-      enum: [procurement, contractors, gecol, hlc, permits_hse, warehouse, quality, issues, risks, change_control, readiness_handover, as_built, meetings, dismantle, car_dispatcher, financial_advances, sites, milestones, tasks, project_status]
+      enum: [procurement, contractors, gecol, hlc, permits_hse, warehouse, quality, issues, risks, change_control, readiness_handover, as_built, meetings, dismantle, car_dispatcher, financial_advances, sites, milestones, tasks, project_status, rf_design, acquisition]
     ExportPart:
       type: object
       required: [key, label_en, label_ar, master_sheet]
@@ -14466,8 +14469,10 @@ components:
         status: { type: string, enum: [queued, running, done, failed, expired] }
         regions: { type: array, items: { $ref: '#/components/schemas/RegionId' } }
         as_of: { type: string, format: date }
-        row_count: { type: [integer, 'null'], description: 'Site rows written; null until the job is done.' }
-        expires_at: { type: [string, 'null'], format: date-time, description: 'Set when done: created_at plus the setting `master_export.retention_days` (default 7).' }
+        row_count: { type: [integer, 'null'], description: 'Site rows written on the Master sheet (all data rows when the file has no Master sheet); null until the job is done.' }
+        expires_at: { type: [string, 'null'], format: date-time, description: 'Set when done: the finish time plus 7 days (0.15.34; the setting `master_export.retention_days` is not read yet).' }
+        progress: { type: number, minimum: 0, maximum: 1, description: '0.15.34: share of the sheets written.' }
+        error: { type: string, description: '0.15.34: one-line reason of a failed job.' }
     CustomValues:
       type: object
       description: Custom field values keyed by field code (ADR 0009). Hidden fields are omitted.

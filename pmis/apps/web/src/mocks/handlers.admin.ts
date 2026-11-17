@@ -547,16 +547,20 @@ export const adminHandlers = [
     if (b.parts?.length && b.view) return bad('/view', 'parts_and_view_exclusive');
     if (b.view && (!b.view.source || !b.view.columns?.length)) return bad('/view/columns', 'required');
     if (b.as_of && b.as_of > TODAY) return bad('/as_of', 'future_date');
+    // contract 0.15.34: only today can be exported (the Master values keep no history)
+    if (b.as_of && b.as_of < TODAY) return bad('/as_of', 'as_of_unsupported');
+    const outside = [...(b.parts ?? []), ...(b.view ? [b.view.source] : [])].filter((p) => p === 'car_dispatcher' || p === 'financial_advances');
+    if (outside.length) return problem(422, 'validation_failed', 'Not part of the Master', { errors: outside.map((p) => ({ path: `/parts/${p}`, code: 'not_in_master' })) });
     if (b.regions && (!b.regions.length || b.regions.some((r) => r < 1 || r > 7))) return bad('/regions', 'out_of_scope');
     const no = [...(b.parts ?? []), ...(b.view ? [b.view.source] : [])].filter((p) => denied().includes(p));
     if (no.length) return problem(403, 'action_forbidden', 'You may not export these parts', { errors: no.map((p) => ({ path: `/parts/${p}`, code: 'export_denied' })) });
     const id = crypto.randomUUID();
     A().exports.unshift({
-      id, kind: b.view ? 'view' : b.parts?.length ? 'partial' : 'full', parts: b.parts ?? [], view: b.view, job_id: `job-${id.slice(0, 8)}`, created_at: now(), status: 'queued', regions: b.regions ?? [1, 2, 3, 4, 5, 6, 7],
-      as_of: b.as_of ?? TODAY, row_count: null, expires_at: null, polls: 0, size: 2048,
+      id, kind: b.view ? 'view' : b.parts?.length ? 'partial' : 'full', parts: b.view ? [] : (b.parts ?? []), view: b.view, job_id: id, created_at: now(), status: 'queued', regions: b.regions ?? [1, 2, 3, 4, 5, 6, 7],
+      as_of: b.as_of ?? TODAY, row_count: null, expires_at: null, progress: 0, polls: 0, size: 2048,
     } as never);
     save();
-    return HttpResponse.json({ id: `job-${id.slice(0, 8)}`, kind: 'master_export', status: 'queued' }, { status: 202 });
+    return HttpResponse.json({ id, kind: 'master_export', status: 'queued', progress: 0, result_file_id: null, created_at: now(), finished_at: null }, { status: 202 });
   }),
   http.get(`${B}/exports/master`, () => {
     const g = guard(); if (g) return g;
@@ -564,6 +568,7 @@ export const adminHandlers = [
     for (const e of A().exports) {
       if (e.status === 'queued' || e.status === 'running') {
         e.polls += 1; e.status = e.polls >= 2 ? 'done' : 'running';
+        e.progress = e.status === 'done' ? 1 : 0.5;
         if (e.status === 'done') { e.row_count = 150; e.expires_at = new Date(Date.now() + 7 * 864e5).toISOString(); }
       }
     }
@@ -576,9 +581,9 @@ export const adminHandlers = [
     if (!e) return problem(404, 'not_found', 'Export not found');
     if (e.status === 'expired') return problem(410, 'export_expired', 'The file expired; start a new export');
     if (e.status !== 'done') return problem(409, 'invalid_transition', 'The export is not ready');
-    const name = `تصدير_ماستر_${TODAY}.xlsx`;
+    const name = `GSDN_Site_Master_${TODAY.replace(/-/g, '')}.xlsx`;
     return new HttpResponse(new Uint8Array([0x50, 0x4b, 3, 4, 0, 0]), {
-      headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'Content-Disposition': `attachment; filename="Master_export_${TODAY}.xlsx"; filename*=UTF-8''${encodeURIComponent(name)}`, 'Cache-Control': 'no-store' },
+      headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'Content-Disposition': `attachment; filename="${name}"`, 'Cache-Control': 'no-store' },
     });
   }),
 
@@ -591,14 +596,16 @@ export const adminHandlers = [
 ];
 
 const PARTS = ([
-  ['procurement', 'Procurement (PR/PO/WO)', 'المشتريات', 'Procurement'], ['contractors', 'Contractors', 'المقاولون', 'Contractors'], ['gecol', 'GECOL power', 'كهرباء GECOL', 'GECOL'], ['hlc', 'HLC fiber', 'ألياف HLC', 'HLC'],
-  ['permits_hse', 'Permits & HSE', 'التصاريح والسلامة', 'Permits'], ['warehouse', 'Warehouse', 'المخزن', 'Warehouse'], ['quality', 'Quality', 'الجودة', 'Quality'], ['issues', 'Issue Log', 'سجل المشاكل', 'Issues'],
-  ['risks', 'Risk Register', 'سجل المخاطر', 'Risks'], ['change_control', 'Change Control', 'ضبط التغيير', 'Change Control'], ['readiness_handover', 'Readiness & Handover', 'الجاهزية والتسليم', 'Readiness'],
-  ['as_built', 'As-Built', 'كما بُني', 'As-Built'], ['meetings', 'Meetings', 'الاجتماعات', 'Meetings'], ['dismantle', 'Dismantle', 'الإزالة', 'Dismantle'],
-  ['sites', 'Sites and milestones', 'المواقع والمعالم', 'Sites'], ['milestones', 'Milestones', 'المعالم', 'Milestones'], ['tasks', 'Tasks by stage', 'المهام حسب المرحلة', 'Tasks'], ['project_status', 'Project Status', 'حالة المشروع', 'Project Status'],
+  // contract 0.15.34: the sheet each part is written on, as the API names it (Car Dispatcher and Financial Advances are not part of the Master)
+  ['sites', 'Sites', 'المواقع', 'Master'], ['milestones', 'Milestones', 'المعالم', 'Master'], ['tasks', 'Tasks by stage', 'المهام حسب المرحلة', 'Master'], ['project_status', 'Project Status', 'حالة المشروع', 'Project Status'],
+  ['procurement', 'Procurement (PR/PO/WO)', 'المشتريات', 'PR-PO'], ['gecol', 'GECOL power', 'كهرباء GECOL', 'GECOL'], ['hlc', 'HLC fiber', 'ألياف HLC', 'HLC'],
+  ['permits_hse', 'Permits & HSE', 'التصاريح والسلامة', 'Permission Log'], ['warehouse', 'Warehouse', 'المخزن', 'Warehouse'], ['quality', 'Quality', 'الجودة', 'Quality Inspections'], ['issues', 'Issue Log', 'سجل المشاكل', 'Issue Log'],
+  ['risks', 'Risk Register', 'سجل المخاطر', 'Risk Register'], ['change_control', 'Change Control', 'ضبط التغيير', 'Change Control'], ['readiness_handover', 'Readiness & Handover', 'الجاهزية والتسليم', 'Readiness & Handover'],
+  ['as_built', 'As-Built', 'كما بُني', 'As-Built'], ['meetings', 'Meetings', 'الاجتماعات', 'Meetings'], ['contractors', 'Contractors', 'المقاولون', 'Contractors'],
+  ['rf_design', 'RF & Design', 'التصميم الراديوي', 'RF & Design'], ['acquisition', 'Acquisition', 'الاستحواذ', 'Acquisition'], ['dismantle', 'Dismantle', 'الإزالة', 'Master'],
 ] as const).map(([key, label_en, label_ar, master_sheet]) => ({ key, label_en, label_ar, master_sheet }));
 const COLUMNS: Record<string, string[]> = {
-  sites: ['site_code', 'site_name', 'region', 'scenario', 'overall_status', 'current_stage', 'progress_pct', 'health_index'],
+  sites: ['site_code', 'site_name', 'region', 'scenario', 'overall_status', 'current_stage'],
   tasks: ['site_code', 'task_code', 'task_name', 'stage', 'task_state', 'holder', 'due_date', 'sla_status', 'approved_at'],
 };
 // A reviewer lacks the export grant for the commercial registers.

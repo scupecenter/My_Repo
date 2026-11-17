@@ -182,6 +182,33 @@ describe('export', () => {
     expect(within(row).getByTestId(/^export-download-/)).toBeInTheDocument();
   });
 
+  it('shows the progress, the row count and the download of the real API shape (contract 0.15.34)', async () => {
+    await signIn('pm');
+    let polls = 0;
+    const base = { id: '7c9e6679-7425-40de-944b-e07fc1f90ae7', kind: 'partial', parts: ['gecol'], job_id: '7c9e6679-7425-40de-944b-e07fc1f90ae7', created_at: '2026-11-17T08:00:00Z', regions: [], as_of: '2026-11-17' };
+    server.use(http.get(`${API_BASE}/exports/master`, () => {
+      polls += 1;
+      const item = polls < 2 ? { ...base, status: 'running', progress: 0.5, row_count: null, expires_at: null } : { ...base, status: 'done', progress: 1, row_count: 12, expires_at: '2026-11-24T08:00:00Z' };
+      return HttpResponse.json({ items: [item], page: { limit: 50, next_cursor: null } });
+    }));
+    renderApp(<ExportDialog open onClose={() => {}} />);
+    expect(await screen.findByTestId(`export-progress-${base.id}`)).toHaveTextContent('50%');
+    await waitFor(() => expect(screen.getByTestId(`export-status-${base.id}`)).toHaveTextContent('Ready'), { timeout: 5000 });
+    expect(screen.getByTestId(`export-rows-${base.id}`)).toHaveTextContent('12');
+    expect(screen.getByTestId(`export-download-${base.id}`)).toBeInTheDocument();
+  });
+
+  it('the mock follows the contract: Car Dispatcher is not part of the Master, past dates are refused', async () => {
+    await signIn('pm');
+    const a = await api.post('/exports/master', { body: { parts: ['car_dispatcher'] } }).catch((e: unknown) => e);
+    expect((a as ApiError).status).toBe(422);
+    expect((a as ApiError).problem.errors?.[0]).toMatchObject({ path: '/parts/car_dispatcher', code: 'not_in_master' });
+    const b = await api.post('/exports/master', { body: { as_of: '2026-01-01' } }).catch((e: unknown) => e);
+    expect((b as ApiError).problem.errors?.[0]).toMatchObject({ path: '/as_of', code: 'as_of_unsupported' });
+    const parts = await api.get<{ items: { key: string }[] }>('/exports/parts');
+    expect(parts.items.map((p) => p.key)).toEqual(expect.arrayContaining(['rf_design', 'acquisition']));
+  });
+
   it('sends parts, never a view, and shows 403 denied parts', async () => {
     await signIn('pm');
     const u = userEvent.setup();

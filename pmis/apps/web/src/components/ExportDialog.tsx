@@ -70,7 +70,10 @@ export function ExportDialog({ open, onClose }: { open: boolean; onClose: () => 
                 {e.kind === 'partial' && <span className="text-mute">{(e.parts ?? []).map(label).join(', ')}</span>}
                 {e.kind === 'view' && <span className="text-mute">{label(e.view?.source ?? '')}</span>}
                 <span className="mono text-xs text-mute">{e.created_at.slice(0, 16).replace('T', ' ')}</span>
-                <span className={`chip ${TONE[e.status]}`} data-testid={`export-status-${e.id}`}>{t(`export.status_${e.status}`)}</span>
+                <span className={`chip ${TONE[e.status]}`} data-testid={`export-status-${e.id}`} title={e.status === 'failed' ? (e.error ?? undefined) : undefined}>{t(`export.status_${e.status}`)}</span>
+                {/* contract 0.15.34: the real job reports the share of sheets written */}
+                {e.status === 'running' && typeof e.progress === 'number' && <span className="mono text-xs text-mute" data-testid={`export-progress-${e.id}`}>{Math.round(e.progress * 100)}%</span>}
+                {e.status === 'done' && e.row_count != null && <span className="text-xs text-mute" data-testid={`export-rows-${e.id}`}>{e.row_count}</span>}
                 <span className="flex-1" />
                 {e.status === 'done' && <button className="btn" data-testid={`export-download-${e.id}`} onClick={() => void dl(e)}><Download size={14} />{t('export.download')}</button>}
               </li>

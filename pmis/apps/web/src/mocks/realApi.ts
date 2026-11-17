@@ -485,6 +485,11 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/tasks/:id/overrides'],
   ['post', '/overrides/:override_id/revert'],
   ['get', '/me/tasks'],
+  // Contract 0.15.34 (P1 of the 2026-11-17 audit; apps/api: exports): the Master-format export (parts, start, the caller's exports, download).
+  ['get', '/exports/parts'],
+  ['post', '/exports/master'],
+  ['get', '/exports/master'],
+  ['get', '/exports/master/:id/download'],
 ] as const;
 
 /** `GET /users/deleted` and `GET /users/picker` are other operations that the `:id` pattern would swallow; they stay mocked. */
@@ -520,10 +525,6 @@ export const NOT_AVAILABLE = [
   ['get', '/reassignments/eligible-users'],
   ['post', '/tasks/reassign'],
   ['post', '/tasks/:id/act-on-behalf'],
-  ['get', '/exports/parts'],
-  ['get', '/exports/master'],
-  ['post', '/exports/master'],
-  ['get', '/exports/master/:id/download'],
   ['get', '/settings/dlp'],
   ['post', '/settings/dlp/versions'],
   ['get', '/settings/idle-task-alert'],
