@@ -1484,7 +1484,7 @@
     "must_change": "Must change password"
   },
   "hybrid": {
-    "banner": "Screens other than sign-in and users show sample data while the system is being built."
+    "banner": "Some screens are not connected to the server yet: they say “not available” and save nothing."
   },
   "sysAdmin": {
     "badge": "System Admin",

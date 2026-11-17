@@ -97,7 +97,8 @@ export function Shell() {
         className="sticky top-0 hidden h-screen shrink-0 flex-col border-e border-line bg-side md:flex">
         {brand}
         <SidebarBody items={sideItems} compact={compact} unread={unread} alerts={alerts} activeKey={activeKey} />
-        {!compact && <div className="border-t border-line px-4 py-3 text-xs text-faint">Synthetic data</div>}
+        {/* the sample-data label only in the pure mock build (P0 of the 2026-11-17 audit: it also showed against the real server) */}
+        {!compact && import.meta.env.VITE_USE_MOCKS === 'true' && !HYBRID && <div className="border-t border-line px-4 py-3 text-xs text-faint">Synthetic data</div>}
         {!compact && <SidebarSplitter width={width} onChange={resize} asideRef={asideRef} />}
       </aside>
       {drawer && (
