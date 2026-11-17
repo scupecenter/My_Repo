@@ -42,10 +42,16 @@ const applyBody = z.object({
   // Q462 (0073): mark the batches "historical load: accept without documents" (a System Admin under the open waiver)
   // 0092 (owner decision 2026-11-12, "Direct approval"): approve every submitted task of the load at once as an admin override (no L2); historical load only
   // 0093 (owner decision 2026-11-12, "Everything from the one file"): also load the register sheets of the run's stored file; historical load only
-  historical_load: z.object({ reason: z.string().trim().min(3).max(2000), approve_directly: z.boolean().optional(), registers: z.boolean().optional() }).strict().optional(),
+  // 0122 (owner decision 2026-11-17, "Re-apply the file with direct approval"): apply again a file that was already applied; with approve_directly only
+  historical_load: z.object({
+    reason: z.string().trim().min(3).max(2000), approve_directly: z.boolean().optional(), registers: z.boolean().optional(), reapply: z.boolean().optional(),
+  }).strict().optional(),
 }).strict().superRefine((b, ctx) => {
   if (b.historical_load?.approve_directly && b.mode !== 'submit') {
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['mode'], message: 'Approving directly is for the submit mode of the historical load.' });
+  }
+  if (b.historical_load?.reapply && !b.historical_load.approve_directly) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['historical_load', 'approve_directly'], message: 'Re-applying a file that was already applied is done with the direct approval.' });
   }
 });
 const resolveBody = z.object({ resolution: z.enum(['open', 'pmis_correct', 'master_correct', 'fixed', 'ignored']), note: z.string().max(1000).optional() }).strict();
@@ -55,6 +61,7 @@ interface RunRow {
   created_by: string; created_at: Date; applied_by: string | null; applied_at: Date | null; apply_reason: string | null; apply_mode: string | null; group_id: string | null;
   outcome: Record<string, unknown> | null; version: number; has_file: boolean; ts: string; progress: Record<string, unknown> | null; staging: Record<string, unknown> | null;
   applying: Record<string, unknown> | null;
+  applied_before_id: string | null; applied_before_at: Date | null;
 }
 
 interface DiffRow {
@@ -224,8 +231,12 @@ export class MasterImportService {
       SELECT r.id::text AS id, r.file_name, r.file_sha256, r.file_size, r.status, r.structure, r.summary, r.created_by::text AS created_by, r.created_at,
         r.applied_by::text AS applied_by, r.applied_at, r.apply_reason, r.apply_mode, r.group_id::text AS group_id, r.outcome, r.version, r.storage_key IS NOT NULL AS has_file,
         mi_run_progress_json(r.id) AS progress, mi_run_staging_json(r.id) AS staging, mi_run_applying_json(r.id) AS applying,
+        ab.id::text AS applied_before_id, ab.applied_at AS applied_before_at,
         to_char(r.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS ts
-      FROM master_reconciliation_runs r WHERE ${where} ${tail}`;
+      FROM master_reconciliation_runs r
+      LEFT JOIN LATERAL (SELECT x.id, x.applied_at FROM master_reconciliation_runs x WHERE x.file_sha256 = r.file_sha256 AND x.status = 'applied' AND x.id <> r.id
+                         ORDER BY x.applied_at DESC NULLS LAST, x.id LIMIT 1) ab ON true
+      WHERE ${where} ${tail}`;
   }
 
   private async runDtos(rows: RunRow[]): Promise<Record<string, unknown>[]> {
@@ -241,6 +252,8 @@ export class MasterImportService {
       staging: r.staging ?? null,
       // 0086: the apply of a big file in the background (status applying, then applied; back to previewed with the error when it could not end)
       applying: r.applying ?? null,
+      // 0122: another run applied the same file (same SHA-256): a plain apply is refused; a System Admin may re-apply it with direct approval
+      applied_before: r.applied_before_id ? { run_id: r.applied_before_id, applied_at: r.applied_before_at } : null,
     }));
   }
 
@@ -351,7 +364,9 @@ export class MasterImportService {
     const hl = body.historical_load;
     // 0093: the register sheets are read here, from the file stored with the run (never from the request); the database checks the file's SHA-256 again
     const registers = hl?.registers ? await this.readRegisters(auth, id, String(run.file_name), String(run.file_sha256)) : null;
-    const hist = hl ? { reason: hl.reason, ...(hl.approve_directly ? { approve_directly: true } : {}), ...(hl.registers ? { registers: true } : {}) } : null;
+    const hist = hl
+      ? { reason: hl.reason, ...(hl.approve_directly ? { approve_directly: true } : {}), ...(hl.registers ? { registers: true } : {}), ...(hl.reapply ? { reapply: true } : {}) }
+      : null;
     // 0075: a staged batch with more rows than imports.async_rows is sent in the background (its run is started here once the request commits)
     const outcome = await this.call<Record<string, unknown>>(auth, registers
       ? Prisma.sql`SELECT mi_apply_run(${id}::uuid, ${version}::int, ${body.mode}::text, ${body.reason}::text, ${stepOk}::boolean, ${JSON.stringify(hist)}::jsonb, ${JSON.stringify(registers)}::jsonb) AS r`

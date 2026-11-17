@@ -6670,6 +6670,7 @@ export interface paths {
          *     **0.15.5:** a file with more sites than `imports.async_rows` is applied in the background after the same checks: 202 with the run `applying` (see `applying`), then `applied` with its `outcome` (or `previewed` again with `applying.error` when the background apply was refused). A second apply meanwhile answers 409 `upload_processing`. Measured with 470 synthetic sites with every task, a historical apply: 405 s in the request before, 32 ms for the request and about 70 s in the background now.
          *     **0.15.11:** `historical_load.approve_directly` (owner decision 2026-11-12) approves every submitted task of the historical load at once as an admin override (no L2 step); the batches and their rows read approved; it applies the same way in the background and in a chunked send.
          *     **0.15.11:** `historical_load.registers` (owner decision 2026-11-12) also loads the register sheets of the run's stored file (RF & Design, Acquisition, Permission Log, PR-PO, GECOL, HLC, As-Built, Risk Register) as register batches of the same group, after the Master batches; with `approve_directly` their rows are approved at once too. Personal columns are never read. 409 `invalid_transition` when the original file is not stored or does not match the run.
+         *     **0.15.36:** `historical_load.reapply` (owner decision 2026-11-17) applies again a file another run already applied, with `approve_directly` only: the open Master import batches of earlier historical loads and of the same file are discarded first (audited per batch, their unsent rows never applied), then the file is loaded and approved directly. Without it, the 409 of a file already applied carries `already_applied` and `applied_run_id`.
          */
         post: operations["applyMasterImportRun"];
         delete?: never;
@@ -8971,6 +8972,13 @@ export interface components {
              * @description 0.15.3. With `upload_processing` on `POST /master-import/runs` or an apply: the run still being compared.
              */
             run_id?: string;
+            /** @description 0.15.36. With `invalid_transition` on `POST /master-import/runs/{run_id}/apply`: another run already applied this file (`applied_run_id`); a System Admin may re-apply it with `historical_load.reapply`. */
+            already_applied?: boolean;
+            /**
+             * Format: uuid
+             * @description 0.15.36. With `already_applied`: the run that applied the file.
+             */
+            applied_run_id?: string;
             /** @description 0.9.1. With `team_scope_mismatch`: the scope of the Procurement order. */
             order_scope?: string | null;
             /** @description 0.9.1. With `team_scope_mismatch`: the specialization of the team (null when the team has none). */
@@ -12136,6 +12144,13 @@ export interface components {
             has_file?: boolean;
             /** @description 0.14.6: the background sends of the batches of an applied run; null when every batch was sent in the request (or the run is not applied). */
             progress?: components["schemas"]["MasterImportRunProgress"] | null;
+            /** @description 0.15.36: another run applied the same file (same SHA-256), the latest one; null when none did. A plain apply of this run is refused (409); a System Admin may re-apply it with `historical_load.reapply` and `approve_directly`. */
+            applied_before?: {
+                /** Format: uuid */
+                run_id: string;
+                /** Format: date-time */
+                applied_at: string | null;
+            } | null;
             /** @description 0.15.3: the comparison of a big file in the background; null when the file was compared in the request. */
             staging?: components["schemas"]["MasterImportStagingProgress"] | null;
             /** @description 0.15.5: the latest apply of the file in the background; null when it was never applied in the background. */
@@ -12244,6 +12259,20 @@ export interface components {
             approve_directly?: boolean;
             /** @description 0.15.11: the register sheets of the file were loaded. */
             registers?: boolean;
+            /** @description 0.15.36: the file was applied again with direct approval (`historical_load.reapply`). */
+            reapply?: boolean;
+            /** @description 0.15.36: the open Master import batches discarded before the re-apply (their rows never sent are rejected and never applied). */
+            discarded?: {
+                /** Format: uuid */
+                id?: string;
+                stream_code?: string | null;
+                register_key?: string | null;
+                status_before?: string;
+                /** @description Rows never sent, now rejected. */
+                rows_rejected?: number;
+                /** @description Rows already sent whose task or record still waits for L2 (they keep that path). */
+                rows_sent_open?: number;
+            }[];
             /** @description 0.15.11: notes on the reading of the register sheets (never blocking): counts, cell addresses and header names only, never a value. Codes: `date_day_first_assumed`, `not_normalised`, `outside_list`, `cell_error_blank`, `master_header_not_found`, `map_unknown_template_header`. */
             register_notes?: {
                 sheet?: string;
@@ -12304,10 +12333,15 @@ export interface components {
                  */
                 approve_directly: boolean;
                 /**
-                 * @description 0.15.11 (owner decision 2026-11-12): also load the register sheets of the file stored with the run (RF & Design, Acquisition, Permission Log, PR-PO, GECOL, HLC, As-Built, Risk Register) into their registers, as register batches of the same group. Personal columns (landlord, contact, phone, e-mail) are never read. Only here (422 otherwise).
+                 * @description 0.15.11 (owner decision 2026-11-12): also load the register sheets of the file stored with the run (RF & Design, Acquisition, Permission Log, PR-PO, GECOL, HLC, As-Built, Risk Register) into their registers, as register batches of the same group. Personal columns (landlord, contact, phone, e-mail) are never read. Only here (422 otherwise). 0.15.36: the RF & Design rows also give the dates of the Design & Acquisition tasks A2, A4 and A5.
                  * @default false
                  */
                 registers: boolean;
+                /**
+                 * @description 0.15.36 (owner decision 2026-11-17): apply again a file that another run already applied (same SHA-256). Only with `approve_directly` (422 otherwise). The open Master import batches of earlier historical loads and of this file are discarded first (status `discarded`, audited per batch, their unsent rows rejected and never applied); approved tasks stay approved and are never approved twice.
+                 * @default false
+                 */
+                reapply: boolean;
             };
         };
         MasterImportDiffResolve: {
@@ -20213,9 +20247,9 @@ export interface operations {
                 /** @description Current milestone/stage code (stable code, ADR 0010). */
                 stage_code?: string;
                 scenario?: components["schemas"]["DeliveryScenario"];
-                /** @description The stored overall status of the site. */
+                /** @description The stored overall status of the site. 0.15.36: it follows the milestones with the dashboard rule (cancelled as set; completed, on hold, in progress, not started). */
                 overall_status?: components["schemas"]["OverallStatus"];
-                /** @description 0.15.33 (migration 0119): the sites whose derived overall status, as `GET /dashboard` counts it in `headline.by_overall_status` (cancelled; completed when the last milestone is done; on hold after an approved suspension with no later resumption; in progress when a milestone is done; else not started), is this one on `ref_date`. Computed by the dashboard engine within the caller's `dashboard.view` regions (403 without it) and the filters `region_id` (when one region is given), `cluster_code`, `scenario`, `stream` and `view`, so the list count equals the card count. Not with `milestone_reached` (422). */
+                /** @description 0.15.33 (migration 0119): the sites whose derived overall status, as `GET /dashboard` counts it in `headline.by_overall_status` (cancelled; completed when the last milestone is done; on hold after an approved suspension with no later resumption; in progress when a milestone is done or, 0.15.36, a task is approved; else not started), is this one on `ref_date`. Computed by the dashboard engine within the caller's `dashboard.view` regions (403 without it) and the filters `region_id` (when one region is given), `cluster_code`, `scenario`, `stream` and `view`, so the list count equals the card count. Not with `milestone_reached` (422). */
                 dashboard_status?: components["schemas"]["OverallStatus"];
                 /** @description 0.15.33 (migration 0119): a milestone stage code (stable code, ADR 0010, for example `MS6`): the sites, not cancelled, whose milestone task is approved with its date on or before `ref_date`, as `GET /dashboard` counts them in `milestones[].completed` (the RFI, On-Air, HOTO and Final Closure cards). Same engine, regions and filters as `dashboard_status`. Not with `dashboard_status` (422). */
                 milestone_reached?: string;

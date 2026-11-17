@@ -68,7 +68,11 @@ export function mapWfError(message: string): ProblemException | null {
     case 'already_claimed':
       return new ProblemException(409, 'already_claimed', { detail: 'Another holder has claimed this level.', extra: { claimed_by: { id: extra.claimed_by } } });
     case 'invalid_transition':
-      return new ProblemException(409, 'invalid_transition', { detail: detail ?? 'This is not possible in the current state.' });
+      return new ProblemException(409, 'invalid_transition', {
+        detail: detail ?? 'This is not possible in the current state.',
+        // 0122: the Master file was already applied by another run; a System Admin may re-apply it with direct approval
+        extra: extra.already_applied === true && typeof extra.applied_run_id === 'string' ? { already_applied: true, applied_run_id: extra.applied_run_id } : undefined,
+      });
     case 'register_locked':
       // 0103 (0.15.22): a locked register record or column: only a System Admin changes it until it is unlocked
       return new ProblemException(403, 'register_locked', { detail: detail ?? 'This is locked: only a System Admin can change it.', extra: typeof extra.field === 'string' ? { field: extra.field } : undefined });

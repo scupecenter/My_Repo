@@ -88,7 +88,10 @@ export const masterImportHandlers = [
     const base = st().runs[0]!;
     // 0.15.3: a big Master (a test file named with `bigmaster<rows>`) is compared in the background: 202 `staging`, 100 rows more per read
     const big = /bigmaster(\d+)/.exec(text), t0 = now();
+    // 0.15.36: another run applied the same file (every mock upload has the same SHA-256)
+    const prior = st().runs.find((x) => x.file_sha256 === 'b2'.repeat(32) && x.status === 'applied');
     const run: MasterImportRun = { ...base, id: `run-${st().runs.length + 1}`, file_name: f.name, file_sha256: 'b2'.repeat(32), file_size: f.size, status: big ? 'staging' : 'previewed', created_at: t0,
+      applied_before: prior ? { run_id: prior.id, applied_at: prior.applied_at ?? null } : null,
       summary: big ? { ...base.summary, rows: Number(big[1]), sites_matched: Number(big[1]) } : base.summary,
       applied_by: null, applied_at: null, apply_reason: null, apply_mode: null, group_id: null, outcome: null, version: 1,
       staging: big ? { upload_id: uid('upload'), state: 'running', rows_total: Number(big[1]), rows_done: 0, percent: 0, started_at: t0, updated_at: t0, finished_at: null, error: null } : null };
@@ -133,7 +136,11 @@ export const masterImportHandlers = [
     const g = adminOnly(); if (g) return g;
     const r = st().runs.find((x) => x.id === params.id);
     if (!r) return problem(404, 'not_found', 'Not found');
-    const body = await request.json() as { mode?: string; reason?: string; historical_load?: { reason?: string; approve_directly?: boolean; registers?: boolean }; approve_directly?: unknown; registers?: unknown };
+    const body = await request.json() as { mode?: string; reason?: string; historical_load?: { reason?: string; approve_directly?: boolean; registers?: boolean; reapply?: boolean }; approve_directly?: unknown; registers?: unknown; reapply?: unknown };
+    if (body.reapply !== undefined) return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '', code: 'unrecognized_keys', message: 'Unrecognized key: reapply' }] });   // 0.15.36: only inside historical_load
+    if (body.historical_load?.reapply && !body.historical_load.approve_directly) {
+      return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '/historical_load/approve_directly', code: 'custom', message: 'Re-applying a file that was already applied is done with the direct approval.' }] });
+    }
     // 0.15.11: approve_directly exists only inside historical_load (an unknown field elsewhere)
     if (body.registers !== undefined) return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '', code: 'unrecognized_keys', message: 'Unrecognized key: registers' }] });   // 0.15.11: only inside historical_load
     if (body.approve_directly !== undefined) return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '', code: 'unrecognized_keys', message: 'Unrecognized key: approve_directly' }] });
@@ -149,6 +156,13 @@ export const masterImportHandlers = [
       if ((body.historical_load.reason ?? '').trim().length < 3) return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '/historical_load/reason', code: 'required', message: 'A reason is required.' }] });
       if (!waiver().open) return problem(409, 'invalid_transition', 'Not possible now', { detail: 'The historical-load waiver is closed: a batch cannot be accepted without documents.' });
     }
+    // 0.15.36: a file another run applied is refused, unless a System Admin re-applies it with direct approval
+    const prior = st().runs.find((x) => x.id !== r.id && x.file_sha256 === r.file_sha256 && x.status === 'applied');
+    const reapply = !!body.historical_load?.reapply;
+    if (prior && !reapply) {
+      return problem(409, 'invalid_transition', 'Not possible now', { detail: `This file was already applied (run ${prior.id}). A reconciliation run compares again; it never applies the same file twice.`,
+        already_applied: true, applied_run_id: prior.id } as never);
+    }
     // 0.14.6: a staged batch with more rows than imports.async_rows (50) is sent in the background: 202 with the run's progress
     const rowsToSend = Number((r.summary as Record<string, unknown>).applicable ?? 0), big = rowsToSend > 50, draft = body.mode === 'draft';
     const direct = !!body.historical_load?.approve_directly;   // 0.15.11: the submitted rows are approved at once (admin override, no L2)
@@ -156,7 +170,8 @@ export const masterImportHandlers = [
       batches: [{ id: uid('batch'), kind: 'stream', sheet: 'Master', ref: 'CW', rows: rowsToSend, template_id: 'TPL-SITE-CW', submitted: big || draft ? 0 : 1, saved: draft && !big ? 1 : 0, held: 0, failed: 0, errors: 0,
         approved: direct && !big && !draft ? 1 : 0,
         ...(big ? { queued: true, job_id: uid('job'), rows: rowsToSend } : {}) }] as Record<string, unknown>[], skipped: [] as Record<string, unknown>[],
-      registers: false, register_notes: [] as Record<string, unknown>[] };
+      registers: false, register_notes: [] as Record<string, unknown>[],
+      reapply, discarded: (reapply ? [{ id: uid('batch'), stream_code: 'CW', register_key: null, status_before: 'in_approval', rows_rejected: 1, rows_sent_open: 0 }] : []) as Record<string, unknown>[] };
     if (body.historical_load?.registers && !draft) {
       // 0.15.11: the register sheets of the same file, one register batch each; the sheets the file lacks are skipped with their reason
       outcome.registers = true;
