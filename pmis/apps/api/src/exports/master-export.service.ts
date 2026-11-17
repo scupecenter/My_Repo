@@ -155,6 +155,17 @@ export class MasterExportService {
     return out;
   }
 
+  /** The parts the caller may not export in any region: their Master columns are not offered in a view export. */
+  private async blockedParts(): Promise<Set<PartKey>> {
+    const cat = await this.catalogue();
+    const out = new Set<PartKey>(PART_KEYS.filter((k) => !cat.some((p) => p.key === k)));
+    for (const p of cat) {
+      const r = await this.exportRegions(p);
+      if (r !== null && r.length === 0) out.add(p.key);
+    }
+    return out;
+  }
+
   /** The regions in which the caller may export a part (B3): null = all, [] = none. */
   private exportRegions(p: PartInfo): Promise<number[] | null> {
     return this.access.regions(p.module, 'export');
@@ -197,8 +208,11 @@ export class MasterExportService {
       const out: ExportColumnDto[] = [];
       const fixed = p.key === 'sites' ? Object.entries(SITE_FIXED) : [['site_code', SITE_FIXED.site_code!] as const];
       for (const [code, f] of fixed) out.push({ code, label_en: f.en, label_ar: f.ar, master_column: f.ord ? (byOrd.get(f.ord)?.letter ?? null) : null, default_visible: true });
+      const blocked = await this.blockedParts();
       for (const c of mcols) {
         if (p.key === 'milestones' && !letters.has(c.letter)) continue;
+        const own = columnPart(c, letters);
+        if (own !== 'all' && blocked.has(own)) continue; // a column of another part needs that part's export grant
         out.push({ code: letterCode(c.letter), label_en: c.header, label_ar: c.header, master_column: c.letter, default_visible: false });
       }
       if (p.key === 'sites') {
@@ -433,7 +447,7 @@ export class MasterExportService {
       const v = scope.view;
       const p = info.get(v.source) as PartInfo;
       const regs = regionsOf.get(v.source) ?? null;
-      if (v.source === 'sites' || v.source === 'milestones') counts.push(await this.masterViewSheet(wb, auth, v, regs));
+      if (v.source === 'sites' || v.source === 'milestones') counts.push(await this.masterViewSheet(wb, auth, v, regs, regionsOf));
       else if (v.source === 'tasks') counts.push(await this.tasksViewSheet(wb, auth, v, regs));
       else if (v.source === 'project_status') counts.push(await this.projectStatusSheet(wb, auth, regs, v.columns));
       else counts.push(await this.registerSheet(wb, auth, p, regs, regionNames, { filters: v.filters, columns: v.columns }));
@@ -557,17 +571,27 @@ export class MasterExportService {
   }
 
   /** "Export current view" of the Sites list or SITE 360: the rows of GET /sites with the same query, the chosen columns in screen order, Master header rows. */
-  private async masterViewSheet(wb: ReturnType<typeof workbookWriter>, auth: AuthContext, v: View, regs: number[] | null): Promise<SheetCount> {
+  private async masterViewSheet(
+    wb: ReturnType<typeof workbookWriter>, auth: AuthContext, v: View, regs: number[] | null, regionsOf: Map<PartKey, number[] | null>,
+  ): Promise<SheetCount> {
     const cols = await this.masterColumns();
+    const ms = await this.milestoneLetters();
+    // a Master column owned by another part (milestones, tasks, dismantle) is written only where the caller may export that part
+    const canPart = (own: PartKey | 'all', region: number): boolean => {
+      if (own === 'all') return true;
+      if (!regionsOf.has(own)) return false;
+      const r = regionsOf.get(own) ?? null;
+      return r === null || r.includes(region);
+    };
     const byOrd = new Map(cols.map((c) => [c.ord, c]));
     const byLetter = new Map(cols.map((c) => [letterCode(c.letter), c]));
     const custom = new Map((await this.siteCustomFields(auth)).map((f) => [`cf:${f.code}`, f]));
-    const spec = v.columns.map((code) => {
+    const spec = v.columns.map((code): { code: string; ord: number | null; own: PartKey | 'all'; head: { group_top: string | null; group_mid: string | null; name: string | null } } => {
       const fixed = SITE_FIXED[code];
       const mc = fixed ? (fixed.ord ? byOrd.get(fixed.ord) : undefined) : byLetter.get(code);
-      if (mc) return { code, ord: mc.ord, head: { group_top: mc.group_top, group_mid: mc.group_mid, name: mc.name ?? mc.header } };
+      if (mc) return { code, ord: mc.ord, own: fixed ? 'all' : columnPart(mc, ms), head: { group_top: mc.group_top, group_mid: mc.group_mid, name: mc.name ?? mc.header } };
       const cf = custom.get(code);
-      return { code, ord: null, head: { group_top: null, group_mid: null, name: cf ? cf.label_en : (fixed?.en ?? code) } };
+      return { code, ord: null, own: 'all', head: { group_top: null, group_mid: null, name: cf ? cf.label_en : (fixed?.en ?? code) } };
     });
     const sheet = new SheetWriter(wb.addWorksheet(MASTER_SHEET, { views: [{ state: 'frozen', ySplit: MASTER_FIRST_DATA_ROW - 1 }] }));
     masterHeaderRows(spec.map((s) => s.head)).forEach((r, i) => sheet.write(i + 1, r, false));
@@ -587,7 +611,8 @@ export class MasterExportService {
         sheet.write(rowNo++, spec.map((s) => {
           if (s.code === 'current_stage') return it.next_milestone ?? null;
           if (s.code.startsWith('cf:')) return customs.get(String(it.id))?.[s.code.slice(3)] ?? null;
-          return s.ord !== null ? (vals.get(s.ord) ?? null) : null;
+          if (s.ord === null || !canPart(s.own, Number(it.region_id))) return null;
+          return vals.get(s.ord) ?? null;
         }));
       }
     }
@@ -627,17 +652,23 @@ export class MasterExportService {
     const cols = columns ?? Object.keys(PS_COLUMNS);
     const sheet = new SheetWriter(wb.addWorksheet('Project Status'));
     sheet.write(1, cols.map((c) => PS_COLUMNS[c]?.[0] ?? c), false);
-    const q: Record<string, unknown> = regs !== null && regs.length === 1 ? { region_id: String(regs[0]) } : {};
-    const ps = (await this.projectStatus.get(auth, q)) as Record<string, unknown>;
+    // project-wide figures only for an exporter limited to no region; otherwise one block per export region (GET /project-status takes one region)
+    const scopes: (number | null)[] = regs === null ? [null] : [...regs].sort((a, b) => a - b);
     let n = 2;
-    for (const a of (Array.isArray(ps.activities) ? ps.activities : []) as Record<string, unknown>[]) {
-      const value: Record<string, unknown> = {
-        activity_code: a.code ?? a.activity_code ?? null, activity_name: a.name_en ?? a.name ?? null, weight: a.weight ?? null,
-        progress_pct: a.progress_pct ?? a.actual_pct ?? null, planned_pct: a.planned_pct ?? null,
-      };
-      sheet.write(n++, cols.map((c) => value[c] ?? null));
+    for (const region of scopes) {
+      const ps = (await this.projectStatus.get(auth, region === null ? {} : { region_id: String(region) })) as Record<string, unknown>;
+      if (scopes.length > 1) sheet.write(n++, cols.map((_c, i) => (i === 0 ? `Region ${region}` : null)), false);
+      for (const a of (Array.isArray(ps.activities) ? ps.activities : []) as Record<string, unknown>[]) {
+        const value: Record<string, unknown> = {
+          activity_code: a.code ?? a.activity_code ?? null, activity_name: a.name_en ?? a.name ?? null, weight: a.weight ?? null,
+          progress_pct: a.progress_pct ?? a.actual_pct ?? null, planned_pct: a.planned_pct ?? null,
+        };
+        sheet.write(n++, cols.map((c) => value[c] ?? null));
+      }
+      const label = region === null ? 'Project' : `Region ${region}`;
+      sheet.write(n + 1, cols.map((c) => (c === 'activity_code' ? label : c === 'progress_pct' ? ps.progress_pct : c === 'planned_pct' ? ps.planned_pct : null)), false);
+      n += 3;
     }
-    sheet.write(n + 1, cols.map((c) => (c === 'activity_code' ? 'Project' : c === 'progress_pct' ? ps.progress_pct : c === 'planned_pct' ? ps.planned_pct : null)), false);
     await sheet.commit();
     return { sheet: 'Project Status', part: 'project_status', rows: sheet.rows };
   }

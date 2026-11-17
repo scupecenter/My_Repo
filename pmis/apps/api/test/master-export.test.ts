@@ -105,6 +105,22 @@ describe('GET /exports/parts', () => {
   });
 });
 
+describe('GET /exports/parts: columns of another part', () => {
+  it('does not offer the Master columns of a part the caller may not export (Dismantle FN:FW) and refuses them in a view export', async () => {
+    const a = await actor(app, db, { regions: [7], grants: EXPORTER });
+    const res = await a.api.call('get', '/exports/parts?include_columns=true');
+    const codes = res.body.items.find((p: { key: string }) => p.key === 'sites').columns.map((c: { code: string }) => c.code);
+    expect(codes).toContain('m_b');
+    expect(codes).not.toContain('m_fn');
+    expect(codes).not.toContain('m_fw');
+    const start = await a.api.call('post', '/exports/master', { view: { source: 'sites', filters: {}, columns: ['site_code', 'm_fn'] } });
+    expect(start.status).toBe(422);
+    const d = await actor(app, db, { regions: [7], grants: [...EXPORTER, ['dismantle', 'view'], ['dismantle', 'export']] });
+    const res2 = await d.api.call('get', '/exports/parts?include_columns=true');
+    expect(res2.body.items.find((p: { key: string }) => p.key === 'sites').columns.map((c: { code: string }) => c.code)).toContain('m_fn');
+  });
+});
+
 describe('POST /exports/master: checks', () => {
   it('refuses parts without the export grant (403 lists them), parts outside the Master, parts and view together, foreign regions and past dates', async () => {
     const a = await actor(app, db, { regions: [7], grants: EXPORTER });
