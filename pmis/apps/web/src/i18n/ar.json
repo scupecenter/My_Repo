@@ -1,4 +1,20 @@
 {
+  "regTypes": {
+    "contractors": {
+      "company": "شركة",
+      "team": "فريق",
+      "contract": "عقد"
+    },
+    "car_dispatcher": {
+      "vehicle": "سيارة",
+      "booking": "حجز"
+    },
+    "financial_advances": {
+      "advance": "عهدة",
+      "expense": "مصروف",
+      "settlement": "تسوية"
+    }
+  },
   "app": {
     "name": "GSDN Workspace"
   },
@@ -1788,6 +1804,7 @@
     "site": "الموقع",
     "site_search": "ابحث برمز الموقع أو اسمه",
     "record_type": "النوع",
+    "type_required": "اختر نوع السجل أولاً: يعرض النموذج بعدها حقول هذا النوع.",
     "all_types": "كل الأنواع",
     "all_states": "كل الحالات",
     "state": "الحالة",
@@ -2268,7 +2285,11 @@
     "filter_state": "الحالة: {{v}}",
     "filter_type": "النوع: {{v}}",
     "filter_bucket": "سريع: {{v}}",
-    "filter_coords": "الإحداثيات: غير صالحة"
+    "filter_coords": "الإحداثيات: غير صالحة",
+    "filter_dash_status": "حالة لوحة المؤشرات: {{v}}",
+    "filter_reached": "المرحلة المنجزة: {{v}}",
+    "filter_ref_date": "حتى تاريخ {{v}}",
+    "filter_cluster": "المجموعة: {{v}}"
   },
   "twoFactor": {
     "badge_label": "التحقق الثنائي",

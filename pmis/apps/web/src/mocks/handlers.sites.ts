@@ -60,7 +60,10 @@ export const siteHandlers = [
       .filter((x) => !view || scopedTasks(siteIndex(x.id), stream ?? undefined, view).some((t) => t.state !== 'na')) // sites with no task in the view are left out
       .filter((x) => bucket !== 'late' || (x.late_task_count ?? 0) > 0)
       .filter((x) => !stream || x.streams?.find((s) => s.code === stream)?.state !== 'na')
-      .filter((x) => !stage || (stream ? x.rail.find((r) => r.state === 'current' || r.state === 'late')?.code === stage : x.current_milestone === stage));
+      .filter((x) => !stage || (stream ? x.rail.find((r) => r.state === 'current' || r.state === 'late')?.code === stage : x.current_milestone === stage))
+      // 0.15.33: the dashboard drill-downs (the mock's status stands for the derived one; a milestone reached is a done node of the rail)
+      .filter((x) => !u.get('dashboard_status') || x.overall_status === u.get('dashboard_status'))
+      .filter((x) => !u.get('milestone_reached') || x.rail.find((r) => r.code === u.get('milestone_reached'))?.state === 'done');
     // 0.15.4: the workflow locks and the data gaps
     const wl = u.get('workflow_locks'), dg = u.get('data_gaps');
     const items2 = items.filter((x) => (!wl || (wl === 'open') === (x.workflow_locks === false)) && (!dg || (dg === 'with') === ((x.data_gaps ?? 0) > 0)));

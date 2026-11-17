@@ -221,10 +221,14 @@ export class SitesService {
     if (stream !== undefined) await this.requireGroup('stream', stream);
     if (view !== undefined) await this.requireGroup('view', view);
     const where = await this.baseWhere(auth, q, regions);
+    // 0.15.33 (audit E section 2, migration 0119): the sites a dashboard card counts, from the dashboard's own engine, so the card and its list agree
+    const drill = await this.drillIds(q, stream, view);
+    if (drill) where.push(Prisma.sql`s.id = ANY(${drill}::uuid[])`);
 
     const post: Prisma.Sql[] = [];
     if (stageCode) post.push(Prisma.sql`ss.cur_stage = ${stageCode}`);
-    if (stream || view) post.push(Prisma.sql`coalesce(ss.has_work, false)`);
+    // with a dashboard filter the stream and the view keep the sites by the dashboard's rule (dash_drill_sites), not by the list's own
+    if ((stream || view) && !drill) post.push(Prisma.sql`coalesce(ss.has_work, false)`);
     if (bucket === 'late') post.push(Prisma.sql`coalesce(ss.late, 0) > 0`);
     else if (bucket === 'waiting_approval') post.push(Prisma.sql`coalesce(ss.waiting, 0) > 0`);
     else if (bucket === 'closed') post.push(Prisma.sql`(vis.overall_status = 'completed' OR (coalesce(ss.all_done, false) AND coalesce(ss.has_work, false)))`);
@@ -286,6 +290,39 @@ export class SitesService {
         total: rows[0] ? Number(rows[0].total) : 0,
       },
     };
+  }
+
+  /**
+   * 0.15.33 (audit E section 2, migration 0119): `dashboard_status` (the derived overall status of the dashboard's status chips) or `milestone_reached`
+   * (the sites whose milestone is done: the RFI, On-Air, HOTO and Final Closure cards), as of `ref_date` (default today; a past date reads its snapshot
+   * when there is one), with the dashboard filters region_id (one region), cluster_code, scenario, stream and view. The set is computed by
+   * dash_drill_sites with the engine of GET /dashboard (the caller's dashboard.view regions), so the list count equals the card count. Null = no
+   * dashboard filter.
+   */
+  private async drillIds(q: Record<string, unknown>, stream: string | undefined, view: string | undefined): Promise<string[] | null> {
+    const status = oneParam(q, 'dashboard_status');
+    const milestone = oneParam(q, 'milestone_reached');
+    const ref = oneParam(q, 'ref_date');
+    if (ref !== undefined && (!/^\d{4}-\d{2}-\d{2}$/.test(ref) || Number.isNaN(Date.parse(`${ref}T00:00:00Z`)) || new Date(`${ref}T00:00:00Z`).toISOString().slice(0, 10) !== ref)) {
+      throw problems.validation([{ path: '/ref_date', code: 'invalid', message: 'ref_date is a date, YYYY-MM-DD.' }]);
+    }
+    if (status === undefined && milestone === undefined) {
+      if (ref !== undefined) throw problems.validation([{ path: '/ref_date', code: 'invalid', message: 'ref_date goes with dashboard_status or milestone_reached.' }]);
+      return null;
+    }
+    if (status !== undefined && milestone !== undefined) {
+      throw problems.validation([{ path: '/milestone_reached', code: 'invalid', message: 'Use dashboard_status or milestone_reached, not both.' }]);
+    }
+    if (status !== undefined && !STATUSES.includes(status)) throw problems.validation([{ path: '/dashboard_status', code: 'invalid', message: 'Unknown overall status.' }]);
+    if (milestone !== undefined && !/^[A-Za-z0-9_-]{1,40}$/.test(milestone)) {
+      throw problems.validation([{ path: '/milestone_reached', code: 'invalid', message: 'milestone_reached is a milestone (stage) code such as MS6.' }]);
+    }
+    const regionIds = this.intList(q, 'region_id', 1, 7);
+    const region = regionIds.length === 1 ? regionIds[0]! : null;
+    const r = await this.db.tx.$queryRaw<{ ids: string[] | null }[]>(Prisma.sql`
+      SELECT dash_drill_sites(${ref ?? null}::date, ${region}::int, ${oneParam(q, 'cluster_code') ?? null}::text, ${oneParam(q, 'scenario') ?? null}::text,
+        ${stream ?? null}::text, ${view ?? null}::text, ${status ?? null}::text, ${milestone ?? null}::text)::text[] AS ids`);
+    return r[0]?.ids ?? [];
   }
 
   /**

@@ -205,7 +205,8 @@ describe('GET /site360/{menu}/rows: the calc columns of the procurement and GECO
     expect(res.status).toBe(200);
     expect(res.body.rows[0].values['36']).toBe(name);
     expect(res.body.rows[0].values['37']).toBe(`${name} team`);
-    expect(res.body.rows[0].values['75']).toBe('energised');
+    // 0119: BW is the workbook formula (the scope AC of this site is N/A); the unwritten gecol_records.status is no longer read
+    expect(res.body.rows[0].values['75']).toBe('N/A');
     const hit = await a.api.call('get', `/site360/master/rows?site_code=${s.code}&contractor=${encodeURIComponent(name)}`);
     expect(hit.body.filtered).toBe(1);
     const miss = await a.api.call('get', `/site360/master/rows?site_code=${s.code}&contractor=${encodeURIComponent(`${name}-X`)}`);

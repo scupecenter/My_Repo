@@ -447,3 +447,64 @@ describe('document rules judge the raw record, never the viewer-masked projectio
     }
   });
 });
+
+describe('voiding a vehicle (migration 0119, audit C X4): its future reservations are cancelled, the past ones stay', () => {
+  /** A reservation written straight as the definer (the shape fa_rules writes on a booking approval), `fromAgo`..`toAgo` days from today (negative = ahead). */
+  async function reservation(vehicleEntity: string, bookingRecord: string, fromAgo: number, toAgo: number): Promise<string> {
+    await db.query('BEGIN');
+    try {
+      await db.query('SET LOCAL ROLE pmis_definer');
+      const r = await db.query(
+        `INSERT INTO vehicle_reservations (vehicle_entity_id, booking_entity_id, booking_record_id, period) VALUES ($1, gen_random_uuid(), $2, daterange(cal_today() - $3::int, cal_today() - $4::int + 1)) RETURNING id`,
+        [vehicleEntity, bookingRecord, fromAgo, toAgo]);
+      await db.query('COMMIT');
+      return r.rows[0].id as string;
+    } catch (e) {
+      await db.query('ROLLBACK');
+      throw e;
+    }
+  }
+  const stateOf = async (id: string): Promise<string> => (await q<{ state: string }>(db, 'SELECT state FROM vehicle_reservations WHERE id = $1', [id]))[0]!.state;
+  const voiderOf = (): Promise<Actor> => actor(app, db, { level: 'entry', grants: G('car_dispatcher', 'view', 'create', 'edit', 'delete'), regions: null, modules: null });
+
+  it('a vehicle with no approved version in force: the future reservation is cancelled with an audit row, past and running ones stay', async () => {
+    const c = await setup();
+    const voider = await voiderOf();
+    // an approved booking (the record the reservations point at) and a vehicle that was never approved
+    const veh = await newVehicle(c);
+    const a1 = await assignment(c, { advance_required: false, advance_not_required_reason: 'none' });
+    const booked = await reserve(c, (await children(c.car, 'booking', a1))[0]!, veh);
+    const draft = await mk(c.car, 'vehicle', { plate_no: `V-${uniq()}`, vehicle_type: 'Van', home_region: 'Tripoli', permit_expiry: '2030-01-01', insurance_expiry: '2030-01-01', vehicle_status: 'available' }, false);
+    const past = await reservation(draft.entity_id, booked.id, 12, 10);
+    const running = await reservation(draft.entity_id, booked.id, 1, -1);
+    const future = await reservation(draft.entity_id, booked.id, -5, -7);
+    const res = await voider.api.call('post', recPath('car_dispatcher', draft.id, '/void'), { reason: 'Vehicle sold' }, { 'If-Match': `"${draft.version}"` });
+    expect(res.status).toBe(200);
+    expect(res.body.state).toBe('voided');
+    expect(await stateOf(future)).toBe('cancelled');
+    expect(await stateOf(past)).toBe('reserved');
+    expect(await stateOf(running)).toBe('reserved');
+    const audit = await q<{ reason: string; after: { reservations: { reservation_id: string }[] } }>(db,
+      `SELECT reason, after FROM audit_log WHERE action = 'vehicle_reservations_cancel' AND entity_id = $1`, [draft.id]);
+    expect(audit).toHaveLength(1);
+    expect(audit[0]!.reason).toBe('Vehicle sold');
+    expect(audit[0]!.after.reservations.map((x) => x.reservation_id)).toEqual([future]);
+    // the approved vehicle's own reservation is untouched
+    expect((await q<{ n: number }>(db, `SELECT count(*)::int AS n FROM vehicle_reservations WHERE vehicle_entity_id = $1 AND state = 'reserved'`, [veh.entity_id]))[0]!.n).toBe(1);
+  });
+
+  it('voiding a draft new version of a vehicle in force cancels nothing', async () => {
+    const c = await setup();
+    const voider = await voiderOf();
+    const veh = await newVehicle(c);
+    const a1 = await assignment(c, { advance_required: false, advance_not_required_reason: 'none' });
+    const booked = await reserve(c, (await children(c.car, 'booking', a1))[0]!, veh);
+    const future = await reservation(veh.entity_id, booked.id, -20, -22);
+    const nv = await c.car.entry.api.call('post', recPath('car_dispatcher', veh.id, '/versions'), undefined, { 'If-Match': `"${veh.version}"` });
+    expect(nv.status).toBe(201);
+    const res = await voider.api.call('post', recPath('car_dispatcher', nv.body.id, '/void'), { reason: 'Edit dropped' }, { 'If-Match': `"${nv.body.version}"` });
+    expect(res.status).toBe(200);
+    expect(await stateOf(future)).toBe('reserved');
+    expect(await q(db, `SELECT 1 FROM audit_log WHERE action = 'vehicle_reservations_cancel' AND entity_id = $1`, [nv.body.id])).toHaveLength(0);
+  });
+});

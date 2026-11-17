@@ -10,7 +10,7 @@ import { useAddRegisterComment, useRegisterComments } from '@/api/x';
 import type { RegisterDefinition, RegisterRecord } from '@/api/types';
 import { registerErrorMessage, serverFieldIssues } from '@/lib/registerErrors';
 import { cellLevel } from '@/lib/matrixLevels';
-import { defaultsFor, forEntry, OWNER_NOTE, patchData, sectionsFor, validateRecord, visibleData, type FieldIssue } from '@/lib/registerForms';
+import { defaultsFor, forEntry, forType, OWNER_NOTE, patchData, sectionsFor, typeData, typeRequired, validateRecord, visibleData, type FieldIssue } from '@/lib/registerForms';
 import { tripoliToday } from '@/lib/today';
 import { FieldHistory } from './logs/FieldHistory';
 import { FieldInput, fieldLabel, issueText, showValue, SitePicker } from './RegisterFields';
@@ -114,10 +114,20 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
   const dr = useDraft(`record.${rawDef.register_key}.${record?.id ?? 'new'}`, { data, record_type: rtype }, dirty, editable);
   // 0042: the form offers only the scopes the caller may enter (the HLC Fiber Team: scope HLC); a read-only view shows the record as it is
   // 0.12.2 (Q222, D220b): the permit form offers only the permit types the caller may enter, and the streams they may choose for a purpose-based type
-  const def = editable ? forEntry(rawDef, data) : rawDef;
-  const issues = { ...validateRecord(def, data, site?.id ?? null, tripoliToday()), ...server };
+  // audit 2026-11-17 (C X2 / X3): a register with record types asks for the type on every new record (site-scoped or not, so a company, team,
+  // contract, vehicle or booking is never created untyped), and the form shows only the fields of the chosen type
+  const types = rawDef.record_types ?? [];
+  const typeMissing = !record && types.length > 0 && !rtype && typeRequired(key);
+  // an older record saved without a type keeps every field visible (nothing to choose from any more)
+  const untypedRecord = !!record && !rtype;
+  const base = editable ? forEntry(rawDef, data) : rawDef;
+  const def = untypedRecord ? base : forType(base, rtype);
+  const issues: Record<string, FieldIssue> = { ...validateRecord(def, data, site?.id ?? null, tripoliToday()), ...(typeMissing ? { record_type: { code: 'required' } } : {}), ...server };
   const issueList = Object.keys(issues);
-  const labelOf = (code: string) => { const f = def.fields.find((x) => x.code === code); return f ? fieldLabel(f, lang) : code; };
+  const typeLabel = (x: string) => t(`regTypes.${key}.${x}`, { defaultValue: x.toUpperCase() });
+  const labelOf = (code: string) => { if (code === 'record_type') return t('registers.record_type'); const f = def.fields.find((x) => x.code === code); return f ? fieldLabel(f, lang) : code; };
+  /** The values sent: those of the chosen record type only. */
+  const typed = (d: Data) => (untypedRecord ? d : typeData(rawDef, rtype, d));
   const sections = sectionsFor(def, data);
   const set = (code: string, v: unknown) => { setData((d) => ({ ...d, [code]: v })); setDirty(true); setServer((s) => { const n = { ...s }; delete n[code]; return n; }); };
   const fail = (e: unknown) => { setServer(serverFieldIssues(e)); const m = reservedMessage(t, e) ?? registerErrorMessage(t, e); if (m) toast(m, 'err'); };
@@ -138,11 +148,12 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
   const save = () => {
     setTried(true);
     if (!site && def.site_scoped) { setServer({ site_id: { code: 'site_required' } }); return; }
-    const body = visibleData(def, data);
+    if (typeMissing) { setServer({ record_type: { code: 'required' } }); return; }
+    const body = visibleData(def, typed(data));
     if (!record) create.mutate({ site_id: site?.id, site_code: site?.code, region_id: site?.region_id, ...(rtype ? { record_type: rtype } : {}), data: body }, {
       onSuccess: (r) => { dr.clear(); toast(t('registers.saved')); setDirty(false); onCreated(r.id); }, onError: fail,
     });
-    else update.mutate({ record, patch: { data: patchData(def, record.data, data) } }, { onSuccess: () => { dr.clear(); toast(t('registers.saved')); setDirty(false); }, onError: fail });
+    else update.mutate({ record, patch: { data: patchData(def, record.data, typed(data)) } }, { onSuccess: () => { dr.clear(); toast(t('registers.saved')); setDirty(false); }, onError: fail });
   };
   const run = (o: RecordOp, r: RegisterRecord, note?: string) => op.mutate({ record: r, op: o, note }, {
     onSuccess: () => { toast(t(o === 'void' ? 'registers.voided' : 'approvals.done')); setRejecting(false); setVoiding(false); },
@@ -152,12 +163,12 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
     setTried(true);
     if (issueList.length) return;
     if (!record) {
-      create.mutate({ site_id: site?.id, site_code: site?.code, region_id: site?.region_id, ...(rtype ? { record_type: rtype } : {}), data: visibleData(def, data) }, {
+      create.mutate({ site_id: site?.id, site_code: site?.code, region_id: site?.region_id, ...(rtype ? { record_type: rtype } : {}), data: visibleData(def, typed(data)) }, {
         // the drawer switches to the saved record only after the submit answered, so the buttons below keep their callbacks
         onSuccess: (r) => op.mutate({ record: r, op: 'submit' }, { onSuccess: () => { toast(t('approvals.done')); onCreated(r.id); }, onError: (e) => { fail(e); onCreated(r.id); } }),
         onError: fail,
       });
-    } else if (dirty) update.mutate({ record, patch: { data: patchData(def, record.data, data) } }, { onSuccess: (r) => { setDirty(false); run('submit', r); }, onError: fail });
+    } else if (dirty) update.mutate({ record, patch: { data: patchData(def, record.data, typed(data)) } }, { onSuccess: (r) => { setDirty(false); run('submit', r); }, onError: fail });
     else run('submit', record);
   };
   const busy = create.isPending || update.isPending || op.isPending || cancelSnag.isPending || claim.isPending || newVersion.isPending || transfer.isPending;
@@ -170,7 +181,7 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
     <div className="flex h-full flex-col" data-testid="register-drawer-body" data-state={record?.state ?? 'new'}>
       <header className="flex items-start gap-2 border-b border-line p-4">
         <div className="flex-1">
-          <Dialog.Title className="font-bold">{name} · {record ? <span className="mono">{record.site_code ?? '—'}</span> : t('registers.new')}{record?.record_type && <span className="chip ms-2 bg-card2">{record.record_type.toUpperCase()}</span>}</Dialog.Title>
+          <Dialog.Title className="font-bold">{name} · {record ? <span className="mono">{record.site_code ?? '—'}</span> : t('registers.new')}{record?.record_type && <span className="chip ms-2 bg-card2">{typeLabel(record.record_type)}</span>}</Dialog.Title>
           <Dialog.Description className="mt-1 flex flex-wrap items-center gap-2 text-sm text-mute">
             {record ? <><span className={`chip ${STATE_TONE[record.state]}`} data-testid="reg-state">{t(`regState.${record.state}`)}</span>{t('drawer.level', { level: record.current_level ?? 1, total: n })}</> : t('registers.new_hint')}
           </Dialog.Description>
@@ -221,12 +232,20 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
                   : <div className="mono font-semibold">{site?.code ?? '—'}</div>}
                 {issues.site_id && tried && <p id="reg-site-error" role="alert" data-testid="reg-error-site_id" className="text-sm text-lateInk">{t(`regErrors.${issues.site_id.code}`, { defaultValue: t('regErrors.invalid', { field: t('registers.site') }) })}</p>}
               </div>
-              {def.record_types && def.record_types.length > 0 && (
-                <div><label htmlFor="reg-record-type" className="text-sm text-mute">{t('registers.record_type')}</label>
-                  {editable && !record ? <select id="reg-record-type" data-testid="reg-record-type" className="input" value={rtype} onChange={(e) => { setRtype(e.target.value); setDirty(true); }}><option value="">{t('registers.choose')}</option>{def.record_types.map((x) => <option key={x} value={x}>{x.toUpperCase()}</option>)}</select>
-                    : <div className="font-semibold">{rtype ? rtype.toUpperCase() : '—'}</div>}
-                </div>
-              )}
+            </section>
+          )}
+          {types.length > 0 && (
+            <section aria-labelledby="rs-type" className="space-y-2" data-testid="reg-section-type">
+              {!def.site_scoped && <h3 id="rs-type" className="font-semibold">{t('registers.record_type')}</h3>}
+              <div><label htmlFor="reg-record-type" id={def.site_scoped ? 'rs-type' : undefined} className="text-sm text-mute">{t('registers.record_type')}{typeRequired(key) ? ' *' : ''}</label>
+                {editable && !record
+                  ? <select id="reg-record-type" data-testid="reg-record-type" className="input" value={rtype} aria-invalid={!!issues.record_type && tried} aria-required={typeRequired(key)}
+                      onChange={(e) => { setRtype(e.target.value); setDirty(true); setServer((x) => { const m = { ...x }; delete m.record_type; return m; }); }}>
+                      <option value="">{t('registers.choose')}</option>{types.map((x) => <option key={x} value={x}>{typeLabel(x)}</option>)}
+                    </select>
+                  : <div className="font-semibold" data-testid="reg-view-record_type">{rtype ? typeLabel(rtype) : '—'}</div>}
+                {issues.record_type && tried && <p role="alert" data-testid="reg-error-record_type" className="text-sm text-lateInk">{t('registers.type_required')}</p>}
+              </div>
             </section>
           )}
           {sections.map((s) => (

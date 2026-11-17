@@ -71,6 +71,47 @@ export function isHidden(key: string, code: string, d: Data, def?: RegisterDefin
   return false;
 }
 
+/**
+ * The fields of each record type, for the registers whose types have fields of their own (audit 2026-11-17, C X2 / X3): the form shows only the
+ * fields of the chosen type, and none until a type is chosen. Contractors mirrors the server's submit rules (0025 and 0061 refuse any other field
+ * with `not_applicable`); Car Dispatcher and Financial Advances follow the sections of their fields (0076; a settlement also names its advance).
+ * Custom fields stay on every type. The other registers show every field whatever the type.
+ */
+const TYPE_FIELDS: Record<string, Record<string, { codes?: string[]; sections?: string[] }>> = {
+  contractors: {
+    company: { codes: ['contractor_name', 'company_type', 'contract_ref', 'contract_start', 'contract_end', 'company_status'] },
+    team: { codes: ['team_name', 'team_type', 'contractor', 'specialization', 'team_status', 'more_specializations', 'safety_cert_expiry', 'team_lead_user'] },
+    contract: { codes: ['contractor', 'contract_ref', 'contract_start', 'contract_end', 'contract_scopes', 'contract_status'] },
+  },
+  car_dispatcher: { vehicle: { sections: ['Vehicle'] }, booking: { sections: ['Booking'] } },
+  financial_advances: { advance: { sections: ['Advance'] }, expense: { sections: ['Expense'] }, settlement: { codes: ['advance_id'], sections: ['Settlement'] } },
+};
+
+/** A register whose record types have fields of their own needs the type on every new record (the server would keep an untyped one). */
+export const typeRequired = (key: string): boolean => key in TYPE_FIELDS;
+
+/** True when the field is not one of the chosen record type's (always false for a register without per-type fields, and for custom fields). */
+export function typeHides(key: string, rtype: string, f: RegisterField): boolean {
+  const types = TYPE_FIELDS[key];
+  if (!types || f.is_custom) return false;
+  const rule = types[rtype];
+  if (!rule) return true;
+  return !(rule.codes?.includes(f.code) || (!!f.section && !!rule.sections?.includes(f.section)));
+}
+
+/** The definition as the form of one record type shows it: only the fields of that type (see TYPE_FIELDS). */
+export function forType(def: RegisterDefinition, rtype: string): RegisterDefinition {
+  if (!TYPE_FIELDS[def.register_key]) return def;
+  return { ...def, fields: def.fields.filter((f) => !typeHides(def.register_key, rtype, f)) };
+}
+
+/** The values of the chosen type only: a value typed under another type before the type was changed is not sent. */
+export function typeData(def: RegisterDefinition, rtype: string, d: Data): Data {
+  if (!TYPE_FIELDS[def.register_key]) return d;
+  const other = new Set(def.fields.filter((f) => typeHides(def.register_key, rtype, f)).map((f) => f.code));
+  return Object.fromEntries(Object.entries(d).filter(([c]) => !other.has(c)));
+}
+
 /** The data the server accepts: no hidden field, no system-filled field (`read_only`, Q45), no empty value. */
 export function visibleData(def: RegisterDefinition, d: Data): Data {
   const ro = new Set(def.fields.filter((f) => f.read_only).map((f) => f.code));
