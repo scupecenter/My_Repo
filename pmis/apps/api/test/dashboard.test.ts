@@ -366,7 +366,8 @@ describe('reference date (Q34)', () => {
     // 25 days ago: T1 4 milestones done · T2 0 (its MS1 is 20 days old) · T4 8 · T6 7 · B1 6 · B2 0 · T3 B3 0
     const done = Object.fromEntries(d.headline.milestones.map((m: J) => [m.code, m.done]));
     expect(done).toEqual({ MS1: 4, MS2: 4, MS3: 4, MS4: 4, MS5: 3, MS6: 3, MS7: 2, MS8: 1, MS9: 0, MS10: 0 });
-    expect(d.headline.by_overall_status).toEqual({ not_started: 4, in_progress: 4, on_hold: 0, completed: 0, cancelled: 1 });
+    // 0122 (owner decision 2026-11-17): a site with a task approved by the reference date is in progress even with no milestone done (T2)
+    expect(d.headline.by_overall_status).toEqual({ not_started: 3, in_progress: 5, on_hold: 0, completed: 0, cancelled: 1 });
     expect(d.gates.available).toBe(false);
     expect(d.headline.final_closure).toMatchObject({ sites_total: 0, sites_closed: 0 });
   });

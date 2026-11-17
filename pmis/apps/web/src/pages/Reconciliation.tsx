@@ -1,5 +1,5 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import { FileDown, FileSpreadsheet, FileUp, Play } from 'lucide-react';
+import { FileDown, FileSpreadsheet, FileUp, Play, RotateCcw } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
@@ -192,7 +192,9 @@ function RunDetail({ id }: { id: string }) {
   const run = useMasterRun(id);
   const [f, setF] = useState<DiffFilters>({ kind: '', reason: '', resolution: '', site_code: '' });
   const diffs = useMasterDiffs(id, f);
-  const [applying, setApplying] = useState(false);
+  const [applying, setApplying] = useState<false | 'apply' | 'reapply'>(false);
+  // 0.15.36 (owner decision 2026-11-17): a file another run already applied may be re-applied with direct approval, by a System Admin while the waiver is open
+  const reapplyOffer = useHistoricalOffer(run.data?.status === 'previewed' && !!run.data?.applied_before);
   const [resolving, setResolving] = useState<MasterImportDiff | null>(null);
   if (run.isLoading) return <LoadingSkeleton />;
   if (!run.data) return <ErrorState onRetry={() => void run.refetch()} />;
@@ -210,7 +212,10 @@ function RunDetail({ id }: { id: string }) {
         <span className="ms-auto flex flex-wrap gap-1">
           <button className="btn px-2 py-1 text-xs" data-testid="mi-export" onClick={() => void down(exportDiffs(r.id, f))}><FileSpreadsheet size={14} />{t('mi.export')}</button>
           {r.has_file && <button className="btn px-2 py-1 text-xs" data-testid="mi-original" onClick={() => void down(downloadOriginal(r.id))}><FileDown size={14} />{t('mi.original')}</button>}
-          {r.status === 'previewed' && <button className="btn btn-primary px-2 py-1 text-xs" data-testid="mi-apply" onClick={() => setApplying(true)}><Play size={14} />{t('mi.apply')}</button>}
+          {r.status === 'previewed' && <button className="btn btn-primary px-2 py-1 text-xs" data-testid="mi-apply" onClick={() => setApplying('apply')}><Play size={14} />{t('mi.apply')}</button>}
+          {r.status === 'previewed' && r.applied_before && reapplyOffer && (
+            <button className="btn px-2 py-1 text-xs" data-testid="mi-reapply" onClick={() => setApplying('reapply')}><RotateCcw size={14} />{t('mi.reapply')}</button>
+          )}
         </span>
       </div>
       <div className="card grid gap-2 p-3 text-sm sm:grid-cols-2" data-testid="mi-structure">
@@ -220,6 +225,11 @@ function RunDetail({ id }: { id: string }) {
         {missing.length > 0 && <p data-testid="mi-missing">{t('mi.missing', { list: missing.slice(0, 5).map((m) => m.header).join(', ') })}</p>}
         {sheetsMissing.length > 0 && <p className="text-mute">{t('mi.sheets_missing', { list: sheetsMissing.join(', ') })}</p>}
         <p className="text-mute">{t('mi.staff', { mapped: num(r.summary, 'staff_mapped'), rows: num(r.summary, 'staff_rows') })}</p>
+        {r.status === 'previewed' && r.applied_before && (
+          <p data-testid="mi-applied-before" className="text-waitInk sm:col-span-2">
+            {t('mi.applied_before', { run: r.applied_before.run_id.slice(0, 8), date: r.applied_before.applied_at ? new Date(r.applied_before.applied_at).toLocaleDateString() : '' })}
+          </p>
+        )}
         {r.status === 'applied' && <p data-testid="mi-applied" className="font-semibold">{t('mi.applied', { mode: t(`mi.mode_${r.apply_mode}`), reason: r.apply_reason ?? '' })}</p>}
       </div>
       <RunStaging r={r} />
@@ -263,7 +273,7 @@ function RunDetail({ id }: { id: string }) {
       </div>
       {/* 0.15.4 (migration 0085): every site of the file with its status and its missing data; the sites opened by a historical load are locked again here */}
       {r.status === 'applied' && <ImportSitesPanel source="run" id={r.id} canManage />}
-      {applying && <ApplyDialog run={r} onClose={() => setApplying(false)} />}
+      {applying && <ApplyDialog run={r} reapply={applying === 'reapply'} onClose={() => setApplying(false)} />}
       {resolving && <ResolveDialog diff={resolving} onClose={() => setResolving(null)} />}
     </section>
   );
@@ -302,52 +312,63 @@ function RunOutcome({ o }: { o: MasterImportOutcome }) {
   );
 }
 
-function ApplyDialog({ run, onClose }: { run: MasterImportRun; onClose: () => void }) {
+function ApplyDialog({ run, reapply = false, onClose }: { run: MasterImportRun; reapply?: boolean; onClose: () => void }) {
   const { t } = useTranslation();
   const toast = useToast();
   const apply = useApplyRun();
   const [mode, setMode] = useState<'submit' | 'draft'>('submit');
+  // 0.15.36 (owner decision 2026-11-17): re-apply a file already applied, with direct approval (System Admin, waiver open, reason, step-up); the server says
+  // `already_applied` when a plain apply is refused, and the dialog then offers the re-apply
+  const [reapplyMode, setReapplyMode] = useState(reapply);
+  const [alreadyApplied, setAlreadyApplied] = useState(false);
   const [reason, setReason] = useState('');
   // Q462 (0.14.3): "historical load: accept without documents", for a System Admin while the waiver is open; a draft has no document check
   const offer = useHistoricalOffer(mode === 'submit');
-  const [hist, setHist] = useState<HistoricalChoice>(NO_HISTORICAL);
+  const [hist, setHist] = useState<HistoricalChoice>(reapply ? { on: true, reason: '' } : NO_HISTORICAL);
   // 0.15.11 (owner decision 2026-11-12): approve the submitted tasks of the historical load directly, as an admin override (no L2); only with the historical option
   const [directChoice, setDirect] = useState(false);
-  const direct = !!offer && hist.on && directChoice;
+  const direct = !!offer && hist.on && (directChoice || reapplyMode);
   // 0.15.11 (owner decision 2026-11-12, "Everything from the one file"): also load the register sheets of the same file; only with the historical option
-  const [registersChoice, setRegisters] = useState(false);
+  const [registersChoice, setRegisters] = useState(reapply);
   const registers = !!offer && hist.on && registersChoice;
   const [err, setErr] = useState<string | null>(null);
-  const go = () => apply.mutate({ run, mode, reason, ...(offer && hist.on ? { historical_load: { reason: hist.reason.trim(), ...(direct ? { approve_directly: true } : {}), ...(registers ? { registers: true } : {}) } } : {}) }, {
+  const go = () => apply.mutate({ run, mode, reason, ...(offer && hist.on ? { historical_load: { reason: hist.reason.trim(), ...(direct ? { approve_directly: true } : {}), ...(registers ? { registers: true } : {}),
+    ...(reapplyMode && direct ? { reapply: true } : {}) } } : {}) }, {
     onSuccess: (r) => {
       const approved = (r.outcome?.batches ?? []).reduce((n, b) => n + (b.approved ?? 0), 0);
       toast(r.status === 'applying' ? t('mi.applying_queued') : r.progress?.state === 'running' ? t('mi.applied_processing')
-        : r.outcome?.approve_directly ? t('mi.approved_directly_toast', { count: approved }) : t('mi.applied_toast', { count: r.outcome?.batches?.length ?? 0 }));
+        : r.outcome?.reapply ? t('mi.reapplied_toast', { count: approved, discarded: r.outcome.discarded?.length ?? 0 })
+          : r.outcome?.approve_directly ? t('mi.approved_directly_toast', { count: approved }) : t('mi.applied_toast', { count: r.outcome?.batches?.length ?? 0 }));
       onClose();
     },
-    onError: (e) => setErr(e.problem.detail ?? registerErrorMessage(t, e)),
+    onError: (e) => {
+      setAlreadyApplied(e.code === 'invalid_transition' && e.problem.already_applied === true);
+      setErr(e.problem.detail ?? registerErrorMessage(t, e));
+    },
   });
+  const toReapply = () => { setReapplyMode(true); setMode('submit'); setHist((h) => ({ ...h, on: true })); setRegisters(true); setErr(null); setAlreadyApplied(false); };
   return (
     <Dialog.Root open onOpenChange={(o) => { if (!o) onClose(); }}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-[70] bg-scrim/60" />
         <Dialog.Content data-testid="mi-apply-dialog" className="card fixed inset-x-0 top-[12vh] z-[70] mx-auto w-[min(520px,94vw)] space-y-3 p-5">
-          <Dialog.Title className="text-lg font-bold">{t('mi.apply_title')}</Dialog.Title>
+          <Dialog.Title className="text-lg font-bold">{t(reapplyMode ? 'mi.reapply_title' : 'mi.apply_title')}</Dialog.Title>
           <Dialog.Description className="text-sm text-mute">{t('mi.apply_hint', { count: num(run.summary, 'applicable') })}</Dialog.Description>
+          {reapplyMode && <p role="note" className="rounded-md border border-line bg-waitBg p-2 text-xs text-lateInk" data-testid="mi-reapply-note">{t('mi.reapply_note')}</p>}
           <fieldset className="space-y-1 text-sm">
             <legend className="font-semibold">{t('mi.mode')}</legend>
             {(['submit', 'draft'] as const).map((m) => (
-              <label key={m} className="flex items-center gap-2"><input type="radio" name="mi-mode" value={m} data-testid={`mi-mode-${m}`} checked={mode === m} onChange={() => setMode(m)} />{t(`mi.mode_${m}`)}</label>
+              <label key={m} className="flex items-center gap-2"><input type="radio" name="mi-mode" value={m} data-testid={`mi-mode-${m}`} checked={mode === m} disabled={reapplyMode && m === 'draft'} onChange={() => setMode(m)} />{t(`mi.mode_${m}`)}</label>
             ))}
           </fieldset>
           {offer && <HistoricalLoadOption waiver={offer} value={hist} onChange={setHist} testid="hl" />}
           {offer && hist.on && (
             <div className="space-y-1 rounded-md border border-line bg-waitBg p-3 text-sm" data-testid="mi-direct-option">
               <label className="flex items-start gap-2">
-                <input type="checkbox" data-testid="mi-approve-directly" checked={directChoice} onChange={(e) => setDirect(e.target.checked)} />
+                <input type="checkbox" data-testid="mi-approve-directly" checked={directChoice || reapplyMode} disabled={reapplyMode} onChange={(e) => setDirect(e.target.checked)} />
                 <span className="font-semibold text-waitInk">{t('mi.approve_directly')}</span>
               </label>
-              {directChoice && <p role="note" className="text-xs text-lateInk" data-testid="mi-approve-directly-warn">{t('mi.approve_directly_warn')}</p>}
+              {(directChoice || reapplyMode) && <p role="note" className="text-xs text-lateInk" data-testid="mi-approve-directly-warn">{t('mi.approve_directly_warn')}</p>}
               <label className="flex items-start gap-2 pt-1">
                 <input type="checkbox" data-testid="mi-load-registers" checked={registersChoice} onChange={(e) => setRegisters(e.target.checked)} />
                 <span>{t('mi.load_registers')}</span>
@@ -360,9 +381,15 @@ function ApplyDialog({ run, onClose }: { run: MasterImportRun; onClose: () => vo
             <textarea id="mi-reason" className="input mt-1 w-full" data-testid="mi-apply-reason" value={reason} onChange={(e) => setReason(e.target.value)} />
           </div>
           {err && <p role="alert" className="text-sm text-lateInk" data-testid="mi-apply-error">{err}</p>}
+          {alreadyApplied && !reapplyMode && offer && (
+            <button className="btn px-2 py-1 text-xs" data-testid="mi-reapply-offer" onClick={toReapply}><RotateCcw size={14} />{t('mi.reapply_offer')}</button>
+          )}
           <div className="flex justify-end gap-2">
             <button className="btn" onClick={onClose}>{t('common.cancel')}</button>
-            <button className="btn btn-primary" data-testid="mi-apply-confirm" disabled={reason.trim().length < 3 || apply.isPending || (!!offer && !historicalReady(hist))} onClick={go}>{t('mi.apply')}</button>
+            <button className="btn btn-primary" data-testid="mi-apply-confirm"
+              disabled={reason.trim().length < 3 || apply.isPending || (!!offer && !historicalReady(hist)) || (reapplyMode && (!offer || !hist.on))} onClick={go}>
+              {t(reapplyMode ? 'mi.reapply' : 'mi.apply')}
+            </button>
           </div>
         </Dialog.Content>
       </Dialog.Portal>

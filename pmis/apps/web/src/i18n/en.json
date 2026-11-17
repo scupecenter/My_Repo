@@ -4021,7 +4021,13 @@
     "applying_title": "Applying the Master",
     "applying_running": "Applying {{sites}} sites in the background…",
     "applying_note": "The whole file is applied in one go (all or nothing). It takes about a minute for 500 sites; you can leave this page.",
-    "applying_failed": "The background apply did not end, nothing was changed. You can apply the file again."
+    "applying_failed": "The background apply did not end, nothing was changed. You can apply the file again.",
+    "applied_before": "This file was already applied on {{date}} (run {{run}}). A plain apply is refused.",
+    "reapply": "Re-apply with direct approval",
+    "reapply_title": "Re-apply the file with direct approval",
+    "reapply_note": "System Admin only. The open batches of the earlier Master loads are discarded first (audited, their rows are not applied), then the whole file (every stream and the register sheets) is loaded and approved at once as an admin override. Tasks already approved stay approved and are never approved twice.",
+    "reapply_offer": "Re-apply it with direct approval",
+    "reapplied_toast": "Re-applied: {{count}} task(s) approved directly, {{discarded}} earlier batch(es) discarded."
   },
   "tmap": {
     "title": "Template mapping",

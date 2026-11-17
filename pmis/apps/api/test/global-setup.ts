@@ -172,6 +172,12 @@ export default async function setup(): Promise<() => Promise<void>> {
   const hregDb = await buildDatabase(adminUrl, hreg, appPassword);
   process.env.TEST_DATABASE_URL_HREG = hregDb.appUrl;
   process.env.TEST_SUPER_URL_HREG = hregDb.superUrl;
+  // The historical re-apply database (migration 0122): the suite discards every open historical Master batch of its database before a re-apply and reads the
+  // overall status of its sites, so it cannot share the historical-registers database.
+  const hrap = `${dbName}_hrap`;
+  const hrapDb = await buildDatabase(adminUrl, hrap, appPassword);
+  process.env.TEST_DATABASE_URL_HRAP = hrapDb.appUrl;
+  process.env.TEST_SUPER_URL_HRAP = hrapDb.superUrl;
   // The workflow-editor database (migration 0090): the suite creates and publishes workflow versions (a new published version changes what every new site uses),
   // so no other suite may share it.
   const wfe = `${dbName}_wfe`;
@@ -247,6 +253,7 @@ export default async function setup(): Promise<() => Promise<void>> {
     await a.query(`DROP DATABASE IF EXISTS ${bgu} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${wl} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${hreg} WITH (FORCE)`);
+    await a.query(`DROP DATABASE IF EXISTS ${hrap} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${wfe} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${wfg} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${rcols} WITH (FORCE)`);

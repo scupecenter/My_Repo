@@ -162,7 +162,7 @@ describe('Change Control feeds change_requests and the gates (Q103, Q180 coordin
     expect(res.body.errors[0]).toMatchObject({ code: 'resumed_already' });
   });
 
-  it('an approved cancellation cancels the site; its withdrawal restores the status', async () => {
+  it('an approved cancellation cancels the site; its withdrawal gives the site the status its work gives (0122)', async () => {
     const t = await team(app, db, 'change_control', 'change_control', R);
     const c = await create(t, 'change_control', { change_id: cid('CAN'), change_type: 'Cancellation', reason: 'client dropped the site' });
     const v1 = await approveFlex(t, c.id, c.version);
@@ -170,7 +170,8 @@ describe('Change Control feeds change_requests and the gates (Q103, Q180 coordin
     expect(await cr(c.entity_id)).toMatchObject({ kind: 'other', change_type: 'Cancellation', status: 'approved' });
     const wd = await newVersion(t, 'change_control', v1, { withdrawn: 'Yes' });
     await approveFlex(t, wd.id, wd.version);
-    expect((await q<{ s: string }>(db, 'SELECT overall_status::text AS s FROM sites WHERE id = $1', [t.site.id]))[0]!.s).toBe('in_progress');
+    // 0122: the status restored by the withdrawal (in_progress, as the site was created) is derived again from the milestones: no task of the site is approved
+    expect((await q<{ s: string }>(db, 'SELECT overall_status::text AS s FROM sites WHERE id = $1', [t.site.id]))[0]!.s).toBe('not_started');
   });
 });
 
