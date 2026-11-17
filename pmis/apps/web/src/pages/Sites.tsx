@@ -2,7 +2,7 @@ import type { SiteListItem, SitesExportColumnCode } from '@/api/types';
 import { errText } from '@/components/FormDialog';
 import { Site360Grid, type Site360GridRow } from '@/components/Site360Grid';
 import { useSaveSite360Cell, useSite360RowsPaged, useSite360Sections } from '@/api/site360';
-import { Download, FileDown, FilePlus2, FileUp, Map as MapIcon, RotateCcw, Table2 } from 'lucide-react';
+import { Columns3, Download, FileDown, FilePlus2, FileUp, Map as MapIcon, RotateCcw, Table2 } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
@@ -27,6 +27,7 @@ import type { ColDef } from '@/lib/tablePrefs';
 import { EmptyState, NoResults } from '@/components/States';
 import { MiniRail } from '@/components/Pipeline';
 import { SiteMap } from '@/components/SiteMap';
+import { SitesBoard, SWIMLANES, type Swimlane } from '@/components/SitesBoard';
 import { useVirtual } from '@/components/useVirtual';
 import { DEFAULT_STREAMS, DEFAULT_VIEWS, DISMANTLE_CODE, isRealStream, statusOf, streamName, viewName } from '@/lib/streams';
 
@@ -99,6 +100,9 @@ export function Sites() {
   // 0.14.5: the sites the map cannot draw (the link of the dashboard map), and the map layout of the register (SC-10)
   const coordinates = sp.get('coordinates') === 'missing' ? 'missing' : '';
   const asMap = sp.get('layout') === 'map';
+  // F5 (0.15.32): the read-only board by milestone (layout=board), with its swimlane in the URL (lane=region|contractor)
+  const asBoard = sp.get('layout') === 'board';
+  const lane = (SWIMLANES as readonly string[]).includes(sp.get('lane') ?? '') ? (sp.get('lane') as Swimlane) : 'none';
   // 0.15.4 (migration 0085): the workflow locks (locked / open) and the sites with data gaps
   const locks = ['locked', 'open'].includes(sp.get('workflow_locks') ?? '') ? (sp.get('workflow_locks') as string) : '';
   const gaps = sp.get('data_gaps') === 'with' ? 'with' : '';
@@ -132,9 +136,9 @@ export function Sites() {
   const real = !!stream && isRealStream(stream, streamsQ.data); // Dismantle has no API stream yet: nothing is fetched for it
   const dismantle = stream === DISMANTLE_CODE && !real;
 
-  const q = useSites({ ...f, ...extra, ...(bucket ? { bucket } : {}), ...(coordinates ? { coordinates } : {}), ...(real ? { stream } : {}), ...(view ? { view } : {}) }, !dismantle && !asMap);
+  const q = useSites({ ...f, ...extra, ...(bucket ? { bucket } : {}), ...(coordinates ? { coordinates } : {}), ...(real ? { stream } : {}), ...(view ? { view } : {}) }, !dismantle && !asMap && !asBoard);
   // Sites where the stream does not apply are not in the stream list. They come from the unfiltered list (their `streams[]` says "na").
-  const allQ = useSites({ ...f, ...extra, stage_code: '', ...(bucket ? { bucket } : {}), ...(coordinates ? { coordinates } : {}), ...(view ? { view } : {}) }, real && !asMap);
+  const allQ = useSites({ ...f, ...extra, stage_code: '', ...(bucket ? { bucket } : {}), ...(coordinates ? { coordinates } : {}), ...(view ? { view } : {}) }, real && !asMap && !asBoard);
   const { hasNextPage: moreAll, isFetchingNextPage: fetchingAll, fetchNextPage: nextAll } = allQ;
   useEffect(() => { if (real && moreAll && !fetchingAll) void nextAll(); }, [real, moreAll, fetchingAll, nextAll]);
   const inStream = q.data?.pages.flatMap((p) => p.items) ?? [];
@@ -260,6 +264,9 @@ export function Sites() {
         <button type="button" className="btn px-2 py-1 text-xs" data-testid="sites-layout" aria-pressed={asMap} onClick={() => setParams({ layout: asMap ? '' : 'map', sel: '' })}>
           {asMap ? <><Table2 size={14} />{t('sites.table')}</> : <><MapIcon size={14} />{t('sites.map')}</>}
         </button>
+        <button type="button" className="btn px-2 py-1 text-xs" data-testid="sites-layout-board" aria-pressed={asBoard} onClick={() => setParams({ layout: asBoard ? '' : 'board', sel: '' })}>
+          {asBoard ? <><Table2 size={14} />{t('sites.table')}</> : <><Columns3 size={14} />{t('board.board')}</>}
+        </button>
         <DensityToggle api={tbl} />
         <ColumnMenu api={tbl} label={label} />
         <ExportViewButton testid="sites-export-view" source="sites" filters={Object.fromEntries(Object.entries({ ...f, ...(bucket ? { bucket } : {}), ...(real ? { stream } : {}) }).filter(([, x]) => x))} columns={SITE_COLUMNS} />
@@ -271,6 +278,10 @@ export function Sites() {
       <ActiveChips chips={chips} onClear={clearAll} />
       {dismantle ? (
         <Navigate to="/registers/dismantle" replace />
+      ) : asBoard ? (
+        // F5: the same filters as the list (the F3 tree included); stage, bucket and stream are list views and do not apply to the board
+        <SitesBoard swimlane={lane} onSwimlane={(x) => setParams({ lane: x === 'none' ? '' : x })}
+          query={{ q: f.q || undefined, region_id: f.region_id || undefined, scenario: f.scenario || undefined, overall_status: f.overall_status || undefined, ...extra }} />
       ) : asMap ? (
         // SC-10: the same map as the dashboard; a stream sub-menu shows the sites whose current stream it is
         <SiteMap testid="sites-map" height={560} outer={{ region_id: f.region_id, scenario: f.scenario, ...(real ? { stream } : {}) }} />

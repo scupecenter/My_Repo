@@ -9,7 +9,7 @@ import { compileFilter, FilterCatalog, FilterField, FilterFieldType, FilterGroup
  *
  * Built-in fields are constants of this file with fixed SQL over the aliases of each list query:
  *   - sites, sites-stream: `s` = sites (GET /sites, GET /site360/{menu}/rows);
- *   - site-tasks: `t` = task_instances, `td` = task_definitions, `st` = stage_definitions, `s` = sites (GET /sites/{id}/tasks);
+ *   - site-tasks, tasks-board: `t` = task_instances, `td` = task_definitions, `st` = stage_definitions, `s` = sites (GET /sites/{id}/tasks; F5 GET /boards/tasks);
  *   - register-<key>: `r` = register_records, `s` = sites (GET /registers/{key}/records).
  * Data-defined fields come from the configuration: `f:<code>` the active fields of a register (its own and its custom fields), `c:<code>` the
  * site custom fields offered in list filters, `ms:<STAGE>` the approved milestone date of a stage of the default workflow. Hidden fields are
@@ -50,7 +50,7 @@ function typed(text: Prisma.Sql, t: FilterFieldType): Prisma.Sql {
   return text;
 }
 
-export type FilterScreen = 'sites' | 'site-tasks' | `register-${string}`;
+export type FilterScreen = 'sites' | 'site-tasks' | 'tasks-board' | `register-${string}`;
 
 @Injectable()
 export class FilterCatalogService {
@@ -58,7 +58,7 @@ export class FilterCatalogService {
 
   /** The screens with a filter builder. Other saved-view screens (the logs) keep their simple filters. */
   static supports(screen: string): boolean {
-    return screen === 'sites' || screen === 'sites-stream' || screen === 'site-tasks' || /^register-[a-z0-9_]{2,60}$/.test(screen);
+    return screen === 'sites' || screen === 'sites-stream' || screen === 'site-tasks' || screen === 'tasks-board' || /^register-[a-z0-9_]{2,60}$/.test(screen);
   }
 
   private async regionOptions() {
@@ -170,7 +170,7 @@ export class FilterCatalogService {
       throw problems.validation([{ path: '/screen_key', code: 'invalid', message: 'This list has no filter builder.' }]);
     }
     const all = screen === 'sites' || screen === 'sites-stream' ? await this.sites()
-      : screen === 'site-tasks' ? await this.tasks()
+      : screen === 'site-tasks' || screen === 'tasks-board' ? await this.tasks()
       : await this.register(screen.slice('register-'.length));
     const hidden = new Set(await this.hidden(screen, all.map((f) => f.key)));
     return new Map(all.filter((f) => !hidden.has(f.key)).map((f) => [f.key, f]));

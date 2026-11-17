@@ -87,11 +87,21 @@ const REGISTER_FIELDS: FF[] = [
   { key: 'created_at', label_en: 'Created on', label_ar: 'تاريخ الإنشاء', type: 'date' },
 ];
 
+/** F5 (0.15.32): the tasks board keeps the whitelist of site-tasks. */
+const TASK_FIELDS: FF[] = [
+  { key: 'site_code', label_en: 'Site ID', label_ar: 'رمز الموقع', type: 'text' },
+  { key: 'task_code', label_en: 'Task code', label_ar: 'رمز المهمة', type: 'text' },
+  { key: 'stage_code', label_en: 'Milestone stage', label_ar: 'المرحلة', type: 'text' },
+  { key: 'state', label_en: 'State', label_ar: 'الحالة', type: 'enum', options: en(['open', 'entry', 'in_review', 'in_approval', 'approved', 'rejected']) },
+  { key: 'region_id', label_en: 'Region', label_ar: 'المنطقة', type: 'enum', options: REGION_OPTS },
+  { key: 'due_date', label_en: 'Due date', label_ar: 'تاريخ الاستحقاق', type: 'date' },
+];
+
 export const viewsHandlers = [
   http.get(`${B}/saved-views/filter-fields`, ({ request }) => {
     const g = guard(); if (g) return g;
     const screen = new URL(request.url).searchParams.get('screen_key') ?? '';
-    const items = screen === 'sites' || screen === 'sites-stream' ? SITE_FIELDS : /^register-/.test(screen) ? REGISTER_FIELDS : null;
+    const items = screen === 'sites' || screen === 'sites-stream' ? SITE_FIELDS : screen === 'site-tasks' || screen === 'tasks-board' ? TASK_FIELDS : /^register-/.test(screen) ? REGISTER_FIELDS : null;
     if (!items) return invalid('/screen_key');
     return HttpResponse.json({
       screen_key: screen, items: items.map((f) => ({ ...f, operators: OPS[f.type] })), operators: OPS,

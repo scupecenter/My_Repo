@@ -211,57 +211,16 @@ export class SitesService {
     const offset = cursor ? Number(cursor[0]) : 0;
     if (!Number.isInteger(offset) || offset < 0) throw problems.badRequest('The cursor is not valid.');
 
-    const text = oneParam(q, 'q')?.trim();
     const stageCode = oneParam(q, 'stage_code');
-    const scenario = oneParam(q, 'scenario');
-    const status = oneParam(q, 'overall_status');
     const bucket = oneParam(q, 'bucket') ?? 'all';
-    const cluster = oneParam(q, 'cluster_code');
-    const batch = oneParam(q, 'delivery_batch');
-    const wfv = oneParam(q, 'workflow_version');
-    const coords = oneParam(q, 'coordinates');
     const stream = oneParam(q, 'stream');
     const view = oneParam(q, 'view');
     const sort = oneParam(q, 'sort') ?? 'site_code';
-    const locks = oneParam(q, 'workflow_locks');
-    const gaps = oneParam(q, 'data_gaps');
-    const regionIds = this.intList(q, 'region_id', 1, 7);
-    if (scenario !== undefined && !SCENARIOS.includes(scenario)) throw problems.validation([{ path: '/scenario', code: 'invalid', message: 'Unknown delivery scenario.' }]);
-    if (status !== undefined && !STATUSES.includes(status)) throw problems.validation([{ path: '/overall_status', code: 'invalid', message: 'Unknown overall status.' }]);
     if (!(BUCKETS as readonly string[]).includes(bucket)) throw problems.validation([{ path: '/bucket', code: 'invalid', message: 'Unknown bucket.' }]);
     if (!(SORTS as readonly string[]).includes(sort)) throw problems.validation([{ path: '/sort', code: 'invalid', message: 'Unknown sort.' }]);
-    if (coords !== undefined && coords !== 'missing' && coords !== 'valid') throw problems.validation([{ path: '/coordinates', code: 'invalid', message: 'coordinates is missing or valid.' }]);
-    if (wfv !== undefined && !/^[0-9]{1,6}$/.test(wfv)) throw problems.validation([{ path: '/workflow_version', code: 'invalid', message: 'workflow_version is a positive integer.' }]);
-    if (locks !== undefined && locks !== 'locked' && locks !== 'open') throw problems.validation([{ path: '/workflow_locks', code: 'invalid', message: 'workflow_locks is locked or open.' }]);
-    if (gaps !== undefined && gaps !== 'with' && gaps !== 'without') throw problems.validation([{ path: '/data_gaps', code: 'invalid', message: 'data_gaps is with or without.' }]);
     if (stream !== undefined) await this.requireGroup('stream', stream);
     if (view !== undefined) await this.requireGroup('view', view);
-
-    const where: Prisma.Sql[] = [Prisma.sql`s.is_active`];
-    if (regions !== null) where.push(Prisma.sql`s.region_id = ANY(${regions}::int[])`);
-    if (regionIds.length > 0) where.push(Prisma.sql`s.region_id = ANY(${regionIds}::int[])`);
-    // 0.15.17 (F4): a pasted list of Site IDs (commas, spaces or new lines), at most 500; the match ignores case
-    const siteCodes = (oneParam(q, 'site_codes') ?? '').split(/[\s,]+/).map((c) => c.trim().toUpperCase()).filter(Boolean);
-    if (siteCodes.length > 500) throw problems.validation([{ path: '/site_codes', code: 'invalid', message: 'At most 500 Site IDs.' }]);
-    if (siteCodes.length > 0) where.push(Prisma.sql`upper(s.site_code) = ANY(${siteCodes}::text[])`);
-    if (text) where.push(Prisma.sql`(s.site_code ILIKE ${likePattern(text)} OR s.owner_site_id ILIKE ${likePattern(text)} OR s.name ILIKE ${likePattern(text)})`);
-    if (scenario) where.push(Prisma.sql`s.delivery_scenario::text = ${scenario}`);
-    if (status) where.push(Prisma.sql`s.overall_status::text = ${status}`);
-    if (cluster) where.push(Prisma.sql`c.cluster_code = ${cluster}`);
-    if (batch) where.push(Prisma.sql`s.delivery_batch = ${batch}`);
-    if (wfv) where.push(Prisma.sql`wd.version = ${Number(wfv)}`);
-    if (locks) where.push(Prisma.sql`s.workflow_locks = ${locks === 'locked'}`);
-    if (gaps) where.push(gaps === 'with' ? Prisma.sql`site_data_gap_count(s.id) > 0` : Prisma.sql`site_data_gap_count(s.id) = 0`);
-    // 0.14.5: the sites the dashboard map cannot draw (no valid coordinates, OV-12; not cancelled, the map's count), and the others
-    if (coords === 'missing') where.push(Prisma.sql`NOT coalesce(${HAS_COORDINATES}, false) AND s.overall_status <> 'cancelled'`);
-    else if (coords === 'valid') where.push(Prisma.sql`coalesce(${HAS_COORDINATES}, false)`);
-    // F3 (0.15.31): the AND/OR filter of a saved view, compiled on the server against the sites whitelist (alias s); the region scope above stays
-    const adv = await this.filters.fromQuery('sites', q);
-    if (adv) where.push(adv);
-    for (const pair of this.customPairs(q)) {
-      where.push(Prisma.sql`EXISTS (SELECT 1 FROM field_definitions fd WHERE fd.entity_type = 'site' AND fd.code = ${pair[0]} AND fd.is_active AND fd.in_list_filters
-        AND coalesce(app_resolve_field_access(${auth.user.id}::uuid, fd.id)::text, 'edit') <> 'hidden') AND s.custom ->> ${pair[0]} = ${pair[1]}`);
-    }
+    const where = await this.baseWhere(auth, q, regions);
 
     const post: Prisma.Sql[] = [];
     if (stageCode) post.push(Prisma.sql`ss.cur_stage = ${stageCode}`);
@@ -327,6 +286,57 @@ export class SitesService {
         total: rows[0] ? Number(rows[0].total) : 0,
       },
     };
+  }
+
+  /**
+   * The site-level conditions of GET /sites (alias s = sites, c = clusters, wd = workflow_definitions): the caller's regions (B3), the simple
+   * filters, the pasted Site IDs, the F3 filter tree and the custom field pairs. Shared with the sites board (F5, 0.15.32), so both read the
+   * same sites for the same query.
+   */
+  async baseWhere(auth: AuthContext, q: Record<string, unknown>, regions: number[] | null): Promise<Prisma.Sql[]> {
+    const text = oneParam(q, 'q')?.trim();
+    const scenario = oneParam(q, 'scenario');
+    const status = oneParam(q, 'overall_status');
+    const cluster = oneParam(q, 'cluster_code');
+    const batch = oneParam(q, 'delivery_batch');
+    const wfv = oneParam(q, 'workflow_version');
+    const coords = oneParam(q, 'coordinates');
+    const locks = oneParam(q, 'workflow_locks');
+    const gaps = oneParam(q, 'data_gaps');
+    const regionIds = this.intList(q, 'region_id', 1, 7);
+    if (scenario !== undefined && !SCENARIOS.includes(scenario)) throw problems.validation([{ path: '/scenario', code: 'invalid', message: 'Unknown delivery scenario.' }]);
+    if (status !== undefined && !STATUSES.includes(status)) throw problems.validation([{ path: '/overall_status', code: 'invalid', message: 'Unknown overall status.' }]);
+    if (coords !== undefined && coords !== 'missing' && coords !== 'valid') throw problems.validation([{ path: '/coordinates', code: 'invalid', message: 'coordinates is missing or valid.' }]);
+    if (wfv !== undefined && !/^[0-9]{1,6}$/.test(wfv)) throw problems.validation([{ path: '/workflow_version', code: 'invalid', message: 'workflow_version is a positive integer.' }]);
+    if (locks !== undefined && locks !== 'locked' && locks !== 'open') throw problems.validation([{ path: '/workflow_locks', code: 'invalid', message: 'workflow_locks is locked or open.' }]);
+    if (gaps !== undefined && gaps !== 'with' && gaps !== 'without') throw problems.validation([{ path: '/data_gaps', code: 'invalid', message: 'data_gaps is with or without.' }]);
+
+    const where: Prisma.Sql[] = [Prisma.sql`s.is_active`];
+    if (regions !== null) where.push(Prisma.sql`s.region_id = ANY(${regions}::int[])`);
+    if (regionIds.length > 0) where.push(Prisma.sql`s.region_id = ANY(${regionIds}::int[])`);
+    // 0.15.17 (F4): a pasted list of Site IDs (commas, spaces or new lines), at most 500; the match ignores case
+    const siteCodes = (oneParam(q, 'site_codes') ?? '').split(/[\s,]+/).map((c) => c.trim().toUpperCase()).filter(Boolean);
+    if (siteCodes.length > 500) throw problems.validation([{ path: '/site_codes', code: 'invalid', message: 'At most 500 Site IDs.' }]);
+    if (siteCodes.length > 0) where.push(Prisma.sql`upper(s.site_code) = ANY(${siteCodes}::text[])`);
+    if (text) where.push(Prisma.sql`(s.site_code ILIKE ${likePattern(text)} OR s.owner_site_id ILIKE ${likePattern(text)} OR s.name ILIKE ${likePattern(text)})`);
+    if (scenario) where.push(Prisma.sql`s.delivery_scenario::text = ${scenario}`);
+    if (status) where.push(Prisma.sql`s.overall_status::text = ${status}`);
+    if (cluster) where.push(Prisma.sql`c.cluster_code = ${cluster}`);
+    if (batch) where.push(Prisma.sql`s.delivery_batch = ${batch}`);
+    if (wfv) where.push(Prisma.sql`wd.version = ${Number(wfv)}`);
+    if (locks) where.push(Prisma.sql`s.workflow_locks = ${locks === 'locked'}`);
+    if (gaps) where.push(gaps === 'with' ? Prisma.sql`site_data_gap_count(s.id) > 0` : Prisma.sql`site_data_gap_count(s.id) = 0`);
+    // 0.14.5: the sites the dashboard map cannot draw (no valid coordinates, OV-12; not cancelled, the map's count), and the others
+    if (coords === 'missing') where.push(Prisma.sql`NOT coalesce(${HAS_COORDINATES}, false) AND s.overall_status <> 'cancelled'`);
+    else if (coords === 'valid') where.push(Prisma.sql`coalesce(${HAS_COORDINATES}, false)`);
+    // F3 (0.15.31): the AND/OR filter of a saved view, compiled on the server against the sites whitelist (alias s); the region scope above stays
+    const adv = await this.filters.fromQuery('sites', q);
+    if (adv) where.push(adv);
+    for (const pair of this.customPairs(q)) {
+      where.push(Prisma.sql`EXISTS (SELECT 1 FROM field_definitions fd WHERE fd.entity_type = 'site' AND fd.code = ${pair[0]} AND fd.is_active AND fd.in_list_filters
+        AND coalesce(app_resolve_field_access(${auth.user.id}::uuid, fd.id)::text, 'edit') <> 'hidden') AND s.custom ->> ${pair[0]} = ${pair[1]}`);
+    }
+    return where;
   }
 
   private customPairs(q: Record<string, unknown>): [string, string][] {

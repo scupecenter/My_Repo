@@ -437,6 +437,11 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/workflow/versions/:version/migration-preview'],
   ['get', '/workflow/site-migrations'],
   ['get', '/settings/task-definitions'],
+  // Contract 0.15.32 (F5, migration 0118; apps/api: kanban): the sites board, the tasks board (read only) and the WIP limits of the sites board.
+  ['get', '/boards/sites'],
+  ['get', '/boards/tasks'],
+  ['get', '/settings/kanban-wip'],
+  ['put', '/settings/kanban-wip'],
 ] as const;
 
 /** `GET /users/deleted` and `GET /users/picker` are other operations that the `:id` pattern would swallow; they stay mocked. */
