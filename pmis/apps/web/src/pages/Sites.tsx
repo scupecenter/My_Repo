@@ -1,6 +1,7 @@
 import type { SiteListItem, SitesExportColumnCode } from '@/api/types';
 import { errText } from '@/components/FormDialog';
 import { Site360Grid, type Site360GridRow } from '@/components/Site360Grid';
+import { Site360SourcePanel } from '@/components/Site360Source';
 import { useSaveSite360Cell, useSite360RowsPaged, useSite360Sections } from '@/api/site360';
 import { Columns3, Download, FileDown, FilePlus2, FileUp, Map as MapIcon, RotateCcw, Table2 } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -119,6 +120,8 @@ export function Sites() {
   const extra = { ...(locks ? { workflow_locks: locks } : {}), ...(gaps ? { data_gaps: gaps } : {}), ...(siteCodes ? { site_codes: siteCodes } : {}), ...(adv ? { filter: adv } : {}), ...drill };
   const [locksDlg, setLocksDlg] = useState<null | boolean>(null);
   const [gridSel, setGridSel] = useState<Site360GridRow[]>([]);
+  // the cell whose source is shown under the grid (0.15.35, P1 Master): a click on a Master cell opens it
+  const [srcCell, setSrcCell] = useState<{ siteId: string; siteCode: string; ord: number } | null>(null);
   const sel = sp.get('sel') ?? '';
   const activeFilters = Object.values(f).filter(Boolean).length + (bucket ? 1 : 0) + (coordinates ? 1 : 0) + (locks ? 1 : 0) + (gaps ? 1 : 0) + (advTree ? 1 : 0) + (dashStatus ? 1 : 0) + (reached ? 1 : 0) + (cluster ? 1 : 0);
   const setParams = (kv: Record<string, string>) => setSp((p) => { const n = new URLSearchParams(p); for (const [k, v] of Object.entries(kv)) { if (v) n.set(k, v); else n.delete(k); } return n; }, { replace: true });
@@ -314,7 +317,8 @@ export function Sites() {
               <button type="button" className="btn" data-testid="site360-locks-lock" onClick={() => setLocksDlg(true)}>{t('locks.bulk_lock')}</button>
             </>}
           </div>
-          <Site360Grid menu={menu} testid="site360-grid" onSelectRows={setGridSel} total={gridTotal} filtered={gridFiltered} rows={grid360Rows} onEditCell={(e) => saveCell.mutate({ task_id: e.target.task_id, version: e.target.version, field: e.target.field, values: e.target.values, value: e.value })} />
+          <Site360Grid menu={menu} testid="site360-grid" onSelectRows={setGridSel} total={gridTotal} filtered={gridFiltered} rows={grid360Rows} onOpenCell={(r, ord) => setSrcCell({ siteId: r.id, siteCode: r.site_code, ord })} onEditCell={(e) => saveCell.mutate({ task_id: e.target.task_id, version: e.target.version, field: e.target.field, values: e.target.values, value: e.value })} />
+          {srcCell ? <Site360SourcePanel siteId={srcCell.siteId} siteCode={srcCell.siteCode} ord={srcCell.ord} onClose={() => setSrcCell(null)} /> : <p className="mt-1 text-xs text-mute" data-testid="site360-source-hint">{t('site360.src.hint')}</p>}
           {gridRowsQ.hasNextPage ? <button type="button" className="btn" data-testid="site360-more" disabled={gridRowsQ.isFetchingNextPage} onClick={() => void gridRowsQ.fetchNextPage()}>{t('site360.more')}</button> : null}
         </div>
       ) : (

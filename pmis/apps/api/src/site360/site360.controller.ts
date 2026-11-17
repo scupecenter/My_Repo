@@ -18,6 +18,11 @@ export class Site360Controller {
     return this.svc.rows(auth, menu, q);
   }
 
+  @Get('sites/:siteId/sources')
+  sources(@Auth() auth: AuthContext, @Param('siteId') siteId: string, @Query() q: Record<string, unknown>) {
+    return this.svc.sources(auth, siteId, q);
+  }
+
   @Patch('columns/:ord/sections')
   @HttpCode(200)
   setSections(@Auth() auth: AuthContext, @Param('ord') ord: string, @Body() body: unknown) {

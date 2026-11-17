@@ -5421,6 +5421,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/site360/sites/{site_id}/sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The value and the source of each Master cell of one site (0.15.35, P1 Master)
+         * @description 0.15.35 (migration 0121). For one site, every Master column of `menu` (default `master`, all 187) in Master order with its value and its source:
+         *     the kind of source, how the value got in (`origin`) and the ids to open the source record (the register record drawer `/registers/{register_key}?record={record_id}`,
+         *     the task drawer of the site page, the baseline version). The source is read from the same branch of `site360_master_values` that computes the value,
+         *     with the caller's rights (row security of every table). Per site, not per page: the grid asks for it when a cell is opened.
+         *     A site outside the caller's `sites` view regions, or an unknown id, answers 404. A value the caller may not see (the register's module view, B3, or a
+         *     site custom field hidden by a field rule) answers `hidden: true` with the kind and no value, record or task id. A column with no source in the
+         *     system is `not_tracked`; a column with a source but no value for this site has the column's kind and a null value.
+         */
+        get: operations["getSite360SiteSources"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/site360/columns/{ord}/sections": {
         parameters: {
             query?: never;
@@ -8718,6 +8744,66 @@ export interface components {
             sections: components["schemas"]["Site360Section"][];
             /** @description True for a Phase Gate column (highlighted in the grid). */
             is_phase_gate: boolean;
+            source_kind?: components["schemas"]["Site360SourceKind"];
+            /** @description 0.15.35. A short English note of the rule of the column. */
+            source_note?: string | null;
+        };
+        /**
+         * @description 0.15.35. The kind of source of a Master column or cell: `site` (a field of the site), `task` (a task field), `milestone` (a milestone task, or a gate
+         *     column that shows the date of the milestone before it), `register` (a field of a register record), `baseline` (the latest approved baseline version),
+         *     `derived` (a workbook formula over other values), `custom_field` (a site custom field carrying the column), `not_tracked` (no source in the system).
+         * @enum {string}
+         */
+        Site360SourceKind: "site" | "task" | "milestone" | "register" | "baseline" | "derived" | "custom_field" | "not_tracked";
+        Site360CellSource: {
+            ord: number;
+            letter: string;
+            header: string;
+            kind: components["schemas"]["Site360SourceKind"];
+            /** @description The rule of the column (source_note). */
+            note: string | null;
+            /** @description The value shown in the grid; null when there is none or when hidden. */
+            value: string | null;
+            /** @description True when the caller may not see the value (register module view or a field rule): no value, no id. */
+            hidden: boolean;
+            /**
+             * @description How the value got in: an approved register record, a register record not yet approved, the workflow (task approval path), the historical Master import, a manual or admin entry (site field, admin override, custom field), or a formula. Null without a value.
+             * @enum {string|null}
+             */
+            origin: "approved_record" | "pending_record" | "workflow" | "historical_import" | "manual" | "calculated" | null;
+            /** @description The field read: a site column, a task field, a register data key or a milestone code. */
+            field?: string;
+            /** @description The register of the record (or of a formula over a register). */
+            register_key?: string;
+            /**
+             * Format: uuid
+             * @description The register record version that holds the value; open it with /registers/{register_key}?record={record_id}.
+             */
+            record_id?: string;
+            record_version?: number;
+            /**
+             * Format: uuid
+             * @description The task instance behind the value (open it on the site page).
+             */
+            task_id?: string;
+            task_code?: string;
+            task_name_en?: string;
+            task_name_ar?: string | null;
+            /** @description The approved baseline version the date comes from. */
+            baseline_version?: number;
+            /** @description For a site field written by the approval of a register record (RF & Design for C:Q and S, Acquisition for T): that record, when the caller may read it. */
+            fed_by?: {
+                register_key: string;
+                /** Format: uuid */
+                record_id: string;
+            };
+        };
+        Site360SiteSources: {
+            /** Format: uuid */
+            site_id: string;
+            site_code: string;
+            menu: components["schemas"]["Site360Menu"];
+            cells: components["schemas"]["Site360CellSource"][];
         };
         Site360Band: {
             name: string | null;
@@ -26663,6 +26749,35 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getSite360SiteSources: {
+        parameters: {
+            query?: {
+                /** @description Limit the cells to the columns of one SITE 360 menu. */
+                menu?: components["schemas"]["Site360Menu"];
+            };
+            header?: never;
+            path: {
+                site_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The cells of the site. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Site360SiteSources"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
             422: components["responses"]["Unprocessable"];
         };
     };

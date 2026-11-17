@@ -47,7 +47,15 @@ export interface Site360ColumnRow {
   header: string;
   /** The menus of the column (a set; status means every menu). */
   sections: Site360Section[];
+  /** The kind of source of the column (0.15.35, migration 0121); not_tracked: no source in the system. Absent in pure tests. */
+  source_kind?: Site360SourceKind;
+  /** A short English note of the column's rule (0.15.35). */
+  source_note?: string | null;
 }
+
+/** The kinds of source of a Master column or cell (0.15.35, migration 0121). */
+export const SITE360_SOURCE_KINDS = ['site', 'task', 'milestone', 'register', 'baseline', 'derived', 'custom_field', 'not_tracked'] as const;
+export type Site360SourceKind = (typeof SITE360_SOURCE_KINDS)[number];
 
 export interface Site360Band {
   name: string | null;

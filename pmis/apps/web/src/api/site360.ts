@@ -38,6 +38,30 @@ export const useSite360Rows = (menu: string | undefined, query: Site360RowsQuery
     queryFn: () => api.get<Site360Rows>(`/site360/${menu}/rows`, { query: { ...query } }),
   });
 
+/** The source of one Master cell (contract 0.15.35): kind, origin and the ids to open the source record. */
+export type Site360CellSource = components['schemas']['Site360CellSource'];
+export type Site360SiteSources = components['schemas']['Site360SiteSources'];
+export type Site360SourceKind = components['schemas']['Site360SourceKind'];
+
+/** Every Master cell of one site with its value and source (`GET /site360/sites/{site_id}/sources`); asked per site when a cell is opened, cached. */
+export const useSite360SiteSources = (siteId: string | null | undefined, menu?: string) =>
+  useQuery({
+    queryKey: ['site360-sources', siteId, menu ?? 'master'],
+    enabled: !!siteId,
+    staleTime: 30_000,
+    queryFn: () => api.get<Site360SiteSources>(`/site360/sites/${siteId}/sources`, { query: menu ? { menu } : {} }),
+  });
+
+/** The app route that opens the source record of a cell, or null when there is none to open (a formula over many rows, a hidden value, not tracked). */
+export function site360SourceHref(siteId: string, c: Site360CellSource): string | null {
+  if (c.hidden) return null;
+  if (c.record_id && c.register_key) return `/registers/${c.register_key}?record=${c.record_id}`;
+  if (c.task_id) return `/sites/${siteId}?task=${c.task_id}&row=${c.task_id}`;
+  if (c.fed_by) return `/registers/${c.fed_by.register_key}?record=${c.fed_by.record_id}`;
+  if (c.kind === 'site' || c.kind === 'custom_field') return `/sites/${siteId}`;
+  return null;
+}
+
 /** The SITE 360 menus a Master column may be in (the status columns are in every menu and cannot change). */
 export const SITE360_MOVABLE_MENUS = ['design_acq', 'sow', 'cw', 'te', 'hoto', 'dismantle', 'om'] as const;
 
