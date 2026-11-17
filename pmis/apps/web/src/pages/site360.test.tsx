@@ -1,5 +1,6 @@
-import { fireEvent, screen } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { server } from '@/mocks/server';
 import { renderApp, signIn } from '@/test/utils';
 import { Sites } from './Sites';
 
@@ -40,5 +41,41 @@ describe('SITE 360 menus on the Sites page', () => {
     await screen.findByTestId('page-sites');
     expect(screen.queryByTestId('site360-grid')).toBeNull();
     expect(screen.queryByTestId('site360-layout')).toBeNull();
+  });
+
+  it('sends the status filter of the grid as `status`, the name the API reads (audit A finding 11)', { timeout: 30_000 }, async () => {
+    await signIn('pm');
+    const seen: URLSearchParams[] = [];
+    const on = ({ request }: { request: Request }) => { const u = new URL(request.url); if (u.pathname.endsWith('/site360/cw/rows')) seen.push(u.searchParams); };
+    server.events.on('request:start', on);
+    try {
+      renderApp(<Sites />, { route: '/sites?section=cw&overall_status=on_hold' });
+      await screen.findByTestId('site360-grid');
+      await waitFor(() => expect(seen.length).toBeGreaterThan(0));
+      expect(seen[0]!.get('status')).toBe('on_hold');
+      expect(seen[0]!.has('overall_status')).toBe(false);
+    } finally {
+      server.events.removeListener('request:start', on);
+    }
+  });
+
+  it('passes a dashboard drill-down to the list and shows it as filters (EN and AR)', { timeout: 30_000 }, async () => {
+    await signIn('pm');
+    const seen: URLSearchParams[] = [];
+    const on = ({ request }: { request: Request }) => { const u = new URL(request.url); if (u.pathname.endsWith('/sites') && u.searchParams.has('milestone_reached')) seen.push(u.searchParams); };
+    server.events.on('request:start', on);
+    try {
+      const { unmount } = renderApp(<Sites />, { route: '/sites?milestone_reached=MS6&ref_date=2026-10-29&cluster_code=CL-TR-01' });
+      await screen.findByTestId('page-sites');
+      await waitFor(() => expect(seen.length).toBeGreaterThan(0));
+      expect(seen[0]!.get('ref_date')).toBe('2026-10-29');
+      expect(seen[0]!.get('cluster_code')).toBe('CL-TR-01');
+      expect(await screen.findByText('As of 2026-10-29')).toBeTruthy();
+      unmount();
+      renderApp(<Sites />, { route: '/sites?dashboard_status=on_hold', locale: 'ar' });
+      expect(await screen.findByText(/حالة لوحة المؤشرات/)).toBeTruthy();
+    } finally {
+      server.events.removeListener('request:start', on);
+    }
   });
 });

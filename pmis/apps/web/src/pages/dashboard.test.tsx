@@ -79,10 +79,24 @@ describe('Dashboard', () => {
     const u = userEvent.setup();
     page('/dashboard?region_id=1&scenario=new_build');
     const link = await screen.findByTestId('dash-status-in_progress');
-    expect(link.getAttribute('href')).toBe('/sites?region_id=1&scenario=new_build&overall_status=in_progress');
+    // 0.15.33 (audit E section 2): a status chip opens the sites of the derived status the card counts, a milestone card the sites that reached it
+    expect(link.getAttribute('href')).toBe('/sites?region_id=1&scenario=new_build&dashboard_status=in_progress');
+    expect(screen.getByTestId('dash-kpi-rfi').getAttribute('href')).toBe('/sites?region_id=1&scenario=new_build&milestone_reached=MS4');
+    expect(screen.getByTestId('dash-kpi-hoto').getAttribute('href')).toBe('/sites?region_id=1&scenario=new_build&milestone_reached=MS9');
     expect(screen.getByTestId('dash-stream-CW').querySelector('a')!.getAttribute('href')).toBe('/sites?region_id=1&scenario=new_build&stream=CW');
     await u.click(screen.getByTestId('dash-pipeline').querySelector('[data-testid="pipe-node-MS4"]')!);
     expect(await screen.findByTestId('where')).toHaveTextContent('/sites?region_id=1&scenario=new_build&stage_code=MS4');
+  });
+
+  it('keeps the cluster and the reference date in the drill-downs of the cards (audit E section 2)', { timeout: 30_000 }, async () => {
+    await signIn('pm');
+    page('/dashboard?cluster_code=CL-TR-01&ref_date=2026-10-29');
+    const link = await screen.findByTestId('dash-status-on_hold');
+    expect(link.getAttribute('href')).toBe('/sites?cluster_code=CL-TR-01&dashboard_status=on_hold&ref_date=2026-10-29');
+    expect(screen.getByTestId('dash-kpi-onair').getAttribute('href')).toBe('/sites?cluster_code=CL-TR-01&milestone_reached=MS6&ref_date=2026-10-29');
+    expect(screen.getByTestId('dash-kpi-closure').getAttribute('href')).toBe('/sites?cluster_code=CL-TR-01&milestone_reached=MS10&ref_date=2026-10-29');
+    // a list that is not a card's own set has no reference date (the Site Register is live)
+    expect(screen.getByTestId('dash-sites-total').getAttribute('href')).toBe('/sites?cluster_code=CL-TR-01');
   });
 
   it('filters by region, cluster, scenario and stream through the URL, and resets', async () => {

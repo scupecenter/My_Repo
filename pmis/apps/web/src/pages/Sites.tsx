@@ -76,7 +76,8 @@ export function Sites() {
     filter: adv || undefined,
     region_id: sp.get('region_id') || undefined,
     scenario: sp.get('scenario') || undefined,
-    overall_status: sp.get('overall_status') || undefined,
+    // the grid reads `status` (GET /site360/{menu}/rows); the page keeps the shared URL key overall_status (audit A finding 11)
+    status: sp.get('overall_status') || undefined,
     sort: 'site_code',
   };
   const gridRowsQ = useSite360RowsPaged(menu ? section : undefined, gridQuery);
@@ -108,14 +109,21 @@ export function Sites() {
   const gaps = sp.get('data_gaps') === 'with' ? 'with' : '';
   // 0.15.17 (F4): the Site IDs pasted into Ctrl+K ("Site ID in list"), kept in the URL so Back and shared links restore them
   const siteCodes = sp.get('site_codes') ?? '';
-  const extra = { ...(locks ? { workflow_locks: locks } : {}), ...(gaps ? { data_gaps: gaps } : {}), ...(siteCodes ? { site_codes: siteCodes } : {}), ...(adv ? { filter: adv } : {}) };
+  // 0.15.33 (audit E section 2): a dashboard drill-down opens exactly the sites its card counts: the derived status (dashboard_status) or the
+  // milestone reached, as of the dashboard's reference date, with its cluster; the server computes the set with the dashboard engine
+  const dashStatus = sp.get('dashboard_status') ?? '';
+  const reached = sp.get('milestone_reached') ?? '';
+  const refDate = dashStatus || reached ? sp.get('ref_date') ?? '' : '';
+  const cluster = sp.get('cluster_code') ?? '';
+  const drill = { ...(dashStatus ? { dashboard_status: dashStatus } : {}), ...(reached ? { milestone_reached: reached } : {}), ...(refDate ? { ref_date: refDate } : {}), ...(cluster ? { cluster_code: cluster } : {}) };
+  const extra = { ...(locks ? { workflow_locks: locks } : {}), ...(gaps ? { data_gaps: gaps } : {}), ...(siteCodes ? { site_codes: siteCodes } : {}), ...(adv ? { filter: adv } : {}), ...drill };
   const [locksDlg, setLocksDlg] = useState<null | boolean>(null);
   const [gridSel, setGridSel] = useState<Site360GridRow[]>([]);
   const sel = sp.get('sel') ?? '';
-  const activeFilters = Object.values(f).filter(Boolean).length + (bucket ? 1 : 0) + (coordinates ? 1 : 0) + (locks ? 1 : 0) + (gaps ? 1 : 0) + (advTree ? 1 : 0);
+  const activeFilters = Object.values(f).filter(Boolean).length + (bucket ? 1 : 0) + (coordinates ? 1 : 0) + (locks ? 1 : 0) + (gaps ? 1 : 0) + (advTree ? 1 : 0) + (dashStatus ? 1 : 0) + (reached ? 1 : 0) + (cluster ? 1 : 0);
   const setParams = (kv: Record<string, string>) => setSp((p) => { const n = new URLSearchParams(p); for (const [k, v] of Object.entries(kv)) { if (v) n.set(k, v); else n.delete(k); } return n; }, { replace: true });
   const set = (k: keyof typeof f) => (v: string) => setParams({ [k]: v, sel: '' });
-  const clearAll = () => setParams({ ...Object.fromEntries(F_KEYS.map((k) => [k, ''])), bucket: '', coordinates: '', workflow_locks: '', data_gaps: '', site_codes: '', adv: '', sel: '' });
+  const clearAll = () => setParams({ ...Object.fromEntries(F_KEYS.map((k) => [k, ''])), bucket: '', coordinates: '', workflow_locks: '', data_gaps: '', site_codes: '', adv: '', dashboard_status: '', milestone_reached: '', ref_date: '', cluster_code: '', sel: '' });
   const toast = useToast();
   const nav = useNavigate();
   // Site creation (contract 0.14.0, Q460): the New sites template is listed only for those who may create sites
@@ -180,6 +188,10 @@ export function Sites() {
     ...(locks ? [{ key: 'workflow_locks', label: `${t('locks.filter')}: ${t(locks === 'open' ? 'locks.filter_open' : 'locks.filter_locked')}`, onRemove: () => setParams({ workflow_locks: '' }) }] : []),
     ...(gaps ? [{ key: 'data_gaps', label: t('locks.quick_gaps'), onRemove: () => setParams({ data_gaps: '' }) }] : []),
     ...(bucket ? [{ key: 'bucket', label: t('table.filter_bucket', { v: t(bucket === 'mine' ? 'table.mine' : 'table.late') }), onRemove: () => setParams({ bucket: '' }) }] : []),
+    ...(dashStatus ? [{ key: 'dashboard_status', label: t('table.filter_dash_status', { v: t(`status.${dashStatus}`) }), onRemove: () => setParams({ dashboard_status: '', ref_date: reached ? refDate : '' }) }] : []),
+    ...(reached ? [{ key: 'milestone_reached', label: t('table.filter_reached', { v: stageName(reached) }), onRemove: () => setParams({ milestone_reached: '', ref_date: dashStatus ? refDate : '' }) }] : []),
+    ...(refDate ? [{ key: 'ref_date', label: t('table.filter_ref_date', { v: refDate }), onRemove: () => setParams({ ref_date: '' }) }] : []),
+    ...(cluster ? [{ key: 'cluster_code', label: t('table.filter_cluster', { v: cluster }), onRemove: () => setParams({ cluster_code: '' }) }] : []),
   ];
 
   // The text each cell shows, for sizing the columns to their content (null = not measurable: the pipeline rail keeps its default width).

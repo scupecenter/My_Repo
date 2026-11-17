@@ -4,7 +4,9 @@ import type { Comment, DocumentFile, Group, Matrix, MatrixPatch, Page, Region, R
 
 export type SiteFilters = { q: string; region_id: string; scenario: string; overall_status: string; stage_code: string; stream?: string; view?: string; bucket?: string; coordinates?: string;
   /** 0.15.4: locked / open */ workflow_locks?: string; /** 0.15.4: with / without */ data_gaps?: string;
-  /** 0.15.31 (F3): the AND/OR filter tree as JSON, compiled by the server */ filter?: string };
+  /** 0.15.31 (F3): the AND/OR filter tree as JSON, compiled by the server */ filter?: string;
+  /** 0.15.33 (audit E section 2): the sites a dashboard card counts: its derived status or the milestone reached, as of ref_date */
+  dashboard_status?: string; milestone_reached?: string; ref_date?: string; cluster_code?: string };
 
 /** 0.15.4 (migration 0085): switch the workflow locks of one site, of a selection, or of every site of a Master import run or a batch (reason, step-up). */
 export type LocksTarget = { site_id: string } | { site_ids: string[] } | { master_run_id: string } | { import_batch_id: string };

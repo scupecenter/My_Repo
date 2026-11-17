@@ -16,7 +16,8 @@ export interface Site360RowsQuery {
   filter?: string;
   region_id?: string;
   scenario?: string;
-  overall_status?: string;
+  /** the stored overall status (comma-separated); the API and the contract name it `status` (audit A finding 11: `overall_status` was ignored) */
+  status?: string;
   sort?: string;
   dir?: 'asc' | 'desc';
   offset?: number;

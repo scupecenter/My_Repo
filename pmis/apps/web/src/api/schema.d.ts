@@ -20117,8 +20117,15 @@ export interface operations {
                 /** @description Current milestone/stage code (stable code, ADR 0010). */
                 stage_code?: string;
                 scenario?: components["schemas"]["DeliveryScenario"];
+                /** @description The stored overall status of the site. */
                 overall_status?: components["schemas"]["OverallStatus"];
-                /** @description Stream code (for example `CW`). Shows each site's status within that stream only: rail, late and waiting counts, `stage_code` and `bucket` are then computed over the stages of the stream. Sites with no task in the stream are left out. 422 `validation_failed` for an unknown code. */
+                /** @description 0.15.33 (migration 0119): the sites whose derived overall status, as `GET /dashboard` counts it in `headline.by_overall_status` (cancelled; completed when the last milestone is done; on hold after an approved suspension with no later resumption; in progress when a milestone is done; else not started), is this one on `ref_date`. Computed by the dashboard engine within the caller's `dashboard.view` regions (403 without it) and the filters `region_id` (when one region is given), `cluster_code`, `scenario`, `stream` and `view`, so the list count equals the card count. Not with `milestone_reached` (422). */
+                dashboard_status?: components["schemas"]["OverallStatus"];
+                /** @description 0.15.33 (migration 0119): a milestone stage code (stable code, ADR 0010, for example `MS6`): the sites, not cancelled, whose milestone task is approved with its date on or before `ref_date`, as `GET /dashboard` counts them in `milestones[].completed` (the RFI, On-Air, HOTO and Final Closure cards). Same engine, regions and filters as `dashboard_status`. Not with `dashboard_status` (422). */
+                milestone_reached?: string;
+                /** @description 0.15.33: the reference date of `dashboard_status` and `milestone_reached` (default today). A past date reads the snapshot of that date when one exists (as `GET /dashboard`); a future date answers 422 `in_future`. Without one of the two filters it answers 422. */
+                ref_date?: string;
+                /** @description Stream code (for example `CW`). With `dashboard_status` or `milestone_reached` the stream keeps the sites by the dashboard's rule (a milestone of the stream applies). Shows each site's status within that stream only: rail, late and waiting counts, `stage_code` and `bucket` are then computed over the stages of the stream. Sites with no task in the stream are left out. 422 `validation_failed` for an unknown code. */
                 stream?: string;
                 /** @description 0.4.7. View code (for example `CW`, `TE`, `OM`). Shows only the tasks of that view: on `GET /sites`, rail, late and waiting counts, `stage_code` and `bucket` are computed over the view's tasks and sites with no task in the view are left out; on the task grid, only those tasks and their stages. Combined with `stream`, the tasks in both. 422 `validation_failed` for an unknown code (for the grid: a code the site's workflow version does not have). Region and module scope are unchanged. */
                 view?: components["parameters"]["ViewCode"];
@@ -26617,7 +26624,7 @@ export interface operations {
                 status?: string;
                 /** @description Current milestone, comma-separated. */
                 milestone?: string;
-                /** @description Contractor Name (Master AJ) of the first active CW procurement order, comma-separated. A caller without the procurement view matches no site. */
+                /** @description Contractor Name (Master AJ) of the first procurement order of scope CW, Tower Erection or Site Adaption that is neither cancelled nor rejected (0.15.33, the workbook rule), comma-separated. A caller without the procurement view matches no site. */
                 contractor?: string;
                 /** @description site_code (default), name, region, status, milestone, phase, or ord:<n> of a column of the menu. */
                 sort?: string;

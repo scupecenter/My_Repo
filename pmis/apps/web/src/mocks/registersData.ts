@@ -140,6 +140,17 @@ export const carDispatcher: RegisterDefinition = {
     F('waiting_reason', 'Waiting reason', 'سبب الانتظار', 'text', 'Booking'),
   ],
 };
+// Contractors (0025, 0061): companies, teams and contracts, not site-scoped; each record type has fields of its own (the server refuses the others).
+export const contractors: RegisterDefinition = {
+  register_key: 'contractors', name_en: 'Contractors', name_ar: 'المقاولون', module_key: 'contractors', site_scoped: false, multiple_per_site: true, record_types: ['company', 'team', 'contract'], approval_levels: 2,
+  fields: [
+    F('contractor_name', 'Contractor', 'المقاول', 'text', 'Company', { in_list: true }), F('company_type', 'Company Type', 'نوع الشركة', 'text', 'Company', { in_list: true }),
+    F('contract_ref', 'Contract Ref', 'مرجع العقد', 'text', 'Contract'), F('contract_start', 'Contract Start', 'بداية العقد', 'date', 'Contract'),
+    F('contract_end', 'Contract End', 'نهاية العقد', 'date', 'Contract', { in_list: true }), F('contract_scopes', 'Contract Scopes', 'نطاقات العقد', 'text', 'Contract'),
+    F('company_status', 'Status', 'الحالة', 'text', 'Contract', { in_list: true }), F('team_name', 'Team', 'الفريق', 'text', 'Teams', { in_list: true }),
+    F('contractor', 'Contractor (of the team)', 'مقاول الفريق', 'text', 'Teams', { in_list: true }), F('specialization', 'Specialization', 'التخصص', 'text', 'Teams', { in_list: true }),
+  ],
+};
 export const financialAdvances: RegisterDefinition = {
   register_key: 'financial_advances' as RegisterDefinition['register_key'], name_en: 'Financial Advances', name_ar: 'العهد المالية', module_key: 'financial_advances', site_scoped: true, multiple_per_site: true, record_types: ['advance', 'expense', 'settlement'], approval_levels: 2,
   fields: [
@@ -154,7 +165,7 @@ export const financialAdvances: RegisterDefinition = {
   ],
 };
 export const REGISTER_DEFS: RegisterDefinition[] = [
-  procurement, more('contractors', 'Contractors', 'المقاولون', 'contractors', false, ['company', 'team']), gecol, hlc, permits,
+  procurement, contractors, gecol, hlc, permits,
   more('warehouse', 'Warehouse', 'المخزن', 'warehouse', false, ['te_dn', 'cw_dn', 'te_rn', 'cw_rn', 'pl', 'open', 'adj']),
   more('quality', 'Quality', 'الجودة', 'quality', true, ['qc', 'snag', 'itp', 'ncr']), more('issues', 'Issue Log', 'سجل المشاكل', 'issues', true), more('risks', 'Risk Register', 'سجل المخاطر', 'risks', false),
   more('change_control', 'Change Control', 'ضبط التغيير', 'change_control', true), more('readiness_handover', 'Readiness & Handover', 'الجاهزية والتسليم', 'readiness', true),

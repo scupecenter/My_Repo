@@ -1,4 +1,20 @@
 {
+  "regTypes": {
+    "contractors": {
+      "company": "Company",
+      "team": "Team",
+      "contract": "Contract"
+    },
+    "car_dispatcher": {
+      "vehicle": "Vehicle",
+      "booking": "Booking"
+    },
+    "financial_advances": {
+      "advance": "Advance",
+      "expense": "Expense",
+      "settlement": "Settlement"
+    }
+  },
   "app": {
     "name": "GSDN Workspace"
   },
@@ -1788,6 +1804,7 @@
     "site": "Site",
     "site_search": "Search site code or name",
     "record_type": "Type",
+    "type_required": "Choose the type of the record first: the form then shows the fields of that type.",
     "all_types": "All types",
     "all_states": "All states",
     "state": "State",
@@ -2260,7 +2277,11 @@
     "filter_state": "State: {{v}}",
     "filter_type": "Type: {{v}}",
     "filter_bucket": "Quick: {{v}}",
-    "filter_coords": "Coordinates: missing"
+    "filter_coords": "Coordinates: missing",
+    "filter_dash_status": "Dashboard status: {{v}}",
+    "filter_reached": "Milestone reached: {{v}}",
+    "filter_ref_date": "As of {{v}}",
+    "filter_cluster": "Cluster: {{v}}"
   },
   "twoFactor": {
     "badge_label": "2FA",

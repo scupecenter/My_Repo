@@ -668,12 +668,14 @@ export function Dashboard() {
   const name = (x: { name_en: string; name_ar?: string | null }) =>
     ar && x.name_ar ? x.name_ar : x.name_en;
 
-  /** Link to the Site Register with the filters of this view and the given ones (the register reads region_id, scenario, overall_status, stage_code, bucket and stream). */
+  /** Link to the Site Register with the filters of this view and the given ones (the register reads region_id, cluster_code, scenario, overall_status, stage_code, bucket and stream). */
   const sites = (extra: Record<string, string> = {}): string => {
     const p = new URLSearchParams();
-    for (const k of ["region_id", "scenario", "stream", "view"] as const)
+    for (const k of ["region_id", "cluster_code", "scenario", "stream", "view"] as const)
       if (q[k]) p.set(k, q[k] as string);
     for (const [k, v] of Object.entries(extra)) if (v) p.set(k, v);
+    // 0.15.33 (audit E section 2): a card's own set (derived status, milestone reached) is counted as of the dashboard's reference date
+    if ((extra.dashboard_status || extra.milestone_reached) && q.ref_date) p.set("ref_date", q.ref_date);
     const s = p.toString();
     return `/sites${s ? `?${s}` : ""}`;
   };
@@ -998,7 +1000,7 @@ export function Dashboard() {
         key={code}
         testid={`dash-kpi-${key}`}
         title={m ? name(m) : code}
-        to={sites({ stage_code: code })}
+        to={sites({ milestone_reached: code })}
         value={m ? pct(m.done_pct) : "–"}
         sub={
           m ? (
@@ -1465,7 +1467,7 @@ export function Dashboard() {
                             {STATUSES.map((s) => (
                               <Link
                                 key={s}
-                                to={sites({ overall_status: s })}
+                                to={sites({ dashboard_status: s })}
                                 className={`chip ${STATUS_TONE[s]}`}
                                 data-testid={`dash-status-${s}`}
                               >
@@ -1491,7 +1493,7 @@ export function Dashboard() {
                       <Kpi
                         testid="dash-kpi-onair"
                         title={t("dash.kpi.onair")}
-                        to={sites({ stage_code: "MS6" })}
+                        to={sites({ milestone_reached: "MS6" })}
                         value={pct(d.headline.on_air.done_pct)}
                         sub={
                           <>
@@ -1521,7 +1523,7 @@ export function Dashboard() {
                     <Kpi
                       testid="dash-kpi-closure"
                       title={t("dash.kpi.closure")}
-                      to={sites({ overall_status: "completed" })}
+                      to={sites({ milestone_reached: "MS10" })}
                       value={pct(fc?.closed_pct)}
                       sub={
                         <div data-testid="dash-closure-detail">
