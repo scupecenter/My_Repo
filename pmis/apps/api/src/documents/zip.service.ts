@@ -31,7 +31,7 @@ type Scope = z.infer<typeof body>;
 
 export interface JobDto {
   id: string;
-  kind: 'zip_export' | 'audit_export' | 'security_export';
+  kind: 'zip_export' | 'audit_export' | 'security_export' | 'master_export';
   status: 'queued' | 'running' | 'done' | 'failed';
   progress: number;
   result?: Record<string, unknown>;
@@ -43,7 +43,7 @@ export interface JobDto {
 interface JobRow {
   id: string;
   requested_by: string;
-  scope: Scope & { kind?: 'audit_export' | 'security_export'; filters?: unknown };
+  scope: Scope & { kind?: 'audit_export' | 'security_export' | 'master_export'; filters?: unknown };
   status: 'queued' | 'running' | 'done' | 'failed';
   progress: string | number;
   file_count: number | null;
@@ -100,7 +100,7 @@ export class ZipService implements OnApplicationBootstrap {
     const dto: JobDto = { id: j.id, kind, status: j.status, progress: Number(j.progress), created_at: j.created_at, finished_at: j.finished_at };
     if (j.status === 'done' && kind !== 'zip_export') {
       dto.result = { export_id: j.id, row_count: j.file_count, size_bytes: j.size_bytes === null ? null : Number(j.size_bytes), expires_at: j.expires_at,
-        download_path: `/${kind === 'audit_export' ? 'audit-log' : 'security-log'}/exports/${j.id}/download` };
+        download_path: kind === 'master_export' ? `/exports/master/${j.id}/download` : `/${kind === 'audit_export' ? 'audit-log' : 'security-log'}/exports/${j.id}/download` };
     } else if (j.status === 'done') dto.result = { export_id: j.id, file_count: j.file_count, size_bytes: j.size_bytes === null ? null : Number(j.size_bytes), expires_at: j.expires_at };
     if (j.status === 'failed') dto.error = { title: 'The export failed', status: 500, code: 'internal_error', detail: j.error ?? undefined };
     return dto;

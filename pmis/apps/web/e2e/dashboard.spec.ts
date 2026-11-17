@@ -68,7 +68,7 @@ for (const c of CASES) {
     await page.getByTestId('dash-status-in_progress').click();
     await expect(page.getByTestId('page-sites')).toBeVisible();
     await expect(page).toHaveURL(/region_id=1/);
-    await expect(page).toHaveURL(/overall_status=in_progress/);
+    await expect(page).toHaveURL(/dashboard_status=in_progress/);
   });
 }
 

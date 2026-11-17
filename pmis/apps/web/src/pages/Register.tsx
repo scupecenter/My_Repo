@@ -647,7 +647,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
               testid="register-export"
               source={key}
               filters={Object.fromEntries(
-                Object.entries(f).filter(([, x]) => x),
+                Object.entries({ ...f, ...(adv ? { filter: adv } : {}) }).filter(([, x]) => x),
               )}
               columns={[
                 "site_code",

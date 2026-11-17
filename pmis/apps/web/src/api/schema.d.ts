@@ -3923,7 +3923,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The caller's recent Master exports (within the retention window) */
+        /**
+         * The caller's recent Master exports (within the retention window)
+         * @description Only the caller's own exports (0.15.34), newest first; an expired file shows `status` = `expired` for one day after it expires.
+         */
         get: operations["listMasterExports"];
         put?: never;
         /**
@@ -3974,7 +3977,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Download a finished export (audited before streaming) */
+        /**
+         * Download a finished export (audited before streaming)
+         * @description Only the user who started the export downloads it; anyone else (a System Admin included) gets 404 (0.15.34). 409 while the job is not done, 410 `export_expired` after 7 days.
+         */
         get: operations["downloadMasterExport"];
         put?: never;
         post?: never;
@@ -8959,7 +8965,7 @@ export interface components {
             regions?: components["schemas"]["RegionId"][];
             /**
              * Format: date
-             * @description Data as of this date (end of day). Default is now; a future date is 422 `validation_failed`.
+             * @description Data as of this date (end of day). Default is now; a future date is 422 `validation_failed`. 0.15.34: only today is accepted, a past date is 422 with item code `as_of_unsupported`.
              */
             as_of?: string;
         };
@@ -8967,7 +8973,7 @@ export interface components {
          * @description Part key. Every register key used by `/registers` (including `dismantle`), plus the four non-register parts.
          * @enum {string}
          */
-        ExportPartKey: "procurement" | "contractors" | "gecol" | "hlc" | "permits_hse" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "dismantle" | "car_dispatcher" | "financial_advances" | "sites" | "milestones" | "tasks" | "project_status";
+        ExportPartKey: "procurement" | "contractors" | "gecol" | "hlc" | "permits_hse" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "dismantle" | "car_dispatcher" | "financial_advances" | "sites" | "milestones" | "tasks" | "project_status" | "rf_design" | "acquisition";
         ExportPart: {
             key: components["schemas"]["ExportPartKey"];
             label_en: string;
@@ -9034,13 +9040,17 @@ export interface components {
             regions: components["schemas"]["RegionId"][];
             /** Format: date */
             as_of?: string;
-            /** @description Site rows written; null until the job is done. */
+            /** @description Site rows written on the Master sheet (all data rows when the file has no Master sheet); null until the job is done. */
             row_count: number | null;
             /**
              * Format: date-time
-             * @description Set when done: created_at plus the setting `master_export.retention_days` (default 7).
+             * @description Set when done: the finish time plus 7 days (0.15.34; the setting `master_export.retention_days` is not read yet).
              */
             expires_at: string | null;
+            /** @description 0.15.34: share of the sheets written. */
+            progress?: number;
+            /** @description 0.15.34: one-line reason of a failed job. */
+            error?: string;
         };
         /** @description Custom field values keyed by field code (ADR 0009). Hidden fields are omitted. */
         CustomValues: {

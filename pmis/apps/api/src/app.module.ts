@@ -152,6 +152,8 @@ import { MasterImportController, TemplateMappingController } from './master-impo
 import { MasterImportService } from './master-import/master-import.service';
 import { ContractorsController } from './contractors/contractors.controller';
 import { ContractorsService } from './contractors/contractors.service';
+import { ExportsController } from './exports/exports.controller';
+import { MasterExportService } from './exports/master-export.service';
 
 export function appModuleFor(config: AppConfig) {
   @Module({
@@ -169,6 +171,7 @@ export function appModuleFor(config: AppConfig) {
       ContractorsController,
       SavedViewsController,
       SearchController, // 0.15.17 (F4)
+      ExportsController, // 0.15.34: Master-format export
     ],
     providers: [
       { provide: APP_CONFIG, useValue: config },
@@ -187,6 +190,7 @@ export function appModuleFor(config: AppConfig) {
       ContractorsService,
       SavedViewsService, FilterCatalogService,
       SearchService, // 0.15.17 (F4)
+      MasterExportService, // 0.15.34
       { provide: APP_GUARD, useClass: SessionGuard },
       { provide: APP_INTERCEPTOR, useClass: TxInterceptor },
       { provide: APP_FILTER, useClass: ProblemFilter },

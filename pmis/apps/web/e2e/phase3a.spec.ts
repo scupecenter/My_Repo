@@ -44,8 +44,8 @@ for (const locale of ['en', 'ar'] as const) {
       await expect(page.getByTestId('toast').first()).toBeVisible();
     });
 
-    test('exports the whole project and a partial, and downloads with the Arabic file name', async ({ page }) => {
-      // Chromium here drops non-ASCII download names from the Download object, so read the anchor's `download` attribute instead.
+    test('exports the whole project and a partial, and downloads with the Master file name', async ({ page }) => {
+      // read the anchor's `download` attribute (Chromium drops non-ASCII names from the Download object)
       await page.addInitScript(() => {
         const click = HTMLAnchorElement.prototype.click;
         HTMLAnchorElement.prototype.click = function (this: HTMLAnchorElement) { if (this.download) (window as unknown as { __dl: string[] }).__dl = [...((window as unknown as { __dl?: string[] }).__dl ?? []), this.download]; click.call(this); };
@@ -56,7 +56,7 @@ for (const locale of ['en', 'ar'] as const) {
       const first = page.locator('[data-testid^="export-row-"]').first();
       await expect(first.locator('[data-testid^="export-status-"]')).toHaveText(locale === 'ar' ? 'جاهز' : 'Ready', { timeout: 10_000 });
       await first.locator('[data-testid^="export-download-"]').click();
-      await expect.poll(() => page.evaluate(() => (window as unknown as { __dl?: string[] }).__dl?.[0])).toBe('تصدير_ماستر_2026-10-25.xlsx');
+      await expect.poll(() => page.evaluate(() => (window as unknown as { __dl?: string[] }).__dl?.[0])).toBe('GSDN_Site_Master_20261025.xlsx');
 
       await page.getByTestId('export-kind-parts').check();
       await page.getByTestId('export-part-gecol').check();
