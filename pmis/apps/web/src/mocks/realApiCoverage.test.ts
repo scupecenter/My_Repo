@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { REAL_API_AUTH_USERS } from './realApi';
+import { NOT_AVAILABLE, REAL_API_AUTH_USERS } from './realApi';
 
 /**
  * Owner report 2026-11-16: SITE 360, the workflow editor, register columns, holidays, SLA rule sets and search showed sample data on the server, because
@@ -24,10 +24,12 @@ function apiRoutes(): string[] {
   for (const file of controllers(API_SRC)) {
     const src = readFileSync(file, 'utf8');
     for (const block of src.split(/(?=@Controller\()/)) {
-      const base = /@Controller\(\s*'([^']*)'\s*\)/.exec(block)?.[1];
-      if (base === undefined) continue;
-      for (const m of block.matchAll(/@(Get|Post|Patch|Put|Delete)\(\s*(?:'([^']*)')?\s*\)/g)) {
-        const path = '/' + [base, m[2] ?? ''].map((x) => x.replace(/^\/+|\/+$/g, '')).filter(Boolean).join('/');
+      // single or double quotes, and the empty @Controller() (P0 of the 2026-11-17 audit: the first version missed both)
+      const head = /@Controller\(\s*(?:(['"])([^'"]*)\1)?\s*\)/.exec(block);
+      if (!head) continue;
+      const base = head[2] ?? '';
+      for (const m of block.matchAll(/@(Get|Post|Patch|Put|Delete)\(\s*(?:(['"])([^'"]*)\2)?\s*\)/g)) {
+        const path = '/' + [base, m[3] ?? ''].map((x) => x.replace(/^\/+|\/+$/g, '')).filter(Boolean).join('/');
         out.add(shape(m[1]!, path));
       }
     }
@@ -41,4 +43,24 @@ describe('the hybrid build passes every API route to the real server', () => {
     const missing = apiRoutes().filter((r) => !real.has(r));
     expect(missing).toEqual([]);
   });
+
+  it('answers "not available" only for routes no controller serves, and never for a passed-through route', () => {
+    const api = new Set(apiRoutes());
+    const real = new Set(REAL_API_AUTH_USERS.map(([m, p]) => shape(m, p)));
+    const wrong = NOT_AVAILABLE.map(([m, p]) => shape(m, p)).filter((r) => api.has(r) || real.has(r));
+    expect(wrong).toEqual([]);
+  });
+});
+
+describe('a route with no API answers "not available" in hybrid mode', () => {
+  it('answers 501 not_available, so the screen shows an error and nothing is saved locally', async () => {
+    const { server } = await import('./server');
+    const { api, ApiError } = await import('@/api/client');
+    const { notAvailableHandlers } = await import('./realApi');
+    server.use(...notAvailableHandlers(true));
+    const err = await api.get('/absences').then(() => null, (e: unknown) => e);
+    expect(err).toBeInstanceOf(ApiError);
+    expect((err as InstanceType<typeof ApiError>).status).toBe(501);
+    expect((err as InstanceType<typeof ApiError>).code).toBe('not_available');
+  }, 30_000);
 });

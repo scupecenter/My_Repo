@@ -23,7 +23,7 @@ import { fleetHandlers } from './handlers.fleet';
 import { xHandlers } from './handlers.x';
 import { logsHandlers } from './handlers.logs';
 import { orgHandlers } from './handlers.org';
-import { realApiHandlers } from './realApi';
+import { notAvailableHandlers, realApiHandlers } from './realApi';
 import { logsWebHandlers } from './handlers.logsWeb';
 import { viewsHandlers } from './handlers.views';
 import { boardHandlers } from './handlers.boards';
@@ -31,4 +31,5 @@ import { masterImportHandlers } from './handlers.masterImport';
 import { workflowLocksHandlers } from './handlers.workflowLocks';
 import { workflowEditorHandlers } from './handlers.workflowEditor';
 import { p9Handlers } from './handlers.p9';
-export const worker = setupWorker(...invitationHandlers, ...realApiHandlers(), ...masterImportHandlers, ...workflowLocksHandlers, ...workflowEditorHandlers, ...viewsHandlers, ...boardHandlers, ...logsWebHandlers, ...p9Handlers, ...logsHandlers, ...xHandlers, ...p4cHandlers, ...listHandlers, ...registerColumnHandlers, ...registerHandlers, ...warehouseHandlers, ...fleetHandlers, ...authHandlers, ...profileHandlers, ...qcHandlers, ...documentHandlers, ...docsGridHandlers, ...searchHandlers, ...settingsHandlers, ...handlers, ...scenarioHandlers, ...siteCreationHandlers, ...siteHandlers, ...adminHandlers, ...orgHandlers, ...dashboardHandlers, ...site360Handlers);
+// the real server first (hybrid), then the routes with no API yet (501 not_available), then the mocks (P0 of the 2026-11-17 audit: invitations used to come first)
+export const worker = setupWorker(...realApiHandlers(), ...notAvailableHandlers(), ...invitationHandlers, ...masterImportHandlers, ...workflowLocksHandlers, ...workflowEditorHandlers, ...viewsHandlers, ...boardHandlers, ...logsWebHandlers, ...p9Handlers, ...logsHandlers, ...xHandlers, ...p4cHandlers, ...listHandlers, ...registerColumnHandlers, ...registerHandlers, ...warehouseHandlers, ...fleetHandlers, ...authHandlers, ...profileHandlers, ...qcHandlers, ...documentHandlers, ...docsGridHandlers, ...searchHandlers, ...settingsHandlers, ...handlers, ...scenarioHandlers, ...siteCreationHandlers, ...siteHandlers, ...adminHandlers, ...orgHandlers, ...dashboardHandlers, ...site360Handlers);

@@ -1,4 +1,4 @@
-import { http, passthrough } from 'msw';
+import { http, HttpResponse, passthrough } from 'msw';
 import { API_BASE } from '@/api/client';
 import { HYBRID, isHybrid, isRealJob } from '@/lib/hybrid';
 
@@ -442,6 +442,49 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/boards/tasks'],
   ['get', '/settings/kanban-wip'],
   ['put', '/settings/kanban-wip'],
+  // P0 of the 2026-11-17 audit: routes of controllers declared with double quotes or an empty @Controller(), which the first coverage test missed
+  // (warehouse, as-built items, My Work, dashboard extras and settings, documents grid, fleet actions, invitations, admin overrides).
+  ['get', '/settings/dashboard'],
+  ['put', '/settings/dashboard'],
+  ['get', '/dashboard/extras'],
+  ['put', '/dashboard/pipeline-variant'],
+  ['post', '/project-status/manual-items/:item_code/plan'],
+  ['get', '/documents/grid'],
+  ['get', '/documents/grid/view'],
+  ['put', '/documents/grid/view'],
+  ['post', '/sites/:site_id/document-overrides'],
+  ['post', '/document-overrides/:override_id/revert'],
+  ['post', '/files/:file_id/move'],
+  ['post', '/document-library/:doc_type_id/delete'],
+  ['get', '/registers/:key/records/:id/time-in-state'],
+  ['get', '/reports/state-durations'],
+  ['get', '/users/invitations'],
+  ['post', '/users/invitations'],
+  ['post', '/users/invitations/:id/resend'],
+  ['post', '/users/invitations/:id/revoke'],
+  ['get', '/invitations/:token'],
+  ['post', '/invitations/:token/accept'],
+  ['post', '/registers/car_dispatcher/records/:id/extend'],
+  ['post', '/registers/financial_advances/records/:id/top-up'],
+  ['get', '/fleet/availability'],
+  ['get', '/registers/procurement/records/:id/readiness'],
+  ['post', '/list-catalogues/:code/values/import'],
+  ['get', '/warehouse/items'],
+  ['post', '/warehouse/items'],
+  ['get', '/warehouse/items/:id'],
+  ['patch', '/warehouse/items/:id'],
+  ['get', '/warehouse/stock'],
+  ['get', '/warehouse/movements'],
+  ['post', '/warehouse/movements'],
+  ['get', '/warehouse/movements/:id'],
+  ['post', '/warehouse/movements/:id/cancel'],
+  ['get', '/as-built/items'],
+  ['post', '/as-built/items'],
+  ['get', '/as-built/items/:id'],
+  ['patch', '/as-built/items/:id'],
+  ['post', '/tasks/:id/overrides'],
+  ['post', '/overrides/:override_id/revert'],
+  ['get', '/me/tasks'],
 ] as const;
 
 /** `GET /users/deleted` and `GET /users/picker` are other operations that the `:id` pattern would swallow; they stay mocked. */
@@ -461,5 +504,55 @@ export function realApiHandlers(on = HYBRID) {
       if (path === '/files/:id/download' && String(params.id).startsWith('9a000000-')) return undefined;
       return passthrough();
     }),
+  );
+}
+
+/**
+ * P0 of the 2026-11-17 audit: routes the web calls that NO controller of apps/api serves yet. In hybrid mode they answered with sample data (and kept
+ * writes in this browser only), which looked like real data. They now answer 501 `not_available`, so the screen shows an error instead of fake records.
+ * When the API gains one of these routes, move it to REAL_API_AUTH_USERS (realApiCoverage.test.ts fails until it is listed there).
+ */
+export const NOT_AVAILABLE = [
+  ['get', '/absences'],
+  ['post', '/absences'],
+  ['delete', '/absences/:id'],
+  ['get', '/reassignments/alerts'],
+  ['get', '/reassignments/eligible-users'],
+  ['post', '/tasks/reassign'],
+  ['post', '/tasks/:id/act-on-behalf'],
+  ['get', '/exports/parts'],
+  ['get', '/exports/master'],
+  ['post', '/exports/master'],
+  ['get', '/exports/master/:id/download'],
+  ['get', '/settings/dlp'],
+  ['post', '/settings/dlp/versions'],
+  ['get', '/settings/idle-task-alert'],
+  ['put', '/settings/idle-task-alert'],
+  ['get', '/settings/notification-policy'],
+  ['put', '/settings/notification-policy'],
+  ['get', '/settings/notification-policy/catalogue'],
+  ['get', '/staff-registry/visibility'],
+  ['put', '/staff-registry/visibility'],
+  ['get', '/staff-registry/:employeeId'],
+  ['patch', '/staff-registry/:employeeId'],
+  ['get', '/users/:id/mfa-exemption'],
+  ['put', '/users/:id/mfa-exemption'],
+  ['post', '/users/:id/mfa-exemption/revoke'],
+  ['patch', '/me/preferences'],
+  ['post', '/auth/employee-id'],
+  ['post', '/me/notify-admins'],
+  ['post', '/groups'],
+  ['post', '/settings/holidays/import'],
+] as const;
+
+export function notAvailableHandlers(on = HYBRID) {
+  if (!on) return [];
+  return NOT_AVAILABLE.map(([method, path]) =>
+    http[method](`${API_BASE}${path}`, () =>
+      HttpResponse.json(
+        { type: 'about:blank', title: 'Not available yet', status: 501, code: 'not_available', detail: 'This screen is not connected to the server yet. Nothing was read or saved.' },
+        { status: 501, headers: { 'Content-Type': 'application/problem+json' } },
+      ),
+    ),
   );
 }
