@@ -88,7 +88,8 @@ BEGIN
   END IF;
   IF OLD.historical_no_source AND (NEW.state IS DISTINCT FROM 'na' OR NOT NEW.is_na) THEN
     NEW.historical_no_source := false;
-    IF coalesce(current_setting('pmis.hns_restore', true), '') <> NEW.id::text THEN
+    -- the restore marker counts only when set by definer code (hns_restore_task), never from a session-level GUC of the app role
+    IF NOT (current_user::text = 'pmis_definer' AND coalesce(current_setting('pmis.hns_restore', true), '') = NEW.id::text) THEN
       UPDATE public.admin_overrides SET reverted_at = clock_timestamp(), reverted_by = coalesce(public.app_actor(), acted_by),
         revert_reason = left('the task left N/A (' || NEW.state::text || ')', 2000)
       WHERE task_id = NEW.id AND kind = 'historical_no_source_na' AND reverted_at IS NULL;
