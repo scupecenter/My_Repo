@@ -13,7 +13,7 @@ import { DbService } from '../db/db.service';
 const reason = z.string().trim().min(3).max(1000);
 const SCENARIOS = ['new_build', 'expansion', 'hot_swap', 'cold_swap', 'relocation'] as const;
 const RULES = ['applies', 'na', 'sla_not_measured', 'flag'] as const;
-const FLAGS = ['cw', 'tower', 'adaption_only', 'gecol', 'hlc', 'rfi', 'te'] as const;
+const FLAGS = ['cw', 'tower', 'adaption_only', 'gecol', 'hlc', 'rfi', 'te', 'hub_terminal'] as const;   // 0124 (contract 0.15.37): hub_terminal, the site type HUB or Terminal
 
 const ruleSchema = z.object({
   task_code: z.string().min(1).max(40),

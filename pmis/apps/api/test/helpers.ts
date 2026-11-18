@@ -109,6 +109,13 @@ export async function superDbHrtk(): Promise<PgClient> {
   return c;
 }
 
+/** Superuser connection to the historical Site Release database (migration 0124; see global-setup). */
+export async function superDbHms1(): Promise<PgClient> {
+  const c = new PgClient({ connectionString: process.env.TEST_SUPER_URL_HMS1 });
+  await c.connect();
+  return c;
+}
+
 /** Superuser connection to the workflow-editor database (migration 0090; see global-setup). */
 export async function superDbWfe(): Promise<PgClient> {
   const c = new PgClient({ connectionString: process.env.TEST_SUPER_URL_WFE });

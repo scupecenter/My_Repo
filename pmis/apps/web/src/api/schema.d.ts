@@ -10984,10 +10984,10 @@ export interface components {
              */
             rule: "applies" | "na" | "sla_not_measured" | "flag";
             /**
-             * @description Only with `flag` (Master AA:AF).
+             * @description Only with `flag` (Master AA:AF). 0.15.37: `hub_terminal` follows the site type (Master J): applies to a HUB or Terminal site, N/A for any other site type, no decision when the site has no site type.
              * @enum {string|null}
              */
-            flag_expr: "cw" | "tower" | "adaption_only" | "gecol" | "hlc" | "rfi" | "te" | null;
+            flag_expr: "cw" | "tower" | "adaption_only" | "gecol" | "hlc" | "rfi" | "te" | "hub_terminal" | null;
             reason: string;
             version?: number;
             /** Format: date-time */
