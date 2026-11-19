@@ -203,6 +203,12 @@ export default async function setup(): Promise<() => Promise<void>> {
   const hnsDb = await buildDatabase(adminUrl, hns, appPassword);
   process.env.TEST_DATABASE_URL_HNS = hnsDb.appUrl;
   process.env.TEST_SUPER_URL_HNS = hnsDb.superUrl;
+  // The historical gates and dates database (migration 0127): the suite runs the one-time catch-up, which reads every site of a historical load approved
+  // directly in its database, applies historical Master files and reads the gates, the milestones and the current stage of its sites, so it shares no database.
+  const hgd = `${dbName}_hgd`;
+  const hgdDb = await buildDatabase(adminUrl, hgd, appPassword);
+  process.env.TEST_DATABASE_URL_HGD = hgdDb.appUrl;
+  process.env.TEST_SUPER_URL_HGD = hgdDb.superUrl;
   // The workflow-editor database (migration 0090): the suite creates and publishes workflow versions (a new published version changes what every new site uses),
   // so no other suite may share it.
   const wfe = `${dbName}_wfe`;
@@ -283,6 +289,7 @@ export default async function setup(): Promise<() => Promise<void>> {
     await a.query(`DROP DATABASE IF EXISTS ${hms1} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${hrfix} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${hns} WITH (FORCE)`);
+    await a.query(`DROP DATABASE IF EXISTS ${hgd} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${wfe} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${wfg} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${rcols} WITH (FORCE)`);
