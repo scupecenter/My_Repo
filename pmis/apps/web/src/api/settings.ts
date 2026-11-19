@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { api, ApiError, downloadFile, type RequestOptions } from './client';
 import type {
-  ActiveSession, ActOnBehalfRequest, Calendar, CalendarConfirmation, MailNotificationKinds, ImportsSettings, NavLayoutSetting, NavLayoutT, ContractorRules, ContractorRulesInput, ContractorsCompletenessReport, TeamScopeMismatchReport, DeletedUser, PurgedUser, DlpSettings, DlpVersion, DlpVersionInput, Holiday, HolidayChangeResult, HolidayInput, HolidayPatch, HolidaySummary, IdleTaskAlertSetting, Job, LogIntegrity, LogRetention, LogRetentionInput,
+  ActiveSession, ActOnBehalfRequest, Calendar, CalendarConfirmation, MailNotificationKinds, ImportsSettings, NavLayoutSetting, UiIdentity, UiBrand, NavLayoutT, ContractorRules, ContractorRulesInput, ContractorsCompletenessReport, TeamScopeMismatchReport, DeletedUser, PurgedUser, DlpSettings, DlpVersion, DlpVersionInput, Holiday, HolidayChangeResult, HolidayInput, HolidayPatch, HolidaySummary, IdleTaskAlertSetting, Job, LogIntegrity, LogRetention, LogRetentionInput,
   NotificationPolicy, NotificationPolicyInput, NotificationTypeDef, Page, ReassignmentAlert, SecurityLogEntry, SessionRevokeResult, SlaPublishPreview, SlaRuleSet, SlaRuleSetPublishResult, SlaRuleSetSummary, SlaTaskRule, StaffVisibility, StructuralFreeze,
   TaskDefinition, TeamScopeMatch, TeamScopeMatchInput, TransitionResultT, User, UserDetail, WeekendDaysResult, WeightSet, WeightSetCode, WeightSetInput, WeightSetPreview, WeightSetPublishResult, WorkflowVersion, WorkflowVersionSummary,
 } from './types';
@@ -82,6 +82,14 @@ export const useSetMailKinds = () => {
 };
 
 /** 0.14.6: the background threshold of batches (imports.async_rows). Read by everyone; changed by a System Admin or an all-regions delegate of settings, with a reason. */
+/** 0.15.41 (migration 0130): Settings, Identity & themes. Saving refreshes /me so the design of the page follows at once. */
+export const useUiIdentity = () => useQuery({ queryKey: ['ui-identity'], queryFn: () => api.get<UiIdentity>('/settings/identity') });
+export const useSetUiIdentity = () => {
+  const qc = useQueryClient();
+  return useMutation<UiIdentity, ApiError, { version: number; default_brand: UiBrand; allow_user_choice: boolean; reason: string }>({
+    mutationFn: ({ version, ...body }) => api.put('/settings/identity', { version, body }), onSettled: () => refresh(qc, 'ui-identity', 'me', 'my-profile'),
+  });
+};
 export const useImportsSettings = () => useQuery({ queryKey: ['imports-settings'], queryFn: () => api.get<ImportsSettings>('/settings/imports') });
 export const useSetImportsSettings = () => {
   const qc = useQueryClient();

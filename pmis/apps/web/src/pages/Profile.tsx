@@ -16,6 +16,7 @@ import { useToast } from '@/components/Toast';
 import { CodeField, codeComplete, codeErrorText, digitsOnly, QrCode, RecoveryCodesView, TwoFactorCard } from '@/components/TwoFactor';
 import { ruleKey } from '@/lib/passwordRules';
 import { fmtDateTime } from '@/lib/time';
+import { BRANDS, type Brand } from '@/lib/brands';
 
 const REGION_NAMES: Record<number, string> = { 1: 'Tripoli', 2: 'Middle', 3: 'WM', 4: 'Zawia', 5: 'Benghazi', 6: 'GM', 7: 'Sebha' };
 const E164 = /^\+[1-9][0-9]{7,14}$/;
@@ -62,12 +63,15 @@ function Details({ p }: { p: MyProfile }) {
   const { t, i18n } = useTranslation();
   const toast = useToast();
   const save = useUpdateMyProfile();
-  const [f, setF] = useState({ name: p.display_name, locale: p.locale, theme: p.theme });
+  const [f, setF] = useState<{ name: string; locale: 'en' | 'ar'; theme: 'light' | 'dark'; brand: Brand | '' }>({ name: p.display_name, locale: p.locale, theme: p.theme, brand: p.ui_brand ?? '' });
+  // 0130: the personal design; '' = follow the organization default. Locked when the admin set one design for everyone.
+  const choice = p.identity.allow_user_choice;
   const bad = { name: !f.name.trim() || f.name.trim().length > 200 };
   const patch = {
     ...(f.name.trim() !== p.display_name ? { display_name: f.name.trim() } : {}),
     ...(f.locale !== p.locale ? { locale: f.locale } : {}),
     ...(f.theme !== p.theme ? { theme: f.theme } : {}),
+    ...(choice && (f.brand || null) !== (p.ui_brand ?? null) ? { ui_brand: f.brand || null } : {}),
   };
   const dirty = Object.keys(patch).length > 0;
   const submit = (e: FormEvent) => {
@@ -95,6 +99,17 @@ function Details({ p }: { p: MyProfile }) {
             <select className="input mt-1 font-normal" data-testid="pf-theme" value={f.theme} onChange={(e) => setF({ ...f, theme: e.target.value as 'light' | 'dark' })}>
               <option value="light">{t('profile.theme_light')}</option><option value="dark">{t('profile.theme_dark')}</option>
             </select></label>
+        </div>
+        <div>
+          <label className="block text-sm font-semibold" htmlFor="pf-brand">{t('profile.appearance')}</label>
+          <select id="pf-brand" className="input mt-1 font-normal" data-testid="pf-brand" value={choice ? f.brand : ''} disabled={!choice}
+            aria-describedby="pf-brand-note" onChange={(e) => setF({ ...f, brand: e.target.value as Brand | '' })}>
+            <option value="">{t('profile.appearance_default', { name: t(`brand.${p.identity.default_brand}`) })}</option>
+            {BRANDS.map((b) => <option key={b} value={b}>{t(`brand.${b}`)}</option>)}
+          </select>
+          <p id="pf-brand-note" className="mt-1 text-xs text-mute" data-testid="pf-brand-note">
+            {choice ? t('profile.appearance_note') : t('profile.appearance_locked', { name: t(`brand.${p.identity.default_brand}`) })}
+          </p>
         </div>
         <Err id="pf-error" msg={save.isError ? (save.error.status === 412 ? t('profile.err_stale') : errText(save.error, t)) : null} />
         <div className="flex justify-end"><button type="submit" className="btn btn-accent" data-testid="pf-save" disabled={!dirty || bad.name || save.isPending}>{t('common.save')}</button></div>

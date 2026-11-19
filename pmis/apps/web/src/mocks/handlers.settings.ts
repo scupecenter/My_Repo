@@ -6,7 +6,8 @@ import type { ContractorRulesInput, Holiday, NotificationPolicyInput, SecurityLo
 import { tripoliToday } from '@/lib/today';
 import { weightIssues } from '@/lib/weights';
 import { NAV_SIDE } from '@/lib/navLayout';
-import { db, save, stepUpValid, viewer } from './db';
+import { db, identity, save, stepUpValid, viewer } from './db';
+import { BRANDS, isBrand } from '@/lib/brands';
 import { guard, page, problem, stepUp } from './handlers';
 import { byId, uid } from './ids';
 import { CALENDAR_CODES, CATALOGUE, COMPLETENESS, MAIL_KIND_CATALOGUE, MISMATCH, initCfg, GATES, MILESTONES, OPEN_TASKS, SCENARIOS, START_EVENT_CODES, TASK_DEFS, type SlaSetRec, type WeightRec } from './settingsData';
@@ -214,6 +215,7 @@ const progress = (s: Pick<WeightSet, 'activities'>) => Math.round(s.activities.r
 const CC = () => (C().calConfirm ??= initCfg().calConfirm);
 const MK = () => (C().mailKinds ??= initCfg().mailKinds);
 /** 0.15.1: nav.layout (a store saved before 0.15.1 starts from the seed). */
+const identityView = () => ({ ...identity(), brands: [...BRANDS], can_edit: isAdmin() });
 const NL = () => (C().navLayout ??= initCfg().navLayout);
 const navView = () => {
   const c = NL();
@@ -465,6 +467,27 @@ export const settingsHandlers = [
     if (IM().async_rows === b.async_rows) return problem(409, 'invalid_transition', `The threshold is already ${String(b.async_rows)} rows.`);
     Object.assign(IM(), { async_rows: b.async_rows as number, version: IM().version + 1, updated_at: new Date().toISOString(), updated_by: viewer()!.employee_id! }); save();
     const j = importsView();
+    return HttpResponse.json(j, tag(j.version));
+  }),
+
+  // ------------------------------------------------------------------ 0.15.41: Settings, Identity & themes (the organization default UI design)
+  http.get(`${B}/settings/identity`, () => { const g = guard(); if (g) return g; const j = identityView(); return HttpResponse.json(j, tag(j.version)); }),
+  http.put(`${B}/settings/identity`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    const b = await body<{ default_brand?: unknown; allow_user_choice?: unknown; reason?: string } & Record<string, unknown>>(request);
+    const errs: { path: string; code: string }[] = Object.keys(b).filter((k) => !['default_brand', 'allow_user_choice', 'reason'].includes(k)).map((k) => ({ path: `/${k}`, code: 'unknown_field' }));
+    if (!isBrand(b.default_brand)) errs.push({ path: '/default_brand', code: 'invalid' });
+    if (typeof b.allow_user_choice !== 'boolean') errs.push({ path: '/allow_user_choice', code: 'required' });
+    if ((b.reason ?? '').trim().length < 3 || (b.reason ?? '').length > 1000) errs.push({ path: '/reason', code: 'required' });
+    if (errs.length) return fields(...errs);
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, identity().version); if (p) return p;
+    if (!stepUpValid()) return stepUp();
+    if (identity().default_brand === b.default_brand && identity().allow_user_choice === b.allow_user_choice) return problem(409, 'invalid_transition', 'These are already the identity settings.');
+    const v = viewer()!;
+    Object.assign(identity(), { default_brand: b.default_brand, allow_user_choice: b.allow_user_choice, version: identity().version + 1, updated_at: new Date().toISOString(),
+      updated_by: { id: uid(v.employee_id ?? '9999'), display_name: v.name, employee_id: v.employee_id } }); save();
+    const j = identityView();
     return HttpResponse.json(j, tag(j.version));
   }),
 

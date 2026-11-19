@@ -195,6 +195,13 @@ export function mapDbError(e: unknown): ProblemException | null {
       if (/two_factor_enforced/.test(msg)) {
         return new ProblemException(403, 'two_factor_enforced', { detail: 'An administrator enforces two-factor on your account, so you cannot turn it off. Ask an administrator.' });
       }
+      // 0130: a personal design while the admin set one design for everyone
+      if (/ui_brand_locked/.test(msg)) {
+        return new ProblemException(403, 'field_read_only', {
+          detail: 'The administrator set one design for everyone, so you cannot choose your own.',
+          errors: [{ path: '/ui_brand', code: 'brand_choice_locked', message: 'The administrator does not allow a personal design.' }],
+        });
+      }
       if (/cannot be changed on your own account/i.test(msg)) {
         return new ProblemException(403, 'field_read_only', { detail: 'This field is managed by an administrator.' });
       }
@@ -331,7 +338,7 @@ export function mapDbError(e: unknown): ProblemException | null {
         });
       }
       if (/profile: /i.test(msg)) {
-        const field = /profile: (display_name|phone|locale|theme)/.exec(msg)?.[1];
+        const field = /profile: (display_name|phone|locale|theme|ui_brand)/.exec(msg)?.[1];
         return new ProblemException(422, 'validation_failed', { detail: 'A profile value is not valid.', errors: field ? [{ path: `/${field}`, code: 'invalid' }] : [] });
       }
       if (/two-factor is not on for this user/i.test(msg)) return new ProblemException(409, 'invalid_transition', { detail: 'Two-factor is not on for this user: there is nothing to reset.' });

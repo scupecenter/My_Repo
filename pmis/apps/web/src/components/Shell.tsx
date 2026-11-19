@@ -13,6 +13,7 @@ import { notificationTarget } from '@/lib/x';
 import { applyLocale, applyTheme, currentLocale, currentTheme } from '@/i18n';
 import { HYBRID } from '@/lib/hybrid';
 import { loadPref, savePref as storePref } from '@/lib/localPref';
+import { applyBrand } from '@/lib/brands';
 import { ExportDialog } from './ExportDialog';
 import { CommandPalette } from './CommandPalette';
 import { firstPeopleTab, PEOPLE_KEYS, PEOPLE_TABS } from './PeopleAdmin';
@@ -51,6 +52,10 @@ export function Shell() {
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
   }, []);
+
+  // 0130: the UI design follows the signed-in user's effective design (independent of the light/dark theme)
+  const userBrand = me.data?.user.brand;
+  useEffect(() => { if (userBrand) applyBrand(userBrand); }, [userBrand]);
 
   const allowed = new Set(me.data?.effective.nav ?? []);
   const unread = useUnreadTotal(allowed.has('messages')).data ?? 0;
@@ -94,7 +99,7 @@ export function Shell() {
   return (
     <div className="flex min-h-screen">
       <aside ref={asideRef} data-testid="sidebar" aria-label={t('nav.sidebar_label')} style={{ width: compact ? 56 : width }}
-        className="sticky top-0 hidden h-screen shrink-0 flex-col border-e border-line bg-side md:flex">
+        className="side-scope sticky top-0 hidden h-screen shrink-0 flex-col border-e border-line bg-side md:flex">
         {brand}
         <SidebarBody items={sideItems} compact={compact} unread={unread} alerts={alerts} activeKey={activeKey} />
         {/* the sample-data label only in the pure mock build (P0 of the 2026-11-17 audit: it also showed against the real server) */}

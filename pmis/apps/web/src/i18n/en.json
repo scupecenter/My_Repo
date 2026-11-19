@@ -1054,7 +1054,8 @@
     "section_data_imports": "Imports",
     "section_data_historical": "Historical load",
     "section_security_staff": "Staff field visibility",
-    "section_security_retention": "Log retention"
+    "section_security_retention": "Log retention",
+    "tab_identity": "Identity & themes"
   },
   "scopeMatch": {
     "title": "Team / scope match (Procurement)",
@@ -3175,7 +3176,11 @@
     "email_code_locked": "Too many wrong codes. Send a new code.",
     "email_code_expired": "The code has expired. Send a new code.",
     "email_verified": "The new address is confirmed. An administrator still has to approve the change.",
-    "email_verified_done": "Address confirmed."
+    "email_verified_done": "Address confirmed.",
+    "appearance": "Appearance",
+    "appearance_default": "Use organization default ({{name}})",
+    "appearance_note": "The design of the menus and buttons. Light or dark is the Theme above; status colours never change.",
+    "appearance_locked": "Your administrator set one design for everyone ({{name}}), so you cannot choose your own."
   },
   "emailChange": {
     "tab": "Email changes",
@@ -5098,5 +5103,38 @@
     "wip_none": "No limit",
     "wip_range": "A whole number from {{min}} to {{max}}, or empty.",
     "wip_confirm": "The new limits apply to the board at once. They only warn."
+  },
+  "brand": {
+    "current": "Current (standard)",
+    "aljeel": "Aljeel",
+    "executive": "Executive",
+    "field": "Field (high contrast)",
+    "current_desc": "The look of the system today. The default.",
+    "aljeel_desc": "The company brand: a navy sidebar with an orange marker and a blue accent.",
+    "executive_desc": "A white sidebar and a light page, for reading and reviews.",
+    "field_desc": "High contrast and larger type for site teams and bright light."
+  },
+  "identity": {
+    "title": "Identity & themes",
+    "note": "The design everyone sees, and whether each person may choose their own in My profile. Light or dark stays each person's own choice.",
+    "default": "Organization default design",
+    "in_force": "In force",
+    "allow": "Let users choose their own design",
+    "allow_on": "Each person may pick a design in My profile; those who do not follow the default.",
+    "allow_off": "Everyone sees the default design. Personal choices are kept and come back if you allow the choice again.",
+    "status_locked": "Status colours are locked",
+    "status_locked_note": "Done, in progress, late, locked, N/A and planned keep the same colours in every design and theme.",
+    "st_done": "Done",
+    "st_progress": "In progress",
+    "st_late": "Late",
+    "st_locked": "Locked",
+    "st_na": "N/A",
+    "st_planned": "Planned",
+    "updated": "Last changed by {{name}} on {{when}}",
+    "never": "Not changed since installation.",
+    "readonly": "Only a System Admin, or a person they delegated settings to for all regions, can change this.",
+    "confirm": "Default design: {{name}}. {{choice}} The change is audited with your reason.",
+    "choice_on": "Users may choose their own design.",
+    "choice_off": "Everyone sees this design."
   }
 }

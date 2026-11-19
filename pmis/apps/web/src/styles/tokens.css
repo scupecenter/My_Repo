@@ -252,6 +252,20 @@
   --line2:var(--outline-gray-1);
   --side:var(--surface-sidebar);
   --sideOn:var(--surface-gray-3);
+  /* Sidebar and accent hooks of the switchable designs (0130). Their defaults are the tokens the sidebar used before, so the current look is unchanged;
+     the sidebar re-scopes --ink --mute --faint --hover --line --accentText --card --sideOn to these (index.css .side-scope). */
+  --sideInk:var(--ink);
+  --sideMute:var(--mute);
+  --sideFaint:var(--faint);
+  --sideHover:var(--hover);
+  --sideLine:var(--line);
+  --sideField:var(--card);
+  --sideOnInk:var(--accentText);
+  --sideSel:var(--sideOn);
+  --sideActive:var(--sideInk);
+  --sideMark:var(--accent);
+  --sideMarkW:2px;
+  --accentHover:var(--accent);
   --accent:var(--surface-teal-8);
   --accentInk:var(--ink-base);
   --accentSoft:var(--surface-teal-2);
@@ -662,4 +676,97 @@
   --focus:3px solid #464646cc;
   --map-cancel:var(--surface-gray-6);
   color-scheme:dark;
+}
+/* Switchable UI designs (owner decision 2026-11-19, migration 0130). data-brand on <html> follows the signed-in user's effective design (GET /me user.brand).
+   current = no override (the look above, the default). A design overrides layer-2 tokens only, and NEVER the status tokens
+   (--done --open --wait --late --lock and their Bg/Ink, --state-*). Light values apply when the theme is light; in the dark theme a design changes only the
+   sidebar to dark-safe values (or nothing). contrast.test.ts checks every design in both themes. */
+[data-brand=aljeel]:not([data-theme=dark]){
+  --side:#0F2557;
+  --sideInk:#DCE3F3;
+  --sideMute:#AAB9DD;
+  --sideFaint:#AAB9DD;
+  --sideHover:#1A3166;
+  --sideLine:#2A4580;
+  --sideField:#16306A;
+  --sideSel:#1E3A7B;
+  --sideOnInk:#FFFFFF;
+  --sideActive:#FFFFFF;
+  --sideMark:#F26A21;
+  --sideMarkW:3px;
+  --accent:#1D4AB8;
+  --accentHover:#143585;
+  --accentInk:#FFFFFF;
+  --accentSoft:#E8EEFB;
+  --accentText:#17337A;
+}
+[data-brand=executive]:not([data-theme=dark]){
+  --bg:#F7F8FA;
+  --side:#FFFFFF;
+  --sideInk:#2A3547;
+  --sideMute:#556070;
+  --sideFaint:#556070;
+  --sideHover:#F1F3F6;
+  --sideLine:#E2E6EA;
+  --sideField:#FFFFFF;
+  --sideSel:#EAF0FD;
+  --sideOnInk:#17337A;
+  --sideActive:#17337A;
+  --accent:#1D4AB8;
+  --accentHover:#143585;
+  --accentInk:#FFFFFF;
+  --accentSoft:#EAF0FD;
+  --accentText:#17337A;
+}
+[data-brand=field]:not([data-theme=dark]){
+  --sideMark:#FB923C;
+  --mute:#3A4651;
+  --faint:#56616C;
+  --line:#AEB8C2;
+  --line2:#C7CFD7;
+  --side:#0B1220;
+  --sideInk:#FFFFFF;
+  --sideMute:#C3CCD9;
+  --sideFaint:#C3CCD9;
+  --sideHover:#16213A;
+  --sideLine:#2A3A55;
+  --sideField:#131C2E;
+  --sideSel:#24324F;
+  --sideOnInk:#FFFFFF;
+  --sideActive:#FFFFFF;
+  --accent:#C2410C;
+  --accentHover:#9A3412;
+  --accentInk:#FFFFFF;
+  --accentSoft:#FDE7DA;
+  --accentText:#7C2D12;
+}
+[data-brand=field]{
+  --text-base:15px;
+}
+[data-theme=dark][data-brand=aljeel]{
+  --side:#0F2557;
+  --sideInk:#DCE3F3;
+  --sideMute:#AAB9DD;
+  --sideFaint:#AAB9DD;
+  --sideHover:#1A3166;
+  --sideLine:#2A4580;
+  --sideField:#16306A;
+  --sideSel:#1E3A7B;
+  --sideOnInk:#FFFFFF;
+  --sideActive:#FFFFFF;
+  --sideMark:#F26A21;
+  --sideMarkW:3px;
+}
+[data-theme=dark][data-brand=field]{
+  --sideMark:#FB923C;
+  --side:#0B1220;
+  --sideInk:#FFFFFF;
+  --sideMute:#C3CCD9;
+  --sideFaint:#C3CCD9;
+  --sideHover:#16213A;
+  --sideLine:#2A3A55;
+  --sideField:#131C2E;
+  --sideSel:#24324F;
+  --sideOnInk:#FFFFFF;
+  --sideActive:#FFFFFF;
 }

@@ -8,8 +8,8 @@ export default {
     extend: {
       colors: {
         bg: v('bg'), card: v('card'), card2: v('card2'), hover: v('hover'), ink: v('ink'), mute: v('mute'), faint: v('faint'),
-        line: v('line'), line2: v('line2'), side: v('side'), sideOn: v('sideOn'),
-        accent: v('accent'), accentInk: v('accentInk'), accentSoft: v('accentSoft'), accentText: v('accentText'), link: v('link'),
+        line: v('line'), line2: v('line2'), side: v('side'), sideOn: v('sideOn'), sideMark: v('sideMark'), sideActive: v('sideActive'),
+        accent: v('accent'), accentHover: v('accentHover'), accentInk: v('accentInk'), accentSoft: v('accentSoft'), accentText: v('accentText'), link: v('link'),
         done: v('done'), doneBg: v('doneBg'), doneInk: v('doneInk'),
         open: v('open'), openBg: v('openBg'), openInk: v('openInk'),
         wait: v('wait'), waitBg: v('waitBg'), waitInk: v('waitInk'),

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.40
+  version: 0.15.41
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -30,6 +30,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.41 (2026-11-19): switchable UI designs (owner decision 2026-11-19; migration 0130; CHANGELOG 169). Additive. New paths `GET` and `PUT /settings/identity` (`getUiIdentity`, `setUiIdentity`, schemas `UiIdentity`, `UiIdentityInput`, `UiBrand`): the organization default design (`current` = today's look, the default; `aljeel`, `executive`, `field`) and whether users may choose their own. Every signed-in user reads it; a System Admin or a delegate of `settings` edit for all regions changes it with a reason, a step-up and `If-Match` (audited `ui_identity_update`). `User` and `MyProfile` gain `ui_brand` (the stored personal design, null = the organization default) and `brand` (the design the user sees); `MyProfile.identity` carries the default and the flag. `MyProfilePatch.ui_brand` (nullable): while the admin does not allow a personal choice a non-null value is 403 `field_read_only` with `errors[0].code` `brand_choice_locked`. The light/dark `theme` is unchanged and independent; status colours never change with the design.
     - 0.15.40 (2026-11-19): Site RFI of the historical Master load (owner decision "Option 2" 2026-11-19; migration 0129; CHANGELOG 168). Additive, no new path or field. On a site of a historical Master load approved directly, a manual milestone (`calc.milestone_manual`, Site RFI MS4) that is open, in entry or locked but ready, that the site moved past (a later task approved with an actual date), is approved directly with its pre-filled date; with no pre-filled date (every predecessor approved or N/A, none dated), with the date of the earliest later task approved, flagged inferred. Never a Site RFI a person submitted, rejected or suspended, never a date a person typed, never on a live site. `TaskDetail.overrides` lists an `Override` of the new `kind` `historical_manual_ms_approved` (`entity` `task`, `before` `{state, actual_date, prefilled_date}`, `after` `{state: approved, actual_date, date_source: prefilled|inferred, note, evidence_task, evidence_date}`), `admin_override` true. `POST /overrides/{override_id}/revert` takes it back (System Admin, never a delegate, a reason, a step-up; 409 `override_not_revertible` once reverted or no longer in force): the milestone is open again with its pre-filled date (no date when it was inferred) and is never approved by the rule again. The historical direct approval and its catch-ups no longer send a notification per task. Responses of the apply are unchanged.
     - 0.15.39 (2026-11-19): gates and milestone dates of the historical Master load (owner decisions 2026-11-19; migration 0127; CHANGELOG 166). Additive, no new path or field. On a site of a historical Master load approved directly: (1) a phase gate the site moved past (a task the gate holds, or a later one, approved with an actual date) is open whatever its conditions say; it is an admin override of the site: `SiteDetail.admin_edits.items[]` lists an `Override` of the new `kind` `historical_gate_open` (`entity` `site`, `before` `{gate, status: blocked, reasons}`, `after` `{gate, status: open, evidence_task, evidence_date}`) and `admin_override_active` is true while it is in force; the gate in the site and task views reads open. (2) A calculated milestone with no date of its own (every predecessor approved or N/A, none dated) that the site moved past is approved with the date of the earliest later task approved with an actual date, flagged "inferred date — historical load": `TaskDetail.overrides` lists an `Override` of the new `kind` `historical_inferred_date` (`entity` `task`, `before` `{state, actual_date}`, `after` `{state: approved, actual_date, note, evidence_task, evidence_date}`), `admin_override` true. `POST /overrides/{override_id}/revert` takes either back (System Admin, never a delegate, a reason, a step-up; 409 `override_not_revertible` once reverted or no longer in force): the gate follows its conditions again; the milestone is open again with no date. A reverted one is never applied again. Site RFI (MS4) keeps its own rule. Responses of the apply are unchanged.
     - 0.15.38 (2026-11-18): N/A "historical load: no source" (owner decision "Option 1" 2026-11-18; migration 0126; CHANGELOG 165). Additive, no new path. In the historical Master load approved directly, a task with no date in the file is made N/A (reason `historical load: no source`) only where a later task of the site (a transitive successor in the workflow) is approved with an actual date; never a date invented. Each such task carries an admin override: `TaskDetail.overrides` lists an `Override` of the new `kind` `historical_no_source_na` (`before` `{state}`, `after` `{state: na, na_reason, evidence_task, evidence_date}`), shown with the "Admin override" badge (`admin_override` true). `POST /overrides/{override_id}/revert` restores the task (System Admin, never a delegate, a reason, a step-up; 409 `override_not_revertible` once the task left N/A or was restored): the task is locked again and opened at once when its predecessors are approved or N/A; the team then enters the date through L1 -> L2. Responses of the apply are unchanged.
@@ -1101,7 +1102,7 @@ paths:
       operationId: updateMyProfile
       summary: Change my own name, phone, language or theme (0.9.2)
       description: |
-        Only `display_name`, `locale` and `theme`. Admin-owned fields (`email`, `employee_id`,
+        Only `display_name`, `locale`, `theme` and (0.15.41) `ui_brand`. Admin-owned fields (`email`, `employee_id`,
         `status`, `team`, `region_ids`, `roles`, `department_id`, `manager_id` and the like) answer 403 `field_read_only` with `errors[]`
         naming them; the email changes only through `POST /me/email-change`, and **0.12.6 (D156):** the phone only through
         `POST /me/phone-change` (`phone` here is 403 `field_read_only`). Unknown keys are 422. Needs `If-Match` (428 / 412). Audited once
@@ -8196,6 +8197,54 @@ paths:
         '412': {$ref: '#/components/responses/PreconditionFailed'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /settings/identity:
+    get:
+      tags: [settings]
+      operationId: getUiIdentity
+      summary: The organization default UI design and whether users may choose their own (0.15.41)
+      description: Every signed-in user may read it; it drives the UI. `can_edit` is true for a System Admin or a delegate of `settings` edit for all regions.
+      x-db-path: ui_identity_state
+      responses:
+        '200':
+          description: The identity settings.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/UiIdentity'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+    put:
+      tags: [settings]
+      operationId: setUiIdentity
+      summary: Set the default design and the personal choice (reason, step-up, If-Match, audited) (0.15.41)
+      description: |
+        A System Admin, or a delegate of `settings` edit for all regions (403 `action_forbidden` otherwise, also for a delegate limited to some regions). A reason
+        (3+ characters), a step-up (401 `step_up_required`) and `If-Match` (428 / 412) are required. Unknown keys and values outside `UiBrand` are 422. Saving the
+        values in force is 409 `invalid_transition`. Audited `ui_identity_update` with `{default_brand, allow_user_choice}` before and after. Turning the personal
+        choice off keeps each user's stored `ui_brand` but everyone sees `default_brand` until it is turned on again.
+      x-step-up: true
+      x-db-path: admin_set_ui_identity
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/UiIdentityInput'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/UiIdentity'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
   /settings/historical-waiver:
     get:
       tags: [settings]
@@ -14765,10 +14814,11 @@ components:
         display_name: { type: string, minLength: 1, maxLength: 200 }
         locale: { type: string, enum: [en, ar] }
         theme: { type: string, enum: [light, dark] }
+        ui_brand: { oneOf: [{ $ref: '#/components/schemas/UiBrand' }, { type: 'null' }], description: '0.15.41. The personal UI design; null goes back to the organization default. While `identity.allow_user_choice` is false a non-null value is 403 `field_read_only` (`errors[0]` `{path: /ui_brand, code: brand_choice_locked}`); null stays allowed. Audited in `profile_updated`.' }
     MyProfile:
       type: object
       description: '0.9.2. The "My profile" page.'
-      required: [id, display_name, email, employee_id, phone, locale, theme, status, auth_method, local_sign_in, editable_fields, admin_owned, two_factor, email_change, phone_change, version]
+      required: [id, display_name, email, employee_id, phone, locale, theme, ui_brand, brand, identity, status, auth_method, local_sign_in, editable_fields, admin_owned, two_factor, email_change, phone_change, version]
       properties:
         id: { type: string, format: uuid }
         display_name: { type: string }
@@ -14777,10 +14827,19 @@ components:
         phone: { type: [string, 'null'], description: 'The sign-in phone. 0.12.6: changes only through an approved phone change request.' }
         locale: { type: string, enum: [en, ar] }
         theme: { type: string, enum: [light, dark] }
+        ui_brand: { oneOf: [{ $ref: '#/components/schemas/UiBrand' }, { type: 'null' }], description: '0.15.41. The stored personal design (null = the organization default).' }
+        brand: { allOf: [{ $ref: '#/components/schemas/UiBrand' }], description: '0.15.41. The design the user sees.' }
+        identity:
+          type: object
+          description: '0.15.41. The organization default and whether a personal design is allowed (drives the Appearance control).'
+          required: [default_brand, allow_user_choice]
+          properties:
+            default_brand: { $ref: '#/components/schemas/UiBrand' }
+            allow_user_choice: { type: boolean }
         status: { $ref: '#/components/schemas/UserStatus' }
         auth_method: { type: string, enum: [local, m365, break_glass] }
         local_sign_in: { type: boolean }
-        editable_fields: { type: array, items: { type: string, enum: [display_name, locale, theme] } }
+        editable_fields: { type: array, items: { type: string, enum: [display_name, locale, theme, ui_brand] } }
         admin_owned:
           type: object
           required: [roles, teams, region_ids, department, manager]
@@ -14864,6 +14923,8 @@ components:
             status: { $ref: '#/components/schemas/UserStatus' }
             locale: { type: string, enum: [en, ar] }
             theme: { type: string, enum: [light, dark] }
+            ui_brand: { oneOf: [{ $ref: '#/components/schemas/UiBrand' }, { type: 'null' }], description: '0.15.41. The personal UI design the user chose; null = follow the organization default (`GET /settings/identity`).' }
+            brand: { allOf: [{ $ref: '#/components/schemas/UiBrand' }], description: '0.15.41. The design the user sees: `ui_brand` while the admin allows a personal choice and one is set, else the organization default. Independent of `theme`.' }
             is_break_glass: { type: boolean }
             phone: { type: [string, 'null'], description: '0.3.0. E.164; a local sign-in identifier.' }
             local_sign_in: { type: boolean, description: '0.3.0. The account can sign in with a password.' }
@@ -18722,6 +18783,30 @@ components:
             oneOf:
               - { type: string, description: 'A screen key of the catalogue.' }
               - $ref: '#/components/schemas/NavSubHeading'
+    UiBrand:
+      type: string
+      enum: [current, aljeel, executive, field]
+      description: '0.15.41. A UI design: `current` is the look of the system before 0.15.41 (the default); `aljeel` the company brand; `executive` a light sidebar; `field` high contrast with larger type for site teams. A design changes the sidebar, the accent, the page background, lines and type size only, never the status colours.'
+    UiIdentity:
+      type: object
+      description: '0.15.41. Settings, Identity & themes (setting `ui.identity`, migration 0130).'
+      required: [default_brand, allow_user_choice, brands, version, can_edit]
+      properties:
+        default_brand: { $ref: '#/components/schemas/UiBrand' }
+        allow_user_choice: { type: boolean, description: 'true: each user may choose their own design in My profile; false: everyone sees `default_brand`.' }
+        brands: { type: array, items: { $ref: '#/components/schemas/UiBrand' } }
+        updated_at: { type: [string, 'null'], format: date-time }
+        updated_by: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+        version: { type: integer, description: The ETag value. }
+        can_edit: { type: boolean, description: 'A System Admin or a delegate of `settings` edit for all regions.' }
+    UiIdentityInput:
+      allOf:
+        - $ref: '#/components/schemas/WithReason'
+        - type: object
+          required: [default_brand, allow_user_choice]
+          properties:
+            default_brand: { $ref: '#/components/schemas/UiBrand' }
+            allow_user_choice: { type: boolean }
     NavLayout:
       type: object
       description: '0.15.1. The shared order of the side menu (setting `nav.layout`).'

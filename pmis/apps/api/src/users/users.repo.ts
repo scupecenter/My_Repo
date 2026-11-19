@@ -18,6 +18,10 @@ export interface UserDto extends UserRef {
   status: string;
   locale: string;
   theme: string;
+  /** 0130: the stored personal UI design; null = the organization default. */
+  ui_brand: 'current' | 'aljeel' | 'executive' | 'field' | null;
+  /** 0130: the design the user sees (ui_effective_brand). */
+  brand: 'current' | 'aljeel' | 'executive' | 'field';
   is_break_glass: boolean;
   phone: string | null;
   local_sign_in: boolean;
@@ -59,6 +63,8 @@ interface UserDbRow {
   status: string;
   locale: string;
   theme: string;
+  ui_brand: string | null;
+  brand: string;
   is_break_glass: boolean;
   last_login_at: Date | null;
   created_at: Date;
@@ -88,7 +94,7 @@ interface UserDbRow {
  * local_credentials). `version` is the microsecond epoch of users.updated_at: an integer that changes with every write to the row.
  */
 const USER_SELECT = Prisma.sql`u.id::text AS id, u.email, u.display_name, trim(u.employee_id) AS employee_id, u.phone, u.status::text AS status,
-  u.locale, u.theme, u.is_break_glass, u.last_login_at, u.created_at,
+  u.locale, u.theme, u.ui_brand, ui_effective_brand(u.ui_brand) AS brand, u.is_break_glass, u.last_login_at, u.created_at,
   (extract(epoch FROM u.updated_at) * 1000000)::bigint::text AS version,
   (l.user_id IS NOT NULL) AS local_sign_in, coalesce(l.must_change, false) AS must_change, tf.required AS tf_required, tf.enrolled AS tf_enrolled, auth_totp_enrol_code_state(u.id) AS tf_code_expires_at, auth_totp_enforced(u.id) AS tf_enforced,
   m.id::text AS manager_id, m.display_name AS manager_name, trim(m.employee_id) AS manager_employee_id,
@@ -107,6 +113,8 @@ export const toUserDto = (r: UserDbRow): UserDto => ({
   status: r.status,
   locale: r.locale,
   theme: r.theme,
+  ui_brand: r.ui_brand as UserDto['ui_brand'],
+  brand: r.brand as UserDto['brand'],
   is_break_glass: r.is_break_glass,
   phone: r.phone,
   local_sign_in: r.local_sign_in,

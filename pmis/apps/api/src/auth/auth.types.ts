@@ -24,6 +24,9 @@ export interface UserRow {
   status: UserStatus;
   locale: string;
   theme: string;
+  /** 0130: the stored personal UI design (null = the organization default) and the design the user sees. */
+  uiBrand: string | null;
+  brand: string;
 }
 
 /** Cached for at most 60 seconds (ADR 0002 section 5). */

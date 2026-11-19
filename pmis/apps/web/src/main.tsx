@@ -6,10 +6,12 @@ import { App } from './App';
 import { StepUpProvider } from './components/StepUp';
 import { ToastProvider } from './components/Toast';
 import { applyLocale, applyTheme, currentLocale, currentTheme } from './i18n';
+import { applyBrand, savedBrand } from './lib/brands';
 import './styles/index.css';
 
 applyLocale(currentLocale());
 applyTheme(currentTheme());
+applyBrand(savedBrand());
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } } });
 

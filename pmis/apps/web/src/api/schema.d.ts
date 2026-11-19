@@ -704,7 +704,7 @@ export interface paths {
         head?: never;
         /**
          * Change my own name, phone, language or theme (0.9.2)
-         * @description Only `display_name`, `locale` and `theme`. Admin-owned fields (`email`, `employee_id`,
+         * @description Only `display_name`, `locale`, `theme` and (0.15.41) `ui_brand`. Admin-owned fields (`email`, `employee_id`,
          *     `status`, `team`, `region_ids`, `roles`, `department_id`, `manager_id` and the like) answer 403 `field_read_only` with `errors[]`
          *     naming them; the email changes only through `POST /me/email-change`, and **0.12.6 (D156):** the phone only through
          *     `POST /me/phone-change` (`phone` here is 403 `field_read_only`). Unknown keys are 422. Needs `If-Match` (428 / 412). Audited once
@@ -5155,6 +5155,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/identity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The organization default UI design and whether users may choose their own (0.15.41)
+         * @description Every signed-in user may read it; it drives the UI. `can_edit` is true for a System Admin or a delegate of `settings` edit for all regions.
+         */
+        get: operations["getUiIdentity"];
+        /**
+         * Set the default design and the personal choice (reason, step-up, If-Match, audited) (0.15.41)
+         * @description A System Admin, or a delegate of `settings` edit for all regions (403 `action_forbidden` otherwise, also for a delegate limited to some regions). A reason
+         *     (3+ characters), a step-up (401 `step_up_required`) and `If-Match` (428 / 412) are required. Unknown keys and values outside `UiBrand` are 422. Saving the
+         *     values in force is 409 `invalid_transition`. Audited `ui_identity_update` with `{default_brand, allow_user_choice}` before and after. Turning the personal
+         *     choice off keeps each user's stored `ui_brand` but everyone sees `default_brand` until it is turned on again.
+         */
+        put: operations["setUiIdentity"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/historical-waiver": {
         parameters: {
             query?: never;
@@ -9375,6 +9402,8 @@ export interface components {
             locale?: "en" | "ar";
             /** @enum {string} */
             theme?: "light" | "dark";
+            /** @description 0.15.41. The personal UI design; null goes back to the organization default. While `identity.allow_user_choice` is false a non-null value is 403 `field_read_only` (`errors[0]` `{path: /ui_brand, code: brand_choice_locked}`); null stays allowed. Audited in `profile_updated`. */
+            ui_brand?: components["schemas"]["UiBrand"] | null;
         };
         /** @description 0.9.2. The "My profile" page. */
         MyProfile: {
@@ -9394,11 +9423,20 @@ export interface components {
             locale: "en" | "ar";
             /** @enum {string} */
             theme: "light" | "dark";
+            /** @description 0.15.41. The stored personal design (null = the organization default). */
+            ui_brand: components["schemas"]["UiBrand"] | null;
+            /** @description 0.15.41. The design the user sees. */
+            brand: components["schemas"]["UiBrand"];
+            /** @description 0.15.41. The organization default and whether a personal design is allowed (drives the Appearance control). */
+            identity: {
+                default_brand: components["schemas"]["UiBrand"];
+                allow_user_choice: boolean;
+            };
             status: components["schemas"]["UserStatus"];
             /** @enum {string} */
             auth_method: "local" | "m365" | "break_glass";
             local_sign_in: boolean;
-            editable_fields: ("display_name" | "locale" | "theme")[];
+            editable_fields: ("display_name" | "locale" | "theme" | "ui_brand")[];
             admin_owned: {
                 roles: components["schemas"]["RoleRef"][];
                 teams: components["schemas"]["TeamKind"][];
@@ -9452,6 +9490,10 @@ export interface components {
             locale?: "en" | "ar";
             /** @enum {string} */
             theme?: "light" | "dark";
+            /** @description 0.15.41. The personal UI design the user chose; null = follow the organization default (`GET /settings/identity`). */
+            ui_brand?: components["schemas"]["UiBrand"] | null;
+            /** @description 0.15.41. The design the user sees: `ui_brand` while the admin allows a personal choice and one is set, else the organization default. Independent of `theme`. */
+            brand?: components["schemas"]["UiBrand"];
             is_break_glass?: boolean;
             /** @description 0.3.0. E.164; a local sign-in identifier. */
             phone?: string | null;
@@ -13628,6 +13670,29 @@ export interface components {
             name_ar: string;
             icon?: string | null;
             children: (string | components["schemas"]["NavSubHeading"])[];
+        };
+        /**
+         * @description 0.15.41. A UI design: `current` is the look of the system before 0.15.41 (the default); `aljeel` the company brand; `executive` a light sidebar; `field` high contrast with larger type for site teams. A design changes the sidebar, the accent, the page background, lines and type size only, never the status colours.
+         * @enum {string}
+         */
+        UiBrand: "current" | "aljeel" | "executive" | "field";
+        /** @description 0.15.41. Settings, Identity & themes (setting `ui.identity`, migration 0130). */
+        UiIdentity: {
+            default_brand: components["schemas"]["UiBrand"];
+            /** @description true: each user may choose their own design in My profile; false: everyone sees `default_brand`. */
+            allow_user_choice: boolean;
+            brands: components["schemas"]["UiBrand"][];
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+            /** @description The ETag value. */
+            version: number;
+            /** @description A System Admin or a delegate of `settings` edit for all regions. */
+            can_edit: boolean;
+        };
+        UiIdentityInput: components["schemas"]["WithReason"] & {
+            default_brand: components["schemas"]["UiBrand"];
+            allow_user_choice: boolean;
         };
         /** @description 0.15.1. The shared order of the side menu (setting `nav.layout`). */
         NavLayout: {
@@ -26376,6 +26441,62 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NavLayoutSetting"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getUiIdentity: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The identity settings. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UiIdentity"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setUiIdentity: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UiIdentityInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UiIdentity"];
                 };
             };
             401: components["responses"]["Unauthorized"];
