@@ -10440,7 +10440,7 @@ export interface components {
             task_id?: string | null;
             /** Format: uuid */
             site_id?: string;
-            /** @description `edit_date` for a task, `site_edit` for a site. 0.15.38: `historical_no_source_na` for a task made N/A "historical load: no source" by the historical Master load (migration 0126); its revert restores the task. */
+            /** @description `edit_date` for a task, `site_edit` for a site. 0.15.38: `historical_no_source_na` for a task made N/A "historical load: no source" by the historical Master load (migration 0126); its revert restores the task. 0.15.39: `historical_gate_open` (entity `site`) for a phase gate opened because the site moved past it, and `historical_inferred_date` (entity `task`) for a milestone approved with the date of the earliest later task ("inferred date — historical load"), both by the historical Master load (migration 0127); their revert closes the gate again or reopens the milestone without a date. */
             kind: string;
             reason: string;
             before?: {
