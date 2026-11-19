@@ -168,8 +168,11 @@ describe('0123: the register records of the historical load close their tasks', 
     // the milestones complete in order with the dates of their conditions
     expect(t.MS2).toMatchObject({ state: 'approved', actual_date: '2026-02-14' });
     expect(t.MS3).toMatchObject({ state: 'approved' });
-    // Site RFI is a milestone entered and approved by hand (Q38): nothing approves it here
-    expect(t.MS4).toMatchObject({ state: 'open', flag: false });   // open for entry on the open site; entered and approved by hand (Q38)
+    // Site RFI is a milestone entered and approved by hand (Q38); since 0129 (owner decision "Option 2") the site moved past it (D1 approved later), so the
+    // historical load approves it directly with its pre-filled date (an admin override of its own, not the flag of a batch row)
+    expect(t.MS4).toMatchObject({ state: 'approved', flag: false });
+    expect((await q<{ hmm: boolean }>(db, `SELECT t.historical_manual_ms AS hmm FROM task_instances t JOIN task_definitions td ON td.id = t.task_def_id
+      WHERE td.code = 'MS4' AND t.site_id = $1`, [s.id]))[0]!.hmm).toBe(true);
 
     // the audit row of a fed task: admin override, the reason of the load, the record and its register; the record is linked to the first task it closed
     const pr = (await q<{ id: string; task_id: string | null }>(db,
@@ -193,7 +196,7 @@ describe('0123: the register records of the historical load close their tasks', 
     // the current stage and the overall status are the real ones
     const list = await admin.api.call('get', `/sites?q=${s.code}`);
     expect(list.status).toBe(200);
-    expect(list.body.items[0]).toMatchObject({ current_milestone: 'MS3', next_milestone: 'MS4', overall_status: 'in_progress' });
+    expect(list.body.items[0]).toMatchObject({ current_milestone: 'MS4', next_milestone: 'MS5', overall_status: 'in_progress' });   // Site RFI approved directly since 0129
     expect(await status(s.id)).toBe('in_progress');
 
     // S2: B3 approved before is never approved again (its permit lands on the register row only)

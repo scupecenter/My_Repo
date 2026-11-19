@@ -136,19 +136,19 @@ describe('0127: gates the site moved past are open, milestones with no date take
     expect(await gate(cw.id, 'G3')).toMatchObject({ status: 'open', gate_date: '2026-01-16' });
     // CW Completion by its own rule (E3: the latest of B10 and B11, the gate date at least): not inferred, not an override
     expect(t.MS3).toMatchObject({ state: 'approved', actual_date: '2026-02-06', hid: false, override: false });
-    // Site RFI keeps its own rule: pre-filled with the latest condition date, waiting for L2
-    expect(t.MS4!.state).toBe('open');
+    // Site RFI: pre-filled with the latest condition date (Q38); since 0129 the site moved past it, so it is approved directly with that date (admin override)
+    expect(t.MS4!.state).toBe('approved');
     expect(t.MS4!.actual_date).toBe('2026-03-01');
-    expect(await stage(cw.id)).toBe('MS4');
+    expect(await stage(cw.id)).toBe('done');
 
-    const ov = await overrides(cw.id, 'historical_gate_open');
+    const ov = (await overrides(cw.id, 'historical_gate_open')).filter((o) => o.after.gate === 'G3');   // and G5 since 0129 (below)
     expect(ov).toHaveLength(1);
     expect(ov[0]).toMatchObject({ entity: 'site', task_id: null, reverted: false, acted_by: admin.user.id,
       after: { gate: 'G3', status: 'open', evidence_task: 'B8', evidence_date: '2026-02-01' } });
     const st = await q<{ o: string | null }>(db, `SELECT historical_open_override::text AS o FROM site_gate_state WHERE site_id = $1 AND gate_code = 'G3'`, [cw.id]);
     expect(st[0]!.o).toBe(ov[0]!.id);
     const au = await q<{ after: Record<string, any>; is_admin_override: boolean; reason: string }>(db,
-      `SELECT after, is_admin_override, reason FROM audit_log WHERE action = 'site_historical_gate_open' AND site_id = $1`, [cw.id]);
+      `SELECT after, is_admin_override, reason FROM audit_log WHERE action = 'site_historical_gate_open' AND site_id = $1 AND after ->> 'gate' = 'G3'`, [cw.id]);
     expect(au).toHaveLength(1);
     expect(au[0]).toMatchObject({ is_admin_override: true, reason: REASON, after: { gate: 'G3', override_id: ov[0]!.id, evidence_task: 'B8', catch_up: false } });
     const step = await q<{ action: string; note: string }>(db,
@@ -159,25 +159,15 @@ describe('0127: gates the site moved past are open, milestones with no date take
     const sum = await q<{ after: Record<string, any>; is_admin_override: boolean }>(db,
       `SELECT after, is_admin_override FROM audit_log WHERE action = 'historical_gates_dates_apply' AND entity_id = $1`, [runId]);
     expect(sum).toHaveLength(1);
-    expect(sum[0]).toMatchObject({ is_admin_override: true, after: { sites_in_scope: 1, gates_opened: 1, gates_opened_by_gate: { G3: 1 }, milestones_inferred: 0,
-      current_stage_after: { MS4: 1 }, waiting_after: { MS4: { 'the pre-filled date waits for its L2 approval': 1 } } } });
+    expect(sum[0]).toMatchObject({ is_admin_override: true, after: { sites_in_scope: 1, gates_opened: 2, gates_opened_by_gate: { G3: 1, G5: 1 }, milestones_inferred: 0,
+      manual_ms_approved: 1, current_stage_after: { done: 1 }, waiting_after: {} } });   // 0129: Site RFI approved directly, then G5 and TE Completion
     // the site page lists the gate override among the admin edits of the site, revertible
     const sd = await admin.api.call('get', `/sites/${cw.id}`);
     expect(sd.status, JSON.stringify(sd.body)).toBe(200);
     expect(sd.body.admin_edits.items).toEqual(expect.arrayContaining([expect.objectContaining({ id: ov[0]!.id, kind: 'historical_gate_open', revertible: true })]));
   });
 
-  it('(a) later gates follow: once Site RFI is approved, G5 (TE permits) opens on the evidence of the TE work and TE Completion is calculated', async () => {
-    // L2 approves the pre-filled Site RFI (fixture: its normal path is the L2 approval)
-    await db.query('SET session_replication_role = replica');
-    try {
-      await db.query(`UPDATE task_instances t SET state = 'approved', approved_date = actual_date FROM task_definitions td WHERE td.id = t.task_def_id AND td.code = 'MS4' AND t.site_id = $1`, [cw.id]);
-    } finally {
-      await db.query('SET session_replication_role = origin');
-    }
-    expect((await gate(cw.id, 'G5')).status).toBe('blocked');
-    const out = await catchUp();
-    expect(out.gates_opened_by_gate).toMatchObject({ G5: 1 });
+  it('(a) later gates follow: once Site RFI is approved (directly since 0129, in the same run), G5 (TE permits) opens on the evidence of the TE work and TE Completion is calculated', async () => {
     expect(await gate(cw.id, 'G5')).toMatchObject({ status: 'open', gate_date: '2026-03-01' });
     const t = await tasks(cw.id);
     expect(t.MS5).toMatchObject({ state: 'approved', actual_date: '2026-03-25', hid: false });
@@ -185,7 +175,7 @@ describe('0127: gates the site moved past are open, milestones with no date take
     expect(ov.after).toMatchObject({ evidence_task: 'D2', evidence_date: '2026-03-10' });
     const au = await q<{ actor_id: string | null; after: Record<string, any> }>(db,
       `SELECT actor_id::text AS actor_id, after FROM audit_log WHERE action = 'site_historical_gate_open' AND site_id = $1 AND after ->> 'gate' = 'G5'`, [cw.id]);
-    expect(au[0]).toMatchObject({ actor_id: admin.user.id, after: { catch_up: true } });   // as the System Admin who loaded the site
+    expect(au[0]).toMatchObject({ actor_id: admin.user.id, after: { catch_up: false } });   // the System Admin of the load
   });
 
   it('(b) Site Release with every predecessor N/A and no date, PRE-CW approved with dates: MS1 takes the date of the earliest later task (B1), flagged inferred; PRE-CW Completion follows', async () => {
