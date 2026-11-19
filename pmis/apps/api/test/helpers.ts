@@ -137,6 +137,13 @@ export async function superDbHgd(): Promise<PgClient> {
   return c;
 }
 
+/** Superuser connection to the historical manual-milestone database (migration 0129; see global-setup). */
+export async function superDbHmm(): Promise<PgClient> {
+  const c = new PgClient({ connectionString: process.env.TEST_SUPER_URL_HMM });
+  await c.connect();
+  return c;
+}
+
 /** Superuser connection to the workflow-editor database (migration 0090; see global-setup). */
 export async function superDbWfe(): Promise<PgClient> {
   const c = new PgClient({ connectionString: process.env.TEST_SUPER_URL_WFE });
