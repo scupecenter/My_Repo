@@ -305,6 +305,8 @@ BEGIN
       WHERE ti.site_id = p_site AND ti.state IN ('locked', 'open', 'entry') AND NOT ti.is_na AND (manual ? sd.code) AND NOT ti.historical_manual_ms
         AND NOT EXISTS (SELECT 1 FROM public.admin_overrides o WHERE o.task_id = ti.id AND o.kind = 'historical_manual_ms_approved' AND o.reverted_at IS NOT NULL)
         AND NOT EXISTS (SELECT 1 FROM public.register_records o WHERE o.task_id = ti.id AND o.state IN ('in_review', 'in_approval'))
+        -- security review: a milestone a person ever submitted, reviewed, rejected or reopened keeps its human path (never overridden here)
+        AND NOT EXISTS (SELECT 1 FROM public.workflow_steps w WHERE w.task_id = ti.id AND w.action::text IN ('submit', 'approve', 'reject', 'reopen', 'reassign'))
       ORDER BY sd.seq
     LOOP
       SELECT * INTO mev FROM public.ms_evaluate(m.id);
@@ -317,9 +319,11 @@ BEGIN
         SELECT * INTO hold FROM public.wf_gate_hold(m.id);
         CONTINUE WHEN hold.gate_code IS NOT NULL;
       END IF;
-      pre := nullif(cur.values ->> 'prefilled_date', '')::date;
-      CONTINUE WHEN cur.actual_date IS NOT NULL AND cur.actual_date IS DISTINCT FROM pre;   -- a date a person typed: their entry, never taken over
-      d := coalesce(cur.actual_date, CASE WHEN coalesce(mev.ready, false) THEN mev.ms_date END);   -- the pre-filled date (the latest condition date, Q38)
+      -- security review: the pre-filled date is the one the system computes (ms_evaluate: the latest condition date, Q38), never values.prefilled_date,
+      -- which an entry can write; a date in the task that differs from it is a person's entry, never taken over
+      pre := CASE WHEN coalesce(mev.ready, false) THEN mev.ms_date END;
+      CONTINUE WHEN cur.actual_date IS NOT NULL AND cur.actual_date IS DISTINCT FROM pre;
+      d := pre;
       inf := d IS NULL;
       IF inf THEN d := e.actual_date; END IF;   -- no condition date at all: the inferred date of 0127
       before := public.wf_snap(m.id);
