@@ -123,6 +123,13 @@ export async function superDbHrfix(): Promise<PgClient> {
   return c;
 }
 
+/** Superuser connection to the historical no-source database (migration 0126; see global-setup). */
+export async function superDbHns(): Promise<PgClient> {
+  const c = new PgClient({ connectionString: process.env.TEST_SUPER_URL_HNS });
+  await c.connect();
+  return c;
+}
+
 /** Superuser connection to the workflow-editor database (migration 0090; see global-setup). */
 export async function superDbWfe(): Promise<PgClient> {
   const c = new PgClient({ connectionString: process.env.TEST_SUPER_URL_WFE });

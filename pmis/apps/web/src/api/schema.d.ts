@@ -10440,7 +10440,7 @@ export interface components {
             task_id?: string | null;
             /** Format: uuid */
             site_id?: string;
-            /** @description `edit_date` for a task, `site_edit` for a site. */
+            /** @description `edit_date` for a task, `site_edit` for a site. 0.15.38: `historical_no_source_na` for a task made N/A "historical load: no source" by the historical Master load (migration 0126); its revert restores the task. */
             kind: string;
             reason: string;
             before?: {

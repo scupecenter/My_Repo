@@ -162,9 +162,9 @@ describe('0123: the register records of the historical load close their tasks', 
     expect(t.B3).toMatchObject({ state: 'approved', flag: true, batch: by('permits_hse').id, actual_date: '2026-02-01', approves: 1 });
     expect(t.D1).toMatchObject({ state: 'approved', flag: true, batch: by('permits_hse').id, actual_date: '2026-04-01', approves: 1 });
     expect(t.D1!.lock_bypassed).toBe(true);   // its predecessor (Site RFI) is not done: the open site bypassed the lock (0085)
-    // no source: left open, never given a date
-    expect(t.A1).toMatchObject({ state: 'open', actual_date: null });
-    expect(t.C2).toMatchObject({ state: 'open', actual_date: null });
+    // no source: never given a date; since 0126 (owner decision "Option 1") N/A "historical load: no source", because later work of the site is approved
+    expect(t.A1).toMatchObject({ state: 'na', actual_date: null });
+    expect(t.C2).toMatchObject({ state: 'na', actual_date: null });
     // the milestones complete in order with the dates of their conditions
     expect(t.MS2).toMatchObject({ state: 'approved', actual_date: '2026-02-14' });
     expect(t.MS3).toMatchObject({ state: 'approved' });
