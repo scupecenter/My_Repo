@@ -99,196 +99,6 @@ END $$;
 -- The guard of the milestone flag (runs as its writer, like hns_guard_task). The flag is set only by hgd_settle_site (current user pmis_definer AND the transaction
 -- marker pmis.hgd_task of this task, from locked / open to approved). When the milestone leaves approved or its date changes by any path the flag goes (audited
 -- and its override closed, unless the restore of hgd_restore_milestone does it: current user pmis_definer AND the marker pmis.hgd_restore of this task).
-
--- 0127 (security review): the transaction markers of the historical rules (0126 and 0127) are rows of hgd_marks, written and read only by definer code
--- (no right for pmis_app), keyed by the transaction id, so a session setting of the application role can never stand in for them.
-CREATE TABLE hgd_marks (
-  xid  bigint NOT NULL,
-  kind text   NOT NULL,
-  key  text   NOT NULL,
-  PRIMARY KEY (xid, kind)
-);
-ALTER TABLE hgd_marks ENABLE ROW LEVEL SECURITY;
-ALTER TABLE hgd_marks FORCE ROW LEVEL SECURITY;   -- no policy: only the definer functions (pmis_definer bypasses row security) read it
-REVOKE ALL ON hgd_marks FROM PUBLIC;
-GRANT SELECT, INSERT, UPDATE, DELETE ON hgd_marks TO pmis_definer;
-DO $do$ BEGIN
-  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'pmis_app') THEN REVOKE ALL ON hgd_marks FROM pmis_app; END IF;
-END $do$;
-
-CREATE OR REPLACE FUNCTION hgd_mark(p_kind text, p_key text) RETURNS void
-LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
-  INSERT INTO public.hgd_marks (xid, kind, key) VALUES (txid_current(), p_kind, p_key)
-  ON CONFLICT (xid, kind) DO UPDATE SET key = EXCLUDED.key;
-$$;
-CREATE OR REPLACE FUNCTION hgd_unmark(p_kind text) RETURNS void
-LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
-  DELETE FROM public.hgd_marks WHERE xid = txid_current() AND kind = p_kind;
-$$;
-CREATE OR REPLACE FUNCTION hgd_marked(p_kind text, p_key text) RETURNS boolean
-LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
-  SELECT EXISTS (SELECT 1 FROM public.hgd_marks m WHERE m.xid = txid_current() AND m.kind = p_kind AND m.key = p_key);
-$$;
-
--- 0127 (security review): redefined from 0126; the marker is a row of hgd_marks for this transaction, not a session setting
-CREATE OR REPLACE FUNCTION hns_guard_task() RETURNS trigger
-LANGUAGE plpgsql SET search_path = pg_catalog, public, pg_temp AS $$
-BEGIN
-  IF TG_OP = 'INSERT' THEN
-    IF public.app_is_seeding() THEN RETURN NEW; END IF;
-    RAISE EXCEPTION 'historical load: the no-source flag of a task is written only by GSDN Workspace (migration 0126)' USING ERRCODE = 'insufficient_privilege';
-  END IF;
-  IF OLD.historical_no_source AND (NEW.state IS DISTINCT FROM 'na' OR NOT NEW.is_na) THEN
-    NEW.historical_no_source := false;
-    -- the restore marker counts only when set by definer code (hns_restore_task), never from a session-level GUC of the app role
-    IF NOT (current_user::text = 'pmis_definer' AND (CASE WHEN current_user::text = 'pmis_definer' THEN public.hgd_marked('hns_restore', NEW.id::text) ELSE false END)) THEN
-      UPDATE public.admin_overrides SET reverted_at = clock_timestamp(), reverted_by = coalesce(public.app_actor(), acted_by),
-        revert_reason = left('the task left N/A (' || NEW.state::text || ')', 2000)
-      WHERE task_id = NEW.id AND kind = 'historical_no_source_na' AND reverted_at IS NULL;
-      INSERT INTO public.audit_log (action, entity_type, entity_id, site_id, region_id, before, after, reason, actor_id)
-      VALUES ('task_historical_no_source_cleared', 'task', NEW.id::text, NEW.site_id, NEW.region_id,
-        jsonb_build_object('historical_no_source', true, 'state', OLD.state::text),
-        jsonb_build_object('historical_no_source', false, 'state', NEW.state::text),
-        'The task left N/A (' || NEW.state::text || '): the historical no-source mark is cleared.', public.app_actor());
-    END IF;
-    NEW.admin_override := EXISTS (SELECT 1 FROM public.admin_overrides o WHERE o.task_id = NEW.id AND o.reverted_at IS NULL AND o.kind <> 'historical_no_source_na');
-    RETURN NEW;
-  END IF;
-  IF public.app_is_seeding() THEN RETURN NEW; END IF;
-  IF (NEW.historical_no_source, NEW.historical_no_source_at) IS NOT DISTINCT FROM (OLD.historical_no_source, OLD.historical_no_source_at) THEN RETURN NEW; END IF;
-  IF current_user::text = 'pmis_definer' AND (CASE WHEN current_user::text = 'pmis_definer' THEN public.hgd_marked('hns_task', NEW.id::text) ELSE false END)
-     AND NEW.historical_no_source AND NOT OLD.historical_no_source AND NEW.state = 'na' AND OLD.state IN ('locked', 'open', 'entry') THEN
-    RETURN NEW;
-  END IF;
-  RAISE EXCEPTION 'historical load: the no-source flag of a task is written only by GSDN Workspace (migration 0126)' USING ERRCODE = 'insufficient_privilege';
-END $$;
-
--- 0127 (security review): redefined from 0126; the marker is a row of hgd_marks for this transaction, not a session setting
-CREATE OR REPLACE FUNCTION hns_mark_site(p_site uuid, p_actor uuid, p_reason text, p_catchup boolean) RETURNS jsonb
-LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
-DECLARE
-  s public.sites%ROWTYPE; t record; cur public.task_instances%ROWTYPE; before jsonb; oid uuid; ids uuid[]; i uuid; n int; rounds int := 0;
-  marked jsonb := '[]'::jsonb; nodate jsonb; was_busy text := coalesce(current_setting('pmis.calc_busy', true), '');
-  why constant text := 'historical load: no source';
-BEGIN
-  SELECT * INTO s FROM public.sites WHERE id = p_site;
-  IF NOT FOUND THEN RETURN NULL; END IF;
-  IF p_actor IS NULL OR NOT public.app_user_is_system_admin(p_actor) THEN
-    RAISE EXCEPTION 'historical no source: only the System Admin of the historical load marks a task' USING ERRCODE = 'insufficient_privilege';
-  END IF;
-  IF NOT public.hns_site_in_scope(p_site) THEN
-    RETURN jsonb_build_object('site_id', p_site, 'in_scope', false, 'marked', '[]'::jsonb, 'milestones_without_date', '[]'::jsonb);
-  END IF;
-  LOOP
-    rounds := rounds + 1;
-    EXIT WHEN rounds > 5;
-    n := 0; ids := ARRAY[]::uuid[];
-    PERFORM set_config('pmis.calc_busy', '1', true);
-    FOR t IN
-      WITH RECURSIVE succ(anc, des) AS (
-        SELECT tp.predecessor_id, tp.task_def_id FROM public.task_predecessors tp
-        JOIN public.task_definitions d ON d.id = tp.task_def_id AND d.workflow_id = s.workflow_version_id
-        UNION
-        SELECT c.anc, tp.task_def_id FROM succ c JOIN public.task_predecessors tp ON tp.predecessor_id = c.des
-      )
-      SELECT ti.id, td.code, ev.code AS ev_code, ev.actual_date AS ev_date
-      FROM public.task_instances ti
-      JOIN public.task_definitions td ON td.id = ti.task_def_id AND td.workflow_id = s.workflow_version_id AND NOT td.is_milestone_task
-      JOIN public.stage_definitions sd ON sd.id = td.stage_id
-      CROSS JOIN LATERAL (
-        SELECT ud.code, u.actual_date FROM succ c
-        JOIN public.task_instances u ON u.site_id = ti.site_id AND u.task_def_id = c.des
-        JOIN public.task_definitions ud ON ud.id = u.task_def_id
-        WHERE c.anc = ti.task_def_id AND u.state = 'approved' AND u.actual_date IS NOT NULL
-        ORDER BY u.actual_date, ud.code COLLATE "C" LIMIT 1) ev
-      WHERE ti.site_id = p_site AND ti.state IN ('locked', 'open', 'entry') AND NOT ti.is_na AND NOT ti.historical_no_source
-        AND NOT EXISTS (SELECT 1 FROM public.register_records o WHERE o.task_id = ti.id AND o.state IN ('in_review', 'in_approval'))
-        AND NOT EXISTS (SELECT 1 FROM public.admin_overrides o WHERE o.task_id = ti.id AND o.kind = 'historical_no_source_na' AND o.reverted_at IS NOT NULL)
-      ORDER BY sd.seq, td.sort_order, td.code COLLATE "C"
-    LOOP
-      SELECT * INTO cur FROM public.task_instances WHERE id = t.id FOR UPDATE;
-      CONTINUE WHEN cur.state NOT IN ('locked', 'open', 'entry') OR cur.is_na OR cur.historical_no_source;
-      before := public.wf_snap(t.id);
-      PERFORM public.hgd_mark('hns_task', t.id::text);
-      UPDATE public.task_instances SET state = 'na', is_na = true, na_reason = why, historical_no_source = true, historical_no_source_at = now(), admin_override = true,
-        ball_in_court_user_id = NULL, ball_in_court_group_id = NULL, ball_in_court_role_id = NULL, level_opened_at = NULL, lock_reason = NULL,
-        version = version + 1, updated_at = now()
-      WHERE id = t.id;
-      PERFORM public.hgd_unmark('hns_task');
-      INSERT INTO public.admin_overrides (entity, site_id, task_id, kind, reason, before, after, acted_by)
-      VALUES ('task', p_site, t.id, 'historical_no_source_na', left(btrim(p_reason), 2000), jsonb_build_object('state', cur.state::text),
-              jsonb_build_object('state', 'na', 'na_reason', why, 'evidence_task', t.ev_code, 'evidence_date', t.ev_date), p_actor)
-      RETURNING id INTO oid;
-      INSERT INTO public.workflow_steps (task_id, level, action, acted_by, note, admin_override, override_reason, stepup_verified, before_state, after_state, created_at)
-      VALUES (t.id, greatest(cur.current_level, 1), 'admin_override', p_actor,
-              left(why || ': no date in the historical Master file and ' || t.ev_code || ' is approved on ' || t.ev_date::text || ' (admin override)'
-                   || CASE WHEN p_catchup THEN ', migration 0126' ELSE '' END, 2000),
-              true, left(btrim(p_reason), 2000), NOT coalesce(p_catchup, false), cur.state, 'na', clock_timestamp());
-      INSERT INTO public.audit_log (action, entity_type, entity_id, site_id, region_id, before, after, reason, actor_id, is_admin_override)
-      VALUES ('task_historical_no_source_na', 'task', t.id::text, p_site, cur.region_id, before || jsonb_build_object('historical_no_source', false),
-              public.wf_snap(t.id) || jsonb_build_object('historical_no_source', true, 'reason_code', 'historical_no_source', 'na_reason', why, 'task_code', t.code,
-                'override_id', oid, 'evidence_task', t.ev_code, 'evidence_date', t.ev_date, 'catch_up', coalesce(p_catchup, false),
-                'rule', 'no date in the historical Master file, and a later task of the workflow (a transitive successor) is approved with an actual date'),
-              left(btrim(p_reason), 2000), p_actor, true);
-      ids := ids || t.id;
-      marked := marked || jsonb_build_array(jsonb_build_object('task_code', t.code, 'task_id', t.id, 'from', cur.state::text, 'evidence_code', t.ev_code, 'evidence_date', t.ev_date));
-      n := n + 1;
-    END LOOP;
-    FOREACH i IN ARRAY ids LOOP PERFORM public.wf_unlock_successors(i); END LOOP;
-    PERFORM set_config('pmis.calc_busy', was_busy, true);
-    IF was_busy <> '1' THEN PERFORM public.calc_refresh_site(p_site); END IF;
-    EXIT WHEN n = 0;
-  END LOOP;
-  -- the milestones that stay open with every predecessor done and no date among them (never invented: reported)
-  SELECT coalesce(jsonb_agg(td.code ORDER BY sd.seq), '[]'::jsonb) INTO nodate
-  FROM public.task_instances ti JOIN public.task_definitions td ON td.id = ti.task_def_id AND td.is_milestone_task
-  JOIN public.stage_definitions sd ON sd.id = td.stage_id
-  WHERE ti.site_id = p_site AND ti.state IN ('open', 'entry') AND sd.code NOT IN (SELECT jsonb_array_elements_text(public.calc_setting('calc.milestone_manual', '["MS4"]'::jsonb)))
-    AND EXISTS (SELECT 1 FROM public.ms_evaluate(ti.id) e WHERE NOT e.ready AND jsonb_array_length(e.reasons) = 0);   -- nothing waits, and no date
-  RETURN jsonb_build_object('site_id', p_site, 'in_scope', true, 'marked', marked, 'milestones_without_date', nodate);
-END $$;
-
--- 0127 (security review): redefined from 0126; the marker is a row of hgd_marks for this transaction, not a session setting
-CREATE OR REPLACE FUNCTION hns_restore_task(p_task uuid, p_reason text, p_why text, p_stepup boolean) RETURNS jsonb
-LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
-DECLARE
-  actor uuid := public.app_actor(); t public.task_instances%ROWTYPE; before jsonb; oid uuid; hold record; opened boolean := false;
-BEGIN
-  IF actor IS NULL OR NOT public.app_user_is_system_admin(actor) THEN
-    RAISE EXCEPTION 'historical no source: only a System Admin restores the task' USING ERRCODE = 'insufficient_privilege';
-  END IF;
-  SELECT * INTO t FROM public.task_instances WHERE id = p_task FOR UPDATE;
-  IF NOT FOUND OR NOT (t.state = 'na' AND t.historical_no_source) THEN
-    RETURN jsonb_build_object('task_id', p_task, 'outcome', 'not_marked');
-  END IF;
-  UPDATE public.admin_overrides SET reverted_at = clock_timestamp(), reverted_by = actor, revert_reason = left(btrim(p_reason), 2000)
-  WHERE task_id = p_task AND kind = 'historical_no_source_na' AND reverted_at IS NULL RETURNING id INTO oid;
-  before := public.wf_snap(p_task);
-  PERFORM public.hgd_mark('hns_restore', p_task::text);
-  UPDATE public.task_instances SET state = 'locked', is_na = false, na_reason = NULL, current_level = 0, historical_no_source = false,
-    version = version + 1, updated_at = now()
-  WHERE id = p_task;
-  PERFORM public.hgd_unmark('hns_restore');
-  IF NOT EXISTS (SELECT 1 FROM public.task_predecessors p2 JOIN public.task_instances pi ON pi.site_id = t.site_id AND pi.task_def_id = p2.predecessor_id
-                 WHERE p2.task_def_id = t.task_def_id AND pi.state NOT IN ('approved', 'na', 'skipped')) THEN
-    SELECT * INTO hold FROM public.wf_gate_hold(p_task);
-    IF hold.gate_code IS NOT NULL THEN
-      UPDATE public.task_instances SET lock_reason = 'gate_closed:' || hold.gate_code WHERE id = p_task;
-    ELSE
-      opened := public.wf_open_locked(p_task, 'restored from N/A (historical load: no source)');
-    END IF;
-  END IF;
-  INSERT INTO public.workflow_steps (task_id, level, action, acted_by, note, admin_override, override_reason, stepup_verified, before_state, after_state, created_at)
-  VALUES (p_task, 1, 'override_revert', actor, left(p_why, 2000), true, left(btrim(p_reason), 2000), coalesce(p_stepup, false), 'na',
-          (SELECT state FROM public.task_instances WHERE id = p_task), clock_timestamp());
-  INSERT INTO public.audit_log (action, entity_type, entity_id, site_id, region_id, before, after, reason, actor_id, is_admin_override)
-  VALUES ('task_historical_no_source_restore', 'task', p_task::text, t.site_id, t.region_id, before || jsonb_build_object('historical_no_source', true),
-          public.wf_snap(p_task) || jsonb_build_object('historical_no_source', false, 'override_id', oid, 'opened', opened, 'why', p_why),
-          left(btrim(p_reason), 2000), actor, true);
-  PERFORM public.calc_refresh_site(t.site_id);
-  RETURN jsonb_build_object('task_id', p_task, 'outcome', 'restored', 'override_id', oid, 'opened', opened);
-END $$;
-
 CREATE OR REPLACE FUNCTION hgd_guard_task() RETURNS trigger
 LANGUAGE plpgsql SET search_path = pg_catalog, public, pg_temp AS $$
 BEGIN
@@ -299,7 +109,7 @@ BEGIN
   IF OLD.historical_inferred_date AND (NEW.state IS DISTINCT FROM 'approved' OR NEW.actual_date IS DISTINCT FROM OLD.actual_date) THEN
     NEW.historical_inferred_date := false;
     -- the restore marker counts only when set by definer code (hgd_restore_milestone), never from a session-level GUC of another role
-    IF NOT (current_user::text = 'pmis_definer' AND (CASE WHEN current_user::text = 'pmis_definer' THEN public.hgd_marked('hgd_restore', NEW.id::text) ELSE false END)) THEN
+    IF NOT (current_user::text = 'pmis_definer' AND coalesce(current_setting('pmis.hgd_restore', true), '') = NEW.id::text) THEN
       UPDATE public.admin_overrides SET reverted_at = clock_timestamp(), reverted_by = coalesce(public.app_actor(), acted_by),
         revert_reason = left('the milestone left its inferred date (' || NEW.state::text || coalesce(', ' || NEW.actual_date::text, '') || ')', 2000)
       WHERE task_id = NEW.id AND kind = 'historical_inferred_date' AND reverted_at IS NULL;
@@ -313,7 +123,7 @@ BEGIN
   END IF;
   IF public.app_is_seeding() THEN RETURN NEW; END IF;
   IF (NEW.historical_inferred_date, NEW.historical_inferred_at) IS NOT DISTINCT FROM (OLD.historical_inferred_date, OLD.historical_inferred_at) THEN RETURN NEW; END IF;
-  IF current_user::text = 'pmis_definer' AND (CASE WHEN current_user::text = 'pmis_definer' THEN public.hgd_marked('hgd_task', NEW.id::text) ELSE false END)
+  IF current_user::text = 'pmis_definer' AND coalesce(current_setting('pmis.hgd_task', true), '') = NEW.id::text
      AND NEW.historical_inferred_date AND NOT OLD.historical_inferred_date AND NEW.state = 'approved' AND OLD.state IN ('locked', 'open') THEN
     RETURN NEW;
   END IF;
@@ -333,7 +143,7 @@ CREATE OR REPLACE FUNCTION hgd_guard_gate() RETURNS trigger
 LANGUAGE plpgsql SET search_path = pg_catalog, public, pg_temp AS $$
 BEGIN
   IF public.app_is_seeding() THEN RETURN NEW; END IF;
-  IF current_user::text = 'pmis_definer' AND (CASE WHEN current_user::text = 'pmis_definer' THEN public.hgd_marked('hgd_gate', NEW.site_id::text || ':' || NEW.gate_code) ELSE false END) THEN
+  IF current_user::text = 'pmis_definer' AND coalesce(current_setting('pmis.hgd_gate', true), '') = NEW.site_id::text || ':' || NEW.gate_code THEN
     RETURN NEW;
   END IF;
   RAISE EXCEPTION 'historical load: a gate opened by the historical load is written only by GSDN Workspace (migration 0127)' USING ERRCODE = 'insufficient_privilege';
@@ -427,9 +237,7 @@ BEGIN
   reasons := rs;
   -- 0127: a gate a historical load approved directly has moved past (an admin override of kind historical_gate_open, revertible) is open whatever its
   -- conditions say; the date is the one its other conditions give (the milestone before it at least); a Change Control suspension below still applies
-  -- a stop work in force is never lifted by the historical override (security review of 0127): only the other conditions are
-  IF blocked AND EXISTS (SELECT 1 FROM public.site_gate_state x WHERE x.site_id = p_site AND x.gate_code = p_gate AND x.historical_open_override IS NOT NULL)
-     AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(coalesce(reasons, '[]'::jsonb)) z WHERE z ->> 'kind' = 'stop_work') THEN
+  IF blocked AND EXISTS (SELECT 1 FROM public.site_gate_state x WHERE x.site_id = p_site AND x.gate_code = p_gate AND x.historical_open_override IS NOT NULL) THEN
     blocked := false; reasons := '[]'::jsonb;
   END IF;
   IF blocked THEN status := 'blocked'; RETURN; END IF;
@@ -524,13 +332,13 @@ BEGIN
   UPDATE public.admin_overrides SET reverted_at = clock_timestamp(), reverted_by = p_actor, revert_reason = left(btrim(p_reason), 2000)
   WHERE task_id = p_task AND kind = 'historical_inferred_date' AND reverted_at IS NULL RETURNING id INTO oid;
   before := public.wf_snap(p_task);
-  PERFORM public.hgd_mark('hgd_restore', p_task::text);
+  PERFORM set_config('pmis.hgd_restore', p_task::text, true);
   UPDATE public.task_instances SET state = 'open', actual_date = NULL, approved_date = NULL, current_level = 1, level_opened_at = now(), lock_reason = NULL,
     historical_inferred_date = false,
     admin_override = EXISTS (SELECT 1 FROM public.admin_overrides o WHERE o.task_id = p_task AND o.reverted_at IS NULL),
     version = version + 1, updated_at = now()
   WHERE id = p_task;
-  PERFORM public.hgd_unmark('hgd_restore');
+  PERFORM set_config('pmis.hgd_restore', '', true);
   INSERT INTO public.workflow_steps (task_id, level, action, acted_by, note, admin_override, override_reason, stepup_verified, before_state, after_state, created_at)
   VALUES (p_task, 1, 'override_revert', p_actor, left(p_why, 2000), true, left(btrim(p_reason), 2000), coalesce(p_stepup, false), 'approved', 'open', clock_timestamp());
   INSERT INTO public.audit_log (action, entity_type, entity_id, site_id, region_id, before, after, reason, actor_id, is_admin_override)
@@ -553,10 +361,10 @@ BEGIN
   gcode := o.after ->> 'gate';
   SELECT * INTO s FROM public.sites WHERE id = o.site_id;
   UPDATE public.admin_overrides SET reverted_at = clock_timestamp(), reverted_by = p_actor, revert_reason = left(btrim(p_reason), 2000) WHERE id = o.id;
-  PERFORM public.hgd_mark('hgd_gate', o.site_id::text || ':' || gcode);
+  PERFORM set_config('pmis.hgd_gate', o.site_id::text || ':' || gcode, true);
   UPDATE public.site_gate_state SET historical_open_override = NULL, historical_open_at = NULL
   WHERE site_id = o.site_id AND gate_code = gcode AND historical_open_override = o.id;
-  PERFORM public.hgd_unmark('hgd_gate');
+  PERFORM set_config('pmis.hgd_gate', '', true);
   SELECT ti.id, ti.state, ti.current_level INTO mt FROM public.task_instances ti
   JOIN public.task_definitions td ON td.id = ti.task_def_id AND td.is_milestone_task JOIN public.stage_definitions sd ON sd.id = td.stage_id
   JOIN public.phase_gate_rules r ON r.workflow_id = s.workflow_version_id AND r.link_code = gcode AND r.is_active AND r.to_code = sd.code
@@ -630,7 +438,7 @@ BEGIN
                               AND o.reverted_at IS NOT NULL);   -- reverted by a System Admin: never opened again
       SELECT * INTO gev FROM public.gate_eval(p_site, g.link_code);
       CONTINUE WHEN gev.status IS DISTINCT FROM 'blocked'
-        OR EXISTS (SELECT 1 FROM jsonb_array_elements(coalesce(gev.reasons, '[]'::jsonb)) z WHERE z ->> 'kind' IN ('suspension', 'stop_work'));
+        OR EXISTS (SELECT 1 FROM jsonb_array_elements(coalesce(gev.reasons, '[]'::jsonb)) z WHERE z ->> 'kind' = 'suspension');
       SELECT * INTO e FROM public.hgd_evidence(p_site, s.workflow_version_id,
         ARRAY(SELECT td.id FROM public.task_definitions td JOIN public.stage_definitions sd ON sd.id = td.stage_id
               WHERE sd.workflow_id = s.workflow_version_id AND sd.code = g.to_code AND NOT public.gate_lock_exempt(td.code)));
@@ -639,11 +447,11 @@ BEGIN
       VALUES ('site', p_site, 'historical_gate_open', rs, jsonb_build_object('gate', g.link_code, 'status', 'blocked', 'reasons', coalesce(gev.reasons, '[]'::jsonb)),
               jsonb_build_object('gate', g.link_code, 'status', 'open', 'evidence_task', e.code, 'evidence_date', e.actual_date), p_actor)
       RETURNING id INTO oid;
-      PERFORM public.hgd_mark('hgd_gate', p_site::text || ':' || g.link_code);
+      PERFORM set_config('pmis.hgd_gate', p_site::text || ':' || g.link_code, true);
       INSERT INTO public.site_gate_state (site_id, gate_code, is_open, status, gate_date, historical_open_override, historical_open_at)
       VALUES (p_site, g.link_code, false, gev.status, gev.gate_date, oid, now())
       ON CONFLICT (site_id, gate_code) DO UPDATE SET historical_open_override = EXCLUDED.historical_open_override, historical_open_at = EXCLUDED.historical_open_at;
-      PERFORM public.hgd_unmark('hgd_gate');
+      PERFORM set_config('pmis.hgd_gate', '', true);
       SELECT ti.id, ti.state, ti.current_level INTO mt FROM public.task_instances ti
       JOIN public.task_definitions td ON td.id = ti.task_def_id AND td.is_milestone_task JOIN public.stage_definitions sd ON sd.id = td.stage_id AND sd.code = g.to_code
       WHERE ti.site_id = p_site LIMIT 1;
@@ -681,12 +489,12 @@ BEGIN
       SELECT * INTO cur FROM public.task_instances WHERE id = m.id FOR UPDATE;
       CONTINUE WHEN cur.state NOT IN ('locked', 'open') OR cur.is_na OR cur.historical_inferred_date;
       before := public.wf_snap(m.id);
-      PERFORM public.hgd_mark('hgd_task', m.id::text);
+      PERFORM set_config('pmis.hgd_task', m.id::text, true);
       UPDATE public.task_instances SET state = 'approved', actual_date = e.actual_date, approved_date = public.cal_today(), current_level = levels_required,
         ball_in_court_user_id = NULL, ball_in_court_group_id = NULL, ball_in_court_role_id = NULL, level_opened_at = NULL, lock_reason = NULL,
         admin_override = true, historical_inferred_date = true, historical_inferred_at = now(), version = version + 1, updated_at = now()
       WHERE id = m.id;
-      PERFORM public.hgd_unmark('hgd_task');
+      PERFORM set_config('pmis.hgd_task', '', true);
       INSERT INTO public.admin_overrides (entity, site_id, task_id, kind, reason, before, after, acted_by)
       VALUES ('task', p_site, m.id, 'historical_inferred_date', rs, jsonb_build_object('state', cur.state::text, 'actual_date', cur.actual_date),
               jsonb_build_object('state', 'approved', 'actual_date', e.actual_date, 'note', why, 'evidence_task', e.code, 'evidence_date', e.actual_date), p_actor)
@@ -751,10 +559,10 @@ BEGIN
       BEGIN
         r := public.hgd_settle_site(sid, who, p_reason, p_catchup);
       EXCEPTION WHEN others THEN   -- one site never stops the load or the update of the server: reported in the System Log and counted
-        PERFORM public.hgd_unmark('hgd_task');
-        PERFORM public.hgd_unmark('hgd_gate');
-        PERFORM public.hgd_unmark('hgd_restore');
-        PERFORM public.hgd_unmark('hns_task');
+        PERFORM set_config('pmis.hgd_task', '', true);
+        PERFORM set_config('pmis.hgd_gate', '', true);
+        PERFORM set_config('pmis.hgd_restore', '', true);
+        PERFORM set_config('pmis.hns_task', '', true);
         PERFORM set_config('pmis.calc_busy', '', true);
         PERFORM public.log_system_write('warn', 'master-import', 'historical load: the gates and dates rule could not run on a site',
           jsonb_build_object('site_id', sid, 'sqlstate', SQLSTATE, 'error', left(SQLERRM, 300)), who, NULL);
@@ -846,7 +654,7 @@ BEGIN
       BEGIN
         r := public.hns_mark_site(sid, who, p_reason, p_catchup);
       EXCEPTION WHEN others THEN   -- one site never stops the load or the update of the server: reported in the System Log and counted
-        PERFORM public.hgd_unmark('hns_task');
+        PERFORM set_config('pmis.hns_task', '', true);
         PERFORM public.log_system_write('warn', 'master-import', 'historical load: the no-source rule could not run on a site',
           jsonb_build_object('site_id', sid, 'sqlstate', SQLSTATE, 'error', left(SQLERRM, 300)), who, NULL);
         r := jsonb_build_object('marked', '[]'::jsonb, 'milestones_without_date', '[]'::jsonb, 'failed', true);
@@ -987,17 +795,12 @@ END $$;
 -- 9. Ownership and execute rights. The new functions are owned by pmis_definer and closed to PUBLIC; none is granted to pmis_app. The redefined functions
 --    keep their owner and grants (CREATE OR REPLACE): gate_eval stays readable by pmis_app, admin_override_revert stays the API door.
 -- ---------------------------------------------------------------------------------------------------------------------
-ALTER TABLE hgd_marks OWNER TO pmis_definer;
--- hgd_marked only answers whether this transaction holds a marker that definer code wrote (it writes nothing); the guard triggers call it, and the
--- executor checks the right on any role that fires them, so it stays executable (a marker can only be written through hgd_mark, closed to PUBLIC)
-ALTER FUNCTION hgd_marked(text, text) OWNER TO pmis_definer;
 DO $$
 DECLARE f text;
 BEGIN
   FOREACH f IN ARRAY ARRAY['hgd_guard_task()', 'hgd_guard_gate()', 'hgd_after_defs(uuid,uuid[])', 'hgd_evidence(uuid,uuid,uuid[])', 'hgd_waiting(uuid)',
                            'hgd_restore_milestone(uuid,uuid,text,text,boolean)', 'hgd_restore_gate(uuid,uuid,text,text,boolean)',
-                           'hgd_settle_site(uuid,uuid,text,boolean)', 'hgd_apply_sites(uuid[],text,boolean,uuid)',
-                           'hgd_mark(text,text)', 'hgd_unmark(text)'] LOOP
+                           'hgd_settle_site(uuid,uuid,text,boolean)', 'hgd_apply_sites(uuid[],text,boolean,uuid)'] LOOP
     EXECUTE format('ALTER FUNCTION %s OWNER TO pmis_definer', f);
     EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC', f);
     IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'pmis_app') THEN EXECUTE format('REVOKE ALL ON FUNCTION %s FROM pmis_app', f); END IF;
