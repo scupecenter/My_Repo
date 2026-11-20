@@ -383,7 +383,10 @@ describe('Q84: the daily job applies due SLA versions and reminds the System Adm
     expect(await count()).toBe(before);
     // a holiday that moves outside the window is not reminded, and one that is confirmed is not either
     await db.query(`UPDATE holidays SET confirmed_at = now(), tentative = false WHERE date = $1`, [soon]);
-    await db.query(`UPDATE holidays SET date = date + 20 WHERE date = $1`, [edge]);
+    // move it to the first free date at least 20 days later (a fixed +20 can land on a seed holiday, e.g. 24 December, and break the unique date)
+    await db.query(`UPDATE holidays SET date = (SELECT min(d)::date FROM generate_series($1::date + 20, $1::date + 120, interval '1 day') d
+       WHERE NOT EXISTS (SELECT 1 FROM holidays h WHERE h.calendar_id = cal_default() AND h.date = d::date))
+     WHERE calendar_id = cal_default() AND date = $1::date`, [edge]);
     expect((await jobs().runOnce())!.reminders).toBe(0);
     expect(await count()).toBe(before);
   });
