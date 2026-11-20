@@ -198,6 +198,8 @@ describe('0123: the register records of the historical load close their tasks', 
     expect(list.status).toBe(200);
     expect(list.body.items[0]).toMatchObject({ current_milestone: 'MS4', next_milestone: 'MS5', overall_status: 'in_progress' });   // Site RFI approved directly since 0129
     expect(await status(s.id)).toBe('in_progress');
+    // 0131: the stored columns follow every state change (calc_refresh_site -> site_status_refresh)
+    expect((await q<{ c: string; n: string }>(db, 'SELECT current_milestone AS c, next_milestone AS n FROM sites WHERE id = $1', [s.id]))[0]).toEqual({ c: 'MS4', n: 'MS5' });
 
     // S2: B3 approved before is never approved again (its permit lands on the register row only)
     const t2 = await tasks(s2.id);
