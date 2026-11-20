@@ -289,7 +289,7 @@ describe('hybrid mode list', () => {
       // contract 0.12.9: P4b contractor rules and the two reports
       'GET /settings/contractor-rules', 'PUT /settings/contractor-rules', 'GET /reports/team-scope-mismatch', 'GET /reports/contractors-completeness',
       // contract 0.9.2: the self-service profile (details, email change and its decision, password, two-factor self-service, enforced mark)
-      'GET /me/profile', 'PATCH /me/profile', 'POST /me/password', 'POST /me/email-change', 'DELETE /me/email-change',
+      'GET /me/profile', 'PATCH /me/profile', 'PATCH /me/preferences', 'POST /me/password', 'POST /me/email-change', 'DELETE /me/email-change',
       'POST /me/two-factor/enrol/start', 'POST /me/two-factor/enrol/confirm', 'POST /me/two-factor/disable',
       'GET /email-change-requests', 'POST /email-change-requests/:id/decide', 'PUT /users/:id/two-factor/enforced',
       // contract 0.10.0: the logs core

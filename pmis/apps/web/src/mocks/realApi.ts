@@ -200,6 +200,7 @@ export const REAL_API_AUTH_USERS = [
   // Contract 0.9.2: the self-service profile (apps/api: me, users; migration 0044). Details, email change request and its decision, password, two-factor self-service, enforced mark.
   ['get', '/me/profile'],
   ['patch', '/me/profile'],
+  ['patch', '/me/preferences'],
   ['post', '/me/password'],
   ['post', '/me/email-change'],
   ['delete', '/me/email-change'],
@@ -543,7 +544,6 @@ export const NOT_AVAILABLE = [
   ['get', '/users/:id/mfa-exemption'],
   ['put', '/users/:id/mfa-exemption'],
   ['post', '/users/:id/mfa-exemption/revoke'],
-  ['patch', '/me/preferences'],
   ['post', '/auth/employee-id'],
   ['post', '/me/notify-admins'],
   ['post', '/groups'],

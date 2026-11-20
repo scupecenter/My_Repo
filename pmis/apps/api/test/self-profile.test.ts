@@ -67,6 +67,28 @@ describe('profile: self-editable and admin-owned fields', () => {
     expect(await audits('profile_updated', u.id)).toHaveLength(1);
   });
 
+  it('saves the top bar language and theme (PATCH /me/preferences) without If-Match, audited like the profile; other keys are refused', async () => {
+    const u = await makeUser(db, { assigned: true });
+    const api = await loggedIn(app, u);
+    const r = await api.call('patch', '/me/preferences', { theme: 'dark' });
+    expect(r.status).toBe(200);
+    expect(r.body.user).toMatchObject({ theme: 'dark', locale: 'en' });
+    expect((await api.call('patch', '/me/preferences', { locale: 'ar' })).body.user).toMatchObject({ theme: 'dark', locale: 'ar' });
+    // kept on the server: a new read sees them
+    expect((await api.call('get', '/me/profile')).body).toMatchObject({ theme: 'dark', locale: 'ar' });
+    const a = await audits('profile_updated', u.id);
+    expect(a).toHaveLength(2);
+    expect(a[0].before).toEqual({ theme: 'light' });
+    expect(a[0].after).toMatchObject({ theme: 'dark', via: 'self_service' });
+    // the same value again writes nothing
+    expect((await api.call('patch', '/me/preferences', { locale: 'ar' })).status).toBe(200);
+    expect(await audits('profile_updated', u.id)).toHaveLength(2);
+    // only locale and theme; bad values and an empty body are 422
+    expect((await api.call('patch', '/me/preferences', { display_name: 'Other Name' })).status).toBe(422);
+    expect((await api.call('patch', '/me/preferences', { theme: 'blue' })).status).toBe(422);
+    expect((await api.call('patch', '/me/preferences', {})).status).toBe(422);
+  });
+
   it('needs If-Match (428) and a current one (412)', async () => {
     const u = await makeUser(db, { assigned: true });
     const api = await loggedIn(app, u);

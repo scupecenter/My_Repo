@@ -44,8 +44,6 @@ export function Shell() {
   const closeRef = useRef<HTMLButtonElement>(null);
   const [palette, setPalette] = useState(false);
   const [exp, setExp] = useState(false);
-  const [theme, setTheme] = useState(currentTheme());
-  const [lang, setLang] = useState(currentLocale());
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setPalette(true); } };
@@ -56,6 +54,14 @@ export function Shell() {
   // 0130: the UI design follows the signed-in user's effective design (independent of the light/dark theme)
   const userBrand = me.data?.user.brand;
   useEffect(() => { if (userBrand) applyBrand(userBrand); }, [userBrand]);
+  // 0.15.42: the language and theme saved on the server follow the user to a new device
+  const userTheme = me.data?.user.theme;
+  const userLocale = me.data?.user.locale;
+  // a choice already made in this browser stays; a browser with none (a new device) takes the saved one
+  const theme: 'light' | 'dark' = localStorage.getItem('pmis.theme') === null && (userTheme === 'light' || userTheme === 'dark') ? userTheme : currentTheme();
+  const lang: 'en' | 'ar' = localStorage.getItem('pmis.locale') === null && (userLocale === 'en' || userLocale === 'ar') ? userLocale : currentLocale();
+  useEffect(() => { if (theme !== currentTheme()) applyTheme(theme); }, [theme]);
+  useEffect(() => { if (lang !== currentLocale()) applyLocale(lang); }, [lang]);
 
   const allowed = new Set(me.data?.effective.nav ?? []);
   const unread = useUnreadTotal(allowed.has('messages')).data ?? 0;
@@ -71,7 +77,11 @@ export function Shell() {
   });
   const pending = notes.data?.unread_count ?? 0;
   const current = inPeople ? NAV.find((n) => n.key === 'admin.users') : NAV.find((n) => loc.pathname.startsWith(n.to));
-  const savePref = (p: { locale?: 'en' | 'ar'; theme?: 'light' | 'dark' }) => void api.patch('/me/preferences', { body: p }).catch(() => {});
+  // saved on the server (PATCH /me/preferences, 0.15.42); the cached /me is updated so the effects above do not switch it back
+  const savePref = (p: { locale?: 'en' | 'ar'; theme?: 'light' | 'dark' }) => {
+    qc.setQueryData<typeof me.data>(['me'], (d) => (d ? { ...d, user: { ...d.user, ...p } } : d));
+    void api.patch('/me/preferences', { body: p }).catch(() => {});
+  };
 
   const resize = (w: number) => { setWidth(w); storePref(WIDTH_KEY, w); };
   const toggleCompact = () => setCompact((c) => { storePref(ICONS_KEY, !c); return !c; });
@@ -93,8 +103,8 @@ export function Shell() {
     </div>
   );
 
-  const switchLang = () => { const l = lang === 'en' ? 'ar' : 'en'; applyLocale(l); setLang(l); savePref({ locale: l }); };
-  const switchTheme = () => { const n = theme === 'light' ? 'dark' : 'light'; applyTheme(n); setTheme(n); savePref({ theme: n }); };
+  const switchLang = () => { const l = lang === 'en' ? 'ar' : 'en'; applyLocale(l); savePref({ locale: l }); };
+  const switchTheme = () => { const n = theme === 'light' ? 'dark' : 'light'; applyTheme(n); savePref({ theme: n }); };
 
   return (
     <div className="flex min-h-screen">
