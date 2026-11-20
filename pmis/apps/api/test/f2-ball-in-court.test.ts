@@ -187,8 +187,19 @@ describe('the stale flag', () => {
     const limit = (await db.query('SELECT task_stale_idle_days() AS n')).rows[0].n as number;
     expect(limit).toBeGreaterThanOrEqual(1);
     const s = await site();
-    const below = await task(s, 'A1', 'entry', { rule: r, openedAgo: limit - 1 });
-    const at = await task(s, 'A2', 'entry', { rule: r, openedAgo: limit });
+    // the idle count is in working days of the calendar of the task's SLA rule (the opening trigger may give it the seed rule): on a weekend day
+    // "N calendar days ago" is not N working days, so set each task's opening to the nearest date exactly N working days back in that calendar
+    const openWdAgo = async (id: string, wd: number): Promise<void> => {
+      await db.query(
+        `UPDATE task_instances t SET level_opened_at = ((cal_today() - (SELECT min(d)::int FROM generate_series(0, 60) d
+            WHERE cal_workdays_between(cal_today() - d, cal_today(), (SELECT r.calendar_id FROM sla_rules r WHERE r.id = t.sla_rule_id)) = $2::int))::timestamp
+            + interval '12 hours') AT TIME ZONE 'Africa/Tripoli'
+         WHERE t.id = $1::uuid`, [id, wd]);
+    };
+    const below = await task(s, 'A1', 'entry', { rule: r });
+    const at = await task(s, 'A2', 'entry', { rule: r });
+    await openWdAgo(below, limit - 1);
+    await openWdAgo(at, limit);
     // updated_at is now on both (a system recalculation moves it too); it is not an activity
     const rows = await siteTasks(admin, s);
     const get = (id: string) => rows.find((x) => x.id === id)!;
