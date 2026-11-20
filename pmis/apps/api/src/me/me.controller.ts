@@ -37,6 +37,15 @@ export class MeController {
     return p;
   }
 
+  // The top bar's language and theme buttons (contract updateMyPreferences): saved on the server, so they follow the user to every device
+  @Patch('preferences')
+  async patchPreferences(@Auth() auth: AuthContext, @Body() body: unknown, @Res({ passthrough: true }) res: Response): Promise<MeDto> {
+    await this.profile.preferences(body);
+    const me = await this.me.me(auth);
+    res.setHeader('ETag', etagHeader(contentVersion(me)));
+    return me;
+  }
+
   @Post('password')
   @HttpCode(200)
   password(@Auth() auth: AuthContext, @Body() body: unknown) {

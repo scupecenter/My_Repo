@@ -40,6 +40,12 @@ const profilePatchSchema = z.object({
   ui_brand: z.enum(UI_BRANDS).nullable().optional(),
 }).strict();
 
+/** PATCH /me/preferences (the language and theme buttons of the top bar): no If-Match, the last click wins. */
+const preferencesSchema = z.object({
+  locale: z.enum(['en', 'ar']).optional(),
+  theme: z.enum(['light', 'dark']).optional(),
+}).strict();
+
 const emailRequestSchema = z.object({
   new_email: z.string().trim().toLowerCase().email().max(254),
   password: z.string().min(1).max(128),
@@ -280,6 +286,18 @@ export class ProfileService {
     }
     await this.db.tx.$queryRaw`SELECT idm_update_own_profile(${JSON.stringify(body)}::jsonb) AS n`;
     return this.get(auth);
+  }
+
+  /**
+   * PATCH /me/preferences (contract `updateMyPreferences`): the language and theme buttons of the top bar. Only `locale` and `theme`; no If-Match,
+   * because a click must not fail on a version the button never saw. The same database door as the profile (idm_update_own_profile), so it is
+   * audited once with before and after (profile_updated), and the same values again write nothing.
+   */
+  async preferences(raw: unknown): Promise<void> {
+    if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) throw problems.validation([{ path: '/', code: 'type', message: 'Send an object.' }]);
+    const body = parse(preferencesSchema, raw);
+    if (Object.keys(body).length === 0) throw problems.validation([{ path: '/', code: 'min_properties', message: 'Send locale, theme or both.' }]);
+    await this.db.tx.$queryRaw`SELECT idm_update_own_profile(${JSON.stringify(body)}::jsonb) AS n`;
   }
 
   /** POST /me/password: the local password change (same rules as POST /auth/local/password), for a full session. */
