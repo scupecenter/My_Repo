@@ -17,14 +17,18 @@
 @layer components {
   .btn { @apply inline-flex items-center justify-center gap-2 rounded-md border border-line bg-card px-3 py-1.5 text-sm font-semibold text-ink hover:bg-hover disabled:opacity-50 disabled:pointer-events-none; }
   /* primary = petrol accent; green --done is only for completed (plan 2.11) */
-  .btn-primary { @apply border-transparent bg-accent text-accentInk hover:opacity-90 hover:bg-accent; }
+  .btn-primary { @apply border-transparent bg-accent text-accentInk hover:opacity-90 hover:bg-accentHover; }
   .btn-done { @apply border-transparent bg-done text-accentInk hover:opacity-90 hover:bg-done; }
-  .btn-accent { @apply border-transparent bg-accent text-accentInk hover:opacity-90 hover:bg-accent; }
+  .btn-accent { @apply border-transparent bg-accent text-accentInk hover:opacity-90 hover:bg-accentHover; }
   .btn-danger { @apply border-late text-late; }
   .card { @apply rounded-lg border border-line bg-card; }
   .chip { @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold; }
   .input { @apply w-full rounded-md border border-line bg-card px-3 py-2 text-sm; }
 }
+
+/* Switchable designs (0130): the sidebar re-scopes the layer-2 tokens it uses to the --side* hooks of tokens.css. Their defaults are those same tokens,
+   so the current design looks exactly as before. */
+.side-scope{--ink:var(--sideInk);--mute:var(--sideMute);--faint:var(--sideFaint);--hover:var(--sideHover);--line:var(--sideLine);--card:var(--sideField);--accentText:var(--sideOnInk);--sideOn:var(--sideSel);color:var(--ink)}
 
 /* pipeline: style and motion from the dashboard "pipeline (signature)" (design/src/app.css) */
 .pipe{position:relative;padding:8px 6px 4px;overflow-x:auto}

@@ -21,6 +21,7 @@ import { KanbanWip } from './KanbanWip';
 import { Workflow } from './Workflow';
 import { Site360Columns } from './Site360Columns';
 import { DashboardSettings } from './DashboardSettings';
+import { Identity } from './Identity';
 
 export interface SettingsSection { key: string; adminOnly?: boolean }
 export interface SettingsTab { key: string; sections: SettingsSection[] }
@@ -39,6 +40,7 @@ export const SETTINGS_TABS: readonly SettingsTab[] = [
   { key: 'alerts', sections: [] },
   { key: 'security', sections: [{ key: 'staff' }, { key: 'retention' }] },
   { key: 'dashboard', sections: [] },
+  { key: 'identity', sections: [] },
 ];
 
 /**
@@ -110,6 +112,7 @@ export function SettingsRoutes() {
         <Route path="alerts" element={<Notifications />} />
         <Route path="site360" element={<Site360Columns />} />
         <Route path="dashboard" element={<DashboardSettings />} />
+        <Route path="identity" element={<Identity />} />
         <Route path="workflow" element={<TabFrame tab="workflow" />}>
           <Route index element={<Navigate to="editor" replace />} />
           <Route path="editor" element={<Workflow />} />

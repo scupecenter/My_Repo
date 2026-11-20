@@ -31,6 +31,8 @@ interface LoadedRow {
   phone: string | null;
   locale: string;
   theme: string;
+  ui_brand: string | null;
+  brand: string;
 }
 
 export const sha256Hex = (s: string): string => createHash('sha256').update(s).digest('hex');
@@ -81,7 +83,8 @@ export class SessionService {
              s.stepup_at, s.two_factor, now() AS db_now,
              (s.revoked_at IS NULL AND s.expires_at > now() AND s.last_activity_at > now() - make_interval(hours => ${IDLE_HOURS}::int)) AS valid,
              (s.revoked_at IS NOT NULL) AS revoked,
-             u.id::text AS user_id, u.status::text AS user_status, u.email, u.display_name, u.employee_id, u.phone, u.locale, u.theme
+             u.id::text AS user_id, u.status::text AS user_status, u.email, u.display_name, u.employee_id, u.phone, u.locale, u.theme,
+             u.ui_brand, ui_effective_brand(u.ui_brand) AS brand
       FROM user_sessions s JOIN users u ON u.id = s.user_id
       WHERE s.token_hash = ${sha256Hex(token)}`);
     const r = rows[0];
@@ -94,7 +97,7 @@ export class SessionService {
       },
       user: {
         id: r.user_id, email: r.email, displayName: r.display_name, employeeId: r.employee_id?.trim() || null, phone: r.phone,
-        status: r.user_status, locale: r.locale, theme: r.theme,
+        status: r.user_status, locale: r.locale, theme: r.theme, uiBrand: r.ui_brand, brand: r.brand,
       },
     };
   }

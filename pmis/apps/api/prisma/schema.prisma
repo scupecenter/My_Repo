@@ -376,6 +376,7 @@ model User {
   status               UserStatus  @default(pending_assignment)
   locale               String      @default("en")
   theme                String      @default("light")
+  ui_brand             String? // 0130: current | aljeel | executive | field; null = the organization default (setting ui.identity). Only through idm_update_own_profile
   is_break_glass       Boolean     @default(false)
   totp_secret_enc      String? // break-glass admin only, encrypted
   last_login_at        DateTime?   @db.Timestamptz(6)

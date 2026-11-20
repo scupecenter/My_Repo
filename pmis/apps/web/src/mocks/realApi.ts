@@ -355,6 +355,9 @@ export const REAL_API_AUTH_USERS = [
   // Contract 0.15.1 (migration 0081; apps/api: settings): the shared layout of the side menu.
   ['get', '/settings/nav-layout'],
   ['put', '/settings/nav-layout'],
+  // Contract 0.15.41 (migration 0130; apps/api: settings): the organization default UI design (Settings, Identity & themes).
+  ['get', '/settings/identity'],
+  ['put', '/settings/identity'],
   // Contract 0.15.4 (migration 0085; apps/api: sites, master-import, templates): the per-site workflow locks (one site, many sites) and the status of the sites of
   // an import (missing data per site). The new site fields ride on the paths above.
   ['post', '/sites/workflow-locks'],

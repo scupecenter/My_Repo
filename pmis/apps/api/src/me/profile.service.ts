@@ -15,13 +15,15 @@ import { parse } from '../common/zod';
 import { DbService } from '../db/db.service';
 import { MailMessage, MailPort } from '../mail/mail.port';
 import { sendQuietly } from '../mail/noop-mail';
+import { UI_BRANDS, UiBrand } from '../settings/ui-identity.service';
 import { DepartmentRef, UserRef, UsersRepo } from '../users/users.repo';
 
 /**
  * Fields a user changes on their own account (owner decision 2026-11-02). Everything else on the account is admin-owned. The phone left this
- * list in 0058 (D156): it is a sign-in identifier and changes through a request an admin approves (POST /me/phone-change).
+ * list in 0058 (D156): it is a sign-in identifier and changes through a request an admin approves (POST /me/phone-change). 0130: `ui_brand`, the personal
+ * UI design (null = the organization default), refused while the admin does not allow a personal choice.
  */
-export const SELF_EDITABLE = ['display_name', 'locale', 'theme'] as const;
+export const SELF_EDITABLE = ['display_name', 'locale', 'theme', 'ui_brand'] as const;
 /**
  * Admin-owned fields a client might try to send: refused with 403 field_read_only (email has its own approval flow). Any other unknown
  * key is a plain 422.
@@ -35,6 +37,7 @@ const profilePatchSchema = z.object({
   display_name: z.string().trim().min(1).max(200).optional(),
   locale: z.enum(['en', 'ar']).optional(),
   theme: z.enum(['light', 'dark']).optional(),
+  ui_brand: z.enum(UI_BRANDS).nullable().optional(),
 }).strict();
 
 const emailRequestSchema = z.object({
@@ -103,6 +106,12 @@ export interface ProfileDto {
   phone: string | null;
   locale: string;
   theme: string;
+  /** 0130: the stored personal design (null = follow the organization default). */
+  ui_brand: UiBrand | null;
+  /** 0130: the design the user sees (their own while the admin allows a choice, else the default). */
+  brand: UiBrand;
+  /** 0130: the organization default and whether a personal design is allowed (the profile shows the choice or a note). */
+  identity: { default_brand: UiBrand; allow_user_choice: boolean };
   status: string;
   auth_method: string;
   local_sign_in: boolean;
@@ -216,6 +225,9 @@ export class ProfileService {
       phone: user.phone,
       locale: user.locale,
       theme: user.theme,
+      ui_brand: user.ui_brand,
+      brand: user.brand,
+      identity: await this.identity(),
       status: user.status,
       auth_method: auth.session.authMethod,
       local_sign_in: user.local_sign_in,
@@ -232,6 +244,12 @@ export class ProfileService {
       phone_change: phones[0] ?? null,
       version: user.version,
     };
+  }
+
+  /** 0130: the organization default design and whether users may choose (ui_identity_state, readable by every signed-in user). */
+  private async identity(): Promise<{ default_brand: UiBrand; allow_user_choice: boolean }> {
+    const r = await this.db.tx.$queryRaw<{ r: { default_brand: UiBrand; allow_user_choice: boolean } }[]>`SELECT ui_identity_state() AS r`;
+    return { default_brand: r[0]!.r.default_brand, allow_user_choice: r[0]!.r.allow_user_choice };
   }
 
   /** PATCH /me/profile: only the self-editable fields; If-Match on the profile version; audited with before and after in the database. */
@@ -253,6 +271,13 @@ export class ProfileService {
     const current = await this.repo.find(auth.user.id);
     if (!current) throw problems.unauthenticated();
     checkIfMatch(ifMatch, current.version);
+    // 0130: a personal design while the admin set one design for everyone (the database refuses it too)
+    if (body.ui_brand != null && !(await this.identity()).allow_user_choice) {
+      throw new ProblemException(403, 'field_read_only', {
+        detail: 'The administrator set one design for everyone, so you cannot choose your own.',
+        errors: [{ path: '/ui_brand', code: 'brand_choice_locked', message: 'The administrator does not allow a personal design.' }],
+      });
+    }
     await this.db.tx.$queryRaw`SELECT idm_update_own_profile(${JSON.stringify(body)}::jsonb) AS n`;
     return this.get(auth);
   }

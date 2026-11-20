@@ -1,3 +1,4 @@
+import type { Brand } from '@/lib/brands';
 import type { ApprovalItem, BallInCourt, Comment, DocumentSlot, Matrix, Me, Session, SiteDraft, TaskDetail, TaskSummary, UserRef, WorkflowStep } from '@/api/types';
 import { initAdmin } from './adminData';
 import { initCfg } from './settingsData';
@@ -102,7 +103,9 @@ const fresh = () => ({
   /** Password right, code or enrolment still to do (the cookie pmis_2fa of the real server). */
   pending: null as null | { account: string; kind: 'two_factor' | 'enrol'; until: number },
   /** 0.9.2 self-service profile: the user's own edits (keyed by account) and the email change requests. */
-  profiles: {} as Record<string, { display_name?: string; phone?: string | null; locale?: 'en' | 'ar'; theme?: 'light' | 'dark'; email?: string; version: number }>,
+  profiles: {} as Record<string, { display_name?: string; phone?: string | null; locale?: 'en' | 'ar'; theme?: 'light' | 'dark'; ui_brand?: Brand | null; email?: string; version: number }>,
+  /** 0.15.41 (migration 0130): Settings, Identity & themes (setting ui.identity). */
+  identity: initIdentity(),
   emailChanges: [] as { id: string; account: string; old_email: string; new_email: string; status: 'pending' | 'approved' | 'rejected' | 'cancelled'; requested_at: string; decided_at: string | null; decision_reason: string | null; decided_by: string | null;
     /** 0.12.6 (Q158): the code "mailed" to the new address (the mock has no mail: it is always the demo code), and the check made. */
     code?: string | null; attempts?: number; verify_sent_at?: string | null; verify_expires_at?: string | null; verified_at?: string | null; verified_via?: 'code' | 'admin_check' | null; identity_check?: string | null }[],
@@ -167,10 +170,19 @@ export function sessionBody(): Session {
   };
 }
 
+function initIdentity() {
+  return { default_brand: 'current' as Brand, allow_user_choice: true, version: 1, updated_at: null as string | null, updated_by: null as null | { id: string; display_name: string; employee_id: string | null } };
+}
+/** 0.15.41: the identity settings (older saved mock states have none). */
+export const identity = () => (db().identity ??= initIdentity());
+/** The design a user sees: their own while the admin allows a choice, else the organization default (ui_effective_brand). */
+export const effectiveBrand = (stored: Brand | null | undefined): Brand => (identity().allow_user_choice && stored ? stored : identity().default_brand);
+
 export function meBody(): Me {
   const v = viewer()!;
   return {
-    user: { id: uid(v.employee_id ?? '9999'), display_name: db().profiles?.[v.key]?.display_name ?? v.name, employee_id: v.employee_id, email: db().profiles?.[v.key]?.email ?? v.email, status: v.status, locale: db().profiles?.[v.key]?.locale ?? 'en', theme: db().profiles?.[v.key]?.theme ?? 'light' },
+    user: { id: uid(v.employee_id ?? '9999'), display_name: db().profiles?.[v.key]?.display_name ?? v.name, employee_id: v.employee_id, email: db().profiles?.[v.key]?.email ?? v.email, status: v.status, locale: db().profiles?.[v.key]?.locale ?? 'en', theme: db().profiles?.[v.key]?.theme ?? 'light',
+      ui_brand: db().profiles?.[v.key]?.ui_brand ?? null, brand: effectiveBrand(db().profiles?.[v.key]?.ui_brand) },
     assignments: [], is_system_admin: v.key === 'pm',
     effective: { grants: [...v.nav.map((m) => ({ module_key: m, action: 'view' as const, region_ids: 'all' as const })), ...(v.key === 'engineer' ? [{ module_key: 'sites', action: 'create' as const, region_ids: 'all' as const }] : []), ...(v.key === 'auditor' ? [{ module_key: 'admin.security_log', action: 'view_security_log' as const, region_ids: 'all' as const }, { module_key: 'audit', action: 'view_audit' as const, region_ids: 'all' as const }] : [])], nav: v.nav },
   };

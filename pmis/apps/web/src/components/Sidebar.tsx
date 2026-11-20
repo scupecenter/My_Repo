@@ -90,7 +90,7 @@ export function SidebarBody({ items, compact, unread, alerts = 0, activeKey, onN
   const togglePin = (k: string) => saveFavs(favs.includes(k) ? favs.filter((x) => x !== k) : [...favs, k]);
   const move = (k: string, d: -1 | 1) => { const i = favs.indexOf(k); const j = i + d; if (i < 0 || j < 0 || j >= favs.length) return; const n = [...favs]; [n[i], n[j]] = [n[j], n[i]]; saveFavs(n); };
 
-  const linkCls = (isActive: boolean) => `flex min-w-0 flex-1 items-center gap-3 rounded-md px-2 py-2 text-sm ${isActive ? 'border-s-2 border-accent bg-sideOn font-semibold' : 'hover:bg-hover'}`;
+  const linkCls = (isActive: boolean) => `flex min-w-0 flex-1 items-center gap-3 rounded-md px-2 py-2 text-sm ${isActive ? 'border-s-[length:var(--sideMarkW)] border-sideMark bg-sideOn font-semibold text-sideActive' : 'hover:bg-hover'}`;
   const inner = (n: NavItem, badge: boolean) => {
     const Icon = ICONS[n.icon];
     return (

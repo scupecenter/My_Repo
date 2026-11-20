@@ -4,14 +4,15 @@
 import { http, HttpResponse } from 'msw';
 import { API_BASE } from '@/api/client';
 import type { MyProfile } from '@/api/profile';
-import { accountKeyOf, ACCOUNTS, cred, db, save, sessionBody, STAFF, stepUpValid, tfLabel, viewer } from './db';
+import { accountKeyOf, ACCOUNTS, cred, db, effectiveBrand, identity, save, sessionBody, STAFF, stepUpValid, tfLabel, viewer } from './db';
+import { isBrand } from '@/lib/brands';
 import { checkCode, codeProblem, GENERIC, needAdmin, recordFailure, userByParam, whoOf } from './handlers.auth';
 import { guard, problem, stepUp } from './handlers';
 import { passwordRules } from './handlers.auth';
 import { newRecoveryCodes, newSecret, otpauth } from './totp';
 
 const B = API_BASE;
-const SELF_EDITABLE = ['display_name', 'locale', 'theme'];
+const SELF_EDITABLE = ['display_name', 'locale', 'theme', 'ui_brand'];
 /** The code the mock "mails" to a requested new address (there is no mail in the mock). */
 export const MOCK_EMAIL_CODE = 'ABCD-2345';
 const ADMIN_OWNED = ['email', 'phone', 'employee_id', 'status', 'team', 'teams', 'region', 'region_id', 'region_ids', 'regions', 'role', 'roles', 'role_ids', 'assignments', 'department', 'department_id', 'manager', 'manager_id', 'position', 'title', 'groups'];
@@ -64,6 +65,7 @@ export function profileBody(): MyProfile {
   return {
     id: sessionBody().user!.id, display_name: nameOf(key) || v.name, email: emailOf(key) || v.email, employee_id: v.employee_id,
     phone: phoneOf(key), locale: o.locale ?? 'en', theme: o.theme ?? 'light', status: v.status,
+    ui_brand: o.ui_brand ?? null, brand: effectiveBrand(o.ui_brand), identity: { default_brand: identity().default_brand, allow_user_choice: identity().allow_user_choice },
     auth_method: db().session!.method ?? 'm365', local_sign_in: !!c?.enabled, editable_fields: SELF_EDITABLE as MyProfile['editable_fields'],
     admin_owned: { roles: v.key === 'pm' ? [{ id: '0f000000-0000-4000-8000-000000000001', code: 'PM', name_en: 'Project Manager', name_ar: 'مدير المشروع' }] : [], teams: [], region_ids: 'all', department: null, manager: null },
     two_factor: { state, enforced, recovery_codes_remaining: state === 'on' ? c!.tf!.codes.length : 0, can_enable: local && state === 'off', can_disable: local && state === 'on' && !enforced },
@@ -114,7 +116,12 @@ export const profileHandlers = [
     if ('display_name' in b && (typeof b.display_name !== 'string' || !b.display_name.trim() || b.display_name.trim().length > 200)) errors.push({ path: '/display_name', code: 'invalid' });
     if ('locale' in b && !['en', 'ar'].includes(b.locale as string)) errors.push({ path: '/locale', code: 'invalid' });
     if ('theme' in b && !['light', 'dark'].includes(b.theme as string)) errors.push({ path: '/theme', code: 'invalid' });
+    if ('ui_brand' in b && b.ui_brand !== null && !isBrand(b.ui_brand)) errors.push({ path: '/ui_brand', code: 'invalid' });
     if (errors.length) return problem(422, 'validation_failed', 'Validation failed', { errors });
+    if (b.ui_brand != null && !identity().allow_user_choice) {
+      return problem(403, 'field_read_only', 'The administrator set one design for everyone', { errors: [{ path: '/ui_brand', code: 'brand_choice_locked' }] });
+    }
+    if ('ui_brand' in b) o.ui_brand = isBrand(b.ui_brand) ? b.ui_brand : null;
     if (typeof b.display_name === 'string') o.display_name = b.display_name.trim();
     if (b.locale) o.locale = b.locale as 'en' | 'ar';
     if (b.theme) o.theme = b.theme as 'light' | 'dark';
