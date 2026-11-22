@@ -129,7 +129,7 @@ export function SiteAdminEdit({ site }: { site: SiteDetail }) {
         <ul className="mt-3 space-y-1" data-testid="site-admin-history">
           {items.map((o) => (
             <li key={o.id} className="flex flex-wrap items-center gap-2" data-testid={`site-admin-edit-${o.id}`} data-reverted={o.reverted_at ? 'true' : 'false'}>
-              <span className="text-mute">{o.created_at.slice(0, 10)} · {o.acted_by?.display_name}</span>
+              <span className="text-mute">{o.created_at.slice(0, 10)} · {o.acted_by?.display_name ?? t('adminOverride.by_rule')}</span>
               <span>{Object.keys(o.after ?? {}).join(', ')}</span>
               <span className="text-mute">{o.reason}</span>
               {o.reverted_at && <span className="chip bg-lockBg text-lockInk">{t('adminOverride.was_reverted')}</span>}
