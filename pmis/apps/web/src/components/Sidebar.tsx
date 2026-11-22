@@ -3,14 +3,12 @@ import { useMemo, useRef, useState, type ReactNode, type RefObject, type Keyboar
 import { useTranslation } from 'react-i18next';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import { useNavLayout } from '@/api/settings';
-import { useStreams, useViews } from '@/api/sites';
 import { ICONS, ICON_PROPS } from '@/lib/icons';
 import { loadPref, savePref } from '@/lib/localPref';
 import { headingIcon, headingName, keysOf, resolveLayout, type NavHead, type NavSub } from '@/lib/navLayout';
-import { DEFAULT_STREAMS, DEFAULT_VIEWS, streamName, viewName, withDismantle } from '@/lib/streams';
-import { SITE360_NAV } from '@/lib/site360Menus';
+import { SITE360_SUBMENUS } from '@/lib/site360Menus';
 import { NavLayoutEditor } from './NavLayoutEditor';
-import { SITE_OM_VIEW, SITE_STREAM_SUBMENUS, type NavItem } from './navItems';
+import type { NavItem } from './navItems';
 
 export const SIDEBAR_MIN = 200;
 export const SIDEBAR_MAX = 400;
@@ -28,31 +26,19 @@ export function siteSelection(pathname: string, search: string): { stream: strin
   return { stream: p.get('stream') ?? '', view: p.get('view') ?? '', section: p.get('section') ?? '' };
 }
 
-/** Sub-menus of the Site Register (owner request 2026-11-05): four streams, Dismantle (its own register), O&M (the OM view). */
-function SiteSubmenus({ onNavigate, dismantle }: { onNavigate?: () => void; dismantle: NavItem | undefined }) {
+/** The seven SITE 360 sub-menus under "Site Master" (owner decision 2026-11-15, F15; the Master parent is the entry itself). Each opens `/sites?section=`. */
+function SiteSubmenus({ onNavigate }: { onNavigate?: () => void }) {
   const { t, i18n } = useTranslation();
-  const streamsQ = useStreams();
-  const viewsQ = useViews();
   const loc = useLocation();
   const sel = siteSelection(loc.pathname, loc.search);
-  const known = withDismantle(streamsQ.data);
-  const streams = SITE_STREAM_SUBMENUS.map((code) => known.find((x) => x.code === code) ?? DEFAULT_STREAMS.find((x) => x.code === code)!);
-  const om = (viewsQ.data?.length ? viewsQ.data : DEFAULT_VIEWS).find((v) => v.code === SITE_OM_VIEW) ?? DEFAULT_VIEWS.find((v) => v.code === SITE_OM_VIEW)!;
   const item = (testid: string, to: string, on: boolean, text: string) => (
     <Link key={testid} to={to} onClick={onNavigate} data-testid={testid} aria-current={on ? 'page' : undefined}
       className={`block rounded-md px-2 py-1.5 text-sm ${on ? 'bg-sideOn font-semibold text-accentText' : 'text-mute hover:bg-hover'}`}>{text}</Link>
   );
   return (
-    <>
     <div className="ms-6 border-s border-line ps-1" role="group" aria-label={t('site360.menus')} data-testid="nav-site360-menus">
-      {SITE360_NAV.map((m) => item(`nav-site360-${m.key}`, `/sites?section=${m.key}`, sel.section === m.key, i18n.language === 'ar' ? m.ar : m.en))}
+      {SITE360_SUBMENUS.map((m) => item(`nav-site360-${m.key}`, `/sites?section=${m.key}`, sel.section === m.key, i18n.language === 'ar' ? m.ar : m.en))}
     </div>
-    <div className="ms-6 border-s border-line ps-1" role="group" aria-label={t('nav.site_submenus')} data-testid="nav-sites-views">
-      {streams.map((st) => item(`nav-sites-stream-${st.code}`, `/sites?stream=${st.code}`, sel.stream === st.code && !sel.view, streamName(t, i18n.language, st)))}
-      {dismantle && item('nav-dismantle', dismantle.to, loc.pathname.startsWith(dismantle.to), t('nav.dismantle'))}
-      {item(`nav-sites-view-${om.code}`, `/sites?view=${om.code}`, sel.view === om.code && !sel.stream, viewName(i18n.language, om))}
-    </div>
-    </>
   );
 }
 
@@ -73,7 +59,7 @@ export function SidebarBody({ items, compact, unread, alerts = 0, activeKey, onN
   const label = (n: NavItem) => t(n.key === 'sites' ? 'nav.sites_all' : `nav.${n.key}`);
   const byKey = (k: string) => items.find((i) => i.key === k);
   const sel = siteSelection(loc.pathname, loc.search);
-  const subOn = SITE_STREAM_SUBMENUS.some((c) => c === sel.stream && !sel.view) || (sel.view === SITE_OM_VIEW && !sel.stream);
+  const subOn = SITE360_SUBMENUS.some((m) => m.key === sel.section);
 
   // Recent items: adjust state while rendering when the active page changes (no effect needed).
   const [seen, setSeen] = useState<string | undefined>();
@@ -129,14 +115,11 @@ export function SidebarBody({ items, compact, unread, alerts = 0, activeKey, onN
   const favItems = favs.map(byKey).filter((x): x is NavItem => !!x);
   const recentItems = recent.filter((k) => k !== activeKey).map(byKey).filter((x): x is NavItem => !!x);
 
-  /** A screen of a heading. The Site Register entry carries its sub-menus; Dismantle sits among them when it is in the same heading as the Site Register. */
-  const itemNode = (k: string, siblings: string[]) => {
+  /** A screen of a heading. The Site Register entry "Site Master" carries the seven SITE 360 sub-menus; every other screen, Dismantle included, is a plain row. */
+  const itemNode = (k: string) => {
     const n = byKey(k);
     if (!n) return null;
-    const hasSites = !compact && siblings.includes('sites') && !!byKey('sites');
-    if (n.key === 'dismantle' && hasSites) return null; // shown among the Site Register sub-menus
     if (n.key !== 'sites' || compact) return row(n, { testid: `nav-${n.key}`, extra: pin(n) });
-    const dm = siblings.includes('dismantle') ? byKey('dismantle') : undefined;
     return (
       <div key={n.key}>
         {row(n, {
@@ -151,7 +134,7 @@ export function SidebarBody({ items, compact, unread, alerts = 0, activeKey, onN
             </>
           ),
         })}
-        {sitesOpen && <SiteSubmenus onNavigate={onNavigate} dismantle={dm} />}
+        {sitesOpen && <SiteSubmenus onNavigate={onNavigate} />}
       </div>
     );
   };
@@ -159,16 +142,17 @@ export function SidebarBody({ items, compact, unread, alerts = 0, activeKey, onN
   const renderHeading = (h: NavHead | NavSub, sub: boolean): ReactNode => {
     const visible = keysOf(h).filter((k) => byKey(k));
     if (!visible.length) return null;
-    const open = compact || !collapsed.includes(h.id);
+    // A heading whose only screen is the Site Register entry is not drawn twice: that entry is the one "Site Master" row (owner request 2026-11-22).
+    const solo = !sub && h.children.length === 1 && h.children[0] === 'sites';
+    const open = compact || solo || !collapsed.includes(h.id);
     const hasActive = visible.some((k) => k === activeKey) || (visible.includes('sites') && loc.pathname.startsWith('/sites'));
     const concept = headingIcon(h);
     const Icon = concept ? ICONS[concept] : null;
-    const direct = (h.children as (string | NavSub)[]).filter((c): c is string => typeof c === 'string');
     return (
       <div key={h.id} className={sub ? 'mb-1 ms-3' : 'mb-3'} data-testid={`nav-group-${h.id}`} data-active={hasActive || undefined} data-depth={sub ? 2 : 1}>
         {compact
           ? (!sub && <div className="mx-2 my-1 border-t border-line" aria-hidden />)
-          : (
+          : solo ? null : (
             <button type="button" data-testid={`nav-group-toggle-${h.id}`} aria-expanded={open} onClick={() => toggleGroup(h.id)}
               className={`flex w-full items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold hover:bg-hover ${hasActive ? 'text-accentText' : 'text-mute'}`}>
               <ChevronRight size={14} aria-hidden className={`transition-transform motion-reduce:transition-none ${open ? 'rotate-90 rtl:-rotate-90' : 'rtl:rotate-180'}`} />
@@ -176,7 +160,7 @@ export function SidebarBody({ items, compact, unread, alerts = 0, activeKey, onN
               {headingName(h, i18n.language)}
             </button>
           )}
-        {open && h.children.map((c) => (typeof c === 'string' ? itemNode(c, direct) : renderHeading(c, true)))}
+        {open && h.children.map((c) => (typeof c === 'string' ? itemNode(c) : renderHeading(c, true)))}
       </div>
     );
   };

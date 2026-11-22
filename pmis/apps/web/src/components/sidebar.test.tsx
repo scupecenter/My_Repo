@@ -6,6 +6,10 @@ import { ErrorState, NoResults } from '@/components/States';
 import { Sites } from '@/pages/Sites';
 import { renderApp, signIn } from '@/test/utils';
 
+/** The seven sub-menus under "Site Master" (owner request 2026-11-22): the Master section is the parent entry, not a sub-menu. */
+const SUBMENU_KEYS = ['design_acq', 'sow', 'cw', 'te', 'hoto', 'dismantle', 'om'] as const;
+const SUBMENU_TESTIDS = SUBMENU_KEYS.map((k) => `nav-site360-${k}`);
+
 const app = (route = '/my-work', locale: 'en' | 'ar' = 'en') =>
   renderApp(<Routes><Route element={<Shell />}><Route path="/sites" element={<Sites />} /><Route path="*" element={<div />} /></Route></Routes>, { route, locale });
 
@@ -94,46 +98,45 @@ describe('Sidebar tree (N1-N12)', () => {
   it('has the two main menus with their sub-menus, and Dismantle sits under the Site Register', async () => {
     app();
     await screen.findByTestId('nav-sites');
-    expect(screen.getByTestId('nav-group-toggle-site_register')).toHaveTextContent('SITE 360');
     expect(screen.getByTestId('nav-group-toggle-registers')).toHaveTextContent('Registers & Logs');
-    expect(screen.getByTestId('nav-sites')).toHaveTextContent('All sites');
+    expect(screen.getByTestId('nav-sites')).toHaveTextContent('Site Master');
     expect(screen.getByTestId('nav-group-work')).not.toContainElement(screen.getByTestId('nav-sites'));
-    const sub = screen.getByTestId('nav-sites-views');
-    expect([...sub.querySelectorAll('a')].map((a) => a.getAttribute('data-testid'))).toEqual(['nav-sites-stream-DESIGN_ACQ', 'nav-sites-stream-CW', 'nav-sites-stream-TE', 'nav-sites-stream-CLOSURE', 'nav-dismantle', 'nav-sites-view-OM']);
-    expect(screen.getByTestId('nav-group-registers')).not.toContainElement(screen.getByTestId('nav-dismantle'));
+    const sub = screen.getByTestId('nav-site360-menus');
+    expect([...sub.querySelectorAll('a')].map((a) => a.getAttribute('data-testid'))).toEqual(SUBMENU_TESTIDS);
+    expect(screen.getByTestId('nav-group-site_register')).not.toContainElement(screen.getByTestId('nav-dismantle'));
     const regs = [...screen.getByTestId('nav-group-registers').querySelectorAll('a')].map((a) => a.getAttribute('data-testid'));
-    expect(regs).toEqual(['procurement', 'gecol', 'hlc', 'permits_hse', 'warehouse', 'quality', 'issues', 'risks', 'change_control', 'readiness', 'as_built', 'meetings', 'rf_design', 'acquisition', 'contractors', 'car_dispatcher', 'financial_advances', 'contractor_reports'].map((k) => `nav-${k}`));
+    expect(regs).toEqual(['dismantle', 'procurement', 'gecol', 'hlc', 'permits_hse', 'warehouse', 'quality', 'issues', 'risks', 'change_control', 'readiness', 'as_built', 'meetings', 'rf_design', 'acquisition', 'contractors', 'car_dispatcher', 'financial_advances', 'contractor_reports'].map((k) => `nav-${k}`));
     expect(screen.getByTestId('nav-change_control')).toHaveTextContent('Change Control Log');
   });
 
-  it('opens each Site Register sub-menu on the right stream or view, titles the page and highlights the entry', async () => {
+  it('shows one "Site Master" entry with exactly the 7 sub-menus, and no older stream or view links', async () => {
+    app();
+    const entry = await screen.findByTestId('nav-sites');
+    expect(entry).toHaveTextContent(/^Site Master$/);
+    // the group heading is not drawn a second time: the entry is the only row with this name
+    expect(screen.queryByTestId('nav-group-toggle-site_register')).not.toBeInTheDocument();
+    expect(screen.getAllByText('Site Master')).toHaveLength(1);
+    expect(screen.queryByTestId('nav-site360-master')).not.toBeInTheDocument();
+    const menus = screen.getByTestId('nav-site360-menus');
+    expect([...menus.querySelectorAll('a')].map((a) => a.getAttribute('data-testid'))).toEqual(SUBMENU_TESTIDS);
+    expect([...menus.querySelectorAll('a')].map((a) => a.textContent)).toEqual(['Design & Acquisition', 'SOW', 'CW', 'TE', 'HOTO', 'Dismantle', 'O&M']);
+    expect([...menus.querySelectorAll('a')].map((a) => a.getAttribute('href'))).toEqual(SUBMENU_KEYS.map((k) => `/sites?section=${k}`));
+    expect(document.querySelector('[data-testid^="nav-sites-stream-"]')).toBeNull();
+    expect(document.querySelector('[data-testid^="nav-sites-view-"]')).toBeNull();
+    expect(screen.queryByTestId('nav-sites-views')).not.toBeInTheDocument();
+  });
+
+  it('opens each SITE 360 menu on its section and highlights the entry', async () => {
     const u = userEvent.setup();
     app();
-    // [link, href, data-stream of the card, page title]
-    const cases: [string, string, string, string][] = [
-      ['nav-sites-stream-DESIGN_ACQ', '/sites?stream=DESIGN_ACQ', 'DESIGN_ACQ', 'Design & Acquisition'],
-      ['nav-sites-stream-CW', '/sites?stream=CW', 'CW', 'Civil Works'],
-      ['nav-sites-stream-TE', '/sites?stream=TE', 'TE', 'Installation (TE)'],
-      ['nav-sites-stream-CLOSURE', '/sites?stream=CLOSURE', 'CLOSURE', 'Handover & Closure'],
-      ['nav-sites-view-OM', '/sites?view=OM', 'ALL', 'O&M'],
-    ];
-    for (const [id, href, tab, title] of cases) {
-      const link = await screen.findByTestId(id);
-      expect(link).toHaveAttribute('href', href);
+    for (const key of SUBMENU_KEYS) {
+      const link = await screen.findByTestId(`nav-site360-${key}`);
       await u.click(link);
-      expect(await screen.findByTestId('page-sites')).toBeInTheDocument();
-      await waitFor(() => expect(document.querySelector(`[data-stream="${tab}"]`)).not.toBeNull()); // the card carries the stream; the O&M view lists all streams
-      expect(screen.queryByTestId('stream-tabs')).toBeNull();
-      expect(screen.queryByTestId('view-tabs')).toBeNull();
-      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(`SITE 360: ${title}`);
-      expect(screen.getByTestId(id)).toHaveAttribute('aria-current', 'page');
+      await waitFor(() => expect(screen.getByTestId(`nav-site360-${key}`)).toHaveAttribute('aria-current', 'page'));
       expect(screen.getByTestId('nav-sites')).not.toHaveAttribute('aria-current');
       expect(screen.getByTestId('nav-group-site_register')).toHaveAttribute('data-active', 'true');
+      expect(screen.getByTestId('page-sites')).toBeInTheDocument();
     }
-    await u.click(screen.getByTestId('nav-sites'));
-    await waitFor(() => expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/^SITE 360$/));
-    expect(screen.getByTestId('nav-sites')).toHaveAttribute('aria-current', 'page');
-    expect(document.querySelector('[data-stream="ALL"]')).not.toBeNull();
   });
 
   it('points the Dismantle sub-menu at the Dismantle register', async () => {
@@ -146,11 +149,11 @@ describe('Sidebar tree (N1-N12)', () => {
     expect(await screen.findByTestId('page-sites')).toBeInTheDocument();
     await screen.findByTestId('nav-sites');
     expect(screen.queryByTestId('view-tabs')).toBeNull();
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('SITE 360: Civil Works');
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Site Master: Civil Works');
     expect(screen.getByTestId('nav-sites')).toHaveAttribute('aria-current', 'page');
     expect(screen.getByTestId('nav-group-site_register')).toHaveAttribute('data-active', 'true');
     expect(screen.queryByTestId('nav-sites-view-CW')).not.toBeInTheDocument();
-    expect(screen.getByTestId('breadcrumb')).toHaveTextContent('SITE 360');
+    expect(screen.getByTestId('breadcrumb')).toHaveTextContent('Site Master');
   });
 
   it('hides sub-menus and registers the caller may not use, as before', async () => {
@@ -158,7 +161,7 @@ describe('Sidebar tree (N1-N12)', () => {
     await signIn('engineer');
     app();
     await screen.findByTestId('nav-sites');
-    expect(screen.getByTestId('nav-sites-stream-CW')).toBeInTheDocument();
+    expect(screen.getByTestId('nav-site360-cw')).toBeInTheDocument();
     expect(screen.queryByTestId('nav-dismantle')).not.toBeInTheDocument();
     expect(screen.queryByTestId('nav-group-registers')).not.toBeInTheDocument();
     cleanup();
@@ -175,9 +178,9 @@ describe('Sidebar tree (N1-N12)', () => {
   it('collapses the Site Register node and remembers it', async () => {
     const u = userEvent.setup();
     app();
-    await screen.findByTestId('nav-sites-views');
+    await screen.findByTestId('nav-site360-menus');
     await u.click(screen.getByTestId('nav-sites-toggle'));
-    expect(screen.queryByTestId('nav-sites-views')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('nav-site360-menus')).not.toBeInTheDocument();
     expect(localStorage.getItem('pmis.nav.sites_open')).toBe('false');
   });
 
@@ -223,16 +226,17 @@ describe('Sidebar tree (N1-N12)', () => {
 
   it('works in Arabic', async () => {
     app('/my-work', 'ar');
-    expect(await screen.findByTestId('nav-sites-stream-CW')).toHaveTextContent('الأعمال المدنية');
-    expect(screen.getByTestId('nav-sites-stream-DESIGN_ACQ')).toHaveTextContent('التصميم والاستحواذ');
-    expect(screen.getByTestId('nav-sites-stream-TE')).toHaveTextContent('التركيبات');
-    expect(screen.getByTestId('nav-sites-stream-CLOSURE')).toHaveTextContent('التسليم والإغلاق');
+    expect(await screen.findByTestId('nav-site360-cw')).toHaveTextContent('الأعمال المدنية');
+    expect(screen.getByTestId('nav-site360-design_acq')).toHaveTextContent('التصميم والاستحواذ');
+    expect(screen.getByTestId('nav-site360-te')).toHaveTextContent('التركيبات');
+    expect(screen.getByTestId('nav-site360-hoto')).toHaveTextContent('التسليم والإغلاق');
+    expect(screen.getByTestId('nav-site360-dismantle')).toHaveTextContent('الفك');
+    expect(screen.getByTestId('nav-site360-om')).toHaveTextContent('التشغيل والصيانة');
     expect(screen.getByTestId('nav-dismantle')).toHaveTextContent('الفك');
-    expect(screen.getByTestId('nav-sites-view-OM')).toHaveTextContent('التشغيل والصيانة');
-    expect(screen.getByTestId('nav-group-toggle-site_register')).toHaveTextContent('الموقع 360');
+    expect(screen.getByTestId('nav-sites')).toHaveTextContent('ماستر المواقع');
     expect(screen.getByTestId('nav-group-toggle-registers')).toHaveTextContent('السجلات والقيود');
     expect(screen.getByTestId('nav-change_control')).toHaveTextContent('سجل التغييرات');
-    expect(screen.getByTestId('nav-group-toggle-site_register')).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByTestId('nav-sites-toggle')).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByTestId('nav-group-toggle-work')).toHaveTextContent('العمل');
   });
 });

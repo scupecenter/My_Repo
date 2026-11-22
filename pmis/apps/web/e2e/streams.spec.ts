@@ -4,10 +4,11 @@ import { login } from './helpers';
 // These specs drive the list grid; the site page opens on the Excel-like row by default (2026-11-08).
 test.beforeEach(async ({ page }) => { await page.addInitScript(() => { if (!localStorage.getItem('pmis.site.layout')) localStorage.setItem('pmis.site.layout', '"list"'); }); });
 
-// Site Register streams, switched from the sidebar sub-menus (the page has no tab bars): EN/light and AR/dark (RTL, dark tokens), against the mock layer.
+// Site Register streams (owner decision 2026-11-15: the sidebar shows only the eight SITE 360 menus; the stream filter is reached by its old URL, ?stream=).
+// EN/light and AR/dark (RTL, dark tokens), against the mock layer.
 const CASES = [
-  { locale: 'en', theme: 'light', title: 'SITE 360', cw: 'Civil Works', dismantle: 'Dismantle', na: /Show N\/A sites \(\d+\)/ },
-  { locale: 'ar', theme: 'dark', title: 'الموقع 360', cw: 'الأعمال المدنية', dismantle: 'الفك', na: /إظهار المواقع غير المنطبقة \(\d+\)/ },
+  { locale: 'en', theme: 'light', title: 'Site Master', cw: 'Civil Works', cwMenu: 'CW', dismantle: 'Dismantle', na: /Show N\/A sites \(\d+\)/ },
+  { locale: 'ar', theme: 'dark', title: 'ماستر المواقع', cw: 'الأعمال المدنية', cwMenu: 'الأعمال المدنية', dismantle: 'الفك', na: /إظهار المواقع غير المنطبقة \(\d+\)/ },
 ] as const;
 
 for (const c of CASES) {
@@ -18,21 +19,23 @@ for (const c of CASES) {
     await expect(page.getByTestId('page-sites')).toBeVisible();
     await expect(page.locator('html')).toHaveAttribute('dir', c.locale === 'ar' ? 'rtl' : 'ltr');
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(c.title);
-    await expect(page.getByTestId('nav-group-toggle-site_register')).toContainText(c.title);
+    await expect(page.getByTestId('nav-group-toggle-site_register')).toHaveCount(0); // the one Site Master row is the entry itself
+    await expect(page.getByTestId('nav-sites')).toHaveText(c.title);
 
-    // the page has no tab bars; the sidebar sub-menus switch the stream
+    // the page has no tab bars; the sidebar shows the eight SITE 360 menus and no stream links
     await expect(page.getByTestId('stream-tabs')).toHaveCount(0);
     await expect(page.getByTestId('view-tabs')).toHaveCount(0);
-    await expect(page.getByTestId('nav-sites-stream-CW')).toHaveText(c.cw);
+    await expect(page.getByTestId('nav-site360-cw')).toHaveText(c.cwMenu);
+    await expect(page.locator('[data-testid^="nav-sites-stream-"]')).toHaveCount(0);
     await expect(page.getByTestId('nav-dismantle')).toHaveText(c.dismantle);
 
-    // pick Civil Works: the request carries ?stream=CW, the page is titled and the entry highlighted
+    // the old stream URL (typed or pushed inside the app) still opens the stream: the page is titled and the Site Register entry stays active
     const req = page.waitForRequest((r) => r.url().includes('/sites?') && r.url().includes('stream=CW'));
-    await page.getByTestId('nav-sites-stream-CW').click();
+    await page.evaluate(() => { window.history.pushState({}, '', '/sites?stream=CW'); window.dispatchEvent(new PopStateEvent('popstate')); });
     await req;
     await expect(page.locator('[data-stream="CW"]')).toBeVisible();
     await expect(page.getByRole('heading', { level: 1 })).toContainText(c.cw);
-    await expect(page.getByTestId('nav-sites-stream-CW')).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByTestId('nav-sites')).toHaveAttribute('aria-current', 'page');
     const row = page.getByTestId('site-row-TR101');
     await expect(row).toBeVisible();
     await expect(page.getByTestId('stream-progress-TR101')).toHaveText(/^\d+\/\d+$/);
@@ -72,12 +75,13 @@ for (const c of VIEW_CASES) {
     await page.getByTestId('nav-sites').click();
     await expect(page.getByTestId('view-tabs')).toHaveCount(0);
 
-    // O&M from the sidebar: the request carries view=OM and the title names the view
-    const om = page.waitForRequest((r) => r.url().includes('/sites?') && r.url().includes('view=OM'));
-    await page.getByTestId('nav-sites-view-OM').click();
+    // O&M from the sidebar: the menu opens its SITE 360 section and is highlighted
+    const om = page.waitForRequest((r) => r.url().includes('/site360/om/rows'));
+    await page.getByTestId('nav-site360-om').click();
     await om;
-    await expect(page.getByRole('heading', { level: 1 })).toContainText(c.om);
-    await expect(page.getByTestId('nav-sites-view-OM')).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByTestId('nav-site360-om')).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByTestId('nav-site360-om')).toHaveText(c.om);
+    await expect(page.locator('[data-testid^="nav-sites-view-"]')).toHaveCount(0);
 
     // an old ?view=TE link (history navigation inside the app) still opens the TE view
     const req = page.waitForRequest((r) => r.url().includes('/sites?') && r.url().includes('view=TE'));

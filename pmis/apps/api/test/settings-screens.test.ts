@@ -448,8 +448,8 @@ describe('Q477: an approved region move tells the Team Leads of the new region',
       expect(nt.body).toMatch(/- A1 .*\[open\], with .*\(/);                             // the holder is named with the employee ID
       expect(nt.body).toContain(leadFrom.user.name);
       expect(nt.body).toMatch(/- A2 .*\[in_review\], with group Old region reviewers/);
-      expect(nt.body).not.toMatch(/A3 /);                                                // approved: not open
-      expect(nt.body).not.toMatch(/A4 /);                                                // locked: not open
+      expect(nt.body).not.toMatch(/- A3 /);                                                // approved: not open
+      expect(nt.body).not.toMatch(/- A4 /);                                                // locked: not open
     }
     for (const nobody of [leadFrom, plainTo, blindLead, endedLead]) {
       expect((await q(db, `SELECT 1 FROM notifications WHERE user_id = $1 AND kind = 'site_region_moved'`, [nobody.user.id])).length).toBe(0);
