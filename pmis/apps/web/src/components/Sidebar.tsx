@@ -6,7 +6,7 @@ import { useNavLayout } from '@/api/settings';
 import { ICONS, ICON_PROPS } from '@/lib/icons';
 import { loadPref, savePref } from '@/lib/localPref';
 import { headingIcon, headingName, keysOf, resolveLayout, type NavHead, type NavSub } from '@/lib/navLayout';
-import { SITE360_NAV } from '@/lib/site360Menus';
+import { SITE360_SUBMENUS } from '@/lib/site360Menus';
 import { NavLayoutEditor } from './NavLayoutEditor';
 import type { NavItem } from './navItems';
 
@@ -26,7 +26,7 @@ export function siteSelection(pathname: string, search: string): { stream: strin
   return { stream: p.get('stream') ?? '', view: p.get('view') ?? '', section: p.get('section') ?? '' };
 }
 
-/** The eight SITE 360 menus (owner decision 2026-11-15, F15): Master, Design & Acquisition, SOW, CW, TE, HOTO, Dismantle, O&M. Each opens `/sites?section=`. */
+/** The seven SITE 360 sub-menus under "Site Master" (owner decision 2026-11-15, F15; the Master parent is the entry itself). Each opens `/sites?section=`. */
 function SiteSubmenus({ onNavigate }: { onNavigate?: () => void }) {
   const { t, i18n } = useTranslation();
   const loc = useLocation();
@@ -37,7 +37,7 @@ function SiteSubmenus({ onNavigate }: { onNavigate?: () => void }) {
   );
   return (
     <div className="ms-6 border-s border-line ps-1" role="group" aria-label={t('site360.menus')} data-testid="nav-site360-menus">
-      {SITE360_NAV.map((m) => item(`nav-site360-${m.key}`, `/sites?section=${m.key}`, sel.section === m.key, i18n.language === 'ar' ? m.ar : m.en))}
+      {SITE360_SUBMENUS.map((m) => item(`nav-site360-${m.key}`, `/sites?section=${m.key}`, sel.section === m.key, i18n.language === 'ar' ? m.ar : m.en))}
     </div>
   );
 }
@@ -59,7 +59,7 @@ export function SidebarBody({ items, compact, unread, alerts = 0, activeKey, onN
   const label = (n: NavItem) => t(n.key === 'sites' ? 'nav.sites_all' : `nav.${n.key}`);
   const byKey = (k: string) => items.find((i) => i.key === k);
   const sel = siteSelection(loc.pathname, loc.search);
-  const subOn = SITE360_NAV.some((m) => m.key === sel.section);
+  const subOn = SITE360_SUBMENUS.some((m) => m.key === sel.section);
 
   // Recent items: adjust state while rendering when the active page changes (no effect needed).
   const [seen, setSeen] = useState<string | undefined>();
@@ -115,7 +115,7 @@ export function SidebarBody({ items, compact, unread, alerts = 0, activeKey, onN
   const favItems = favs.map(byKey).filter((x): x is NavItem => !!x);
   const recentItems = recent.filter((k) => k !== activeKey).map(byKey).filter((x): x is NavItem => !!x);
 
-  /** A screen of a heading. The Site Register entry carries the eight SITE 360 menus; every other screen, Dismantle included, is a plain row. */
+  /** A screen of a heading. The Site Register entry "Site Master" carries the seven SITE 360 sub-menus; every other screen, Dismantle included, is a plain row. */
   const itemNode = (k: string) => {
     const n = byKey(k);
     if (!n) return null;
@@ -142,7 +142,9 @@ export function SidebarBody({ items, compact, unread, alerts = 0, activeKey, onN
   const renderHeading = (h: NavHead | NavSub, sub: boolean): ReactNode => {
     const visible = keysOf(h).filter((k) => byKey(k));
     if (!visible.length) return null;
-    const open = compact || !collapsed.includes(h.id);
+    // A heading whose only screen is the Site Register entry is not drawn twice: that entry is the one "Site Master" row (owner request 2026-11-22).
+    const solo = !sub && h.children.length === 1 && h.children[0] === 'sites';
+    const open = compact || solo || !collapsed.includes(h.id);
     const hasActive = visible.some((k) => k === activeKey) || (visible.includes('sites') && loc.pathname.startsWith('/sites'));
     const concept = headingIcon(h);
     const Icon = concept ? ICONS[concept] : null;
@@ -150,7 +152,7 @@ export function SidebarBody({ items, compact, unread, alerts = 0, activeKey, onN
       <div key={h.id} className={sub ? 'mb-1 ms-3' : 'mb-3'} data-testid={`nav-group-${h.id}`} data-active={hasActive || undefined} data-depth={sub ? 2 : 1}>
         {compact
           ? (!sub && <div className="mx-2 my-1 border-t border-line" aria-hidden />)
-          : (
+          : solo ? null : (
             <button type="button" data-testid={`nav-group-toggle-${h.id}`} aria-expanded={open} onClick={() => toggleGroup(h.id)}
               className={`flex w-full items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold hover:bg-hover ${hasActive ? 'text-accentText' : 'text-mute'}`}>
               <ChevronRight size={14} aria-hidden className={`transition-transform motion-reduce:transition-none ${open ? 'rotate-90 rtl:-rotate-90' : 'rtl:rotate-180'}`} />

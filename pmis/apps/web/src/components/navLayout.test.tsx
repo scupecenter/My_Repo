@@ -25,7 +25,7 @@ describe('the layout model (lib/navLayout)', () => {
   it('the default is the six groups of the code with their screens in NAV order', () => {
     const d = defaultLayout();
     expect(d.headings.map((h) => h.id)).toEqual(['work', 'site_register', 'registers', 'data', 'admin', 'logs']);
-    expect(d.headings[1]).toMatchObject({ name_en: 'SITE 360', name_ar: 'الموقع 360', children: ['sites'] });
+    expect(d.headings[1]).toMatchObject({ name_en: 'Site Master', name_ar: 'ماستر المواقع', children: ['sites'] });
     expect(d.headings[0]!.children).toEqual(['my_work', 'inbox', 'approvals', 'workload', 'status_updates', 'dashboard', 'messages', 'absence']);
     expect(resolveLayout(null)).toEqual(d);
   });
