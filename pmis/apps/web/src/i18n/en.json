@@ -4963,8 +4963,11 @@
     "revert": "Revert",
     "reverted": "Override reverted",
     "was_reverted": "Reverted",
+    "by_rule": "GSDN Workspace (automatic rule)",
     "none": "(none)",
     "field": {
+      "na_reason": "N/A reason",
+      "d6_mw_antenna": "D6 MW antenna",
       "planned_date": "Planned date",
       "actual_start": "Actual start",
       "actual_date": "Actual date",
