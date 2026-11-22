@@ -1,13 +1,12 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  useCreateTask, useDiscardDraft, useGateLight, useInsertTask, useMilestoneLight, usePublish, useRemoveItem, useReorderTasks, useReplaceStructure, useSetClosing, useSetPredecessors, useSetSuccessors, useUpdateTask,
+  useCreateTask, useDiscardDraft, useGateLight, useInsertTask, useMilestoneLight, usePublish, useRemoveItem, useReorderTasks, useRemoveSlaRule, useReplaceStructure, useSaveSlaRule, useSetClosing, useSetWeight, useSetPredecessors, useSetSuccessors, useUpdateTask,
   type SlaWeightItem, type WeightTotal, type WorkflowVersion,
 } from '@/api/workflowEditor';
 import { useToast } from '@/components/Toast';
-import type { Can } from '../wf/Columns';
 import { ReasonDialog } from '../wf/Forms';
-import type { G, M, P } from '../wf/model';
+import type { Can, G, M, P } from '../wf/model';
 import { useErr } from '../wf/useErr';
 import type { StudioSel } from './studioModel';
 
@@ -16,7 +15,7 @@ export function useWrites(version: number, etag: number) {
   return {
     createTask: useCreateTask(version, etag), updateTask: useUpdateTask(version, etag), setPreds: useSetPredecessors(version, etag), setSuccs: useSetSuccessors(version, etag), setClosing: useSetClosing(version, etag),
     insertTask: useInsertTask(version, etag), replace: useReplaceStructure(version, etag), reorder: useReorderTasks(version, etag), msLight: useMilestoneLight(version, etag), gateLight: useGateLight(version, etag),
-    publish: usePublish(version, etag), removeItem: useRemoveItem(version, etag), discard: useDiscardDraft(version, etag),
+    saveSla: useSaveSlaRule(version, etag), removeSla: useRemoveSlaRule(version, etag), setWeight: useSetWeight(version, etag), publish: usePublish(version, etag), removeItem: useRemoveItem(version, etag), discard: useDiscardDraft(version, etag),
   };
 }
 export type Writes = ReturnType<typeof useWrites>;

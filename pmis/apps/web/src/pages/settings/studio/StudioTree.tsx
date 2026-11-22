@@ -31,7 +31,7 @@ export function StudioTree(p: Props) {
           <li key={m.code} data-testid={`studio-row-${m.code}`}>
             <div className="flex items-center gap-1">
               <button type="button" className="btn min-h-11 min-w-11 border-transparent px-0" aria-expanded={open} aria-label={t(open ? 'studio.collapse' : 'studio.expand', { name: p.nm(m) })} data-testid={`studio-ms-toggle-${m.code}`} onClick={() => p.onToggle(m.code)}>
-                {open ? <ChevronDown size={16} aria-hidden className="rtl:rotate-90" /> : <ChevronRight size={16} aria-hidden className="rtl:rotate-180" />}
+                {open ? <ChevronDown size={16} aria-hidden /> : <ChevronRight size={16} aria-hidden className="rtl:rotate-180" />}
               </button>
               <button type="button" className={rowCls(is('milestone', m.code))} aria-current={is('milestone', m.code) ? 'true' : undefined} data-testid={`studio-ms-${m.code}`} onClick={() => p.onSelect({ kind: 'milestone', code: m.code })}>
                 <span className="min-w-0 flex-1 truncate">{p.nm(m)}</span>{dot(m.code)}
