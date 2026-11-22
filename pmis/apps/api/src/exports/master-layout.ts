@@ -60,6 +60,23 @@ export function columnPart(c: MasterColumn, milestoneLetters: Set<string>): Part
   return 'sites';
 }
 
+/** A position of the Master sheet that holds no column (a deleted or deactivated one): the letters of the columns after it stay true. */
+export const BLANK_MASTER_OWNER = 'blank';
+
+/**
+ * 0133 (contract 0.15.43): the active columns in Master order, with an empty placeholder for every order that has no active column up to the last one, so a
+ * column always sits at the position of its letter (A = 1) even after a column was deleted or deactivated.
+ */
+export function padMasterColumns(cols: readonly MasterColumn[]): MasterColumn[] {
+  const byOrd = new Map(cols.map((c) => [c.ord, c]));
+  const last = cols.reduce((m, c) => Math.max(m, c.ord), 0);
+  const out: MasterColumn[] = [];
+  for (let o = 1; o <= last; o++) {
+    out.push(byOrd.get(o) ?? { ord: o, letter: '', group_top: null, group_mid: null, name: null, header: '', owner: BLANK_MASTER_OWNER });
+  }
+  return out;
+}
+
 /** The three header rows of the Master sheet: a group label is written where its span starts (the Master merges the rest of the span). */
 export function masterHeaderRows(cols: { group_top: string | null; group_mid: string | null; name: string | null }[]): (string | null)[][] {
   const top: (string | null)[] = [];

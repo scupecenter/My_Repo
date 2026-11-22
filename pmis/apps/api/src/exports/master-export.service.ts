@@ -20,7 +20,7 @@ import { loadRegisterMaps, type RegisterMap } from '../master-import/register-sh
 import { RegistersService } from '../registers/registers.service';
 import { SitesService } from '../sites/sites.service';
 import {
-  MASTER_FIRST_DATA_ROW, MASTER_SHEET, MASTER_SHEET_PARTS, NON_REGISTER, NOT_IN_MASTER, PART_KEYS, PART_LABELS, columnPart, masterHeaderRows, partSheet,
+  BLANK_MASTER_OWNER, MASTER_FIRST_DATA_ROW, MASTER_SHEET, MASTER_SHEET_PARTS, NON_REGISTER, NOT_IN_MASTER, PART_KEYS, PART_LABELS, columnPart, masterHeaderRows, padMasterColumns, partSheet,
   registerLayout, SheetWriter, workbookWriter, type MasterColumn, type PartKey, type RegisterSheetColumn, type TplCol,
 } from './master-layout';
 
@@ -497,7 +497,7 @@ export class MasterExportService {
     // a not-tracked column filled by a site custom field follows that field's rule for the caller (hidden = left empty)
     const hiddenOrds = vals.some((v) => v.kind === 'custom_field')
       ? new Set((await this.db.tx.$queryRaw<{ ord: number }[]>(Prisma.sql`
-          SELECT mc.ord FROM field_definitions fd JOIN master_columns mc ON mc.letter = fd.master_export_column
+          SELECT mc.ord FROM field_definitions fd JOIN master_columns mc ON mc.letter = fd.master_export_column OR mc.source_field_id = fd.id
           WHERE fd.entity_type::text = 'site' AND fd.is_active
             AND coalesce(app_resolve_field_access(${auth.user.id}::uuid, fd.id)::text, 'edit') = 'hidden'`)).map((r) => r.ord))
       : new Set<number>();
@@ -526,7 +526,7 @@ export class MasterExportService {
    * column. Every column is kept (the layout can be pasted into the Master); a part not chosen, or not exportable in the site's region, stays empty.
    */
   private async masterSheet(wb: ReturnType<typeof workbookWriter>, auth: AuthContext, parts: PartKey[], regionsOf: Map<PartKey, number[] | null>): Promise<SheetCount> {
-    const cols = await this.masterColumns();
+    const cols = padMasterColumns(await this.masterColumns());
     const ms = await this.milestoneLetters();
     const custom = parts.includes('sites') ? await this.siteCustomFields(auth) : [];
     const owner = cols.map((c) => columnPart(c, ms));
@@ -538,7 +538,7 @@ export class MasterExportService {
       SELECT s.id::text AS id, s.site_code, s.region_id, s.custom FROM sites s
       WHERE s.is_active ${union === null ? Prisma.empty : Prisma.sql`AND s.region_id = ANY(${union}::int[])`}
       ORDER BY s.site_code COLLATE "C"`);
-    const ords = cols.map((c) => c.ord);
+    const ords = cols.filter((c) => c.owner !== BLANK_MASTER_OWNER).map((c) => c.ord);
     let rowNo = MASTER_FIRST_DATA_ROW;
     for (let i = 0; i < sites.length; i += MASTER_ROW_BATCH) {
       const batch = sites.slice(i, i + MASTER_ROW_BATCH);
@@ -552,7 +552,7 @@ export class MasterExportService {
           const r = regionsOf.get(k) ?? null;
           return r === null || r.includes(s.region_id);
         };
-        const row: unknown[] = cols.map((c, ci) => (c.ord === 1 ? i + j + 1 : inPart(owner[ci] as PartKey | 'all') ? (v.get(c.ord) ?? null) : null));
+        const row: unknown[] = cols.map((c, ci) => (c.owner === BLANK_MASTER_OWNER ? null : c.ord === 1 ? i + j + 1 : inPart(owner[ci] as PartKey | 'all') ? (v.get(c.ord) ?? null) : null));
         for (const f of custom) row.push(inPart('sites') ? (s.custom ?? {})[f.code] : null);
         sheet.write(rowNo++, row);
       }
