@@ -19,14 +19,11 @@
     "name": "GSDN Workspace"
   },
   "site360": {
-    "layout": "عرض ماستر المواقع",
     "menus": "قوائم ماستر المواقع",
     "gate": "بوابة",
     "freeze": "تجميد هذا العمود أو فكّه",
     "rows": "الصفوف: {{count}}",
     "of": "{{count}} من {{total}} موقعاً",
-    "grid": "شبكة",
-    "vertical": "عمودي",
     "more": "تحميل المزيد من المواقع",
     "site_ids": "معرّفات المواقع للبحث",
     "site_ids_placeholder": "الصق معرّفات المواقع، واحدًا في كل سطر أو مفصولة بفواصل",
@@ -112,7 +109,7 @@
     "admin.profiles": "ملفات الصلاحيات",
     "admin.assignments": "الإسنادات",
     "procurement": "المشتريات",
-    "gecol": "الجيكول",
+    "gecol": "كهرباء GECOL",
     "hlc": "الفايبر",
     "permits_hse": "التصاريح والسلامة",
     "dismantle": "الفك",
@@ -124,14 +121,14 @@
     "car_dispatcher": "توزيع السيارات",
     "financial_advances": "العهد المالية",
     "warehouse": "المخزن",
-    "quality": "الجودة",
+    "quality": "ضبط الجودة",
     "issues": "سجل المشاكل",
     "risks": "سجل المخاطر",
     "change_control": "سجل التغييرات",
     "readiness": "الجاهزية والتسليم",
     "as_built": "كما نُفّذ",
     "meetings": "الاجتماعات",
-    "rf_design": "تصميم RF",
+    "rf_design": "الترددات والتصميم",
     "acquisition": "الاستحواذ",
     "favourites": "المفضلة",
     "recent": "الأخيرة",
@@ -1813,8 +1810,6 @@
     "hidden": "مخفي"
   },
   "viewMode": {
-    "label": "طريقة العرض",
-    "vertical": "عمودي",
     "grid": "شبكة"
   },
   "registers": {
@@ -2643,9 +2638,9 @@
   "dash": {
     "tabs": {
       "label": "أقسام لوحة المعلومات",
-      "pmo": "الإدارة وPMO",
-      "cw": "متابعة المقاول CW",
-      "te": "متابعة التركيب TE",
+      "pmo": "PMO",
+      "cw": "CW",
+      "te": "TE",
       "unavailable": "هذا التبويب غير مُعدّ لسير العمل الحالي."
     },
     "print": "طباعة ورقة A4",
@@ -4201,9 +4196,9 @@
     "unit_count": "عدد",
     "dir_higher": "الأعلى أفضل",
     "dir_lower": "الأدنى أفضل",
-    "tab_pmo": "PMO والإدارة",
-    "tab_cw": "متابعة CW",
-    "tab_te": "متابعة TE",
+    "tab_pmo": "PMO",
+    "tab_cw": "CW",
+    "tab_te": "TE",
     "move_up": "نقل {{name}} إلى الأعلى",
     "move_down": "نقل {{name}} إلى الأسفل",
     "invalid": "يجب تحديد قيمة خضراء وقيمة برتقالية لكل مؤشر، ويجب أن يكون الأخضر أفضل من البرتقالي حسب اتجاه المؤشر."

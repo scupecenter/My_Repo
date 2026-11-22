@@ -24,7 +24,7 @@ const A1 = taskIdOf(0, 0);
 describe('Site Master: streams', () => {
   it('names the module Site Register, has no tab bars (the sidebar switches) and titles the open stream with the API name', async () => {
     await signIn('pm');
-    renderApp(<Sites />, { route: '/sites' });
+    renderApp(<Sites />, { route: '/sites?layout=list' });
     expect(screen.getByRole('heading', { name: 'Site Master' })).toBeInTheDocument();
     expect(await screen.findByTestId('site-row-TR101')).toBeInTheDocument();
     expect(document.querySelector('[data-stream="ALL"]')).not.toBeNull();
@@ -42,7 +42,7 @@ describe('Site Master: streams', () => {
   it('shows the agreed Arabic names in the title of each stream', async () => {
     await signIn('pm');
     const names = { DESIGN_ACQ: 'التصميم والاستحواذ', CW: 'الأعمال المدنية', TE: 'التركيبات', CLOSURE: 'التسليم والإغلاق' };
-    renderApp(<Sites />, { route: '/sites', locale: 'ar' });
+    renderApp(<Sites />, { route: '/sites?layout=list', locale: 'ar' });
     expect(screen.getByRole('heading', { name: 'ماستر المواقع' })).toBeInTheDocument();
     cleanup();
     for (const [code, name] of Object.entries(names)) {

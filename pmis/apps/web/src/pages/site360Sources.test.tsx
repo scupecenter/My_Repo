@@ -18,7 +18,7 @@ const cellOf = (code: string, ord: number): HTMLElement => {
 describe('SITE 360 grid: source of a cell and not tracked columns', () => {
   it('shows a visible "Not tracked" marker for a column with no source, not a dash', async () => {
     await signIn('pm');
-    renderApp(<Sites />, { route: '/sites?section=dismantle' });
+    renderApp(<Sites />, { route: '/sites?section=dismantle&layout=grid' });
     await screen.findByTestId('site360-grid-row-S360-001');
     expect(within(cellOf('S360-001', 172)).getByTestId('site360-grid-not-tracked')).toHaveTextContent('Not tracked');
     // a tracked column without a value keeps the dash
@@ -27,14 +27,14 @@ describe('SITE 360 grid: source of a cell and not tracked columns', () => {
 
   it('shows the Arabic marker in the Arabic locale', async () => {
     await signIn('pm');
-    renderApp(<Sites />, { route: '/sites?section=dismantle', locale: 'ar' });
+    renderApp(<Sites />, { route: '/sites?section=dismantle&layout=grid', locale: 'ar' });
     await screen.findByTestId('site360-grid-row-S360-001');
     expect(within(cellOf('S360-001', 172)).getByTestId('site360-grid-not-tracked')).toHaveTextContent('غير متتبَّع');
   });
 
   it('a click on a register cell opens its source with a link to the register record', async () => {
     await signIn('pm');
-    renderApp(<Sites />, { route: '/sites?section=te' });
+    renderApp(<Sites />, { route: '/sites?section=te&layout=grid' });
     await screen.findByTestId('site360-grid-row-S360-001');
     expect(screen.getByTestId('site360-source-hint')).toBeTruthy();
     fireEvent.mouseDown(cellOf('S360-001', 78), { button: 0 });
@@ -49,7 +49,7 @@ describe('SITE 360 grid: source of a cell and not tracked columns', () => {
 
   it('a hidden value shows the kind without a link (Arabic)', async () => {
     await signIn('pm');
-    renderApp(<Sites />, { route: '/sites?section=dismantle', locale: 'ar' });
+    renderApp(<Sites />, { route: '/sites?section=dismantle&layout=grid', locale: 'ar' });
     await screen.findByTestId('site360-grid-row-S360-001');
     fireEvent.mouseDown(cellOf('S360-001', 170), { button: 0 });
     const panel = await screen.findByTestId('site360-source-panel');

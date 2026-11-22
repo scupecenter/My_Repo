@@ -30,7 +30,7 @@ const fill = async (u: ReturnType<typeof userEvent.setup>, o: Record<string, str
 describe('Site Register: New site, Download template, Upload', () => {
   it('offers all three to somebody who may create sites and use the Templates page', async () => {
     await signIn('pm');
-    renderApp(<Routed />, { route: '/sites' });
+    renderApp(<Routed />, { route: '/sites?layout=list' });
     expect(await screen.findByTestId('sites-new')).toHaveAttribute('href', '/sites/new');
     expect(await screen.findByTestId('sites-template-download')).toBeInTheDocument();
     expect(screen.getByTestId('sites-template-upload')).toBeInTheDocument();
@@ -38,7 +38,7 @@ describe('Site Register: New site, Download template, Upload', () => {
 
   it('offers only New site to somebody who creates by hand and has no Templates page (the template is listed only for those who can use it)', async () => {
     await signIn('engineer');
-    renderApp(<Routed />, { route: '/sites' });
+    renderApp(<Routed />, { route: '/sites?layout=list' });
     expect(await screen.findByTestId('sites-new')).toBeInTheDocument();
     await screen.findByTestId(`site-row-${siteMeta(0).code}`);
     expect(screen.queryByTestId('sites-template-download')).not.toBeInTheDocument();
@@ -47,14 +47,14 @@ describe('Site Register: New site, Download template, Upload', () => {
 
   it('offers nothing to somebody who may not create sites', async () => {
     await signIn('auditor');
-    renderApp(<Routed />, { route: '/sites' });
+    renderApp(<Routed />, { route: '/sites?layout=list' });
     await screen.findByTestId('page-sites');
     expect(screen.queryByTestId('sites-create-actions')).not.toBeInTheDocument();
   });
 
   it('shows the Arabic site name next to the English one (G9)', async () => {
     await signIn('pm');
-    renderApp(<Routed />, { route: '/sites' });
+    renderApp(<Routed />, { route: '/sites?layout=list' });
     const row = await screen.findByTestId(`site-row-${siteMeta(0).code}`);
     expect(within(row).getByTestId(`site-name-ar-${siteMeta(0).code}`)).toHaveTextContent(`موقع ${siteMeta(0).name}`);
     expect(within(row).getByTestId(`site-name-ar-${siteMeta(0).code}`)).toHaveAttribute('dir', 'rtl');
@@ -63,7 +63,7 @@ describe('Site Register: New site, Download template, Upload', () => {
 
   it('downloads the New sites template from the Site Register', async () => {
     await signIn('pm');
-    renderApp(<Routed />, { route: '/sites' });
+    renderApp(<Routed />, { route: '/sites?layout=list' });
     const u = userEvent.setup();
     await u.click(await screen.findByTestId('sites-template-download'));
     await waitFor(() => expect(screen.getAllByTestId('toast').at(-1)).toHaveTextContent('TPL-SITE-NEW'));
@@ -148,7 +148,7 @@ describe('New site: the manual way', () => {
 describe('New sites: the template and the L2 review of the batch', () => {
   const uploadFor = async (account: 'reviewer' | 'pm', content = 'x') => {
     await signIn(account);
-    const view = renderApp(<Routed />, { route: '/sites' });
+    const view = renderApp(<Routed />, { route: '/sites?layout=list' });
     const u = userEvent.setup();
     await u.click(await screen.findByTestId('sites-template-upload'));
     await u.upload(await screen.findByTestId('template-upload-file'), new File([content], 'new-sites.xlsx'));
@@ -200,7 +200,7 @@ describe('New sites: the template and the L2 review of the batch', () => {
 
   it('refuses a file of an old version, and a changed header, in the dialog with the server reason', async () => {
     await signIn('reviewer');
-    renderApp(<Routed />, { route: '/sites' });
+    renderApp(<Routed />, { route: '/sites?layout=list' });
     const u = userEvent.setup();
     await u.click(await screen.findByTestId('sites-template-upload'));
     expect(await screen.findByTestId('template-upload-rule-sites')).toBeInTheDocument();
