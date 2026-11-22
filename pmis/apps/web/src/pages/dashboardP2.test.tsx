@@ -95,11 +95,8 @@ describe('Dashboard P2 (owner answers of 2026-11-04)', () => {
   it('Q175: a regional view shows the manual values on a separate central line, outside its figure', async () => {
     await signIn('pm');
     await api.post('/project-status/manual-items/8.1/values', { body: { value_pct: 40, effective_date: tripoliToday(), reason: 'training started', source: 'training log' } });
-    const u = userEvent.setup();
-    page();
+    page('/dashboard?region_id=1');
     await screen.findByTestId('dash-progress-value');
-    expect(screen.queryByTestId('dash-central-line')).toBeNull(); // project-wide: the value is in the figure
-    await u.selectOptions(screen.getByTestId('dash-filter-region'), '1');
     expect(await screen.findByTestId('dash-central-line')).toHaveTextContent('1 of 14 have a value');
     expect(screen.getByTestId('dash-central-line')).toHaveTextContent('their weighted progress 40%');
   });

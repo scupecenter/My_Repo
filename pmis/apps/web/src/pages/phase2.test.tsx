@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -36,7 +36,10 @@ describe('Sites list', () => {
     await waitFor(() => expect(screen.getByTestId('sites-count')).toHaveTextContent('150'));
     expect(screen.getAllByRole('listitem').length).toBeLessThan(40);
     expect(screen.getAllByTestId('mini-rail').length).toBeGreaterThan(0);
-    await userEvent.selectOptions(screen.getByTestId('sites-filter-region'), '1');
+    // the region filter of a link (the older URL parameter) shows as a chip of the unified filter and narrows the list
+    cleanup();
+    renderApp(<Sites />, { route: '/sites?layout=list&region_id=1' });
+    expect(await screen.findByTestId('filter-chip-x-region_id')).toBeInTheDocument();
     await waitFor(() => expect(Number(screen.getByTestId('sites-count').textContent?.match(/\d+/)?.[0])).toBeLessThan(40));
     await userEvent.type(screen.getByTestId('sites-search'), 'zzzz');
     await waitFor(() => expect(screen.getByTestId('sites-empty')).toBeInTheDocument());

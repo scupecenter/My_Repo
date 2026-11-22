@@ -29,13 +29,13 @@ describe('saved views on the list screens', () => {
     await u.click(screen.getByTestId('views-name-ok'));
     await waitFor(() => expect(options()).toContain('Tripoli lean'));
 
-    await u.click(screen.getByTestId('chips-clear'));
+    await u.click(await screen.findByTestId('filter-clear-all'));
     await u.click(screen.getByTestId('cols-menu'));
     await u.click(screen.getByTestId('cols-reset'));
     expect(await screen.findByRole('columnheader', { name: /Scenario/ })).toBeInTheDocument();
     await u.keyboard('{Escape}');
     await u.selectOptions(screen.getByTestId('views-select'), screen.getByRole('option', { name: 'Tripoli lean' }));
-    await waitFor(() => expect(screen.getByTestId('sites-filter-region')).toHaveValue('1'));
+    expect(await screen.findByTestId('filter-chip-x-region_id')).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByRole('columnheader', { name: /Scenario/ })).toBeNull());
   });
 
