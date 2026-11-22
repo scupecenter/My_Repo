@@ -4502,7 +4502,7 @@ export interface paths {
         /**
          * Act on the task's current level on behalf of its assignee (B12b choice 3)
          * @description For a Team Lead (the `reassign` grant for the module and region) or a System Admin. Performs `action` at the current level instead of its holder.
-         *     `reason` is mandatory. `level` must equal the task's current level, else 409 `invalid_transition`. Nothing is reset: SLA start and version, stage progress, entered data and documents stay (B12b).
+         *     `reason` is mandatory. `level` must equal the task's current level, else 409 `invalid_transition`. 0.15.45 a level on nobody (no single holder) answers 409 `invalid_transition`; the caller must lead the holder (every region of the holder is the caller's, else 403). Nothing is reset: SLA start and version, stage progress, entered data and documents stay (B12b).
          *     The normal rules apply unchanged: a level the caller also holds next is skipped and logged (`skipped_levels`), and if the caller ends up holding every level the result is a self-approval (B5, flagged in KPIs and the Audit Log, step-up needed). `reject` needs `note` (422 `note_required`).
          *     Audit and `WorkflowStep` record the step as "lead on behalf of the assignee": `acted_by` = caller, `on_behalf_of` = the person who held the level, `on_behalf_kind` = `assignee`.
          */

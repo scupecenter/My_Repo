@@ -2,7 +2,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { randomBytes } from 'node:crypto';
 import type { Client as PgClient } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { makeUser, startApp, superDb } from './helpers';
+import { beginAs, makeUser, startApp, superDb } from './helpers';
 import { Actor, actor, addAssignment, etag, makeSite, newRole, plainAdmin, setCell, taskDef, type Site } from './wf-helpers';
 
 /**
@@ -26,6 +26,7 @@ let lead4: Actor;
 let e: Actor;
 let h: Actor;
 let other: Actor;
+let approver: Actor;
 let roleEng: string;
 let today: string;
 
@@ -46,6 +47,7 @@ beforeAll(async () => {
   e = await actor(app, db, { level: 'entry', regions: [REGION] });
   h = await actor(app, db, { level: 'entry', regions: [REGION] });
   other = await actor(app, db, { level: 'entry', regions: [REGION] });
+  approver = await actor(app, db, { level: 'approve', regions: [REGION] });
   await addAssignment(db, e.user.id, { roleId: roleEng, level: 'entry', regions: [REGION] });
   await addAssignment(db, h.user.id, { roleId: roleEng, level: 'entry', regions: [REGION] });
 });
@@ -310,9 +312,9 @@ describe('POST /tasks/{id}/act-on-behalf', () => {
     // D6: L1 = the engineers' role, L2 = the lead (so a lead submitting on behalf holds the next level: B5)
     await setCell(db, 'D6', REGION, 'entry', { role: [roleEng] });
     await setCell(db, 'D6', REGION, 'approve', { user: [lead.user.id] });
-    // D7: L2 = the System Admin (the lead does not hold it)
+    // D7: L2 = a regional approver (the lead does not hold it)
     await setCell(db, 'D7', REGION, 'entry', { role: [roleEng] });
-    await setCell(db, 'D7', REGION, 'approve', { user: [admin.user.id] });
+    await setCell(db, 'D7', REGION, 'approve', { user: [approver.user.id] });
   });
 
   it('validates the call: reason, note for a reject, the current level, If-Match, the grant and the region', async () => {
@@ -348,6 +350,9 @@ describe('POST /tasks/{id}/act-on-behalf', () => {
     expect(audit.rows.map((r) => r.action)).toEqual(['task_submit', 'task_act_on_behalf']);
     expect(audit.rows.every((r) => r.actor_id === lead.user.id && r.on_behalf_of === e.user.id && r.after.on_behalf_kind === 'assignee')).toBe(true);
     expect(audit.rows[1].reason).toBe('E is on sick leave');
+    // informational: the holder's state when the lead acted (B12b sets no precondition)
+    expect(audit.rows[1].after).toMatchObject({ holder: e.user.id, holder_absent: true, holder_deactivated: false, idle_limit: 2 });
+    expect(typeof audit.rows[1].after.idle_working_days).toBe('number');
 
     // the audit reader shows the kind
     const log = await admin.api.call('get', '/audit-log').query({ entity_type: 'task', entity_id: t });
@@ -387,6 +392,90 @@ describe('POST /tasks/{id}/act-on-behalf', () => {
     expect(res.status, JSON.stringify(res.body)).toBe(200);
     expect(res.body.task.state).toBe('entry');
     const step = await db.query(`SELECT on_behalf_of FROM workflow_steps WHERE task_id = $1 AND action = 'reject'`, [t]);
-    expect(step.rows[0].on_behalf_of).toBe(admin.user.id);
+    expect(step.rows[0].on_behalf_of).toBe(approver.user.id);
+  });
+
+  it('refuses a level that is on nobody (shared by several eligible people): the no-holder path is the System Admins\'', async () => {
+    const t = await task(s, 'D7', 'entry', { actual: true });
+    const res = await lead.api.call('post', `/tasks/${t}/act-on-behalf`, { action: 'submit', level: 1, reason: 'Nobody to cover' }, { 'If-Match': '"1"' });
+    expect(res.status).toBe(409);
+    expect(res.body.code).toBe('invalid_transition');
+  });
+
+  it('a cover is bound to its level: a marker granted at L1 is refused at L2, honoured at L2 only when granted there', async () => {
+    const t = await task(s, 'D7', 'in_approval', { actual: true });
+    const q = async (level: number): Promise<string> => {
+      await db.query('BEGIN');
+      try {
+        await beginAs(db, lead.user.id);
+        await db.query(`INSERT INTO hgd_marks (xid, kind, key) VALUES (txid_current(), 'rsn_cover', $1)`, [`${t}|${lead.user.id}|${level}|${approver.user.id}`]);
+        const r = await db.query(`SELECT wf_require_actor($1::uuid, 'approve', $2::uuid) AS m`, [t, lead.user.id]);
+        return r.rows[0].m as string;
+      } catch (err) {
+        return String((err as Error).message);
+      } finally {
+        await db.query('ROLLBACK');
+      }
+    };
+    expect(await q(1)).toMatch(/not_eligible_holder/);
+    expect(await q(2)).toBe('cover');
+  });
+
+  it('one person completing two levels through a cover is a self-approval (B5): covered L1, then approves L2 as a holder', async () => {
+    const t = await task(s, 'D8', 'entry', { pinned: e.user.id, actual: true });
+    await setCell(db, 'D8', REGION, 'entry', { role: [roleEng] });
+    await setCell(db, 'D8', REGION, 'approve', { user: [approver.user.id] });
+    const sub = await lead.api.call('post', `/tasks/${t}/act-on-behalf`, { action: 'submit', level: 1, reason: 'E is away' }, { 'If-Match': '"1"' });
+    expect(sub.status, JSON.stringify(sub.body)).toBe(200);
+    expect(sub.body.task.state).toBe('in_approval');
+    // the lead becomes an L2 holder afterwards and approves as a holder
+    await setCell(db, 'D8', REGION, 'approve', { user: [lead.user.id] });
+    const ok = await lead.api.call('post', `/tasks/${t}/approve`, {}, { 'If-Match': `"${sub.body.task.version}"` });
+    expect(ok.status, JSON.stringify(ok.body)).toBe(200);
+    expect(ok.body.task.state).toBe('approved');
+    const step = await db.query(`SELECT self_approval, stepup_verified FROM workflow_steps WHERE task_id = $1 AND action = 'approve'`, [t]);
+    expect(step.rows).toEqual([{ self_approval: true, stepup_verified: true }]);
+    expect((await db.query('SELECT self_approval FROM task_instances WHERE id = $1', [t])).rows[0].self_approval).toBe(true);
+    const audit = await db.query(`SELECT after FROM audit_log WHERE entity_id = $1 AND action = 'task_approve'`, [t]);
+    expect(audit.rows[0].after.self_approval_flag).toBe(true);
+  });
+
+  it('the reverse: submitted L1 as a holder, then covers L2 for its holder: a self-approval (approve needs the step-up)', async () => {
+    const t = await task(s, 'D9', 'entry', { pinned: lead.user.id, actual: true });
+    await setCell(db, 'D9', REGION, 'entry', { user: [lead.user.id, h.user.id] });
+    await setCell(db, 'D9', REGION, 'approve', { user: [approver.user.id] });
+    const sub = await lead.api.call('post', `/tasks/${t}/submit`, {}, { 'If-Match': '"1"' });
+    expect(sub.status, JSON.stringify(sub.body)).toBe(200);
+    expect(sub.body.task.state).toBe('in_approval');
+    const v = `"${sub.body.task.version}"`;
+    const res = await lead.api.call('post', `/tasks/${t}/act-on-behalf`, { action: 'approve', level: 2, reason: 'Approver away' }, { 'If-Match': v });
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect(res.body.task.state).toBe('approved');
+    const step = await db.query(`SELECT self_approval, on_behalf_of FROM workflow_steps WHERE task_id = $1 AND action = 'approve'`, [t]);
+    expect(step.rows).toEqual([{ self_approval: true, on_behalf_of: approver.user.id }]);
+  });
+});
+
+describe('lead scope: every region of the person must be the lead\'s', () => {
+  it('a regional lead neither sees, records nor removes absences of a System Admin, an all-regions user or a person with a region outside theirs', async () => {
+    const wide = await actor(app, db, { level: 'entry', regions: null });
+    const twoRegions = await actor(app, db, { level: 'entry', regions: [REGION, 4] });
+    for (const p of [admin, wide, twoRegions]) {
+      const rec = await lead.api.call('post', '/absences', { user_id: p.user.id, kind: 'sick', from_date: addDays(today, 100), to_date: addDays(today, 101) });
+      expect(rec.status, `record for ${p.user.id}`).toBe(403);
+      const own = await absence(p, { kind: 'annual', from_date: addDays(today, 110), to_date: addDays(today, 111) });
+      expect((await lead.api.call('get', '/absences').query({ user_id: p.user.id })).body.items).toHaveLength(0);
+      expect((await lead.api.call('get', `/absences/${own.id}`)).status).toBe(404);
+      expect((await lead.api.call('delete', `/absences/${own.id}`, undefined, { 'If-Match': '"1"' })).status).toBe(404);
+      // a System Admin leads everyone
+      expect((await admin.api.call('get', `/absences/${own.id}`)).status).toBe(200);
+    }
+    // nor reassigns or covers their tasks, nor lists the eligible people for them
+    const t = await task(await site(), 'D2', 'entry', { pinned: twoRegions.user.id });
+    await addAssignment(db, twoRegions.user.id, { roleId: roleEng, level: 'entry', regions: [REGION, 4] });
+    expect((await lead.api.call('post', '/tasks/reassign', { scope: 'task', task_id: t, decision: 'keep', reason: 'Not my person' })).status).toBe(403);
+    expect((await lead.api.call('post', '/tasks/reassign', { scope: 'person', from_user_id: twoRegions.user.id, decision: 'keep', reason: 'Not my person' })).status).toBe(403);
+    expect((await lead.api.call('get', '/reassignments/eligible-users').query({ task_id: t })).status).toBe(403);
+    expect((await lead.api.call('post', `/tasks/${t}/act-on-behalf`, { action: 'submit', level: 1, reason: 'Not my person' }, { 'If-Match': '"1"' })).status).toBe(403);
   });
 });

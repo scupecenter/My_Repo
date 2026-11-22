@@ -22,6 +22,17 @@
 --      (no activity for N working days, N = dashboard setting stale_idle_days, default 2, the same limit as the stale badge, 0116), scoped to the regions
 --      the caller leads and sees.
 --
+-- SEPARATION OF DUTIES (security review of 2026-11-22). The act-on-behalf marker names the task, the caller AND the level it was granted for; wf_require_actor
+-- honours it only at that level, so a cover granted at L1 is never usable at L2. When one person completes two levels of the same pass of a task through a cover
+-- (covered L1 and then approves L2 as a holder, or submitted L1 as a holder and then covers L2), the final approval is a self-approval (B5): step-up and the
+-- self_approval flag on the step, the task and the audit row (wf_complete_hw, redefined from 0073, one line marked 0137). A task on nobody (no single holder)
+-- cannot be covered: that is the "no holder" path to the System Admins (B10). No absence or idle precondition (B12b: the lead decides); the audit row of the
+-- cover records whether the holder was absent, deactivated or idle at that moment.
+-- LEAD SCOPE. A person's regions come from their assignments only (never from System Admin status); a person with an all-regions assignment, or a System
+-- Admin, is "all regions". A regional lead leads a person only when EVERY region of the person is one of the lead's regions; an all-regions person is led only
+-- by a System Admin or an all-regions lead; a person with no region is led only by them too. The same rule (rsn_leads_person) governs the absences (read,
+-- record, change, remove), the alerts, the eligible people, the reassignment and the cover.
+--
 -- SECURITY. Every function is SECURITY DEFINER, search_path pg_catalog, public, pg_temp, owner pmis_definer, PUBLIC revoked. pmis_app may execute only the
 -- doors: ops_save_absence, ops_delete_absence, ops_reassign_tasks, ops_act_on_behalf (writes) and rsn_visible_absences, rsn_alerts, rsn_eligible_users,
 -- rsn_holder_absent, rsn_open_task_counts (reads). The two tables have row security forced and no right for pmis_app (db/sql/app_grants.sql). Each door
@@ -94,23 +105,31 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, pg_te
          OR (public.ss_holds_reassign(p_user, p_region) AND public.wf_user_in_scope(p_user, p_region)))
 $$;
 
--- The regions a person works in: an active assignment covering the region and the Sites module (whatever the account status, so a deactivated person
--- keeps their leads). A System Admin works everywhere.
+-- The regions a person works in, from their active assignments only (whatever the account status, so a deactivated person keeps their leads): every
+-- assignment, whatever its module, counts, so a lead never misses a region of the person. NULL = all regions: an all-regions assignment, or a System Admin
+-- (who can be led only by a System Admin or an all-regions lead). An empty array = no region.
 CREATE OR REPLACE FUNCTION rsn_user_regions(p_user uuid) RETURNS integer[]
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
-  SELECT coalesce(array_agg(r.id ORDER BY r.id), ARRAY[]::integer[]) FROM public.regions r
-  WHERE public.app_user_is_system_admin(p_user)
-     OR EXISTS (SELECT 1 FROM public.user_role_assignments ua
-                WHERE ua.user_id = p_user AND ua.valid_from <= now() AND (ua.valid_to IS NULL OR ua.valid_to > now())
-                  AND (ua.all_regions OR EXISTS (SELECT 1 FROM public.user_role_assignment_regions x WHERE x.assignment_id = ua.id AND x.region_id = r.id))
-                  AND (ua.all_modules OR EXISTS (SELECT 1 FROM public.user_role_assignment_modules m WHERE m.assignment_id = ua.id AND m.module_key = 'sites')))
+  SELECT CASE
+    WHEN public.app_user_is_system_admin(p_user)
+      OR EXISTS (SELECT 1 FROM public.user_role_assignments ua
+                 WHERE ua.user_id = p_user AND ua.all_regions AND ua.valid_from <= now() AND (ua.valid_to IS NULL OR ua.valid_to > now())) THEN NULL
+    ELSE coalesce((SELECT array_agg(DISTINCT x.region_id ORDER BY x.region_id)
+                   FROM public.user_role_assignments ua JOIN public.user_role_assignment_regions x ON x.assignment_id = ua.id
+                   WHERE ua.user_id = p_user AND ua.valid_from <= now() AND (ua.valid_to IS NULL OR ua.valid_to > now())), ARRAY[]::integer[]) END
 $$;
 
+-- Does p_lead lead p_person? A System Admin or an all-regions lead leads everyone; a regional lead leads a person whose regions are ALL among the lead's
+-- regions (never an all-regions person, never a person with no region).
 CREATE OR REPLACE FUNCTION rsn_leads_person(p_lead uuid, p_person uuid) RETURNS boolean
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
-DECLARE lr integer[] := public.rsn_lead_regions(p_lead);
+DECLARE lr integer[] := public.rsn_lead_regions(p_lead); pr integer[];
 BEGIN
-  RETURN lr IS NULL OR lr && public.rsn_user_regions(p_person);
+  IF p_lead IS NULL OR p_person IS NULL THEN RETURN false; END IF;
+  IF lr IS NULL OR lr @> (SELECT array_agg(r.id) FROM public.regions r) THEN RETURN true; END IF;
+  IF cardinality(lr) = 0 THEN RETURN false; END IF;
+  pr := public.rsn_user_regions(p_person);
+  RETURN pr IS NOT NULL AND cardinality(pr) > 0 AND pr <@ lr;
 END $$;
 
 -- The stages whose Matrix cells may hold the user (named, through a role they hold, or through a group they are in): a cheap pre-filter of rsn_task_on.
@@ -158,14 +177,35 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, pg_te
                    AND public.cal_workdays_between(public.cal_local_date(d.created_at), public.cal_today(), p_cal) < p_days)
 $$;
 
--- The act-on-behalf marker of this transaction for the task and the caller: the person the level was on ('' when nobody single), NULL when not covering.
--- Read only by the definer (hgd_marks has no right for pmis_app and is written only through hgd_mark, closed to PUBLIC).
+-- The act-on-behalf marker of this transaction for the task and the caller (key task|caller|level|holder): the person the level was on, NULL when not
+-- covering. Read only by the definer (hgd_marks has no right for pmis_app and is written only through hgd_mark, closed to PUBLIC). rsn_covering stamps the
+-- steps and audit rows of the transition; rsn_covering_at authorises, and only at the level the cover was granted for.
 CREATE OR REPLACE FUNCTION rsn_covering(p_task uuid) RETURNS text
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
-  SELECT split_part(m.key, '|', 3) FROM public.hgd_marks m
+  SELECT split_part(m.key, '|', 4) FROM public.hgd_marks m
   WHERE m.xid = txid_current() AND m.kind = 'rsn_cover'
     AND split_part(m.key, '|', 1) = p_task::text AND split_part(m.key, '|', 2) = public.app_actor()::text
   LIMIT 1
+$$;
+
+CREATE OR REPLACE FUNCTION rsn_covering_at(p_task uuid, p_level integer) RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
+  SELECT EXISTS (SELECT 1 FROM public.hgd_marks m
+                 WHERE m.xid = txid_current() AND m.kind = 'rsn_cover' AND p_level IS NOT NULL
+                   AND split_part(m.key, '|', 1) = p_task::text AND split_part(m.key, '|', 2) = public.app_actor()::text
+                   AND split_part(m.key, '|', 3) = p_level::text AND split_part(m.key, '|', 4) <> '')
+$$;
+
+-- B5 through a cover: the caller already completed a lower level of this pass (task_level_actors keeps only the current pass; a rejection clears it), and
+-- either acts now through a cover, or acted there through a cover (the acted_on_behalf decision of that level, written in the same transaction as the act).
+CREATE OR REPLACE FUNCTION rsn_cover_twice(p_task uuid, p_level integer, p_actor uuid) RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.task_level_actors a
+    WHERE a.task_id = p_task AND a.level < p_level AND a.user_id = p_actor AND a.how = 'acted'
+      AND (public.rsn_covering(p_task) IS NOT NULL
+           OR EXISTS (SELECT 1 FROM public.task_cover_decisions d
+                      WHERE d.task_id = p_task AND d.decided_by = p_actor AND d.decision = 'acted_on_behalf' AND d.level = a.level AND d.created_at >= a.acted_at)))
 $$;
 
 CREATE OR REPLACE FUNCTION rsn_absence_json(p_id uuid) RETURNS jsonb
@@ -178,16 +218,15 @@ $$;
 -- The leads of the person are told (inbox, kind absence_alert); when nobody leads the person, the System Admins are (B12b, as ss_notify_region_move).
 CREATE OR REPLACE FUNCTION rsn_notify_absence(p_absence uuid) RETURNS integer
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
-DECLARE ab public.absences%ROWTYPE; who text; regs integer[]; recipients uuid[]; u uuid; a uuid := public.app_actor();
+DECLARE ab public.absences%ROWTYPE; who text; recipients uuid[]; u uuid; a uuid := public.app_actor();
 BEGIN
   SELECT * INTO ab FROM public.absences WHERE id = p_absence;
   IF NOT FOUND THEN RETURN 0; END IF;
   SELECT x.display_name || coalesce(' (' || btrim(x.employee_id) || ')', '') INTO who FROM public.users x WHERE x.id = ab.user_id;
-  regs := public.rsn_user_regions(ab.user_id);
   SELECT coalesce(array_agg(l.id), ARRAY[]::uuid[]) INTO recipients FROM public.users l
   WHERE l.id <> ab.user_id AND l.id IS DISTINCT FROM a AND l.status = 'active' AND l.deleted_at IS NULL AND NOT l.is_break_glass
     AND NOT public.app_user_is_system_admin(l.id)
-    AND EXISTS (SELECT 1 FROM unnest(regs) r(id) WHERE public.rsn_is_lead(l.id, r.id));
+    AND public.rsn_leads_person(l.id, ab.user_id);
   IF cardinality(recipients) = 0 THEN
     SELECT coalesce(array_agg(DISTINCT gm.user_id), ARRAY[]::uuid[]) INTO recipients
     FROM public.group_members gm JOIN public.groups g ON g.id = gm.group_id AND g.is_system_admins AND g.is_active
@@ -217,7 +256,7 @@ DECLARE t public.task_instances%ROWTYPE; rl public."MatrixRule"; is_admin boolea
 BEGIN
   SELECT * INTO t FROM public.task_instances WHERE id = p_task;
   -- 0137 (B12b choice 3): the lead acts at the current level for its holder; only ops_act_on_behalf writes the marker, after checking the lead right
-  IF p_actor = public.app_actor() AND public.rsn_covering(p_task) IS NOT NULL THEN RETURN 'cover'; END IF;
+  IF p_actor = public.app_actor() AND public.rsn_covering_at(p_task, t.current_level) THEN RETURN 'cover'; END IF;
   rl := public.wf_rule(p_task, p_kind);
   is_admin := public.app_user_is_system_admin(p_actor);
   has_holder := public.wf_has_holder(p_task, p_kind);
@@ -281,18 +320,124 @@ BEGIN
   END IF;
 END $function$;
 
+-- wf_complete_hw (latest 0073)
+CREATE OR REPLACE FUNCTION public.wf_complete_hw(p_task uuid, p_version integer, p_action text, p_note text, p_stepup boolean, p_batch_row uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'pg_catalog', 'public', 'pg_temp'
+AS $function$
+DECLARE
+  actor uuid := public.app_actor(); t public.task_instances%ROWTYPE; n int; lvl int; k text; mode text;
+  ch record; before jsonb; step_ids uuid[] := ARRAY[]::uuid[]; sk int; self boolean; unlocked uuid[] := ARRAY[]::uuid[];
+  missing_f text[] := ARRAY[]::text[]; missing_s text[]; after_state public."TaskState"; v_left int; n_snags int; v_scope text; sid uuid; first boolean;
+  hw_batch uuid;   -- 0073: the batch whose mark covers this submit
+BEGIN
+  t := public.wf_lock_task(p_task, p_version);
+  IF (p_action = 'submit' AND t.state <> 'entry') OR (p_action = 'review' AND t.state <> 'in_review') OR (p_action = 'approve' AND t.state <> 'in_approval') THEN
+    PERFORM public.wf_err('invalid_transition', jsonb_build_object('detail', 'The task is ' || t.state::text || ': ' || p_action || ' is not possible now.'));
+  END IF;
+  before := public.wf_snap(p_task);
+  first := t.path_frozen_at IS NULL;
+  n := public.wf_task_levels(p_task);
+  lvl := t.current_level;
+  k := public.wf_kind(n, lvl);
+  IF p_action = 'review' AND k <> 'review' THEN PERFORM public.wf_err('invalid_transition', jsonb_build_object('detail', 'The task is at the approve level.')); END IF;
+  IF p_action = 'approve' AND k <> 'approve' THEN PERFORM public.wf_err('invalid_transition', jsonb_build_object('detail', 'The task is not at the approve level.')); END IF;
+  PERFORM public.wf_require_grant(t.region_id, CASE k WHEN 'entry' THEN 'edit' WHEN 'approve' THEN 'approve' ELSE 'view' END::public."PermissionAction");
+  mode := public.wf_require_actor(p_task, k, actor);
+
+  -- E6 / Q25: the four acceptances are blocked by the open snags of their own stream, whatever the action (submit, review, approve).
+  v_scope := public.wf_snag_scope_of(p_task);
+  IF v_scope IS NOT NULL THEN
+    n_snags := public.wf_open_snags_of(p_task);
+    IF n_snags > 0 THEN PERFORM public.wf_err('open_snags', jsonb_build_object('count', n_snags, 'scope', v_scope)); END IF;
+  END IF;
+
+  IF p_action = 'submit' THEN
+    IF t.actual_date IS NULL THEN missing_f := ARRAY['actual_date']; END IF;
+    IF cardinality(missing_f) > 0 THEN PERFORM public.wf_err('mandatory_fields_missing', jsonb_build_object('missing', to_jsonb(missing_f))); END IF;
+    missing_s := public.wf_missing_slots(p_task);
+    IF cardinality(missing_s) > 0 THEN
+      hw_batch := public.hw_row_waiver(p_task, p_batch_row);   -- 0073 (Q462): NULL unless the batch is marked, the waiver is open and the actual date is on or before the cutoff
+      IF hw_batch IS NULL THEN PERFORM public.wf_err('mandatory_slots_missing', jsonb_build_object('missing', to_jsonb(missing_s))); END IF;
+    END IF;
+    IF first THEN
+      UPDATE public.task_instances SET levels_required = n, path_frozen_at = now() WHERE id = p_task;   -- B7
+    END IF;
+  END IF;
+
+  -- all_members: record the vote; the level completes with the last vote
+  IF mode = 'vote' THEN
+    UPDATE public.task_level_voters SET voted_at = now() WHERE task_id = p_task AND level = lvl AND round = t.level_round AND user_id = actor;
+    SELECT count(*) INTO v_left FROM public.task_level_voters WHERE task_id = p_task AND level = lvl AND round = t.level_round AND voted_at IS NULL;
+    IF v_left > 0 THEN
+      sid := public.wf_step(p_task, lvl, p_action, actor, p_note, t.state, t.state, false, false);
+      UPDATE public.task_instances SET version = version + 1, updated_at = now() WHERE id = p_task;
+      PERFORM public.wf_audit('task_' || p_action || '_vote', p_task, before, public.wf_snap(p_task), p_note);
+      RETURN jsonb_build_object('step_ids', jsonb_build_array(sid), 'skipped_levels', '[]'::jsonb, 'unlocked_task_ids', '[]'::jsonb, 'votes_missing', v_left);
+    END IF;
+  END IF;
+
+  SELECT * INTO ch FROM public.wf_chain(p_task, lvl, actor);
+  IF ch.is_final THEN
+    IF k <> 'approve' THEN PERFORM public.wf_require_grant(t.region_id, 'approve'); END IF;
+    IF NOT coalesce(p_stepup, false) THEN PERFORM public.wf_err('step_up_required'); END IF;   -- B5 and the final approval
+  END IF;
+
+  self := ch.is_final AND (n = 1 OR n = ANY (ch.skipped) OR public.rsn_cover_twice(p_task, lvl, actor));   -- 0137: two levels by one person through a cover (B5)
+  after_state := CASE WHEN ch.is_final THEN 'approved'
+                      ELSE CASE public.wf_kind(n, ch.next_level) WHEN 'review' THEN 'in_review' WHEN 'approve' THEN 'in_approval' ELSE 'entry' END END;
+
+  sid := public.wf_step(p_task, lvl, p_action, actor, p_note, t.state, after_state, coalesce(p_stepup, false) AND ch.is_final, self);
+  step_ids := step_ids || sid;
+  INSERT INTO public.task_level_actors (task_id, level, user_id, how) VALUES (p_task, lvl, actor, 'acted')
+    ON CONFLICT (task_id, level) DO UPDATE SET user_id = EXCLUDED.user_id, how = 'acted', acted_at = now();
+  FOREACH sk IN ARRAY ch.skipped LOOP
+    sid := public.wf_step(p_task, sk, 'auto_skip', actor, 'level skipped: same holder', t.state, after_state, false, self);
+    step_ids := step_ids || sid;
+    INSERT INTO public.task_level_actors (task_id, level, user_id, how) VALUES (p_task, sk, actor, 'skipped')
+      ON CONFLICT (task_id, level) DO UPDATE SET user_id = EXCLUDED.user_id, how = 'skipped', acted_at = now();
+  END LOOP;
+
+  IF p_action = 'submit' THEN
+    UPDATE public.task_instances SET submitted_date = current_date WHERE id = p_task;
+    UPDATE public.document_slots SET status = 'in_review', reject_reason = NULL WHERE task_id = p_task AND status = 'uploaded';
+  END IF;
+
+  IF ch.is_final THEN
+    UPDATE public.task_instances SET state = 'approved', current_level = n, approved_date = current_date, ball_in_court_user_id = NULL,
+      level_opened_at = NULL, self_approval = self WHERE id = p_task;
+    UPDATE public.document_slots SET status = 'approved', reject_reason = NULL WHERE task_id = p_task AND status IN ('uploaded', 'in_review');
+    UPDATE public.document_files f SET approved_date = current_date FROM public.document_slots s
+      WHERE s.task_id = p_task AND f.slot_id = s.id AND f.is_current AND f.approved_date IS NULL;
+    unlocked := public.wf_unlock_successors(p_task);
+  ELSE
+    PERFORM public.wf_open_level(p_task, ch.next_level, NULL);
+  END IF;
+  UPDATE public.task_instances SET version = version + 1, updated_at = now() WHERE id = p_task;
+  IF hw_batch IS NOT NULL THEN PERFORM public.hw_flag_task(p_task, hw_batch, p_batch_row, missing_s); END IF;   -- 0073
+
+  PERFORM public.wf_audit('task_' || p_action, p_task, before,
+    public.wf_snap(p_task) || jsonb_build_object('skipped_levels', to_jsonb(ch.skipped), 'self_approval_flag', self), p_note);
+  FOREACH sk IN ARRAY ch.skipped LOOP
+    PERFORM public.wf_audit('task_auto_skip', p_task, jsonb_build_object('level', sk, 'holder', actor),
+      jsonb_build_object('level', sk, 'skipped', true, 'reason', 'same holder', 'self_approval', self), 'level skipped: same holder');
+  END LOOP;
+
+  RETURN jsonb_build_object('step_ids', to_jsonb(step_ids), 'skipped_levels', to_jsonb(ch.skipped), 'unlocked_task_ids', to_jsonb(unlocked));
+END $function$;
+
 -- ---------------------------------------------------------------------------------------------------------------------
 -- 4. Reads (doors of the API)
 -- ---------------------------------------------------------------------------------------------------------------------
 -- The absences the caller may read: their own, those of the people they lead, all for a System Admin.
 CREATE OR REPLACE FUNCTION rsn_visible_absences() RETURNS SETOF absences
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
-DECLARE a uuid := public.app_actor(); lr integer[];
+DECLARE a uuid := public.app_actor();
 BEGIN
   IF a IS NULL THEN RAISE EXCEPTION 'no signed-in actor' USING ERRCODE = 'insufficient_privilege'; END IF;
-  lr := public.rsn_lead_regions(a);
-  RETURN QUERY SELECT ab.* FROM public.absences ab
-    WHERE ab.user_id = a OR lr IS NULL OR (cardinality(lr) > 0 AND lr && public.rsn_user_regions(ab.user_id));
+  RETURN QUERY SELECT ab.* FROM public.absences ab WHERE ab.user_id = a OR public.rsn_leads_person(a, ab.user_id);
 END $$;
 
 -- The open tasks (visible to the caller) that are on each person.
@@ -358,13 +503,13 @@ BEGIN
   )
   SELECT h.id, h.c, h.uid, h.aid,
          public.cal_workdays_between(public.cal_local_date(public.task_last_activity(h.id)), d, h.calendar_id)
-  FROM held h WHERE NOT public.rsn_recently_decided(h.id, h.calendar_id, n)
+  FROM held h WHERE NOT public.rsn_recently_decided(h.id, h.calendar_id, n) AND public.rsn_leads_person(a, h.uid)
   UNION ALL
   SELECT x.id, 'idle'::text, x.uid, NULL::uuid, x.wd
   FROM (SELECT sc.id, public.rsn_task_on(sc.id) AS uid,
                public.cal_workdays_between(public.cal_local_date(public.task_last_activity(sc.id)), d, sc.calendar_id) AS wd
         FROM sc WHERE p_cause IS NULL OR p_cause = 'idle') x
-  WHERE x.wd >= n AND (p_user IS NULL OR x.uid = p_user);
+  WHERE x.wd >= n AND (p_user IS NULL OR x.uid = p_user) AND (x.uid IS NULL OR public.rsn_leads_person(a, x.uid));
 END $$;
 
 -- People who may receive the task(s): eligible holders of the level in the Matrix, region and module (wf_eligible), active, not absent today, not the
@@ -383,13 +528,17 @@ BEGIN
   IF p_task IS NOT NULL THEN
     SELECT * INTO t FROM public.task_instances WHERE id = p_task;
     IF NOT FOUND OR NOT public.app_region_check(t.region_id) OR (see IS NOT NULL AND NOT t.region_id = ANY (see)) THEN PERFORM public.wf_err('not_found'); END IF;
-    IF NOT public.rsn_is_lead(a, t.region_id) THEN
-      PERFORM public.wf_err('action_forbidden', jsonb_build_object('detail', 'You need the reassign grant for the region of this task.'));
+    IF NOT public.rsn_is_lead(a, t.region_id)
+       OR (public.rsn_task_on(p_task) IS NOT NULL AND NOT public.rsn_leads_person(a, public.rsn_task_on(p_task))) THEN
+      PERFORM public.wf_err('action_forbidden', jsonb_build_object('detail', 'You need the reassign grant for the region of this task and for every region of the person it is on.'));
     END IF;
     ids := ARRAY[p_task];
   ELSE
     IF p_from IS NULL THEN
       PERFORM public.wf_err('validation_failed', jsonb_build_object('errors', jsonb_build_array(jsonb_build_object('path', '/from_user_id', 'code', 'required', 'message', 'Pass task_id, or from_user_id (with site_id for one site).'))));
+    END IF;
+    IF NOT public.rsn_leads_person(a, p_from) THEN
+      PERFORM public.wf_err('action_forbidden', jsonb_build_object('detail', 'You lead this person only when every region of theirs is one of yours.'));
     END IF;
     st := public.rsn_candidate_stages(p_from);
     SELECT coalesce(array_agg(ti.id), ARRAY[]::uuid[]) INTO ids
@@ -543,11 +692,15 @@ BEGIN
   IF sc = 'task' THEN
     SELECT * INTO t FROM public.task_instances WHERE id = v_task;
     IF NOT FOUND OR NOT public.app_region_check(t.region_id) OR (see IS NOT NULL AND NOT t.region_id = ANY (see)) THEN PERFORM public.wf_err('not_found'); END IF;
-    IF NOT public.rsn_is_lead(a, t.region_id) THEN
-      PERFORM public.wf_err('action_forbidden', jsonb_build_object('detail', 'You need the reassign grant for the region of this task.'));
+    IF NOT public.rsn_is_lead(a, t.region_id)
+       OR (public.rsn_task_on(v_task) IS NOT NULL AND NOT public.rsn_leads_person(a, public.rsn_task_on(v_task))) THEN
+      PERFORM public.wf_err('action_forbidden', jsonb_build_object('detail', 'You need the reassign grant for the region of this task and for every region of the person it is on.'));
     END IF;
     ids := ARRAY[v_task];
   ELSE
+    IF NOT public.rsn_leads_person(a, v_from) THEN
+      PERFORM public.wf_err('action_forbidden', jsonb_build_object('detail', 'You lead this person only when every region of theirs is one of yours.'));
+    END IF;
     st := public.rsn_candidate_stages(v_from);
     SELECT coalesce(array_agg(ti.id ORDER BY ti.id), ARRAY[]::uuid[]) INTO ids
     FROM public.task_instances ti JOIN public.task_definitions td ON td.id = ti.task_def_id
@@ -620,7 +773,9 @@ END $$;
 CREATE OR REPLACE FUNCTION ops_act_on_behalf(p_task uuid, p_version integer, p_action text, p_level integer, p_reason text, p_note text, p_stepup boolean)
 RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
-DECLARE a uuid := public.app_actor(); t public.task_instances%ROWTYPE; k text; holder uuid; res jsonb; rs text := btrim(coalesce(p_reason, ''));
+DECLARE
+  a uuid := public.app_actor(); t public.task_instances%ROWTYPE; k text; holder uuid; res jsonb; rs text := btrim(coalesce(p_reason, '')); hs jsonb; cal uuid;
+  hu public.users%ROWTYPE;
 BEGIN
   IF a IS NULL THEN RAISE EXCEPTION 'no signed-in actor' USING ERRCODE = 'insufficient_privilege'; END IF;
   t := public.wf_lock_task(p_task, p_version);   -- 404 outside the caller's regions, 412 on a stale version
@@ -641,7 +796,25 @@ BEGIN
     PERFORM public.wf_err('invalid_transition', jsonb_build_object('detail', 'Every member votes on this level: reassign the vote instead of acting on it.'));
   END IF;
   holder := public.rsn_task_on(p_task);
-  PERFORM public.hgd_mark('rsn_cover', p_task::text || '|' || a::text || '|' || coalesce(holder::text, ''));
+  -- a level on nobody (shared, or no eligible holder) is not covered: that is the "no holder" path to the System Admins (B10)
+  IF holder IS NULL THEN
+    PERFORM public.wf_err('invalid_transition', jsonb_build_object('detail', 'This level has no single holder to act for; any eligible holder may take it, and a level with no holder goes to the System Admins.'));
+  END IF;
+  IF NOT public.rsn_leads_person(a, holder) THEN
+    PERFORM public.wf_err('action_forbidden', jsonb_build_object('detail', 'You lead the holder of this task only when every region of theirs is one of yours.'));
+  END IF;
+  IF holder = a THEN
+    PERFORM public.wf_err('invalid_transition', jsonb_build_object('detail', 'The task is with you: act on it directly.'));
+  END IF;
+  -- informational (B12b: the lead decides, no precondition): the holder's state at this moment
+  SELECT * INTO hu FROM public.users WHERE id = holder;
+  SELECT r.calendar_id INTO cal FROM public.sla_rules r WHERE r.id = t.sla_rule_id;
+  hs := jsonb_build_object('holder', holder, 'holder_absent', public.rsn_absence_on(holder, public.cal_today()) IS NOT NULL,
+          'holder_deactivated', hu.status IN ('suspended', 'disabled') OR hu.deleted_at IS NOT NULL,
+          'idle_working_days', public.cal_workdays_between(public.cal_local_date(public.task_last_activity(p_task)), public.cal_today(), cal),
+          'idle_limit', public.task_stale_idle_days());
+  -- the marker names the level: a cover granted at this level is never usable at another one
+  PERFORM public.hgd_mark('rsn_cover', p_task::text || '|' || a::text || '|' || t.current_level::text || '|' || holder::text);
   IF p_action = 'reject' THEN
     res := public.wf_reject(p_task, p_version, p_note, '[]'::jsonb);
   ELSE
@@ -649,8 +822,8 @@ BEGIN
   END IF;
   INSERT INTO public.task_cover_decisions (bulk_action_id, task_id, region_id, decision, level, from_user_id, action, decided_by, reason)
   VALUES (gen_random_uuid(), p_task, t.region_id, 'acted_on_behalf', t.current_level, holder, p_action, a, rs);
-  PERFORM public.wf_audit('task_act_on_behalf', p_task, jsonb_build_object('level', t.current_level, 'state', t.state, 'holder', holder),
-    public.wf_snap(p_task) || jsonb_build_object('action', p_action, 'step_ids', res -> 'step_ids', 'skipped_levels', res -> 'skipped_levels'), rs);
+  PERFORM public.wf_audit('task_act_on_behalf', p_task, jsonb_build_object('level', t.current_level, 'state', t.state) || hs,
+    public.wf_snap(p_task) || jsonb_build_object('action', p_action, 'step_ids', res -> 'step_ids', 'skipped_levels', res -> 'skipped_levels') || hs, rs);
   PERFORM public.hgd_unmark('rsn_cover');
   RETURN res;
 END $$;
@@ -666,9 +839,11 @@ BEGIN
   -- internal: never callable by pmis_app
   FOREACH f IN ARRAY ARRAY[
     'rsn_lead_regions(uuid)', 'rsn_is_lead(uuid,integer)', 'rsn_user_regions(uuid)', 'rsn_leads_person(uuid,uuid)', 'rsn_candidate_stages(uuid)',
-    'rsn_task_on(uuid)', 'rsn_absence_on(uuid,date)', 'rsn_recently_decided(uuid,uuid,integer)', 'rsn_covering(uuid)', 'rsn_absence_json(uuid)',
+    'rsn_task_on(uuid)', 'rsn_absence_on(uuid,date)', 'rsn_recently_decided(uuid,uuid,integer)', 'rsn_covering(uuid)', 'rsn_covering_at(uuid,integer)',
+    'rsn_cover_twice(uuid,integer,uuid)', 'rsn_absence_json(uuid)',
     'rsn_notify_absence(uuid)',
-    'wf_require_actor(uuid,text,uuid)', 'wf_step(uuid,integer,text,uuid,text,"TaskState","TaskState",boolean,boolean)', 'wf_audit(text,uuid,jsonb,jsonb,text)'
+    'wf_require_actor(uuid,text,uuid)', 'wf_step(uuid,integer,text,uuid,text,"TaskState","TaskState",boolean,boolean)', 'wf_audit(text,uuid,jsonb,jsonb,text)',
+    'wf_complete_hw(uuid,integer,text,text,boolean,uuid)'
   ] LOOP
     EXECUTE format('ALTER FUNCTION %s OWNER TO pmis_definer', f);
     EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC', f);

@@ -160,11 +160,11 @@ WITH f AS (
          has_function_privilege('public', p.oid, 'EXECUTE') AS pub, has_function_privilege('pmis_app', p.oid, 'EXECUTE') AS app
   FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
   WHERE n.nspname = 'public' AND (p.proname LIKE 'rsn\_%' OR p.proname IN ('ops_save_absence', 'ops_delete_absence', 'ops_reassign_tasks', 'ops_act_on_behalf',
-                                                                         'wf_require_actor', 'wf_step', 'wf_audit'))
+                                                                         'wf_require_actor', 'wf_step', 'wf_audit', 'wf_complete_hw'))
 ), doors AS (SELECT unnest(ARRAY['ops_save_absence', 'ops_delete_absence', 'ops_reassign_tasks', 'ops_act_on_behalf', 'rsn_visible_absences', 'rsn_alerts',
                                  'rsn_eligible_users', 'rsn_holder_absent', 'rsn_open_task_counts']) AS proname)
 SELECT CASE
-  WHEN (SELECT count(*) FROM f) <> 23 THEN 'functions: ' || (SELECT count(*) FROM f)::text
+  WHEN (SELECT count(*) FROM f) <> 26 THEN 'functions: ' || (SELECT count(*) FROM f)::text
   WHEN EXISTS (SELECT 1 FROM f WHERE NOT prosecdef) THEN 'not SECURITY DEFINER'
   WHEN EXISTS (SELECT 1 FROM f WHERE cfg NOT ILIKE '%search_path=pg_catalog, public, pg_temp%') THEN 'search_path'
   WHEN EXISTS (SELECT 1 FROM f WHERE owner <> 'pmis_definer') THEN 'owner'
@@ -177,4 +177,48 @@ SELECT CASE
     OR NOT (SELECT relrowsecurity AND relforcerowsecurity FROM pg_class WHERE oid = 'public.task_cover_decisions'::regclass) THEN 'row security'
   WHEN has_column_privilege('pmis_app', 'public.task_instances', 'ball_in_court_user_id', 'UPDATE') THEN 'pin writable'
   ELSE 'ok' END;
+-- @end
+
+-- @case CVR-12
+-- @title The System Admin acts on behalf at a level that is on nobody (no single holder): refused, that is the "no holder" path to the System Admins
+-- @category absences-reassignment
+-- @expect error P0001 wf:invalid_transition
+\ctx ADMIN stepup=300
+SELECT ops_act_on_behalf('{{TASK_TRI}}'::uuid, NULL, 'submit', 1, 'cover nobody', NULL, true);
+-- @end
+
+-- @case CVR-13
+-- @title Alice, lead of Tripoli through a delegation of the reassign right, records sick leave for the System Admin (an all-regions person)
+-- @category absences-reassignment
+-- @expect error P0001 action_forbidden
+\ctx ADMIN stepup=300
+SELECT idm_delegate('user', '{{ALICE}}'::uuid, NULL, NULL, false, '[{"module":"overrides.reassign","action":"administer"}]'::jsonb,
+  false, ARRAY[1], NULL, NULL, false, NULL, 'Tripoli lead for the case');
+SELECT ops_save_absence(NULL, NULL, jsonb_build_object('kind', 'annual', 'from_date', current_date + 200, 'to_date', current_date + 201));
+\ctx ALICE
+SELECT ops_save_absence(NULL, NULL, jsonb_build_object('user_id', '{{ADMIN}}', 'kind', 'sick', 'from_date', current_date + 300, 'to_date', current_date + 301));
+-- @end
+
+-- @case CVR-14
+-- @title Control: Alice, lead of Tripoli, does not see the System Admin's absence, and leads nobody outside Tripoli
+-- @category absences-reassignment
+-- @expect output 0
+\ctx ADMIN stepup=300
+SELECT idm_delegate('user', '{{ALICE}}'::uuid, NULL, NULL, false, '[{"module":"overrides.reassign","action":"administer"}]'::jsonb,
+  false, ARRAY[1], NULL, NULL, false, NULL, 'Tripoli lead for the case');
+SELECT ops_save_absence(NULL, NULL, jsonb_build_object('kind', 'annual', 'from_date', current_date + 200, 'to_date', current_date + 201));
+\ctx ALICE
+SELECT count(*) FROM rsn_visible_absences() WHERE user_id = '{{ADMIN}}'::uuid;
+-- @end
+
+-- @case CVR-15
+-- @title Control: the same delegation makes Alice a lead of Tripoli, so she may record her own sick leave (every region of hers is hers to lead)
+-- @category absences-reassignment
+-- @expect output ok
+\ctx ADMIN stepup=300
+SELECT idm_delegate('user', '{{ALICE}}'::uuid, NULL, NULL, false, '[{"module":"overrides.reassign","action":"administer"}]'::jsonb,
+  false, ARRAY[1], NULL, NULL, false, NULL, 'Tripoli lead for the case');
+\ctx ALICE
+SELECT CASE WHEN ops_save_absence(NULL, NULL, jsonb_build_object('kind', 'sick', 'from_date', current_date + 300, 'to_date', current_date + 301)) IS NOT NULL
+  THEN 'ok' ELSE 'no' END;
 -- @end
