@@ -46,4 +46,16 @@ describe('Edit (admin) on the site page', () => {
     await waitFor(() => expect(siteAdminEdits[0]!.reverted_at).not.toBeNull());
     await waitFor(() => expect(screen.queryByTestId('site-admin-badge')).toBeNull());
   });
+
+  it('lists a gate opened by the rule (contract 0.15.43) as made by GSDN Workspace, with no person, and offers its revert', async () => {
+    siteAdminEdits.push({ id: 'rule-g5', entity: 'site', site_id: SITE, task_id: null, kind: 'gate_moved_past_open', reason: 'owner decision 2026-11-22: the site moved past the gate',
+      before: { gate: 'G5', status: 'blocked' }, after: { gate: 'G5', status: 'open', evidence_task: 'D2', evidence_date: '2026-03-05' },
+      created_at: '2026-11-22T10:00:00Z', reverted_at: null, revertible: true });
+    await signIn('pm');
+    renderApp(<SiteAt />, { route: `/sites/${SITE}` });
+    const row = await screen.findByTestId('site-admin-edit-rule-g5');
+    expect(row).toHaveTextContent('GSDN Workspace (automatic rule)');
+    expect(await screen.findByTestId('site-admin-badge')).toBeInTheDocument();
+    expect(within(row).getByTestId('site-admin-revert-rule-g5')).toBeInTheDocument();
+  });
 });
