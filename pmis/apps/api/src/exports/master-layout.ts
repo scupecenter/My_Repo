@@ -64,7 +64,7 @@ export function columnPart(c: MasterColumn, milestoneLetters: Set<string>): Part
 export const BLANK_MASTER_OWNER = 'blank';
 
 /**
- * 0132 (contract 0.15.43): the active columns in Master order, with an empty placeholder for every order that has no active column up to the last one, so a
+ * 0133 (contract 0.15.43): the active columns in Master order, with an empty placeholder for every order that has no active column up to the last one, so a
  * column always sits at the position of its letter (A = 1) even after a column was deleted or deactivated.
  */
 export function padMasterColumns(cols: readonly MasterColumn[]): MasterColumn[] {

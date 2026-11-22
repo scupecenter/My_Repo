@@ -9,7 +9,7 @@ import { MasterExportService } from '../src/exports/master-export.service';
 import { Actor, actor, makeSite, makeTask, plainAdmin } from './wf-helpers';
 
 /**
- * Workflow Studio S2 (contract 0.15.43, migration 0132): the admin of the Site Master columns. Its own database (TEST_DATABASE_URL_SCOLS): the suite adds, retypes,
+ * Workflow Studio S2 (contract 0.15.43, migration 0133): the admin of the Site Master columns. Its own database (TEST_DATABASE_URL_SCOLS): the suite adds, retypes,
  * moves, deactivates and deletes Master columns. The tests build on one another, in order.
  */
 const REASON = 'Studio columns test';

@@ -396,7 +396,7 @@ const COLUMNS_SQL = Prisma.sql`
       ELSE 'not_tracked'
     END AS source_kind,
     mc.source_note, mc.display_order, mc.name_ar, mc.is_added,
-    -- 0132: the effective type and list (a column filled by a task input reads the input)
+    -- 0133: the effective type and list (a column filled by a task input reads the input)
     coalesce((SELECT tf.field_type FROM template_task_fields tf WHERE tf.is_active AND tf.master_col = mc.letter ORDER BY tf.task_code, tf.field_key LIMIT 1), mc.value_type, 'text') AS value_type,
     CASE WHEN EXISTS (SELECT 1 FROM template_task_fields tf WHERE tf.is_active AND tf.master_col = mc.letter)
          THEN (SELECT tf.list_catalogue FROM template_task_fields tf WHERE tf.is_active AND tf.master_col = mc.letter ORDER BY tf.task_code, tf.field_key LIMIT 1)

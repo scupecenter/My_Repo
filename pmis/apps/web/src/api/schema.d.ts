@@ -5487,7 +5487,7 @@ export interface paths {
         };
         /**
          * Every Site Master column with its display order, band, group, type, list, source, menus and protection (0.15.43, Workflow Studio S2)
-         * @description 0.15.43 (migration 0132). The Studio's view of the Master columns: the 187 original columns and the columns an admin added, in display order (`display_order`,
+         * @description 0.15.43 (migration 0133). The Studio's view of the Master columns: the 187 original columns and the columns an admin added, in display order (`display_order`,
          *     which is not the Master order `ord`: a new column can sit after any column). `bands` lists the distinct bands and groups in display order, to pick the place of
          *     a new column. Only a System Admin, or a delegate of `fields` edit for all regions (checked in the database with `app_actor_is_admin` and the region
          *     filter), reads it; anyone else gets 403 `action_forbidden`.
@@ -5499,7 +5499,7 @@ export interface paths {
         put?: never;
         /**
          * Add a Site Master column after any column (0.15.43, Workflow Studio S2)
-         * @description 0.15.43 (migration 0132). Adds a column after the column `after_ord`, inside a band (`group_top`) and a group (`group_mid`), with a type, an optional dropdown
+         * @description 0.15.43 (migration 0133). Adds a column after the column `after_ord`, inside a band (`group_top`) and a group (`group_mid`), with a type, an optional dropdown
          *     list and a source. The new column takes the next free Master order after the 187 and its letter (GF, GG, ...), so the Master-format export carries it after the
          *     187 under that letter; its place on the grid is `display_order` (right after `after_ord`).
          *     The source is one of: a task input (`kind` `task_input`, `task_code`, optional `field_key`: an existing input that no column uses is linked, a missing one
@@ -5542,7 +5542,7 @@ export interface paths {
         post?: never;
         /**
          * Delete an added Site Master column that never held a value (0.15.43, Workflow Studio S2)
-         * @description 0.15.43 (migration 0132). Only a column that an admin added and that never held a value (no site has a value in it, in the task input or the site field that fills
+         * @description 0.15.43 (migration 0133). Only a column that an admin added and that never held a value (no site has a value in it, in the task input or the site field that fills
          *     it) is deleted for good; the task input it created is deleted with it and an input it only linked is released (`master_col` null). The `reason` is a query
          *     parameter. An original column is never deleted (409 `system_field`); a column that holds values is 409 `column_in_use` (`why`: `has_values`, `count`): deactivate
          *     it with `POST .../deactivate`. The letter and the Master order are free again only when it was the last added column; otherwise the export keeps an empty column
@@ -5554,7 +5554,7 @@ export interface paths {
         head?: never;
         /**
          * Rename, retype, change the list, band, group or place of a Site Master column (0.15.43, Workflow Studio S2)
-         * @description 0.15.43 (migration 0132). Send the keys to change and a `reason`. Rename (`name_en`, `name_ar`; the header `Group / Name` follows), change the type (`value_type`)
+         * @description 0.15.43 (migration 0133). Send the keys to change and a `reason`. Rename (`name_en`, `name_ar`; the header `Group / Name` follows), change the type (`value_type`)
          *     and the dropdown list (`list_catalogue`, null clears it), move the column (`after_ord`, the same placement rules as the creation) and change its band and group.
          *     A protected column allows only the rename (its menus change with `PATCH /site360/columns/{ord}/sections`); any other key is 409 `system_field`. An original
          *     column keeps its letter, order, band, group and place: `group_top`, `group_mid` and `after_ord` on one are 409 `system_field`; its type and list can change
@@ -5610,7 +5610,7 @@ export interface paths {
         put?: never;
         /**
          * Deactivate a Site Master column (0.15.43, Workflow Studio S2)
-         * @description 0.15.43 (migration 0132). The column leaves every menu, the grid and the Master-format export (which keeps its position empty so the letters of the others stay true); its values, its source and its letter stay, so it can be
+         * @description 0.15.43 (migration 0133). The column leaves every menu, the grid and the Master-format export (which keeps its position empty so the letters of the others stay true); its values, its source and its letter stay, so it can be
          *     reactivated. A protected column cannot be deactivated (409 `system_field`); an inactive one is 409 `invalid_transition`. `If-Match` is required. System Admin,
          *     or a delegate of `fields` edit for all regions; a reason and a step-up; audited `site360.column_deactivated`.
          */
@@ -9068,7 +9068,7 @@ export interface components {
             site_field_code?: string;
             site_field_label?: string;
         };
-        /** @description 0.15.43 (migration 0132). A Site Master column as the Workflow Studio manages it. */
+        /** @description 0.15.43 (migration 0133). A Site Master column as the Workflow Studio manages it. */
         Site360ColumnAdmin: {
             /** @description The Master order (A = 1). The 187 original columns are 1 to 187; an added column takes the next free order, so its letter is GF, GG, ... and it is exported after the 187. */
             ord: number;

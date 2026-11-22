@@ -22,7 +22,7 @@ import {
   type Site360ColumnRow,
 } from '../src/site360/site360-sections';
 
-/** Workflow Studio S2 (contract 0.15.43, migration 0132): the pure parts, with no database. */
+/** Workflow Studio S2 (contract 0.15.43, migration 0133): the pure parts, with no database. */
 const REASON = 'Studio test change';
 const mc = (ord: number, over: Partial<MasterColumn> = {}): MasterColumn => ({
   ord,
@@ -282,7 +282,7 @@ describe('the database refusals of the doors', () => {
   });
 });
 
-describe('migration 0132 and its mirror', () => {
+describe('migration 0133 and its mirror', () => {
   const root = join(__dirname, '..', '..', '..');
   const mig = readFileSync(
     join(
@@ -290,16 +290,16 @@ describe('migration 0132 and its mirror', () => {
       '..',
       'prisma',
       'migrations',
-      '0132_site360_column_admin',
+      '0133_site360_column_admin',
       'migration.sql',
     ),
     'utf8',
   );
 
-  it('is byte-identical to db/sql/131_site360_column_admin.sql', () => {
+  it('is byte-identical to db/sql/132_site360_column_admin.sql', () => {
     expect(
       readFileSync(
-        join(root, 'db', 'sql', '131_site360_column_admin.sql'),
+        join(root, 'db', 'sql', '132_site360_column_admin.sql'),
         'utf8',
       ),
     ).toBe(mig);

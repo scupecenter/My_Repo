@@ -51,7 +51,7 @@ export interface Site360ColumnRow {
   source_kind?: Site360SourceKind;
   /** A short English note of the column's rule (0.15.35). */
   source_note?: string | null;
-  /** 0132 (0.15.43): the place on the grid (the columns of a menu are listed in this order); equals ord until a column is added after another. */
+  /** 0133 (0.15.43): the place on the grid (the columns of a menu are listed in this order); equals ord until a column is added after another. */
   display_order?: number;
   name_ar?: string | null;
   /** The effective value type (a task input column reads its input) and its dropdown list. */

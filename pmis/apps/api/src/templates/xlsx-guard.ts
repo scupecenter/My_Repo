@@ -23,7 +23,12 @@ interface Entry {
 }
 
 const MAX_ENTRIES = 500;
+/** The default budget of the unzipped workbook; PMIS_IMPORT_MAX_UNCOMPRESSED_BYTES (set by the installer from the server's env file) can raise it. */
 export const MAX_UNCOMPRESSED_BYTES = 40 * 1024 * 1024;
+export const maxUncompressedBytes = (): number => {
+  const v = Number(process.env.PMIS_IMPORT_MAX_UNCOMPRESSED_BYTES);
+  return Number.isFinite(v) && v > 0 ? Math.floor(v) : MAX_UNCOMPRESSED_BYTES;
+};
 const MAX_RATIO = 200;
 
 function readDirectory(buf: Buffer): Entry[] | null {
@@ -100,13 +105,14 @@ export function guardXlsx(fileName: string, buf: Buffer): GuardResult {
   const entries = readDirectory(buf);
   if (!entries) return { ok: false, reason: 'not_xlsx', detail: 'The file is not a valid .xlsx workbook.' };
   let total = 0;
+  const budget = maxUncompressedBytes();
   for (const e of entries) {
     total += e.size;
-    if (total > MAX_UNCOMPRESSED_BYTES || (e.size > 1024 * 1024 && e.compressed > 0 && e.size / e.compressed > MAX_RATIO)) {
+    if (total > budget || (e.size > 1024 * 1024 && e.compressed > 0 && e.size / e.compressed > MAX_RATIO)) {
       return { ok: false, reason: 'size_or_rows_exceeded', detail: 'The workbook expands to an unreasonable size.' };
     }
     // The declared sizes can lie: inflate the entry for real, never past what is left of the budget, and refuse a mismatch.
-    const real = realSize(buf, e, MAX_UNCOMPRESSED_BYTES - (total - e.size));
+    const real = realSize(buf, e, budget - (total - e.size));
     if (real === 'too_big') return { ok: false, reason: 'size_or_rows_exceeded', detail: 'The workbook expands to an unreasonable size.' };
     if (real !== e.size) return { ok: false, reason: 'not_xlsx', detail: 'The file is not a valid .xlsx workbook.' };
     if (FORBIDDEN_PARTS.some((re) => re.test(e.name))) {

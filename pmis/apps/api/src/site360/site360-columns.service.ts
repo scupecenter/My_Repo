@@ -28,7 +28,7 @@ export interface Site360ColumnListDto {
 }
 
 /**
- * Workflow Studio S2 (contract 0.15.43, migration 0132): the admin of the Site Master columns. Every rule (who may, the protected columns, the placement,
+ * Workflow Studio S2 (contract 0.15.43, migration 0133): the admin of the Site Master columns. Every rule (who may, the protected columns, the placement,
  * the type conversion, the ETag, the audit) is in the SECURITY DEFINER doors site360_column_*; this service checks the permission before the step-up (a plain
  * user gets 403, not 401), parses the request, adds the step-up and translates the database refusals.
  */

@@ -1,5 +1,5 @@
--- 0132_site360_column_admin: Workflow Studio S2, the API to manage the Site Master columns (owner request 2026-11-22; plan docs/plans/2026-11-22-workflow-studio.md;
--- CHANGELOG 175; contract 0.15.43). Mirror: db/sql/131_site360_column_admin.sql (kept byte-identical).
+-- 0133_site360_column_admin: Workflow Studio S2, the API to manage the Site Master columns (owner request 2026-11-22; plan docs/plans/2026-11-22-workflow-studio.md;
+-- CHANGELOG 177; contract 0.15.43). Mirror: db/sql/132_site360_column_admin.sql (kept byte-identical).
 --
 -- WHAT THIS ADDS.
 --   1. master_columns learns what an added column needs:
@@ -15,7 +15,7 @@
 --                              source of each original column).
 --        version               the ETag of the column (If-Match).
 --      owner gains the value `added` (an added column filled by a site field; a task-input column has the owner `task`).
---   2. site360_master_values (latest 0121, redefined in full; the only change is marked 0132): a site custom field named by master_columns.source_field_id
+--   2. site360_master_values (latest 0121, redefined in full; the only change is marked 0133): a site custom field named by master_columns.source_field_id
 --      fills the added column. A task input column needs no change: the existing task branch reads template_task_fields.master_col, which the creation sets.
 --   3. The doors (SECURITY DEFINER, owner pmis_definer; System Admin or a delegate of `fields` edit for ALL regions; a reason; the ETag; audited with before and after):
 --        site360_columns_list / site360_column_get          the screen
@@ -65,15 +65,15 @@ ALTER TABLE master_columns DROP CONSTRAINT IF EXISTS master_columns_protected_ch
 ALTER TABLE master_columns ADD CONSTRAINT master_columns_protected_chk CHECK (NOT is_protected OR protected_reason IS NOT NULL);
 CREATE UNIQUE INDEX IF NOT EXISTS master_columns_source_field_idx ON master_columns (source_field_id) WHERE source_field_id IS NOT NULL;
 
-COMMENT ON COLUMN master_columns.display_order IS '0132: the place on the grid and in the menus (unique, deferred). ord and letter stay the Master order of the export; an added column takes the next free ord after the 187.';
-COMMENT ON COLUMN master_columns.name_ar IS '0132: the Arabic name of the column.';
-COMMENT ON COLUMN master_columns.value_type IS '0132: text, number, date, list or yes_no. A column filled by a task input reads the input (template_task_fields.field_type) instead.';
-COMMENT ON COLUMN master_columns.list_catalogue IS '0132: the dropdown list of a list column (list_catalogues.code).';
-COMMENT ON COLUMN master_columns.source_field_id IS '0132: the site custom field (field_definitions) that fills an added column.';
-COMMENT ON COLUMN master_columns.source_input_created IS '0132: the column created its task input row (template_task_fields); deleting the column deletes the input.';
-COMMENT ON COLUMN master_columns.is_added IS '0132: an admin added the column (ord 188 and up); the 187 original columns keep their letters and orders.';
-COMMENT ON COLUMN master_columns.is_protected IS '0132: the system depends on the column; only a rename and its menus can change.';
-COMMENT ON COLUMN master_columns.version IS '0132: the ETag of the column (If-Match); every write bumps it.';
+COMMENT ON COLUMN master_columns.display_order IS '0133: the place on the grid and in the menus (unique, deferred). ord and letter stay the Master order of the export; an added column takes the next free ord after the 187.';
+COMMENT ON COLUMN master_columns.name_ar IS '0133: the Arabic name of the column.';
+COMMENT ON COLUMN master_columns.value_type IS '0133: text, number, date, list or yes_no. A column filled by a task input reads the input (template_task_fields.field_type) instead.';
+COMMENT ON COLUMN master_columns.list_catalogue IS '0133: the dropdown list of a list column (list_catalogues.code).';
+COMMENT ON COLUMN master_columns.source_field_id IS '0133: the site custom field (field_definitions) that fills an added column.';
+COMMENT ON COLUMN master_columns.source_input_created IS '0133: the column created its task input row (template_task_fields); deleting the column deletes the input.';
+COMMENT ON COLUMN master_columns.is_added IS '0133: an admin added the column (ord 188 and up); the 187 original columns keep their letters and orders.';
+COMMENT ON COLUMN master_columns.is_protected IS '0133: the system depends on the column; only a rename and its menus can change.';
+COMMENT ON COLUMN master_columns.version IS '0133: the ETag of the column (If-Match); every write bumps it.';
 
 -- The protected originals: the row number and Site ID, the identity and scope columns, baselines, calculated columns, milestone and gate dates, the columns a register
 -- fills, the fields of the site record and the status columns. What stays open: the task input columns and the columns with no source yet.
@@ -104,7 +104,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON template_task_fields TO pmis_definer;
 GRANT SELECT ON field_definitions, task_field_sources, task_definitions, task_instances, sites, external_parties, list_catalogues, list_values TO pmis_definer;
 
 -- ---------------------------------------------------------------------------------------------------------------------
--- 3. The view (latest 0121, redefined in full; the change of 0132 is the last branch)
+-- 3. The view (latest 0121, redefined in full; the change of 0133 is the last branch)
 -- ---------------------------------------------------------------------------------------------------------------------
 CREATE OR REPLACE VIEW site360_master_values WITH (security_invoker = true) AS
 SELECT x.site_id, x.ord, x.value, 'site'::text AS kind, NULL::text AS register_key,
@@ -485,7 +485,7 @@ CROSS JOIN sites s
 WHERE fd.entity_type = 'site' AND fd.is_active AND s.is_active
   AND nullif(btrim(s.custom ->> fd.code), '') IS NOT NULL
 UNION ALL
--- 0132: a site custom field chosen as the source of an added column (master_columns.source_field_id) fills it
+-- 0133: a site custom field chosen as the source of an added column (master_columns.source_field_id) fills it
 SELECT s.id, mc.ord, s.custom ->> fd.code, 'custom_field'::text, NULL::text,
   'custom_field'::text, 'custom_field'::text, fd.id, fd.code
 FROM master_columns mc
@@ -495,7 +495,7 @@ WHERE fd.entity_type = 'site' AND fd.is_active AND s.is_active
   AND nullif(btrim(s.custom ->> fd.code), '') IS NOT NULL
 ;
 
-COMMENT ON VIEW site360_master_values IS 'The Master values of each site and column with the source of each value (0104, F15, extended 0106 to 0112, 0119, 0121, 0132): the set-based read model of the SITE 360 grid rows and of the per-site sources. 0132: a site custom field fills an added column.';
+COMMENT ON VIEW site360_master_values IS 'The Master values of each site and column with the source of each value (0104, F15, extended 0106 to 0112, 0119, 0121, 0133): the set-based read model of the SITE 360 grid rows and of the per-site sources. 0133: a site custom field fills an added column.';
 
 -- ---------------------------------------------------------------------------------------------------------------------
 -- 4. Small pure helpers
