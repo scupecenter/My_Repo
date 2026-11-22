@@ -264,6 +264,14 @@ describe('legacy Master import: refusals', () => {
     const none = await uploadMaster(admin.api, await masterFile([], { noMaster: true }));
     expect(none.body).toMatchObject({ code: 'template_rejected', reason: 'not_a_master' });
     expect((await logRows('not_a_master'))[0]!.user_id).toBe(admin.user.id);
+    // 0132: a Master with renamed headers names what it did not find and what it does not know
+    const letters = ['C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V'];
+    const renamed = await uploadMaster(admin.api, await masterFile([{ A: 1, B: 'X-1' }], { rename: Object.fromEntries(letters.map((l) => [l, `Renamed ${l}`])) }));
+    expect(renamed.body).toMatchObject({ code: 'template_rejected', reason: 'not_a_master' });
+    expect(renamed.body.detail).toMatch(/only 167 of the 187 Master column headers were found/);
+    expect(renamed.body.detail).toContain('Not found (20): C "Identification / Site Owner ID"');
+    expect(renamed.body.detail).toContain('Renamed C');
+    expect(renamed.body.detail).toMatch(/Headers in the file that are not known \(\d+\)/);
     const tpl = await uploadMaster(admin.api, await masterFile([{ A: 1, B: 'X-1' }], { tpl: true }));
     expect(tpl.body).toMatchObject({ code: 'template_rejected', reason: 'is_pmis_template' });
     // a typed column whose header was removed: the structure check refuses it
