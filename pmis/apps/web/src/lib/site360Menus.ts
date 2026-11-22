@@ -16,5 +16,8 @@ export const SITE360_NAV: { key: string; en: string; ar: string }[] = [
 /** The section key of the Master menu. It is the parent entry "Site Master" (the default view of /sites), not one of the sub-menus. */
 export const SITE360_MASTER = 'master';
 
-/** The seven sub-menus shown under the Site Master entry, in menu order (owner request 2026-11-22). */
-export const SITE360_SUBMENUS = SITE360_NAV.filter((m) => m.key !== SITE360_MASTER);
+/**
+ * The six sub-menus shown under the Site Master entry, in menu order (owner request 2026-11-22): Design & Acquisition, SOW, CW, TE, HOTO and O&M.
+ * Dismantle is not one of them: it lives only under "Registers & Logs" (`/registers/dismantle`).
+ */
+export const SITE360_SUBMENUS = SITE360_NAV.filter((m) => m.key !== SITE360_MASTER && m.key !== 'dismantle');

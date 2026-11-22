@@ -118,6 +118,51 @@ describe('the side menu with a shared layout', () => {
     expect(screen.queryByTestId('nav-group-registers')).not.toBeInTheDocument();
   });
 
+  it('moves dismantle out of the heading that holds sites to the end of Registers & Logs, and touches nothing else (owner request 2026-11-22)', () => {
+    const d = defaultLayout();
+    const saved = {
+      headings: d.headings.map((h) => (h.id === 'site_register' ? { ...h, name_en: 'SITE 360', children: ['sites', 'dismantle'] } : h.id === 'registers' ? { ...h, children: h.children.filter((k) => k !== 'dismantle').reverse() } : h)),
+    };
+    const r = resolveLayout(saved);
+    expect(r.headings.find((h) => h.id === 'site_register')).toMatchObject({ name_en: 'SITE 360', children: ['sites'] });
+    const regs = r.headings.find((h) => h.id === 'registers')!;
+    expect(regs.children.at(-1)).toBe('dismantle');
+    expect(regs.children.filter((k) => k === 'dismantle')).toHaveLength(1);
+    expect(regs.children.slice(0, -1)).toEqual(saved.headings.find((h) => h.id === 'registers')!.children); // the other keys keep their saved order
+    expect(r.headings.map((h) => h.id)).toEqual(d.headings.map((h) => h.id));
+  });
+
+  it('moves dismantle out of a sub-heading of the sites heading, and falls back to the heading of procurement, then to Other', () => {
+    const sub = { id: 'sub', name_en: 'Sub', name_ar: 'فرعي', icon: null, children: ['dismantle'] };
+    const r1 = resolveLayout({ headings: [
+      { id: 'one', name_en: 'One', name_ar: 'واحد', icon: null, children: ['sites', sub] },
+      { id: 'procs', name_en: 'Procs', name_ar: 'مشتريات', icon: null, children: ['procurement'] },
+    ] });
+    expect(r1.headings[0]!.children).toEqual(['sites', { ...sub, children: [] }]);
+    expect(r1.headings[1]!.children.slice(0, 2)).toEqual(['procurement', 'dismantle']);
+    const r2 = resolveLayout({ headings: [{ id: 'one', name_en: 'One', name_ar: 'واحد', icon: null, children: ['sites', 'dismantle'] }] });
+    expect(r2.headings[0]!.children).toEqual(['sites']);
+    expect(r2.headings.find((h) => h.id === OTHER_ID)!.children).toContain('dismantle');
+    // dismantle in a heading without sites is left where it is
+    const r3 = resolveLayout({ headings: [{ id: 'x', name_en: 'X', name_ar: 'س', icon: null, children: ['dismantle'] }, { id: 'y', name_en: 'Y', name_ar: 'ص', icon: null, children: ['sites'] }] });
+    expect(r3.headings[0]!.children).toEqual(['dismantle']);
+  });
+
+  it('a saved SITE 360 heading holding sites and dismantle renders as the one Site Master row, with six sub-menus and Dismantle under Registers & Logs', async () => {
+    const d = defaultLayout();
+    store({ headings: d.headings.map((h) => (h.id === 'site_register' ? { ...h, name_en: 'SITE 360', name_ar: 'سايت 360', children: ['sites', 'dismantle'] } : h.id === 'registers' ? { ...h, children: h.children.filter((k) => k !== 'dismantle') } : h)) });
+    await signIn('pm');
+    app();
+    await screen.findByTestId('nav-sites');
+    expect(screen.queryByTestId('nav-group-toggle-site_register')).not.toBeInTheDocument();
+    expect(screen.queryByText('SITE 360')).not.toBeInTheDocument();
+    expect(screen.getByTestId('nav-sites')).toHaveTextContent(/^Site Master$/);
+    expect(screen.getByTestId('nav-site360-menus').querySelectorAll('a')).toHaveLength(6);
+    expect(screen.queryByTestId('nav-site360-dismantle')).not.toBeInTheDocument();
+    expect(screen.getByTestId('nav-group-registers')).toContainElement(screen.getByTestId('nav-dismantle'));
+    expect(screen.getByTestId('nav-group-site_register')).not.toContainElement(screen.getByTestId('nav-dismantle'));
+  });
+
   it('applies the permission filter after the layout: hidden screens stay hidden and a heading with no open screen is hidden', async () => {
     store({ headings: [
       { id: 'mix', name_en: 'Mixed', name_ar: 'مختلط', icon: 'site', children: ['warehouse', 'sites'] },

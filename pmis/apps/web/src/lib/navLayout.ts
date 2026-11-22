@@ -77,7 +77,28 @@ export function resolveLayout(saved: unknown, nav: readonly NavItem[] = NAV_SIDE
     const target = findHeading({ headings: out }, n.group) ?? findHeading({ headings: out }, OTHER_ID) ?? (out.push(otherHeading()), out[out.length - 1]!);
     target.children.push(n.key);
   }
+  moveDismantle(out);
   return { headings: out };
+}
+
+/**
+ * Dismantle lives only under "Registers & Logs" (owner request 2026-11-22). A layout saved before that has it in the heading of the Site Register (the one that holds
+ * 'sites'): the key moves to the end of the registers heading (id 'registers', else the heading that holds 'procurement', else "Other"). Nothing else is touched.
+ */
+function moveDismantle(out: NavHead[]) {
+  const holds = (c: string | NavSub, k: string) => (isSub(c) ? c.children.includes(k) : c === k);
+  const withSites = out.find((h) => h.children.some((c) => holds(c, 'sites')));
+  if (!withSites) return;
+  const lists: string[][] = [withSites.children.filter((c): c is string => !isSub(c)), ...withSites.children.filter(isSub).map((s) => s.children)];
+  const src = lists.find((l) => l.includes('dismantle'));
+  if (!src) return;
+  const target = out.find((h) => h.id === 'registers') ?? out.find((h) => h.children.some((c) => holds(c, 'procurement'))) ?? out.find((h) => h.id === OTHER_ID) ?? (out.push(otherHeading()), out[out.length - 1]!);
+  if (target === withSites) return; // the registers heading also holds the sites (a hand-made layout): nothing to move
+  const inTarget = target.children.some((c) => holds(c, 'dismantle'));
+  const i = withSites.children.indexOf('dismantle');
+  if (i >= 0) withSites.children.splice(i, 1);
+  else for (const c of withSites.children) if (isSub(c) && c.children.includes('dismantle')) c.children = c.children.filter((k) => k !== 'dismantle');
+  if (!inTarget) target.children.push('dismantle');
 }
 
 export const otherHeading = (): NavHead => ({ id: OTHER_ID, name_en: en.navEdit.other, name_ar: ar.navEdit.other, icon: null, children: [] });

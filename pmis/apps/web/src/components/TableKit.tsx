@@ -299,9 +299,12 @@ export function HeaderRow({
   select,
   testid,
   colMenu,
+  hint,
 }: {
   api: TableApi;
   label: (id: string) => string;
+  /** A tooltip for a column header (for example the group of a Master column). */
+  hint?: (id: string) => string | undefined;
   select?: SelectProps;
   testid?: string;
   /** Items of the menu in a column header (add before or after, rename, hide); a column with no items has no menu. */
@@ -352,7 +355,7 @@ export function HeaderRow({
             role="columnheader"
             data-col={c.id}
             draggable={!c.pinned}
-            title={undefined}
+            title={hint?.(c.id)}
             onDragStart={(e) => {
               setDrag(c.id);
               e.dataTransfer.setData("text/plain", c.id);

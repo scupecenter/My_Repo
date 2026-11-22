@@ -67,7 +67,7 @@ describe('SITE 360: the column, the filter and the bulk action', () => {
   it('shows the Workflow locks column, filters on Open, and opens the locks of the selected sites with one reason', async () => {
     await signIn('pm');
     const u = userEvent.setup();
-    renderApp(<Routed />, { route: '/sites' });
+    renderApp(<Routed />, { route: '/sites?layout=list' });
     const a = siteMeta(0).code, b = siteMeta(1).code;
     expect(await screen.findByTestId(`site-locks-${a}`)).toHaveTextContent('Locked');
     await u.click(screen.getByTestId(`site-select-${a}`));
@@ -91,7 +91,7 @@ describe('SITE 360: the column, the filter and the bulk action', () => {
   it('keeps the sites with data gaps with the quick filter, and hides the bulk switch from someone without the right', async () => {
     await signIn('engineer');
     const u = userEvent.setup();
-    renderApp(<Routed />, { route: '/sites' });
+    renderApp(<Routed />, { route: '/sites?layout=list' });
     await screen.findByTestId(`site-row-${siteMeta(0).code}`);
     await u.click(screen.getByTestId('sites-quick-gaps'));
     await waitFor(() => expect(screen.getByTestId(`site-gaps-${siteMeta(3).code}`)).toHaveTextContent('2'));
