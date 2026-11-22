@@ -1,8 +1,8 @@
--- 0135_moved_past_site_rfi: on ANY site, a manual milestone (Site RFI, MS4: calc.milestone_manual) the site has moved past is approved directly with its
+-- 0136_moved_past_site_rfi: on ANY site, a manual milestone (Site RFI, MS4: calc.milestone_manual) the site has moved past is approved directly with its
 -- pre-filled date (the rule of 0129, which held only at the end of a completed historical load approved directly), as an admin override made by a rule of
 -- GSDN Workspace; it runs from now on in the calculation path before the gate and D8 rules of 0134, and once on the existing sites. The ongoing hook of 0134
 -- now stands aside only while a Master import apply is actually running (owner decision 2026-11-22; CHANGELOG 179; contract 0.15.47).
--- Mirror: db/sql/134_moved_past_site_rfi.sql (kept byte-identical).
+-- Mirror: db/sql/135_moved_past_site_rfi.sql (kept byte-identical).
 --
 -- WHY (production, read-only diagnosis 2026-11-22, counts only): the backfill of 0134 opened 0 gates. On the 58 sites whose TE Completion (MS5) is locked
 -- gate_closed:G5, gate_eval(site, 'G5') answers pending with the reason predecessor_not_approved: Site RFI (MS4, a manual milestone) is not approved,
@@ -57,7 +57,7 @@
 --
 -- ACTOR. admin_overrides.acted_by may be NULL, and reverted_by NULL on an automatic closing, for the rule kinds only (CHECK of 0134, extended to the new kind).
 --
--- Redefined from their latest definitions (bodies unchanged except where marked "0135"): gmp_site_deferred (0134), gmp_apply_site (0134), hgd_settle_site
+-- Redefined from their latest definitions (bodies unchanged except where marked "0136"): gmp_site_deferred (0134), gmp_apply_site (0134), hgd_settle_site
 -- (0134), ao_current_matches (0134), admin_override_revert (0134). CREATE OR REPLACE keeps their owner and grants (admin_override_revert stays the API door;
 -- the others stay internal).
 --
@@ -75,7 +75,7 @@ ALTER TABLE admin_overrides ADD CONSTRAINT admin_overrides_rule_actor_check
 ALTER TABLE admin_overrides DROP CONSTRAINT admin_overrides_revert_check;
 ALTER TABLE admin_overrides ADD CONSTRAINT admin_overrides_revert_check CHECK ((reverted_at IS NULL) = (reverted_by IS NULL)
   OR (reverted_at IS NOT NULL AND reverted_by IS NULL AND kind IN ('gate_moved_past_open', 'no_microwave_na', 'manual_ms_moved_past')));
-COMMENT ON COLUMN admin_overrides.acted_by IS '0134 / 0135: NULL only for an override made by a rule of GSDN Workspace (kinds gate_moved_past_open, no_microwave_na and manual_ms_moved_past, owner decisions 2026-11-22)';
+COMMENT ON COLUMN admin_overrides.acted_by IS '0134 / 0136: NULL only for an override made by a rule of GSDN Workspace (kinds gate_moved_past_open, no_microwave_na and manual_ms_moved_past, owner decisions 2026-11-22)';
 
 -- ---------------------------------------------------------------------------------------------------------------------
 -- 2. The flags of the manual milestone approved because the site moved past it, and their guard
@@ -87,8 +87,8 @@ ALTER TABLE task_instances
   ADD CONSTRAINT task_instances_mmp_check CHECK (NOT manual_ms_moved_past OR (state = 'approved' AND manual_ms_moved_past_at IS NOT NULL)),
   ADD CONSTRAINT task_instances_mmp_inferred_check CHECK (NOT manual_ms_moved_past_inferred OR manual_ms_moved_past);
 CREATE INDEX task_instances_mmp_idx ON task_instances (site_id) WHERE manual_ms_moved_past;
-COMMENT ON COLUMN task_instances.manual_ms_moved_past IS '0135: a manual milestone (Site RFI) the site moved past, approved directly with its pre-filled date by a rule of GSDN Workspace on any site (owner decision 2026-11-22; admin override, reversible through POST /overrides/{id}/revert)';
-COMMENT ON COLUMN task_instances.manual_ms_moved_past_inferred IS '0135: the milestone had no pre-filled date: the date is the one of the earliest later task approved (inferred date)';
+COMMENT ON COLUMN task_instances.manual_ms_moved_past IS '0136: a manual milestone (Site RFI) the site moved past, approved directly with its pre-filled date by a rule of GSDN Workspace on any site (owner decision 2026-11-22; admin override, reversible through POST /overrides/{id}/revert)';
+COMMENT ON COLUMN task_instances.manual_ms_moved_past_inferred IS '0136: the milestone had no pre-filled date: the date is the one of the earliest later task approved (inferred date)';
 
 DO $$
 BEGIN
@@ -107,7 +107,7 @@ LANGUAGE plpgsql SET search_path = pg_catalog, public, pg_temp AS $$
 BEGIN
   IF TG_OP = 'INSERT' THEN
     IF public.app_is_seeding() THEN RETURN NEW; END IF;
-    RAISE EXCEPTION 'moved past: the direct approval of a manual milestone is written only by GSDN Workspace (migration 0135)' USING ERRCODE = 'insufficient_privilege';
+    RAISE EXCEPTION 'moved past: the direct approval of a manual milestone is written only by GSDN Workspace (migration 0136)' USING ERRCODE = 'insufficient_privilege';
   END IF;
   IF OLD.manual_ms_moved_past AND (NEW.state IS DISTINCT FROM 'approved' OR NEW.actual_date IS DISTINCT FROM OLD.actual_date) THEN
     NEW.manual_ms_moved_past := false;
@@ -133,7 +133,7 @@ BEGIN
      AND NEW.manual_ms_moved_past AND NOT OLD.manual_ms_moved_past AND NEW.state = 'approved' AND OLD.state IN ('locked', 'open', 'entry') THEN
     RETURN NEW;
   END IF;
-  RAISE EXCEPTION 'moved past: the direct approval of a manual milestone is written only by GSDN Workspace (migration 0135)' USING ERRCODE = 'insufficient_privilege';
+  RAISE EXCEPTION 'moved past: the direct approval of a manual milestone is written only by GSDN Workspace (migration 0136)' USING ERRCODE = 'insufficient_privilege';
 END $$;
 
 CREATE TRIGGER mmp_guard_task_ins BEFORE INSERT ON task_instances FOR EACH ROW
@@ -211,7 +211,7 @@ BEGIN
             left(CASE WHEN inf THEN why || ': no pre-filled date (every predecessor approved or N/A, none dated); the date of the earliest later task approved, '
                       ELSE whym || ': the earliest later task approved is ' END
                  || e.code || ' on ' || e.actual_date::text || ' (admin override by the rule of 2026-11-22)'
-                 || CASE WHEN p_backfill THEN ', migration 0135' ELSE '' END, 2000),
+                 || CASE WHEN p_backfill THEN ', migration 0136' ELSE '' END, 2000),
             true, rs, false, cur.state, 'approved', clock_timestamp());
     INSERT INTO public.audit_log (action, entity_type, entity_id, site_id, region_id, before, after, reason, actor_id, is_admin_override)
     VALUES ('task_manual_ms_moved_past', 'task', m.id::text, p_site, cur.region_id,
@@ -281,11 +281,11 @@ BEGIN
 END $$;
 
 -- ---------------------------------------------------------------------------------------------------------------------
--- 6. The hook stands aside only while a Master import apply is running (gmp_site_deferred: latest 0134, changed 0135)
+-- 6. The hook stands aside only while a Master import apply is running (gmp_site_deferred: latest 0134, changed 0136)
 -- ---------------------------------------------------------------------------------------------------------------------
 -- The historical rules (0126 / 0127 / 0129) are working on the site in this transaction (the definer-only marker hist_quiet of the site, or hist_load of a
 -- historical Master load written by swl_open_for_load), or a Master import apply runs in the background (an mi_apply_jobs row in state running, 0086).
--- 0135: a historical batch approved directly that is not closed no longer defers the hook (staged batches that never finish deferred it for good).
+-- 0136: a historical batch approved directly that is not closed no longer defers the hook (staged batches that never finish deferred it for good).
 CREATE OR REPLACE FUNCTION gmp_site_deferred(p_site uuid) RETURNS boolean
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
   SELECT (CASE WHEN current_user::text = 'pmis_definer' THEN public.hgd_marked('hist_quiet', p_site::text) OR public.hgd_marked('hist_load', '1') ELSE false END)
@@ -293,17 +293,17 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, pg_te
 $$;
 
 -- ---------------------------------------------------------------------------------------------------------------------
--- 7. The hook of the calculation path (gmp_apply_site: latest 0134, changes marked 0135). Returns the number of changes.
+-- 7. The hook of the calculation path (gmp_apply_site: latest 0134, changes marked 0136). Returns the number of changes.
 -- ---------------------------------------------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION gmp_apply_site(p_site uuid) RETURNS integer
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
 DECLARE n integer := 0; r jsonb;
 BEGIN
-  -- cheap first: nothing held by a gate, no D8 still to decide and (0135) no manual milestone still to approve on the site
+  -- cheap first: nothing held by a gate, no D8 still to decide and (0136) no manual milestone still to approve on the site
   IF NOT EXISTS (SELECT 1 FROM public.task_instances h WHERE h.site_id = p_site AND h.state = 'locked' AND starts_with(coalesce(h.lock_reason, ''), 'gate_closed:'))
      AND NOT EXISTS (SELECT 1 FROM public.task_instances h JOIN public.task_definitions td ON td.id = h.task_def_id AND td.code = 'D8'
                      WHERE h.site_id = p_site AND h.state IN ('locked', 'open') AND NOT h.is_na)
-     AND NOT EXISTS (SELECT 1 FROM public.task_instances h JOIN public.task_definitions td ON td.id = h.task_def_id AND td.is_milestone_task   -- 0135
+     AND NOT EXISTS (SELECT 1 FROM public.task_instances h JOIN public.task_definitions td ON td.id = h.task_def_id AND td.is_milestone_task   -- 0136
                      JOIN public.stage_definitions sd ON sd.id = td.stage_id
                      WHERE h.site_id = p_site AND h.state IN ('locked', 'open', 'entry') AND NOT h.is_na
                        AND public.calc_setting('calc.milestone_manual', '["MS4"]'::jsonb) ? sd.code) THEN
@@ -312,7 +312,7 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM public.sites s WHERE s.id = p_site AND s.is_active AND s.overall_status::text <> 'cancelled') THEN RETURN 0; END IF;
   IF public.gmp_site_deferred(p_site) THEN RETURN 0; END IF;
   BEGIN
-    -- 0135: the manual milestone first, then the gates, then D8 (mmp_rules_site)
+    -- 0136: the manual milestone first, then the gates, then D8 (mmp_rules_site)
     r := public.mmp_rules_site(p_site, false);
     n := jsonb_array_length(r -> 'manual') + jsonb_array_length(r -> 'gates') + jsonb_array_length(r -> 'd8');
   EXCEPTION WHEN others THEN   -- the rule never stops the calculation (nor the approval that triggered it): reported in the System Log
@@ -324,7 +324,7 @@ BEGIN
 END $$;
 
 -- ---------------------------------------------------------------------------------------------------------------------
--- 8. The historical settle loop never approves again a manual milestone reverted under either kind (hgd_settle_site: latest 0134, change marked 0135)
+-- 8. The historical settle loop never approves again a manual milestone reverted under either kind (hgd_settle_site: latest 0134, change marked 0136)
 -- ---------------------------------------------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION hgd_settle_site(p_site uuid, p_actor uuid, p_reason text, p_catchup boolean) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
@@ -466,7 +466,7 @@ BEGIN
       JOIN public.task_definitions td ON td.id = ti.task_def_id AND td.is_milestone_task AND td.workflow_id = s.workflow_version_id
       JOIN public.stage_definitions sd ON sd.id = td.stage_id
       WHERE ti.site_id = p_site AND ti.state IN ('locked', 'open', 'entry') AND NOT ti.is_na AND (manual ? sd.code) AND NOT ti.historical_manual_ms
-        -- 0135: reverted by a System Admin under either kind (this one or manual_ms_moved_past): never approved by a rule again
+        -- 0136: reverted by a System Admin under either kind (this one or manual_ms_moved_past): never approved by a rule again
         AND NOT EXISTS (SELECT 1 FROM public.admin_overrides o WHERE o.task_id = ti.id AND o.kind IN ('historical_manual_ms_approved', 'manual_ms_moved_past')
                           AND o.reverted_at IS NOT NULL)
         AND NOT EXISTS (SELECT 1 FROM public.register_records o WHERE o.task_id = ti.id AND o.state IN ('in_review', 'in_approval'))
@@ -534,7 +534,7 @@ BEGIN
 END $$;
 
 -- ---------------------------------------------------------------------------------------------------------------------
--- 9. The revert door knows the new kind (ao_current_matches and admin_override_revert: latest 0134, changes marked 0135)
+-- 9. The revert door knows the new kind (ao_current_matches and admin_override_revert: latest 0134, changes marked 0136)
 -- ---------------------------------------------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION ao_current_matches(p_id uuid) RETURNS boolean
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
@@ -562,7 +562,7 @@ BEGIN
   IF o.kind = 'no_microwave_na' THEN   -- 0134: the task is still N/A from the mark
     RETURN EXISTS (SELECT 1 FROM public.task_instances t WHERE t.id = o.task_id AND t.state = 'na' AND t.no_microwave_na);
   END IF;
-  IF o.kind = 'manual_ms_moved_past' THEN   -- 0135: the manual milestone is still approved by the rule with that date
+  IF o.kind = 'manual_ms_moved_past' THEN   -- 0136: the manual milestone is still approved by the rule with that date
     RETURN EXISTS (SELECT 1 FROM public.task_instances t WHERE t.id = o.task_id AND t.state = 'approved' AND t.manual_ms_moved_past
                    AND t.actual_date::text IS NOT DISTINCT FROM o.after ->> 'actual_date');
   END IF;
@@ -619,7 +619,7 @@ BEGIN
     PERFORM public.nmw_restore_task(o.task_id, actor, rs, 'restored from N/A "no microwave on site" by a System Admin (revert of the override)', true);
     RETURN public.ao_override_json(o.id);
   END IF;
-  IF o.kind = 'manual_ms_moved_past' THEN   -- 0135: the manual milestone is open again with its pre-filled date (never approved by either rule again)
+  IF o.kind = 'manual_ms_moved_past' THEN   -- 0136: the manual milestone is open again with its pre-filled date (never approved by either rule again)
     PERFORM public.mmp_restore_task(o.task_id, actor, rs, 'the direct approval of a manual milestone the site moved past is taken back by a System Admin (revert of the override)', true);
     RETURN public.ao_override_json(o.id);
   END IF;
@@ -714,7 +714,7 @@ BEGIN
       PERFORM public.hgd_unmark('hist_quiet');
     EXCEPTION WHEN others THEN   -- one site never stops the update of the server: reported in the System Log and counted (its changes are rolled back)
       PERFORM set_config('pmis.calc_busy', was_busy, true);
-      PERFORM public.log_system_write('warn', 'calc', 'migration 0135: the moved-past backfill (manual milestone, gate, no microwave) could not run on a site',
+      PERFORM public.log_system_write('warn', 'calc', 'migration 0136: the moved-past backfill (manual milestone, gate, no microwave) could not run on a site',
         jsonb_build_object('site_id', sid, 'sqlstate', SQLSTATE, 'error', left(SQLERRM, 300)), NULL, NULL);
       n_failed := n_failed + 1; changed := false;
     END;
@@ -732,7 +732,7 @@ BEGIN
   INSERT INTO public.audit_log (action, entity_type, entity_id, before, after, reason, actor_id, is_admin_override)
   VALUES ('manual_ms_moved_past_backfill', 'site', 'all', jsonb_build_object('milestones_approved', ms_before),
           res || jsonb_build_object('rule', 'owner decision 2026-11-22: Site RFI (a manual milestone) the site moved past is approved directly as an admin override (pre-filled date, else the date of the earliest later task approved, inferred); then the gates the site moved past open and MW alignment without microwave is N/A (0134); all revertible'),
-          'migration 0135: Site RFI the site moved past, on any site (owner decision 2026-11-22)', NULL, true);
+          'migration 0136: Site RFI the site moved past, on any site (owner decision 2026-11-22)', NULL, true);
   RETURN res;
 END $$;
 

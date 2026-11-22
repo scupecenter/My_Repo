@@ -7,7 +7,7 @@ import { SITE_ENTRY_GRANTS } from './tpl-stream-helpers';
 import { Actor, Site, actor, makeSite, makeTask, plainAdmin } from './wf-helpers';
 
 /**
- * Migration 0135 (owner decision 2026-11-22): on ANY site, a manual milestone (Site RFI, MS4) the site moved past (a later task approved with an actual date)
+ * Migration 0136 (owner decision 2026-11-22): on ANY site, a manual milestone (Site RFI, MS4) the site moved past (a later task approved with an actual date)
  * is approved directly with its pre-filled date (else the date of the earliest later task approved, flagged inferred), as an admin override made by a rule
  * (kind manual_ms_moved_past, no acting person); never one a person touched, never a typed date, never while a gate holds it, never again once reverted
  * (this kind or 0129's historical_manual_ms_approved). It runs in the hook of the calculation path before the gate and D8 rules of 0134 (MS4 -> G5 -> MS5
@@ -121,7 +121,7 @@ async function expectChain(s: Site, backfilled: boolean): Promise<void> {
   expect((await q<{ n: number }>(db, 'SELECT count(*)::int AS n FROM permit_records WHERE site_id = $1', [s.id]))[0]!.n).toBe(0);
 }
 
-describe('0135: Site RFI the site moved past is approved automatically, on any site', () => {
+describe('0136: Site RFI the site moved past is approved automatically, on any site', () => {
   let admin: Actor;
   let live: Site;
 

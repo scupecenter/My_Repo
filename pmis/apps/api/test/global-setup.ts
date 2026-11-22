@@ -221,7 +221,7 @@ export default async function setup(): Promise<() => Promise<void>> {
   const gmpDb = await buildDatabase(adminUrl, gmp, appPassword);
   process.env.TEST_DATABASE_URL_GMP = gmpDb.appUrl;
   process.env.TEST_SUPER_URL_GMP = gmpDb.superUrl;
-  // The moved-past Site RFI database (migration 0135): the suite runs the one-time backfill, which reads every active site of its database, writes a running
+  // The moved-past Site RFI database (migration 0136): the suite runs the one-time backfill, which reads every active site of its database, writes a running
   // Master import apply job (which defers the rules on every site of its database) and reads the milestones, the gates and the overrides of its sites.
   const rfi = `${dbName}_rfi`;
   const rfiDb = await buildDatabase(adminUrl, rfi, appPassword);
