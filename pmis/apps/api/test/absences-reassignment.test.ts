@@ -478,4 +478,22 @@ describe('lead scope: every region of the person must be the lead\'s', () => {
     expect((await lead.api.call('get', '/reassignments/eligible-users').query({ task_id: t })).status).toBe(403);
     expect((await lead.api.call('post', `/tasks/${t}/act-on-behalf`, { action: 'submit', level: 1, reason: 'Not my person' }, { 'If-Match': '"1"' })).status).toBe(403);
   });
+
+  it('a regional lead cannot move the vote of an all-members voter outside their scope, and can move one inside it', async () => {
+    const outside = await actor(app, db, { level: 'entry', regions: [REGION, 4] });
+    // an L2 "all members must approve" level (L1 is always any one)
+    const t = await task(await site(), 'D10a', 'in_approval', { actual: true });
+    await setCell(db, 'D10a', REGION, 'approve', { user: [e.user.id, outside.user.id, h.user.id] }, 'all_members');
+    await db.query('INSERT INTO task_level_voters (task_id, level, round, user_id) VALUES ($1, 2, 1, $2), ($1, 2, 1, $3)', [t, e.user.id, outside.user.id]);
+    const move = (from: string) => lead.api.call('post', '/tasks/reassign', { scope: 'task', task_id: t, from_user_id: from, decision: 'reassign', to_user_id: h.user.id, reason: 'Vote moves' });
+    const refused = await move(outside.user.id);
+    expect(refused.status).toBe(403);
+    expect(refused.body.code).toBe('action_forbidden');
+    expect((await lead.api.call('get', '/reassignments/eligible-users').query({ task_id: t, from_user_id: outside.user.id })).status).toBe(403);
+    const voters = async () => (await db.query('SELECT user_id FROM task_level_voters WHERE task_id = $1 ORDER BY user_id', [t])).rows.map((r) => r.user_id as string).sort();
+    expect(await voters()).toEqual([e.user.id, outside.user.id].sort());
+    const ok = await move(e.user.id);
+    expect(ok.status, JSON.stringify(ok.body)).toBe(200);
+    expect(await voters()).toEqual([h.user.id, outside.user.id].sort());
+  });
 });

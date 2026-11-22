@@ -222,3 +222,26 @@ SELECT idm_delegate('user', '{{ALICE}}'::uuid, NULL, NULL, false, '[{"module":"o
 SELECT CASE WHEN ops_save_absence(NULL, NULL, jsonb_build_object('kind', 'sick', 'from_date', current_date + 300, 'to_date', current_date + 301)) IS NOT NULL
   THEN 'ok' ELSE 'no' END;
 -- @end
+
+-- @case CVR-16
+-- @title Alice, lead of Tripoli through a delegation, names Bob (no region, so outside her scope) as the person whose pin or all-members vote moves on a Tripoli task
+-- @category absences-reassignment
+-- @expect error P0001 action_forbidden
+\ctx ADMIN stepup=300
+SELECT idm_delegate('user', '{{ALICE}}'::uuid, NULL, NULL, false, '[{"module":"overrides.reassign","action":"administer"}]'::jsonb,
+  false, ARRAY[1], NULL, NULL, false, NULL, 'Tripoli lead for the case');
+\ctx ALICE
+SELECT ops_reassign_tasks(jsonb_build_object('scope', 'task', 'task_id', '{{TASK_TRI}}', 'from_user_id', '{{BOB}}', 'decision', 'reassign',
+  'to_user_id', '{{CAROL}}', 'reason', 'move the vote of someone I do not lead'));
+-- @end
+
+-- @case CVR-17
+-- @title The same Tripoli lead asks for the people eligible to receive a Tripoli task from Bob (outside her scope)
+-- @category absences-reassignment
+-- @expect error P0001 action_forbidden
+\ctx ADMIN stepup=300
+SELECT idm_delegate('user', '{{ALICE}}'::uuid, NULL, NULL, false, '[{"module":"overrides.reassign","action":"administer"}]'::jsonb,
+  false, ARRAY[1], NULL, NULL, false, NULL, 'Tripoli lead for the case');
+\ctx ALICE
+SELECT count(*) FROM rsn_eligible_users('{{TASK_TRI}}'::uuid, NULL, '{{BOB}}'::uuid);
+-- @end

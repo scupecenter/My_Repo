@@ -31,7 +31,8 @@
 -- LEAD SCOPE. A person's regions come from their assignments only (never from System Admin status); a person with an all-regions assignment, or a System
 -- Admin, is "all regions". A regional lead leads a person only when EVERY region of the person is one of the lead's regions; an all-regions person is led only
 -- by a System Admin or an all-regions lead; a person with no region is led only by them too. The same rule (rsn_leads_person) governs the absences (read,
--- record, change, remove), the alerts, the eligible people, the reassignment and the cover.
+-- record, change, remove), the alerts, the eligible people, the reassignment and the cover; in a reassignment both the person a task is on and the person
+-- named in from_user_id (whose pin or all-members vote moves) must be led.
 --
 -- SECURITY. Every function is SECURITY DEFINER, search_path pg_catalog, public, pg_temp, owner pmis_definer, PUBLIC revoked. pmis_app may execute only the
 -- doors: ops_save_absence, ops_delete_absence, ops_reassign_tasks, ops_act_on_behalf (writes) and rsn_visible_absences, rsn_alerts, rsn_eligible_users,
@@ -525,6 +526,9 @@ BEGIN
     PERFORM public.wf_err('action_forbidden', jsonb_build_object('detail', 'Only a lead (the reassign grant) or a System Admin reassigns tasks.'));
   END IF;
   see := public.wf_actor_regions('sites', 'view');
+  IF p_from IS NOT NULL AND NOT public.rsn_leads_person(a, p_from) THEN
+    PERFORM public.wf_err('action_forbidden', jsonb_build_object('detail', 'You lead this person only when every region of theirs is one of yours.'));
+  END IF;
   IF p_task IS NOT NULL THEN
     SELECT * INTO t FROM public.task_instances WHERE id = p_task;
     IF NOT FOUND OR NOT public.app_region_check(t.region_id) OR (see IS NOT NULL AND NOT t.region_id = ANY (see)) THEN PERFORM public.wf_err('not_found'); END IF;
@@ -536,9 +540,6 @@ BEGIN
   ELSE
     IF p_from IS NULL THEN
       PERFORM public.wf_err('validation_failed', jsonb_build_object('errors', jsonb_build_array(jsonb_build_object('path', '/from_user_id', 'code', 'required', 'message', 'Pass task_id, or from_user_id (with site_id for one site).'))));
-    END IF;
-    IF NOT public.rsn_leads_person(a, p_from) THEN
-      PERFORM public.wf_err('action_forbidden', jsonb_build_object('detail', 'You lead this person only when every region of theirs is one of yours.'));
     END IF;
     st := public.rsn_candidate_stages(p_from);
     SELECT coalesce(array_agg(ti.id), ARRAY[]::uuid[]) INTO ids
@@ -682,6 +683,10 @@ BEGIN
     PERFORM public.wf_err('action_forbidden', jsonb_build_object('detail', 'Only a lead (the reassign grant for the module and region) or a System Admin decides on these tasks.'));
   END IF;
   see := public.wf_actor_regions('sites', 'view');
+  -- the person named as the one the tasks are on (whose pin or all-members vote moves) must be led by the caller, in every scope
+  IF v_from IS NOT NULL AND NOT public.rsn_leads_person(a, v_from) THEN
+    PERFORM public.wf_err('action_forbidden', jsonb_build_object('detail', 'You lead this person only when every region of theirs is one of yours.'));
+  END IF;
   IF dc = 'reassign' THEN
     SELECT * INTO tu FROM public.users WHERE id = v_to;
     IF NOT FOUND OR tu.status <> 'active' OR tu.deleted_at IS NOT NULL OR tu.is_break_glass OR v_to = v_from OR public.rsn_absence_on(v_to, d) IS NOT NULL THEN
@@ -698,9 +703,6 @@ BEGIN
     END IF;
     ids := ARRAY[v_task];
   ELSE
-    IF NOT public.rsn_leads_person(a, v_from) THEN
-      PERFORM public.wf_err('action_forbidden', jsonb_build_object('detail', 'You lead this person only when every region of theirs is one of yours.'));
-    END IF;
     st := public.rsn_candidate_stages(v_from);
     SELECT coalesce(array_agg(ti.id ORDER BY ti.id), ARRAY[]::uuid[]) INTO ids
     FROM public.task_instances ti JOIN public.task_definitions td ON td.id = ti.task_def_id
