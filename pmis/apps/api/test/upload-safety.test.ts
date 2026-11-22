@@ -1,6 +1,7 @@
+import { randomBytes } from 'node:crypto';
 import { deflateRawSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
-import { guardXlsx, MAX_UNCOMPRESSED_BYTES } from '../src/templates/xlsx-guard';
+import { guardXlsx, MAX_UNCOMPRESSED_BYTES, maxUncompressedBytes } from '../src/templates/xlsx-guard';
 
 /** A minimal zip (deflate) whose declared sizes can be forged, to test the guard without a real workbook. */
 function zip(entries: { name: string; data: Buffer; declared?: number }[]): Buffer {
@@ -41,6 +42,21 @@ describe('xlsx guard (zip bomb)', () => {
   it('refuses an entry that inflates past the budget although it declares a tiny size', () => {
     const bomb = { name: 'xl/worksheets/sheet1.xml', data: Buffer.alloc(MAX_UNCOMPRESSED_BYTES + 1024 * 1024), declared: 1000 };
     expect(guardXlsx('a.xlsx', zip([...base, bomb]))).toMatchObject({ ok: false, reason: 'size_or_rows_exceeded' });
+  });
+
+  it('takes a larger budget from PMIS_IMPORT_MAX_UNCOMPRESSED_BYTES (a large Master), and ignores a value that is not a positive number', () => {
+    // random bytes: an honest large part (it does not compress, so the ratio guard stays quiet and only the budget decides)
+    const big = { name: 'xl/worksheets/sheet1.xml', data: randomBytes(MAX_UNCOMPRESSED_BYTES + 1024 * 1024), declared: MAX_UNCOMPRESSED_BYTES + 1024 * 1024 };
+    const pkg = zip([...base, big]);
+    try {
+      expect(guardXlsx('a.xlsx', pkg)).toMatchObject({ ok: false, reason: 'size_or_rows_exceeded' });
+      process.env.PMIS_IMPORT_MAX_UNCOMPRESSED_BYTES = String(MAX_UNCOMPRESSED_BYTES * 2);
+      expect(guardXlsx('a.xlsx', pkg)).toEqual({ ok: true });
+      process.env.PMIS_IMPORT_MAX_UNCOMPRESSED_BYTES = 'lots';
+      expect(maxUncompressedBytes()).toBe(MAX_UNCOMPRESSED_BYTES);
+    } finally {
+      delete process.env.PMIS_IMPORT_MAX_UNCOMPRESSED_BYTES;
+    }
   });
 
   it('refuses an entry whose real size differs from the declared one', () => {
