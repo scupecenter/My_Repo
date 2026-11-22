@@ -6,8 +6,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { q } from './calc-helpers';
 import { Api, startApp, superDbMina } from './helpers';
 import { GECOL, PROC, createRec, post, regCell, team as regTeam } from './reg-helpers';
-import { day } from './tpl-helpers';
-import { Actor, Site, makeSite, makeTask, plainAdmin } from './wf-helpers';
+import { day, downloadTemplate, fillTemplate, uploadFile } from './tpl-helpers';
+import { SITE_ENTRY_GRANTS } from './tpl-stream-helpers';
+import { Actor, Site, actor, addAssignment, makeSite, makeTask, plainAdmin, setCell } from './wf-helpers';
 
 /**
  * Migration 0136 (owner decisions 2026-11-22), on the Master import only:
@@ -215,6 +216,80 @@ describe('0136: the Master sheet reads "Pending" and "N/A" as the owner means th
     } finally {
       await db.query('ROLLBACK');
     }
+  });
+});
+
+describe('0136 (security review): the N/A of the Master file needs the rights of an entry of the task, at the staging and at the send (TPL-MASTER upload)', () => {
+  const SSV = 'SSV / SSV Date';
+  const OTHER = 2;
+  async function upload(a: Actor, siteCode: string): Promise<{ id: string; version: number }> {
+    const dl = await downloadTemplate(a.api, 'TPL-MASTER');
+    expect(dl.status).toBe(200);
+    const file = await fillTemplate(dl.buffer, [{ 'Site ID': siteCode, [SSV]: 'N/A' }], { sheet: 'Master' });
+    const res = await uploadFile(a.api, file);
+    expect([201, 202], JSON.stringify(res.body)).toContain(res.status);
+    const parts = (res.body.parts ?? [res.body]) as { id: string; version: number; stream?: string }[];
+    const te = parts.find((x) => x.stream === 'TE')!;
+    expect(te, JSON.stringify(res.body)).toBeTruthy();
+    return { id: te.id, version: te.version };
+  }
+  const send = async (a: Actor, b: { id: string; version: number }) => {
+    const r = await a.api.call('post', `/import-batches/${b.id}/submit`, undefined, { 'If-Match': `"${b.version}"` });
+    expect(r.status, JSON.stringify(r.body)).toBe(200);
+  };
+  const d11Row = async (batchId: string) => (await batchRows(batchId)).find((r) => r.task_code === 'D11')!;
+  const entryUser = (regions: number[]) => actor(app, db, { level: 'entry', grants: SITE_ENTRY_GRANTS, regions, modules: null });
+
+  it('a region-limited importer (sites view in the task region, import and edit elsewhere) cannot make the task N/A', async () => {
+    const s = await onAirSite('MSR');
+    const d11 = await makeTask(db, s, 'D11', 'open');
+    const u = await entryUser([OTHER]);
+    await addAssignment(db, u.user.id, { level: 'view', regions: [R], modules: null, grants: [['sites', 'view'], ['templates', 'view']] });
+    await setCell(db, 'D11', R, 'entry', { user: [u.user.id] });
+    const b = await upload(u, s.code);
+    const row = await d11Row(b.id);
+    expect(codes(row.warnings)).toEqual(['master_na_not_applicable']);
+    expect(row.payload.master_na).toBeUndefined();
+    await send(u, b);
+    expect((await tasks(s.id)).D11).toMatchObject({ state: 'open', master_na: false });
+    expect(await overrides(s.id)).toHaveLength(0);
+    expect(d11).toBeTruthy();
+  });
+
+  it('a user who is not an entry holder (L1) of the task cannot make it N/A', async () => {
+    const s = await onAirSite('MSE');
+    await makeTask(db, s, 'D11', 'open');
+    const holder = await entryUser([R]);
+    const u = await entryUser([R]);
+    await setCell(db, 'D11', R, 'entry', { user: [holder.user.id] });
+    const b = await upload(u, s.code);
+    expect(codes((await d11Row(b.id)).warnings)).toEqual(['master_na_not_applicable']);
+    await send(u, b);
+    expect((await tasks(s.id)).D11).toMatchObject({ state: 'open', master_na: false });
+  });
+
+  it('the entry holder makes it N/A when the batch is sent; rights revoked between the staging and the send: not applied', async () => {
+    const s = await onAirSite('MSK');
+    await makeTask(db, s, 'D11', 'open');
+    const u = await entryUser([R]);
+    await setCell(db, 'D11', R, 'entry', { user: [u.user.id] });
+    const ok = await upload(u, s.code);
+    expect(codes((await d11Row(ok.id)).warnings)).toEqual(['master_na_requested']);
+    await send(u, ok);
+    expect((await tasks(s.id)).D11).toMatchObject({ state: 'na', master_na: true });
+
+    const s2 = await onAirSite('MSK');
+    await makeTask(db, s2, 'D11', 'open');
+    const b = await upload(u, s2.code);
+    expect(codes((await d11Row(b.id)).warnings)).toEqual(['master_na_requested']);
+    const other = await entryUser([R]);
+    await setCell(db, 'D11', R, 'entry', { user: [other.user.id] });   // the Matrix moved L1 to someone else before the send
+    await send(u, b);
+    expect((await tasks(s2.id)).D11).toMatchObject({ state: 'open', master_na: false });
+    const row = await d11Row(b.id);
+    expect(codes(row.warnings)).toEqual(['master_na_requested', 'master_na_not_marked']);
+    expect(row.payload).toMatchObject({ master_na_result: 'skipped', master_na_reason: 'not_entry_holder' });
+    expect(await notesOf(b.id)).toMatchObject({ na_task_not_marked: 1 });
   });
 });
 

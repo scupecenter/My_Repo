@@ -34,7 +34,8 @@
 ### أمان
 - كل دالة جديدة أو ملفوفة أو معاد تعريفها: SECURITY DEFINER (عدا الحارس الذي يعمل بصلاحية كاتبه)، و`search_path = pg_catalog, public, pg_temp`، والمالك `pmis_definer`، وEXECUTE مسحوب من PUBLIC ومن `pmis_app`؛ باب التراجع يبقى `admin_override_revert`. الأعمدة الجديدة مسحوبة من `pmis_app`، ولا جدول جديد.
 - العلامة لا تؤخذ من الملف ولا من المستدعي: مفاتيح `mina_*` تُنزع من الصفوف قبل التحضير.
-- حالات أمان جديدة: `tests/db-security/cases/E5_master_import_na.sql` (10 حالات).
+- (مراجعة أمنية) جعل المهمة N/A يتطلب حقوق إدخال تلك المهمة لمن رفع الملف، عند التجهيز ثم من جديد عند الإرسال (`mina_rights_check`): منطقة الاستيراد (`templates` import) ومنطقة التعديل (`sites` edit) لمنطقة المهمة، وأهلية مستوى الإدخال L1 (`wf_is_eligible`، أو مدير النظام حين لا حامل للمستوى، أو تجاوز التحميل التاريخي باعتماد مباشر)، والمرسِل هو رافع الملف نفسه؛ وإلا يقول الصف السبب (`region_forbidden` أو `action_forbidden` أو `not_entry_holder` أو `not_uploader`) ولا يُوسم شيء. سطر التدقيق الملخّص للدفعة `import_batch.master_na` لا يُعلَّم تجاوزاً إدارياً (كل مهمة لها سطر تجاوزها)، فلم يعد يرفض إرسال مستخدم ليس مدير نظام.
+- حالات أمان جديدة: `tests/db-security/cases/E5_master_import_na.sql` (11 حالة).
 
 ### مفتوح
 - Q581: حقول PR-PO التي لا مقابل لها في GECOL (PO / WO No.، PO / WO Date، Order Status، Delivery، Team) لا تُحفظ عند التوجيه وتُذكر في تحذير الصف.

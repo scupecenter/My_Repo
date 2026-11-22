@@ -89,6 +89,15 @@ INSERT INTO admin_overrides (entity, site_id, task_id, kind, reason, before, aft
 VALUES ('task', '{{SITE_TRI}}'::uuid, (SELECT id FROM task_instances WHERE site_id = '{{SITE_TRI}}'::uuid LIMIT 1), 'master_na', 'forged override', '{"state":"open"}', '{"state":"na"}', NULL);
 -- @end
 
+-- @case MINA-11
+-- @title Alice asks the internal rights check of the rule to pass her for a task outside her regions (a forged all-regions setting and the override flag)
+-- @category master-import-na
+-- @actor ALICE
+-- @region *
+-- @expect error 42501 permission denied
+SELECT mina_rights_check((SELECT id FROM task_instances WHERE site_id = '{{SITE_BEN}}'::uuid LIMIT 1), '{{ALICE}}'::uuid, NULL, NULL, true);
+-- @end
+
 -- @case MINA-10
 -- @title The shape: the new and wrapped functions (SECURITY DEFINER, search_path ending in pg_temp, owner pmis_definer, PUBLIC revoked, nothing for pmis_app), the renamed originals kept internal, the guard (runs as its writer) and its triggers, the revert door kept, the override checks naming master_na, the new columns and the setting guard
 -- @category master-import-na
@@ -98,7 +107,7 @@ WITH f AS (
          has_function_privilege('public', p.oid, 'EXECUTE') AS pub, has_function_privilege('pmis_app', p.oid, 'EXECUTE') AS app
   FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
   WHERE n.nspname = 'public' AND p.proname IN ('mina_token', 'mina_list_has', 'mina_blank', 'mina_cnt', 'mina_clean_row', 'mina_notes_add', 'mina_na_check',
-    'mina_reason_text', 'mina_prep_task_row', 'mina_route_gecol', 'mina_route_regs', 'mina_prep_register_unit', 'mina_mark_task', 'mina_apply_batch',
+    'mina_reason_text', 'mina_rights_check', 'mina_prep_task_row', 'mina_route_gecol', 'mina_route_regs', 'mina_prep_register_unit', 'mina_mark_task', 'mina_apply_batch',
     'mina_restore_task', 'imp_master_plan', 'imp_master_unit', 'imp_stream_eval', 'imp_stream_close', 'imp_submit_stream_finish',
     'imp_master_plan_pre_0136', 'imp_master_unit_pre_0136', 'imp_stream_eval_pre_0136', 'imp_stream_close_pre_0136', 'imp_submit_stream_finish_pre_0136',
     'hrg_stage_registers')
@@ -107,7 +116,7 @@ WITH f AS (
   FROM pg_proc p WHERE p.oid = 'public.mina_guard_task()'::regprocedure
 )
 SELECT CASE
-  WHEN (SELECT count(*) FROM f) <> 26 THEN 'functions: ' || (SELECT count(*) FROM f)::text
+  WHEN (SELECT count(*) FROM f) <> 27 THEN 'functions: ' || (SELECT count(*) FROM f)::text
   WHEN EXISTS (SELECT 1 FROM f WHERE NOT prosecdef) THEN 'not SECURITY DEFINER'
   WHEN EXISTS (SELECT 1 FROM f WHERE cfg NOT ILIKE '%search_path=pg_catalog, public, pg_temp%') THEN 'search_path'
   WHEN EXISTS (SELECT 1 FROM f WHERE owner <> 'pmis_definer') THEN 'owner'

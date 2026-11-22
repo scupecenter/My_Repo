@@ -23,6 +23,9 @@
 --         reverted task is never marked again). Never a milestone task, never a task with an actual / start / submitted / approved date, never one that is
 --         approved, N/A, skipped, in entry, review or approval, rejected or suspended, never one with a human workflow step (submit, approve, reject, claim,
 --         release, reassign, reopen, start, review) or a register record in review, never one a gate holds (lock reason gate_closed:* or wf_gate_hold).
+--         The uploader must hold the rights of an entry of that task, at the staging and again at the send: the import and edit regions of the task
+--         (templates import, sites edit) and its entry level (L1 holder, or a System Admin when the level has no holder, or the admin override of a
+--         historical load approved directly); otherwise the row says why and nothing is marked (security review of 0136).
 --         When the row also carries other values of that task, the N/A is read as an empty cell (rule 2b) and the row is staged as today. A draft upload
 --         (Save Draft / Planning) never marks: the N/A is an empty cell there.
 --      b. in any other date, number or list column (task or register): an empty cell. A list whose own values hold "N/A" keeps it.
@@ -235,8 +238,32 @@ LANGUAGE sql IMMUTABLE SECURITY DEFINER SET search_path = pg_catalog, public, pg
     WHEN 'record_in_review' THEN 'a register record of the task waits for its review'
     WHEN 'reverted_before' THEN 'a System Admin restored this task from the N/A of the Master file before'
     WHEN 'gate_held' THEN 'a closed gate holds the task'
+    WHEN 'region_forbidden' THEN 'you may not import in the region of this task'
+    WHEN 'action_forbidden' THEN 'you may not edit tasks in the region of this task'
+    WHEN 'not_entry_holder' THEN 'you are not an entry holder (L1) of this task in the Matrix'
+    WHEN 'not_uploader' THEN 'only the person who uploaded the file sends its rows'
     ELSE coalesce(p_reason, 'not applicable') END
 $$;
+
+-- The rights of an entry on the task, decided as imp_stage_task_row decides them for a row of the same batch (security review of 0136): the import region
+-- (templates import), the edit region (sites edit) and the entry level (L1 holder of the task, or a System Admin when the level has no holder, or the admin
+-- override of a historical load approved directly, p_override). NULL = allowed; else the reason. Read at the staging (the uploader's context) and again at the
+-- send (mina_mark_task: the rights may have changed in between).
+CREATE OR REPLACE FUNCTION mina_rights_check(p_task uuid, p_actor uuid, p_imp int[], p_edit int[], p_override boolean) RETURNS text
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
+DECLARE rg int;
+BEGIN
+  IF p_actor IS NULL THEN RETURN 'not_entry_holder'; END IF;
+  SELECT t.region_id INTO rg FROM public.task_instances t WHERE t.id = p_task;
+  IF NOT FOUND THEN RETURN 'not_on_site'; END IF;
+  IF NOT public.imp_region_ok(p_imp, rg) THEN RETURN 'region_forbidden'; END IF;
+  IF NOT public.imp_region_ok(p_edit, rg) THEN RETURN 'action_forbidden'; END IF;
+  IF NOT (public.wf_is_eligible(p_task, 'entry', p_actor) OR (public.app_user_is_system_admin(p_actor) AND NOT public.wf_has_holder(p_task, 'entry'))
+          OR coalesce(p_override, false)) THEN
+    RETURN 'not_entry_holder';
+  END IF;
+  RETURN NULL;
+END $$;
 
 -- ---------------------------------------------------------------------------------------------------------------------
 -- 4. Rules 1 and 2 on a row of the Master sheet (internal). Returns {row, pending, na_empty, na_tasks}: the row without the cells read as empty, the counts,
@@ -447,7 +474,7 @@ END $$;
 -- ---------------------------------------------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION mina_mark_task(p_task uuid, p_batch uuid, p_row uuid, p_ref text) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
-DECLARE cur public.task_instances%ROWTYPE; why_not text; before jsonb; oid uuid; tcode text; uploader uuid;
+DECLARE cur public.task_instances%ROWTYPE; why_not text; before jsonb; oid uuid; tcode text; uploader uuid; b public.import_batches%ROWTYPE;
   why constant text := 'N/A in the Master file';
   rs constant text := 'owner decision 2026-11-22: the actual date of the task is N/A in the Master file, so the task does not apply (admin override by rule, revertible)';
 BEGIN
@@ -456,7 +483,14 @@ BEGIN
   why_not := public.mina_na_check(p_task);
   IF why_not IS NOT NULL THEN RETURN jsonb_build_object('outcome', 'skipped', 'reason', why_not, 'site_id', cur.site_id); END IF;
   SELECT td.code INTO tcode FROM public.task_definitions td WHERE td.id = cur.task_def_id;
-  SELECT b.uploaded_by INTO uploader FROM public.import_batches b WHERE b.id = p_batch;
+  SELECT * INTO b FROM public.import_batches x WHERE x.id = p_batch;
+  uploader := b.uploaded_by;
+  -- the rights of the uploader, again at the send (they may have changed since the staging): only the uploader sends, in the task's regions of import and
+  -- edit, as an entry holder of the task (or the admin override of a historical load approved directly, which only a System Admin marks)
+  why_not := CASE WHEN b.id IS NULL OR public.app_actor() IS DISTINCT FROM b.uploaded_by OR NOT public.app_region_check(cur.region_id) THEN 'not_uploader'
+                  ELSE public.mina_rights_check(p_task, b.uploaded_by, public.wf_actor_regions('templates', 'import'), public.wf_actor_regions('sites', 'edit'),
+                         b.historical_direct_approve AND public.app_user_is_system_admin(b.uploaded_by)) END;
+  IF why_not IS NOT NULL THEN RETURN jsonb_build_object('outcome', 'skipped', 'reason', why_not, 'site_id', cur.site_id); END IF;
   before := public.wf_snap(p_task);
   PERFORM public.hgd_mark('mina_task', p_task::text);
   UPDATE public.task_instances SET state = 'na', is_na = true, na_reason = why, master_na = true, master_na_at = now(), admin_override = true,
@@ -514,7 +548,7 @@ BEGIN
   END LOOP;
   PERFORM public.log_audit_write('import_batch.master_na', 'import_batch', p_batch::text, NULL,
     jsonb_build_object('marked', nm, 'not_marked', ns, 'rule', 'owner decision 2026-11-22: a task whose actual date is N/A in the Master file is N/A (admin override by rule)'),
-    'Master import: N/A in the actual date column', NULL, NULL, NULL, true);
+    'Master import: N/A in the actual date column', NULL, NULL, NULL, false);   -- a summary of the batch (each task carries its own override audit row)
   RETURN jsonb_build_object('marked', nm, 'not_marked', ns);
 END $$;
 
@@ -698,6 +732,10 @@ BEGIN
             WHERE x.site_id = s.id AND td.code = tc AND td.workflow_id = s.workflow_version_id;
           IF NOT FOUND THEN cnt := public.mina_cnt(cnt, 'na_as_empty', 1); CONTINUE; END IF;
           why_not := public.mina_na_check(ti.id);
+          IF why_not IS NULL THEN   -- the same rights as an entry of this row (region of import and edit, the entry level)
+            why_not := public.mina_rights_check(ti.id, public.app_actor(), public.imp_int_array(p_ctx -> 'r_import'), public.imp_int_array(p_ctx -> 'r_edit'),
+              (p_ctx ->> 'hw_cutoff') IS NOT NULL AND public.hrf_staging());
+          END IF;
           w := public.imp_task_note(cols, tc, 'actual_date', CASE WHEN why_not IS NULL THEN 'master_na_requested' ELSE 'master_na_not_applicable' END,
             CASE WHEN why_not IS NULL THEN 'N/A in the Master file: the task is made N/A (admin override by rule, revertible) when the batch is sent.'
                  ELSE 'N/A in the Master file, but the task is not made N/A: ' || public.mina_reason_text(why_not) || '.' END);
@@ -981,6 +1019,7 @@ DECLARE f text;
 BEGIN
   FOREACH f IN ARRAY ARRAY['mina_guard_task()', 'mina_token(jsonb)', 'mina_list_has(jsonb,text)', 'mina_blank(jsonb)', 'mina_cnt(jsonb,text,integer)',
                            'mina_clean_row(jsonb)', 'mina_notes_add(uuid,jsonb)', 'mina_na_check(uuid)', 'mina_reason_text(text)',
+                           'mina_rights_check(uuid,uuid,integer[],integer[],boolean)',
                            'mina_prep_task_row(jsonb,jsonb,boolean)', 'mina_route_gecol(jsonb,jsonb,text,text)', 'mina_route_regs(jsonb)',
                            'mina_prep_register_unit(jsonb)', 'mina_mark_task(uuid,uuid,uuid,text)', 'mina_apply_batch(uuid)',
                            'mina_restore_task(uuid,uuid,text,text,boolean)',
