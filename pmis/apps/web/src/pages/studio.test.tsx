@@ -30,11 +30,12 @@ const expand = (u: U, ms: string) => u.click(screen.getByTestId(`studio-ms-toggl
 describe('Workflow Studio', () => {
   beforeEach(() => resetWorkflowEditorMock());
 
-  it('is the default of Settings, Workflow with a link to the classic editor, chips for the live and draft versions and a tree with counts', async () => {
+  it('is the default of Settings, Workflow with no link to a classic editor, chips for the live and draft versions and a tree with counts', async () => {
     await open();
     expect(screen.getByTestId('studio-chip-live')).toHaveTextContent('Live: version 1');
     expect(screen.getByTestId('studio-chip-draft')).toHaveTextContent('Draft version 2');
-    expect(screen.getByTestId('studio-classic-link')).toHaveAttribute('href', '/admin/settings/workflow/classic');
+    expect(screen.queryByTestId('studio-classic-link')).toBeNull();
+    expect(screen.getByTestId('studio-lockpanel')).toBeInTheDocument();
     expect(screen.getByTestId('studio-tree-title')).toHaveTextContent('WORKFLOW, VERSION 2 (DRAFT)');
     expect(screen.getByTestId('studio-tree-counts')).toHaveTextContent('2 milestones, 5 tasks, 1 gates');
     expect(screen.getByTestId('studio-pending')).toHaveTextContent('0 pending changes');

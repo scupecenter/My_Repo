@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ApiError } from '@/api/client';
 import { useMigrateSites, usePreviewMigration, type SlaWeightItem, type WorkflowVersion } from '@/api/workflowEditor';
 import { useToast } from '@/components/Toast';
 import { findCycle } from '../wf/model';
+import { Code, Flow, ltr, Name, useArrow } from '../wf/rtl';
 import { useErr } from '../wf/useErr';
-import { pendingChanges, type Change, type Struct } from './studioModel';
+import { impactCounts, pendingChanges, type Change, type Struct } from './studioModel';
 import { StudioCard } from './StudioForms';
 import type { Ctx } from './studioCtx';
 
@@ -41,7 +43,9 @@ export function StudioReview({ c, parent, parentSw, draftSw, frozen, onBack, onP
   const problems = c.v.validation?.problems ?? [], warnings = c.v.validation?.warnings ?? [];
   const blocked = !c.v.can_publish || frozen || problems.length > 0 || !!cycle || c.v.validation?.valid === false;
   const ready = !blocked && reason.trim().length >= 3 && typed === `v${c.v.version}` && (!phrase || master === phrase) && !busy;
-  const migratable = pv?.sites.filter((s) => s.migratable).length ?? 0;
+  const n = pv ? impactCounts(pv) : null;
+  const arrow = useArrow();
+  const refused = preview.error instanceof ApiError ? preview.error : null;
 
   const publish = () => {
     setError(null); setBusy(true);
@@ -65,7 +69,7 @@ export function StudioReview({ c, parent, parentSw, draftSw, frozen, onBack, onP
   return (
     <div className="space-y-4" data-testid="studio-review">
       <header><h2 className="text-lg font-bold">{t('studio.review_title')}</h2><p className="text-sm text-mute">{t('studio.review_sub', { from: c.v.parent_version ?? '-', to: c.v.version })}</p></header>
-      {blocked && <p role="alert" className="rounded-lg border border-line bg-lockBg p-3 text-sm text-lockInk" data-testid="studio-review-blocked">{frozen ? t('wfe.frozen_why', { date: '' }) : !c.v.can_publish ? t('wfe.readonly') : cycle ? t('wfe.cycle_found', { path: cycle.join(' → ') }) : problems.join('; ')}</p>}
+      {blocked && <p role="alert" className="rounded-lg border border-line bg-lockBg p-3 text-sm text-lockInk" data-testid="studio-review-blocked">{frozen ? t('wfe.frozen_why', { date: '' }) : !c.v.can_publish ? t('wfe.readonly') : cycle ? t('wfe.cycle_found', { path: cycle.join(arrow) }) : problems.join('; ')}</p>}
       {warnings.length > 0 && <ul className="list-disc ps-5 text-sm text-waitInk" data-testid="studio-review-warnings">{warnings.map((w) => <li key={w}>{w}</li>)}</ul>}
 
       <StudioCard title={t('studio.changes_title', { count: changes.length })} testid="studio-review-changes">
@@ -74,16 +78,30 @@ export function StudioReview({ c, parent, parentSw, draftSw, frozen, onBack, onP
         <ul className="divide-y divide-line">
           {changes.map((x) => (
             <li key={x.id} className="flex flex-wrap items-center gap-2 py-2 text-sm" data-testid={`studio-change-${x.id}`}>
-              <Badge kind={x.kind} /><span>{t(`studio.change_${x.key}`)}</span>{x.code !== '*' && <span className="mono" dir="ltr">{x.code}</span>}{x.detail && <span className="text-mute">{x.detail}</span>}
+              <Badge kind={x.kind} /><span>{t(`studio.change_${x.key}`)}</span>{x.code !== '*' && <Code>{x.code}</Code>}
+              {x.from !== undefined && x.to !== undefined ? <span className="text-mute"><Flow from={x.from} to={x.to} ltr={!!x.ltr} /></span> : x.detail && <span className="text-mute"><Name>{x.detail}</Name></span>}
             </li>))}
         </ul>
       </StudioCard>
 
       <StudioCard title={t('studio.impact_title')} testid="studio-review-impact">
-        {preview.isPending && <p className="text-sm text-mute">{t('wfe.loading')}</p>}
-        {preview.isError && <p className="text-sm text-mute" data-testid="studio-impact-na">{t('studio.impact_na')}</p>}
-        {pv && <p className="text-sm" data-testid="studio-impact">{t('studio.impact_sites', { count: pv.sites.length, ok: migratable })}</p>}
-        {pv && pv.sites.some((s) => !s.migratable) && <p className="text-sm text-waitInk">{t('studio.impact_blocked', { count: pv.sites.length - migratable })}</p>}
+        {preview.isPending && <p className="text-sm text-mute" data-testid="studio-impact-loading">{t('wfe.loading')}</p>}
+        {preview.isError && (
+          <div className="space-y-2" data-testid="studio-impact-refused" data-status={refused?.status ?? ''}>
+            <p className="text-sm text-waitInk" role="status">{refused?.status === 403 ? t('studioPanel.impact_forbidden') : t('studioPanel.impact_refused', { status: refused?.status ?? '-' })}</p>
+            <button type="button" className="btn min-h-11" data-testid="studio-impact-retry" onClick={() => mutate(parentNo ? { filter: { from_version: parentNo } } : { filter: {} })}>{t('studioPanel.impact_retry')}</button>
+          </div>
+        )}
+        {n && (
+          <>
+            <p className="text-sm" data-testid="studio-impact">{t('studio.impact_sites', { count: n.sites, ok: n.movable })}</p>
+            <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4" data-testid="studio-impact-counts">
+              {([['sites', n.sites], ['added', n.added], ['moved', n.moved], ['dates', n.dates]] as const).map(([k, v]) => (
+                <div key={k} className="rounded-lg border border-line p-3"><dt className="text-xs text-mute">{t(`studioPanel.impact_${k}`)}</dt><dd className="text-xl font-bold" data-testid={`studio-impact-${k}`}><Code className="">{v}</Code></dd></div>))}
+            </dl>
+            {n.blocked > 0 && <p className="text-sm text-waitInk" data-testid="studio-impact-blocked">{t('studio.impact_blocked', { count: n.blocked })}</p>}
+          </>
+        )}
       </StudioCard>
 
       <StudioCard title={t('studio.options_title')} testid="studio-review-options">
@@ -96,8 +114,8 @@ export function StudioReview({ c, parent, parentSw, draftSw, frozen, onBack, onP
 
       <StudioCard title={t('studio.confirm_title')} testid="studio-review-confirm">
         <label className="block text-sm font-semibold">{t('common.reason')}<textarea className="input mt-1 min-h-16 font-normal" data-testid="studio-publish-reason" value={reason} onChange={(e) => setReason(e.target.value)} /></label>
-        <label className="block text-sm font-semibold">{t('wfe.type_to_confirm', { text: `v${c.v.version}` })}<input className="input mt-1 min-h-11 font-normal" dir="ltr" data-testid="studio-publish-confirm" value={typed} onChange={(e) => setTyped(e.target.value)} /></label>
-        {phrase && <label className="block text-sm font-semibold">{t('wfe.type_to_confirm', { text: phrase })}<input className="input mt-1 min-h-11 font-normal" dir="ltr" data-testid="studio-publish-master" value={master} onChange={(e) => setMaster(e.target.value)} /></label>}
+        <label className="block text-sm font-semibold">{t('wfe.type_to_confirm', { text: ltr(`v${c.v.version}`) })}<input className="input mt-1 min-h-11 font-normal" dir="ltr" data-testid="studio-publish-confirm" value={typed} onChange={(e) => setTyped(e.target.value)} /></label>
+        {phrase && <label className="block text-sm font-semibold">{t('wfe.type_to_confirm', { text: ltr(phrase) })}<input className="input mt-1 min-h-11 font-normal" dir="ltr" data-testid="studio-publish-master" value={master} onChange={(e) => setMaster(e.target.value)} /></label>}
         <p className="text-xs text-mute" data-testid="studio-stepup-note">{t('studio.stepup_note')}</p>
         {error && <p role="alert" className="text-sm text-lateInk" data-testid="studio-publish-error">{error}</p>}
       </StudioCard>
