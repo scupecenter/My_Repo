@@ -30,6 +30,8 @@ import { MiniRail } from '@/components/Pipeline';
 import { SiteMap } from '@/components/SiteMap';
 import { SitesBoard, SWIMLANES, type Swimlane } from '@/components/SitesBoard';
 import { useVirtual } from '@/components/useVirtual';
+import { SITE360_MASTER, SITE360_NAV } from '@/lib/site360Menus';
+import { fmtDate } from '@/lib/time';
 import { DEFAULT_STREAMS, DEFAULT_VIEWS, DISMANTLE_CODE, isRealStream, statusOf, streamName, viewName } from '@/lib/streams';
 
 const ROWS = { comfortable: 52, compact: 38 } as const;
@@ -62,18 +64,24 @@ export function Sites() {
   const [sp, setSp] = useSearchParams();
   const stream = sp.get('stream') ?? '';
   const view = sp.get('view') ?? '';
-  // SITE 360 menus (F15): ?section= picks a menu; ?layout=vertical shows the list, the default is the Grid.
+  // SITE 360 menus (F15): ?section= picks a menu. The default is the normal list (owner request 2026-11-22); the Excel-like Grid has no button any more and
+  // opens only when ?layout=grid is in the URL (hidden, kept for its source panel and tests).
   const section = sp.get('section') ?? '';
-  const layout = sp.get('layout') === 'vertical' ? 'vertical' : 'grid';
+  const layout = sp.get('layout') === 'grid' ? 'grid' : 'list';
   const site360Q = useSite360Sections();
-  const menu = section ? site360Q.data?.items.find((m) => m.key === section) : undefined;
+  // Site Master and each sub-menu keep their OWN columns (GET /site360/sections) and values (GET /site360/{menu}/rows) in the calm list style of this page (owner request
+  // 2026-11-22): no band or group rows, no inline editing. A stream or a work view (?stream=, ?view=) keeps the generic list.
+  const menuKey = section || (!stream && !view ? SITE360_MASTER : '');
+  const lay = sp.get('layout');
+  const menuList = !!menuKey && lay !== 'list' && lay !== 'grid' && lay !== 'map' && lay !== 'board' && !site360Q.isError;
+  const menu = menuKey ? site360Q.data?.items.find((m) => m.key === menuKey) : undefined;
   // The grid reads its rows from GET /site360/{menu}/rows (one page, the same URL filters as the list), so the grid and the list share the source.
   // Multi Site ID search (paste a list, comma or newline separated) is kept in the URL as site_code, like the other filters.
   // F3 (0.15.31): the AND/OR filter tree lives in the URL as JSON (adv) and goes to the server as `filter`, which compiles it
   const adv = sp.get('adv') ?? '';
   const advTree = decodeFilter(adv);
   const gridQuery = {
-    site_code: sp.get('site_code') || undefined,
+    site_code: sp.get('site_code') || sp.get('site_codes') || undefined,
     filter: adv || undefined,
     region_id: sp.get('region_id') || undefined,
     scenario: sp.get('scenario') || undefined,
@@ -81,8 +89,8 @@ export function Sites() {
     status: sp.get('overall_status') || undefined,
     sort: 'site_code',
   };
-  const gridRowsQ = useSite360RowsPaged(menu ? section : undefined, gridQuery);
-  const saveCell = useSaveSite360Cell(menu ? section : undefined, gridQuery);
+  const gridRowsQ = useSite360RowsPaged(menu && (layout === 'grid' || menuList) ? menuKey : undefined, gridQuery);
+  const saveCell = useSaveSite360Cell(menu && layout === 'grid' ? menuKey : undefined, gridQuery);
   const gridPages = gridRowsQ.data?.pages ?? [];
   const gridTotal = gridPages[0]?.total;
   const gridFiltered = gridPages[0]?.filtered;
@@ -143,15 +151,17 @@ export function Sites() {
   // Name of the Site Register sub-menu that is open (sidebar request 2026-11-05): the view wins, else the stream; empty = all sites.
   const viewRef = view ? (viewsQ.data ?? DEFAULT_VIEWS).find((x) => x.code === view) : undefined;
   const streamRef = stream ? (streamsQ.data?.length ? streamsQ.data : DEFAULT_STREAMS).find((x) => x.code === stream) : undefined;
-  const subMenu = view ? (viewRef ? viewName(i18n.language, viewRef) : view) : streamRef ? streamName(t, i18n.language, streamRef) : '';
+  const navSection = section && section !== SITE360_MASTER ? SITE360_NAV.find((m) => m.key === section) : undefined;
+  const sectionName = navSection ? (i18n.language === 'ar' ? navSection.ar : navSection.en) : '';
+  const subMenu = view ? (viewRef ? viewName(i18n.language, viewRef) : view) : streamRef ? streamName(t, i18n.language, streamRef) : sectionName;
   const real = !!stream && isRealStream(stream, streamsQ.data); // Dismantle has no API stream yet: nothing is fetched for it
   const dismantle = stream === DISMANTLE_CODE && !real;
 
   // "Export current view" sends exactly the query of the list: its filters, the F3 filter tree, the pasted Site IDs, the bucket and the stream (contract 0.15.34)
   const viewFilters = Object.fromEntries(Object.entries({ ...f, ...extra, ...(bucket ? { bucket } : {}), ...(coordinates ? { coordinates } : {}), ...(real ? { stream } : {}), ...(view ? { view } : {}) }).filter(([, x]) => x));
-  const q = useSites({ ...f, ...extra, ...(bucket ? { bucket } : {}), ...(coordinates ? { coordinates } : {}), ...(real ? { stream } : {}), ...(view ? { view } : {}) }, !dismantle && !asMap && !asBoard);
+  const q = useSites({ ...f, ...extra, ...(bucket ? { bucket } : {}), ...(coordinates ? { coordinates } : {}), ...(real ? { stream } : {}), ...(view ? { view } : {}) }, !dismantle && !asMap && !asBoard && !menuList);
   // Sites where the stream does not apply are not in the stream list. They come from the unfiltered list (their `streams[]` says "na").
-  const allQ = useSites({ ...f, ...extra, stage_code: '', ...(bucket ? { bucket } : {}), ...(coordinates ? { coordinates } : {}), ...(view ? { view } : {}) }, real && !asMap && !asBoard);
+  const allQ = useSites({ ...f, ...extra, stage_code: '', ...(bucket ? { bucket } : {}), ...(coordinates ? { coordinates } : {}), ...(view ? { view } : {}) }, real && !asMap && !asBoard && !menuList);
   const { hasNextPage: moreAll, isFetchingNextPage: fetchingAll, fetchNextPage: nextAll } = allQ;
   useEffect(() => { if (real && moreAll && !fetchingAll) void nextAll(); }, [real, moreAll, fetchingAll, nextAll]);
   const inStream = q.data?.pages.flatMap((p) => p.items) ?? [];
@@ -160,29 +170,41 @@ export function Sites() {
   const total = (q.data?.pages[0]?.page.total ?? inStream.length) + (showNa && real ? naItems.length : 0);
   const stageOptions = (inStream[0] ?? q.data?.pages[0]?.items[0])?.rail.map((r) => r.code) ?? [];
 
-  const tbl = useTablePrefs(real ? 'sites-stream' : 'sites', real ? DEFS_STREAM : DEFS_ALL);
+  // The list of a menu: its rows (the quick filter works on the loaded rows) and its columns. Site ID and Site Name stay frozen; the # column is not drawn.
+  const mRows = useMemo(() => {
+    const n = f.q.trim().toLowerCase();
+    return n ? gridRows.filter((r) => r.site_code.toLowerCase().includes(n) || (r.values['4'] ?? '').toLowerCase().includes(n)) : gridRows;
+  }, [gridRowsQ.data, f.q]); // eslint-disable-line react-hooks/exhaustive-deps
+  const mCols = useMemo(() => (menu?.columns ?? []).filter((c) => c.ord !== 1), [menu]);
+  const defsMenu: ColDef[] = mCols.map((c) => (c.ord === 2 ? { id: 'c2', w: 110, min: 70, pinned: true } : c.ord === 4 ? { id: 'c4', w: 220, min: 100, max: 340, pinned: true } : { id: `c${c.ord}`, w: 150, min: 70, max: 400 }));
+  const mCol = (id: string) => mCols.find((c) => `c${c.ord}` === id);
+  const tbl = useTablePrefs(menuList ? `sites-menu-${menuKey}` : real ? 'sites-stream' : 'sites', menuList ? defsMenu : real ? DEFS_STREAM : DEFS_ALL);
+  const nRows = menuList ? mRows.length : items.length;
   const ROW = ROWS[tbl.density];
   const viewport = Math.max(320, (typeof window === 'undefined' ? 800 : window.innerHeight) - 380);
-  const v = useVirtual(items.length, ROW, viewport);
+  const v = useVirtual(nRows, ROW, viewport);
   const { hasNextPage, isFetchingNextPage, fetchNextPage } = q;
   useEffect(() => { if (hasNextPage && !isFetchingNextPage && v.end >= inStream.length - 20) void fetchNextPage(); }, [v.end, inStream.length, hasNextPage, isFetchingNextPage, fetchNextPage]);
+  const { hasNextPage: moreRows, isFetchingNextPage: fetchingRows, fetchNextPage: nextRows } = gridRowsQ;
+  useEffect(() => { if (menuList && moreRows && !fetchingRows && v.end >= mRows.length - 20) void nextRows(); }, [menuList, moreRows, fetchingRows, v.end, mRows.length, nextRows]);
   const scroller = useRef<HTMLDivElement>(null);
   const restored = useRef(false);
   const scrollKey = `pmis.scroll.sites.${stream || 'ALL'}`;
   useLayoutEffect(() => { // back from a site: the list comes back where it was
     const el = scroller.current;
-    if (!el || restored.current || !items.length) return;
+    if (!el || restored.current || !nRows) return;
     restored.current = true;
     const y = Number(sessionStorage.getItem(scrollKey) ?? 0);
     if (y) el.scrollTop = y;
-  }, [items.length, scrollKey]);
+  }, [nRows, scrollKey]);
   const rname = (id: number) => { const r = regions.data?.find((x) => x.id === id); return (i18n.language === 'ar' && r?.name_ar) || r?.name_en || String(id); };
   const stageName = (code?: string | null) => (code ? t(`stage.${code}`, { defaultValue: code }) : '—');
-  const label = (id: string) => t(LABEL[id]);
+  const label = (id: string) => (mCol(id) ? mCol(id)!.header : LABEL[id] ? t(LABEL[id]) : id);
+  const hint = (id: string) => { const c = mCol(id); return c ? [c.group_top, c.group_mid].filter(Boolean).join(' / ') || undefined : undefined; };
   const cols = tbl.cols, W = totalWidth(cols, true);
   const linkTo = (s: SiteListItem) => `/sites/${s.id}${new URLSearchParams([...(real ? [['stream', stream]] : []), ...(view ? [['view', view]] : [])]).toString().replace(/^(?=.)/, '?')}`;
   const flip = (code: string) => setPicked((p) => { const n = new Set(p); if (n.has(code)) n.delete(code); else n.add(code); return n; });
-  const allCodes = items.map((s) => s.site_code), allPicked = allCodes.length > 0 && allCodes.every((c) => picked.has(c));
+  const allCodes = menuList ? mRows.map((r) => r.site_code) : items.map((s) => s.site_code), allPicked = allCodes.length > 0 && allCodes.every((c) => picked.has(c));
   const chips = [
     ...(f.q ? [{ key: 'q', label: t('table.filter_q', { v: f.q }), onRemove: () => set('q')('') }] : []),
     ...(f.region_id ? [{ key: 'region_id', label: t('table.filter_region', { v: rname(Number(f.region_id)) }), onRemove: () => set('region_id')('') }] : []),
@@ -218,7 +240,17 @@ export function Sites() {
       default: return null;
     }
   };
-  useAutoFit(tbl, label, items, fitText, i18n.language);
+  useAutoFit(tbl, label, menuList ? [] : items, fitText, i18n.language);
+  /** The read-only text of a Master cell: dates in the app's format, a list as comma separated text, the overall status by its name. */
+  const mText = (ord: number, r: { site_code: string; values: Record<string, string | null> }): string => {
+    if (ord === 2) return r.site_code;
+    const raw = r.values[String(ord)] ?? '';
+    if (!raw) return '';
+    if (ord === 182 && STATUSES.includes(raw)) return t(`status.${raw}`);
+    if (raw.startsWith('[') && raw.endsWith(']')) { try { const a: unknown = JSON.parse(raw); if (Array.isArray(a)) return a.map((x) => fmtDate(String(x), i18n.language)).join(', '); } catch { /* plain text */ } }
+    return fmtDate(raw, i18n.language);
+  };
+  useAutoFit(tbl, label, menuList ? mRows : [], (id, r) => { const c = mCol(id); return c ? mText(c.ord, r) : null; }, i18n.language);
 
   const cell = (id: string, s: SiteListItem) => {
     const st = statusOf(s.streams, stream);
@@ -244,11 +276,7 @@ export function Sites() {
 
   return (
     <div data-testid="page-sites">
-      <PageHeader title={subMenu ? `${t('sites.title')}: ${subMenu}` : t('sites.title')} subtitle={t('sites.subtitle')} context={<>{menu && (
-        <span className="inline-flex gap-1" role="group" aria-label={t('site360.layout')} data-testid="site360-layout">
-          <button type="button" aria-pressed={layout === 'grid'} data-testid="site360-layout-grid" onClick={() => setParams({ layout: 'grid' })} className={`btn px-2 py-1 text-xs ${layout === 'grid' ? 'btn-primary' : ''}`}>{t('site360.grid')}</button>
-          <button type="button" aria-pressed={layout === 'vertical'} data-testid="site360-layout-vertical" onClick={() => setParams({ layout: 'vertical' })} className={`btn px-2 py-1 text-xs ${layout === 'vertical' ? 'btn-primary' : ''}`}>{t('site360.vertical')}</button>
-        </span>)}{(canCreate || newTpl) && (
+      <PageHeader title={subMenu ? `${t('sites.title')}: ${subMenu}` : t('sites.title')} subtitle={t('sites.subtitle')} context={<>{(canCreate || newTpl) && (
         <span className="ms-auto flex flex-wrap gap-1" data-testid="sites-create-actions">
           {canCreate && <Link className="btn btn-primary px-2 py-1 text-xs" to="/sites/new" data-testid="sites-new"><FilePlus2 size={14} />{t('sites.new_site')}</Link>}
           {newTpl && <><button type="button" className="btn px-2 py-1 text-xs" data-testid="sites-template-download"
@@ -264,11 +292,13 @@ export function Sites() {
         <Select id="region" value={f.region_id} onChange={set('region_id')} all={t('sites.all_regions')} options={(regions.data ?? []).map((r) => [String(r.id), (i18n.language === 'ar' && r.name_ar) || r.name_en])} />
         <Select id="scenario" value={f.scenario} onChange={set('scenario')} all={t('sites.all_scenarios')} options={SCENARIOS.map((s) => [s, t(`scenario.${s}`)])} />
         <Select id="status" value={f.overall_status} onChange={set('overall_status')} all={t('sites.all_statuses')} options={STATUSES.map((s) => [s, t(`status.${s}`)])} />
+        {!menuList && <>
         <Select id="stage" value={f.stage_code} onChange={set('stage_code')} all={t('sites.all_stages')} options={stageOptions.map((s) => [s, stageName(s)])} />
         <QuickFilter testid="sites-quick-mine" on={bucket === 'mine'} onClick={() => setParams({ bucket: bucket === 'mine' ? '' : 'mine', sel: '' })}>{t('table.mine')}</QuickFilter>
         <QuickFilter testid="sites-quick-late" on={bucket === 'late'} onClick={() => setParams({ bucket: bucket === 'late' ? '' : 'late', sel: '' })}>{t('table.late')}</QuickFilter>
         <Select id="locks" value={locks} onChange={(v) => setParams({ workflow_locks: v, sel: '' })} all={t('locks.filter')} options={[['locked', t('locks.filter_locked')], ['open', t('locks.filter_open')]]} />
         <QuickFilter testid="sites-quick-gaps" on={!!gaps} onClick={() => setParams({ data_gaps: gaps ? '' : 'with', sel: '' })}>{t('locks.quick_gaps')}</QuickFilter>
+        </>}
         {real && (
           <label className="flex items-center gap-2 text-sm" title={t('sites.na_hint')}>
             <input type="checkbox" data-testid="sites-show-na" checked={showNa} onChange={(e) => setShowNa(e.target.checked)} />
@@ -276,7 +306,7 @@ export function Sites() {
           </label>
         )}
         </>}
-        count={<span className="text-sm text-mute" data-testid="sites-count">{t('sites.count', { count: total })}</span>}
+        count={<span className="text-sm text-mute" data-testid="sites-count">{t('sites.count', { count: menuList ? (gridFiltered ?? mRows.length) : total })}</span>}
         tools={<>
         <button type="button" className="btn px-2 py-1 text-xs" data-testid="sites-layout" aria-pressed={asMap} onClick={() => setParams({ layout: asMap ? '' : 'map', sel: '' })}>
           {asMap ? <><Table2 size={14} />{t('sites.table')}</> : <><MapIcon size={14} />{t('sites.map')}</>}
@@ -321,6 +351,29 @@ export function Sites() {
           {srcCell ? <Site360SourcePanel siteId={srcCell.siteId} siteCode={srcCell.siteCode} ord={srcCell.ord} onClose={() => setSrcCell(null)} /> : <p className="mt-1 text-xs text-mute" data-testid="site360-source-hint">{t('site360.src.hint')}</p>}
           {gridRowsQ.hasNextPage ? <button type="button" className="btn" data-testid="site360-more" disabled={gridRowsQ.isFetchingNextPage} onClick={() => void gridRowsQ.fetchNextPage()}>{t('site360.more')}</button> : null}
         </div>
+      ) : menuList ? (
+        <div className="card gx overflow-hidden" data-menu={menuKey} data-density={tbl.density} data-testid="site360-list">
+          <div ref={scroller} data-testid="sites-scroll" className="relative overflow-auto" style={{ height: viewport }} onScroll={(e) => { v.onScroll(e); sessionStorage.setItem(scrollKey, String(e.currentTarget.scrollTop)); }}>
+            <HeaderRow api={tbl} label={label} hint={hint} select={{ checked: allPicked, indeterminate: picked.size > 0, onChange: () => setPicked(allPicked ? new Set() : new Set(allCodes)), label: t('table.select_all'), testid: 'sites-select-all' }} />
+            <div data-testid="sites-list" role="list" className="relative" style={{ height: v.total, minWidth: W }}>
+              {mRows.slice(v.start, v.end).map((r, k) => {
+                const on = picked.has(r.site_code), cur = sel === r.site_code;
+                const g = gxRow(v.start + k, { picked: on, current: cur });
+                return (
+                  <div key={r.site_id} role="listitem" aria-selected={on || cur} data-selected={cur || undefined} data-zebra={g['data-zebra']} data-picked={g['data-picked']} className={`absolute inset-x-0 border-b border-line text-sm ${g.className}`} style={{ insetBlockStart: (v.start + k) * ROW, height: ROW }}>
+                    <div className="sticky start-0 z-20 h-0 w-9"><span className="absolute start-0 top-0 flex w-9 items-center justify-center bg-inherit" style={{ height: ROW }}><SelectBox checked={on} onChange={() => flip(r.site_code)} label={t('table.select_row', { code: r.site_code })} testid={`site-select-${r.site_code}`} /></span></div>
+                    <Link to={`/sites/${r.site_id}`} data-testid={`site-row-${r.site_code}`} onClick={() => setParams({ sel: r.site_code })} className="grid h-full items-center bg-inherit" style={{ gridTemplateColumns: tracks(cols, true) }}>
+                      <span aria-hidden />
+                      {cols.map((c) => { const p = pin(c, true, cols); const col = mCol(c.id); const txt = col ? mText(col.ord, r) : ''; return <span key={c.id} data-col={c.id} className={`min-w-0 px-2 ${p.className}`} style={p.style}>{col?.ord === 2 ? <b className="mono">{txt}</b> : col?.ord === 182 && txt ? <StatusChip tone={TONE[r.values['182'] ?? '']} text={txt}>{txt}</StatusChip> : txt ? <Trunc text={txt} /> : <Empty />}</span>; })}
+                    </Link>
+                  </div>
+                );
+              })}
+              {gridRowsQ.isSuccess && !mRows.length && (activeFilters ? <NoResults testid="sites-empty" onClear={clearAll} /> : <EmptyState testid="sites-empty" title={t('sites.empty')} />)}
+            </div>
+          </div>
+          {gridRowsQ.hasNextPage ? <button type="button" className="btn m-2" data-testid="site360-more" disabled={gridRowsQ.isFetchingNextPage} onClick={() => void gridRowsQ.fetchNextPage()}>{t('site360.more')}</button> : null}
+        </div>
       ) : (
         <div className="card gx overflow-hidden" data-stream={stream || 'ALL'} data-density={tbl.density}>
           <div ref={scroller} data-testid="sites-scroll" className="relative overflow-auto" style={{ height: viewport }} onScroll={(e) => { v.onScroll(e); sessionStorage.setItem(scrollKey, String(e.currentTarget.scrollTop)); }}>
@@ -346,14 +399,14 @@ export function Sites() {
           </div>
         </div>
       )}
-      <BulkBar testid="sites-bulk" count={picked.size} loaded={items.length} total={total} onClear={() => setPicked(new Set())}>
-        {picked.size === 1 && <button type="button" className="btn" data-testid="sites-bulk-open" onClick={() => { const s = items.find((x) => picked.has(x.site_code)); if (s) nav(linkTo(s)); }}>{t('table.open_selected')}</button>}
+      <BulkBar testid="sites-bulk" count={picked.size} loaded={nRows} total={menuList ? (gridFiltered ?? nRows) : total} onClear={() => setPicked(new Set())}>
+        {picked.size === 1 && <button type="button" className="btn" data-testid="sites-bulk-open" onClick={() => { if (menuList) { const r = mRows.find((x) => picked.has(x.site_code)); if (r) nav(`/sites/${r.site_id}`); return; } const s = items.find((x) => picked.has(x.site_code)); if (s) nav(linkTo(s)); }}>{t('table.open_selected')}</button>}
         {canUnlock && <><button type="button" className="btn" data-testid="sites-bulk-locks-open" onClick={() => setLocksDlg(false)}>{t('locks.bulk_open')}</button>
           <button type="button" className="btn" data-testid="sites-bulk-locks-lock" onClick={() => setLocksDlg(true)}>{t('locks.bulk_lock')}</button></>}
         <button type="button" className="btn" data-testid="sites-bulk-copy" onClick={() => { void navigator.clipboard?.writeText([...picked].join('\n')); toast(t('table.copied', { count: picked.size })); }}>{t('table.copy_codes')}</button>
       </BulkBar>
       <ExportDialog open={exp} onClose={() => setExp(false)} />
-      {locksDlg !== null && <LocksDialog target={{ site_ids: menu && layout === 'grid' ? gridSel.map((r) => r.id) : items.filter((x) => picked.has(x.site_code)).map((x) => x.id) }} locked={locksDlg} count={menu && layout === 'grid' ? gridSel.length : picked.size} testid="sites-locks-dialog"
+      {locksDlg !== null && <LocksDialog target={{ site_ids: menu && layout === 'grid' ? gridSel.map((r) => r.id) : menuList ? mRows.filter((x) => picked.has(x.site_code)).map((x) => x.site_id) : items.filter((x) => picked.has(x.site_code)).map((x) => x.id) }} locked={locksDlg} count={menu && layout === 'grid' ? gridSel.length : picked.size} testid="sites-locks-dialog"
         onClose={() => { setLocksDlg(null); setPicked(new Set()); }} />}
       {upSites && newTpl && <TemplateUploadDialog open onClose={() => setUpSites(false)} templateId={newTpl.template_id} templateName={`${(i18n.language === 'ar' && newTpl.name_ar) || newTpl.name_en} · v${newTpl.current_version}`}
         kind="sites" onDone={(b) => { setUpSites(false); toast(t('grid.uploaded')); nav(batchPath(b)); }} />}

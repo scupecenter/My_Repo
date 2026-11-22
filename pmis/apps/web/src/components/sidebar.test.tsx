@@ -6,8 +6,8 @@ import { ErrorState, NoResults } from '@/components/States';
 import { Sites } from '@/pages/Sites';
 import { renderApp, signIn } from '@/test/utils';
 
-/** The seven sub-menus under "Site Master" (owner request 2026-11-22): the Master section is the parent entry, not a sub-menu. */
-const SUBMENU_KEYS = ['design_acq', 'sow', 'cw', 'te', 'hoto', 'dismantle', 'om'] as const;
+/** The six sub-menus under "Site Master" (owner request 2026-11-22): the Master section is the parent entry, not a sub-menu. */
+const SUBMENU_KEYS = ['design_acq', 'sow', 'cw', 'te', 'hoto', 'om'] as const;
 const SUBMENU_TESTIDS = SUBMENU_KEYS.map((k) => `nav-site360-${k}`);
 
 const app = (route = '/my-work', locale: 'en' | 'ar' = 'en') =>
@@ -109,7 +109,7 @@ describe('Sidebar tree (N1-N12)', () => {
     expect(screen.getByTestId('nav-change_control')).toHaveTextContent('Change Control Log');
   });
 
-  it('shows one "Site Master" entry with exactly the 7 sub-menus, and no older stream or view links', async () => {
+  it('shows one "Site Master" entry with exactly the 6 sub-menus (no Dismantle), and no older stream or view links', async () => {
     app();
     const entry = await screen.findByTestId('nav-sites');
     expect(entry).toHaveTextContent(/^Site Master$/);
@@ -119,7 +119,9 @@ describe('Sidebar tree (N1-N12)', () => {
     expect(screen.queryByTestId('nav-site360-master')).not.toBeInTheDocument();
     const menus = screen.getByTestId('nav-site360-menus');
     expect([...menus.querySelectorAll('a')].map((a) => a.getAttribute('data-testid'))).toEqual(SUBMENU_TESTIDS);
-    expect([...menus.querySelectorAll('a')].map((a) => a.textContent)).toEqual(['Design & Acquisition', 'SOW', 'CW', 'TE', 'HOTO', 'Dismantle', 'O&M']);
+    expect([...menus.querySelectorAll('a')].map((a) => a.textContent)).toEqual(['Design & Acquisition', 'SOW', 'CW', 'TE', 'HOTO', 'O&M']);
+    expect(screen.queryByTestId('nav-site360-dismantle')).not.toBeInTheDocument();
+    expect(SUBMENU_KEYS).toHaveLength(6);
     expect([...menus.querySelectorAll('a')].map((a) => a.getAttribute('href'))).toEqual(SUBMENU_KEYS.map((k) => `/sites?section=${k}`));
     expect(document.querySelector('[data-testid^="nav-sites-stream-"]')).toBeNull();
     expect(document.querySelector('[data-testid^="nav-sites-view-"]')).toBeNull();
@@ -137,6 +139,14 @@ describe('Sidebar tree (N1-N12)', () => {
       expect(screen.getByTestId('nav-group-site_register')).toHaveAttribute('data-active', 'true');
       expect(screen.getByTestId('page-sites')).toBeInTheDocument();
     }
+  });
+
+  it('names the renamed registers in English: GECOL Power, Quality Control, RF & Design', async () => {
+    app();
+    await screen.findByTestId('nav-sites');
+    expect(screen.getByTestId('nav-gecol')).toHaveTextContent('GECOL Power');
+    expect(screen.getByTestId('nav-quality')).toHaveTextContent('Quality Control');
+    expect(screen.getByTestId('nav-rf_design')).toHaveTextContent('RF & Design');
   });
 
   it('points the Dismantle sub-menu at the Dismantle register', async () => {
@@ -230,7 +240,10 @@ describe('Sidebar tree (N1-N12)', () => {
     expect(screen.getByTestId('nav-site360-design_acq')).toHaveTextContent('التصميم والاستحواذ');
     expect(screen.getByTestId('nav-site360-te')).toHaveTextContent('التركيبات');
     expect(screen.getByTestId('nav-site360-hoto')).toHaveTextContent('التسليم والإغلاق');
-    expect(screen.getByTestId('nav-site360-dismantle')).toHaveTextContent('الفك');
+    expect(screen.queryByTestId('nav-site360-dismantle')).not.toBeInTheDocument();
+    expect(screen.getByTestId('nav-gecol')).toHaveTextContent('كهرباء GECOL');
+    expect(screen.getByTestId('nav-quality')).toHaveTextContent('ضبط الجودة');
+    expect(screen.getByTestId('nav-rf_design')).toHaveTextContent('الترددات والتصميم');
     expect(screen.getByTestId('nav-site360-om')).toHaveTextContent('التشغيل والصيانة');
     expect(screen.getByTestId('nav-dismantle')).toHaveTextContent('الفك');
     expect(screen.getByTestId('nav-sites')).toHaveTextContent('ماستر المواقع');

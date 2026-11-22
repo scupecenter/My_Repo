@@ -42,7 +42,6 @@ import { GridCellEditor, INLINE_TYPES } from "@/components/GridCellEditor";
 import { RegisterGrid } from "@/components/RegisterGrid";
 import { RejectDialog } from "@/components/RejectDialog";
 import { TemplateUploadDialog } from "@/components/TemplateUploadDialog";
-import { ViewModeToggle, type ViewMode } from "@/components/ViewModeToggle";
 import { Holders } from "@/components/HolderChip";
 import {
   canEditColumns,
@@ -145,10 +144,9 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
   const set = (k: keyof RecordFilters) => (v: string) => setParams({ [k]: v });
   const clearAll = () =>
     setParams({ ...Object.fromEntries(RF_KEYS.map((k) => [k, ""])), adv: "" });
-  // F16: the view is kept in the URL (view=grid; vertical is the default and leaves no parameter), so Back and shared links restore it.
-  const view: ViewMode = sp.get("view") === "grid" ? "grid" : "vertical";
-  const setView = (v: ViewMode) =>
-    setParams({ view: v === "grid" ? "grid" : "" });
+  // The list ("vertical") is the only visible view (owner request 2026-11-22): the Excel-like Grid has no button any more and opens only when
+  // `?view=grid` is in the URL (hidden).
+  const view: "vertical" | "grid" = sp.get("view") === "grid" ? "grid" : "vertical";
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const regions = useRegions();
   // F16: As-Built splits CW BOQ / TE BOQ and Dismantle splits CW / TE by record_type (the server filter); the first tab is the default.
@@ -636,11 +634,6 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
         }
         tools={
           <>
-            <ViewModeToggle
-              value={view}
-              onChange={setView}
-              testid="register-view"
-            />
             {view === "vertical" && <DensityToggle api={tbl} />}
             {view === "vertical" && <ColumnMenu api={tbl} label={label} />}
             <ExportViewButton

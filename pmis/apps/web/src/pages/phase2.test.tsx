@@ -32,7 +32,7 @@ async function submitA1AsReviewer() {
 describe('Sites list', () => {
   it('virtualises rows and filters by region', async () => {
     await signIn('pm');
-    renderApp(<Sites />, { route: '/sites' });
+    renderApp(<Sites />, { route: '/sites?layout=list' });
     await waitFor(() => expect(screen.getByTestId('sites-count')).toHaveTextContent('150'));
     expect(screen.getAllByRole('listitem').length).toBeLessThan(40);
     expect(screen.getAllByTestId('mini-rail').length).toBeGreaterThan(0);

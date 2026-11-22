@@ -19,14 +19,11 @@
     "name": "GSDN Workspace"
   },
   "site360": {
-    "layout": "Site Master layout",
     "menus": "Site Master menus",
     "gate": "gate",
     "freeze": "Freeze or unfreeze this column",
     "rows": "Rows: {{count}}",
     "of": "{{count}} of {{total}} sites",
-    "grid": "Grid",
-    "vertical": "Vertical",
     "more": "Load more sites",
     "site_ids": "Site IDs to find",
     "site_ids_placeholder": "Paste Site IDs, one per line or comma separated",
@@ -112,7 +109,7 @@
     "admin.profiles": "Permission profiles",
     "admin.assignments": "Assignments",
     "procurement": "Procurement",
-    "gecol": "GECOL",
+    "gecol": "GECOL Power",
     "hlc": "HLC Fiber",
     "permits_hse": "Permits & HSE",
     "dismantle": "Dismantle",
@@ -124,14 +121,14 @@
     "car_dispatcher": "Car Dispatcher",
     "financial_advances": "Financial Advances",
     "warehouse": "Warehouse",
-    "quality": "Quality",
+    "quality": "Quality Control",
     "issues": "Issue Log",
     "risks": "Risk Register",
     "change_control": "Change Control Log",
     "readiness": "Readiness & Handover",
     "as_built": "As-Built",
     "meetings": "Meetings",
-    "rf_design": "RF Design",
+    "rf_design": "RF & Design",
     "acquisition": "Acquisition",
     "favourites": "Favourites",
     "recent": "Recent",
@@ -1813,8 +1810,6 @@
     "hidden": "hidden"
   },
   "viewMode": {
-    "label": "View",
-    "vertical": "Vertical",
     "grid": "Grid"
   },
   "registers": {
@@ -2635,9 +2630,9 @@
   "dash": {
     "tabs": {
       "label": "Dashboard sections",
-      "pmo": "PMO and management",
-      "cw": "CW follow-up",
-      "te": "TE follow-up",
+      "pmo": "PMO",
+      "cw": "CW",
+      "te": "TE",
       "unavailable": "This tab is not set up for this workflow."
     },
     "print": "Print A4 sheet",
@@ -4177,9 +4172,9 @@
     "unit_count": "count",
     "dir_higher": "higher is better",
     "dir_lower": "lower is better",
-    "tab_pmo": "PMO and management",
-    "tab_cw": "CW follow-up",
-    "tab_te": "TE follow-up",
+    "tab_pmo": "PMO",
+    "tab_cw": "CW",
+    "tab_te": "TE",
     "move_up": "Move {{name}} up",
     "move_down": "Move {{name}} down",
     "invalid": "Every KPI needs a green and an amber value, and green must be better than amber for that KPI's direction."

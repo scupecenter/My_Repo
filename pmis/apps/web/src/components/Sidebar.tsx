@@ -26,7 +26,7 @@ export function siteSelection(pathname: string, search: string): { stream: strin
   return { stream: p.get('stream') ?? '', view: p.get('view') ?? '', section: p.get('section') ?? '' };
 }
 
-/** The seven SITE 360 sub-menus under "Site Master" (owner decision 2026-11-15, F15; the Master parent is the entry itself). Each opens `/sites?section=`. */
+/** The six SITE 360 sub-menus under "Site Master" (owner decision 2026-11-15, F15; the Master parent is the entry itself). Each opens `/sites?section=`. */
 function SiteSubmenus({ onNavigate }: { onNavigate?: () => void }) {
   const { t, i18n } = useTranslation();
   const loc = useLocation();
@@ -115,7 +115,7 @@ export function SidebarBody({ items, compact, unread, alerts = 0, activeKey, onN
   const favItems = favs.map(byKey).filter((x): x is NavItem => !!x);
   const recentItems = recent.filter((k) => k !== activeKey).map(byKey).filter((x): x is NavItem => !!x);
 
-  /** A screen of a heading. The Site Register entry "Site Master" carries the seven SITE 360 sub-menus; every other screen, Dismantle included, is a plain row. */
+  /** A screen of a heading. The Site Register entry "Site Master" carries the six SITE 360 sub-menus (no Dismantle); every other screen, Dismantle included, is a plain row (under Registers & Logs). */
   const itemNode = (k: string) => {
     const n = byKey(k);
     if (!n) return null;

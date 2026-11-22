@@ -203,7 +203,7 @@ describe('SiteMap', () => {
 
   it('the Site Register lists the sites without coordinates (the link of the map) and shows the same map (SC-10)', async () => {
     await signIn('pm');
-    renderApp(<Routes><Route path="/sites" element={<Sites />} /></Routes>, { route: '/sites?coordinates=missing' });
+    renderApp(<Routes><Route path="/sites" element={<Sites />} /></Routes>, { route: '/sites?layout=list&coordinates=missing' });
     expect(await screen.findByTestId('chip-coordinates')).toHaveTextContent('Coordinates: missing');
     const missing = Array.from({ length: SITE_COUNT }, (_, k) => k).filter((k) => !hasValidCoords(k)).length;
     await waitFor(() => expect(screen.getByTestId('sites-count')).toHaveTextContent(String(missing)));
