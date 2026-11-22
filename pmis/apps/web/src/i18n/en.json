@@ -5320,7 +5320,7 @@
       "preview_bad": "{{bad}} of {{total}} stored values would not convert.",
       "preview_note": "They stay as they are; nothing is rewritten.",
       "accept": "I accept that these values stay as they are.",
-      "sample": "{{site}}: {{value}}",
+      "sample": "Site {{site}}: {{value}}",
       "menus_hint": "Choose the SITE 360 menus that show this column.",
       "confirm": "Confirm",
       "saved_added": "Column {{letter}} added.",
