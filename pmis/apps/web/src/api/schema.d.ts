@@ -662,7 +662,11 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Change language and theme */
+        /**
+         * Change language and theme
+         * @description The top bar's language and theme buttons. Only `locale` and `theme` (others are 422); no `If-Match`, the last click wins.
+         *     Audited once with before and after (`profile_updated`), like `PATCH /me/profile`; the same value again writes nothing. (0.15.42)
+         */
         patch: operations["updateMyPreferences"];
         trace?: never;
     };
@@ -5474,6 +5478,173 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/site360/columns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Every Site Master column with its display order, band, group, type, list, source, menus and protection (0.15.43, Workflow Studio S2)
+         * @description 0.15.43 (migration 0133). The Studio's view of the Master columns: the 187 original columns and the columns an admin added, in display order (`display_order`,
+         *     which is not the Master order `ord`: a new column can sit after any column). `bands` lists the distinct bands and groups in display order, to pick the place of
+         *     a new column. Only a System Admin, or a delegate of `fields` edit for all regions (checked in the database with `app_actor_is_admin` and the region
+         *     filter), reads it; anyone else gets 403 `action_forbidden`.
+         *     `value_type` and `list_catalogue` are the effective ones: for a column filled by a task input they are the input's own type and list, so the two never differ.
+         *     `is_protected` marks a column the system depends on (the Site ID and the row number, the identity and scope columns, calculated columns, milestones, baselines,
+         *     register-fed columns and the status columns): it allows only a rename and its menus. An original column keeps its letter, order, band, group and place.
+         */
+        get: operations["listSite360Columns"];
+        put?: never;
+        /**
+         * Add a Site Master column after any column (0.15.43, Workflow Studio S2)
+         * @description 0.15.43 (migration 0133). Adds a column after the column `after_ord`, inside a band (`group_top`) and a group (`group_mid`), with a type, an optional dropdown
+         *     list and a source. The new column takes the next free Master order after the 187 and its letter (GF, GG, ...), so the Master-format export carries it after the
+         *     187 under that letter; its place on the grid is `display_order` (right after `after_ord`).
+         *     The source is one of: a task input (`kind` `task_input`, `task_code`, optional `field_key`: an existing input that no column uses is linked, a missing one
+         *     (`v:<key>`, or one of the date keys) is created with the column's type and list; its `template_task_fields.master_col` becomes the new letter, so the existing
+         *     task branch of `site360_master_values`, the stream templates, the Master import and the inline edit of the grid all follow) or a site custom field (`kind`
+         *     `site_field`, `field_id`: its values fill the column; the field must not carry another Master column).
+         *     The placement keeps the header coherent: inside a band the column must take that band, and inside a group that group; at the end of a band or a group it may
+         *     extend it, join the next one or start a new one (422 `validation_failed`, `/group_top` or `/group_mid`, code `placement_splits_band` or `placement_splits_group`;
+         *     the bands `#`, `Phase Gate` and `STATUS` are reserved, code `reserved_band`).
+         *     `value_type` is the type of the input when an existing input is linked (a different value is 422 `type_follows_source`); for a new input and for a site field
+         *     it is the type of the column. A `list` type needs `list_catalogue` (an active list); another type takes none (422 `list_required` or `list_not_allowed`).
+         *     System Admin, or a delegate of `fields` edit for all regions; a reason and a step-up; audited `site360.column_created` with after. The new column has no value
+         *     yet. 409 `duplicate` when the header exists, 409 `input_already_mapped` or `field_already_mapped` when the source already feeds a column, 422 `unknown_task`.
+         */
+        post: operations["createSite360Column"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/site360/columns/{ord}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The Master column order (1 to 187 original, 188 and up added; A = 1). */
+                ord: components["parameters"]["Site360ColumnOrd"];
+            };
+            cookie?: never;
+        };
+        /**
+         * One Site Master column with its usage (0.15.43, Workflow Studio S2)
+         * @description 0.15.43. The column as in `GET /site360/columns`, with `value_count` (the number of sites that hold a value in it; null when protected) and `delete_mode`: `hard` (an added column that never held a
+         *     value: `DELETE` removes it), `deactivate` (it holds values or is an original column that is not protected) or `blocked` (protected). The ETag is the column's
+         *     `version`. Same permission as the list.
+         */
+        get: operations["getSite360Column"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete an added Site Master column that never held a value (0.15.43, Workflow Studio S2)
+         * @description 0.15.43 (migration 0133). Only a column that an admin added and that never held a value (no site has a value in it, in the task input or the site field that fills
+         *     it) is deleted for good; the task input it created is deleted with it and an input it only linked is released (`master_col` null). The `reason` is a query
+         *     parameter. An original column is never deleted (409 `system_field`); a column that holds values is 409 `column_in_use` (`why`: `has_values`, `count`): deactivate
+         *     it with `POST .../deactivate`. The letter and the Master order are free again only when it was the last added column; otherwise the export keeps an empty column
+         *     at that position so the letters of the others stay true. `If-Match` is required. System Admin, or a delegate of `fields` edit for all regions; a step-up; audited
+         *     `site360.column_deleted` with before.
+         */
+        delete: operations["deleteSite360Column"];
+        options?: never;
+        head?: never;
+        /**
+         * Rename, retype, change the list, band, group or place of a Site Master column (0.15.43, Workflow Studio S2)
+         * @description 0.15.43 (migration 0133). Send the keys to change and a `reason`. Rename (`name_en`, `name_ar`; the header `Group / Name` follows), change the type (`value_type`)
+         *     and the dropdown list (`list_catalogue`, null clears it), move the column (`after_ord`, the same placement rules as the creation) and change its band and group.
+         *     A protected column allows only the rename (its menus change with `PATCH /site360/columns/{ord}/sections`); any other key is 409 `system_field`. An original
+         *     column keeps its letter, order, band, group and place: `group_top`, `group_mid` and `after_ord` on one are 409 `system_field`; its type and list can change
+         *     when it is not protected (a task input column). A column filled by a task input changes the input's own type and list (`template_task_fields.field_type`,
+         *     `list_catalogue`), so the task form, the stream templates and the Master import follow, and the templates are issued again with a new version; a date key of a
+         *     task (planned, actual, start, submitted, approved) is always a date and the external party is text (422 `type_follows_source`). A column filled by a site field
+         *     keeps its own type; the type of the field itself stays in Settings > Custom fields.
+         *     A type or list change never rewrites a stored value. The values that would not convert are counted (see `POST .../type-preview`); when there are some and
+         *     `confirm_unconvertible` is not true the answer is 409 `conversion_unconfirmed` with `conversion` (the preview). An `If-Match` with the column's `version` is
+         *     required (428, 412). System Admin, or a delegate of `fields` edit for all regions; a reason and a step-up; one audit row with before and after
+         *     (`site360.column_updated`). Changing nothing is 409 `invalid_transition`.
+         */
+        patch: operations["updateSite360Column"];
+        trace?: never;
+    };
+    "/site360/columns/{ord}/type-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The Master column order (1 to 187 original, 188 and up added; A = 1). */
+                ord: components["parameters"]["Site360ColumnOrd"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview the values that would not convert to another type or list (0.15.43, Workflow Studio S2)
+         * @description 0.15.43. Reads the values the column holds in every site (a read, nothing changes, no step-up, no If-Match) and counts how many would not fit the new `value_type`
+         *     and `list_catalogue`: a number is `[+-]digits[.digits]`, a date starts with `YYYY-MM-DD`, a yes or no is one of yes, no, true, false, y, n, 1, 0, a list value is
+         *     a code, a label or an alias of an active value of the list, and text accepts everything. `samples` gives up to 50 of the failing values with their site. Same
+         *     permission as the list. The answer is the `conversion` of the 409 `conversion_unconfirmed` of the PATCH.
+         */
+        post: operations["previewSite360ColumnType"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/site360/columns/{ord}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The Master column order (1 to 187 original, 188 and up added; A = 1). */
+                ord: components["parameters"]["Site360ColumnOrd"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Deactivate a Site Master column (0.15.43, Workflow Studio S2)
+         * @description 0.15.43 (migration 0133). The column leaves every menu, the grid and the Master-format export (which keeps its position empty so the letters of the others stay true); its values, its source and its letter stay, so it can be
+         *     reactivated. A protected column cannot be deactivated (409 `system_field`); an inactive one is 409 `invalid_transition`. `If-Match` is required. System Admin,
+         *     or a delegate of `fields` edit for all regions; a reason and a step-up; audited `site360.column_deactivated`.
+         */
+        post: operations["deactivateSite360Column"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/site360/columns/{ord}/reactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The Master column order (1 to 187 original, 188 and up added; A = 1). */
+                ord: components["parameters"]["Site360ColumnOrd"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reactivate a deactivated Site Master column (0.15.43, Workflow Studio S2)
+         * @description 0.15.43. The column returns to its menus, the grid and the export at its place and with its letter. An active column is 409 `invalid_transition`. `If-Match`
+         *     is required. System Admin, or a delegate of `fields` edit for all regions; a reason and a step-up; audited `site360.column_reactivated`.
+         */
+        post: operations["reactivateSite360Column"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/site360/columns/{ord}/sections": {
         parameters: {
             query?: never;
@@ -8760,7 +8931,7 @@ export interface components {
         Site360Menu: "master" | "design_acq" | "sow" | "cw" | "te" | "hoto" | "dismantle" | "om";
         Site360Column: {
             ord: number;
-            /** @description The column letter in the Master sheet (A to GE). */
+            /** @description The column letter in the Master sheet (A to GE; GF and up for an added column, 0.15.43). */
             letter: string;
             /** @description The phase band (row 1 of the Master sheet). */
             group_top: string | null;
@@ -8775,6 +8946,15 @@ export interface components {
             source_kind?: components["schemas"]["Site360SourceKind"];
             /** @description 0.15.35. A short English note of the rule of the column. */
             source_note?: string | null;
+            /** @description 0.15.43. The place of the column on the grid (the columns of a menu are listed in this order). */
+            display_order?: number;
+            /** @description 0.15.43. The Arabic name of the column. */
+            name_ar?: string | null;
+            value_type?: components["schemas"]["Site360ColumnType"];
+            /** @description 0.15.43. The dropdown list of a `list` column. */
+            list_catalogue?: string | null;
+            /** @description 0.15.43. True for a column an admin added (ord 188 and up). */
+            is_added?: boolean;
         };
         /**
          * @description 0.15.35. The kind of source of a Master column or cell: `site` (a field of the site), `task` (a task field), `milestone` (a milestone task, or a gate
@@ -8860,6 +9040,166 @@ export interface components {
         Site360ColumnSectionsRequest: {
             sections: ("design_acq" | "sow" | "cw" | "te" | "hoto" | "dismantle" | "om")[];
             reason: string;
+        };
+        /**
+         * @description 0.15.43. The value type of a Site Master column: `text`, `number`, `date`, `list` (a dropdown list, `list_catalogue`) or `yes_no`. The same five types as
+         *     the task inputs (`template_task_fields.field_type`).
+         * @enum {string}
+         */
+        Site360ColumnType: "text" | "number" | "date" | "list" | "yes_no";
+        /** @description 0.15.43. Where the values of a column come from. */
+        Site360ColumnSource: {
+            kind: components["schemas"]["Site360SourceKind"];
+            /** @description The rule of the column (source_note). */
+            note: string | null;
+            /** @description kind task: the task whose input fills the column. */
+            task_code?: string;
+            /** @description kind task: the key of the input (planned_date, actual_date, ..., or v:<key> of the task values). */
+            field_key?: string;
+            /** @description kind task: the label of the input. */
+            input_label?: string;
+            /** @description kind task: true when the input is set by the workflow (submitted and approved dates, external party). */
+            input_read_only?: boolean;
+            /**
+             * Format: uuid
+             * @description kind custom_field: the site custom field.
+             */
+            site_field_id?: string;
+            site_field_code?: string;
+            site_field_label?: string;
+        };
+        /** @description 0.15.43 (migration 0133). A Site Master column as the Workflow Studio manages it. */
+        Site360ColumnAdmin: {
+            /** @description The Master order (A = 1). The 187 original columns are 1 to 187; an added column takes the next free order, so its letter is GF, GG, ... and it is exported after the 187. */
+            ord: number;
+            letter: string;
+            /** @description The place on the grid and in the menus (1 = first). It equals ord for the original columns until a column is added after one of them. */
+            display_order: number;
+            /** @description The band (row 1 of the Master sheet). */
+            group_top: string | null;
+            /** @description The group (row 2 of the Master sheet). */
+            group_mid: string | null;
+            /** @description The name (row 3 of the Master sheet); the header is `group / name`. */
+            name_en: string | null;
+            name_ar: string | null;
+            header: string;
+            value_type: components["schemas"]["Site360ColumnType"];
+            /** @description The dropdown list (`GET /list-catalogues`) of a `list` column. */
+            list_catalogue: string | null;
+            source: components["schemas"]["Site360ColumnSource"];
+            /** @description The SITE 360 menus of the column (`status` = every menu). Change them with `PATCH /site360/columns/{ord}/sections`. */
+            sections: components["schemas"]["Site360Section"][];
+            /** @description The system depends on the column: only a rename and its menus can change. */
+            is_protected: boolean;
+            protected_reason: string | null;
+            /** @description True for a column an admin added (ord 188 and up). */
+            is_added: boolean;
+            is_active: boolean;
+            /** @description The ETag, to send back as `If-Match`. */
+            version: number;
+        };
+        /** @description 0.15.43. A column with its usage. */
+        Site360ColumnDetail: components["schemas"]["Site360ColumnAdmin"] & {
+            /** @description The number of sites that hold a value in the column; null for a protected column (the system fills it, it is never counted). */
+            value_count: number | null;
+            /**
+             * @description `hard`: an added column that never held a value. `deactivate`: it holds values, or it is an original column. `blocked`: protected.
+             * @enum {string}
+             */
+            delete_mode: "hard" | "deactivate" | "blocked";
+        };
+        Site360ColumnList: {
+            items: components["schemas"]["Site360ColumnAdmin"][];
+            /** @description The bands and groups of the active columns in display order, to choose the place of a new column. */
+            bands: {
+                name: string | null;
+                groups: (string | null)[];
+            }[];
+            types: components["schemas"]["Site360ColumnType"][];
+        };
+        Site360ColumnTaskInputSource: {
+            /** @enum {string} */
+            kind: "task_input";
+            /** @description A task code of the workflow (any version). */
+            task_code: string;
+            /** @description An existing input that no column uses is linked; a missing key is created (a `v:<key>` input or a date key). Omit it to create a new `v:` input from the column name. */
+            field_key?: string;
+        };
+        Site360ColumnSiteFieldSource: {
+            /** @enum {string} */
+            kind: "site_field";
+            /**
+             * Format: uuid
+             * @description An active site custom field (`GET /custom-fields?entity_type=site`) that carries no Master column.
+             */
+            field_id: string;
+        };
+        Site360ColumnCreate: {
+            name_en: string;
+            name_ar?: string | null;
+            /** @description The band. */
+            group_top: string;
+            /** @description The group inside the band. */
+            group_mid?: string | null;
+            /** @description The column it sits after (any column, active or not). */
+            after_ord: number;
+            value_type?: components["schemas"]["Site360ColumnType"];
+            /** @description Required for `list`, refused for any other type. */
+            list_catalogue?: string | null;
+            source: components["schemas"]["Site360ColumnTaskInputSource"] | components["schemas"]["Site360ColumnSiteFieldSource"];
+            /** @description The menus; by default the menus of the column it sits after (without status). */
+            sections?: ("design_acq" | "sow" | "cw" | "te" | "hoto" | "dismantle" | "om")[];
+            reason: string;
+        };
+        /** @description Send at least one key besides `reason` and `confirm_unconvertible`. */
+        Site360ColumnUpdate: {
+            name_en?: string;
+            name_ar?: string | null;
+            group_top?: string;
+            group_mid?: string | null;
+            /** @description Move the column to sit after this one (an added column only). */
+            after_ord?: number;
+            value_type?: components["schemas"]["Site360ColumnType"];
+            list_catalogue?: string | null;
+            /**
+             * @description Accept that values that do not fit the new type or list stay as they are (409 `conversion_unconfirmed` otherwise).
+             * @default false
+             */
+            confirm_unconvertible: boolean;
+            reason: string;
+        };
+        Site360ColumnTypePreviewRequest: {
+            value_type: components["schemas"]["Site360ColumnType"];
+            list_catalogue?: string | null;
+        };
+        Site360ColumnTypePreview: {
+            ord: number;
+            letter: string;
+            from_type: components["schemas"]["Site360ColumnType"];
+            to_type: components["schemas"]["Site360ColumnType"];
+            from_list: string | null;
+            to_list: string | null;
+            /** @description Non-empty values the column holds in all sites. */
+            total_values: number;
+            convertible: number;
+            not_convertible: number;
+            samples: {
+                site_code: string;
+                value: string;
+                /** @enum {string} */
+                reason: "not_a_number" | "not_a_date" | "not_yes_no" | "not_in_list";
+            }[];
+        };
+        Site360ColumnReasonRequest: {
+            reason: string;
+        };
+        Site360ColumnDeleted: {
+            ord: number;
+            letter: string;
+            /** @enum {boolean} */
+            deleted: true;
+            /** @description True when the task input the column created was deleted with it. */
+            removed_input: boolean;
         };
         Site360Rows: {
             menu: components["schemas"]["Site360MenuItem"];
@@ -9014,7 +9354,7 @@ export interface components {
             conflicts?: components["schemas"]["ScopeConflict"][];
         };
         /** @enum {string} */
-        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "insufficient_stock" | "item_in_use" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "invalid_code" | "invalid_enrol_code" | "enrol_code_expired" | "password_change_required" | "weak_password" | "internal_error" | "team_scope_mismatch" | "two_factor_enforced" | "scope_scenario_conflict" | "too_many_rows" | "integrity_too_large" | "mail_not_configured" | "self_approval_forbidden" | "document_rule_pending" | "file_pending_scan" | "list_not_configured" | "email_not_verified" | "batch_processing" | "vehicle_already_reserved" | "upload_processing" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "invitation_invalid";
+        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "insufficient_stock" | "item_in_use" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "invalid_code" | "invalid_enrol_code" | "enrol_code_expired" | "password_change_required" | "weak_password" | "internal_error" | "team_scope_mismatch" | "two_factor_enforced" | "scope_scenario_conflict" | "too_many_rows" | "integrity_too_large" | "mail_not_configured" | "self_approval_forbidden" | "document_rule_pending" | "file_pending_scan" | "list_not_configured" | "email_not_verified" | "batch_processing" | "vehicle_already_reserved" | "upload_processing" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "invitation_invalid" | "system_field" | "conversion_unconfirmed" | "column_in_use" | "input_already_mapped" | "field_already_mapped";
         PageEnvelope: {
             items: unknown[];
             page: components["schemas"]["PageInfo"];
@@ -17227,6 +17567,8 @@ export interface components {
         RegisterKeyAny: string;
         /** @description The ETag last read. */
         IfMatch: string;
+        /** @description The Master column order (1 to 187 original, 188 and up added; A = 1). */
+        Site360ColumnOrd: number;
         IdempotencyKey: string;
         /** @description Sent as `1` by timer-driven polling (notification bell, online-now list). The server does not count the request as user activity: it neither extends the idle timeout nor updates `last_activity_at`. Only real user activity does. */
         LivePoll: "1";
@@ -26936,13 +27278,275 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
         };
     };
+    listSite360Columns: {
+        parameters: {
+            query?: {
+                /** @description true (default) also lists the deactivated columns. */
+                include_inactive?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The columns in display order. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Site360ColumnList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    createSite360Column: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Site360ColumnCreate"];
+            };
+        };
+        responses: {
+            /** @description The new column. */
+            201: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Site360ColumnDetail"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getSite360Column: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The Master column order (1 to 187 original, 188 and up added; A = 1). */
+                ord: components["parameters"]["Site360ColumnOrd"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The column. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Site360ColumnDetail"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    deleteSite360Column: {
+        parameters: {
+            query: {
+                reason: string;
+            };
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description The Master column order (1 to 187 original, 188 and up added; A = 1). */
+                ord: components["parameters"]["Site360ColumnOrd"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Site360ColumnDeleted"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    updateSite360Column: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description The Master column order (1 to 187 original, 188 and up added; A = 1). */
+                ord: components["parameters"]["Site360ColumnOrd"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Site360ColumnUpdate"];
+            };
+        };
+        responses: {
+            /** @description The column after the change. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Site360ColumnDetail"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    previewSite360ColumnType: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The Master column order (1 to 187 original, 188 and up added; A = 1). */
+                ord: components["parameters"]["Site360ColumnOrd"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Site360ColumnTypePreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description The preview. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Site360ColumnTypePreview"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    deactivateSite360Column: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description The Master column order (1 to 187 original, 188 and up added; A = 1). */
+                ord: components["parameters"]["Site360ColumnOrd"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Site360ColumnReasonRequest"];
+            };
+        };
+        responses: {
+            /** @description The column, inactive. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Site360ColumnDetail"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    reactivateSite360Column: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description The Master column order (1 to 187 original, 188 and up added; A = 1). */
+                ord: components["parameters"]["Site360ColumnOrd"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Site360ColumnReasonRequest"];
+            };
+        };
+        responses: {
+            /** @description The column, active. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Site360ColumnDetail"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
     setSite360ColumnSections: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description The Master column order (1 to 187, A = 1). */
-                ord: number;
+                /** @description The Master column order (1 to 187 original, 188 and up added; A = 1). */
+                ord: components["parameters"]["Site360ColumnOrd"];
             };
             cookie?: never;
         };

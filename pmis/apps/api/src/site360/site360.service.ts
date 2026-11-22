@@ -26,17 +26,17 @@ export class Site360Service {
 
   async sections(): Promise<{ items: Site360MenuItem[]; can_move: boolean }> {
     const rows = await this.db.tx.$queryRaw<Site360ColumnRow[]>`
-      ${COLUMNS_SQL} WHERE mc.is_active ORDER BY mc.ord`;
+      ${COLUMNS_SQL} WHERE mc.is_active ORDER BY mc.display_order`;
     const admin = await this.db.tx.$queryRaw<{ ok: boolean }[]>`
-      SELECT coalesce(app_actor_is_admin('admin.settings', 'edit'), false) AS ok`;
+      SELECT coalesce(site360_col_can_admin(), false) AS ok`; // one right for every column change (owner decision 2026-11-22)
     return { items: buildSite360(rows), can_move: admin[0]?.ok ?? false };
   }
 
   /** Replaces the set of menus of one column (owner decision 2026-11-15: a column may be in several menus). */
   async setSections(auth: AuthContext, rawOrd: unknown, raw: unknown): Promise<Site360ColumnDto> {
     const ord = Number(rawOrd);
-    if (!Number.isInteger(ord) || ord < 1 || ord > 187) {
-      throw new ProblemException(422, 'validation_failed', { detail: 'The column order must be 1 to 187.', errors: [{ path: '/ord', code: 'invalid' }] });
+    if (!Number.isInteger(ord) || ord < 1 || ord > 1000) {
+      throw new ProblemException(422, 'validation_failed', { detail: 'The column order must be 1 to 1000.', errors: [{ path: '/ord', code: 'invalid' }] });
     }
     const b = parse(setSchema, raw);
     await this.stepUp.require(auth);
@@ -64,12 +64,12 @@ export class Site360Service {
     const sortKey = oneString(q, 'sort') ?? 'site_code';
 
     const colRows = await this.db.tx.$queryRaw<Site360ColumnRow[]>`
-      ${COLUMNS_SQL} WHERE mc.is_active ORDER BY mc.ord`;
+      ${COLUMNS_SQL} WHERE mc.is_active ORDER BY mc.display_order`;
     const menuItem = buildMenu(menu, colRows);
     const menuOrds = menuItem.columns.map((c) => c.ord);
 
     const sortField = SORT_FIELDS[sortKey];
-    const ordSort = /^ord:([0-9]{1,3})$/.exec(sortKey);
+    const ordSort = /^ord:([0-9]{1,4})$/.exec(sortKey);
     if (!sortField && !(ordSort && menuOrds.includes(Number(ordSort[1])))) {
       throw new ProblemException(422, 'validation_failed', { detail: 'Unknown sort for this menu.', errors: [{ path: '/sort', code: 'invalid' }] });
     }
@@ -210,7 +210,7 @@ export class Site360Service {
   /** The Master columns filled by a site custom field that is hidden for the caller (field-level rules). */
   private async hiddenCustomFieldOrds(auth: AuthContext): Promise<Set<number>> {
     const rows = await this.db.tx.$queryRaw<{ ord: number }[]>(Prisma.sql`
-      SELECT mc.ord FROM field_definitions fd JOIN master_columns mc ON mc.letter = fd.master_export_column
+      SELECT mc.ord FROM field_definitions fd JOIN master_columns mc ON mc.letter = fd.master_export_column OR mc.source_field_id = fd.id
       WHERE fd.entity_type::text = 'site' AND fd.is_active
         AND coalesce(app_resolve_field_access(${auth.user.id}::uuid, fd.id)::text, 'edit') = 'hidden'`);
     return new Set(rows.map((r) => r.ord));
@@ -231,7 +231,7 @@ export class Site360Service {
       WHERE s.id = ${siteId}::uuid AND s.is_active ${regs !== null ? Prisma.sql`AND s.region_id = ANY(${regs}::int[])` : Prisma.empty}`);
     if (!site[0]) throw new ProblemException(404, 'not_found', { detail: 'Site not found.' });
     const colRows = await this.db.tx.$queryRaw<Site360ColumnRow[]>`
-      ${COLUMNS_SQL} WHERE mc.is_active ORDER BY mc.ord`;
+      ${COLUMNS_SQL} WHERE mc.is_active ORDER BY mc.display_order`;
     const cols = buildMenu(menu, colRows).columns;
     const ords = cols.map((c) => c.ord);
     const vals = await this.db.tx.$queryRaw<SourceRow[]>(Prisma.sql`
@@ -395,7 +395,12 @@ const COLUMNS_SQL = Prisma.sql`
       WHEN EXISTS (SELECT 1 FROM task_field_sources x WHERE x.is_active AND x.master_col = mc.letter) THEN 'register'
       ELSE 'not_tracked'
     END AS source_kind,
-    mc.source_note
+    mc.source_note, mc.display_order, mc.name_ar, mc.is_added,
+    -- 0133: the effective type and list (a column filled by a task input reads the input)
+    coalesce((SELECT tf.field_type FROM template_task_fields tf WHERE tf.is_active AND tf.master_col = mc.letter ORDER BY tf.task_code, tf.field_key LIMIT 1), mc.value_type, 'text') AS value_type,
+    CASE WHEN EXISTS (SELECT 1 FROM template_task_fields tf WHERE tf.is_active AND tf.master_col = mc.letter)
+         THEN (SELECT tf.list_catalogue FROM template_task_fields tf WHERE tf.is_active AND tf.master_col = mc.letter ORDER BY tf.task_code, tf.field_key LIMIT 1)
+         ELSE mc.list_catalogue END AS list_catalogue
   FROM master_columns mc`;
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
