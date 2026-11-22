@@ -504,7 +504,7 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/exports/master'],
   ['get', '/exports/master'],
   ['get', '/exports/master/:id/download'],
-  // Contract 0.15.45 (migration 0137; apps/api: reassignment): absence records and the lead decisions on tasks (B12b, B14).
+  // Contract 0.15.45 (migration 0138; apps/api: reassignment): absence records and the lead decisions on tasks (B12b, B14).
   ['get', '/absences'],
   ['post', '/absences'],
   ['get', '/absences/:id'],

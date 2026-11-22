@@ -1,5 +1,5 @@
--- 0137_absences_reassignment: staff absence and the lead decisions on a task (CLAUDE.md decision B12b, B14; contract 0.15.45; CHANGELOG 181).
--- Mirror: db/sql/136_absences_reassignment.sql (kept byte-identical).
+-- 0138_absences_reassignment: staff absence and the lead decisions on a task (CLAUDE.md decision B12b, B14; contract 0.15.45; CHANGELOG 184).
+-- Mirror: db/sql/137_absences_reassignment.sql (kept byte-identical).
 --
 -- WHAT THIS ADDS. The seven routes the web app calls (GET/POST /absences, DELETE /absences/{id}, GET /reassignments/alerts, GET /reassignments/eligible-users,
 -- POST /tasks/reassign, POST /tasks/{id}/act-on-behalf) and GET/PATCH /absences/{id}, on the existing approval engine (0015) without a parallel path:
@@ -25,7 +25,7 @@
 -- SEPARATION OF DUTIES (security review of 2026-11-22). The act-on-behalf marker names the task, the caller AND the level it was granted for; wf_require_actor
 -- honours it only at that level, so a cover granted at L1 is never usable at L2. When one person completes two levels of the same pass of a task through a cover
 -- (covered L1 and then approves L2 as a holder, or submitted L1 as a holder and then covers L2), the final approval is a self-approval (B5): step-up and the
--- self_approval flag on the step, the task and the audit row (wf_complete_hw, redefined from 0073, one line marked 0137). A task on nobody (no single holder)
+-- self_approval flag on the step, the task and the audit row (wf_complete_hw, redefined from 0073, one line marked 0138). A task on nobody (no single holder)
 -- cannot be covered: that is the "no holder" path to the System Admins (B10). No absence or idle precondition (B12b: the lead decides); the audit row of the
 -- cover records whether the holder was absent, deactivated or idle at that moment.
 -- LEAD SCOPE. A person's regions come from their assignments only (never from System Admin status); a person with an all-regions assignment, or a System
@@ -244,7 +244,7 @@ BEGIN
 END $$;
 
 -- ---------------------------------------------------------------------------------------------------------------------
--- 3. The engine learns "lead on behalf of the assignee" (redefined in full; only the lines marked 0137 are new)
+-- 3. The engine learns "lead on behalf of the assignee" (redefined in full; only the lines marked 0138 are new)
 -- ---------------------------------------------------------------------------------------------------------------------
 -- wf_require_actor (latest 0125)
 CREATE OR REPLACE FUNCTION public.wf_require_actor(p_task uuid, p_kind text, p_actor uuid)
@@ -256,7 +256,7 @@ AS $function$
 DECLARE t public.task_instances%ROWTYPE; rl public."MatrixRule"; is_admin boolean; has_holder boolean;
 BEGIN
   SELECT * INTO t FROM public.task_instances WHERE id = p_task;
-  -- 0137 (B12b choice 3): the lead acts at the current level for its holder; only ops_act_on_behalf writes the marker, after checking the lead right
+  -- 0138 (B12b choice 3): the lead acts at the current level for its holder; only ops_act_on_behalf writes the marker, after checking the lead right
   IF p_actor = public.app_actor() AND public.rsn_covering_at(p_task, t.current_level) THEN RETURN 'cover'; END IF;
   rl := public.wf_rule(p_task, p_kind);
   is_admin := public.app_user_is_system_admin(p_actor);
@@ -291,7 +291,7 @@ CREATE OR REPLACE FUNCTION public.wf_step(p_task uuid, p_level integer, p_action
  SECURITY DEFINER
  SET search_path TO 'pg_catalog', 'public', 'pg_temp'
 AS $function$
-DECLARE sid uuid; cov text := CASE WHEN p_actor = public.app_actor() THEN public.rsn_covering(p_task) END;   -- 0137
+DECLARE sid uuid; cov text := CASE WHEN p_actor = public.app_actor() THEN public.rsn_covering(p_task) END;   -- 0138
 BEGIN
   -- clock_timestamp(): the steps of one transaction (a submit and its auto-skips) must keep their order in the history
   INSERT INTO public.workflow_steps (task_id, level, action, acted_by, on_behalf_of, note, before_state, after_state, stepup_verified, self_approval, batch_row_id, created_at)
@@ -308,11 +308,11 @@ CREATE OR REPLACE FUNCTION public.wf_audit(p_action text, p_task uuid, p_before 
  SECURITY DEFINER
  SET search_path TO 'pg_catalog', 'public', 'pg_temp'
 AS $function$
-DECLARE t public.task_instances%ROWTYPE; v text := nullif(public.app_ctx_via(), ''); a jsonb := p_after; cov text := public.rsn_covering(p_task);   -- 0137
+DECLARE t public.task_instances%ROWTYPE; v text := nullif(public.app_ctx_via(), ''); a jsonb := p_after; cov text := public.rsn_covering(p_task);   -- 0138
 BEGIN
   SELECT * INTO t FROM public.task_instances WHERE id = p_task;
   IF v IN ('button', 'drag', 'bulk') AND p_action <> 'task_unlock' THEN a := coalesce(p_after, '{}'::jsonb) || jsonb_build_object('via', v); END IF;
-  -- 0137: "lead on behalf of the assignee" (B12b choice 3)
+  -- 0138: "lead on behalf of the assignee" (B12b choice 3)
   IF cov IS NOT NULL THEN a := coalesce(a, '{}'::jsonb) || jsonb_build_object('on_behalf_kind', 'assignee', 'on_behalf_of', nullif(cov, '')); END IF;
   INSERT INTO public.audit_log (action, entity_type, entity_id, site_id, region_id, before, after, reason, actor_id, on_behalf_of)
   VALUES (p_action, 'task', p_task::text, t.site_id, t.region_id, p_before, a, p_reason, public.app_actor(), nullif(cov, '')::uuid);
@@ -386,7 +386,7 @@ BEGIN
     IF NOT coalesce(p_stepup, false) THEN PERFORM public.wf_err('step_up_required'); END IF;   -- B5 and the final approval
   END IF;
 
-  self := ch.is_final AND (n = 1 OR n = ANY (ch.skipped) OR public.rsn_cover_twice(p_task, lvl, actor));   -- 0137: two levels by one person through a cover (B5)
+  self := ch.is_final AND (n = 1 OR n = ANY (ch.skipped) OR public.rsn_cover_twice(p_task, lvl, actor));   -- 0138: two levels by one person through a cover (B5)
   after_state := CASE WHEN ch.is_final THEN 'approved'
                       ELSE CASE public.wf_kind(n, ch.next_level) WHEN 'review' THEN 'in_review' WHEN 'approve' THEN 'in_approval' ELSE 'entry' END END;
 

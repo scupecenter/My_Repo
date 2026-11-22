@@ -59,7 +59,7 @@ export interface ReassignmentAlertDto {
 const RANK: Record<Cause, number> = { holder_deactivated: 0, absent: 1, idle: 2 };
 
 /**
- * B12b (migration 0137): the tasks that need a lead decision, the people who may receive them, and the decision itself (keep, reassign, act on behalf).
+ * B12b (migration 0138): the tasks that need a lead decision, the people who may receive them, and the decision itself (keep, reassign, act on behalf).
  * The database decides every rule (who leads which region, whom a task is on, who is eligible); the API validates the shape and pages.
  */
 @Injectable()

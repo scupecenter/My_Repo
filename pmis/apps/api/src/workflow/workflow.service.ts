@@ -153,7 +153,7 @@ export class WorkflowService {
   }
 
   /**
-   * B12b choice 3, migration 0137: a lead (the reassign grant for the task's region) or a System Admin performs the current level for the person it is on.
+   * B12b choice 3, migration 0138: a lead (the reassign grant for the task's region) or a System Admin performs the current level for the person it is on.
    * The database checks the lead right, the level and the state, then runs the engine's own transition (wf_complete / wf_reject) with the act-on-behalf
    * marker, so the grants per level, the self-skip chain, the self-approval flag (B5) and the step-up of a final approval apply unchanged. Steps and audit
    * rows carry on_behalf_of (the assignee). Nothing is reset (SLA start and version, stage progress, data, documents).
@@ -266,7 +266,7 @@ export class WorkflowService {
         if (r.acted_by && refs.get(r.acted_by)) item.acted_by = refs.get(r.acted_by);
         if (r.on_behalf_of && refs.get(r.on_behalf_of)) {
           item.on_behalf_of = refs.get(r.on_behalf_of);
-          item.on_behalf_kind = 'assignee'; // 0137: only "lead on behalf of the assignee" (B12b) writes on_behalf_of on a step
+          item.on_behalf_kind = 'assignee'; // 0138: only "lead on behalf of the assignee" (B12b) writes on_behalf_of on a step
         }
         if (r.before_state) item.before_state = r.before_state;
         if (r.after_state) item.after_state = r.after_state;

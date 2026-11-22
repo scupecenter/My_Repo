@@ -99,7 +99,7 @@ export interface TaskSummaryDto {
   /** 0092: approved directly by the historical Master import (admin override, no L2): the "Admin override" badge. */
   historical_direct_approved: boolean;
   holder_account_status?: 'active' | 'deactivated' | 'deleted';
-  /** 0137 (B12b): the person the open task is on has an absence today (the "absent" badge). Only on open tasks. */
+  /** 0138 (B12b): the person the open task is on has an absence today (the "absent" badge). Only on open tasks. */
   holder_absent?: boolean;
   /** F2 (0.15.30): the last time a person acted on the open task (task_last_activity); null when the task is not open. */
   last_activity_at: string | null;
@@ -351,7 +351,7 @@ export class TaskViewService {
       byCell.set(a.cell_id, list);
     }
 
-    // 0137 (B12b): the "absent" badge; the database answers nothing at once when nobody is absent today
+    // 0138 (B12b): the "absent" badge; the database answers nothing at once when nobody is absent today
     const open = rows.filter((r) => ACTIVE_STATES.includes(r.state)).map((r) => r.id);
     const absent = open.length
       ? new Set((await this.db.tx.$queryRaw<{ id: string }[]>(Prisma.sql`SELECT task_id::text AS id FROM rsn_holder_absent(${open}::uuid[])`)).map((x) => x.id))

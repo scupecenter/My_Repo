@@ -179,7 +179,7 @@ export function appModuleFor(config: AppConfig) {
       SavedViewsController,
       SearchController, // 0.15.17 (F4)
       ExportsController, // 0.15.34: Master-format export
-      AbsencesController, ReassignmentController, // 0.15.45 (migration 0137): absences and the lead decisions (B12b)
+      AbsencesController, ReassignmentController, // 0.15.45 (migration 0138): absences and the lead decisions (B12b)
     ],
     providers: [
       { provide: APP_CONFIG, useValue: config },
@@ -199,7 +199,7 @@ export function appModuleFor(config: AppConfig) {
       SavedViewsService, FilterCatalogService,
       SearchService, // 0.15.17 (F4)
       MasterExportService, // 0.15.34
-      AbsencesService, ReassignmentService, // 0.15.45 (migration 0137)
+      AbsencesService, ReassignmentService, // 0.15.45 (migration 0138)
       { provide: APP_GUARD, useClass: SessionGuard },
       { provide: APP_INTERCEPTOR, useClass: TxInterceptor },
       { provide: APP_FILTER, useClass: ProblemFilter },

@@ -1,4 +1,4 @@
--- Staff absence and the lead decisions on tasks (migration 0137, CLAUDE.md B12b and B14, contract 0.15.45). Absences and decisions are written only through the
+-- Staff absence and the lead decisions on tasks (migration 0138, CLAUDE.md B12b and B14, contract 0.15.45). Absences and decisions are written only through the
 -- doors ops_save_absence, ops_delete_absence, ops_reassign_tasks and ops_act_on_behalf (SECURITY DEFINER, owner pmis_definer), which take the actor from the verified
 -- session, check the lead right (overrides.reassign + administer, B12b) per region and audit before and after; the tables have no right for pmis_app. Acting on
 -- behalf rides on a marker row of hgd_marks (kind rsn_cover) that only definer code writes, so neither a session setting nor a direct insert stands in for it.

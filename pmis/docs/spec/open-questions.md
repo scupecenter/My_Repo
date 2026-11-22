@@ -519,7 +519,7 @@ Built from the owner answers of 2026-11-04 (Q2, Q3, Q9, Q13, Q14, Q15, Q135, Q13
 | Q573 | **F5, which sites and tasks are on the boards.** | Sites board: cancelled sites are left out unless asked for (`include_cancelled`, or the status filter "cancelled"); a site without tasks sits in the first milestone. Tasks board: open, at L1, at L2, sent back by a rejection (until resubmitted) and approved tasks; locked, N/A, skipped and suspended tasks are not shown. "Mine" = tasks the caller acted on, holds the ball of, or may act on now. |
 | Q574 | **F5, what a drop opens.** | On "In review / approval": submit. On "Approved": approve, or a review or a submit that is final (self-approval, B5). On "Rejected": the reject dialog with its mandatory note. Nothing returns a task to Data Entry except a rejection, so a drop on "Open / Data Entry" opens nothing. The drawer opens with the action highlighted; it runs only when the person presses the usual button, and only if `allowed_actions` of the task lists it (else the drop is refused with a message). |
 
-## B12b / B14: staff absence and the lead decisions on tasks (migration 0137, contract 0.15.45)
+## B12b / B14: staff absence and the lead decisions on tasks (migration 0138, contract 0.15.45)
 
 | # | Gap | Proposed default (built, configurable) |
 |---|---|---|

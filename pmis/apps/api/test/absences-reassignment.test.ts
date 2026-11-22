@@ -6,7 +6,7 @@ import { beginAs, makeUser, startApp, superDb } from './helpers';
 import { Actor, actor, addAssignment, etag, makeSite, newRole, plainAdmin, setCell, taskDef, type Site } from './wf-helpers';
 
 /**
- * Staff absence and the lead decisions (CLAUDE.md B12b, B14; migration 0137, contract 0.15.45). Region 3 (WM), synthetic people and sites only.
+ * Staff absence and the lead decisions (CLAUDE.md B12b, B14; migration 0138, contract 0.15.45). Region 3 (WM), synthetic people and sites only.
  *   LEAD: the reassign grant (overrides.reassign + administer) and the Sites module in region 3. LEAD4: the same in region 4 only (wrong region).
  *   E: a data-entry engineer of region 3 (the absent person). H: a second engineer of the same role (an eligible receiver). OTHER: same region, no lead.
  * The tasks are written straight into the database (state, pin, opening time); every decision goes through the API.
