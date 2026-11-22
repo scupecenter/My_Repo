@@ -28,8 +28,8 @@ Owner request: one screen in Settings to see the whole workflow and edit it dire
 |---|---|---|---|
 | S1 | Studio UI on the existing API: tree, selection, one form per kind (milestone, gate, task), "+ Add new" menu and add screen for task / milestone / gate, draft bar with pending changes, review and publish screen. Replaces the three-column editor as the default of Settings > Workflow (the old editor stays reachable until S4). | claude/workflow-studio-ui, PR #175 | built, CI running |
 | S2 | API for Site Master columns: create a column (band, group, place, type, dropdown list, source: a task input or a site field), rename, change type with a preview, change dropdown, deactivate; Master-format export carries new columns after the 187. Migration 0133, contract 0.15.43. | claude/workflow-studio-columns, PR #174 | built, CI running |
-| S3 | Wire S2 into the studio: the task's "Site Master columns" table and the "Site Master column" add type. | after S1 and S2 | waiting |
-| S4 | Pending-changes list with undo per change, impact counts in review, Arabic RTL pass, remove the old editor route. | after S3 | waiting |
+| S3 | Wire S2 into the studio: the task's "Site Master columns" table and the "Site Master column" add type. | claude/workflow-studio-s3 (from S2) | started 2026-11-22 |
+| S4 | Pending-changes list with undo per change, impact counts in review, Arabic RTL pass, remove the old editor route. | claude/workflow-studio-s4 (from main) | started 2026-11-22 |
 
 ## Numbers reserved
 - Migration 0133 (S2; main took 0132 for the Master import header report). Next free after it: 0134.
@@ -41,3 +41,4 @@ Owner request: one screen in Settings to see the whole workflow and edit it dire
 - 2026-11-22: S2 committed (contract 0.15.43, migration 0132, later renumbered 0133), PR #174. Local DB tests 32/32 plus neighbours 129/129. Open: db-security cases for the new doors; unify `admin.settings` (menus) and `fields` (other writes) rights is an owner decision.
 - 2026-11-22: S1 committed, PR #175. vitest 1185/1185. Open: SLA-to-open-tasks option disabled (not in publish body), no optimistic undo yet (S4), closing-task action only in classic editor.
 - 2026-11-22: main merged #172 and #173 (migration 0132, CHANGELOG 174/175). S2 renumbered to migration 0133 and CHANGELOG 177, S1 to CHANGELOG 176; both branches merged main.
+- 2026-11-22: S1 merged (#175). S3 (CHANGELOG 179), S4 (CHANGELOG 180) and the db-security cases for the S2 doors (branch claude/site360-columns-dbsec) started in parallel; Site Master navigation and dashboard tab names on branch claude/site-master-nav (CHANGELOG 178).
