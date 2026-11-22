@@ -28,7 +28,7 @@ export class Site360Service {
     const rows = await this.db.tx.$queryRaw<Site360ColumnRow[]>`
       ${COLUMNS_SQL} WHERE mc.is_active ORDER BY mc.display_order`;
     const admin = await this.db.tx.$queryRaw<{ ok: boolean }[]>`
-      SELECT coalesce(app_actor_is_admin('admin.settings', 'edit'), false) AS ok`;
+      SELECT coalesce(site360_col_can_admin(), false) AS ok`; // one right for every column change (owner decision 2026-11-22)
     return { items: buildSite360(rows), can_move: admin[0]?.ok ?? false };
   }
 

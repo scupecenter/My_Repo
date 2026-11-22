@@ -1067,8 +1067,9 @@ LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp 
 DECLARE a uuid; rs text := btrim(coalesce(p_reason, '')); before_j jsonb; col record; sec text[]; errs jsonb := '[]'::jsonb;
 BEGIN
   a := public.app_actor();
-  IF a IS NULL OR NOT public.app_has_permission(a, 'admin.settings', 'edit') THEN
-    PERFORM public.wf_err('action_forbidden', jsonb_build_object('detail', 'Only a user who may edit the settings can change the SITE 360 menus of a column.'));
+  -- one right for every column change (owner decision 2026-11-22): System Admin or a delegate of `fields` edit for all regions, as the other column doors
+  IF a IS NULL OR NOT public.site360_col_can_admin() THEN
+    PERFORM public.wf_err('action_forbidden', jsonb_build_object('detail', 'Only a System Admin or a delegate of fields edit for all regions can change the menus of a column.'));
   END IF;
   IF char_length(rs) < 3 OR char_length(rs) > 1000 THEN
     errs := errs || jsonb_build_array(jsonb_build_object('path', '/reason', 'code', 'required', 'message', 'A reason of 3 to 1000 characters is required.'));

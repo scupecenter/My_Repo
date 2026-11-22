@@ -708,6 +708,18 @@ describe('the menus of an added column', () => {
     );
     expect(status.status).toBe(422);
   });
+
+  it('uses the one right of the column doors (owner decision 2026-11-22): fields edit for all regions, not admin.settings', async () => {
+    const ok = await delegateApi.call('patch', `/site360/columns/${first.ord}/sections`, { sections: ['cw', 'te'], reason: REASON });
+    expect(ok.status).toBe(200);
+    first.version = (await admin.api.call('get', `/site360/columns/${first.ord}`)).body.version;
+    expect((await regionDelegateApi.call('patch', `/site360/columns/${first.ord}/sections`, { sections: ['cw'], reason: REASON })).status).toBe(403);
+    const s = await actor(app, db, { level: 'entry' });
+    await delegate(db, s.user.id, [['admin.settings', 'edit']]);
+    expect((await s.api.call('patch', `/site360/columns/${first.ord}/sections`, { sections: ['cw'], reason: REASON })).status).toBe(403);
+    expect((await s.api.call('get', '/site360/sections')).body.can_move).toBe(false);
+    expect((await delegateApi.call('get', '/site360/sections')).body.can_move).toBe(true);
+  });
 });
 
 describe('moving a column and a site field source', () => {
