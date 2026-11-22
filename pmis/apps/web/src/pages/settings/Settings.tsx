@@ -19,6 +19,7 @@ import { HistoricalWaiver } from './HistoricalWaiver';
 import { Imports } from './Imports';
 import { KanbanWip } from './KanbanWip';
 import { Workflow } from './Workflow';
+import { Studio } from './studio/Studio';
 import { Site360Columns } from './Site360Columns';
 import { DashboardSettings } from './DashboardSettings';
 import { Identity } from './Identity';
@@ -115,7 +116,8 @@ export function SettingsRoutes() {
         <Route path="identity" element={<Identity />} />
         <Route path="workflow" element={<TabFrame tab="workflow" />}>
           <Route index element={<Navigate to="editor" replace />} />
-          <Route path="editor" element={<Workflow />} />
+          <Route path="editor" element={<Studio />} />
+          <Route path="classic" element={<Workflow />} />
           <Route path="freeze" element={<Freeze />} />
           <Route path="idle" element={<Idle />} />
           <Route path="board" element={<KanbanWip />} />
