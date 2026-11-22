@@ -80,10 +80,12 @@ export function SitesWideTable({ menu, rows, hasMore, loadingMore, onMore, loade
     const value: string | number | boolean = kind === 'number' && d !== '' ? Number(d) : kind === 'boolean' ? d === 'true' : d;
     setEditing({ ...editing, pending: true, error: null });
     try { await onEdit({ row, ord, target, value }); setEditing(null); } catch (e) {
-      const generic = t('errors.generic');
-      const m = errText(e, t as (k: string) => string);
-      const api = e instanceof ApiError ? (e.problem.errors ?? []).find((x) => x.message)?.message : undefined;
-      setEditing((cur) => (cur ? { ...cur, pending: false, error: m === generic && api ? api : m } : cur));
+      // a field problem of the API: its own translated text when the app has one for the code, else the API's message, else the general message of the error
+      const fields = e instanceof ApiError ? e.problem.errors ?? [] : [];
+      const known = fields.map((x) => t(`errors.${x.code}`)).find((x, i) => x !== `errors.${fields[i]!.code}`);
+      const api = fields.find((x) => x.message)?.message;
+      const m = known ?? api ?? errText(e, t as (k: string) => string);
+      setEditing((cur) => (cur ? { ...cur, pending: false, error: m } : cur));
     }
   };
   const stick = (left: number, z: number) => ({ position: 'sticky' as const, insetInlineStart: left, zIndex: z });

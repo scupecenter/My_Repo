@@ -143,10 +143,10 @@ describe('Site Master wide table', () => {
     });
 
     const typed = () => server.use(http.get(`${API_BASE}/site360/:menu/rows`, () => HttpResponse.json({ total: 1, filtered: 1, offset: 0, limit: 50, rows: [
-      { site_id: 'a0000000-0000-4000-8000-000000000001', site_code: 'S360-001', row_no: 1, values: { '4': 'Name', '40': '12', '41': 'B', '42': 'true' }, cells: {
-        '40': { task_id: 'task-1', version: 3, editable: true, values: 'height', input_type: 'number' },
-        '41': { task_id: 'task-1', version: 3, editable: true, values: 'grade', input_type: 'list', options: [{ value: 'A', label_en: 'Grade A', label_ar: 'الدرجة أ' }, { value: 'B', label_en: 'Grade B', label_ar: null }] },
-        '42': { task_id: 'task-1', version: 3, editable: true, values: 'fenced', input_type: 'boolean' },
+      { site_id: 'a0000000-0000-4000-8000-000000000001', site_code: 'S360-001', row_no: 1, values: { '4': 'Name', '24': '12', '33': 'B', '157': 'true' }, cells: {
+        '24': { task_id: 'task-1', version: 3, editable: true, values: 'height', input_type: 'number' },
+        '33': { task_id: 'task-1', version: 3, editable: true, values: 'grade', input_type: 'list', options: [{ value: 'A', label_en: 'Grade A', label_ar: 'الدرجة أ' }, { value: 'B', label_en: 'Grade B', label_ar: null }] },
+        '157': { task_id: 'task-1', version: 3, editable: true, values: 'fenced', input_type: 'boolean' },
       } },
     ] })));
 
@@ -154,8 +154,8 @@ describe('Site Master wide table', () => {
       patched.length = 0;
       await signIn('pm'); typed(); ok();
       renderApp(<App />, { route: '/sites?layout=wide' });
-      await userEvent.click(await screen.findByTestId('wide-edit-S360-001-40'));
-      const input = screen.getByTestId('wide-input-S360-001-40');
+      await userEvent.click(await screen.findByTestId('wide-edit-S360-001-24'));
+      const input = screen.getByTestId('wide-input-S360-001-24');
       expect(input).toHaveAttribute('type', 'number');
       await userEvent.clear(input);
       await userEvent.type(input, '15.5{Enter}');
@@ -169,14 +169,14 @@ describe('Site Master wide table', () => {
       patched.length = 0;
       await signIn('pm'); typed(); ok();
       renderApp(<App />, { route: '/sites?layout=wide' });
-      const btn = await screen.findByTestId('wide-edit-S360-001-41');
+      const btn = await screen.findByTestId('wide-edit-S360-001-33');
       expect(btn).toHaveTextContent('Grade B');
       await userEvent.click(btn);
-      const sel = screen.getByTestId('wide-input-S360-001-41');
+      const sel = screen.getByTestId('wide-input-S360-001-33');
       expect(sel.tagName).toBe('SELECT');
       expect(within(sel).getAllByRole('option').map((o) => o.textContent)).toEqual(['None', 'Grade A', 'Grade B']);
       await userEvent.selectOptions(sel, 'A');
-      await userEvent.click(screen.getByTestId('wide-save-S360-001-41'));
+      await userEvent.click(screen.getByTestId('wide-save-S360-001-33'));
       await waitFor(() => expect(patched).toHaveLength(1));
       expect(patched[0]!.body).toEqual({ values: { grade: 'A' } });
     });
@@ -185,12 +185,12 @@ describe('Site Master wide table', () => {
       patched.length = 0;
       await signIn('pm'); typed(); ok();
       renderApp(<App />, { route: '/sites?layout=wide' });
-      await userEvent.click(await screen.findByTestId('wide-edit-S360-001-42'));
-      const box = screen.getByTestId('wide-input-S360-001-42');
+      await userEvent.click(await screen.findByTestId('wide-edit-S360-001-157'));
+      const box = screen.getByTestId('wide-input-S360-001-157');
       expect(box).toHaveAttribute('type', 'checkbox');
       expect(box).toBeChecked();
       await userEvent.click(box);
-      await userEvent.click(screen.getByTestId('wide-save-S360-001-42'));
+      await userEvent.click(screen.getByTestId('wide-save-S360-001-157'));
       await waitFor(() => expect(patched).toHaveLength(1));
       expect(patched[0]!.body).toEqual({ values: { fenced: false } });
     });
@@ -199,11 +199,11 @@ describe('Site Master wide table', () => {
       await signIn('pm'); typed();
       server.use(http.patch(`${API_BASE}/tasks/:id`, () => HttpResponse.json({ type: 'about:blank', title: 'Validation failed', status: 422, code: 'validation_failed', errors: [{ path: '/values/height', code: 'out_of_range', message: 'The height is out of range.' }] }, { status: 422 })));
       renderApp(<App />, { route: '/sites?layout=wide' });
-      await userEvent.click(await screen.findByTestId('wide-edit-S360-001-40'));
-      await userEvent.clear(screen.getByTestId('wide-input-S360-001-40'));
-      await userEvent.type(screen.getByTestId('wide-input-S360-001-40'), '999{Enter}');
-      expect((await screen.findByTestId('wide-error-S360-001-40')).textContent).toMatch(/out of range/);
-      expect(screen.getByTestId('wide-input-S360-001-40')).toBeTruthy();
+      await userEvent.click(await screen.findByTestId('wide-edit-S360-001-24'));
+      await userEvent.clear(screen.getByTestId('wide-input-S360-001-24'));
+      await userEvent.type(screen.getByTestId('wide-input-S360-001-24'), '999{Enter}');
+      expect((await screen.findByTestId('wide-error-S360-001-24')).textContent).toMatch(/out of range/);
+      expect(screen.getByTestId('wide-input-S360-001-24')).toBeTruthy();
     });
   });
 });
