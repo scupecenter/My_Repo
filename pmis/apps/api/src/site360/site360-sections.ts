@@ -51,7 +51,17 @@ export interface Site360ColumnRow {
   source_kind?: Site360SourceKind;
   /** A short English note of the column's rule (0.15.35). */
   source_note?: string | null;
+  /** 0132 (0.15.43): the place on the grid (the columns of a menu are listed in this order); equals ord until a column is added after another. */
+  display_order?: number;
+  name_ar?: string | null;
+  /** The effective value type (a task input column reads its input) and its dropdown list. */
+  value_type?: 'text' | 'number' | 'date' | 'list' | 'yes_no';
+  list_catalogue?: string | null;
+  is_added?: boolean;
 }
+
+/** Display order of a column (the Master order when it has none). */
+export const displayOrder = (c: { ord: number; display_order?: number }): number => c.display_order ?? c.ord;
 
 /** The kinds of source of a Master column or cell (0.15.35, migration 0121). */
 export const SITE360_SOURCE_KINDS = ['site', 'task', 'milestone', 'register', 'baseline', 'derived', 'custom_field', 'not_tracked'] as const;
@@ -90,9 +100,9 @@ export function defaultSectionsByOrd(): Map<number, Site360Section[]> {
   return m;
 }
 
-/** The columns of one menu in Master order: Master lists all; a menu lists the columns that carry it, the status columns and the identity. */
+/** The columns of one menu in display order (the Master order until a column is added after another): Master lists all; a menu lists the columns that carry it, the status columns and the identity. */
 export function menuColumns<T extends Site360ColumnRow>(menu: Site360Menu, columns: readonly T[]): T[] {
-  const sorted = [...columns].sort((a, b) => a.ord - b.ord);
+  const sorted = [...columns].sort((a, b) => displayOrder(a) - displayOrder(b) || a.ord - b.ord);
   if (menu === 'master') return sorted;
   return sorted.filter(
     (c) => c.sections.includes(menu) || c.sections.includes('status') || (SITE360_IDENTITY_ORDS as readonly number[]).includes(c.ord),

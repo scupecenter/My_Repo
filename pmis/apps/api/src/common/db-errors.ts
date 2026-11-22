@@ -156,6 +156,16 @@ export function mapWfError(message: string): ProblemException | null {
       });
     case 'freeze_active':
       return new ProblemException(409, 'freeze_active', { detail: detail ?? 'Structural changes are frozen.' });
+    case 'column_in_use':
+      // 0132 (0.15.43): a Site Master column that holds values is never deleted; deactivate it
+      return new ProblemException(409, 'column_in_use', {
+        detail: detail ?? 'The column holds values: deactivate it instead.',
+        extra: { why: typeof extra.why === 'string' ? extra.why : null, count: Number(extra.count ?? 0) },
+      });
+    case 'input_already_mapped':
+    case 'field_already_mapped':
+      // 0132 (0.15.43): the task input or the site field already fills a Master column
+      return new ProblemException(409, m[1], { detail: detail ?? 'This source already fills a Master column.' });
     case 'system_field':
       return new ProblemException(409, 'system_field', { detail: detail ?? 'This column is protected.', extra: { reason: typeof extra.reason === 'string' ? extra.reason : null } });
     case 'conversion_blocked':

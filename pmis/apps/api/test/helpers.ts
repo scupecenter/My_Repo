@@ -172,6 +172,13 @@ export async function superDbRcols(): Promise<PgClient> {
   return c;
 }
 
+/** Superuser connection to the Site Master columns database (migration 0132; see global-setup). */
+export async function superDbScols(): Promise<PgClient> {
+  const c = new PgClient({ connectionString: process.env.TEST_SUPER_URL_SCOLS });
+  await c.connect();
+  return c;
+}
+
 /** Superuser connection to the template-streams database (see global-setup). */
 export async function superDbTplst(): Promise<PgClient> {
   const c = new PgClient({ connectionString: process.env.TEST_SUPER_URL_TPLST });
