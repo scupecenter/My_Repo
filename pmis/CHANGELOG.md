@@ -6,6 +6,45 @@
 
 ---
 
+## 2026-11-22 (182): استيراد الماستر يقرأ «Pending» و«N/A» كما يقصدهما المالك، ويتخطى صفوف المفاتيح فقط، ويحوّل طلبات GECOL من PR-PO إلى سجل GECOL (الترحيل 0136، العقد 0.15.46)
+
+### قرارات
+- قرارات المالك (2026-11-22) بعد ملخص أخطاء ماستره الحقيقي (أعداد فقط)، **على مسار استيراد الماستر فقط** (الاستيراد والمقارنة، ورفع قالب `TPL-MASTER`)؛ الإدخال اليدوي وباقي القوالب على قواعد اليوم:
+  1. «Pending» (أي حالة أحرف، بعد القص) في خلية تاريخ أو رقم أو قائمة = خلية فارغة (لم يتم بعد)، بلا خطأ، وتُعدّ في ملاحظات الدفعة.
+  2. «N/A» (`n/a` و`na` و`not applicable` و`-`): في عمود **التاريخ الفعلي** للمهمة تصبح المهمة N/A عند إرسال الدفعة، تجاوزاً إدارياً بقاعدة (نوع `master_na`، بلا منفّذ)، قابلاً للتراجع عبر `POST /overrides/{id}/revert` ولا يُعاد بعد التراجع، كسابقتَي 0126 و0134؛ وفي أي عمود تاريخ أو رقم أو قائمة آخر = خلية فارغة. القائمة التي تحمل «N/A» أو «Pending» ضمن قيمها تبقيها قيمة.
+  3. صف سجل لا يحمل إلا مفاتيحه (Site ID ونوع السجل وRecord ID ومفاتيح القالب الطبيعية) صف نائب: يُتخطى ويُعدّ، ولا يكون خطأً ولا `scope_conflict`.
+  4. صف PR-PO نطاقه لـ GECOL (قاعدة `wrong_register`) يُحوَّل إلى سجل GECOL في الاستيراد نفسه ويمر بمسار دفعات GECOL.
+  5. Order Status الفارغ يُشتق: `po_wo_issued` إن وُجد تاريخ PO / WO وإلا `pr_raised`، من قيم القائمة الموجودة.
+  6. مرشح Acquisition له Contract Sign-off Date وSelected ليست Yes يُجعل Selected = Yes، فقط إن لم يكن مرشح آخر للموقع نفسه مختاراً (في الملف أو في السجل).
+
+### إضافة
+- الترحيل `0136_master_import_na_routing` (مرآته `db/sql/135_master_import_na_routing.sql`):
+  - العمودان `task_instances.master_na` و`master_na_at` مع الحارس `mina_guard_task` (المعرّف وعلامته في `hgd_marks` فقط)، وصف `admin_overrides` من نوع `master_na` بلا منفّذ، وخطوة `admin_override`، وسطر تدقيق `task_master_na`؛ التراجع `mina_restore_task` (سطر `task_master_na_restore`).
+  - لا تُجعل المهمة N/A إن كانت مَعلماً، أو تحمل تاريخاً (فعلياً أو بداية أو إرسالاً أو اعتماداً)، أو معتمدة، أو في إدخال أو مراجعة أو اعتماد، أو لها خطوة بشرية (submit, approve, reject, claim, release, reassign, reopen, start, review)، أو سجل سجلّ في المراجعة، أو تحجزها بوابة (`gate_closed:*` أو `wf_gate_hold`)، أو تراجع عنها مدير النظام سابقاً. إن حمل الصف قيماً أخرى للمهمة نفسها تُقرأ N/A خلية فارغة. مسودة (Save Draft) لا تجعل شيئاً N/A. بعد الوسم: `wf_unlock_successors` ثم `calc_refresh_site` إلا إن كان تحميل تاريخي يعمل على الموقع (`gmp_site_deferred`، فتقرر قواعده في نهايته).
+  - العمود `import_batches.import_notes` (أعداد فقط، بلا قيم): `pending_as_empty` و`na_as_empty` و`na_task_requested` و`na_task_not_applicable` و`na_task_marked` و`na_task_not_marked` و`placeholder_rows_skipped` و`routed_to_gecol` و`routed_from_procurement` و`order_status_derived` و`order_status_not_derived` و`selected_set_by_import` و`selected_not_set`؛ وتحذيرات بالأسماء نفسها على صفوف الدفعة، وسطر تدقيق `import_batch.master_import_rules` لكل دفعة.
+  - التوجيه إلى GECOL: PR No. ← GECOL PR No.، وPR Date ← GECOL Request Date، وRemark ← Remark؛ يملأ الفراغات فقط في صف GECOL للموقع نفسه من ورقة GECOL (قيم ورقة GECOL تبقى)، وعند تعارض القيم يبقى الصف المحوَّل خطأً مستقلاً `gecol_one_per_site`. بلا ورقة GECOL في الملف تُنشأ دفعة GECOL بورقة PR-PO.
+  - الإعداد `imports.master_order_status_derived` = `{"po_wo_issued": null, "pr_raised": null}` (محمي بـ `settings_guarded_keys`): القاعدة 5 متوقفة حتى يسمّي المالك القيم (انظر «مفتوح»).
+  - العقد 0.15.46: `Override.kind` `master_na`، و`ImportBatch.import_notes` (`ImportNote`)، و`MasterImportOutcome.batches[].import_notes`، ورموز الملاحظات الجديدة في `register_notes`؛ أُعيد توليد `apps/web/src/api/schema.d.ts`.
+  - الـ API: `ImportBatch.import_notes` في استجابة الدفعة. اختبارات `apps/api/test/master-import-na.test.ts` (قاعدة بيانات `_mina`).
+
+### تعديل
+- الدوال الداخلية `imp_master_plan` و`imp_master_unit` و`imp_stream_eval` و`imp_stream_close` و`imp_submit_stream_finish` أُعيدت تسميتها `*_pre_0136` ولُفّت بدوال بالاسم والتوقيع نفسيهما (كما لُفّ `reg_validate` في 0063): التحضير قبلها لورقة Master أو وحدة سجل فقط، والملاحظات بعدها. لا يتغير أي حكم فيها.
+- `hrg_stage_registers` (0093) أعيد تعريفه مع التوجيه؛ `ao_current_matches` و`admin_override_revert` (0134) يعرفان `master_na`؛ قيدا `admin_overrides` يقبلان `master_na` لنوع القاعدة.
+
+### أمان
+- كل دالة جديدة أو ملفوفة أو معاد تعريفها: SECURITY DEFINER (عدا الحارس الذي يعمل بصلاحية كاتبه)، و`search_path = pg_catalog, public, pg_temp`، والمالك `pmis_definer`، وEXECUTE مسحوب من PUBLIC ومن `pmis_app`؛ باب التراجع يبقى `admin_override_revert`. الأعمدة الجديدة مسحوبة من `pmis_app`، ولا جدول جديد.
+- العلامة لا تؤخذ من الملف ولا من المستدعي: مفاتيح `mina_*` تُنزع من الصفوف قبل التحضير.
+- حالات أمان جديدة: `tests/db-security/cases/E5_master_import_na.sql` (10 حالات).
+
+### مفتوح
+- Q581: حقول PR-PO التي لا مقابل لها في GECOL (PO / WO No.، PO / WO Date، Order Status، Delivery، Team) لا تُحفظ عند التوجيه وتُذكر في تحذير الصف.
+- Q582: قائمة Order Status فيها Active وCompleted وCancelled وRejected فقط؛ لا قيمة تعني «PR raised» أو «PO/WO issued»، فالقاعدة 5 متوقفة (الإعداد null) حتى يسمّي المالك القيمتين.
+- Q583: Selected = Yes يتطلب Selection Date، وملف المالك بلا Selection Date؛ لا يُخترع تاريخ، فيبقى الصف خطأ «Selection Date required» للمراجعة.
+- Q584: سجل GECOL واحد لكل موقع؛ أكثر من طلب GECOL لموقع واحد بقيم مختلفة يبقى خطأً `gecol_one_per_site`.
+- لم يُكتب اختبار API لمسار رفع `TPL-MASTER` نفسه (الدوال ذاتها، مغطاة عبر مسار الاستيراد والمقارنة).
+
+---
+
 ## 2026-11-22 (181): استوديو سير العمل المرحلة S4، قائمة التغييرات المعلّقة والتراجع وأرقام الأثر وتقاعد المحرر الكلاسيكي
 
 ### إضافة

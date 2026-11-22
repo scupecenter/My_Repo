@@ -221,6 +221,12 @@ export default async function setup(): Promise<() => Promise<void>> {
   const gmpDb = await buildDatabase(adminUrl, gmp, appPassword);
   process.env.TEST_DATABASE_URL_GMP = gmpDb.appUrl;
   process.env.TEST_SUPER_URL_GMP = gmpDb.superUrl;
+  // The Master import N/A and routing database (migration 0136): the suite opens the historical-load waiver, sets the Order Status rule of the Master import
+  // and reads the GECOL, Procurement and Acquisition records and the overrides of its sites, so it shares no database.
+  const mina = `${dbName}_mina`;
+  const minaDb = await buildDatabase(adminUrl, mina, appPassword);
+  process.env.TEST_DATABASE_URL_MINA = minaDb.appUrl;
+  process.env.TEST_SUPER_URL_MINA = minaDb.superUrl;
   // The workflow-editor database (migration 0090): the suite creates and publishes workflow versions (a new published version changes what every new site uses),
   // so no other suite may share it.
   const wfe = `${dbName}_wfe`;
@@ -310,6 +316,7 @@ export default async function setup(): Promise<() => Promise<void>> {
     await a.query(`DROP DATABASE IF EXISTS ${hgd} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${hmm} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${gmp} WITH (FORCE)`);
+    await a.query(`DROP DATABASE IF EXISTS ${mina} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${wfe} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${wfg} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${rcols} WITH (FORCE)`);

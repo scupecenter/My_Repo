@@ -10822,7 +10822,7 @@ export interface components {
             task_id?: string | null;
             /** Format: uuid */
             site_id?: string;
-            /** @description `edit_date` for a task, `site_edit` for a site. 0.15.38: `historical_no_source_na` for a task made N/A "historical load: no source" by the historical Master load (migration 0126); its revert restores the task. 0.15.39: `historical_gate_open` (entity `site`) for a phase gate opened because the site moved past it, and `historical_inferred_date` (entity `task`) for a milestone approved with the date of the earliest later task ("inferred date — historical load"), both by the historical Master load (migration 0127); their revert closes the gate again or reopens the milestone without a date. 0.15.40: `historical_manual_ms_approved` (entity `task`) for a manual milestone (Site RFI) the site moved past, approved directly with its pre-filled date (or the inferred one, `after.date_source`) by the historical Master load (migration 0129); its revert reopens it with its pre-filled date. 0.15.44: `gate_moved_past_open` (entity `site`) for a phase gate opened because the site moved past it, on any site, and `no_microwave_na` (entity `task`) for MW alignment (D8) made N/A because the approved TE installation (D6) has no MW antenna; both are made by a rule of GSDN Workspace (owner decisions 2026-11-22, migration 0134, no `acted_by`); their revert closes the gate again or restores D8. */
+            /** @description `edit_date` for a task, `site_edit` for a site. 0.15.38: `historical_no_source_na` for a task made N/A "historical load: no source" by the historical Master load (migration 0126); its revert restores the task. 0.15.39: `historical_gate_open` (entity `site`) for a phase gate opened because the site moved past it, and `historical_inferred_date` (entity `task`) for a milestone approved with the date of the earliest later task ("inferred date — historical load"), both by the historical Master load (migration 0127); their revert closes the gate again or reopens the milestone without a date. 0.15.40: `historical_manual_ms_approved` (entity `task`) for a manual milestone (Site RFI) the site moved past, approved directly with its pre-filled date (or the inferred one, `after.date_source`) by the historical Master load (migration 0129); its revert reopens it with its pre-filled date. 0.15.44: `gate_moved_past_open` (entity `site`) for a phase gate opened because the site moved past it, on any site, and `no_microwave_na` (entity `task`) for MW alignment (D8) made N/A because the approved TE installation (D6) has no MW antenna; both are made by a rule of GSDN Workspace (owner decisions 2026-11-22, migration 0134, no `acted_by`); their revert closes the gate again or restores D8. 0.15.46: `master_na` (entity `task`) for a task made N/A because its actual date is N/A in the Master file (migration 0136, no `acted_by`); its revert restores the task and the rule never applies again. */
             kind: string;
             reason: string;
             before?: {
@@ -10831,7 +10831,7 @@ export interface components {
             after?: {
                 [key: string]: unknown;
             };
-            /** @description 0.15.44: absent for an override made by a rule of GSDN Workspace (`gate_moved_past_open`, `no_microwave_na`). */
+            /** @description 0.15.44: absent for an override made by a rule of GSDN Workspace (`gate_moved_past_open`, `no_microwave_na`; 0.15.46 `master_na`). */
             acted_by?: components["schemas"]["UserRef"];
             on_behalf_of?: components["schemas"]["UserRef"];
             /** Format: date-time */
@@ -12348,6 +12348,8 @@ export interface components {
             part_sheet?: string | null;
             /** @description The last note of a return. */
             note?: string | null;
+            /** @description 0.15.46: informational notes of a Master staging (counts only, never a value); empty for every other batch. */
+            import_notes?: components["schemas"]["ImportNote"][];
             /**
              * @description Q206 (0.12.8): `submit` enters and submits every row; `draft` (Save Draft / Planning) saves the rows without submission.
              * @enum {string}
@@ -12600,6 +12602,12 @@ export interface components {
             /** Format: date-time */
             finished_at?: string | null;
         };
+        /** @description 0.15.46: one informational note of a Master staging (migration 0136). */
+        ImportNote: {
+            /** @description `pending_as_empty`, `na_as_empty`, `na_task_requested`, `na_task_not_applicable`, `na_task_marked`, `na_task_not_marked`, `placeholder_rows_skipped`, `routed_to_gecol`, `routed_from_procurement`, `order_status_derived`, `order_status_not_derived`, `selected_set_by_import`, `selected_not_set`. */
+            code: string;
+            count: number;
+        };
         MasterImportOutcome: {
             /** Format: uuid */
             group_id?: string;
@@ -12637,6 +12645,8 @@ export interface components {
                 approved?: number;
                 /** @description 0.15.11: rows that change nothing (the register or the task already holds these values). */
                 skipped?: number;
+                /** @description 0.15.46: the notes of the Master rules of the batch (counts only). */
+                import_notes?: components["schemas"]["ImportNote"][];
             }[];
             /** @description 0.15.11: the apply approved the submitted rows directly (historical load, admin override). */
             approve_directly?: boolean;
@@ -12656,7 +12666,7 @@ export interface components {
                 /** @description Rows already sent whose task or record still waits for L2 (they keep that path). */
                 rows_sent_open?: number;
             }[];
-            /** @description 0.15.11: notes on the reading of the register sheets (never blocking): counts, cell addresses and header names only, never a value. Codes: `date_day_first_assumed`, `not_normalised`, `outside_list`, `cell_error_blank`, `master_header_not_found`, `map_unknown_template_header`. */
+            /** @description 0.15.11: notes on the reading of the register sheets (never blocking): counts, cell addresses and header names only, never a value. Codes: `date_day_first_assumed`, `not_normalised`, `outside_list`, `cell_error_blank`, `master_header_not_found`, `map_unknown_template_header`; 0.15.46 adds the codes of `ImportNote` for the register batches. */
             register_notes?: {
                 sheet?: string;
                 ref?: string;
