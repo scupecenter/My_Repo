@@ -7,7 +7,7 @@ import { SITE_ENTRY_GRANTS } from './tpl-stream-helpers';
 import { Actor, Site, actor, makeSite, makeTask, plainAdmin } from './wf-helpers';
 
 /**
- * Migration 0133 (owner decisions 2026-11-22), on ANY site (not only a historical load):
+ * Migration 0134 (owner decisions 2026-11-22), on ANY site (not only a historical load):
  *   1. a phase gate the site moved past (a task the gate holds, or a later one, approved with an actual date) is open as an admin override of the site (kind
  *      gate_moved_past_open), the permits stay unrecorded, the engine opens the held tasks and calculates the milestones; a stop work in force still holds it;
  *   2. MW alignment (D8) is N/A (kind no_microwave_na) when the site's TE installation D6 is approved with no MW antenna; never a D8 with a date, a measured
@@ -66,7 +66,7 @@ async function teSite(prefix: string, mw: unknown, o: { d8?: { state?: string; d
   return s;
 }
 
-describe('0133: a gate the site moved past is open, MW alignment is N/A without microwave (any site)', () => {
+describe('0134: a gate the site moved past is open, MW alignment is N/A without microwave (any site)', () => {
   let admin: Actor;
   let main: Site;
 

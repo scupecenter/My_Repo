@@ -1,8 +1,8 @@
--- 0133_gate_moved_past_no_microwave: on ANY site, a phase gate the site has moved past is open as an admin override (the rule of 0127, which held only for a
+-- 0134_gate_moved_past_no_microwave: on ANY site, a phase gate the site has moved past is open as an admin override (the rule of 0127, which held only for a
 -- historical load approved directly), and MW alignment (D8) is N/A on a site without microwave (the approved TE installation D6 has no MW antenna), also an
 -- admin override; both revertible through the existing door, both applied once to the existing sites and from now on in the calculation path (owner
 -- decisions 2026-11-22; CHANGELOG 176; contract 0.15.43).
--- Mirror: db/sql/132_gate_moved_past_no_microwave.sql (kept byte-identical).
+-- Mirror: db/sql/133_gate_moved_past_no_microwave.sql (kept byte-identical).
 --
 -- WHY (production, read-only diagnosis 2026-11-22): the Master counts 282 sites On-Air (task D10 approved with the On-Air date), GSDN Workspace 273 (milestone
 -- MS6 approved); 51 sites have D10 approved but MS6 locked. MS6 waits for D7, D8, D9 and D10. On 58 sites the TE installation D6 is approved with an actual date
@@ -64,7 +64,7 @@
 -- (as the catch-ups of 0127 / 0129), and the API omits acted_by (the screens say "automatic rule"). An automatic closing of a no_microwave_na override with no
 -- signed-in actor may leave reverted_by NULL, for the two rule kinds only (CHECK).
 --
--- Redefined from their latest definitions (bodies unchanged except where marked "0133"): calc_refresh_site (0122; also search_path now ends in pg_temp),
+-- Redefined from their latest definitions (bodies unchanged except where marked "0134"): calc_refresh_site (0122; also search_path now ends in pg_temp),
 -- swl_open_for_load (0085: the marker hist_load), hgd_restore_gate (0128), hgd_settle_site (0129), ao_current_matches (0129), admin_override_revert (0129).
 -- CREATE OR REPLACE keeps their owner and grants (admin_override_revert stays the API door; calc_refresh_site and swl_open_for_load stay internal).
 --
@@ -81,7 +81,7 @@ ALTER TABLE admin_overrides ADD CONSTRAINT admin_overrides_rule_actor_check CHEC
 ALTER TABLE admin_overrides DROP CONSTRAINT admin_overrides_revert_check;
 ALTER TABLE admin_overrides ADD CONSTRAINT admin_overrides_revert_check CHECK ((reverted_at IS NULL) = (reverted_by IS NULL)
   OR (reverted_at IS NOT NULL AND reverted_by IS NULL AND kind IN ('gate_moved_past_open', 'no_microwave_na')));
-COMMENT ON COLUMN admin_overrides.acted_by IS '0133: NULL only for an override made by a rule of GSDN Workspace (kinds gate_moved_past_open and no_microwave_na, owner decisions 2026-11-22)';
+COMMENT ON COLUMN admin_overrides.acted_by IS '0134: NULL only for an override made by a rule of GSDN Workspace (kinds gate_moved_past_open and no_microwave_na, owner decisions 2026-11-22)';
 
 -- ---------------------------------------------------------------------------------------------------------------------
 -- 2. The flag of MW alignment made N/A for want of microwave, and its guard
@@ -91,7 +91,7 @@ ALTER TABLE task_instances
   ADD COLUMN no_microwave_na_at timestamptz,
   ADD CONSTRAINT task_instances_nmw_check CHECK (NOT no_microwave_na OR (state = 'na' AND is_na AND no_microwave_na_at IS NOT NULL));
 CREATE INDEX task_instances_nmw_idx ON task_instances (site_id) WHERE no_microwave_na;
-COMMENT ON COLUMN task_instances.no_microwave_na IS '0133: MW alignment (D8) N/A because the approved TE installation (D6) has no MW antenna (owner decision 2026-11-22; admin override, reversible through POST /overrides/{id}/revert)';
+COMMENT ON COLUMN task_instances.no_microwave_na IS '0134: MW alignment (D8) N/A because the approved TE installation (D6) has no MW antenna (owner decision 2026-11-22; admin override, reversible through POST /overrides/{id}/revert)';
 
 DO $$
 BEGIN
@@ -108,7 +108,7 @@ LANGUAGE plpgsql SET search_path = pg_catalog, public, pg_temp AS $$
 BEGIN
   IF TG_OP = 'INSERT' THEN
     IF public.app_is_seeding() THEN RETURN NEW; END IF;
-    RAISE EXCEPTION 'no microwave: the N/A of MW alignment is written only by GSDN Workspace (migration 0133)' USING ERRCODE = 'insufficient_privilege';
+    RAISE EXCEPTION 'no microwave: the N/A of MW alignment is written only by GSDN Workspace (migration 0134)' USING ERRCODE = 'insufficient_privilege';
   END IF;
   IF OLD.no_microwave_na AND (NEW.state IS DISTINCT FROM 'na' OR NOT NEW.is_na) THEN
     NEW.no_microwave_na := false;
@@ -131,7 +131,7 @@ BEGIN
      AND NEW.no_microwave_na AND NOT OLD.no_microwave_na AND NEW.state = 'na' AND NEW.is_na AND OLD.state IN ('locked', 'open') THEN
     RETURN NEW;
   END IF;
-  RAISE EXCEPTION 'no microwave: the N/A of MW alignment is written only by GSDN Workspace (migration 0133)' USING ERRCODE = 'insufficient_privilege';
+  RAISE EXCEPTION 'no microwave: the N/A of MW alignment is written only by GSDN Workspace (migration 0134)' USING ERRCODE = 'insufficient_privilege';
 END $$;
 
 CREATE TRIGGER nmw_guard_task_ins BEFORE INSERT ON task_instances FOR EACH ROW
@@ -221,7 +221,7 @@ BEGIN
       INSERT INTO public.workflow_steps (task_id, level, action, acted_by, note, admin_override, override_reason, stepup_verified, before_state, after_state, created_at)
       VALUES (mt.id, greatest(mt.current_level, 1), 'admin_override', NULL,
               left('the gate ' || g.link_code || ' is open, the site moved past it (' || e.code || ' is approved on ' || e.actual_date::text
-                   || '; admin override by the rule of 2026-11-22)' || CASE WHEN p_backfill THEN ', migration 0133' ELSE '' END, 2000),
+                   || '; admin override by the rule of 2026-11-22)' || CASE WHEN p_backfill THEN ', migration 0134' ELSE '' END, 2000),
               true, rs, false, mt.state, mt.state, clock_timestamp());
     END IF;
     INSERT INTO public.audit_log (action, entity_type, entity_id, site_id, region_id, before, after, reason, actor_id, is_admin_override)
@@ -285,7 +285,7 @@ BEGIN
     INSERT INTO public.workflow_steps (task_id, level, action, acted_by, note, admin_override, override_reason, stepup_verified, before_state, after_state, created_at)
     VALUES (t.id, greatest(cur.current_level, 1), 'admin_override', NULL,
             left(why || ': the TE installation D6 is approved without an MW antenna (admin override by the rule of 2026-11-22)'
-                 || CASE WHEN p_backfill THEN ', migration 0133' ELSE '' END, 2000),
+                 || CASE WHEN p_backfill THEN ', migration 0134' ELSE '' END, 2000),
             true, rs, false, cur.state, 'na', clock_timestamp());
     INSERT INTO public.audit_log (action, entity_type, entity_id, site_id, region_id, before, after, reason, actor_id, is_admin_override)
     VALUES ('task_no_microwave_na', 'task', t.id::text, p_site, cur.region_id, before || jsonb_build_object('no_microwave_na', false),
@@ -369,13 +369,13 @@ BEGIN
 END $$;
 
 -- ---------------------------------------------------------------------------------------------------------------------
--- 8. The calculation path runs the two rules (calc_refresh_site: latest 0122, changes marked 0133; search_path now ends in pg_temp)
+-- 8. The calculation path runs the two rules (calc_refresh_site: latest 0122, changes marked 0134; search_path now ends in pg_temp)
 -- ---------------------------------------------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION calc_refresh_site(p_site uuid) RETURNS integer
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
 DECLARE
   changed integer := 0; round_ integer := 0; progress boolean; m record; ev record; manual jsonb; before jsonb; pre date; sid uuid; released integer;
-  ruled integer;   -- 0133
+  ruled integer;   -- 0134
 BEGIN
   IF current_setting('pmis.calc_busy', true) = '1' THEN RETURN 0; END IF;
   PERFORM set_config('pmis.calc_busy', '1', true);
@@ -453,7 +453,7 @@ BEGIN
       PERFORM public.sla_task_open(sid);
       IF EXISTS (SELECT 1 FROM public.task_instances WHERE id = sid AND sla_start_date IS NOT NULL) THEN changed := changed + 1; progress := true; END IF;
     END LOOP;
-    -- 0133: a gate the site moved past is open, and MW alignment is N/A on a site without microwave (owner decisions 2026-11-22; admin overrides by
+    -- 0134: a gate the site moved past is open, and MW alignment is N/A on a site without microwave (owner decisions 2026-11-22; admin overrides by
     -- the rule, revertible); a change is progress, so the next round releases the held tasks and calculates the milestones
     ruled := public.gmp_apply_site(p_site);
     IF ruled > 0 THEN changed := changed + ruled; progress := true; END IF;
@@ -469,7 +469,7 @@ EXCEPTION WHEN OTHERS THEN
 END $$;
 
 -- ---------------------------------------------------------------------------------------------------------------------
--- 8b. A historical Master load marks its transaction (swl_open_for_load: latest 0085, change marked 0133)
+-- 8b. A historical Master load marks its transaction (swl_open_for_load: latest 0085, change marked 0134)
 -- ---------------------------------------------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION swl_open_for_load(p_sites uuid[], p_reason text, p_source text) RETURNS integer
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
@@ -477,7 +477,7 @@ DECLARE sid uuid; n int := 0;
 BEGIN
   IF p_sites IS NULL OR cardinality(p_sites) = 0 THEN RETURN 0; END IF;
   PERFORM public.hw_require_admin_stepup();
-  -- 0133: this transaction applies a historical Master load: the hook of the calculation (gmp_apply_site) stands aside until it ends, so the historical
+  -- 0134: this transaction applies a historical Master load: the hook of the calculation (gmp_apply_site) stands aside until it ends, so the historical
   -- rules of 0126 / 0127 / 0129 decide its sites as before (definer-only marker; one row of hgd_marks per load transaction, never read again)
   IF p_source = 'historical_master_import' THEN PERFORM public.hgd_mark('hist_load', '1'); END IF;
   FOR sid IN SELECT s.id FROM public.sites s WHERE s.id = ANY (p_sites) AND s.workflow_locks ORDER BY s.site_code LOOP
@@ -488,7 +488,7 @@ BEGIN
 END $$;
 
 -- ---------------------------------------------------------------------------------------------------------------------
--- 9. The restore of a gate override takes either kind (hgd_restore_gate: latest 0128, changes marked 0133)
+-- 9. The restore of a gate override takes either kind (hgd_restore_gate: latest 0128, changes marked 0134)
 -- ---------------------------------------------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION hgd_restore_gate(p_override uuid, p_actor uuid, p_reason text, p_why text, p_stepup boolean) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
@@ -497,7 +497,7 @@ BEGIN
   IF p_actor IS NULL OR NOT public.app_user_is_system_admin(p_actor) THEN
     RAISE EXCEPTION 'gates: only a System Admin closes a gate opened by an override' USING ERRCODE = 'insufficient_privilege';
   END IF;
-  SELECT * INTO o FROM public.admin_overrides WHERE id = p_override AND kind IN ('historical_gate_open', 'gate_moved_past_open') FOR UPDATE;   -- 0133: either kind
+  SELECT * INTO o FROM public.admin_overrides WHERE id = p_override AND kind IN ('historical_gate_open', 'gate_moved_past_open') FOR UPDATE;   -- 0134: either kind
   IF NOT FOUND OR o.reverted_at IS NOT NULL THEN RETURN jsonb_build_object('override_id', p_override, 'outcome', 'not_open'); END IF;
   gcode := o.after ->> 'gate';
   SELECT * INTO s FROM public.sites WHERE id = o.site_id;
@@ -516,14 +516,14 @@ BEGIN
             coalesce(p_stepup, false), mt.state, mt.state, clock_timestamp());
   END IF;
   INSERT INTO public.audit_log (action, entity_type, entity_id, site_id, region_id, before, after, reason, actor_id, is_admin_override)
-  VALUES (CASE o.kind WHEN 'gate_moved_past_open' THEN 'site_gate_moved_past_restore' ELSE 'site_historical_gate_restore' END /* 0133 */, 'site', o.site_id::text, o.site_id, s.region_id, jsonb_build_object('gate', gcode, 'historical_open', true, 'override_id', o.id),
+  VALUES (CASE o.kind WHEN 'gate_moved_past_open' THEN 'site_gate_moved_past_restore' ELSE 'site_historical_gate_restore' END /* 0134 */, 'site', o.site_id::text, o.site_id, s.region_id, jsonb_build_object('gate', gcode, 'historical_open', true, 'override_id', o.id),
           jsonb_build_object('gate', gcode, 'historical_open', false, 'override_id', o.id, 'why', p_why), left(btrim(p_reason), 2000), p_actor, true);
   PERFORM public.calc_refresh_site(o.site_id);
   RETURN jsonb_build_object('override_id', o.id, 'outcome', 'closed');
 END $$;
 
 -- ---------------------------------------------------------------------------------------------------------------------
--- 10. The historical settle loop never reopens a gate reverted under either kind (hgd_settle_site: latest 0129, change marked 0133)
+-- 10. The historical settle loop never reopens a gate reverted under either kind (hgd_settle_site: latest 0129, change marked 0134)
 -- ---------------------------------------------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION hgd_settle_site(p_site uuid, p_actor uuid, p_reason text, p_catchup boolean) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
@@ -576,7 +576,7 @@ BEGIN
     FOR g IN SELECT x.link_code, x.to_code FROM public.phase_gate_rules x WHERE x.workflow_id = s.workflow_version_id AND x.is_active ORDER BY x.seq LOOP
       CONTINUE WHEN EXISTS (SELECT 1 FROM public.site_gate_state y WHERE y.site_id = p_site AND y.gate_code = g.link_code AND y.historical_open_override IS NOT NULL);
       CONTINUE WHEN EXISTS (SELECT 1 FROM public.admin_overrides o WHERE o.site_id = p_site AND o.kind IN ('historical_gate_open', 'gate_moved_past_open')
-                              AND o.after ->> 'gate' = g.link_code AND o.reverted_at IS NOT NULL);   -- reverted by a System Admin (0133: either kind): never opened again
+                              AND o.after ->> 'gate' = g.link_code AND o.reverted_at IS NOT NULL);   -- reverted by a System Admin (0134: either kind): never opened again
       SELECT * INTO gev FROM public.gate_eval(p_site, g.link_code);
       CONTINUE WHEN gev.status IS DISTINCT FROM 'blocked'
         OR EXISTS (SELECT 1 FROM jsonb_array_elements(coalesce(gev.reasons, '[]'::jsonb)) z WHERE z ->> 'kind' IN ('suspension', 'stop_work'));
@@ -731,7 +731,7 @@ BEGIN
 END $$;
 
 -- ---------------------------------------------------------------------------------------------------------------------
--- 11. The revert door (ao_current_matches and admin_override_revert: latest 0129, changes marked 0133)
+-- 11. The revert door (ao_current_matches and admin_override_revert: latest 0129, changes marked 0134)
 -- ---------------------------------------------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION ao_current_matches(p_id uuid) RETURNS boolean
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
@@ -753,10 +753,10 @@ BEGIN
     RETURN EXISTS (SELECT 1 FROM public.task_instances t WHERE t.id = o.task_id AND t.state = 'approved' AND t.historical_manual_ms
                    AND t.actual_date::text IS NOT DISTINCT FROM o.after ->> 'actual_date');
   END IF;
-  IF o.kind = 'gate_moved_past_open' THEN   -- 0133: the gate is still open by this override
+  IF o.kind = 'gate_moved_past_open' THEN   -- 0134: the gate is still open by this override
     RETURN EXISTS (SELECT 1 FROM public.site_gate_state g WHERE g.site_id = o.site_id AND g.gate_code = o.after ->> 'gate' AND g.historical_open_override = o.id);
   END IF;
-  IF o.kind = 'no_microwave_na' THEN   -- 0133: the task is still N/A from the mark
+  IF o.kind = 'no_microwave_na' THEN   -- 0134: the task is still N/A from the mark
     RETURN EXISTS (SELECT 1 FROM public.task_instances t WHERE t.id = o.task_id AND t.state = 'na' AND t.no_microwave_na);
   END IF;
   FOR k IN SELECT jsonb_object_keys(o.after) LOOP
@@ -804,11 +804,11 @@ BEGIN
     PERFORM public.hmm_restore_task(o.task_id, actor, rs, 'the direct approval of the historical load is taken back by a System Admin (revert of the override)', true);
     RETURN public.ao_override_json(o.id);
   END IF;
-  IF o.kind = 'gate_moved_past_open' THEN   -- 0133: the gate follows its conditions again (never opened by the rule again)
+  IF o.kind = 'gate_moved_past_open' THEN   -- 0134: the gate follows its conditions again (never opened by the rule again)
     PERFORM public.hgd_restore_gate(o.id, actor, rs, 'the gate opened because the site moved past it is closed again by a System Admin (revert of the override)', true);
     RETURN public.ao_override_json(o.id);
   END IF;
-  IF o.kind = 'no_microwave_na' THEN   -- 0133: MW alignment is restored from N/A (locked again, opened when it can be; never marked by the rule again)
+  IF o.kind = 'no_microwave_na' THEN   -- 0134: MW alignment is restored from N/A (locked again, opened when it can be; never marked by the rule again)
     PERFORM public.nmw_restore_task(o.task_id, actor, rs, 'restored from N/A "no microwave on site" by a System Admin (revert of the override)', true);
     RETURN public.ao_override_json(o.id);
   END IF;
@@ -894,7 +894,7 @@ BEGIN
       PERFORM public.hgd_unmark('hist_quiet');
     EXCEPTION WHEN others THEN   -- one site never stops the update of the server: reported in the System Log and counted (its changes are rolled back)
       PERFORM set_config('pmis.calc_busy', was_busy, true);
-      PERFORM public.log_system_write('warn', 'calc', 'migration 0133: the gate moved-past / no-microwave backfill could not run on a site',
+      PERFORM public.log_system_write('warn', 'calc', 'migration 0134: the gate moved-past / no-microwave backfill could not run on a site',
         jsonb_build_object('site_id', sid, 'sqlstate', SQLSTATE, 'error', left(SQLERRM, 300)), NULL, NULL);
       n_failed := n_failed + 1; changed := false;
     END;
@@ -910,7 +910,7 @@ BEGIN
   INSERT INTO public.audit_log (action, entity_type, entity_id, before, after, reason, actor_id, is_admin_override)
   VALUES ('gate_moved_past_no_microwave_backfill', 'site', 'all', jsonb_build_object('milestones_approved', ms_before),
           res || jsonb_build_object('rule', 'owner decisions 2026-11-22: a gate the site moved past is open as an admin override (a stop work in force still holds it); MW alignment (D8) is N/A as an admin override when the approved TE installation (D6) has no MW antenna; both revertible'),
-          'migration 0133: gates the site moved past and MW alignment without microwave (owner decisions 2026-11-22)', NULL, true);
+          'migration 0134: gates the site moved past and MW alignment without microwave (owner decisions 2026-11-22)', NULL, true);
   RETURN res;
 END $$;
 

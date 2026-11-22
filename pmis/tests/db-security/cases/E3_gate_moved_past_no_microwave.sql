@@ -1,4 +1,4 @@
--- A gate the site moved past is open, and MW alignment (D8) is N/A on a site without microwave, on any site (migration 0133, owner decisions 2026-11-22,
+-- A gate the site moved past is open, and MW alignment (D8) is N/A on a site without microwave, on any site (migration 0134, owner decisions 2026-11-22,
 -- contract 0.15.43). Both rules are admin overrides made by GSDN Workspace (kinds gate_moved_past_open and no_microwave_na, acted_by NULL), decided only by
 -- definer code: gmp_* and nmw_* are internal (owner pmis_definer, PUBLIC revoked, nothing granted to pmis_app); the flag task_instances.no_microwave_na is
 -- written only under the definer AND its definer-only marker row (guard nmw_guard_task; a GUC alone never passes); the gate column is the one of 0127 (guard

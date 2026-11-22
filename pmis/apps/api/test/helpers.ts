@@ -144,7 +144,7 @@ export async function superDbHmm(): Promise<PgClient> {
   return c;
 }
 
-/** Superuser connection to the gate moved-past / no-microwave database (migration 0133; see global-setup). */
+/** Superuser connection to the gate moved-past / no-microwave database (migration 0134; see global-setup). */
 export async function superDbGmp(): Promise<PgClient> {
   const c = new PgClient({ connectionString: process.env.TEST_SUPER_URL_GMP });
   await c.connect();
@@ -175,6 +175,13 @@ export async function superDbWfg(): Promise<PgClient> {
 /** Superuser connection to the register-columns database (migration 0095; see global-setup). */
 export async function superDbRcols(): Promise<PgClient> {
   const c = new PgClient({ connectionString: process.env.TEST_SUPER_URL_RCOLS });
+  await c.connect();
+  return c;
+}
+
+/** Superuser connection to the Site Master columns database (migration 0133; see global-setup). */
+export async function superDbScols(): Promise<PgClient> {
+  const c = new PgClient({ connectionString: process.env.TEST_SUPER_URL_SCOLS });
   await c.connect();
   return c;
 }

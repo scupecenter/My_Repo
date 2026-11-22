@@ -35,27 +35,30 @@ function DateRefInput({ value, onChange, tasks, prefix }: { value: string | unde
   );
 }
 
+/** A fresh condition of a type, with the first valid reference. */
+export function newCondition(type: string, tasks: P[], milestones: M[]): GateCondition {
+  const base: GateCondition = { type };
+  if (type === 'task') base.ref = tasks[0]?.task_code ?? '';
+  if (type === 'milestone') base.ref = milestones[0]?.code ?? '';
+  if (type === 'date_field') { base.ref = 'site.rf_survey_date'; base.offset_wd = 0; }
+  if (type === 'permit') base.accept_na = true;
+  return base;
+}
+
 /**
  * The conditions of a gate: a task approved, a milestone reached, a permit valid, a date of the site plus an offset in working days, or "no stop work".
  * References are chosen from the tasks and milestones of the version; a date condition is built from choices (0096).
  */
-export function ConditionsEditor({ value, onChange, prefix, tasks, milestones, permits }: { value: GateCondition[]; onChange: (v: GateCondition[]) => void; prefix: string; tasks: P[]; milestones: M[]; permits: string[] }) {
+export function ConditionsEditor({ value, onChange, prefix, tasks, milestones, permits, quickAdd }: { value: GateCondition[]; onChange: (v: GateCondition[]) => void; prefix: string; tasks: P[]; milestones: M[]; permits: string[]; quickAdd?: boolean }) {
   const { t } = useTranslation();
   const set = (i: number, patch: Partial<GateCondition>) => onChange(value.map((c, k) => (k === i ? { ...c, ...patch } : c)));
-  const setType = (i: number, type: string) => {
-    const base: GateCondition = { type };
-    if (type === 'task') base.ref = tasks[0]?.task_code ?? '';
-    if (type === 'milestone') base.ref = milestones[0]?.code ?? '';
-    if (type === 'date_field') { base.ref = 'site.rf_survey_date'; base.offset_wd = 0; }
-    if (type === 'permit') base.accept_na = true;
-    onChange(value.map((c, k) => (k === i ? base : c)));
-  };
+  const setType = (i: number, type: string) => onChange(value.map((c, k) => (k === i ? newCondition(type, tasks, milestones) : c)));
   return (
     <div className="space-y-2" data-testid={`${prefix}-conditions`}>
       <p className="text-xs font-semibold">{t('wfe.conditions')}</p>
       {value.length === 0 && <p className="text-xs text-mute">{t('wfe.cond.none')}</p>}
       {value.map((c, i) => (
-        <div key={i} className="flex flex-wrap items-center gap-1 rounded border border-line p-1" data-testid={`${prefix}-cond-${i}`}>
+        <div key={i} className={`flex flex-wrap items-center gap-2 rounded-md border border-line p-2 ${quickAdd ? '[&_.input]:min-h-11 [&_.input]:w-auto' : ''}`} data-testid={`${prefix}-cond-${i}`}>
           <select className="input" aria-label={t('wfe.condition_type')} data-testid={`${prefix}-ctype-${i}`} value={c.type} onChange={(e) => setType(i, e.target.value)}>
             {TYPES.map((x) => <option key={x} value={x}>{t(`wfe.cond.type_${x}`)}</option>)}
           </select>
@@ -84,10 +87,18 @@ export function ConditionsEditor({ value, onChange, prefix, tasks, milestones, p
             </>
           )}
           {c.type !== 'stop_work_blocks' && <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={c.accept_na ?? false} onChange={(e) => set(i, { accept_na: e.target.checked })} />{t('wfe.accept_na')}</label>}
-          <button type="button" className="btn" aria-label={t('common.remove')} onClick={() => onChange(value.filter((_, k) => k !== i))}><Trash2 size={14} aria-hidden /></button>
+          <button type="button" className={`btn ${quickAdd ? 'min-h-11 min-w-11' : ''}`} aria-label={t('common.remove')} onClick={() => onChange(value.filter((_, k) => k !== i))}><Trash2 size={14} aria-hidden /></button>
         </div>
       ))}
+      {quickAdd ? (
+        <div className="flex flex-wrap gap-2">
+          {([['task', 'quick_task'], ['milestone', 'quick_milestone'], ['permit', 'quick_permit'], ['date_field', 'quick_date']] as const).map(([type, k]) => (
+            <button key={type} type="button" className="btn min-h-11" data-testid={`${prefix}-add-${type}`} onClick={() => onChange([...value, newCondition(type, tasks, milestones)])}><Plus size={14} aria-hidden /> {t(`wfe.cond.${k}`)}</button>
+          ))}
+        </div>
+      ) : (
       <button type="button" className="btn" data-testid={`${prefix}-add-condition`} onClick={() => onChange([...value, { type: 'task', ref: tasks[0]?.task_code ?? '' }])}><Plus size={14} aria-hidden /> {t('wfe.add_condition')}</button>
+      )}
     </div>
   );
 }

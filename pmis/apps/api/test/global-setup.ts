@@ -215,7 +215,7 @@ export default async function setup(): Promise<() => Promise<void>> {
   const hmmDb = await buildDatabase(adminUrl, hmm, appPassword);
   process.env.TEST_DATABASE_URL_HMM = hmmDb.appUrl;
   process.env.TEST_SUPER_URL_HMM = hmmDb.superUrl;
-  // The gate moved-past / no-microwave database (migration 0133): the suite runs the one-time backfill, which reads every active site of its database, and
+  // The gate moved-past / no-microwave database (migration 0134): the suite runs the one-time backfill, which reads every active site of its database, and
   // reads the gates, the milestones and the overrides of its sites, so it shares no database.
   const gmp = `${dbName}_gmp`;
   const gmpDb = await buildDatabase(adminUrl, gmp, appPassword);
@@ -247,6 +247,12 @@ export default async function setup(): Promise<() => Promise<void>> {
   const tplstDb = await buildDatabase(adminUrl, tplst, appPassword);
   process.env.TEST_DATABASE_URL_TPLST = tplstDb.appUrl;
   process.env.TEST_SUPER_URL_TPLST = tplstDb.superUrl;
+  // The Site Master columns database (migration 0133, Workflow Studio S2): the suite adds, retypes, moves, deactivates and deletes Master columns, which changes the
+  // columns of every SITE 360 menu, of the Master export and of the stream templates.
+  const scols = `${dbName}_scols`;
+  const scolsDb = await buildDatabase(adminUrl, scols, appPassword);
+  process.env.TEST_DATABASE_URL_SCOLS = scolsDb.appUrl;
+  process.env.TEST_SUPER_URL_SCOLS = scolsDb.superUrl;
   process.env.TEST_DATABASE_URL_LOGS = logsDb.appUrl;
   process.env.TEST_SUPER_URL_LOGS = logsDb.superUrl;
   process.env.TEST_DATABASE_URL_DOCS = docsDb.appUrl;
@@ -308,6 +314,7 @@ export default async function setup(): Promise<() => Promise<void>> {
     await a.query(`DROP DATABASE IF EXISTS ${wfg} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${rcols} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${tplst} WITH (FORCE)`);
+    await a.query(`DROP DATABASE IF EXISTS ${scols} WITH (FORCE)`);
     await a.end();
   };
 }
