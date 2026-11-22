@@ -770,7 +770,8 @@ export function UnifiedFilter({
 
   const entries: Entry[] = useMemo(
     () => [
-      ...fields.map((f) => {
+      // a page filter (extra) with the same key replaces the catalog field, so a field is listed once (e.g. workflow_locks)
+      ...fields.filter((f) => !extras.some((x) => !x.hidden && x.key === f.key)).map((f) => {
         const g = groupOf(f, screen, lang, t);
         return {
           id: `f:${f.key}`,
