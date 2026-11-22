@@ -4481,7 +4481,7 @@ export interface paths {
         put?: never;
         /**
          * Decide for one task, one site, or all open tasks of a person (B12b)
-         * @description Needs the `reassign` grant for the module and region, or admin. Keeps all entered data, documents and comments. It does not reset or pause the SLA (its start date and version stay) or stage progress. The Matrix is not changed. If the caller takes over a level and also holds the next one, the skip rule and the self-approval rule apply (a final approval then needs step-up on the transition itself). `dry_run` previews. One request is one audit group (`bulk_action_id`).
+         * @description Needs the `reassign` grant for the module and region, or admin. Keeps all entered data, documents and comments. It does not reset or pause the SLA (its start date and version stay) or stage progress. The Matrix is not changed. If the caller takes over a level and also holds the next one, the skip rule and the self-approval rule apply (a final approval then needs step-up on the transition itself). `dry_run` previews. One request is one audit group (`bulk_action_id`). 0.15.45 a `to_user_id` that is inactive, absent today or the person the tasks are on is refused with 422 `not_eligible_holder`; with `scope` = `task` the refusal of the one task is the answer (422 `not_eligible_holder`, 409 `invalid_transition`).
          */
         post: operations["reassignTasks"];
         delete?: never;
@@ -4522,7 +4522,7 @@ export interface paths {
         };
         /**
          * People who may receive the task(s)
-         * @description Eligible = would be a valid holder of the level in the Responsibility Matrix, region and module. Pass `task_id`, or `site_id` with `from_user_id`, or `from_user_id` alone.
+         * @description Eligible = would be a valid holder of the level in the Responsibility Matrix, region and module. Pass `task_id`, or `site_id` with `from_user_id`, or `from_user_id` alone. 0.15.45 active people only, never someone absent today or the person the task is on; with `from_user_id`, anyone eligible for at least one of that person's open tasks in the regions the caller leads. Only for a lead (the `reassign` grant for the task's region) or a System Admin.
          */
         get: operations["listEligibleReassignees"];
         put?: never;
@@ -4542,7 +4542,7 @@ export interface paths {
         };
         /**
          * Tasks that need a lead decision (absent holder or idle)
-         * @description A task shows when its holder has an active absence, when it has had no activity for `working_days` (setting), or when its holder's account is deactivated or deleted (`holder_deactivated`, B14). Scoped to the caller's modules and regions.
+         * @description A task shows when the person it is on has an active absence today, when it has had no activity for the idle limit (0.15.45 the dashboard setting `stale_idle_days`, default 2 working days), or when the person it is on has a deactivated or deleted account (`holder_deactivated`, B14). 0.15.45 a task is on a person when its current level is pinned to them, else when they are the only eligible holder of the level, else (nobody eligible) when the Matrix cell names their deactivated or deleted account. A `keep` or `act_on_behalf` decision silences the absent and deactivated alerts of the task for the idle window. Only for a lead (the `reassign` grant) or a System Admin (else 403), scoped to the regions the caller leads and sees.
          */
         get: operations["listReassignmentAlerts"];
         put?: never;
@@ -25506,6 +25506,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             422: components["responses"]["Unprocessable"];
         };
     };

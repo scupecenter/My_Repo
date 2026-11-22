@@ -504,6 +504,16 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/exports/master'],
   ['get', '/exports/master'],
   ['get', '/exports/master/:id/download'],
+  // Contract 0.15.45 (migration 0137; apps/api: reassignment): absence records and the lead decisions on tasks (B12b, B14).
+  ['get', '/absences'],
+  ['post', '/absences'],
+  ['get', '/absences/:id'],
+  ['patch', '/absences/:id'],
+  ['delete', '/absences/:id'],
+  ['get', '/reassignments/alerts'],
+  ['get', '/reassignments/eligible-users'],
+  ['post', '/tasks/reassign'],
+  ['post', '/tasks/:id/act-on-behalf'],
 ] as const;
 
 /** `GET /users/deleted` and `GET /users/picker` are other operations that the `:id` pattern would swallow; they stay mocked. */
@@ -532,13 +542,6 @@ export function realApiHandlers(on = HYBRID) {
  * When the API gains one of these routes, move it to REAL_API_AUTH_USERS (realApiCoverage.test.ts fails until it is listed there).
  */
 export const NOT_AVAILABLE = [
-  ['get', '/absences'],
-  ['post', '/absences'],
-  ['delete', '/absences/:id'],
-  ['get', '/reassignments/alerts'],
-  ['get', '/reassignments/eligible-users'],
-  ['post', '/tasks/reassign'],
-  ['post', '/tasks/:id/act-on-behalf'],
   ['get', '/settings/dlp'],
   ['post', '/settings/dlp/versions'],
   ['get', '/settings/idle-task-alert'],

@@ -6,12 +6,12 @@ import type { UserPickerItem } from '@/api/types';
 
 /** Searchable multi-select of registered people (name or ID, 2+ characters). `single` keeps one; `blockId` greys out a person (for example yourself). */
 export function PeoplePicker({ value, onChange, single, blockId, blockHint, id = 'picker', eligible }: {
-  value: UserPickerItem[]; onChange: (v: UserPickerItem[]) => void; single?: boolean; blockId?: string; blockHint?: string; id?: string; eligible?: { from?: string };
+  value: UserPickerItem[]; onChange: (v: UserPickerItem[]) => void; single?: boolean; blockId?: string; blockHint?: string; id?: string; eligible?: { from?: string; task?: string; site?: string };
 }) {
   const { t } = useTranslation();
   const [q, setQ] = useState('');
   const own = usePicker(eligible ? '' : q);
-  const el = useEligible(eligible?.from, q, !!eligible);
+  const el = useEligible(eligible?.from, q, !!eligible, eligible?.task, eligible?.site);
   const found = (eligible ? el.data : own.data) ?? [];
   const picked = new Set(value.map((v) => v.id));
   const add = (u: UserPickerItem) => onChange(single ? [u] : [...value, u]);

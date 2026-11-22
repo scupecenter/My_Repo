@@ -99,6 +99,8 @@ export interface TaskSummaryDto {
   /** 0092: approved directly by the historical Master import (admin override, no L2): the "Admin override" badge. */
   historical_direct_approved: boolean;
   holder_account_status?: 'active' | 'deactivated' | 'deleted';
+  /** 0137 (B12b): the person the open task is on has an absence today (the "absent" badge). Only on open tasks. */
+  holder_absent?: boolean;
   /** F2 (0.15.30): the last time a person acted on the open task (task_last_activity); null when the task is not open. */
   last_activity_at: string | null;
   /** F2 (0.15.30): working days since last_activity_at. */
@@ -349,6 +351,12 @@ export class TaskViewService {
       byCell.set(a.cell_id, list);
     }
 
+    // 0137 (B12b): the "absent" badge; the database answers nothing at once when nobody is absent today
+    const open = rows.filter((r) => ACTIVE_STATES.includes(r.state)).map((r) => r.id);
+    const absent = open.length
+      ? new Set((await this.db.tx.$queryRaw<{ id: string }[]>(Prisma.sql`SELECT task_id::text AS id FROM rsn_holder_absent(${open}::uuid[])`)).map((x) => x.id))
+      : new Set<string>();
+
     return rows.map((r) => {
       const dto: TaskSummaryDto = {
         id: r.id,
@@ -401,6 +409,7 @@ export class TaskViewService {
         lock_reasons: [],
         version: r.version,
       };
+      if (ACTIVE_STATES.includes(r.state)) dto.holder_absent = absent.has(r.id);
       if (r.kind) {
         const pinned = r.pinned_user ? users.get(r.pinned_user) : undefined;
         const party = r.external_party_id ? parties.find((p) => p.id === r.external_party_id) : undefined;
