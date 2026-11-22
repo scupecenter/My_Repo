@@ -27,7 +27,7 @@ Owner request: one screen in Settings to see the whole workflow and edit it dire
 | Phase | Scope | Branch / PR | Status |
 |---|---|---|---|
 | S1 | Studio UI on the existing API: tree, selection, one form per kind (milestone, gate, task), "+ Add new" menu and add screen for task / milestone / gate, draft bar with pending changes, review and publish screen. Replaces the three-column editor as the default of Settings > Workflow (the old editor stays reachable until S4). | claude/workflow-studio-ui | started 2026-11-22 |
-| S2 | API for Site Master columns: create a column (band, group, place, type, dropdown list, source: a task input or a site field), rename, change type with a preview, change dropdown, deactivate; Master-format export carries new columns after the 187. Migration 0132, contract 0.15.43. | claude/workflow-studio-columns | started 2026-11-22 |
+| S2 | API for Site Master columns: create a column (band, group, place, type, dropdown list, source: a task input or a site field), rename, change type with a preview, change dropdown, deactivate; Master-format export carries new columns after the 187. Migration 0132, contract 0.15.43. | claude/workflow-studio-columns, PR #174 | built, CI running |
 | S3 | Wire S2 into the studio: the task's "Site Master columns" table and the "Site Master column" add type. | after S1 and S2 | waiting |
 | S4 | Pending-changes list with undo per change, impact counts in review, Arabic RTL pass, remove the old editor route. | after S3 | waiting |
 
@@ -38,3 +38,4 @@ Owner request: one screen in Settings to see the whole workflow and edit it dire
 
 ## Progress log
 - 2026-11-22: design approved; plan written; S1 and S2 started in parallel.
+- 2026-11-22: S2 committed (contract 0.15.43, migration 0132), PR #174. Local DB tests 32/32 plus neighbours 129/129. Open: db-security cases for the new doors; unify `admin.settings` (menus) and `fields` (other writes) rights is an owner decision.
