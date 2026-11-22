@@ -227,6 +227,14 @@ BEGIN
   SELECT coalesce(array_agg(l.id), ARRAY[]::uuid[]) INTO recipients FROM public.users l
   WHERE l.id <> ab.user_id AND l.id IS DISTINCT FROM a AND l.status = 'active' AND l.deleted_at IS NULL AND NOT l.is_break_glass
     AND NOT public.app_user_is_system_admin(l.id)
+    -- cheap pre-filter: someone who holds the reassign grant through an assignment profile, or who has a delegation at all
+    AND (EXISTS (SELECT 1 FROM public.user_role_assignments ua
+                 JOIN public.user_role_assignment_profiles ap ON ap.assignment_id = ua.id
+                 JOIN public.permission_profiles pp ON pp.id = ap.profile_id AND pp.is_active
+                 JOIN public.permission_grants g ON g.profile_id = pp.id AND g.action = 'administer'
+                 WHERE ua.user_id = l.id AND ua.valid_from <= now() AND (ua.valid_to IS NULL OR ua.valid_to > now())
+                   AND ('overrides.reassign' = g.module_key OR 'overrides.reassign' LIKE g.module_key || '.%'))
+         OR EXISTS (SELECT 1 FROM public.app_user_delegations(l.id)))
     AND public.rsn_leads_person(l.id, ab.user_id);
   IF cardinality(recipients) = 0 THEN
     SELECT coalesce(array_agg(DISTINCT gm.user_id), ARRAY[]::uuid[]) INTO recipients
@@ -242,6 +250,20 @@ BEGIN
   END LOOP;
   RETURN cardinality(recipients);
 END $$;
+
+-- The two kinds this release starts writing (absence_alert to the leads, reassigned to the new and the former holder) join the mail catalogue (latest 0072:
+-- "added here by the release that starts writing them"). Redefined in full; only the last two kinds are new.
+CREATE OR REPLACE FUNCTION mail_kind_catalogue() RETURNS jsonb
+LANGUAGE sql IMMUTABLE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
+  SELECT jsonb_agg(jsonb_build_object('kind', k, 'recommended', ord <= 6) ORDER BY ord)
+  FROM unnest(ARRAY[
+    'task_assigned', 'register_assigned', 'snag_review', 'task_rejected', 'register_rejected', 'snag_rejected',
+    'email_change_decided', 'email_change_requested', 'followed_change', 'gate_closed_again', 'holiday_tentative', 'import_batch', 'levels_converted', 'mention',
+    'no_eligible_holder', 'order_team_mismatch', 'party_type_review', 'permit_transferred', 'phone_change_decided', 'phone_change_requested', 'site_draft_approved',
+    'site_draft_assigned', 'site_draft_returned', 'site_region_moved', 'sla_negative_duration', 'snag_closed', 'snag_raised', 'team_safety_cert',
+    'absence_alert', 'reassigned'
+  ]) WITH ORDINALITY AS t(k, ord)
+$$;
 
 -- ---------------------------------------------------------------------------------------------------------------------
 -- 3. The engine learns "lead on behalf of the assignee" (redefined in full; only the lines marked 0138 are new)
@@ -843,7 +865,7 @@ BEGIN
     'rsn_lead_regions(uuid)', 'rsn_is_lead(uuid,integer)', 'rsn_user_regions(uuid)', 'rsn_leads_person(uuid,uuid)', 'rsn_candidate_stages(uuid)',
     'rsn_task_on(uuid)', 'rsn_absence_on(uuid,date)', 'rsn_recently_decided(uuid,uuid,integer)', 'rsn_covering(uuid)', 'rsn_covering_at(uuid,integer)',
     'rsn_cover_twice(uuid,integer,uuid)', 'rsn_absence_json(uuid)',
-    'rsn_notify_absence(uuid)',
+    'rsn_notify_absence(uuid)', 'mail_kind_catalogue()',
     'wf_require_actor(uuid,text,uuid)', 'wf_step(uuid,integer,text,uuid,text,"TaskState","TaskState",boolean,boolean)', 'wf_audit(text,uuid,jsonb,jsonb,text)',
     'wf_complete_hw(uuid,integer,text,text,boolean,uuid)'
   ] LOOP

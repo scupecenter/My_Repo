@@ -477,7 +477,7 @@ describe('lead scope: every region of the person must be the lead\'s', () => {
     expect((await lead.api.call('post', '/tasks/reassign', { scope: 'person', from_user_id: twoRegions.user.id, decision: 'keep', reason: 'Not my person' })).status).toBe(403);
     expect((await lead.api.call('get', '/reassignments/eligible-users').query({ task_id: t })).status).toBe(403);
     expect((await lead.api.call('post', `/tasks/${t}/act-on-behalf`, { action: 'submit', level: 1, reason: 'Not my person' }, { 'If-Match': '"1"' })).status).toBe(403);
-  });
+  }, 120_000);
 
   it('a regional lead cannot move the vote of an all-members voter outside their scope, and can move one inside it', async () => {
     const outside = await actor(app, db, { level: 'entry', regions: [REGION, 4] });

@@ -25,6 +25,7 @@
 - اختبارات: `apps/api/test/absences-reassignment.test.ts` (19 اختباراً)، وحالات أمان `tests/db-security/cases/E4_absences_reassignment.sql` (23 حالة).
 
 ### تعديل
+- `mail_kind_catalogue` (آخر تعريف 0072) صار يضم النوعين اللذين يكتبهما هذا الإصدار: `absence_alert` و`reassigned` (حالة الأمان SCR-27 صارت 30 نوعاً). وحالة `misc.test.ts` لمسار غير مبني صارت `GET /settings/dlp` بدل `/absences`.
 - `wf_require_actor` (آخر تعريف 0125) و`wf_step` (0051) و`wf_audit` (0069) أُعيد تعريفها كاملة؛ الجديد فقط فرع «التصرف نيابة» وختم `on_behalf_of`، و`search_path` ينتهي بـ `pg_temp`.
 - قارئ سجل التدقيق: `on_behalf_kind` صار `assignee` للقائد نيابة عن المكلَّف و`system_admin` لغيره (كان يُرجع `delegate` الذي ليس في العقد). سجل المهمة (`GET /tasks/{id}/history`) يعيد `on_behalf_kind`.
 - شاشة الغياب: من هو القائد تُحسب بـ `canReassign` (صلاحية `overrides.reassign` مع `administer`)، ومنتقي المستلم يطلب المؤهلين للمهمة نفسها (`task_id`) أو للموقع (`site_id`) حسب النطاق.
