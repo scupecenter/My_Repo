@@ -153,3 +153,12 @@ export function impactCounts(pv: Pick<MigrationPreview, 'sites'>) {
   const movable = pv.sites.filter((s) => s.migratable).length;
   return { sites: pv.sites.length, movable, blocked: pv.sites.length - movable, added: n((s) => s.tasks_added?.length ?? 0), moved: n((s) => s.tasks_moved?.length ?? 0), retired: n((s) => s.tasks_retired?.length ?? 0), dates: n((s) => s.date_changes?.length ?? 0) };
 }
+
+/** The letter of a Master order: 1 = A, 26 = Z, 27 = AA, 187 = GE, 188 = GF. */
+export function letterOf(ord: number): string {
+  let s = '';
+  for (let x = ord; x > 0; x = Math.floor((x - 1) / 26)) s = String.fromCharCode(65 + ((x - 1) % 26)) + s;
+  return s;
+}
+/** The letter the next added column gets: the next order after the 187 and after every added one (the API decides the last word). */
+export const nextColumnLetter = (cols: { ord: number }[]) => letterOf(Math.max(187, ...cols.map((c) => c.ord)) + 1);

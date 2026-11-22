@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { M, P } from '../wf/model';
-import { buildTree, editedCodes, pendingChanges, type Struct } from './studioModel';
+import { buildTree, editedCodes, letterOf, nextColumnLetter, pendingChanges, type Struct } from './studioModel';
 
 const m = (code: string, name: string): M => ({ code, name_en: name });
 const p = (task_code: string, stage_code: string, n: number, name_en: string, predecessors: string[] = []): P => ({ task_code, stage_code, sort_order: n, name_en, predecessors, is_active: true });
@@ -33,5 +33,15 @@ describe('studioModel', () => {
     expect(hit).toHaveLength(1);
     expect(hit[0]).toMatchObject({ open: true, gate: undefined });
     expect(buildTree(s, 'release', new Set())[0]!.tasks).toHaveLength(2);
+  });
+});
+
+describe('Site Master column letters', () => {
+  it('numbers the Master like the sheet: 187 is GE, so the first added column is GF', () => {
+    expect([1, 26, 27, 52, 53, 187, 188, 189, 702, 703].map(letterOf)).toEqual(['A', 'Z', 'AA', 'AZ', 'BA', 'GE', 'GF', 'GG', 'ZZ', 'AAA']);
+  });
+  it('previews the next letter after the 187 and after the columns already added (a deleted one leaves its position)', () => {
+    expect(nextColumnLetter([{ ord: 5 }, { ord: 187 }])).toBe('GF');
+    expect(nextColumnLetter([{ ord: 187 }, { ord: 188 }, { ord: 190 }])).toBe('GI');
   });
 });

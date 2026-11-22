@@ -61,6 +61,7 @@ function StudioBody({ v, liveNo, versions }: { v: WorkflowVersion; liveNo: numbe
   const [view, setView] = useState<View>('form');
   const [tab, setTab] = useState<AddTab>('task');
   const [addMs, setAddMs] = useState<string | undefined>();
+  const [addTask, setAddTask] = useState<string | undefined>();
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState<Set<string>>(new Set());
   const [step, setStep] = useState<'tree' | 'detail'>('tree');
@@ -79,9 +80,9 @@ function StudioBody({ v, liveNo, versions }: { v: WorkflowVersion; liveNo: numbe
   const msOf = (s: NonNullable<StudioSel>) => (s.kind === 'task' ? placements.find((p) => p.task_code === s.code)?.stage_code : s.kind === 'gate' ? gates.find((g) => g.code === s.code)?.from_milestone : s.code);
   const select = (s: StudioSel) => { setSel(s); setView('form'); setStep('detail'); const m = s && msOf(s); if (m) setOpen((o) => new Set(o).add(m)); };
   const toggle = (code: string) => setOpen((o) => { const n = new Set(o); if (n.has(code)) n.delete(code); else n.add(code); return n; });
-  const startAdd = (k: AddTab, ms?: string) => { setTab(k); setAddMs(ms ?? (sel ? msOf(sel) : undefined)); setView('add'); setStep('detail'); setMenu(false); };
+  const startAdd = (k: AddTab, ms?: string, taskCode?: string) => { setTab(k); setAddMs(ms ?? (sel ? msOf(sel) : undefined)); setAddTask(taskCode ?? (k === 'column' && sel?.kind === 'task' ? sel.code : undefined)); setView('add'); setStep('detail'); setMenu(false); };
 
-  const c: Ctx = { v, etag, placements, milestones, gates, can, W, askReason, nm, sw: new Map(sw.map((x) => [x.task_code, x])), baseSw: baseSw ? new Map(baseSw.map((x) => [x.task_code, x])) : null, totals, edited, select, isDraft };
+  const c: Ctx = { v, etag, placements, milestones, gates, can, W, askReason, nm, sw: new Map(sw.map((x) => [x.task_code, x])), baseSw: baseSw ? new Map(baseSw.map((x) => [x.task_code, x])) : null, totals, edited, select, isDraft, canCols: canEdit, addColumn: (code) => startAdd('column', undefined, code) };
   const menuItem = 'flex min-h-11 w-full items-center rounded-md px-3 text-start text-sm hover:bg-hover disabled:opacity-50 disabled:pointer-events-none';
 
   return (
@@ -104,13 +105,13 @@ function StudioBody({ v, liveNo, versions }: { v: WorkflowVersion; liveNo: numbe
           <label className="min-w-48 flex-1 sm:max-w-sm"><span className="sr-only">{t('studio.search')}</span>
             <input type="search" className="input min-h-11" placeholder={t('studio.search')} data-testid="studio-search" value={query} onChange={(e) => setQuery(e.target.value)} /></label>
           <Popover.Root open={menu} onOpenChange={setMenu}>
-            <Popover.Trigger asChild><button type="button" className="btn min-h-11" data-testid="studio-add-menu" aria-haspopup="menu" disabled={!isDraft}><Plus size={14} aria-hidden />{t('studio.add_new')}</button></Popover.Trigger>
+            <Popover.Trigger asChild><button type="button" className="btn min-h-11" data-testid="studio-add-menu" aria-haspopup="menu" disabled={!isDraft && !canEdit}><Plus size={14} aria-hidden />{t('studio.add_new')}</button></Popover.Trigger>
             <Popover.Portal>
               <Popover.Content align="start" sideOffset={6} role="menu" aria-label={t('studio.add_new')} className="card z-[60] w-64 p-1 shadow-lg" data-testid="studio-add-menu-list">
                 <button type="button" role="menuitem" className={menuItem} data-testid="studio-menu-task" disabled={!struct} title={!struct ? why ?? undefined : undefined} onClick={() => startAdd('task')}>{t('studio.menu_task')}</button>
                 <button type="button" role="menuitem" className={menuItem} data-testid="studio-menu-milestone" disabled={!struct} title={!struct ? why ?? undefined : undefined} onClick={() => startAdd('milestone')}>{t('studio.new_milestone')}</button>
                 <button type="button" role="menuitem" className={menuItem} data-testid="studio-menu-gate" disabled={!struct} title={!struct ? why ?? undefined : undefined} onClick={() => startAdd('gate')}>{t('studio.new_gate')}</button>
-                <button type="button" role="menuitem" className={menuItem} data-testid="studio-menu-column" disabled aria-disabled="true">{t('studio.menu_column')}<span className="ms-auto text-xs text-mute">{t('studio.coming_s3')}</span></button>
+                <button type="button" role="menuitem" className={menuItem} data-testid="studio-menu-column" disabled={!canEdit} title={!canEdit ? t('studio.columns.readonly') : undefined} onClick={() => startAdd('column')}>{t('studio.menu_column')}</button>
               </Popover.Content>
             </Popover.Portal>
           </Popover.Root>
@@ -132,7 +133,7 @@ function StudioBody({ v, liveNo, versions }: { v: WorkflowVersion; liveNo: numbe
         </div>
         <main className={`${step === 'detail' ? '' : 'hidden'} min-w-0 space-y-3 md:block`} aria-label={t('studio.title')} data-testid="studio-centre">
           <button type="button" className="btn min-h-11 md:hidden" data-testid="studio-back" onClick={() => setStep('tree')}><ArrowLeft size={14} aria-hidden className="rtl:rotate-180" />{t('wfe.back')}</button>
-          {view === 'add' && <StudioAdd c={c} tab={tab} {...(addMs ? { milestone: addMs } : {})} onTab={setTab} onClose={() => setView('form')} onAdded={(s) => { select(s); }} />}
+          {view === 'add' && <StudioAdd c={c} tab={tab} {...(addMs ? { milestone: addMs } : {})} {...(addTask ? { task: addTask } : {})} onTab={setTab} onClose={() => setView('form')} onAdded={(s) => { select(s); }} />}
           {view === 'review' && <StudioReview c={c} parent={parent} parentSw={baseSw ?? []} draftSw={sw} frozen={frozen} onBack={() => setView('form')} onPublished={() => { setView('form'); setSel(null); setStep('tree'); }} />}
           {view === 'form' && (!sel
             ? <div className="card rounded-xl p-6 text-center text-sm text-mute" data-testid="studio-empty">{t('studio.empty')}</div>
