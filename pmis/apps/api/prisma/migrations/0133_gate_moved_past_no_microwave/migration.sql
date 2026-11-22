@@ -257,6 +257,9 @@ BEGIN
       AND ti.actual_date IS NULL AND ti.actual_start IS NULL AND ti.submitted_date IS NULL AND ti.approved_date IS NULL
       AND public.nmw_blank(ti.values -> 'measured_rsl') AND public.nmw_blank(ti.values -> 'mw_rsl_dbm')
       AND public.nmw_mw_absent(d6.values -> 'mw_antenna')
+      -- a gate holding D8 (its conditions, a stop work or a suspension) keeps it: the rule never steps past a gate
+      AND coalesce(ti.lock_reason, '') NOT LIKE 'gate_closed:%'
+      AND (SELECT h.gate_code FROM public.wf_gate_hold(ti.id) h) IS NULL
       -- D8 would open: every predecessor is done (the order D7 -> D8 -> D9 is kept)
       AND NOT EXISTS (SELECT 1 FROM public.task_predecessors p2 JOIN public.task_instances pi ON pi.site_id = ti.site_id AND pi.task_def_id = p2.predecessor_id
                       WHERE p2.task_def_id = ti.task_def_id AND pi.state NOT IN ('approved', 'na', 'skipped'))

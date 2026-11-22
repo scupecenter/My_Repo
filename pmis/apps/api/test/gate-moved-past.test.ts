@@ -166,6 +166,22 @@ describe('0133: a gate the site moved past is open, MW alignment is N/A without 
     expect((await tasks(early.id)).D8).toMatchObject({ state: 'locked', nmw: false });
     await approve(db, early, 'D7', '2026-03-20');
     expect((await tasks(early.id)).D8).toMatchObject({ state: 'na', nmw: true });
+    // a gate holding D8 keeps it: the rule never steps past a gate (checked on the rule alone, in one transaction, before any release at commit)
+    const held = await teSite('GMG', undefined);
+    const c = db;
+    try {
+      await c.query('BEGIN');
+      await c.query(`SET LOCAL session_replication_role = replica`); // the setup only: no trigger re-runs the calculation
+      await c.query(`UPDATE task_instances t SET state = 'approved', approved_date = '2026-03-15', actual_date = '2026-03-15' FROM task_definitions td WHERE td.id = t.task_def_id AND td.code = 'D6' AND t.site_id = $1`, [held.id]);
+      await c.query(`UPDATE task_instances t SET state = 'locked', lock_reason = 'gate_closed:G6' FROM task_definitions td WHERE td.id = t.task_def_id AND td.code = 'D8' AND t.site_id = $1`, [held.id]);
+      await c.query(`SET LOCAL session_replication_role = origin`);
+      const r = await c.query<{ m: unknown[] }>(`SELECT nmw_mark_site($1, false) AS m`, [held.id]);
+      expect(r.rows[0]!.m).toEqual([]);
+      const d8 = await c.query<{ state: string; nmw: boolean }>(`SELECT t.state::text AS state, t.no_microwave_na AS nmw FROM task_instances t JOIN task_definitions td ON td.id = t.task_def_id AND td.code = 'D8' WHERE t.site_id = $1`, [held.id]);
+      expect(d8.rows[0]).toEqual({ state: 'locked', nmw: false });
+    } finally {
+      await c.query('ROLLBACK');
+    }
   });
 
   it('(c) a stop work in force on PTW - TE still holds G5: no override, TE Completion stays locked; lifting it lets the rule open the gate', async () => {

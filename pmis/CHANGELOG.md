@@ -30,6 +30,7 @@
 ### أمان
 - كل الدوال الجديدة (`gmp_*` و`nmw_*`) داخلية: SECURITY DEFINER، و`search_path = pg_catalog, public, pg_temp`، والمالك `pmis_definer`، وEXECUTE مسحوب من PUBLIC ومن `pmis_app`؛ الحارس `nmw_guard_task` يعمل بصلاحية الكاتب كـ `hns_guard_task`. العلامات (`nmw_task` و`nmw_restore` و`hist_load`) صفوف في `hgd_marks` تُكتب عبر `hgd_mark` وحده وتُقرأ داخل CASE على `current_user = 'pmis_definer'`؛ إعداد جلسة (GUC) وحده لا يكفي أبداً. لا جدول جديد؛ أعمدة العلامة مسحوبة من `pmis_app` في الترحيل، و`app_grants.sql` يوثّق «لا حق جديد».
 - stop work الساري يبقى حاجزاً؛ لا تُمسّ D8 فيها خطوة بشرية؛ لا يُقرأ `values.prefilled_date` أبداً.
+- لا تُجعل D8 غير منطبقة وبوابة تحجزها (`lock_reason` من نوع `gate_closed:*` أو `wf_gate_hold` يُرجع بوابة، ومنها stop work أو تعليق)؛ تنتظر حتى تُفتح البوابة بمسارها العادي.
 - حالات أمان جديدة: `tests/db-security/cases/E3_gate_moved_past_no_microwave.sql` (12 حالة). اختبارات الـ API: `apps/api/test/gate-moved-past.test.ts` بقاعدة بيانات خاصة (`TEST_DATABASE_URL_GMP`).
 
 ### مفتوح
