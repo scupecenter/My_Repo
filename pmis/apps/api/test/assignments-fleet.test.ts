@@ -369,7 +369,8 @@ describe('Financial Advances', () => {
       wb.eachSheet((ws) => ws.eachRow((row) => row.eachCell((cell) => out.push(String(cell.value ?? '')))));
       return out;
     };
-    expect((await cells(c.viewerFin.api)).some((x) => x.includes(String(AMOUNT)))).toBe(false);
+    // exact cell match: a substring test also hits random IDs and codes that happen to contain the digits
+    expect((await cells(c.viewerFin.api)).some((x) => x.trim() === String(AMOUNT))).toBe(false);
     // the top-up needs the entry holder: a read-only user is refused (403)
     const dis = await disburse(c, ap, AMOUNT);
     const denied = await c.viewerFin.api.call('post', `/registers/financial_advances/records/${dis.id}/top-up`, { requested_amount: 10 });
