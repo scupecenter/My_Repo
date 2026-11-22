@@ -26,7 +26,7 @@ describe('filter builder (F3)', () => {
     await signIn('pm');
     const seen = sitesFilters();
     const u = userEvent.setup();
-    renderApp(<Sites />, { route: '/sites?layout=vertical' });
+    renderApp(<Sites />, { route: '/sites?layout=list' });
     await screen.findByTestId('sites-list');
     await u.click(await screen.findByTestId('filter-builder-open'));
     const dlg = await screen.findByTestId('filter-dialog');
@@ -77,7 +77,7 @@ describe('filter builder (F3)', () => {
   it('is keyboard operable: the AND/OR toggle moves with the arrow keys and every control has a name', async () => {
     await signIn('pm');
     const u = userEvent.setup();
-    renderApp(<Sites />, { route: '/sites?layout=vertical' });
+    renderApp(<Sites />, { route: '/sites?layout=list' });
     await screen.findByTestId('sites-list');
     (await screen.findByTestId('filter-builder-open')).focus();
     await u.keyboard('{Enter}');
@@ -98,7 +98,7 @@ describe('filter builder (F3)', () => {
   it('Arabic (RTL): labels, operators and chips', async () => {
     await signIn('pm');
     const u = userEvent.setup();
-    renderApp(<Sites />, { route: '/sites?layout=vertical', locale: 'ar' });
+    renderApp(<Sites />, { route: '/sites?layout=list', locale: 'ar' });
     await screen.findByTestId('sites-list');
     expect(document.documentElement.dir).toBe('rtl');
     const open = await screen.findByTestId('filter-builder-open');
@@ -120,7 +120,7 @@ describe('filter builder (F3)', () => {
     const bodies: unknown[] = [];
     server.use(http.patch(`${API_BASE}/saved-views/:id`, async ({ request }) => { bodies.push(await request.clone().json()); }));
     const u = userEvent.setup();
-    renderApp(<Sites />, { route: '/sites?layout=vertical' });
+    renderApp(<Sites />, { route: '/sites?layout=list' });
     await screen.findByTestId('sites-list');
     await u.click(screen.getByTestId('views-save'));
     await u.type(screen.getByTestId('views-name'), 'By region');

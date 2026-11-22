@@ -30,11 +30,12 @@ const expand = (u: U, ms: string) => u.click(screen.getByTestId(`studio-ms-toggl
 describe('Workflow Studio', () => {
   beforeEach(() => resetWorkflowEditorMock());
 
-  it('is the default of Settings, Workflow with a link to the classic editor, chips for the live and draft versions and a tree with counts', async () => {
+  it('is the default of Settings, Workflow with no link to a classic editor, chips for the live and draft versions and a tree with counts', async () => {
     await open();
     expect(screen.getByTestId('studio-chip-live')).toHaveTextContent('Live: version 1');
     expect(screen.getByTestId('studio-chip-draft')).toHaveTextContent('Draft version 2');
-    expect(screen.getByTestId('studio-classic-link')).toHaveAttribute('href', '/admin/settings/workflow/classic');
+    expect(screen.queryByTestId('studio-classic-link')).toBeNull();
+    expect(screen.getByTestId('studio-lockpanel')).toBeInTheDocument();
     expect(screen.getByTestId('studio-tree-title')).toHaveTextContent('WORKFLOW, VERSION 2 (DRAFT)');
     expect(screen.getByTestId('studio-tree-counts')).toHaveTextContent('2 milestones, 5 tasks, 1 gates');
     expect(screen.getByTestId('studio-pending')).toHaveTextContent('0 pending changes');
@@ -56,7 +57,7 @@ describe('Workflow Studio', () => {
     expect(screen.getByTestId('studio-form-title')).toHaveTextContent('Site Release');
     expect(screen.getByTestId('studio-after-A1')).toBeInTheDocument();
     expect(screen.getByTestId('studio-before-A4')).toBeInTheDocument();
-    expect(screen.getByTestId('studio-master-empty')).toHaveTextContent('Available in S3');
+    expect(await screen.findByTestId('studio-col-table')).toBeInTheDocument();
     expect(screen.getByTestId('studio-docs-link')).toHaveAttribute('href', '/admin/settings/documents/library');
     await u.type(screen.getByTestId('studio-search'), 'po email');
     expect(screen.getByTestId('studio-task-B2')).toBeInTheDocument();
@@ -95,12 +96,12 @@ describe('Workflow Studio', () => {
     expect(screen.getByTestId('studio-task-A1')).toHaveTextContent('Site acceptance report');
   }, 60_000);
 
-  it('opens the add menu: task, milestone and gate; the Site Master column is off and says S3; they are off while the structure is locked', async () => {
+  it('opens the add menu: the Site Master column is on (it is not part of the draft); task, milestone and gate are off while the structure is locked', async () => {
     const u = userEvent.setup();
     await open();
     await u.click(screen.getByTestId('studio-add-menu'));
-    expect(await screen.findByTestId('studio-menu-column')).toBeDisabled();
-    expect(screen.getByTestId('studio-menu-column')).toHaveTextContent('coming in S3');
+    expect(await screen.findByTestId('studio-menu-column')).toBeEnabled();
+    expect(screen.getByTestId('studio-menu-column')).toHaveTextContent('Site Master column');
     for (const k of ['task', 'milestone', 'gate']) expect(screen.getByTestId(`studio-menu-${k}`)).toBeDisabled();
     expect(screen.getByTestId('studio-menu-task')).toHaveAttribute('title', expect.stringMatching(/locked until/i));
   }, 60_000);
@@ -120,7 +121,7 @@ describe('Workflow Studio', () => {
     await u.type(screen.getByTestId('studio-add-en'), 'Site photos');
     expect(await screen.findByTestId('studio-add-rewire-A2')).toHaveTextContent('A1 → NEW1 → A2');
     expect(screen.getByTestId('studio-add-matrix-link')).toHaveAttribute('href', '/admin/matrix');
-    expect(screen.getByTestId('studio-add-inputs')).toHaveTextContent('Available in S3');
+    expect(screen.getByTestId('studio-add-inputs')).toHaveTextContent('Add the Site Master columns this task fills');
     await u.click(screen.getByTestId('studio-add-submit'));
     await reasonAndSave(u);
     expect(await screen.findByTestId('studio-task-NEW1')).toHaveTextContent('Site photos');

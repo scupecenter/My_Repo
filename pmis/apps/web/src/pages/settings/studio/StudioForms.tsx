@@ -10,9 +10,12 @@ import { TaskPicker } from '../wf/Dialogs';
 import { DuplicateDialog, PredecessorDialog } from '../wf/Forms';
 import { findCycle, parallelGroups, successorsOf, type P } from '../wf/model';
 import { SlaWeightSection } from '../wf/SlaWeightSection';
+import { Chev, Code, ltr, Name, useArrow } from '../wf/rtl';
 import { useErr } from '../wf/useErr';
 import { masterCol, nextMilestone } from './studioModel';
+import { ClosingToggle } from './StudioClosing';
 import type { Ctx } from './studioCtx';
+import { TaskColumnsCard } from './StudioColumns';
 
 /** A calm card: white, 12px radius, 1px border, 16 to 18px padding. */
 export function StudioCard({ title, children, testid, aside }: { title: string; children: ReactNode; testid: string; aside?: ReactNode }) {
@@ -33,12 +36,13 @@ function Chip({ code, name, onClick, testid }: { code: string; name?: string; on
 /** Pick the tasks that come after this one (its successors). */
 function SuccessorDialog({ task, all, onClose, onSubmit, busy, error }: { task: P; all: P[]; onClose: () => void; busy: boolean; error: string | null; onSubmit: (list: string[], reason: string) => void }) {
   const { t } = useTranslation();
+  const arrow = useArrow();
   const [sel, setSel] = useState<string[]>(successorsOf(all, task.task_code));
   const loop = findCycle(all.map((p) => (sel.includes(p.task_code) ? { ...p, predecessors: [...(p.predecessors ?? []).filter((c) => c !== task.task_code), task.task_code] } : { ...p, predecessors: (p.predecessors ?? []).filter((c) => c !== task.task_code) })));
   return (
     <FormDialog open wide onClose={onClose} testid="studio-succ-dialog" title={`${t('studio.comes_before')}: ${task.task_code}`} busy={busy} error={error} disabled={!!loop} onSubmit={(r) => onSubmit(sel, r)}>
       <TaskPicker all={all} exclude={task.task_code} sel={sel} onChange={setSel} prefix="studio-succ" />
-      {loop && <p role="alert" className="text-sm text-lateInk" data-testid="studio-succ-cycle">{t('wfe.cycle_found', { path: loop.join(' → ') })}</p>}
+      {loop && <p role="alert" className="text-sm text-lateInk" data-testid="studio-succ-cycle">{t('wfe.cycle_found', { path: loop.join(arrow) })}</p>}
     </FormDialog>
   );
 }
@@ -66,6 +70,7 @@ const Act = ({ id, icon, label, onClick, disabled, why }: { id: string; icon: Re
 /** The task form: general, order and dependencies, SLA and weight, documents, Site Master columns. */
 export function TaskForm({ c, code }: { c: Ctx; code: string }) {
   const { t } = useTranslation();
+  const arrow = useArrow();
   const toast = useToast();
   const err = useErr();
   const task = c.placements.find((x) => x.task_code === code);
@@ -91,9 +96,9 @@ export function TaskForm({ c, code }: { c: Ctx; code: string }) {
   const act = task.is_active === false;
   return (
     <div className="space-y-4" data-testid="studio-task-form" data-code={code}>
-      <Header crumbs={<><button type="button" className="text-mute hover:underline" data-testid="studio-crumb-ms" onClick={() => ms && c.select({ kind: 'milestone', code: ms.code })}>{ms ? c.nm(ms) : task.stage_code}</button><span aria-hidden className="mx-2 text-mute">{'>'}</span><span className="mono" dir="ltr">{code}</span> {c.nm(task)}</>}>
+      <Header crumbs={<><button type="button" className="text-mute hover:underline" data-testid="studio-crumb-ms" onClick={() => ms && c.select({ kind: 'milestone', code: ms.code })}>{ms ? c.nm(ms) : task.stage_code}</button><Chev className="mx-2 inline text-mute" size={14} /><Code>{code}</Code> <Name>{c.nm(task)}</Name></>}>
         <Act id="studio-duplicate" icon={<Copy size={14} aria-hidden />} label={t('wfe.duplicate')} disabled={dis} why={why} onClick={() => setDlg('dup')} />
-        <Act id="studio-move" icon={<MoveRight size={14} aria-hidden />} label={t('studio.move_to_ms')} disabled={!c.can.struct} why={why} onClick={() => stageRef.current?.focus()} />
+        <Act id="studio-move" icon={<MoveRight size={14} aria-hidden className="rtl:rotate-180" />} label={t('studio.move_to_ms')} disabled={!c.can.struct} why={why} onClick={() => stageRef.current?.focus()} />
         <Act id="studio-toggle-active" icon={act ? <Power size={14} aria-hidden /> : <PowerOff size={14} aria-hidden />} label={t(act ? 'wfe.activate' : 'wfe.deactivate')} disabled={dis} why={why}
           onClick={() => c.askReason({ title: `${act ? t('wfe.activate') : t('wfe.deactivate')}: ${code}`, hint: t('wfe.toggle_task_hint'), run: (reason, cb) => c.W.updateTask.mutate({ code, is_active: act, reason }, cb) })} />
       </Header>
@@ -106,6 +111,7 @@ export function TaskForm({ c, code }: { c: Ctx; code: string }) {
             <select ref={stageRef} className={field} data-testid="studio-stage" disabled={!c.can.struct} title={!c.can.struct ? why ?? undefined : undefined} value={stage} onChange={(e) => setStage(e.target.value)}>
               {c.milestones.filter((m) => m.is_active !== false || m.code === task.stage_code).map((m) => <option key={m.code} value={m.code}>{m.code} {c.nm(m)}</option>)}</select></label>
           <label className="flex min-h-11 items-center gap-2 self-end text-sm"><input type="checkbox" className="h-5 w-5" data-testid="studio-counts" disabled={dis} checked={counts} onChange={(e) => setCounts(e.target.checked)} />{t('studio.counts_toward')}</label>
+          <ClosingToggle c={c} task={task} />
         </div>
         <div className="flex justify-end"><button type="button" className="btn btn-accent min-h-11" data-testid="studio-general-save" disabled={dis || !dirty || !en.trim()} title={dis ? why ?? undefined : undefined}
           onClick={() => c.askReason({ title: `${t('studio.save_general')}: ${code}`, hint: stage !== task.stage_code ? t('wfe.move_task_hint') : undefined,
@@ -138,7 +144,7 @@ export function TaskForm({ c, code }: { c: Ctx; code: string }) {
             <button type="button" className="btn min-h-11" data-testid="studio-parallel-go" disabled={dis || !target || !!loop}
               onClick={() => target && c.askReason({ title: t('wfe.parallel_title', { code, other: target.task_code }), hint: t('wfe.parallel_hint'), run: (reason, cb) => c.W.setPreds.mutate({ code, predecessors: target.predecessors ?? [], reason }, cb) })}>{t('wfe.parallel_go')}</button>
           </div>
-          {loop && <p role="alert" className="text-xs text-lateInk">{t('wfe.cycle_found', { path: loop.join(' → ') })}</p>}
+          {loop && <p role="alert" className="text-xs text-lateInk">{t('wfe.cycle_found', { path: loop.join(arrow) })}</p>}
         </div>
       </StudioCard>
 
@@ -151,9 +157,7 @@ export function TaskForm({ c, code }: { c: Ctx; code: string }) {
         <Link className="inline-flex min-h-11 items-center text-sm text-link underline" to="/admin/settings/documents/library" data-testid="studio-docs-link">{t('studio.open_library')}</Link>
       </StudioCard>
 
-      <StudioCard title={t('studio.master_cols')} testid="studio-card-master">
-        <div className="rounded-lg border border-dashed border-line p-4 text-center text-sm text-mute" data-testid="studio-master-empty">{t('studio.available_s3')}</div>
-      </StudioCard>
+      <TaskColumnsCard c={c} code={code} />
 
       {dlg === 'dup' && <DuplicateDialog source={task} onClose={() => setDlg(null)} busy={c.W.createTask.isPending} error={c.W.createTask.isError ? err(c.W.createTask.error) : null}
         onSubmit={(f, reason) => c.W.createTask.mutate({ stage_code: task.stage_code, code: f.code, name_en: f.name_en, name_ar: f.name_ar || null, counts_toward_milestone: task.counts_toward_milestone, after_task_code: code, predecessors: task.predecessors ?? [], reason }, { ...done, onSuccess: () => { done.onSuccess(); c.select({ kind: 'task', code: f.code }); } })} />}
@@ -177,7 +181,7 @@ function Names({ en, ar, setEn, setAr, dis, prefix }: { en: string; ar: string; 
 }
 const MasterLine = ({ col, testid }: { col: string | null; testid: string }) => {
   const { t } = useTranslation();
-  return <p className="text-sm text-mute" data-testid={testid}>{col ? t('studio.master_col_is', { col }) : t('studio.master_col_none')}</p>;
+  return <p className="text-sm text-mute" data-testid={testid}>{col ? t('studio.master_col_is', { col: ltr(col) }) : t('studio.master_col_none')}</p>;
 };
 
 /** The gate form: names, gate SLA, the Master column it writes, its conditions and what it opens. */

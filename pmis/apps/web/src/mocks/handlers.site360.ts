@@ -60,6 +60,7 @@ function rowsFor(key: string, offset: number, limit: number) {
   const values = (site: (typeof SITES)[number]) => {
     const v: Record<string, string | null> = {};
     for (const c of cols) v[String(c.ord)] = null;
+    v['4'] = site.name || null;
     v['5'] = site.region;
     v['24'] = site.phase;
     v['33'] = site.model;
