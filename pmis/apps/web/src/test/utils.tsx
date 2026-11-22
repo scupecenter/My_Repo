@@ -25,6 +25,6 @@ export function renderApp(ui: ReactElement, { route = '/', locale = 'en' as 'en'
 
 /** Opens the unified filter ("+ Filter") and picks one field of its dropdown (the field key, or the key of a page extra such as `late`). */
 export async function pickFilterField(u: UserEvent, key: string) {
-  await u.click(screen.getByTestId('filter-add'));
+  await u.click(await screen.findByTestId('filter-add')); // rendered once the field catalog has loaded
   await u.click(await screen.findByTestId(`filter-field-${key}`));
 }

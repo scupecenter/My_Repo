@@ -935,7 +935,6 @@ export function UnifiedFilter({
       data-screen={screen}
     >
       <Popover.Root open={open} onOpenChange={(o) => (o ? setOpen(true) : close())}>
-        <Popover.Anchor asChild>
           <span className="inline-flex">
             <Popover.Trigger asChild>
               <button
@@ -957,7 +956,6 @@ export function UnifiedFilter({
               </button>
             </Popover.Trigger>
           </span>
-        </Popover.Anchor>
         <Popover.Portal>
           <Popover.Content
             align="start"
