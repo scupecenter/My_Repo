@@ -13,6 +13,7 @@ import { SlaWeightSection } from '../wf/SlaWeightSection';
 import { useErr } from '../wf/useErr';
 import { masterCol, nextMilestone } from './studioModel';
 import type { Ctx } from './studioCtx';
+import { TaskColumnsCard } from './StudioColumns';
 
 /** A calm card: white, 12px radius, 1px border, 16 to 18px padding. */
 export function StudioCard({ title, children, testid, aside }: { title: string; children: ReactNode; testid: string; aside?: ReactNode }) {
@@ -151,9 +152,7 @@ export function TaskForm({ c, code }: { c: Ctx; code: string }) {
         <Link className="inline-flex min-h-11 items-center text-sm text-link underline" to="/admin/settings/documents/library" data-testid="studio-docs-link">{t('studio.open_library')}</Link>
       </StudioCard>
 
-      <StudioCard title={t('studio.master_cols')} testid="studio-card-master">
-        <div className="rounded-lg border border-dashed border-line p-4 text-center text-sm text-mute" data-testid="studio-master-empty">{t('studio.available_s3')}</div>
-      </StudioCard>
+      <TaskColumnsCard c={c} code={code} />
 
       {dlg === 'dup' && <DuplicateDialog source={task} onClose={() => setDlg(null)} busy={c.W.createTask.isPending} error={c.W.createTask.isError ? err(c.W.createTask.error) : null}
         onSubmit={(f, reason) => c.W.createTask.mutate({ stage_code: task.stage_code, code: f.code, name_en: f.name_en, name_ar: f.name_ar || null, counts_toward_milestone: task.counts_toward_milestone, after_task_code: code, predecessors: task.predecessors ?? [], reason }, { ...done, onSuccess: () => { done.onSuccess(); c.select({ kind: 'task', code: f.code }); } })} />}
