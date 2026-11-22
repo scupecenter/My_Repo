@@ -64,7 +64,7 @@ export function AdminTaskOverride({ task }: { task: TaskDetail }) {
           <li key={o.id} className="flex flex-wrap items-center gap-2" data-testid={`admin-override-${o.id}`} data-reverted={o.reverted_at ? 'true' : 'false'}>
             <span className="chip bg-waitBg text-waitInk"><ShieldAlert size={12} className="me-1" aria-hidden />{t('override.badge')}</span>
             <span>{show(o.before)} {'->'} {show(o.after)}</span>
-            <span className="text-mute">{o.acted_by?.display_name} · {o.reason}</span>
+            <span className="text-mute">{o.acted_by?.display_name ?? t('adminOverride.by_rule')} · {o.reason}</span>
             {o.reverted_at && <span className="chip bg-lockBg text-lockInk">{t('adminOverride.was_reverted')}</span>}
             {o.revertible && task.can_override && <button className="btn px-2 py-0.5 text-xs" data-testid={`admin-override-revert-${o.id}`} onClick={() => setRev({ id: o.id, reason: '' })}><Undo2 size={12} />{t('adminOverride.revert')}</button>}
           </li>

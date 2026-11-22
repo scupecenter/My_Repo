@@ -662,7 +662,11 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Change language and theme */
+        /**
+         * Change language and theme
+         * @description The top bar's language and theme buttons. Only `locale` and `theme` (others are 422); no `If-Match`, the last click wins.
+         *     Audited once with before and after (`profile_updated`), like `PATCH /me/profile`; the same value again writes nothing. (0.15.42)
+         */
         patch: operations["updateMyPreferences"];
         trace?: never;
     };
@@ -10482,7 +10486,7 @@ export interface components {
             task_id?: string | null;
             /** Format: uuid */
             site_id?: string;
-            /** @description `edit_date` for a task, `site_edit` for a site. 0.15.38: `historical_no_source_na` for a task made N/A "historical load: no source" by the historical Master load (migration 0126); its revert restores the task. 0.15.39: `historical_gate_open` (entity `site`) for a phase gate opened because the site moved past it, and `historical_inferred_date` (entity `task`) for a milestone approved with the date of the earliest later task ("inferred date — historical load"), both by the historical Master load (migration 0127); their revert closes the gate again or reopens the milestone without a date. 0.15.40: `historical_manual_ms_approved` (entity `task`) for a manual milestone (Site RFI) the site moved past, approved directly with its pre-filled date (or the inferred one, `after.date_source`) by the historical Master load (migration 0129); its revert reopens it with its pre-filled date. */
+            /** @description `edit_date` for a task, `site_edit` for a site. 0.15.38: `historical_no_source_na` for a task made N/A "historical load: no source" by the historical Master load (migration 0126); its revert restores the task. 0.15.39: `historical_gate_open` (entity `site`) for a phase gate opened because the site moved past it, and `historical_inferred_date` (entity `task`) for a milestone approved with the date of the earliest later task ("inferred date — historical load"), both by the historical Master load (migration 0127); their revert closes the gate again or reopens the milestone without a date. 0.15.40: `historical_manual_ms_approved` (entity `task`) for a manual milestone (Site RFI) the site moved past, approved directly with its pre-filled date (or the inferred one, `after.date_source`) by the historical Master load (migration 0129); its revert reopens it with its pre-filled date. 0.15.43: `gate_moved_past_open` (entity `site`) for a phase gate opened because the site moved past it, on any site, and `no_microwave_na` (entity `task`) for MW alignment (D8) made N/A because the approved TE installation (D6) has no MW antenna; both are made by a rule of GSDN Workspace (owner decisions 2026-11-22, migration 0133, no `acted_by`); their revert closes the gate again or restores D8. */
             kind: string;
             reason: string;
             before?: {
@@ -10491,6 +10495,7 @@ export interface components {
             after?: {
                 [key: string]: unknown;
             };
+            /** @description 0.15.43: absent for an override made by a rule of GSDN Workspace (`gate_moved_past_open`, `no_microwave_na`). */
             acted_by?: components["schemas"]["UserRef"];
             on_behalf_of?: components["schemas"]["UserRef"];
             /** Format: date-time */
