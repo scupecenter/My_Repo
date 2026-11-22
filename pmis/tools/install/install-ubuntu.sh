@@ -620,9 +620,10 @@ LOG_HMAC_KEY=${PREV_LOG_HMAC_KEY:-$(openssl rand -hex 32)}
 # Two-factor secrets are encrypted with this key (32 bytes). An update keeps the existing one and creates it for an installation that lacks it. Never regenerate a key that is in use: every enrolled user would have to enrol again.
 TOTP_ENC_KEY=${PREV_TOTP_ENC_KEY:-$(openssl rand -hex 32)}
 # Stored files are encrypted with this key (32 bytes, ADR 0008 amendment). Kept on update; never regenerate a key in use (the stored files
-# could not be read). Settings of the optional steps (virus scan, key id, old keys) are kept from the previous file as they are.
+# could not be read). Settings of the optional steps (virus scan, key id, old keys) and the template upload limits (PMIS_IMPORT_*) are kept
+# from the previous file as they are.
 FILE_ENC_KEY=${PREV_FILE_ENC_KEY:-$(openssl rand -hex 32)}
-KEEP_LINES=$( [[ -r $CONF_DIR/pmis.env ]] && grep -E '^(FILE_ENC_KEY_ID|FILE_ENC_OLD_KEYS|MALWARE_SCAN|CLAMD_SOCKET|CLAMD_HOST|CLAMD_PORT|CLAMD_TIMEOUT_MS|SCAN_FAILURE)=' "$CONF_DIR/pmis.env" || true )
+KEEP_LINES=$( [[ -r $CONF_DIR/pmis.env ]] && grep -E '^(FILE_ENC_KEY_ID|FILE_ENC_OLD_KEYS|MALWARE_SCAN|CLAMD_SOCKET|CLAMD_HOST|CLAMD_PORT|CLAMD_TIMEOUT_MS|SCAN_FAILURE|PMIS_IMPORT_MAX_BYTES|PMIS_IMPORT_MAX_ROWS|PMIS_IMPORT_MAX_UNCOMPRESSED_BYTES)=' "$CONF_DIR/pmis.env" || true )
 grep -q '^FILE_ENC_KEY_ID=' <<<"$KEEP_LINES" || KEEP_LINES="${KEEP_LINES:+$KEEP_LINES
 }FILE_ENC_KEY_ID=k1"
 # Outbound mail (owner answer Q167, migration 0055) and the integrity anchors (Q171). The SMTP lines are filled by IT on the server and are kept as

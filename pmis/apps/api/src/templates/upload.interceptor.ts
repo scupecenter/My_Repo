@@ -14,8 +14,12 @@ export interface UploadedFile {
 }
 
 /** Largest accepted template file, and the most data rows (environment overrides are for tests and the installer). */
-export const importMaxBytes = (): number => Number(process.env.PMIS_IMPORT_MAX_BYTES ?? 5 * 1024 * 1024);
-export const importMaxRows = (): number => Number(process.env.PMIS_IMPORT_MAX_ROWS ?? 2000);
+const envInt = (name: string, fallback: number): number => {
+  const v = Number(process.env[name]);
+  return Number.isFinite(v) && v > 0 ? Math.floor(v) : fallback;
+};
+export const importMaxBytes = (): number => envInt('PMIS_IMPORT_MAX_BYTES', 5 * 1024 * 1024);
+export const importMaxRows = (): number => envInt('PMIS_IMPORT_MAX_ROWS', 2000);
 
 /**
  * Reads one multipart file into memory with a size limit. It runs inside the request transaction (after the session guard), so a refused file is
