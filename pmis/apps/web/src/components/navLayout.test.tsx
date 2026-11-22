@@ -25,7 +25,7 @@ describe('the layout model (lib/navLayout)', () => {
   it('the default is the six groups of the code with their screens in NAV order', () => {
     const d = defaultLayout();
     expect(d.headings.map((h) => h.id)).toEqual(['work', 'site_register', 'registers', 'data', 'admin', 'logs']);
-    expect(d.headings[1]).toMatchObject({ name_en: 'SITE 360', name_ar: 'الموقع 360', children: ['sites', 'dismantle'] });
+    expect(d.headings[1]).toMatchObject({ name_en: 'SITE 360', name_ar: 'الموقع 360', children: ['sites'] });
     expect(d.headings[0]!.children).toEqual(['my_work', 'inbox', 'approvals', 'workload', 'status_updates', 'dashboard', 'messages', 'absence']);
     expect(resolveLayout(null)).toEqual(d);
   });
@@ -89,7 +89,7 @@ describe('the layout model (lib/navLayout)', () => {
     l = dropOn(l, itemRef('my_work'), itemRef('approvals'))!; // the same list: takes the place of the target
     expect(l.headings[0]!.children.slice(0, 3)).toEqual(['inbox', 'approvals', 'my_work']);
     l = dropOn(l, itemRef('templates'), itemRef('sites'))!; // another list: before the target
-    expect(l.headings[1]!.children).toEqual(['templates', 'sites', 'dismantle']);
+    expect(l.headings[1]!.children).toEqual(['templates', 'sites']);
     l = dropOn(l, headRef(sub), headRef('logs'))!;
     expect(l.headings[5]!.children.at(-1)).toMatchObject({ id: sub });
     expect(dropOn(l, headRef(sub), itemRef('gecol'))).toBeNull();
