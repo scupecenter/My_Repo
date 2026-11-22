@@ -113,14 +113,30 @@ const TASK_FIELDS: FF[] = [
   { key: 'due_date', label_en: 'Due date', label_ar: 'تاريخ الاستحقاق', type: 'date' },
 ];
 
+const fieldsOf = (screen: string) => screen === 'sites' || screen === 'sites-stream' ? withGroup(SITE_FIELDS, 'columns')
+  : screen === 'dashboard' ? withGroup(SITE_FIELDS.filter((f) => f.key !== 'workflow_locks'), 'columns')
+  : /^site360-[a-z0-9_]+$/.test(screen) ? withGroup([...SITE_FIELDS, ...MENU_FIELDS], 'columns')
+  : screen === 'site-tasks' || screen === 'tasks-board' ? withGroup(TASK_FIELDS, 'fields') : /^register-/.test(screen) ? withGroup(REGISTER_FIELDS, 'fields') : null;
+
 export const viewsHandlers = [
+  // 0.15.49: the values of an enum field that match q (anywhere in the value or a label), at most `limit`, `truncated` when there are more
+  http.get(`${B}/saved-views/filter-fields/:field/values`, ({ request, params }) => {
+    const g = guard(); if (g) return g;
+    const u = new URL(request.url), screen = u.searchParams.get('screen_key') ?? '', needle = (u.searchParams.get('q') ?? '').trim().toLowerCase();
+    const limit = Number(u.searchParams.get('limit') ?? 50);
+    const items = fieldsOf(screen);
+    if (!items) return invalid('/screen_key');
+    const key = decodeURIComponent(String(params.field));
+    const f = items.find((x) => x.key === key);
+    if (!f) return invalid('/field', 'unknown_field');
+    if (f.type !== 'enum') return invalid('/field', 'not_enum');
+    const hit = (f.options ?? []).filter((o) => !needle || o.value.toLowerCase().includes(needle) || o.label_en.toLowerCase().includes(needle) || (o.label_ar ?? '').toLowerCase().includes(needle));
+    return HttpResponse.json({ screen_key: screen, field: key, q: needle, items: hit.slice(0, limit), truncated: hit.length > limit });
+  }),
   http.get(`${B}/saved-views/filter-fields`, ({ request }) => {
     const g = guard(); if (g) return g;
     const screen = new URL(request.url).searchParams.get('screen_key') ?? '';
-    const items = screen === 'sites' || screen === 'sites-stream' ? withGroup(SITE_FIELDS, 'columns')
-      : screen === 'dashboard' ? withGroup(SITE_FIELDS.filter((f) => f.key !== 'workflow_locks'), 'columns')
-      : /^site360-[a-z0-9_]+$/.test(screen) ? withGroup([...SITE_FIELDS, ...MENU_FIELDS], 'columns')
-      : screen === 'site-tasks' || screen === 'tasks-board' ? withGroup(TASK_FIELDS, 'fields') : /^register-/.test(screen) ? withGroup(REGISTER_FIELDS, 'fields') : null;
+    const items = fieldsOf(screen);
     if (!items) return invalid('/screen_key');
     return HttpResponse.json({
       screen_key: screen, items: items.map((f) => ({ ...f, operators: OPS[f.type] })), operators: OPS,

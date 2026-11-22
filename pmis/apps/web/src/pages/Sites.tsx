@@ -41,6 +41,8 @@ const LABEL: Record<string, string> = { code: 'sites.code', name: 'sites.name', 
 const F_KEYS = ['q', 'region_id', 'scenario', 'overall_status', 'stage_code'] as const;
 // P10: what a saved view of the Site Register keeps (the filters of the URL, the quick filter included).
 const VIEW_EMPTY = { q: '', region_id: '', scenario: '', overall_status: '', stage_code: '', bucket: '' };
+// 0.15.49: what a saved view of a Site Master menu (screen site360-<menu>) keeps: the quick filters, the Site IDs, the layout (list or wide = ?layout=grid) and the tree.
+const MENU_VIEW_EMPTY = { q: '', region_id: '', scenario: '', overall_status: '', site_codes: '', layout: '' };
 // ExportColumnCode values (stable codes of the `sites` part).
 const SITE_COLUMNS: SitesExportColumnCode[] = ['site_code', 'site_name', 'region', 'scenario', 'overall_status', 'current_stage'];
 // Extra pixels of a status chip (its own padding and border) when columns are sized to content.
@@ -219,6 +221,9 @@ export function Sites() {
     { key: 'site_codes', label: t('filters.site_ids'), group: 'work', kind: 'list', value: siteCodes || sp.get('site_code') || '', set: (v: string) => setParams({ site_codes: v, site_code: '', sel: '' }) },
   ];
   const filterScreen = menuList ? `site360-${menuKey}` : real ? 'sites-stream' : 'sites';
+  // 0.15.49: a menu (list or wide layout) has its own saved views; the generic list of Site Master keeps the views of `sites` and `sites-stream`
+  const siteMenu = menuList || (!!menu && layout === 'grid');
+  const savedScreen = siteMenu ? `site360-${menuKey}` : real ? 'sites-stream' : 'sites';
 
   // The text each cell shows, for sizing the columns to their content (null = not measurable: the pipeline rail keeps its default width).
   const fitText = (id: string, s: SiteListItem): FitSample | null => {
@@ -284,9 +289,19 @@ export function Sites() {
         </span>)}</>} />
       <Toolbar activeFilters={activeFilters} activeLabel={t('states.filters')}
         filters={<>
-        {/* `site360-<menu>` has no saved views (contract 0.15.45): in a sub-menu a view keeps the simple filters and the columns of the Site Master list; the Master-column tree is not stored */}
-        <SavedViews screen={real ? 'sites-stream' : 'sites'} value={{ ...f, bucket, ...(advTree && !menuList ? { advanced: advTree } : {}) }} empty={VIEW_EMPTY} table={tbl}
-          onApply={(v) => setParams({ ...Object.fromEntries(Object.keys(VIEW_EMPTY).map((k) => [k, String((v as Record<string, unknown>)[k] ?? '')])), ...(menuList ? {} : { adv: encodeFilter((v as { advanced?: FilterTree }).advanced) }), sel: '' })} />
+        {/* a menu keeps its own saved views (contract 0.15.49): the tree, the quick filters, the layout and the column order of the list */}
+        <SavedViews screen={savedScreen}
+          value={siteMenu
+            ? { q: f.q, region_id: f.region_id, scenario: f.scenario, overall_status: f.overall_status, site_codes: siteCodes || sp.get('site_code') || '', layout: layout === 'grid' ? 'wide' : 'list', ...(advTree ? { advanced: advTree } : {}) }
+            : { ...f, bucket, ...(advTree ? { advanced: advTree } : {}) }}
+          empty={siteMenu ? MENU_VIEW_EMPTY : VIEW_EMPTY} table={siteMenu && !menuList ? undefined : tbl}
+          onApply={(v) => {
+            const r = v as Record<string, unknown>;
+            const pick = (keys: string[]) => Object.fromEntries(keys.map((k) => [k, String(r[k] ?? '')]));
+            setParams(siteMenu
+              ? { ...pick(['q', 'region_id', 'scenario', 'overall_status', 'site_codes']), site_code: '', layout: r.layout === 'wide' ? 'grid' : '', adv: encodeFilter(r.advanced as FilterTree | undefined), sel: '' }
+              : { ...pick(Object.keys(VIEW_EMPTY)), adv: encodeFilter(r.advanced as FilterTree | undefined), sel: '' });
+          }} />
         <input className="input max-w-64" data-testid="sites-search" placeholder={t('sites.search')} aria-label={t('sites.search')} value={f.q} onChange={(e) => set('q')(e.target.value)} />
         <UnifiedFilter screen={filterScreen} value={advTree} onChange={(tree) => setParams({ adv: encodeFilter(tree), sel: '' })} extras={extras} onClearAll={clearAll} />
         {real && (

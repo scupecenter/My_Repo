@@ -4226,6 +4226,7 @@
     "search_values": "Search values",
     "values": "Values",
     "no_values": "No matching values",
+    "searching": "Searching…",
     "truncated": "Only the first values are listed. Type to narrow the list.",
     "remove": "Remove this filter",
     "apply": "Apply",
