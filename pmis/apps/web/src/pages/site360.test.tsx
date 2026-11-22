@@ -49,14 +49,12 @@ describe('SITE 360 menus on the Sites page', () => {
     expect(row.querySelector('input')).toBeNull();
   });
 
-  it('Site Master (no section) shows the columns of the master menu in the list, not the Excel grid', async () => {
+  it('Site Master (no section) shows the generic list with the pipeline and the quick filters, not the Excel grid (owner answer 2026-11-22)', async () => {
     await signIn('pm');
     renderApp(<Sites />, { route: '/sites' });
-    expect(await screen.findByTestId('site360-list')).toBeTruthy();
-    await screen.findByTestId('site-row-S360-001');
+    expect(await screen.findByTestId('sites-list')).toBeTruthy();
+    expect(screen.queryByTestId('site360-list')).toBeNull();
     expect(screen.queryByTestId('site360-grid')).toBeNull();
-    const head = screen.getAllByRole('columnheader').map((h) => h.textContent);
-    expect(head).toEqual(expect.arrayContaining(['Site ID', 'Site Name', 'Region', 'Project Phase', 'TE Access Date', 'Site CW RFD']));
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/^Site Master$/);
   });
 

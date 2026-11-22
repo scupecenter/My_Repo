@@ -5010,8 +5010,11 @@
     "revert": "تراجع",
     "reverted": "تم التراجع عن التجاوز",
     "was_reverted": "تم التراجع",
+    "by_rule": "GSDN Workspace (قاعدة تلقائية)",
     "none": "(لا شيء)",
     "field": {
+      "na_reason": "سبب عدم الانطباق",
+      "d6_mw_antenna": "هوائي MW في D6",
       "planned_date": "التاريخ المخطط",
       "actual_start": "البدء الفعلي",
       "actual_date": "التاريخ الفعلي",

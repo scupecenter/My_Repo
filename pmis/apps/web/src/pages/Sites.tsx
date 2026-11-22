@@ -69,11 +69,12 @@ export function Sites() {
   const section = sp.get('section') ?? '';
   const layout = sp.get('layout') === 'grid' ? 'grid' : 'list';
   const site360Q = useSite360Sections();
-  // Site Master and each sub-menu keep their OWN columns (GET /site360/sections) and values (GET /site360/{menu}/rows) in the calm list style of this page (owner request
-  // 2026-11-22): no band or group rows, no inline editing. A stream or a work view (?stream=, ?view=) keeps the generic list.
-  const menuKey = section || (!stream && !view ? SITE360_MASTER : '');
+  // Each sub-menu keeps its OWN columns (GET /site360/sections) and values (GET /site360/{menu}/rows) in the calm list style of this page (owner request
+  // 2026-11-22): no band or group rows, no inline editing. Site Master itself shows the generic list with the pipeline, workflow locks, data gaps and the
+  // stage/mine/late/locks/gaps filters (owner answer 2026-11-22 "bring them back"); a stream or a work view (?stream=, ?view=) keeps it too.
+  const menuKey = section || (layout === 'grid' && !stream && !view ? SITE360_MASTER : '');
   const lay = sp.get('layout');
-  const menuList = !!menuKey && lay !== 'list' && lay !== 'grid' && lay !== 'map' && lay !== 'board' && !site360Q.isError;
+  const menuList = !!section && lay !== 'list' && lay !== 'grid' && lay !== 'map' && lay !== 'board' && !site360Q.isError;
   const menu = menuKey ? site360Q.data?.items.find((m) => m.key === menuKey) : undefined;
   // The grid reads its rows from GET /site360/{menu}/rows (one page, the same URL filters as the list), so the grid and the list share the source.
   // Multi Site ID search (paste a list, comma or newline separated) is kept in the URL as site_code, like the other filters.

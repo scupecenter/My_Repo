@@ -22,7 +22,7 @@ const isPm = () => viewer()?.key === 'pm';
 // ---------------------------------------------------------------- Q130: the site's custom fields
 const siteCustom = new Map<string, { custom: Record<string, unknown>; version: number }>();
 /** Contract 0.15.6: direct admin edits of a site (mock store; the real API audits them). */
-type MockEdit = { id: string; entity: 'site'; site_id: string; task_id: null; kind: 'site_edit'; reason: string; before: Record<string, unknown>; after: Record<string, unknown>; created_at: string; reverted_at: string | null; revertible: boolean; acted_by: { id: string; display_name: string } };
+type MockEdit = { id: string; entity: 'site'; site_id: string; task_id: null; kind: 'site_edit' | 'gate_moved_past_open'; reason: string; before: Record<string, unknown>; after: Record<string, unknown>; created_at: string; reverted_at: string | null; revertible: boolean; acted_by?: { id: string; display_name: string } };   // 0.15.43: no acted_by for a rule override
 export const siteAdminEdits: MockEdit[] = [];
 // contract 0.12.10 (Q225): near_airport changes the permits, so it is changed by a Change Control proposal, never by PATCH
 const SITE_FIELDS = [{ code: 'near_airport', label_en: 'Near an airport', label_ar: 'قريب من مطار', type: 'bool' as const, section: 'Site', required: false, requires_approval: true }];
