@@ -77,6 +77,19 @@ describe('Site Master wide table', () => {
     expect(screen.getByTestId('sites-wide-table')).toHaveAttribute('dir', 'ltr');
   });
 
+  it('keeps the filters visible and sends the same URL filters as the sub-menu list to the rows endpoint', async () => {
+    await signIn('pm');
+    const urls: URL[] = [];
+    server.use(http.get(`${API_BASE}/site360/:menu/rows`, ({ request }) => { urls.push(new URL(request.url)); return HttpResponse.json({ total: 0, filtered: 0, offset: 0, limit: 200, rows: [] }); }));
+    renderApp(<App />, { route: '/sites?section=te&layout=wide&region_id=1&scenario=expansion&overall_status=in_progress&q=abc' });
+    await screen.findByTestId('sites-wide-table');
+    for (const id of ['sites-search', 'sites-filter-region', 'sites-filter-scenario', 'sites-filter-status']) expect(screen.getByTestId(id)).toBeTruthy();
+    await waitFor(() => expect(urls.length).toBeGreaterThan(0));
+    const p = urls[0]!.searchParams;
+    expect(urls[0]!.pathname).toContain('/site360/te/rows');
+    expect([p.get('region_id'), p.get('scenario'), p.get('status')]).toEqual(['1', 'expansion', 'in_progress']);
+  });
+
   describe('editing', () => {
     const rowsWithTargets = () => server.use(http.get(`${API_BASE}/site360/:menu/rows`, ({ request }) => {
       const values = { '4': 'Name', '5': 'Tripoli', '78': '2026-03-10', '33': 'outsourced' };
@@ -125,7 +138,72 @@ describe('Site Master wide table', () => {
       await userEvent.clear(screen.getByTestId('wide-input-S360-001-78'));
       await userEvent.type(screen.getByTestId('wide-input-S360-001-78'), '2026-05-05');
       await userEvent.click(screen.getByTestId('wide-save-S360-001-78'));
-      expect((await screen.findByTestId('site360-cell-error')).textContent).toMatch(/Someone changed this/);
+      expect((await screen.findByTestId('wide-error-S360-001-78')).textContent).toMatch(/Someone changed this/);
+      expect(screen.getByTestId('wide-input-S360-001-78')).toBeTruthy(); // the editor stays open with the draft
+    });
+
+    const typed = () => server.use(http.get(`${API_BASE}/site360/:menu/rows`, () => HttpResponse.json({ total: 1, filtered: 1, offset: 0, limit: 50, rows: [
+      { site_id: 'a0000000-0000-4000-8000-000000000001', site_code: 'S360-001', row_no: 1, values: { '4': 'Name', '40': '12', '41': 'B', '42': 'true' }, cells: {
+        '40': { task_id: 'task-1', version: 3, editable: true, values: 'height', input_type: 'number' },
+        '41': { task_id: 'task-1', version: 3, editable: true, values: 'grade', input_type: 'list', options: [{ value: 'A', label_en: 'Grade A', label_ar: 'الدرجة أ' }, { value: 'B', label_en: 'Grade B', label_ar: null }] },
+        '42': { task_id: 'task-1', version: 3, editable: true, values: 'fenced', input_type: 'boolean' },
+      } },
+    ] })));
+
+    it('a number cell opens a number input and saves a JSON number through the same endpoint', async () => {
+      patched.length = 0;
+      await signIn('pm'); typed(); ok();
+      renderApp(<App />, { route: '/sites?layout=wide' });
+      await userEvent.click(await screen.findByTestId('wide-edit-S360-001-40'));
+      const input = screen.getByTestId('wide-input-S360-001-40');
+      expect(input).toHaveAttribute('type', 'number');
+      await userEvent.clear(input);
+      await userEvent.type(input, '15.5{Enter}');
+      await waitFor(() => expect(patched).toHaveLength(1));
+      expect(patched[0]!.url).toContain('/tasks/task-1');
+      expect(patched[0]!.body).toEqual({ values: { height: 15.5 } });
+      expect(patched[0]!.ifMatch).toContain('3');
+    });
+
+    it('a list cell shows its label, opens a select with the options and saves the chosen value', async () => {
+      patched.length = 0;
+      await signIn('pm'); typed(); ok();
+      renderApp(<App />, { route: '/sites?layout=wide' });
+      const btn = await screen.findByTestId('wide-edit-S360-001-41');
+      expect(btn).toHaveTextContent('Grade B');
+      await userEvent.click(btn);
+      const sel = screen.getByTestId('wide-input-S360-001-41');
+      expect(sel.tagName).toBe('SELECT');
+      expect(within(sel).getAllByRole('option').map((o) => o.textContent)).toEqual(['None', 'Grade A', 'Grade B']);
+      await userEvent.selectOptions(sel, 'A');
+      await userEvent.click(screen.getByTestId('wide-save-S360-001-41'));
+      await waitFor(() => expect(patched).toHaveLength(1));
+      expect(patched[0]!.body).toEqual({ values: { grade: 'A' } });
+    });
+
+    it('a yes or no cell is a checkbox and saves a boolean', async () => {
+      patched.length = 0;
+      await signIn('pm'); typed(); ok();
+      renderApp(<App />, { route: '/sites?layout=wide' });
+      await userEvent.click(await screen.findByTestId('wide-edit-S360-001-42'));
+      const box = screen.getByTestId('wide-input-S360-001-42');
+      expect(box).toHaveAttribute('type', 'checkbox');
+      expect(box).toBeChecked();
+      await userEvent.click(box);
+      await userEvent.click(screen.getByTestId('wide-save-S360-001-42'));
+      await waitFor(() => expect(patched).toHaveLength(1));
+      expect(patched[0]!.body).toEqual({ values: { fenced: false } });
+    });
+
+    it('a validation error of the API shows next to the cell and the editor stays open', async () => {
+      await signIn('pm'); typed();
+      server.use(http.patch(`${API_BASE}/tasks/:id`, () => HttpResponse.json({ type: 'about:blank', title: 'Validation failed', status: 422, code: 'validation_failed', errors: [{ path: '/values/height', code: 'out_of_range', message: 'The height is out of range.' }] }, { status: 422 })));
+      renderApp(<App />, { route: '/sites?layout=wide' });
+      await userEvent.click(await screen.findByTestId('wide-edit-S360-001-40'));
+      await userEvent.clear(screen.getByTestId('wide-input-S360-001-40'));
+      await userEvent.type(screen.getByTestId('wide-input-S360-001-40'), '999{Enter}');
+      expect((await screen.findByTestId('wide-error-S360-001-40')).textContent).toMatch(/out of range/);
+      expect(screen.getByTestId('wide-input-S360-001-40')).toBeTruthy();
     });
   });
 });

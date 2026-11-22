@@ -418,6 +418,8 @@
     "wide_locked": "Read-only: the task is locked, not applicable, or not the only source of this column.",
     "wide_computed": "Calculated: this value is derived and cannot be typed.",
     "wide_label": "Wide table of Master columns",
+    "wide_bad_number": "Enter a valid number.",
+    "wide_none": "None",
     "map": "Map",
     "table": "Table",
     "locks": "Locks",

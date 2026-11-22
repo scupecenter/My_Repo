@@ -191,6 +191,8 @@ export function Sites() {
   useEffect(() => { if (hasNextPage && !isFetchingNextPage && v.end >= inStream.length - 20) void fetchNextPage(); }, [v.end, inStream.length, hasNextPage, isFetchingNextPage, fetchNextPage]);
   const { hasNextPage: moreRows, isFetchingNextPage: fetchingRows, fetchNextPage: nextRows } = gridRowsQ;
   useEffect(() => { if (menuList && moreRows && !fetchingRows && v.end >= mRows.length - 20) void nextRows(); }, [menuList, moreRows, fetchingRows, v.end, mRows.length, nextRows]);
+  // The wide table does not scroll in pages: while the quick search is typed, the rest of the pages load so the search covers every site of the menu, not only the first 200.
+  useEffect(() => { if (asWide && f.q.trim() && moreRows && !fetchingRows) void nextRows(); }, [asWide, f.q, moreRows, fetchingRows, nextRows]);
   const scroller = useRef<HTMLDivElement>(null);
   const restored = useRef(false);
   const scrollKey = `pmis.scroll.sites.${stream || 'ALL'}`;
@@ -360,9 +362,8 @@ export function Sites() {
         </div>
       ) : asWide && menu ? (
         <div className="space-y-2">
-          {saveCell.isError && <p role="alert" className="text-sm text-red-600" data-testid="site360-cell-error">{errText(saveCell.error, t)}</p>}
           <SitesWideTable menu={menu} rows={mRows} sel={sel} height={viewport + 120} loaded={gridRowsQ.isSuccess} filtered={activeFilters > 0} onClear={clearAll} busy={saveCell.isPending}
-            onEdit={(e) => saveCell.mutate({ task_id: e.target.task_id, version: e.target.version, field: e.target.field, values: e.target.values, value: e.value })}
+            onEdit={(e) => saveCell.mutateAsync({ task_id: e.target.task_id, version: e.target.version, field: e.target.field, values: e.target.values, value: e.value })}
             hasMore={!!gridRowsQ.hasNextPage} loadingMore={gridRowsQ.isFetchingNextPage} onMore={() => void gridRowsQ.fetchNextPage()} />
         </div>
       ) : menuList ? (
