@@ -83,7 +83,9 @@ describe('Site Master wide table', () => {
     server.use(http.get(`${API_BASE}/site360/:menu/rows`, ({ request }) => { urls.push(new URL(request.url)); return HttpResponse.json({ total: 0, filtered: 0, offset: 0, limit: 200, rows: [] }); }));
     renderApp(<App />, { route: '/sites?section=te&layout=wide&region_id=1&scenario=expansion&overall_status=in_progress&q=abc' });
     await screen.findByTestId('sites-wide-table');
-    for (const id of ['sites-search', 'sites-filter-region', 'sites-filter-scenario', 'sites-filter-status']) expect(screen.getByTestId(id)).toBeTruthy();
+    // the unified filter (+ Filter) on the menu's screen, with the URL filters as chips
+    expect(await screen.findByTestId('unified-filter')).toHaveAttribute('data-screen', 'site360-te');
+    for (const k of ['q', 'region_id', 'scenario', 'overall_status']) expect(screen.getByTestId(`filter-chip-x-${k}`)).toBeTruthy();
     await waitFor(() => expect(urls.length).toBeGreaterThan(0));
     const p = urls[0]!.searchParams;
     expect(urls[0]!.pathname).toContain('/site360/te/rows');
