@@ -70,6 +70,7 @@ interface BatchRow {
   historical_reason: string | null;
   historical_marked_by: string | null;
   historical_marked_at: Date | null;
+  import_notes: { code: string; count: number }[] | null;
   c_create: bigint; c_update: bigint; c_unchanged: bigint; c_error: bigint; c_pending: bigint; c_approved: bigint; c_rejected: bigint; c_held: bigint; c_saved: bigint; c_admin_approved: bigint; c_incomplete: bigint;
   progress: Record<string, unknown> | null;
   ts: string;
@@ -380,7 +381,7 @@ export class ImportService {
       file_name: u.file_name, status: u.state === 'failed' ? 'failed' : 'parsing', current_level: 1, levels_required: 2,
       counts: { create: 0, update: 0, unchanged: 0, error: 0, pending: 0, approved: 0, rejected: 0, held: 0, saved: 0 },
       mode: u.mode, file_template_version: u.file_template_version, historical_load: null, job_id: null, progress: u.progress,
-      task_id: u.task_id, site_id: null, register_key: u.register_key, entity: u.entity, stream: u.stream, group_id: u.group_id, part_sheet: null, note: null,
+      task_id: u.task_id, site_id: null, register_key: u.register_key, entity: u.entity, stream: u.stream, group_id: u.group_id, part_sheet: null, note: null, import_notes: [],
       uploaded_at: u.uploaded_at, version: 0, uploaded_by: refs.get(u.uploaded_by) ?? { id: u.uploaded_by },
       upload: { id: u.upload_id, kind: u.kind, state: u.state, batch_ids: u.batches.map((b) => b.id), error: u.error },
       warnings: this.partWarnings(u),
@@ -690,7 +691,7 @@ export class ImportService {
         SELECT b.id::text AS id, d.template_id, v.version AS template_version, b.source, b.file_name, b.uploaded_by::text AS uploaded_by, b.created_at,
           b.version, b.task_id::text AS task_id, b.site_id::text AS site_id, b.register_key, b.entity, b.stream_code, b.group_id::text AS group_id, b.part_sheet, b.note, coalesce(rd.module_key, CASE WHEN b.stream_code IS NOT NULL OR b.entity = 'site' THEN 'sites' END) AS module_key,
           b.mode, b.file_template_version, b.historical_load, b.historical_cutoff::text AS historical_cutoff, b.historical_reason, b.historical_marked_by::text AS historical_marked_by,
-          b.historical_marked_at,
+          b.historical_marked_at, b.import_notes,
           to_char(b.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS ts
         FROM import_batches b
         JOIN template_versions v ON v.id = b.template_version_id
@@ -746,6 +747,8 @@ export class ImportService {
         group_id: r.group_id,
         part_sheet: r.part_sheet,
         note: r.note,
+        // 0144: informational notes of a Master staging (counts only): cells read as empty, placeholder rows skipped, rows routed, values derived
+        import_notes: Array.isArray(r.import_notes) ? r.import_notes : [],
         uploaded_at: r.created_at,
         version: r.version,
       };
