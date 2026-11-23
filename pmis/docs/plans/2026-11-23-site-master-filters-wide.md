@@ -13,3 +13,5 @@ Owner request (2026-11-22/23): Site Master and its sub-menus show everything req
 Remaining human check: a visual review of Site Master (wide view, bulk edit dialog with "Clear the value", AND/OR builder on a long list) in the browser, in English and Arabic, light and dark.
 
 Rules: tests run on GitHub CI; one PR handed over at a time after green CI and a clean merge state; branches deleted after merge.
+
+Next work (site page tabs, register views, Settings clean-up, stuck screens, Documents hub, daily plan): see `2026-11-23-next-ui-cleanup.md`.
