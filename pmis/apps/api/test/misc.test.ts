@@ -25,7 +25,7 @@ describe('problem+json, request ids, unknown routes', () => {
       [api, 'get', '/nothing-here'],
       [api, 'put', '/users'],
       [api, 'delete', '/users/00000000-0000-4000-8000-000000000000'],
-      [api, 'post', '/absences'], // in the contract, not built yet (POST /groups is served since 0143)
+      [api, 'post', '/settings/dlp/versions'], // in the contract, not built yet (POST /groups is served since 0143, POST /absences since 0140)
       [api, 'patch', '/groups/00000000-0000-4000-8000-000000000000'],
       [api, 'get', '/settings/dlp'], // in the contract, not built yet
       [new Api(app), 'get', '/settings/dlp'], // unauthenticated: still a plain 404

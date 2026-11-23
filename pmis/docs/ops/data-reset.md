@@ -98,6 +98,8 @@ records of the Contractors register (companies, teams, contracts) and the vehicl
 | email_change_requests | KEEP | Identity requests. |
 | phone_change_requests | KEEP | Identity requests. |
 | user_invitations | KEEP | Invitations (owner: keep). |
+| user_mfa_exemptions | KEEP | Per-user MFA exemptions (migration 0143): identity; the history stays in the Audit Log. |
+| me_admin_requests | KEEP | Requests of users to the System Admins (POST /me/notify-admins, migration 0143): people and admin data, and the cooldown of each user. |
 | roles | KEEP | Roles. |
 | role_default_regions | KEEP | Role defaults. |
 | role_default_modules | KEEP | Role defaults. |
