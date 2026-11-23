@@ -34,7 +34,6 @@ Menu names and places:
 | New main menu | Documents | المستندات | Sidebar, after Data entry and before Administration |
 | Its first page (approved forms) | Templates | القوالب | Documents > Templates |
 | Its second page (site document archive) | Archive | الأرشيف | Documents > Archive |
-| The current input templates page | Uploads | الرفع | Data entry > Uploads (renamed from "Templates", same route with a redirect from the old one) |
 | Daily progress and plan | Daily Plan | الخطة اليومية | My Work > Daily Plan, with two tabs: Progress (الإنجاز) and Tomorrow (خطة الغد) |
 
 W5 decisions (Documents: Templates and Archive):
@@ -158,7 +157,7 @@ Today "Data entry > Templates" (pages/Templates.tsx, "Templates and uploads") mi
 
 The owner wants this clear:
 
-1. **Data entry** (main menu) keeps only the input templates: download, download pre-filled, upload filled template, Template mapping, Master import and comparison. Rename the page title accordingly.
+1. **Data entry > Templates stays exactly as it is** (name, route and content), owner decision 2026-11-23: it may be removed later. Do not rename or move it. Only the document forms (the uploaded SoF and CW forms) move from it to Documents > Templates, if they are listed there today.
 2. **Documents** (new main menu) has two cards:
    - **Approved forms and templates**: every approved document form (the uploaded project forms and future HTML forms), with version, owner, the document type it produces and the stage or task that triggers it. From here, a user with the right can generate a filled document for a site: auto-fill, preview, download or print. Admins upload and approve new forms here; Settings > Documents > Library moves here or links here.
    - **Site documents (archive)**: one card per document type, for example Site Survey Report or Handover Certificate, with a count. Opening a card lists every document of that type for all sites in a list with + Filter, saved views and Export: site, version, status (generated / signed and uploaded / approved), uploaded by, date, file. Each row opens the file and the site's Documents tab.
@@ -174,7 +173,7 @@ The owner wants this clear:
 5. Navigation: add Documents to the sidebar between Data entry and Administration (or where CLAUDE.md navigation says). Update CLAUDE.md navigation notes.
 6. Tests: vitest for both cards and the archive list; API tests for any new endpoint; one e2e: generate a filled document for a site, upload the signed copy, see it in the archive.
 
-Acceptance: input templates and document forms are no longer mixed; a user finds approved forms in one place and every uploaded site document by type in one place; the lifecycle state is visible.
+Acceptance: Data entry > Templates is unchanged except that document forms no longer appear in it; a user finds approved forms in one place and every uploaded site document by type in one place; the lifecycle state is visible.
 
 ## W7. Daily Progress and Tomorrow Plan (owner request 2026-11-23, image of the Excel sheet)
 
@@ -218,5 +217,6 @@ Total: roughly 6 PRs and several CI cycles each. This does not fit in one short 
 
 ## Log
 
+- 2026-11-23: Data entry > Templates stays as it is (no rename), it may be removed later.
 - 2026-11-23: owner decisions added (names, places, permissions via the matrix, settings in general Settings, Daily Plan under My Work, copy-paste email).
 - 2026-11-23: plan written after #183-#187 (unified filter, wide view, saved views, bulk edit, dependent lists). Nothing in W1-W6 started.
