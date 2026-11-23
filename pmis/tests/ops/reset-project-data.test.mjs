@@ -20,7 +20,7 @@
 // Exit:   0 = every check passed, 1 = a check failed, 2 = setup failed.
 
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -30,6 +30,7 @@ const pmis = resolve(here, '..', '..');
 const migrationsDir = join(pmis, 'apps', 'api', 'prisma', 'migrations');
 const sqlFile = join(pmis, 'infra', 'scripts', 'reset-project-data.sql');
 const shFile = join(pmis, 'infra', 'scripts', 'reset-project-data.sh');
+const quarFile = join(pmis, 'infra', 'scripts', 'reset-project-data-quarantine.sh');
 const signScript = join(pmis, 'tests', 'db-security', 'sign-context.mjs');
 
 const adminUrl = process.env.TEST_PG_ADMIN_URL ?? 'postgresql://postgres:ci-test-pw@127.0.0.1:5432/postgres';
@@ -110,7 +111,46 @@ function snapshot() {
 const digest = (sql) => q(`SELECT md5(coalesce(string_agg(x, E'\\n' ORDER BY x), '')) FROM (${sql}) s(x);`);
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------
+// ---------------------------------------------------------------------------------------------------------------------------------------------
+// The quarantine move (no database): a good key moves; a symlinked file, a symlinked directory on the path, "..", an absolute key, an empty
+// component and a directory are refused and left in place; nothing outside the store moves.
+function quarantineChecks() {
+  const root = mkdtempSync(join(tmpdir(), 'pmis-reset-quar-'));
+  try {
+    const store = join(root, 'files'), outside = join(root, 'outside'), qdir = join(root, 'files-pre-reset-test');
+    for (const d of [join(store, 'docs', '2026', '11'), join(store, 'docs', 'dir-key'), outside]) mkdirSync(d, { recursive: true });
+    writeFileSync(join(store, 'docs', '2026', '11', 'good-file'), 'good');
+    writeFileSync(join(outside, 'secret'), 'secret');
+    writeFileSync(join(outside, 'victim'), 'victim');
+    symlinkSync(join(outside, 'secret'), join(store, 'docs', '2026', '11', 'link-file'));   // a symlinked file
+    symlinkSync(outside, join(store, 'docs', 'evil'));                                     // a symlinked directory on the path
+    mkdirSync(qdir);
+    const keys = ['docs/2026/11/good-file', 'docs/2026/11/link-file', 'docs/evil/victim', 'docs/../outside/victim', '/etc/hostname',
+      'docs//2026/11/good-file', 'docs/dir-key', 'docs/2026/11/not-there', ''];
+    writeFileSync(join(root, 'keys.txt'), keys.join('\n') + '\n');
+    const manifest = join(root, 'manifest');
+    writeFileSync(manifest, '');
+    const r = spawnSync('bash', ['-c', `set -euo pipefail; . "$1"; QUAR_AS= quarantine_files "$2" "$3" "$4" "$5"`, '_', quarFile, store, qdir, join(root, 'keys.txt'), manifest],
+      { encoding: 'utf8' });
+    check('quarantine: the move runs', r.status === 0, r.stderr.trim());
+    check('quarantine: counts are 1 moved, 1 missing, 7 refused', r.stdout.trim() === '1 1 7', r.stdout.trim());
+    const m = readFileSync(manifest, 'utf8');
+    check('quarantine: the regular file is moved into the quarantine', existsSync(join(qdir, 'docs', '2026', '11', 'good-file')) && !existsSync(join(store, 'docs', '2026', '11', 'good-file')));
+    check('quarantine: a symlinked file is refused and left in place', /REFUSED docs\/2026\/11\/link-file \(symbolic link/.test(m) && lstatSync(join(store, 'docs', '2026', '11', 'link-file')).isSymbolicLink());
+    check('quarantine: a symlinked directory on the path is refused', /REFUSED docs\/evil\/victim \(symbolic link at docs\/evil\)/.test(m));
+    check('quarantine: "..", absolute, empty-component, empty and directory keys are refused',
+      ['docs/../outside/victim', '/etc/hostname', 'docs//2026/11/good-file', 'docs/dir-key'].every((k) => m.includes(`REFUSED ${k} (`)) && /^REFUSED  \(empty key\)/m.test(m), m);
+    check('quarantine: a missing key is listed as missing', /^MISSING docs\/2026\/11\/not-there$/m.test(m));
+    check('quarantine: nothing outside the store moved', readFileSync(join(outside, 'secret'), 'utf8') === 'secret' && readFileSync(join(outside, 'victim'), 'utf8') === 'victim'
+      && readdirSync(qdir, { recursive: true }).filter((f) => !lstatSync(join(qdir, String(f))).isDirectory()).join(',') === join('docs', '2026', '11', 'good-file'));
+    check('quarantine: the store keeps its directory key', lstatSync(join(store, 'docs', 'dir-key')).isDirectory());
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
 function main() {
+  quarantineChecks();
   try {
     build();
   } catch (e) {

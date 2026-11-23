@@ -35,8 +35,13 @@ Steps of `--execute`, stopping at the first failure (nothing changes before step
    `audit_log` and `users` data), and `tar` of the documents directory to `pre-reset-<timestamp>-files.tar`, verified with `tar -t`;
 5. `reset-project-data.sql` in ONE transaction (see below); its output is kept in `pre-reset-<timestamp>.log`;
 6. the stored files of the deleted rows are moved (`mv`, a rename on the same filesystem, never a delete) to
-   `<STORAGE_DIR>-pre-reset-<timestamp>`, with a manifest `<...>.manifest` (MOVED / MISSING / SKIPPED per key). The script stops before the
-   backup if `STORAGE_DIR` is a mount point (the quarantine would be a copy, not a rename);
+   `<STORAGE_DIR>-pre-reset-<timestamp>`, with a manifest `<...>.manifest` (MOVED / MISSING / REFUSED per key). The script stops before the
+   backup if `STORAGE_DIR` is a mount point (the quarantine would be a copy, not a rename), if `STORAGE_DIR` or its parent is a symbolic link
+   or `STORAGE_DIR` resolves elsewhere, or if the parent is not owned by root or is writable by group or others. The move itself
+   (`infra/scripts/reset-project-data-quarantine.sh`) runs as the owner of the store through `runuser`, never as root, and refuses a key that is
+   empty, absolute, has an empty, `.` or `..` component or is not in the API's key format, a key with a symbolic link on any component under the
+   store, a target that is not a regular file, and a target whose resolved path leaves the store. A refused key is listed in the manifest and the
+   summary and left in place, never deleted;
 7. the API starts again; the summary prints the audit row id, the number of ended sessions, the files moved, the restore commands and how to
    delete the quarantine later.
 
@@ -118,6 +123,7 @@ records of the Contractors register (companies, teams, contracts) and the vehicl
 | delegation_regions | KEEP | Delegated regions. |
 | departments | KEEP | Departments (direct managers and MFA exemptions are columns of `users`). |
 | pmis_context_keys | KEEP | Session-context signing keys. |
+| absences | KEEP | Staff absence records (migration 0140): they concern people, not sites; kept on the safe side (see Open). |
 
 ### Configuration (KEEP)
 
@@ -261,6 +267,7 @@ records of the Contractors register (companies, teams, contracts) and the vehicl
 | sites | Sites: the root of the project data. |
 | clusters | Clusters are created by site creation and carry the KPI Acceptance date per cluster. |
 | task_instances | Site tasks. |
+| task_cover_decisions | Lead decisions on a task (keep, reassign, act on behalf; migration 0140); they follow their task. |
 | workflow_steps | Task step ledger. |
 | task_level_actors | Task level holders. |
 | task_level_voters | Task level votes. |
@@ -332,5 +339,7 @@ Outside the `public` schema nothing is touched (`pmis_admin.migrations`, the ins
 - **Quarantine retention.** Project documents are kept for the life of the project plus 10 years (non-functional requirements). The quarantine
   directory and the two backups should be kept (in the encrypted backup store) until the owner decides; the script never deletes them.
 - **Backup encryption.** `pre-reset-*.dump` and the tar are written root-only (0600) but not encrypted; copy them to the encrypted backup store.
+- **Absences** (`absences`, migration 0140) are kept: they belong to people, not to sites, and past and planned leave stays useful for the
+  new project. If the owner sees them as project data, they move to DELETE (nothing references them).
 - **Staff registry.** There is no separate staff registry table on main (the employee ID lives on `users`); when it is added it must be
   classified KEEP here and in the plan, or the reset refuses to run.
