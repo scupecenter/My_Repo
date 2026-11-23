@@ -87,13 +87,14 @@ describe('Site Master wide table: bulk edit', () => {
     expect(screen.queryByTestId('bulk-edit')).toBeNull();
     expect(screen.getByTestId('sites-bulk-count')).toHaveTextContent('1');
     expect(seen).toHaveLength(0);
-    // S360-003 has a locked date and no list: its date column is still offered (the row is skipped), but a menu with no task column offers none
+  });
+
+  it('with no editable cell in the menu the dialog says so and cannot confirm', async () => {
+    await signIn('pm');
     server.use(http.get(`${API_BASE}/site360/:menu/rows`, () => HttpResponse.json({ total: 1, filtered: 1, offset: 0, limit: 50, rows: [{ site_id: 'a0000000-0000-4000-8000-000000000001', site_code: 'S360-001', row_no: 1, values: { '4': 'Name' }, cells: {} }] })));
     renderApp(<App />, { route: '/sites?section=sow&layout=wide' });
-    const boxes = await screen.findAllByTestId('wide-select-S360-001');
-    await userEvent.click(boxes[boxes.length - 1]!);
-    const edit = screen.getAllByTestId('sites-bulk-edit');
-    await userEvent.click(edit[edit.length - 1]!);
+    await userEvent.click(await screen.findByTestId('wide-select-S360-001'));
+    await userEvent.click(screen.getByTestId('sites-bulk-edit'));
     expect(await screen.findByTestId('bulk-edit-none')).toBeTruthy();
     expect((screen.getByTestId('bulk-edit-confirm') as HTMLButtonElement).disabled).toBe(true);
   });
@@ -102,24 +103,24 @@ describe('Site Master wide table: bulk edit', () => {
 describe('Site Master wide table: dependent lists', () => {
   const rows = () => server.use(http.get(`${API_BASE}/site360/:menu/rows`, () => HttpResponse.json({ total: 3, filtered: 3, offset: 0, limit: 50, rows: [
     ['S360-001', 'WEST'], ['S360-002', 'EAST'], ['S360-003', null],
-  ].map(([code, parent], i) => ({ site_id: `a0000000-0000-4000-8000-00000000000${i + 1}`, site_code: code, row_no: i + 1, values: { '4': 'Name', '40': parent, '41': null }, cells: {
-    '40': { task_id: `p${i}`, version: 1, editable: true, values: 'region', input_type: 'list', options: [{ value: 'WEST', label_en: 'West', label_ar: null }, { value: 'EAST', label_en: 'East', label_ar: null }] },
-    '41': { task_id: `c${i}`, version: 1, editable: true, values: 'city', input_type: 'list', parent_ord: 40, options: [
+  ].map(([code, parent], i) => ({ site_id: `a0000000-0000-4000-8000-00000000000${i + 1}`, site_code: code, row_no: i + 1, values: { '4': 'Name', '24': parent, '33': null }, cells: {
+    '24': { task_id: `p${i}`, version: 1, editable: true, values: 'region', input_type: 'list', options: [{ value: 'WEST', label_en: 'West', label_ar: null }, { value: 'EAST', label_en: 'East', label_ar: null }] },
+    '33': { task_id: `c${i}`, version: 1, editable: true, values: 'city', input_type: 'list', parent_ord: 24, options: [
       { value: 'TIP', label_en: 'Tripoli', label_ar: null, parent: 'WEST' }, { value: 'MSR', label_en: 'Misrata', label_ar: null, parent: 'WEST' }, { value: 'BNG', label_en: 'Benghazi', label_ar: null, parent: 'EAST' }] },
   } })) })));
 
   it('the editor offers only the children of the parent value of the same row, and asks for the parent first when there is none', async () => {
     await signIn('pm'); rows();
     renderApp(<App />, { route: '/sites?layout=wide' });
-    await userEvent.click(await screen.findByTestId('wide-edit-S360-001-41'));
-    expect(within(screen.getByTestId('wide-input-S360-001-41')).getAllByRole('option').map((o) => o.textContent)).toEqual(['None', 'Tripoli', 'Misrata']);
+    await userEvent.click(await screen.findByTestId('wide-edit-S360-001-33'));
+    expect(within(screen.getByTestId('wide-input-S360-001-33')).getAllByRole('option').map((o) => o.textContent)).toEqual(['None', 'Tripoli', 'Misrata']);
     await userEvent.keyboard('{Escape}');
-    await userEvent.click(screen.getByTestId('wide-edit-S360-002-41'));
-    expect(within(screen.getByTestId('wide-input-S360-002-41')).getAllByRole('option').map((o) => o.textContent)).toEqual(['None', 'Benghazi']);
+    await userEvent.click(screen.getByTestId('wide-edit-S360-002-33'));
+    expect(within(screen.getByTestId('wide-input-S360-002-33')).getAllByRole('option').map((o) => o.textContent)).toEqual(['None', 'Benghazi']);
     await userEvent.keyboard('{Escape}');
-    await userEvent.click(screen.getByTestId('wide-edit-S360-003-41'));
-    expect(within(screen.getByTestId('wide-input-S360-003-41')).getAllByRole('option').map((o) => o.textContent)).toEqual(['None']);
-    expect(screen.getByTestId('wide-parent-hint-S360-003-41')).toBeTruthy();
+    await userEvent.click(screen.getByTestId('wide-edit-S360-003-33'));
+    expect(within(screen.getByTestId('wide-input-S360-003-33')).getAllByRole('option').map((o) => o.textContent)).toEqual(['None']);
+    expect(screen.getByTestId('wide-parent-hint-S360-003-33')).toBeTruthy();
   });
 
   it('a bulk edit skips the sites whose parent value does not offer the chosen child', async () => {
@@ -130,7 +131,7 @@ describe('Site Master wide table: dependent lists', () => {
     await userEvent.click(await screen.findByTestId('wide-select-all'));
     await userEvent.click(screen.getByTestId('sites-bulk-edit'));
     const dlg = await screen.findByTestId('bulk-edit');
-    await userEvent.selectOptions(within(dlg).getByTestId('bulk-edit-field'), '41');
+    await userEvent.selectOptions(within(dlg).getByTestId('bulk-edit-field'), '33');
     expect(within(dlg).getByTestId('bulk-edit-parent-hint')).toBeTruthy();
     await userEvent.selectOptions(within(dlg).getByTestId('bulk-edit-value'), 'TIP');
     expect(within(dlg).getByTestId('bulk-edit-preview')).toHaveTextContent('1 sites will change, 2 skipped');
@@ -140,24 +141,22 @@ describe('Site Master wide table: dependent lists', () => {
 });
 
 describe('Site Master wide table: the list filters', () => {
-  it('shows the stage, mine, late, locks and gaps filters and sends them to the rows endpoint with the same names as GET /sites', async () => {
+  it('sends the stage, mine or late, locks and gaps filters of the page to the rows endpoint with the same names as GET /sites', async () => {
     await signIn('pm');
     const urls: URL[] = [];
     server.use(http.get(`${API_BASE}/site360/:menu/rows`, ({ request }) => { urls.push(new URL(request.url)); return HttpResponse.json({ total: 0, filtered: 0, offset: 0, limit: 200, rows: [] }); }));
     renderApp(<App />, { route: '/sites?section=cw&layout=wide&stage_code=MS2&bucket=late&workflow_locks=open&data_gaps=with&scenario=expansion' });
     await screen.findByTestId('sites-wide-table');
-    for (const id of ['sites-filter-stage', 'sites-quick-mine', 'sites-quick-late', 'sites-filter-locks', 'sites-quick-gaps']) expect(screen.getByTestId(id)).toBeTruthy();
     await waitFor(() => expect(urls.length).toBeGreaterThan(0));
     const p = urls[0]!.searchParams;
     expect([p.get('stage_code'), p.get('bucket'), p.get('workflow_locks'), p.get('data_gaps'), p.get('scenario')]).toEqual(['MS2', 'late', 'open', 'with', 'expansion']);
   });
 
-  it('the Mine quick filter sets bucket=mine and the sub-menu list sends it too', async () => {
+  it('the sub-menu list sends the same filters (bucket=mine, stage and locks)', async () => {
     await signIn('pm');
     const urls: URL[] = [];
     server.use(http.get(`${API_BASE}/site360/:menu/rows`, ({ request }) => { urls.push(new URL(request.url)); return HttpResponse.json({ total: 0, filtered: 0, offset: 0, limit: 200, rows: [] }); }));
-    renderApp(<App />, { route: '/sites?section=te' });
-    await userEvent.click(await screen.findByTestId('sites-quick-mine'));
-    await waitFor(() => expect(urls.some((u) => u.searchParams.get('bucket') === 'mine')).toBe(true));
+    renderApp(<App />, { route: '/sites?section=te&bucket=mine&stage_code=MS2&workflow_locks=locked' });
+    await waitFor(() => expect(urls.some((u) => u.searchParams.get('bucket') === 'mine' && u.searchParams.get('stage_code') === 'MS2' && u.searchParams.get('workflow_locks') === 'locked')).toBe(true));
   });
 });

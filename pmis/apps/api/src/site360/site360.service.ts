@@ -9,6 +9,7 @@ import { AccessService } from '../access/access.service';
 import { DbService } from '../db/db.service';
 import { FilterCatalogService } from '../views/filter-catalog.service';
 import { BUCKETS, siteLocksGapsConds, siteStageIds } from '../sites/sites.service';
+import { COLUMNS_SQL } from './site360-columns-sql';
 import { buildMenu, buildSite360, SITE360_MOVABLE, type Site360ColumnRow, type Site360Menu, type Site360MenuItem, type Site360SourceKind } from './site360-sections';
 
 const setSchema = z.object({
@@ -131,16 +132,17 @@ export class Site360Service {
     filters.push(...siteLocksGapsConds(locks, gaps));
     const byStage = siteStageIds(auth.user.id, { stageCode, bucket });
     if (byStage) filters.push(Prisma.sql`s.id IN (${byStage})`);
-    // F3 (0.15.31): the AND/OR filter of a saved view (the sites whitelist, alias s); the region scope of `base` stays
-    const adv = await this.filters.fromQuery('sites', q);
-    if (adv) filters.push(adv);
+    // F3 (0.15.31): the AND/OR filter of a saved view, compiled against the whitelist of this menu (0.15.45: the sites fields and the menu's Master columns;
+    // each Master column used is one derived table joined once, set-based, with the caller's register and field visibility); the region scope of `base` stays
+    const adv = await this.filters.compile(`site360-${menu}`, q);
+    if (adv.where) filters.push(adv.where);
     const all = filters.length ? Prisma.sql`${base} AND ${Prisma.join(filters, ' AND ')}` : base;
 
     const counts = await this.db.tx.$queryRaw<{ total: number; filtered: number }[]>(Prisma.sql`
       SELECT (SELECT count(*)::int FROM sites s WHERE ${base}) AS total,
-             (SELECT count(*)::int FROM sites s WHERE ${all}) AS filtered`);
+             (SELECT count(*)::int FROM sites s ${adv.joins} WHERE ${all}) AS filtered`);
     const page = await this.db.tx.$queryRaw<{ id: string; site_code: string }[]>(Prisma.sql`
-      SELECT s.id::text AS id, s.site_code FROM sites s JOIN regions r ON r.id = s.region_id ${sortJoin}
+      SELECT s.id::text AS id, s.site_code FROM sites s JOIN regions r ON r.id = s.region_id ${sortJoin} ${adv.joins}
       WHERE ${all}
       ORDER BY ${sortSql} ${Prisma.raw(dir === 'desc' ? 'DESC' : 'ASC')} NULLS LAST, s.site_code COLLATE "C"
       LIMIT ${limit} OFFSET ${offset}`);
@@ -453,24 +455,6 @@ function csvParam(q: Record<string, unknown>, key: string, max: number): string[
   if (parts.length > max || parts.some((x) => x.length > 100)) throw new ProblemException(422, 'validation_failed', { detail: `${key} has too many values.`, errors: [{ path: `/${key}`, code: 'invalid' }] });
   return parts;
 }
-
-/** The Master columns, with the effective kind of source (0.15.35): a not-tracked column takes the kind of a mapping an admin added later. */
-const COLUMNS_SQL = Prisma.sql`
-  SELECT mc.ord, mc.letter, mc.group_top, mc.group_mid, mc.header, mc.site360_sections AS sections,
-    CASE
-      WHEN mc.source_kind <> 'not_tracked' THEN mc.source_kind
-      WHEN EXISTS (SELECT 1 FROM field_definitions fd WHERE fd.entity_type::text = 'site' AND fd.is_active AND fd.master_export_column = mc.letter) THEN 'custom_field'
-      WHEN EXISTS (SELECT 1 FROM template_task_fields tf WHERE tf.is_active AND tf.master_col = mc.letter) THEN 'task'
-      WHEN EXISTS (SELECT 1 FROM task_field_sources x WHERE x.is_active AND x.master_col = mc.letter) THEN 'register'
-      ELSE 'not_tracked'
-    END AS source_kind,
-    mc.source_note, mc.display_order, mc.name_ar, mc.is_added,
-    -- 0133: the effective type and list (a column filled by a task input reads the input)
-    coalesce((SELECT tf.field_type FROM template_task_fields tf WHERE tf.is_active AND tf.master_col = mc.letter ORDER BY tf.task_code, tf.field_key LIMIT 1), mc.value_type, 'text') AS value_type,
-    CASE WHEN EXISTS (SELECT 1 FROM template_task_fields tf WHERE tf.is_active AND tf.master_col = mc.letter)
-         THEN (SELECT tf.list_catalogue FROM template_task_fields tf WHERE tf.is_active AND tf.master_col = mc.letter ORDER BY tf.task_code, tf.field_key LIMIT 1)
-         ELSE mc.list_catalogue END AS list_catalogue
-  FROM master_columns mc`;
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** Site columns written by the approval of the RF & Design record (C:Q and S, feed of 0072); T is fed by Acquisition. */

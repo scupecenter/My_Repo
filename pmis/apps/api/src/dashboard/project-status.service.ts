@@ -79,8 +79,8 @@ export class ProjectStatusService {
       ws = r[0].id;
     }
     const exclude = await this.dash.excludeOverrides({ exclude_overrides: excl });
-    const rows = await this.db.tx.$queryRaw<{ r: Json }[]>(Prisma.sql`
-      SELECT dash_project_status(NULL::date, ${regionRaw ? Number(regionRaw) : null}::int, ${siteRaw ?? null}::uuid, ${group}::text, ${ws}::uuid, ${exclude}::boolean) AS r`);
+    const rows = await this.dash.withSiteSet(q, () => this.db.tx.$queryRaw<{ r: Json }[]>(Prisma.sql`
+      SELECT dash_project_status(NULL::date, ${regionRaw ? Number(regionRaw) : null}::int, ${siteRaw ?? null}::uuid, ${group}::text, ${ws}::uuid, ${exclude}::boolean) AS r`));
     const r = rows[0]!.r;
     const meta = (r.meta ?? {}) as Json;
     const ps = (r.ps ?? {}) as Json;

@@ -49,9 +49,9 @@ function menu(key: string, name_en: string, name_ar: string) {
 
 /** Three synthetic sites in the shape of GET /site360/{menu}/rows: the values are keyed by the menu's column order. */
 const SITES = [
-  { id: 'a0000000-0000-4000-8000-000000000001', code: 'S360-001', name: 'Synthetic site one', region: 'Tripoli', milestone: 'Site Release', status: 'in_progress', phase: 'Phase 1', model: 'outsourced' },
-  { id: 'a0000000-0000-4000-8000-000000000002', code: 'S360-002', name: 'Synthetic site two', region: 'Middle', milestone: 'CW Completion', status: 'on_hold', phase: 'Phase 2', model: 'internal' },
-  { id: 'a0000000-0000-4000-8000-000000000003', code: 'S360-003', name: '', region: 'Zawia', milestone: null, status: 'completed', phase: 'Phase 2', model: 'outsourced' },
+  { id: 'a0000000-0000-4000-8000-000000000001', code: 'S360-001', name: 'Synthetic site one', region: 'Tripoli', milestone: 'Site Release', status: 'in_progress', phase: 'Phase 1', model: 'outsourced', batch: 'B1' },
+  { id: 'a0000000-0000-4000-8000-000000000002', code: 'S360-002', name: 'Synthetic site two', region: 'Middle', milestone: 'CW Completion', status: 'on_hold', phase: 'Phase 2', model: 'internal', batch: 'B3' },
+  { id: 'a0000000-0000-4000-8000-000000000003', code: 'S360-003', name: '', region: 'Zawia', milestone: null, status: 'completed', phase: 'Phase 2', model: 'outsourced', batch: 'B4' },
 ];
 
 /**
@@ -70,9 +70,20 @@ function wideCells(n: number, cols: Col[]) {
   return out;
 }
 
-function rowsFor(key: string, offset: number, limit: number) {
+/** 0.15.45: `filter` (the unified filter tree). The mock narrows the rows on the Delivery batch field only; the real server compiles the whole tree. */
+function batchesOf(filter: string | null): string[] | null {
+  if (!filter) return null;
+  try {
+    const t = JSON.parse(filter) as { items: { field?: string; value?: unknown }[] };
+    const c = t.items.find((x) => x.field === 'delivery_batch');
+    return c ? (Array.isArray(c.value) ? c.value.map(String) : [String(c.value)]) : null;
+  } catch { return null; }
+}
+
+function rowsFor(key: string, offset: number, limit: number, batches: string[] | null = null) {
   const cols = COLS.filter((c) => key === 'master' || c.sections.includes(key) || c.sections.includes('status') || IDENT.includes(c.ord));
-  const page = SITES.slice(offset, offset + limit);
+  const list = batches ? SITES.filter((x) => batches.includes(x.batch)) : SITES;
+  const page = list.slice(offset, offset + limit);
   const values = (site: (typeof SITES)[number]) => {
     const v: Record<string, string | null> = {};
     for (const c of cols) v[String(c.ord)] = null;
@@ -87,7 +98,7 @@ function rowsFor(key: string, offset: number, limit: number) {
   };
   return {
     total: SITES.length,
-    filtered: SITES.length,
+    filtered: list.length,
     offset,
     limit,
     rows: page.map((site, i) => ({ site_id: site.id, site_code: site.code, row_no: offset + i + 1, values: values(site), cells: wideCells(SITES.indexOf(site) + 1, cols) })),
@@ -125,7 +136,7 @@ export const site360Handlers = [
     const url = new URL(request.url);
     const offset = Number(url.searchParams.get('offset') ?? 0);
     const limit = Number(url.searchParams.get('limit') ?? 50);
-    return HttpResponse.json(rowsFor(String(params.menu), offset, limit));
+    return HttpResponse.json(rowsFor(String(params.menu), offset, limit, batchesOf(url.searchParams.get('filter'))));
   }),
 ];
 

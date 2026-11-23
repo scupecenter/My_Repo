@@ -18,10 +18,10 @@ import { isAdmin } from '@/lib/perm';
 import { registerErrorMessage } from '@/lib/registerErrors';
 import { ExportDialog, ExportViewButton } from '@/components/ExportDialog';
 import { SavedViews } from '@/components/SavedViews';
-import { FilterBuilder } from '@/components/FilterBuilder';
+import { UnifiedFilter, type ExtraField } from '@/components/UnifiedFilter';
 import { decodeFilter, encodeFilter, type FilterTree } from '@/api/views';
 import { MoreMenu, PageHeader, Toolbar } from '@/components/PageHeader';
-import { ActiveChips, BulkBar, ColumnMenu, DensityToggle, Empty, gxRow, HeaderRow, pin, QuickFilter, SelectBox, StatusChip, tracks, totalWidth, Trunc, useAutoFit, useTablePrefs } from '@/components/TableKit';
+import { BulkBar, ColumnMenu, DensityToggle, Empty, gxRow, HeaderRow, pin, SelectBox, StatusChip, tracks, totalWidth, Trunc, useAutoFit, useTablePrefs } from '@/components/TableKit';
 import { Tip } from '@/components/Tip';
 import type { FitSample } from '@/lib/tablePrefs';
 import { useToast } from '@/components/Toast';
@@ -47,19 +47,9 @@ const VIEW_EMPTY = { q: '', region_id: '', scenario: '', overall_status: '', sta
 const SITE_COLUMNS: SitesExportColumnCode[] = ['site_code', 'site_name', 'region', 'scenario', 'overall_status', 'current_stage'];
 // Extra pixels of a status chip (its own padding and border) when columns are sized to content.
 const CHIP_PX = 24;
-const SCENARIOS = ['new_build', 'expansion', 'hot_swap', 'cold_swap', 'relocation'];
 const STATUSES = ['not_started', 'in_progress', 'on_hold', 'completed', 'cancelled'];
 const TONE: Record<string, string> = { completed: 'bg-doneBg text-doneInk', in_progress: 'bg-openBg text-openInk', on_hold: 'bg-waitBg text-waitInk', not_started: 'bg-lockBg text-lockInk', cancelled: 'bg-lateBg text-lateInk' };
 const STREAM_TONE: Record<string, string> = { done: 'bg-doneBg text-doneInk', in_progress: 'bg-openBg text-openInk', not_started: 'bg-lockBg text-lockInk', na: 'bg-lockBg text-lockInk' };
-
-function Select({ id, value, onChange, all, options }: { id: string; value: string; onChange: (v: string) => void; all: string; options: [string, string][] }) {
-  return (
-    <select aria-label={all} data-testid={`sites-filter-${id}`} className="input w-auto" value={value} onChange={(e) => onChange(e.target.value)}>
-      <option value="">{all}</option>
-      {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-    </select>
-  );
-}
 
 export function Sites() {
   const { t, i18n } = useTranslation();
@@ -144,7 +134,7 @@ export function Sites() {
   const activeFilters = Object.values(f).filter(Boolean).length + (bucket ? 1 : 0) + (coordinates ? 1 : 0) + (locks ? 1 : 0) + (gaps ? 1 : 0) + (advTree ? 1 : 0) + (dashStatus ? 1 : 0) + (reached ? 1 : 0) + (cluster ? 1 : 0);
   const setParams = (kv: Record<string, string>) => setSp((p) => { const n = new URLSearchParams(p); for (const [k, v] of Object.entries(kv)) { if (v) n.set(k, v); else n.delete(k); } return n; }, { replace: true });
   const set = (k: keyof typeof f) => (v: string) => setParams({ [k]: v, sel: '' });
-  const clearAll = () => setParams({ ...Object.fromEntries(F_KEYS.map((k) => [k, ''])), bucket: '', coordinates: '', workflow_locks: '', data_gaps: '', site_codes: '', adv: '', dashboard_status: '', milestone_reached: '', ref_date: '', cluster_code: '', sel: '' });
+  const clearAll = () => setParams({ ...Object.fromEntries(F_KEYS.map((k) => [k, ''])), bucket: '', coordinates: '', workflow_locks: '', data_gaps: '', site_codes: '', site_code: '', adv: '', dashboard_status: '', milestone_reached: '', ref_date: '', cluster_code: '', sel: '' });
   const toast = useToast();
   const nav = useNavigate();
   // Site creation (contract 0.14.0, Q460): the New sites template is listed only for those who may create sites
@@ -221,21 +211,29 @@ export function Sites() {
   const linkTo = (s: SiteListItem) => `/sites/${s.id}${new URLSearchParams([...(real ? [['stream', stream]] : []), ...(view ? [['view', view]] : [])]).toString().replace(/^(?=.)/, '?')}`;
   const flip = (code: string) => setPicked((p) => { const n = new Set(p); if (n.has(code)) n.delete(code); else n.add(code); return n; });
   const allCodes = fromRows ? mRows.map((r) => r.site_code) : items.map((s) => s.site_code), allPicked = allCodes.length > 0 && allCodes.every((c) => picked.has(c));
-  const chips = [
-    ...(f.q ? [{ key: 'q', label: t('table.filter_q', { v: f.q }), onRemove: () => set('q')('') }] : []),
-    ...(f.region_id ? [{ key: 'region_id', label: t('table.filter_region', { v: rname(Number(f.region_id)) }), onRemove: () => set('region_id')('') }] : []),
-    ...(f.scenario ? [{ key: 'scenario', label: t('table.filter_scenario', { v: t(`scenario.${f.scenario}`) }), onRemove: () => set('scenario')('') }] : []),
-    ...(f.overall_status ? [{ key: 'overall_status', label: t('table.filter_status', { v: t(`status.${f.overall_status}`) }), onRemove: () => set('overall_status')('') }] : []),
-    ...(f.stage_code ? [{ key: 'stage_code', label: t('table.filter_stage', { v: stageName(f.stage_code) }), onRemove: () => set('stage_code')('') }] : []),
-    ...(coordinates ? [{ key: 'coordinates', label: t('table.filter_coords'), onRemove: () => setParams({ coordinates: '' }) }] : []),
-    ...(locks ? [{ key: 'workflow_locks', label: `${t('locks.filter')}: ${t(locks === 'open' ? 'locks.filter_open' : 'locks.filter_locked')}`, onRemove: () => setParams({ workflow_locks: '' }) }] : []),
-    ...(gaps ? [{ key: 'data_gaps', label: t('locks.quick_gaps'), onRemove: () => setParams({ data_gaps: '' }) }] : []),
-    ...(bucket ? [{ key: 'bucket', label: t('table.filter_bucket', { v: t(bucket === 'mine' ? 'table.mine' : 'table.late') }), onRemove: () => setParams({ bucket: '' }) }] : []),
-    ...(dashStatus ? [{ key: 'dashboard_status', label: t('table.filter_dash_status', { v: t(`status.${dashStatus}`) }), onRemove: () => setParams({ dashboard_status: '', ref_date: reached ? refDate : '' }) }] : []),
-    ...(reached ? [{ key: 'milestone_reached', label: t('table.filter_reached', { v: stageName(reached) }), onRemove: () => setParams({ milestone_reached: '', ref_date: dashStatus ? refDate : '' }) }] : []),
-    ...(refDate ? [{ key: 'ref_date', label: t('table.filter_ref_date', { v: refDate }), onRemove: () => setParams({ ref_date: '' }) }] : []),
-    ...(cluster ? [{ key: 'cluster_code', label: t('table.filter_cluster', { v: cluster }), onRemove: () => setParams({ cluster_code: '' }) }] : []),
+  // The unified filter (owner request 2026-11-22): the filters that are not columns of the list map to their old URL parameters, so behaviour does not change.
+  // Chip-only extras keep the older links working (dashboard drill-down, the quick search, saved views of the old selects).
+  const onlyChip = (key: string, label: string, value: string, set: (v: string) => void): ExtraField => ({ key, label, kind: 'text', value, set, chip: label, hidden: true });
+  const extras: ExtraField[] = [
+    onlyChip('q', t('table.filter_q', { v: f.q }), f.q, set('q')),
+    onlyChip('region_id', t('table.filter_region', { v: rname(Number(f.region_id)) }), f.region_id, set('region_id')),
+    onlyChip('scenario', t('table.filter_scenario', { v: f.scenario ? t(`scenario.${f.scenario}`) : '' }), f.scenario, set('scenario')),
+    onlyChip('overall_status', t('table.filter_status', { v: f.overall_status ? t(`status.${f.overall_status}`) : '' }), f.overall_status, set('overall_status')),
+    onlyChip('coordinates', t('table.filter_coords'), coordinates, (v) => setParams({ coordinates: v })),
+    onlyChip('dashboard_status', t('table.filter_dash_status', { v: dashStatus ? t(`status.${dashStatus}`) : '' }), dashStatus, (v) => setParams({ dashboard_status: v, ref_date: v ? refDate : reached ? refDate : '' })),
+    onlyChip('milestone_reached', t('table.filter_reached', { v: stageName(reached) }), reached, (v) => setParams({ milestone_reached: v, ref_date: v ? refDate : dashStatus ? refDate : '' })),
+    onlyChip('ref_date', t('table.filter_ref_date', { v: refDate }), refDate, (v) => setParams({ ref_date: v })),
+    onlyChip('cluster_code', t('table.filter_cluster', { v: cluster }), cluster, (v) => setParams({ cluster_code: v })),
+    ...[
+      { key: 'mine', label: t('table.mine'), group: 'work', kind: 'bool', value: bucket === 'mine' ? '1' : '', set: (v: string) => setParams({ bucket: v ? 'mine' : bucket === 'mine' ? '' : bucket, sel: '' }) } as ExtraField,
+      { key: 'late', label: t('table.late'), group: 'work', kind: 'bool', value: bucket === 'late' ? '1' : '', set: (v: string) => setParams({ bucket: v ? 'late' : bucket === 'late' ? '' : bucket, sel: '' }) } as ExtraField,
+      { key: 'stage_code', label: t('sites.current_stage'), group: 'work', kind: 'enum', options: stageOptions.map((x) => ({ value: x, label: stageName(x) })), value: f.stage_code, set: (v: string) => setParams({ stage_code: v, sel: '' }) } as ExtraField,
+      { key: 'workflow_locks', label: t('locks.filter'), group: 'work', kind: 'enum', options: [{ value: 'locked', label: t('locks.filter_locked') }, { value: 'open', label: t('locks.filter_open') }], value: locks, set: (v: string) => setParams({ workflow_locks: v, sel: '' }) } as ExtraField,
+      { key: 'data_gaps', label: t('locks.quick_gaps'), group: 'work', kind: 'bool', value: gaps, set: (v: string) => setParams({ data_gaps: v ? 'with' : '', sel: '' }) } as ExtraField,
+    ],
+    { key: 'site_codes', label: t('filters.site_ids'), group: 'work', kind: 'list', value: siteCodes || sp.get('site_code') || '', set: (v: string) => setParams({ site_codes: v, site_code: '', sel: '' }) },
   ];
+  const filterScreen = menuList || asWide ? `site360-${menuKey}` : real ? 'sites-stream' : 'sites';
 
   // The text each cell shows, for sizing the columns to their content (null = not measurable: the pipeline rail keeps its default width).
   const fitText = (id: string, s: SiteListItem): FitSample | null => {
@@ -301,20 +299,11 @@ export function Sites() {
         </span>)}</>} />
       <Toolbar activeFilters={activeFilters} activeLabel={t('states.filters')}
         filters={<>
-        <SavedViews screen={real ? 'sites-stream' : 'sites'} value={{ ...f, bucket, ...(advTree ? { advanced: advTree } : {}) }} empty={VIEW_EMPTY} table={tbl}
-          onApply={(v) => setParams({ ...Object.fromEntries(Object.keys(VIEW_EMPTY).map((k) => [k, String((v as Record<string, unknown>)[k] ?? '')])), adv: encodeFilter((v as { advanced?: FilterTree }).advanced), sel: '' })} />
-        <FilterBuilder screen={real ? 'sites-stream' : 'sites'} value={advTree} onChange={(tree) => setParams({ adv: encodeFilter(tree), sel: '' })} />
+        {/* `site360-<menu>` has no saved views (contract 0.15.45): in a sub-menu a view keeps the simple filters and the columns of the Site Master list; the Master-column tree is not stored */}
+        <SavedViews screen={real ? 'sites-stream' : 'sites'} value={{ ...f, bucket, ...(advTree && !menuList ? { advanced: advTree } : {}) }} empty={VIEW_EMPTY} table={tbl}
+          onApply={(v) => setParams({ ...Object.fromEntries(Object.keys(VIEW_EMPTY).map((k) => [k, String((v as Record<string, unknown>)[k] ?? '')])), ...(menuList ? {} : { adv: encodeFilter((v as { advanced?: FilterTree }).advanced) }), sel: '' })} />
         <input className="input max-w-64" data-testid="sites-search" placeholder={t('sites.search')} aria-label={t('sites.search')} value={f.q} onChange={(e) => set('q')(e.target.value)} />
-        <Select id="region" value={f.region_id} onChange={set('region_id')} all={t('sites.all_regions')} options={(regions.data ?? []).map((r) => [String(r.id), (i18n.language === 'ar' && r.name_ar) || r.name_en])} />
-        <Select id="scenario" value={f.scenario} onChange={set('scenario')} all={t('sites.all_scenarios')} options={SCENARIOS.map((s) => [s, t(`scenario.${s}`)])} />
-        <Select id="status" value={f.overall_status} onChange={set('overall_status')} all={t('sites.all_statuses')} options={STATUSES.map((s) => [s, t(`status.${s}`)])} />
-        <>
-        <Select id="stage" value={f.stage_code} onChange={set('stage_code')} all={t('sites.all_stages')} options={stageOptions.map((s) => [s, stageName(s)])} />
-        <QuickFilter testid="sites-quick-mine" on={bucket === 'mine'} onClick={() => setParams({ bucket: bucket === 'mine' ? '' : 'mine', sel: '' })}>{t('table.mine')}</QuickFilter>
-        <QuickFilter testid="sites-quick-late" on={bucket === 'late'} onClick={() => setParams({ bucket: bucket === 'late' ? '' : 'late', sel: '' })}>{t('table.late')}</QuickFilter>
-        <Select id="locks" value={locks} onChange={(v) => setParams({ workflow_locks: v, sel: '' })} all={t('locks.filter')} options={[['locked', t('locks.filter_locked')], ['open', t('locks.filter_open')]]} />
-        <QuickFilter testid="sites-quick-gaps" on={!!gaps} onClick={() => setParams({ data_gaps: gaps ? '' : 'with', sel: '' })}>{t('locks.quick_gaps')}</QuickFilter>
-        </>
+        <UnifiedFilter screen={filterScreen} value={advTree} onChange={(tree) => setParams({ adv: encodeFilter(tree), sel: '' })} extras={extras} onClearAll={clearAll} />
         {real && (
           <label className="flex items-center gap-2 text-sm" title={t('sites.na_hint')}>
             <input type="checkbox" data-testid="sites-show-na" checked={showNa} onChange={(e) => setShowNa(e.target.checked)} />
@@ -341,7 +330,6 @@ export function Sites() {
           { id: 'reset', label: t('table.reset'), icon: <RotateCcw size={16} />, testid: 'sites-reset-cols', onSelect: tbl.reset },
         ]} />
         </>} />
-      <ActiveChips chips={chips} onClear={clearAll} />
       {dismantle ? (
         <Navigate to="/registers/dismantle" replace />
       ) : asBoard ? (
@@ -350,7 +338,7 @@ export function Sites() {
           query={{ q: f.q || undefined, region_id: f.region_id || undefined, scenario: f.scenario || undefined, overall_status: f.overall_status || undefined, ...extra }} />
       ) : asMap ? (
         // SC-10: the same map as the dashboard; a stream sub-menu shows the sites whose current stream it is
-        <SiteMap testid="sites-map" height={560} outer={{ region_id: f.region_id, scenario: f.scenario, ...(real ? { stream } : {}) }} />
+        <SiteMap testid="sites-map" height={560} outer={{ region_id: f.region_id, scenario: f.scenario, ...(real ? { stream } : {}), ...(adv ? { filter: adv } : {}) }} />
       ) : menu && layout === 'grid' ? (
         <div className="space-y-2">
           <div className="flex flex-wrap items-start gap-2">
