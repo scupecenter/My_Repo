@@ -158,11 +158,11 @@ export class Site360Service {
     const cells = new Map<string, Record<string, EditCell>>();
     if (page.length) {
       const tasks = await this.db.tx.$queryRaw<
-        { site_id: string; ord: number; task_id: string; version: number; state: string; locked: boolean; field_key: string; n: number }[]
+        { site_id: string; ord: number; task_id: string; version: number; state: string; locked: boolean; field_key: string; field_type: string; options: unknown; list_catalogue: string | null; n: number }[]
       >(Prisma.sql`
-        SELECT x.site_id, x.ord, x.task_id, x.version, x.state, x.locked, x.field_key, x.n FROM (
+        SELECT x.site_id, x.ord, x.task_id, x.version, x.state, x.locked, x.field_key, x.field_type, x.options, x.list_catalogue, x.n FROM (
           SELECT ti.site_id::text AS site_id, mc.ord, ti.id::text AS task_id, ti.version, ti.state::text AS state,
-                 (ti.lock_reason IS NOT NULL OR ti.is_na) AS locked, tf.field_key,
+                 (ti.lock_reason IS NOT NULL OR ti.is_na) AS locked, tf.field_key, tf.field_type, tf.options, tf.list_catalogue,
                  count(*) OVER (PARTITION BY ti.site_id, mc.ord) AS n
           FROM task_instances ti
           JOIN sites s ON s.id = ti.site_id
@@ -173,10 +173,20 @@ export class Site360Service {
           JOIN master_columns mc ON mc.letter = tf.master_col
           WHERE s.id = ANY(${page.map((r) => r.id)}::uuid[]) AND mc.ord = ANY(${menuOrds}::int[])
         ) x WHERE x.n = 1`);
+      // the dropdown values of the list fields that read a list catalogue (active values, in list order), one query for the page
+      const catalogues = [...new Set(tasks.filter((t) => t.list_catalogue).map((t) => t.list_catalogue!))];
+      const listValues = new Map<string, CellOption[]>();
+      if (catalogues.length) {
+        const lv = await this.db.tx.$queryRaw<{ catalogue_code: string; code: string; label_en: string; label_ar: string | null }[]>(Prisma.sql`
+          SELECT catalogue_code, code, label_en, label_ar FROM list_values
+          WHERE catalogue_code = ANY(${catalogues}::text[]) AND is_active ORDER BY catalogue_code, sort_order, label_en`);
+        for (const r of lv) listValues.set(r.catalogue_code, [...(listValues.get(r.catalogue_code) ?? []), { value: r.code, label_en: r.label_en, label_ar: r.label_ar }]);
+      }
       for (const t of tasks) {
         const editable = !t.locked && EDITABLE_STATES.has(t.state);
         const field = t.field_key.startsWith('v:') ? { values: t.field_key.slice(2) } : { field: t.field_key };
-        const cell: EditCell = { task_id: t.task_id, version: t.version, editable, ...field };
+        const typed = cellInput(t.field_key, t.field_type, t.options, t.list_catalogue ? listValues.get(t.list_catalogue) : undefined);
+        const cell: EditCell = { task_id: t.task_id, version: t.version, editable, ...field, ...typed };
         const byOrd = cells.get(t.site_id) ?? {};
         byOrd[String(t.ord)] = cell;
         cells.set(t.site_id, byOrd);
@@ -333,6 +343,29 @@ interface EditCell {
   editable: boolean;
   field?: string;
   values?: string;
+  /** 0.15.48: the kind of editor of the field (the template field's own type); `list` carries its `options`. */
+  input_type: CellInputType;
+  options?: CellOption[];
+}
+
+export type CellInputType = 'date' | 'number' | 'list' | 'text' | 'boolean';
+export interface CellOption { value: string; label_en: string; label_ar: string | null }
+
+/**
+ * The editor kind of a task-backed cell (0.15.48). The three task date keys are always dates; the other kinds follow the template field type
+ * (yes_no is a boolean). A list takes its options from its catalogue (active values) or from the field's own options; a list with no option
+ * degrades to text, so a cell is never left without an editor.
+ */
+export function cellInput(fieldKey: string, fieldType: string, options: unknown, catalogue: CellOption[] | undefined): { input_type: CellInputType; options?: CellOption[] } {
+  if (['planned_date', 'actual_date', 'actual_start'].includes(fieldKey) || fieldType === 'date') return { input_type: 'date' };
+  if (fieldType === 'number') return { input_type: 'number' };
+  if (fieldType === 'yes_no') return { input_type: 'boolean' };
+  if (fieldType === 'list') {
+    const own = Array.isArray(options) ? options.filter((o): o is string => typeof o === 'string').map((o) => ({ value: o, label_en: o, label_ar: null })) : [];
+    const list = catalogue?.length ? catalogue : own;
+    if (list.length) return { input_type: 'list', options: list };
+  }
+  return { input_type: 'text' };
 }
 
 const SITE360_MENU_KEYS = ['master', 'design_acq', 'sow', 'cw', 'te', 'hoto', 'dismantle', 'om'] as const;
@@ -353,7 +386,7 @@ export interface Site360RowsDto {
   filtered: number;
   offset: number;
   limit: number;
-  rows: { site_id: string; site_code: string; row_no: number; values: Record<string, string | null> }[];
+  rows: { site_id: string; site_code: string; row_no: number; values: Record<string, string | null>; cells: Record<string, EditCell> }[];
 }
 
 function oneString(q: Record<string, unknown>, key: string): string | undefined {

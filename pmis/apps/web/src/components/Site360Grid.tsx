@@ -21,6 +21,9 @@ export interface Site360CellTarget {
   editable: boolean;
   field?: "planned_date" | "actual_date" | "actual_start";
   values?: string;
+  /** 0.15.48: the kind of editor and, for a list, its options (a mock or an older answer may omit them: the editor then falls back to a date or text). */
+  input_type?: "date" | "number" | "list" | "text" | "boolean";
+  options?: { value: string; label_en: string; label_ar: string | null }[];
 }
 
 /** A value typed into a cell: the target and the new value (an empty text clears the value). */

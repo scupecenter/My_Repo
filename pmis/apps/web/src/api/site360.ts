@@ -94,7 +94,7 @@ export const useSite360RowsPaged = (menu: string | undefined, query: Omit<Site36
 export const useSaveSite360Cell = (menu: string | undefined, query: Omit<Site360RowsQuery, 'offset'>) => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (v: { task_id: string; version: number; field?: 'planned_date' | 'actual_date' | 'actual_start'; values?: string; value: string }) => {
+    mutationFn: (v: { task_id: string; version: number; field?: 'planned_date' | 'actual_date' | 'actual_start'; values?: string; value: string | number | boolean }) => {
       const body = v.field
         ? { [v.field]: v.value === '' ? null : v.value }
         : { values: { [v.values ?? '']: v.value === '' ? null : v.value } };

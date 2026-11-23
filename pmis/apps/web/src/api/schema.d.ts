@@ -9236,6 +9236,17 @@ export interface components {
                         field?: "planned_date" | "actual_date" | "actual_start";
                         /** @description The key of the task values map (a typed field). */
                         values?: string;
+                        /**
+                         * @description 0.15.48. The kind of editor: date (a date key, or a date field), number, list (see `options`), boolean (a yes or no field) or text.
+                         * @enum {string}
+                         */
+                        input_type: "date" | "number" | "list" | "text" | "boolean";
+                        /** @description 0.15.48. Only for `input_type` list: the values to choose from, active ones in list order. The value to send is `value`. */
+                        options?: {
+                            value: string;
+                            label_en: string;
+                            label_ar: string | null;
+                        }[];
                     };
                 };
             }[];
