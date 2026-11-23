@@ -15,6 +15,7 @@
 #      and a tar of the documents directory (STORAGE_DIR, default /var/lib/gsdn-pmis/files), verified with tar -t;
 #   4. runs reset-project-data.sql in ONE transaction (deletes, keep checks, ends every session, one audit row on the hash chain);
 #   5. moves (never deletes) the stored files of the deleted rows to <STORAGE_DIR>-pre-reset-<timestamp> on the same filesystem;
+#      as the owner of the store (runuser), refusing symbolic links, ".." and paths that leave the store (reset-project-data-quarantine.sh);
 #   6. starts the API and prints the summary, the restore commands and how to delete the quarantine later.
 #
 # Environment overrides (tests and non-standard installations): CONF_DIR (default /etc/gsdn-pmis), BACKUP_DIR (default /var/backups/gsdn-pmis),
@@ -26,7 +27,8 @@ BACKUP_DIR=${BACKUP_DIR:-/var/backups/gsdn-pmis}
 SERVICE=${SERVICE:-gsdn-pmis-api}
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 SQL_FILE=$HERE/reset-project-data.sql
-KEY_RE='^[a-z0-9]+(/[a-z0-9-]+)+$'   # the storage key format of the API (apps/api/src/documents/storage.service.ts)
+# shellcheck source=SCRIPTDIR/reset-project-data-quarantine.sh
+. "$HERE/reset-project-data-quarantine.sh"   # quarantine_files: the symlink-safe move, run as the owner of the store
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 usage() {
@@ -125,13 +127,23 @@ fi
 [[ $EUID -eq 0 ]] || die "--execute runs as root only (it stops the service and writes the backups)."
 if ! command -v pg_dump >/dev/null || ! command -v pg_restore >/dev/null; then die "pg_dump and pg_restore are needed (postgresql-client-16)."; fi
 [[ -d $STORAGE_DIR ]] || die "The documents directory $STORAGE_DIR does not exist."
+# The quarantine is made as root next to the store and the files are moved by the store's owner: refuse anything a non-root user could redirect.
+STORE_PARENT=$(dirname "$STORAGE_DIR")
+[[ ! -L $STORAGE_DIR ]] || die "$STORAGE_DIR is a symbolic link. Set STORAGE_DIR to the real directory. Nothing was changed."
+[[ ! -L $STORE_PARENT ]] || die "$STORE_PARENT (the parent of the store and of the quarantine) is a symbolic link. Nothing was changed."
+[[ $(realpath -e -- "$STORAGE_DIR") == "$STORAGE_DIR" ]] || die "$STORAGE_DIR goes through a symbolic link ($(realpath -e -- "$STORAGE_DIR")). Nothing was changed."
+read -r P_UID P_MODE < <(stat -c '%u %a' "$STORE_PARENT")
+[[ $P_UID == 0 && $(( 8#$P_MODE & 8#022 )) == 0 ]] \
+  || die "$STORE_PARENT must be owned by root and not writable by group or others (it is uid $P_UID, mode $P_MODE). Nothing was changed."
+STORE_OWNER=$(stat -c %U "$STORAGE_DIR"); STORE_GROUP=$(stat -c %G "$STORAGE_DIR")
+command -v runuser >/dev/null || die "runuser is needed (util-linux): the files are moved as $STORE_OWNER, never as root."
 
 TS=$(date +%Y%m%d-%H%M%S)
 QUARANTINE=$STORAGE_DIR-pre-reset-$TS
 DUMP=$BACKUP_DIR/pre-reset-$TS.dump
 TAR=$BACKUP_DIR/pre-reset-$TS-files.tar
 LOG=$BACKUP_DIR/pre-reset-$TS.log
-[[ ! -e $QUARANTINE ]] || die "$QUARANTINE already exists."
+[[ ! -e $QUARANTINE && ! -L $QUARANTINE && ! -e $QUARANTINE.manifest && ! -L $QUARANTINE.manifest ]] || die "$QUARANTINE already exists."
 [[ $(stat -c %d "$STORAGE_DIR") == $(stat -c %d "$(dirname "$STORAGE_DIR")") ]] \
   || die "$STORAGE_DIR is a mount point: the quarantine $QUARANTINE would be on another filesystem (a copy, not a rename). Stop."
 
@@ -186,21 +198,13 @@ cp "$WORK/reset.txt" "$LOG"; chmod 600 "$LOG"
 IFS='|' read -r _ AUDIT_ID SESSIONS NFILES < <(grep '^DONE|' "$WORK/reset.txt")
 
 echo "Moving the files of the deleted rows to $QUARANTINE"
-install -d -m 700 "$QUARANTINE"
-chown --reference="$STORAGE_DIR" "$QUARANTINE"
-MOVED=0 MISSING=0 BAD=0
-: > "$QUARANTINE.manifest"; chmod 600 "$QUARANTINE.manifest"
-while IFS= read -r KEY; do
-  if [[ ! $KEY =~ $KEY_RE || $KEY == *..* ]]; then BAD=$((BAD + 1)); echo "SKIPPED (not a storage key) $KEY" >> "$QUARANTINE.manifest"; continue; fi
-  if [[ -e $STORAGE_DIR/$KEY ]]; then
-    mkdir -p "$QUARANTINE/$(dirname "$KEY")"
-    mv -n "$STORAGE_DIR/$KEY" "$QUARANTINE/$KEY"
-    MOVED=$((MOVED + 1)); echo "MOVED $KEY" >> "$QUARANTINE.manifest"
-  else
-    MISSING=$((MISSING + 1)); echo "MISSING $KEY" >> "$QUARANTINE.manifest"
-  fi
-done < <(sed -n 's/^FILE|//p' "$WORK/reset.txt")
-chown -R --reference="$STORAGE_DIR" "$QUARANTINE"
+mkdir -m 700 -- "$QUARANTINE" || die "Cannot create $QUARANTINE. The reset is done; move the files listed in $LOG (FILE lines) by hand."
+chown -- "$STORE_OWNER:$STORE_GROUP" "$QUARANTINE"
+[[ -d $QUARANTINE && ! -L $QUARANTINE ]] || die "$QUARANTINE is not a plain directory. The reset is done; no file was moved."
+( umask 077; : > "$QUARANTINE.manifest" )
+sed -n 's/^FILE|//p' "$WORK/reset.txt" > "$WORK/keys.txt"
+read -r MOVED MISSING BAD < <(QUAR_AS=$STORE_OWNER quarantine_files "$STORAGE_DIR" "$QUARANTINE" "$WORK/keys.txt" "$QUARANTINE.manifest") \
+  || die "The quarantine move failed. The reset is done; see $QUARANTINE.manifest and the FILE lines of $LOG."
 
 if [[ $STOPPED == 1 ]]; then
   echo "Starting $SERVICE."
@@ -212,7 +216,7 @@ cat <<EOF
 Done. The project data of $DB_NAME is reset.
   Audit row:            id $AUDIT_ID (action project_data_reset), sealed on the Audit Log hash chain
   Sessions ended:       $SESSIONS (everyone signs in again)
-  Files listed:         $NFILES; moved $MOVED, not found on disk $MISSING, skipped $BAD (see $QUARANTINE.manifest)
+  Files listed:         $NFILES; moved $MOVED, not found on disk $MISSING, refused and left in place $BAD (see $QUARANTINE.manifest)
   Database backup:      $DUMP (verified with pg_restore --list)
   Documents backup:     $TAR (verified with tar -t)
   Reset output:         $LOG
