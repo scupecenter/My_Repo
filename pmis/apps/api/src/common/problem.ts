@@ -17,7 +17,7 @@ export type ErrorCode =
   | 'batch_processing' | 'vehicle_already_reserved' | 'upload_processing'
   | 'column_in_use' | 'input_already_mapped' | 'field_already_mapped'
   | 'system_field' | 'conversion_blocked' | 'conversion_unconfirmed' | 'section_not_empty'
-  | 'freeze_active' | 'workflow_invalid' | 'master_impact_unconfirmed' | 'stale_preview' | 'invitation_invalid' | 'register_locked';
+  | 'list_parent_mismatch' | 'freeze_active' | 'workflow_invalid' | 'master_impact_unconfirmed' | 'stale_preview' | 'invitation_invalid' | 'register_locked';
 
 export interface FieldError {
   path: string;
@@ -81,6 +81,7 @@ const TITLES: Record<string, string> = {
   email_not_verified: 'The new email address is not confirmed',
   batch_processing: 'The batch is being processed',
   upload_processing: 'The file is being checked',
+  list_parent_mismatch: 'The value does not belong to the parent value',
   freeze_active: 'Structural changes are frozen',
   workflow_invalid: 'The workflow version cannot be published',
   master_impact_unconfirmed: 'Confirm the Master impact to continue',

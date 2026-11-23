@@ -22,7 +22,7 @@ import { OverrideJson, overrideDtos } from '../workflow/override-dto';
  */
 export const TE_PAC_STAGE_CODE = 'MS7';
 const SORTS = ['site_code', '-site_code', 'region', '-region', 'stage', '-stage', 'due_date', '-due_date'] as const;
-const BUCKETS = ['all', 'mine', 'late', 'waiting_approval', 'closed'] as const;
+export const BUCKETS = ['all', 'mine', 'late', 'waiting_approval', 'closed'] as const;
 const SCENARIOS = ['new_build', 'expansion', 'hot_swap', 'cold_swap', 'relocation'];
 /** The ETag of a site: its last change to the millisecond (String(Date) would keep only the second, so two edits in one second shared an ETag). */
 const siteVersion = (v: unknown): number => contentVersion([v instanceof Date ? v.toISOString() : String(v)]);
@@ -154,6 +154,61 @@ const stageAgg = (view?: string): Prisma.Sql => Prisma.sql`
 const stageDone = (r: StageRow): boolean => r.ms_done || (!r.has_ms && Number(r.total) > 0 && Number(r.done) >= Number(r.total));
 const stageNa = (r: StageRow): boolean => (r.has_ms && r.ms_na && !r.ms_done) || (!r.has_ms && Number(r.total) === 0);
 
+/**
+ * The per-site stage summary the stage, mine, late, waiting and closed filters read: `flags` (one row per active stage of a site, with its task counts) and
+ * `ss` (one row per site: the current stage, late and waiting counts, next due date), over a CTE `vis` of sites (columns s.id and s.workflow_version_id).
+ * Shared by GET /sites and GET /site360/{menu}/rows (0.15.50), so the two lists mean the same by "stage", "mine" and "late".
+ */
+export const siteStageCtes = (stream?: string, view?: string): Prisma.Sql => Prisma.sql`flags AS (
+        SELECT s.id AS site_id, st.code, st.seq, a.late, a.waiting, a.next_due,
+          (a.ms_done OR (NOT a.has_ms AND a.total > 0 AND a.done >= a.total)) AS is_done,
+          ((a.has_ms AND a.ms_na AND NOT a.ms_done) OR (NOT a.has_ms AND a.total = 0)) AS is_na
+        FROM vis AS s
+        JOIN stage_definitions st ON st.workflow_id = s.workflow_version_id AND st.is_active ${stream ? Prisma.sql`AND st.stream_code = ${stream}` : Prisma.empty} ${stageInView(view)}
+        ${stageAgg(view)}
+      ), ss AS (
+        SELECT site_id, (array_agg(code ORDER BY seq) FILTER (WHERE NOT is_done AND NOT is_na))[1] AS cur_stage,
+          (array_agg(seq ORDER BY seq) FILTER (WHERE NOT is_done AND NOT is_na))[1] AS cur_seq,
+          sum(late) AS late, sum(waiting) AS waiting, min(next_due) AS next_due,
+          bool_and(is_done OR is_na) AS all_done, bool_or(NOT is_na) AS has_work
+        FROM flags GROUP BY site_id
+      )`;
+
+export interface SiteStageFilter { stageCode?: string; bucket: string; stream?: string; view?: string }
+
+/** The conditions of the stage and bucket filters on `vis` and `ss` (see siteStageCtes); empty when neither filter is set. `mine` is the caller's own open work. */
+export function siteStageConds(userId: string, f: SiteStageFilter): Prisma.Sql[] {
+  const { stageCode, bucket, stream, view } = f;
+  const out: Prisma.Sql[] = [];
+  if (stageCode) out.push(Prisma.sql`ss.cur_stage = ${stageCode}`);
+  if (bucket === 'late') out.push(Prisma.sql`coalesce(ss.late, 0) > 0`);
+  else if (bucket === 'waiting_approval') out.push(Prisma.sql`coalesce(ss.waiting, 0) > 0`);
+  else if (bucket === 'closed') out.push(Prisma.sql`(vis.overall_status = 'completed' OR (coalesce(ss.all_done, false) AND coalesce(ss.has_work, false)))`);
+  else if (bucket === 'mine') {
+    out.push(Prisma.sql`EXISTS (SELECT 1 FROM task_instances tt JOIN task_definitions tdd ON tdd.id = tt.task_def_id JOIN stage_definitions stt ON stt.id = tdd.stage_id
+      WHERE tt.site_id = vis.id AND tt.state IN ('open', 'entry', 'in_review', 'in_approval') ${stream ? Prisma.sql`AND stt.stream_code = ${stream}` : Prisma.empty} ${inView(view, 'tdd.id')}
+      AND (tt.ball_in_court_user_id = ${userId}::uuid OR wf_is_eligible(tt.id,
+            wf_kind(CASE WHEN tt.path_frozen_at IS NULL THEN wf_levels_live(tt.id) ELSE tt.levels_required END, greatest(tt.current_level, 1)), ${userId}::uuid)))`);
+  }
+  return out;
+}
+
+/** `SELECT vis.id ...` of the sites that pass the stage and bucket filters over every active site, to use as `s.id IN (...)` in another list; null when no filter is set. */
+export function siteStageIds(userId: string, f: SiteStageFilter): Prisma.Sql | null {
+  const conds = siteStageConds(userId, f);
+  if (!conds.length) return null;
+  return Prisma.sql`WITH vis AS (SELECT * FROM sites WHERE is_active), ${siteStageCtes(f.stream, f.view)}
+    SELECT vis.id FROM vis LEFT JOIN ss ON ss.site_id = vis.id WHERE ${Prisma.join(conds, ' AND ')}`;
+}
+
+/** The workflow locks (`locked`, `open`) and data gaps (`with`, `without`) filters on a sites row aliased `s`; shared by GET /sites and GET /site360/{menu}/rows (0.15.50). */
+export function siteLocksGapsConds(locks?: string, gaps?: string): Prisma.Sql[] {
+  const out: Prisma.Sql[] = [];
+  if (locks) out.push(Prisma.sql`s.workflow_locks = ${locks === 'locked'}`);
+  if (gaps) out.push(gaps === 'with' ? Prisma.sql`site_data_gap_count(s.id) > 0` : Prisma.sql`site_data_gap_count(s.id) = 0`);
+  return out;
+}
+
 @Injectable()
 export class SitesService {
   constructor(
@@ -226,18 +281,9 @@ export class SitesService {
     if (drill) where.push(Prisma.sql`s.id = ANY(${drill}::uuid[])`);
 
     const post: Prisma.Sql[] = [];
-    if (stageCode) post.push(Prisma.sql`ss.cur_stage = ${stageCode}`);
+    post.push(...siteStageConds(auth.user.id, { stageCode, bucket, stream, view }));
     // with a dashboard filter the stream and the view keep the sites by the dashboard's rule (dash_drill_sites), not by the list's own
     if ((stream || view) && !drill) post.push(Prisma.sql`coalesce(ss.has_work, false)`);
-    if (bucket === 'late') post.push(Prisma.sql`coalesce(ss.late, 0) > 0`);
-    else if (bucket === 'waiting_approval') post.push(Prisma.sql`coalesce(ss.waiting, 0) > 0`);
-    else if (bucket === 'closed') post.push(Prisma.sql`(vis.overall_status = 'completed' OR (coalesce(ss.all_done, false) AND coalesce(ss.has_work, false)))`);
-    else if (bucket === 'mine') {
-      post.push(Prisma.sql`EXISTS (SELECT 1 FROM task_instances tt JOIN task_definitions tdd ON tdd.id = tt.task_def_id JOIN stage_definitions stt ON stt.id = tdd.stage_id
-        WHERE tt.site_id = vis.id AND tt.state IN ('open', 'entry', 'in_review', 'in_approval') ${stream ? Prisma.sql`AND stt.stream_code = ${stream}` : Prisma.empty} ${inView(view, 'tdd.id')}
-        AND (tt.ball_in_court_user_id = ${auth.user.id}::uuid OR wf_is_eligible(tt.id,
-              wf_kind(CASE WHEN tt.path_frozen_at IS NULL THEN wf_levels_live(tt.id) ELSE tt.levels_required END, greatest(tt.current_level, 1)), ${auth.user.id}::uuid)))`);
-    }
 
     const dir = sort.startsWith('-') ? Prisma.sql`DESC` : Prisma.sql`ASC`;
     const key = sort.replace(/^-/, '');
@@ -252,20 +298,7 @@ export class SitesService {
         SELECT s.*, c.cluster_code AS cluster_code_v, wd.version AS wf_version
         FROM sites s JOIN workflow_definitions wd ON wd.id = s.workflow_version_id LEFT JOIN clusters c ON c.id = s.cluster_id
         WHERE ${Prisma.join(where, ' AND ')}
-      ), flags AS (
-        SELECT s.id AS site_id, st.code, st.seq, a.late, a.waiting, a.next_due,
-          (a.ms_done OR (NOT a.has_ms AND a.total > 0 AND a.done >= a.total)) AS is_done,
-          ((a.has_ms AND a.ms_na AND NOT a.ms_done) OR (NOT a.has_ms AND a.total = 0)) AS is_na
-        FROM vis AS s
-        JOIN stage_definitions st ON st.workflow_id = s.workflow_version_id AND st.is_active ${stream ? Prisma.sql`AND st.stream_code = ${stream}` : Prisma.empty} ${stageInView(view)}
-        ${stageAgg(view)}
-      ), ss AS (
-        SELECT site_id, (array_agg(code ORDER BY seq) FILTER (WHERE NOT is_done AND NOT is_na))[1] AS cur_stage,
-          (array_agg(seq ORDER BY seq) FILTER (WHERE NOT is_done AND NOT is_na))[1] AS cur_seq,
-          sum(late) AS late, sum(waiting) AS waiting, min(next_due) AS next_due,
-          bool_and(is_done OR is_na) AS all_done, bool_or(NOT is_na) AS has_work
-        FROM flags GROUP BY site_id
-      )
+      ), ${siteStageCtes(stream, view)}
       SELECT vis.id::text AS id, vis.site_code, vis.name, vis.name_ar, vis.region_id, vis.cluster_code_v AS cluster_code, vis.delivery_scenario::text AS delivery_scenario,
         vis.overall_status::text AS overall_status, vis.current_milestone AS current_milestone_col, vis.next_milestone AS next_milestone_col,
         vis.wf_version AS workflow_version, vis.workflow_version_id::text AS workflow_id, vis.workflow_locks, count(*) OVER () AS total
@@ -361,8 +394,7 @@ export class SitesService {
     if (cluster) where.push(Prisma.sql`c.cluster_code = ${cluster}`);
     if (batch) where.push(Prisma.sql`s.delivery_batch = ${batch}`);
     if (wfv) where.push(Prisma.sql`wd.version = ${Number(wfv)}`);
-    if (locks) where.push(Prisma.sql`s.workflow_locks = ${locks === 'locked'}`);
-    if (gaps) where.push(gaps === 'with' ? Prisma.sql`site_data_gap_count(s.id) > 0` : Prisma.sql`site_data_gap_count(s.id) = 0`);
+    where.push(...siteLocksGapsConds(locks, gaps));
     // 0.14.5: the sites the dashboard map cannot draw (no valid coordinates, OV-12; not cancelled, the map's count), and the others
     if (coords === 'missing') where.push(Prisma.sql`NOT coalesce(${HAS_COORDINATES}, false) AND s.overall_status <> 'cancelled'`);
     else if (coords === 'valid') where.push(Prisma.sql`coalesce(${HAS_COORDINATES}, false)`);

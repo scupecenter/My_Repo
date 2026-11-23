@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.46
+  version: 0.15.53
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -30,7 +30,13 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
-    - 0.15.46 (2026-11-22): the Master import reads "Pending" and "N/A" as the owner means them, skips placeholder rows, routes the GECOL requests of PR-PO to GECOL, derives an empty Order Status and selects the one candidate with a contract sign-off (owner decisions 2026-11-22; migration 0136, mirror `db/sql/135_master_import_na_routing.sql`; CHANGELOG 182). Additive, Master paths only (the Master import and comparison, and the TPL-MASTER upload; manual entry and the other templates are unchanged). (1) `Override.kind` `master_na` (entity `task`): a task whose actual date column holds N/A in the Master file is N/A when its batch is sent, an admin override made by a rule (no `acted_by`), revertible through `POST /overrides/{override_id}/revert` (System Admin, reason, step-up) and never applied again once reverted; never a milestone, a task with a date, a person's step, a register record in review, approved, or held by a gate; and only when the uploader holds the rights of an entry of that task, at the staging and again at the send (the import and edit regions of the task and its entry level L1, or a System Admin when the level has no holder). (2) `ImportBatch.import_notes` (`ImportNote[]`, counts only, never a value): `pending_as_empty`, `na_as_empty`, `na_task_requested`, `na_task_not_applicable`, `na_task_marked`, `na_task_not_marked`, `placeholder_rows_skipped`, `routed_to_gecol`, `routed_from_procurement`, `order_status_derived`, `order_status_not_derived`, `selected_set_by_import`, `selected_not_set`; the same list rides on `MasterImportOutcome.batches[].import_notes`, and `MasterImportOutcome.register_notes` carries the register ones with the sheet. Batch rows carry the matching warnings (`master_na_requested`, `master_na_not_applicable`, `master_na_ignored`, `master_na_marked`, `master_na_not_marked`, `routed_from_procurement`, `order_status_derived`, `selected_set_by_import`) and a conflicting GECOL request the error `gecol_one_per_site`. A register sheet of placeholders only is in `skipped` with reason `no_rows`.
+    - 0.15.53 (2026-11-23): the Master import reads "Pending" and "N/A" as the owner means them, skips placeholder rows, routes the GECOL requests of PR-PO to GECOL, derives an empty Order Status and selects the one candidate with a contract sign-off (owner decisions 2026-11-22 and 2026-11-23; migration 0139, mirror `db/sql/138_master_import_na_routing.sql`; CHANGELOG 189). Additive, Master paths only (the Master import and comparison, and the TPL-MASTER upload; manual entry and the other templates are unchanged). (1) `Override.kind` `master_na` (entity `task`): a task whose actual date column holds N/A in the Master file is N/A when its batch is sent, an admin override made by a rule (no `acted_by`), revertible through `POST /overrides/{override_id}/revert` (System Admin, reason, step-up) and never applied again once reverted; never a milestone, a task with a date, a person's step, a register record in review, approved, or held by a gate; and only when the uploader holds the rights of an entry of that task, at the staging and again at the send (the import and edit regions of the task and its entry level L1, or a System Admin when the level has no holder). (2) `ImportBatch.import_notes` (`ImportNote[]`, counts only, never a value): `pending_as_empty`, `na_as_empty`, `na_task_requested`, `na_task_not_applicable`, `na_task_marked`, `na_task_not_marked`, `placeholder_rows_skipped`, `routed_to_gecol`, `routed_from_procurement`, `order_status_derived`, `order_status_not_derived`, `selected_set_by_import`, `selection_date_from_contract`, `selected_not_set`; the same list rides on `MasterImportOutcome.batches[].import_notes`, and `MasterImportOutcome.register_notes` carries the register ones with the sheet. Batch rows carry the matching warnings (`master_na_requested`, `master_na_not_applicable`, `master_na_ignored`, `master_na_marked`, `master_na_not_marked`, `routed_from_procurement`, `order_status_derived`, `selected_set_by_import`, `selection_date_from_contract`) and a conflicting GECOL request the error `gecol_one_per_site`. A register sheet of placeholders only is in `skipped` with reason `no_rows`. (3) An empty Order Status of a PR-PO row becomes `Active` (`Completed` only when the row holds a delivery / completion date, a field PR-PO does not have today; values in the setting `imports.master_order_status_derived`, changed by definer code only), and a candidate selected by the import with an empty Selection Date takes its Contract Sign-off Date (warning `selection_date_from_contract`) (owner decisions 2026-11-23).
+    - 0.15.52 (2026-11-23): Site RFI the site moved past is approved automatically, on any site (owner decision 2026-11-22; migration 0136, mirror `db/sql/135_moved_past_site_rfi.sql`; CHANGELOG 179; 0.15.45 and 0.15.53 are reserved by other branches). Additive, no new path or field. A manual milestone (`calc.milestone_manual`, Site RFI MS4) that is open, in entry or locked but ready, that nothing waits for (its gate open, its predecessors done), that the site moved past (a later task approved with an actual date), that no person touched (no submit, review, approve, reject, reopen or reassign step, no date typed, no date override) and that was never reverted, is approved directly with its pre-filled date; with no pre-filled date, with the date of the earliest later task approved, flagged inferred. It is an admin override made by a rule of GSDN Workspace: `TaskDetail.overrides` lists an `Override` of the new `kind` `manual_ms_moved_past` (`entity` `task`, `before` `{state, actual_date, prefilled_date}`, `after` `{state: approved, actual_date, date_source: prefilled|inferred, note, evidence_task, evidence_date}`, no `acted_by`), revertible through `POST /overrides/{override_id}/revert` (System Admin, reason, step-up), which reopens the milestone at L1 with its pre-filled date; a milestone reverted under this kind or `historical_manual_ms_approved` is never approved again by either rule. It runs in the calculation path before the gate and D8 rules of 0.15.44 (Site RFI, then the gate, then TE Completion, D8 and On-Air follow) and once on the existing sites; the rules now stand aside only while a Master import apply runs.
+    - 0.15.51 (2026-11-23): dependent lists are enforced on save (owner request 2026-11-23; CHANGELOG 187). Additive, no migration. `PATCH /tasks/{task_id}` answers 422 with the new error code `list_parent_mismatch` when a list field whose list has a parent list gets a value whose parent value differs from the parent value the site holds (the list field of the parent list, in this task or in another task of the site); `errors[0].path` is `/values/<key>` and the problem carries `field`, `list`, `parent_list` and `expected_parent`. While the parent value is empty, or for a value with no parent or one outside the list, or when a value is cleared (null), the save is accepted as before. A refusal saves nothing. The bulk edit uses the same path, so it is refused the same way; it can now also clear a value (`null`) in the client.
+    - 0.15.50 (2026-11-22): the Site Master wide table is complete: the list filters in `GET /site360/{menu}/rows`, dependent lists, and bulk edit on the existing save path (owner request 2026-11-22; CHANGELOG 186). Additive, no migration. 0.15.49 is taken by another branch. (1) `GET /site360/{menu}/rows` takes `stage_code`, `bucket` (`all`, `mine`, `late`, `waiting_approval`, `closed`), `workflow_locks` (`locked`, `open`) and `data_gaps` (`with`, `without`) with the same meaning as `GET /sites`, computed by the same SQL (`sites.service`: the current stage of the site, the caller's own open work for `mine`, an overdue open task for `late`, the workflow locks flag, the missing required values), so the Site Master list and the wide table count the same sites; they combine with the filters already accepted (`site_code`, `region_id`, `sub_region`, `phase`, `batch`, `scenario`, `delivery_model`, `status`, `milestone`, `contractor`, `filter`). An unknown value is 422 `validation_failed`. (2) Dependent lists: for a list cell whose list has a parent list, each `options[]` entry carries `parent` (the code of its parent value) and the cell carries `parent_ord` (the Master column, of the same site and menu, that holds the parent value); the client offers only the options whose `parent` equals the value of that column in the same row. A cell with no `parent_ord` (the parent list is not in the menu) offers every option. Since 0.15.51 the server also refuses a non-matching child on save (422 `list_parent_mismatch`). (3) Bulk edit has no new path: the client saves each eligible cell with `PATCH /tasks/{task_id}` and `If-Match` (the same rights, locks, gate rules and errors as one inline edit), a few at a time, and shows saved, skipped and failed with the reasons.
+    - 0.15.49 (2026-11-22): saved views for the screens `site360-<menu>` and `dashboard`, and a server-side search of the value lists that were cut at 500 (owner request 2026-11-22; closes the two open items of CHANGELOG 183; migration 0138, mirror `db/sql/137_saved_views_site360_dashboard.sql`; CHANGELOG 185). Additive. (1) `SavedViewScreenKey` now also accepts `site360-<menu>` (menu: master, design_acq, sow, cw, te, hoto, dismantle, om) and `dashboard` on `GET/POST /saved-views`, `GET /saved-views?screen_key=`, `PATCH`, deactivate, restore, transfer, versions and import: the same rights model as every other list screen (private by default; shared with roles, groups, users, regions or everyone with `views.share`; a region filter of a shared view must lie in the sharer's regions; owner and `views.manage` edit; versioned, audited, deactivated and never deleted). The module of `site360-<menu>` is `sites` and the module of `dashboard` is `dashboard`; a `dashboard` view is opened and saved only with the Site Register right as well (403 `action_forbidden` otherwise, as `GET /saved-views/filter-fields` asks for both rights). A view stores what the screen keeps: the filter tree in `filters.advanced` (a `FilterTree` validated against the catalogue of the screen, 422 for an unknown or hidden field), the quick parameters as keys of `filters` (`site360-<menu>`: `q`, `region_id`, `scenario`, `overall_status`, `site_codes`, and `layout` = `list` or `wide`; `dashboard`: `region_id`, `cluster_code`, `scenario`, `stream`, `view`) and, where the screen has a column control, `columns` (`order`, `hidden`, `width`, `density`) and `sort`. A condition of a stored tree on a Master column `m:<ord>` that the reader may not use (a register the reader may not view, a custom field a field rule hides) is removed from what that reader gets and counted in `stripped_columns`, as the hidden `f:` and `c:` fields already are. (2) New path `GET /saved-views/filter-fields/{field}/values` (`listFilterFieldValues`; query `screen_key`, `q`, `limit`): the values of one `enum` field of the catalogue that match `q` (anywhere in the value or in the label, case-insensitive, no wildcards; empty `q` = the first values), at most `limit` (1 to 500, default 50) with `truncated` when there are more. The same sources, scope and hidden-field rules as `GET /saved-views/filter-fields`: the distinct non-empty values of the rows the caller can see (region scope and row security apply), or the active values of a list catalogue, or the fixed options of the field. It lets the builder reach every value of a field whose `options` came back with `truncated: true`. Needs the view right on the screen's module as the catalogue does (403 `module_forbidden`); 422 `validation_failed` with `unknown_field` for a field outside the catalogue (a hidden field is unknown too), `not_enum` for a field with no value list, `invalid` for a screen with no filter builder or a `q` longer than 100 characters, `out_of_range` for a `limit` outside 1 to 500. No other path or schema changes.
+    - 0.15.48 (2026-11-22): typed inline editors in the Site Master wide table (owner request 2026-11-22; PR 184; CHANGELOG 184). Additive, no migration. Each cell of `GET /site360/{menu}/rows` `cells` (the task-backed, editable targets) gains `input_type` (`date`, `number`, `list`, `text` or `boolean`, the kind of editor of the template field behind the column: a task date key is always `date`, `yes_no` is `boolean`, a `list` with no option degrades to `text`) and, for `list`, `options` (`value`, `label_en`, `label_ar`: the active values of the field's list catalogue in list order, or the field's own options). The save is unchanged: `PATCH /tasks/{task_id}` with If-Match (a number is sent as a JSON number, a boolean as a JSON boolean, a date as `YYYY-MM-DD`), with its 422 errors shown by the client next to the cell. Nothing else changes; the rows endpoint filters are the same.
+    - 0.15.45 (2026-11-22): one unified filter on every list and on the dashboard (owner request 2026-11-22; migration 0137, mirror `db/sql/136_dashboard_site_filter.sql`; CHANGELOG 183). Additive. (1) `GET /saved-views/filter-fields` (`listFilterFields`): a field that holds codes or repeating text is now an `enum` field whose `options` are the DISTINCT non-empty values the caller can see (the caller's region scope and row security apply; a field hidden from the caller is not offered, so its values are not either), at most 500, with `truncated: true` when the data has more (`FilterField.truncated`, present with `options`). On `sites`, `sites-stream`, `dashboard` and `site360-<menu>`: `sub_region`, `cluster_code`, `delivery_batch`, `project_phase`, `cw_delivery_model`, `current_milestone`, `next_milestone`, `site_type`, `site_scenario`, `tower_owner`, `existing_or_new`, `rt_or_gf` and `tower_type` (they were `text`; the operators `contains` and `not_contains` are gone for them, `is`, `is_not`, `in`, `not_in`, `empty`, `not_empty` remain), the six scope flags `scope_tower_erection`, `scope_site_adaption`, `scope_gecol_power`, `scope_hlc_fiber`, `scope_te_full` and `scope_te_ip_router_only` (new, `yes` or `na`) and a site custom field of type list (`c:<code>`, its list values). On `register-<key>`: `record_type` (distinct values of the register's visible records) and every `list` or `list_code` field (the active values of its list catalogue, `label_en` and `label_ar` from the catalogue; without a catalogue the distinct values of the register; a list with a fixed set of options keeps it and keeps refusing a value outside it). A value that is not among the options of such a field is not an error (the data changes): it matches nothing; only the fixed sets (regions, scenarios, statuses, scope flags, the fixed options of a register field) are checked (422 `invalid_value`). Every field gains the optional `group` (`FilterFieldGroup`: `key`, `label_en`, `label_ar`) so the builder can group its one dropdown (sites: Site, Delivery, Tower and RF, Scope, Milestone dates, Custom fields; Master columns by their phase band; register fields by their section). (2) New screen keys for `screen_key`: `site360-<menu>` (`site360-master`, `site360-design_acq`, `site360-sow`, `site360-cw`, `site360-te`, `site360-hoto`, `site360-dismantle`, `site360-om`) and `dashboard`. `dashboard` offers exactly the `sites` fields. `site360-<menu>` offers the `sites` fields and then the Master columns of the menu as `m:<ord>` (the order of the column; label `header`, group the phase band; added S2 columns included), typed as the grid types them: `date`, `number`, `bool` (yes or no), `enum` for a dropdown list column (the values of its list catalogue, or the fixed options of its task input) and `text` otherwise; a column that is already a `sites` field (Site ID, name, region, sub-region, cluster, site type and scenario, tower owner, existing or new, rooftop or greenfield, tower type and height, RF survey and acquisition dates, project phase, delivery batch, the scope flags, CW delivery model, current and next milestone, overall status) is offered once, as the `sites` field, and the columns without a source in the system are left out. A column filled by a site custom field the caller may not see, and a register-owned column of a register the caller may not view, are left out and refused like an unknown field. These two screens have no saved views (the module is `sites`; `dashboard` needs `dashboard.view` and `sites.view`, 403 `module_forbidden` otherwise). `FilterCondition.field` also accepts `m:<ord>` (`^m:[0-9]{1,4}$`). (3) `GET /site360/{menu}/rows`: `filter` is compiled against `site360-<menu>` (a superset of the `sites` whitelist, so every earlier tree still works): a condition on `m:<ord>` reads the value of that Master column (typed: a date is compared as a date, a number as a number) from the set-based view `site360_master_values` through one derived table per column used, joined once (no per-site path), and a value hidden from the caller (a register the caller may not view, a hidden custom field) is empty for the filter, as in the grid. 422 `unknown_field` for a field outside the menu (a Master column of another menu, an unknown or hidden one). (4) The dashboard accepts the same `filter` (a `FilterTree` as JSON, screen `dashboard`): `GET /dashboard`, `GET /dashboard/export` (the CW and TE sheets and the About sheet follow it), `GET /dashboard/extras` (the site-based sections: data quality, swap and relocation, the counters that count sites and the SLA counters; the risk matrix, decisions and the register-based counters have no site filter, as for `cluster_code`), `GET /dashboard/site-map` and `GET /project-status`. It narrows the site set in addition to `region_id`, `cluster_code`, `scenario`, `stream` and `view` and the caller's `dashboard.view` regions (it only narrows), and keeps `ref_date`; a filtered view is not project wide (`meta.project_wide` false, the central Project Status items stay hidden, as for a region or a cluster). The engine receives the matching site ids through the transaction-local setting `pmis.dash_sites` (migration 0137: dash_core keeps only these sites in its facts, as the stream and view rules do). A caller without `sites.view` who sends `filter` gets 403 `module_forbidden`; an unknown or hidden field, a wrong operator or value, too deep or too many conditions is 422 as on any list. `GET /project-status/snapshots` has no `filter` (a snapshot keeps the values frozen at its date).
     - 0.15.44 (2026-11-22): a gate the site moved past is open, and MW alignment is N/A on a site without microwave, on any site (owner decisions 2026-11-22; migration 0134, mirror `db/sql/133_gate_moved_past_no_microwave.sql`; CHANGELOG 178). Additive, no new path or field. (1) A phase gate that holds a task of the site and is blocked by its conditions (not by a Change Control suspension, never while a stop work is in force), when a task it holds or a later one is approved with an actual date, is open as an admin override of the site made by GSDN Workspace: `SiteDetail.admin_edits.items[]` lists an `Override` of the new `kind` `gate_moved_past_open` (`entity` `site`, `before` `{gate, status: blocked, reasons}`, `after` `{gate, status: open, evidence_task, evidence_date}`) and `admin_override_active` is true while it is in force; the permits stay unrecorded; the held tasks open and the milestones are calculated as usual. (2) MW alignment (D8), open or ready, with no date, no measured RSL and no human workflow step, is N/A (`na_reason` `no microwave on site (D6 MW antenna empty)`) when the site's TE installation D6 is approved and its MW antenna is empty (missing, blank, 0, false, `No`, `N/A`, `NA`, `None`, `-`): `TaskDetail.overrides` lists an `Override` of the new `kind` `no_microwave_na` (`entity` `task`, `before` `{state}`, `after` `{state: na, na_reason, d6_mw_antenna}`), `admin_override` true. Both are made by a rule, not a person: `Override.acted_by` is absent for them. `POST /overrides/{override_id}/revert` takes either back (System Admin, never a delegate, a reason, a step-up; 409 `override_not_revertible` once reverted or no longer in force): the gate follows its conditions again; D8 is locked again and opened when its predecessors are done. A reverted one is never applied again. Both apply once to the existing sites (migration backfill) and from now on whenever the calculation of a site runs.
     - 0.15.43 (2026-11-22): Workflow Studio S2, the API to manage the Site Master columns (owner request 2026-11-22, plan `docs/plans/2026-11-22-workflow-studio.md`; migration 0133, mirror `db/sql/132_site360_column_admin.sql`; CHANGELOG 175). Additive. (1) New paths `GET /site360/columns` (`listSite360Columns`: every column with display order, band, group, type, list, source, menus, protection and state, and the bands and groups to choose a place), `POST /site360/columns` (`createSite360Column`: after any column, inside a band and group, with a type, a dropdown list and a source that is a task input or a site custom field; the column takes the next Master order after the 187 and the letter GF, GG, ...), `GET /site360/columns/{ord}` (`getSite360Column`, with `value_count` and `delete_mode`), `PATCH /site360/columns/{ord}` (`updateSite360Column`: rename EN/AR, type, list, band, group, place; `confirm_unconvertible`), `POST /site360/columns/{ord}/type-preview` (`previewSite360ColumnType`: the values that would not convert), `POST /site360/columns/{ord}/deactivate` and `/reactivate` (`deactivateSite360Column`, `reactivateSite360Column`) and `DELETE /site360/columns/{ord}` (`deleteSite360Column`: only an added column that never held a value). (2) Every write: System Admin, or a delegate of `fields` edit for all regions (checked in the database), a reason, a step-up, `If-Match` with the column's `version` (428, 412) and one audit row with before and after (`site360.column_created`, `_updated`, `_deactivated`, `_reactivated`, `_deleted`). The 187 original columns keep their letters, orders, bands, groups and places; a protected column (key, identity, scope, calculated, milestone, baseline, register-fed, status) allows only a rename and its menus (409 `system_field`). Errors: 409 `column_in_use` (delete), `conversion_unconfirmed`, `input_already_mapped`, `field_already_mapped`, `duplicate`; 422 `validation_failed` with the codes `placement_splits_band`, `placement_splits_group`, `reserved_band`, `list_required`, `list_not_allowed`, `type_follows_source`, `unknown_task`, `unknown_column`, `unknown_list`, `unknown_field`, `not_a_site_field`, `inactive_input`, `inactive_field`, `too_many_columns`. (3) `Site360Column` gains the optional `display_order`, `name_ar`, `value_type`, `list_catalogue` and `is_added`; `ord` goes up to 1000 (`Site360Band`, `frozen_ords`, `Site360CellSource` and the path of `PATCH /site360/columns/{ord}/sections` too). `GET /site360/sections`, `GET /site360/{menu}/rows` and the sources list the columns in display order (the Master order for the original columns until one is added after another) and include the added columns with their values: a task input column reads the input, a site field column reads the field's values (the view `site360_master_values`, still set-based). The Master-format export carries the added columns after the 187 under their letter (a deleted or deactivated column leaves an empty position, so the letters of the others stay true). (4) `PATCH /site360/columns/{ord}/sections` takes any column order and bumps the column's `version`. (5) One right for every column change (owner decision 2026-11-22): `PATCH /site360/columns/{ord}/sections` now needs, like the other column writes, a System Admin or a delegate of `fields` edit for all regions (was `admin.settings` edit); `can_move` of `GET /site360/sections` follows the same right.
     - 0.15.42 (2026-11-20): `PATCH /me/preferences` (`updateMyPreferences`) is implemented (it was in the contract but not in the API, so the top bar language and theme buttons were kept in the browser only; CHANGELOG 172). No shape change: `locale` and/or `theme` only, no If-Match, returns `Me`. It uses the profile door (`idm_update_own_profile`), audited once as `profile_updated` with before and after; the same value again writes nothing. `x-db-path` corrected.
@@ -3588,7 +3594,7 @@ paths:
       tags: [tasks]
       operationId: updateTaskEntry
       summary: Save entry data (dates, values, custom fields) at level 1
-      description: Allowed in states `open` and `entry` to an eligible entry holder. Read-only and hidden fields are refused with `field_read_only`.
+      description: Allowed in states `open` and `entry` to an eligible entry holder. Read-only and hidden fields are refused with `field_read_only`. Since 0.15.51 a value of a dependent list (a list with a parent list) whose parent differs from the parent value held by the site is refused with 422 `list_parent_mismatch` and nothing is saved; an empty parent value accepts any child, and a cleared value is never refused.
       parameters:
         - $ref: '#/components/parameters/IfMatch'
       requestBody:
@@ -8562,6 +8568,7 @@ paths:
       operationId: getSite360Rows
       summary: The grid rows of one SITE 360 menu, one page at a time (0.15.21, F15)
       description: |
+        0.15.45: `filter` is compiled against the screen `site360-<menu>` of `GET /saved-views/filter-fields` (the `sites` fields and the Master columns of the menu as `m:<ord>`, typed date, number, bool, enum or text); a condition on a Master column is set-based (one derived table per column used) and reads only what the caller may see.
         0.15.21. The rows of one menu (`master`, `design_acq`, `sow`, `cw`, `te`, `hoto`, `dismantle`, `om`) with the Master values of its columns, read from the set-based view `site360_master_values` (one query per page, no per-site path). `menu` gives the columns, bands and frozen columns as `GET /site360/sections`. Each row has `row_no`, the running number of the rows in view (the # column), and `values` keyed by the Master column order (ord); a value is `null` when the column has no source yet. `total` counts the sites the caller may see (region scope, B3); `filtered` counts the sites that match the filters. Filters are multi-value (comma-separated): Site ID, region, sub region, phase, batch, scenario, delivery model, status, milestone. The contractor filter (`contractor`) is in 0.15.21 item (5). `sort` takes a site field or `ord:<n>` of a column of the menu. Needs the `sites` view in a region; reading only, every value is written through the site and task paths.
       parameters:
         - $ref: '#/components/parameters/FilterTree'
@@ -8576,6 +8583,10 @@ paths:
         - { name: status, in: query, required: false, description: 'Overall status, comma-separated.', schema: { type: string, maxLength: 400 } }
         - { name: milestone, in: query, required: false, description: 'Current milestone, comma-separated.', schema: { type: string, maxLength: 4000 } }
         - { name: contractor, in: query, required: false, description: 'Contractor Name (Master AJ) of the first procurement order of scope CW, Tower Erection or Site Adaption that is neither cancelled nor rejected (0.15.33, the workbook rule), comma-separated. A caller without the procurement view matches no site.', schema: { type: string, maxLength: 4000 } }
+        - { name: stage_code, in: query, required: false, description: '0.15.50. The current stage (milestone code, for example MS2) of the site, as in `GET /sites`.', schema: { type: string, maxLength: 40 } }
+        - { name: bucket, in: query, required: false, description: '0.15.50. `mine` (sites with open work held by the caller), `late` (an overdue open task), `waiting_approval`, `closed`; as in `GET /sites`.', schema: { type: string, enum: [all, mine, late, waiting_approval, closed], default: all } }
+        - { name: workflow_locks, in: query, required: false, description: '0.15.50. `locked` keeps the sites whose sequencing locks apply, `open` the sites whose locks are off.', schema: { type: string, enum: [locked, open] } }
+        - { name: data_gaps, in: query, required: false, description: '0.15.50. `with` keeps the sites with at least one missing required value, `without` the others.', schema: { type: string, enum: [with, without] } }
         - { name: sort, in: query, required: false, description: 'site_code (default), name, region, status, milestone, phase, or ord:<n> of a column of the menu.', schema: { type: string, maxLength: 40 } }
         - { name: dir, in: query, required: false, schema: { type: string, enum: [asc, desc], default: asc } }
         - { name: offset, in: query, required: false, schema: { type: integer, minimum: 0, default: 0 } }
@@ -13253,12 +13264,14 @@ paths:
       operationId: getDashboard
       summary: The main dashboard, limited to the caller's regions and modules (0.7.2)
       description: |
+        0.15.45: `filter` (a `FilterTree`, screen `dashboard` = the `sites` fields) narrows the sites like `region_id`, `cluster_code`, `scenario`, `stream` and `view` do and keeps `ref_date`; the view is then not project wide.
         One call for the whole dashboard page (owner request 2026-11-02; `docs/spec/dashboard-kpis.md`). It supersedes the five `/dashboard/*` reads below, which are not built.
         Needs `dashboard.view`; a caller without it is 403 `module_forbidden`. **Every figure is computed from the sites in the caller's `dashboard.view` regions** (B3, VI-04): a Tripoli user never sees a Benghazi count, and the project-wide ("central") Project Status items (1.3, 1.5, 3.2 to 3.9, 6.1, 6.6, 7.7, 8.1) are left out and reported in `meta.central_items_hidden` whenever the figures are not for the whole project. The `issues` section needs `issues.view` as well and is null without it. Cancelled sites are left out of every figure; their number is `headline.sites_cancelled`.
         **Reference date (Q34).** `ref_date` defaults to today and may be any earlier date. `basis.source` says how the figures were made: `live` (today), `snapshot` (a weekly snapshot dated exactly `ref_date` exists: headline, pipeline, streams and Project Status come from it; SLA, issues, delay attribution and health are computed as of the date) or `as_of_computed` (no snapshot: everything is computed from dated facts, an actual date counts when it is on or before the date; blocked gates are not available, `gates.available` is false). A date in the future is 422 `validation_failed` with `/ref_date` `in_future`.
         **Counting (Q36).** Issues are counted for the owner bars and the totals, sites for `sites_with_open_issue`; the issue age is in working days from the raised date. **Health index** (rules.md section 9, version 1) is a draft under owner review (`health.draft`); the bands are the setting `dashboard.health_bands` (green from 85, amber from 70, red below, Q35). **Health index** factors D and I are approved (0.11.0, Q121): `health.draft` is false. **Delay attribution** (rules.md section 8) uses the attribution periods of the tasks and leaves out Change Control suspension days (0.11.0, Q122). **Central items** (0.11.0, Q118) count by their weight wherever a manual value is in force on the reference date. Working days use the default work calendar (Friday and Saturday weekend, holidays table).
         **Streams** are the stream codes of the workflow plus `DISMANTLE` (Q41). The `stream` filter keeps the sites the stream applies to (for `DISMANTLE` the sites with a Dismantle part) and limits the pipeline and the SLA to its stages.
       parameters:
+      - {$ref: '#/components/parameters/DashboardFilterTree'}
       - name: ref_date
         in: query
         schema: {type: string, format: date}
@@ -13300,6 +13313,7 @@ paths:
       operationId: getDashboardSiteMap
       summary: The sites of the dashboard map (OV-12, SC-10; 0.14.5)
       description: |
+        0.15.45: `filter` (a `FilterTree`, screen `dashboard`) keeps the sites that match, beside the caller's regions.
         One compact row per active site the caller may see, for the map of the dashboard and of the Site Register (owner request 2026-11-05). The map is drawn in the browser
         from a bundled outline of Libya; nothing is fetched from outside the internal server (no map tiles).
         **Who sees what (B3).** Needs `dashboard.view` (403 `module_forbidden` otherwise) and `sites.view` (403 `module_forbidden` when the caller has it in no region). The sites
@@ -13314,6 +13328,8 @@ paths:
         other active, not cancelled sites (`GET /sites?coordinates=missing` lists them).
         The list is not paged: 1000 sites answer in well under 2 s (CLAUDE.md). The filters of the map (status, region, sub-region, site owner, scenario, stream, milestone,
         cluster, late only, search) are applied in the browser.
+      parameters:
+      - {$ref: '#/components/parameters/DashboardFilterTree'}
       responses:
         '200':
           description: The sites of the map.
@@ -13328,6 +13344,7 @@ paths:
       operationId: getDashboardExtras
       summary: The F13 sections of the dashboard in one read (0.15.18)
       description: |
+        0.15.45: `filter` (a `FilterTree`, screen `dashboard`) narrows the site-based sections like `cluster_code` and `scenario` (not the risk matrix, the decisions or the register-based counters).
         The sections added to the dashboard with the three tabs (F13 of the features build plan; owner decisions 2026-11-15): the 5x5 risk matrix with the top open risks, the data
         quality panel, the swap and relocation breakdown by delivery scenario, and the decisions card. Read only. The filters `region_id` (risks and sites), `cluster_code` and `scenario` (sites only) narrow the figures as in `GET /dashboard`;
         `stream` is accepted and ignored. The figures are current (no reference date).
@@ -13340,6 +13357,7 @@ paths:
         **Data quality.** The gaps of each site as `site_data_gaps` reports them (a task without its actual date, a missing delivery scenario). Cancelled sites are left out.
         **Counters (0.15.24).** `counters` holds the SLA breaches and at-risk tasks of the open tasks (task states open, entry, in review, in approval and rejected), by stage, using the SLA status of each task (red past the maximum, amber past the warning share); the data quality KPI (sites with a gap of the sites checked); and every KPI of the dashboard catalogue with its value, its saved thresholds and its colour. A KPI with no value (no base, or no monthly target) is listed in `pending_kpis` and has a null value; since 0.15.29 all seven former gaps have a source, and `site360_menus` counts the sites per SITE 360 view. The same B3 scope applies (sites of the caller's regions; `available: false` without `sites.view`).
       parameters:
+      - {$ref: '#/components/parameters/DashboardFilterTree'}
       - name: region_id
         in: query
         schema: {$ref: '#/components/schemas/RegionId'}
@@ -13370,6 +13388,7 @@ paths:
       description: |
         Same query as `GET /dashboard`, plus `format` (0.11.0, Q127): `xlsx` (default) writes an Excel workbook (since 0.12.7, Q187: sheets `Project Overview` with the rows of the view, `CW` and `TE` with the rows of the same filters for those views, `Late tasks`, `Delay attribution`, `Project Status items`, `Regions`, and `About` with the filters, reference date, basis, definitions and versions; landscape, one page wide; text cells are text, never formulas), `csv` the CSV of 0.7.2 (a text that starts like a formula gets a leading quote). The file holds the rows `section,item,metric,value` of the headline figures, the milestones, the Final Closure KPI, the streams, the SLA, the issues, the health index (marked draft), the delay attribution (marked draft) and the regions of the view the caller sees. It is UTF-8 with a byte-order mark so Excel opens Arabic text. Needs `dashboard.export` as well as `dashboard.view` (403 `action_forbidden` otherwise). Scoped by the caller's regions exactly as the dashboard is. Every export writes an audit row (`export`, entity `dashboard`). The Master-format Excel export of `/exports/master` has no dashboard part.
       parameters:
+      - {$ref: '#/components/parameters/DashboardFilterTree'}
       - {name: ref_date, in: query, schema: {type: string, format: date}}
       - {name: region_id, in: query, schema: {$ref: '#/components/schemas/RegionId'}}
       - {name: cluster_code, in: query, schema: {type: string, minLength: 1, maxLength: 40}}
@@ -13427,8 +13446,9 @@ paths:
       tags: [project-status]
       operationId: getProjectStatus
       summary: Project Status (ends at HOTO) with the weight-set version used
-      description: Uses the active weight set, or `weight_set_version` / `weight_set_id` (0.2.6) to re-run with an older set for comparison. Both together, a set of another code, or an unknown `weight_set_version` is 422. Weekly snapshots are never recomputed.
+      description: Uses the active weight set, or `weight_set_version` / `weight_set_id` (0.2.6) to re-run with an older set for comparison. Both together, a set of another code, or an unknown `weight_set_version` is 422. Weekly snapshots are never recomputed. Since 0.15.45 `filter` (a `FilterTree`, screen `dashboard`) narrows the sites (not project wide then).
       parameters:
+      - {$ref: '#/components/parameters/DashboardFilterTree'}
       - name: region_id
         in: query
         schema: {$ref: '#/components/schemas/RegionId'}
@@ -13752,9 +13772,12 @@ paths:
       operationId: listFilterFields
       summary: The filter fields of a list screen the caller may filter on (0.15.31, F3)
       description: |
-        The whitelist of the AND/OR filter builder for `sites`, `sites-stream`, `site-tasks` and `register-<key>`, with the operators of each type and the
-        limits. Fields hidden from the caller by a field rule, inactive fields and fields not offered in list filters are left out. Needs the view right on
-        the screen's module (403 `module_forbidden`); another screen answers 422.
+        The whitelist of the AND/OR filter builder for `sites`, `sites-stream`, `site-tasks`, `tasks-board`, `register-<key>` and (0.15.45) `site360-<menu>` and
+        `dashboard`, with the operators of each type and the limits. Fields hidden from the caller by a field rule, inactive fields and fields not offered in list
+        filters are left out. A field that holds codes or repeating text is an `enum` with its `options` (the distinct values the caller can see, at most 500,
+        `truncated` when there are more; a list field: the values of its list catalogue), and every field carries a `group` for the one dropdown of the builder.
+        Needs the view right on the screen's module (403 `module_forbidden`; `dashboard` needs `dashboard.view` and `sites.view`); another screen answers 422.
+        0.15.49: a field whose `options` came back with `truncated: true` is searched on the server with `GET /saved-views/filter-fields/{field}/values`.
       parameters:
       - {name: screen_key, in: query, required: true, schema: {$ref: '#/components/schemas/SavedViewScreenKey'}}
       responses:
@@ -13763,6 +13786,33 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/FilterFieldList'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /saved-views/filter-fields/{field}/values:
+    get:
+      tags: [saved-views]
+      operationId: listFilterFieldValues
+      summary: Search the values of an enum filter field on the server (0.15.49)
+      description: |
+        The values of one `enum` field of `GET /saved-views/filter-fields` that match `q`, so that every value is reachable when the field's `options` were cut at
+        500 (`truncated: true`). The same sources, scope and hidden-field rules as the catalogue: the distinct non-empty values of the rows the caller can see (the
+        caller's region scope and row security apply), the active values of the field's list catalogue, or its fixed options. `q` matches anywhere in the value or in
+        the label (English or Arabic), case-insensitively, with no wildcards; an empty `q` returns the first values in the order of the catalogue. At most `limit`
+        items, `truncated` when there are more. Read only, no audit row. Needs the view right on the screen's module (403 `module_forbidden`, as the catalogue).
+        422 `validation_failed`: `unknown_field` (a field outside the catalogue; a field hidden from the caller is unknown too), `not_enum` (the field has no value
+        list), `invalid` (`screen_key` is not a screen with a filter builder, or `q` is longer than 100 characters), `out_of_range` (`limit`).
+      parameters:
+      - {name: field, in: path, required: true, schema: {type: string, maxLength: 100}, description: 'The field key as the catalogue lists it, URL-encoded (for example `m%3A12` for the Master column 12 or `cluster_code`).'}
+      - {name: screen_key, in: query, required: true, schema: {$ref: '#/components/schemas/SavedViewScreenKey'}}
+      - {name: q, in: query, required: false, schema: {type: string, maxLength: 100}}
+      - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 500, default: 50}}
+      responses:
+        '200':
+          description: The matching values.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/FilterFieldValues'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '422': {$ref: '#/components/responses/Unprocessable'}
@@ -14085,6 +14135,12 @@ components:
       required: false
       description: '0.15.31 (F3): a `FilterTree` as one JSON string (at most 8000 characters), compiled on the server against the whitelist of this list. 422 `validation_failed` with `unknown_field` (also for a field hidden from the caller by a field rule), `invalid_operator`, `invalid_value`, `too_deep` or `too_many`. The caller''s regions and row security still apply.'
       schema: {type: string, maxLength: 8000}
+    DashboardFilterTree:
+      name: filter
+      in: query
+      required: false
+      description: '0.15.45: a `FilterTree` as one JSON string (at most 8000 characters), compiled against the screen `dashboard` of `GET /saved-views/filter-fields` (the `sites` fields) and evaluated on the sites the caller may see; it only narrows (the caller''s `dashboard.view` regions and every other filter still apply). Needs `sites.view` (403 `module_forbidden`). 422 `validation_failed` with `unknown_field` (also for a field hidden from the caller), `invalid_operator`, `invalid_value`, `too_deep` or `too_many`.'
+      schema: {type: string, maxLength: 8000}
     Limit:
       name: limit
       in: query
@@ -14346,7 +14402,7 @@ components:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problem' }
     Unprocessable:
-      description: Validation failed (`validation_failed`, `note_required`, `mandatory_slots_missing`, `mandatory_fields_missing`, `open_snags`, `empty_cell`, `workflow_invalid`, `master_impact_unconfirmed`, `file_rejected`, `template_rejected`, `insufficient_stock`, `confirmation_mismatch`).
+      description: Validation failed (`validation_failed`, `list_parent_mismatch`, `note_required`, `mandatory_slots_missing`, `mandatory_fields_missing`, `open_snags`, `empty_cell`, `workflow_invalid`, `master_impact_unconfirmed`, `file_rejected`, `template_rejected`, `insufficient_stock`, `confirmation_mismatch`).
       content:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problem' }
@@ -14708,13 +14764,27 @@ components:
                 description: 'Task-backed columns only (0.15.21 item 3), keyed by ord. Edit a cell with PATCH /tasks/{task_id} (If-Match the version; body planned_date, actual_date or actual_start, or values with the key). A locked or N/A task, or a task that is not the only source of its column, is read-only (editable false).'
                 additionalProperties:
                   type: object
-                  required: [task_id, version, editable]
+                  required: [task_id, version, editable, input_type]
                   properties:
                     task_id: { type: string, format: uuid }
                     version: { type: integer, minimum: 1 }
                     editable: { type: boolean }
                     field: { type: string, enum: [planned_date, actual_date, actual_start] }
                     values: { type: string, description: 'The key of the task values map (a typed field).' }
+                    input_type: { type: string, enum: [date, number, list, text, boolean], description: '0.15.48. The kind of editor: date (a date key, or a date field), number, list (see `options`), boolean (a yes or no field) or text.' }
+                    options:
+                      type: array
+                      description: '0.15.48. Only for `input_type` list: the values to choose from, active ones in list order. The value to send is `value`.'
+                      items:
+                        type: object
+                        additionalProperties: false
+                        required: [value, label_en, label_ar]
+                        properties:
+                          value: { type: string }
+                          label_en: { type: string }
+                          label_ar: { type: [string, 'null'] }
+                          parent: { type: [string, 'null'], description: '0.15.50. Only in a dependent list: the code of the parent value of this option.' }
+                    parent_ord: { type: integer, minimum: 1, maximum: 1000, description: '0.15.50. Only for a list whose catalogue has a parent list: the Master column (ord) of the cell of the same site that holds the parent value. Offer the options whose `parent` equals that value; absent when the parent list is not in the menu.' }
     SearchType:
       type: string
       enum: [sites, registers, documents, meetings, people, contractors]
@@ -14887,6 +14957,7 @@ components:
         - document_rule_pending
         - file_pending_scan
         - list_not_configured
+        - list_parent_mismatch
         - email_not_verified
         - batch_processing
         - vehicle_already_reserved
@@ -16278,11 +16349,11 @@ components:
         entity: { type: string, enum: [task, site], description: '0.15.6: a task date override or a direct admin edit of a site.' }
         task_id: { type: [string, 'null'], format: uuid, description: 'Null for a site edit.' }
         site_id: { type: string, format: uuid }
-        kind: { type: string, description: '`edit_date` for a task, `site_edit` for a site. 0.15.38: `historical_no_source_na` for a task made N/A "historical load: no source" by the historical Master load (migration 0126); its revert restores the task. 0.15.39: `historical_gate_open` (entity `site`) for a phase gate opened because the site moved past it, and `historical_inferred_date` (entity `task`) for a milestone approved with the date of the earliest later task ("inferred date — historical load"), both by the historical Master load (migration 0127); their revert closes the gate again or reopens the milestone without a date. 0.15.40: `historical_manual_ms_approved` (entity `task`) for a manual milestone (Site RFI) the site moved past, approved directly with its pre-filled date (or the inferred one, `after.date_source`) by the historical Master load (migration 0129); its revert reopens it with its pre-filled date. 0.15.44: `gate_moved_past_open` (entity `site`) for a phase gate opened because the site moved past it, on any site, and `no_microwave_na` (entity `task`) for MW alignment (D8) made N/A because the approved TE installation (D6) has no MW antenna; both are made by a rule of GSDN Workspace (owner decisions 2026-11-22, migration 0134, no `acted_by`); their revert closes the gate again or restores D8. 0.15.46: `master_na` (entity `task`) for a task made N/A because its actual date is N/A in the Master file (migration 0136, no `acted_by`); its revert restores the task and the rule never applies again.' }
+        kind: { type: string, description: '`edit_date` for a task, `site_edit` for a site. 0.15.38: `historical_no_source_na` for a task made N/A "historical load: no source" by the historical Master load (migration 0126); its revert restores the task. 0.15.39: `historical_gate_open` (entity `site`) for a phase gate opened because the site moved past it, and `historical_inferred_date` (entity `task`) for a milestone approved with the date of the earliest later task ("inferred date — historical load"), both by the historical Master load (migration 0127); their revert closes the gate again or reopens the milestone without a date. 0.15.40: `historical_manual_ms_approved` (entity `task`) for a manual milestone (Site RFI) the site moved past, approved directly with its pre-filled date (or the inferred one, `after.date_source`) by the historical Master load (migration 0129); its revert reopens it with its pre-filled date. 0.15.44: `gate_moved_past_open` (entity `site`) for a phase gate opened because the site moved past it, on any site, and `no_microwave_na` (entity `task`) for MW alignment (D8) made N/A because the approved TE installation (D6) has no MW antenna; both are made by a rule of GSDN Workspace (owner decisions 2026-11-22, migration 0134, no `acted_by`); their revert closes the gate again or restores D8. 0.15.52: `manual_ms_moved_past` (entity `task`) for a manual milestone (Site RFI) the site moved past, approved directly with its pre-filled date (or the inferred one, `after.date_source`) by a rule of GSDN Workspace on any site (owner decision 2026-11-22, migration 0136, no `acted_by`); its revert reopens it with its pre-filled date. 0.15.53: `master_na` (entity `task`) for a task made N/A because its actual date is N/A in the Master file (migration 0139, no `acted_by`); its revert restores the task and the rule never applies again.' }
         reason: { type: string }
         before: { type: object, additionalProperties: true }
         after: { type: object, additionalProperties: true }
-        acted_by: { $ref: '#/components/schemas/UserRef', description: '0.15.44: absent for an override made by a rule of GSDN Workspace (`gate_moved_past_open`, `no_microwave_na`; 0.15.46 `master_na`).' }
+        acted_by: { $ref: '#/components/schemas/UserRef', description: '0.15.44: absent for an override made by a rule of GSDN Workspace (`gate_moved_past_open`, `no_microwave_na`; 0.15.52: `manual_ms_moved_past`; 0.15.53: `master_na`).' }
         on_behalf_of: { $ref: '#/components/schemas/UserRef' }
         created_at: { type: string, format: date-time }
         reverted_at: { type: [string, 'null'], format: date-time }
@@ -17667,7 +17738,7 @@ components:
         note: { type: [string, 'null'], description: The last note of a return. }
         import_notes:
           type: array
-          description: '0.15.46: informational notes of a Master staging (counts only, never a value); empty for every other batch.'
+          description: '0.15.53: informational notes of a Master staging (counts only, never a value); empty for every other batch.'
           items: { $ref: '#/components/schemas/ImportNote' }
         mode: { type: string, enum: [submit, draft], description: 'Q206 (0.12.8): `submit` enters and submits every row; `draft` (Save Draft / Planning) saves the rows without submission.' }
         file_template_version: { type: [integer, 'null'], description: 'D112 (0.12.8): the template version of the file when it was older than the current one and only non-input columns had changed.' }
@@ -17844,9 +17915,9 @@ components:
     ImportNote:
       type: object
       required: [code, count]
-      description: '0.15.46: one informational note of a Master staging (migration 0136).'
+      description: '0.15.53: one informational note of a Master staging (migration 0139).'
       properties:
-        code: { type: string, description: '`pending_as_empty`, `na_as_empty`, `na_task_requested`, `na_task_not_applicable`, `na_task_marked`, `na_task_not_marked`, `placeholder_rows_skipped`, `routed_to_gecol`, `routed_from_procurement`, `order_status_derived`, `order_status_not_derived`, `selected_set_by_import`, `selected_not_set`.' }
+        code: { type: string, description: '`pending_as_empty`, `na_as_empty`, `na_task_requested`, `na_task_not_applicable`, `na_task_marked`, `na_task_not_marked`, `placeholder_rows_skipped`, `routed_to_gecol`, `routed_from_procurement`, `order_status_derived`, `order_status_not_derived`, `selected_set_by_import`, `selection_date_from_contract`, `selected_not_set`.' }
         count: { type: integer, minimum: 1 }
     MasterImportOutcome:
       type: object
@@ -17873,7 +17944,7 @@ components:
               rows: { type: integer, description: '0.14.6: the rows to send of a queued batch.' }
               approved: { type: integer, description: '0.15.11: the rows of the batch already approved (with `approve_directly`, every submitted row). A queued batch counts them in its `ImportBatch.progress`.' }
               skipped: { type: integer, description: '0.15.11: rows that change nothing (the register or the task already holds these values).' }
-              import_notes: { type: array, items: { $ref: '#/components/schemas/ImportNote' }, description: '0.15.46: the notes of the Master rules of the batch (counts only).' }
+              import_notes: { type: array, items: { $ref: '#/components/schemas/ImportNote' }, description: '0.15.53: the notes of the Master rules of the batch (counts only).' }
         approve_directly: { type: boolean, description: '0.15.11: the apply approved the submitted rows directly (historical load, admin override).' }
         registers: { type: boolean, description: '0.15.11: the register sheets of the file were loaded.' }
         reapply: { type: boolean, description: '0.15.36: the file was applied again with direct approval (`historical_load.reapply`).' }
@@ -17891,7 +17962,7 @@ components:
               rows_sent_open: { type: integer, description: 'Rows already sent whose task or record still waits for L2 (they keep that path).' }
         register_notes:
           type: array
-          description: '0.15.11: notes on the reading of the register sheets (never blocking): counts, cell addresses and header names only, never a value. Codes: `date_day_first_assumed`, `not_normalised`, `outside_list`, `cell_error_blank`, `master_header_not_found`, `map_unknown_template_header`; 0.15.46 adds the codes of `ImportNote` for the register batches.'
+          description: '0.15.11: notes on the reading of the register sheets (never blocking): counts, cell addresses and header names only, never a value. Codes: `date_day_first_assumed`, `not_normalised`, `outside_list`, `cell_error_blank`, `master_header_not_found`, `map_unknown_template_header`; 0.15.53 adds the codes of `ImportNote` for the register batches.'
           items:
             type: object
             properties:
@@ -21002,7 +21073,7 @@ components:
       required: [field, operator]
       description: 'One condition. `value` is one value, a list (in, not_in), a pair [from, to] (between), a number of days (in_last_days, in_next_days) or absent (empty, not_empty).'
       properties:
-        field: {type: string, pattern: '^([a-z][a-z0-9_]{0,60}|[fc]:[a-z][a-z0-9_]{0,60}|ms:[A-Z][A-Z0-9_]{0,30})$', description: 'A key of `GET /saved-views/filter-fields`.'}
+        field: {type: string, pattern: '^([a-z][a-z0-9_]{0,60}|[fc]:[a-z][a-z0-9_]{0,60}|ms:[A-Z][A-Z0-9_]{0,30}|m:[0-9]{1,4})$', description: 'A key of `GET /saved-views/filter-fields`.'}
         operator: {$ref: '#/components/schemas/FilterOperator'}
         value:
           oneOf:
@@ -21019,12 +21090,22 @@ components:
       type: object
       required: [key, label_en, label_ar, type, operators]
       properties:
-        key: {type: string, description: 'Built-in key, `f:<code>` (register field), `c:<code>` (site custom field) or `ms:<STAGE>` (approved milestone date).'}
+        key: {type: string, description: 'Built-in key, `f:<code>` (register field), `c:<code>` (site custom field), `ms:<STAGE>` (approved milestone date) or, on `site360-<menu>` (0.15.45), `m:<ord>` (a Master column of the menu).'}
         label_en: {type: string}
         label_ar: {type: [string, 'null']}
         type: {$ref: '#/components/schemas/FilterFieldType'}
         operators: {type: array, items: {$ref: '#/components/schemas/FilterOperator'}}
-        options: {type: array, description: 'The allowed values of an enum field.', items: {type: object, required: [value, label_en], properties: {value: {type: string}, label_en: {type: string}, label_ar: {type: [string, 'null']}}}}
+        options: {type: array, description: 'The values of an enum field. A fixed set (regions, scenarios, statuses, scope flags, the fixed options of a register field) is checked on a filter (422 `invalid_value`); since 0.15.45 the values of a field that holds codes or repeating text (the distinct values the caller can see, or the values of a list catalogue) are offered only: another value matches nothing.', items: {type: object, required: [value, label_en], properties: {value: {type: string}, label_en: {type: string}, label_ar: {type: [string, 'null']}}}}
+        truncated: {type: boolean, description: '0.15.45. Present with `options`: true when the data has more than the 500 values offered.'}
+        group: {$ref: '#/components/schemas/FilterFieldGroup'}
+    FilterFieldGroup:
+      type: object
+      required: [key, label_en, label_ar]
+      description: '0.15.45. The group of a field in the dropdown of the filter builder: a stable key and the two labels.'
+      properties:
+        key: {type: string}
+        label_en: {type: string}
+        label_ar: {type: string}
     FilterFieldList:
       type: object
       required: [screen_key, items, operators, limits]
@@ -21041,10 +21122,28 @@ components:
             max_groups: {type: integer}
             max_conditions: {type: integer}
             max_values: {type: integer}
+    FilterFieldValues:
+      type: object
+      required: [screen_key, field, q, items, truncated]
+      description: '0.15.49. The values of one enum field that match `q`.'
+      properties:
+        screen_key: {type: string}
+        field: {type: string}
+        q: {type: string, description: 'The search text as the server used it (trimmed).'}
+        items:
+          type: array
+          items:
+            type: object
+            required: [value, label_en]
+            properties:
+              value: {type: string}
+              label_en: {type: string}
+              label_ar: {type: string}
+        truncated: {type: boolean, description: 'True when more values match than `limit`.'}
     SavedViewScreenKey:
       type: string
       pattern: '^[a-z][a-z0-9_-]{1,80}$'
-      description: 'A list screen (0.12.12): `sites`, `sites-stream`, `site-tasks`, `register-<register key>`, `audit-log`, `field-changes`, `security-log`, `system-log` (0.15.2), `tasks-board` (0.15.32, F5).'
+      description: 'A list screen (0.12.12): `sites`, `sites-stream`, `site-tasks`, `register-<register key>`, `audit-log`, `field-changes`, `security-log`, `system-log` (0.15.2), `tasks-board` (0.15.32, F5). 0.15.45: `GET /saved-views/filter-fields` also takes `site360-<menu>` (menu: master, design_acq, sow, cw, te, hoto, dismantle, om) and `dashboard`. 0.15.49: these two screens have saved views too (the module of `site360-<menu>` is `sites`, the module of `dashboard` is `dashboard`, and a `dashboard` view also needs the Site Register right).'
     SavedViewColumns:
       type: object
       additionalProperties: false

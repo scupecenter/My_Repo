@@ -256,10 +256,22 @@ describe('filters and scope', () => {
       await setCell(db, code, REGION, 'approve', { user: [ap.user.id] });
     }
     await db.query(`INSERT INTO workflow_steps (task_id, level, action, acted_by) VALUES ($1, 1, 'submit', $2)`, [waiting, e.user.id]);
+    // The matrix cells of A1..A3 in region 7 are shared with other test files that run in parallel (levels-permits, levels-permits-p11,
+    // assignments-fleet, x-insights replace them), so the holder can vanish between two calls. The level is therefore also pinned to its
+    // holder (the same stored state a claim leaves, `mine` = pinned to the caller), which no other file rewrites on these tasks.
+    for (const [id, who] of [[late, e], [now, e], [waiting, ap]] as const) await db.query('UPDATE task_instances SET ball_in_court_user_id = $2 WHERE id = $1', [id, who.user.id]);
+    // every page: the cells are region-wide, so the caller also holds the tasks other tests created in the region, and one page of 50 may not reach this site's
     const mine = async (who: Actor, qs: string): Promise<J[]> => {
-      const res = await who.api.call('get', `/me/tasks${qs}`);
-      expect(res.status, qs).toBe(200);
-      return (res.body.items as J[]).filter((t) => t.site_code === s.code);
+      const out: J[] = [];
+      let cursor: string | null = null;
+      do {
+        const sep = qs ? '&' : '?';
+        const res = await who.api.call('get', `/me/tasks${qs}${sep}limit=200${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`);
+        expect(res.status, qs).toBe(200);
+        out.push(...(res.body.items as J[]));
+        cursor = res.body.page.next_cursor as string | null;
+      } while (cursor);
+      return out.filter((t) => t.site_code === s.code);
     };
     const lateItems = await mine(e, '?bucket=late');
     expect(lateItems.map((t) => t.id)).toEqual([late]);

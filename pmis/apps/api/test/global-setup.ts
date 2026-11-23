@@ -221,7 +221,13 @@ export default async function setup(): Promise<() => Promise<void>> {
   const gmpDb = await buildDatabase(adminUrl, gmp, appPassword);
   process.env.TEST_DATABASE_URL_GMP = gmpDb.appUrl;
   process.env.TEST_SUPER_URL_GMP = gmpDb.superUrl;
-  // The Master import N/A and routing database (migration 0136): the suite opens the historical-load waiver, sets the Order Status rule of the Master import
+  // The moved-past Site RFI database (migration 0136): the suite runs the one-time backfill, which reads every active site of its database, writes a running
+  // Master import apply job (which defers the rules on every site of its database) and reads the milestones, the gates and the overrides of its sites.
+  const rfi = `${dbName}_rfi`;
+  const rfiDb = await buildDatabase(adminUrl, rfi, appPassword);
+  process.env.TEST_DATABASE_URL_RFI = rfiDb.appUrl;
+  process.env.TEST_SUPER_URL_RFI = rfiDb.superUrl;
+  // The Master import N/A and routing database (migration 0139): the suite opens the historical-load waiver, sets the Order Status rule of the Master import
   // and reads the GECOL, Procurement and Acquisition records and the overrides of its sites, so it shares no database.
   const mina = `${dbName}_mina`;
   const minaDb = await buildDatabase(adminUrl, mina, appPassword);
@@ -316,12 +322,15 @@ export default async function setup(): Promise<() => Promise<void>> {
     await a.query(`DROP DATABASE IF EXISTS ${hgd} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${hmm} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${gmp} WITH (FORCE)`);
+    await a.query(`DROP DATABASE IF EXISTS ${rfi} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${mina} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${wfe} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${wfg} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${rcols} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${tplst} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${scols} WITH (FORCE)`);
+    await a.query(`DROP DATABASE IF EXISTS ${slaDb_} WITH (FORCE)`);
+    await a.query(`DROP DATABASE IF EXISTS ${f20k} WITH (FORCE)`);
     await a.end();
   };
 }

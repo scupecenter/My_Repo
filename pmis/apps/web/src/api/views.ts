@@ -58,12 +58,23 @@ export type FilterField = S['FilterField'];
 export type FilterFieldList = S['FilterFieldList'];
 
 /** The screens whose lists accept the `filter` parameter (the others keep their simple filters). */
-export const hasFilterBuilder = (screen: string) => screen === 'sites' || screen === 'sites-stream' || screen === 'site-tasks' || /^register-[a-z0-9_]{2,60}$/.test(screen);
+export const hasFilterBuilder = (screen: string) =>
+  screen === 'sites' || screen === 'sites-stream' || screen === 'site-tasks' || screen === 'tasks-board' || screen === 'dashboard' || /^register-[a-z0-9_]{2,60}$/.test(screen) || /^site360-[a-z0-9_]{2,40}$/.test(screen);
+
+/** 0.15.45: a field also carries its `group` (key and two labels) and `truncated` (the option list was cut; the search narrows it). */
+export type UnifiedField = FilterField;
 
 /** The whitelist of the screen for the caller (the server leaves hidden fields out). */
 export const useFilterFields = (screen: string, enabled = true) =>
   useQuery({ queryKey: ['filter-fields', screen], enabled: enabled && hasFilterBuilder(screen), staleTime: 300_000,
     queryFn: () => api.get<FilterFieldList>('/saved-views/filter-fields', { query: { screen_key: screen } }) });
+
+export type FilterFieldValues = S['FilterFieldValues'];
+
+/** 0.15.49: the values of a truncated enum field that match `q`, searched on the server (the caller debounces `q`). */
+export const useFilterFieldValues = (screen: string, field: string, q: string, enabled = true) =>
+  useQuery({ queryKey: ['filter-field-values', screen, field, q], enabled: enabled && !!screen && !!field && q.trim() !== '', staleTime: 60_000, placeholderData: (prev) => prev,
+    queryFn: () => api.get<FilterFieldValues>(`/saved-views/filter-fields/${encodeURIComponent(field)}/values`, { query: { screen_key: screen, q: q.trim(), limit: 50 } }) });
 
 /** A tree for the URL and the `filter` parameter; an empty tree is no filter. */
 export const encodeFilter = (t: FilterTree | null | undefined): string => (t && t.items.length ? JSON.stringify(t) : '');

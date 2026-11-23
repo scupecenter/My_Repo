@@ -1,27 +1,26 @@
-import { Filter, Plus, Trash2, X } from 'lucide-react';
-import { useState } from 'react';
+import { Plus, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import { useFilterFields, type FilterCondition, type FilterField, type FilterOperator, type FilterSubGroup, type FilterTree, type FilterValue } from '@/api/views';
-import { FormDialog } from './FormDialog';
+import { ChoiceList } from './ChoiceList';
+import { type FilterCondition, type FilterField, type FilterOperator, type FilterSubGroup, type FilterTree, type FilterValue } from '@/api/views';
 
 /**
  * F3 (contract 0.15.31): the AND/OR filter builder of a list screen. Groups are combined with AND or OR, two levels at most (the root group
  * and its groups). The fields, their operators and the limits come from the server (GET /saved-views/filter-fields), which leaves out the
  * fields the caller may not see. The tree is sent as JSON in the `filter` parameter and compiled by the server; this component never builds a
- * query. It edits a draft in a dialog and hands the tree over on Apply; the chips beside the button summarise what is applied.
+ * query. Since the unified filter (2026-11-22) this file keeps the AND/OR editor (FilterTreeEditor), opened from "Advanced (AND/OR)" in components/UnifiedFilter.tsx, and the chip text helpers.
  */
-type Item = FilterCondition | FilterSubGroup;
+export type Item = FilterCondition | FilterSubGroup;
 type Op = 'and' | 'or';
-const isGroup = (x: Item): x is FilterSubGroup => Array.isArray((x as FilterSubGroup).items);
+export const isGroup = (x: Item): x is FilterSubGroup => Array.isArray((x as FilterSubGroup).items);
 const LIMITS = { items: 20, groups: 10, conditions: 50 };
 const NO_VALUE: readonly string[] = ['empty', 'not_empty'];
 const MULTI: readonly string[] = ['in', 'not_in'];
-const countConditions = (t: FilterTree) => t.items.reduce((n, it) => n + (isGroup(it) ? it.items.length : 1), 0);
+export const countConditions = (t: FilterTree) => t.items.reduce((n, it) => n + (isGroup(it) ? it.items.length : 1), 0);
 const countGroups = (t: FilterTree) => t.items.filter(isGroup).length;
 
-const label = (f: FilterField | undefined, lang: string, key: string) => (f ? (lang === 'ar' && f.label_ar) || f.label_en : key);
-const optLabel = (f: FilterField | undefined, v: string, lang: string) => {
+export const label = (f: FilterField | undefined, lang: string, key: string) => (f ? (lang === 'ar' && f.label_ar) || f.label_en : key);
+export const optLabel = (f: FilterField | undefined, v: string, lang: string) => {
   const o = f?.options?.find((x) => x.value === v);
   return o ? (lang === 'ar' && o.label_ar) || o.label_en : v;
 };
@@ -59,26 +58,6 @@ export function conditionText(c: FilterCondition, fields: FilterField[], t: TFun
   return `${label(f, lang, c.field)} ${op} ${v}`;
 }
 
-/** The chips of an applied tree; each removes its condition or group. */
-export function FilterChips({ tree, fields, onChange }: { tree: FilterTree; fields: FilterField[]; onChange: (t: FilterTree | null) => void }) {
-  const { t, i18n } = useTranslation();
-  const join = t(`filterBuilder.${tree.op}`);
-  const drop = (i: number) => { const items = tree.items.filter((_, j) => j !== i); onChange(items.length ? { ...tree, items } : null); };
-  return (
-    <ul className="flex flex-wrap items-center gap-1" data-testid="filter-chips" aria-label={t('filterBuilder.applied')}>
-      {tree.items.map((it, i) => (
-        <li key={i} className="flex items-center gap-1">
-          {i > 0 && <span className="text-xs font-semibold uppercase text-mute" aria-hidden>{join}</span>}
-          <span className="chip bg-openBg text-openInk" data-testid={`filter-chip-${i}`}>
-            {isGroup(it) ? `( ${it.items.map((c) => conditionText(c, fields, t, i18n.language)).join(` ${t(`filterBuilder.${it.op}`)} `)} )` : conditionText(it, fields, t, i18n.language)}
-            <button type="button" className="ms-1 rounded hover:bg-hover" aria-label={t('filterBuilder.remove_chip')} data-testid={`filter-chip-remove-${i}`} onClick={() => drop(i)}><X size={12} aria-hidden /></button>
-          </span>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
 function OpToggle({ value, onChange, id }: { value: Op; onChange: (o: Op) => void; id: string }) {
   const { t } = useTranslation();
   return (
@@ -95,12 +74,24 @@ function OpToggle({ value, onChange, id }: { value: Op; onChange: (o: Op) => voi
   );
 }
 
-function ValueEditor({ c, f, onChange, id }: { c: FilterCondition; f: FilterField; onChange: (v: FilterCondition['value']) => void; id: string }) {
+function ValueEditor({ c, f, onChange, id, screen }: { c: FilterCondition; f: FilterField; onChange: (v: FilterCondition['value']) => void; id: string; screen?: string }) {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
   const op = c.operator;
   if (NO_VALUE.includes(op)) return null;
   const aria = t('filterBuilder.value');
+  if (f.type === 'enum' && f.options && f.truncated && screen) {
+    // the list of values was cut by the server: the same checklist as the unified filter, which searches the server as the user types (0.15.49)
+    const multi = MULTI.includes(op);
+    const sel = multi ? (Array.isArray(c.value) ? c.value.map(String) : []) : c.value === undefined || c.value === '' ? [] : [String(c.value)];
+    return (
+      <div className="w-64" data-testid={`${id}-value`}>
+        <ChoiceList idp={`${id}-choice`} single={!multi} truncated options={f.options.map((o) => ({ value: o.value, label: optLabel(f, o.value, lang) }))} selected={sel}
+          search={{ screen, field: f.key, lang }}
+          onToggle={(v) => onChange(multi ? (sel.includes(v) ? sel.filter((x) => x !== v) : [...sel, v]) : v)} />
+      </div>
+    );
+  }
   if (f.type === 'enum' && f.options) {
     if (MULTI.includes(op)) {
       const sel = Array.isArray(c.value) ? c.value.map(String) : [];
@@ -172,7 +163,7 @@ function ValueEditor({ c, f, onChange, id }: { c: FilterCondition; f: FilterFiel
   return <input className="input w-44" aria-label={aria} data-testid={`${id}-value`} maxLength={200} value={String(c.value ?? '')} onChange={(e) => onChange(e.target.value)} />;
 }
 
-function ConditionRow({ c, fields, onChange, onRemove, id }: { c: FilterCondition; fields: FilterField[]; onChange: (c: FilterCondition) => void; onRemove: () => void; id: string }) {
+function ConditionRow({ c, fields, onChange, onRemove, id, screen }: { c: FilterCondition; fields: FilterField[]; onChange: (c: FilterCondition) => void; onRemove: () => void; id: string; screen?: string }) {
   const { t, i18n } = useTranslation();
   const f = fields.find((x) => x.key === c.field);
   return (
@@ -188,14 +179,15 @@ function ConditionRow({ c, fields, onChange, onRemove, id }: { c: FilterConditio
           {f.operators.map((o) => <option key={o} value={o}>{t(`filterBuilder.op.${o}`)}</option>)}
         </select>
       )}
-      {f && <ValueEditor c={c} f={f} id={id} onChange={(value) => onChange({ ...c, value })} />}
+      {f && <ValueEditor c={c} f={f} id={id} screen={screen} onChange={(value) => onChange({ ...c, value })} />}
       <button type="button" className="btn px-2" aria-label={t('filterBuilder.remove_condition')} title={t('filterBuilder.remove_condition')} data-testid={`${id}-remove`} onClick={onRemove}><Trash2 size={14} aria-hidden /></button>
     </li>
   );
 }
 
 /** The builder itself (the draft tree); exported for the dialog and the tests. */
-export function FilterTreeEditor({ tree, fields, onChange }: { tree: FilterTree; fields: FilterField[]; onChange: (t: FilterTree) => void }) {
+/** `screen` (the screen key of the filter fields) switches a truncated enum field to the server value search; without it the plain select is used. */
+export function FilterTreeEditor({ tree, fields, onChange, screen }: { tree: FilterTree; fields: FilterField[]; onChange: (t: FilterTree) => void; screen?: string }) {
   const { t } = useTranslation();
   const conds = countConditions(tree), groups = countGroups(tree);
   const fullRoot = tree.items.length >= LIMITS.items, fullConds = conds >= LIMITS.conditions;
@@ -220,7 +212,7 @@ export function FilterTreeEditor({ tree, fields, onChange }: { tree: FilterTree;
             </div>
             <ol className="space-y-2">
               {it.items.map((c, j) => (
-                <ConditionRow key={j} id={`filter-group-${i}-cond-${j}`} c={c} fields={fields}
+                <ConditionRow key={j} id={`filter-group-${i}-cond-${j}`} c={c} fields={fields} screen={screen}
                   onChange={(nc) => setItem(i, { ...it, items: it.items.map((x, k) => (k === j ? nc : x)) })}
                   onRemove={() => { const items = it.items.filter((_, k) => k !== j); if (items.length) setItem(i, { ...it, items }); else dropItem(i); }} />
               ))}
@@ -229,7 +221,7 @@ export function FilterTreeEditor({ tree, fields, onChange }: { tree: FilterTree;
               onClick={() => first && setItem(i, { ...it, items: [...it.items, newCondition(first)] })}><Plus size={12} aria-hidden /> {t('filterBuilder.add_condition')}</button>
           </li>
         ) : (
-          <ConditionRow key={i} id={`filter-cond-${i}`} c={it} fields={fields} onChange={(nc) => setItem(i, nc)} onRemove={() => dropItem(i)} />
+          <ConditionRow key={i} id={`filter-cond-${i}`} c={it} fields={fields} screen={screen} onChange={(nc) => setItem(i, nc)} onRemove={() => dropItem(i)} />
         ))}
       </ol>
       <div className="flex flex-wrap gap-2">
@@ -239,31 +231,6 @@ export function FilterTreeEditor({ tree, fields, onChange }: { tree: FilterTree;
           onClick={() => first && onChange({ ...tree, items: [...tree.items, { op: tree.op === 'and' ? 'or' : 'and', items: [newCondition(first)] }] })}><Plus size={14} aria-hidden /> {t('filterBuilder.add_group')}</button>
       </div>
       {(fullRoot || fullConds || groups >= LIMITS.groups) && <p className="text-xs text-mute" data-testid="filter-limit">{t('filterBuilder.limit', { items: LIMITS.items, groups: LIMITS.groups, conditions: LIMITS.conditions })}</p>}
-    </div>
-  );
-}
-
-/** Toolbar control: the button that opens the builder, and the chips of the applied tree. */
-export function FilterBuilder({ screen, value, onChange }: { screen: string; value: FilterTree | null; onChange: (t: FilterTree | null) => void }) {
-  const { t } = useTranslation();
-  const q = useFilterFields(screen);
-  const [open, setOpen] = useState(false);
-  const [draft, setDraft] = useState<FilterTree>({ op: 'and', items: [] });
-  const fields = q.data?.items ?? [];
-  if (!q.isSuccess) return null;
-  const n = value ? countConditions(value) : 0;
-  return (
-    <div className="flex flex-wrap items-center gap-2" data-testid="filter-builder" data-screen={screen}>
-      <button type="button" className="btn" data-testid="filter-builder-open" aria-haspopup="dialog" onClick={() => { setDraft(value ?? { op: 'and', items: [] }); setOpen(true); }}>
-        <Filter size={14} aria-hidden /> {n ? t('filterBuilder.button_count', { count: n }) : t('filterBuilder.button')}
-      </button>
-      {value && <FilterChips tree={value} fields={fields} onChange={onChange} />}
-      <FormDialog open={open} onClose={() => setOpen(false)} title={t('filterBuilder.title')} testid="filter-dialog" withReason={false} wide submitLabel={t('filterBuilder.apply')}
-        onSubmit={() => { setOpen(false); onChange(draft.items.length ? draft : null); }}>
-        <p className="text-sm text-mute">{t('filterBuilder.hint')}</p>
-        <FilterTreeEditor tree={draft} fields={fields} onChange={setDraft} />
-        {!!draft.items.length && <button type="button" className="btn text-xs" data-testid="filter-clear" onClick={() => setDraft({ op: 'and', items: [] })}>{t('filterBuilder.clear')}</button>}
-      </FormDialog>
     </div>
   );
 }

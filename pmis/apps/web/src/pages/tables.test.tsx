@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router-dom';
 import { siteIdOf, taskIdOf } from '@/mocks/sites';
 import { dropCol, moveCol, reconcile, resizeCol, toggleCol, visibleCols, EMPTY_PREFS, type ColDef } from '@/lib/tablePrefs';
-import { renderApp, signIn } from '@/test/utils';
+import { pickFilterField, renderApp, signIn } from '@/test/utils';
 import { MyWork } from './MyWork';
 import { Site } from './Site';
 import { Sites } from './Sites';
@@ -42,7 +42,7 @@ describe('Sites list: prefs, chips, selection', () => {
   it('hides and reorders columns, remembers them per user after a reload, and resets', async () => {
     await signIn('pm');
     const u = userEvent.setup();
-    const first = renderApp(<Sites />, { route: '/sites' });
+    const first = renderApp(<Sites />, { route: '/sites?layout=list' });
     await firstCode();
     expect(screen.getByRole('columnheader', { name: /Scenario/ })).toBeInTheDocument();
     await u.click(screen.getByTestId('cols-menu'));
@@ -54,7 +54,7 @@ describe('Sites list: prefs, chips, selection', () => {
     expect(screen.getByTestId('sites-scroll').parentElement).toHaveAttribute('data-density', 'compact');
     first.unmount();
 
-    renderApp(<Sites />, { route: '/sites' }); // a fresh mount reads the stored prefs
+    renderApp(<Sites />, { route: '/sites?layout=list' }); // a fresh mount reads the stored prefs
     await screen.findByTestId('sites-list');
     await waitFor(() => expect(screen.queryByRole('columnheader', { name: /Scenario/ })).toBeNull());
     const heads = screen.getAllByRole('columnheader').map((h) => h.getAttribute('data-col')).filter(Boolean);
@@ -69,34 +69,34 @@ describe('Sites list: prefs, chips, selection', () => {
   it('shows active-filter chips from the URL, removes one, clears all, and tells no data from no results', async () => {
     await signIn('pm');
     const u = userEvent.setup();
-    renderApp(<Sites />, { route: '/sites?region_id=1&q=zzzz' });
+    renderApp(<Sites />, { route: '/sites?layout=list&region_id=1&q=zzzz' });
     expect(await screen.findByTestId('sites-empty')).toHaveAttribute('data-testid', 'sites-empty');
     expect(screen.getByTestId('sites-empty-clear')).toBeInTheDocument(); // "no results" has a Clear button
     expect(screen.getByTestId('toolbar-active-filters')).toHaveTextContent('2');
-    expect(screen.getByTestId('chip-q')).toHaveTextContent('zzzz');
-    expect(screen.getByTestId('chip-region_id')).toBeInTheDocument();
-    await u.click(screen.getByTestId('chip-remove-q'));
-    await waitFor(() => expect(screen.queryByTestId('chip-q')).toBeNull());
+    expect(await screen.findByTestId('filter-chip-x-q')).toHaveTextContent('zzzz');
+    expect(screen.getByTestId('filter-chip-x-region_id')).toBeInTheDocument();
+    await u.click(screen.getByTestId('filter-chip-remove-x-q'));
+    await waitFor(() => expect(screen.queryByTestId('filter-chip-x-q')).toBeNull());
     await waitFor(() => expect(screen.queryByTestId('sites-empty')).toBeNull());
-    await u.click(screen.getByTestId('chips-clear'));
-    await waitFor(() => expect(screen.queryByTestId('active-chips')).toBeNull());
-    expect(screen.getByTestId('sites-filter-region')).toHaveValue('');
+    await u.click(screen.getByTestId('filter-clear-all'));
+    await waitFor(() => expect(screen.queryByTestId('filter-chips')).toBeNull());
   });
 
   it('applies the late quick filter through the API bucket filter', async () => {
     await signIn('pm');
-    renderApp(<Sites />, { route: '/sites' });
+    renderApp(<Sites />, { route: '/sites?layout=list' });
     await waitFor(() => expect(screen.getByTestId('sites-count')).toHaveTextContent('150'));
-    await userEvent.click(screen.getByTestId('sites-quick-late'));
-    expect(screen.getByTestId('sites-quick-late')).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByTestId('chip-bucket')).toBeInTheDocument();
+    const u = userEvent.setup();
+    await pickFilterField(u, 'late');
+    await u.click(await screen.findByTestId('filter-extra-on'));
+    expect(await screen.findByTestId('filter-chip-x-late')).toHaveTextContent('Late');
     await waitFor(() => expect(Number(screen.getByTestId('sites-count').textContent?.match(/\d+/)?.[0])).toBeLessThan(150));
   });
 
   it('selects rows, shows a bulk bar that separates loaded rows from all matching, and clears', async () => {
     await signIn('pm');
     const u = userEvent.setup();
-    renderApp(<Sites />, { route: '/sites' });
+    renderApp(<Sites />, { route: '/sites?layout=list' });
     const code = await firstCode();
     await screen.findByTestId(`site-row-${code}`);
     expect(screen.queryByTestId('sites-bulk')).toBeNull();
