@@ -19,7 +19,7 @@
 --   3. POST /me/notify-admins (contract notifyAdmins): a signed-in user, typically "Pending assignment", asks the System Admins for an assignment. One
 --      request per cooldown (setting notify_admins.cooldown_minutes, default 60, Q623) checked in the database (me_admin_requests), plain text only (no
 --      markup, no control characters, at most 500 characters, Q624), an in-app notice (kind assignment_request) to every active System Admin, a mail to
---      them through mail_to_system_admins, and an audit row.
+--      them (always; with the dedup key of mail_on_notification), and an audit row. Both new notification kinds join mail_kind_catalogue.
 --   POST /auth/employee-id has no database part: the staff registry and the M365 sign-in do not exist on the server yet (Q625); the API answers 409.
 --
 -- Owners: the identity writers (idm_set_mfa_exempt, idm_group_create, the readers of the exemption) are owned by pmis_identity_owner, as every idm_*
@@ -91,11 +91,13 @@ BEGIN
   RETURN coalesce(public.log_setting('require_mfa', 'false'::jsonb) = 'true'::jsonb, false) AND NOT public.idm_mfa_exempt_now(p_user);
 END $$;
 
--- PUT /users/{id}/mfa-exemption (p_exempt true) and POST /users/{id}/mfa-exemption/revoke (p_exempt false). Returns the audit action written.
-CREATE OR REPLACE FUNCTION idm_set_mfa_exempt(p_user uuid, p_exempt boolean, p_until timestamptz, p_reason text) RETURNS text
+-- PUT /users/{id}/mfa-exemption (p_exempt true) and POST /users/{id}/mfa-exemption/revoke (p_exempt false). Returns the audit action written and the id of
+-- the in-app notice, whose dedup key (notification:<id>) the API uses for the mail to the user.
+CREATE OR REPLACE FUNCTION idm_set_mfa_exempt(p_user uuid, p_exempt boolean, p_until timestamptz, p_reason text)
+RETURNS TABLE (r_action text, r_notification uuid)
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
 DECLARE a uuid := public.idm_actor('users', 'administer'); o public.user_mfa_exemptions%ROWTYPE; was boolean := false; bef jsonb; aft jsonb;
-        rs text := btrim(coalesce(p_reason, '')); act text;
+        rs text := btrim(coalesce(p_reason, '')); act text; nid uuid;
 BEGIN
   IF char_length(rs) < 3 OR char_length(rs) > 1000 THEN
     PERFORM public.wf_err('validation_failed', jsonb_build_object('errors', jsonb_build_array(jsonb_build_object('path', '/reason', 'code', 'required',
@@ -123,23 +125,25 @@ BEGIN
         revoked_at = NULL, revoked_by = NULL, revoke_reason = NULL;
     act := CASE WHEN was THEN 'mfa_exemption_changed' ELSE 'mfa_exemption_granted' END;
     aft := jsonb_build_object('exempt', true, 'until', p_until, 'granted_by', a);
-    INSERT INTO public.notifications (user_id, channel, kind, title, body, link)
+    nid := gen_random_uuid();
+    INSERT INTO public.notifications (user_id, channel, kind, title, body, link, id)
     VALUES (p_user, 'in_app', 'mfa_exemption', 'You are exempt from the GSDN Workspace MFA requirement',
       CASE WHEN p_until IS NULL THEN 'An administrator exempted your account from the GSDN Workspace MFA requirement until it is revoked.'
            ELSE 'An administrator exempted your account from the GSDN Workspace MFA requirement until ' || to_char(p_until AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') || ' UTC.' END
-        || ' MFA required by Microsoft 365 is not changed.', '/profile');
+        || ' MFA required by Microsoft 365 is not changed.', '/profile', nid);
   ELSE
     IF NOT was THEN PERFORM public.wf_err('invalid_transition', jsonb_build_object('detail', 'This user is not exempt from MFA, so there is nothing to revoke.')); END IF;
     UPDATE public.user_mfa_exemptions SET revoked_at = now(), revoked_by = a, revoke_reason = rs WHERE user_id = p_user;
     act := 'mfa_exemption_revoked';
     aft := jsonb_build_object('exempt', false);
-    INSERT INTO public.notifications (user_id, channel, kind, title, body, link)
+    nid := gen_random_uuid();
+    INSERT INTO public.notifications (user_id, channel, kind, title, body, link, id)
     VALUES (p_user, 'in_app', 'mfa_exemption', 'Your MFA exemption was revoked',
-      'An administrator revoked the exemption of your account from the GSDN Workspace MFA requirement. Sign-in and step-up follow the normal MFA rule again.', '/profile');
+      'An administrator revoked the exemption of your account from the GSDN Workspace MFA requirement. Sign-in and step-up follow the normal MFA rule again.', '/profile', nid);
   END IF;
   UPDATE public.users SET updated_at = now() WHERE id = p_user;
   PERFORM public.log_audit_write(act, 'user', p_user::text, bef, aft, rs, NULL, NULL, public.idm_on_behalf(), true);
-  RETURN act;
+  r_action := act; r_notification := nid; RETURN NEXT;
 END $$;
 
 -- ---------------------------------------------------------------------------------------------------------------------
@@ -208,7 +212,7 @@ GRANT SELECT, INSERT ON me_admin_requests TO pmis_definer;
 -- Returns the number of System Admins notified. The actor is the user of the signed context (a pending account has no app_actor()).
 CREATE OR REPLACE FUNCTION me_notify_admins(p_message text) RETURNS integer
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
-DECLARE uid uuid := public.app_ctx_user(); u public.users%ROWTYPE; msg text; cool int; last_at timestamptz; rid uuid; n int := 0; mailed int := 0; adm uuid;
+DECLARE uid uuid := public.app_ctx_user(); u public.users%ROWTYPE; msg text; cool int; last_at timestamptz; rid uuid; n int := 0; mailed int := 0; adm uuid; adm_email text; nid uuid;
         who text; v jsonb;
 BEGIN
   IF uid IS NULL THEN RAISE EXCEPTION 'no signed-in user' USING ERRCODE = 'insufficient_privilege'; END IF;
@@ -235,20 +239,26 @@ BEGIN
   END IF;
   INSERT INTO public.me_admin_requests (user_id, message) VALUES (uid, msg) RETURNING id INTO rid;
   who := u.display_name || coalesce(' (' || btrim(u.employee_id) || ')', '');
-  FOR adm IN SELECT DISTINCT x.id FROM public.group_members gm JOIN public.groups g ON g.id = gm.group_id AND g.is_system_admins AND g.is_active
+  FOR adm, adm_email IN SELECT DISTINCT x.id, x.email FROM public.group_members gm JOIN public.groups g ON g.id = gm.group_id AND g.is_system_admins AND g.is_active
              JOIN public.users x ON x.id = gm.user_id AND x.status = 'active' AND x.deleted_at IS NULL WHERE x.id <> uid ORDER BY x.id LOOP
     INSERT INTO public.notifications (user_id, channel, kind, title, body, link)
     VALUES (adm, 'in_app', 'assignment_request', 'Assignment requested',
-      left(who || ' asks for an assignment (status: ' || replace(u.status::text, '_', ' ') || ').' || coalesce(E'\n' || msg, ''), 2000), '/admin/users/' || uid::text);
+      left(who || ' asks for an assignment (status: ' || replace(u.status::text, '_', ' ') || ').' || coalesce(E'\n' || msg, ''), 2000), '/admin/users/' || uid::text)
+    RETURNING id INTO nid;
     n := n + 1;
+    -- always mailed; the dedup key is the one of mail_on_notification, so listing the kind in mail.notification_kinds never sends a second mail
+    BEGIN
+      IF public.mail_address_ok(adm_email) AND public.mail_enqueue_internal('identity.assignment_request', adm_email, adm,
+           left('[PMIS] Assignment requested: ' || regexp_replace(u.display_name, '[\r\n]+', ' ', 'g'), 200),
+           who || ' asks for an assignment in GSDN Workspace (status: ' || replace(u.status::text, '_', ' ') || ').' || coalesce(E'\n\nMessage:\n' || msg, '')
+             || E'\n\nOpen: {{app_url}}/admin/users/' || uid::text || E'\n\nGSDN Workspace.',
+           'notification:' || nid::text, false, jsonb_build_object('request_id', rid, 'notification_id', nid)) IS NOT NULL THEN
+        mailed := mailed + 1;
+      END IF;
+    EXCEPTION WHEN others THEN
+      PERFORM public.log_system_write('warn', 'mail', 'assignment request mail not queued', jsonb_build_object('request_id', rid, 'error', left(SQLERRM, 200)), uid, NULL);
+    END;
   END LOOP;
-  BEGIN
-    mailed := public.mail_to_system_admins('identity.assignment_request', left('[PMIS] Assignment requested: ' || regexp_replace(u.display_name, '[\r\n]+', ' ', 'g'), 200),
-      who || ' asks for an assignment in GSDN Workspace (status: ' || replace(u.status::text, '_', ' ') || ').' || coalesce(E'\n\nMessage:\n' || msg, '')
-        || E'\n\nOpen: {{app_url}}/admin/users/' || uid::text || E'\n\nGSDN Workspace.', 'notify_admins:' || rid::text, jsonb_build_object('request_id', rid));
-  EXCEPTION WHEN others THEN
-    PERFORM public.log_system_write('warn', 'mail', 'assignment request mail not queued', jsonb_build_object('request_id', rid, 'error', left(SQLERRM, 200)), uid, NULL);
-  END;
   UPDATE public.me_admin_requests SET recipients = n WHERE id = rid;
   -- a pending account has no app_actor(), so the row is written here (as idm_set_employee_id does) with the signed user as the actor
   INSERT INTO public.audit_log (action, entity_type, entity_id, after, actor_id)
@@ -257,6 +267,23 @@ BEGIN
   RETURN n;
 END $$;
 GRANT UPDATE ON me_admin_requests TO pmis_definer;
+
+-- The two notification kinds this release starts writing (mfa_exemption to the exempted user, assignment_request to the System Admins) join the mail
+-- catalogue (rule of 0072: "added here by the release that starts writing them"). Redefined in full from its latest body (0140); only the last two kinds are new.
+-- Both kinds are also mailed by this release in every case, with the dedup key notification:<id> that mail_on_notification uses, so an admin who also lists
+-- them in mail.notification_kinds never causes a second mail.
+CREATE OR REPLACE FUNCTION mail_kind_catalogue() RETURNS jsonb
+LANGUAGE sql IMMUTABLE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
+  SELECT jsonb_agg(jsonb_build_object('kind', k, 'recommended', ord <= 6) ORDER BY ord)
+  FROM unnest(ARRAY[
+    'task_assigned', 'register_assigned', 'snag_review', 'task_rejected', 'register_rejected', 'snag_rejected',
+    'email_change_decided', 'email_change_requested', 'followed_change', 'gate_closed_again', 'holiday_tentative', 'import_batch', 'levels_converted', 'mention',
+    'no_eligible_holder', 'order_team_mismatch', 'party_type_review', 'permit_transferred', 'phone_change_decided', 'phone_change_requested', 'site_draft_approved',
+    'site_draft_assigned', 'site_draft_returned', 'site_region_moved', 'sla_negative_duration', 'snag_closed', 'snag_raised', 'team_safety_cert',
+    'absence_alert', 'reassigned',
+    'mfa_exemption', 'assignment_request'
+  ]) WITH ORDINALITY AS t(k, ord)
+$$;
 
 -- ---------------------------------------------------------------------------------------------------------------------
 -- 4. Ownership and rights
@@ -277,6 +304,39 @@ BEGIN
     GRANT EXECUTE ON FUNCTION idm_mfa_exemption_state(uuid), auth_mfa_required(uuid), idm_set_mfa_exempt(uuid, boolean, timestamptz, text),
       idm_group_create(text, text, uuid[], text), me_notify_admins(text) TO pmis_app;
   END IF;
+END $$;
+
+-- ---------------------------------------------------------------------------------------------------------------------
+-- 5. The progress of an integrity check (redefined in full from its latest body, 0055; only the progress expression changes)
+-- ---------------------------------------------------------------------------------------------------------------------
+-- The progress was floor(100 * checked / total): once a chain holds more than 100 positions per step, a step that checked rows still read 0 %,
+-- as if nothing had moved (the audit chain of a fresh database passed 200 positions with this release). While a run is not at its end the progress
+-- is now 1 to 99, and 100 only at the end. Same signature, owner and rights.
+CREATE OR REPLACE FUNCTION log_integrity_step(p_run uuid, p_max_rows integer) RETURNS log_integrity_runs
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+DECLARE r public.log_integrity_runs%ROWTYPE; upto bigint; s record; nb jsonb;
+BEGIN
+  SELECT * INTO r FROM public.log_integrity_runs WHERE id = p_run FOR UPDATE;
+  IF NOT FOUND THEN PERFORM public.wf_err('not_found', jsonb_build_object('detail', 'The integrity check does not exist.')); END IF;
+  IF NOT public.log_integrity_driver_ok(r) THEN RAISE EXCEPTION 'log integrity: not the driver of this check' USING ERRCODE = 'insufficient_privilege'; END IF;
+  IF r.status <> 'running' OR r.checked_through >= r.to_seq THEN RETURN r; END IF;
+  upto := least(r.to_seq, r.checked_through + least(greatest(coalesce(p_max_rows, 10000), 1), 50000));
+  SELECT * INTO s FROM public.log_chain_verify_slice(r.log, r.checked_through, upto, r.last_hash);
+  nb := r.breaks;
+  IF jsonb_array_length(nb) < 100 THEN
+    nb := nb || (SELECT coalesce(jsonb_agg(q.b ORDER BY q.o), '[]'::jsonb)
+                 FROM (SELECT e.value AS b, e.ordinality AS o FROM jsonb_array_elements(s.breaks) WITH ORDINALITY e ORDER BY e.ordinality LIMIT 100 - jsonb_array_length(r.breaks)) q);
+  END IF;
+  UPDATE public.log_integrity_runs SET checked_through = upto, last_hash = s.last_hash, row_count = r.row_count + s.checked, breaks = nb,
+    break_count = r.break_count + jsonb_array_length(s.breaks), head_hash = coalesce(s.last_hash, r.head_hash)
+  WHERE id = p_run RETURNING * INTO r;
+  UPDATE public.job_runs SET rows = r.row_count, detail = jsonb_build_object('run_id', r.id, 'log', r.log, 'trigger', r.trigger, 'from_seq', r.from_seq, 'to_seq', r.to_seq,
+    'checked_through', r.checked_through, 'break_count', r.break_count,
+    'progress', CASE WHEN r.to_seq < r.from_seq OR r.checked_through >= r.to_seq THEN 100
+                     -- 0143: a step that checked rows never reads 0 %, and a run that has not reached the end never reads 100 %
+                     ELSE least(99, greatest(1, floor(100.0 * (r.checked_through - r.from_seq + 1) / (r.to_seq - r.from_seq + 1))))::int END)
+  WHERE id = r.job_run_id AND outcome = 'running';
+  RETURN r;
 END $$;
 
 INSERT INTO audit_log (action, entity_type, entity_id, after, reason)

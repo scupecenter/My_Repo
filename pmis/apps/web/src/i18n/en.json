@@ -4190,7 +4190,9 @@
       "sla_negative_duration": "SLA data alert (negative duration)",
       "snag_closed": "A snag was closed",
       "snag_raised": "A snag was raised",
-      "team_safety_cert": "A team safety certificate expires"
+      "team_safety_cert": "A team safety certificate expires",
+      "mfa_exemption": "Your MFA exemption was granted or revoked (always mailed)",
+      "assignment_request": "A user asks for an assignment (always mailed)"
     }
   },
   "dashSettings": {

@@ -15,6 +15,7 @@ import { ProblemException, problems } from '../common/problem';
 import { parse, uuidSchema } from '../common/zod';
 import { DbService } from '../db/db.service';
 import { MailMessage, MailPort } from '../mail/mail.port';
+import { MailService } from '../mail/mail.service';
 import { SecurityLogService } from '../logs/security-log.service';
 import { notifyByMail, PROFILE_MAIL } from '../me/profile.service';
 import { AssignmentDto, GroupRef, PickerItem, PurgedUserDto, UserDto, UsersRepo } from './users.repo';
@@ -119,6 +120,7 @@ export class UsersService {
     private readonly twoFactor: TwoFactorService,
     private readonly mail: MailPort,
     private readonly securityLog: SecurityLogService,
+    private readonly mailer: MailService,
   ) {}
 
   async list(auth: AuthContext, q: Query): Promise<{ items: UserDto[]; page: { limit: number; next_cursor: string | null; total: number } }> {
@@ -427,17 +429,33 @@ export class UsersService {
     if (!revoke && until && until.getTime() <= Date.now()) {
       throw problems.validation([{ path: '/until', code: 'must_be_future', message: 'The end date must be in the future (or empty: until revoked).' }]);
     }
-    const rows = await this.db.tx.$queryRaw<{ act: string }[]>`
-      SELECT idm_set_mfa_exempt(${user.id}::uuid, ${!revoke}::boolean, ${until}::timestamptz, ${body.reason}::text) AS act`;
+    const rows = await this.db.tx.$queryRaw<{ act: string; nid: string | null }[]>`
+      SELECT r_action AS act, r_notification::text AS nid FROM idm_set_mfa_exempt(${user.id}::uuid, ${!revoke}::boolean, ${until}::timestamptz, ${body.reason}::text)`;
     this.states.invalidate(user.id);
     const granted = !revoke;
     await this.securityLog.write({ event: granted ? 'mfa_exemption_granted' : 'mfa_exemption_revoked', outcome: 'info', userId: user.id,
       detail: { by: auth.user.id, until: until?.toISOString() ?? null, action: rows[0]?.act ?? null },
       ctx: { ip: auth.ip, userAgent: null, requestId: null, sessionId: auth.session.id, authMethod: auth.session.authMethod === 'm365' ? 'oidc' : auth.session.authMethod } }, { inTx: true });
-    await notifyByMail(this.mail, this.syslog, [user.email], MFA_MAIL(granted, until), auth.user.id);
+    await this.mailMfa(user.email, granted, until, rows[0]?.nid ?? null, auth.user.id);
     const next = await this.repo.find(user.id);
     if (!next) throw new ProblemException(500, 'internal_error', {});
     return this.mfaState(next);
+  }
+
+  /**
+   * The mail to the user, always sent, never failing the request. Its dedup key is the one mail_on_notification gives the in-app notice
+   * (notification:<id>), so a System Admin who lists the kind mfa_exemption in mail.notification_kinds never causes a second mail.
+   */
+  private async mailMfa(email: string, granted: boolean, until: Date | null, notificationId: string | null, actor: string): Promise<void> {
+    const m = MFA_MAIL(granted, until);
+    await this.db.tx.$executeRaw`SAVEPOINT pmis_mfa_mail`;
+    try {
+      await this.mailer.sendToAddress(email, { kind: `identity.${m.category}`, subject: m.subject, text: m.text, dedupKey: notificationId ? `notification:${notificationId}` : undefined });
+      await this.db.tx.$executeRaw`RELEASE SAVEPOINT pmis_mfa_mail`;
+    } catch (e) {
+      await this.db.tx.$executeRaw`ROLLBACK TO SAVEPOINT pmis_mfa_mail`;
+      await this.syslog.write('warn', 'mail_send_failed', { category: m.category, error: e instanceof Error ? e.message.split('\n')[0] : 'unknown' }, actor);
+    }
   }
 
   private async mfaState(user: UserDto): Promise<MfaExemptionDto> {

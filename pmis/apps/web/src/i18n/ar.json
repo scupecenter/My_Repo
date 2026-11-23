@@ -4214,7 +4214,9 @@
       "sla_negative_duration": "تنبيه بيانات SLA (مدة سالبة)",
       "snag_closed": "أُغلقت ملاحظة",
       "snag_raised": "رُفعت ملاحظة",
-      "team_safety_cert": "شهادة سلامة فريق تنتهي"
+      "team_safety_cert": "شهادة سلامة فريق تنتهي",
+      "mfa_exemption": "منح إعفائك من التحقق متعدد العوامل أو إلغاؤه (يُرسل بالبريد دائماً)",
+      "assignment_request": "مستخدم يطلب تعييناً (يُرسل بالبريد دائماً)"
     }
   },
   "dashSettings": {
