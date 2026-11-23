@@ -115,6 +115,10 @@ records of the Contractors register (companies, teams, contracts) and the vehicl
 | delegation_grants | KEEP | Delegated actions. |
 | delegation_regions | KEEP | Delegated regions. |
 | departments | KEEP | Departments (direct managers and MFA exemptions are columns of `users`). |
+| staff_registry | KEEP | The staff registry (0142): employee cards, kept like accounts. |
+| staff_registry_visibility_state | KEEP | Staff registry visibility settings (0142). |
+| staff_registry_visibility_fields | KEEP | Staff registry per-field defaults (0142). |
+| staff_registry_visibility_entries | KEEP | Staff registry allow/deny entries (0142). |
 | pmis_context_keys | KEEP | Session-context signing keys. |
 
 ### Configuration (KEEP)
