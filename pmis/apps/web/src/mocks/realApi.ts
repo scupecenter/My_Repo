@@ -505,6 +505,12 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/exports/master'],
   ['get', '/exports/master'],
   ['get', '/exports/master/:id/download'],
+  // Contract 0.15.56 (migration 0142; apps/api: staff-registry): the hover card (visibility applied by the database), the email and phone visibility settings,
+  // and the edit of a registry row (also hiding a field for one employee). Moved from NOT_AVAILABLE.
+  ['get', '/staff-registry/visibility'],
+  ['put', '/staff-registry/visibility'],
+  ['get', '/staff-registry/:employeeId'],
+  ['patch', '/staff-registry/:employeeId'],
 ] as const;
 
 /** `GET /users/deleted` and `GET /users/picker` are other operations that the `:id` pattern would swallow; they stay mocked. */
@@ -547,10 +553,6 @@ export const NOT_AVAILABLE = [
   ['get', '/settings/notification-policy'],
   ['put', '/settings/notification-policy'],
   ['get', '/settings/notification-policy/catalogue'],
-  ['get', '/staff-registry/visibility'],
-  ['put', '/staff-registry/visibility'],
-  ['get', '/staff-registry/:employeeId'],
-  ['patch', '/staff-registry/:employeeId'],
   ['get', '/users/:id/mfa-exemption'],
   ['put', '/users/:id/mfa-exemption'],
   ['post', '/users/:id/mfa-exemption/revoke'],

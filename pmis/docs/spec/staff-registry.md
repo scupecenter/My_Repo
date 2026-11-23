@@ -60,6 +60,8 @@ Create, edit, deactivate, reactivate, import (batch ID, counts), link and unlink
 - **SR-10** Given any registry change, then an audit entry exists with before/after values.
 
 ## 8. Requests to other agents
+**Built (migration 0142, contract 0.15.56):** table `staff_registry` (team stored as `cw`/`te`/`both`/`none`, the contract values), the email and phone visibility settings (default, allow, deny per field), the synthetic draft seed, and the routes `GET /staff-registry/{employee_id}`, `GET`/`PUT /staff-registry/visibility` and `PATCH /staff-registry/{employee_id}`. Still to build: the list, create, deactivate, reactivate, the TPL-STAFF import and the first sign-in link. Defaults of the gaps: Q610 to Q619 in `open-questions.md`.
+
 **database-engineer** (proposal, not applied): table `staff_registry`
 - `employee_id char(4) primary key check (employee_id ~ '^[0-9]{4}$')`
 - `name_en text not null`, `name_ar text not null`

@@ -158,6 +158,8 @@ import { ContractorsController } from './contractors/contractors.controller';
 import { ContractorsService } from './contractors/contractors.service';
 import { ExportsController } from './exports/exports.controller';
 import { MasterExportService } from './exports/master-export.service';
+import { StaffRegistryController } from './staff-registry/staff-registry.controller';
+import { StaffRegistryService } from './staff-registry/staff-registry.service';
 
 export function appModuleFor(config: AppConfig) {
   @Module({
@@ -176,6 +178,7 @@ export function appModuleFor(config: AppConfig) {
       SavedViewsController,
       SearchController, // 0.15.17 (F4)
       ExportsController, // 0.15.34: Master-format export
+      StaffRegistryController, // 0.15.56 (0142): staff registry card, visibility, edit
     ],
     providers: [
       { provide: APP_CONFIG, useValue: config },
@@ -195,6 +198,7 @@ export function appModuleFor(config: AppConfig) {
       SavedViewsService, FilterCatalogService,
       SearchService, // 0.15.17 (F4)
       MasterExportService, // 0.15.34
+      StaffRegistryService, // 0.15.56 (0142)
       { provide: APP_GUARD, useClass: SessionGuard },
       { provide: APP_INTERCEPTOR, useClass: TxInterceptor },
       { provide: APP_FILTER, useClass: ProblemFilter },

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.52
+  version: 0.15.56
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -30,6 +30,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.56 (2026-11-23): the staff registry is served by the API (owner request 2026-10-25, B13; migration 0142, mirror `db/sql/141_staff_registry_api.sql`; CHANGELOG 192; 0.15.53 to 0.15.55 are reserved by other branches). No path, field or enum changes; the four operations the web already calls are now real and their descriptions say who may use them. (1) `GET /staff-registry/{employee_id}` (any signed-in employee; `x-db-path` `people_staff_card`): the database applies the field visibility of email and phone for the caller and returns a hidden field as null, named in `hidden_fields`; a registry administrator (below) sees both; an ID that is not 4 digits or not in the registry is 404; `ETag` is the row version. (2) `GET /staff-registry/visibility` and `PUT /staff-registry/visibility` (`people_save_staff_visibility`): only the System Admin or a holder of `users.edit` for all regions (the grid, `app_has_permission`, held for all regions; Q610), otherwise 403 before any step-up; PUT needs a reason, a step-up and `If-Match`; each field given replaces that field's settings; an entry counts by `kind` and `ref_id` only (the label, `employee_id`, `user_id` and `account_status` are read again from the person, role or group); an unknown person, role or group, or an unknown key, is 422; saving the same settings again keeps the version; audited (`staff_registry.visibility_changed`, before and after). For a viewer who is not a registry administrator a field is hidden when the employee hides it (`hidden_fields`), or the viewer matches a deny entry (as the person, through an active role assignment, or as a member of an active group); otherwise it is shown when `default_visible` is true or the viewer matches an allow entry. (3) `PATCH /staff-registry/{employee_id}` (`people_save_staff`): the same right, a reason, a step-up and `If-Match`; `employee_id` in the body is 422 (`errors[].code` `read_only`), as are `status` and any unknown key; an email (case-blind) or phone held by another row is 409 `duplicate` without echoing the value; a patch that changes nothing keeps the version; audited (`staff_registry.updated`, or `staff_registry.fields_hidden` when only `hidden_fields` changed), with the full row before and after. The synthetic draft `db/seed/staff-registry.draft.csv` is seeded (a draft row whose employee ID, email or phone already belongs to an account is skipped, Q611). Rows are never deleted.
     - 0.15.52 (2026-11-23): Site RFI the site moved past is approved automatically, on any site (owner decision 2026-11-22; migration 0136, mirror `db/sql/135_moved_past_site_rfi.sql`; CHANGELOG 179; 0.15.45 and 0.15.46 are reserved by other branches). Additive, no new path or field. A manual milestone (`calc.milestone_manual`, Site RFI MS4) that is open, in entry or locked but ready, that nothing waits for (its gate open, its predecessors done), that the site moved past (a later task approved with an actual date), that no person touched (no submit, review, approve, reject, reopen or reassign step, no date typed, no date override) and that was never reverted, is approved directly with its pre-filled date; with no pre-filled date, with the date of the earliest later task approved, flagged inferred. It is an admin override made by a rule of GSDN Workspace: `TaskDetail.overrides` lists an `Override` of the new `kind` `manual_ms_moved_past` (`entity` `task`, `before` `{state, actual_date, prefilled_date}`, `after` `{state: approved, actual_date, date_source: prefilled|inferred, note, evidence_task, evidence_date}`, no `acted_by`), revertible through `POST /overrides/{override_id}/revert` (System Admin, reason, step-up), which reopens the milestone at L1 with its pre-filled date; a milestone reverted under this kind or `historical_manual_ms_approved` is never approved again by either rule. It runs in the calculation path before the gate and D8 rules of 0.15.44 (Site RFI, then the gate, then TE Completion, D8 and On-Air follow) and once on the existing sites; the rules now stand aside only while a Master import apply runs.
     - 0.15.51 (2026-11-23): dependent lists are enforced on save (owner request 2026-11-23; CHANGELOG 187). Additive, no migration. `PATCH /tasks/{task_id}` answers 422 with the new error code `list_parent_mismatch` when a list field whose list has a parent list gets a value whose parent value differs from the parent value the site holds (the list field of the parent list, in this task or in another task of the site); `errors[0].path` is `/values/<key>` and the problem carries `field`, `list`, `parent_list` and `expected_parent`. While the parent value is empty, or for a value with no parent or one outside the list, or when a value is cleared (null), the save is accepted as before. A refusal saves nothing. The bulk edit uses the same path, so it is refused the same way; it can now also clear a value (`null`) in the client.
     - 0.15.50 (2026-11-22): the Site Master wide table is complete: the list filters in `GET /site360/{menu}/rows`, dependent lists, and bulk edit on the existing save path (owner request 2026-11-22; CHANGELOG 186). Additive, no migration. 0.15.49 is taken by another branch. (1) `GET /site360/{menu}/rows` takes `stage_code`, `bucket` (`all`, `mine`, `late`, `waiting_approval`, `closed`), `workflow_locks` (`locked`, `open`) and `data_gaps` (`with`, `without`) with the same meaning as `GET /sites`, computed by the same SQL (`sites.service`: the current stage of the site, the caller's own open work for `mine`, an overdue open task for `late`, the workflow locks flag, the missing required values), so the Site Master list and the wide table count the same sites; they combine with the filters already accepted (`site_code`, `region_id`, `sub_region`, `phase`, `batch`, `scenario`, `delivery_model`, `status`, `milestone`, `contractor`, `filter`). An unknown value is 422 `validation_failed`. (2) Dependent lists: for a list cell whose list has a parent list, each `options[]` entry carries `parent` (the code of its parent value) and the cell carries `parent_ord` (the Master column, of the same site and menu, that holds the parent value); the client offers only the options whose `parent` equals the value of that column in the same row. A cell with no `parent_ord` (the parent list is not in the menu) offers every option. Since 0.15.51 the server also refuses a non-matching child on save (422 `list_parent_mismatch`). (3) Bulk edit has no new path: the client saves each eligible cell with `PATCH /tasks/{task_id}` and `If-Match` (the same rights, locks, gate rules and errors as one inline edit), a few at a time, and shows saved, skipped and failed with the reasons.
@@ -6765,7 +6766,8 @@ paths:
       operationId: getStaffMember
       summary: Hover-card payload for one person
       description: Any signed-in employee may read a card. The server applies the field-visibility settings and the per-employee hide; hidden fields come back null and are named in `hidden_fields`. An inactive person is still returned, with status
-        `inactive`.
+        `inactive`. Since 0.15.56 the database decides (a registry administrator, the System Admin or an all-regions holder of `users.edit`, sees both fields); an ID that is not 4 digits or not in the registry is 404.
+      x-db-path: people_staff_card
       responses:
         '200':
           description: Card.
@@ -6781,7 +6783,7 @@ paths:
       operationId: updateStaffMember
       x-step-up: true
       summary: Edit a row or hide fields for this employee
-      description: Changing `employee_id` is not possible here (blocked when linked to an account). `hidden_fields` hides email or phone for this one employee.
+      description: Changing `employee_id` is not possible here (blocked when linked to an account). `hidden_fields` hides email or phone for this one employee. Since 0.15.56 the System Admin or a holder of `users.edit` for all regions (403 before the step-up for anyone else); `employee_id`, `status` or an unknown key in the body is 422; an email (case-blind) or phone of another row is 409 `duplicate`; a patch that changes nothing keeps the version; audited with the full row before and after.
       x-db-path: people_save_staff
       parameters:
       - {$ref: '#/components/parameters/IfMatch'}
@@ -6913,6 +6915,8 @@ paths:
       tags: [staff-registry]
       operationId: getStaffVisibility
       summary: Field-visibility settings for email and phone
+      description: Since 0.15.56, the System Admin or a holder of `users.edit` for all regions; anyone else gets 403.
+      x-db-path: people_staff_visibility_get
       responses:
         '200':
           description: Settings.
@@ -6928,7 +6932,7 @@ paths:
       operationId: setStaffVisibility
       x-step-up: true
       summary: Set who sees email and phone
-      description: 'Per field: default (everyone signed in), roles, groups or persons who see it, and who never do (deny wins). Audited with before/after values.'
+      description: 'Per field: default (everyone signed in), roles, groups or persons who see it, and who never do (deny wins). Audited with before/after values. Since 0.15.56: the System Admin or a holder of `users.edit` for all regions (403 before the step-up for anyone else); each field given replaces that field; an entry counts by `kind` and `ref_id` (the label is read from the source); an unknown person, role, group or key is 422; the same settings again keep the version. A registry administrator always sees both fields on the card.'
       x-db-path: people_save_staff_visibility
       parameters:
       - {$ref: '#/components/parameters/IfMatch'}
