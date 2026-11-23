@@ -112,7 +112,7 @@ export class UsersController {
     return this.users.issueEnrolCode(auth, id, body);
   }
 
-  // 0143 (contract 0.15.57): the per-user MFA exemption (idm_set_mfa_exempt)
+  // 0143 (contract 0.15.60): the per-user MFA exemption (idm_set_mfa_exempt)
   @Get(':id/mfa-exemption')
   getMfaExemption(@Auth() auth: AuthContext, @Param('id') id: string): Promise<MfaExemptionDto> {
     return this.users.getMfaExemption(auth, id);

@@ -1,4 +1,4 @@
--- The last users, groups and sign-in routes on the real API (migration 0143, contract 0.15.57): the per-user MFA exemption (user_mfa_exemptions, written only
+-- The last users, groups and sign-in routes on the real API (migration 0143, contract 0.15.60): the per-user MFA exemption (user_mfa_exemptions, written only
 -- by idm_set_mfa_exempt; read through idm_mfa_exemption_state and auth_mfa_required), group creation (idm_group_create, through the ceilings of
 -- idm_group_add_member) and the request of a user to the System Admins (me_admin_requests, written only by me_notify_admins). The settings require_mfa and
 -- notify_admins.cooldown_minutes are guarded keys. Alice: CW Team Lead in Tripoli, no admin right. DEL_ALL: delegate of users create/edit/delete and groups

@@ -9,7 +9,7 @@ export function Pending({ session }: { session: Session }) {
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
-  // contract 0.15.57: one request per cooldown (429 rate_limited); a refusal is shown, never swallowed
+  // contract 0.15.60: one request per cooldown (429 rate_limited); a refusal is shown, never swallowed
   const notify = () => {
     setBusy(true);
     setErr('');

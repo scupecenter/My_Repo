@@ -46,7 +46,7 @@ describe('Pending', () => {
     await screen.findByText('The admins were notified.');
   });
 
-  it('shows the cooldown refusal of the real API (contract 0.15.57: 429 rate_limited) instead of swallowing it', async () => {
+  it('shows the cooldown refusal of the real API (contract 0.15.60: 429 rate_limited) instead of swallowing it', async () => {
     await signIn('pending');
     server.use(http.post(`${API_BASE}/me/notify-admins`, () => HttpResponse.json({ status: 429, code: 'rate_limited', title: 'Too many requests' },
       { status: 429, headers: { 'Content-Type': 'application/problem+json', 'Retry-After': '3600' } })));
@@ -57,7 +57,7 @@ describe('Pending', () => {
   });
 });
 
-describe('EmployeeId on the real API (contract 0.15.57)', () => {
+describe('EmployeeId on the real API (contract 0.15.60)', () => {
   it('explains the 409 answered while the Microsoft 365 link is not available', async () => {
     await signIn('newbie');
     server.use(http.post(`${API_BASE}/auth/employee-id`, () => HttpResponse.json({ status: 409, code: 'invalid_transition', title: 'Conflict' },

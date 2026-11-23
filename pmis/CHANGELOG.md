@@ -6,6 +6,51 @@
 
 ---
 
+## 2026-11-23 (195): استيراد الماستر يقرأ «Pending» و«N/A» كما يقصدهما المالك، ويتخطى صفوف المفاتيح فقط، ويحوّل طلبات GECOL من PR-PO إلى سجل GECOL (الترحيل 0144، العقد 0.15.58)
+
+### قرارات
+- قرارات المالك (2026-11-22) بعد ملخص أخطاء ماستره الحقيقي (أعداد فقط)، **على مسار استيراد الماستر فقط** (الاستيراد والمقارنة، ورفع قالب `TPL-MASTER`)؛ الإدخال اليدوي وباقي القوالب على قواعد اليوم:
+  1. «Pending» (أي حالة أحرف، بعد القص) في خلية تاريخ أو رقم أو قائمة = خلية فارغة (لم يتم بعد)، بلا خطأ، وتُعدّ في ملاحظات الدفعة.
+  2. «N/A» (`n/a` و`na` و`not applicable` و`-`): في عمود **التاريخ الفعلي** للمهمة تصبح المهمة N/A عند إرسال الدفعة، تجاوزاً إدارياً بقاعدة (نوع `master_na`، بلا منفّذ)، قابلاً للتراجع عبر `POST /overrides/{id}/revert` ولا يُعاد بعد التراجع، كسابقتَي 0126 و0134؛ وفي أي عمود تاريخ أو رقم أو قائمة آخر = خلية فارغة. القائمة التي تحمل «N/A» أو «Pending» ضمن قيمها تبقيها قيمة.
+  3. صف سجل لا يحمل إلا مفاتيحه (Site ID ونوع السجل وRecord ID ومفاتيح القالب الطبيعية) صف نائب: يُتخطى ويُعدّ، ولا يكون خطأً ولا `scope_conflict`.
+  4. صف PR-PO نطاقه لـ GECOL (قاعدة `wrong_register`) يُحوَّل إلى سجل GECOL في الاستيراد نفسه ويمر بمسار دفعات GECOL.
+  5. Order Status الفارغ يُشتق: `po_wo_issued` إن وُجد تاريخ PO / WO وإلا `pr_raised`، من قيم القائمة الموجودة.
+  6. مرشح Acquisition له Contract Sign-off Date وSelected ليست Yes يُجعل Selected = Yes، فقط إن لم يكن مرشح آخر للموقع نفسه مختاراً (في الملف أو في السجل).
+
+- قرارات المالك (2026-11-23، «اختر الأفضل») على الأسئلة المفتوحة:
+  7. **Q582** Order Status الفارغ يُشتق من قيم القائمة الموجودة فقط: `Completed` إن حمل الصف تاريخ تسليم أو إنجاز، وإلا `Active` (طلب الشراء مفتوح حتى التسليم ولو صدر له PO / WO). لا حقل تسليم أو إنجاز في PR-PO اليوم، فلا يكون الصف المشتق Completed. القاعدة **مفعّلة**، والقيم في الإعداد ولا تتغير إلا عبر دوال المعرّف.
+  8. **Q583** حين يجعل الاستيراد Selected = Yes (القرار 6) وSelection Date فارغ، يؤخذ Contract Sign-off Date تاريخاً للاختيار، بتحذير `selection_date_from_contract` وعدّه في ملاحظات الدفعة وسطر تدقيقها.
+  9. **Q584** طلب GECOL واحد لكل موقع يبقى؛ الطلب الثاني المختلف للموقع نفسه يبقى خطأ `gecol_one_per_site` للمراجعة. السؤال مغلق.
+
+### إضافة
+- الترحيل `0144_master_import_na_routing` (مرآته `db/sql/143_master_import_na_routing.sql`):
+  - العمودان `task_instances.master_na` و`master_na_at` مع الحارس `mina_guard_task` (المعرّف وعلامته في `hgd_marks` فقط)، وصف `admin_overrides` من نوع `master_na` بلا منفّذ، وخطوة `admin_override`، وسطر تدقيق `task_master_na`؛ التراجع `mina_restore_task` (سطر `task_master_na_restore`).
+  - لا تُجعل المهمة N/A إن كانت مَعلماً، أو تحمل تاريخاً (فعلياً أو بداية أو إرسالاً أو اعتماداً)، أو معتمدة، أو في إدخال أو مراجعة أو اعتماد، أو لها خطوة بشرية (submit, approve, reject, claim, release, reassign, reopen, start, review)، أو سجل سجلّ في المراجعة، أو تحجزها بوابة (`gate_closed:*` أو `wf_gate_hold`)، أو تراجع عنها مدير النظام سابقاً. إن حمل الصف قيماً أخرى للمهمة نفسها تُقرأ N/A خلية فارغة. مسودة (Save Draft) لا تجعل شيئاً N/A. بعد الوسم: `wf_unlock_successors` ثم `calc_refresh_site` إلا إن كان تحميل تاريخي يعمل على الموقع (`gmp_site_deferred`، فتقرر قواعده في نهايته).
+  - العمود `import_batches.import_notes` (أعداد فقط، بلا قيم): `pending_as_empty` و`na_as_empty` و`na_task_requested` و`na_task_not_applicable` و`na_task_marked` و`na_task_not_marked` و`placeholder_rows_skipped` و`routed_to_gecol` و`routed_from_procurement` و`order_status_derived` و`order_status_not_derived` و`selected_set_by_import` و`selection_date_from_contract` و`selected_not_set`؛ وتحذيرات بالأسماء نفسها على صفوف الدفعة، وسطر تدقيق `import_batch.master_import_rules` لكل دفعة.
+  - التوجيه إلى GECOL: PR No. ← GECOL PR No.، وPR Date ← GECOL Request Date، وRemark ← Remark؛ يملأ الفراغات فقط في صف GECOL للموقع نفسه من ورقة GECOL (قيم ورقة GECOL تبقى)، وعند تعارض القيم يبقى الصف المحوَّل خطأً مستقلاً `gecol_one_per_site`. بلا ورقة GECOL في الملف تُنشأ دفعة GECOL بورقة PR-PO.
+  - الإعداد `imports.master_order_status_derived` = `{"open": "Active", "completed": "Completed", "completion_field": null}` (محمي بـ `settings_guarded_keys`): القاعدة 5 مفعّلة بقرار المالك (Q582)؛ `completion_field` هو حقل PR-PO الذي يعني التسليم أو الإنجاز (لا يوجد اليوم).
+  - العقد 0.15.58: `Override.kind` `master_na`، و`ImportBatch.import_notes` (`ImportNote`)، و`MasterImportOutcome.batches[].import_notes`، ورموز الملاحظات الجديدة في `register_notes`؛ أُعيد توليد `apps/web/src/api/schema.d.ts`.
+  - الـ API: `ImportBatch.import_notes` في استجابة الدفعة. اختبارات `apps/api/test/master-import-na.test.ts` (قاعدة بيانات `_mina`).
+
+### تعديل
+- بعد دمج main: أعيد ترقيم الترحيل إلى 0144 (0136 إلى 0140 صارت على main، و0141 إلى 0143 محجوزة لفروع أخرى)، وأعيد اشتقاق `ao_current_matches` و`admin_override_revert` من آخر تعريف لهما (`0136_moved_past_site_rfi`) فيبقى نوع `manual_ms_moved_past`، وقيدا `admin_overrides` يقبلان أنواع القواعد الأربعة (`gate_moved_past_open` و`no_microwave_na` و`manual_ms_moved_past` و`master_na`).
+- بعد دمج 0140 (الغياب وإعادة الإسناد): قرار القائد على المهمة (`task_cover_decisions`: إبقاء أو إعادة إسناد أو تصرّف نيابة) يُعدّ خطوة بشرية، فلا تُجعل المهمة N/A بعده. لا دالة من دوال 0140 أعيد تعريفها هنا.
+- الدوال الداخلية `imp_master_plan` و`imp_master_unit` و`imp_stream_eval` و`imp_stream_close` و`imp_submit_stream_finish` أُعيدت تسميتها `*_pre_0144` ولُفّت بدوال بالاسم والتوقيع نفسيهما (كما لُفّ `reg_validate` في 0063): التحضير قبلها لورقة Master أو وحدة سجل فقط، والملاحظات بعدها. لا يتغير أي حكم فيها.
+- `hrg_stage_registers` (0093) أعيد تعريفه مع التوجيه؛ `ao_current_matches` و`admin_override_revert` (0134) يعرفان `master_na`؛ قيدا `admin_overrides` يقبلان `master_na` لنوع القاعدة.
+
+### أمان
+- كل دالة جديدة أو ملفوفة أو معاد تعريفها: SECURITY DEFINER (عدا الحارس الذي يعمل بصلاحية كاتبه)، و`search_path = pg_catalog, public, pg_temp`، والمالك `pmis_definer`، وEXECUTE مسحوب من PUBLIC ومن `pmis_app`؛ باب التراجع يبقى `admin_override_revert`. الأعمدة الجديدة مسحوبة من `pmis_app`، ولا جدول جديد.
+- العلامة لا تؤخذ من الملف ولا من المستدعي: مفاتيح `mina_*` تُنزع من الصفوف قبل التحضير.
+- (مراجعة أمنية) جعل المهمة N/A يتطلب حقوق إدخال تلك المهمة لمن رفع الملف، عند التجهيز ثم من جديد عند الإرسال (`mina_rights_check`): منطقة الاستيراد (`templates` import) ومنطقة التعديل (`sites` edit) لمنطقة المهمة، وأهلية مستوى الإدخال L1 (`wf_is_eligible`، أو مدير النظام حين لا حامل للمستوى، أو تجاوز التحميل التاريخي باعتماد مباشر)، والمرسِل هو رافع الملف نفسه؛ وإلا يقول الصف السبب (`region_forbidden` أو `action_forbidden` أو `not_entry_holder` أو `not_uploader`) ولا يُوسم شيء. سطر التدقيق الملخّص للدفعة `import_batch.master_na` لا يُعلَّم تجاوزاً إدارياً (كل مهمة لها سطر تجاوزها)، فلم يعد يرفض إرسال مستخدم ليس مدير نظام.
+- حالات أمان جديدة: `tests/db-security/cases/E5_master_import_na.sql` (11 حالة).
+
+### مفتوح
+- Q582 وQ583 وQ584 أُجيبت (2026-11-23، انظر «قرارات»).
+- Q581: حقول PR-PO التي لا مقابل لها في GECOL (PO / WO No.، PO / WO Date، Order Status، Delivery، Team) لا تُحفظ عند التوجيه وتُذكر في تحذير الصف.
+- لم يُكتب اختبار API لمسار رفع `TPL-MASTER` نفسه (الدوال ذاتها، مغطاة عبر مسار الاستيراد والمقارنة).
+---
+
+---
 ## 2026-11-23 (196): نقل ملفات الحجر في سكربت تصفير بيانات المشروع آمن من الروابط الرمزية، وتصنيف جدولي الترحيل 0140 (متابعة 194)
 
 ### أمان
@@ -38,7 +83,7 @@
 - `status_transitions` و`status_updates` و`mail_outbox` محفوظة لأنها إلحاقية بالتصميم؛ قد يُرسل بريد منتظر عن مهام محذوفة بعد التصفير.
 - مدة الاحتفاظ بمجلد الحجر والنسختين (المستندات تُحفظ مدة المشروع + 10 سنوات) قرار للمالك؛ والنسختان غير مشفرتين فتُنقلان إلى مخزن النسخ المشفر.
 
-## 2026-11-23 (193): إعفاء المستخدم من شرط MFA وإنشاء المجموعات وتنبيه مديري النظام ورابط الرقم الوظيفي على الـ API الحقيقي (الترحيل 0143، العقد 0.15.57)
+## 2026-11-23 (193): إعفاء المستخدم من شرط MFA وإنشاء المجموعات وتنبيه مديري النظام ورابط الرقم الوظيفي على الـ API الحقيقي (الترحيل 0143، العقد 0.15.60)
 
 ### قرارات
 - المسارات الستة التي كانت تجيب 501 `not_available` في الوضع الهجين تُخدم الآن من الـ API: `GET`/`PUT /users/{id}/mfa-exemption`، `POST /users/{id}/mfa-exemption/revoke`، `POST /groups`، `POST /me/notify-admins`، `POST /auth/employee-id`.
@@ -53,7 +98,7 @@
   - الجدول `me_admin_requests` والباب `me_notify_admins`: طلب واحد لكل فترة `notify_admins.cooldown_minutes` (الافتراضي 60، Q623)، نص عادي فقط حتى 500 حرف بلا `<` و`>` وكيانات HTML (Q624)، إشعار داخلي من النوع الجديد `assignment_request` وبريد لكل مدير نظام نشط، وسطر تدقيق `admins_notified`.
   - الإعدادان `require_mfa` (false) و`notify_admins.cooldown_minutes` (60) مفتاحان محميان (`settings_guarded_keys`).
 - الـ API: `User.mfa_exempt` و`mfa_exempt_until` لشارة «MFA exempt»؛ الدخول وإعادة التحقق يجيبان 401 `mfa_required` عند تفعيل `require_mfa` بلا تحقق بخطوتين ولا إعفاء ساري؛ أحداث سجل الأمان `mfa_exemption_granted` و`mfa_exemption_revoked`.
-- العقد 0.15.57: أوصاف المسارات الستة، الاستجابات 403/422 لـ `notifyAdmins` و429 لـ `linkEmployeeId`، والنوع `assignment_request` في `NotificationKind`.
+- العقد 0.15.60: أوصاف المسارات الستة، الاستجابات 403/422 لـ `notifyAdmins` و429 لـ `linkEmployeeId`، والنوع `assignment_request` في `NotificationKind`.
 - اختبارات `apps/api/test/users-groups-api.test.ts` بقاعدة بيانات خاصة (`TEST_DATABASE_URL_MFA`)، وحالات أمان قاعدة البيانات `tests/db-security/cases/E9_users_groups_api.sql`.
 
 ### تعديل

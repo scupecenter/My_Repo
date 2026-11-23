@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { adminApi, Api, delegate, grantProfile, loggedIn, makeAdmin, makeUser, startApp, superDbMfa } from './helpers';
 
 /**
- * Migration 0143, contract 0.15.57: the per-user MFA exemption, POST /groups, POST /me/notify-admins and POST /auth/employee-id on the real API.
+ * Migration 0143, contract 0.15.60: the per-user MFA exemption, POST /groups, POST /me/notify-admins and POST /auth/employee-id on the real API.
  * Runs on its own database (TEST_DATABASE_URL_MFA): one case switches the global setting require_mfa on.
  */
 let app: NestExpressApplication;

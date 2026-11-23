@@ -521,7 +521,7 @@ export const REAL_API_AUTH_USERS = [
   ['put', '/staff-registry/visibility'],
   ['get', '/staff-registry/:employeeId'],
   ['patch', '/staff-registry/:employeeId'],
-  // Contract 0.15.57 (migration 0143): the MFA exemption, creating a group, the pending user's request to the System Admins, the employee-ID link.
+  // Contract 0.15.60 (migration 0143): the MFA exemption, creating a group, the pending user's request to the System Admins, the employee-ID link.
   ['get', '/users/:id/mfa-exemption'],
   ['put', '/users/:id/mfa-exemption'],
   ['post', '/users/:id/mfa-exemption/revoke'],

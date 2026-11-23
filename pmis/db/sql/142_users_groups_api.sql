@@ -1,4 +1,4 @@
--- 0143_users_groups_api: the last users, groups and sign-in routes of the web on the real API (CHANGELOG 193; contract 0.15.57).
+-- 0143_users_groups_api: the last users, groups and sign-in routes of the web on the real API (CHANGELOG 193; contract 0.15.60).
 -- Mirror: db/sql/142_users_groups_api.sql (kept byte-identical).
 --
 -- WHAT THIS ADDS.
