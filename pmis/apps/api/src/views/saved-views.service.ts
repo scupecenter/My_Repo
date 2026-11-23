@@ -83,6 +83,27 @@ function treeRegions(tree: unknown): unknown[] {
   return out;
 }
 
+/** The Master-column conditions (`m:<ord>`) of a tree, at any level. */
+function treeHasMaster(tree: unknown): boolean {
+  if (!tree || typeof tree !== 'object' || !Array.isArray((tree as { items?: unknown }).items)) return false;
+  return (tree as { items: unknown[] }).items.some((it) => (it && typeof it === 'object' && Array.isArray((it as { items?: unknown }).items) ? treeHasMaster(it) : typeof (it as { field?: unknown })?.field === 'string' && /^m:/.test((it as { field: string }).field)));
+}
+
+/** The tree without the conditions on fields the reader may not use (a group left empty goes too), and how many conditions went. */
+function stripTree(tree: { op?: unknown; items: unknown[] }, keys: Set<string>): { tree: { op?: unknown; items: unknown[] }; n: number } {
+  let n = 0;
+  const items: unknown[] = [];
+  for (const it of tree.items) {
+    if (it && typeof it === 'object' && Array.isArray((it as { items?: unknown }).items)) {
+      const sub = stripTree(it as { items: unknown[] }, keys);
+      n += sub.n;
+      if (sub.tree.items.length) items.push(sub.tree);
+    } else if (typeof (it as { field?: unknown })?.field === 'string' && keys.has((it as { field: string }).field)) items.push(it);
+    else n += 1;
+  }
+  return { tree: { ...tree, items }, n };
+}
+
 @Injectable()
 export class SavedViewsService {
   constructor(private readonly db: DbService, private readonly access: AccessService, private readonly catalog: FilterCatalogService) {}
@@ -98,20 +119,36 @@ export class SavedViewsService {
     }
   }
 
+  /**
+   * 0.15.49: a view of `site360-<menu>` may hold a condition on a Master column (`m:<ord>`) that the reader may not use (a register the reader may not view, a
+   * custom field a field rule hides): the condition is removed from what the reader gets and counted in `stripped_columns`, as hidden columns and fields are
+   * on the other screens (the database strips `f:` and `c:` fields; the Master columns are decided by the catalogue of the reader).
+   */
+  private async scrub<T extends SavedViewDto>(dto: T): Promise<T> {
+    if (!dto || typeof dto.screen_key !== 'string' || !/^site360-/.test(dto.screen_key)) return dto;
+    const adv = (dto.filters as { advanced?: unknown } | undefined)?.advanced;
+    if (!treeHasMaster(adv)) return dto;
+    const keys = new Set((await this.catalog.catalog(dto.screen_key)).keys());
+    const out = stripTree(adv as { items: unknown[] }, keys);
+    if (!out.n) return dto;
+    const stripped = typeof dto.stripped_columns === 'number' ? dto.stripped_columns : 0;
+    return { ...dto, filters: { ...dto.filters, advanced: out.tree }, stripped_columns: stripped + out.n };
+  }
+
   // ------------------------------------------------------------------ views
   async list(_auth: AuthContext, q: Record<string, unknown>): Promise<{ items: SavedViewDto[]; can_share: string; can_manage: boolean }> {
     const screen = typeof q.screen_key === 'string' && q.screen_key !== '' ? q.screen_key : null;
     if (screen !== null && !SCREEN.safeParse(screen).success) throw problems.validation([{ path: '/screen_key', code: 'invalid' }]);
     const scope = typeof q.scope === 'string' && q.scope !== '' ? q.scope : 'all';
     const inactive = boolParam(q, 'include_inactive') === true;
-    const items = await this.run<SavedViewDto[]>(Prisma.sql`SELECT sv_list(${screen}::text, ${scope}::text, ${inactive}::boolean) AS r`);
+    const items = await Promise.all((await this.run<SavedViewDto[]>(Prisma.sql`SELECT sv_list(${screen}::text, ${scope}::text, ${inactive}::boolean) AS r`)).map((v) => this.scrub(v)));
     const flags = await this.run<{ share: string; manage: boolean }>(Prisma.sql`SELECT jsonb_build_object('share', sv_share_scope(app_actor()), 'manage', sv_is_manager()) AS r`);
     return { items, can_share: flags.share, can_manage: flags.manage };
   }
 
   async get(_auth: AuthContext, id: string): Promise<SavedViewDto> {
     if (!uuidSchema.safeParse(id).success) throw problems.notFound();
-    return this.run<SavedViewDto>(Prisma.sql`SELECT sv_get(${id}::uuid) AS r`);
+    return this.scrub(await this.run<SavedViewDto>(Prisma.sql`SELECT sv_get(${id}::uuid) AS r`));
   }
 
   /**
@@ -137,7 +174,7 @@ export class SavedViewsService {
     await this.catalog.validate(b.screen_key, b.filters?.advanced);
     if (nonEmpty(b.audience)) await this.checkRegionScope(b.screen_key, b.filters);
     const { reason: why, ...body } = b;
-    return this.run<SavedViewDto>(Prisma.sql`SELECT sv_save(NULL::uuid, NULL::int, ${JSON.stringify(body)}::jsonb, ${why ?? null}::text) AS r`);
+    return this.scrub(await this.run<SavedViewDto>(Prisma.sql`SELECT sv_save(NULL::uuid, NULL::int, ${JSON.stringify(body)}::jsonb, ${why ?? null}::text) AS r`));
   }
 
   async update(auth: AuthContext, id: string, ifMatch: string | undefined, raw: unknown): Promise<SavedViewDto> {
@@ -148,7 +185,7 @@ export class SavedViewsService {
     const shared = b.audience === undefined ? cur.shared : nonEmpty(b.audience);
     if (shared && (b.filters !== undefined || b.audience !== undefined)) await this.checkRegionScope(cur.screen_key, b.filters ?? cur.filters);
     const { reason: why, ...body } = b;
-    return this.run<SavedViewDto>(Prisma.sql`SELECT sv_save(${id}::uuid, ${version}::int, ${JSON.stringify(body)}::jsonb, ${why ?? null}::text) AS r`);
+    return this.scrub(await this.run<SavedViewDto>(Prisma.sql`SELECT sv_save(${id}::uuid, ${version}::int, ${JSON.stringify(body)}::jsonb, ${why ?? null}::text) AS r`));
   }
 
   async setActive(_auth: AuthContext, id: string, active: boolean, ifMatch: string | undefined, raw: unknown): Promise<SavedViewDto> {
@@ -178,21 +215,40 @@ export class SavedViewsService {
     return this.run<unknown>(Prisma.sql`SELECT sv_import(${b.screen_key}::text, ${JSON.stringify(b.items)}::jsonb) AS r`);
   }
 
-  /** F3: the filter fields of a list screen the caller may filter on (the whitelist, hidden fields left out). */
-  async filterFields(q: Record<string, unknown>): Promise<Record<string, unknown>> {
+  /** The screen of a filter-fields request: it must have a filter builder and the caller must be able to open its module(s). */
+  private async requireFilterScreen(q: Record<string, unknown>): Promise<string> {
     const screen = typeof q.screen_key === 'string' ? q.screen_key : '';
     if (!SCREEN.safeParse(screen).success || !FilterCatalogService.supports(screen)) {
       throw problems.validation([{ path: '/screen_key', code: 'invalid', message: 'This list has no filter builder.' }]);
     }
-    const local = FilterCatalogService.modulesOf(screen); // the screens of 0.15.45 (dashboard, site360-<menu>) have no saved views
+    const local = FilterCatalogService.modulesOf(screen); // dashboard and site360-<menu>: two rights for the dashboard, the Site Register for the menus
     if (local) {
       for (const m of local) await this.access.requireRegions(m, 'view');
-      return this.catalog.describe(screen);
+      return screen;
     }
     const mod = await this.run<string | null>(Prisma.sql`SELECT sv_screen_module(${screen}::text) AS r`);
     if (!mod) throw problems.validation([{ path: '/screen_key', code: 'invalid', message: 'Not a list screen with saved views.' }]);
     await this.access.requireRegions(mod, 'view');
-    return this.catalog.describe(screen);
+    return screen;
+  }
+
+  /** F3: the filter fields of a list screen the caller may filter on (the whitelist, hidden fields left out). */
+  async filterFields(q: Record<string, unknown>): Promise<Record<string, unknown>> {
+    return this.catalog.describe(await this.requireFilterScreen(q));
+  }
+
+  /** 0.15.49: the values of one enum field that match `q` (a field whose list was cut at 500 stays reachable); the same scope and hidden-field rules as the catalogue. */
+  async filterFieldValues(field: string, q: Record<string, unknown>): Promise<Record<string, unknown>> {
+    const screen = await this.requireFilterScreen(q);
+    const text = q.q === undefined || q.q === null ? '' : typeof q.q === 'string' ? q.q : null;
+    if (text === null || text.length > 100) throw problems.validation([{ path: '/q', code: 'invalid', message: 'q is a text of at most 100 characters.' }]);
+    let limit = 50;
+    if (q.limit !== undefined && q.limit !== '') {
+      limit = Number(q.limit);
+      if (!Number.isInteger(limit) || limit < 1 || limit > 500) throw problems.validation([{ path: '/limit', code: 'out_of_range', message: 'limit is a whole number from 1 to 500.' }]);
+    }
+    if (!field || field.length > 100) throw problems.validation([{ path: '/field', code: 'unknown_field' }]);
+    return this.catalog.values(screen, field, text, limit);
   }
 
   // ------------------------------------------------------------------ drafts (Q115)

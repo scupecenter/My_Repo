@@ -32,6 +32,12 @@ export class SavedViewsController {
     return this.svc.filterFields(q);
   }
 
+  /** 0.15.49: the values of one enum field that match `q` (server-side search of a value list that was cut at 500). */
+  @Get('saved-views/filter-fields/:field/values')
+  filterFieldValues(@Param('field') field: string, @Query() q: Record<string, unknown>) {
+    return this.svc.filterFieldValues(field, q);
+  }
+
   @Post('saved-views/import')
   @HttpCode(200)
   import(@Auth() auth: AuthContext, @Body() body: unknown) {

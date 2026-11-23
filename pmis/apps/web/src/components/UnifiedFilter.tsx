@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
   useFilterFields,
+  useFilterFieldValues,
   type FilterCondition,
   type FilterOperator,
   type FilterTree,
@@ -128,7 +129,19 @@ function Check({
   );
 }
 
-/** A multi-select checklist with its own search (the real values of the column). */
+function useDebounced<T>(value: T, ms: number): T {
+  const [v, setV] = useState(value);
+  useEffect(() => {
+    const h = setTimeout(() => setV(value), ms);
+    return () => clearTimeout(h);
+  }, [value, ms]);
+  return v;
+}
+
+/**
+ * A multi-select checklist with its own search (the real values of the column). When the list was cut by the server (`truncated`, 0.15.49) the search asks the
+ * server as the user types (debounced), so a value beyond the first 500 is reachable; the values already chosen stay on the list.
+ */
 function ChoiceList({
   options,
   selected,
@@ -136,6 +149,7 @@ function ChoiceList({
   truncated,
   single,
   idp,
+  search,
 }: {
   options: { value: string; label: string }[];
   selected: string[];
@@ -143,15 +157,38 @@ function ChoiceList({
   truncated?: boolean;
   single?: boolean;
   idp: string;
+  search?: { screen: string; field: string; lang: string };
 }) {
   const { t } = useTranslation();
   const [q, setQ] = useState("");
-  const shown = options.filter(
-    (o) =>
-      !q.trim() ||
-      o.label.toLowerCase().includes(q.trim().toLowerCase()) ||
-      o.value.toLowerCase().includes(q.trim().toLowerCase()),
+  const term = useDebounced(q.trim(), 300);
+  const remote = useFilterFieldValues(
+    search?.screen ?? "",
+    search?.field ?? "",
+    term,
+    !!search && !!truncated,
   );
+  const server = !!search && !!truncated && q.trim() !== "" && !!remote.data;
+  const pending = !!search && !!truncated && q.trim() !== "" && (term !== q.trim() || remote.isFetching);
+  const found = server
+    ? remote.data!.items.map((o) => ({
+        value: o.value,
+        label: (search!.lang === "ar" && o.label_ar) || o.label_en,
+      }))
+    : [];
+  const chosen = server
+    ? selected
+        .filter((v) => !found.some((o) => o.value === v))
+        .map((v) => ({ value: v, label: options.find((o) => o.value === v)?.label ?? v }))
+    : [];
+  const shown = server
+    ? [...chosen, ...found]
+    : options.filter(
+        (o) =>
+          !q.trim() ||
+          o.label.toLowerCase().includes(q.trim().toLowerCase()) ||
+          o.value.toLowerCase().includes(q.trim().toLowerCase()),
+      );
   return (
     <div className="space-y-1">
       {(options.length > 6 || truncated) && (
@@ -182,8 +219,13 @@ function ChoiceList({
             {o.label}
           </Check>
         ))}
-        {!shown.length && (
+        {!shown.length && !pending && (
           <p className="p-2 text-sm text-mute">{t("filters.no_values")}</p>
+        )}
+        {pending && (
+          <p className="p-2 text-xs text-mute" data-testid={`${idp}-searching`}>
+            {t("filters.searching")}
+          </p>
         )}
       </div>
       {truncated && (
@@ -241,11 +283,13 @@ function FieldEditor({
   cond,
   apply,
   done,
+  screen,
 }: {
   f: UnifiedField;
   cond: FilterCondition | undefined;
   apply: (c: FilterCondition | null) => void;
   done: () => void;
+  screen: string;
 }) {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
@@ -367,6 +411,7 @@ function FieldEditor({
           options={opts}
           selected={sel}
           truncated={f.truncated}
+          search={{ screen, field: f.key, lang }}
           onToggle={(v) =>
             setList(
               sel.includes(v) ? sel.filter((x) => x !== v) : [...sel, v],
@@ -1109,6 +1154,7 @@ export function UnifiedFilter({
                       cond={condOf(entry.field.key)}
                       apply={applyField(entry.field.key)}
                       done={close}
+                      screen={screen}
                     />
                   )}
                   {entry?.extra && (

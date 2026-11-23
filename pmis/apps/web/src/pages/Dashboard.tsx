@@ -24,8 +24,9 @@ import { streamName } from "@/lib/streams";
 import { tripoliToday } from "@/lib/today";
 import { orderedVisible, type TabLayout } from "./dashboardLayout";
 import { useDashboardSettings } from "@/api/dashboardSettings";
+import { SavedViews } from "@/components/SavedViews";
 import { UnifiedFilter } from "@/components/UnifiedFilter";
-import { decodeFilter, encodeFilter } from "@/api/views";
+import { decodeFilter, encodeFilter, type FilterTree } from "@/api/views";
 import {
   DASH_TABS,
   readRemembered,
@@ -608,6 +609,9 @@ function F13Panel({
   );
 }
 
+/** What a saved view of the dashboard keeps (0.15.49): the quick parameters; the filter tree is the key `advanced`. */
+const DASH_VIEW_EMPTY = { region_id: "", cluster_code: "", scenario: "", stream: "", view: "" };
+
 export function Dashboard() {
   const { t, i18n } = useTranslation();
   const ar = i18n.language === "ar";
@@ -1086,6 +1090,23 @@ export function Dashboard() {
         className="card flex flex-wrap items-end gap-3 p-3 print:hidden"
         data-testid="dash-filters"
       >
+        {/* 0.15.49: saved views of the dashboard keep the filter tree and the quick parameters (region, cluster, scenario, stream, view); the reference date is not saved */}
+        <SavedViews
+          screen="dashboard"
+          value={{ region_id: q.region_id ?? "", cluster_code: q.cluster_code ?? "", scenario: q.scenario ?? "", stream: q.stream ?? "", view: tab === "pmo" ? (q.view ?? "") : "", ...(advTree ? { advanced: advTree } : {}) }}
+          empty={DASH_VIEW_EMPTY}
+          onApply={(v) => {
+            const r = v as Record<string, unknown>;
+            setParam({
+              region_id: String(r.region_id ?? ""),
+              cluster_code: String(r.cluster_code ?? ""),
+              scenario: String(r.scenario ?? ""),
+              stream: String(r.stream ?? ""),
+              ...(tab === "pmo" ? { view: String(r.view ?? "") } : {}),
+              adv: encodeFilter(r.advanced as FilterTree | undefined),
+            });
+          }}
+        />
         <div className="text-sm">
           <div>
             <UnifiedFilter

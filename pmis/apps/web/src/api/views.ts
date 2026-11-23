@@ -69,6 +69,13 @@ export const useFilterFields = (screen: string, enabled = true) =>
   useQuery({ queryKey: ['filter-fields', screen], enabled: enabled && hasFilterBuilder(screen), staleTime: 300_000,
     queryFn: () => api.get<FilterFieldList>('/saved-views/filter-fields', { query: { screen_key: screen } }) });
 
+export type FilterFieldValues = S['FilterFieldValues'];
+
+/** 0.15.49: the values of a truncated enum field that match `q`, searched on the server (the caller debounces `q`). */
+export const useFilterFieldValues = (screen: string, field: string, q: string, enabled = true) =>
+  useQuery({ queryKey: ['filter-field-values', screen, field, q], enabled: enabled && !!screen && !!field && q.trim() !== '', staleTime: 60_000, placeholderData: (prev) => prev,
+    queryFn: () => api.get<FilterFieldValues>(`/saved-views/filter-fields/${encodeURIComponent(field)}/values`, { query: { screen_key: screen, q: q.trim(), limit: 50 } }) });
+
 /** A tree for the URL and the `filter` parameter; an empty tree is no filter. */
 export const encodeFilter = (t: FilterTree | null | undefined): string => (t && t.items.length ? JSON.stringify(t) : '');
 export function decodeFilter(s: string | null | undefined): FilterTree | null {

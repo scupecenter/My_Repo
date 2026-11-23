@@ -8739,8 +8739,35 @@ export interface paths {
          *     filters are left out. A field that holds codes or repeating text is an `enum` with its `options` (the distinct values the caller can see, at most 500,
          *     `truncated` when there are more; a list field: the values of its list catalogue), and every field carries a `group` for the one dropdown of the builder.
          *     Needs the view right on the screen's module (403 `module_forbidden`; `dashboard` needs `dashboard.view` and `sites.view`); another screen answers 422.
+         *     0.15.49: a field whose `options` came back with `truncated: true` is searched on the server with `GET /saved-views/filter-fields/{field}/values`.
          */
         get: operations["listFilterFields"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/saved-views/filter-fields/{field}/values": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search the values of an enum filter field on the server (0.15.49)
+         * @description The values of one `enum` field of `GET /saved-views/filter-fields` that match `q`, so that every value is reachable when the field's `options` were cut at
+         *     500 (`truncated: true`). The same sources, scope and hidden-field rules as the catalogue: the distinct non-empty values of the rows the caller can see (the
+         *     caller's region scope and row security apply), the active values of the field's list catalogue, or its fixed options. `q` matches anywhere in the value or in
+         *     the label (English or Arabic), case-insensitively, with no wildcards; an empty `q` returns the first values in the order of the catalogue. At most `limit`
+         *     items, `truncated` when there are more. Read only, no audit row. Needs the view right on the screen's module (403 `module_forbidden`, as the catalogue).
+         *     422 `validation_failed`: `unknown_field` (a field outside the catalogue; a field hidden from the caller is unknown too), `not_enum` (the field has no value
+         *     list), `invalid` (`screen_key` is not a screen with a filter builder, or `q` is longer than 100 characters), `out_of_range` (`limit`).
+         */
+        get: operations["listFilterFieldValues"];
         put?: never;
         post?: never;
         delete?: never;
@@ -16036,7 +16063,21 @@ export interface components {
                 max_values: number;
             };
         };
-        /** @description A list screen (0.12.12): `sites`, `sites-stream`, `site-tasks`, `register-<register key>`, `audit-log`, `field-changes`, `security-log`, `system-log` (0.15.2), `tasks-board` (0.15.32, F5). 0.15.45: `GET /saved-views/filter-fields` also takes `site360-<menu>` (menu: master, design_acq, sow, cw, te, hoto, dismantle, om) and `dashboard`; these two have no saved views. */
+        /** @description 0.15.49. The values of one enum field that match `q`. */
+        FilterFieldValues: {
+            screen_key: string;
+            field: string;
+            /** @description The search text as the server used it (trimmed). */
+            q: string;
+            items: {
+                value: string;
+                label_en: string;
+                label_ar?: string;
+            }[];
+            /** @description True when more values match than `limit`. */
+            truncated: boolean;
+        };
+        /** @description A list screen (0.12.12): `sites`, `sites-stream`, `site-tasks`, `register-<register key>`, `audit-log`, `field-changes`, `security-log`, `system-log` (0.15.2), `tasks-board` (0.15.32, F5). 0.15.45: `GET /saved-views/filter-fields` also takes `site360-<menu>` (menu: master, design_acq, sow, cw, te, hoto, dismantle, om) and `dashboard`. 0.15.49: these two screens have saved views too (the module of `site360-<menu>` is `sites`, the module of `dashboard` is `dashboard`, and a `dashboard` view also needs the Site Register right). */
         SavedViewScreenKey: string;
         /** @description Column control of the screen: order, hidden columns, widths in px and density. Hiding a column never changes a permission. */
         SavedViewColumns: {
@@ -33417,6 +33458,36 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FilterFieldList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listFilterFieldValues: {
+        parameters: {
+            query: {
+                screen_key: components["schemas"]["SavedViewScreenKey"];
+                q?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                /** @description The field key as the catalogue lists it, URL-encoded (for example `m%3A12` for the Master column 12 or `cluster_code`). */
+                field: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The matching values. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FilterFieldValues"];
                 };
             };
             401: components["responses"]["Unauthorized"];

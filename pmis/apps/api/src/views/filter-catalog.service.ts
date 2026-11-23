@@ -620,8 +620,8 @@ export class FilterCatalogService {
     }
   }
 
-  /** The whitelist of a screen for the signed-in caller (hidden fields left out); `withOptions` loads the value lists of the enum fields (the builder only). */
-  async catalog(screen: string, withOptions = false): Promise<FilterCatalog> {
+  /** The visible fields of a screen (hidden ones left out) and where the value list of each enum field comes from. */
+  private async build(screen: string, withOptions: boolean): Promise<Built> {
     if (!FilterCatalogService.supports(screen)) {
       throw problems.validation([
         {
@@ -647,7 +647,66 @@ export class FilterCatalogService {
     );
     const fields = built.fields.filter((f) => !hidden.has(f.key));
     if (withOptions) await this.resolveOptions(fields, built.wants);
+    return { fields, wants: built.wants };
+  }
+
+  /** The whitelist of a screen for the signed-in caller (hidden fields left out); `withOptions` loads the value lists of the enum fields (the builder only). */
+  async catalog(screen: string, withOptions = false): Promise<FilterCatalog> {
+    const { fields } = await this.build(screen, withOptions);
     return new Map(fields.map((f) => [f.key, f]));
+  }
+
+  /**
+   * GET /saved-views/filter-fields/{field}/values (0.15.49): the values of one enum field that match `q`, so that a value beyond the first CAP of a cut list is
+   * reachable. The same sources, the same scope and the same hidden-field rules as the catalogue: a field the caller may not see is unknown (422 `unknown_field`),
+   * the distinct values of the data are those of the rows the caller can see (region scope, row security), a list field matches the active values of its list
+   * catalogue by code or label. `q` matches anywhere in the value or the label, case-insensitively and without wildcards; at most `limit` items, `truncated`
+   * when there are more.
+   */
+  async values(screen: string, key: string, q: string, limit: number): Promise<{ screen_key: string; field: string; q: string; items: NonNullable<FilterField['options']>; truncated: boolean }> {
+    const { fields, wants } = await this.build(screen, false);
+    const f = fields.find((x) => x.key === key);
+    if (!f) throw problems.validation([{ path: '/field', code: 'unknown_field', message: `${key} is not a filter field of this list.` }]);
+    if (f.type !== 'enum') throw problems.validation([{ path: '/field', code: 'not_enum', message: `${key} has no list of values.` }]);
+    const needle = q.trim().toLowerCase().slice(0, 100);
+    const has = (...cols: Prisma.Sql[]) =>
+      needle ? Prisma.sql`AND (${Prisma.join(cols.map((c) => Prisma.sql`strpos(lower(${c}), ${needle}::text) > 0`), ' OR ')})` : Prisma.empty;
+    const w = wants.get(key);
+    let rows: { value: string; label_en?: string; label_ar?: string | null }[];
+    if (!w) {
+      // a fixed set (regions, statuses, scope flags, the fixed options of a column): nothing is cut, it is filtered here
+      rows = (f.options ?? []).filter((o) => !needle || o.value.toLowerCase().includes(needle) || o.label_en.toLowerCase().includes(needle) || (o.label_ar ?? '').toLowerCase().includes(needle));
+    } else if (w.kind === 'site') {
+      const regs = await this.access.regions('sites', 'view');
+      const scope = regs === null ? Prisma.empty : Prisma.sql`AND s.region_id = ANY(${regs}::int[])`;
+      const got = await this.db.tx.$queryRaw<{ v: string }[]>(Prisma.sql`
+        SELECT d.v FROM (SELECT DISTINCT (${w.expr})::text AS v FROM sites s WHERE s.is_active ${scope}) d
+        WHERE nullif(btrim(d.v), '') IS NOT NULL ${has(Prisma.sql`d.v`)} ORDER BY d.v LIMIT ${limit + 1}`);
+      rows = got.map((r) => ({ value: r.v }));
+    } else if (w.kind === 'register') {
+      const got = await this.db.tx.$queryRaw<{ v: string }[]>(Prisma.sql`
+        SELECT d.v FROM (SELECT DISTINCT (${w.expr})::text AS v FROM register_records r
+          WHERE r.register_key = ${w.key} AND ${w.regs === null ? Prisma.sql`true` : Prisma.sql`(r.is_global OR r.region_id = ANY(${w.regs}::int[]))`}
+            AND NOT EXISTS (SELECT 1 FROM register_records n WHERE n.entity_id = r.entity_id AND n.version_no > r.version_no)) d
+        WHERE nullif(btrim(d.v), '') IS NOT NULL ${has(Prisma.sql`d.v`)} ORDER BY d.v LIMIT ${limit + 1}`);
+      rows = got.map((r) => ({ value: r.v }));
+    } else if (w.kind === 'catalogue') {
+      rows = await this.db.tx.$queryRaw<{ value: string; label_en: string; label_ar: string | null }[]>(Prisma.sql`
+        SELECT v.code AS value, v.label_en, v.label_ar FROM list_values v WHERE v.catalogue_code = ${w.code} AND v.is_active
+          ${has(Prisma.sql`v.code`, Prisma.sql`v.label_en`, Prisma.sql`coalesce(v.label_ar, '')`)} ORDER BY v.sort_order, v.code LIMIT ${limit + 1}`);
+    } else {
+      rows = await this.db.tx.$queryRaw<{ value: string; label_en: string; label_ar: string | null }[]>(Prisma.sql`
+        SELECT l.code AS value, l.label_en, l.label_ar FROM field_list_values l JOIN field_definitions fd ON fd.id = l.field_id
+        WHERE fd.entity_type = 'site'::"FieldEntityType" AND fd.code = ${w.code} AND l.is_active
+          ${has(Prisma.sql`l.code`, Prisma.sql`l.label_en`, Prisma.sql`coalesce(l.label_ar, '')`)} ORDER BY l.sort_order, l.code LIMIT ${limit + 1}`);
+    }
+    return {
+      screen_key: screen,
+      field: key,
+      q: q.trim(),
+      truncated: rows.length > limit,
+      items: rows.slice(0, limit).map((r) => ({ value: r.value, label_en: r.label_en ?? r.value, ...(r.label_ar ? { label_ar: r.label_ar } : {}) })),
+    };
   }
 
   /** The field ids among these that the caller may not see on the screen (the database decides; built-in ids are never hidden). */

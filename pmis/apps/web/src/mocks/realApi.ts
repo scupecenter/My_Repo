@@ -317,6 +317,7 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/saved-views'],
   ['post', '/saved-views/import'],
   ['get', '/saved-views/filter-fields'], // 0.15.31 (F3)
+  ['get', '/saved-views/filter-fields/:field/values'], // 0.15.49
   ['get', '/saved-views/:id'],
   ['patch', '/saved-views/:id'],
   ['post', '/saved-views/:id/deactivate'],
