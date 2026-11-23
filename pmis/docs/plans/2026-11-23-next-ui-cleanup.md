@@ -31,25 +31,25 @@ Menu names and places:
 
 | Item | English | Arabic | Place |
 |------|---------|--------|-------|
-| New main menu | Documents | المستندات | Sidebar, after Data entry and before Administration |
-| Its first page (approved forms) | Templates | القوالب | Documents > Templates |
-| Its second page (site document archive) | Archive | الأرشيف | Documents > Archive |
+| New main menu | Library | المكتبة | Sidebar, after Data entry and before Administration |
+| Its first page (approved forms) | Forms | النماذج | Library > Forms |
+| Its second page (site document archive) | Archive | الأرشيف | Library > Archive |
 | Daily progress and plan | Daily Plan | الخطة اليومية | My Work > Daily Plan, with two tabs: Progress (الإنجاز) and Tomorrow (خطة الغد) |
 
-W5 decisions (Documents: Templates and Archive):
+W5 decisions (Library: Forms and Archive):
 1. **Who generates a filled document for a site:** the L1 holder of the task that the document belongs to, plus anyone the Responsibility Matrix or the permission grid gives "Documents: generate" for that region. The L2 holder approves the signed upload, as today.
-2. **Archive cards:** one card per Document Library type that has at least one file or one generated document, grouped by stream (Design & Acquisition, Civil Works, Installation (TE), O&M, Handover & Closure, Dismantle, Registers). Each card shows the counts approved, waiting review and missing. The admin hides, shows and orders the cards in Settings > Documents > Archive.
+2. **Archive cards:** one card per Document Library type that has at least one file or one generated document, grouped by stream (Design & Acquisition, Civil Works, Installation (TE), O&M, Handover & Closure, Dismantle, Registers). Each card shows the counts approved, waiting review and missing. The admin hides, shows and orders the cards in Settings > Library > Archive.
 3. **Archive list (inside a card), full options:**
    - Columns: Site ID, site name, region, cluster, document type, document number, version, status (due / generated / signed and uploaded / in review / approved / rejected / superseded), task, uploaded by, upload date, approved by, approval date.
    - Tools: + Filter, saved views, search (site, number or file name), Export current view, bulk download as zip (by filter), file preview, version history, and open the site's Documents tab.
    - Every download is audited.
-4. **Templates page, full options:**
+4. **Forms page, full options:**
    - Lists every approved form (the uploaded SoF and CW forms, future HTML forms), with: name, code, version, document type it produces, triggering task, numbering pattern and last update.
    - A user with the right picks a form and a site, sees the auto-filled preview, then downloads or prints it. The generated copy enters the Archive as "generated".
    - Uploading a new form or a new version, approving it and binding its fields happen in Settings > Documents (Library and Form templates), linked from this page for admins.
 5. **When a document is due:** each form is bound in the Document Library to its document type and its triggering task (admin setting). A document becomes "due" when that task opens. The site's Documents tab and the Archive show the lifecycle: due, generated, signed and uploaded, in review, approved.
 6. **Settings > Documents** gets these sections:
-   - Library (existing).
+   - Document types (the existing "Library" section, renamed so it is not confused with the new Library menu; same route with a redirect).
    - Form templates (upload, versions, field bindings, numbering).
    - Archive (visible cards and their order, default columns, bulk zip limit).
    - Mail (existing).
@@ -87,7 +87,7 @@ W1 decision: the single tab row takes its phases from the published workflow ver
 | W2 | Registers & Logs: the same view options as Site Master (wide table, board, density, map where it applies) | Pending | |
 | W3 | Settings > Site360: remove the tab and the name; move what is still useful into Settings > Workflow | Pending | |
 | W4 | Dead or stuck screens: Settings > Alerts and Security stay on "Loading..."; audit every menu and tab | Pending | |
-| W5 | Documents hub: split "Data entry > Templates" into Data entry (input templates) and a new main menu Documents | Pending | |
+| W5 | Library menu (Forms and Archive); Data entry > Templates stays as it is | Pending | |
 | W7 | Daily Progress and Tomorrow Plan: a screen in the system, copyable to email | Pending | |
 | W6 | CHANGELOG, CLAUDE.md navigation notes and this file updated | Pending | |
 
@@ -149,7 +149,7 @@ Do:
 
 Acceptance: no screen stays on "Loading..."; each one either works or says "not available" clearly; the audit table is filled in.
 
-## W5. Documents hub (owner image 7 and request)
+## W5. Library (Forms and Archive) (owner image 7 and request)
 
 Today "Data entry > Templates" (pages/Templates.tsx, "Templates and uploads") mixes:
 - input templates (Excel per register and per SITE 360 stream, upload and validate), and
@@ -157,10 +157,10 @@ Today "Data entry > Templates" (pages/Templates.tsx, "Templates and uploads") mi
 
 The owner wants this clear:
 
-1. **Data entry > Templates stays exactly as it is** (name, route and content), owner decision 2026-11-23: it may be removed later. Do not rename or move it. Only the document forms (the uploaded SoF and CW forms) move from it to Documents > Templates, if they are listed there today.
-2. **Documents** (new main menu) has two cards:
-   - **Approved forms and templates**: every approved document form (the uploaded project forms and future HTML forms), with version, owner, the document type it produces and the stage or task that triggers it. From here, a user with the right can generate a filled document for a site: auto-fill, preview, download or print. Admins upload and approve new forms here; Settings > Documents > Library moves here or links here.
-   - **Site documents (archive)**: one card per document type, for example Site Survey Report or Handover Certificate, with a count. Opening a card lists every document of that type for all sites in a list with + Filter, saved views and Export: site, version, status (generated / signed and uploaded / approved), uploaded by, date, file. Each row opens the file and the site's Documents tab.
+1. **Data entry > Templates stays exactly as it is** (name, route and content), owner decision 2026-11-23: it may be removed later. Do not rename or move it. Only the document forms (the uploaded SoF and CW forms) move from it to Library > Forms, if they are listed there today.
+2. **Library** (new main menu, المكتبة) has two cards:
+   - **Forms (النماذج)**: every approved document form (the uploaded project forms and future HTML forms), with version, owner, the document type it produces and the stage or task that triggers it. From here, a user with the right can generate a filled document for a site: auto-fill, preview, download or print. For admins, the page links to Settings > Documents (Document types and Form templates), where forms are uploaded, versioned and approved.
+   - **Archive (الأرشيف)**: one card per document type, for example Site Survey Report or Handover Certificate, with a count. Opening a card lists every document of that type for all sites in a list with + Filter, saved views and Export: site, version, status (generated / signed and uploaded / approved), uploaded by, date, file. Each row opens the file and the site's Documents tab.
 3. The document lifecycle is visible:
    - **Due:** a task reaches the stage that needs the document.
    - **Generated:** auto-filled from site data.
@@ -170,7 +170,7 @@ The owner wants this clear:
 
    Each step is shown on the site's Documents tab and in the archive list.
 4. Reuse the existing APIs for documents, the document library and site documents (find them in apps/api/src/documents and the contract). Add only what is missing, with a contract patch version.
-5. Navigation: add Documents to the sidebar between Data entry and Administration (or where CLAUDE.md navigation says). Update CLAUDE.md navigation notes.
+5. Navigation: add Library to the sidebar between Data entry and Administration (or where CLAUDE.md navigation says). Update CLAUDE.md navigation notes.
 6. Tests: vitest for both cards and the archive list; API tests for any new endpoint; one e2e: generate a filled document for a site, upload the signed copy, see it in the archive.
 
 Acceptance: Data entry > Templates is unchanged except that document forms no longer appear in it; a user finds approved forms in one place and every uploaded site document by type in one place; the lifecycle state is visible.
@@ -200,7 +200,7 @@ Acceptance: the two tables of the Excel sheet appear in the system for any date,
 
 ## W6. Documentation
 
-The CHANGELOG entry in every PR. Update CLAUDE.md navigation (Documents menu, Settings tabs), this file's Status table and the log below.
+The CHANGELOG entry in every PR. Update CLAUDE.md navigation (Library menu, Settings tabs), this file's Status table and the log below.
 
 ## Size estimate (honest)
 
@@ -217,6 +217,7 @@ Total: roughly 6 PRs and several CI cycles each. This does not fit in one short 
 
 ## Log
 
+- 2026-11-23: the new main menu is named Library (المكتبة) with Forms (النماذج) and Archive (الأرشيف); Settings > Documents > Library is renamed Document types.
 - 2026-11-23: Data entry > Templates stays as it is (no rename), it may be removed later.
 - 2026-11-23: owner decisions added (names, places, permissions via the matrix, settings in general Settings, Daily Plan under My Work, copy-paste email).
 - 2026-11-23: plan written after #183-#187 (unified filter, wide view, saved views, bulk edit, dependent lists). Nothing in W1-W6 started.
