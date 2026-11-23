@@ -52,7 +52,10 @@ const REASON = 'Registry maintenance (test)';
 
 async function freeRow(db: PgClient, over: Partial<Record<'status' | 'name_en', string>> = {}): Promise<{ id: string; email: string; phone: string }> {
   for (;;) {
-    const id = String(randomInt(2000, 9000));
+    // 9500-9999: the shared test helpers give accounts employee IDs in 1000-8999 (and the bootstrap admin 9001), so a registry row of this suite is
+    // never linked by chance to an account another suite creates in parallel; an ID an account already holds is skipped as well.
+    const id = String(randomInt(9500, 10000));
+    if ((await db.query('SELECT 1 FROM users WHERE employee_id = $1', [id])).rowCount) continue;
     const phone = `+218 9${randomInt(0, 10)} ${String(randomInt(0, 1000)).padStart(3, '0')} ${String(randomInt(0, 10000)).padStart(4, '0')}`;
     const email = `staff.${id}.${randomInt(0, 1e6)}@example.com`;
     const r = await db.query(
