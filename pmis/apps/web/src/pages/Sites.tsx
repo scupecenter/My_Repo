@@ -3,7 +3,7 @@ import { errText } from '@/components/FormDialog';
 import { Site360Grid, type Site360GridRow } from '@/components/Site360Grid';
 import { Site360SourcePanel } from '@/components/Site360Source';
 import { useSaveSite360Cell, useSite360RowsPaged, useSite360Sections } from '@/api/site360';
-import { Columns3, Download, FileDown, FilePlus2, FileUp, Map as MapIcon, RotateCcw, Table2 } from 'lucide-react';
+import { Columns3, Download, FileDown, FilePlus2, FileUp, Map as MapIcon, RotateCcw, Table2, TableProperties } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
@@ -28,6 +28,7 @@ import type { ColDef } from '@/lib/tablePrefs';
 import { EmptyState, NoResults } from '@/components/States';
 import { MiniRail } from '@/components/Pipeline';
 import { SiteMap } from '@/components/SiteMap';
+import { SitesWideTable } from '@/components/SitesWideTable';
 import { SitesBoard, SWIMLANES, type Swimlane } from '@/components/SitesBoard';
 import { useVirtual } from '@/components/useVirtual';
 import { SITE360_MASTER, SITE360_NAV } from '@/lib/site360Menus';
@@ -60,13 +61,15 @@ export function Sites() {
   // opens only when ?layout=grid is in the URL (hidden, kept for its source panel and tests).
   const section = sp.get('section') ?? '';
   const layout = sp.get('layout') === 'grid' ? 'grid' : 'list';
+  // Wide table (owner request 2026-11-22): read-only, the Master columns of the menu left to right; it reads the same GET /site360/{menu}/rows as the grid
+  const asWide = sp.get('layout') === 'wide';
   const site360Q = useSite360Sections();
   // Each sub-menu keeps its OWN columns (GET /site360/sections) and values (GET /site360/{menu}/rows) in the calm list style of this page (owner request
   // 2026-11-22): no band or group rows, no inline editing. Site Master itself shows the generic list with the pipeline, workflow locks, data gaps and the
   // stage/mine/late/locks/gaps filters (owner answer 2026-11-22 "bring them back"); a stream or a work view (?stream=, ?view=) keeps it too.
-  const menuKey = section || (layout === 'grid' && !stream && !view ? SITE360_MASTER : '');
+  const menuKey = section || ((layout === 'grid' || asWide) && !stream && !view ? SITE360_MASTER : '');
   const lay = sp.get('layout');
-  const menuList = !!section && lay !== 'list' && lay !== 'grid' && lay !== 'map' && lay !== 'board' && !site360Q.isError;
+  const menuList = !!section && lay !== 'list' && lay !== 'grid' && lay !== 'map' && lay !== 'board' && !asWide && !site360Q.isError;
   const menu = menuKey ? site360Q.data?.items.find((m) => m.key === menuKey) : undefined;
   // The grid reads its rows from GET /site360/{menu}/rows (one page, the same URL filters as the list), so the grid and the list share the source.
   // Multi Site ID search (paste a list, comma or newline separated) is kept in the URL as site_code, like the other filters.
@@ -82,8 +85,8 @@ export function Sites() {
     status: sp.get('overall_status') || undefined,
     sort: 'site_code',
   };
-  const gridRowsQ = useSite360RowsPaged(menu && (layout === 'grid' || menuList) ? menuKey : undefined, gridQuery);
-  const saveCell = useSaveSite360Cell(menu && layout === 'grid' ? menuKey : undefined, gridQuery);
+  const gridRowsQ = useSite360RowsPaged(menu && (layout === 'grid' || menuList || asWide) ? menuKey : undefined, gridQuery);
+  const saveCell = useSaveSite360Cell(menu && (layout === 'grid' || asWide) ? menuKey : undefined, gridQuery);
   const gridPages = gridRowsQ.data?.pages ?? [];
   const gridTotal = gridPages[0]?.total;
   const gridFiltered = gridPages[0]?.filtered;
@@ -152,9 +155,9 @@ export function Sites() {
 
   // "Export current view" sends exactly the query of the list: its filters, the F3 filter tree, the pasted Site IDs, the bucket and the stream (contract 0.15.34)
   const viewFilters = Object.fromEntries(Object.entries({ ...f, ...extra, ...(bucket ? { bucket } : {}), ...(coordinates ? { coordinates } : {}), ...(real ? { stream } : {}), ...(view ? { view } : {}) }).filter(([, x]) => x));
-  const q = useSites({ ...f, ...extra, ...(bucket ? { bucket } : {}), ...(coordinates ? { coordinates } : {}), ...(real ? { stream } : {}), ...(view ? { view } : {}) }, !dismantle && !asMap && !asBoard && !menuList);
+  const q = useSites({ ...f, ...extra, ...(bucket ? { bucket } : {}), ...(coordinates ? { coordinates } : {}), ...(real ? { stream } : {}), ...(view ? { view } : {}) }, !dismantle && !asMap && !asBoard && !menuList && !asWide);
   // Sites where the stream does not apply are not in the stream list. They come from the unfiltered list (their `streams[]` says "na").
-  const allQ = useSites({ ...f, ...extra, stage_code: '', ...(bucket ? { bucket } : {}), ...(coordinates ? { coordinates } : {}), ...(view ? { view } : {}) }, real && !asMap && !asBoard && !menuList);
+  const allQ = useSites({ ...f, ...extra, stage_code: '', ...(bucket ? { bucket } : {}), ...(coordinates ? { coordinates } : {}), ...(view ? { view } : {}) }, real && !asMap && !asBoard && !menuList && !asWide);
   const { hasNextPage: moreAll, isFetchingNextPage: fetchingAll, fetchNextPage: nextAll } = allQ;
   useEffect(() => { if (real && moreAll && !fetchingAll) void nextAll(); }, [real, moreAll, fetchingAll, nextAll]);
   const inStream = q.data?.pages.flatMap((p) => p.items) ?? [];
@@ -180,6 +183,8 @@ export function Sites() {
   useEffect(() => { if (hasNextPage && !isFetchingNextPage && v.end >= inStream.length - 20) void fetchNextPage(); }, [v.end, inStream.length, hasNextPage, isFetchingNextPage, fetchNextPage]);
   const { hasNextPage: moreRows, isFetchingNextPage: fetchingRows, fetchNextPage: nextRows } = gridRowsQ;
   useEffect(() => { if (menuList && moreRows && !fetchingRows && v.end >= mRows.length - 20) void nextRows(); }, [menuList, moreRows, fetchingRows, v.end, mRows.length, nextRows]);
+  // The wide table does not scroll in pages: while the quick search is typed, the rest of the pages load so the search covers every site of the menu, not only the first 200.
+  useEffect(() => { if (asWide && f.q.trim() && moreRows && !fetchingRows) void nextRows(); }, [asWide, f.q, moreRows, fetchingRows, nextRows]);
   const scroller = useRef<HTMLDivElement>(null);
   const restored = useRef(false);
   const scrollKey = `pmis.scroll.sites.${stream || 'ALL'}`;
@@ -211,7 +216,7 @@ export function Sites() {
     onlyChip('milestone_reached', t('table.filter_reached', { v: stageName(reached) }), reached, (v) => setParams({ milestone_reached: v, ref_date: v ? refDate : dashStatus ? refDate : '' })),
     onlyChip('ref_date', t('table.filter_ref_date', { v: refDate }), refDate, (v) => setParams({ ref_date: v })),
     onlyChip('cluster_code', t('table.filter_cluster', { v: cluster }), cluster, (v) => setParams({ cluster_code: v })),
-    ...(menuList ? [] : [
+    ...(menuList || asWide ? [] : [
       { key: 'mine', label: t('table.mine'), group: 'work', kind: 'bool', value: bucket === 'mine' ? '1' : '', set: (v: string) => setParams({ bucket: v ? 'mine' : bucket === 'mine' ? '' : bucket, sel: '' }) } as ExtraField,
       { key: 'late', label: t('table.late'), group: 'work', kind: 'bool', value: bucket === 'late' ? '1' : '', set: (v: string) => setParams({ bucket: v ? 'late' : bucket === 'late' ? '' : bucket, sel: '' }) } as ExtraField,
       { key: 'stage_code', label: t('sites.current_stage'), group: 'work', kind: 'enum', options: stageOptions.map((x) => ({ value: x, label: stageName(x) })), value: f.stage_code, set: (v: string) => setParams({ stage_code: v, sel: '' }) } as ExtraField,
@@ -220,9 +225,9 @@ export function Sites() {
     ]),
     { key: 'site_codes', label: t('filters.site_ids'), group: 'work', kind: 'list', value: siteCodes || sp.get('site_code') || '', set: (v: string) => setParams({ site_codes: v, site_code: '', sel: '' }) },
   ];
-  const filterScreen = menuList ? `site360-${menuKey}` : real ? 'sites-stream' : 'sites';
-  // 0.15.49: a menu (list or wide layout) has its own saved views; the generic list of Site Master keeps the views of `sites` and `sites-stream`
-  const siteMenu = menuList || (!!menu && layout === 'grid');
+  const filterScreen = menuList || asWide ? `site360-${menuKey}` : real ? 'sites-stream' : 'sites';
+  // 0.15.49: a menu (list, grid or wide layout) has its own saved views; the generic list of Site Master keeps the views of `sites` and `sites-stream`
+  const siteMenu = menuList || asWide || (!!menu && layout === 'grid');
   const savedScreen = siteMenu ? `site360-${menuKey}` : real ? 'sites-stream' : 'sites';
 
   // The text each cell shows, for sizing the columns to their content (null = not measurable: the pipeline rail keeps its default width).
@@ -292,14 +297,14 @@ export function Sites() {
         {/* a menu keeps its own saved views (contract 0.15.49): the tree, the quick filters, the layout and the column order of the list */}
         <SavedViews screen={savedScreen}
           value={siteMenu
-            ? { q: f.q, region_id: f.region_id, scenario: f.scenario, overall_status: f.overall_status, site_codes: siteCodes || sp.get('site_code') || '', layout: layout === 'grid' ? 'wide' : 'list', ...(advTree ? { advanced: advTree } : {}) }
+            ? { q: f.q, region_id: f.region_id, scenario: f.scenario, overall_status: f.overall_status, site_codes: siteCodes || sp.get('site_code') || '', layout: asWide ? 'wide' : 'list', ...(advTree ? { advanced: advTree } : {}) }
             : { ...f, bucket, ...(advTree ? { advanced: advTree } : {}) }}
           empty={siteMenu ? MENU_VIEW_EMPTY : VIEW_EMPTY} table={siteMenu && !menuList ? undefined : tbl}
           onApply={(v) => {
             const r = v as Record<string, unknown>;
             const pick = (keys: string[]) => Object.fromEntries(keys.map((k) => [k, String(r[k] ?? '')]));
             setParams(siteMenu
-              ? { ...pick(['q', 'region_id', 'scenario', 'overall_status', 'site_codes']), site_code: '', layout: r.layout === 'wide' ? 'grid' : '', adv: encodeFilter(r.advanced as FilterTree | undefined), sel: '' }
+              ? { ...pick(['q', 'region_id', 'scenario', 'overall_status', 'site_codes']), site_code: '', layout: r.layout === 'wide' ? 'wide' : '', adv: encodeFilter(r.advanced as FilterTree | undefined), sel: '' }
               : { ...pick(Object.keys(VIEW_EMPTY)), adv: encodeFilter(r.advanced as FilterTree | undefined), sel: '' });
           }} />
         <input className="input max-w-64" data-testid="sites-search" placeholder={t('sites.search')} aria-label={t('sites.search')} value={f.q} onChange={(e) => set('q')(e.target.value)} />
@@ -311,13 +316,16 @@ export function Sites() {
           </label>
         )}
         </>}
-        count={<span className="text-sm text-mute" data-testid="sites-count">{t('sites.count', { count: menuList ? (gridFiltered ?? mRows.length) : total })}</span>}
+        count={<span className="text-sm text-mute" data-testid="sites-count">{t('sites.count', { count: menuList || asWide ? (gridFiltered ?? mRows.length) : total })}</span>}
         tools={<>
         <button type="button" className="btn px-2 py-1 text-xs" data-testid="sites-layout" aria-pressed={asMap} onClick={() => setParams({ layout: asMap ? '' : 'map', sel: '' })}>
           {asMap ? <><Table2 size={14} />{t('sites.table')}</> : <><MapIcon size={14} />{t('sites.map')}</>}
         </button>
         <button type="button" className="btn px-2 py-1 text-xs" data-testid="sites-layout-board" aria-pressed={asBoard} onClick={() => setParams({ layout: asBoard ? '' : 'board', sel: '' })}>
           {asBoard ? <><Table2 size={14} />{t('sites.table')}</> : <><Columns3 size={14} />{t('board.board')}</>}
+        </button>
+        <button type="button" className="btn px-2 py-1 text-xs" data-testid="sites-layout-wide" aria-pressed={asWide} onClick={() => setParams({ layout: asWide ? '' : 'wide' })}>
+          {asWide ? <><Table2 size={14} />{t('sites.table')}</> : <><TableProperties size={14} />{t('sites.wide')}</>}
         </button>
         <DensityToggle api={tbl} />
         <ColumnMenu api={tbl} label={label} />
@@ -354,6 +362,12 @@ export function Sites() {
           <Site360Grid menu={menu} testid="site360-grid" onSelectRows={setGridSel} total={gridTotal} filtered={gridFiltered} rows={grid360Rows} onOpenCell={(r, ord) => setSrcCell({ siteId: r.id, siteCode: r.site_code, ord })} onEditCell={(e) => saveCell.mutate({ task_id: e.target.task_id, version: e.target.version, field: e.target.field, values: e.target.values, value: e.value })} />
           {srcCell ? <Site360SourcePanel siteId={srcCell.siteId} siteCode={srcCell.siteCode} ord={srcCell.ord} onClose={() => setSrcCell(null)} /> : <p className="mt-1 text-xs text-mute" data-testid="site360-source-hint">{t('site360.src.hint')}</p>}
           {gridRowsQ.hasNextPage ? <button type="button" className="btn" data-testid="site360-more" disabled={gridRowsQ.isFetchingNextPage} onClick={() => void gridRowsQ.fetchNextPage()}>{t('site360.more')}</button> : null}
+        </div>
+      ) : asWide && menu ? (
+        <div className="space-y-2">
+          <SitesWideTable menu={menu} rows={mRows} sel={sel} height={viewport + 120} loaded={gridRowsQ.isSuccess} filtered={activeFilters > 0} onClear={clearAll} busy={saveCell.isPending}
+            onEdit={(e) => saveCell.mutateAsync({ task_id: e.target.task_id, version: e.target.version, field: e.target.field, values: e.target.values, value: e.value })}
+            hasMore={!!gridRowsQ.hasNextPage} loadingMore={gridRowsQ.isFetchingNextPage} onMore={() => void gridRowsQ.fetchNextPage()} />
         </div>
       ) : menuList ? (
         <div className="card gx overflow-hidden" data-menu={menuKey} data-density={tbl.density} data-testid="site360-list">

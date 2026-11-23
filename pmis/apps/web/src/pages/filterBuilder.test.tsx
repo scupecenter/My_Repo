@@ -189,6 +189,8 @@ describe('advanced (AND / OR) beside the unified filter', () => {
     await screen.findByTestId('sites-list');
     await pickFilterField(u, 'delivery_batch');
     await u.click(await screen.findByTestId('filter-value-opt-B3'));
+    await u.keyboard('{Escape}'); // the value step stays open (multi-select); "+ Filter" would toggle it shut
+    await waitFor(() => expect(screen.queryByTestId('filter-popover')).toBeNull());
     await advancedGroup(u, 'overall_status', 1);
     await waitFor(() => expect(last(seen)).toEqual({ op: 'and', items: [
       { field: 'delivery_batch', operator: 'in', value: ['B3'] },

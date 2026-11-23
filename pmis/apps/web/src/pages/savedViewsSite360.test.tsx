@@ -33,7 +33,7 @@ const watchRows = (): string[] => {
   server.events.on('request:start', ({ request }) => {
     const u = new URL(request.url);
     if (/\/site360\/[a-z_]+\/rows$/.test(u.pathname))
-      seen.push(`${u.pathname.split('/')[2]}?${u.searchParams.toString()}`);
+      seen.push(`${u.pathname.match(/\/site360\/([a-z_]+)\/rows$/)![1]}?${u.searchParams.toString()}`); // the menu key, whatever the API base path
   });
   return seen;
 };
@@ -106,8 +106,8 @@ describe('saved views of a Site Master sub-menu', () => {
       screen.getByTestId('views-select'),
       screen.getByRole('option', { name: 'CW B3 wide' }),
     );
-    // wide = the grid layout of the menu, with the same filters
-    expect(await screen.findByTestId('site360-grid')).toBeInTheDocument();
+    // wide = the wide table of the menu (layout=wide), with the same filters
+    expect(await screen.findByTestId('sites-wide-table')).toBeInTheDocument();
     expect(
       await screen.findByTestId('filter-chip-x-region_id'),
     ).toBeInTheDocument();

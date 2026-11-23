@@ -815,7 +815,8 @@ export function UnifiedFilter({
 
   const entries: Entry[] = useMemo(
     () => [
-      ...fields.map((f) => {
+      // a page filter (extra) with the same key replaces the catalog field, so a field is listed once (e.g. workflow_locks)
+      ...fields.filter((f) => !extras.some((x) => !x.hidden && x.key === f.key)).map((f) => {
         const g = groupOf(f, screen, lang, t);
         return {
           id: `f:${f.key}`,
@@ -980,7 +981,6 @@ export function UnifiedFilter({
       data-screen={screen}
     >
       <Popover.Root open={open} onOpenChange={(o) => (o ? setOpen(true) : close())}>
-        <Popover.Anchor asChild>
           <span className="inline-flex">
             <Popover.Trigger asChild>
               <button
@@ -1002,7 +1002,6 @@ export function UnifiedFilter({
               </button>
             </Popover.Trigger>
           </span>
-        </Popover.Anchor>
         <Popover.Portal>
           <Popover.Content
             align="start"
