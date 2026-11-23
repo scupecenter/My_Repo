@@ -11,14 +11,15 @@ import { SITE_ENTRY_GRANTS } from './tpl-stream-helpers';
 import { Actor, Site, actor, addAssignment, makeSite, makeTask, plainAdmin, setCell } from './wf-helpers';
 
 /**
- * Migration 0136 (owner decisions 2026-11-22), on the Master import only:
+ * Migration 0139 (owner decisions 2026-11-22), on the Master import only:
  *   1. "Pending" in a date, number or list cell is an empty cell (no error), counted in the batch notes;
  *   2. "N/A" in the task's actual date column makes the task N/A when the batch is sent (admin override by rule, kind master_na, revertible, never applied
  *      again after a revert; never a task with a human step, a date, approved, or held by a gate); N/A in any other date, number or list column is empty;
  *   3. a register row holding only its keys is a placeholder: skipped, never an error or a scope_conflict;
  *   4. a PR-PO row of scope GECOL is routed into the GECOL register;
  *   5. an empty Order Status is derived from the PO / WO date with the values of the setting (off by default);
- *   6. the one candidate with a Contract Sign-off Date is Selected = Yes unless another candidate of the site is selected.
+ *   6. the one candidate with a Contract Sign-off Date is Selected = Yes unless another candidate of the site is selected; an empty Selection Date then
+ *      takes the Contract Sign-off Date (owner decision 2026-11-23, Q583).
  * Manual entry keeps today's rules. Its own database (TEST_DATABASE_URL_MINA). Synthetic data only. Region 3.
  */
 let app: NestExpressApplication;
@@ -105,7 +106,7 @@ async function onAirSite(prefix: string): Promise<Site> {
   return s;
 }
 
-describe('0136: the Master sheet reads "Pending" and "N/A" as the owner means them', () => {
+describe('0139: the Master sheet reads "Pending" and "N/A" as the owner means them', () => {
   let admin: Actor;
   let s1: Site;
   let streamBatch: string;
@@ -197,7 +198,7 @@ describe('0136: the Master sheet reads "Pending" and "N/A" as the owner means th
     try {
       for (const sql of [`SELECT mina_mark_task(gen_random_uuid(), gen_random_uuid(), gen_random_uuid(), 'x')`, `SELECT mina_apply_batch(gen_random_uuid())`,
         `SELECT mina_restore_task(gen_random_uuid(), gen_random_uuid(), 'x', 'x', true)`, `SELECT mina_prep_register_unit('{}'::jsonb)`,
-        `SELECT mina_route_regs('{}'::jsonb)`, `SELECT mina_notes_add(gen_random_uuid(), '{}'::jsonb)`, `SELECT imp_master_unit_pre_0136('{}'::jsonb, 'x', 'x', 'submit', 'x', NULL, NULL, NULL)`]) {
+        `SELECT mina_route_regs('{}'::jsonb)`, `SELECT mina_notes_add(gen_random_uuid(), '{}'::jsonb)`, `SELECT imp_master_unit_pre_0139('{}'::jsonb, 'x', 'x', 'submit', 'x', NULL, NULL, NULL)`]) {
         await expect(app2.query(sql)).rejects.toThrow(/permission denied/);
       }
       await expect(app2.query(`UPDATE task_instances SET master_na = true, master_na_at = now()`)).rejects.toThrow(/permission denied/);
@@ -219,7 +220,7 @@ describe('0136: the Master sheet reads "Pending" and "N/A" as the owner means th
   });
 });
 
-describe('0136 (security review): the N/A of the Master file needs the rights of an entry of the task, at the staging and at the send (TPL-MASTER upload)', () => {
+describe('0139 (security review): the N/A of the Master file needs the rights of an entry of the task, at the staging and at the send (TPL-MASTER upload)', () => {
   const SSV = 'SSV / SSV Date';
   const OTHER = 2;
   async function upload(a: Actor, siteCode: string): Promise<{ id: string; version: number }> {
@@ -293,17 +294,15 @@ describe('0136 (security review): the N/A of the Master file needs the rights of
   });
 });
 
-describe('0136: the register sheets of the Master import', () => {
+describe('0139: the register sheets of the Master import', () => {
   it('placeholders skipped, GECOL requests of PR-PO routed to GECOL, Order Status derived, the one candidate with a sign-off selected; another selected candidate keeps the error', async () => {
     const admin = await plainAdmin(app, db);
     for (const k of ['gecol', 'procurement', 'acquisition', 'hlc']) await regCell(db, k, R, 'entry', { user: [admin.user.id] });
     const r = await admin.api.call('put', '/settings/historical-waiver', { open: true, cutoff_date: '2026-06-30', reason: 'Open for the historical load' });
     expect([200, 409]).toContain(r.status);
-    // rule 5 configured for the test (the owner has not named the values yet: off by default)
-    await db.query('BEGIN');
-    await db.query('SET LOCAL ROLE pmis_definer');
-    await db.query(`UPDATE settings SET value = '{"po_wo_issued": "Completed", "pr_raised": "Active"}' WHERE key = 'imports.master_order_status_derived'`);
-    await db.query('COMMIT');
+    // rule 5 as seeded (owner decision 2026-11-23, Q582): Active, Completed only with a delivery / completion field, which PR-PO does not have
+    expect((await q<{ value: unknown }>(db, `SELECT value FROM settings WHERE key = 'imports.master_order_status_derived'`))[0]!.value)
+      .toEqual({ open: 'Active', completed: 'Completed', completion_field: null });
     const g1 = await makeSite(db, R, { prefix: 'MRG' });
     const g2 = await makeSite(db, R, { prefix: 'MRG' });
     const g3 = await makeSite(db, R, { prefix: 'MRG' });
@@ -317,8 +316,8 @@ describe('0136: the register sheets of the Master import', () => {
       { name: 'GECOL', headers: ['#', 'Site ID', 'GECOL PR No.', 'Survey Date'], rows: [[1, g1.code, null, null], [2, g2.code, null, 'N/A']] },
       { name: 'HLC', headers: ['#', 'Site ID', 'Request Date'], rows: [[1, g1.code, null], [2, g2.code, 'Pending']] },
       { name: 'PR-PO', headers: ['#', 'Site ID', 'Scope', 'PR No.', 'PR Date', 'PO / WO No.', 'PO / WO Date', 'Order Status', 'Remark'], rows: [
-        [1, p1.code, 'CW', 'PR-71', day('2026-01-05'), null, null, null, null],                         // no PO: pr_raised
-        [2, p1.code, 'Tower Erection', 'PR-72', day('2026-01-05'), 'PO-72', day('2026-01-20'), 'Pending', null],   // PO date: po_wo_issued
+        [1, p1.code, 'CW', 'PR-71', day('2026-01-05'), null, null, null, null],                         // no PO: Active
+        [2, p1.code, 'Tower Erection', 'PR-72', day('2026-01-05'), 'PO-72', day('2026-01-20'), 'Pending', null],   // PO issued, not delivered: Active
         [3, g1.code, 'GECOL', 'GP-11', day('2026-01-07'), 'PO-G1', null, null, 'merged'],               // into the GECOL placeholder of g1
         [4, g3.code, 'GECOL', 'GP-33', day('2026-01-08'), null, null, null, null],                      // a GECOL row of its own
       ] },
@@ -361,15 +360,17 @@ describe('0136: the register sheets of the Master import', () => {
       expect(codes(x.warnings)).toContain('order_status_derived');
     }
     const procRecs = await q<{ data: Record<string, any> }>(db, `SELECT data FROM register_records WHERE register_key = 'procurement' AND site_id = $1 ORDER BY data ->> 'pr_no'`, [p1.id]);
-    expect(procRecs.map((x) => x.data.order_status)).toEqual(['Active', 'Completed']);
+    expect(procRecs.map((x) => x.data.order_status)).toEqual(['Active', 'Active']);
 
-    // Acquisition: a1 selected by the import (the Selection Date the register asks for is not invented: Q583); a2 B keeps not_selected
-    expect(await notesOf(acq.id)).toMatchObject({ selected_set_by_import: 1, selected_not_set: 1, na_as_empty: 1 });
+    // Acquisition: a1 selected by the import, its empty Selection Date taken from the Contract Sign-off Date (Q583); a2 B keeps not_selected
+    expect(await notesOf(acq.id)).toMatchObject({ selected_set_by_import: 1, selection_date_from_contract: 1, selected_not_set: 1, na_as_empty: 1 });
     const ar = await batchRows(acq.id);
     const ra1 = ar.find((x) => x.site_code === a1.code)!;
     expect(codes(ra1.warnings)).toContain('selected_set_by_import');
     expect(codes(ra1.errors)).not.toContain('not_selected');
-    expect(ra1.payload.data).toMatchObject({ selected: 'Yes' });
+    expect(ra1.payload.data).toMatchObject({ selected: 'Yes', selection_date: '2026-02-01' });
+    expect(codes(ra1.warnings)).toContain('selection_date_from_contract');
+    expect(JSON.stringify(ra1.errors)).not.toContain('selection_date');
     expect(ra1.payload.data.title_verified).toBeUndefined();
     const ra2 = ar.find((x) => x.site_code === a2.code && x.row_no === 5)!;
     expect(codes(ra2.errors)).toContain('not_selected');
