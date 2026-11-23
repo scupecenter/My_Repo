@@ -128,6 +128,9 @@ export function mapWfError(message: string): ProblemException | null {
       const after = Math.max(1, Math.ceil(Number(extra.retry_after ?? 60)) || 60);
       return new ProblemException(429, 'rate_limited', { detail: detail ?? 'You asked a moment ago. Try again later.', headers: { 'Retry-After': String(after) } });
     }
+    case 'delegate_forbidden':
+      // 0145: a change that only a System Admin acting without delegation may make (the security and system rows of the notification policy)
+      return new ProblemException(403, 'delegate_forbidden', { detail: detail ?? 'Only a System Admin acting without delegation may do this.' });
     case 'insufficient_stock':
     case 'item_in_use':
       return new ProblemException(422, m[1], {

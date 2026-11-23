@@ -149,6 +149,7 @@ records of the Contractors register (companies, teams, contracts) and the vehicl
 | sla_master_columns | KEEP | SLA to Master column map (reference). |
 | work_calendars | KEEP | Calendar (weekend). |
 | holidays | KEEP | Holidays. |
+| dlp_versions | KEEP | Versions of the Defects Liability Period months (migration 0145): configuration; a PAC keeps the version in force on its date. |
 | weight_sets | KEEP | Project Status weight sets. |
 | weight_activities | KEEP | Weights per activity. |
 | weight_items | KEEP | Weights per item. |

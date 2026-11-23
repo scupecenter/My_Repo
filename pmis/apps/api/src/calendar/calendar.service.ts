@@ -1,14 +1,22 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import ExcelJS from 'exceljs';
 import { z } from 'zod';
 import { AccessService } from '../access/access.service';
 import type { AuthContext } from '../auth/auth.types';
 import { StepUpService } from '../auth/step-up.service';
+import { SyslogService } from '../auth/syslog.service';
 import { parseIfMatch } from '../common/etag';
 import { problems, ProblemException } from '../common/problem';
 import { oneParam, Query } from '../common/query';
 import { parse, uuidSchema } from '../common/zod';
 import { DbService } from '../db/db.service';
+import { DATA_SHEET, TPL_SHEET } from '../templates/templates.service';
+import { importMaxRows, type UploadedFile } from '../templates/upload.interceptor';
+import { guardXlsx } from '../templates/xlsx-guard';
+
+/** 0145: the columns of TPL-HOLIDAYS, in order (tpl_holidays_columns). */
+const HOLIDAY_KEYS = ['date', 'name_en', 'name_ar', 'kind', 'tentative', 'note'] as const;
 
 const reason = z.string().trim().min(3).max(1000);
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD.').refine((s) => !Number.isNaN(Date.parse(`${s}T00:00:00Z`)), 'Not a date.')
@@ -105,6 +113,7 @@ export class CalendarService {
     private readonly db: DbService,
     private readonly access: AccessService,
     private readonly stepUp: StepUpService,
+    private readonly syslog: SyslogService,
   ) {}
 
   private year(q: Query): number | undefined {
@@ -293,5 +302,95 @@ export class CalendarService {
     const r = await this.db.tx.$queryRaw<{ r: { calendar_code: string; weekend_days: number[]; affected_open_tasks: number; version: number } }[]>(Prisma.sql`
       SELECT admin_save_weekend_days(${b.calendar_code ?? null}::text, ${b.weekend_days}::int[], ${b.reason}::text) AS r`);
     return r[0]!.r;
+  }
+
+  /**
+   * POST /settings/holidays/import (0145, B12, ADR 0011: the approved xlsx template TPL-HOLIDAYS only). The upload guards of the other imports apply: the size limit
+   * of the upload interceptor (413), the xlsx guard (no macros, no zip bomb) before any parser, the hidden _tpl sheet naming TPL-HOLIDAYS and its current version,
+   * and the header row as issued; each rejection goes to the System Log. The file itself is never stored (like the other template imports), so it is not sent to the
+   * virus scanner. The rows go to admin_import_holidays in one call: every row is checked, one bad row refuses the file, and the open tasks are recalculated once.
+   */
+  async importHolidays(auth: AuthContext, file: UploadedFile | undefined, rawReason: unknown, requestId: string | undefined) {
+    await this.access.requireAdmin('calendars', 'edit');
+    const why = parse(reason, rawReason ?? '');
+    if (!file || file.size === 0) throw problems.validation([{ path: '/file', code: 'required', message: 'Send the filled TPL-HOLIDAYS template as the form field "file".' }]);
+    const fileName = (file.originalname ?? '').slice(0, 200);
+    const reject = async (code: string, detail: string, ctx: Record<string, unknown> = {}): Promise<never> => {
+      await this.syslog.write('warn', `holidays import rejected: ${code}`, { reason: code, detail, file_name: fileName, ...ctx }, auth.user.id, requestId, 'holidays-import');
+      throw new ProblemException(422, 'template_rejected', { detail, extra: { reason: code }, commit: true });
+    };
+    const guard = guardXlsx(file.originalname ?? '', file.buffer);
+    if (!guard.ok) return reject(guard.reason ?? 'not_xlsx', guard.detail ?? 'The file is not accepted: upload the TPL-HOLIDAYS template (.xlsx).');
+    const wb = new ExcelJS.Workbook();
+    try {
+      await wb.xlsx.load(file.buffer as unknown as ExcelJS.Buffer);
+    } catch {
+      return reject('not_xlsx', 'The file is not a valid .xlsx workbook.');
+    }
+    const text = (cell: ExcelJS.Cell): string => {
+      const v = cell.value;
+      if (v instanceof Date) return v.toISOString().slice(0, 10);
+      return (cell.text ?? '').toString().trim();
+    };
+    const tpl = wb.getWorksheet(TPL_SHEET);
+    if (!tpl) return reject('tpl_missing', 'This file is not an approved GSDN Workspace template: the hidden _tpl sheet is missing. Download TPL-HOLIDAYS from the Templates page.');
+    const kv = new Map<string, string>();
+    tpl.eachRow((row) => {
+      const k = text(row.getCell(1));
+      if (k) kv.set(k, text(row.getCell(2)));
+    });
+    const templateId = (kv.get('template_id') ?? '').slice(0, 60);
+    const versionText = (kv.get('version') ?? '').slice(0, 12);
+    if (templateId !== 'TPL-HOLIDAYS' || !/^[0-9]{1,6}$/.test(versionText)) {
+      return reject('wrong_template', `This file is not the holidays template (TPL-HOLIDAYS); it names ${templateId || 'no template'}.`, { template_id: templateId });
+    }
+    const cur = await this.db.tx.$queryRaw<{ current_version: number; columns: { header: string }[] }[]>(Prisma.sql`
+      SELECT d.current_version, v.columns FROM template_definitions d
+      JOIN template_versions v ON v.template_def_id = d.id AND v.is_current
+      WHERE d.template_id = 'TPL-HOLIDAYS' AND d.is_active`);
+    if (!cur[0]) return reject('template_unknown_or_inactive', 'The holidays template is not in use.');
+    const version = Number(versionText);
+    if (version !== cur[0].current_version) {
+      return reject('outdated_version', `This file was made from version ${version} of TPL-HOLIDAYS; the current version is ${cur[0].current_version}. Download the template again.`,
+        { version, current_version: cur[0].current_version });
+    }
+    const data = wb.getWorksheet(DATA_SHEET);
+    if (!data) return reject('checksum_mismatch', 'The Data sheet is missing.');
+    const headers = cur[0].columns.map((c) => c.header);
+    const head = data.getRow(1);
+    if (headers.some((h, i) => text(head.getCell(i + 1)) !== h)) {
+      return reject('checksum_mismatch', 'The header row of the file was changed. Use the template as it was issued, without adding, moving or renaming columns.');
+    }
+    const rows: Record<string, unknown>[] = [];
+    for (let r = 2; r <= data.rowCount; r++) {
+      const cells = HOLIDAY_KEYS.map((_, i) => text(data.getRow(r).getCell(i + 1)));
+      if (cells.every((v) => v === '')) continue;
+      if (rows.length >= importMaxRows()) return reject('size_or_rows_exceeded', `At most ${importMaxRows()} holidays per file.`);
+      const row: Record<string, unknown> = { line: r };
+      HOLIDAY_KEYS.forEach((k, i) => { row[k] = cells[i]; });
+      rows.push(row);
+    }
+    if (rows.length === 0) throw problems.validation([{ path: '/file', code: 'empty', message: 'The Data sheet has no holiday row.' }]);
+    const meta = { file_name: fileName, template_version: version };
+    const out = await this.db.tx.$queryRaw<{ r: { id: string; created: number; unchanged: number; affected_open_tasks: number } }[]>(Prisma.sql`
+      SELECT admin_import_holidays(${JSON.stringify(rows)}::jsonb, ${why}::text, ${JSON.stringify(meta)}::jsonb) AS r`);
+    const r = out[0]!.r;
+    await this.syslog.write('info', 'holidays imported', { import_id: r.id, created: r.created, unchanged: r.unchanged, version }, auth.user.id, requestId, 'holidays-import');
+    return {
+      id: r.id,
+      template_id: 'TPL-HOLIDAYS',
+      template_version: version,
+      source: 'template',
+      file_name: fileName,
+      status: 'applied',
+      current_level: 2,
+      levels_required: 2,
+      register_key: null,
+      entity: null,
+      stream: null,
+      counts: { create: r.created, update: 0, unchanged: r.unchanged, error: 0 },
+      affected_open_tasks: r.affected_open_tasks,
+      version: 1,
+    };
   }
 }

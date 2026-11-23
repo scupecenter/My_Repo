@@ -57,8 +57,10 @@ describe('a route with no API answers "not available" in hybrid mode', () => {
     const { server } = await import('./server');
     const { api, ApiError } = await import('@/api/client');
     const { notAvailableHandlers } = await import('./realApi');
-    server.use(...notAvailableHandlers(true));
-    const err = await api.get('/settings/dlp').then(() => null, (e: unknown) => e);
+    // the first GET still listed, or (the list is empty since every route is served) a sample route given to the same handler
+    const [, path] = NOT_AVAILABLE.find(([m]) => m === 'get') ?? (['get', '/not-built-yet/:id'] as const);
+    server.use(...notAvailableHandlers(true, [['get', path]]));
+    const err = await api.get(path.replace(/:[A-Za-z_]+/g, '00000000-0000-4000-8000-000000000001')).then(() => null, (e: unknown) => e);
     expect(err).toBeInstanceOf(ApiError);
     expect((err as InstanceType<typeof ApiError>).status).toBe(501);
     expect((err as InstanceType<typeof ApiError>).code).toBe('not_available');

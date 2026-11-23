@@ -113,7 +113,7 @@ SELECT t, 'keep', 'true' FROM unnest(ARRAY[
   -- configuration
   'workflow_definitions', 'workflow_streams', 'workflow_views', 'workflow_view_members', 'stage_definitions', 'task_definitions', 'task_predecessors',
   'phase_gate_rules', 'scenario_task_rules', 'scenario_rule_state', 'sla_rules', 'sla_rule_sets', 'sla_rule_set_items', 'sla_master_columns',
-  'work_calendars', 'holidays', 'weight_sets', 'weight_activities', 'weight_items', 'list_catalogues', 'list_values', 'field_definitions',
+  'work_calendars', 'holidays', 'dlp_versions', 'weight_sets', 'weight_activities', 'weight_items', 'list_catalogues', 'list_values', 'field_definitions',
   'field_list_values', 'field_set_versions', 'document_types', 'document_type_versions', 'document_type_drafts', 'document_type_placements',
   'document_blank_forms', 'template_definitions', 'template_versions', 'template_parts', 'template_task_fields', 'template_task_rules', 'matrix_cells',
   'matrix_cell_assignees', 'matrix_state', 'settings', 'nav_item_catalogue', 'master_columns', 'master_header_aliases', 'regions', 'region_aliases',

@@ -505,6 +505,16 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/exports/master'],
   ['get', '/exports/master'],
   ['get', '/exports/master/:id/download'],
+  // Contract 0.15.61 (migration 0145; apps/api: settings, calendar): DLP versions, the idle-task alert, the notification policy and its catalogue, and the
+  // holidays import (TPL-HOLIDAYS). They answered 501 not_available until the API served them.
+  ['get', '/settings/dlp'],
+  ['post', '/settings/dlp/versions'],
+  ['get', '/settings/idle-task-alert'],
+  ['put', '/settings/idle-task-alert'],
+  ['get', '/settings/notification-policy/catalogue'],
+  ['get', '/settings/notification-policy'],
+  ['put', '/settings/notification-policy'],
+  ['post', '/settings/holidays/import'],
   // Contract 0.15.54 (migration 0140; apps/api: reassignment): absence records and the lead decisions on tasks (B12b, B14).
   ['get', '/absences'],
   ['post', '/absences'],
@@ -555,20 +565,13 @@ export function realApiHandlers(on = HYBRID) {
  * writes in this browser only), which looked like real data. They now answer 501 `not_available`, so the screen shows an error instead of fake records.
  * When the API gains one of these routes, move it to REAL_API_AUTH_USERS (realApiCoverage.test.ts fails until it is listed there).
  */
-export const NOT_AVAILABLE = [
-  ['get', '/settings/dlp'],
-  ['post', '/settings/dlp/versions'],
-  ['get', '/settings/idle-task-alert'],
-  ['put', '/settings/idle-task-alert'],
-  ['get', '/settings/notification-policy'],
-  ['put', '/settings/notification-policy'],
-  ['get', '/settings/notification-policy/catalogue'],
-  ['post', '/settings/holidays/import'],
-] as const;
+// Empty since 2026-11-23: every route the web calls is served by the API (0140, 0142, 0143, 0145). The list and its 501 handler stay for any new
+// screen that is built before its API.
+export const NOT_AVAILABLE: ReadonlyArray<readonly ['get' | 'post' | 'put' | 'patch' | 'delete', string]> = [];
 
-export function notAvailableHandlers(on = HYBRID) {
+export function notAvailableHandlers(on = HYBRID, routes: typeof NOT_AVAILABLE = NOT_AVAILABLE) {
   if (!on) return [];
-  return NOT_AVAILABLE.map(([method, path]) =>
+  return routes.map(([method, path]) =>
     http[method](`${API_BASE}${path}`, () =>
       HttpResponse.json(
         { type: 'about:blank', title: 'Not available yet', status: 501, code: 'not_available', detail: 'This screen is not connected to the server yet. Nothing was read or saved.' },

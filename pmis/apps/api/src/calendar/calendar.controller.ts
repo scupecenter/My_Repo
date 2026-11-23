@@ -1,14 +1,17 @@
-import { Body, Controller, Delete, Get, Headers, HttpCode, Param, Patch, Post, Put, Query, Res } from '@nestjs/common';
-import type { Response } from 'express';
+import { Body, Controller, Delete, Get, Headers, HttpCode, Param, Patch, Post, Put, Query, Req, Res, UploadedFile as Upload, UseInterceptors } from '@nestjs/common';
+import { createHash } from 'node:crypto';
+import type { Request, Response } from 'express';
 import type { AuthContext } from '../auth/auth.types';
 import { Auth } from '../auth/decorators';
 import { etagHeader } from '../common/etag';
+import { IdempotencyService } from '../common/idempotency.service';
+import { UploadInterceptor, type UploadedFile } from '../templates/upload.interceptor';
 import { CalendarService } from './calendar.service';
 
 /** Work calendar (contract tag `calendar`, decision B12). */
 @Controller('settings')
 export class CalendarController {
-  constructor(private readonly calendar: CalendarService) {}
+  constructor(private readonly calendar: CalendarService, private readonly idem: IdempotencyService) {}
 
   @Get('calendars')
   calendars(@Query() q: Record<string, unknown>) {
@@ -24,6 +27,18 @@ export class CalendarController {
   @HttpCode(201)
   create(@Auth() auth: AuthContext, @Body() body: unknown) {
     return this.calendar.create(auth, body);
+  }
+
+  /** 0145: the approved template TPL-HOLIDAYS, applied at once (202 with the import summary) */
+  @Post('holidays/import')
+  @HttpCode(202)
+  @UseInterceptors(UploadInterceptor)
+  importHolidays(
+    @Auth() auth: AuthContext, @Upload() file: UploadedFile | undefined, @Body() body: { reason?: unknown } | undefined,
+    @Headers('idempotency-key') key: string | undefined, @Req() req: Request & { id?: string },
+  ) {
+    const fingerprint = { reason: body?.reason ?? null, file: file ? createHash('sha256').update(file.buffer).digest('hex') : null };
+    return this.idem.run(auth.user.id, 'importHolidays', key, fingerprint, () => this.calendar.importHolidays(auth, file, body?.reason, req.id));
   }
 
   @Patch('holidays/:id')

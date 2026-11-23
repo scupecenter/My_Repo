@@ -4582,9 +4582,15 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Idle-task alert setting */
+        /**
+         * Idle-task alert setting
+         * @description Every signed-in user (the stale badge reads it).
+         */
         get: operations["getIdleTaskAlertSetting"];
-        /** Set the idle days that alert the lead (default 2 working days) */
+        /**
+         * Set the idle days that alert the lead (default 2 working days)
+         * @description 0.15.61 (migration 0145): System Admin or a delegate of `admin.settings` edit for all regions, a reason and If-Match. Closed body (`unknown_key`; `working_days` 1 to 30, `out_of_range`). `working_days` is the dashboard idle limit `stale_idle_days` (`PUT /settings/dashboard`, the stale flag and the stale-task counter use the same value, Q523): it is one setting, so the ETag of this resource moves when either screen changes it. Audited (`idle_task_alert_update`, before and after).
+         */
         put: operations["setIdleTaskAlertSetting"];
         post?: never;
         delete?: never;
@@ -4787,6 +4793,7 @@ export interface paths {
          *     **Mandatory types** (`mandatory` in the catalogue) cannot be switched off: a channel that is on by default stays on and the cells of the default recipients stay on, else 422 with `code` = `mandatory_locked`. A cell for a role or group that the catalogue does not make eligible for the type is `not_eligible_recipient`. A `timezone` that is not an IANA zone is `invalid_timezone`.
          *     Rows left out of `matrix` keep the catalogue defaults.
          *     **Security and system types (0.2.5 hardening):** every `security` type is mandatory for the System Admins. A body that changes any `security` or `system` row, or a threshold that feeds one (`rate_cap_per_hour`), needs step-up and a System Admin acting without delegation (403 `delegate_forbidden`); the change sends the System Admins an in-app alert naming the actor.
+         *     0.15.61 (migration 0145): an unknown key is reported at its own path with `code` = `unknown_key` (for example `/thresholds/x`, `/matrix/0/channels/sms`); other codes: `required`, `invalid`, `out_of_range`, `unknown_type`, `unknown_column` (a cell or column naming no such role, group or column), `duplicate`, `too_many`. The System Admins group must stay a column (`/columns` `mandatory_locked`) and every mandatory type that goes to the System Admins keeps their cell on. Like the security and system rows, a change of `enabled`, `timezone`, `digest_hour`, `work_days_follow_calendar` or `work_days` needs a System Admin (403 `delegate_forbidden`) and a step-up, and the System Admins are told (security review 2026-11-23). When nothing was saved the columns are the System Admins group and the Project Manager role. Audited (`notification_policy_update`, before and after).
          */
         put: operations["setNotificationPolicy"];
         post?: never;
@@ -4950,8 +4957,9 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Upload the TPL-HOLIDAYS template (creates an import batch)
-         * @description Seed file: `db/seed/holidays-2026-2027.csv`. Whether the CSV is accepted besides the xlsx template is an open point (ADR 0011). Needs a `reason` (0.2.6), like every other holiday change; it is written to the audit row of each holiday the batch changes. A missing or too short reason is 422 `validation_failed`.
+         * Upload the TPL-HOLIDAYS template (applied at once)
+         * @description Seed file: `db/seed/holidays-2026-2027.csv` (loaded by the seed script). The upload accepts the approved xlsx template `TPL-HOLIDAYS` only (ADR 0011, owner decision); a CSV or any other file is 422 `template_rejected` (`reason` `not_xlsx`, `macros_not_allowed`, `tpl_missing`, `wrong_template`, `outdated_version`, `checksum_mismatch`, `size_or_rows_exceeded`), written to the System Log. Needs a `reason` (0.2.6), like every other holiday change; it is written to the audit row of each holiday the file adds. A missing or too short reason is 422 `validation_failed`.
+         *     0.15.61 (migration 0145): System Admin or a delegate of `calendars` edit for all regions (checked in the database). The file is applied at once, not sent to L2 (holidays are configuration): `status` `applied`, `counts.create` (added) and `counts.unchanged` (a date the calendar already holds with the same values), `affected_open_tasks`. One bad row refuses the whole file: 422 `validation_failed` with `errors[]` per line (`path` `/rows/<line>/<field>`, codes `required`, `invalid`, `out_of_range`, `too_long`, `duplicate_in_file`, and `duplicate` for a date the calendar holds with other values; setting `calendar.holiday_import_existing` = `skip` leaves those dates as they are instead, Q602). The SLA due dates of open tasks are recalculated once; closed tasks keep their values. Audited per holiday (`holiday_create` with the import id) and per file (`holidays_import`).
          */
         post: operations["importHolidays"];
         delete?: never;
@@ -5247,7 +5255,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Defects Liability Period months (CW and TE) with history */
+        /**
+         * Defects Liability Period months (CW and TE) with history
+         * @description Every signed-in user. `current` is the version in force today; `history` is newest first.
+         */
         get: operations["getDlpSettings"];
         put?: never;
         post?: never;
@@ -5269,6 +5280,7 @@ export interface paths {
         /**
          * Publish a new DLP version (`dlp.months.cw`, `dlp.months.te`)
          * @description Counted from the PAC date. A PAC keeps the version in force on its issue date.
+         *     0.15.61 (migration 0145): System Admin or a delegate of `admin.settings` edit for all regions, a reason and a step-up. Closed body (`unknown_key`). `effective_from` is today or later (`in_the_past`, Q600) and not before the effective date of the latest version (`before_latest_version`). A version effective today is in force at once; a later one is listed in `history` and becomes `current` on its date. Audited (`dlp_version_publish`, before and after).
          */
         post: operations["publishDlpVersion"];
         delete?: never;
@@ -12226,10 +12238,10 @@ export interface components {
             kind: "data_import" | "assignment_import" | "config_import" | "master";
             module_key?: components["schemas"]["ModuleKey"];
             /**
-             * @description A register template (one per register), a Site Register stream template (`TPL-SITE-DA`, `-CW`, `-TE`, `-CL`), the whole Master (`TPL-MASTER`) or, since 0.14.0, the New sites template (`TPL-SITE-NEW`, kind `sites`: one row per new site, entered through batch and L2).
+             * @description A register template (one per register), a Site Register stream template (`TPL-SITE-DA`, `-CW`, `-TE`, `-CL`), the whole Master (`TPL-MASTER`) or, since 0.14.0, the New sites template (`TPL-SITE-NEW`, kind `sites`: one row per new site, entered through batch and L2). `list_values` (0.15.23): the values of a list (`TPL-LISTVALUES`). `holidays` (0.15.61): the holidays of the work calendar (`TPL-HOLIDAYS`, for a System Admin or a delegate of the calendar).
              * @enum {string}
              */
-            template_kind?: "register" | "stream" | "master" | "sites";
+            template_kind?: "register" | "stream" | "master" | "sites" | "list_values" | "holidays";
             /** @description The register the template enters (`gecol` for TPL-GECOL). Null for a Site Register stream template or TPL-MASTER. */
             register_key?: string | null;
             /** @description The stream of a Site Register stream template (Q73): DESIGN_ACQ, CW, TE or CLOSURE. */
@@ -12494,6 +12506,8 @@ export interface components {
             uploaded_by?: components["schemas"]["UserRef"];
             /** Format: date-time */
             uploaded_at?: string;
+            /** @description 0.15.61. `POST /settings/holidays/import` only: the open tasks whose SLA due date moved. */
+            affected_open_tasks?: number;
             version: number;
         };
         ImportRow: {

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.60
+  version: 0.15.61
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -30,6 +30,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.61 (2026-11-23): the system-settings routes the web called that no controller served are served by the API (migration 0145, mirror `db/sql/144_settings_screens_api.sql`; CHANGELOG 197). Additive. (1) `GET /settings/dlp`, `POST /settings/dlp/versions`: the versions of `dlp.months.cw` and `dlp.months.te` (seed version 1: CW 3, TE 12); a version takes effect today or later and never before the latest version (field errors `in_the_past`, `before_latest_version`, `out_of_range`, `unknown_key`), so a PAC keeps the version in force on its date (the SLA start event `DLP:<task>:<key>` adds the months in force on the PAC date). (2) `GET`/`PUT /settings/idle-task-alert`: `working_days` is the existing dashboard idle limit `stale_idle_days` (one setting, Q523); `enabled` is new; the ETag moves when either screen changes it. (3) `GET`/`PUT /settings/notification-policy` and `GET /settings/notification-policy/catalogue`: closed schema validated in the database (`unknown_key` at the path of the key, the cross-field rule on both paths, `invalid_timezone`, `mandatory_locked`, `not_eligible_recipient`, `unknown_type`, `unknown_column`, `duplicate`); the security and system rows and `rate_cap_per_hour` need a System Admin (403 `delegate_forbidden`) and a step-up. (4) `POST /settings/holidays/import`: the approved template `TPL-HOLIDAYS` only (`template_kind` `holidays`, ADR 0011), applied at once: 202 with `status` `applied`, `counts.create` and `counts.unchanged`, and `affected_open_tasks`; one bad row refuses the file (`errors[]` with `path` `/rows/<line>/<field>`); any other file is 422 `template_rejected`. `Template.template_kind` lists `list_values` (0.15.23) and `holidays`. Numbered 0.15.61 because 0.15.53 to 0.15.58 are used by other branches.
     - 0.15.60 (2026-11-23): the last users, groups and sign-in routes of the web on the real API (migration 0143, mirror `db/sql/142_users_groups_api.sql`; CHANGELOG 193; 0.15.53 to 0.15.56 are reserved by other branches). Additive. (1) `GET`, `PUT /users/{user_id}/mfa-exemption` and `POST .../revoke` are served (`idm_set_mfa_exempt`, `idm_mfa_exemption_state`): a System Admin, or a delegate holding `users.administer` for all regions (the delegable right `users.two_factor`, Q620); reason and the acting admin's own step-up; nobody exempts themselves (403 `self_beneficiary`); an admin or a delegate is exempted by a System Admin only (403 `action_forbidden`); `until` must be in the future (422 `must_be_future`) or null (until revoked); a second PUT changes the exemption in force; revoking with no exemption in force is 409 `invalid_transition`. The user gets an in-app notice (`mfa_exemption`) and a mail. `User.mfa_exempt` and `mfa_exempt_until` are filled. The check is GSDN Workspace's own (setting `require_mfa`, default false): when it is on, a local account without two-factor and without an exemption in force gets 401 `mfa_required` at sign-in and at step-up; an exemption whose `until` has passed no longer counts. Entra Conditional Access is not affected. (2) `POST /groups` is served (`idm_group_create`): `groups.create` for all regions and step-up; `member_ids` also need `groups.edit` for all regions; the caller among the members is 403 `self_beneficiary`; a pending or unknown member is 422 with `errors[].path` `/member_ids/<index>`; a name equal to another group's name ignoring case is 409 `duplicate` (Q622); the create is atomic. (3) `POST /me/notify-admins` is served (`me_notify_admins`): reachable by a pending account; plain text only (422 `markup_not_allowed` for `<`, `>` or an HTML entity, Q624); one request per `notify_admins.cooldown_minutes` (default 60, Q623), else 429 `rate_limited` with `Retry-After`; an in-app notice of the new kind `assignment_request` and a mail to every active System Admin. (4) `POST /auth/employee-id` is served but, until the M365 sign-in and the staff registry exist on the server (Q625), answers 409 `invalid_transition` to every session whatever ID is typed (no enumeration); the format is still checked (422) and the calls are rate limited like sign-in (429).
     - 0.15.58 (2026-11-23): the Master import reads "Pending" and "N/A" as the owner means them, skips placeholder rows, routes the GECOL requests of PR-PO to GECOL, derives an empty Order Status and selects the one candidate with a contract sign-off (owner decisions 2026-11-22 and 2026-11-23; migration 0144, mirror `db/sql/143_master_import_na_routing.sql`; CHANGELOG 195). Additive, Master paths only (the Master import and comparison, and the TPL-MASTER upload; manual entry and the other templates are unchanged). (1) `Override.kind` `master_na` (entity `task`): a task whose actual date column holds N/A in the Master file is N/A when its batch is sent, an admin override made by a rule (no `acted_by`), revertible through `POST /overrides/{override_id}/revert` (System Admin, reason, step-up) and never applied again once reverted; never a milestone, a task with a date, a person's step, a register record in review, approved, or held by a gate; and only when the uploader holds the rights of an entry of that task, at the staging and again at the send (the import and edit regions of the task and its entry level L1, or a System Admin when the level has no holder). (2) `ImportBatch.import_notes` (`ImportNote[]`, counts only, never a value): `pending_as_empty`, `na_as_empty`, `na_task_requested`, `na_task_not_applicable`, `na_task_marked`, `na_task_not_marked`, `placeholder_rows_skipped`, `routed_to_gecol`, `routed_from_procurement`, `order_status_derived`, `order_status_not_derived`, `selected_set_by_import`, `selection_date_from_contract`, `selected_not_set`; the same list rides on `MasterImportOutcome.batches[].import_notes`, and `MasterImportOutcome.register_notes` carries the register ones with the sheet. Batch rows carry the matching warnings (`master_na_requested`, `master_na_not_applicable`, `master_na_ignored`, `master_na_marked`, `master_na_not_marked`, `routed_from_procurement`, `order_status_derived`, `selected_set_by_import`, `selection_date_from_contract`) and a conflicting GECOL request the error `gecol_one_per_site`. A register sheet of placeholders only is in `skipped` with reason `no_rows`. (3) An empty Order Status of a PR-PO row becomes `Active` (`Completed` only when the row holds a delivery / completion date, a field PR-PO does not have today; values in the setting `imports.master_order_status_derived`, changed by definer code only), and a candidate selected by the import with an empty Selection Date takes its Contract Sign-off Date (warning `selection_date_from_contract`) (owner decisions 2026-11-23).
     - 0.15.56 (2026-11-23): the staff registry is served by the API (owner request 2026-10-25, B13; migration 0142, mirror `db/sql/141_staff_registry_api.sql`; CHANGELOG 192; 0.15.53 to 0.15.55 are reserved by other branches). No path, field or enum changes; the four operations the web already calls are now real and their descriptions say who may use them. (1) `GET /staff-registry/{employee_id}` (any signed-in employee; `x-db-path` `people_staff_card`): the database applies the field visibility of email and phone for the caller and returns a hidden field as null, named in `hidden_fields`; a registry administrator (below) sees both; an ID that is not 4 digits or not in the registry is 404; `ETag` is the row version. (2) `GET /staff-registry/visibility` and `PUT /staff-registry/visibility` (`people_save_staff_visibility`): only the System Admin or a holder of `users.edit` for all regions (the grid, `app_has_permission`, held for all regions; Q610), otherwise 403 before any step-up; PUT needs a reason, a step-up and `If-Match`; each field given replaces that field's settings; an entry counts by `kind` and `ref_id` only (the label, `employee_id`, `user_id` and `account_status` are read again from the person, role or group); an unknown person, role or group, or an unknown key, is 422; saving the same settings again keeps the version; audited (`staff_registry.visibility_changed`, before and after). For a viewer who is not a registry administrator a field is hidden when the employee hides it (`hidden_fields`), or the viewer matches a deny entry (as the person, through an active role assignment, or as a member of an active group); otherwise it is shown when `default_visible` is true or the viewer matches an allow entry. (3) `PATCH /staff-registry/{employee_id}` (`people_save_staff`): the same right, a reason, a step-up and `If-Match`; `employee_id` in the body is 422 (`errors[].code` `read_only`), as are `status` and any unknown key; an email (case-blind) or phone held by another row is 409 `duplicate` without echoing the value; a patch that changes nothing keeps the version; audited (`staff_registry.updated`, or `staff_registry.fields_hidden` when only `hidden_fields` changed), with the full row before and after. Nothing is seeded (Q611): the registry starts empty and the owner fills it; until then every card answers 404. Rows are never deleted.
@@ -7236,6 +7237,7 @@ paths:
       tags: [settings]
       operationId: getIdleTaskAlertSetting
       summary: Idle-task alert setting
+      description: Every signed-in user (the stale badge reads it).
       responses:
         '200':
           description: Setting.
@@ -7250,7 +7252,9 @@ paths:
       tags: [settings]
       operationId: setIdleTaskAlertSetting
       summary: Set the idle days that alert the lead (default 2 working days)
-      x-db-path: admin_set_setting
+      description: |
+        0.15.61 (migration 0145): System Admin or a delegate of `admin.settings` edit for all regions, a reason and If-Match. Closed body (`unknown_key`; `working_days` 1 to 30, `out_of_range`). `working_days` is the dashboard idle limit `stale_idle_days` (`PUT /settings/dashboard`, the stale flag and the stale-task counter use the same value, Q523): it is one setting, so the ETag of this resource moves when either screen changes it. Audited (`idle_task_alert_update`, before and after).
+      x-db-path: admin_set_idle_task_alert
       parameters:
       - {$ref: '#/components/parameters/IfMatch'}
       requestBody:
@@ -7553,8 +7557,9 @@ paths:
         **Mandatory types** (`mandatory` in the catalogue) cannot be switched off: a channel that is on by default stays on and the cells of the default recipients stay on, else 422 with `code` = `mandatory_locked`. A cell for a role or group that the catalogue does not make eligible for the type is `not_eligible_recipient`. A `timezone` that is not an IANA zone is `invalid_timezone`.
         Rows left out of `matrix` keep the catalogue defaults.
         **Security and system types (0.2.5 hardening):** every `security` type is mandatory for the System Admins. A body that changes any `security` or `system` row, or a threshold that feeds one (`rate_cap_per_hour`), needs step-up and a System Admin acting without delegation (403 `delegate_forbidden`); the change sends the System Admins an in-app alert naming the actor.
-      x-step-up: when the body changes a security or system row or a threshold that feeds one
-      x-db-path: admin_set_setting
+        0.15.61 (migration 0145): an unknown key is reported at its own path with `code` = `unknown_key` (for example `/thresholds/x`, `/matrix/0/channels/sms`); other codes: `required`, `invalid`, `out_of_range`, `unknown_type`, `unknown_column` (a cell or column naming no such role, group or column), `duplicate`, `too_many`. The System Admins group must stay a column (`/columns` `mandatory_locked`) and every mandatory type that goes to the System Admins keeps their cell on. Like the security and system rows, a change of `enabled`, `timezone`, `digest_hour`, `work_days_follow_calendar` or `work_days` needs a System Admin (403 `delegate_forbidden`) and a step-up, and the System Admins are told (security review 2026-11-23). When nothing was saved the columns are the System Admins group and the Project Manager role. Audited (`notification_policy_update`, before and after).
+      x-step-up: when the body changes a security or system row, a threshold that feeds one, the switch, the timezone, the digest hour or the working days
+      x-db-path: admin_set_notification_policy
       parameters:
       - {$ref: '#/components/parameters/IfMatch'}
       requestBody:
@@ -7822,8 +7827,10 @@ paths:
     post:
       tags: [calendar]
       operationId: importHolidays
-      summary: Upload the TPL-HOLIDAYS template (creates an import batch)
-      description: 'Seed file: `db/seed/holidays-2026-2027.csv`. Whether the CSV is accepted besides the xlsx template is an open point (ADR 0011). Needs a `reason` (0.2.6), like every other holiday change; it is written to the audit row of each holiday the batch changes. A missing or too short reason is 422 `validation_failed`.'
+      summary: Upload the TPL-HOLIDAYS template (applied at once)
+      description: |
+        Seed file: `db/seed/holidays-2026-2027.csv` (loaded by the seed script). The upload accepts the approved xlsx template `TPL-HOLIDAYS` only (ADR 0011, owner decision); a CSV or any other file is 422 `template_rejected` (`reason` `not_xlsx`, `macros_not_allowed`, `tpl_missing`, `wrong_template`, `outdated_version`, `checksum_mismatch`, `size_or_rows_exceeded`), written to the System Log. Needs a `reason` (0.2.6), like every other holiday change; it is written to the audit row of each holiday the file adds. A missing or too short reason is 422 `validation_failed`.
+        0.15.61 (migration 0145): System Admin or a delegate of `calendars` edit for all regions (checked in the database). The file is applied at once, not sent to L2 (holidays are configuration): `status` `applied`, `counts.create` (added) and `counts.unchanged` (a date the calendar already holds with the same values), `affected_open_tasks`. One bad row refuses the whole file: 422 `validation_failed` with `errors[]` per line (`path` `/rows/<line>/<field>`, codes `required`, `invalid`, `out_of_range`, `too_long`, `duplicate_in_file`, and `duplicate` for a date the calendar holds with other values; setting `calendar.holiday_import_existing` = `skip` leaves those dates as they are instead, Q602). The SLA due dates of open tasks are recalculated once; closed tasks keep their values. Audited per holiday (`holiday_create` with the import id) and per file (`holidays_import`).
       parameters:
       - {$ref: '#/components/parameters/IdempotencyKey'}
       requestBody:
@@ -8335,6 +8342,7 @@ paths:
       tags: [settings]
       operationId: getDlpSettings
       summary: Defects Liability Period months (CW and TE) with history
+      description: Every signed-in user. `current` is the version in force today; `history` is newest first.
       responses:
         '200':
           description: Current and history.
@@ -8347,7 +8355,9 @@ paths:
       tags: [settings]
       operationId: publishDlpVersion
       summary: Publish a new DLP version (`dlp.months.cw`, `dlp.months.te`)
-      description: Counted from the PAC date. A PAC keeps the version in force on its issue date.
+      description: |
+        Counted from the PAC date. A PAC keeps the version in force on its issue date.
+        0.15.61 (migration 0145): System Admin or a delegate of `admin.settings` edit for all regions, a reason and a step-up. Closed body (`unknown_key`). `effective_from` is today or later (`in_the_past`, Q600) and not before the effective date of the latest version (`before_latest_version`). A version effective today is in force at once; a later one is listed in `history` and becomes `current` on its date. Audited (`dlp_version_publish`, before and after).
       x-step-up: true
       x-db-path: admin_publish_dlp
       requestBody:
@@ -17634,7 +17644,7 @@ components:
         name_ar: { type: [string, 'null'] }
         kind: { type: string, enum: [data_import, assignment_import, config_import, master] }
         module_key: { $ref: '#/components/schemas/ModuleKey' }
-        template_kind: { type: string, enum: [register, stream, master, sites], description: 'A register template (one per register), a Site Register stream template (`TPL-SITE-DA`, `-CW`, `-TE`, `-CL`), the whole Master (`TPL-MASTER`) or, since 0.14.0, the New sites template (`TPL-SITE-NEW`, kind `sites`: one row per new site, entered through batch and L2).' }
+        template_kind: { type: string, enum: [register, stream, master, sites, list_values, holidays], description: 'A register template (one per register), a Site Register stream template (`TPL-SITE-DA`, `-CW`, `-TE`, `-CL`), the whole Master (`TPL-MASTER`) or, since 0.14.0, the New sites template (`TPL-SITE-NEW`, kind `sites`: one row per new site, entered through batch and L2). `list_values` (0.15.23): the values of a list (`TPL-LISTVALUES`). `holidays` (0.15.61): the holidays of the work calendar (`TPL-HOLIDAYS`, for a System Admin or a delegate of the calendar).' }
         register_key: { type: [string, 'null'], description: 'The register the template enters (`gecol` for TPL-GECOL). Null for a Site Register stream template or TPL-MASTER.' }
         stream: { type: [string, 'null'], description: 'The stream of a Site Register stream template (Q73): DESIGN_ACQ, CW, TE or CLOSURE.' }
         current_version: { type: integer, minimum: 1, description: 'Shown as "v3". Exactly one version is current; older versions are rejected on upload. A new version is issued by the database when the register''s fields or custom fields change.' }
@@ -17805,6 +17815,7 @@ components:
         site_id: { type: [string, 'null'], format: uuid, description: 'The task''s site when `task_id` is set.' }
         uploaded_by: { $ref: '#/components/schemas/UserRef' }
         uploaded_at: { type: string, format: date-time }
+        affected_open_tasks: { type: integer, description: '0.15.61. `POST /settings/holidays/import` only: the open tasks whose SLA due date moved.' }
         version: { type: integer }
     ImportRow:
       type: object
