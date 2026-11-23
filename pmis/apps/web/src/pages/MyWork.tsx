@@ -10,8 +10,7 @@ import { TaskDrawer } from '@/components/TaskDrawer';
 import { BallSince, ExternalParty, SlaOverrun, StaleBadge } from '@/components/TaskTiming';
 import { TasksBoard } from '@/components/TasksBoard';
 import { SavedViews } from '@/components/SavedViews';
-import { FilterBuilder } from '@/components/FilterBuilder';
-import { QuickFilter } from '@/components/TableKit';
+import { UnifiedFilter } from '@/components/UnifiedFilter';
 import { decodeFilter, encodeFilter, type FilterTree } from '@/api/views';
 
 const SLA_CHIP: Record<string, string> = { green: 'bg-doneBg text-doneInk', amber: 'bg-waitBg text-waitInk', red: 'bg-lateBg text-lateInk', none: 'bg-lockBg text-lockInk' };
@@ -82,8 +81,8 @@ export function MyWork() {
           <div className="flex flex-wrap items-center gap-2" data-testid="tasks-board-toolbar">
             <SavedViews screen="tasks-board" value={{ mine: mine ? 'true' : '', ...(advTree ? { advanced: advTree } : {}) }} empty={BOARD_EMPTY}
               onApply={(v) => setParams({ mine: String((v as Record<string, unknown>).mine ?? ''), adv: encodeFilter((v as { advanced?: FilterTree }).advanced) })} />
-            <FilterBuilder screen="tasks-board" value={advTree} onChange={(tree) => setParams({ adv: encodeFilter(tree) })} />
-            <QuickFilter testid="tasks-board-mine" on={mine} onClick={() => setParams({ mine: mine ? '' : 'true' })}>{t('board.mine')}</QuickFilter>
+            <UnifiedFilter screen="tasks-board" value={advTree} onChange={(tree) => setParams({ adv: encodeFilter(tree) })} onClearAll={() => setParams({ adv: '', mine: '' })}
+              extras={[{ key: 'mine', label: t('board.mine'), group: 'work', kind: 'bool', value: mine ? '1' : '', set: (v) => setParams({ mine: v ? 'true' : '' }) }]} />
           </div>
           <TasksBoard query={{ filter: adv || undefined, mine: mine || undefined }} />
         </div>

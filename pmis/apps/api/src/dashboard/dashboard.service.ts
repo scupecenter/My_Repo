@@ -7,6 +7,7 @@ import { problems } from '../common/problem';
 import { boolParam, oneParam, Query } from '../common/query';
 import { DbService } from '../db/db.service';
 import { applyContext } from '../logs/context';
+import { FilterCatalogService } from '../views/filter-catalog.service';
 import { z } from 'zod';
 import { parse } from '../common/zod';
 
@@ -75,7 +76,25 @@ export class DashboardService {
   constructor(
     private readonly db: DbService,
     private readonly access: AccessService,
+    private readonly filterCatalog: FilterCatalogService,
   ) {}
+
+  /**
+   * 0.15.45: runs `fn` (a dash_core call) with the site set of the request's `filter` tree. The tree is compiled against the `dashboard` whitelist (the sites
+   * fields) for the caller and evaluated on `sites` (region scope and row security apply); the ids go to the engine in the transaction-local setting
+   * pmis.dash_sites (migration 0137), which keeps only these sites in the facts, so every figure follows the same set. Without a filter nothing changes.
+   * The setting is cleared afterwards: the request transaction may run other calculations.
+   */
+  async withSiteSet<T>(q: Query, fn: () => Promise<T>): Promise<T> {
+    const ids = await this.filterCatalog.siteSet(q);
+    if (ids === null) return fn();
+    await this.db.tx.$queryRaw(Prisma.sql`SELECT set_config('pmis.dash_sites', ${ids.length ? ids.join(',') : 'none'}::text, true)`);
+    try {
+      return await fn();
+    } finally {
+      await this.db.tx.$queryRaw(Prisma.sql`SELECT set_config('pmis.dash_sites', '', true)`);
+    }
+  }
 
   /** The default of exclude_overrides is the setting `dashboard.exclude_overrides` (Project Status leaves out admin overrides unless told otherwise). */
   async excludeOverrides(p: DashboardParams): Promise<boolean> {
@@ -103,8 +122,8 @@ export class DashboardService {
     if (p.stream) await this.requireStream(p.stream);
     if (p.view) await this.requireView(p.view);
     const excl = await this.excludeOverrides(p);
-    const rows = await this.db.tx.$queryRaw<{ r: Json }[]>(Prisma.sql`
-      SELECT dash_overview(${p.ref_date ?? null}::date, ${p.region_id ?? null}::int, ${p.cluster_code ?? null}::text, ${p.scenario ?? null}::text, ${p.stream ?? null}::text, ${excl}::boolean, ${p.view ?? null}::text) AS r`);
+    const rows = await this.withSiteSet(q, () => this.db.tx.$queryRaw<{ r: Json }[]>(Prisma.sql`
+      SELECT dash_overview(${p.ref_date ?? null}::date, ${p.region_id ?? null}::int, ${p.cluster_code ?? null}::text, ${p.scenario ?? null}::text, ${p.stream ?? null}::text, ${excl}::boolean, ${p.view ?? null}::text) AS r`));
     const r = rows[0]!.r;
     const meta = (r.meta ?? {}) as Json;
     const basis = (r.basis ?? {}) as Json;

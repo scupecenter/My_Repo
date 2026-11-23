@@ -184,6 +184,11 @@ export class SavedViewsService {
     if (!SCREEN.safeParse(screen).success || !FilterCatalogService.supports(screen)) {
       throw problems.validation([{ path: '/screen_key', code: 'invalid', message: 'This list has no filter builder.' }]);
     }
+    const local = FilterCatalogService.modulesOf(screen); // the screens of 0.15.45 (dashboard, site360-<menu>) have no saved views
+    if (local) {
+      for (const m of local) await this.access.requireRegions(m, 'view');
+      return this.catalog.describe(screen);
+    }
     const mod = await this.run<string | null>(Prisma.sql`SELECT sv_screen_module(${screen}::text) AS r`);
     if (!mod) throw problems.validation([{ path: '/screen_key', code: 'invalid', message: 'Not a list screen with saved views.' }]);
     await this.access.requireRegions(mod, 'view');

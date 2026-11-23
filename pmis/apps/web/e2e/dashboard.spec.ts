@@ -42,11 +42,15 @@ for (const c of CASES) {
     await expect(page.locator('[data-testid="dash-pipeline"] .pipe-line i')).toBeAttached();
 
     // filters go to the request and change the view
-    const req = page.waitForRequest((r) => r.url().includes('/dashboard?') && r.url().includes('region_id=5'));
-    await page.getByTestId('dash-filter-region').selectOption('5');
+    // the unified filter (screen `dashboard`): the region is a field of the sites tree, sent as `filter`
+    const req = page.waitForRequest((r) => r.url().includes('/dashboard?') && r.url().includes('filter='));
+    await page.getByTestId('filter-add').click();
+    await page.getByTestId('filter-field-region_id').click();
+    await page.getByTestId('filter-value-opt-5').click();
     await req;
-    await expect(page).toHaveURL(/region_id=5/);
-    await expect(page.getByTestId('dash-central-hidden')).toBeVisible();
+    await expect(page).toHaveURL(/adv=/);
+    await expect(page.getByTestId('filter-chip-0')).toBeVisible();
+    await page.keyboard.press('Escape');
     await page.getByTestId('dash-filter-stream').selectOption('TE');
     await expect(page.locator('[data-testid="dash-pipeline"] [data-testid^="pipe-node-"]')).toHaveCount(4);
     // Q126: the view filter beside the stream filter (O&M keeps Final Closure only, so with TE nothing is left)
@@ -64,10 +68,13 @@ for (const c of CASES) {
     await expect(page.getByTestId('dash-basis')).toHaveAttribute('data-source', 'live');
 
     // drill-down to the Site Register keeps the filters
-    await page.getByTestId('dash-filter-region').selectOption('1');
+    await page.getByTestId('filter-add').click();
+    await page.getByTestId('filter-field-region_id').click();
+    await page.getByTestId('filter-value-opt-1').click();
+    await page.keyboard.press('Escape');
     await page.getByTestId('dash-status-in_progress').click();
     await expect(page.getByTestId('page-sites')).toBeVisible();
-    await expect(page).toHaveURL(/region_id=1/);
+    await expect(page).toHaveURL(/adv=/);
     await expect(page).toHaveURL(/dashboard_status=in_progress/);
   });
 }

@@ -5441,7 +5441,8 @@ export interface paths {
         };
         /**
          * The grid rows of one SITE 360 menu, one page at a time (0.15.21, F15)
-         * @description 0.15.21. The rows of one menu (`master`, `design_acq`, `sow`, `cw`, `te`, `hoto`, `dismantle`, `om`) with the Master values of its columns, read from the set-based view `site360_master_values` (one query per page, no per-site path). `menu` gives the columns, bands and frozen columns as `GET /site360/sections`. Each row has `row_no`, the running number of the rows in view (the # column), and `values` keyed by the Master column order (ord); a value is `null` when the column has no source yet. `total` counts the sites the caller may see (region scope, B3); `filtered` counts the sites that match the filters. Filters are multi-value (comma-separated): Site ID, region, sub region, phase, batch, scenario, delivery model, status, milestone. The contractor filter (`contractor`) is in 0.15.21 item (5). `sort` takes a site field or `ord:<n>` of a column of the menu. Needs the `sites` view in a region; reading only, every value is written through the site and task paths.
+         * @description 0.15.45: `filter` is compiled against the screen `site360-<menu>` of `GET /saved-views/filter-fields` (the `sites` fields and the Master columns of the menu as `m:<ord>`, typed date, number, bool, enum or text); a condition on a Master column is set-based (one derived table per column used) and reads only what the caller may see.
+         *     0.15.21. The rows of one menu (`master`, `design_acq`, `sow`, `cw`, `te`, `hoto`, `dismantle`, `om`) with the Master values of its columns, read from the set-based view `site360_master_values` (one query per page, no per-site path). `menu` gives the columns, bands and frozen columns as `GET /site360/sections`. Each row has `row_no`, the running number of the rows in view (the # column), and `values` keyed by the Master column order (ord); a value is `null` when the column has no source yet. `total` counts the sites the caller may see (region scope, B3); `filtered` counts the sites that match the filters. Filters are multi-value (comma-separated): Site ID, region, sub region, phase, batch, scenario, delivery model, status, milestone. The contractor filter (`contractor`) is in 0.15.21 item (5). `sort` takes a site field or `ord:<n>` of a column of the menu. Needs the `sites` view in a region; reading only, every value is written through the site and task paths.
          */
         get: operations["getSite360Rows"];
         put?: never;
@@ -8403,7 +8404,8 @@ export interface paths {
         };
         /**
          * The main dashboard, limited to the caller's regions and modules (0.7.2)
-         * @description One call for the whole dashboard page (owner request 2026-11-02; `docs/spec/dashboard-kpis.md`). It supersedes the five `/dashboard/*` reads below, which are not built.
+         * @description 0.15.45: `filter` (a `FilterTree`, screen `dashboard` = the `sites` fields) narrows the sites like `region_id`, `cluster_code`, `scenario`, `stream` and `view` do and keeps `ref_date`; the view is then not project wide.
+         *     One call for the whole dashboard page (owner request 2026-11-02; `docs/spec/dashboard-kpis.md`). It supersedes the five `/dashboard/*` reads below, which are not built.
          *     Needs `dashboard.view`; a caller without it is 403 `module_forbidden`. **Every figure is computed from the sites in the caller's `dashboard.view` regions** (B3, VI-04): a Tripoli user never sees a Benghazi count, and the project-wide ("central") Project Status items (1.3, 1.5, 3.2 to 3.9, 6.1, 6.6, 7.7, 8.1) are left out and reported in `meta.central_items_hidden` whenever the figures are not for the whole project. The `issues` section needs `issues.view` as well and is null without it. Cancelled sites are left out of every figure; their number is `headline.sites_cancelled`.
          *     **Reference date (Q34).** `ref_date` defaults to today and may be any earlier date. `basis.source` says how the figures were made: `live` (today), `snapshot` (a weekly snapshot dated exactly `ref_date` exists: headline, pipeline, streams and Project Status come from it; SLA, issues, delay attribution and health are computed as of the date) or `as_of_computed` (no snapshot: everything is computed from dated facts, an actual date counts when it is on or before the date; blocked gates are not available, `gates.available` is false). A date in the future is 422 `validation_failed` with `/ref_date` `in_future`.
          *     **Counting (Q36).** Issues are counted for the owner bars and the totals, sites for `sites_with_open_issue`; the issue age is in working days from the raised date. **Health index** (rules.md section 9, version 1) is a draft under owner review (`health.draft`); the bands are the setting `dashboard.health_bands` (green from 85, amber from 70, red below, Q35). **Health index** factors D and I are approved (0.11.0, Q121): `health.draft` is false. **Delay attribution** (rules.md section 8) uses the attribution periods of the tasks and leaves out Change Control suspension days (0.11.0, Q122). **Central items** (0.11.0, Q118) count by their weight wherever a manual value is in force on the reference date. Working days use the default work calendar (Friday and Saturday weekend, holidays table).
@@ -8427,7 +8429,8 @@ export interface paths {
         };
         /**
          * The sites of the dashboard map (OV-12, SC-10; 0.14.5)
-         * @description One compact row per active site the caller may see, for the map of the dashboard and of the Site Register (owner request 2026-11-05). The map is drawn in the browser
+         * @description 0.15.45: `filter` (a `FilterTree`, screen `dashboard`) keeps the sites that match, beside the caller's regions.
+         *     One compact row per active site the caller may see, for the map of the dashboard and of the Site Register (owner request 2026-11-05). The map is drawn in the browser
          *     from a bundled outline of Libya; nothing is fetched from outside the internal server (no map tiles).
          *     **Who sees what (B3).** Needs `dashboard.view` (403 `module_forbidden` otherwise) and `sites.view` (403 `module_forbidden` when the caller has it in no region). The sites
          *     are those in the regions where the caller holds both; the database row-level filter applies as for `GET /sites`. Cancelled sites are listed with `overall_status`
@@ -8460,7 +8463,8 @@ export interface paths {
         };
         /**
          * The F13 sections of the dashboard in one read (0.15.18)
-         * @description The sections added to the dashboard with the three tabs (F13 of the features build plan; owner decisions 2026-11-15): the 5x5 risk matrix with the top open risks, the data
+         * @description 0.15.45: `filter` (a `FilterTree`, screen `dashboard`) narrows the site-based sections like `cluster_code` and `scenario` (not the risk matrix, the decisions or the register-based counters).
+         *     The sections added to the dashboard with the three tabs (F13 of the features build plan; owner decisions 2026-11-15): the 5x5 risk matrix with the top open risks, the data
          *     quality panel, the swap and relocation breakdown by delivery scenario, and the decisions card. Read only. The filters `region_id` (risks and sites), `cluster_code` and `scenario` (sites only) narrow the figures as in `GET /dashboard`;
          *     `stream` is accepted and ignored. The figures are current (no reference date).
          *     **Who sees what (B3).** Needs `dashboard.view` (403 `module_forbidden` otherwise). The risk matrix needs `risks.view`, the other sections need `sites.view`; a section the caller
@@ -8530,7 +8534,7 @@ export interface paths {
         };
         /**
          * Project Status (ends at HOTO) with the weight-set version used
-         * @description Uses the active weight set, or `weight_set_version` / `weight_set_id` (0.2.6) to re-run with an older set for comparison. Both together, a set of another code, or an unknown `weight_set_version` is 422. Weekly snapshots are never recomputed.
+         * @description Uses the active weight set, or `weight_set_version` / `weight_set_id` (0.2.6) to re-run with an older set for comparison. Both together, a set of another code, or an unknown `weight_set_version` is 422. Weekly snapshots are never recomputed. Since 0.15.45 `filter` (a `FilterTree`, screen `dashboard`) narrows the sites (not project wide then).
          */
         get: operations["getProjectStatus"];
         put?: never;
@@ -8730,9 +8734,11 @@ export interface paths {
         };
         /**
          * The filter fields of a list screen the caller may filter on (0.15.31, F3)
-         * @description The whitelist of the AND/OR filter builder for `sites`, `sites-stream`, `site-tasks` and `register-<key>`, with the operators of each type and the
-         *     limits. Fields hidden from the caller by a field rule, inactive fields and fields not offered in list filters are left out. Needs the view right on
-         *     the screen's module (403 `module_forbidden`); another screen answers 422.
+         * @description The whitelist of the AND/OR filter builder for `sites`, `sites-stream`, `site-tasks`, `tasks-board`, `register-<key>` and (0.15.45) `site360-<menu>` and
+         *     `dashboard`, with the operators of each type and the limits. Fields hidden from the caller by a field rule, inactive fields and fields not offered in list
+         *     filters are left out. A field that holds codes or repeating text is an `enum` with its `options` (the distinct values the caller can see, at most 500,
+         *     `truncated` when there are more; a list field: the values of its list catalogue), and every field carries a `group` for the one dropdown of the builder.
+         *     Needs the view right on the screen's module (403 `module_forbidden`; `dashboard` needs `dashboard.view` and `sites.view`); another screen answers 422.
          */
         get: operations["listFilterFields"];
         put?: never;
@@ -15989,18 +15995,27 @@ export interface components {
         /** @enum {string} */
         FilterFieldType: "text" | "enum" | "number" | "date" | "bool";
         FilterField: {
-            /** @description Built-in key, `f:<code>` (register field), `c:<code>` (site custom field) or `ms:<STAGE>` (approved milestone date). */
+            /** @description Built-in key, `f:<code>` (register field), `c:<code>` (site custom field), `ms:<STAGE>` (approved milestone date) or, on `site360-<menu>` (0.15.45), `m:<ord>` (a Master column of the menu). */
             key: string;
             label_en: string;
             label_ar: string | null;
             type: components["schemas"]["FilterFieldType"];
             operators: components["schemas"]["FilterOperator"][];
-            /** @description The allowed values of an enum field. */
+            /** @description The values of an enum field. A fixed set (regions, scenarios, statuses, scope flags, the fixed options of a register field) is checked on a filter (422 `invalid_value`); since 0.15.45 the values of a field that holds codes or repeating text (the distinct values the caller can see, or the values of a list catalogue) are offered only: another value matches nothing. */
             options?: {
                 value: string;
                 label_en: string;
                 label_ar?: string | null;
             }[];
+            /** @description 0.15.45. Present with `options`: true when the data has more than the 500 values offered. */
+            truncated?: boolean;
+            group?: components["schemas"]["FilterFieldGroup"];
+        };
+        /** @description 0.15.45. The group of a field in the dropdown of the filter builder: a stable key and the two labels. */
+        FilterFieldGroup: {
+            key: string;
+            label_en: string;
+            label_ar: string;
         };
         FilterFieldList: {
             screen_key: string;
@@ -16017,7 +16032,7 @@ export interface components {
                 max_values: number;
             };
         };
-        /** @description A list screen (0.12.12): `sites`, `sites-stream`, `site-tasks`, `register-<register key>`, `audit-log`, `field-changes`, `security-log`, `system-log` (0.15.2), `tasks-board` (0.15.32, F5). */
+        /** @description A list screen (0.12.12): `sites`, `sites-stream`, `site-tasks`, `register-<register key>`, `audit-log`, `field-changes`, `security-log`, `system-log` (0.15.2), `tasks-board` (0.15.32, F5). 0.15.45: `GET /saved-views/filter-fields` also takes `site360-<menu>` (menu: master, design_acq, sow, cw, te, hoto, dismantle, om) and `dashboard`; these two have no saved views. */
         SavedViewScreenKey: string;
         /** @description Column control of the screen: order, hidden columns, widths in px and density. Hiding a column never changes a permission. */
         SavedViewColumns: {
@@ -17572,6 +17587,8 @@ export interface components {
         StaleFilter: boolean;
         /** @description 0.15.31 (F3): a `FilterTree` as one JSON string (at most 8000 characters), compiled on the server against the whitelist of this list. 422 `validation_failed` with `unknown_field` (also for a field hidden from the caller by a field rule), `invalid_operator`, `invalid_value`, `too_deep` or `too_many`. The caller's regions and row security still apply. */
         FilterTree: string;
+        /** @description 0.15.45: a `FilterTree` as one JSON string (at most 8000 characters), compiled against the screen `dashboard` of `GET /saved-views/filter-fields` (the `sites` fields) and evaluated on the sites the caller may see; it only narrows (the caller's `dashboard.view` regions and every other filter still apply). Needs `sites.view` (403 `module_forbidden`). 422 `validation_failed` with `unknown_field` (also for a field hidden from the caller), `invalid_operator`, `invalid_value`, `too_deep` or `too_many`. */
+        DashboardFilterTree: string;
         Limit: number;
         /** @description Opaque cursor from `page.next_cursor`. */
         Cursor: string;
@@ -32837,6 +32854,8 @@ export interface operations {
     getDashboard: {
         parameters: {
             query?: {
+                /** @description 0.15.45: a `FilterTree` as one JSON string (at most 8000 characters), compiled against the screen `dashboard` of `GET /saved-views/filter-fields` (the `sites` fields) and evaluated on the sites the caller may see; it only narrows (the caller's `dashboard.view` regions and every other filter still apply). Needs `sites.view` (403 `module_forbidden`). 422 `validation_failed` with `unknown_field` (also for a field hidden from the caller), `invalid_operator`, `invalid_value`, `too_deep` or `too_many`. */
+                filter?: components["parameters"]["DashboardFilterTree"];
                 /** @description Reference date, today or earlier. Default today (Africa/Tripoli). */
                 ref_date?: string;
                 /** @description One region. A region outside the caller's regions gives an empty view, not the other region. */
@@ -32872,7 +32891,10 @@ export interface operations {
     };
     getDashboardSiteMap: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description 0.15.45: a `FilterTree` as one JSON string (at most 8000 characters), compiled against the screen `dashboard` of `GET /saved-views/filter-fields` (the `sites` fields) and evaluated on the sites the caller may see; it only narrows (the caller's `dashboard.view` regions and every other filter still apply). Needs `sites.view` (403 `module_forbidden`). 422 `validation_failed` with `unknown_field` (also for a field hidden from the caller), `invalid_operator`, `invalid_value`, `too_deep` or `too_many`. */
+                filter?: components["parameters"]["DashboardFilterTree"];
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -32895,6 +32917,8 @@ export interface operations {
     getDashboardExtras: {
         parameters: {
             query?: {
+                /** @description 0.15.45: a `FilterTree` as one JSON string (at most 8000 characters), compiled against the screen `dashboard` of `GET /saved-views/filter-fields` (the `sites` fields) and evaluated on the sites the caller may see; it only narrows (the caller's `dashboard.view` regions and every other filter still apply). Needs `sites.view` (403 `module_forbidden`). 422 `validation_failed` with `unknown_field` (also for a field hidden from the caller), `invalid_operator`, `invalid_value`, `too_deep` or `too_many`. */
+                filter?: components["parameters"]["DashboardFilterTree"];
                 region_id?: components["schemas"]["RegionId"];
                 cluster_code?: string;
                 scenario?: components["schemas"]["DeliveryScenario"];
@@ -32924,6 +32948,8 @@ export interface operations {
     exportDashboard: {
         parameters: {
             query?: {
+                /** @description 0.15.45: a `FilterTree` as one JSON string (at most 8000 characters), compiled against the screen `dashboard` of `GET /saved-views/filter-fields` (the `sites` fields) and evaluated on the sites the caller may see; it only narrows (the caller's `dashboard.view` regions and every other filter still apply). Needs `sites.view` (403 `module_forbidden`). 422 `validation_failed` with `unknown_field` (also for a field hidden from the caller), `invalid_operator`, `invalid_value`, `too_deep` or `too_many`. */
+                filter?: components["parameters"]["DashboardFilterTree"];
                 ref_date?: string;
                 region_id?: components["schemas"]["RegionId"];
                 cluster_code?: string;
@@ -32992,6 +33018,8 @@ export interface operations {
     getProjectStatus: {
         parameters: {
             query?: {
+                /** @description 0.15.45: a `FilterTree` as one JSON string (at most 8000 characters), compiled against the screen `dashboard` of `GET /saved-views/filter-fields` (the `sites` fields) and evaluated on the sites the caller may see; it only narrows (the caller's `dashboard.view` regions and every other filter still apply). Needs `sites.view` (403 `module_forbidden`). 422 `validation_failed` with `unknown_field` (also for a field hidden from the caller), `invalid_operator`, `invalid_value`, `too_deep` or `too_many`. */
+                filter?: components["parameters"]["DashboardFilterTree"];
                 region_id?: components["schemas"]["RegionId"];
                 site_id?: string;
                 group_by?: "none" | "region" | "site";
