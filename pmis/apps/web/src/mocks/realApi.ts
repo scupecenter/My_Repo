@@ -515,6 +515,12 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/reassignments/eligible-users'],
   ['post', '/tasks/reassign'],
   ['post', '/tasks/:id/act-on-behalf'],
+  // Contract 0.15.56 (migration 0142; apps/api: staff-registry): the hover card (visibility applied by the database), the email and phone visibility settings,
+  // and the edit of a registry row (also hiding a field for one employee). Moved from NOT_AVAILABLE.
+  ['get', '/staff-registry/visibility'],
+  ['put', '/staff-registry/visibility'],
+  ['get', '/staff-registry/:employeeId'],
+  ['patch', '/staff-registry/:employeeId'],
   // Contract 0.15.57 (migration 0143): the MFA exemption, creating a group, the pending user's request to the System Admins, the employee-ID link.
   ['get', '/users/:id/mfa-exemption'],
   ['put', '/users/:id/mfa-exemption'],
@@ -557,10 +563,6 @@ export const NOT_AVAILABLE = [
   ['get', '/settings/notification-policy'],
   ['put', '/settings/notification-policy'],
   ['get', '/settings/notification-policy/catalogue'],
-  ['get', '/staff-registry/visibility'],
-  ['put', '/staff-registry/visibility'],
-  ['get', '/staff-registry/:employeeId'],
-  ['patch', '/staff-registry/:employeeId'],
   ['post', '/settings/holidays/import'],
 ] as const;
 

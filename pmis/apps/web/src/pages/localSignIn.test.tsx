@@ -352,6 +352,8 @@ describe('hybrid mode list', () => {
       // 0.15.54 (migration 0140): absences and the lead decisions (B12b)
       'GET /absences', 'POST /absences', 'GET /absences/:id', 'PATCH /absences/:id', 'DELETE /absences/:id', 'GET /reassignments/alerts', 'GET /reassignments/eligible-users',
       'POST /tasks/reassign', 'POST /tasks/:id/act-on-behalf',
+      // 0.15.56 (migration 0142): the staff registry card, its visibility settings and the edit of a row
+      'GET /staff-registry/visibility', 'PUT /staff-registry/visibility', 'GET /staff-registry/:employeeId', 'PATCH /staff-registry/:employeeId',
       // contract 0.15.57
       'GET /users/:id/mfa-exemption', 'PUT /users/:id/mfa-exemption', 'POST /users/:id/mfa-exemption/revoke', 'POST /groups', 'POST /me/notify-admins', 'POST /auth/employee-id',
     ]);
