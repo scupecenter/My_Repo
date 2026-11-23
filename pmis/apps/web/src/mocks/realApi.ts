@@ -515,6 +515,16 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/settings/notification-policy'],
   ['put', '/settings/notification-policy'],
   ['post', '/settings/holidays/import'],
+  // Contract 0.15.54 (migration 0140; apps/api: reassignment): absence records and the lead decisions on tasks (B12b, B14).
+  ['get', '/absences'],
+  ['post', '/absences'],
+  ['get', '/absences/:id'],
+  ['patch', '/absences/:id'],
+  ['delete', '/absences/:id'],
+  ['get', '/reassignments/alerts'],
+  ['get', '/reassignments/eligible-users'],
+  ['post', '/tasks/reassign'],
+  ['post', '/tasks/:id/act-on-behalf'],
 ] as const;
 
 /** `GET /users/deleted` and `GET /users/picker` are other operations that the `:id` pattern would swallow; they stay mocked. */
@@ -543,13 +553,6 @@ export function realApiHandlers(on = HYBRID) {
  * When the API gains one of these routes, move it to REAL_API_AUTH_USERS (realApiCoverage.test.ts fails until it is listed there).
  */
 export const NOT_AVAILABLE = [
-  ['get', '/absences'],
-  ['post', '/absences'],
-  ['delete', '/absences/:id'],
-  ['get', '/reassignments/alerts'],
-  ['get', '/reassignments/eligible-users'],
-  ['post', '/tasks/reassign'],
-  ['post', '/tasks/:id/act-on-behalf'],
   ['get', '/staff-registry/visibility'],
   ['put', '/staff-registry/visibility'],
   ['get', '/staff-registry/:employeeId'],

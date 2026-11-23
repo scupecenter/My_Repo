@@ -200,7 +200,8 @@ export class LogsService {
     const after = r.after && typeof r.after === 'object' ? r.after : null;
     return {
       id: Number(r.id), at: r.at_text, actor: r.actor_id ? u.get(r.actor_id) ?? null : null, on_behalf_of: r.on_behalf_of ? u.get(r.on_behalf_of) ?? null : null,
-      on_behalf_kind: r.on_behalf_of ? 'delegate' : null,
+      // 0140: a lead acting for the assignee of a task level (B12b) is marked in the row; any other on_behalf_of is a delegate of the System Admin
+      on_behalf_kind: r.on_behalf_of ? (after?.on_behalf_kind === 'assignee' ? 'assignee' : 'system_admin') : null,
       action: r.action, entity_type: r.entity_type, entity_id: r.entity_id, site_id: r.site_id, site_code: r.site_code, region_id: r.region_id, module_key: r.module_key,
       before: r.before ?? null, after, reason: r.reason,
       bulk_action_id: typeof after?.bulk_action_id === 'string' ? after.bulk_action_id : r.entity_type === 'bulk_action' ? r.entity_id : null,

@@ -54,6 +54,15 @@ const patchSchema = z
   })
   .strict()
   .refine((v) => Object.keys(v).length > 0, 'send at least one field');
+/** B12b choice 3 (contract 0.2.5, POST /tasks/{task_id}/act-on-behalf). */
+const actOnBehalfSchema = z
+  .object({
+    action: z.enum(['submit', 'review', 'approve', 'reject']),
+    level: z.number().int().min(1),
+    reason: z.string().trim().min(3).max(1000),
+    note: z.string().max(2000).optional(),
+  })
+  .strict();
 const commentSchema = z
   .object({ body: z.string().trim().min(1).max(4000), mention_user_ids: z.array(z.string().uuid()).max(20).optional() })
   .strict();
@@ -142,6 +151,27 @@ export class WorkflowService {
     await this.documents.syncTaskById(taskId);
     const fn = action === 'submit' ? Prisma.sql`wf_submit` : action === 'review' ? Prisma.sql`wf_review` : Prisma.sql`wf_approve`;
     return this.call(auth, Prisma.sql`SELECT ${fn}(${taskId}::uuid, ${version}::int, ${note}::text, ${stepOk}::boolean) AS r`);
+  }
+
+  /**
+   * B12b choice 3, migration 0140: a lead (the reassign grant for the task's region) or a System Admin performs the current level for the person it is on.
+   * The database checks the lead right, the level and the state, then runs the engine's own transition (wf_complete / wf_reject) with the act-on-behalf
+   * marker, so the grants per level, the self-skip chain, the self-approval flag (B5) and the step-up of a final approval apply unchanged. Steps and audit
+   * rows carry on_behalf_of (the assignee). Nothing is reset (SLA start and version, stage progress, data, documents).
+   */
+  async actOnBehalf(auth: AuthContext, taskId: string, ifMatch: string | undefined, rawBody: unknown): Promise<TransitionResultDto> {
+    const version = parseIfMatch(ifMatch);
+    const body = parse(actOnBehalfSchema, rawBody ?? {});
+    if (body.action === 'reject' && !(body.note ?? '').trim()) {
+      throw new ProblemException(422, 'note_required', { detail: 'A rejection needs a note.', errors: [{ path: '/note', code: 'required', message: 'A note is required.' }] });
+    }
+    await this.visible(auth, taskId);
+    if (body.action === 'approve') await this.stepUp.require(auth);
+    const stepOk = Boolean(await this.stepUp.validUntil(auth));
+    if (body.action !== 'reject') await this.documents.syncTaskById(taskId);
+    const r = await this.call(auth, Prisma.sql`SELECT ops_act_on_behalf(${taskId}::uuid, ${version}::int, ${body.action}::text, ${body.level}::int,
+      ${body.reason}::text, ${body.note ?? null}::text, ${stepOk}::boolean) AS r`);
+    return this.result(auth, taskId, r);
   }
 
   async start(auth: AuthContext, taskId: string, ifMatch: string | undefined, rawBody: unknown): Promise<TransitionResultDto> {
@@ -237,7 +267,10 @@ export class WorkflowService {
           created_at: r.created_at,
         };
         if (r.acted_by && refs.get(r.acted_by)) item.acted_by = refs.get(r.acted_by);
-        if (r.on_behalf_of && refs.get(r.on_behalf_of)) item.on_behalf_of = refs.get(r.on_behalf_of);
+        if (r.on_behalf_of && refs.get(r.on_behalf_of)) {
+          item.on_behalf_of = refs.get(r.on_behalf_of);
+          item.on_behalf_kind = 'assignee'; // 0140: only "lead on behalf of the assignee" (B12b) writes on_behalf_of on a step
+        }
         if (r.before_state) item.before_state = r.before_state;
         if (r.after_state) item.after_state = r.after_state;
         return item;

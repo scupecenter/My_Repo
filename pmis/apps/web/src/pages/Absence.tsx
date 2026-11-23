@@ -9,6 +9,7 @@ import { errText, FormDialog } from '@/components/FormDialog';
 import { PeoplePicker } from '@/components/PeoplePicker';
 import { PersonTag } from '@/components/PersonTag';
 import { useToast } from '@/components/Toast';
+import { canReassign } from '@/lib/x';
 
 const KINDS = ['annual', 'sick', 'emergency', 'other'] as const;
 export type Decision = 'reassign' | 'act_on_behalf' | 'keep';
@@ -55,7 +56,7 @@ export function CoverDialog({ alert, decision, onClose, personOnly = false }: { 
         : <fieldset data-testid="cover-scope"><legend className="text-sm font-semibold">{t('cover.scope')}</legend>
             <div className="mt-1 flex flex-col gap-1 text-sm">{(['task', 'site', 'person'] as const).map((s) => (
               <label key={s} className="flex items-center gap-2"><input type="radio" name="cover-scope" data-testid={`cover-scope-${s}`} checked={scope === s} onChange={() => setScope(s)} />{t(`cover.scope_${s}`)}</label>))}</div></fieldset>}
-      {decision === 'reassign' && <div><b className="text-sm">{t('cover.to')}</b><PeoplePicker id="cover-to" single value={to} onChange={setTo} eligible={{ from }} /><p className="mt-1 text-xs text-mute">{t('cover.eligible_only')}</p></div>}
+      {decision === 'reassign' && <div><b className="text-sm">{t('cover.to')}</b><PeoplePicker id="cover-to" single value={to} onChange={setTo} eligible={scope === 'task' && alert.task ? { task: alert.task.id } : { from, ...(scope === 'site' ? { site: alert.task?.site_id } : {}) }} /><p className="mt-1 text-xs text-mute">{t('cover.eligible_only')}</p></div>}
       <p className="rounded-md bg-card2 p-2 text-sm text-mute" data-testid="cover-sla-note">{t('cover.sla_note')}</p>
     </FormDialog>
   );
@@ -89,7 +90,8 @@ export function Absence() {
   const { t } = useTranslation();
   const toast = useToast();
   const me = useMe(true), list = useAbsences(), create = useCreateAbsence(), del = useDeleteAbsence();
-  const lead = !!me.data?.is_system_admin || !!me.data?.effective.grants.some((g) => g.action === ('reassign' as string));
+  // the reassign right is stored as overrides.reassign + administer (the server checks it per region on every write)
+  const lead = canReassign(me.data);
   const [kind, setKind] = useState<(typeof KINDS)[number]>('annual');
   const [who, setWho] = useState<UserPickerItem[]>([]);
   const [from, setFrom] = useState(''), [to, setTo] = useState(''), [note, setNote] = useState('');

@@ -28,8 +28,12 @@ export const useMfa = (id: string) => useQuery({ queryKey: key('mfa', id), query
 export const useDelegations = (state: string) => useQuery({ queryKey: key('delegations', state), queryFn: () => api.get<Page<Delegation>>('/delegations', { query: { state } }).then((r) => r.items) });
 export const useAbsences = () => useQuery({ queryKey: ['absences'], queryFn: () => api.get<Page<Absence>>('/absences').then((r) => r.items) });
 export const useAlerts = (cause: string) => useQuery({ queryKey: key('alerts', cause), queryFn: () => api.get<Page<ReassignmentAlert>>('/reassignments/alerts', { query: { cause } }).then((r) => r.items), retry: false });
-export const useEligible = (from: string | undefined, q: string, enabled = true) =>
-  useQuery({ queryKey: key('eligible', from, q), enabled, queryFn: () => api.get<Page<UserPickerItem>>('/reassignments/eligible-users', { query: { from_user_id: from, q } }).then((r) => r.items) });
+/** Contract 0.15.54: with a task, the people who may hold that task's level; with a person (and a site), anyone eligible for one of the person's open tasks. */
+export const useEligible = (from: string | undefined, q: string, enabled = true, task?: string, site?: string) =>
+  useQuery({
+    queryKey: key('eligible', from, q, task, site), enabled,
+    queryFn: () => api.get<Page<UserPickerItem>>('/reassignments/eligible-users', { query: task ? { task_id: task, q } : { from_user_id: from, site_id: site, q } }).then((r) => r.items),
+  });
 export const usePicker = (q: string) =>
   useQuery({ queryKey: key('picker', q), enabled: q.trim().length >= 2, queryFn: () => api.get<Page<UserPickerItem>>('/users/picker', { query: { q: q.trim() } }).then((r) => r.items) });
 

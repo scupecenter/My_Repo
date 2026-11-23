@@ -4481,7 +4481,7 @@ export interface paths {
         put?: never;
         /**
          * Decide for one task, one site, or all open tasks of a person (B12b)
-         * @description Needs the `reassign` grant for the module and region, or admin. Keeps all entered data, documents and comments. It does not reset or pause the SLA (its start date and version stay) or stage progress. The Matrix is not changed. If the caller takes over a level and also holds the next one, the skip rule and the self-approval rule apply (a final approval then needs step-up on the transition itself). `dry_run` previews. One request is one audit group (`bulk_action_id`).
+         * @description Needs the `reassign` grant for the module and region, or admin. Keeps all entered data, documents and comments. It does not reset or pause the SLA (its start date and version stay) or stage progress. The Matrix is not changed. If the caller takes over a level and also holds the next one, the skip rule and the self-approval rule apply (a final approval then needs step-up on the transition itself). `dry_run` previews. One request is one audit group (`bulk_action_id`). 0.15.54 a `to_user_id` that is inactive, absent today or the person the tasks are on is refused with 422 `not_eligible_holder`; with `scope` = `task` the refusal of the one task is the answer (422 `not_eligible_holder`, 409 `invalid_transition`).
          */
         post: operations["reassignTasks"];
         delete?: never;
@@ -4502,7 +4502,7 @@ export interface paths {
         /**
          * Act on the task's current level on behalf of its assignee (B12b choice 3)
          * @description For a Team Lead (the `reassign` grant for the module and region) or a System Admin. Performs `action` at the current level instead of its holder.
-         *     `reason` is mandatory. `level` must equal the task's current level, else 409 `invalid_transition`. Nothing is reset: SLA start and version, stage progress, entered data and documents stay (B12b).
+         *     `reason` is mandatory. `level` must equal the task's current level, else 409 `invalid_transition`. 0.15.54 a level on nobody (no single holder) answers 409 `invalid_transition`; the caller must lead the holder (every region of the holder is the caller's, else 403). Nothing is reset: SLA start and version, stage progress, entered data and documents stay (B12b).
          *     The normal rules apply unchanged: a level the caller also holds next is skipped and logged (`skipped_levels`), and if the caller ends up holding every level the result is a self-approval (B5, flagged in KPIs and the Audit Log, step-up needed). `reject` needs `note` (422 `note_required`).
          *     Audit and `WorkflowStep` record the step as "lead on behalf of the assignee": `acted_by` = caller, `on_behalf_of` = the person who held the level, `on_behalf_kind` = `assignee`.
          */
@@ -4522,7 +4522,7 @@ export interface paths {
         };
         /**
          * People who may receive the task(s)
-         * @description Eligible = would be a valid holder of the level in the Responsibility Matrix, region and module. Pass `task_id`, or `site_id` with `from_user_id`, or `from_user_id` alone.
+         * @description Eligible = would be a valid holder of the level in the Responsibility Matrix, region and module. Pass `task_id`, or `site_id` with `from_user_id`, or `from_user_id` alone. 0.15.54 active people only, never someone absent today or the person the task is on; with `from_user_id`, anyone eligible for at least one of that person's open tasks in the regions the caller leads. Only for a lead (the `reassign` grant for the task's region) or a System Admin.
          */
         get: operations["listEligibleReassignees"];
         put?: never;
@@ -4542,7 +4542,7 @@ export interface paths {
         };
         /**
          * Tasks that need a lead decision (absent holder or idle)
-         * @description A task shows when its holder has an active absence, when it has had no activity for `working_days` (setting), or when its holder's account is deactivated or deleted (`holder_deactivated`, B14). Scoped to the caller's modules and regions.
+         * @description A task shows when the person it is on has an active absence today, when it has had no activity for the idle limit (0.15.54 the dashboard setting `stale_idle_days`, default 2 working days), or when the person it is on has a deactivated or deleted account (`holder_deactivated`, B14). 0.15.54 a task is on a person when its current level is pinned to them, else when they are the only eligible holder of the level, else (nobody eligible) when the Matrix cell names their deactivated or deleted account. A `keep` or `act_on_behalf` decision silences the absent and deactivated alerts of the task for the idle window. Only for a lead (the `reassign` grant) or a System Admin (else 403), scoped to the regions the caller leads and sees.
          */
         get: operations["listReassignmentAlerts"];
         put?: never;
@@ -4567,7 +4567,7 @@ export interface paths {
         get: operations["getIdleTaskAlertSetting"];
         /**
          * Set the idle days that alert the lead (default 2 working days)
-         * @description 0.15.55 (migration 0141): System Admin or a delegate of `admin.settings` edit for all regions, a reason and If-Match. Closed body (`unknown_key`; `working_days` 1 to 30, `out_of_range`). `working_days` is the dashboard idle limit `stale_idle_days` (`PUT /settings/dashboard`, the stale flag and the stale-task counter use the same value, Q523): it is one setting, so the ETag of this resource moves when either screen changes it. Audited (`idle_task_alert_update`, before and after).
+         * @description 0.15.59 (migration 0145): System Admin or a delegate of `admin.settings` edit for all regions, a reason and If-Match. Closed body (`unknown_key`; `working_days` 1 to 30, `out_of_range`). `working_days` is the dashboard idle limit `stale_idle_days` (`PUT /settings/dashboard`, the stale flag and the stale-task counter use the same value, Q523): it is one setting, so the ETag of this resource moves when either screen changes it. Audited (`idle_task_alert_update`, before and after).
          */
         put: operations["setIdleTaskAlertSetting"];
         post?: never;
@@ -4771,7 +4771,7 @@ export interface paths {
          *     **Mandatory types** (`mandatory` in the catalogue) cannot be switched off: a channel that is on by default stays on and the cells of the default recipients stay on, else 422 with `code` = `mandatory_locked`. A cell for a role or group that the catalogue does not make eligible for the type is `not_eligible_recipient`. A `timezone` that is not an IANA zone is `invalid_timezone`.
          *     Rows left out of `matrix` keep the catalogue defaults.
          *     **Security and system types (0.2.5 hardening):** every `security` type is mandatory for the System Admins. A body that changes any `security` or `system` row, or a threshold that feeds one (`rate_cap_per_hour`), needs step-up and a System Admin acting without delegation (403 `delegate_forbidden`); the change sends the System Admins an in-app alert naming the actor.
-         *     0.15.55 (migration 0141): an unknown key is reported at its own path with `code` = `unknown_key` (for example `/thresholds/x`, `/matrix/0/channels/sms`); other codes: `required`, `invalid`, `out_of_range`, `unknown_type`, `unknown_column` (a cell or column naming no such role, group or column), `duplicate`, `too_many`. A mandatory type keeps the System Admins cell on when the System Admins group is a column. When nothing was saved the columns are the System Admins group and the Project Manager role. Audited (`notification_policy_update`, before and after).
+         *     0.15.59 (migration 0145): an unknown key is reported at its own path with `code` = `unknown_key` (for example `/thresholds/x`, `/matrix/0/channels/sms`); other codes: `required`, `invalid`, `out_of_range`, `unknown_type`, `unknown_column` (a cell or column naming no such role, group or column), `duplicate`, `too_many`. The System Admins group must stay a column (`/columns` `mandatory_locked`) and every mandatory type that goes to the System Admins keeps their cell on. Like the security and system rows, a change of `enabled`, `timezone`, `digest_hour`, `work_days_follow_calendar` or `work_days` needs a System Admin (403 `delegate_forbidden`) and a step-up, and the System Admins are told (security review 2026-11-23). When nothing was saved the columns are the System Admins group and the Project Manager role. Audited (`notification_policy_update`, before and after).
          */
         put: operations["setNotificationPolicy"];
         post?: never;
@@ -4934,7 +4934,7 @@ export interface paths {
         /**
          * Upload the TPL-HOLIDAYS template (applied at once)
          * @description Seed file: `db/seed/holidays-2026-2027.csv` (loaded by the seed script). The upload accepts the approved xlsx template `TPL-HOLIDAYS` only (ADR 0011, owner decision); a CSV or any other file is 422 `template_rejected` (`reason` `not_xlsx`, `macros_not_allowed`, `tpl_missing`, `wrong_template`, `outdated_version`, `checksum_mismatch`, `size_or_rows_exceeded`), written to the System Log. Needs a `reason` (0.2.6), like every other holiday change; it is written to the audit row of each holiday the file adds. A missing or too short reason is 422 `validation_failed`.
-         *     0.15.55 (migration 0141): System Admin or a delegate of `calendars` edit for all regions (checked in the database). The file is applied at once, not sent to L2 (holidays are configuration): `status` `applied`, `counts.create` (added) and `counts.unchanged` (a date the calendar already holds with the same values), `affected_open_tasks`. One bad row refuses the whole file: 422 `validation_failed` with `errors[]` per line (`path` `/rows/<line>/<field>`, codes `required`, `invalid`, `out_of_range`, `too_long`, `duplicate_in_file`, and `duplicate` for a date the calendar holds with other values; setting `calendar.holiday_import_existing` = `skip` leaves those dates as they are instead, Q602). The SLA due dates of open tasks are recalculated once; closed tasks keep their values. Audited per holiday (`holiday_create` with the import id) and per file (`holidays_import`).
+         *     0.15.59 (migration 0145): System Admin or a delegate of `calendars` edit for all regions (checked in the database). The file is applied at once, not sent to L2 (holidays are configuration): `status` `applied`, `counts.create` (added) and `counts.unchanged` (a date the calendar already holds with the same values), `affected_open_tasks`. One bad row refuses the whole file: 422 `validation_failed` with `errors[]` per line (`path` `/rows/<line>/<field>`, codes `required`, `invalid`, `out_of_range`, `too_long`, `duplicate_in_file`, and `duplicate` for a date the calendar holds with other values; setting `calendar.holiday_import_existing` = `skip` leaves those dates as they are instead, Q602). The SLA due dates of open tasks are recalculated once; closed tasks keep their values. Audited per holiday (`holiday_create` with the import id) and per file (`holidays_import`).
          */
         post: operations["importHolidays"];
         delete?: never;
@@ -5255,7 +5255,7 @@ export interface paths {
         /**
          * Publish a new DLP version (`dlp.months.cw`, `dlp.months.te`)
          * @description Counted from the PAC date. A PAC keeps the version in force on its issue date.
-         *     0.15.55 (migration 0141): System Admin or a delegate of `admin.settings` edit for all regions, a reason and a step-up. Closed body (`unknown_key`). `effective_from` is today or later (`in_the_past`, Q600) and not before the effective date of the latest version (`before_latest_version`). A version effective today is in force at once; a later one is listed in `history` and becomes `current` on its date. Audited (`dlp_version_publish`, before and after).
+         *     0.15.59 (migration 0145): System Admin or a delegate of `admin.settings` edit for all regions, a reason and a step-up. Closed body (`unknown_key`). `effective_from` is today or later (`in_the_past`, Q600) and not before the effective date of the latest version (`before_latest_version`). A version effective today is in force at once; a later one is listed in `history` and becomes `current` on its date. Audited (`dlp_version_publish`, before and after).
          */
         post: operations["publishDlpVersion"];
         delete?: never;
@@ -12213,7 +12213,7 @@ export interface components {
             kind: "data_import" | "assignment_import" | "config_import" | "master";
             module_key?: components["schemas"]["ModuleKey"];
             /**
-             * @description A register template (one per register), a Site Register stream template (`TPL-SITE-DA`, `-CW`, `-TE`, `-CL`), the whole Master (`TPL-MASTER`) or, since 0.14.0, the New sites template (`TPL-SITE-NEW`, kind `sites`: one row per new site, entered through batch and L2). `list_values` (0.15.23): the values of a list (`TPL-LISTVALUES`). `holidays` (0.15.55): the holidays of the work calendar (`TPL-HOLIDAYS`, for a System Admin or a delegate of the calendar).
+             * @description A register template (one per register), a Site Register stream template (`TPL-SITE-DA`, `-CW`, `-TE`, `-CL`), the whole Master (`TPL-MASTER`) or, since 0.14.0, the New sites template (`TPL-SITE-NEW`, kind `sites`: one row per new site, entered through batch and L2). `list_values` (0.15.23): the values of a list (`TPL-LISTVALUES`). `holidays` (0.15.59): the holidays of the work calendar (`TPL-HOLIDAYS`, for a System Admin or a delegate of the calendar).
              * @enum {string}
              */
             template_kind?: "register" | "stream" | "master" | "sites" | "list_values" | "holidays";
@@ -12479,7 +12479,7 @@ export interface components {
             uploaded_by?: components["schemas"]["UserRef"];
             /** Format: date-time */
             uploaded_at?: string;
-            /** @description 0.15.55. `POST /settings/holidays/import` only: the open tasks whose SLA due date moved. */
+            /** @description 0.15.59. `POST /settings/holidays/import` only: the open tasks whose SLA due date moved. */
             affected_open_tasks?: number;
             version: number;
         };
@@ -25593,6 +25593,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             422: components["responses"]["Unprocessable"];
         };
     };

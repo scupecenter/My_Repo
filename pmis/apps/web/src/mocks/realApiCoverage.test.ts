@@ -58,7 +58,9 @@ describe('a route with no API answers "not available" in hybrid mode', () => {
     const { api, ApiError } = await import('@/api/client');
     const { notAvailableHandlers } = await import('./realApi');
     server.use(...notAvailableHandlers(true));
-    const err = await api.get('/absences').then(() => null, (e: unknown) => e);
+    // any route still listed (routes leave the list as the API serves them): the first GET of NOT_AVAILABLE, with a sample id
+    const [, path] = NOT_AVAILABLE.find(([m]) => m === 'get')!;
+    const err = await api.get(path.replace(/:[A-Za-z_]+/g, '00000000-0000-4000-8000-000000000001')).then(() => null, (e: unknown) => e);
     expect(err).toBeInstanceOf(ApiError);
     expect((err as InstanceType<typeof ApiError>).status).toBe(501);
     expect((err as InstanceType<typeof ApiError>).code).toBe('not_available');
