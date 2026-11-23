@@ -58,7 +58,7 @@ describe('a route with no API answers "not available" in hybrid mode', () => {
     const { api, ApiError } = await import('@/api/client');
     const { notAvailableHandlers } = await import('./realApi');
     server.use(...notAvailableHandlers(true));
-    const err = await api.get('/absences').then(() => null, (e: unknown) => e);
+    const err = await api.get('/settings/dlp').then(() => null, (e: unknown) => e);
     expect(err).toBeInstanceOf(ApiError);
     expect((err as InstanceType<typeof ApiError>).status).toBe(501);
     expect((err as InstanceType<typeof ApiError>).code).toBe('not_available');
