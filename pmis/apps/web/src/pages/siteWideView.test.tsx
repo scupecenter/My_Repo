@@ -48,7 +48,7 @@ describe('Site Master wide table', () => {
     expect(within(row).getAllByRole('cell')[1].style.position).toBe('sticky');
     expect(within(row).getByText('Synthetic site one')).toBeTruthy();
     expect(within(row).getAllByText('Not entered').length).toBeGreaterThan(0);
-    expect(row.querySelector('input')).toBeNull();
+    expect(row.querySelector('input:not([type=checkbox])')).toBeNull(); // the only input of a row is its selection checkbox
   });
 
   it('a sub-menu shows #, the site and only its own columns; the open icon of the Site ID cell opens the site page', async () => {

@@ -39,6 +39,8 @@ export const useSites = (f: SiteFilters, enabled = true) =>
 const useFirstSite = <T,>(select: (s: SiteListItem | undefined) => T) =>
   useQuery({ queryKey: ['streams'], staleTime: 300_000, queryFn: () => api.get<Page<SiteListItem>>('/sites', { query: { limit: 1 } }).then((r) => r.items[0] ?? null), select: (s) => select(s ?? undefined) });
 export const useStreams = () => useFirstSite((s) => s?.streams as Stream[] | undefined);
+/** The stage codes of the workflow (the rail of the first site), for the stage filter of the menu lists that do not load the site list. */
+export const useStageCodes = () => useFirstSite((s) => s?.rail.map((r) => r.code) ?? []);
 /** The view tabs (0.4.7), from the same call. */
 export const useViews = () => useFirstSite((s) => s?.views as ViewRef[] | undefined);
 
