@@ -223,7 +223,7 @@ Do:
    - Columns: #, Code, Task, Status, Plan, Actual, SLA (due and state), Ball in court, Documents (count missing), Last update.
    - Full options: + Filter, column chooser, density, Export current view, and the display options below.
    - The current task-as-column layout stays as a second option, named "Timeline", and the user's choice is remembered.
-4. **Display options on every table that shows site data.** One shared "Display" menu in the toolbar, next to density and columns:
+4. **Display options, one system-wide standard on every data table (owner rule 2026-11-23).** It applies to every screen that shows data in a table or list, not only site data: Site Master and its sub-menus, the wide table, the site Tasks table, every register and log, My Work, Approvals, the Daily Plan, the Archive and Forms, dashboard tables and drill-downs, the audit, system and security logs, Users & Roles, and the Settings tables. One shared "Display" menu in the toolbar, next to density and columns:
    - text size: small, normal, large;
    - alignment of text cells: start, center;
    - row density: compact, normal, comfortable;
@@ -233,14 +233,15 @@ Do:
    Rules for the menu:
    - It is stored per user and per screen, and saved views keep it.
    - Defaults come from Settings > Dashboard or a new Settings > Display section in the general Settings, per the owner rule.
-   - Build it once as a shared table setting and apply it to Site Master, its sub-menus, the wide table, the site Tasks table, registers (W2), My Work, the Daily Plan (W7) and the Archive (W5).
+   - Build it once as a shared table toolbar and settings layer. The same toolbar (row numbers, + Filter, saved views, search, view switcher where it applies, columns, density, Display, Export) appears in the same order on every one of these screens.
+   - List every data screen in the PR with its state (done / not applicable and why). A guard test fails when a data table renders without the shared toolbar.
 5. Tests: vitest for the row numbers across pages, the three-level header merge, the task list layout and the display menu (persisted and applied); update the e2e for the wide table and the site page.
 
 Acceptance:
 - Every site list shows `#` first.
 - Wide-table headers show section, group and column on three rows, without the "Group / Column" repetition.
 - The site Tasks table opens as a list like Site Master.
-- A Display menu changes text size, alignment, density, wrap and zebra rows, and remembers the choice, on every table of site data.
+- The same toolbar and Display menu (text size, alignment, density, wrap, zebra rows, remembered) appear on every data table in the system.
 
 ## W6. Documentation
 
@@ -262,7 +263,7 @@ Total: roughly 7 PRs and several CI cycles each. This does not fit in one short 
 
 ## Log
 
-- 2026-11-23: W8 added (row numbers, three-level headers, task list layout, display options).
+- 2026-11-23: W8 added (row numbers, three-level headers, task list layout, one system-wide display standard on every data table).
 - 2026-11-23: the new main menu is named Library (المكتبة) with Forms (النماذج) and Archive (الأرشيف); Settings > Documents > Library is renamed Document types.
 - 2026-11-23: Data entry > Templates stays as it is (no rename), it may be removed later.
 - 2026-11-23: owner decisions added (names, places, permissions via the matrix, settings in general Settings, Daily Plan under My Work, copy-paste email).
