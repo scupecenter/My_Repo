@@ -11,6 +11,75 @@ House rules (unchanged):
 - Edit .ts/.tsx files through Bash or Python: the Edit and Write tools trigger an auto-format hook that rewrites whole files with double quotes.
 - Number collisions with other authors: before opening a PR, check the newest migration, the db/sql mirror (N-1, byte-identical), the contract version and the CHANGELOG number on main and on open PRs. At the time of writing, main has migration 0138 and contract 0.15.51, and the newest CHANGELOG entry is 187. Open PR #182 (another author) uses migration 0136.
 
+## How to start from another place or account
+
+1. Open Claude Code on the repository scupecenter/My_Repo (main branch).
+2. Say: "Read pmis/CLAUDE.md and pmis/docs/plans/2026-11-23-next-ui-cleanup.md, then do the first workstream whose Status is not Done, following the Owner decisions section. One PR per workstream; reply to me in Arabic; PR text in English."
+3. After each merge: update the Status table and the Log in this file in the next PR.
+
+Everything below is decided. Do not ask the owner again about anything this section answers. If something truly new comes up, choose the option that matches what the system already does, and note the choice in the Log.
+
+## Owner decisions (2026-11-23, final)
+
+General rules for all workstreams:
+- **Complete, not minimal.** Every new screen gets the full set of options the system already offers elsewhere: + Filter, saved views, search, column chooser, density, Export current view, and the view switcher where it applies.
+- **Settings live in the general Settings.** Every new setting goes in Administration > Settings, in the tab that matches its area, never on the work screen itself. Use the same save rules: reason, audit with before/after, versioned where the area is versioned. The work screens link to their settings, shown only to users with the right.
+- **Permissions come from the Responsibility Matrix and the permission grid, as everywhere else.** Add a matrix row or grid entries for each new module (L1 = enters and edits, L2 = reviews and locks or approves), scoped by region and module. No new permission mechanism.
+- **Names are short.** New menus use one or two words, in English and Arabic, and sit in a logical place in the sidebar.
+
+Menu names and places:
+
+| Item | English | Arabic | Place |
+|------|---------|--------|-------|
+| New main menu | Documents | المستندات | Sidebar, after Data entry and before Administration |
+| Its first page (approved forms) | Templates | القوالب | Documents > Templates |
+| Its second page (site document archive) | Archive | الأرشيف | Documents > Archive |
+| The current input templates page | Uploads | الرفع | Data entry > Uploads (renamed from "Templates", same route with a redirect from the old one) |
+| Daily progress and plan | Daily Plan | الخطة اليومية | My Work > Daily Plan, with two tabs: Progress (الإنجاز) and Tomorrow (خطة الغد) |
+
+W5 decisions (Documents: Templates and Archive):
+1. **Who generates a filled document for a site:** the L1 holder of the task that the document belongs to, plus anyone the Responsibility Matrix or the permission grid gives "Documents: generate" for that region. The L2 holder approves the signed upload, as today.
+2. **Archive cards:** one card per Document Library type that has at least one file or one generated document, grouped by stream (Design & Acquisition, Civil Works, Installation (TE), O&M, Handover & Closure, Dismantle, Registers). Each card shows the counts approved, waiting review and missing. The admin hides, shows and orders the cards in Settings > Documents > Archive.
+3. **Archive list (inside a card), full options:**
+   - Columns: Site ID, site name, region, cluster, document type, document number, version, status (due / generated / signed and uploaded / in review / approved / rejected / superseded), task, uploaded by, upload date, approved by, approval date.
+   - Tools: + Filter, saved views, search (site, number or file name), Export current view, bulk download as zip (by filter), file preview, version history, and open the site's Documents tab.
+   - Every download is audited.
+4. **Templates page, full options:**
+   - Lists every approved form (the uploaded SoF and CW forms, future HTML forms), with: name, code, version, document type it produces, triggering task, numbering pattern and last update.
+   - A user with the right picks a form and a site, sees the auto-filled preview, then downloads or prints it. The generated copy enters the Archive as "generated".
+   - Uploading a new form or a new version, approving it and binding its fields happen in Settings > Documents (Library and Form templates), linked from this page for admins.
+5. **When a document is due:** each form is bound in the Document Library to its document type and its triggering task (admin setting). A document becomes "due" when that task opens. The site's Documents tab and the Archive show the lifecycle: due, generated, signed and uploaded, in review, approved.
+6. **Settings > Documents** gets these sections:
+   - Library (existing).
+   - Form templates (upload, versions, field bindings, numbering).
+   - Archive (visible cards and their order, default columns, bulk zip limit).
+   - Mail (existing).
+
+W7 decisions (My Work > Daily Plan):
+1. **Scope:** one plan per region per day. A user sees the regions their assignments cover. The Project Manager and the System Admins see all regions.
+2. **Who:** a Responsibility Matrix row "Daily Plan". L1 (site engineers and team leads by default) edits the rows. L2 (the region's team lead by default) locks the day. A locked day is read-only, except through an admin override.
+3. **Auto-filled columns** (the user may change them by hand, and the change is audited):
+   - From Site Master: Site ID, Tower Owner, Owner ID, Latitude, Longitude, Region, Site Type, SOW.
+   - From the Procurement assignment of that day: Vendor / Contractor Name and AAT SE.
+   - From the CW access date or permit validity: Access Valid (Yes / No / expiry date).
+   - From system tasks and assignment field-work dates:
+     - Planned Work: tasks with a planned date that day, and field work scheduled that day.
+     - Actual Work: tasks with an actual date that day.
+4. **Manual columns:** "Reason (if not reach target)", required when Actual is below Planned, and "Remark". Users may also add or remove sites in the plan.
+5. **Tomorrow tab:** the next working day (the weekend is Friday and Saturday; holidays come from the calendar), filled the same way.
+6. **Tools:** + Filter (region, contractor, AAT SE, SOW), saved views, Export (Excel with the exact column order of the owner's sheet), and "Copy for email". Copy for email puts both tables on the clipboard as an HTML table with a plain-text fallback, with the titles "Daily Progress <date>" and "Tomorrow Plan <date>". There is no direct sending from the system.
+7. **Settings > My Work > Daily Plan** (a new section):
+   - Visible columns and their order.
+   - Default region scope.
+   - The time after which today's plan locks automatically, empty for no automatic lock.
+   - A reminder to the L1 holders if Tomorrow is empty by a set hour.
+
+W2 decision: inline editing in the wide table follows each register's own field rights (field-level rules and register state). Board columns use the register's status field, and Map uses the site coordinates.
+
+W3 decision: everything Settings > Site360 still does moves to Settings > Workflow > Columns, with the same rights.
+
+W1 decision: the single tab row takes its phases from the published workflow version of the site.
+
 ## Status
 
 | # | Workstream | Status | PR |
@@ -149,4 +218,5 @@ Total: roughly 6 PRs and several CI cycles each. This does not fit in one short 
 
 ## Log
 
+- 2026-11-23: owner decisions added (names, places, permissions via the matrix, settings in general Settings, Daily Plan under My Work, copy-paste email).
 - 2026-11-23: plan written after #183-#187 (unified filter, wide view, saved views, bulk edit, dependent lists). Nothing in W1-W6 started.
