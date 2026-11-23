@@ -2,14 +2,15 @@ import type { SiteListItem, SitesExportColumnCode } from '@/api/types';
 import { errText } from '@/components/FormDialog';
 import { Site360Grid, type Site360GridRow } from '@/components/Site360Grid';
 import { Site360SourcePanel } from '@/components/Site360Source';
-import { useSaveSite360Cell, useSite360RowsPaged, useSite360Sections } from '@/api/site360';
-import { Columns3, Download, FileDown, FilePlus2, FileUp, Map as MapIcon, RotateCcw, Table2, TableProperties } from 'lucide-react';
+import { useRefreshSite360Rows, useSaveSite360Cell, useSite360RowsPaged, useSite360Sections } from '@/api/site360';
+import { SitesBulkEdit } from '@/components/SitesBulkEdit';
+import { Columns3, Download, FileDown, FilePlus2, FileUp, Map as MapIcon, Pencil, RotateCcw, Table2, TableProperties } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMe } from '@/api/hooks';
 import { downloadTemplate, useTemplates } from '@/api/registers';
-import { useRegions, useSites, useStreams, useViews } from '@/api/sites';
+import { useRegions, useSites, useStageCodes, useStreams, useViews } from '@/api/sites';
 import { batchPath } from '@/api/types';
 import { TemplateUploadDialog } from '@/components/TemplateUploadDialog';
 import { LocksDialog } from '@/components/WorkflowLocks';
@@ -91,6 +92,11 @@ export function Sites() {
     scenario: sp.get('scenario') || undefined,
     // the grid reads `status` (GET /site360/{menu}/rows); the page keeps the shared URL key overall_status (audit A finding 11)
     status: sp.get('overall_status') || undefined,
+    // 0.15.50: the list filters of GET /sites that the rows endpoint now takes with the same meaning: stage, mine/late, workflow locks, data gaps
+    stage_code: sp.get('stage_code') || undefined,
+    bucket: ['mine', 'late'].includes(sp.get('bucket') ?? '') ? sp.get('bucket')! : undefined,
+    workflow_locks: ['locked', 'open'].includes(sp.get('workflow_locks') ?? '') ? sp.get('workflow_locks')! : undefined,
+    data_gaps: sp.get('data_gaps') === 'with' ? 'with' : undefined,
     sort: 'site_code',
   };
   const gridRowsQ = useSite360RowsPaged(menu && (layout === 'grid' || menuList || asWide) ? menuKey : undefined, gridQuery);
@@ -149,6 +155,8 @@ export function Sites() {
   const canUnlock = isAdmin(me) || !!me?.effective.grants.some((g) => g.module_key === 'overrides.unlock' && (g.action as string) === 'administer');
   const [upSites, setUpSites] = useState(false);
   const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [bulkEdit, setBulkEdit] = useState(false);
+  const refreshRows = useRefreshSite360Rows(menuKey || undefined);
   const regions = useRegions();
   const viewsQ = useViews();
   const streamsQ = useStreams();
@@ -172,7 +180,8 @@ export function Sites() {
   const naItems = real ? (allQ.data?.pages.flatMap((p) => p.items) ?? []).filter((s) => statusOf(s.streams, stream)?.state === 'na') : [];
   const items = dismantle ? [] : showNa && real ? [...inStream, ...naItems] : inStream;
   const total = (q.data?.pages[0]?.page.total ?? inStream.length) + (showNa && real ? naItems.length : 0);
-  const stageOptions = (inStream[0] ?? q.data?.pages[0]?.items[0])?.rail.map((r) => r.code) ?? [];
+  const stageCodesQ = useStageCodes(); // the menu lists do not load the site list, so the stage filter reads the stages of the workflow from one site
+  const stageOptions = (inStream[0] ?? q.data?.pages[0]?.items[0])?.rail.map((r) => r.code) ?? stageCodesQ.data ?? [];
 
   // The list of a menu: its rows (the quick filter works on the loaded rows) and its columns. Site ID and Site Name stay frozen; the # column is not drawn.
   const mRows = useMemo(() => {
@@ -183,7 +192,8 @@ export function Sites() {
   const defsMenu: ColDef[] = mCols.map((c) => (c.ord === 2 ? { id: 'c2', w: 110, min: 70, pinned: true } : c.ord === 4 ? { id: 'c4', w: 220, min: 100, max: 340, pinned: true } : { id: `c${c.ord}`, w: 150, min: 70, max: 400 }));
   const mCol = (id: string) => mCols.find((c) => `c${c.ord}` === id);
   const tbl = useTablePrefs(menuList ? `sites-menu-${menuKey}` : real ? 'sites-stream' : 'sites', menuList ? defsMenu : real ? DEFS_STREAM : DEFS_ALL);
-  const nRows = menuList ? mRows.length : items.length;
+  const fromRows = menuList || asWide; // the rows come from GET /site360/{menu}/rows
+  const nRows = fromRows ? mRows.length : items.length;
   const ROW = ROWS[tbl.density];
   const viewport = Math.max(320, (typeof window === 'undefined' ? 800 : window.innerHeight) - 380);
   const v = useVirtual(nRows, ROW, viewport);
@@ -210,7 +220,7 @@ export function Sites() {
   const cols = tbl.cols, W = totalWidth(cols, true);
   const linkTo = (s: SiteListItem) => `/sites/${s.id}${new URLSearchParams([...(real ? [['stream', stream]] : []), ...(view ? [['view', view]] : [])]).toString().replace(/^(?=.)/, '?')}`;
   const flip = (code: string) => setPicked((p) => { const n = new Set(p); if (n.has(code)) n.delete(code); else n.add(code); return n; });
-  const allCodes = menuList ? mRows.map((r) => r.site_code) : items.map((s) => s.site_code), allPicked = allCodes.length > 0 && allCodes.every((c) => picked.has(c));
+  const allCodes = fromRows ? mRows.map((r) => r.site_code) : items.map((s) => s.site_code), allPicked = allCodes.length > 0 && allCodes.every((c) => picked.has(c));
   const chips = [
     ...(f.q ? [{ key: 'q', label: t('table.filter_q', { v: f.q }), onRemove: () => set('q')('') }] : []),
     ...(f.region_id ? [{ key: 'region_id', label: t('table.filter_region', { v: rname(Number(f.region_id)) }), onRemove: () => set('region_id')('') }] : []),
@@ -298,13 +308,13 @@ export function Sites() {
         <Select id="region" value={f.region_id} onChange={set('region_id')} all={t('sites.all_regions')} options={(regions.data ?? []).map((r) => [String(r.id), (i18n.language === 'ar' && r.name_ar) || r.name_en])} />
         <Select id="scenario" value={f.scenario} onChange={set('scenario')} all={t('sites.all_scenarios')} options={SCENARIOS.map((s) => [s, t(`scenario.${s}`)])} />
         <Select id="status" value={f.overall_status} onChange={set('overall_status')} all={t('sites.all_statuses')} options={STATUSES.map((s) => [s, t(`status.${s}`)])} />
-        {!menuList && !asWide && <>
+        <>
         <Select id="stage" value={f.stage_code} onChange={set('stage_code')} all={t('sites.all_stages')} options={stageOptions.map((s) => [s, stageName(s)])} />
         <QuickFilter testid="sites-quick-mine" on={bucket === 'mine'} onClick={() => setParams({ bucket: bucket === 'mine' ? '' : 'mine', sel: '' })}>{t('table.mine')}</QuickFilter>
         <QuickFilter testid="sites-quick-late" on={bucket === 'late'} onClick={() => setParams({ bucket: bucket === 'late' ? '' : 'late', sel: '' })}>{t('table.late')}</QuickFilter>
         <Select id="locks" value={locks} onChange={(v) => setParams({ workflow_locks: v, sel: '' })} all={t('locks.filter')} options={[['locked', t('locks.filter_locked')], ['open', t('locks.filter_open')]]} />
         <QuickFilter testid="sites-quick-gaps" on={!!gaps} onClick={() => setParams({ data_gaps: gaps ? '' : 'with', sel: '' })}>{t('locks.quick_gaps')}</QuickFilter>
-        </>}
+        </>
         {real && (
           <label className="flex items-center gap-2 text-sm" title={t('sites.na_hint')}>
             <input type="checkbox" data-testid="sites-show-na" checked={showNa} onChange={(e) => setShowNa(e.target.checked)} />
@@ -364,6 +374,7 @@ export function Sites() {
         <div className="space-y-2">
           <SitesWideTable menu={menu} rows={mRows} sel={sel} height={viewport + 120} loaded={gridRowsQ.isSuccess} filtered={activeFilters > 0} onClear={clearAll} busy={saveCell.isPending}
             onEdit={(e) => saveCell.mutateAsync({ task_id: e.target.task_id, version: e.target.version, field: e.target.field, values: e.target.values, value: e.value })}
+            picked={picked} onPick={flip} onPickAll={() => setPicked(allPicked ? new Set() : new Set(allCodes))}
             hasMore={!!gridRowsQ.hasNextPage} loadingMore={gridRowsQ.isFetchingNextPage} onMore={() => void gridRowsQ.fetchNextPage()} />
         </div>
       ) : menuList ? (
@@ -414,14 +425,17 @@ export function Sites() {
           </div>
         </div>
       )}
-      <BulkBar testid="sites-bulk" count={picked.size} loaded={nRows} total={menuList ? (gridFiltered ?? nRows) : total} onClear={() => setPicked(new Set())}>
-        {picked.size === 1 && <button type="button" className="btn" data-testid="sites-bulk-open" onClick={() => { if (menuList) { const r = mRows.find((x) => picked.has(x.site_code)); if (r) nav(`/sites/${r.site_id}`); return; } const s = items.find((x) => picked.has(x.site_code)); if (s) nav(linkTo(s)); }}>{t('table.open_selected')}</button>}
+      <BulkBar testid="sites-bulk" count={picked.size} loaded={nRows} total={fromRows ? (gridFiltered ?? nRows) : total} onClear={() => setPicked(new Set())}>
+        {picked.size === 1 && <button type="button" className="btn" data-testid="sites-bulk-open" onClick={() => { if (fromRows) { const r = mRows.find((x) => picked.has(x.site_code)); if (r) nav(`/sites/${r.site_id}`); return; } const s = items.find((x) => picked.has(x.site_code)); if (s) nav(linkTo(s)); }}>{t('table.open_selected')}</button>}
+        {asWide && <button type="button" className="btn" data-testid="sites-bulk-edit" onClick={() => setBulkEdit(true)}><Pencil size={14} />{t('sites.wide_bulk_edit')}</button>}
         {canUnlock && <><button type="button" className="btn" data-testid="sites-bulk-locks-open" onClick={() => setLocksDlg(false)}>{t('locks.bulk_open')}</button>
           <button type="button" className="btn" data-testid="sites-bulk-locks-lock" onClick={() => setLocksDlg(true)}>{t('locks.bulk_lock')}</button></>}
         <button type="button" className="btn" data-testid="sites-bulk-copy" onClick={() => { void navigator.clipboard?.writeText([...picked].join('\n')); toast(t('table.copied', { count: picked.size })); }}>{t('table.copy_codes')}</button>
       </BulkBar>
+      {bulkEdit && menu && <SitesBulkEdit menu={menu} rows={mRows.filter((r) => picked.has(r.site_code))} onRefresh={refreshRows}
+        onClose={(failed) => { setBulkEdit(false); if (failed) setPicked(new Set(failed)); }} />}
       <ExportDialog open={exp} onClose={() => setExp(false)} />
-      {locksDlg !== null && <LocksDialog target={{ site_ids: menu && layout === 'grid' ? gridSel.map((r) => r.id) : menuList ? mRows.filter((x) => picked.has(x.site_code)).map((x) => x.site_id) : items.filter((x) => picked.has(x.site_code)).map((x) => x.id) }} locked={locksDlg} count={menu && layout === 'grid' ? gridSel.length : picked.size} testid="sites-locks-dialog"
+      {locksDlg !== null && <LocksDialog target={{ site_ids: menu && layout === 'grid' ? gridSel.map((r) => r.id) : fromRows ? mRows.filter((x) => picked.has(x.site_code)).map((x) => x.site_id) : items.filter((x) => picked.has(x.site_code)).map((x) => x.id) }} locked={locksDlg} count={menu && layout === 'grid' ? gridSel.length : picked.size} testid="sites-locks-dialog"
         onClose={() => { setLocksDlg(null); setPicked(new Set()); }} />}
       {upSites && newTpl && <TemplateUploadDialog open onClose={() => setUpSites(false)} templateId={newTpl.template_id} templateName={`${(i18n.language === 'ar' && newTpl.name_ar) || newTpl.name_en} · v${newTpl.current_version}`}
         kind="sites" onDone={(b) => { setUpSites(false); toast(t('grid.uploaded')); nav(batchPath(b)); }} />}

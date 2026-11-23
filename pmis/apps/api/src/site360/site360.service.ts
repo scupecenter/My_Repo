@@ -8,6 +8,7 @@ import { parse } from '../common/zod';
 import { AccessService } from '../access/access.service';
 import { DbService } from '../db/db.service';
 import { FilterCatalogService } from '../views/filter-catalog.service';
+import { BUCKETS, siteLocksGapsConds, siteStageIds } from '../sites/sites.service';
 import { buildMenu, buildSite360, SITE360_MOVABLE, type Site360ColumnRow, type Site360Menu, type Site360MenuItem, type Site360SourceKind } from './site360-sections';
 
 const setSchema = z.object({
@@ -122,6 +123,14 @@ export class Site360Service {
     }
     const milestones = csvParam(q, 'milestone', 50);
     if (milestones.length) filters.push(Prisma.sql`s.current_milestone = ANY(${milestones}::text[])`);
+    // 0.15.50: the stage, mine/late (bucket), workflow locks and data gaps filters of GET /sites, with the same meaning and the same SQL (sites.service)
+    const stageCode = oneString(q, 'stage_code');
+    const bucket = oneOf(q, 'bucket', BUCKETS, 'all');
+    const locks = oneOf(q, 'workflow_locks', ['', 'locked', 'open'] as const, '');
+    const gaps = oneOf(q, 'data_gaps', ['', 'with', 'without'] as const, '');
+    filters.push(...siteLocksGapsConds(locks, gaps));
+    const byStage = siteStageIds(auth.user.id, { stageCode, bucket });
+    if (byStage) filters.push(Prisma.sql`s.id IN (${byStage})`);
     // F3 (0.15.31): the AND/OR filter of a saved view (the sites whitelist, alias s); the region scope of `base` stays
     const adv = await this.filters.fromQuery('sites', q);
     if (adv) filters.push(adv);
@@ -174,11 +183,17 @@ export class Site360Service {
       // the dropdown values of the list fields that read a list catalogue (active values, in list order), one query for the page
       const catalogues = [...new Set(tasks.filter((t) => t.list_catalogue).map((t) => t.list_catalogue!))];
       const listValues = new Map<string, CellOption[]>();
+      const parentCatalogue = new Map<string, string>();
       if (catalogues.length) {
-        const lv = await this.db.tx.$queryRaw<{ catalogue_code: string; code: string; label_en: string; label_ar: string | null }[]>(Prisma.sql`
-          SELECT catalogue_code, code, label_en, label_ar FROM list_values
-          WHERE catalogue_code = ANY(${catalogues}::text[]) AND is_active ORDER BY catalogue_code, sort_order, label_en`);
-        for (const r of lv) listValues.set(r.catalogue_code, [...(listValues.get(r.catalogue_code) ?? []), { value: r.code, label_en: r.label_en, label_ar: r.label_ar }]);
+        // a dependent list (its catalogue has a parent list): each option names the code of its parent value, so the client can offer only the children of the parent value of the same row
+        const lv = await this.db.tx.$queryRaw<{ catalogue_code: string; code: string; label_en: string; label_ar: string | null; parent_catalogue: string | null; parent_code: string | null }[]>(Prisma.sql`
+          SELECT v.catalogue_code, v.code, v.label_en, v.label_ar, c.parent_catalogue, p.code AS parent_code FROM list_values v
+          JOIN list_catalogues c ON c.code = v.catalogue_code LEFT JOIN list_values p ON p.id = v.parent_value_id
+          WHERE v.catalogue_code = ANY(${catalogues}::text[]) AND v.is_active ORDER BY v.catalogue_code, v.sort_order, v.label_en`);
+        for (const r of lv) {
+          if (r.parent_catalogue) parentCatalogue.set(r.catalogue_code, r.parent_catalogue);
+          listValues.set(r.catalogue_code, [...(listValues.get(r.catalogue_code) ?? []), { value: r.code, label_en: r.label_en, label_ar: r.label_ar, ...(r.parent_catalogue ? { parent: r.parent_code } : {}) }]);
+        }
       }
       for (const t of tasks) {
         const editable = !t.locked && EDITABLE_STATES.has(t.state);
@@ -189,6 +204,8 @@ export class Site360Service {
         byOrd[String(t.ord)] = cell;
         cells.set(t.site_id, byOrd);
       }
+      // a dependent list cell says which cell of the same site holds its parent value (the column `parent_ord`); none when the parent list is not in this menu
+      attachParentOrds(tasks, cells, parentCatalogue);
     }
     const c = counts[0] ?? { total: 0, filtered: 0 };
     return {
@@ -344,10 +361,12 @@ interface EditCell {
   /** 0.15.48: the kind of editor of the field (the template field's own type); `list` carries its `options`. */
   input_type: CellInputType;
   options?: CellOption[];
+  /** 0.15.50: for a list of a dependent catalogue, the column (ord) of the cell of the same site that holds the parent value; each option's `parent` is compared with it. */
+  parent_ord?: number;
 }
 
 export type CellInputType = 'date' | 'number' | 'list' | 'text' | 'boolean';
-export interface CellOption { value: string; label_en: string; label_ar: string | null }
+export interface CellOption { value: string; label_en: string; label_ar: string | null; /** 0.15.50: the code of the parent value (dependent lists only) */ parent?: string | null }
 
 /**
  * The editor kind of a task-backed cell (0.15.48). The three task date keys are always dates; the other kinds follow the template field type
@@ -364,6 +383,23 @@ export function cellInput(fieldKey: string, fieldType: string, options: unknown,
     if (list.length) return { input_type: 'list', options: list };
   }
   return { input_type: 'text' };
+}
+
+/**
+ * 0.15.50: a list cell of a dependent catalogue gets `parent_ord`, the column of the cell of the same site whose list is the parent catalogue.
+ * `parentCatalogue` maps a catalogue to its parent catalogue; a cell whose parent list is not among the site's cells in this menu gets none.
+ */
+export function attachParentOrds(
+  tasks: { site_id: string; ord: number; list_catalogue: string | null }[],
+  cells: Map<string, Record<string, { parent_ord?: number }>>,
+  parentCatalogue: Map<string, string>,
+): void {
+  for (const t of tasks) {
+    const pc = t.list_catalogue ? parentCatalogue.get(t.list_catalogue) : undefined;
+    const parent = pc ? tasks.find((x) => x.site_id === t.site_id && x.list_catalogue === pc) : undefined;
+    const cell = cells.get(t.site_id)?.[String(t.ord)];
+    if (parent && cell) cell.parent_ord = parent.ord;
+  }
 }
 
 const SITE360_MENU_KEYS = ['master', 'design_acq', 'sow', 'cw', 'te', 'hoto', 'dismantle', 'om'] as const;

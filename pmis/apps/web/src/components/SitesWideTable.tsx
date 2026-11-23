@@ -7,6 +7,7 @@ import type { Site360MenuItem } from '@/api/site360';
 import { errText } from '@/components/FormDialog';
 import type { Site360CellTarget } from '@/components/Site360Grid';
 import { EmptyState, NoResults } from '@/components/States';
+import { optionsOf } from '@/lib/siteBulkEdit';
 import { fmtDate } from '@/lib/time';
 
 export interface WideRow { site_id: string; site_code: string; row_no?: number | null; values: Record<string, string | null>; cells?: Record<string, Site360CellTarget> }
@@ -26,7 +27,7 @@ export function inputOf(target: Site360CellTarget, raw: string): WideInput {
 
 const STATUSES = ['not_started', 'in_progress', 'on_hold', 'completed', 'cancelled'];
 const HEAD = 32; // px: height of one header row, so the second header row sticks right under the first
-const NUM_W = 56, ID_W = 110;
+const NUM_W = 80, ID_W = 110;
 
 /**
  * Wide table (owner request 2026-11-22): one row per site, the Master columns of the menu left to right in Master order, section headers above the column
@@ -35,9 +36,11 @@ const NUM_W = 56, ID_W = 110;
  * Editing (owner decision 2026-11-22): a task-backed cell the API marks editable opens a typed inline editor (click or Enter), Save or Esc; one edit changes
  * only that site's cell, through the same save path as the grid (the same rights, locks, gate rules and errors). Other cells stay plain, with the reason in a tooltip.
  */
-export function SitesWideTable({ menu, rows, hasMore, loadingMore, onMore, loaded, filtered, onClear, sel, onEdit, busy, height }: {
+export function SitesWideTable({ menu, rows, hasMore, loadingMore, onMore, loaded, filtered, onClear, sel, onEdit, busy, height, picked, onPick, onPickAll }: {
   menu: Site360MenuItem; rows: WideRow[]; hasMore: boolean; loadingMore: boolean; onMore: () => void; loaded: boolean; filtered: boolean; onClear: () => void;
   sel: string; onEdit: (e: WideEdit) => Promise<unknown>; busy?: boolean; height: number;
+  /** the selected sites (Site IDs) for the bulk bar: a checkbox in the frozen # cell of each row and a select-all in its header */
+  picked: Set<string>; onPick: (code: string) => void; onPickAll: () => void;
 }) {
   const { t, i18n } = useTranslation();
   const [editing, setEditing] = useState<{ site: string; ord: number; draft: string; error: string | null; pending: boolean } | null>(null);
@@ -94,7 +97,7 @@ export function SitesWideTable({ menu, rows, hasMore, loadingMore, onMore, loade
         <table dir="ltr" aria-label={t('sites.wide_label')} className="border-separate border-spacing-0 text-sm" data-menu={menu.key} data-testid="sites-wide-table">
           <thead>
             <tr style={{ height: HEAD }}>
-              <th rowSpan={2} scope="col" className={`${th} text-center`} style={{ ...stick(0, 40), top: 0, width: NUM_W, minWidth: NUM_W }} data-testid="wide-col-num">#</th>
+              <th rowSpan={2} scope="col" className={`${th} text-center`} style={{ ...stick(0, 40), top: 0, width: NUM_W, minWidth: NUM_W }} data-testid="wide-col-num"><span className="flex items-center justify-center gap-1"><input type="checkbox" className="h-4 w-4" aria-label={t('table.select_all')} data-testid="wide-select-all" checked={rows.length > 0 && rows.every((r) => picked.has(r.site_code))} onChange={onPickAll} />#</span></th>
               <th rowSpan={2} scope="col" className={`${th} text-start`} style={{ ...stick(NUM_W, 40), top: 0, width: ID_W, minWidth: ID_W }} data-testid="wide-col-site">{menu.columns.find((c) => c.ord === 2)?.header ?? t('sites.code')}</th>
               {groups.map((g, i) => <th key={i} colSpan={g.n} scope="colgroup" className={`${th} text-start text-mute`} style={{ position: 'sticky', top: 0, zIndex: 30, height: HEAD }} data-testid="wide-group">{g.top}</th>)}
             </tr>
@@ -108,7 +111,7 @@ export function SitesWideTable({ menu, rows, hasMore, loadingMore, onMore, loade
               const bg = cur ? 'bg-accentSoft' : i % 2 ? 'bg-card2' : 'bg-card';
               return (
                 <tr key={r.site_id} data-testid={`wide-row-${r.site_code}`} data-selected={cur || undefined} className={`hover:bg-hover ${bg}`} onClick={() => undefined}>
-                  <td className={`border-b border-e border-line px-2 text-center text-mute ${bg}`} style={stick(0, 20)}>{r.row_no ?? i + 1}</td>
+                  <td className={`border-b border-e border-line px-2 text-center text-mute ${bg}`} style={stick(0, 20)}><span className="flex items-center justify-center gap-1"><input type="checkbox" className="h-4 w-4" aria-label={t('table.select_row', { code: r.site_code })} data-testid={`wide-select-${r.site_code}`} checked={picked.has(r.site_code)} onChange={() => onPick(r.site_code)} />{r.row_no ?? i + 1}</span></td>
                   <td className={`border-b border-e border-line px-2 ${bg}`} style={stick(NUM_W, 20)}><span className="flex items-center gap-1"><b className="mono">{r.site_code}</b>
                     <Link to={`/sites/${r.site_id}`} className="rounded p-0.5 text-link hover:bg-hover" aria-label={t('sites.wide_open', { code: r.site_code })} title={t('sites.wide_open', { code: r.site_code })} data-testid={`site-row-${r.site_code}`}><ExternalLink size={14} /></Link></span></td>
                   {cols.map((c) => {
@@ -127,12 +130,16 @@ export function SitesWideTable({ menu, rows, hasMore, loadingMore, onMore, loade
                               const common = { autoFocus: true, 'aria-label': c.header, 'aria-invalid': editing.error ? true : undefined, disabled: editing.pending, 'data-testid': `wide-input-${r.site_code}-${c.ord}`, 'data-input': kind } as const;
                               const keys = (e: React.KeyboardEvent) => { if (e.key === 'Enter') void save(r, c.ord, target); if (e.key === 'Escape') setEditing(null); };
                               if (kind === 'list') {
+                                const noParent = target.parent_ord !== undefined && !optionsOf(target, r.values).length;
                                 return (
+                                  <>
                                   <select {...common} className="input h-7 w-40 px-1 py-0 text-xs" value={editing.draft} onChange={(e) => setEditing({ ...editing, draft: e.target.value, error: null })} onKeyDown={keys}>
                                     <option value="">{t('sites.wide_none')}</option>
                                     {editing.draft && !target.options?.some((o) => o.value === editing.draft) && <option value={editing.draft}>{editing.draft}</option>}
-                                    {(target.options ?? []).map((o) => <option key={o.value} value={o.value}>{label(o)}</option>)}
+                                    {optionsOf(target, r.values).map((o) => <option key={o.value} value={o.value}>{label(o)}</option>)}
                                   </select>
+                                  {noParent && <span className="text-xs text-mute" data-testid={`wide-parent-hint-${r.site_code}-${c.ord}`}>{t('sites.wide_pick_parent')}</span>}
+                                  </>
                                 );
                               }
                               if (kind === 'boolean') {
