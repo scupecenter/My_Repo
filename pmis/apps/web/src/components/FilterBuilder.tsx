@@ -1,6 +1,7 @@
 import { Plus, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
+import { ChoiceList } from './ChoiceList';
 import { type FilterCondition, type FilterField, type FilterOperator, type FilterSubGroup, type FilterTree, type FilterValue } from '@/api/views';
 
 /**
@@ -73,12 +74,24 @@ function OpToggle({ value, onChange, id }: { value: Op; onChange: (o: Op) => voi
   );
 }
 
-function ValueEditor({ c, f, onChange, id }: { c: FilterCondition; f: FilterField; onChange: (v: FilterCondition['value']) => void; id: string }) {
+function ValueEditor({ c, f, onChange, id, screen }: { c: FilterCondition; f: FilterField; onChange: (v: FilterCondition['value']) => void; id: string; screen?: string }) {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
   const op = c.operator;
   if (NO_VALUE.includes(op)) return null;
   const aria = t('filterBuilder.value');
+  if (f.type === 'enum' && f.options && f.truncated && screen) {
+    // the list of values was cut by the server: the same checklist as the unified filter, which searches the server as the user types (0.15.49)
+    const multi = MULTI.includes(op);
+    const sel = multi ? (Array.isArray(c.value) ? c.value.map(String) : []) : c.value === undefined || c.value === '' ? [] : [String(c.value)];
+    return (
+      <div className="w-64" data-testid={`${id}-value`}>
+        <ChoiceList idp={`${id}-choice`} single={!multi} truncated options={f.options.map((o) => ({ value: o.value, label: optLabel(f, o.value, lang) }))} selected={sel}
+          search={{ screen, field: f.key, lang }}
+          onToggle={(v) => onChange(multi ? (sel.includes(v) ? sel.filter((x) => x !== v) : [...sel, v]) : v)} />
+      </div>
+    );
+  }
   if (f.type === 'enum' && f.options) {
     if (MULTI.includes(op)) {
       const sel = Array.isArray(c.value) ? c.value.map(String) : [];
@@ -150,7 +163,7 @@ function ValueEditor({ c, f, onChange, id }: { c: FilterCondition; f: FilterFiel
   return <input className="input w-44" aria-label={aria} data-testid={`${id}-value`} maxLength={200} value={String(c.value ?? '')} onChange={(e) => onChange(e.target.value)} />;
 }
 
-function ConditionRow({ c, fields, onChange, onRemove, id }: { c: FilterCondition; fields: FilterField[]; onChange: (c: FilterCondition) => void; onRemove: () => void; id: string }) {
+function ConditionRow({ c, fields, onChange, onRemove, id, screen }: { c: FilterCondition; fields: FilterField[]; onChange: (c: FilterCondition) => void; onRemove: () => void; id: string; screen?: string }) {
   const { t, i18n } = useTranslation();
   const f = fields.find((x) => x.key === c.field);
   return (
@@ -166,14 +179,15 @@ function ConditionRow({ c, fields, onChange, onRemove, id }: { c: FilterConditio
           {f.operators.map((o) => <option key={o} value={o}>{t(`filterBuilder.op.${o}`)}</option>)}
         </select>
       )}
-      {f && <ValueEditor c={c} f={f} id={id} onChange={(value) => onChange({ ...c, value })} />}
+      {f && <ValueEditor c={c} f={f} id={id} screen={screen} onChange={(value) => onChange({ ...c, value })} />}
       <button type="button" className="btn px-2" aria-label={t('filterBuilder.remove_condition')} title={t('filterBuilder.remove_condition')} data-testid={`${id}-remove`} onClick={onRemove}><Trash2 size={14} aria-hidden /></button>
     </li>
   );
 }
 
 /** The builder itself (the draft tree); exported for the dialog and the tests. */
-export function FilterTreeEditor({ tree, fields, onChange }: { tree: FilterTree; fields: FilterField[]; onChange: (t: FilterTree) => void }) {
+/** `screen` (the screen key of the filter fields) switches a truncated enum field to the server value search; without it the plain select is used. */
+export function FilterTreeEditor({ tree, fields, onChange, screen }: { tree: FilterTree; fields: FilterField[]; onChange: (t: FilterTree) => void; screen?: string }) {
   const { t } = useTranslation();
   const conds = countConditions(tree), groups = countGroups(tree);
   const fullRoot = tree.items.length >= LIMITS.items, fullConds = conds >= LIMITS.conditions;
@@ -198,7 +212,7 @@ export function FilterTreeEditor({ tree, fields, onChange }: { tree: FilterTree;
             </div>
             <ol className="space-y-2">
               {it.items.map((c, j) => (
-                <ConditionRow key={j} id={`filter-group-${i}-cond-${j}`} c={c} fields={fields}
+                <ConditionRow key={j} id={`filter-group-${i}-cond-${j}`} c={c} fields={fields} screen={screen}
                   onChange={(nc) => setItem(i, { ...it, items: it.items.map((x, k) => (k === j ? nc : x)) })}
                   onRemove={() => { const items = it.items.filter((_, k) => k !== j); if (items.length) setItem(i, { ...it, items }); else dropItem(i); }} />
               ))}
@@ -207,7 +221,7 @@ export function FilterTreeEditor({ tree, fields, onChange }: { tree: FilterTree;
               onClick={() => first && setItem(i, { ...it, items: [...it.items, newCondition(first)] })}><Plus size={12} aria-hidden /> {t('filterBuilder.add_condition')}</button>
           </li>
         ) : (
-          <ConditionRow key={i} id={`filter-cond-${i}`} c={it} fields={fields} onChange={(nc) => setItem(i, nc)} onRemove={() => dropItem(i)} />
+          <ConditionRow key={i} id={`filter-cond-${i}`} c={it} fields={fields} screen={screen} onChange={(nc) => setItem(i, nc)} onRemove={() => dropItem(i)} />
         ))}
       </ol>
       <div className="flex flex-wrap gap-2">

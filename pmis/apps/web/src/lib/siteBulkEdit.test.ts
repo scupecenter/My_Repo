@@ -86,3 +86,31 @@ describe('runBulk', () => {
     expect(progress).toEqual([1, 2, 3, 4, 5]);
   });
 });
+
+describe('clear a value (null)', () => {
+  const dateCell = (editable: boolean, v: number): Site360CellTarget => ({ task_id: `t${v}`, version: v, editable, field: 'actual_date', input_type: 'date' });
+  const rows = [
+    row('S1', { '78': '2026-03-10' }, { '78': dateCell(true, 1) }),
+    row('S2', { '78': null }, { '78': dateCell(true, 2) }),
+    row('S3', { '78': '2026-03-10' }, { '78': dateCell(false, 3) }),
+    row('S4', { '78': '2026-03-10' }, {}),
+  ];
+  it('saves the cells that hold a value and skips the empty, locked and not editable ones', () => {
+    const p = planBulk(rows, 78, 'date', null);
+    expect(p.change.map((c) => c.row.site_code)).toEqual(['S1']);
+    expect(p.skipped.map((s) => [s.row.site_code, s.reason])).toEqual([['S2', 'already_empty'], ['S3', 'locked'], ['S4', 'not_editable']]);
+  });
+  it('does not check the options of a list when clearing', () => {
+    const rs = [row('A', { '40': null, '41': 'TIP' }, { '41': city })];
+    expect(planBulk(rs, 41, 'list', null).change).toHaveLength(1);
+  });
+  it('sends null for each cell and reports the message of a refusal as a failure', async () => {
+    const plan = planBulk(rows, 78, 'date', null);
+    const save = vi.fn(async (v: { value: unknown }) => { expect(v.value).toBeNull(); });
+    const ok = await runBulk(plan.change, null, save);
+    expect(ok.map((o) => o.status)).toEqual(['saved']);
+    const err = new ApiError(422, { type: 'about:blank', title: 'Validation failed', status: 422, code: 'validation_failed', detail: 'A value is required.' } as never);
+    const bad = await runBulk(plan.change, null, async () => { throw err; });
+    expect(bad[0]).toMatchObject({ status: 'failed', http: 422, error: err });
+  });
+});

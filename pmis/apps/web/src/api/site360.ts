@@ -102,14 +102,14 @@ export const useSite360RowsPaged = (menu: string | undefined, query: Omit<Site36
   });
 };
 
-/** One cell edit: the task, its version (If-Match), the field (a date key or a key of the task values) and the new value (an empty text clears it). */
-export interface Site360CellSave { task_id: string; version: number; field?: 'planned_date' | 'actual_date' | 'actual_start'; values?: string; value: string | number | boolean }
+/** One cell edit: the task, its version (If-Match), the field (a date key or a key of the task values) and the new value (an empty text or null clears it). */
+export interface Site360CellSave { task_id: string; version: number; field?: 'planned_date' | 'actual_date' | 'actual_start'; values?: string; value: string | number | boolean | null }
 
 /** The one save path of a cell, `PATCH /tasks/{task_id}` with If-Match: used by the single inline edit and, once per site, by the bulk edit (0.15.50). */
 export const saveSite360Cell = (v: Site360CellSave) => {
   const body = v.field
-    ? { [v.field]: v.value === '' ? null : v.value }
-    : { values: { [v.values ?? '']: v.value === '' ? null : v.value } };
+    ? { [v.field]: v.value === '' || v.value === null ? null : v.value }
+    : { values: { [v.values ?? '']: v.value === '' || v.value === null ? null : v.value } };
   return api.patch<unknown>(`/tasks/${v.task_id}`, { body, version: v.version });
 };
 

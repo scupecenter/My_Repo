@@ -2300,7 +2300,7 @@ export interface paths {
         head?: never;
         /**
          * Save entry data (dates, values, custom fields) at level 1
-         * @description Allowed in states `open` and `entry` to an eligible entry holder. Read-only and hidden fields are refused with `field_read_only`.
+         * @description Allowed in states `open` and `entry` to an eligible entry holder. Read-only and hidden fields are refused with `field_read_only`. Since 0.15.51 a value of a dependent list (a list with a parent list) whose parent differs from the parent value held by the site is refused with 422 `list_parent_mismatch` and nothing is saved; an empty parent value accepts any child, and a cleared value is never refused.
          */
         patch: operations["updateTaskEntry"];
         trace?: never;
@@ -9402,7 +9402,7 @@ export interface components {
             conflicts?: components["schemas"]["ScopeConflict"][];
         };
         /** @enum {string} */
-        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "insufficient_stock" | "item_in_use" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "invalid_code" | "invalid_enrol_code" | "enrol_code_expired" | "password_change_required" | "weak_password" | "internal_error" | "team_scope_mismatch" | "two_factor_enforced" | "scope_scenario_conflict" | "too_many_rows" | "integrity_too_large" | "mail_not_configured" | "self_approval_forbidden" | "document_rule_pending" | "file_pending_scan" | "list_not_configured" | "email_not_verified" | "batch_processing" | "vehicle_already_reserved" | "upload_processing" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "invitation_invalid" | "system_field" | "conversion_unconfirmed" | "column_in_use" | "input_already_mapped" | "field_already_mapped";
+        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "insufficient_stock" | "item_in_use" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "invalid_code" | "invalid_enrol_code" | "enrol_code_expired" | "password_change_required" | "weak_password" | "internal_error" | "team_scope_mismatch" | "two_factor_enforced" | "scope_scenario_conflict" | "too_many_rows" | "integrity_too_large" | "mail_not_configured" | "self_approval_forbidden" | "document_rule_pending" | "file_pending_scan" | "list_not_configured" | "list_parent_mismatch" | "email_not_verified" | "batch_processing" | "vehicle_already_reserved" | "upload_processing" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "invitation_invalid" | "system_field" | "conversion_unconfirmed" | "column_in_use" | "input_already_mapped" | "field_already_mapped";
         PageEnvelope: {
             items: unknown[];
             page: components["schemas"]["PageInfo"];
@@ -17595,7 +17595,7 @@ export interface components {
                 "application/problem+json": components["schemas"]["Problem"];
             };
         };
-        /** @description Validation failed (`validation_failed`, `note_required`, `mandatory_slots_missing`, `mandatory_fields_missing`, `open_snags`, `empty_cell`, `workflow_invalid`, `master_impact_unconfirmed`, `file_rejected`, `template_rejected`, `insufficient_stock`, `confirmation_mismatch`). */
+        /** @description Validation failed (`validation_failed`, `list_parent_mismatch`, `note_required`, `mandatory_slots_missing`, `mandatory_fields_missing`, `open_snags`, `empty_cell`, `workflow_invalid`, `master_impact_unconfirmed`, `file_rejected`, `template_rejected`, `insufficient_stock`, `confirmation_mismatch`). */
         Unprocessable: {
             headers: {
                 [name: string]: unknown;

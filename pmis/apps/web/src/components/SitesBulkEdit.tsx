@@ -16,6 +16,7 @@ export function SitesBulkEdit({ menu, rows, onClose, onRefresh }: { menu: Site36
   const { t, i18n } = useTranslation();
   const [ord, setOrd] = useState(0);
   const [draft, setDraft] = useState('');
+  const [clear, setClear] = useState(false); // clear the value (send null) instead of entering one
   const [phase, setPhase] = useState<Phase>('form');
   const [done, setDone] = useState(0);
   const [outcomes, setOutcomes] = useState<BulkOutcome[]>([]);
@@ -25,15 +26,15 @@ export function SitesBulkEdit({ menu, rows, onClose, onRefresh }: { menu: Site36
   const kind = ord ? columnKind(rows, ord) : null;
   const options = ord && kind === 'list' ? columnOptions(rows, ord) : [];
   const value = kind ? toValue(kind, draft) : null;
-  const plan = kind && value !== null ? planBulk(rows, ord, kind, value) : null;
+  const plan = kind && clear ? planBulk(rows, ord, kind, null) : kind && value !== null ? planBulk(rows, ord, kind, value) : null;
   const shown = phase === 'form' ? plan : snap;
   const skipCount = (r: string) => shown?.skipped.filter((s) => s.reason === r).length ?? 0;
   const label = (o: { label_en: string; label_ar: string | null }) => (i18n.language === 'ar' && o.label_ar) || o.label_en;
 
   const confirm = async () => {
-    if (!plan || value === null || !plan.change.length) return;
+    if (!plan || (!clear && value === null) || !plan.change.length) return;
     setSnap(plan); setPhase('running'); setDone(0);
-    const res = await runBulk(plan.change, value, saveSite360Cell, { onProgress: setDone });
+    const res = await runBulk(plan.change, clear ? null : value, saveSite360Cell, { onProgress: setDone });
     await onRefresh();
     setOutcomes(res); setPhase('done');
   };
@@ -59,12 +60,17 @@ export function SitesBulkEdit({ menu, rows, onClose, onRefresh }: { menu: Site36
               {!fields.length ? <p data-testid="bulk-edit-none" className="text-sm">{t('sites.wide_bulk_no_fields')}</p> : (
                 <>
                   <label className="block text-sm font-semibold" htmlFor="bulk-edit-field">{t('sites.wide_bulk_field')}</label>
-                  <select id="bulk-edit-field" data-testid="bulk-edit-field" className="input w-full" value={ord} onChange={(e) => { setOrd(Number(e.target.value)); setDraft(''); }}>
+                  <select id="bulk-edit-field" data-testid="bulk-edit-field" className="input w-full" value={ord} onChange={(e) => { setOrd(Number(e.target.value)); setDraft(''); setClear(false); }}>
                     <option value={0}>{t('sites.wide_bulk_choose')}</option>
                     {fields.map((c) => <option key={c.ord} value={c.ord}>{c.header}</option>)}
                   </select>
                   {kind && (
                     <div>
+                      <label className="flex items-center gap-2 text-sm" htmlFor="bulk-edit-clear">
+                        <input id="bulk-edit-clear" data-testid="bulk-edit-clear" type="checkbox" checked={clear} onChange={(e) => setClear(e.target.checked)} />
+                        {t('sites.wide_bulk_clear')}
+                      </label>
+                      {clear ? <p className="mt-1 text-xs text-mute" data-testid="bulk-edit-clear-hint">{t('sites.wide_bulk_clear_note')}</p> : <>
                       <label className="block text-sm font-semibold" htmlFor="bulk-edit-value">{t('sites.wide_bulk_value')}</label>
                       {kind === 'list' || kind === 'boolean' ? (
                         <select id="bulk-edit-value" data-testid="bulk-edit-value" data-input={kind} className="input w-full" value={draft} onChange={(e) => setDraft(e.target.value)}>
@@ -75,6 +81,7 @@ export function SitesBulkEdit({ menu, rows, onClose, onRefresh }: { menu: Site36
                         <input id="bulk-edit-value" data-testid="bulk-edit-value" data-input={kind} type={kind} step={kind === 'number' ? 'any' : undefined} className="input w-full" value={draft} onChange={(e) => setDraft(e.target.value)} />
                       )}
                       {kind === 'list' && anyMissingParent(rows, ord) && <p className="mt-1 text-xs text-mute" data-testid="bulk-edit-parent-hint">{t('sites.wide_bulk_pick_parent')}</p>}
+                      </>}
                     </div>
                   )}
                   {plan && (

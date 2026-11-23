@@ -15,8 +15,8 @@ export type BulkOption = { value: string; label_en: string; label_ar: string | n
 export interface BulkRow { site_id: string; site_code: string; values: Record<string, string | null>; cells?: Record<string, Site360CellTarget> }
 
 /** Why a site is skipped before anything is sent. A missing right is only known to the server, so it shows later as a failure. */
-export type SkipReason = 'not_editable' | 'locked' | 'unchanged' | 'not_allowed';
-export const SKIP_REASONS: SkipReason[] = ['not_editable', 'locked', 'unchanged', 'not_allowed'];
+export type SkipReason = 'not_editable' | 'locked' | 'unchanged' | 'not_allowed' | 'already_empty';
+export const SKIP_REASONS: SkipReason[] = ['not_editable', 'locked', 'unchanged', 'not_allowed', 'already_empty'];
 
 const isTrue = (x: string) => /^(true|yes|1)$/i.test(x);
 
@@ -81,13 +81,20 @@ const same = (kind: BulkInput, stored: string, value: BulkValue): boolean => {
 export interface BulkChange { row: BulkRow; target: Site360CellTarget }
 export interface BulkPlan { change: BulkChange[]; skipped: { row: BulkRow; reason: SkipReason }[] }
 
-/** What a bulk edit of column `ord` to `value` would do for each row: the cells to save, and the rows that are skipped with the reason. */
-export function planBulk(rows: BulkRow[], ord: number, kind: BulkInput, value: BulkValue): BulkPlan {
+/**
+ * What a bulk edit of column `ord` to `value` would do for each row: the cells to save, and the rows that are skipped with the reason. A `null` value clears the
+ * cell (0.15.51): a cell that is already empty is skipped (`already_empty`), and the options of a list are not checked. The server decides whether a required field may be empty.
+ */
+export function planBulk(rows: BulkRow[], ord: number, kind: BulkInput, value: BulkValue | null): BulkPlan {
   const plan: BulkPlan = { change: [], skipped: [] };
   for (const row of rows) {
     const target = row.cells?.[String(ord)];
     if (!target) { plan.skipped.push({ row, reason: 'not_editable' }); continue; }
     if (!target.editable) { plan.skipped.push({ row, reason: 'locked' }); continue; }
+    if (value === null) {
+      if ((row.values[String(ord)] ?? '') === '') plan.skipped.push({ row, reason: 'already_empty' }); else plan.change.push({ row, target });
+      continue;
+    }
     if (kind === 'list' && !optionsOf(target, row.values).some((o) => o.value === value)) { plan.skipped.push({ row, reason: 'not_allowed' }); continue; }
     if (same(kind, row.values[String(ord)] ?? '', value)) { plan.skipped.push({ row, reason: 'unchanged' }); continue; }
     plan.change.push({ row, target });
@@ -102,7 +109,7 @@ export type BulkOutcome = { code: string; status: 'saved' } | { code: string; st
  * others. `save` is the single-cell save path; `onProgress` gets the number of finished cells.
  */
 export async function runBulk(
-  changes: BulkChange[], value: BulkValue, save: (v: Site360CellSave) => Promise<unknown>,
+  changes: BulkChange[], value: BulkValue | null, save: (v: Site360CellSave) => Promise<unknown>,
   { concurrency = 4, onProgress }: { concurrency?: number; onProgress?: (done: number) => void } = {},
 ): Promise<BulkOutcome[]> {
   const out: BulkOutcome[] = new Array(changes.length);
