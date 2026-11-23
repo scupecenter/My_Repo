@@ -123,6 +123,11 @@ export function mapWfError(message: string): ProblemException | null {
       });
     case 'step_up_required':
       return new ProblemException(401, 'step_up_required', { detail: 'Confirm your password to continue.', step_up_method: 'password' });
+    case 'rate_limited': {
+      // 0143: the cooldown of POST /me/notify-admins, decided by the database (me_notify_admins)
+      const after = Math.max(1, Math.ceil(Number(extra.retry_after ?? 60)) || 60);
+      return new ProblemException(429, 'rate_limited', { detail: detail ?? 'You asked a moment ago. Try again later.', headers: { 'Retry-After': String(after) } });
+    }
     case 'insufficient_stock':
     case 'item_in_use':
       return new ProblemException(422, m[1], {

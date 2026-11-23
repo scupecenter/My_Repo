@@ -226,11 +226,11 @@ SELECT admin_save_mail_kinds('["task_assigned"]'::jsonb, 'No verified step-up', 
 -- @end
 
 -- @case SCR-27
--- @title Control: the System Admin reads the setting with its catalogue (30 kinds since migration 0140 added absence_alert and reassigned, 6 recommended, no reserved kind) and the ETag
+-- @title Control: the System Admin reads the setting with its catalogue (32 kinds since migration 0143 added mfa_exemption and assignment_request after 0140 added absence_alert and reassigned, 6 recommended, no reserved kind) and the ETag
 -- @category settings-screens
 -- @actor ADMIN
 -- @region *
--- @expect output 30|6|0|true
+-- @expect output 32|6|0|true
 SELECT jsonb_array_length(j -> 'catalogue') || '|'
   || (SELECT count(*) FROM jsonb_array_elements(j -> 'catalogue') c WHERE (c ->> 'recommended')::boolean) || '|'
   || (SELECT count(*) FROM jsonb_array_elements(j -> 'catalogue') c WHERE c ->> 'kind' ~ '^(security_|integrity_|audit_integrity|break_glass|retention_)') || '|'

@@ -29,6 +29,7 @@ const TITLES: Record<string, string> = {
   validation_failed: 'Validation failed',
   unauthenticated: 'Not signed in',
   step_up_required: 'Re-authentication required',
+  mfa_required: 'Two-factor sign-in required',
   pending_assignment: 'Account is waiting for an assignment',
   module_forbidden: 'Module not available',
   action_forbidden: 'Action not allowed',
@@ -132,6 +133,10 @@ export const problems = {
   notFound: (detail = 'The resource does not exist or is not visible to you.') => new ProblemException(404, 'not_found', { detail }),
   validation: (errors: FieldError[], detail = 'The request is not valid.') => new ProblemException(422, 'validation_failed', { errors, detail }),
   badRequest: (detail: string) => new ProblemException(400, 'validation_failed', { detail }),
+  /** 0143 (ADR 0002 item 3): require_mfa is on, the account has no second factor and no MFA exemption is in force. */
+  mfaRequired: () => new ProblemException(401, 'mfa_required', {
+    detail: 'GSDN Workspace requires two-factor sign-in for your account. Ask an administrator to turn two-factor on for you.',
+  }),
   rateLimited: (retryAfterSeconds: number) =>
     new ProblemException(429, 'rate_limited', { detail: 'Too many attempts. Try again later.', headers: { 'Retry-After': String(retryAfterSeconds) } }),
 };

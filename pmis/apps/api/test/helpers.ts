@@ -151,6 +151,13 @@ export async function superDbGmp(): Promise<PgClient> {
   return c;
 }
 
+/** Superuser connection to the users and groups API database (migration 0143: the suite switches require_mfa on; see global-setup). */
+export async function superDbMfa(): Promise<PgClient> {
+  const c = new PgClient({ connectionString: process.env.TEST_SUPER_URL_MFA });
+  await c.connect();
+  return c;
+}
+
 /** Superuser connection to the moved-past Site RFI database (migration 0136; see global-setup). */
 export async function superDbRfi(): Promise<PgClient> {
   const c = new PgClient({ connectionString: process.env.TEST_SUPER_URL_RFI });

@@ -14,6 +14,14 @@ export class GroupsController {
     return this.groups.list(auth, query);
   }
 
+  @Post()
+  @HttpCode(201)
+  async create(@Auth() auth: AuthContext, @Body() body: unknown, @Res({ passthrough: true }) res: Response): Promise<GroupDetailDto> {
+    const g = await this.groups.create(auth, body);
+    res.setHeader('ETag', etagHeader(g.version));
+    return g;
+  }
+
   @Get(':id')
   async get(@Auth() auth: AuthContext, @Param('id') id: string, @Res({ passthrough: true }) res: Response): Promise<GroupDetailDto> {
     const g = await this.groups.get(auth, id);

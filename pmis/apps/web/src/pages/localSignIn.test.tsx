@@ -354,6 +354,8 @@ describe('hybrid mode list', () => {
       'POST /tasks/reassign', 'POST /tasks/:id/act-on-behalf',
       // 0.15.56 (migration 0142): the staff registry card, its visibility settings and the edit of a row
       'GET /staff-registry/visibility', 'PUT /staff-registry/visibility', 'GET /staff-registry/:employeeId', 'PATCH /staff-registry/:employeeId',
+      // contract 0.15.60
+      'GET /users/:id/mfa-exemption', 'PUT /users/:id/mfa-exemption', 'POST /users/:id/mfa-exemption/revoke', 'POST /groups', 'POST /me/notify-admins', 'POST /auth/employee-id',
     ]);
     expect(realApiHandlers(false)).toHaveLength(0);
     expect(realApiHandlers(true)).toHaveLength(REAL_API_AUTH_USERS.length);
