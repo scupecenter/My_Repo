@@ -79,7 +79,7 @@ async function setup(
   return { e, child, site: site.id };
 }
 const save = (e: Actor, id: string, version: number, body: unknown) =>
-  e.api.call('patch', `/tasks/${id}`, body, { 'If-Match': `'${version}'` });
+  e.api.call('patch', `/tasks/${id}`, body, { 'If-Match': `"${version}"` });
 const version = async (e: Actor, id: string) =>
   (await e.api.call('get', `/tasks/${id}`)).body.version as number;
 
