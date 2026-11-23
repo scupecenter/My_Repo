@@ -76,10 +76,60 @@ BEGIN
   RETURN false;
 END $$;
 
+-- 0138: a Master column condition (m:<ord>, 0.15.45) passes the tree check, as it passes the API compiler (FIELD_ID)
+CREATE OR REPLACE FUNCTION sv_check_tree(p_tree jsonb) RETURNS void
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
+DECLARE g jsonb; it jsonb; sub jsonb; v jsonb; groups int := 0; conds int := 0; k text;
+  bad CONSTANT text := '{"errors":[{"path":"/filters/advanced","code":"invalid"}]}';
+BEGIN
+  IF p_tree IS NULL OR jsonb_typeof(p_tree) = 'null' THEN RETURN; END IF;
+  IF length(p_tree::text) > 12000 THEN PERFORM public.sv_fail('validation_failed', 'The filter is larger than 12 KB.', bad::jsonb); END IF;
+  -- the root group, then its items; a group inside a group may hold conditions only (two levels)
+  FOR g IN SELECT p_tree UNION ALL SELECT x FROM jsonb_array_elements(CASE WHEN jsonb_typeof(p_tree -> 'items') = 'array' THEN p_tree -> 'items' ELSE '[]' END) q(x) WHERE x ? 'items' LOOP
+    IF jsonb_typeof(g) <> 'object' OR coalesce(g ->> 'op', '') NOT IN ('and', 'or') OR jsonb_typeof(g -> 'items') IS DISTINCT FROM 'array'
+       OR jsonb_array_length(g -> 'items') > 20 THEN
+      PERFORM public.sv_fail('validation_failed', 'A filter group has op and/or and at most 20 items.', bad::jsonb);
+    END IF;
+    FOR k IN SELECT jsonb_object_keys(g) LOOP
+      IF k NOT IN ('op', 'items') THEN PERFORM public.sv_fail('validation_failed', 'Unknown key in a filter group.', bad::jsonb); END IF;
+    END LOOP;
+    IF g IS DISTINCT FROM p_tree THEN groups := groups + 1; END IF;
+    FOR it IN SELECT x FROM jsonb_array_elements(g -> 'items') q(x) LOOP
+      IF jsonb_typeof(it) <> 'object' THEN PERFORM public.sv_fail('validation_failed', 'A filter item is an object.', bad::jsonb); END IF;
+      IF it ? 'items' THEN
+        IF g IS DISTINCT FROM p_tree THEN PERFORM public.sv_fail('validation_failed', 'Filters nest two levels at most.', '{"errors":[{"path":"/filters/advanced","code":"too_deep"}]}'::jsonb); END IF;
+        CONTINUE;
+      END IF;
+      conds := conds + 1;
+      FOR k IN SELECT jsonb_object_keys(it) LOOP
+        IF k NOT IN ('field', 'operator', 'value') THEN PERFORM public.sv_fail('validation_failed', 'Unknown key in a filter condition.', bad::jsonb); END IF;
+      END LOOP;
+      IF jsonb_typeof(it -> 'field') IS DISTINCT FROM 'string' OR (it ->> 'field') !~ '^([a-z][a-z0-9_]{0,60}|[fc]:[a-z][a-z0-9_]{0,60}|ms:[A-Z][A-Z0-9_]{0,30}|m:[0-9]{1,4})$'
+         OR jsonb_typeof(it -> 'operator') IS DISTINCT FROM 'string' OR (it ->> 'operator') !~ '^[a-z_]{2,20}$' THEN
+        PERFORM public.sv_fail('validation_failed', 'A filter condition needs a field and an operator.', bad::jsonb);
+      END IF;
+      sub := it -> 'value';
+      IF sub IS NOT NULL AND jsonb_typeof(sub) = 'array' THEN
+        IF jsonb_array_length(sub) > 100 THEN PERFORM public.sv_fail('validation_failed', 'At most 100 values in a condition.', '{"errors":[{"path":"/filters/advanced","code":"too_many"}]}'::jsonb); END IF;
+        FOR v IN SELECT x FROM jsonb_array_elements(sub) q(x) LOOP
+          IF jsonb_typeof(v) NOT IN ('string', 'number', 'boolean', 'object') OR length(v::text) > 202 THEN
+            PERFORM public.sv_fail('validation_failed', 'A filter value is not valid.', bad::jsonb);
+          END IF;
+        END LOOP;
+      ELSIF sub IS NOT NULL AND (jsonb_typeof(sub) NOT IN ('string', 'number', 'boolean', 'object', 'null') OR length(sub::text) > 202) THEN
+        PERFORM public.sv_fail('validation_failed', 'A filter value is not valid.', bad::jsonb);
+      END IF;
+    END LOOP;
+  END LOOP;
+  IF groups > 10 OR conds > 50 THEN
+    PERFORM public.sv_fail('validation_failed', 'At most 10 groups and 50 conditions.', '{"errors":[{"path":"/filters/advanced","code":"too_many"}]}'::jsonb);
+  END IF;
+END $$;
+
 DO $$
 DECLARE f text;
 BEGIN
-  FOREACH f IN ARRAY ARRAY['sv_screen_module(text)', 'sv_module_ok(text,uuid)', 'sv_hidden_filter_field(text,text)'] LOOP
+  FOREACH f IN ARRAY ARRAY['sv_screen_module(text)', 'sv_module_ok(text,uuid)', 'sv_hidden_filter_field(text,text)', 'sv_check_tree(jsonb)'] LOOP
     EXECUTE format('ALTER FUNCTION %s OWNER TO pmis_definer', f);
     EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC', f);
     EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO pmis_definer', f);

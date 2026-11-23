@@ -595,8 +595,8 @@ describe('GET /saved-views/filter-fields/{field}/values', () => {
   });
 
   it('searches a list field by code or label, and a field a field rule hides is unknown to the reader', async () => {
-    const lead = await actor(app, db, { regions: null, grants: SITES_VIEW });
-    const reader = await actor(app, db, { regions: null, grants: SITES_VIEW });
+    const lead = await actor(app, db, { regions: null, grants: DASH_VIEW });
+    const reader = await actor(app, db, { regions: null, grants: DASH_VIEW });
     const code = `sv_list_${TAG.toLowerCase()}`;
     const f = await db.query(
       `INSERT INTO field_definitions (entity_type, code, label_en, data_type, in_list_filters) VALUES ('site', $1, 'Pick', 'list', true) RETURNING id`,
