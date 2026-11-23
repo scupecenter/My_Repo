@@ -34,8 +34,14 @@ describe('Register list', () => {
     expect(screen.getByTestId(`reg-state-${recId(2)}`)).toHaveTextContent('In review');
     expect(screen.getByTestId('register-export')).toBeInTheDocument();
     expect(screen.getByTestId('register-owner-note')).toHaveTextContent(/HLC Fiber Team enters the HLC purchase requests here/);
-    const u = userEvent.setup();
-    await u.selectOptions(screen.getByTestId('register-filter-state'), 'entry');
+    expect(await screen.findByTestId('filter-add')).toBeInTheDocument(); // the unified filter replaced the separate selects
+    expect(screen.queryByTestId('register-filter-state')).toBeNull();
+  });
+
+  it('keeps the older state parameter as a chip that narrows the list', async () => {
+    await signIn('pm');
+    renderApp(<Routed />, at('procurement', '?state=entry'));
+    expect(await screen.findByTestId('filter-chip-x-state')).toHaveTextContent('State: Entry');
     await waitFor(() => expect(screen.getByTestId('register-count')).toHaveTextContent('1'));
   });
 

@@ -32,8 +32,8 @@ export class DashboardController {
   /** OV-12 / SC-10 (contract 0.14.5): the sites of the dashboard map, limited to dashboard.view ∩ sites.view regions. */
   @Get('dashboard/site-map')
   @Header('Cache-Control', 'no-store')
-  siteMap() {
-    return this.map.get();
+  siteMap(@Query() q: Record<string, unknown>) {
+    return this.map.get(q);
   }
 
   @Get('dashboard/export')

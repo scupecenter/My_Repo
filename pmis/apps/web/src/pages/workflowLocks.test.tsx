@@ -10,7 +10,7 @@ import { ImportSitesPanel } from '@/components/WorkflowLocks';
 import ar from '@/i18n/ar.json';
 import en from '@/i18n/en.json';
 import { siteIdOf, siteMeta } from '@/mocks/sites';
-import { renderApp, signIn } from '@/test/utils';
+import { pickFilterField, renderApp, signIn } from '@/test/utils';
 import { NewSite } from './NewSite';
 import { Site } from './Site';
 import { Sites } from './Sites';
@@ -82,7 +82,9 @@ describe('SITE 360: the column, the filter and the bulk action', () => {
     await waitFor(() => expect(screen.getByTestId(`site-locks-${a}`)).toHaveTextContent('Open'));
     expect(screen.getByTestId(`site-locks-${b}`)).toHaveTextContent('Open');
 
-    await u.selectOptions(screen.getByTestId('sites-filter-locks'), 'open');
+    await pickFilterField(u, 'workflow_locks');
+    await u.click(await screen.findByTestId('filter-value-opt-open'));
+    expect(await screen.findByTestId('filter-chip-x-workflow_locks')).toHaveTextContent('Workflow locks: Open');
     await waitFor(() => expect(screen.getByTestId('sites-count')).toHaveTextContent(/^2 /));
     const open = await api.get<Page<SiteListItem>>('/sites', { query: { workflow_locks: 'open' } });
     expect(open.items.map((x) => x.site_code).sort()).toEqual([a, b].sort());
@@ -93,7 +95,8 @@ describe('SITE 360: the column, the filter and the bulk action', () => {
     const u = userEvent.setup();
     renderApp(<Routed />, { route: '/sites?layout=list' });
     await screen.findByTestId(`site-row-${siteMeta(0).code}`);
-    await u.click(screen.getByTestId('sites-quick-gaps'));
+    await pickFilterField(u, 'data_gaps');
+    await u.click(await screen.findByTestId('filter-extra-on'));
     await waitFor(() => expect(screen.getByTestId(`site-gaps-${siteMeta(3).code}`)).toHaveTextContent('2'));
     expect(screen.queryByTestId(`site-row-${siteMeta(0).code}`)).not.toBeInTheDocument();
     await u.click(screen.getByTestId(`site-select-${siteMeta(3).code}`));

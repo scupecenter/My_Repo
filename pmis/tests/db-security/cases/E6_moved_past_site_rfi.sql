@@ -1,4 +1,4 @@
--- Site RFI the site moved past is approved automatically, on any site (migration 0136, owner decision 2026-11-22, contract 0.15.47). The rule is an admin
+-- Site RFI the site moved past is approved automatically, on any site (migration 0136, owner decision 2026-11-22, contract 0.15.52). The rule is an admin
 -- override made by GSDN Workspace (kind manual_ms_moved_past, acted_by NULL), decided only by definer code: mmp_* are internal (owner pmis_definer, PUBLIC
 -- revoked, nothing granted to pmis_app); the flags task_instances.manual_ms_moved_past (+ _at, _inferred) are written only under the definer AND its
 -- definer-only marker row (guard mmp_guard_task; a GUC alone never passes); the markers (mmp_task, mmp_restore) are rows of hgd_marks written only through

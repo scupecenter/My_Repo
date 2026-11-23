@@ -24,6 +24,9 @@ import { streamName } from "@/lib/streams";
 import { tripoliToday } from "@/lib/today";
 import { orderedVisible, type TabLayout } from "./dashboardLayout";
 import { useDashboardSettings } from "@/api/dashboardSettings";
+import { SavedViews } from "@/components/SavedViews";
+import { UnifiedFilter } from "@/components/UnifiedFilter";
+import { decodeFilter, encodeFilter, type FilterTree } from "@/api/views";
 import {
   DASH_TABS,
   readRemembered,
@@ -606,6 +609,9 @@ function F13Panel({
   );
 }
 
+/** What a saved view of the dashboard keeps (0.15.49): the quick parameters; the filter tree is the key `advanced`. */
+const DASH_VIEW_EMPTY = { region_id: "", cluster_code: "", scenario: "", stream: "", view: "" };
+
 export function Dashboard() {
   const { t, i18n } = useTranslation();
   const ar = i18n.language === "ar";
@@ -629,7 +635,10 @@ export function Dashboard() {
     scenario: sp.get("scenario") ?? "",
     stream: sp.get("stream") ?? "",
     view: tab === "pmo" ? (sp.get("view") ?? "") : tabView(tab),
+    // 0.15.45: the unified filter tree (screen `dashboard`) goes to every dashboard endpoint as `filter`
+    filter: encodeFilter(decodeFilter(sp.get("adv"))),
   };
+  const advTree = decodeFilter(sp.get("adv"));
   const refDate = q.ref_date || today;
   const dash = useDashboard(q);
   const d = dash.data;
@@ -664,7 +673,7 @@ export function Dashboard() {
   const activeFilters =
     ["region_id", "cluster_code", "scenario", "stream", "view"].filter((k) =>
       sp.get(k),
-    ).length + (q.ref_date ? 1 : 0);
+    ).length + (q.ref_date ? 1 : 0) + (advTree ? 1 : 0);
   const name = (x: { name_en: string; name_ar?: string | null }) =>
     ar && x.name_ar ? x.name_ar : x.name_en;
 
@@ -673,6 +682,8 @@ export function Dashboard() {
     const p = new URLSearchParams();
     for (const k of ["region_id", "cluster_code", "scenario", "stream", "view"] as const)
       if (q[k]) p.set(k, q[k] as string);
+    // the dashboard tree is a sites tree: a card opens the Site Master with the same tree
+    if (q.filter) p.set("adv", q.filter);
     for (const [k, v] of Object.entries(extra)) if (v) p.set(k, v);
     // 0.15.33 (audit E section 2): a card's own set (derived status, milestone reached) is counted as of the dashboard's reference date
     if ((extra.dashboard_status || extra.milestone_reached) && q.ref_date) p.set("ref_date", q.ref_date);
@@ -1079,54 +1090,38 @@ export function Dashboard() {
         className="card flex flex-wrap items-end gap-3 p-3 print:hidden"
         data-testid="dash-filters"
       >
-        <label className="text-sm font-semibold">
-          {t("dash.filters.region")}
-          <select
-            className="input mt-1 w-auto font-normal"
-            data-testid="dash-filter-region"
-            value={q.region_id}
-            onChange={(e) => setParam({ region_id: e.target.value })}
-          >
-            <option value="">{t("sites.all_regions")}</option>
-            {(d?.filters.regions ?? []).map((r) => (
-              <option key={r.id} value={String(r.id)}>
-                {ar && r.name_ar ? r.name_ar : r.name_en}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="text-sm font-semibold">
-          {t("dash.filters.cluster")}
-          <select
-            className="input mt-1 w-auto font-normal"
-            data-testid="dash-filter-cluster"
-            value={q.cluster_code}
-            onChange={(e) => setParam({ cluster_code: e.target.value })}
-          >
-            <option value="">{t("dash.filters.all_clusters")}</option>
-            {(d?.filters.clusters ?? []).map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="text-sm font-semibold">
-          {t("dash.filters.scenario")}
-          <select
-            className="input mt-1 w-auto font-normal"
-            data-testid="dash-filter-scenario"
-            value={q.scenario}
-            onChange={(e) => setParam({ scenario: e.target.value })}
-          >
-            <option value="">{t("sites.all_scenarios")}</option>
-            {(d?.filters.scenarios ?? []).map((s) => (
-              <option key={s} value={s}>
-                {t(`scenario.${s}`)}
-              </option>
-            ))}
-          </select>
-        </label>
+        {/* 0.15.49: saved views of the dashboard keep the filter tree and the quick parameters (region, cluster, scenario, stream, view); the reference date is not saved */}
+        <SavedViews
+          screen="dashboard"
+          value={{ region_id: q.region_id ?? "", cluster_code: q.cluster_code ?? "", scenario: q.scenario ?? "", stream: q.stream ?? "", view: tab === "pmo" ? (q.view ?? "") : "", ...(advTree ? { advanced: advTree } : {}) }}
+          empty={DASH_VIEW_EMPTY}
+          onApply={(v) => {
+            const r = v as Record<string, unknown>;
+            setParam({
+              region_id: String(r.region_id ?? ""),
+              cluster_code: String(r.cluster_code ?? ""),
+              scenario: String(r.scenario ?? ""),
+              stream: String(r.stream ?? ""),
+              ...(tab === "pmo" ? { view: String(r.view ?? "") } : {}),
+              adv: encodeFilter(r.advanced as FilterTree | undefined),
+            });
+          }}
+        />
+        <div className="text-sm">
+          <div>
+            <UnifiedFilter
+              screen="dashboard"
+              value={advTree}
+              onChange={(tree) => setParam({ adv: encodeFilter(tree) })}
+              onClearAll={() => setParam({ adv: "", region_id: "", cluster_code: "", scenario: "" })}
+              extras={[
+                { key: "region_id", label: t("dash.filters.region"), kind: "text", hidden: true, value: q.region_id ?? "", set: (v) => setParam({ region_id: v }), chip: `${t("dash.filters.region")}: ${(d?.filters.regions ?? []).map((r) => (String(r.id) === q.region_id ? (ar && r.name_ar ? r.name_ar : r.name_en) : "")).join("") || q.region_id}` },
+                { key: "cluster_code", label: t("dash.filters.cluster"), kind: "text", hidden: true, value: q.cluster_code ?? "", set: (v) => setParam({ cluster_code: v }), chip: `${t("dash.filters.cluster")}: ${q.cluster_code}` },
+                { key: "scenario", label: t("dash.filters.scenario"), kind: "text", hidden: true, value: q.scenario ?? "", set: (v) => setParam({ scenario: v }), chip: `${t("dash.filters.scenario")}: ${q.scenario ? t(`scenario.${q.scenario}`) : ""}` },
+              ]}
+            />
+          </div>
+        </div>
         <label className="text-sm font-semibold">
           {t("dash.filters.stream")}
           <select
@@ -1197,6 +1192,7 @@ export function Dashboard() {
                   region_id: "",
                   cluster_code: "",
                   scenario: "",
+                  adv: "",
                   stream: "",
                   view: "",
                 })
@@ -1327,6 +1323,7 @@ export function Dashboard() {
                       cluster_code: q.cluster_code,
                       scenario: q.scenario,
                       stream: q.stream === "DISMANTLE" ? "" : q.stream,
+                      filter: q.filter,
                     }}
                   />
                 </>

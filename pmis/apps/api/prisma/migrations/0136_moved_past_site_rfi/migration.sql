@@ -1,7 +1,7 @@
 -- 0136_moved_past_site_rfi: on ANY site, a manual milestone (Site RFI, MS4: calc.milestone_manual) the site has moved past is approved directly with its
 -- pre-filled date (the rule of 0129, which held only at the end of a completed historical load approved directly), as an admin override made by a rule of
 -- GSDN Workspace; it runs from now on in the calculation path before the gate and D8 rules of 0134, and once on the existing sites. The ongoing hook of 0134
--- now stands aside only while a Master import apply is actually running (owner decision 2026-11-22; CHANGELOG 179; contract 0.15.47).
+-- now stands aside only while a Master import apply is actually running (owner decision 2026-11-22; CHANGELOG 179; contract 0.15.52).
 -- Mirror: db/sql/135_moved_past_site_rfi.sql (kept byte-identical).
 --
 -- WHY (production, read-only diagnosis 2026-11-22, counts only): the backfill of 0134 opened 0 gates. On the 58 sites whose TE Completion (MS5) is locked
@@ -63,7 +63,7 @@
 --
 -- Function rules: SECURITY DEFINER (except the guard, which runs as its writer like hmm_guard_task / nmw_guard_task), search_path = pg_catalog, public,
 -- pg_temp, owner pmis_definer, EXECUTE revoked from PUBLIC and pmis_app. No new table; no new right for pmis_app (the flag columns are revoked here too;
--- app_grants.sql keeps task_instances and admin_overrides unwritable). Contract 0.15.47: the override kind manual_ms_moved_past (Override.kind), no
+-- app_grants.sql keeps task_instances and admin_overrides unwritable). Contract 0.15.52: the override kind manual_ms_moved_past (Override.kind), no
 -- Override.acted_by for it.
 
 -- ---------------------------------------------------------------------------------------------------------------------
