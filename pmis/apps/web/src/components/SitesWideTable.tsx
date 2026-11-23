@@ -95,7 +95,8 @@ export function SitesWideTable({ menu, rows, hasMore, loadingMore, onMore, loade
   const th = 'border-b border-e border-line bg-card2 px-2 text-xs font-semibold whitespace-nowrap';
   return (
     <div className="card overflow-hidden" data-testid="sites-wide">
-      <div className="overflow-auto" style={{ maxHeight: height }} data-testid="sites-wide-scroll">
+      {/* dir=ltr on the scroller too: in the Arabic UI an RTL scroller would open the LTR table at its right end (the last stages) */}
+      <div dir="ltr" className="overflow-auto" style={{ maxHeight: height }} data-testid="sites-wide-scroll">
         <table dir="ltr" aria-label={t('sites.wide_label')} className="border-separate border-spacing-0 text-sm" data-menu={menu.key} data-testid="sites-wide-table">
           <thead>
             <tr style={{ height: HEAD }}>
