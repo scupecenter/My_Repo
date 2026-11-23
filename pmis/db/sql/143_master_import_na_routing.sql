@@ -1,7 +1,7 @@
--- 0139_master_import_na_routing: the Master import reads "Pending" and "N/A" as the owner means them, skips the placeholder rows of the register sheets,
+-- 0144_master_import_na_routing: the Master import reads "Pending" and "N/A" as the owner means them, skips the placeholder rows of the register sheets,
 -- routes the GECOL purchase requests of the PR-PO sheet into the GECOL register, derives an empty Order Status, and selects the one candidate that holds a
--- contract sign-off (owner decisions 2026-11-22; CHANGELOG 189; contract 0.15.53).
--- Mirror: db/sql/138_master_import_na_routing.sql (kept byte-identical).
+-- contract sign-off (owner decisions 2026-11-22; CHANGELOG 195; contract 0.15.58).
+-- Mirror: db/sql/143_master_import_na_routing.sql (kept byte-identical).
 --
 -- WHY (the owner's real Site Master, error summary with counts only): date columns of the Master sheet hold the text "N/A" or "Pending" (D10 window, KPI dates
 -- and Cutover Result N/A in 469 rows; D11 SSV Date N/A 282; D8 MW Alignment Date N/A 205 and Pending 30; D8 Measured RSL N/A 203; D9 Integration Date Pending
@@ -25,7 +25,7 @@
 --         release, reassign, reopen, start, review) or a register record in review, never one a gate holds (lock reason gate_closed:* or wf_gate_hold).
 --         The uploader must hold the rights of an entry of that task, at the staging and again at the send: the import and edit regions of the task
 --         (templates import, sites edit) and its entry level (L1 holder, or a System Admin when the level has no holder, or the admin override of a
---         historical load approved directly); otherwise the row says why and nothing is marked (security review of 0139).
+--         historical load approved directly); otherwise the row says why and nothing is marked (security review of 0144).
 --         When the row also carries other values of that task, the N/A is read as an empty cell (rule 2b) and the row is staged as today. A draft upload
 --         (Save Draft / Planning) never marks: the N/A is an empty cell there.
 --      b. in any other date, number or list column (task or register): an empty cell. A list whose own values hold "N/A" keeps it.
@@ -51,7 +51,7 @@
 -- Every derivation is a warning on its batch row and a count in the batch notes; one audit row per batch (import_batch.master_import_rules, counts only).
 --
 -- HOW (no rule of an existing function is rewritten): the internal functions imp_master_plan, imp_master_unit, imp_stream_eval, imp_stream_close and
--- imp_submit_stream_finish (all last defined in 0083 / 0092, owner pmis_definer, nothing granted to pmis_app) are renamed *_pre_0139 and wrapped by a
+-- imp_submit_stream_finish (all last defined in 0083 / 0092, owner pmis_definer, nothing granted to pmis_app) are renamed *_pre_0144 and wrapped by a
 -- function of the same name and signature that prepares the rows before them (only for the Master sheet or a register unit) and records the notes after
 -- them, as 0063 wrapped reg_validate. hrg_stage_registers (0093) is redefined with the routing (rule 4); ao_current_matches and admin_override_revert (latest
 -- 0134) learn the kind master_na.
@@ -68,10 +68,10 @@ ALTER TABLE task_instances
   ADD COLUMN master_na_at timestamptz,
   ADD CONSTRAINT task_instances_mina_check CHECK (NOT master_na OR (state = 'na' AND is_na AND master_na_at IS NOT NULL));
 CREATE INDEX task_instances_mina_idx ON task_instances (site_id) WHERE master_na;
-COMMENT ON COLUMN task_instances.master_na IS '0139: N/A because the actual date of the task is N/A in the Master file (owner decision 2026-11-22; admin override by rule, reversible through POST /overrides/{id}/revert)';
+COMMENT ON COLUMN task_instances.master_na IS '0144: N/A because the actual date of the task is N/A in the Master file (owner decision 2026-11-22; admin override by rule, reversible through POST /overrides/{id}/revert)';
 
 ALTER TABLE import_batches ADD COLUMN import_notes jsonb NOT NULL DEFAULT '[]'::jsonb;
-COMMENT ON COLUMN import_batches.import_notes IS '0139: informational notes of a Master staging ([{code, count}], counts only, never a value): cells read as empty, placeholder rows skipped, rows routed, values derived';
+COMMENT ON COLUMN import_batches.import_notes IS '0144: informational notes of a Master staging ([{code, count}], counts only, never a value): cells read as empty, placeholder rows skipped, rows routed, values derived';
 
 DO $$
 BEGIN
@@ -86,12 +86,12 @@ ALTER TABLE admin_overrides ADD CONSTRAINT admin_overrides_rule_actor_check CHEC
 ALTER TABLE admin_overrides DROP CONSTRAINT admin_overrides_revert_check;
 ALTER TABLE admin_overrides ADD CONSTRAINT admin_overrides_revert_check CHECK ((reverted_at IS NULL) = (reverted_by IS NULL)
   OR (reverted_at IS NOT NULL AND reverted_by IS NULL AND kind IN ('gate_moved_past_open', 'no_microwave_na', 'manual_ms_moved_past', 'master_na')));
-COMMENT ON COLUMN admin_overrides.acted_by IS '0134 / 0136 / 0139: NULL only for an override made by a rule of GSDN Workspace (kinds gate_moved_past_open, no_microwave_na, manual_ms_moved_past and master_na, owner decisions 2026-11-22)';
+COMMENT ON COLUMN admin_overrides.acted_by IS '0134 / 0136 / 0144: NULL only for an override made by a rule of GSDN Workspace (kinds gate_moved_past_open, no_microwave_na, manual_ms_moved_past and master_na, owner decisions 2026-11-22)';
 
 -- Rule 5: the Order Status values of a derived PR-PO row (owner decision 2026-11-23, Q582). Changes only through definer code (settings_guarded_keys).
 INSERT INTO settings (key, value, description, updated_at) VALUES
   ('imports.master_order_status_derived', '{"open": "Active", "completed": "Completed", "completion_field": null}'::jsonb,
-   '0139 (owner decisions 2026-11-22 and 2026-11-23, rule 5, Q582): the Order Status the Master import gives a PR-PO row with no Order Status: completed when the row holds a value in completion_field (the PR-PO field meaning delivery / completion; null = none, so never completed), else open. Each must be an active value of the list ProcStatus; a value that is not = not derived (the row keeps its "Order Status is required" error).',
+   '0144 (owner decisions 2026-11-22 and 2026-11-23, rule 5, Q582): the Order Status the Master import gives a PR-PO row with no Order Status: completed when the row holds a value in completion_field (the PR-PO field meaning delivery / completion; null = none, so never completed), else open. Each must be an active value of the list ProcStatus; a value that is not = not derived (the row keeps its "Order Status is required" error).',
    now())
 ON CONFLICT (key) DO NOTHING;
 CREATE TRIGGER b_settings_mina_status BEFORE INSERT ON settings FOR EACH ROW
@@ -111,7 +111,7 @@ LANGUAGE plpgsql SET search_path = pg_catalog, public, pg_temp AS $$
 BEGIN
   IF TG_OP = 'INSERT' THEN
     IF public.app_is_seeding() THEN RETURN NEW; END IF;
-    RAISE EXCEPTION 'Master import: the N/A of a task from the Master file is written only by GSDN Workspace (migration 0139)' USING ERRCODE = 'insufficient_privilege';
+    RAISE EXCEPTION 'Master import: the N/A of a task from the Master file is written only by GSDN Workspace (migration 0144)' USING ERRCODE = 'insufficient_privilege';
   END IF;
   IF OLD.master_na AND (NEW.state IS DISTINCT FROM 'na' OR NOT NEW.is_na) THEN
     NEW.master_na := false;
@@ -134,7 +134,7 @@ BEGIN
      AND NEW.master_na AND NOT OLD.master_na AND NEW.state = 'na' AND NEW.is_na AND OLD.state IN ('locked', 'open') THEN
     RETURN NEW;
   END IF;
-  RAISE EXCEPTION 'Master import: the N/A of a task from the Master file is written only by GSDN Workspace (migration 0139)' USING ERRCODE = 'insufficient_privilege';
+  RAISE EXCEPTION 'Master import: the N/A of a task from the Master file is written only by GSDN Workspace (migration 0144)' USING ERRCODE = 'insufficient_privilege';
 END $$;
 
 CREATE TRIGGER mina_guard_task_ins BEFORE INSERT ON task_instances FOR EACH ROW
@@ -218,6 +218,8 @@ BEGIN
              AND w.action::text IN ('submit', 'approve', 'reject', 'claim', 'release', 'reassign', 'reopen', 'start', 'review')) THEN
     RETURN 'human_step';
   END IF;
+  -- 0140 (B12b): a lead decision on the task (keep, reassign, act on behalf) is a person's step too
+  IF EXISTS (SELECT 1 FROM public.task_cover_decisions c WHERE c.task_id = p_task) THEN RETURN 'human_step'; END IF;
   IF EXISTS (SELECT 1 FROM public.register_records o WHERE o.task_id = p_task AND o.state IN ('in_review', 'in_approval')) THEN RETURN 'record_in_review'; END IF;
   IF EXISTS (SELECT 1 FROM public.admin_overrides o WHERE o.task_id = p_task AND o.kind = 'master_na' AND o.reverted_at IS NOT NULL) THEN RETURN 'reverted_before'; END IF;
   IF coalesce(t.lock_reason, '') LIKE 'gate_closed:%' THEN RETURN 'gate_held'; END IF;
@@ -247,7 +249,7 @@ LANGUAGE sql IMMUTABLE SECURITY DEFINER SET search_path = pg_catalog, public, pg
     ELSE coalesce(p_reason, 'not applicable') END
 $$;
 
--- The rights of an entry on the task, decided as imp_stage_task_row decides them for a row of the same batch (security review of 0139): the import region
+-- The rights of an entry on the task, decided as imp_stage_task_row decides them for a row of the same batch (security review of 0144): the import region
 -- (templates import), the edit region (sites edit) and the entry level (L1 holder of the task, or a System Admin when the level has no holder, or the admin
 -- override of a historical load approved directly, p_override). NULL = allowed; else the reason. Read at the staging (the uploader's context) and again at the
 -- send (mina_mark_task: the rights may have changed in between).
@@ -605,11 +607,11 @@ END $$;
 -- ---------------------------------------------------------------------------------------------------------------------
 -- 8. The wrapped staging functions (internal, renamed and called unchanged; the new functions keep their name and signature)
 -- ---------------------------------------------------------------------------------------------------------------------
-ALTER FUNCTION imp_master_plan(text, integer, jsonb, text) RENAME TO imp_master_plan_pre_0139;
-ALTER FUNCTION imp_master_unit(jsonb, text, text, text, text, uuid, jsonb, integer) RENAME TO imp_master_unit_pre_0139;
-ALTER FUNCTION imp_stream_eval(jsonb, jsonb, text, text) RENAME TO imp_stream_eval_pre_0139;
-ALTER FUNCTION imp_stream_close(jsonb, jsonb, text, text, uuid, text, text, text, jsonb, uuid) RENAME TO imp_stream_close_pre_0139;
-ALTER FUNCTION imp_submit_stream_finish(uuid, text, integer, integer, integer, integer) RENAME TO imp_submit_stream_finish_pre_0139;
+ALTER FUNCTION imp_master_plan(text, integer, jsonb, text) RENAME TO imp_master_plan_pre_0144;
+ALTER FUNCTION imp_master_unit(jsonb, text, text, text, text, uuid, jsonb, integer) RENAME TO imp_master_unit_pre_0144;
+ALTER FUNCTION imp_stream_eval(jsonb, jsonb, text, text) RENAME TO imp_stream_eval_pre_0144;
+ALTER FUNCTION imp_stream_close(jsonb, jsonb, text, text, uuid, text, text, text, jsonb, uuid) RENAME TO imp_stream_close_pre_0144;
+ALTER FUNCTION imp_submit_stream_finish(uuid, text, integer, integer, integer, integer) RENAME TO imp_submit_stream_finish_pre_0144;
 
 -- The plan of a TPL-MASTER file (0083), then rule 4 on its register units: the GECOL requests of the PR-PO unit go to the GECOL unit (or to a GECOL unit added
 -- with the sheet of the PR-PO unit when the file has no GECOL sheet and the GECOL template is in use). A draft has no register unit (they are skipped).
@@ -617,7 +619,7 @@ CREATE FUNCTION imp_master_plan(p_template text, p_version integer, p_parts json
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
 DECLARE plan jsonb; units jsonb; pi int; gi int; pu jsonb; gu jsonb; res jsonb; n int; gd public.template_definitions%ROWTYPE; gv public.template_versions%ROWTYPE;
 BEGIN
-  plan := public.imp_master_plan_pre_0139(p_template, p_version, p_parts, p_mode);
+  plan := public.imp_master_plan_pre_0144(p_template, p_version, p_parts, p_mode);
   units := coalesce(plan -> 'units', '[]'::jsonb);
   SELECT (o - 1)::int INTO pi FROM jsonb_array_elements(units) WITH ORDINALITY AS t(x, o) WHERE x ->> 'kind' = 'register' AND x ->> 'ref' = 'procurement' ORDER BY o LIMIT 1;
   IF pi IS NULL THEN RETURN plan; END IF;
@@ -652,7 +654,7 @@ DECLARE prep jsonb; u jsonb; r jsonb; bid uuid; counts jsonb := '{}'::jsonb; not
 BEGIN
   IF public.app_actor() IS NULL THEN RAISE EXCEPTION 'no signed-in actor' USING ERRCODE = 'insufficient_privilege'; END IF;
   IF p_unit ->> 'kind' IS DISTINCT FROM 'register' THEN
-    r := public.imp_master_unit_pre_0139(p_unit, p_file_name, p_sha, p_mode, p_source, p_group, p_hw, p_file_v);
+    r := public.imp_master_unit_pre_0144(p_unit, p_file_name, p_sha, p_mode, p_source, p_group, p_hw, p_file_v);
     IF r ? 'batch' THEN
       SELECT b.import_notes INTO notes FROM public.import_batches b WHERE b.id = (r -> 'batch' ->> 'id')::uuid;
       r := jsonb_set(r, '{batch,import_notes}', coalesce(notes, '[]'::jsonb));
@@ -675,7 +677,7 @@ BEGIN
         || CASE WHEN coalesce((counts ->> 'routed_to_gecol')::int, 0) > 0 THEN '; ' || (counts ->> 'routed_to_gecol') || ' row(s) were routed to the GECOL register' ELSE '' END || '.',
       'import_notes', notes));
   END IF;
-  r := public.imp_master_unit_pre_0139(u, p_file_name, p_sha, p_mode, p_source, p_group, p_hw, p_file_v);
+  r := public.imp_master_unit_pre_0144(u, p_file_name, p_sha, p_mode, p_source, p_group, p_hw, p_file_v);
   IF r ? 'batch' THEN
     bid := (r -> 'batch' ->> 'id')::uuid;
     -- a row routed from another sheet keeps its own source (Sheet!row)
@@ -706,7 +708,7 @@ DECLARE
   r jsonb; items jsonb; tc text; idx int; it jsonb; s public.sites%ROWTYPE; ti public.task_instances%ROWTYPE; why_not text; cnt jsonb; w jsonb;
   draft boolean := (p_mode = 'draft');
 BEGIN
-  IF p_sheet IS DISTINCT FROM 'Master' THEN RETURN public.imp_stream_eval_pre_0139(p_ctx, p_rows, p_mode, p_sheet); END IF;
+  IF p_sheet IS DISTINCT FROM 'Master' THEN RETURN public.imp_stream_eval_pre_0144(p_ctx, p_rows, p_mode, p_sheet); END IF;
   IF public.app_actor() IS NULL THEN RAISE EXCEPTION 'no signed-in actor' USING ERRCODE = 'insufficient_privilege'; END IF;
   SELECT v.columns INTO cols FROM public.template_versions v WHERE v.id = (p_ctx ->> 'version_id')::uuid;
   FOR el IN SELECT x FROM jsonb_array_elements(coalesce(p_rows, '[]'::jsonb)) x LOOP
@@ -714,7 +716,7 @@ BEGIN
     preps := array_append(preps, pr);
     rows_ := array_append(rows_, pr -> 'row');
   END LOOP;
-  res := public.imp_stream_eval_pre_0139(p_ctx, to_jsonb(rows_), p_mode, p_sheet);
+  res := public.imp_stream_eval_pre_0144(p_ctx, to_jsonb(rows_), p_mode, p_sheet);
   FOR i IN 1 .. coalesce(jsonb_array_length(res), 0) LOOP
     el := res -> (i - 1);
     pr := preps[i];
@@ -776,7 +778,7 @@ RETURNS uuid
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
 DECLARE bid uuid; counts jsonb;
 BEGIN
-  bid := public.imp_stream_close_pre_0139(p_ctx, p_results, p_file_name, p_sha, p_group, p_source, p_sheet, p_mode, p_hw, p_task);
+  bid := public.imp_stream_close_pre_0144(p_ctx, p_results, p_file_name, p_sha, p_group, p_source, p_sheet, p_mode, p_hw, p_task);
   IF bid IS NOT NULL AND p_sheet = 'Master' THEN
     SELECT coalesce(jsonb_object_agg(q.k, q.n), '{}'::jsonb) INTO counts FROM (
       SELECT e.key AS k, sum((e.value #>> '{}')::int)::int AS n
@@ -798,13 +800,13 @@ CREATE FUNCTION imp_submit_stream_finish(p_batch uuid, p_prev_status text, p_sub
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
 DECLARE st text;
 BEGIN
-  st := public.imp_submit_stream_finish_pre_0139(p_batch, p_prev_status, p_submitted, p_saved, p_held, p_failed);
+  st := public.imp_submit_stream_finish_pre_0144(p_batch, p_prev_status, p_submitted, p_saved, p_held, p_failed);
   PERFORM public.mina_apply_batch(p_batch);
   RETURN st;
 END $$;
 
 -- ---------------------------------------------------------------------------------------------------------------------
--- 9. The register sheets of the Master import route the GECOL requests first (hrg_stage_registers: latest 0093, changes marked 0139)
+-- 9. The register sheets of the Master import route the GECOL requests first (hrg_stage_registers: latest 0093, changes marked 0144)
 -- ---------------------------------------------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION hrg_stage_registers(p_regs jsonb, p_run public.master_reconciliation_runs, p_mode text, p_group uuid, p_hw_reason text) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
@@ -813,7 +815,7 @@ DECLARE
   n int; u jsonb; res jsonb; bid uuid; j jsonb; seen text[] := ARRAY[]::text[]; batches jsonb[] := ARRAY[]::jsonb[]; skipped jsonb[] := ARRAY[]::jsonb[]; s jsonb; notes jsonb;
   allowed constant text[] := ARRAY['rf_design', 'acquisition', 'permits_hse', 'procurement', 'gecol', 'hlc', 'as_built', 'risks'];
   cutoff date := public.hw_waiver_cutoff();
-  regs jsonb := public.mina_route_regs(p_regs);   -- 0139: rule 4, the GECOL requests of the PR-PO sheet go to the GECOL sheet
+  regs jsonb := public.mina_route_regs(p_regs);   -- 0144: rule 4, the GECOL requests of the PR-PO sheet go to the GECOL sheet
 BEGIN
   IF actor IS NULL THEN RAISE EXCEPTION 'no signed-in actor' USING ERRCODE = 'insufficient_privilege'; END IF;
   -- the sheets the API could not read (missing, no Site ID column, too many rows ...): reported as skipped
@@ -839,7 +841,7 @@ BEGIN
     SELECT * INTO v FROM public.template_versions x WHERE x.template_def_id = d.id AND x.is_current;
     SELECT coalesce(array_agg(c ->> 'code'), ARRAY[]::text[]) INTO personal FROM jsonb_array_elements(v.columns) c
     WHERE c ->> 'header' ~* '(landlord|contact|phone|e-?mail)';
-    -- 0139: a row routed from another sheet keeps its sheet and its warnings (mina_warn, set by mina_route_regs only: the parts are cleaned of them first)
+    -- 0144: a row routed from another sheet keeps its sheet and its warnings (mina_warn, set by mina_route_regs only: the parts are cleaned of them first)
     SELECT coalesce(jsonb_agg(jsonb_strip_nulls(jsonb_build_object('row_no', (t.e ->> 'row_no')::int,
              'sheet', CASE WHEN coalesce((t.e ->> 'mina_routed')::boolean, false) THEN left(coalesce(nullif(t.e ->> 'sheet', ''), sheet), 60) ELSE sheet END,
              'site_code', left(nullif(btrim(t.e ->> 'site_code'), ''), 60), 'record_type', left(nullif(btrim(t.e ->> 'record_type'), ''), 40),
@@ -851,7 +853,7 @@ BEGIN
     WHERE jsonb_typeof(t.e) = 'object' AND (t.e ->> 'row_no') ~ '^[0-9]{1,7}$';
     IF n = 0 THEN
       skipped := array_append(skipped, jsonb_build_object('sheet', sheet, 'kind', 'register', 'ref', rk, 'reason', 'no_rows',
-        'detail', CASE WHEN coalesce((part -> 'mina_counts' ->> 'routed_to_gecol')::int, 0) > 0   -- 0139
+        'detail', CASE WHEN coalesce((part -> 'mina_counts' ->> 'routed_to_gecol')::int, 0) > 0   -- 0144
                        THEN 'Every row of the sheet was routed to the GECOL register (' || (part -> 'mina_counts' ->> 'routed_to_gecol') || ' row(s)).'
                        ELSE 'The sheet has no data rows.' END));
       CONTINUE;
@@ -861,7 +863,7 @@ BEGIN
       CONTINUE;
     END IF;
     u := jsonb_build_object('kind', 'register', 'sheet', sheet, 'ref', rk, 'template_id', d.template_id, 'version', v.version, 'checksum', v.header_checksum, 'rows', rows_)
-         || CASE WHEN jsonb_typeof(part -> 'mina_counts') = 'object' THEN jsonb_build_object('mina_counts', part -> 'mina_counts') ELSE '{}'::jsonb END;   -- 0139
+         || CASE WHEN jsonb_typeof(part -> 'mina_counts') = 'object' THEN jsonb_build_object('mina_counts', part -> 'mina_counts') ELSE '{}'::jsonb END;   -- 0144
     BEGIN
       res := public.imp_master_unit(u, p_run.file_name, p_run.file_sha256, p_mode, 'master_import', p_group, NULL, NULL);
       IF res ? 'batch' THEN
@@ -888,7 +890,7 @@ BEGIN
            'headers', CASE WHEN jsonb_typeof(x -> 'headers') = 'array' THEN (SELECT jsonb_agg(left(c #>> '{}', 80)) FROM (SELECT c FROM jsonb_array_elements(x -> 'headers') c LIMIT 60) q) END))), '[]'::jsonb)
     INTO notes
   FROM (SELECT x FROM jsonb_array_elements(CASE WHEN jsonb_typeof(regs -> 'notes') = 'array' THEN regs -> 'notes' ELSE '[]'::jsonb END) x WHERE jsonb_typeof(x) = 'object' LIMIT 100) y;
-  -- 0139: the notes of the Master rules of each register batch (counts only), in the same list
+  -- 0144: the notes of the Master rules of each register batch (counts only), in the same list
   SELECT notes || coalesce(jsonb_agg(jsonb_build_object('sheet', b ->> 'sheet', 'ref', b ->> 'ref', 'code', n2 ->> 'code', 'count', (n2 ->> 'count')::int)), '[]'::jsonb)
     INTO notes
   FROM unnest(batches) b, jsonb_array_elements(CASE WHEN jsonb_typeof(b -> 'import_notes') = 'array' THEN b -> 'import_notes' ELSE '[]'::jsonb END) n2;
@@ -900,7 +902,7 @@ BEGIN
 END $$;
 
 -- ---------------------------------------------------------------------------------------------------------------------
--- 10. The revert door (ao_current_matches and admin_override_revert: latest 0136_moved_past_site_rfi, changes marked 0139)
+-- 10. The revert door (ao_current_matches and admin_override_revert: latest 0136_moved_past_site_rfi, changes marked 0144)
 -- ---------------------------------------------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION ao_current_matches(p_id uuid) RETURNS boolean
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
@@ -932,7 +934,7 @@ BEGIN
     RETURN EXISTS (SELECT 1 FROM public.task_instances t WHERE t.id = o.task_id AND t.state = 'approved' AND t.manual_ms_moved_past
                    AND t.actual_date::text IS NOT DISTINCT FROM o.after ->> 'actual_date');
   END IF;
-  IF o.kind = 'master_na' THEN   -- 0139: the task is still N/A from the Master file
+  IF o.kind = 'master_na' THEN   -- 0144: the task is still N/A from the Master file
     RETURN EXISTS (SELECT 1 FROM public.task_instances t WHERE t.id = o.task_id AND t.state = 'na' AND t.master_na);
   END IF;
   FOR k IN SELECT jsonb_object_keys(o.after) LOOP
@@ -992,7 +994,7 @@ BEGIN
     PERFORM public.mmp_restore_task(o.task_id, actor, rs, 'the direct approval of a manual milestone the site moved past is taken back by a System Admin (revert of the override)', true);
     RETURN public.ao_override_json(o.id);
   END IF;
-  IF o.kind = 'master_na' THEN   -- 0139: the task is restored from the N/A of the Master file (locked again, opened when it can be; never marked by the rule again)
+  IF o.kind = 'master_na' THEN   -- 0144: the task is restored from the N/A of the Master file (locked again, opened when it can be; never marked by the rule again)
     PERFORM public.mina_restore_task(o.task_id, actor, rs, 'restored from N/A "N/A in the Master file" by a System Admin (revert of the override)', true);
     RETURN public.ao_override_json(o.id);
   END IF;

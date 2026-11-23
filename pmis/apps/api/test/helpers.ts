@@ -158,7 +158,7 @@ export async function superDbRfi(): Promise<PgClient> {
   return c;
 }
 
-/** Superuser connection to the Master import N/A and routing database (migration 0139; see global-setup). */
+/** Superuser connection to the Master import N/A and routing database (migration 0144; see global-setup). */
 export async function superDbMina(): Promise<PgClient> {
   const c = new PgClient({ connectionString: process.env.TEST_SUPER_URL_MINA });
   await c.connect();

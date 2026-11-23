@@ -227,7 +227,7 @@ export default async function setup(): Promise<() => Promise<void>> {
   const rfiDb = await buildDatabase(adminUrl, rfi, appPassword);
   process.env.TEST_DATABASE_URL_RFI = rfiDb.appUrl;
   process.env.TEST_SUPER_URL_RFI = rfiDb.superUrl;
-  // The Master import N/A and routing database (migration 0139): the suite opens the historical-load waiver, sets the Order Status rule of the Master import
+  // The Master import N/A and routing database (migration 0144): the suite opens the historical-load waiver, sets the Order Status rule of the Master import
   // and reads the GECOL, Procurement and Acquisition records and the overrides of its sites, so it shares no database.
   const mina = `${dbName}_mina`;
   const minaDb = await buildDatabase(adminUrl, mina, appPassword);

@@ -1,5 +1,5 @@
 -- The Master import reads "Pending" and "N/A" as the owner means them, skips placeholder rows, routes the GECOL requests of PR-PO to GECOL, derives an empty
--- Order Status and selects the one candidate with a contract sign-off (migration 0139, owner decisions 2026-11-22, contract 0.15.53). The rules live only in
+-- Order Status and selects the one candidate with a contract sign-off (migration 0144, owner decisions 2026-11-22, contract 0.15.58). The rules live only in
 -- definer code: mina_* and the wrapped staging functions are internal (owner pmis_definer, PUBLIC revoked, nothing granted to pmis_app); the flag
 -- task_instances.master_na is written only under the definer AND its definer-only marker row (guard mina_guard_task; a GUC alone never passes); the batch notes
 -- (import_batches.import_notes) and the rule setting (imports.master_order_status_derived, guarded by settings_guarded_keys) are not writable by pmis_app; the
@@ -48,7 +48,7 @@ SELECT imp_master_unit('{"kind": "register", "rows": []}'::jsonb, 'x.xlsx', repe
 -- @actor ALICE
 -- @region 1
 -- @expect error 42501 permission denied
-SELECT imp_master_unit_pre_0139('{"kind": "register", "rows": []}'::jsonb, 'x.xlsx', repeat('a', 64), 'submit', 'master_template', NULL, NULL, NULL);
+SELECT imp_master_unit_pre_0144('{"kind": "register", "rows": []}'::jsonb, 'x.xlsx', repeat('a', 64), 'submit', 'master_template', NULL, NULL, NULL);
 -- @end
 
 -- @case MINA-06
@@ -109,7 +109,7 @@ WITH f AS (
   WHERE n.nspname = 'public' AND p.proname IN ('mina_token', 'mina_list_has', 'mina_blank', 'mina_cnt', 'mina_clean_row', 'mina_notes_add', 'mina_na_check',
     'mina_reason_text', 'mina_rights_check', 'mina_prep_task_row', 'mina_route_gecol', 'mina_route_regs', 'mina_prep_register_unit', 'mina_mark_task', 'mina_apply_batch',
     'mina_restore_task', 'imp_master_plan', 'imp_master_unit', 'imp_stream_eval', 'imp_stream_close', 'imp_submit_stream_finish',
-    'imp_master_plan_pre_0139', 'imp_master_unit_pre_0139', 'imp_stream_eval_pre_0139', 'imp_stream_close_pre_0139', 'imp_submit_stream_finish_pre_0139',
+    'imp_master_plan_pre_0144', 'imp_master_unit_pre_0144', 'imp_stream_eval_pre_0144', 'imp_stream_close_pre_0144', 'imp_submit_stream_finish_pre_0144',
     'hrg_stage_registers')
 ), g AS (
   SELECT p.prosecdef, coalesce(p.proconfig::text, '') AS cfg, has_function_privilege('pmis_app', p.oid, 'EXECUTE') AS app, pg_get_userbyid(p.proowner) AS owner

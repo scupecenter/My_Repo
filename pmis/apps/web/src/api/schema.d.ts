@@ -4481,7 +4481,7 @@ export interface paths {
         put?: never;
         /**
          * Decide for one task, one site, or all open tasks of a person (B12b)
-         * @description Needs the `reassign` grant for the module and region, or admin. Keeps all entered data, documents and comments. It does not reset or pause the SLA (its start date and version stay) or stage progress. The Matrix is not changed. If the caller takes over a level and also holds the next one, the skip rule and the self-approval rule apply (a final approval then needs step-up on the transition itself). `dry_run` previews. One request is one audit group (`bulk_action_id`).
+         * @description Needs the `reassign` grant for the module and region, or admin. Keeps all entered data, documents and comments. It does not reset or pause the SLA (its start date and version stay) or stage progress. The Matrix is not changed. If the caller takes over a level and also holds the next one, the skip rule and the self-approval rule apply (a final approval then needs step-up on the transition itself). `dry_run` previews. One request is one audit group (`bulk_action_id`). 0.15.54 a `to_user_id` that is inactive, absent today or the person the tasks are on is refused with 422 `not_eligible_holder`; with `scope` = `task` the refusal of the one task is the answer (422 `not_eligible_holder`, 409 `invalid_transition`).
          */
         post: operations["reassignTasks"];
         delete?: never;
@@ -4502,7 +4502,7 @@ export interface paths {
         /**
          * Act on the task's current level on behalf of its assignee (B12b choice 3)
          * @description For a Team Lead (the `reassign` grant for the module and region) or a System Admin. Performs `action` at the current level instead of its holder.
-         *     `reason` is mandatory. `level` must equal the task's current level, else 409 `invalid_transition`. Nothing is reset: SLA start and version, stage progress, entered data and documents stay (B12b).
+         *     `reason` is mandatory. `level` must equal the task's current level, else 409 `invalid_transition`. 0.15.54 a level on nobody (no single holder) answers 409 `invalid_transition`; the caller must lead the holder (every region of the holder is the caller's, else 403). Nothing is reset: SLA start and version, stage progress, entered data and documents stay (B12b).
          *     The normal rules apply unchanged: a level the caller also holds next is skipped and logged (`skipped_levels`), and if the caller ends up holding every level the result is a self-approval (B5, flagged in KPIs and the Audit Log, step-up needed). `reject` needs `note` (422 `note_required`).
          *     Audit and `WorkflowStep` record the step as "lead on behalf of the assignee": `acted_by` = caller, `on_behalf_of` = the person who held the level, `on_behalf_kind` = `assignee`.
          */
@@ -4522,7 +4522,7 @@ export interface paths {
         };
         /**
          * People who may receive the task(s)
-         * @description Eligible = would be a valid holder of the level in the Responsibility Matrix, region and module. Pass `task_id`, or `site_id` with `from_user_id`, or `from_user_id` alone.
+         * @description Eligible = would be a valid holder of the level in the Responsibility Matrix, region and module. Pass `task_id`, or `site_id` with `from_user_id`, or `from_user_id` alone. 0.15.54 active people only, never someone absent today or the person the task is on; with `from_user_id`, anyone eligible for at least one of that person's open tasks in the regions the caller leads. Only for a lead (the `reassign` grant for the task's region) or a System Admin.
          */
         get: operations["listEligibleReassignees"];
         put?: never;
@@ -4542,7 +4542,7 @@ export interface paths {
         };
         /**
          * Tasks that need a lead decision (absent holder or idle)
-         * @description A task shows when its holder has an active absence, when it has had no activity for `working_days` (setting), or when its holder's account is deactivated or deleted (`holder_deactivated`, B14). Scoped to the caller's modules and regions.
+         * @description A task shows when the person it is on has an active absence today, when it has had no activity for the idle limit (0.15.54 the dashboard setting `stale_idle_days`, default 2 working days), or when the person it is on has a deactivated or deleted account (`holder_deactivated`, B14). 0.15.54 a task is on a person when its current level is pinned to them, else when they are the only eligible holder of the level, else (nobody eligible) when the Matrix cell names their deactivated or deleted account. A `keep` or `act_on_behalf` decision silences the absent and deactivated alerts of the task for the idle window. Only for a lead (the `reassign` grant) or a System Admin (else 403), scoped to the regions the caller leads and sees.
          */
         get: operations["listReassignmentAlerts"];
         put?: never;
@@ -10870,7 +10870,7 @@ export interface components {
             task_id?: string | null;
             /** Format: uuid */
             site_id?: string;
-            /** @description `edit_date` for a task, `site_edit` for a site. 0.15.38: `historical_no_source_na` for a task made N/A "historical load: no source" by the historical Master load (migration 0126); its revert restores the task. 0.15.39: `historical_gate_open` (entity `site`) for a phase gate opened because the site moved past it, and `historical_inferred_date` (entity `task`) for a milestone approved with the date of the earliest later task ("inferred date — historical load"), both by the historical Master load (migration 0127); their revert closes the gate again or reopens the milestone without a date. 0.15.40: `historical_manual_ms_approved` (entity `task`) for a manual milestone (Site RFI) the site moved past, approved directly with its pre-filled date (or the inferred one, `after.date_source`) by the historical Master load (migration 0129); its revert reopens it with its pre-filled date. 0.15.44: `gate_moved_past_open` (entity `site`) for a phase gate opened because the site moved past it, on any site, and `no_microwave_na` (entity `task`) for MW alignment (D8) made N/A because the approved TE installation (D6) has no MW antenna; both are made by a rule of GSDN Workspace (owner decisions 2026-11-22, migration 0134, no `acted_by`); their revert closes the gate again or restores D8. 0.15.52: `manual_ms_moved_past` (entity `task`) for a manual milestone (Site RFI) the site moved past, approved directly with its pre-filled date (or the inferred one, `after.date_source`) by a rule of GSDN Workspace on any site (owner decision 2026-11-22, migration 0136, no `acted_by`); its revert reopens it with its pre-filled date. 0.15.53: `master_na` (entity `task`) for a task made N/A because its actual date is N/A in the Master file (migration 0139, no `acted_by`); its revert restores the task and the rule never applies again. */
+            /** @description `edit_date` for a task, `site_edit` for a site. 0.15.38: `historical_no_source_na` for a task made N/A "historical load: no source" by the historical Master load (migration 0126); its revert restores the task. 0.15.39: `historical_gate_open` (entity `site`) for a phase gate opened because the site moved past it, and `historical_inferred_date` (entity `task`) for a milestone approved with the date of the earliest later task ("inferred date — historical load"), both by the historical Master load (migration 0127); their revert closes the gate again or reopens the milestone without a date. 0.15.40: `historical_manual_ms_approved` (entity `task`) for a manual milestone (Site RFI) the site moved past, approved directly with its pre-filled date (or the inferred one, `after.date_source`) by the historical Master load (migration 0129); its revert reopens it with its pre-filled date. 0.15.44: `gate_moved_past_open` (entity `site`) for a phase gate opened because the site moved past it, on any site, and `no_microwave_na` (entity `task`) for MW alignment (D8) made N/A because the approved TE installation (D6) has no MW antenna; both are made by a rule of GSDN Workspace (owner decisions 2026-11-22, migration 0134, no `acted_by`); their revert closes the gate again or restores D8. 0.15.52: `manual_ms_moved_past` (entity `task`) for a manual milestone (Site RFI) the site moved past, approved directly with its pre-filled date (or the inferred one, `after.date_source`) by a rule of GSDN Workspace on any site (owner decision 2026-11-22, migration 0136, no `acted_by`); its revert reopens it with its pre-filled date. 0.15.58: `master_na` (entity `task`) for a task made N/A because its actual date is N/A in the Master file (migration 0144, no `acted_by`); its revert restores the task and the rule never applies again. */
             kind: string;
             reason: string;
             before?: {
@@ -10879,7 +10879,7 @@ export interface components {
             after?: {
                 [key: string]: unknown;
             };
-            /** @description 0.15.44: absent for an override made by a rule of GSDN Workspace (`gate_moved_past_open`, `no_microwave_na`; 0.15.52: `manual_ms_moved_past`; 0.15.53: `master_na`). */
+            /** @description 0.15.44: absent for an override made by a rule of GSDN Workspace (`gate_moved_past_open`, `no_microwave_na`; 0.15.52: `manual_ms_moved_past`; 0.15.58: `master_na`). */
             acted_by?: components["schemas"]["UserRef"];
             on_behalf_of?: components["schemas"]["UserRef"];
             /** Format: date-time */
@@ -12396,7 +12396,7 @@ export interface components {
             part_sheet?: string | null;
             /** @description The last note of a return. */
             note?: string | null;
-            /** @description 0.15.53: informational notes of a Master staging (counts only, never a value); empty for every other batch. */
+            /** @description 0.15.58: informational notes of a Master staging (counts only, never a value); empty for every other batch. */
             import_notes?: components["schemas"]["ImportNote"][];
             /**
              * @description Q206 (0.12.8): `submit` enters and submits every row; `draft` (Save Draft / Planning) saves the rows without submission.
@@ -12650,7 +12650,7 @@ export interface components {
             /** Format: date-time */
             finished_at?: string | null;
         };
-        /** @description 0.15.53: one informational note of a Master staging (migration 0139). */
+        /** @description 0.15.58: one informational note of a Master staging (migration 0144). */
         ImportNote: {
             /** @description `pending_as_empty`, `na_as_empty`, `na_task_requested`, `na_task_not_applicable`, `na_task_marked`, `na_task_not_marked`, `placeholder_rows_skipped`, `routed_to_gecol`, `routed_from_procurement`, `order_status_derived`, `order_status_not_derived`, `selected_set_by_import`, `selection_date_from_contract`, `selected_not_set`. */
             code: string;
@@ -12693,7 +12693,7 @@ export interface components {
                 approved?: number;
                 /** @description 0.15.11: rows that change nothing (the register or the task already holds these values). */
                 skipped?: number;
-                /** @description 0.15.53: the notes of the Master rules of the batch (counts only). */
+                /** @description 0.15.58: the notes of the Master rules of the batch (counts only). */
                 import_notes?: components["schemas"]["ImportNote"][];
             }[];
             /** @description 0.15.11: the apply approved the submitted rows directly (historical load, admin override). */
@@ -12714,7 +12714,7 @@ export interface components {
                 /** @description Rows already sent whose task or record still waits for L2 (they keep that path). */
                 rows_sent_open?: number;
             }[];
-            /** @description 0.15.11: notes on the reading of the register sheets (never blocking): counts, cell addresses and header names only, never a value. Codes: `date_day_first_assumed`, `not_normalised`, `outside_list`, `cell_error_blank`, `master_header_not_found`, `map_unknown_template_header`; 0.15.53 adds the codes of `ImportNote` for the register batches. */
+            /** @description 0.15.11: notes on the reading of the register sheets (never blocking): counts, cell addresses and header names only, never a value. Codes: `date_day_first_assumed`, `not_normalised`, `outside_list`, `cell_error_blank`, `master_header_not_found`, `map_unknown_template_header`; 0.15.58 adds the codes of `ImportNote` for the register batches. */
             register_notes?: {
                 sheet?: string;
                 ref?: string;
@@ -25589,6 +25589,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             422: components["responses"]["Unprocessable"];
         };
     };

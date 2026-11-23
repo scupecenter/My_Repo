@@ -11,7 +11,7 @@ import { SITE_ENTRY_GRANTS } from './tpl-stream-helpers';
 import { Actor, Site, actor, addAssignment, makeSite, makeTask, plainAdmin, setCell } from './wf-helpers';
 
 /**
- * Migration 0139 (owner decisions 2026-11-22), on the Master import only:
+ * Migration 0144 (owner decisions 2026-11-22), on the Master import only:
  *   1. "Pending" in a date, number or list cell is an empty cell (no error), counted in the batch notes;
  *   2. "N/A" in the task's actual date column makes the task N/A when the batch is sent (admin override by rule, kind master_na, revertible, never applied
  *      again after a revert; never a task with a human step, a date, approved, or held by a gate); N/A in any other date, number or list column is empty;
@@ -106,7 +106,7 @@ async function onAirSite(prefix: string): Promise<Site> {
   return s;
 }
 
-describe('0139: the Master sheet reads "Pending" and "N/A" as the owner means them', () => {
+describe('0144: the Master sheet reads "Pending" and "N/A" as the owner means them', () => {
   let admin: Actor;
   let s1: Site;
   let streamBatch: string;
@@ -198,7 +198,7 @@ describe('0139: the Master sheet reads "Pending" and "N/A" as the owner means th
     try {
       for (const sql of [`SELECT mina_mark_task(gen_random_uuid(), gen_random_uuid(), gen_random_uuid(), 'x')`, `SELECT mina_apply_batch(gen_random_uuid())`,
         `SELECT mina_restore_task(gen_random_uuid(), gen_random_uuid(), 'x', 'x', true)`, `SELECT mina_prep_register_unit('{}'::jsonb)`,
-        `SELECT mina_route_regs('{}'::jsonb)`, `SELECT mina_notes_add(gen_random_uuid(), '{}'::jsonb)`, `SELECT imp_master_unit_pre_0139('{}'::jsonb, 'x', 'x', 'submit', 'x', NULL, NULL, NULL)`]) {
+        `SELECT mina_route_regs('{}'::jsonb)`, `SELECT mina_notes_add(gen_random_uuid(), '{}'::jsonb)`, `SELECT imp_master_unit_pre_0144('{}'::jsonb, 'x', 'x', 'submit', 'x', NULL, NULL, NULL)`]) {
         await expect(app2.query(sql)).rejects.toThrow(/permission denied/);
       }
       await expect(app2.query(`UPDATE task_instances SET master_na = true, master_na_at = now()`)).rejects.toThrow(/permission denied/);
@@ -220,7 +220,7 @@ describe('0139: the Master sheet reads "Pending" and "N/A" as the owner means th
   });
 });
 
-describe('0139 (security review): the N/A of the Master file needs the rights of an entry of the task, at the staging and at the send (TPL-MASTER upload)', () => {
+describe('0144 (security review): the N/A of the Master file needs the rights of an entry of the task, at the staging and at the send (TPL-MASTER upload)', () => {
   const SSV = 'SSV / SSV Date';
   const OTHER = 2;
   async function upload(a: Actor, siteCode: string): Promise<{ id: string; version: number }> {
@@ -294,7 +294,7 @@ describe('0139 (security review): the N/A of the Master file needs the rights of
   });
 });
 
-describe('0139: the register sheets of the Master import', () => {
+describe('0144: the register sheets of the Master import', () => {
   it('placeholders skipped, GECOL requests of PR-PO routed to GECOL, Order Status derived, the one candidate with a sign-off selected; another selected candidate keeps the error', async () => {
     const admin = await plainAdmin(app, db);
     for (const k of ['gecol', 'procurement', 'acquisition', 'hlc']) await regCell(db, k, R, 'entry', { user: [admin.user.id] });
