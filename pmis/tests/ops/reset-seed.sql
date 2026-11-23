@@ -54,6 +54,7 @@ INSERT INTO user_totp (user_id, required) VALUES (pg_temp.i('user2'), true);
 INSERT INTO user_recovery_codes (user_id, code_hash) VALUES (pg_temp.i('user2'), repeat('ab', 32)), (pg_temp.i('user2'), repeat('cd', 32));
 INSERT INTO groups (id, name) VALUES (pg_temp.i('group'), 'CW Approvers Tripoli (synthetic)');
 INSERT INTO group_members (group_id, user_id) VALUES (pg_temp.i('group'), pg_temp.i('user2'));
+INSERT INTO absences (user_id, kind, from_date, to_date, recorded_by) VALUES (pg_temp.i('user2'), 'annual', date '2026-12-01', date '2026-12-05', pg_temp.i('user2'));
 INSERT INTO user_sessions (token_hash, user_id, auth_method, csrf_token, expires_at) VALUES
   (repeat('1', 64), pg_temp.i('admin'), 'local', 'csrf-1', now() + interval '1 hour'),
   (repeat('2', 64), pg_temp.i('user2'), 'local', 'csrf-2', now() + interval '1 hour');
@@ -145,6 +146,8 @@ INSERT INTO quality_inspections (record_code, record_type, site_id, region_id) V
 INSERT INTO readiness_handover (site_id, region_id) VALUES (pg_temp.i('site1'), 1);
 INSERT INTO as_built_records (site_id, region_id, quantities) VALUES (pg_temp.i('site1'), 1, '{}');
 INSERT INTO task_level_voters (task_id, level, round, user_id) SELECT id, 2, 1, pg_temp.i('admin') FROM t1;
+INSERT INTO task_cover_decisions (bulk_action_id, task_id, region_id, decision, level, from_user_id, to_user_id, decided_by, reason)
+SELECT gen_random_uuid(), id, 1, 'reassign', 1, pg_temp.i('user2'), pg_temp.i('admin'), pg_temp.i('admin'), 'synthetic cover' FROM t1;
 INSERT INTO levels_conversions (entity_type, entity_id, converted_at, levels_before, migration, reason) SELECT 'task', id, now(), 3, '0054', 'synthetic' FROM t1;
 
 -- warehouse movements and stock (the item master stays)

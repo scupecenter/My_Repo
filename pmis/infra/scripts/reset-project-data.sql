@@ -106,6 +106,7 @@ SELECT t, 'keep', 'true' FROM unnest(ARRAY[
   'user_invitations', 'roles', 'role_default_regions', 'role_default_modules', 'role_aliases', 'user_role_assignments', 'user_role_assignment_regions',
   'user_role_assignment_modules', 'user_role_assignment_profiles', 'permission_profiles', 'permission_grants', 'field_permissions', 'groups',
   'group_members', 'delegations', 'delegation_grants', 'delegation_regions', 'departments', 'pmis_context_keys',
+  'absences',   -- staff absence records (0140): about people, not sites; KEEP (docs/ops/data-reset.md, Open)
   -- configuration
   'workflow_definitions', 'workflow_streams', 'workflow_views', 'workflow_view_members', 'stage_definitions', 'task_definitions', 'task_predecessors',
   'phase_gate_rules', 'scenario_task_rules', 'scenario_rule_state', 'sla_rules', 'sla_rule_sets', 'sla_rule_set_items', 'sla_master_columns',
@@ -152,7 +153,7 @@ INSERT INTO reset_plan (tbl, action, keep_where) VALUES
 
 INSERT INTO reset_plan (tbl, action, keep_where)
 SELECT t, 'delete', 'false' FROM unnest(ARRAY[
-  'sites', 'clusters', 'task_instances', 'workflow_steps', 'task_level_actors', 'task_level_voters', 'task_delay_periods', 'admin_overrides',
+  'sites', 'clusters', 'task_instances', 'task_cover_decisions', 'workflow_steps', 'task_level_actors', 'task_level_voters', 'task_delay_periods', 'admin_overrides',
   'site_gate_state', 'site_gate_events', 'site_scope_exceptions', 'site_snapshots', 'site_workflow_migrations', 'site_drafts', 'baseline_versions',
   'baseline_entries', 'change_requests', 'rf_design_records', 'acquisition_candidates', 'procurement_records', 'gecol_records', 'hlc_records',
   'hlc_pr_links', 'hlc_legacy_migrations', 'permit_records', 'quality_inspections', 'issues', 'risks', 'readiness_handover', 'as_built_records',
@@ -283,6 +284,7 @@ DELETE FROM public.site_gate_state;
 DELETE FROM public.admin_overrides;
 DELETE FROM public.task_level_actors;
 DELETE FROM public.task_level_voters;
+DELETE FROM public.task_cover_decisions;
 DELETE FROM public.workflow_steps;
 DELETE FROM public.task_instances;
 DELETE FROM public.site_workflow_migrations;
