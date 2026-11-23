@@ -4,6 +4,7 @@ import { AccessService } from "../access/access.service";
 import type { AuthContext } from "../auth/auth.types";
 import { Query } from "../common/query";
 import { DbService } from "../db/db.service";
+import { FilterCatalogService } from "../views/filter-catalog.service";
 import { SCENARIOS, dashboardParams } from "./dashboard.service";
 import {
   aggregateGaps,
@@ -84,6 +85,7 @@ export class DashboardExtrasService {
   constructor(
     private readonly db: DbService,
     private readonly access: AccessService,
+    private readonly filters: FilterCatalogService,
   ) {}
 
   async get(_auth: AuthContext, q: Query): Promise<Record<string, unknown>> {
@@ -96,8 +98,11 @@ export class DashboardExtrasService {
     const sitesOk = sitesRegions === null || sitesRegions.length > 0;
     const risksOk = risksRegions === null || risksRegions.length > 0;
 
+    // 0.15.45: the AND/OR filter (screen `dashboard`, the sites fields) narrows the site-based sections like the filters below; the risk matrix has no site filter
+    const adv = await this.filters.fromQuery('dashboard', q);
     const siteWhere = Prisma.sql`
       ${sitesScope === null ? Prisma.empty : Prisma.sql`AND s.region_id = ANY(${sitesScope}::int[])`}
+      ${adv ? Prisma.sql`AND ${adv}` : Prisma.empty}
       ${p.region_id ? Prisma.sql`AND s.region_id = ${p.region_id}` : Prisma.empty}
       ${p.cluster_code ? Prisma.sql`AND c.cluster_code = ${p.cluster_code}` : Prisma.empty}
       ${p.scenario ? Prisma.sql`AND s.delivery_scenario = ${p.scenario}::"DeliveryScenario"` : Prisma.empty}`;

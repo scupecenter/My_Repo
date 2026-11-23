@@ -99,25 +99,33 @@ describe('Dashboard', () => {
     expect(screen.getByTestId('dash-sites-total').getAttribute('href')).toBe('/sites?cluster_code=CL-TR-01');
   });
 
-  it('filters by region, cluster, scenario and stream through the URL, and resets', async () => {
+  it('filters by region and stream through the URL (the region shows as a chip of the unified filter), and resets', async () => {
     await signIn('pm');
     const u = userEvent.setup();
     const seen: string[] = [];
     server.events.on('request:start', ({ request }) => { if (new URL(request.url).pathname.endsWith('/dashboard')) seen.push(new URL(request.url).search); });
-    page();
+    page('/dashboard?region_id=5');
     await screen.findByTestId('dash-progress-value');
-    await u.selectOptions(screen.getByTestId('dash-filter-region'), '5');
+    expect(await screen.findByTestId('filter-chip-x-region_id')).toBeInTheDocument();
+    expect(screen.queryByTestId('dash-filter-region')).toBeNull(); // the separate selects are gone
     await waitFor(() => expect(seen.some((s) => s.includes('region_id=5'))).toBe(true));
     await u.selectOptions(await screen.findByTestId('dash-filter-stream'), 'TE');
     await waitFor(() => expect(seen.some((s) => s.includes('stream=TE') && s.includes('region_id=5'))).toBe(true));
     await waitFor(() => expect(within(screen.getByTestId('dash-pipeline')).queryByTestId('pipe-node-MS1')).toBeNull());
     expect(screen.getByTestId('dash-central-hidden')).toHaveTextContent('14');
-    await u.selectOptions(screen.getByTestId('dash-filter-scenario'), 'expansion');
-    await u.selectOptions(screen.getByTestId('dash-filter-cluster'), 'CL-TR-01');
-    await waitFor(() => expect(seen.some((s) => s.includes('scenario=expansion') && s.includes('cluster_code=CL-TR-01'))).toBe(true));
     await u.click(screen.getByTestId('dash-reset'));
     await waitFor(() => expect(screen.queryByTestId('dash-reset')).toBeNull());
-    expect((screen.getByTestId('dash-filter-region') as HTMLSelectElement).value).toBe('');
+    expect(screen.queryByTestId('filter-chip-x-region_id')).toBeNull();
+  });
+
+  it('keeps the cluster and scenario links as chips and sends them with the request', async () => {
+    await signIn('pm');
+    const seen: string[] = [];
+    server.events.on('request:start', ({ request }) => { if (new URL(request.url).pathname.endsWith('/dashboard')) seen.push(new URL(request.url).search); });
+    page('/dashboard?scenario=expansion&cluster_code=CL-TR-01');
+    expect(await screen.findByTestId('filter-chip-x-scenario')).toHaveTextContent('Scenario: Expansion');
+    expect(screen.getByTestId('filter-chip-x-cluster_code')).toHaveTextContent('Cluster: CL-TR-01');
+    await waitFor(() => expect(seen.some((s) => s.includes('scenario=expansion') && s.includes('cluster_code=CL-TR-01'))).toBe(true));
   });
 
   it('changes the reference date: a date with a snapshot says so, another says it is computed, and Today goes back to live', async () => {

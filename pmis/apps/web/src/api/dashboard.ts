@@ -26,6 +26,8 @@ export interface DashboardQuery {
   scenario?: string;
   stream?: string;
   view?: string;
+  /** 0.15.45: the unified filter tree (JSON of the sites tree, screen `dashboard`), applied by every dashboard endpoint beside the other filters */
+  filter?: string;
 }
 
 export type ExportFormat = 'xlsx' | 'csv';
@@ -48,7 +50,7 @@ export type DashboardExtras = S['DashboardExtras'];
 export type DashboardRiskItem = S['DashboardRiskItem'];
 /** Read only. The same region, cluster and scenario filters as the dashboard; the sections are not dated. */
 export const useDashboardExtras = (q: DashboardQuery, enabled = true) => {
-  const query = clean({ region_id: q.region_id, cluster_code: q.cluster_code, scenario: q.scenario });
+  const query = clean({ region_id: q.region_id, cluster_code: q.cluster_code, scenario: q.scenario, filter: q.filter });
   return useQuery({
     queryKey: ['dashboard-extras', query],
     staleTime: 30_000,
@@ -62,8 +64,8 @@ export const useDashboardExtras = (q: DashboardQuery, enabled = true) => {
 export type SiteMap = S['SiteMap'];
 export type SiteMapItem = S['SiteMapItem'];
 /** The sites of the map: the caller's dashboard.view regions that are also sites.view regions. Filters are applied in the browser (lib/siteMap). */
-export const useSiteMap = (enabled = true) =>
-  useQuery({ queryKey: ['dashboard-site-map'], staleTime: 60_000, enabled, queryFn: () => api.get<SiteMap>('/dashboard/site-map') });
+export const useSiteMap = (enabled = true, filter = '') =>
+  useQuery({ queryKey: ['dashboard-site-map', filter], staleTime: 60_000, enabled, queryFn: () => api.get<SiteMap>('/dashboard/site-map', { query: filter ? { filter } : {} }) });
 
 // ---------------------------------------------------------------- Q118: manual percentage of the central Project Status items
 export const useManualItems = () =>

@@ -58,7 +58,11 @@ export type FilterField = S['FilterField'];
 export type FilterFieldList = S['FilterFieldList'];
 
 /** The screens whose lists accept the `filter` parameter (the others keep their simple filters). */
-export const hasFilterBuilder = (screen: string) => screen === 'sites' || screen === 'sites-stream' || screen === 'site-tasks' || /^register-[a-z0-9_]{2,60}$/.test(screen);
+export const hasFilterBuilder = (screen: string) =>
+  screen === 'sites' || screen === 'sites-stream' || screen === 'site-tasks' || screen === 'tasks-board' || screen === 'dashboard' || /^register-[a-z0-9_]{2,60}$/.test(screen) || /^site360-[a-z0-9_]{2,40}$/.test(screen);
+
+/** 0.15.45: a field also carries its `group` (key and two labels) and `truncated` (the option list was cut; the search narrows it). */
+export type UnifiedField = FilterField;
 
 /** The whitelist of the screen for the caller (the server leaves hidden fields out). */
 export const useFilterFields = (screen: string, enabled = true) =>

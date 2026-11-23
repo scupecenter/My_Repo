@@ -36,6 +36,7 @@ import {
 } from "@/api/registers";
 import { decodeFilter, encodeFilter, type FilterTree } from "@/api/views";
 import { useRegions } from "@/api/sites";
+import type { ExtraField } from "@/components/UnifiedFilter";
 import type { RegisterDefinition, RegisterRecord } from "@/api/types";
 import { ExportViewButton } from "@/components/ExportDialog";
 import { GridCellEditor, INLINE_TYPES } from "@/components/GridCellEditor";
@@ -81,7 +82,6 @@ import { registerErrorMessage } from "@/lib/registerErrors";
 import { isLive, OWNER_NOTE } from "@/lib/registerForms";
 
 const RF_KEYS = ["q", "region_id", "state", "record_type"] as const;
-const STATES = ["entry", "in_review", "in_approval", "approved", "voided"];
 const VIEW_EMPTY: RecordFilters = {
   q: "",
   region_id: "",
@@ -96,8 +96,8 @@ const SavedViews = lazy(() =>
   })),
 );
 // F3 (0.15.31): the AND/OR filter builder loads with the saved views.
-const FilterBuilder = lazy(() =>
-  import("@/components/FilterBuilder").then((m) => ({ default: m.FilterBuilder })),
+const UnifiedFilter = lazy(() =>
+  import("@/components/UnifiedFilter").then((m) => ({ default: m.UnifiedFilter })),
 );
 
 export function RegisterSoon({ name }: { name: string }) {
@@ -183,6 +183,15 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
   const [legacy, setLegacy] = useState(false); // 0063 (Q139): the one-time migration of the legacy HLC requests
   // The saved-views control mounts once the first page has settled; the list keeps its previous data, so a filter change does not unmount it.
   const viewsReady = !list.isPending;
+  // The unified filter (owner request 2026-11-22): region and state are fields of the register list; the older URL parameters stay as chips so links and saved views keep working.
+  const regionName = (id: string) => { const r = regions.data?.find((x) => x.id === Number(id)); return (i18n.language === "ar" && r?.name_ar) || r?.name_en || id; };
+  const filterExtras: ExtraField[] = [
+    { key: "region_id", label: t("sites.all_regions"), kind: "text", hidden: true, value: f.region_id, set: set("region_id"), chip: `${t("sites.region")}: ${f.region_id ? regionName(f.region_id) : ""}` },
+    { key: "state", label: t("registers.all_states"), kind: "text", hidden: true, value: f.state, set: set("state"), chip: `${t("registers.state")}: ${f.state ? t(`regState.${f.state}`) : ""}` },
+    ...(def.record_types?.length && !tabDefs.length
+      ? [{ key: "record_type", label: t("registers.record_type"), group: "fields", kind: "enum" as const, options: def.record_types.map((x) => ({ value: x, label: x.toUpperCase() })), value: f.record_type, set: set("record_type") }]
+      : []),
+  ];
   const items = list.data?.pages.flatMap((p) => p.items) ?? [];
   const total = list.data?.pages[0]?.page.total ?? items.length;
   // The catalogue only lists fields the caller may see, so a permission-hidden field never becomes a column (plan G1).
@@ -556,10 +565,12 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
                     })
                   }
                 />
-                <FilterBuilder
+                <UnifiedFilter
                   screen={`register-${key}`}
                   value={advTree}
                   onChange={(tree) => setParams({ adv: encodeFilter(tree) })}
+                  onClearAll={clearAll}
+                  extras={filterExtras}
                 />
               </Suspense>
             )}
@@ -571,50 +582,6 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
               value={f.q}
               onChange={(e) => set("q")(e.target.value)}
             />
-            <select
-              className="input w-auto"
-              aria-label={t("sites.all_regions")}
-              data-testid="register-filter-region"
-              value={f.region_id}
-              onChange={(e) => set("region_id")(e.target.value)}
-            >
-              <option value="">{t("sites.all_regions")}</option>
-              {(regions.data ?? []).map((r) => (
-                <option key={r.id} value={r.id}>
-                  {(i18n.language === "ar" && r.name_ar) || r.name_en}
-                </option>
-              ))}
-            </select>
-            <select
-              className="input w-auto"
-              aria-label={t("registers.all_states")}
-              data-testid="register-filter-state"
-              value={f.state}
-              onChange={(e) => set("state")(e.target.value)}
-            >
-              <option value="">{t("registers.all_states")}</option>
-              {STATES.map((s) => (
-                <option key={s} value={s}>
-                  {t(`regState.${s}`)}
-                </option>
-              ))}
-            </select>
-            {!!def.record_types?.length && (
-              <select
-                className="input w-auto"
-                aria-label={t("registers.record_type")}
-                data-testid="register-filter-type"
-                value={f.record_type}
-                onChange={(e) => set("record_type")(e.target.value)}
-              >
-                <option value="">{t("registers.all_types")}</option>
-                {def.record_types.map((x) => (
-                  <option key={x} value={x}>
-                    {x.toUpperCase()}
-                  </option>
-                ))}
-              </select>
-            )}
           </>
         }
         count={
