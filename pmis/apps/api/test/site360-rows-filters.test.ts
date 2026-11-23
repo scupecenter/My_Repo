@@ -90,7 +90,7 @@ describe('GET /site360/{menu}/rows: the filters of GET /sites', () => {
     const me = await actor(app, db, { regions: [REGION] });
     await setCell(db, 'B1', REGION, 'entry', { user: [me.user.id] });
     const other = await actor(app, db, { regions: [REGION] });
-    const ids = created.join(',');
+    const ids = [late.code, fine.code, open.code].join(','); // this fixture only: the earlier fixtures of the file hold open B1 work of the same region too
     const rows = async (who: typeof me) => rowCodes((await who.api.call('get', `/site360/master/rows?site_code=${ids}&limit=200&bucket=mine`)).body);
     const mineList = async (who: typeof me) => listCodes((await who.api.call('get', `/sites?site_codes=${ids}&limit=200&bucket=mine`)).body);
     expect(await rows(me)).toEqual([fine.code, late.code].sort());
@@ -100,9 +100,9 @@ describe('GET /site360/{menu}/rows: the filters of GET /sites', () => {
   });
 
   it('combines with the other filters and refuses an unknown value', async () => {
-    const { late } = await fixture();
+    const { late, fine, open } = await fixture();
     const a = await actor(app, db, { regions: [REGION] });
-    const ids = created.join(',');
+    const ids = [late.code, fine.code, open.code].join(','); // this fixture only, earlier fixtures have late sites too
     const ok = await a.api.call('get', `/site360/master/rows?site_code=${ids}&limit=200&bucket=late&stage_code=MS2&workflow_locks=locked&scenario=new_build&region_id=${REGION}`);
     expect(ok.status).toBe(200);
     expect(rowCodes(ok.body)).toEqual([late.code]);
