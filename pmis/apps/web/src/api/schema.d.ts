@@ -4325,7 +4325,7 @@ export interface paths {
         };
         /**
          * Hover-card payload for one person
-         * @description Any signed-in employee may read a card. The server applies the field-visibility settings and the per-employee hide; hidden fields come back null and are named in `hidden_fields`. An inactive person is still returned, with status `inactive`.
+         * @description Any signed-in employee may read a card. The server applies the field-visibility settings and the per-employee hide; hidden fields come back null and are named in `hidden_fields`. An inactive person is still returned, with status `inactive`. Since 0.15.56 the database decides (a registry administrator, the System Admin or an all-regions holder of `users.edit`, sees both fields); an ID that is not 4 digits or not in the registry is 404.
          */
         get: operations["getStaffMember"];
         put?: never;
@@ -4335,7 +4335,7 @@ export interface paths {
         head?: never;
         /**
          * Edit a row or hide fields for this employee
-         * @description Changing `employee_id` is not possible here (blocked when linked to an account). `hidden_fields` hides email or phone for this one employee.
+         * @description Changing `employee_id` is not possible here (blocked when linked to an account). `hidden_fields` hides email or phone for this one employee. Since 0.15.56 the System Admin or a holder of `users.edit` for all regions (403 before the step-up for anyone else); `employee_id`, `status` or an unknown key in the body is 422; an email (case-blind) or phone of another row is 409 `duplicate`; a patch that changes nothing keeps the version; audited with the full row before and after.
          */
         patch: operations["updateStaffMember"];
         trace?: never;
@@ -4410,11 +4410,14 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Field-visibility settings for email and phone */
+        /**
+         * Field-visibility settings for email and phone
+         * @description Since 0.15.56, the System Admin or a holder of `users.edit` for all regions; anyone else gets 403.
+         */
         get: operations["getStaffVisibility"];
         /**
          * Set who sees email and phone
-         * @description Per field: default (everyone signed in), roles, groups or persons who see it, and who never do (deny wins). Audited with before/after values.
+         * @description Per field: default (everyone signed in), roles, groups or persons who see it, and who never do (deny wins). Audited with before/after values. Since 0.15.56: the System Admin or a holder of `users.edit` for all regions (403 before the step-up for anyone else); each field given replaces that field; an entry counts by `kind` and `ref_id` (the label is read from the source); an unknown person, role, group or key is 422; the same settings again keep the version. A registry administrator always sees both fields on the card.
          */
         put: operations["setStaffVisibility"];
         post?: never;

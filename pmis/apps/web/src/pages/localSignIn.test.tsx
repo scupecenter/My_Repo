@@ -352,6 +352,8 @@ describe('hybrid mode list', () => {
       // 0.15.54 (migration 0140): absences and the lead decisions (B12b)
       'GET /absences', 'POST /absences', 'GET /absences/:id', 'PATCH /absences/:id', 'DELETE /absences/:id', 'GET /reassignments/alerts', 'GET /reassignments/eligible-users',
       'POST /tasks/reassign', 'POST /tasks/:id/act-on-behalf',
+      // 0.15.56 (migration 0142): the staff registry card, its visibility settings and the edit of a row
+      'GET /staff-registry/visibility', 'PUT /staff-registry/visibility', 'GET /staff-registry/:employeeId', 'PATCH /staff-registry/:employeeId',
     ]);
     expect(realApiHandlers(false)).toHaveLength(0);
     expect(realApiHandlers(true)).toHaveLength(REAL_API_AUTH_USERS.length);
