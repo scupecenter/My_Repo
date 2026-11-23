@@ -2,7 +2,7 @@
 -- by pmis_app directly: the card goes through people_staff_card, which applies the visibility in the database, and every write goes through
 -- people_save_staff / people_save_staff_visibility (System Admin or an all-regions holder of users.edit, a reason, a step-up in the verified context,
 -- the version; audited). The helpers that decide visibility are internal. Rows are never deleted. Alice: CW Team Lead in Tripoli, not a System Admin.
--- ADMIN: the System Admin. DEL_TRI: a Tripoli-only delegate. The draft row 1103 (Ali Barka, synthetic) is seeded by the migration. Each case is rolled back.
+-- ADMIN: the System Admin. DEL_TRI: a Tripoli-only delegate. The synthetic row 1103 (Ali Barka) is loaded by sql/01_fixtures.sql (the migration seeds nothing, Q611). Each case is rolled back.
 
 -- @case SR-01
 -- @title Alice reads the phone and email of the whole registry straight from the table, around the visibility settings

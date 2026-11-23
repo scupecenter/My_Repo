@@ -1,4 +1,6 @@
 import { randomInt } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { Client as PgClient } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -10,7 +12,30 @@ import { Actor, actor, groupWith, newRole, plainAdmin } from './wf-helpers';
  * Staff registry (B13; migration 0142, contract 0.15.56): GET /staff-registry/{employee_id} (the hover card, visibility applied by the database),
  * GET and PUT /staff-registry/visibility, PATCH /staff-registry/{employee_id}. Only this suite writes the registry and its visibility settings; it puts the
  * settings back to the default (everyone sees email and phone) at the end. All people and numbers are synthetic.
+ * The migration seeds nothing (Q611): the suite loads the synthetic draft db/seed/staff-registry.draft.csv itself, as the superuser.
  */
+const PMIS = join(__dirname, '..', '..', '..');
+const DRAFT_COLUMNS = ['employee_id', 'name_en', 'name_ar', 'email', 'phone', 'position', 'team', 'main_role', 'region', 'status', 'notes'] as const;
+type DraftRow = Record<(typeof DRAFT_COLUMNS)[number], string>;
+
+/** The draft CSV (one header line, commas, a field may be quoted). */
+function draftRows(): DraftRow[] {
+  const lines = readFileSync(join(PMIS, 'db', 'seed', 'staff-registry.draft.csv'), 'utf8').split(/\r?\n/).filter((l) => l.trim());
+  return lines.slice(1).map((line) => {
+    const cells = [...line.matchAll(/(?:^|,)(?:"([^"]*)"|([^,]*))/g)].map((m) => m[1] ?? m[2] ?? '');
+    return Object.fromEntries(DRAFT_COLUMNS.map((c, i) => [c, cells[i] ?? ''])) as DraftRow;
+  });
+}
+
+async function loadDraft(db: PgClient): Promise<void> {
+  for (const r of draftRows()) {
+    await db.query(
+      `INSERT INTO staff_registry (employee_id, name_en, name_ar, email, phone, position, team, main_role, region, status, notes)
+       VALUES ($1, $2, $3, $4, $5, $6, lower($7), nullif($8, ''), $9, $10, nullif($11, '')) ON CONFLICT DO NOTHING`,
+      [r.employee_id, r.name_en, r.name_ar, r.email, r.phone, r.position, r.team, r.main_role, r.region, r.status, r.notes],
+    );
+  }
+}
 let app: NestExpressApplication;
 let db: PgClient;
 let admin: Actor;
@@ -49,6 +74,7 @@ const DEFAULT_FIELD = { default_visible: true, allow: [], deny: [] };
 beforeAll(async () => {
   app = await startApp();
   db = await superDb();
+  await loadDraft(db);
   admin = await plainAdmin(app, db);
   noStep = await plainAdmin(app, db, false);
   const view = G('sites', 'view');
@@ -91,13 +117,17 @@ describe('GET /staff-registry/{employee_id}: the hover card', () => {
     }
   });
 
-  it('returns an inactive person with status inactive, and the seeded synthetic draft', async () => {
+  it('returns an inactive person with status inactive; the migration seeds nothing, the draft comes from the test', async () => {
     const row = await freeRow(db, { status: 'inactive' });
     expect((await card(plain, row.id)).body).toMatchObject({ employee_id: row.id, status: 'inactive' });
-    // the synthetic draft (25 rows) was seeded: no account existed when the migration ran (Q611 skips a row an account already holds)
+    const sql = readFileSync(join(__dirname, '..', 'prisma', 'migrations', '0142_staff_registry_api', 'migration.sql'), 'utf8');
+    expect(sql).not.toMatch(/INSERT INTO staff_registry\s*\(/);
+    expect(readFileSync(join(PMIS, 'db', 'sql', '141_staff_registry_api.sql'), 'utf8')).toBe(sql);
+    expect(draftRows()).toHaveLength(25);
     const seeded = await db.query(`SELECT count(*)::int AS n FROM staff_registry WHERE employee_id < '2000' AND email LIKE '%@example.com'`);
     expect(seeded.rows[0].n).toBe(25);
     expect((await card(plain, '1104')).body).toMatchObject({ name_en: 'Karim Zaroug', status: 'inactive', team: 'none', region: 'Benghazi' });
+    expect((await card(plain, '1203')).body).toMatchObject({ team: 'cw', name_ar: 'عمر خالد' });
   });
 });
 

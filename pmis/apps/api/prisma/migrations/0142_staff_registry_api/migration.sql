@@ -8,8 +8,7 @@
 --   2. The field-visibility settings of email and phone: staff_registry_visibility_state (one row: version, who, when), staff_registry_visibility_fields
 --      (default_visible per field, true by default = every signed-in employee sees it) and staff_registry_visibility_entries (roles, groups or persons who see
 --      a field when the default is off, and who never see it; deny wins).
---   3. The seed: the synthetic draft db/seed/staff-registry.draft.csv (25 fictional people), skipping any draft row whose employee ID, email or phone already
---      belongs to an account (Q611), so a real person is never shown as a fictional one.
+--   3. No seed: the registry starts empty (Q611). The synthetic draft db/seed/staff-registry.draft.csv is loaded only by the tests, never by a migration.
 --   4. The doors (SECURITY DEFINER, owner pmis_definer, search_path pg_catalog, public, pg_temp, PUBLIC revoked):
 --        people_staff_can_admin()                                   who may administer the registry (API entry: asked before the step-up)
 --        people_staff_card(text)                                    GET /staff-registry/{employee_id}: the hover card, visibility applied here
@@ -75,7 +74,7 @@ CREATE TABLE staff_registry_visibility_entries (
   ord    integer NOT NULL DEFAULT 0,
   PRIMARY KEY (field, mode, kind, ref_id)
 );
-COMMENT ON TABLE staff_registry_visibility_fields IS '0142: who sees email and phone on the registry card. default_visible true (the seed) = every signed-in employee. Written only through people_save_staff_visibility.';
+COMMENT ON TABLE staff_registry_visibility_fields IS '0142: who sees email and phone on the registry card. default_visible true (the default) = every signed-in employee. Written only through people_save_staff_visibility.';
 COMMENT ON TABLE staff_registry_visibility_entries IS '0142: per field, the roles, groups or persons who see it when the default is off (allow) and who never see it (deny wins). Written only through people_save_staff_visibility.';
 
 INSERT INTO staff_registry_visibility_state (id) VALUES (true);
@@ -91,39 +90,10 @@ CREATE TRIGGER staff_registry_no_delete BEFORE DELETE ON staff_registry FOR EACH
 CREATE TRIGGER staff_registry_no_truncate BEFORE TRUNCATE ON staff_registry FOR EACH STATEMENT EXECUTE FUNCTION people_staff_no_delete();
 
 -- ---------------------------------------------------------------------------------------------------------------------
--- 2. The seed: the synthetic draft (db/seed/staff-registry.draft.csv, 25 fictional people; team in the contract's lower case)
+-- 2. No seed (Q611, decided 2026-11-23): the registry starts empty. The production server already holds real accounts, so the synthetic draft
+--    (db/seed/staff-registry.draft.csv) is never loaded by a migration; the tests load it themselves, and the owner fills the registry through the screens and
+--    the import.
 -- ---------------------------------------------------------------------------------------------------------------------
-INSERT INTO staff_registry (employee_id, name_en, name_ar, email, phone, position, team, main_role, region, status, notes)
-SELECT d.* FROM (VALUES
-  ('1001', 'Ahmed Salem', 'أحمد سالم', 'ahmed.salem@example.com', '+218 91 200 1000', 'Project Manager', 'both', 'Project Manager', 'All', 'active', 'Demo login in the prototype'),
-  ('1102', 'Mona Fathi', 'منى فتحي', 'mona.fathi@example.com', '+218 92 207 1113', 'RF & Design / Acquisition Team Lead', 'none', 'RF & Design / Acquisition Team Lead', 'All', 'active', NULL),
-  ('1103', 'Ali Barka', 'علي بركة', 'ali.barka@example.com', '+218 94 214 1226', 'RF Engineer', 'none', 'RF & Design / Acquisition Team Lead', 'Tripoli', 'active', NULL),
-  ('1104', 'Karim Zaroug', 'كريم زروق', 'karim.zaroug@example.com', '+218 91 221 1339', 'MW Engineer', 'none', 'RF & Design / Acquisition Team Lead', 'Benghazi', 'inactive', 'Left the company; deactivated, history kept'),
-  ('1203', 'Omar Khaled', 'عمر خالد', 'omar.khaled@example.com', '+218 92 228 1452', 'CW Team Lead', 'cw', 'CW Team Lead', 'All', 'active', NULL),
-  ('1204', 'Sami Nuri', 'سامي نوري', 'sami.nuri@example.com', '+218 94 235 1565', 'Site Engineer (CW)', 'cw', 'CW Team Lead', 'Tripoli', 'active', NULL),
-  ('1205', 'Fadi Omran', 'فادي عمران', 'fadi.omran@example.com', '+218 91 242 1678', 'Site Engineer (CW)', 'cw', 'CW Team Lead', 'Middle', 'active', NULL),
-  ('1206', 'Khalid Jaber', 'خالد جابر', 'khalid.jaber@example.com', '+218 92 249 1791', 'GECOL Power Coordinator', 'cw', 'CW Team Lead', 'Zawia', 'active', NULL),
-  ('1207', 'Nadia Hamed', 'نادية حامد', 'nadia.hamed@example.com', '+218 94 256 1904', 'HLC Fiber Engineer', 'cw', 'CW Team Lead', 'Tripoli', 'active', NULL),
-  ('1208', 'Marwa Tarhuni', 'مروة الترهوني', 'marwa.tarhuni@example.com', '+218 91 263 2017', 'Site Engineer (CW)', 'cw', 'CW Team Lead', 'Benghazi', 'active', NULL),
-  ('1209', 'Idris Mabrouk', 'إدريس مبروك', 'idris.mabrouk@example.com', '+218 92 270 2130', 'Site Engineer (CW)', 'cw', 'CW Team Lead', 'Sebha', 'active', NULL),
-  ('1210', 'Hana Zidan', 'هناء زيدان', 'hana.zidan@example.com', '+218 94 277 2243', 'Site Engineer (CW)', 'cw', 'CW Team Lead', 'Middle', 'active', 'Pending assignment in the prototype'),
-  ('1211', 'Wael Saadi', 'وائل السعدي', 'wael.saadi@example.com', '+218 91 284 2356', 'Site Engineer (CW)', 'cw', 'CW Team Lead', 'WM', 'active', 'Pending assignment in the prototype'),
-  ('1305', 'Hassan Ali', 'حسن علي', 'hassan.ali@example.com', '+218 92 291 2469', 'TE Team Lead', 'te', 'TE Team Lead', 'All', 'active', NULL),
-  ('1306', 'Tarek Mansour', 'طارق منصور', 'tarek.mansour@example.com', '+218 94 298 2582', 'Site Engineer (TE)', 'te', 'TE Team Lead', 'Tripoli', 'active', NULL),
-  ('1307', 'Rami Saeed', 'رامي سعيد', 'rami.saeed@example.com', '+218 91 305 2695', 'HOTO Engineer', 'te', 'TE Team Lead', 'WM', 'active', NULL),
-  ('1308', 'Salma Younis', 'سلمى يونس', 'salma.younis@example.com', '+218 92 312 2808', 'Site Engineer (TE)', 'te', 'TE Team Lead', 'Zawia', 'active', NULL),
-  ('1309', 'Jamal Fituri', 'جمال فيتوري', 'jamal.fituri@example.com', '+218 94 319 2921', 'Site Engineer (TE)', 'te', 'TE Team Lead', 'GM', 'active', NULL),
-  ('1310', 'Anis Gharyani', 'أنيس الغرياني', 'anis.gharyani@example.com', '+218 91 326 3034', 'Site Engineer (TE)', 'te', 'TE Team Lead', 'Sebha', 'active', NULL),
-  ('1407', 'Rania Saad', 'رانيا سعد', 'rania.saad@example.com', '+218 92 333 3147', 'Inventory Supervisor', 'none', 'Inventory Supervisor', 'All', 'active', NULL),
-  ('1408', 'Huda Bashir', 'هدى بشير', 'huda.bashir@example.com', '+218 94 340 3260', 'Warehouse Keeper', 'none', 'Inventory Supervisor', 'Benghazi', 'active', NULL),
-  ('1508', 'Laila Omar', 'ليلى عمر', 'laila.omar@example.com', '+218 91 347 3373', 'Project Support Lead', 'none', 'Project Support', 'All', 'active', NULL),
-  ('1509', 'Yousef Adel', 'يوسف عادل', 'yousef.adel@example.com', '+218 92 354 3486', 'Procurement Officer', 'none', 'Project Support', 'Tripoli', 'active', NULL),
-  ('1510', 'Salem Aswad', 'سالم الأسود', 'salem.aswad@example.com', '+218 94 361 3599', 'Project Coordinator', 'none', 'Project Support', 'GM', 'active', NULL),
-  ('1999', 'Noor Hadi', 'نور هادي', 'noor.hadi@example.com', '+218 91 368 3712', 'Site Engineer (CW)', 'cw', 'CW Team Lead', 'Zawia', 'active', 'Pending assignment in the prototype')
-) AS d (employee_id, name_en, name_ar, email, phone, position, team, main_role, region, status, notes)
--- Q611: a draft row is skipped when an account already holds its employee ID, email or phone (spaces ignored)
-WHERE NOT EXISTS (SELECT 1 FROM users u WHERE u.employee_id = d.employee_id OR lower(u.email) = lower(d.email)
-                  OR replace(coalesce(u.phone, ''), ' ', '') = replace(d.phone, ' ', ''));
 
 -- ---------------------------------------------------------------------------------------------------------------------
 -- 3. Rights of the definer role
