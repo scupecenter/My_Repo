@@ -89,9 +89,10 @@ W1 decision: the single tab row takes its phases from the published workflow ver
 | W4 | Dead or stuck screens: Settings > Alerts and Security stay on "Loading..."; audit every menu and tab | Pending | |
 | W5 | Library menu (Forms and Archive); Data entry > Templates stays as it is | Pending | |
 | W7 | Daily Progress and Tomorrow Plan: a screen in the system, copyable to email | Pending | |
+| W8 | Site lists and the site task table: row numbers everywhere, three-level headers, list-style task table, display options (font size, alignment, density, wrap) | Pending | |
 | W6 | CHANGELOG, CLAUDE.md navigation notes and this file updated | Pending | |
 
-Suggested order: W4 first (it may expose broken APIs that W3/W5 depend on), then W1, W3, W7, W2, W5, W6. W2 and W5 are the largest.
+Suggested order: W4 first (it may expose broken APIs that W3/W5 depend on), then W1, W8, W3, W7, W2, W5, W6. W8 builds the shared table options that W2 then reuses on registers. W2 and W5 are the largest.
 
 ## W1. Site page tabs (owner images 1-2)
 
@@ -198,6 +199,49 @@ Do:
 
 Acceptance: the two tables of the Excel sheet appear in the system for any date, filled from system data; the user adds only the daily facts; one click copies them into an email in the same layout.
 
+## W8. Site lists, the site task table and display options (owner request 2026-11-23, images of Site Master and the site page)
+
+Findings from the owner's screenshots:
+- The Site Master list (normal layout, for example Design & Acquisition) has no row-number column. Only the wide table has `#`.
+- The wide table repeats the group name in every header ("Identification / Site Owner ID", "Identification / Region", ...) under one section row ("RF & DESIGN"). The headers are long and hard to scan.
+- On the site page, the Tasks table defaults to the "Row" layout: tasks are columns, and Status, Plan and Actual are rows. This reads sideways and does not look like the Site Master lists. A "List" toggle exists.
+- Cluster ID shows "Not entered" for every site: the cluster codes produced in the owner's Excel file (2026-11-23) are not loaded into the system yet. Loading them is the owner's action (the Master upload or a direct admin edit). No code is needed, but note it in the PR.
+
+Do:
+1. **Row-number column everywhere sites are listed.**
+   - Cover the Site Master main list and every sub-menu, normal list and wide table, plus every other screen that lists sites: registers with a site column, My Work lists, dashboard drill-downs and the archive lists of W5.
+   - The first column is `#`: 1..n in the current sort and filter, continuing across "Load more" pages. It is frozen with Site ID.
+   - The count beside the toolbar stays.
+2. **Three header levels in the wide table and in grouped lists.**
+   - Row 1: section (for example RF & DESIGN).
+   - Row 2: group (for example Identification, Coordinates, Classification, Tower Information).
+   - Row 3: the column name only (Site Owner ID, Site Name, Region, ...).
+   - Adjacent headers with the same section or group merge across their columns. A column without a group spans rows 2 and 3.
+   - Take the groups from the Master column metadata (the same source as the section headers today).
+3. **Site page Tasks table.**
+   - The default is a list like the Site Master lists: one row per task, grouped under its milestone (a collapsible group header with progress).
+   - Columns: #, Code, Task, Status, Plan, Actual, SLA (due and state), Ball in court, Documents (count missing), Last update.
+   - Full options: + Filter, column chooser, density, Export current view, and the display options below.
+   - The current task-as-column layout stays as a second option, named "Timeline", and the user's choice is remembered.
+4. **Display options on every table that shows site data.** One shared "Display" menu in the toolbar, next to density and columns:
+   - text size: small, normal, large;
+   - alignment of text cells: start, center;
+   - row density: compact, normal, comfortable;
+   - wrap long text on or off;
+   - zebra rows on or off.
+
+   Rules for the menu:
+   - It is stored per user and per screen, and saved views keep it.
+   - Defaults come from Settings > Dashboard or a new Settings > Display section in the general Settings, per the owner rule.
+   - Build it once as a shared table setting and apply it to Site Master, its sub-menus, the wide table, the site Tasks table, registers (W2), My Work, the Daily Plan (W7) and the Archive (W5).
+5. Tests: vitest for the row numbers across pages, the three-level header merge, the task list layout and the display menu (persisted and applied); update the e2e for the wide table and the site page.
+
+Acceptance:
+- Every site list shows `#` first.
+- Wide-table headers show section, group and column on three rows, without the "Group / Column" repetition.
+- The site Tasks table opens as a list like Site Master.
+- A Display menu changes text size, alignment, density, wrap and zebra rows, and remembers the choice, on every table of site data.
+
 ## W6. Documentation
 
 The CHANGELOG entry in every PR. Update CLAUDE.md navigation (Library menu, Settings tabs), this file's Status table and the log below.
@@ -212,11 +256,13 @@ The CHANGELOG entry in every PR. Update CLAUDE.md navigation (Library menu, Sett
 | W2 | Large | Generalise the wide table, board and map; saved-view layout for registers |
 | W5 | Large | New menu and archive list; may need new API endpoints |
 | W7 | Medium | New screen, saved plan table, copy and export |
+| W8 | Medium | Shared table options reused by W2, W5 and W7 |
 
-Total: roughly 6 PRs and several CI cycles each. This does not fit in one short session at the end of a weekly limit. Do it from a fresh session or account, in the order above.
+Total: roughly 7 PRs and several CI cycles each. This does not fit in one short session at the end of a weekly limit. Do it from a fresh session or account, in the order above.
 
 ## Log
 
+- 2026-11-23: W8 added (row numbers, three-level headers, task list layout, display options).
 - 2026-11-23: the new main menu is named Library (المكتبة) with Forms (النماذج) and Archive (الأرشيف); Settings > Documents > Library is renamed Document types.
 - 2026-11-23: Data entry > Templates stays as it is (no rename), it may be removed later.
 - 2026-11-23: owner decisions added (names, places, permissions via the matrix, settings in general Settings, Daily Plan under My Work, copy-paste email).
