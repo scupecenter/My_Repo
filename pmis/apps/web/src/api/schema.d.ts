@@ -97,7 +97,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Link the 4-digit employee ID (once, first sign-in) */
+        /**
+         * Link the 4-digit employee ID (once, first sign-in)
+         * @description The first-sign-in link of the M365 path (ADR 0002 item 4): the ID must exist in the staff registry and not be linked to another account; the account
+         *     stays `pending_assignment`. **0.15.60:** the M365 sign-in and the staff registry do not exist on the server yet (Q625), and a local account gets its
+         *     employee ID from an administrator, so every session answers 409 `invalid_transition`, with the same body whatever ID is typed (nothing tells whether
+         *     an ID is registered or already linked). A malformed ID is 422; calls are rate limited per user and per address like sign-in (429). Each refusal is
+         *     written to the System Log with a keyed hash of the ID only.
+         */
         post: operations["linkEmployeeId"];
         delete?: never;
         options?: never;
@@ -679,7 +686,13 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Pending user asks the System Admins for an assignment */
+        /**
+         * Pending user asks the System Admins for an assignment
+         * @description 0.15.60 (`me_notify_admins`). Reachable by a pending account. Plain text only: `<`, `>` and HTML entities are refused (422 `markup_not_allowed`,
+         *     Q624); control characters become spaces. One request per user per `notify_admins.cooldown_minutes` (setting, default 60, Q623), checked in the
+         *     database: else 429 `rate_limited` with `Retry-After`. Every active System Admin gets an in-app notice (`assignment_request`, linked to the user's
+         *     page) and a mail; the request is audited (`admins_notified`). Not for the break-glass account or before a forced password change (403).
+         */
         post: operations["notifyAdmins"];
         delete?: never;
         options?: never;
@@ -1729,7 +1742,13 @@ export interface paths {
         /** Groups with member counts and matrix usage */
         get: operations["listGroups"];
         put?: never;
-        /** Create a group */
+        /**
+         * Create a group
+         * @description 0.15.60. `groups.create` for all regions; `member_ids` also need `groups.edit` for all regions and go through `idm_group_add_member` (the same ceilings
+         *     as adding members): the caller is never a member of a group they create (403 `self_beneficiary`), a pending or unknown member is 422 with
+         *     `errors[].path` `/member_ids/<index>`. The create is atomic. A name equal to another group's name ignoring case is 409 `duplicate` (Q622). A group made
+         *     here is never the System Admins group. Audited (`group_created`, and `group_member_added` per member).
+         */
         post: operations["createGroup"];
         delete?: never;
         options?: never;
@@ -4325,7 +4344,7 @@ export interface paths {
         };
         /**
          * Hover-card payload for one person
-         * @description Any signed-in employee may read a card. The server applies the field-visibility settings and the per-employee hide; hidden fields come back null and are named in `hidden_fields`. An inactive person is still returned, with status `inactive`.
+         * @description Any signed-in employee may read a card. The server applies the field-visibility settings and the per-employee hide; hidden fields come back null and are named in `hidden_fields`. An inactive person is still returned, with status `inactive`. Since 0.15.56 the database decides (a registry administrator, the System Admin or an all-regions holder of `users.edit`, sees both fields); an ID that is not 4 digits or not in the registry is 404.
          */
         get: operations["getStaffMember"];
         put?: never;
@@ -4335,7 +4354,7 @@ export interface paths {
         head?: never;
         /**
          * Edit a row or hide fields for this employee
-         * @description Changing `employee_id` is not possible here (blocked when linked to an account). `hidden_fields` hides email or phone for this one employee.
+         * @description Changing `employee_id` is not possible here (blocked when linked to an account). `hidden_fields` hides email or phone for this one employee. Since 0.15.56 the System Admin or a holder of `users.edit` for all regions (403 before the step-up for anyone else); `employee_id`, `status` or an unknown key in the body is 422; an email (case-blind) or phone of another row is 409 `duplicate`; a patch that changes nothing keeps the version; audited with the full row before and after.
          */
         patch: operations["updateStaffMember"];
         trace?: never;
@@ -4410,11 +4429,14 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Field-visibility settings for email and phone */
+        /**
+         * Field-visibility settings for email and phone
+         * @description Since 0.15.56, the System Admin or a holder of `users.edit` for all regions; anyone else gets 403.
+         */
         get: operations["getStaffVisibility"];
         /**
          * Set who sees email and phone
-         * @description Per field: default (everyone signed in), roles, groups or persons who see it, and who never do (deny wins). Audited with before/after values.
+         * @description Per field: default (everyone signed in), roles, groups or persons who see it, and who never do (deny wins). Audited with before/after values. Since 0.15.56: the System Admin or a holder of `users.edit` for all regions (403 before the step-up for anyone else); each field given replaces that field; an entry counts by `kind` and `ref_id` (the label is read from the source); an unknown person, role, group or key is 422; the same settings again keep the version. A registry administrator always sees both fields on the card.
          */
         put: operations["setStaffVisibility"];
         post?: never;
@@ -4567,7 +4589,7 @@ export interface paths {
         get: operations["getIdleTaskAlertSetting"];
         /**
          * Set the idle days that alert the lead (default 2 working days)
-         * @description 0.15.59 (migration 0145): System Admin or a delegate of `admin.settings` edit for all regions, a reason and If-Match. Closed body (`unknown_key`; `working_days` 1 to 30, `out_of_range`). `working_days` is the dashboard idle limit `stale_idle_days` (`PUT /settings/dashboard`, the stale flag and the stale-task counter use the same value, Q523): it is one setting, so the ETag of this resource moves when either screen changes it. Audited (`idle_task_alert_update`, before and after).
+         * @description 0.15.61 (migration 0145): System Admin or a delegate of `admin.settings` edit for all regions, a reason and If-Match. Closed body (`unknown_key`; `working_days` 1 to 30, `out_of_range`). `working_days` is the dashboard idle limit `stale_idle_days` (`PUT /settings/dashboard`, the stale flag and the stale-task counter use the same value, Q523): it is one setting, so the ETag of this resource moves when either screen changes it. Audited (`idle_task_alert_update`, before and after).
          */
         put: operations["setIdleTaskAlertSetting"];
         post?: never;
@@ -4771,7 +4793,7 @@ export interface paths {
          *     **Mandatory types** (`mandatory` in the catalogue) cannot be switched off: a channel that is on by default stays on and the cells of the default recipients stay on, else 422 with `code` = `mandatory_locked`. A cell for a role or group that the catalogue does not make eligible for the type is `not_eligible_recipient`. A `timezone` that is not an IANA zone is `invalid_timezone`.
          *     Rows left out of `matrix` keep the catalogue defaults.
          *     **Security and system types (0.2.5 hardening):** every `security` type is mandatory for the System Admins. A body that changes any `security` or `system` row, or a threshold that feeds one (`rate_cap_per_hour`), needs step-up and a System Admin acting without delegation (403 `delegate_forbidden`); the change sends the System Admins an in-app alert naming the actor.
-         *     0.15.59 (migration 0145): an unknown key is reported at its own path with `code` = `unknown_key` (for example `/thresholds/x`, `/matrix/0/channels/sms`); other codes: `required`, `invalid`, `out_of_range`, `unknown_type`, `unknown_column` (a cell or column naming no such role, group or column), `duplicate`, `too_many`. The System Admins group must stay a column (`/columns` `mandatory_locked`) and every mandatory type that goes to the System Admins keeps their cell on. Like the security and system rows, a change of `enabled`, `timezone`, `digest_hour`, `work_days_follow_calendar` or `work_days` needs a System Admin (403 `delegate_forbidden`) and a step-up, and the System Admins are told (security review 2026-11-23). When nothing was saved the columns are the System Admins group and the Project Manager role. Audited (`notification_policy_update`, before and after).
+         *     0.15.61 (migration 0145): an unknown key is reported at its own path with `code` = `unknown_key` (for example `/thresholds/x`, `/matrix/0/channels/sms`); other codes: `required`, `invalid`, `out_of_range`, `unknown_type`, `unknown_column` (a cell or column naming no such role, group or column), `duplicate`, `too_many`. The System Admins group must stay a column (`/columns` `mandatory_locked`) and every mandatory type that goes to the System Admins keeps their cell on. Like the security and system rows, a change of `enabled`, `timezone`, `digest_hour`, `work_days_follow_calendar` or `work_days` needs a System Admin (403 `delegate_forbidden`) and a step-up, and the System Admins are told (security review 2026-11-23). When nothing was saved the columns are the System Admins group and the Project Manager role. Audited (`notification_policy_update`, before and after).
          */
         put: operations["setNotificationPolicy"];
         post?: never;
@@ -4865,7 +4887,10 @@ export interface paths {
             };
             cookie?: never;
         };
-        /** MFA exemption of a user */
+        /**
+         * MFA exemption of a user
+         * @description 0.15.60. For a holder of `admin.users` view (403 `module_forbidden` otherwise) or the user themselves. `exempt` is true only while an exemption is in force (an `until` in the past counts as not exempt).
+         */
         get: operations["getMfaExemption"];
         /**
          * Exempt a user from GSDN Workspace MFA requirement
@@ -4934,7 +4959,7 @@ export interface paths {
         /**
          * Upload the TPL-HOLIDAYS template (applied at once)
          * @description Seed file: `db/seed/holidays-2026-2027.csv` (loaded by the seed script). The upload accepts the approved xlsx template `TPL-HOLIDAYS` only (ADR 0011, owner decision); a CSV or any other file is 422 `template_rejected` (`reason` `not_xlsx`, `macros_not_allowed`, `tpl_missing`, `wrong_template`, `outdated_version`, `checksum_mismatch`, `size_or_rows_exceeded`), written to the System Log. Needs a `reason` (0.2.6), like every other holiday change; it is written to the audit row of each holiday the file adds. A missing or too short reason is 422 `validation_failed`.
-         *     0.15.59 (migration 0145): System Admin or a delegate of `calendars` edit for all regions (checked in the database). The file is applied at once, not sent to L2 (holidays are configuration): `status` `applied`, `counts.create` (added) and `counts.unchanged` (a date the calendar already holds with the same values), `affected_open_tasks`. One bad row refuses the whole file: 422 `validation_failed` with `errors[]` per line (`path` `/rows/<line>/<field>`, codes `required`, `invalid`, `out_of_range`, `too_long`, `duplicate_in_file`, and `duplicate` for a date the calendar holds with other values; setting `calendar.holiday_import_existing` = `skip` leaves those dates as they are instead, Q602). The SLA due dates of open tasks are recalculated once; closed tasks keep their values. Audited per holiday (`holiday_create` with the import id) and per file (`holidays_import`).
+         *     0.15.61 (migration 0145): System Admin or a delegate of `calendars` edit for all regions (checked in the database). The file is applied at once, not sent to L2 (holidays are configuration): `status` `applied`, `counts.create` (added) and `counts.unchanged` (a date the calendar already holds with the same values), `affected_open_tasks`. One bad row refuses the whole file: 422 `validation_failed` with `errors[]` per line (`path` `/rows/<line>/<field>`, codes `required`, `invalid`, `out_of_range`, `too_long`, `duplicate_in_file`, and `duplicate` for a date the calendar holds with other values; setting `calendar.holiday_import_existing` = `skip` leaves those dates as they are instead, Q602). The SLA due dates of open tasks are recalculated once; closed tasks keep their values. Audited per holiday (`holiday_create` with the import id) and per file (`holidays_import`).
          */
         post: operations["importHolidays"];
         delete?: never;
@@ -5255,7 +5280,7 @@ export interface paths {
         /**
          * Publish a new DLP version (`dlp.months.cw`, `dlp.months.te`)
          * @description Counted from the PAC date. A PAC keeps the version in force on its issue date.
-         *     0.15.59 (migration 0145): System Admin or a delegate of `admin.settings` edit for all regions, a reason and a step-up. Closed body (`unknown_key`). `effective_from` is today or later (`in_the_past`, Q600) and not before the effective date of the latest version (`before_latest_version`). A version effective today is in force at once; a later one is listed in `history` and becomes `current` on its date. Audited (`dlp_version_publish`, before and after).
+         *     0.15.61 (migration 0145): System Admin or a delegate of `admin.settings` edit for all regions, a reason and a step-up. Closed body (`unknown_key`). `effective_from` is today or later (`in_the_past`, Q600) and not before the effective date of the latest version (`before_latest_version`). A version effective today is in force at once; a later one is listed in `history` and becomes `current` on its date. Audited (`dlp_version_publish`, before and after).
          */
         post: operations["publishDlpVersion"];
         delete?: never;
@@ -10882,7 +10907,7 @@ export interface components {
             task_id?: string | null;
             /** Format: uuid */
             site_id?: string;
-            /** @description `edit_date` for a task, `site_edit` for a site. 0.15.38: `historical_no_source_na` for a task made N/A "historical load: no source" by the historical Master load (migration 0126); its revert restores the task. 0.15.39: `historical_gate_open` (entity `site`) for a phase gate opened because the site moved past it, and `historical_inferred_date` (entity `task`) for a milestone approved with the date of the earliest later task ("inferred date — historical load"), both by the historical Master load (migration 0127); their revert closes the gate again or reopens the milestone without a date. 0.15.40: `historical_manual_ms_approved` (entity `task`) for a manual milestone (Site RFI) the site moved past, approved directly with its pre-filled date (or the inferred one, `after.date_source`) by the historical Master load (migration 0129); its revert reopens it with its pre-filled date. 0.15.44: `gate_moved_past_open` (entity `site`) for a phase gate opened because the site moved past it, on any site, and `no_microwave_na` (entity `task`) for MW alignment (D8) made N/A because the approved TE installation (D6) has no MW antenna; both are made by a rule of GSDN Workspace (owner decisions 2026-11-22, migration 0134, no `acted_by`); their revert closes the gate again or restores D8. 0.15.52: `manual_ms_moved_past` (entity `task`) for a manual milestone (Site RFI) the site moved past, approved directly with its pre-filled date (or the inferred one, `after.date_source`) by a rule of GSDN Workspace on any site (owner decision 2026-11-22, migration 0136, no `acted_by`); its revert reopens it with its pre-filled date. */
+            /** @description `edit_date` for a task, `site_edit` for a site. 0.15.38: `historical_no_source_na` for a task made N/A "historical load: no source" by the historical Master load (migration 0126); its revert restores the task. 0.15.39: `historical_gate_open` (entity `site`) for a phase gate opened because the site moved past it, and `historical_inferred_date` (entity `task`) for a milestone approved with the date of the earliest later task ("inferred date — historical load"), both by the historical Master load (migration 0127); their revert closes the gate again or reopens the milestone without a date. 0.15.40: `historical_manual_ms_approved` (entity `task`) for a manual milestone (Site RFI) the site moved past, approved directly with its pre-filled date (or the inferred one, `after.date_source`) by the historical Master load (migration 0129); its revert reopens it with its pre-filled date. 0.15.44: `gate_moved_past_open` (entity `site`) for a phase gate opened because the site moved past it, on any site, and `no_microwave_na` (entity `task`) for MW alignment (D8) made N/A because the approved TE installation (D6) has no MW antenna; both are made by a rule of GSDN Workspace (owner decisions 2026-11-22, migration 0134, no `acted_by`); their revert closes the gate again or restores D8. 0.15.52: `manual_ms_moved_past` (entity `task`) for a manual milestone (Site RFI) the site moved past, approved directly with its pre-filled date (or the inferred one, `after.date_source`) by a rule of GSDN Workspace on any site (owner decision 2026-11-22, migration 0136, no `acted_by`); its revert reopens it with its pre-filled date. 0.15.58: `master_na` (entity `task`) for a task made N/A because its actual date is N/A in the Master file (migration 0144, no `acted_by`); its revert restores the task and the rule never applies again. */
             kind: string;
             reason: string;
             before?: {
@@ -10891,7 +10916,7 @@ export interface components {
             after?: {
                 [key: string]: unknown;
             };
-            /** @description 0.15.44: absent for an override made by a rule of GSDN Workspace (`gate_moved_past_open`, `no_microwave_na`; 0.15.52: `manual_ms_moved_past`). */
+            /** @description 0.15.44: absent for an override made by a rule of GSDN Workspace (`gate_moved_past_open`, `no_microwave_na`; 0.15.52: `manual_ms_moved_past`; 0.15.58: `master_na`). */
             acted_by?: components["schemas"]["UserRef"];
             on_behalf_of?: components["schemas"]["UserRef"];
             /** Format: date-time */
@@ -12213,7 +12238,7 @@ export interface components {
             kind: "data_import" | "assignment_import" | "config_import" | "master";
             module_key?: components["schemas"]["ModuleKey"];
             /**
-             * @description A register template (one per register), a Site Register stream template (`TPL-SITE-DA`, `-CW`, `-TE`, `-CL`), the whole Master (`TPL-MASTER`) or, since 0.14.0, the New sites template (`TPL-SITE-NEW`, kind `sites`: one row per new site, entered through batch and L2). `list_values` (0.15.23): the values of a list (`TPL-LISTVALUES`). `holidays` (0.15.59): the holidays of the work calendar (`TPL-HOLIDAYS`, for a System Admin or a delegate of the calendar).
+             * @description A register template (one per register), a Site Register stream template (`TPL-SITE-DA`, `-CW`, `-TE`, `-CL`), the whole Master (`TPL-MASTER`) or, since 0.14.0, the New sites template (`TPL-SITE-NEW`, kind `sites`: one row per new site, entered through batch and L2). `list_values` (0.15.23): the values of a list (`TPL-LISTVALUES`). `holidays` (0.15.61): the holidays of the work calendar (`TPL-HOLIDAYS`, for a System Admin or a delegate of the calendar).
              * @enum {string}
              */
             template_kind?: "register" | "stream" | "master" | "sites" | "list_values" | "holidays";
@@ -12408,6 +12433,8 @@ export interface components {
             part_sheet?: string | null;
             /** @description The last note of a return. */
             note?: string | null;
+            /** @description 0.15.58: informational notes of a Master staging (counts only, never a value); empty for every other batch. */
+            import_notes?: components["schemas"]["ImportNote"][];
             /**
              * @description Q206 (0.12.8): `submit` enters and submits every row; `draft` (Save Draft / Planning) saves the rows without submission.
              * @enum {string}
@@ -12479,7 +12506,7 @@ export interface components {
             uploaded_by?: components["schemas"]["UserRef"];
             /** Format: date-time */
             uploaded_at?: string;
-            /** @description 0.15.59. `POST /settings/holidays/import` only: the open tasks whose SLA due date moved. */
+            /** @description 0.15.61. `POST /settings/holidays/import` only: the open tasks whose SLA due date moved. */
             affected_open_tasks?: number;
             version: number;
         };
@@ -12662,6 +12689,12 @@ export interface components {
             /** Format: date-time */
             finished_at?: string | null;
         };
+        /** @description 0.15.58: one informational note of a Master staging (migration 0144). */
+        ImportNote: {
+            /** @description `pending_as_empty`, `na_as_empty`, `na_task_requested`, `na_task_not_applicable`, `na_task_marked`, `na_task_not_marked`, `placeholder_rows_skipped`, `routed_to_gecol`, `routed_from_procurement`, `order_status_derived`, `order_status_not_derived`, `selected_set_by_import`, `selection_date_from_contract`, `selected_not_set`. */
+            code: string;
+            count: number;
+        };
         MasterImportOutcome: {
             /** Format: uuid */
             group_id?: string;
@@ -12699,6 +12732,8 @@ export interface components {
                 approved?: number;
                 /** @description 0.15.11: rows that change nothing (the register or the task already holds these values). */
                 skipped?: number;
+                /** @description 0.15.58: the notes of the Master rules of the batch (counts only). */
+                import_notes?: components["schemas"]["ImportNote"][];
             }[];
             /** @description 0.15.11: the apply approved the submitted rows directly (historical load, admin override). */
             approve_directly?: boolean;
@@ -12718,7 +12753,7 @@ export interface components {
                 /** @description Rows already sent whose task or record still waits for L2 (they keep that path). */
                 rows_sent_open?: number;
             }[];
-            /** @description 0.15.11: notes on the reading of the register sheets (never blocking): counts, cell addresses and header names only, never a value. Codes: `date_day_first_assumed`, `not_normalised`, `outside_list`, `cell_error_blank`, `master_header_not_found`, `map_unknown_template_header`. */
+            /** @description 0.15.11: notes on the reading of the register sheets (never blocking): counts, cell addresses and header names only, never a value. Codes: `date_day_first_assumed`, `not_normalised`, `outside_list`, `cell_error_blank`, `master_header_not_found`, `map_unknown_template_header`; 0.15.58 adds the codes of `ImportNote` for the register batches. */
             register_notes?: {
                 sheet?: string;
                 ref?: string;
@@ -15973,7 +16008,7 @@ export interface components {
             revoked_count: number;
         };
         /** @enum {string} */
-        NotificationKind: "task_assigned" | "task_returned" | "task_approved" | "approval_due" | "reassigned" | "absence_alert" | "idle_task_alert" | "no_holder" | "holiday_tentative" | "delegation" | "mfa_exemption" | "template_updated" | "import_batch" | "system" | "mention" | "followed_change" | "task_rejected" | "no_eligible_holder" | "register_assigned" | "register_rejected" | "gate_closed_again" | "sla_negative_duration" | "email_change_requested" | "email_change_decided" | "security_alert" | "snag_raised" | "snag_review" | "snag_rejected" | "snag_closed" | "levels_converted" | "permit_transferred" | "phone_change_requested" | "phone_change_decided" | "security_notice" | "site_region_moved";
+        NotificationKind: "task_assigned" | "task_returned" | "task_approved" | "approval_due" | "reassigned" | "absence_alert" | "idle_task_alert" | "no_holder" | "holiday_tentative" | "delegation" | "mfa_exemption" | "template_updated" | "import_batch" | "system" | "mention" | "followed_change" | "task_rejected" | "no_eligible_holder" | "register_assigned" | "register_rejected" | "gate_closed_again" | "sla_negative_duration" | "email_change_requested" | "email_change_decided" | "security_alert" | "snag_raised" | "snag_review" | "snag_rejected" | "snag_closed" | "levels_converted" | "permit_transferred" | "phone_change_requested" | "phone_change_decided" | "security_notice" | "site_region_moved" | "assignment_request";
         Notification: {
             /** Format: uuid */
             id: string;
@@ -17843,6 +17878,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
         };
     };
     startStepUp: {
@@ -18685,6 +18721,8 @@ export interface operations {
                 content?: never;
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
             429: components["responses"]["TooManyRequests"];
         };
     };

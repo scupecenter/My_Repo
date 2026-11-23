@@ -8,7 +8,7 @@ import { G } from './reg-helpers';
 import { Actor, actor, makeSite, makeTask, plainAdmin } from './wf-helpers';
 
 /**
- * Migration 0145 (contract 0.15.59): the settings routes the web called that no controller served: DLP versions, the idle-task alert, the notification
+ * Migration 0145 (contract 0.15.61): the settings routes the web called that no controller served: DLP versions, the idle-task alert, the notification
  * policy and its catalogue, and the holidays import (TPL-HOLIDAYS). The suite runs in its own database (TEST_DATABASE_URL_SSA): it publishes DLP versions,
  * changes the policy and the idle limit and adds holidays, which recalculates open tasks.
  */

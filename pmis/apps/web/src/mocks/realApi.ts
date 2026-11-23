@@ -505,7 +505,7 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/exports/master'],
   ['get', '/exports/master'],
   ['get', '/exports/master/:id/download'],
-  // Contract 0.15.59 (migration 0145; apps/api: settings, calendar): DLP versions, the idle-task alert, the notification policy and its catalogue, and the
+  // Contract 0.15.61 (migration 0145; apps/api: settings, calendar): DLP versions, the idle-task alert, the notification policy and its catalogue, and the
   // holidays import (TPL-HOLIDAYS). They answered 501 not_available until the API served them.
   ['get', '/settings/dlp'],
   ['post', '/settings/dlp/versions'],
@@ -525,6 +525,19 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/reassignments/eligible-users'],
   ['post', '/tasks/reassign'],
   ['post', '/tasks/:id/act-on-behalf'],
+  // Contract 0.15.56 (migration 0142; apps/api: staff-registry): the hover card (visibility applied by the database), the email and phone visibility settings,
+  // and the edit of a registry row (also hiding a field for one employee). Moved from NOT_AVAILABLE.
+  ['get', '/staff-registry/visibility'],
+  ['put', '/staff-registry/visibility'],
+  ['get', '/staff-registry/:employeeId'],
+  ['patch', '/staff-registry/:employeeId'],
+  // Contract 0.15.60 (migration 0143): the MFA exemption, creating a group, the pending user's request to the System Admins, the employee-ID link.
+  ['get', '/users/:id/mfa-exemption'],
+  ['put', '/users/:id/mfa-exemption'],
+  ['post', '/users/:id/mfa-exemption/revoke'],
+  ['post', '/groups'],
+  ['post', '/me/notify-admins'],
+  ['post', '/auth/employee-id'],
 ] as const;
 
 /** `GET /users/deleted` and `GET /users/picker` are other operations that the `:id` pattern would swallow; they stay mocked. */
@@ -552,22 +565,13 @@ export function realApiHandlers(on = HYBRID) {
  * writes in this browser only), which looked like real data. They now answer 501 `not_available`, so the screen shows an error instead of fake records.
  * When the API gains one of these routes, move it to REAL_API_AUTH_USERS (realApiCoverage.test.ts fails until it is listed there).
  */
-export const NOT_AVAILABLE = [
-  ['get', '/staff-registry/visibility'],
-  ['put', '/staff-registry/visibility'],
-  ['get', '/staff-registry/:employeeId'],
-  ['patch', '/staff-registry/:employeeId'],
-  ['get', '/users/:id/mfa-exemption'],
-  ['put', '/users/:id/mfa-exemption'],
-  ['post', '/users/:id/mfa-exemption/revoke'],
-  ['post', '/auth/employee-id'],
-  ['post', '/me/notify-admins'],
-  ['post', '/groups'],
-] as const;
+// Empty since 2026-11-23: every route the web calls is served by the API (0140, 0142, 0143, 0145). The list and its 501 handler stay for any new
+// screen that is built before its API.
+export const NOT_AVAILABLE: ReadonlyArray<readonly ['get' | 'post' | 'put' | 'patch' | 'delete', string]> = [];
 
-export function notAvailableHandlers(on = HYBRID) {
+export function notAvailableHandlers(on = HYBRID, routes: typeof NOT_AVAILABLE = NOT_AVAILABLE) {
   if (!on) return [];
-  return NOT_AVAILABLE.map(([method, path]) =>
+  return routes.map(([method, path]) =>
     http[method](`${API_BASE}${path}`, () =>
       HttpResponse.json(
         { type: 'about:blank', title: 'Not available yet', status: 501, code: 'not_available', detail: 'This screen is not connected to the server yet. Nothing was read or saved.' },

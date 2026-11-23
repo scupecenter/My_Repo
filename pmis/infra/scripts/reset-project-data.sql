@@ -107,6 +107,9 @@ SELECT t, 'keep', 'true' FROM unnest(ARRAY[
   'user_role_assignment_modules', 'user_role_assignment_profiles', 'permission_profiles', 'permission_grants', 'field_permissions', 'groups',
   'group_members', 'delegations', 'delegation_grants', 'delegation_regions', 'departments', 'pmis_context_keys',
   'absences',   -- staff absence records (0140): about people, not sites; KEEP (docs/ops/data-reset.md, Open)
+  -- staff registry (0142)
+  'staff_registry', 'staff_registry_visibility_state', 'staff_registry_visibility_fields', 'staff_registry_visibility_entries',
+  'user_mfa_exemptions', 'me_admin_requests',  -- 0143: MFA exemptions (identity) and the requests of users to the System Admins (people/admin data)
   -- configuration
   'workflow_definitions', 'workflow_streams', 'workflow_views', 'workflow_view_members', 'stage_definitions', 'task_definitions', 'task_predecessors',
   'phase_gate_rules', 'scenario_task_rules', 'scenario_rule_state', 'sla_rules', 'sla_rule_sets', 'sla_rule_set_items', 'sla_master_columns',

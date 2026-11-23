@@ -231,13 +231,17 @@
     "submit": "Link ID",
     "invalid": "Enter exactly 4 digits.",
     "not_in_registry": "This ID is not in the staff registry.",
-    "duplicate": "This ID is already linked to another account."
+    "duplicate": "This ID is already linked to another account.",
+    "unavailable": "Linking an employee ID is part of the Microsoft 365 sign-in, which is not available yet. An administrator sets your employee ID in Users & Roles.",
+    "rate_limited": "Too many attempts. Wait a minute and try again."
   },
   "pending": {
     "title": "Waiting for assignment",
     "body": "Your account is linked. A System Admin must assign your role and regions before you can see anything.",
     "notify": "Ask the admins",
     "sent": "The admins were notified.",
+    "rate_limited": "You asked the admins a moment ago. Try again later.",
+    "failed": "The admins could not be notified. Try again later.",
     "id": "Employee ID"
   },
   "myWork": {
@@ -4195,7 +4199,9 @@
       "sla_negative_duration": "SLA data alert (negative duration)",
       "snag_closed": "A snag was closed",
       "snag_raised": "A snag was raised",
-      "team_safety_cert": "A team safety certificate expires"
+      "team_safety_cert": "A team safety certificate expires",
+      "mfa_exemption": "Your MFA exemption was granted or revoked (always mailed)",
+      "assignment_request": "A user asks for an assignment (always mailed)"
     }
   },
   "dashSettings": {

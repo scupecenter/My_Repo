@@ -44,7 +44,9 @@ function codeInput(b: { code?: string; recovery_code?: string }): CodeInput | nu
   if (b.code !== undefined) return { code: b.code.replace(/\s/g, '') };
   return null;
 }
-const changePasswordSchema = z.object({ current_password: z.string().max(128), new_password: z.string().max(1024) }).strict();
+/** POST /auth/employee-id (contract EmployeeId: exactly 4 digits). */
+const employeeIdSchema = z.object({ employee_id: z.string().regex(/^[0-9]{4}$/) }).strict();
+const changePasswordSchema =z.object({ current_password: z.string().max(128), new_password: z.string().max(1024) }).strict();
 
 export const LOGIN_LIMIT_PER_IP = 10;
 /** Progressive limiting per address (Q168): failures counted over 15 minutes; after LOGIN_LIMIT_PER_IP of them the wait doubles from 2 s up to 60 s. */
@@ -200,6 +202,11 @@ export class AuthService {
       return this.db.runIn(tx, async () => {
         const tf = ok ? await this.twoFactor.state(row.user_id) : null;
         // Two-factor on: the password alone gives no session. A pending sign-in (5 minutes, single use) waits for the code or the enrolment.
+        // 0143 (ADR 0002 item 3): require_mfa on and no MFA exemption in force: a password alone gives no session (a TOTP code is GSDN Workspace's MFA)
+        if (ok && !tf?.required && (await this.mfaRequired(row.user_id))) {
+          await this.syslog.write('warn', 'local_sign_in_mfa_required', { identifier_hmac: masked, ip }, row.user_id, requestId);
+          return { mfaRequired: true as const };
+        }
         const next = tf?.required ? (tf.enrolled ? ('two_factor' as const) : ('enrol' as const)) : null;
         const pending = next ? await this.twoFactor.createPending(row.user_id, next, ip) : null;
         await this.syslog.write(ok ? 'info' : 'warn', !ok ? 'local_sign_in_failed' : pending ? 'local_sign_in_password_ok' : 'local_sign_in_ok',
@@ -210,6 +217,10 @@ export class AuthService {
       });
     });
     this.states.invalidate(row.user_id);
+    if (created && 'mfaRequired' in created) {
+      await this.securityLog.write({ event: 'sign_in_failed', outcome: 'failure', userId: row.user_id, identifier, ctx, detail: { reason: 'mfa_required' } });
+      throw problems.mfaRequired();
+    }
     if (!created) {
       failed();
       await this.securityLog.write({ event: 'sign_in_failed', outcome: 'failure', userId: row.user_id, identifier, ctx, detail: { reason: 'bad_password' } });
@@ -239,6 +250,12 @@ export class AuthService {
     const wait = this.limiter.hit(`stepup:${auth.user.id}`, LOGIN_LIMIT_PER_IDENTIFIER);
     if (wait) throw problems.rateLimited(wait);
     await this.checkOwnPassword(auth, body.password, 'step_up');
+    // 0143 (ADR 0002 items 3 and 6): the same MFA rule as sign-in; an MFA exemption in force skips it
+    if (!needCode && (await this.mfaRequired(auth.user.id))) {
+      await this.securityLog.write({ event: 'step_up_failed', outcome: 'failure', userId: auth.user.id, detail: { reason: 'mfa_required' },
+        ctx: { ip: auth.ip, userAgent: null, requestId: null, sessionId: auth.session.id, authMethod: 'local' } });
+      throw problems.mfaRequired();
+    }
     if (needCode && input) {
       const r = await this.twoFactor.check(auth.user.id, input);
       if (!r.ok) {
@@ -408,6 +425,37 @@ export class AuthService {
     const codes = await this.twoFactor.regenerateRecovery(auth.user.id);
     await this.syslog.write('info', 'local_recovery_codes_regenerated', {}, auth.user.id, undefined);
     return { recovery_codes: codes, recovery_codes_remaining: codes.length };
+  }
+
+  /** GSDN Workspace's MFA check (0143, auth_mfa_required): the setting require_mfa is on and no MFA exemption is in force for the user. */
+  private async mfaRequired(userId: string): Promise<boolean> {
+    const rows = await this.db.tx.$queryRaw<{ r: boolean }[]>`SELECT auth_mfa_required(${userId}::uuid) AS r`;
+    return rows[0]?.r === true;
+  }
+
+  /**
+   * POST /auth/employee-id (0143, contract linkEmployeeId). The first-sign-in link belongs to the M365 path (ADR 0002 item 4): the typed ID must exist
+   * in the staff registry and not be linked to another account. Neither the M365 sign-in nor the staff registry exists on the server yet (Q625), and a
+   * local account gets its employee ID from the admin in Users & Roles, so every session answers the same 409 `invalid_transition` whatever ID is
+   * typed (nothing tells whether an ID is registered or used). The format is checked first (422), the calls are rate limited like sign-in, and each
+   * refusal is written to the System Log with a keyed hash of the ID only.
+   */
+  async linkEmployeeId(auth: AuthContext, rawBody: unknown): Promise<never> {
+    const { employee_id } = parse(employeeIdSchema, rawBody);
+    const ipWait = this.limiter.hit(`empid:ip:${auth.ip ?? 'unknown'}`, LOGIN_LIMIT_PER_IP);
+    const userWait = ipWait ? 0 : this.limiter.hit(`empid:user:${auth.user.id}`, LOGIN_LIMIT_PER_IDENTIFIER);
+    if (ipWait || userWait) {
+      await this.syslog.write('warn', 'employee_id_link_rate_limited', { ip: auth.ip }, auth.user.id);
+      const rl = problems.rateLimited(Math.max(ipWait, userWait));
+      throw new ProblemException(429, 'rate_limited', { ...rl.opts, commit: true }); // commit: the System Log row stays
+    }
+    await this.syslog.write('warn', 'employee_id_link_refused', {
+      employee_id_hmac: this.hmac.mask(employee_id), auth_method: auth.session.authMethod, reason: auth.session.authMethod === 'm365' ? 'registry_unavailable' : 'not_m365',
+    }, auth.user.id);
+    throw new ProblemException(409, 'invalid_transition', {
+      detail: 'The employee-ID link is part of the first Microsoft 365 sign-in, which is not available yet. An administrator sets the employee ID of a local account in Users & Roles.',
+      commit: true, // the System Log row of the refusal stays
+    });
   }
 
   async logout(auth: AuthContext): Promise<void> {

@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tansta
 import { api, ApiError, downloadFile, type RequestOptions } from './client';
 import type {
   ActiveSession, ActOnBehalfRequest, Calendar, CalendarConfirmation, MailNotificationKinds, ImportsSettings, NavLayoutSetting, UiIdentity, UiBrand, NavLayoutT, ContractorRules, ContractorRulesInput, ContractorsCompletenessReport, TeamScopeMismatchReport, DeletedUser, PurgedUser, DlpSettings, DlpVersion, DlpVersionInput, Holiday, HolidayChangeResult, HolidayInput, HolidayPatch, HolidaySummary, IdleTaskAlertSetting, Job, LogIntegrity, LogRetention, LogRetentionInput,
-  NotificationPolicy, NotificationPolicyInput, NotificationTypeDef, Page, ReassignmentAlert, SecurityLogEntry, SessionRevokeResult, SlaPublishPreview, SlaRuleSet, SlaRuleSetPublishResult, SlaRuleSetSummary, SlaTaskRule, StaffVisibility, StructuralFreeze,
+  NotificationPolicy, NotificationPolicyInput, NotificationTypeDef, Page, ReassignmentAlert, SecurityLogEntry, SessionRevokeResult, SlaPublishPreview, SlaRuleSet, SlaRuleSetPublishResult, SlaRuleSetSummary, SlaTaskRule, StaffCard, StaffVisibility, StructuralFreeze,
   TaskDefinition, TeamScopeMatch, TeamScopeMatchInput, TransitionResultT, User, UserDetail, WeekendDaysResult, WeightSet, WeightSetCode, WeightSetInput, WeightSetPreview, WeightSetPublishResult, WorkflowVersion, WorkflowVersionSummary,
 } from './types';
 
@@ -194,8 +194,13 @@ export const useSetStaffVisibility = () => {
 };
 export const useHideStaffFields = () => {
   const qc = useQueryClient();
-  return useMutation<unknown, ApiError, { employee_id: string; hidden_fields: string[]; reason: string }>({
-    mutationFn: ({ employee_id, ...body }) => api.patch(`/staff-registry/${employee_id}`, { body }), onSettled: () => refresh(qc, 'staff'),
+  // PATCH /staff-registry/{employee_id} needs If-Match (contract): the row version is read from the card first.
+  return useMutation<unknown, ApiError, { employee_id: string; hidden_fields: ('email' | 'phone')[]; reason: string }>({
+    mutationFn: async ({ employee_id, ...body }) => {
+      const card = await api.get<StaffCard>(`/staff-registry/${employee_id}`);
+      return api.patch(`/staff-registry/${employee_id}`, { version: card.version, body });
+    },
+    onSettled: () => refresh(qc, 'staff'),
   });
 };
 

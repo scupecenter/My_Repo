@@ -14,7 +14,9 @@ import { checkIfMatch } from '../common/etag';
 import { ProblemException, problems } from '../common/problem';
 import { parse, uuidSchema } from '../common/zod';
 import { DbService } from '../db/db.service';
-import { MailPort } from '../mail/mail.port';
+import { MailMessage, MailPort } from '../mail/mail.port';
+import { MailService } from '../mail/mail.service';
+import { SecurityLogService } from '../logs/security-log.service';
 import { notifyByMail, PROFILE_MAIL } from '../me/profile.service';
 import { AssignmentDto, GroupRef, PickerItem, PurgedUserDto, UserDto, UsersRepo } from './users.repo';
 
@@ -51,6 +53,10 @@ const twoFactorSchema = z.object({ enabled: z.boolean(), reason }).strict();
 const twoFactorResetSchema = z.object({ reason }).strict();
 const enforcedSchema = z.object({ enforced: z.boolean(), reason }).strict();
 
+/** 0143: PUT /users/{id}/mfa-exemption (`until` null or missing = until revoked) and the revoke body. */
+const mfaSetSchema = z.object({ reason, until: z.string().datetime({ offset: true }).nullable().optional() }).strict();
+const mfaRevokeSchema = z.object({ reason }).strict();
+
 const resetSchema = z.object({ reason, temporary_password: z.string().max(1024).optional() }).strict();
 
 /** Answer of the two-factor admin calls. `enrol_code` is present only when a new code was made; it is shown once and never stored in clear. */
@@ -61,6 +67,29 @@ export interface TwoFactorChange {
 }
 const changeOf = (r: { s: string; e: Date | null }, code: string): TwoFactorChange =>
   r.e ? { two_factor: r.s, enrol_code: code, enrol_code_expires_at: r.e } : { two_factor: r.s };
+
+/** Contract MfaExemption (0143). */
+export interface MfaExemptionDto {
+  user: { id: string; display_name: string; employee_id: string | null };
+  exempt: boolean;
+  until: Date | null;
+  reason: string | null;
+  granted_by?: { id: string; display_name: string; employee_id: string | null };
+  granted_at: Date | null;
+}
+
+/** The mail to the user (0143). It never carries the reason or a link that signs in. */
+const MFA_MAIL = (granted: boolean, until: Date | null): Omit<MailMessage, 'to'> => ({
+  category: 'security_notice',
+  subject: granted ? 'GSDN Workspace: your account is exempt from the MFA requirement' : 'GSDN Workspace: your MFA exemption was revoked',
+  text: (granted
+    ? `An administrator exempted your GSDN Workspace account from the GSDN Workspace MFA requirement ${until ? `until ${until.toISOString().slice(0, 16).replace('T', ' ')} UTC` : 'until it is revoked'}. `
+      + 'MFA required by Microsoft 365 is not changed. '
+    : 'An administrator revoked the exemption of your GSDN Workspace account from the MFA requirement. Sign-in and step-up follow the normal MFA rule again. ')
+    + 'If you did not expect this, tell an administrator.\n\n'
+    + (granted ? 'أعفى المسؤول حسابك في نظام GSDN Workspace من شرط التحقق متعدد العوامل الخاص بالنظام. لا يتغير ما يفرضه Microsoft 365.'
+      : 'ألغى المسؤول إعفاء حسابك في نظام GSDN Workspace من شرط التحقق متعدد العوامل.'),
+});
 
 export interface UserDetailDto extends UserDto {
   assignments: AssignmentDto[];
@@ -90,6 +119,8 @@ export class UsersService {
     private readonly syslog: SyslogService,
     private readonly twoFactor: TwoFactorService,
     private readonly mail: MailPort,
+    private readonly securityLog: SecurityLogService,
+    private readonly mailer: MailService,
   ) {}
 
   async list(auth: AuthContext, q: Query): Promise<{ items: UserDto[]; page: { limit: number; next_cursor: string | null; total: number } }> {
@@ -371,6 +402,73 @@ export class UsersService {
     this.states.invalidate(user.id);
     await this.syslog.write('info', body.enforced ? 'two_factor_enforced_by_admin' : 'two_factor_unenforced_by_admin', { target_user: user.id }, auth.user.id);
     return { two_factor: user.two_factor, enforced: rows[0]?.e === true };
+  }
+
+  /** GET /users/{id}/mfa-exemption (0143): the exemption in force, for a holder of admin.users view (or the user themselves). */
+  async getMfaExemption(auth: AuthContext, id: string): Promise<MfaExemptionDto> {
+    if (id !== auth.user.id) await this.access.requireModuleView(auth, 'admin.users');
+    const user = uuidSchema.safeParse(id).success ? await this.repo.find(id) : null;
+    if (!user || user.is_break_glass) throw problems.notFound();
+    return this.mfaState(user);
+  }
+
+  /**
+   * PUT /users/{id}/mfa-exemption and POST /users/{id}/mfa-exemption/revoke (0143, idm_set_mfa_exempt). System Admin, or a delegate holding
+   * users.administer for all regions; a reason and the acting admin's own step-up; nobody exempts themselves; admins and delegates are exempted
+   * by a System Admin only. Removes only GSDN Workspace's own MFA check (auth_mfa_required), never Entra Conditional Access. The user is told in the
+   * inbox (database) and by mail (outbox).
+   */
+  async setMfaExemption(auth: AuthContext, id: string, raw: unknown, revoke: boolean): Promise<MfaExemptionDto> {
+    const body = revoke ? { ...parse(mfaRevokeSchema, raw), until: null } : parse(mfaSetSchema, raw);
+    await this.access.requireAdmin('users', 'administer');
+    const user = uuidSchema.safeParse(id).success ? await this.repo.find(id) : null;
+    if (!user || user.is_break_glass) throw problems.notFound();
+    if (user.id === auth.user.id) throw new ProblemException(403, 'self_beneficiary', { detail: 'Nobody can exempt themselves from MFA; another admin does it.' });
+    await this.stepUp.require(auth);
+    const until = body.until ? new Date(body.until) : null;
+    if (!revoke && until && until.getTime() <= Date.now()) {
+      throw problems.validation([{ path: '/until', code: 'must_be_future', message: 'The end date must be in the future (or empty: until revoked).' }]);
+    }
+    const rows = await this.db.tx.$queryRaw<{ act: string; nid: string | null }[]>`
+      SELECT r_action AS act, r_notification::text AS nid FROM idm_set_mfa_exempt(${user.id}::uuid, ${!revoke}::boolean, ${until}::timestamptz, ${body.reason}::text)`;
+    this.states.invalidate(user.id);
+    const granted = !revoke;
+    await this.securityLog.write({ event: granted ? 'mfa_exemption_granted' : 'mfa_exemption_revoked', outcome: 'info', userId: user.id,
+      detail: { by: auth.user.id, until: until?.toISOString() ?? null, action: rows[0]?.act ?? null },
+      ctx: { ip: auth.ip, userAgent: null, requestId: null, sessionId: auth.session.id, authMethod: auth.session.authMethod === 'm365' ? 'oidc' : auth.session.authMethod } }, { inTx: true });
+    await this.mailMfa(user.email, granted, until, rows[0]?.nid ?? null, auth.user.id);
+    const next = await this.repo.find(user.id);
+    if (!next) throw new ProblemException(500, 'internal_error', {});
+    return this.mfaState(next);
+  }
+
+  /**
+   * The mail to the user, always sent, never failing the request. Its dedup key is the one mail_on_notification gives the in-app notice
+   * (notification:<id>), so a System Admin who lists the kind mfa_exemption in mail.notification_kinds never causes a second mail.
+   */
+  private async mailMfa(email: string, granted: boolean, until: Date | null, notificationId: string | null, actor: string): Promise<void> {
+    const m = MFA_MAIL(granted, until);
+    await this.db.tx.$executeRaw`SAVEPOINT pmis_mfa_mail`;
+    try {
+      await this.mailer.sendToAddress(email, { kind: `identity.${m.category}`, subject: m.subject, text: m.text, dedupKey: notificationId ? `notification:${notificationId}` : undefined });
+      await this.db.tx.$executeRaw`RELEASE SAVEPOINT pmis_mfa_mail`;
+    } catch (e) {
+      await this.db.tx.$executeRaw`ROLLBACK TO SAVEPOINT pmis_mfa_mail`;
+      await this.syslog.write('warn', 'mail_send_failed', { category: m.category, error: e instanceof Error ? e.message.split('\n')[0] : 'unknown' }, actor);
+    }
+  }
+
+  private async mfaState(user: UserDto): Promise<MfaExemptionDto> {
+    const rows = await this.db.tx.$queryRaw<{ exempt: boolean; until: Date | null; reason: string | null; granted_at: Date | null; by_id: string | null; by_name: string | null; by_emp: string | null }[]>`
+      SELECT s.exempt, s.until, s.reason, s.granted_at, g.id::text AS by_id, g.display_name AS by_name, trim(g.employee_id) AS by_emp
+      FROM idm_mfa_exemption_state(${user.id}::uuid) s LEFT JOIN users g ON g.id = s.granted_by`;
+    const r = rows[0];
+    const ref = { id: user.id, display_name: user.display_name, employee_id: user.employee_id };
+    if (!r?.exempt) return { user: ref, exempt: false, until: null, reason: null, granted_at: null };
+    return {
+      user: ref, exempt: true, until: r.until, reason: r.reason, granted_at: r.granted_at,
+      ...(r.by_id ? { granted_by: { id: r.by_id, display_name: r.by_name ?? '', employee_id: r.by_emp } } : {}),
+    };
   }
 
   private requireStrong(password: string, ctx: { email: string; employeeId: string | null; phone: string | null }, path: string): void {

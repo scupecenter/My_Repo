@@ -10,11 +10,18 @@ import { UserStateService } from '../auth/user-state.service';
 import { decodeCursor, encodeCursor, likePattern, parseLimit } from '../common/cursor';
 import { mapDbError } from '../common/db-errors';
 import { contentVersion } from '../common/etag';
-import { problems } from '../common/problem';
+import { ProblemException, problems } from '../common/problem';
 import { parse, uuidSchema } from '../common/zod';
 import { DbService } from '../db/db.service';
 
 const reasonSchema = z.string().trim().min(3).max(1000);
+/** 0143: POST /groups (contract createGroup). Name 2..120, description up to 500, members optional (up to 500). */
+const createSchema = z.object({
+  name: z.string().trim().min(2).max(120),
+  description: z.string().max(500).optional(),
+  member_ids: z.array(z.string().uuid()).max(500).optional(),
+  reason: reasonSchema,
+}).strict();
 const addSchema = z.object({ user_ids: z.array(z.string().uuid()).min(1).max(500), reason: reasonSchema }).strict();
 
 interface GroupRow {
@@ -123,6 +130,28 @@ export class GroupsService {
     await this.access.requireModuleView(auth, 'admin.groups');
     const d = await this.detail(id);
     if (!d) throw problems.notFound();
+    return d;
+  }
+
+  /**
+   * POST /groups (0143, idm_group_create): groups.create for all regions and step-up; members also need groups.edit for all regions and go through
+   * idm_group_add_member (nobody adds themselves, no pending member, the post-state ceiling). Atomic: one refused member refuses the whole create.
+   */
+  async create(auth: AuthContext, raw: unknown): Promise<GroupDetailDto> {
+    const body = parse(createSchema, raw);
+    await this.access.requireAdmin('groups', 'create');
+    const members = [...new Set(body.member_ids ?? [])];
+    if (members.length > 0) await this.access.requireAdmin('groups', 'edit');
+    if (members.includes(auth.user.id)) throw new ProblemException(403, 'self_beneficiary', { detail: 'You cannot add yourself to a group.' });
+    await this.stepUp.require(auth);
+    const rows = await this.db.tx.$queryRaw<{ id: string }[]>`
+      SELECT idm_group_create(${body.name}::text, ${body.description ?? null}::text, ${members}::uuid[], ${body.reason}::text)::text AS id`;
+    await this.db.tx.$executeRaw`SET CONSTRAINTS ALL IMMEDIATE`;
+    const id = rows[0]!.id;
+    this.states.invalidate(...members);
+    await this.syslog.write('info', 'group_created', { group: id, members: members.length }, auth.user.id);
+    const d = await this.detail(id);
+    if (!d) throw new ProblemException(500, 'internal_error', {});
     return d;
   }
 

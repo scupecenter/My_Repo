@@ -232,11 +232,10 @@ describe('pending accounts (ADR 0002 section 5)', () => {
     expect((await api.call('get', '/groups')).status).toBe(200);
   });
 
-  it('POST /me/notify-admins is not built yet: 404 problem+json', async () => {
+  it('POST /me/notify-admins is reachable by a pending account (0143; the details are in users-groups-api.test.ts)', async () => {
     const api = await loggedIn(app, await makeUser(db, { status: 'pending_assignment' }));
     const res = await api.call('post', '/me/notify-admins', {});
-    expect(res.status).toBe(404);
-    expect(res.body.code).toBe('not_found');
+    expect(res.status).toBe(202);
   });
 });
 

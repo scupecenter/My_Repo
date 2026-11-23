@@ -20,7 +20,7 @@ function split(raw: unknown): { reason: string | null; rest: Record<string, unkn
 }
 
 /**
- * Migration 0145 (contract 0.15.59): the system-settings screens the web served from mocks only. The database owns every rule (the readers and the doors
+ * Migration 0145 (contract 0.15.61): the system-settings screens the web served from mocks only. The database owns every rule (the readers and the doors
  * dlp_settings_json, admin_publish_dlp, idle_task_alert_json, admin_set_idle_task_alert, notification_policy_json, notification_catalogue_json and
  * admin_set_notification_policy): who may read or write (admin.settings, System Admin or an all-regions delegate), the closed schemas with field errors,
  * the cross-field rules, the versions, the step-up and the audit rows. The service only shapes the call and keeps the step-up method of the session.

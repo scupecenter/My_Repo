@@ -223,10 +223,22 @@ export default async function setup(): Promise<() => Promise<void>> {
   process.env.TEST_SUPER_URL_GMP = gmpDb.superUrl;
   // The moved-past Site RFI database (migration 0136): the suite runs the one-time backfill, which reads every active site of its database, writes a running
   // Master import apply job (which defers the rules on every site of its database) and reads the milestones, the gates and the overrides of its sites.
+  // The users and groups API database (migration 0143): the suite switches the global setting require_mfa on, which would refuse every password-only
+  // sign-in of the other suites, so no other suite may share it.
+  const mfa = `${dbName}_mfa`;
+  const mfaDb = await buildDatabase(adminUrl, mfa, appPassword);
+  process.env.TEST_DATABASE_URL_MFA = mfaDb.appUrl;
+  process.env.TEST_SUPER_URL_MFA = mfaDb.superUrl;
   const rfi = `${dbName}_rfi`;
   const rfiDb = await buildDatabase(adminUrl, rfi, appPassword);
   process.env.TEST_DATABASE_URL_RFI = rfiDb.appUrl;
   process.env.TEST_SUPER_URL_RFI = rfiDb.superUrl;
+  // The Master import N/A and routing database (migration 0144): the suite opens the historical-load waiver, sets the Order Status rule of the Master import
+  // and reads the GECOL, Procurement and Acquisition records and the overrides of its sites, so it shares no database.
+  const mina = `${dbName}_mina`;
+  const minaDb = await buildDatabase(adminUrl, mina, appPassword);
+  process.env.TEST_DATABASE_URL_MINA = minaDb.appUrl;
+  process.env.TEST_SUPER_URL_MINA = minaDb.superUrl;
   // The workflow-editor database (migration 0090): the suite creates and publishes workflow versions (a new published version changes what every new site uses),
   // so no other suite may share it.
   const wfe = `${dbName}_wfe`;
@@ -323,6 +335,8 @@ export default async function setup(): Promise<() => Promise<void>> {
     await a.query(`DROP DATABASE IF EXISTS ${hmm} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${gmp} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${rfi} WITH (FORCE)`);
+    await a.query(`DROP DATABASE IF EXISTS ${mina} WITH (FORCE)`);
+    await a.query(`DROP DATABASE IF EXISTS ${mfa} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${wfe} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${wfg} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${rcols} WITH (FORCE)`);

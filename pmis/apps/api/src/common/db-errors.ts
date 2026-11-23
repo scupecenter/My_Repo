@@ -123,6 +123,11 @@ export function mapWfError(message: string): ProblemException | null {
       });
     case 'step_up_required':
       return new ProblemException(401, 'step_up_required', { detail: 'Confirm your password to continue.', step_up_method: 'password' });
+    case 'rate_limited': {
+      // 0143: the cooldown of POST /me/notify-admins, decided by the database (me_notify_admins)
+      const after = Math.max(1, Math.ceil(Number(extra.retry_after ?? 60)) || 60);
+      return new ProblemException(429, 'rate_limited', { detail: detail ?? 'You asked a moment ago. Try again later.', headers: { 'Retry-After': String(after) } });
+    }
     case 'delegate_forbidden':
       // 0145: a change that only a System Admin acting without delegation may make (the security and system rows of the notification policy)
       return new ProblemException(403, 'delegate_forbidden', { detail: detail ?? 'Only a System Admin acting without delegation may do this.' });

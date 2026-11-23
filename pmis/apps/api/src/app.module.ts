@@ -113,6 +113,7 @@ import { GroupsService } from './groups/groups.service';
 import { MatrixController } from './matrix/matrix.controller';
 import { MatrixService } from './matrix/matrix.service';
 import { EmailChangeRequestsController, MeController, PhoneChangeRequestsController } from './me/me.controller';
+import { NotifyAdminsService } from './me/notify-admins.service';
 import { EmailChangesService, PhoneChangesService, ProfileService } from './me/profile.service';
 import { MailPort } from './mail/mail.port';
 import { OutboxMail } from './mail/outbox-mail';
@@ -163,6 +164,8 @@ import { MasterExportService } from './exports/master-export.service';
 import { AbsencesController, ReassignmentController } from './reassignment/reassignment.controller';
 import { AbsencesService } from './reassignment/absences.service';
 import { ReassignmentService } from './reassignment/reassignment.service';
+import { StaffRegistryController } from './staff-registry/staff-registry.controller';
+import { StaffRegistryService } from './staff-registry/staff-registry.service';
 
 export function appModuleFor(config: AppConfig) {
   @Module({
@@ -182,12 +185,13 @@ export function appModuleFor(config: AppConfig) {
       SearchController, // 0.15.17 (F4)
       ExportsController, // 0.15.34: Master-format export
       AbsencesController, ReassignmentController, // 0.15.54 (migration 0140): absences and the lead decisions (B12b)
+      StaffRegistryController, // 0.15.56 (0142): staff registry card, visibility, edit
     ],
     providers: [
       { provide: APP_CONFIG, useValue: config },
       DbService, SyslogService, LogHmacService, TwoFactorService, PasswordService, RateLimiter, SessionService, UserStateService, StepUpService,
       InvitationsService, // 0091
-      AccessService, AuthService, UsersRepo, MeService, ProfileService, EmailChangesService, PhoneChangesService, UsersService, GroupsService,
+      AccessService, AuthService, UsersRepo, MeService, NotifyAdminsService, ProfileService, EmailChangesService, PhoneChangesService, UsersService, GroupsService,
       DepartmentsService, MessagesService, AnnouncementsService, IdempotencyService, RegionsService, RolesService, PermissionsService,
       AssignmentsService, DelegationsService, SitesService, SiteLocksService, SiteDraftsService, TaskViewService, TaskDetailService, WorkflowEditorService, WorkflowService, ApprovalsService, MyWorkService, OverridesService, CalendarService, SlaService, JobsService, RegistersService, RegisterColumnsService, MatrixService, WarehouseService, WarehouseConfigService, AsBuiltItemsService,
       NotificationsService, FollowService, StatusUpdatesService, InsightsService, TemplatesService, ImportService, ImportJobsService, UploadInterceptor, StorageService, DocumentsService, DocsGridService, LibraryService, ZipService, StorageJobsService, SnagsService,
@@ -202,6 +206,7 @@ export function appModuleFor(config: AppConfig) {
       SearchService, // 0.15.17 (F4)
       MasterExportService, // 0.15.34
       AbsencesService, ReassignmentService, // 0.15.54 (migration 0140)
+      StaffRegistryService, // 0.15.56 (0142)
       { provide: APP_GUARD, useClass: SessionGuard },
       { provide: APP_INTERCEPTOR, useClass: TxInterceptor },
       { provide: APP_FILTER, useClass: ProblemFilter },

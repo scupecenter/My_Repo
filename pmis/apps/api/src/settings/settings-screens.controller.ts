@@ -5,7 +5,7 @@ import { Auth } from '../auth/decorators';
 import { etagHeader } from '../common/etag';
 import { SettingsScreensService } from './settings-screens.service';
 
-/** DLP, idle-task alert and notification policy (contract tag `settings`, 0.15.59, migration 0145). The session guard is global; the database checks the rights. */
+/** DLP, idle-task alert and notification policy (contract tag `settings`, 0.15.61, migration 0145). The session guard is global; the database checks the rights. */
 @Controller('settings')
 export class SettingsScreensController {
   constructor(private readonly screens: SettingsScreensService) {}

@@ -1,4 +1,4 @@
--- Settings screens on the real API (migration 0145, contract 0.15.59): DLP versions, the idle-task alert, the notification policy and the holidays import.
+-- Settings screens on the real API (migration 0145, contract 0.15.61): DLP versions, the idle-task alert, the notification policy and the holidays import.
 -- dlp_versions is written only by admin_publish_dlp; the settings notifications.policy and tasks.idle_alert only by their doors (settings_guarded_keys of 0072);
 -- every door needs a System Admin or a delegate of admin.settings (calendars for the holidays) edit for all regions and a reason; the DLP door and the security
 -- and system rows of the policy need a step-up. Alice: CW Team Lead in Tripoli, not a System Admin. DEL_ALL: a delegate of the System Admin for users, assignments

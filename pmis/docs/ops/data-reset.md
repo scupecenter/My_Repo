@@ -103,6 +103,8 @@ records of the Contractors register (companies, teams, contracts) and the vehicl
 | email_change_requests | KEEP | Identity requests. |
 | phone_change_requests | KEEP | Identity requests. |
 | user_invitations | KEEP | Invitations (owner: keep). |
+| user_mfa_exemptions | KEEP | Per-user MFA exemptions (migration 0143): identity; the history stays in the Audit Log. |
+| me_admin_requests | KEEP | Requests of users to the System Admins (POST /me/notify-admins, migration 0143): people and admin data, and the cooldown of each user. |
 | roles | KEEP | Roles. |
 | role_default_regions | KEEP | Role defaults. |
 | role_default_modules | KEEP | Role defaults. |
@@ -120,6 +122,10 @@ records of the Contractors register (companies, teams, contracts) and the vehicl
 | delegation_grants | KEEP | Delegated actions. |
 | delegation_regions | KEEP | Delegated regions. |
 | departments | KEEP | Departments (direct managers and MFA exemptions are columns of `users`). |
+| staff_registry | KEEP | The staff registry (0142): employee cards, kept like accounts. |
+| staff_registry_visibility_state | KEEP | Staff registry visibility settings (0142). |
+| staff_registry_visibility_fields | KEEP | Staff registry per-field defaults (0142). |
+| staff_registry_visibility_entries | KEEP | Staff registry allow/deny entries (0142). |
 | pmis_context_keys | KEEP | Session-context signing keys. |
 | absences | KEEP | Staff absence records (migration 0140): they concern people, not sites; kept on the safe side (see Open). |
 

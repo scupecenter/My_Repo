@@ -19,7 +19,7 @@ const TONE: Record<string, string> = { validated: 'bg-waitBg text-waitInk', in_a
 const dateOf = (iso?: string) => (iso ? iso.slice(0, 10) : '—');
 /** The kind of a template: the whole Master, a Site Register stream template (Q73), or the template of a register (a file from before 0.11.5 has no `template_kind`). */
 const kindOf = (x: Template): NonNullable<Template['template_kind']> => x.template_kind ?? (x.stream ? 'stream' : x.register_key ? 'register' : 'master');
-/** 0.15.59: the list values (TPL-LISTVALUES) and the holidays (TPL-HOLIDAYS) are uploaded on their own screens (Lists, Settings > Calendar), not as an import batch. */
+/** 0.15.61: the list values (TPL-LISTVALUES) and the holidays (TPL-HOLIDAYS) are uploaded on their own screens (Lists, Settings > Calendar), not as an import batch. */
 const ownScreen = (k: ReturnType<typeof kindOf>): k is 'list_values' | 'holidays' => k === 'list_values' || k === 'holidays';
 
 /**

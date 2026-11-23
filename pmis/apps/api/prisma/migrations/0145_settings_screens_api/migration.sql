@@ -1,4 +1,4 @@
--- 0145_settings_screens_api: the system-settings routes the web calls that no controller served (contract 0.15.59, CHANGELOG 197).
+-- 0145_settings_screens_api: the system-settings routes the web calls that no controller served (contract 0.15.61, CHANGELOG 197).
 -- Mirror: db/sql/144_settings_screens_api.sql (kept byte-identical).
 --
 --   1. DLP (CLAUDE.md "Defects Liability Period"): dlp_versions holds the versions of dlp.months.cw (default 3) and dlp.months.te (default 12), each with an
@@ -867,7 +867,7 @@ VALUES ('settings_screens_api_applied', 'workflow', NULL,
                            'idle_task_alert', 'tasks.idle_alert (switch); the working days are dashboard.settings.stale_idle_days',
                            'notification_policy', 'notifications.policy with admin_set_notification_policy and notif_catalogue',
                            'holidays_import', 'TPL-HOLIDAYS with admin_import_holidays'),
-        'Settings screens on the real API (migration 0145, contract 0.15.59).');
+        'Settings screens on the real API (migration 0145, contract 0.15.61).');
 
 DO $$
 DECLARE f text;
