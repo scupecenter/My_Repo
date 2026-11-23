@@ -221,6 +221,12 @@ export default async function setup(): Promise<() => Promise<void>> {
   const gmpDb = await buildDatabase(adminUrl, gmp, appPassword);
   process.env.TEST_DATABASE_URL_GMP = gmpDb.appUrl;
   process.env.TEST_SUPER_URL_GMP = gmpDb.superUrl;
+  // The moved-past Site RFI database (migration 0136): the suite runs the one-time backfill, which reads every active site of its database, writes a running
+  // Master import apply job (which defers the rules on every site of its database) and reads the milestones, the gates and the overrides of its sites.
+  const rfi = `${dbName}_rfi`;
+  const rfiDb = await buildDatabase(adminUrl, rfi, appPassword);
+  process.env.TEST_DATABASE_URL_RFI = rfiDb.appUrl;
+  process.env.TEST_SUPER_URL_RFI = rfiDb.superUrl;
   // The workflow-editor database (migration 0090): the suite creates and publishes workflow versions (a new published version changes what every new site uses),
   // so no other suite may share it.
   const wfe = `${dbName}_wfe`;
@@ -310,11 +316,14 @@ export default async function setup(): Promise<() => Promise<void>> {
     await a.query(`DROP DATABASE IF EXISTS ${hgd} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${hmm} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${gmp} WITH (FORCE)`);
+    await a.query(`DROP DATABASE IF EXISTS ${rfi} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${wfe} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${wfg} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${rcols} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${tplst} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${scols} WITH (FORCE)`);
+    await a.query(`DROP DATABASE IF EXISTS ${slaDb_} WITH (FORCE)`);
+    await a.query(`DROP DATABASE IF EXISTS ${f20k} WITH (FORCE)`);
     await a.end();
   };
 }
