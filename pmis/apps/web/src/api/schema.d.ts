@@ -9273,7 +9273,11 @@ export interface components {
                             value: string;
                             label_en: string;
                             label_ar: string | null;
+                            /** @description 0.15.50. Only in a dependent list: the code of the parent value of this option. */
+                            parent?: string | null;
                         }[];
+                        /** @description 0.15.50. Only for a list whose catalogue has a parent list: the Master column (ord) of the cell of the same site that holds the parent value. Offer the options whose `parent` equals that value; absent when the parent list is not in the menu. */
+                        parent_ord?: number;
                     };
                 };
             }[];
@@ -27289,6 +27293,14 @@ export interface operations {
                 milestone?: string;
                 /** @description Contractor Name (Master AJ) of the first procurement order of scope CW, Tower Erection or Site Adaption that is neither cancelled nor rejected (0.15.33, the workbook rule), comma-separated. A caller without the procurement view matches no site. */
                 contractor?: string;
+                /** @description 0.15.50. The current stage (milestone code, for example MS2) of the site, as in `GET /sites`. */
+                stage_code?: string;
+                /** @description 0.15.50. `mine` (sites with open work held by the caller), `late` (an overdue open task), `waiting_approval`, `closed`; as in `GET /sites`. */
+                bucket?: "all" | "mine" | "late" | "waiting_approval" | "closed";
+                /** @description 0.15.50. `locked` keeps the sites whose sequencing locks apply, `open` the sites whose locks are off. */
+                workflow_locks?: "locked" | "open";
+                /** @description 0.15.50. `with` keeps the sites with at least one missing required value, `without` the others. */
+                data_gaps?: "with" | "without";
                 /** @description site_code (default), name, region, status, milestone, phase, or ord:<n> of a column of the menu. */
                 sort?: string;
                 dir?: "asc" | "desc";
