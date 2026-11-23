@@ -13,6 +13,7 @@ import { DbService } from '../db/db.service';
 import { setVia, viaSchema } from '../common/via';
 import { resolveMentions } from '../common/mentions';
 import { DocumentsService } from '../documents/documents.service';
+import { assertListParents } from './list-parent';
 import { TaskDetailDto, TaskDetailService } from './task-detail.service';
 import { TaskViewService, UserRefDto } from './task-view.service';
 
@@ -195,6 +196,8 @@ export class WorkflowService {
       if (p) throw p;
       throw e;
     }
+    // after the save, so the rights, the state and the version are decided first; a refusal rolls the whole request back (the transaction of the request)
+    await assertListParents(this.db, taskId, patch.values);
     return this.detail.get(auth, taskId);
   }
 
