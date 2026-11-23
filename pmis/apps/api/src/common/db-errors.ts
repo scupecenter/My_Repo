@@ -123,6 +123,9 @@ export function mapWfError(message: string): ProblemException | null {
       });
     case 'step_up_required':
       return new ProblemException(401, 'step_up_required', { detail: 'Confirm your password to continue.', step_up_method: 'password' });
+    case 'delegate_forbidden':
+      // 0145: a change that only a System Admin acting without delegation may make (the security and system rows of the notification policy)
+      return new ProblemException(403, 'delegate_forbidden', { detail: detail ?? 'Only a System Admin acting without delegation may do this.' });
     case 'insufficient_stock':
     case 'item_in_use':
       return new ProblemException(422, m[1], {

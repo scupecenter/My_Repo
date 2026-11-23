@@ -571,8 +571,8 @@ describe('holiday import needs a reason', () => {
     await signIn('pm');
     const u = userEvent.setup();
     settings('calendar');
-    await u.upload(await screen.findByTestId('cal-import-file'), new File(['date,name_en\n2026-12-30,Test\n'], 'h.csv', { type: 'text/csv' }));
-    expect(await screen.findByTestId('holiday-import-name')).toHaveTextContent('h.csv');
+    await u.upload(await screen.findByTestId('cal-import-file'), new File(['date,name_en\n2026-12-30,Test\n'], 'h.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+    expect(await screen.findByTestId('holiday-import-name')).toHaveTextContent('h.xlsx');
     await u.click(screen.getByTestId('holiday-import-dialog-submit'));
     expect(await screen.findByTestId('holiday-import-dialog-reason-error')).toBeInTheDocument();
     await reasonAndSave(u, 'holiday-import-dialog', 'Official list 2026');

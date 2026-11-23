@@ -505,6 +505,16 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/exports/master'],
   ['get', '/exports/master'],
   ['get', '/exports/master/:id/download'],
+  // Contract 0.15.59 (migration 0145; apps/api: settings, calendar): DLP versions, the idle-task alert, the notification policy and its catalogue, and the
+  // holidays import (TPL-HOLIDAYS). They answered 501 not_available until the API served them.
+  ['get', '/settings/dlp'],
+  ['post', '/settings/dlp/versions'],
+  ['get', '/settings/idle-task-alert'],
+  ['put', '/settings/idle-task-alert'],
+  ['get', '/settings/notification-policy/catalogue'],
+  ['get', '/settings/notification-policy'],
+  ['put', '/settings/notification-policy'],
+  ['post', '/settings/holidays/import'],
 ] as const;
 
 /** `GET /users/deleted` and `GET /users/picker` are other operations that the `:id` pattern would swallow; they stay mocked. */
@@ -540,13 +550,6 @@ export const NOT_AVAILABLE = [
   ['get', '/reassignments/eligible-users'],
   ['post', '/tasks/reassign'],
   ['post', '/tasks/:id/act-on-behalf'],
-  ['get', '/settings/dlp'],
-  ['post', '/settings/dlp/versions'],
-  ['get', '/settings/idle-task-alert'],
-  ['put', '/settings/idle-task-alert'],
-  ['get', '/settings/notification-policy'],
-  ['put', '/settings/notification-policy'],
-  ['get', '/settings/notification-policy/catalogue'],
   ['get', '/staff-registry/visibility'],
   ['put', '/staff-registry/visibility'],
   ['get', '/staff-registry/:employeeId'],
@@ -557,7 +560,6 @@ export const NOT_AVAILABLE = [
   ['post', '/auth/employee-id'],
   ['post', '/me/notify-admins'],
   ['post', '/groups'],
-  ['post', '/settings/holidays/import'],
 ] as const;
 
 export function notAvailableHandlers(on = HYBRID) {

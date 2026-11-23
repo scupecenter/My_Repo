@@ -6,6 +6,42 @@
 
 ---
 
+## 2026-11-23 (197): شاشات إعدادات النظام على الخادم الحقيقي: فترة ضمان العيوب (DLP)، تنبيه المهمة الخاملة، سياسة الإشعارات، واستيراد العطل (الترحيل 0145، العقد 0.15.59)
+
+### قرارات
+- المسارات الثمانية التي كانت تُجاب في الإنتاج الهجين بـ 501 `not_available` صار يخدمها الخادم: `GET /settings/dlp`، `POST /settings/dlp/versions`، `GET`/`PUT /settings/idle-task-alert`، `GET`/`PUT /settings/notification-policy`، `GET /settings/notification-policy/catalogue`، `POST /settings/holidays/import`. كل القواعد في قاعدة البيانات (الصلاحية، المخطط المغلق، القواعد بين الحقول، الإصدار، الخطوة الإضافية، التدقيق).
+- **أيام الخمول هي إعداد واحد**: أيام «تنبيه المهمة الخاملة» (B12b، افتراضياً يوما عمل) هي نفسها `stale_idle_days` في إعدادات لوحة القيادة (0113، Q523: حد واحد لكل المهام). لا تكرار: الشاشتان تكتبان القيمة نفسها، وشارة «راكدة» وعدّاد اللوحة يقرآنها. الجديد فقط مفتاح التشغيل `tasks.idle_alert`، ورقم الإصدار (ETag) يتحرك إذا غيّرت أيٌّ من الشاشتين القيمة.
+- **DLP بإصدارات**: جدول `dlp_versions`؛ الإصدار 1 من القيم السارية (CW 3 أشهر، TE 12 شهراً). الإصدار يسري من اليوم أو بعده ولا يسبق آخر إصدار (Q600)، فلا يتغير DLP لأي PAC صدر. حدث بداية SLA `DLP:<task>:<key>` يجمع الأشهر السارية **في تاريخ PAC** لا اليوم.
+- **استيراد العطل**: القالب المعتمد `TPL-HOLIDAYS` (xlsx) فقط، كما قرر المالك في ADR 0011؛ ملف CSV يُرفض. يُطبق فوراً (العطل إعدادات، لا دفعة L1/L2)؛ صف خاطئ واحد يرفض الملف كله.
+
+### إضافة
+- الترحيل `0145_settings_screens_api` (مرآته `db/sql/144_settings_screens_api.sql`):
+  - `dlp_versions` و`dlp_months_at(key, date)` و`dlp_settings_json()` و`admin_publish_dlp(body, reason)` (مدير النظام أو مفوَّض `admin.settings` تعديل لكل المناطق، سبب، خطوة إضافية، أخطاء حقول `in_the_past` و`before_latest_version` و`out_of_range` و`unknown_key`، سطر تدقيق `dlp_version_publish` قبل/بعد).
+  - `idle_task_alert_json()` و`admin_set_idle_task_alert(body, reason, version)` (سبب وIf-Match، أيام 1 إلى 30، سطر تدقيق `idle_task_alert_update`).
+  - كتالوج الإشعارات `notif_catalogue()` (25 نوعاً بأسماء العقد؛ أنواع الأمان إلزامية لمديري النظام داخل التطبيق وبالبريد، و`no_holder` إلزامي وفوري)، و`notification_policy_json()` و`notification_catalogue_json()` (عرض أو تعديل `admin.settings`)، و`admin_set_notification_policy(body, reason, version)`.
+  - قالب `TPL-HOLIDAYS` (نوع القالب `holidays`، أعمدة ملف البذرة `db/seed/holidays-2026-2027.csv`) و`admin_import_holidays(rows, reason, meta)`.
+- الخادم: `SettingsScreensController` (DLP، الخمول، السياسة، الكتالوج) و`POST /settings/holidays/import` في وحدة التقويم الموجودة (`CalendarController`)، وتنزيل `TPL-HOLIDAYS` من صفحة القوالب لمن يملك تعديل التقويم.
+- اختبارات `apps/api/test/settings-screens-api.test.ts` بقاعدة خاصة (`TEST_DATABASE_URL_SSA`): 22 اختباراً (الرفض، التحقق مع المفاتيح المجهولة والقاعدة بين الحقول، الإصدارات، التدقيق، PAC يحتفظ بقيمته، الملف الجيد والسيئ، إعادة حساب مواعيد المهام المفتوحة).
+
+### تعديل
+- `calc_setting` (آخر تعريف 0017): المفتاحان `dlp.months.cw` و`dlp.months.te` يُقرآن من الإصدار الساري اليوم، فكل قارئ للقيمة الحالية (مقترح خط الأساس، عمود نهاية DLP في الماستر) يتبع الإصدارات.
+- `sla_resolve_start` (آخر تعريف 0076) مغلَّف (`sla_resolve_start_pre_0145`) لحدث DLP فقط؛ بقية الأحداث كما هي.
+- `tpl_sync` (آخر تعريف 0105) يعرف النوع `holidays`؛ قيدا `template_definitions` يقبلانه.
+- العقد 0.15.59: وصف المسارات الثمانية، `template_kind` يضم `list_values` و`holidays`، و`ImportBatch.affected_open_tasks`. وأعيد توليد `apps/web/src/api/schema.d.ts`.
+- الواجهة: المسارات الثمانية انتقلت من `NOT_AVAILABLE` إلى `REAL_API_AUTH_USERS`؛ شاشة التقويم تقبل `.xlsx` فقط؛ صفحة القوالب لا تعرض «رفع» و«تعبئة مسبقة» لقالبي العطل وقيم القوائم (يُرفعان من شاشتيهما)؛ نصوص أخطاء الحقول الجديدة بالعربية والإنجليزية.
+
+### أمان
+- كل الدوال الجديدة SECURITY DEFINER مع `search_path = pg_catalog, public, pg_temp`، المالك `pmis_definer`، وEXECUTE مسحوب من PUBLIC؛ لـ `pmis_app` أبواب القراءة والكتابة فقط و`dlp_months_at` (يستدعيها `calc_setting` في جلسة القارئ). الصلاحية تُفحص في قاعدة البيانات.
+- `dlp_versions` بلا حق كتابة لـ `pmis_app` (`db/sql/app_grants.sql`)؛ المفتاحان `notifications.policy` و`tasks.idle_alert` محروسان بـ `settings_guarded_keys` (0072) فلا يُكتبان إلا عبر بابيهما.
+- صفوف الأمان والنظام في سياسة الإشعارات و`rate_cap_per_hour`: مدير نظام فقط (المفوَّض 403 `delegate_forbidden`) مع خطوة إضافية، ويُبلَّغ مديرو النظام داخل التطبيق باسم الفاعل.
+- ملف العطل يمر بحراسات الرفع نفسها (حد الحجم 413، حارس xlsx ضد الماكرو وقنبلة الضغط قبل أي محلل، ورقة `_tpl` والإصدار الحالي وصف العناوين)؛ كل رفض يُكتب في سجل النظام. الملف لا يُخزَّن (كبقية استيرادات القوالب) فلا يمر بفاحص الفيروسات.
+- حالات أمان جديدة: `tests/db-security/cases/E7_settings_screens_api.sql` (20 حالة).
+
+### مفتوح
+- Q600 إلى Q604 في `docs/spec/open-questions.md`: عدم الرجوع بتاريخ إصدار DLP، عمود نهاية DLP في الماستر (FG)، تاريخ عطلة موجود بقيم أخرى عند الاستيراد، مستلمو وقنوات الكتالوج الافتراضية، ومتى يُرسل تنبيه الخمول فعلاً.
+
+---
+
 ## 2026-11-23 (188): Site RFI التي تجاوزها الموقع تُعتمد تلقائياً على كل المواقع، والخطاف لا يتنحى إلا أثناء تطبيق ماستر جارٍ فعلاً (الترحيل 0136، العقد 0.15.52)
 
 ### قرارات

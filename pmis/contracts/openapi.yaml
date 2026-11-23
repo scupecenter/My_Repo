@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.52
+  version: 0.15.59
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -30,6 +30,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.59 (2026-11-23): the system-settings routes the web called that no controller served are served by the API (migration 0145, mirror `db/sql/144_settings_screens_api.sql`; CHANGELOG 197). Additive. (1) `GET /settings/dlp`, `POST /settings/dlp/versions`: the versions of `dlp.months.cw` and `dlp.months.te` (seed version 1: CW 3, TE 12); a version takes effect today or later and never before the latest version (field errors `in_the_past`, `before_latest_version`, `out_of_range`, `unknown_key`), so a PAC keeps the version in force on its date (the SLA start event `DLP:<task>:<key>` adds the months in force on the PAC date). (2) `GET`/`PUT /settings/idle-task-alert`: `working_days` is the existing dashboard idle limit `stale_idle_days` (one setting, Q523); `enabled` is new; the ETag moves when either screen changes it. (3) `GET`/`PUT /settings/notification-policy` and `GET /settings/notification-policy/catalogue`: closed schema validated in the database (`unknown_key` at the path of the key, the cross-field rule on both paths, `invalid_timezone`, `mandatory_locked`, `not_eligible_recipient`, `unknown_type`, `unknown_column`, `duplicate`); the security and system rows and `rate_cap_per_hour` need a System Admin (403 `delegate_forbidden`) and a step-up. (4) `POST /settings/holidays/import`: the approved template `TPL-HOLIDAYS` only (`template_kind` `holidays`, ADR 0011), applied at once: 202 with `status` `applied`, `counts.create` and `counts.unchanged`, and `affected_open_tasks`; one bad row refuses the file (`errors[]` with `path` `/rows/<line>/<field>`); any other file is 422 `template_rejected`. `Template.template_kind` lists `list_values` (0.15.23) and `holidays`. Numbered 0.15.59 because 0.15.53 to 0.15.58 are used by other branches.
     - 0.15.52 (2026-11-23): Site RFI the site moved past is approved automatically, on any site (owner decision 2026-11-22; migration 0136, mirror `db/sql/135_moved_past_site_rfi.sql`; CHANGELOG 179; 0.15.45 and 0.15.46 are reserved by other branches). Additive, no new path or field. A manual milestone (`calc.milestone_manual`, Site RFI MS4) that is open, in entry or locked but ready, that nothing waits for (its gate open, its predecessors done), that the site moved past (a later task approved with an actual date), that no person touched (no submit, review, approve, reject, reopen or reassign step, no date typed, no date override) and that was never reverted, is approved directly with its pre-filled date; with no pre-filled date, with the date of the earliest later task approved, flagged inferred. It is an admin override made by a rule of GSDN Workspace: `TaskDetail.overrides` lists an `Override` of the new `kind` `manual_ms_moved_past` (`entity` `task`, `before` `{state, actual_date, prefilled_date}`, `after` `{state: approved, actual_date, date_source: prefilled|inferred, note, evidence_task, evidence_date}`, no `acted_by`), revertible through `POST /overrides/{override_id}/revert` (System Admin, reason, step-up), which reopens the milestone at L1 with its pre-filled date; a milestone reverted under this kind or `historical_manual_ms_approved` is never approved again by either rule. It runs in the calculation path before the gate and D8 rules of 0.15.44 (Site RFI, then the gate, then TE Completion, D8 and On-Air follow) and once on the existing sites; the rules now stand aside only while a Master import apply runs.
     - 0.15.51 (2026-11-23): dependent lists are enforced on save (owner request 2026-11-23; CHANGELOG 187). Additive, no migration. `PATCH /tasks/{task_id}` answers 422 with the new error code `list_parent_mismatch` when a list field whose list has a parent list gets a value whose parent value differs from the parent value the site holds (the list field of the parent list, in this task or in another task of the site); `errors[0].path` is `/values/<key>` and the problem carries `field`, `list`, `parent_list` and `expected_parent`. While the parent value is empty, or for a value with no parent or one outside the list, or when a value is cleared (null), the save is accepted as before. A refusal saves nothing. The bulk edit uses the same path, so it is refused the same way; it can now also clear a value (`null`) in the client.
     - 0.15.50 (2026-11-22): the Site Master wide table is complete: the list filters in `GET /site360/{menu}/rows`, dependent lists, and bulk edit on the existing save path (owner request 2026-11-22; CHANGELOG 186). Additive, no migration. 0.15.49 is taken by another branch. (1) `GET /site360/{menu}/rows` takes `stage_code`, `bucket` (`all`, `mine`, `late`, `waiting_approval`, `closed`), `workflow_locks` (`locked`, `open`) and `data_gaps` (`with`, `without`) with the same meaning as `GET /sites`, computed by the same SQL (`sites.service`: the current stage of the site, the caller's own open work for `mine`, an overdue open task for `late`, the workflow locks flag, the missing required values), so the Site Master list and the wide table count the same sites; they combine with the filters already accepted (`site_code`, `region_id`, `sub_region`, `phase`, `batch`, `scenario`, `delivery_model`, `status`, `milestone`, `contractor`, `filter`). An unknown value is 422 `validation_failed`. (2) Dependent lists: for a list cell whose list has a parent list, each `options[]` entry carries `parent` (the code of its parent value) and the cell carries `parent_ord` (the Master column, of the same site and menu, that holds the parent value); the client offers only the options whose `parent` equals the value of that column in the same row. A cell with no `parent_ord` (the parent list is not in the menu) offers every option. Since 0.15.51 the server also refuses a non-matching child on save (422 `list_parent_mismatch`). (3) Bulk edit has no new path: the client saves each eligible cell with `PATCH /tasks/{task_id}` and `If-Match` (the same rights, locks, gate rules and errors as one inline edit), a few at a time, and shows saved, skipped and failed with the reasons.
@@ -7207,6 +7208,7 @@ paths:
       tags: [settings]
       operationId: getIdleTaskAlertSetting
       summary: Idle-task alert setting
+      description: Every signed-in user (the stale badge reads it).
       responses:
         '200':
           description: Setting.
@@ -7221,7 +7223,9 @@ paths:
       tags: [settings]
       operationId: setIdleTaskAlertSetting
       summary: Set the idle days that alert the lead (default 2 working days)
-      x-db-path: admin_set_setting
+      description: |
+        0.15.59 (migration 0145): System Admin or a delegate of `admin.settings` edit for all regions, a reason and If-Match. Closed body (`unknown_key`; `working_days` 1 to 30, `out_of_range`). `working_days` is the dashboard idle limit `stale_idle_days` (`PUT /settings/dashboard`, the stale flag and the stale-task counter use the same value, Q523): it is one setting, so the ETag of this resource moves when either screen changes it. Audited (`idle_task_alert_update`, before and after).
+      x-db-path: admin_set_idle_task_alert
       parameters:
       - {$ref: '#/components/parameters/IfMatch'}
       requestBody:
@@ -7524,8 +7528,9 @@ paths:
         **Mandatory types** (`mandatory` in the catalogue) cannot be switched off: a channel that is on by default stays on and the cells of the default recipients stay on, else 422 with `code` = `mandatory_locked`. A cell for a role or group that the catalogue does not make eligible for the type is `not_eligible_recipient`. A `timezone` that is not an IANA zone is `invalid_timezone`.
         Rows left out of `matrix` keep the catalogue defaults.
         **Security and system types (0.2.5 hardening):** every `security` type is mandatory for the System Admins. A body that changes any `security` or `system` row, or a threshold that feeds one (`rate_cap_per_hour`), needs step-up and a System Admin acting without delegation (403 `delegate_forbidden`); the change sends the System Admins an in-app alert naming the actor.
+        0.15.59 (migration 0145): an unknown key is reported at its own path with `code` = `unknown_key` (for example `/thresholds/x`, `/matrix/0/channels/sms`); other codes: `required`, `invalid`, `out_of_range`, `unknown_type`, `unknown_column` (a cell or column naming no such role, group or column), `duplicate`, `too_many`. A mandatory type keeps the System Admins cell on when the System Admins group is a column. When nothing was saved the columns are the System Admins group and the Project Manager role. Audited (`notification_policy_update`, before and after).
       x-step-up: when the body changes a security or system row or a threshold that feeds one
-      x-db-path: admin_set_setting
+      x-db-path: admin_set_notification_policy
       parameters:
       - {$ref: '#/components/parameters/IfMatch'}
       requestBody:
@@ -7792,8 +7797,10 @@ paths:
     post:
       tags: [calendar]
       operationId: importHolidays
-      summary: Upload the TPL-HOLIDAYS template (creates an import batch)
-      description: 'Seed file: `db/seed/holidays-2026-2027.csv`. Whether the CSV is accepted besides the xlsx template is an open point (ADR 0011). Needs a `reason` (0.2.6), like every other holiday change; it is written to the audit row of each holiday the batch changes. A missing or too short reason is 422 `validation_failed`.'
+      summary: Upload the TPL-HOLIDAYS template (applied at once)
+      description: |
+        Seed file: `db/seed/holidays-2026-2027.csv` (loaded by the seed script). The upload accepts the approved xlsx template `TPL-HOLIDAYS` only (ADR 0011, owner decision); a CSV or any other file is 422 `template_rejected` (`reason` `not_xlsx`, `macros_not_allowed`, `tpl_missing`, `wrong_template`, `outdated_version`, `checksum_mismatch`, `size_or_rows_exceeded`), written to the System Log. Needs a `reason` (0.2.6), like every other holiday change; it is written to the audit row of each holiday the file adds. A missing or too short reason is 422 `validation_failed`.
+        0.15.59 (migration 0145): System Admin or a delegate of `calendars` edit for all regions (checked in the database). The file is applied at once, not sent to L2 (holidays are configuration): `status` `applied`, `counts.create` (added) and `counts.unchanged` (a date the calendar already holds with the same values), `affected_open_tasks`. One bad row refuses the whole file: 422 `validation_failed` with `errors[]` per line (`path` `/rows/<line>/<field>`, codes `required`, `invalid`, `out_of_range`, `too_long`, `duplicate_in_file`, and `duplicate` for a date the calendar holds with other values; setting `calendar.holiday_import_existing` = `skip` leaves those dates as they are instead, Q602). The SLA due dates of open tasks are recalculated once; closed tasks keep their values. Audited per holiday (`holiday_create` with the import id) and per file (`holidays_import`).
       parameters:
       - {$ref: '#/components/parameters/IdempotencyKey'}
       requestBody:
@@ -8305,6 +8312,7 @@ paths:
       tags: [settings]
       operationId: getDlpSettings
       summary: Defects Liability Period months (CW and TE) with history
+      description: Every signed-in user. `current` is the version in force today; `history` is newest first.
       responses:
         '200':
           description: Current and history.
@@ -8317,7 +8325,9 @@ paths:
       tags: [settings]
       operationId: publishDlpVersion
       summary: Publish a new DLP version (`dlp.months.cw`, `dlp.months.te`)
-      description: Counted from the PAC date. A PAC keeps the version in force on its issue date.
+      description: |
+        Counted from the PAC date. A PAC keeps the version in force on its issue date.
+        0.15.59 (migration 0145): System Admin or a delegate of `admin.settings` edit for all regions, a reason and a step-up. Closed body (`unknown_key`). `effective_from` is today or later (`in_the_past`, Q600) and not before the effective date of the latest version (`before_latest_version`). A version effective today is in force at once; a later one is listed in `history` and becomes `current` on its date. Audited (`dlp_version_publish`, before and after).
       x-step-up: true
       x-db-path: admin_publish_dlp
       requestBody:
@@ -17604,7 +17614,7 @@ components:
         name_ar: { type: [string, 'null'] }
         kind: { type: string, enum: [data_import, assignment_import, config_import, master] }
         module_key: { $ref: '#/components/schemas/ModuleKey' }
-        template_kind: { type: string, enum: [register, stream, master, sites], description: 'A register template (one per register), a Site Register stream template (`TPL-SITE-DA`, `-CW`, `-TE`, `-CL`), the whole Master (`TPL-MASTER`) or, since 0.14.0, the New sites template (`TPL-SITE-NEW`, kind `sites`: one row per new site, entered through batch and L2).' }
+        template_kind: { type: string, enum: [register, stream, master, sites, list_values, holidays], description: 'A register template (one per register), a Site Register stream template (`TPL-SITE-DA`, `-CW`, `-TE`, `-CL`), the whole Master (`TPL-MASTER`) or, since 0.14.0, the New sites template (`TPL-SITE-NEW`, kind `sites`: one row per new site, entered through batch and L2). `list_values` (0.15.23): the values of a list (`TPL-LISTVALUES`). `holidays` (0.15.59): the holidays of the work calendar (`TPL-HOLIDAYS`, for a System Admin or a delegate of the calendar).' }
         register_key: { type: [string, 'null'], description: 'The register the template enters (`gecol` for TPL-GECOL). Null for a Site Register stream template or TPL-MASTER.' }
         stream: { type: [string, 'null'], description: 'The stream of a Site Register stream template (Q73): DESIGN_ACQ, CW, TE or CLOSURE.' }
         current_version: { type: integer, minimum: 1, description: 'Shown as "v3". Exactly one version is current; older versions are rejected on upload. A new version is issued by the database when the register''s fields or custom fields change.' }
@@ -17771,6 +17781,7 @@ components:
         site_id: { type: [string, 'null'], format: uuid, description: 'The task''s site when `task_id` is set.' }
         uploaded_by: { $ref: '#/components/schemas/UserRef' }
         uploaded_at: { type: string, format: date-time }
+        affected_open_tasks: { type: integer, description: '0.15.59. `POST /settings/holidays/import` only: the open tasks whose SLA due date moved.' }
         version: { type: integer }
     ImportRow:
       type: object

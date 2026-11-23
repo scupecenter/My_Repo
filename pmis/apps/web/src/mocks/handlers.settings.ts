@@ -387,7 +387,7 @@ export const settingsHandlers = [
     const rows = (await f.text()).split(/\r?\n/).slice(1).map((l) => l.split(',')).filter((c) => /^\d{4}-\d{2}-\d{2}$/.test(c[0]) && !C().holidays.some((h) => h.date === c[0]));
     rows.forEach((c, i) => C().holidays.push({ id: crypto.randomUUID(), calendar_code: 'LY', date: c[0], name_en: c[1] ?? `Imported ${i}`, name_ar: c[2] ?? null, kind: c[3] === 'religious' ? 'religious' : 'national', tentative: c[4] === 'yes', confirmed_at: null, confirmed_by: null, version: 1 } as Holiday));
     save();
-    return HttpResponse.json({ id: crypto.randomUUID(), status: 'applied', rows_added: rows.length }, { status: 202 });
+    return HttpResponse.json({ id: crypto.randomUUID(), template_id: 'TPL-HOLIDAYS', template_version: 1, status: 'applied', counts: { create: rows.length, update: 0, unchanged: 0, error: 0 }, affected_open_tasks: 12, version: 1 }, { status: 202 });
   }),
   http.patch(`${B}/settings/holidays/:id`, async ({ params, request }) => {
     const g = needAdmin(); if (g) return g;

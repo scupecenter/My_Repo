@@ -269,6 +269,12 @@ export default async function setup(): Promise<() => Promise<void>> {
   const f20kDb = await buildDatabase(adminUrl, f20k, appPassword);
   process.env.TEST_DATABASE_URL_F20K = f20kDb.appUrl;
   process.env.TEST_SUPER_URL_F20K = f20kDb.superUrl;
+  // The settings screens API database (migration 0145): the suite publishes DLP versions, changes the notification policy and the idle limit, and imports
+  // holidays, which recalculates the due dates of open tasks: no other suite may meet those settings or that calendar.
+  const ssa = `${dbName}_ssa`;
+  const ssaDb = await buildDatabase(adminUrl, ssa, appPassword);
+  process.env.TEST_DATABASE_URL_SSA = ssaDb.appUrl;
+  process.env.TEST_SUPER_URL_SSA = ssaDb.superUrl;
   process.env.TEST_DATABASE_URL = main.appUrl;
   process.env.TEST_SUPER_URL = main.superUrl;
   process.env.TEST_DATABASE_URL_SOLO = one.appUrl;
@@ -322,6 +328,7 @@ export default async function setup(): Promise<() => Promise<void>> {
     await a.query(`DROP DATABASE IF EXISTS ${rcols} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${tplst} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${scols} WITH (FORCE)`);
+    await a.query(`DROP DATABASE IF EXISTS ${ssa} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${slaDb_} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${f20k} WITH (FORCE)`);
     await a.end();

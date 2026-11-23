@@ -115,7 +115,7 @@ export function Calendar() {
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <h2 className="me-auto font-bold">{t('cal.holidays')}</h2>
           <select className="input w-auto" aria-label={t('cal.year')} data-testid="cal-year" value={year} onChange={(e) => setYear(Number(e.target.value))}>{[2026, 2027, 2028].map((y) => <option key={y}>{y}</option>)}</select>
-          <input ref={file} type="file" accept=".csv,.xlsx" className="sr-only" data-testid="cal-import-file" aria-label={t('cal.import')}
+          <input ref={file} type="file" accept=".xlsx" className="sr-only" data-testid="cal-import-file" aria-label={t('cal.import')}
             onChange={(e) => { setImportFile(e.target.files?.[0] ?? null); imp.reset(); e.target.value = ''; }} />
           <button className="btn" data-testid="cal-import" onClick={() => file.current?.click()}><Upload size={14} />{t('cal.import')}</button>
           <button className="btn btn-accent" data-testid="cal-add" onClick={() => setDlg({ kind: 'edit', h: null })}><Plus size={14} />{t('cal.add')}</button>
