@@ -28,7 +28,7 @@ ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
 -- @title The System Admin renames the saved policy row away after a legitimate save: the update trigger looks at the old key too
 -- @category settings-screens-api
 -- @expect error 42501 permission denied
-\ctx ADMIN
+\ctx ADMIN stepup=300
 SELECT admin_set_notification_policy((p - 'version' - 'updated_at' - 'updated_by') || '{"digest_hour": 9}'::jsonb, 'A legitimate save first', NULL)
 FROM notification_policy_json() p;
 UPDATE settings SET key = 'notifications.policy_old' WHERE key = 'notifications.policy';
@@ -178,6 +178,39 @@ SELECT idle_task_alert_json();
 -- @expect error P0001 wf:validation_failed.*/rows/3/date
 SELECT admin_import_holidays('[{"line": 2, "date": "2034-01-01", "name_en": "Good row", "kind": "national", "tentative": "no"},
                                {"line": 3, "date": "2034-02-30", "name_en": "Bad date", "kind": "national", "tentative": "no"}]'::jsonb, 'Bad file', '{}'::jsonb);
+-- @end
+
+-- @case SSA-21
+-- @title The System Admin without a step-up switches the whole policy off (security review 2026-11-23: the switch is protected)
+-- @category settings-screens-api
+-- @actor ADMIN
+-- @region *
+-- @expect error P0001 step_up_required
+SELECT admin_set_notification_policy((p - 'version' - 'updated_at' - 'updated_by') || '{"enabled": false}'::jsonb, 'Silence everything', NULL)
+FROM notification_policy_json() p;
+-- @end
+
+-- @case SSA-22
+-- @title A delegate of settings edit for all regions switches the policy off or moves the digest hour: only a System Admin may
+-- @category settings-screens-api
+-- @expect error P0001 delegate_forbidden
+\ctx ADMIN stepup=300
+SELECT idm_delegate('user', '{{DEL_TRI}}', NULL, NULL, false, '[{"module":"admin.settings","action":"edit"}]'::jsonb, true, NULL, NULL, NULL, false, NULL, 'Settings delegate');
+\ctx DEL_TRI stepup=300
+SELECT admin_set_notification_policy((p - 'version' - 'updated_at' - 'updated_by') || '{"enabled": false, "digest_hour": 3}'::jsonb, 'Delegate silences it', NULL)
+FROM notification_policy_json() p;
+-- @end
+
+-- @case SSA-23
+-- @title The System Admin with a step-up removes the System Admins column (the mandatory types would lose their recipients)
+-- @category settings-screens-api
+-- @expect error P0001 wf:validation_failed.*mandatory_locked
+\ctx ADMIN stepup=300
+SELECT admin_set_notification_policy((p - 'version' - 'updated_at' - 'updated_by')
+  || jsonb_build_object('columns', (SELECT coalesce(jsonb_agg(c), '[]'::jsonb) FROM jsonb_array_elements(p -> 'columns') c WHERE c ->> 'kind' <> 'group'),
+                        'matrix', (SELECT jsonb_agg(r || jsonb_build_object('cells', '[]'::jsonb)) FROM jsonb_array_elements(p -> 'matrix') r)),
+  'Drop the System Admins', NULL)
+FROM notification_policy_json() p;
 -- @end
 
 -- @case SSA-19

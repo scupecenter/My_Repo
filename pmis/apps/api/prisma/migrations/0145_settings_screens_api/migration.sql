@@ -15,8 +15,9 @@
 --      notifications.policy (guarded): on/off, timezone (Africa/Tripoli), digest hour, thresholds with their ranges, the type x role/group matrix with channels.
 --      admin_set_notification_policy validates the whole body in the database: an unknown key anywhere is a field error (unknown_key), the ranges, the cross-field rule
 --      (approval_escalate_days * 24 > approval_remind_hours, must_exceed_remind_hours on both paths), the IANA timezone (invalid_timezone), mandatory types
---      (mandatory_locked), recipients the type does not allow (not_eligible_recipient). A change of a security or system row, or of rate_cap_per_hour, needs a System
---      Admin (a delegate gets delegate_forbidden) and a step-up, and tells the System Admins in-app. Versioned and audited with before and after.
+--      (mandatory_locked; the System Admins group must stay a column and keep the mandatory types on), recipients the type does not allow (not_eligible_recipient).
+--      A change of a security or system row, of rate_cap_per_hour, of the switch, the timezone, the digest hour or the working days needs a System Admin (a delegate
+--      gets delegate_forbidden) and a step-up, and tells the System Admins in-app. Versioned and audited with before and after.
 --   4. Holidays import (B12, ADR 0011: the approved xlsx template TPL-HOLIDAYS only): the template kind holidays and its first version; tpl_sync (latest 0105)
 --      knows the kind; admin_import_holidays inserts the rows of one file in one statement (all or nothing, field errors per line), so the SLA due dates of open
 --      tasks are recalculated once (the statement trigger of 0017); one audit row per holiday and one for the import.
@@ -530,6 +531,10 @@ BEGIN
     SELECT coalesce(array_agg((e ->> 'kind') || ':' || lower(e ->> 'id')), ARRAY[]::text[]) INTO col_keys FROM jsonb_array_elements(cols) e;
     SELECT coalesce(jsonb_agg(jsonb_build_object('kind', e ->> 'kind', 'id', lower(e ->> 'id'))), '[]'::jsonb) INTO cols FROM jsonb_array_elements(cols) e;
   END IF;
+  -- the mandatory types go to the System Admins: their group must stay a column (security review 2026-11-23), whether or not the body names the columns
+  IF sa IS NOT NULL AND NOT (('group:' || sa::text) = ANY (col_keys)) THEN
+    errs := errs || public.reg_err_item('/columns', 'mandatory_locked', 'The System Admins group must stay a column: the mandatory types go to it.');
+  END IF;
 
   -- matrix: one row per type at most; channels closed; cells for the columns, allowed by the type; mandatory types locked
   IF jsonb_typeof(p_body -> 'matrix') IS DISTINCT FROM 'array' THEN
@@ -623,8 +628,25 @@ BEGIN
     'columns', cols, 'matrix', rows_);
   nxt := public.notif_policy_view(stored);
 
-  -- security and system rows, and the rate cap that feeds them: a System Admin (never a delegate) with a step-up, and the System Admins are told
+  -- every mandatory type that goes to the System Admins keeps their cell on in the resulting policy, not only when the body names the cell
+  IF sa IS NOT NULL THEN
+    SELECT coalesce(jsonb_agg(public.reg_err_item('/matrix', 'mandatory_locked', 'The mandatory type ' || (e ->> 'type_code') || ' must stay on for the System Admins.') -> 0), '[]'::jsonb)
+    INTO errs
+    FROM jsonb_array_elements(nxt -> 'matrix') e
+    JOIN LATERAL (SELECT cd FROM jsonb_array_elements(cat) cd WHERE cd ->> 'code' = e ->> 'type_code') tdef ON true
+    WHERE (tdef.cd ->> 'mandatory')::boolean AND (tdef.cd -> 'default_recipients') ? 'system_admins'
+      AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(e -> 'cells') xc WHERE xc ->> 'kind' = 'group' AND xc ->> 'id' = sa::text AND (xc ->> 'on')::boolean);
+    IF jsonb_array_length(errs) > 0 THEN PERFORM public.wf_err('validation_failed', jsonb_build_object('errors', errs)); END IF;
+  END IF;
+
+  -- a System Admin (never a delegate) with a step-up, and the System Admins are told, for: the security and system rows, the rate cap that feeds them,
+  -- the master switch, the timezone, the digest hour and the working days (security review 2026-11-23: a delegate must not silence or reshape the policy)
   sensitive := (cur -> 'thresholds' -> 'rate_cap_per_hour') IS DISTINCT FROM (nxt -> 'thresholds' -> 'rate_cap_per_hour')
+    OR (cur -> 'enabled') IS DISTINCT FROM (nxt -> 'enabled')
+    OR (cur -> 'timezone') IS DISTINCT FROM (nxt -> 'timezone')
+    OR (cur -> 'digest_hour') IS DISTINCT FROM (nxt -> 'digest_hour')
+    OR (cur -> 'work_days_follow_calendar') IS DISTINCT FROM (nxt -> 'work_days_follow_calendar')
+    OR (cur -> 'work_days') IS DISTINCT FROM (nxt -> 'work_days')
     OR (SELECT coalesce(jsonb_agg(e ORDER BY e ->> 'type_code'), '[]'::jsonb) FROM jsonb_array_elements(cur -> 'matrix') e
          WHERE (SELECT c ->> 'category' FROM jsonb_array_elements(cat) c WHERE c ->> 'code' = e ->> 'type_code') IN ('security', 'system'))
        IS DISTINCT FROM
@@ -632,19 +654,19 @@ BEGIN
          WHERE (SELECT c ->> 'category' FROM jsonb_array_elements(cat) c WHERE c ->> 'code' = e ->> 'type_code') IN ('security', 'system'));
   IF sensitive THEN
     IF NOT public.app_actor_is_system_admin() THEN
-      PERFORM public.wf_err('delegate_forbidden', jsonb_build_object('detail', 'Only a System Admin acting without delegation may change the security and system types or the rate cap.'));
+      PERFORM public.wf_err('delegate_forbidden', jsonb_build_object('detail', 'Only a System Admin acting without delegation may change the security and system types, the rate cap, the switch, the timezone, the digest hour or the working days.'));
     END IF;
     IF NOT public.app_ctx_stepup() THEN PERFORM public.wf_err('step_up_required'); END IF;
   END IF;
 
   UPDATE public.settings SET value = stored, updated_by = actor, updated_at = clock_timestamp() WHERE key = 'notifications.policy';
-  PERFORM public.log_audit_write('notification_policy_update', 'setting', 'notifications.policy', cur, nxt || jsonb_build_object('security_or_system_changed', sensitive), btrim(p_reason));
+  PERFORM public.log_audit_write('notification_policy_update', 'setting', 'notifications.policy', cur, nxt || jsonb_build_object('protected_change', sensitive), btrim(p_reason));
   IF sensitive THEN
     SELECT u2.display_name || coalesce(' (' || nullif(btrim(u2.employee_id), '') || ')', '') INTO who FROM public.users u2 WHERE u2.id = actor;
     FOR u IN SELECT DISTINCT gm.user_id FROM public.group_members gm JOIN public.groups g ON g.id = gm.group_id AND g.is_system_admins AND g.is_active
              JOIN public.users x ON x.id = gm.user_id AND x.status = 'active' AND NOT x.is_break_glass LOOP
       INSERT INTO public.notifications (user_id, channel, kind, title, body, link)
-      VALUES (u, 'in_app', 'security_alert', 'Notification policy: security or system types changed',
+      VALUES (u, 'in_app', 'security_alert', 'Notification policy: a protected setting changed',
               'Changed by ' || coalesce(who, 'a System Admin') || '. Reason: ' || left(btrim(p_reason), 500), '/admin/settings/alerts');
     END LOOP;
   END IF;

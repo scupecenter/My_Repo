@@ -256,20 +256,21 @@ describe('notification policy', () => {
 
   it('a delegate saves ordinary changes; rows left out return to the defaults; versioned and audited', async () => {
     const cur = await get(admin);
-    const b: any = bodyOf(cur.body, 'Digest at nine', { digest_hour: 9 });
+    const b: any = bodyOf(cur.body, 'Mail the returns');
     const tr = row(b, 'task_rejected');
     tr.channels.email = true;
     b.matrix = b.matrix.filter((r: any) => r.type_code !== 'sla_near_max');
     const res = await put(delegateAll, b, etag(cur));
     expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({ digest_hour: 9, version: cur.body.version + 1, updated_by: { id: delegateAll.user.id } });
+    expect(res.body).toMatchObject({ digest_hour: 8, version: cur.body.version + 1, updated_by: { id: delegateAll.user.id } });
     expect(row(res.body, 'task_rejected').channels).toEqual({ in_app: true, email: true });
     expect(row(res.body, 'sla_near_max').channels).toEqual({ in_app: true, email: false });   // catalogue default
     const rows = await audit('notification_policy_update');
     expect(rows).toHaveLength(1);
-    expect(rows[0]!.before.digest_hour).toBe(8);
-    expect(rows[0]!.after).toMatchObject({ digest_hour: 9, security_or_system_changed: false });
-    expect(rows[0]!.reason).toBe('Digest at nine');
+    expect(row(rows[0]!.before, 'task_rejected').channels.email).toBe(false);
+    expect(row(rows[0]!.after, 'task_rejected').channels.email).toBe(true);
+    expect(rows[0]!.after).toMatchObject({ protected_change: false });
+    expect(rows[0]!.reason).toBe('Mail the returns');
     expect((await put(admin, b, etag(cur))).status).toBe(412);                                       // the old ETag
     expect((await put(admin, b)).status).toBe(428);
   });
@@ -298,7 +299,58 @@ describe('notification policy', () => {
     expect((await put(delegateAll, b2, etag(cur2))).status).toBe(403);
     const ok2 = await put(admin, b2, etag(cur2));
     expect(ok2.status).toBe(200);
-    expect((await audit('notification_policy_update')).at(-1)!.after.security_or_system_changed).toBe(true);
+    expect((await audit('notification_policy_update')).at(-1)!.after.protected_change).toBe(true);
+  });
+
+  // security review 2026-11-23: a delegate must not silence or reshape the policy
+  for (const [what, over] of [
+    ['the switch off', (p: any) => ({ enabled: !p.enabled })],
+    ['the timezone', () => ({ timezone: 'Africa/Cairo' })],
+    ['the digest hour', (p: any) => ({ digest_hour: (p.digest_hour + 1) % 24 })],
+    ['the working days', () => ({ work_days_follow_calendar: false, work_days: [0, 1, 2, 3] })],
+  ] as [string, (p: any) => Record<string, unknown>][]) {
+    it(`${what}: a delegate is refused, an admin without step-up is asked for one, an admin with step-up saves it`, async () => {
+      const cur = await get(admin);
+      const b = bodyOf(cur.body, `Change ${what}`, over(cur.body));
+      const del = await put(delegateAll, b, etag(cur));
+      expect(del.status).toBe(403);
+      expect(del.body.code).toBe('delegate_forbidden');
+      expect((await put(adminNoStep, b, etag(cur))).body.code).toBe('step_up_required');
+      const ok = await put(admin, b, etag(cur));
+      expect(ok.status).toBe(200);
+      expect((await audit('notification_policy_update')).at(-1)!.after.protected_change).toBe(true);
+      // back to the defaults for the next case
+      const back = await put(admin, bodyOf(ok.body, 'Back', { enabled: true, timezone: 'Africa/Tripoli', digest_hour: 8, work_days_follow_calendar: true }), etag(ok));
+      expect(back.status).toBe(200);
+    });
+  }
+
+  it('the System Admins column cannot be removed, and a mandatory type cannot be left without it (even when the body omits the cell)', async () => {
+    const cur = await get(admin);
+    const saId = await sa();
+    const noSa = bodyOf(cur.body, 'Drop the System Admins', {
+      columns: cur.body.columns.filter((c: any) => c.id !== saId).map((c: any) => ({ kind: c.kind, id: c.id })),
+      matrix: cur.body.matrix.map((r: any) => ({ type_code: r.type_code, channels: { ...r.channels }, cells: r.cells.filter((c: any) => c.id !== saId) })),
+    });
+    for (const who of [delegateAll, admin]) {
+      const res = await put(who, noSa, etag(cur));
+      expect(res.status).toBe(422);
+      expect(codes(res)).toContain('/columns:mandatory_locked');
+    }
+    // the cell named off for a mandatory type: refused for the System Admin with a step-up as well
+    const off: any = bodyOf(cur.body, 'No holder silenced');
+    const nh = off.matrix.findIndex((r: any) => r.type_code === 'no_holder');
+    const j = off.matrix[nh].cells.findIndex((c: any) => c.id === saId);
+    off.matrix[nh].cells[j].on = false;
+    const r2 = await put(admin, off, etag(cur));
+    expect(r2.status).toBe(422);
+    expect(codes(r2)).toEqual([`/matrix/${nh}/cells/${j}:mandatory_locked`]);
+    // leaving the cell out keeps it on (the default)
+    const omit: any = bodyOf(cur.body, 'Cell left out');
+    omit.matrix[nh].cells = omit.matrix[nh].cells.filter((c: any) => c.id !== saId);
+    const r3 = await put(delegateAll, omit, etag(cur));
+    expect(r3.status).toBe(200);
+    expect(row(r3.body, 'no_holder').cells).toContainEqual({ kind: 'group', id: saId, on: true });
   });
 });
 
