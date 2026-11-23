@@ -226,7 +226,7 @@ SELECT admin_save_mail_kinds('["task_assigned"]'::jsonb, 'No verified step-up', 
 -- @end
 
 -- @case SCR-27
--- @title Control: the System Admin reads the setting with its catalogue (30 kinds since migration 0138 added absence_alert and reassigned, 6 recommended, no reserved kind) and the ETag
+-- @title Control: the System Admin reads the setting with its catalogue (30 kinds since migration 0140 added absence_alert and reassigned, 6 recommended, no reserved kind) and the ETag
 -- @category settings-screens
 -- @actor ADMIN
 -- @region *

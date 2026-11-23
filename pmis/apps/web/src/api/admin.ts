@@ -28,7 +28,7 @@ export const useMfa = (id: string) => useQuery({ queryKey: key('mfa', id), query
 export const useDelegations = (state: string) => useQuery({ queryKey: key('delegations', state), queryFn: () => api.get<Page<Delegation>>('/delegations', { query: { state } }).then((r) => r.items) });
 export const useAbsences = () => useQuery({ queryKey: ['absences'], queryFn: () => api.get<Page<Absence>>('/absences').then((r) => r.items) });
 export const useAlerts = (cause: string) => useQuery({ queryKey: key('alerts', cause), queryFn: () => api.get<Page<ReassignmentAlert>>('/reassignments/alerts', { query: { cause } }).then((r) => r.items), retry: false });
-/** Contract 0.15.45: with a task, the people who may hold that task's level; with a person (and a site), anyone eligible for one of the person's open tasks. */
+/** Contract 0.15.54: with a task, the people who may hold that task's level; with a person (and a site), anyone eligible for one of the person's open tasks. */
 export const useEligible = (from: string | undefined, q: string, enabled = true, task?: string, site?: string) =>
   useQuery({
     queryKey: key('eligible', from, q, task, site), enabled,

@@ -60,7 +60,7 @@ function make(screen: string, b: { name: string; filters?: Record<string, unknow
 }
 
 // 0.15.31 (F3): the whitelist of the filter builder. The real server builds it from the configuration and leaves hidden fields out.
-type FF = { key: string; label_en: string; label_ar: string; type: 'text' | 'enum' | 'number' | 'date' | 'bool'; options?: { value: string; label_en: string; label_ar?: string | null }[] };
+type FF = { key: string; label_en: string; label_ar: string; type: 'text' | 'enum' | 'number' | 'date' | 'bool'; options?: { value: string; label_en: string; label_ar?: string | null }[]; group?: string; truncated?: boolean };
 const OPS = {
   text: ['is', 'is_not', 'in', 'not_in', 'contains', 'not_contains', 'empty', 'not_empty'],
   enum: ['is', 'is_not', 'in', 'not_in', 'empty', 'not_empty'],
@@ -79,6 +79,22 @@ const SITE_FIELDS: FF[] = [
   { key: 'tower_height_m', label_en: 'Tower height (m)', label_ar: 'ارتفاع البرج (م)', type: 'number' },
   { key: 'rf_survey_date', label_en: 'RF survey date', label_ar: 'تاريخ المسح الراديوي', type: 'date' },
   { key: 'workflow_locks', label_en: 'Workflow locks on', label_ar: 'أقفال التسلسل مفعّلة', type: 'bool' },
+  // 0.15.45: a Master column with its real distinct values
+  { key: 'delivery_batch', label_en: 'Delivery batch', label_ar: 'دفعة التسليم', type: 'enum', options: ['B1', 'B2', 'B3', 'B4'].map((x) => ({ value: x, label_en: x })) },
+];
+/** 0.15.45: the groups the server sends (Site, Status and stage, Dates, Menu columns / Register fields). */
+const GROUP_OF: Record<string, string> = { site_code: 'site', name: 'site', region_id: 'site', delivery_scenario: 'site', overall_status: 'status', state: 'status', stage_code: 'status', rf_survey_date: 'dates', created_at: 'dates', due_date: 'dates', tower_height_m: 'columns', delivery_batch: 'columns', workflow_locks: 'columns', task_code: 'fields' };
+const GROUPS: Record<string, { key: string; label_en: string; label_ar: string }> = {
+  site: { key: 'site', label_en: 'Site', label_ar: 'الموقع' }, status: { key: 'status', label_en: 'Status and stage', label_ar: 'الحالة والمرحلة' },
+  dates: { key: 'dates', label_en: 'Dates', label_ar: 'التواريخ' }, columns: { key: 'columns', label_en: 'Menu columns', label_ar: 'أعمدة القائمة' },
+  fields: { key: 'fields', label_en: 'Register fields', label_ar: 'حقول السجل' },
+};
+const withGroup = (items: FF[], fallback: string) => items.map((f) => ({ ...f, group: GROUPS[f.group ?? GROUP_OF[f.key] ?? fallback] }));
+/** A site360 menu and the dashboard filter the sites tree; the menu adds its own Master columns. */
+const MENU_FIELDS: FF[] = [
+  { key: 'c:project_phase', label_en: 'Project Phase', label_ar: 'مرحلة المشروع', type: 'enum', options: ['Phase 1', 'Phase 2'].map((x) => ({ value: x, label_en: x })), group: 'columns' },
+  { key: 'c:cw_delivery_model', label_en: 'CW Delivery Model', label_ar: 'نموذج تسليم الأعمال المدنية', type: 'enum', options: ['outsourced', 'internal'].map((x) => ({ value: x, label_en: x })), group: 'columns' },
+  { key: 'c:te_access_date', label_en: 'TE Access Date', label_ar: 'تاريخ إتاحة التركيبات', type: 'date', group: 'dates' },
 ];
 const REGISTER_FIELDS: FF[] = [
   { key: 'site_code', label_en: 'Site ID', label_ar: 'رمز الموقع', type: 'text' },
@@ -97,11 +113,30 @@ const TASK_FIELDS: FF[] = [
   { key: 'due_date', label_en: 'Due date', label_ar: 'تاريخ الاستحقاق', type: 'date' },
 ];
 
+const fieldsOf = (screen: string) => screen === 'sites' || screen === 'sites-stream' ? withGroup(SITE_FIELDS, 'columns')
+  : screen === 'dashboard' ? withGroup(SITE_FIELDS.filter((f) => f.key !== 'workflow_locks'), 'columns')
+  : /^site360-[a-z0-9_]+$/.test(screen) ? withGroup([...SITE_FIELDS, ...MENU_FIELDS], 'columns')
+  : screen === 'site-tasks' || screen === 'tasks-board' ? withGroup(TASK_FIELDS, 'fields') : /^register-/.test(screen) ? withGroup(REGISTER_FIELDS, 'fields') : null;
+
 export const viewsHandlers = [
+  // 0.15.49: the values of an enum field that match q (anywhere in the value or a label), at most `limit`, `truncated` when there are more
+  http.get(`${B}/saved-views/filter-fields/:field/values`, ({ request, params }) => {
+    const g = guard(); if (g) return g;
+    const u = new URL(request.url), screen = u.searchParams.get('screen_key') ?? '', needle = (u.searchParams.get('q') ?? '').trim().toLowerCase();
+    const limit = Number(u.searchParams.get('limit') ?? 50);
+    const items = fieldsOf(screen);
+    if (!items) return invalid('/screen_key');
+    const key = decodeURIComponent(String(params.field));
+    const f = items.find((x) => x.key === key);
+    if (!f) return invalid('/field', 'unknown_field');
+    if (f.type !== 'enum') return invalid('/field', 'not_enum');
+    const hit = (f.options ?? []).filter((o) => !needle || o.value.toLowerCase().includes(needle) || o.label_en.toLowerCase().includes(needle) || (o.label_ar ?? '').toLowerCase().includes(needle));
+    return HttpResponse.json({ screen_key: screen, field: key, q: needle, items: hit.slice(0, limit), truncated: hit.length > limit });
+  }),
   http.get(`${B}/saved-views/filter-fields`, ({ request }) => {
     const g = guard(); if (g) return g;
     const screen = new URL(request.url).searchParams.get('screen_key') ?? '';
-    const items = screen === 'sites' || screen === 'sites-stream' ? SITE_FIELDS : screen === 'site-tasks' || screen === 'tasks-board' ? TASK_FIELDS : /^register-/.test(screen) ? REGISTER_FIELDS : null;
+    const items = fieldsOf(screen);
     if (!items) return invalid('/screen_key');
     return HttpResponse.json({
       screen_key: screen, items: items.map((f) => ({ ...f, operators: OPS[f.type] })), operators: OPS,

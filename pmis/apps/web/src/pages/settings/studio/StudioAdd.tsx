@@ -10,8 +10,9 @@ import type { Ctx } from './studioCtx';
 import { StudioCard } from './StudioForms';
 import type { StudioSel } from './studioModel';
 import { nextMilestone } from './studioModel';
+import { AddColumn } from './StudioAddColumn';
 
-export type AddTab = 'task' | 'milestone' | 'gate';
+export type AddTab = 'task' | 'milestone' | 'gate' | 'column';
 const lbl = 'block text-sm font-semibold';
 const field = 'input mt-1 min-h-11 font-normal';
 const CODE = /^[A-Z][A-Z0-9_-]{0,19}$/;
@@ -21,9 +22,9 @@ const Step = ({ n, title, children, testid }: { n: number; title: string; childr
 );
 
 /** The add screen: three tabs (task, milestone, gate). Nothing is written until "Add to draft", which asks for the reason like every write. */
-export function StudioAdd({ c, tab: first, milestone, onTab, onClose, onAdded }: { c: Ctx; tab: AddTab; milestone?: string; onTab: (t: AddTab) => void; onClose: () => void; onAdded: (s: StudioSel) => void }) {
+export function StudioAdd({ c, tab: first, milestone, task, onTab, onClose, onAdded }: { c: Ctx; tab: AddTab; milestone?: string; task?: string; onTab: (t: AddTab) => void; onClose: () => void; onAdded: (s: StudioSel) => void }) {
   const { t } = useTranslation();
-  const tabs: AddTab[] = ['task', 'milestone', 'gate'];
+  const tabs: AddTab[] = ['task', 'milestone', 'gate', 'column'];
   return (
     <div className="space-y-4" data-testid="studio-add">
       <header className="space-y-2">
@@ -34,6 +35,7 @@ export function StudioAdd({ c, tab: first, milestone, onTab, onClose, onAdded }:
       </header>
       {first === 'task' && <AddTask c={c} milestone={milestone} onClose={onClose} onAdded={onAdded} />}
       {first === 'milestone' && <AddMilestone c={c} onClose={onClose} onAdded={onAdded} />}
+      {first === 'column' && <AddColumn c={c} {...(task ? { presetTask: task } : {})} onClose={onClose} onAdded={onAdded} />}
       {first === 'gate' && <AddGate c={c} milestone={milestone} onClose={onClose} onAdded={onAdded} />}
     </div>
   );
@@ -134,7 +136,7 @@ function AddTask({ c, milestone, onClose, onAdded }: { c: Ctx; milestone?: strin
         {slaBad && <p role="alert" className="text-sm text-lateInk" data-testid="studio-add-sla-bad">{t('studio.sla_bad')}</p>}
       </Step>
       <Step n={3} title={t('studio.step_inputs')} testid="studio-step-inputs">
-        <div className="rounded-lg border border-dashed border-line p-4 text-center text-sm text-mute" data-testid="studio-add-inputs">{t('studio.available_s3')}</div>
+        <div className="rounded-lg border border-dashed border-line p-4 text-center text-sm text-mute" data-testid="studio-add-inputs">{t('studio.inputs_after')}</div>
       </Step>
       <Step n={4} title={t('studio.step_docs')} testid="studio-step-docs">
         <p className="text-sm text-mute">{t('studio.docs_approval_note')}</p>

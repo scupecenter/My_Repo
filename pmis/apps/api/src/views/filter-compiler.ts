@@ -32,12 +32,25 @@ export const OPERATORS: Record<FilterFieldType, readonly FilterOperator[]> = {
 
 export interface FilterOption { value: string; label_en: string; label_ar?: string | null }
 
+/** The group of a field in the builder's dropdown (0.15.45): a stable key and the two labels. */
+export interface FilterGroupInfo { key: string; label_en: string; label_ar: string }
+
 export interface FilterField {
   key: string;
   label_en: string;
   label_ar?: string | null;
   type: FilterFieldType;
   options?: FilterOption[];
+  /**
+   * 0.15.45: the values of an enum field come from the data or from a list catalogue (they change), so a value that is not in `options` is not an error
+   * (it simply matches nothing); only the fixed sets of this repository (scenarios, statuses, regions) and the fixed options of a register field are checked.
+   */
+  open?: boolean;
+  /** 0.15.45: `options` holds the first values only (the data has more than the cap). */
+  truncated?: boolean;
+  group?: FilterGroupInfo;
+  /** 0.15.45 (site360-<menu>): the JOIN the expression needs (one derived table per Master column used), added to the FROM clause by the list. */
+  join?: Prisma.Sql;
   /** The SQL of the field, built in this repository from fixed aliases; a field code inside it is a bound parameter. */
   expr: Prisma.Sql;
 }
@@ -45,7 +58,7 @@ export interface FilterField {
 export type FilterCatalog = Map<string, FilterField>;
 
 // ---------------------------------------------------------------------------------------------------------------- shape
-const FIELD_ID = /^([a-z][a-z0-9_]{0,60}|[fc]:[a-z][a-z0-9_]{0,60}|ms:[A-Z][A-Z0-9_]{0,30})$/;
+const FIELD_ID = /^([a-z][a-z0-9_]{0,60}|[fc]:[a-z][a-z0-9_]{0,60}|ms:[A-Z][A-Z0-9_]{0,30}|m:[0-9]{1,4})$/;
 const relDate = z.object({ rel: z.literal('today'), offset: z.number().int().min(-3650).max(3650).optional() }).strict();
 const scalar = z.union([z.string().max(FILTER_LIMITS.maxString), z.number().finite(), z.boolean(), relDate]);
 const condition = z.object({
@@ -174,7 +187,7 @@ function condSql(c: FilterCondition, f: FilterField, path: string): Prisma.Sql {
   const e = f.expr;
   if (op === 'empty') return f.type === 'text' || f.type === 'enum' ? Prisma.sql`(nullif(${e}, '') IS NULL)` : Prisma.sql`(${e} IS NULL)`;
   if (op === 'not_empty') return f.type === 'text' || f.type === 'enum' ? Prisma.sql`(nullif(${e}, '') IS NOT NULL)` : Prisma.sql`(${e} IS NOT NULL)`;
-  const allowed = f.type === 'enum' ? new Set((f.options ?? []).map((o) => o.value)) : null;
+  const allowed = f.type === 'enum' && !f.open ? new Set((f.options ?? []).map((o) => o.value)) : null;
   const enumStr = (v: Scalar): string => {
     const s = str(v, path);
     if (allowed && !allowed.has(s)) fail(`${path}/value`, 'invalid_value', `${s.slice(0, 40)} is not a value of this field.`);
@@ -239,5 +252,9 @@ export function compileFilter(tree: FilterGroup, catalog: FilterCatalog, hidden:
 
 /** What the builder needs of a field (the SQL never leaves the server). */
 export function fieldDto(f: FilterField): Record<string, unknown> {
-  return { key: f.key, label_en: f.label_en, label_ar: f.label_ar ?? null, type: f.type, operators: OPERATORS[f.type], ...(f.options ? { options: f.options } : {}) };
+  return {
+    key: f.key, label_en: f.label_en, label_ar: f.label_ar ?? null, type: f.type, operators: OPERATORS[f.type],
+    ...(f.group ? { group: f.group } : {}),
+    ...(f.options ? { options: f.options, truncated: f.truncated === true } : {}),
+  };
 }

@@ -55,7 +55,7 @@ export interface AbsenceDto {
 const UNKNOWN: UserRefDto = { id: '00000000-0000-0000-0000-000000000000', display_name: 'Unknown', employee_id: null };
 
 /**
- * Absence records (B12b, migration 0138). Informational: nothing moves when one is recorded. Reads go through rsn_visible_absences (own, the people the
+ * Absence records (B12b, migration 0140). Informational: nothing moves when one is recorded. Reads go through rsn_visible_absences (own, the people the
  * caller leads, all for a System Admin); writes through ops_save_absence / ops_delete_absence, which check who may record what and audit before and after.
  */
 @Injectable()

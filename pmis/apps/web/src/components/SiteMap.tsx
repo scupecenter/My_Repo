@@ -83,7 +83,7 @@ export function SiteMap({ outer: outerIn, height = 460, testid = 'site-map' }: {
   const f = useMemo(() => readFilters(new URLSearchParams(fKey)), [fKey]);
   const outerKey = JSON.stringify(outerIn ?? {});
   const outer = useMemo(() => JSON.parse(outerKey) as OuterScope, [outerKey]);
-  const q = useSiteMap();
+  const q = useSiteMap(true, outer.filter);
   const regions = useRegions();
   const reduced = useReducedMotion();
   const [full, setFull] = useState(false);

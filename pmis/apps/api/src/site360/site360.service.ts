@@ -8,6 +8,8 @@ import { parse } from '../common/zod';
 import { AccessService } from '../access/access.service';
 import { DbService } from '../db/db.service';
 import { FilterCatalogService } from '../views/filter-catalog.service';
+import { BUCKETS, siteLocksGapsConds, siteStageIds } from '../sites/sites.service';
+import { COLUMNS_SQL } from './site360-columns-sql';
 import { buildMenu, buildSite360, SITE360_MOVABLE, type Site360ColumnRow, type Site360Menu, type Site360MenuItem, type Site360SourceKind } from './site360-sections';
 
 const setSchema = z.object({
@@ -122,16 +124,25 @@ export class Site360Service {
     }
     const milestones = csvParam(q, 'milestone', 50);
     if (milestones.length) filters.push(Prisma.sql`s.current_milestone = ANY(${milestones}::text[])`);
-    // F3 (0.15.31): the AND/OR filter of a saved view (the sites whitelist, alias s); the region scope of `base` stays
-    const adv = await this.filters.fromQuery('sites', q);
-    if (adv) filters.push(adv);
+    // 0.15.50: the stage, mine/late (bucket), workflow locks and data gaps filters of GET /sites, with the same meaning and the same SQL (sites.service)
+    const stageCode = oneString(q, 'stage_code');
+    const bucket = oneOf(q, 'bucket', BUCKETS, 'all');
+    const locks = oneOf(q, 'workflow_locks', ['', 'locked', 'open'] as const, '');
+    const gaps = oneOf(q, 'data_gaps', ['', 'with', 'without'] as const, '');
+    filters.push(...siteLocksGapsConds(locks, gaps));
+    const byStage = siteStageIds(auth.user.id, { stageCode, bucket });
+    if (byStage) filters.push(Prisma.sql`s.id IN (${byStage})`);
+    // F3 (0.15.31): the AND/OR filter of a saved view, compiled against the whitelist of this menu (0.15.45: the sites fields and the menu's Master columns;
+    // each Master column used is one derived table joined once, set-based, with the caller's register and field visibility); the region scope of `base` stays
+    const adv = await this.filters.compile(`site360-${menu}`, q);
+    if (adv.where) filters.push(adv.where);
     const all = filters.length ? Prisma.sql`${base} AND ${Prisma.join(filters, ' AND ')}` : base;
 
     const counts = await this.db.tx.$queryRaw<{ total: number; filtered: number }[]>(Prisma.sql`
       SELECT (SELECT count(*)::int FROM sites s WHERE ${base}) AS total,
-             (SELECT count(*)::int FROM sites s WHERE ${all}) AS filtered`);
+             (SELECT count(*)::int FROM sites s ${adv.joins} WHERE ${all}) AS filtered`);
     const page = await this.db.tx.$queryRaw<{ id: string; site_code: string }[]>(Prisma.sql`
-      SELECT s.id::text AS id, s.site_code FROM sites s JOIN regions r ON r.id = s.region_id ${sortJoin}
+      SELECT s.id::text AS id, s.site_code FROM sites s JOIN regions r ON r.id = s.region_id ${sortJoin} ${adv.joins}
       WHERE ${all}
       ORDER BY ${sortSql} ${Prisma.raw(dir === 'desc' ? 'DESC' : 'ASC')} NULLS LAST, s.site_code COLLATE "C"
       LIMIT ${limit} OFFSET ${offset}`);
@@ -156,11 +167,11 @@ export class Site360Service {
     const cells = new Map<string, Record<string, EditCell>>();
     if (page.length) {
       const tasks = await this.db.tx.$queryRaw<
-        { site_id: string; ord: number; task_id: string; version: number; state: string; locked: boolean; field_key: string; n: number }[]
+        { site_id: string; ord: number; task_id: string; version: number; state: string; locked: boolean; field_key: string; field_type: string; options: unknown; list_catalogue: string | null; n: number }[]
       >(Prisma.sql`
-        SELECT x.site_id, x.ord, x.task_id, x.version, x.state, x.locked, x.field_key, x.n FROM (
+        SELECT x.site_id, x.ord, x.task_id, x.version, x.state, x.locked, x.field_key, x.field_type, x.options, x.list_catalogue, x.n FROM (
           SELECT ti.site_id::text AS site_id, mc.ord, ti.id::text AS task_id, ti.version, ti.state::text AS state,
-                 (ti.lock_reason IS NOT NULL OR ti.is_na) AS locked, tf.field_key,
+                 (ti.lock_reason IS NOT NULL OR ti.is_na) AS locked, tf.field_key, tf.field_type, tf.options, tf.list_catalogue,
                  count(*) OVER (PARTITION BY ti.site_id, mc.ord) AS n
           FROM task_instances ti
           JOIN sites s ON s.id = ti.site_id
@@ -171,14 +182,32 @@ export class Site360Service {
           JOIN master_columns mc ON mc.letter = tf.master_col
           WHERE s.id = ANY(${page.map((r) => r.id)}::uuid[]) AND mc.ord = ANY(${menuOrds}::int[])
         ) x WHERE x.n = 1`);
+      // the dropdown values of the list fields that read a list catalogue (active values, in list order), one query for the page
+      const catalogues = [...new Set(tasks.filter((t) => t.list_catalogue).map((t) => t.list_catalogue!))];
+      const listValues = new Map<string, CellOption[]>();
+      const parentCatalogue = new Map<string, string>();
+      if (catalogues.length) {
+        // a dependent list (its catalogue has a parent list): each option names the code of its parent value, so the client can offer only the children of the parent value of the same row
+        const lv = await this.db.tx.$queryRaw<{ catalogue_code: string; code: string; label_en: string; label_ar: string | null; parent_catalogue: string | null; parent_code: string | null }[]>(Prisma.sql`
+          SELECT v.catalogue_code, v.code, v.label_en, v.label_ar, c.parent_catalogue, p.code AS parent_code FROM list_values v
+          JOIN list_catalogues c ON c.code = v.catalogue_code LEFT JOIN list_values p ON p.id = v.parent_value_id
+          WHERE v.catalogue_code = ANY(${catalogues}::text[]) AND v.is_active ORDER BY v.catalogue_code, v.sort_order, v.label_en`);
+        for (const r of lv) {
+          if (r.parent_catalogue) parentCatalogue.set(r.catalogue_code, r.parent_catalogue);
+          listValues.set(r.catalogue_code, [...(listValues.get(r.catalogue_code) ?? []), { value: r.code, label_en: r.label_en, label_ar: r.label_ar, ...(r.parent_catalogue ? { parent: r.parent_code } : {}) }]);
+        }
+      }
       for (const t of tasks) {
         const editable = !t.locked && EDITABLE_STATES.has(t.state);
         const field = t.field_key.startsWith('v:') ? { values: t.field_key.slice(2) } : { field: t.field_key };
-        const cell: EditCell = { task_id: t.task_id, version: t.version, editable, ...field };
+        const typed = cellInput(t.field_key, t.field_type, t.options, t.list_catalogue ? listValues.get(t.list_catalogue) : undefined);
+        const cell: EditCell = { task_id: t.task_id, version: t.version, editable, ...field, ...typed };
         const byOrd = cells.get(t.site_id) ?? {};
         byOrd[String(t.ord)] = cell;
         cells.set(t.site_id, byOrd);
       }
+      // a dependent list cell says which cell of the same site holds its parent value (the column `parent_ord`); none when the parent list is not in this menu
+      attachParentOrds(tasks, cells, parentCatalogue);
     }
     const c = counts[0] ?? { total: 0, filtered: 0 };
     return {
@@ -331,6 +360,48 @@ interface EditCell {
   editable: boolean;
   field?: string;
   values?: string;
+  /** 0.15.48: the kind of editor of the field (the template field's own type); `list` carries its `options`. */
+  input_type: CellInputType;
+  options?: CellOption[];
+  /** 0.15.50: for a list of a dependent catalogue, the column (ord) of the cell of the same site that holds the parent value; each option's `parent` is compared with it. */
+  parent_ord?: number;
+}
+
+export type CellInputType = 'date' | 'number' | 'list' | 'text' | 'boolean';
+export interface CellOption { value: string; label_en: string; label_ar: string | null; /** 0.15.50: the code of the parent value (dependent lists only) */ parent?: string | null }
+
+/**
+ * The editor kind of a task-backed cell (0.15.48). The three task date keys are always dates; the other kinds follow the template field type
+ * (yes_no is a boolean). A list takes its options from its catalogue (active values) or from the field's own options; a list with no option
+ * degrades to text, so a cell is never left without an editor.
+ */
+export function cellInput(fieldKey: string, fieldType: string, options: unknown, catalogue: CellOption[] | undefined): { input_type: CellInputType; options?: CellOption[] } {
+  if (['planned_date', 'actual_date', 'actual_start'].includes(fieldKey) || fieldType === 'date') return { input_type: 'date' };
+  if (fieldType === 'number') return { input_type: 'number' };
+  if (fieldType === 'yes_no') return { input_type: 'boolean' };
+  if (fieldType === 'list') {
+    const own = Array.isArray(options) ? options.filter((o): o is string => typeof o === 'string').map((o) => ({ value: o, label_en: o, label_ar: null })) : [];
+    const list = catalogue?.length ? catalogue : own;
+    if (list.length) return { input_type: 'list', options: list };
+  }
+  return { input_type: 'text' };
+}
+
+/**
+ * 0.15.50: a list cell of a dependent catalogue gets `parent_ord`, the column of the cell of the same site whose list is the parent catalogue.
+ * `parentCatalogue` maps a catalogue to its parent catalogue; a cell whose parent list is not among the site's cells in this menu gets none.
+ */
+export function attachParentOrds(
+  tasks: { site_id: string; ord: number; list_catalogue: string | null }[],
+  cells: Map<string, Record<string, { parent_ord?: number }>>,
+  parentCatalogue: Map<string, string>,
+): void {
+  for (const t of tasks) {
+    const pc = t.list_catalogue ? parentCatalogue.get(t.list_catalogue) : undefined;
+    const parent = pc ? tasks.find((x) => x.site_id === t.site_id && x.list_catalogue === pc) : undefined;
+    const cell = cells.get(t.site_id)?.[String(t.ord)];
+    if (parent && cell) cell.parent_ord = parent.ord;
+  }
 }
 
 const SITE360_MENU_KEYS = ['master', 'design_acq', 'sow', 'cw', 'te', 'hoto', 'dismantle', 'om'] as const;
@@ -351,7 +422,7 @@ export interface Site360RowsDto {
   filtered: number;
   offset: number;
   limit: number;
-  rows: { site_id: string; site_code: string; row_no: number; values: Record<string, string | null> }[];
+  rows: { site_id: string; site_code: string; row_no: number; values: Record<string, string | null>; cells: Record<string, EditCell> }[];
 }
 
 function oneString(q: Record<string, unknown>, key: string): string | undefined {
@@ -384,24 +455,6 @@ function csvParam(q: Record<string, unknown>, key: string, max: number): string[
   if (parts.length > max || parts.some((x) => x.length > 100)) throw new ProblemException(422, 'validation_failed', { detail: `${key} has too many values.`, errors: [{ path: `/${key}`, code: 'invalid' }] });
   return parts;
 }
-
-/** The Master columns, with the effective kind of source (0.15.35): a not-tracked column takes the kind of a mapping an admin added later. */
-const COLUMNS_SQL = Prisma.sql`
-  SELECT mc.ord, mc.letter, mc.group_top, mc.group_mid, mc.header, mc.site360_sections AS sections,
-    CASE
-      WHEN mc.source_kind <> 'not_tracked' THEN mc.source_kind
-      WHEN EXISTS (SELECT 1 FROM field_definitions fd WHERE fd.entity_type::text = 'site' AND fd.is_active AND fd.master_export_column = mc.letter) THEN 'custom_field'
-      WHEN EXISTS (SELECT 1 FROM template_task_fields tf WHERE tf.is_active AND tf.master_col = mc.letter) THEN 'task'
-      WHEN EXISTS (SELECT 1 FROM task_field_sources x WHERE x.is_active AND x.master_col = mc.letter) THEN 'register'
-      ELSE 'not_tracked'
-    END AS source_kind,
-    mc.source_note, mc.display_order, mc.name_ar, mc.is_added,
-    -- 0133: the effective type and list (a column filled by a task input reads the input)
-    coalesce((SELECT tf.field_type FROM template_task_fields tf WHERE tf.is_active AND tf.master_col = mc.letter ORDER BY tf.task_code, tf.field_key LIMIT 1), mc.value_type, 'text') AS value_type,
-    CASE WHEN EXISTS (SELECT 1 FROM template_task_fields tf WHERE tf.is_active AND tf.master_col = mc.letter)
-         THEN (SELECT tf.list_catalogue FROM template_task_fields tf WHERE tf.is_active AND tf.master_col = mc.letter ORDER BY tf.task_code, tf.field_key LIMIT 1)
-         ELSE mc.list_catalogue END AS list_catalogue
-  FROM master_columns mc`;
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** Site columns written by the approval of the RF & Design record (C:Q and S, feed of 0072); T is fed by Acquisition. */

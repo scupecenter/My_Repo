@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { AccessService } from '../access/access.service';
 import { ProblemException } from '../common/problem';
 import { DbService } from '../db/db.service';
+import { FilterCatalogService } from '../views/filter-catalog.service';
 
 /** The stable code of the On-Air milestone (default workflow, ADR 0010): a site that has reached it shows a steady green light on the map. */
 export const ON_AIR_CODE = 'MS6';
@@ -54,6 +55,7 @@ export class SiteMapService {
   constructor(
     private readonly db: DbService,
     private readonly access: AccessService,
+    private readonly filters: FilterCatalogService,
   ) {}
 
   /** The regions of the map: dashboard.view ∩ sites.view (null = every region). 403 module_forbidden without either. */
@@ -66,9 +68,11 @@ export class SiteMapService {
     return dash.filter((r) => sites.includes(r)).sort((a, b) => a - b);
   }
 
-  async get(): Promise<Record<string, unknown>> {
+  async get(q: Record<string, unknown> = {}): Promise<Record<string, unknown>> {
     const regions = await this.scope();
-    const where = regions === null ? Prisma.empty : Prisma.sql`AND s.region_id = ANY(${regions}::int[])`;
+    // 0.15.45: the AND/OR filter of the dashboard (the sites fields), beside the region scope that stays
+    const adv = await this.filters.fromQuery('dashboard', q);
+    const where = Prisma.sql`${regions === null ? Prisma.empty : Prisma.sql`AND s.region_id = ANY(${regions}::int[])`} ${adv ? Prisma.sql`AND ${adv}` : Prisma.empty}`;
     const rows = await this.db.tx.$queryRaw<Row[]>(Prisma.sql`
       WITH d AS (SELECT cal_today() AS today),
       vis AS (

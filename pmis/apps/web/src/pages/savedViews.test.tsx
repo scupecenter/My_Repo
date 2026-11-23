@@ -18,7 +18,7 @@ describe('saved views on the list screens', () => {
   it('saves the filters and the columns of the Site Register, and applies both again', async () => {
     await signIn('pm');
     const u = userEvent.setup();
-    renderApp(<Sites />, { route: '/sites?region_id=1' });
+    renderApp(<Sites />, { route: '/sites?layout=list&region_id=1' });
     await screen.findByTestId('sites-list');
     await u.click(screen.getByTestId('cols-menu'));
     await u.click(screen.getByTestId('col-toggle-scenario'));
@@ -29,13 +29,13 @@ describe('saved views on the list screens', () => {
     await u.click(screen.getByTestId('views-name-ok'));
     await waitFor(() => expect(options()).toContain('Tripoli lean'));
 
-    await u.click(screen.getByTestId('chips-clear'));
+    await u.click(await screen.findByTestId('filter-clear-all'));
     await u.click(screen.getByTestId('cols-menu'));
     await u.click(screen.getByTestId('cols-reset'));
     expect(await screen.findByRole('columnheader', { name: /Scenario/ })).toBeInTheDocument();
     await u.keyboard('{Escape}');
     await u.selectOptions(screen.getByTestId('views-select'), screen.getByRole('option', { name: 'Tripoli lean' }));
-    await waitFor(() => expect(screen.getByTestId('sites-filter-region')).toHaveValue('1'));
+    expect(await screen.findByTestId('filter-chip-x-region_id')).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByRole('columnheader', { name: /Scenario/ })).toBeNull());
   });
 
@@ -72,7 +72,7 @@ describe('saved views on the list screens', () => {
   it('a user without views.share cannot share (no share button, and the server refuses)', async () => {
     await signIn('engineer');
     const u = userEvent.setup();
-    renderApp(<Sites />, { route: '/sites' });
+    renderApp(<Sites />, { route: '/sites?layout=list' });
     await screen.findByTestId('sites-list');
     await u.click(screen.getByTestId('views-save'));
     await u.type(screen.getByTestId('views-name'), 'Mine');

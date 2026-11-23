@@ -1,126 +1,240 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http } from 'msw';
 import { Route, Routes } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 import { API_BASE } from '@/api/client';
-import { decodeFilter } from '@/api/views';
+import { decodeFilter, type FilterTree } from '@/api/views';
 import { server } from '@/mocks/server';
-import { renderApp, signIn } from '@/test/utils';
+import { pickFilterField, renderApp, signIn } from '@/test/utils';
+import { MyWork } from './MyWork';
 import { RegisterPage } from './Register';
 import { Sites } from './Sites';
 
-/** F3 (contract 0.15.31): the AND/OR filter builder inside saved views (EN and AR), sent to the server as a tree it compiles. */
-function sitesFilters(): string[] {
+/** The unified filter (owner request 2026-11-22) on every list screen, with the AND/OR builder reachable from it (EN and AR). */
+type U = ReturnType<typeof userEvent.setup>;
+/** Records the `filter` parameter of the GET requests of a path (the other handlers still answer). */
+function watch(path: string, param = 'filter'): string[] {
   const seen: string[] = [];
-  server.use(http.get(`${API_BASE}/sites`, ({ request }) => {
-    const f = new URL(request.url).searchParams.get('filter');
+  server.use(http.get(`${API_BASE}${path}`, ({ request }) => {
+    const f = new URL(request.url).searchParams.get(param);
     if (f) seen.push(f);
-    // fall through to the mock list
   }));
   return seen;
 }
+const last = (seen: string[]): FilterTree | null => decodeFilter(seen[seen.length - 1]);
+const tree = (t: FilterTree) => `adv=${encodeURIComponent(JSON.stringify(t))}`;
 
-describe('filter builder (F3)', () => {
-  it('builds AND with an OR group, applies it as one filter parameter, shows chips and keeps it in a saved view', async () => {
+/** The advanced builder: opens it from the dropdown, adds a group on `field` (its first value) and applies. */
+async function advancedGroup(u: U, field: string, index = 0) {
+  await u.click(await screen.findByTestId('filter-add'));
+  await u.click(screen.getByTestId('filter-advanced'));
+  const dlg = await screen.findByTestId('filter-dialog');
+  await u.click(within(dlg).getByTestId('filter-add-group'));
+  await u.selectOptions(within(dlg).getByTestId(`filter-group-${index}-cond-0-field`), field);
+  await u.click(within(dlg).getByTestId('filter-dialog-submit'));
+}
+
+describe('unified filter', () => {
+  it('opens the dropdown, searches a field, picks Delivery batch, selects two values, shows the chip and sends the tree', async () => {
     await signIn('pm');
-    const seen = sitesFilters();
+    const seen = watch('/sites');
     const u = userEvent.setup();
-    renderApp(<Sites />, { route: '/sites?layout=vertical' });
+    renderApp(<Sites />, { route: '/sites?layout=list' });
     await screen.findByTestId('sites-list');
-    await u.click(await screen.findByTestId('filter-builder-open'));
-    const dlg = await screen.findByTestId('filter-dialog');
-    expect(within(dlg).getByTestId('filter-empty')).toBeInTheDocument();
-    await u.click(within(dlg).getByTestId('filter-add-condition'));
-    await u.selectOptions(within(dlg).getByTestId('filter-cond-0-field'), 'region_id');
-    await u.selectOptions(within(dlg).getByTestId('filter-cond-0-value'), '1');
-    await u.click(within(dlg).getByTestId('filter-add-group'));
-    await u.selectOptions(within(dlg).getByTestId('filter-group-1-cond-0-field'), 'delivery_scenario');
-    await u.selectOptions(within(dlg).getByTestId('filter-group-1-cond-0-value'), 'expansion');
-    await u.click(within(dlg).getByTestId('filter-group-1-add'));
-    await u.selectOptions(within(dlg).getByTestId('filter-group-1-cond-1-field'), 'tower_height_m');
-    await u.selectOptions(within(dlg).getByTestId('filter-group-1-cond-1-operator'), 'gte');
-    await u.clear(within(dlg).getByTestId('filter-group-1-cond-1-value'));
-    await u.type(within(dlg).getByTestId('filter-group-1-cond-1-value'), '40');
-    // the group combines with OR (the opposite of the root by default); a third level is not offered
-    expect(within(dlg).getByTestId('filter-group-1-op-or')).toHaveAttribute('aria-checked', 'true');
-    expect(within(within(dlg).getByTestId('filter-group-1')).queryByTestId(/add-group/)).toBeNull();
-    await u.click(within(dlg).getByTestId('filter-dialog-submit'));
+    expect(screen.queryByTestId('sites-filter-region')).toBeNull(); // the separate selects are gone
+    await u.click(await screen.findByTestId('filter-add'));
+    expect(await screen.findByTestId('filter-popover')).toBeInTheDocument();
+    expect(screen.getByTestId('filter-group-site')).toBeInTheDocument();
+    expect(screen.getByTestId('filter-group-work')).toBeInTheDocument();
+    await u.type(screen.getByTestId('filter-search'), 'batch');
+    expect(screen.queryByTestId('filter-field-region_id')).toBeNull();
+    await u.click(screen.getByTestId('filter-field-delivery_batch'));
+    await u.click(await screen.findByTestId('filter-value-opt-B3'));
+    await u.click(screen.getByTestId('filter-value-opt-B4'));
+    await waitFor(() => expect(last(seen)).toEqual({ op: 'and', items: [{ field: 'delivery_batch', operator: 'in', value: ['B3', 'B4'] }] }));
+    expect(screen.getByTestId('filter-chip-0')).toHaveTextContent('Delivery batch: B3, B4');
 
-    await waitFor(() => expect(seen.length).toBeGreaterThan(0));
-    expect(JSON.parse(seen[seen.length - 1]!)).toEqual({
-      op: 'and',
-      items: [
-        { field: 'region_id', operator: 'is', value: '1' },
-        { op: 'or', items: [{ field: 'delivery_scenario', operator: 'is', value: 'expansion' }, { field: 'tower_height_m', operator: 'gte', value: 40 }] },
-      ],
-    });
-    const chips = await screen.findByTestId('filter-chips');
-    expect(within(chips).getByTestId('filter-chip-0')).toHaveTextContent('Region is Tripoli');
-    expect(within(chips).getByTestId('filter-chip-1')).toHaveTextContent('( Delivery scenario is Expansion OR Tower height (m) ≥ 40 )');
-    expect(screen.getByTestId('filter-builder-open')).toHaveTextContent('Filters (3)');
-
-    // the view keeps the tree; applying the default view clears it, choosing the view brings it back
+    // the view keeps the tree; clearing all and choosing the view brings it back
     await u.click(screen.getByTestId('views-save'));
-    await u.type(screen.getByTestId('views-name'), 'Tripoli or tall');
+    await u.type(screen.getByTestId('views-name'), 'Batches 3 and 4');
     await u.click(screen.getByTestId('views-name-ok'));
-    await waitFor(() => expect(within(screen.getByTestId('views-select')).getByRole('option', { name: 'Tripoli or tall' })).toBeInTheDocument());
-    await u.selectOptions(screen.getByTestId('views-select'), '');
+    await waitFor(() => expect(within(screen.getByTestId('views-select')).getByRole('option', { name: 'Batches 3 and 4' })).toBeInTheDocument());
+    await u.click(screen.getByTestId('filter-clear-all'));
     await waitFor(() => expect(screen.queryByTestId('filter-chips')).toBeNull());
-    await u.selectOptions(screen.getByTestId('views-select'), screen.getByRole('option', { name: 'Tripoli or tall' }));
-    expect(await screen.findByTestId('filter-chip-1')).toBeInTheDocument();
-    // removing a chip removes that part only
-    await u.click(screen.getByTestId('filter-chip-remove-1'));
-    await waitFor(() => expect(decodeFilter(seen[seen.length - 1])).toEqual({ op: 'and', items: [{ field: 'region_id', operator: 'is', value: '1' }] }));
+    await u.selectOptions(screen.getByTestId('views-select'), screen.getByRole('option', { name: 'Batches 3 and 4' }));
+    expect(await screen.findByTestId('filter-chip-0')).toHaveTextContent('Delivery batch: B3, B4');
   }, 30_000);
 
-  it('is keyboard operable: the AND/OR toggle moves with the arrow keys and every control has a name', async () => {
+  it('date: between from and to, then edit the chip to "last N days"', async () => {
     await signIn('pm');
+    const seen = watch('/sites');
     const u = userEvent.setup();
-    renderApp(<Sites />, { route: '/sites?layout=vertical' });
+    renderApp(<Sites />, { route: '/sites?layout=list' });
     await screen.findByTestId('sites-list');
-    (await screen.findByTestId('filter-builder-open')).focus();
-    await u.keyboard('{Enter}');
-    const dlg = await screen.findByTestId('filter-dialog');
-    const and = within(dlg).getByTestId('filter-root-op-and');
-    and.focus();
-    await u.keyboard('{ArrowRight}');
-    expect(within(dlg).getByTestId('filter-root-op-or')).toHaveAttribute('aria-checked', 'true');
-    await u.click(within(dlg).getByTestId('filter-add-condition'));
-    for (const el of within(dlg).getAllByRole('combobox')) expect(el).toHaveAccessibleName();
-    await u.selectOptions(within(dlg).getByTestId('filter-cond-0-field'), 'rf_survey_date');
-    await u.selectOptions(within(dlg).getByTestId('filter-cond-0-operator'), 'in_last_days');
-    expect(within(dlg).getByTestId('filter-cond-0-value')).toHaveAccessibleName('Number of days');
-    await u.click(within(dlg).getByTestId('filter-cond-0-remove'));
-    expect(within(dlg).getByTestId('filter-empty')).toBeInTheDocument();
+    await pickFilterField(u, 'rf_survey_date');
+    expect(screen.getByTestId('filter-apply')).toBeDisabled(); // both dates are needed
+    fireEvent.change(await screen.findByTestId('filter-date-from'), { target: { value: '2026-01-01' } });
+    fireEvent.change(screen.getByTestId('filter-date-to'), { target: { value: '2026-01-31' } });
+    await u.click(screen.getByTestId('filter-apply'));
+    await waitFor(() => expect(last(seen)).toEqual({ op: 'and', items: [{ field: 'rf_survey_date', operator: 'between', value: ['2026-01-01', '2026-01-31'] }] }));
+    expect(screen.getByTestId('filter-chip-0')).toHaveTextContent('RF survey date is between 2026-01-01 and 2026-01-31');
+    // click the chip to edit it
+    await u.click(screen.getByTestId('filter-chip-0-edit'));
+    await u.click(await screen.findByTestId('filter-date-mode-last'));
+    fireEvent.change(screen.getByTestId('filter-date-days'), { target: { value: '14' } });
+    await u.click(screen.getByTestId('filter-apply'));
+    await waitFor(() => expect(last(seen)).toEqual({ op: 'and', items: [{ field: 'rf_survey_date', operator: 'in_last_days', value: 14 }] }));
   }, 30_000);
 
-  it('Arabic (RTL): labels, operators and chips', async () => {
+  it('removes one chip, then clears all', async () => {
+    await signIn('pm');
+    const seen = watch('/sites');
+    const u = userEvent.setup();
+    const t: FilterTree = { op: 'and', items: [{ field: 'delivery_batch', operator: 'in', value: ['B3'] }, { field: 'region_id', operator: 'in', value: ['1'] }] };
+    renderApp(<Sites />, { route: `/sites?layout=list&${tree(t)}` });
+    expect(await screen.findByTestId('filter-chip-1')).toHaveTextContent('Region: Tripoli');
+    await u.click(screen.getByTestId('filter-chip-remove-1'));
+    await waitFor(() => expect(last(seen)).toEqual({ op: 'and', items: [{ field: 'delivery_batch', operator: 'in', value: ['B3'] }] }));
+    expect(screen.queryByTestId('filter-chip-1')).toBeNull();
+    await u.click(screen.getByTestId('filter-clear-all'));
+    await waitFor(() => expect(screen.queryByTestId('filter-chips')).toBeNull());
+  }, 30_000);
+
+  it('"Assigned to me" is a field of the Work group and still sends the old bucket parameter', async () => {
+    await signIn('pm');
+    const buckets = watch('/sites', 'bucket');
+    const u = userEvent.setup();
+    renderApp(<Sites />, { route: '/sites?layout=list' });
+    await screen.findByTestId('sites-list');
+    await pickFilterField(u, 'mine');
+    await u.click(await screen.findByTestId('filter-extra-on'));
+    await waitFor(() => expect(buckets).toContain('mine'));
+    expect(screen.getByTestId('filter-chip-x-mine')).toHaveTextContent('Assigned to me');
+    await u.click(screen.getByTestId('filter-chip-remove-x-mine'));
+    await waitFor(() => expect(screen.queryByTestId('filter-chip-x-mine')).toBeNull());
+  }, 30_000);
+
+  it('a Site Master sub-menu uses its own screen key and sends the tree to its rows', async () => {
+    await signIn('pm');
+    const seen = watch('/site360/:menu/rows');
+    const screens: string[] = [];
+    server.use(http.get(`${API_BASE}/saved-views/filter-fields`, ({ request }) => { screens.push(new URL(request.url).searchParams.get('screen_key') ?? ''); }));
+    const u = userEvent.setup();
+    renderApp(<Sites />, { route: '/sites?section=cw' });
+    await u.click(await screen.findByTestId('filter-add'));
+    expect(screens).toContain('site360-cw');
+    await u.type(screen.getByTestId('filter-search'), 'batch');
+    await u.click(screen.getByTestId('filter-field-delivery_batch'));
+    await u.click(await screen.findByTestId('filter-value-opt-B3'));
+    await waitFor(() => expect(last(seen)).toEqual({ op: 'and', items: [{ field: 'delivery_batch', operator: 'in', value: ['B3'] }] }));
+    expect(screen.getByTestId('filter-chip-0')).toHaveTextContent('Delivery batch: B3');
+  }, 30_000);
+
+  it('is keyboard operable: arrows move through the list and Enter opens the field; every control has a name', async () => {
     await signIn('pm');
     const u = userEvent.setup();
-    renderApp(<Sites />, { route: '/sites?layout=vertical', locale: 'ar' });
+    renderApp(<Sites />, { route: '/sites?layout=list' });
+    await screen.findByTestId('sites-list');
+    (await screen.findByTestId('filter-add')).focus();
+    await u.keyboard('{Enter}');
+    const search = await screen.findByTestId('filter-search');
+    expect(search).toHaveAccessibleName();
+    expect(screen.getByTestId('filter-add')).toHaveAccessibleName();
+    await u.keyboard('{ArrowDown}{Enter}');
+    expect(await screen.findByTestId('filter-editor-title')).toHaveTextContent('Site name'); // the second field of the Site group
+    await u.click(screen.getByTestId('filter-back'));
+    expect(await screen.findByTestId('filter-search')).toBeInTheDocument();
+  }, 30_000);
+
+  it('Arabic (RTL): labels, groups, values and chips', async () => {
+    await signIn('pm');
+    const u = userEvent.setup();
+    renderApp(<Sites />, { route: '/sites?layout=list', locale: 'ar' });
     await screen.findByTestId('sites-list');
     expect(document.documentElement.dir).toBe('rtl');
-    const open = await screen.findByTestId('filter-builder-open');
-    expect(open).toHaveTextContent('منشئ الفلاتر');
-    await u.click(open);
-    const dlg = await screen.findByTestId('filter-dialog');
-    expect(within(dlg).getByRole('heading', { name: 'منشئ الفلاتر' })).toBeInTheDocument();
-    await u.click(within(dlg).getByTestId('filter-add-condition'));
-    await u.selectOptions(within(dlg).getByTestId('filter-cond-0-field'), 'region_id');
-    expect(within(within(dlg).getByTestId('filter-cond-0-field')).getByRole('option', { name: 'المنطقة' })).toBeInTheDocument();
-    await u.selectOptions(within(dlg).getByTestId('filter-cond-0-operator'), 'not_empty');
-    expect(within(dlg).getByTestId('filter-root-op-and')).toHaveTextContent('و');
-    await u.click(within(dlg).getByTestId('filter-dialog-submit'));
-    expect(await screen.findByTestId('filter-chip-0')).toHaveTextContent('المنطقة غير فارغ');
+    const add = await screen.findByTestId('filter-add');
+    expect(add).toHaveTextContent('فلتر');
+    expect(add).toHaveAccessibleName('إضافة فلتر');
+    await u.click(add);
+    expect(await screen.findByRole('group', { name: 'الموقع' })).toBeInTheDocument();
+    expect(screen.getByTestId('filter-field-delivery_batch')).toHaveTextContent('دفعة التسليم');
+    expect(screen.getByTestId('filter-advanced')).toHaveTextContent('متقدم');
+    await u.click(screen.getByTestId('filter-field-delivery_batch'));
+    await u.click(await screen.findByTestId('filter-value-opt-B3'));
+    expect(await screen.findByTestId('filter-chip-0')).toHaveTextContent('دفعة التسليم: B3');
+    expect(screen.getByTestId('filter-clear-all')).toHaveTextContent('مسح الكل');
   }, 30_000);
 
+  it('a register list: the unified filter sends the tree with the records query', async () => {
+    await signIn('pm');
+    const seen = watch('/registers/:key/records');
+    const u = userEvent.setup();
+    renderApp(<Routes><Route path="/registers/:key" element={<RegisterPage />} /></Routes>, { route: '/registers/procurement' });
+    await u.click(await screen.findByTestId('filter-add'));
+    await u.click(await screen.findByTestId('filter-field-state'));
+    await u.click(await screen.findByTestId('filter-value-opt-entry'));
+    await u.click(screen.getByTestId('filter-value-opt-approved'));
+    await waitFor(() => expect(last(seen)).toEqual({ op: 'and', items: [{ field: 'state', operator: 'in', value: ['entry', 'approved'] }] }));
+    expect(screen.getByTestId('filter-chip-0')).toHaveTextContent('State: Entry, Approved');
+  }, 30_000);
+});
+
+describe('advanced (AND / OR) beside the unified filter', () => {
+  it('Site Master: a group combines with a simple chip into one tree', async () => {
+    await signIn('pm');
+    const seen = watch('/sites');
+    const u = userEvent.setup();
+    renderApp(<Sites />, { route: '/sites?layout=list' });
+    await screen.findByTestId('sites-list');
+    await pickFilterField(u, 'delivery_batch');
+    await u.click(await screen.findByTestId('filter-value-opt-B3'));
+    await u.keyboard('{Escape}'); // the value step stays open (multi-select); "+ Filter" would toggle it shut
+    await waitFor(() => expect(screen.queryByTestId('filter-popover')).toBeNull());
+    await advancedGroup(u, 'overall_status', 1);
+    await waitFor(() => expect(last(seen)).toEqual({ op: 'and', items: [
+      { field: 'delivery_batch', operator: 'in', value: ['B3'] },
+      { op: 'or', items: [{ field: 'overall_status', operator: 'is', value: 'not_started' }] },
+    ] }));
+    expect(await screen.findByTestId('filter-chip-1')).toHaveTextContent('( Overall status is Not started )');
+  }, 30_000);
+
+  it('Site Master sub-menu', async () => {
+    await signIn('pm');
+    const seen = watch('/site360/:menu/rows');
+    const u = userEvent.setup();
+    renderApp(<Sites />, { route: '/sites?section=te' });
+    await advancedGroup(u, 'overall_status');
+    await waitFor(() => expect(last(seen)).toEqual({ op: 'and', items: [{ op: 'or', items: [{ field: 'overall_status', operator: 'is', value: 'not_started' }] }] }));
+  }, 30_000);
+
+  it('a register', async () => {
+    await signIn('pm');
+    const seen = watch('/registers/:key/records');
+    const u = userEvent.setup();
+    renderApp(<Routes><Route path="/registers/:key" element={<RegisterPage />} /></Routes>, { route: '/registers/procurement' });
+    await advancedGroup(u, 'state');
+    await waitFor(() => expect(last(seen)).toEqual({ op: 'and', items: [{ op: 'or', items: [{ field: 'state', operator: 'is', value: 'entry' }] }] }));
+    expect(await screen.findByTestId('filter-chip-0')).toHaveTextContent('( State is Entry )');
+  }, 30_000);
+
+  it('My Work (the tasks board)', async () => {
+    await signIn('pm');
+    const seen = watch('/boards/tasks');
+    const u = userEvent.setup();
+    renderApp(<MyWork />, { route: '/my-work?layout=board' });
+    await advancedGroup(u, 'state');
+    await waitFor(() => expect(last(seen)).toEqual({ op: 'and', items: [{ op: 'or', items: [{ field: 'state', operator: 'is', value: 'open' }] }] }));
+  }, 30_000);
+});
+
+describe('saved view sharing', () => {
   it('the share dialog offers regions and sends region_ids', async () => {
     await signIn('pm');
     const bodies: unknown[] = [];
     server.use(http.patch(`${API_BASE}/saved-views/:id`, async ({ request }) => { bodies.push(await request.clone().json()); }));
     const u = userEvent.setup();
-    renderApp(<Sites />, { route: '/sites?layout=vertical' });
+    renderApp(<Sites />, { route: '/sites?layout=list' });
     await screen.findByTestId('sites-list');
     await u.click(screen.getByTestId('views-save'));
     await u.type(screen.getByTestId('views-name'), 'By region');
@@ -135,23 +249,5 @@ describe('filter builder (F3)', () => {
     await waitFor(() => expect(bodies.length).toBe(1));
     expect(bodies[0]).toMatchObject({ audience: { region_ids: [1, 4] } });
     await waitFor(() => expect(within(screen.getByTestId('views-select')).getByRole('option', { name: /By region · shared/ })).toBeInTheDocument());
-  }, 30_000);
-
-  it('a register list offers the builder with its own whitelist and sends the tree with the records query', async () => {
-    await signIn('pm');
-    const seen: string[] = [];
-    server.use(http.get(`${API_BASE}/registers/:key/records`, ({ request }) => { const f = new URL(request.url).searchParams.get('filter'); if (f) seen.push(f); }));
-    const u = userEvent.setup();
-    renderApp(<Routes><Route path="/registers/:key" element={<RegisterPage />} /></Routes>, { route: '/registers/procurement' });
-    await u.click(await screen.findByTestId('filter-builder-open'));
-    const dlg = await screen.findByTestId('filter-dialog');
-    await u.click(within(dlg).getByTestId('filter-add-condition'));
-    await u.selectOptions(within(dlg).getByTestId('filter-cond-0-field'), 'state');
-    await u.selectOptions(within(dlg).getByTestId('filter-cond-0-operator'), 'in');
-    await u.selectOptions(within(dlg).getByTestId('filter-cond-0-value'), ['entry', 'approved']);
-    await u.click(within(dlg).getByTestId('filter-dialog-submit'));
-    await waitFor(() => expect(seen.length).toBeGreaterThan(0));
-    expect(JSON.parse(seen[seen.length - 1]!)).toEqual({ op: 'and', items: [{ field: 'state', operator: 'in', value: ['entry', 'approved'] }] });
-    expect(await screen.findByTestId('filter-chip-0')).toHaveTextContent('State is any of Entry, Approved');
   }, 30_000);
 });

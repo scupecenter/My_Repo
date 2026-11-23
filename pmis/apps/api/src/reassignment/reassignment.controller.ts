@@ -7,7 +7,7 @@ import { TransitionResultDto, WorkflowService } from '../workflow/workflow.servi
 import { AbsenceDto, AbsencesService } from './absences.service';
 import { ReassignmentService } from './reassignment.service';
 
-/** Absence records (B12b, contract tag absences; migration 0138). */
+/** Absence records (B12b, contract tag absences; migration 0140). */
 @Controller('absences')
 export class AbsencesController {
   constructor(private readonly svc: AbsencesService) {}
@@ -48,7 +48,7 @@ export class AbsencesController {
   }
 }
 
-/** The lead decisions on tasks (B12b, contract tag reassignment; migration 0138). */
+/** The lead decisions on tasks (B12b, contract tag reassignment; migration 0140). */
 @Controller()
 export class ReassignmentController {
   constructor(private readonly svc: ReassignmentService, private readonly workflow: WorkflowService) {}

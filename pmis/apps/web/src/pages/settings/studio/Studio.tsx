@@ -1,18 +1,19 @@
 import * as Popover from '@radix-ui/react-popover';
-import { ArrowLeft, Eye, Plus, Upload } from 'lucide-react';
+import { ArrowLeft, Eye, ListChecks, Lock, Plus, Trash2, Upload } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
-import { useCreateDraft, useSlaWeight, useWeightTotals, useWorkflowVersion, useWorkflowVersions, type WorkflowVersion } from '@/api/workflowEditor';
+import { useCreateDraft, useSlaWeight, useWeightTotals, useWorkflowVersion, useWorkflowVersions, type WorkflowVersion, type WorkflowVersionSummary } from '@/api/workflowEditor';
 import { FormDialog } from '@/components/FormDialog';
-import { useFrozen } from '@/components/FreezePanel';
+import { FreezeCard, useFrozen } from '@/components/FreezePanel';
 import { useToast } from '@/components/Toast';
-import type { Can } from '../wf/Columns';
-import { PreviewDialog } from '../wf/Forms';
-import { diffVersions, findCycle, type G, type M, type P } from '../wf/model';
+import { PreviewDialog, SiteLocksShortcut } from '../wf/Forms';
+import { diffVersions, findCycle, type Can, type G, type M, type P } from '../wf/model';
+import { Chev } from '../wf/rtl';
 import { useErr } from '../wf/useErr';
+import { MigrationDialog, MigrationLog } from '../WorkflowStructure';
 import { StudioAdd, type AddTab } from './StudioAdd';
 import { GateForm, MilestoneForm, TaskForm } from './StudioForms';
+import { StudioPending } from './StudioPending';
 import { StudioReview } from './StudioReview';
 import { StudioTree } from './StudioTree';
 import { useAsk, useWrites, type Ctx } from './studioCtx';
@@ -20,7 +21,7 @@ import { editedCodes, pendingChanges, type StudioSel, type Struct } from './stud
 
 type View = 'form' | 'add' | 'review';
 
-/** Settings, Workflow, "Workflow Studio" (S1): one tree, one form at a time, a reviewed publish. It reads and writes through the same API and rules as the classic editor. */
+/** Settings, Workflow, "Workflow Studio" (S1): one tree, one form at a time, a reviewed publish. It reads and writes through the workflow API (reason, step-up and If-Match on every write). */
 export function Studio() {
   const { t } = useTranslation();
   const q = useWorkflowVersions();
@@ -31,10 +32,10 @@ export function Studio() {
   const one = useWorkflowVersion(shown);
   if (q.isError || one.isError) return <p role="alert" className="text-lateInk" data-testid="studio-error">{t('errors.generic')}</p>;
   if (!one.data) return <p data-testid="studio-loading">{'…'}</p>;
-  return <StudioBody key={one.data.version} v={one.data} liveNo={live?.version ?? null} />;
+  return <StudioBody key={one.data.version} v={one.data} liveNo={live?.version ?? null} versions={items} />;
 }
 
-function StudioBody({ v, liveNo }: { v: WorkflowVersion; liveNo: number | null }) {
+function StudioBody({ v, liveNo, versions }: { v: WorkflowVersion; liveNo: number | null; versions: WorkflowVersionSummary[] }) {
   const { t, i18n } = useTranslation();
   const toast = useToast();
   const err = useErr();
@@ -60,11 +61,13 @@ function StudioBody({ v, liveNo }: { v: WorkflowVersion; liveNo: number | null }
   const [view, setView] = useState<View>('form');
   const [tab, setTab] = useState<AddTab>('task');
   const [addMs, setAddMs] = useState<string | undefined>();
+  const [addTask, setAddTask] = useState<string | undefined>();
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState<Set<string>>(new Set());
   const [step, setStep] = useState<'tree' | 'detail'>('tree');
   const [menu, setMenu] = useState(false);
-  const [dlg, setDlg] = useState<null | 'draft' | 'preview'>(null);
+  const [dlg, setDlg] = useState<null | 'draft' | 'preview' | 'discard' | 'sitelocks' | 'migrate'>(null);
+  const [panel, setPanel] = useState(false);
 
   const placements = v.placements as P[], milestones = v.milestones as M[], gates = v.gates as G[];
   const struc: Struct = { milestones, gates, placements };
@@ -77,44 +80,49 @@ function StudioBody({ v, liveNo }: { v: WorkflowVersion; liveNo: number | null }
   const msOf = (s: NonNullable<StudioSel>) => (s.kind === 'task' ? placements.find((p) => p.task_code === s.code)?.stage_code : s.kind === 'gate' ? gates.find((g) => g.code === s.code)?.from_milestone : s.code);
   const select = (s: StudioSel) => { setSel(s); setView('form'); setStep('detail'); const m = s && msOf(s); if (m) setOpen((o) => new Set(o).add(m)); };
   const toggle = (code: string) => setOpen((o) => { const n = new Set(o); if (n.has(code)) n.delete(code); else n.add(code); return n; });
-  const startAdd = (k: AddTab, ms?: string) => { setTab(k); setAddMs(ms ?? (sel ? msOf(sel) : undefined)); setView('add'); setStep('detail'); setMenu(false); };
+  const startAdd = (k: AddTab, ms?: string, taskCode?: string) => { setTab(k); setAddMs(ms ?? (sel ? msOf(sel) : undefined)); setAddTask(taskCode ?? (k === 'column' && sel?.kind === 'task' ? sel.code : undefined)); setView('add'); setStep('detail'); setMenu(false); };
 
-  const c: Ctx = { v, etag, placements, milestones, gates, can, W, askReason, nm, sw: new Map(sw.map((x) => [x.task_code, x])), baseSw: baseSw ? new Map(baseSw.map((x) => [x.task_code, x])) : null, totals, edited, select, isDraft };
+  const c: Ctx = { v, etag, placements, milestones, gates, can, W, askReason, nm, sw: new Map(sw.map((x) => [x.task_code, x])), baseSw: baseSw ? new Map(baseSw.map((x) => [x.task_code, x])) : null, totals, edited, select, isDraft, canCols: canEdit, addColumn: (code) => startAdd('column', undefined, code) };
   const menuItem = 'flex min-h-11 w-full items-center rounded-md px-3 text-start text-sm hover:bg-hover disabled:opacity-50 disabled:pointer-events-none';
 
   return (
     <div className="space-y-3" data-testid="studio" data-status={v.status}>
       <header className="space-y-2">
-        <nav aria-label={t('studio.breadcrumb')} className="text-xs text-mute" data-testid="studio-breadcrumb">{t('studio.crumb_settings')} {'>'} {t('settings.tab_workflow')}</nav>
+        <nav aria-label={t('studio.breadcrumb')} className="text-xs text-mute" data-testid="studio-breadcrumb"><span className="inline-flex items-center gap-1">{t('studio.crumb_settings')}<Chev />{t('settings.tab_workflow')}</span></nav>
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="me-2 text-xl font-bold">{t('studio.title')}</h2>
           <span className="chip bg-accentSoft text-accentText" data-testid="studio-chip-live">{t('studio.live', { version: liveNo ?? v.version })}</span>
           {isDraft
             ? <span className="chip bg-waitBg text-waitInk" data-testid="studio-chip-draft">{t('studio.draft', { version: v.version })}</span>
             : <button type="button" className="btn btn-accent min-h-11" data-testid="studio-create-draft" disabled={!canEdit} title={!canEdit ? t('wfe.readonly') : undefined} onClick={() => { create.reset(); setDlg('draft'); }}>{t('studio.create_draft', { version: v.version + 1 })}</button>}
-          <Link className="ms-auto inline-flex min-h-11 items-center text-sm text-link underline" to="/admin/settings/workflow/classic" data-testid="studio-classic-link">{t('studio.classic')}</Link>
+          <div className="ms-auto flex flex-wrap items-center gap-2">
+            {(canEdit || v.can_publish) && <button type="button" className="btn min-h-11" data-testid="studio-sitelocks-btn" onClick={() => setDlg('sitelocks')}><Lock size={14} aria-hidden />{t('wfe.sitelocks.title')}</button>}
+            {isDraft && canEdit && <button type="button" className="btn min-h-11" data-testid="studio-discard" onClick={() => { W.discard.reset(); setDlg('discard'); }}><Trash2 size={14} aria-hidden />{t('wfe.discard_draft')}</button>}
+            {!isDraft && v.can_publish && <button type="button" className="btn min-h-11" data-testid="studio-migrate" onClick={() => setDlg('migrate')}>{t('wfe.migrate_sites')}</button>}
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <label className="min-w-48 flex-1 sm:max-w-sm"><span className="sr-only">{t('studio.search')}</span>
             <input type="search" className="input min-h-11" placeholder={t('studio.search')} data-testid="studio-search" value={query} onChange={(e) => setQuery(e.target.value)} /></label>
           <Popover.Root open={menu} onOpenChange={setMenu}>
-            <Popover.Trigger asChild><button type="button" className="btn min-h-11" data-testid="studio-add-menu" aria-haspopup="menu" disabled={!isDraft}><Plus size={14} aria-hidden />{t('studio.add_new')}</button></Popover.Trigger>
+            <Popover.Trigger asChild><button type="button" className="btn min-h-11" data-testid="studio-add-menu" aria-haspopup="menu" disabled={!isDraft && !canEdit}><Plus size={14} aria-hidden />{t('studio.add_new')}</button></Popover.Trigger>
             <Popover.Portal>
               <Popover.Content align="start" sideOffset={6} role="menu" aria-label={t('studio.add_new')} className="card z-[60] w-64 p-1 shadow-lg" data-testid="studio-add-menu-list">
                 <button type="button" role="menuitem" className={menuItem} data-testid="studio-menu-task" disabled={!struct} title={!struct ? why ?? undefined : undefined} onClick={() => startAdd('task')}>{t('studio.menu_task')}</button>
                 <button type="button" role="menuitem" className={menuItem} data-testid="studio-menu-milestone" disabled={!struct} title={!struct ? why ?? undefined : undefined} onClick={() => startAdd('milestone')}>{t('studio.new_milestone')}</button>
                 <button type="button" role="menuitem" className={menuItem} data-testid="studio-menu-gate" disabled={!struct} title={!struct ? why ?? undefined : undefined} onClick={() => startAdd('gate')}>{t('studio.new_gate')}</button>
-                <button type="button" role="menuitem" className={menuItem} data-testid="studio-menu-column" disabled aria-disabled="true">{t('studio.menu_column')}<span className="ms-auto text-xs text-mute">{t('studio.coming_s3')}</span></button>
+                <button type="button" role="menuitem" className={menuItem} data-testid="studio-menu-column" disabled={!canEdit} title={!canEdit ? t('studio.columns.readonly') : undefined} onClick={() => startAdd('column')}>{t('studio.menu_column')}</button>
               </Popover.Content>
             </Popover.Portal>
           </Popover.Root>
           {isDraft && <>
-            <span className="chip bg-hover text-ink" data-testid="studio-pending" aria-live="polite">{t('studio.pending', { count: changes.length })}</span>
+            <button type="button" className="chip min-h-11 bg-hover text-ink hover:bg-line" data-testid="studio-pending" aria-expanded={panel} aria-haspopup="dialog" title={t('studioPanel.open')} onClick={() => setPanel((o) => !o)}><ListChecks size={14} aria-hidden />{t('studio.pending', { count: changes.length })}</button>
             <button type="button" className="btn min-h-11" data-testid="studio-preview" onClick={() => setDlg('preview')}><Eye size={14} aria-hidden />{t('studio.preview_impact')}</button>
             <button type="button" className="btn btn-accent min-h-11" data-testid="studio-review-btn" disabled={!v.can_publish} title={!v.can_publish ? t('wfe.readonly') : undefined} onClick={() => { setView('review'); setStep('detail'); }}><Upload size={14} aria-hidden />{t('studio.review_publish')}</button>
           </>}
         </div>
       </header>
+      <details className="rounded-lg border border-line p-2" data-testid="studio-lockpanel" open={frozen}><summary className="min-h-11 cursor-pointer py-2 text-sm font-semibold">{t('wfe.lock.panel')}</summary><FreezeCard compact /></details>
       {frozen && <p role="status" className="rounded-lg border border-line bg-lockBg p-3 text-sm text-lockInk" data-testid="studio-frozen-banner">{t('wfe.frozen_banner', { date: until ?? '' })}</p>}
       {!canEdit && <p className="text-sm text-mute" data-testid="studio-readonly">{t('wfe.readonly')}</p>}
       {!isDraft && canEdit && <p className="text-sm text-mute" data-testid="studio-live-note">{t('studio.live_note')}</p>}
@@ -125,7 +133,7 @@ function StudioBody({ v, liveNo }: { v: WorkflowVersion; liveNo: number | null }
         </div>
         <main className={`${step === 'detail' ? '' : 'hidden'} min-w-0 space-y-3 md:block`} aria-label={t('studio.title')} data-testid="studio-centre">
           <button type="button" className="btn min-h-11 md:hidden" data-testid="studio-back" onClick={() => setStep('tree')}><ArrowLeft size={14} aria-hidden className="rtl:rotate-180" />{t('wfe.back')}</button>
-          {view === 'add' && <StudioAdd c={c} tab={tab} {...(addMs ? { milestone: addMs } : {})} onTab={setTab} onClose={() => setView('form')} onAdded={(s) => { select(s); }} />}
+          {view === 'add' && <StudioAdd c={c} tab={tab} {...(addMs ? { milestone: addMs } : {})} {...(addTask ? { task: addTask } : {})} onTab={setTab} onClose={() => setView('form')} onAdded={(s) => { select(s); }} />}
           {view === 'review' && <StudioReview c={c} parent={parent} parentSw={baseSw ?? []} draftSw={sw} frozen={frozen} onBack={() => setView('form')} onPublished={() => { setView('form'); setSel(null); setStep('tree'); }} />}
           {view === 'form' && (!sel
             ? <div className="card rounded-xl p-6 text-center text-sm text-mute" data-testid="studio-empty">{t('studio.empty')}</div>
@@ -135,12 +143,20 @@ function StudioBody({ v, liveNo }: { v: WorkflowVersion; liveNo: number | null }
       </div>
 
       {node}
+      {panel && isDraft && <StudioPending c={c} parent={parent} parentSw={baseSw ?? []} draftSw={sw} changes={changes} onClose={() => setPanel(false)} />}
+      <MigrationLog />
       {dlg === 'draft' && (
         <FormDialog open onClose={() => setDlg(null)} testid="studio-draft-dialog" title={t('wfe.new_draft', { version: v.version })} busy={create.isPending} error={create.isError ? err(create.error) : null}
           onSubmit={(reason) => create.mutate({ parent_version: v.version, reason }, { onSuccess: () => { toast(t('wfe.draft_created')); setDlg(null); } })}>
           <p className="text-sm text-mute">{t('wfe.new_draft_hint')}</p>
         </FormDialog>
       )}
+      {dlg === 'discard' && (
+        <FormDialog open onClose={() => setDlg(null)} testid="studio-discard-dialog" title={t('wfe.discard_draft')} busy={W.discard.isPending} error={W.discard.isError ? err(W.discard.error) : null}
+          onSubmit={(reason) => W.discard.mutate({ reason }, { onSuccess: () => { toast(t('wfe.discarded')); setDlg(null); setSel(null); } })}><p className="text-sm text-mute">{t('wfe.discard_hint')}</p></FormDialog>
+      )}
+      {dlg === 'sitelocks' && <SiteLocksShortcut onClose={() => setDlg(null)} />}
+      {dlg === 'migrate' && <MigrationDialog version={v.version} versions={versions} phrase={v.validation?.master_impact?.confirmation_phrase ?? null} onClose={() => setDlg(null)} />}
       {dlg === 'preview' && <PreviewDialog diff={diff} loading={!!v.parent_version && !parent} problems={v.validation?.problems ?? []} warnings={v.validation?.warnings ?? []} cycle={cycle} canPublish={!!v.can_publish && !frozen && !!v.validation?.valid}
         onClose={() => setDlg(null)} onContinue={() => { setDlg(null); setView('review'); setStep('detail'); }} />}
     </div>

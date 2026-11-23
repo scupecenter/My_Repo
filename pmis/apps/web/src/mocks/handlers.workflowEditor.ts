@@ -2,6 +2,7 @@ import { http, HttpResponse } from 'msw';
 import { API_BASE as B } from '@/api/client';
 import { stepUpValid, viewer } from './db';
 import { guard, problem, stepUp } from './handlers';
+import { resetSiteColumnsMock } from './handlers.siteColumns';
 
 /**
  * Decision 4 of 2026-11-12 (migration 0090): the workflow editor. A small in-memory definition (two milestones, one gate, five tasks): version 1 published,
@@ -22,7 +23,7 @@ interface Mig { id: string; site_id: string; site_code: string; from_version: nu
 let migrations: Mig[] = [];
 type SlaWeightMock = { counts: boolean; value: number; group: string | null; sla: Record<string, unknown> | null };
 const slaW = new Map<string, SlaWeightMock>();
-export const resetWorkflowEditorMock = () => { state = seed(); migrations = []; slaW.clear(); };
+export const resetWorkflowEditorMock = () => { state = seed(); migrations = []; slaW.clear(); resetSiteColumnsMock(); };
 /** Until someone drafts a version, the reads fall through to the settings mock that the matrix and the rules screens already use. */
 const untouched = () => state.length === 1 && state[0]!.etag === 1;
 
