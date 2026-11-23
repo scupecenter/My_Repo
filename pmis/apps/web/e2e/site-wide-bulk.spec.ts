@@ -3,10 +3,12 @@ import { login } from './helpers';
 
 // The wide Site Master table: frozen columns, one cell edit, a bulk edit on two sites, and the screens in light/dark and en/ar.
 // The screenshots are attached to the test (artifacts of the run), nothing is written outside the report folder.
-const ROUTE = '/sites?section=te&layout=wide';
+// Site Master main: every mocked Master column, so the table is wider than the viewport and scrolls horizontally
+const ROUTE = '/sites?layout=wide';
 
 const open = async (page: Page, locale: 'en' | 'ar', theme: 'light' | 'dark') => {
   await page.addInitScript(([l, t]) => { localStorage.setItem('pmis.locale', l); localStorage.setItem('pmis.theme', t); }, [locale, theme]);
+  await page.setViewportSize({ width: 900, height: 900 });
   await login(page, 'pm');
   await page.goto(ROUTE);
   await expect(page.getByTestId('sites-wide-table')).toBeVisible();
