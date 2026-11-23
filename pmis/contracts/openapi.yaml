@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.52
+  version: 0.15.57
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -30,6 +30,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.57 (2026-11-23): the last users, groups and sign-in routes of the web on the real API (migration 0143, mirror `db/sql/142_users_groups_api.sql`; CHANGELOG 193; 0.15.53 to 0.15.56 are reserved by other branches). Additive. (1) `GET`, `PUT /users/{user_id}/mfa-exemption` and `POST .../revoke` are served (`idm_set_mfa_exempt`, `idm_mfa_exemption_state`): a System Admin, or a delegate holding `users.administer` for all regions (the delegable right `users.two_factor`, Q620); reason and the acting admin's own step-up; nobody exempts themselves (403 `self_beneficiary`); an admin or a delegate is exempted by a System Admin only (403 `action_forbidden`); `until` must be in the future (422 `must_be_future`) or null (until revoked); a second PUT changes the exemption in force; revoking with no exemption in force is 409 `invalid_transition`. The user gets an in-app notice (`mfa_exemption`) and a mail. `User.mfa_exempt` and `mfa_exempt_until` are filled. The check is GSDN Workspace's own (setting `require_mfa`, default false): when it is on, a local account without two-factor and without an exemption in force gets 401 `mfa_required` at sign-in and at step-up; an exemption whose `until` has passed no longer counts. Entra Conditional Access is not affected. (2) `POST /groups` is served (`idm_group_create`): `groups.create` for all regions and step-up; `member_ids` also need `groups.edit` for all regions; the caller among the members is 403 `self_beneficiary`; a pending or unknown member is 422 with `errors[].path` `/member_ids/<index>`; a name equal to another group's name ignoring case is 409 `duplicate` (Q622); the create is atomic. (3) `POST /me/notify-admins` is served (`me_notify_admins`): reachable by a pending account; plain text only (422 `markup_not_allowed` for `<`, `>` or an HTML entity, Q624); one request per `notify_admins.cooldown_minutes` (default 60, Q623), else 429 `rate_limited` with `Retry-After`; an in-app notice of the new kind `assignment_request` and a mail to every active System Admin. (4) `POST /auth/employee-id` is served but, until the M365 sign-in and the staff registry exist on the server (Q625), answers 409 `invalid_transition` to every session whatever ID is typed (no enumeration); the format is still checked (422) and the calls are rate limited like sign-in (429).
     - 0.15.52 (2026-11-23): Site RFI the site moved past is approved automatically, on any site (owner decision 2026-11-22; migration 0136, mirror `db/sql/135_moved_past_site_rfi.sql`; CHANGELOG 179; 0.15.45 and 0.15.46 are reserved by other branches). Additive, no new path or field. A manual milestone (`calc.milestone_manual`, Site RFI MS4) that is open, in entry or locked but ready, that nothing waits for (its gate open, its predecessors done), that the site moved past (a later task approved with an actual date), that no person touched (no submit, review, approve, reject, reopen or reassign step, no date typed, no date override) and that was never reverted, is approved directly with its pre-filled date; with no pre-filled date, with the date of the earliest later task approved, flagged inferred. It is an admin override made by a rule of GSDN Workspace: `TaskDetail.overrides` lists an `Override` of the new `kind` `manual_ms_moved_past` (`entity` `task`, `before` `{state, actual_date, prefilled_date}`, `after` `{state: approved, actual_date, date_source: prefilled|inferred, note, evidence_task, evidence_date}`, no `acted_by`), revertible through `POST /overrides/{override_id}/revert` (System Admin, reason, step-up), which reopens the milestone at L1 with its pre-filled date; a milestone reverted under this kind or `historical_manual_ms_approved` is never approved again by either rule. It runs in the calculation path before the gate and D8 rules of 0.15.44 (Site RFI, then the gate, then TE Completion, D8 and On-Air follow) and once on the existing sites; the rules now stand aside only while a Master import apply runs.
     - 0.15.51 (2026-11-23): dependent lists are enforced on save (owner request 2026-11-23; CHANGELOG 187). Additive, no migration. `PATCH /tasks/{task_id}` answers 422 with the new error code `list_parent_mismatch` when a list field whose list has a parent list gets a value whose parent value differs from the parent value the site holds (the list field of the parent list, in this task or in another task of the site); `errors[0].path` is `/values/<key>` and the problem carries `field`, `list`, `parent_list` and `expected_parent`. While the parent value is empty, or for a value with no parent or one outside the list, or when a value is cleared (null), the save is accepted as before. A refusal saves nothing. The bulk edit uses the same path, so it is refused the same way; it can now also clear a value (`null`) in the client.
     - 0.15.50 (2026-11-22): the Site Master wide table is complete: the list filters in `GET /site360/{menu}/rows`, dependent lists, and bulk edit on the existing save path (owner request 2026-11-22; CHANGELOG 186). Additive, no migration. 0.15.49 is taken by another branch. (1) `GET /site360/{menu}/rows` takes `stage_code`, `bucket` (`all`, `mine`, `late`, `waiting_approval`, `closed`), `workflow_locks` (`locked`, `open`) and `data_gaps` (`with`, `without`) with the same meaning as `GET /sites`, computed by the same SQL (`sites.service`: the current stage of the site, the caller's own open work for `mine`, an overdue open task for `late`, the workflow locks flag, the missing required values), so the Site Master list and the wide table count the same sites; they combine with the filters already accepted (`site_code`, `region_id`, `sub_region`, `phase`, `batch`, `scenario`, `delivery_model`, `status`, `milestone`, `contractor`, `filter`). An unknown value is 422 `validation_failed`. (2) Dependent lists: for a list cell whose list has a parent list, each `options[]` entry carries `parent` (the code of its parent value) and the cell carries `parent_ord` (the Master column, of the same site and menu, that holds the parent value); the client offers only the options whose `parent` equals the value of that column in the same row. A cell with no `parent_ord` (the parent list is not in the menu) offers every option. Since 0.15.51 the server also refuses a non-matching child on save (422 `list_parent_mismatch`). (3) Bulk edit has no new path: the client saves each eligible cell with `PATCH /tasks/{task_id}` and `If-Match` (the same rights, locks, gate rules and errors as one inline edit), a few at a time, and shows saved, skipped and failed with the reasons.
@@ -346,6 +347,12 @@ paths:
       tags: [auth]
       operationId: linkEmployeeId
       summary: Link the 4-digit employee ID (once, first sign-in)
+      description: |
+        The first-sign-in link of the M365 path (ADR 0002 item 4): the ID must exist in the staff registry and not be linked to another account; the account
+        stays `pending_assignment`. **0.15.57:** the M365 sign-in and the staff registry do not exist on the server yet (Q625), and a local account gets its
+        employee ID from an administrator, so every session answers 409 `invalid_transition`, with the same body whatever ID is typed (nothing tells whether
+        an ID is registered or already linked). A malformed ID is 422; calls are rate limited per user and per address like sign-in (429). Each refusal is
+        written to the System Log with a keyed hash of the ID only.
       x-db-path: idm_link_employee_id
       requestBody:
         required: true
@@ -365,6 +372,7 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '409': { $ref: '#/components/responses/Conflict' }
         '422': { $ref: '#/components/responses/Unprocessable' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
   /auth/step-up:
     get:
       tags: [auth]
@@ -1079,16 +1087,25 @@ paths:
       tags: [me]
       operationId: notifyAdmins
       summary: Pending user asks the System Admins for an assignment
+      description: |
+        0.15.57 (`me_notify_admins`). Reachable by a pending account. Plain text only: `<`, `>` and HTML entities are refused (422 `markup_not_allowed`,
+        Q624); control characters become spaces. One request per user per `notify_admins.cooldown_minutes` (setting, default 60, Q623), checked in the
+        database: else 429 `rate_limited` with `Retry-After`. Every active System Admin gets an in-app notice (`assignment_request`, linked to the user's
+        page) and a mail; the request is audited (`admins_notified`). Not for the break-glass account or before a forced password change (403).
+      x-db-path: me_notify_admins
       requestBody:
         content:
           application/json:
             schema:
               type: object
+              additionalProperties: false
               properties:
                 message: { type: string, maxLength: 500 }
       responses:
         '202': { description: 'Notification queued (in-app and email).' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
   /me/profile:
     get:
@@ -2707,6 +2724,11 @@ paths:
       tags: [groups]
       operationId: createGroup
       summary: Create a group
+      description: |
+        0.15.57. `groups.create` for all regions; `member_ids` also need `groups.edit` for all regions and go through `idm_group_add_member` (the same ceilings
+        as adding members): the caller is never a member of a group they create (403 `self_beneficiary`), a pending or unknown member is 422 with
+        `errors[].path` `/member_ids/<index>`. The create is atomic. A name equal to another group's name ignoring case is 409 `duplicate` (Q622). A group made
+        here is never the System Admins group. Audited (`group_created`, and `group_member_added` per member).
       x-step-up: true
       x-db-path: idm_group_create
       requestBody:
@@ -7670,6 +7692,7 @@ paths:
       tags: [mfa-exemption]
       operationId: getMfaExemption
       summary: MFA exemption of a user
+      description: 0.15.57. For a holder of `admin.users` view (403 `module_forbidden` otherwise) or the user themselves. `exempt` is true only while an exemption is in force (an `until` in the past counts as not exempt).
       responses:
         '200':
           description: State.
@@ -20990,7 +21013,7 @@ components:
     # ---------------------------------------------------------- notifications and logs
     NotificationKind:
       type: string
-      enum: [task_assigned, task_returned, task_approved, approval_due, reassigned, absence_alert, idle_task_alert, no_holder, holiday_tentative, delegation, mfa_exemption, template_updated, import_batch, system, mention, followed_change, task_rejected, no_eligible_holder, register_assigned, register_rejected, gate_closed_again, sla_negative_duration, email_change_requested, email_change_decided, security_alert, snag_raised, snag_review, snag_rejected, snag_closed, levels_converted, permit_transferred, phone_change_requested, phone_change_decided, security_notice, site_region_moved]
+      enum: [task_assigned, task_returned, task_approved, approval_due, reassigned, absence_alert, idle_task_alert, no_holder, holiday_tentative, delegation, mfa_exemption, template_updated, import_batch, system, mention, followed_change, task_rejected, no_eligible_holder, register_assigned, register_rejected, gate_closed_again, sla_negative_duration, email_change_requested, email_change_decided, security_alert, snag_raised, snag_review, snag_rejected, snag_closed, levels_converted, permit_transferred, phone_change_requested, phone_change_decided, security_notice, site_region_moved, assignment_request]
     Notification:
       type: object
       required: [id, kind, title, created_at, read_at]

@@ -505,6 +505,13 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/exports/master'],
   ['get', '/exports/master'],
   ['get', '/exports/master/:id/download'],
+  // Contract 0.15.57 (migration 0143): the MFA exemption, creating a group, the pending user's request to the System Admins, the employee-ID link.
+  ['get', '/users/:id/mfa-exemption'],
+  ['put', '/users/:id/mfa-exemption'],
+  ['post', '/users/:id/mfa-exemption/revoke'],
+  ['post', '/groups'],
+  ['post', '/me/notify-admins'],
+  ['post', '/auth/employee-id'],
 ] as const;
 
 /** `GET /users/deleted` and `GET /users/picker` are other operations that the `:id` pattern would swallow; they stay mocked. */
@@ -551,12 +558,6 @@ export const NOT_AVAILABLE = [
   ['put', '/staff-registry/visibility'],
   ['get', '/staff-registry/:employeeId'],
   ['patch', '/staff-registry/:employeeId'],
-  ['get', '/users/:id/mfa-exemption'],
-  ['put', '/users/:id/mfa-exemption'],
-  ['post', '/users/:id/mfa-exemption/revoke'],
-  ['post', '/auth/employee-id'],
-  ['post', '/me/notify-admins'],
-  ['post', '/groups'],
   ['post', '/settings/holidays/import'],
 ] as const;
 

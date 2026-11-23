@@ -25,7 +25,7 @@ describe('problem+json, request ids, unknown routes', () => {
       [api, 'get', '/nothing-here'],
       [api, 'put', '/users'],
       [api, 'delete', '/users/00000000-0000-4000-8000-000000000000'],
-      [api, 'post', '/groups'], // createGroup is in the contract but not built yet
+      [api, 'post', '/absences'], // in the contract, not built yet (POST /groups is served since 0143)
       [api, 'patch', '/groups/00000000-0000-4000-8000-000000000000'],
       [api, 'get', '/absences'], // in the contract, not built yet
       [new Api(app), 'get', '/absences'], // unauthenticated: still a plain 404

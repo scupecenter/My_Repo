@@ -16,7 +16,9 @@ export function EmployeeId() {
       await qc.invalidateQueries({ queryKey: ['session'] });
     } catch (x) {
       const code = x instanceof ApiError ? (x.problem.errors?.[0]?.code ?? x.code) : '';
-      setErr(code === 'not_in_registry' ? t('employeeId.not_in_registry') : code === 'duplicate' ? t('employeeId.duplicate') : t('errors.generic'));
+      // contract 0.15.57: the real API answers 409 invalid_transition until the M365 sign-in and the staff registry exist (Q625)
+      setErr(code === 'not_in_registry' ? t('employeeId.not_in_registry') : code === 'duplicate' ? t('employeeId.duplicate')
+        : code === 'invalid_transition' ? t('employeeId.unavailable') : code === 'rate_limited' ? t('employeeId.rate_limited') : t('errors.generic'));
     }
   };
   return (

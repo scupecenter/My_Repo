@@ -93,6 +93,14 @@ export class AuthController {
     return this.auth.changePassword(auth, body);
   }
 
+  /** 0143: the first-sign-in employee-ID link of the M365 path. Answers 409 for every session until M365 and the staff registry exist (Q625). */
+  @AllowIncomplete()
+  @Post('employee-id')
+  @HttpCode(200)
+  linkEmployeeId(@Auth() auth: AuthContext, @Body() body: unknown): Promise<SessionBody> {
+    return this.auth.linkEmployeeId(auth, body);
+  }
+
   @AllowIncomplete()
   @Post('local/step-up')
   @HttpCode(200)

@@ -223,6 +223,12 @@ export default async function setup(): Promise<() => Promise<void>> {
   process.env.TEST_SUPER_URL_GMP = gmpDb.superUrl;
   // The moved-past Site RFI database (migration 0136): the suite runs the one-time backfill, which reads every active site of its database, writes a running
   // Master import apply job (which defers the rules on every site of its database) and reads the milestones, the gates and the overrides of its sites.
+  // The users and groups API database (migration 0143): the suite switches the global setting require_mfa on, which would refuse every password-only
+  // sign-in of the other suites, so no other suite may share it.
+  const mfa = `${dbName}_mfa`;
+  const mfaDb = await buildDatabase(adminUrl, mfa, appPassword);
+  process.env.TEST_DATABASE_URL_MFA = mfaDb.appUrl;
+  process.env.TEST_SUPER_URL_MFA = mfaDb.superUrl;
   const rfi = `${dbName}_rfi`;
   const rfiDb = await buildDatabase(adminUrl, rfi, appPassword);
   process.env.TEST_DATABASE_URL_RFI = rfiDb.appUrl;
@@ -317,6 +323,7 @@ export default async function setup(): Promise<() => Promise<void>> {
     await a.query(`DROP DATABASE IF EXISTS ${hmm} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${gmp} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${rfi} WITH (FORCE)`);
+    await a.query(`DROP DATABASE IF EXISTS ${mfa} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${wfe} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${wfg} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${rcols} WITH (FORCE)`);

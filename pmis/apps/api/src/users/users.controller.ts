@@ -3,7 +3,7 @@ import type { Response } from 'express';
 import { Auth } from '../auth/decorators';
 import type { AuthContext } from '../auth/auth.types';
 import { etagHeader } from '../common/etag';
-import { TwoFactorChange, UserDetailDto, UsersService } from './users.service';
+import { MfaExemptionDto, TwoFactorChange, UserDetailDto, UsersService } from './users.service';
 import type { PurgedUserDto, UserDto } from './users.repo';
 
 @Controller('users')
@@ -110,6 +110,23 @@ export class UsersController {
   async issueEnrolCode(@Auth() auth: AuthContext, @Param('id') id: string, @Body() body: unknown, @Res({ passthrough: true }) res: Response): Promise<TwoFactorChange> {
     res.setHeader('Cache-Control', 'no-store');
     return this.users.issueEnrolCode(auth, id, body);
+  }
+
+  // 0143 (contract 0.15.57): the per-user MFA exemption (idm_set_mfa_exempt)
+  @Get(':id/mfa-exemption')
+  getMfaExemption(@Auth() auth: AuthContext, @Param('id') id: string): Promise<MfaExemptionDto> {
+    return this.users.getMfaExemption(auth, id);
+  }
+
+  @Put(':id/mfa-exemption')
+  setMfaExemption(@Auth() auth: AuthContext, @Param('id') id: string, @Body() body: unknown): Promise<MfaExemptionDto> {
+    return this.users.setMfaExemption(auth, id, body, false);
+  }
+
+  @Post(':id/mfa-exemption/revoke')
+  @HttpCode(200)
+  revokeMfaExemption(@Auth() auth: AuthContext, @Param('id') id: string, @Body() body: unknown): Promise<MfaExemptionDto> {
+    return this.users.setMfaExemption(auth, id, body, true);
   }
 
   @Post(':id/password-reset')

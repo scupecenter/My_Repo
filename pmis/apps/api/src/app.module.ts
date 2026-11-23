@@ -111,6 +111,7 @@ import { GroupsService } from './groups/groups.service';
 import { MatrixController } from './matrix/matrix.controller';
 import { MatrixService } from './matrix/matrix.service';
 import { EmailChangeRequestsController, MeController, PhoneChangeRequestsController } from './me/me.controller';
+import { NotifyAdminsService } from './me/notify-admins.service';
 import { EmailChangesService, PhoneChangesService, ProfileService } from './me/profile.service';
 import { MailPort } from './mail/mail.port';
 import { OutboxMail } from './mail/outbox-mail';
@@ -181,7 +182,7 @@ export function appModuleFor(config: AppConfig) {
       { provide: APP_CONFIG, useValue: config },
       DbService, SyslogService, LogHmacService, TwoFactorService, PasswordService, RateLimiter, SessionService, UserStateService, StepUpService,
       InvitationsService, // 0091
-      AccessService, AuthService, UsersRepo, MeService, ProfileService, EmailChangesService, PhoneChangesService, UsersService, GroupsService,
+      AccessService, AuthService, UsersRepo, MeService, NotifyAdminsService, ProfileService, EmailChangesService, PhoneChangesService, UsersService, GroupsService,
       DepartmentsService, MessagesService, AnnouncementsService, IdempotencyService, RegionsService, RolesService, PermissionsService,
       AssignmentsService, DelegationsService, SitesService, SiteLocksService, SiteDraftsService, TaskViewService, TaskDetailService, WorkflowEditorService, WorkflowService, ApprovalsService, MyWorkService, OverridesService, CalendarService, SlaService, JobsService, RegistersService, RegisterColumnsService, MatrixService, WarehouseService, WarehouseConfigService, AsBuiltItemsService,
       NotificationsService, FollowService, StatusUpdatesService, InsightsService, TemplatesService, ImportService, ImportJobsService, UploadInterceptor, StorageService, DocumentsService, DocsGridService, LibraryService, ZipService, StorageJobsService, SnagsService,

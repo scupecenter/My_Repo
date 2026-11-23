@@ -4,6 +4,7 @@ import { AllowIncomplete, Auth } from '../auth/decorators';
 import type { AuthContext } from '../auth/auth.types';
 import { contentVersion, etagHeader } from '../common/etag';
 import { MeDto, MeService } from './me.service';
+import { NotifyAdminsService } from './notify-admins.service';
 import { EmailChangesService, PhoneChangesService, ProfileDto, ProfileService } from './profile.service';
 
 @Controller('me')
@@ -11,6 +12,7 @@ export class MeController {
   constructor(
     private readonly me: MeService,
     private readonly profile: ProfileService,
+    private readonly notify: NotifyAdminsService,
   ) {}
 
   @AllowIncomplete()
@@ -19,6 +21,14 @@ export class MeController {
     const body = await this.me.me(auth);
     res.setHeader('ETag', etagHeader(contentVersion(body)));
     return body;
+  }
+
+  /** 0143: a pending (or active) user asks the System Admins for an assignment. Reachable by a pending account (ADR 0002 item 5). */
+  @AllowIncomplete()
+  @Post('notify-admins')
+  @HttpCode(202)
+  async notifyAdmins(@Auth() auth: AuthContext, @Body() body: unknown): Promise<void> {
+    await this.notify.notify(auth, body);
   }
 
   // ------------------------------------------------------------------ self-service profile (contract 0.9.2, migration 0044)

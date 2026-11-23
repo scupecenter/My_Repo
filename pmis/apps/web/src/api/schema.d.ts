@@ -97,7 +97,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Link the 4-digit employee ID (once, first sign-in) */
+        /**
+         * Link the 4-digit employee ID (once, first sign-in)
+         * @description The first-sign-in link of the M365 path (ADR 0002 item 4): the ID must exist in the staff registry and not be linked to another account; the account
+         *     stays `pending_assignment`. **0.15.57:** the M365 sign-in and the staff registry do not exist on the server yet (Q625), and a local account gets its
+         *     employee ID from an administrator, so every session answers 409 `invalid_transition`, with the same body whatever ID is typed (nothing tells whether
+         *     an ID is registered or already linked). A malformed ID is 422; calls are rate limited per user and per address like sign-in (429). Each refusal is
+         *     written to the System Log with a keyed hash of the ID only.
+         */
         post: operations["linkEmployeeId"];
         delete?: never;
         options?: never;
@@ -679,7 +686,13 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Pending user asks the System Admins for an assignment */
+        /**
+         * Pending user asks the System Admins for an assignment
+         * @description 0.15.57 (`me_notify_admins`). Reachable by a pending account. Plain text only: `<`, `>` and HTML entities are refused (422 `markup_not_allowed`,
+         *     Q624); control characters become spaces. One request per user per `notify_admins.cooldown_minutes` (setting, default 60, Q623), checked in the
+         *     database: else 429 `rate_limited` with `Retry-After`. Every active System Admin gets an in-app notice (`assignment_request`, linked to the user's
+         *     page) and a mail; the request is audited (`admins_notified`). Not for the break-glass account or before a forced password change (403).
+         */
         post: operations["notifyAdmins"];
         delete?: never;
         options?: never;
@@ -1729,7 +1742,13 @@ export interface paths {
         /** Groups with member counts and matrix usage */
         get: operations["listGroups"];
         put?: never;
-        /** Create a group */
+        /**
+         * Create a group
+         * @description 0.15.57. `groups.create` for all regions; `member_ids` also need `groups.edit` for all regions and go through `idm_group_add_member` (the same ceilings
+         *     as adding members): the caller is never a member of a group they create (403 `self_beneficiary`), a pending or unknown member is 422 with
+         *     `errors[].path` `/member_ids/<index>`. The create is atomic. A name equal to another group's name ignoring case is 409 `duplicate` (Q622). A group made
+         *     here is never the System Admins group. Audited (`group_created`, and `group_member_added` per member).
+         */
         post: operations["createGroup"];
         delete?: never;
         options?: never;
@@ -4858,7 +4877,10 @@ export interface paths {
             };
             cookie?: never;
         };
-        /** MFA exemption of a user */
+        /**
+         * MFA exemption of a user
+         * @description 0.15.57. For a holder of `admin.users` view (403 `module_forbidden` otherwise) or the user themselves. `exempt` is true only while an exemption is in force (an `until` in the past counts as not exempt).
+         */
         get: operations["getMfaExemption"];
         /**
          * Exempt a user from GSDN Workspace MFA requirement
@@ -15959,7 +15981,7 @@ export interface components {
             revoked_count: number;
         };
         /** @enum {string} */
-        NotificationKind: "task_assigned" | "task_returned" | "task_approved" | "approval_due" | "reassigned" | "absence_alert" | "idle_task_alert" | "no_holder" | "holiday_tentative" | "delegation" | "mfa_exemption" | "template_updated" | "import_batch" | "system" | "mention" | "followed_change" | "task_rejected" | "no_eligible_holder" | "register_assigned" | "register_rejected" | "gate_closed_again" | "sla_negative_duration" | "email_change_requested" | "email_change_decided" | "security_alert" | "snag_raised" | "snag_review" | "snag_rejected" | "snag_closed" | "levels_converted" | "permit_transferred" | "phone_change_requested" | "phone_change_decided" | "security_notice" | "site_region_moved";
+        NotificationKind: "task_assigned" | "task_returned" | "task_approved" | "approval_due" | "reassigned" | "absence_alert" | "idle_task_alert" | "no_holder" | "holiday_tentative" | "delegation" | "mfa_exemption" | "template_updated" | "import_batch" | "system" | "mention" | "followed_change" | "task_rejected" | "no_eligible_holder" | "register_assigned" | "register_rejected" | "gate_closed_again" | "sla_negative_duration" | "email_change_requested" | "email_change_decided" | "security_alert" | "snag_raised" | "snag_review" | "snag_rejected" | "snag_closed" | "levels_converted" | "permit_transferred" | "phone_change_requested" | "phone_change_decided" | "security_notice" | "site_region_moved" | "assignment_request";
         Notification: {
             /** Format: uuid */
             id: string;
@@ -17829,6 +17851,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
         };
     };
     startStepUp: {
@@ -18671,6 +18694,8 @@ export interface operations {
                 content?: never;
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
             429: components["responses"]["TooManyRequests"];
         };
     };

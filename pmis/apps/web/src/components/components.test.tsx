@@ -45,6 +45,29 @@ describe('Pending', () => {
     await userEvent.click(screen.getByTestId('pending-notify'));
     await screen.findByText('The admins were notified.');
   });
+
+  it('shows the cooldown refusal of the real API (contract 0.15.57: 429 rate_limited) instead of swallowing it', async () => {
+    await signIn('pending');
+    server.use(http.post(`${API_BASE}/me/notify-admins`, () => HttpResponse.json({ status: 429, code: 'rate_limited', title: 'Too many requests' },
+      { status: 429, headers: { 'Content-Type': 'application/problem+json', 'Retry-After': '3600' } })));
+    renderApp(<Pending session={{ authenticated: true, csrf_token: '', user: { id: 'u', display_name: 'Wael Saadi', employee_id: '1211' } }} />);
+    await userEvent.click(screen.getByTestId('pending-notify'));
+    expect(await screen.findByTestId('pending-notify-error')).toHaveTextContent('a moment ago');
+    expect(screen.getByTestId('pending-notify')).not.toBeDisabled();
+  });
+});
+
+describe('EmployeeId on the real API (contract 0.15.57)', () => {
+  it('explains the 409 answered while the Microsoft 365 link is not available', async () => {
+    await signIn('newbie');
+    server.use(http.post(`${API_BASE}/auth/employee-id`, () => HttpResponse.json({ status: 409, code: 'invalid_transition', title: 'Conflict' },
+      { status: 409, headers: { 'Content-Type': 'application/problem+json' } })));
+    renderApp(<EmployeeId />);
+    const u = userEvent.setup();
+    await u.type(screen.getByTestId('employee-id-input'), '1234');
+    await u.click(screen.getByTestId('employee-id-submit'));
+    await waitFor(() => expect(screen.getByTestId('employee-id-error')).toHaveTextContent('Microsoft 365 sign-in'));
+  });
 });
 
 describe('PersonTag hover card', () => {
