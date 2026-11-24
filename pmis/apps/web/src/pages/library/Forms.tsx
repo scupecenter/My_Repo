@@ -89,8 +89,9 @@ export function GenerateDialog({ form, initialSite, onClose }: { form: LibraryFo
               <span className="chip bg-doneBg text-doneInk" data-testid="lib-generated-number">{t('lib.number')}: <b className="mono">{done.number}</b></span>
               <button type="button" className="btn" data-testid="lib-print" onClick={() => void generatedHtml(done.id, 'print').then(printHtml, (e) => toast(errText(e as ApiError), 'err'))}><Printer size={14} />{t('lib.print')}</button>
               <button type="button" className="btn" data-testid="lib-download" onClick={() => void downloadGenerated(done.id).catch((e) => toast(errText(e as ApiError), 'err'))}><Download size={14} />{t('lib.download')}</button>
-              <label className="btn cursor-pointer" data-testid="lib-upload-signed"><Upload size={14} />{t('lib.upload_signed')}
-                <input type="file" className="sr-only" data-testid="lib-upload-input" accept=".pdf,.png,.jpg,.jpeg" disabled={uploading}
+              {/* the upload needs the task's document slot: it stays disabled until the archive row of the generated copy is read, so a file chosen at once is never dropped */}
+              <label className={`btn ${row?.task_id && !uploading ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`} data-testid="lib-upload-signed" aria-disabled={!row?.task_id || uploading}><Upload size={14} />{t('lib.upload_signed')}
+                <input type="file" className="sr-only" data-testid="lib-upload-input" accept=".pdf,.png,.jpg,.jpeg" disabled={uploading || !row?.task_id}
                   onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void upload(f); }} /></label>
               {row && <span className="chip bg-card2 text-mute" data-testid="lib-generated-status">{t(`lib.status.${row.status}`)}</span>}
             </>)}

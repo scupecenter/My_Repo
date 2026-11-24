@@ -20,6 +20,9 @@ for (const locale of ['en', 'ar'] as const) {
     await page.getByTestId('lib-generate').click();
     await expect(page.getByTestId('lib-generated-number')).toContainText('SSR-2026-0001');
     // print and sign offline, then upload the signed copy into the task's slot
+    // the upload is enabled once the task's document slot of the generated copy is known
+    await expect(page.getByTestId('lib-generated-status')).toBeVisible();
+    await expect(page.getByTestId('lib-upload-input')).toBeEnabled();
     await page.getByTestId('lib-upload-input').setInputFiles({ name: 'MI102-signed.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 signed copy') });
     await expect(page.getByTestId('lib-generated-status')).toHaveAttribute('class', /chip/);
     await expect(page.getByTestId('lib-generated-status')).toContainText(locale === 'en' ? 'Signed and uploaded' : 'موقَّع ومرفوع');
