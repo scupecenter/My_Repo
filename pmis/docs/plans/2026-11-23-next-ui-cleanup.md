@@ -84,13 +84,13 @@ W1 decision: the single tab row takes its phases from the published workflow ver
 | # | Workstream | Status | PR |
 |---|------------|--------|----|
 | W1 | Site page: one clear tab row instead of two overlapping rows | Done | #199 |
-| W2 | Registers & Logs: the same view options as Site Master (wide table, board, density, map where it applies) | Done (branch `claude/w2-register-views`, built on W8; contract 0.15.69, no migration, CHANGELOG 204) | #204 |
+| W2 | Registers & Logs: the same view options as Site Master (wide table, board, density, map where it applies) | Done | #204 |
 | W3 | Settings > Site360: remove the tab and the name; move what is still useful into Settings > Workflow | Done | #198 |
 | W4 | Dead or stuck screens: Settings > Alerts and Security stay on "Loading..."; audit every menu and tab | Done | #201 |
-| W5 | Library menu (Forms and Archive); Data entry > Templates stays as it is | Done (branch `claude/w5-library`, contract 0.15.70, migration 0151, CHANGELOG 205) | this PR |
+| W5 | Library menu (Forms and Archive); Data entry > Templates stays as it is | Done | #205 |
 | W7 | Daily Progress and Tomorrow Plan: a screen in the system, copyable to email | Done | #203 |
-| W8 | Site lists and the site task table: row numbers everywhere, three-level headers, list-style task table, display options (font size, alignment, density, wrap) | Done (branch `claude/w8-table-standard`, contract 0.15.68, migration 0148, CHANGELOG 201); the Daily Plan (W7) and the Archive (W5) adopt it when they are built | |
-| W6 | CHANGELOG, CLAUDE.md navigation notes and this file updated | Pending | |
+| W8 | Site lists and the site task table: row numbers everywhere, three-level headers, list-style task table, display options (font size, alignment, density, wrap) | Done | #200 |
+| W6 | CHANGELOG, CLAUDE.md navigation notes and this file updated | Done | this PR |
 
 Suggested order: W4 first (it may expose broken APIs that W3/W5 depend on), then W1, W8, W3, W7, W2, W5, W6. W8 builds the shared table options that W2 then reuses on registers. W2 and W5 are the largest.
 
@@ -421,6 +421,7 @@ Total: roughly 7 PRs and several CI cycles each. This does not fit in one short 
 
 ## Log
 
+- 2026-11-24: W6 done: CLAUDE.md has the navigation after the cleanup (Library menu, Daily Plan entry, one table standard, register layouts, the Settings tabs and the Documents sections; owner approval 2026-11-24 for this CLAUDE.md change only), the Status table points to the merged PRs (W1 #199, W2 #204, W3 #198, W4 #201, W5 #205, W7 #203, W8 #200), CHANGELOG 206. Every workstream of this plan is done. Open after the plan: PDF rendering of the Library forms through headless Chromium; the owner questions on the Arabic name of Site Master, CW FAC, HOTO and TE FAC under Handover & Closure, and the delegate read of some settings screens.
 - 2026-11-24: W5 done on branch `claude/w5-library` (migration 0151, mirror `db/sql/150_library.sql`, contract 0.15.70, CHANGELOG 205), built on W8. Library > Forms and Archive, Settings > Documents > Document types, Form templates and Archive (see the W5 result). New tables `library_form_templates` (KEEP) and `library_generated_docs` (DELETE) are classified in `data_reset_plan()` / `data_reset_core()` (redefined from 0149). Choices: the grant `library.forms` create is "Documents: generate"; O&M groups the documents of a task of the O&M work view; the form template upload is multipart (the JSON body limit is 100 KB and the owner's CW forms are about 480 KB); print and download are HTML until the Chromium PDF is built; a security review replaced the deny-list check of templates by an allow-list re-serializer.
 - 2026-11-24: W2 done on branch `claude/w2-register-views` (built on W8; contract 0.15.69 documentation only, no migration, CHANGELOG 204): the shared WideTable and BoardGrid, the register wide table with inline edit through the record update, the register board by its status field (or the approval state), the register map narrowed to the records' sites, saved views with the layout, every register in `siteDataScreens.ts` and the guard. Choice noted: the status field is the register's single-value field named `status`, `..._status` or `stage`; the approval state is always offered, so Board applies to every register; Map only where `site_scoped`.
 - 2026-11-24: W7 done on branch `claude/w7-daily-plan` (migration 0149, mirror `db/sql/148_daily_plan.sql`, contract 0.15.67, CHANGELOG 203). My Work > Daily Plan (`/my-work/daily-plan`) with the Progress and Tomorrow tabs; one plan per region per day (`daily_plans`, `daily_plan_rows`, row security by region, doors only); the Matrix row `daily_plan` (L1 Site Engineers CW/TE and CW/TE Team Leads, L2 CW/TE Team Leads; held through the module `daily_plan` or `sites`); Settings > My Work > Daily Plan (columns and order per tab, default region scope, automatic lock time, reminder hour; the job `dp_tick` every 5 minutes). Choices made where the plan was silent, following what the system already does:
