@@ -156,7 +156,7 @@ INSERT INTO reset_plan (tbl, action, keep_where) VALUES
 
 INSERT INTO reset_plan (tbl, action, keep_where)
 SELECT t, 'delete', 'false' FROM unnest(ARRAY[
-  'sites', 'clusters', 'task_instances', 'task_cover_decisions', 'workflow_steps', 'task_level_actors', 'task_level_voters', 'task_delay_periods', 'admin_overrides',
+  'sites', 'clusters', 'task_instances', 'task_cover_decisions', 'daily_plans', 'daily_plan_rows', 'workflow_steps', 'task_level_actors', 'task_level_voters', 'task_delay_periods', 'admin_overrides',
   'site_gate_state', 'site_gate_events', 'site_scope_exceptions', 'site_snapshots', 'site_workflow_migrations', 'site_drafts', 'baseline_versions',
   'baseline_entries', 'change_requests', 'rf_design_records', 'acquisition_candidates', 'procurement_records', 'gecol_records', 'hlc_records',
   'hlc_pr_links', 'hlc_legacy_migrations', 'permit_records', 'quality_inspections', 'issues', 'risks', 'readiness_handover', 'as_built_records',
@@ -288,6 +288,8 @@ DELETE FROM public.admin_overrides;
 DELETE FROM public.task_level_actors;
 DELETE FROM public.task_level_voters;
 DELETE FROM public.task_cover_decisions;
+DELETE FROM public.daily_plan_rows;  -- 0149 (W7): the Daily Plan rows and their headers are project data (the setting daily_plan.settings stays in settings)
+DELETE FROM public.daily_plans;
 DELETE FROM public.workflow_steps;
 DELETE FROM public.task_instances;
 DELETE FROM public.site_workflow_migrations;

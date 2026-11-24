@@ -163,6 +163,8 @@ import { ExportsController } from './exports/exports.controller';
 import { MasterExportService } from './exports/master-export.service';
 import { AbsencesController, ReassignmentController } from './reassignment/reassignment.controller';
 import { AbsencesService } from './reassignment/absences.service';
+import { DailyPlanController, DailyPlanSettingsController } from './daily-plan/daily-plan.controller';
+import { DailyPlanService } from './daily-plan/daily-plan.service';
 import { ReassignmentService } from './reassignment/reassignment.service';
 import { StaffRegistryController } from './staff-registry/staff-registry.controller';
 import { StaffRegistryService } from './staff-registry/staff-registry.service';
@@ -185,6 +187,7 @@ export function appModuleFor(config: AppConfig) {
       SearchController, // 0.15.17 (F4)
       ExportsController, // 0.15.34: Master-format export
       AbsencesController, ReassignmentController, // 0.15.54 (migration 0140): absences and the lead decisions (B12b)
+      DailyPlanController, DailyPlanSettingsController, // 0.15.67 (migration 0149): My Work > Daily Plan (W7)
       StaffRegistryController, // 0.15.56 (0142): staff registry card, visibility, edit
     ],
     providers: [
@@ -206,6 +209,7 @@ export function appModuleFor(config: AppConfig) {
       SearchService, // 0.15.17 (F4)
       MasterExportService, // 0.15.34
       AbsencesService, ReassignmentService, // 0.15.54 (migration 0140)
+      DailyPlanService, // 0.15.67 (migration 0149)
       StaffRegistryService, // 0.15.56 (0142)
       { provide: APP_GUARD, useClass: SessionGuard },
       { provide: APP_INTERCEPTOR, useClass: TxInterceptor },

@@ -88,7 +88,7 @@ W1 decision: the single tab row takes its phases from the published workflow ver
 | W3 | Settings > Site360: remove the tab and the name; move what is still useful into Settings > Workflow | Pending | |
 | W4 | Dead or stuck screens: Settings > Alerts and Security stay on "Loading..."; audit every menu and tab | Pending | |
 | W5 | Library menu (Forms and Archive); Data entry > Templates stays as it is | Pending | |
-| W7 | Daily Progress and Tomorrow Plan: a screen in the system, copyable to email | Pending | |
+| W7 | Daily Progress and Tomorrow Plan: a screen in the system, copyable to email | Done (branch `claude/w7-daily-plan`, PR pending review) | |
 | W8 | Site lists and the site task table: row numbers everywhere, three-level headers, list-style task table, display options (font size, alignment, density, wrap) | Pending | |
 | W6 | CHANGELOG, CLAUDE.md navigation notes and this file updated | Pending | |
 
@@ -280,6 +280,16 @@ Total: roughly 7 PRs and several CI cycles each. This does not fit in one short 
 
 ## Log
 
+- 2026-11-24: W7 done on branch `claude/w7-daily-plan` (migration 0149, mirror `db/sql/148_daily_plan.sql`, contract 0.15.67, CHANGELOG 203). My Work > Daily Plan (`/my-work/daily-plan`) with the Progress and Tomorrow tabs; one plan per region per day (`daily_plans`, `daily_plan_rows`, row security by region, doors only); the Matrix row `daily_plan` (L1 Site Engineers CW/TE and CW/TE Team Leads, L2 CW/TE Team Leads; held through the module `daily_plan` or `sites`); Settings > My Work > Daily Plan (columns and order per tab, default region scope, automatic lock time, reminder hour; the job `dp_tick` every 5 minutes). Choices made where the plan was silent, following what the system already does:
+  - The sidebar has sub-menus only for Site Master, so Daily Plan is its own entry in the Work group, right after My Work, at `/my-work/daily-plan`.
+  - "Actual below Planned" counts the items (one per line of the cell): planned = tasks with a planned date or planned start that day plus field work scheduled that day; actual = tasks with an actual date that day plus field work that ended that day. A manual Planned or Actual Work cell counts its lines. Only days up to today can be below target.
+  - The Procurement assignment of the day is the order whose field-work dates cover the day; with none, the site's latest approved active order names the contractor and the AAT SE (members with role supervisor, else every member). The contractor is the order's external party, else its team, else "In-House".
+  - Access Valid: an approved CW permit valid that day ("Yes (to <valid to>)"), else B3 approved by that day ("Yes"), else "No".
+  - Site ID, Site Name and Region identify the row and the plan: they are never overridden. Every other auto column can be changed by hand (audited); an empty value goes back to the auto value.
+  - The lock freezes the rows (a locked day reads the same whatever happens to the tasks later). The L2 lock needs every reason first; the automatic lock locks anyway and keeps the rows flagged. A day reopened by the admin override is never locked again by the job.
+  - "Tomorrow is empty" for the reminder means the plan of the next working day has no row at all (auto or added). The reminder is in-app, once per region per day, to the L1 holders of the region.
+  - Export and Copy for email always use the exact column order of the owner's sheet; the visible-column setting shapes the screen only. Both follow the current filters (region, contractor, AAT SE, SOW, search).
+  - Table standard: the screen uses the list pieces already on main (unified + Filter with page extras, saved views, search, count, density, columns, Export) and a plain `<table>`, so the shared table toolbar of W8 (row numbers, counts, Display menu) can wrap it later without a rewrite. `UnifiedFilter` now renders for a screen without server filter fields (its extras only).
 - 2026-11-24: W8 item 6: total / filtered / shown counts on every site-data screen.
 - 2026-11-23: W8 item 5: search by a pasted list of Site IDs.
 - 2026-11-23: W8 added (row numbers, three-level headers, task list layout, one full table standard on every screen of site data).

@@ -162,6 +162,9 @@ export function mapWfError(message: string): ProblemException | null {
         detail: detail ?? 'A critical list of this register has no value yet.',
         extra: { lists: Array.isArray(extra.lists) ? extra.lists : [] },
       });
+    case 'plan_locked':
+      // 0149 (W7): the day of the Daily Plan is locked; only an admin override reopens it
+      return new ProblemException(409, 'plan_locked', { detail: detail ?? 'The day is locked: only an admin override reopens it.' });
     case 'freeze_active':
       return new ProblemException(409, 'freeze_active', { detail: detail ?? 'Structural changes are frozen.' });
     case 'column_in_use':

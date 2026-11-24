@@ -57,9 +57,9 @@ describe('the editable side menu: GET and PUT /settings/nav-layout', () => {
       expect(r.status).toBe(200);
       expect(etag(r)).toMatch(/^"\d{1,9}"$/);
       expect(r.body).toMatchObject({ layout: null, is_default: true, updated_by: null, can_edit: can });
-      expect(r.body.catalogue).toHaveLength(43); // 42 of 0081 and logs.system of 0082 (the System Log screen)
+      expect(r.body.catalogue).toHaveLength(44); // 42 of 0081, logs.system of 0082 (the System Log screen) and daily_plan of 0149 (My Work > Daily Plan)
       expect(r.body.catalogue.at(-1)).toBe('logs.system');
-      expect(r.body.catalogue.slice(0, 3)).toEqual(['my_work', 'inbox', 'approvals']);
+      expect(r.body.catalogue.slice(0, 3)).toEqual(['my_work', 'daily_plan', 'inbox']);
       expect(r.body.catalogue).toContain('admin.settings');
     }
     expect((await new Api(app).raw('get', '/settings/nav-layout')).status).toBe(401);

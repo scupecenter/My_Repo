@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.61
+  version: 0.15.67
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -30,6 +30,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.67 (2026-11-24): My Work > Daily Plan, the daily progress and the plan of the next working day (plan W7, owner decisions 2026-11-23; migration 0149, mirror `db/sql/148_daily_plan.sql`; CHANGELOG 203; 0.15.62 to 0.15.66 are used by other branches). Additive. New tag `daily-plan`: (1) `GET /daily-plans?date=&region_id=` returns one plan per region per day for the regions the caller sees (the Project Manager and the System Admins see all), with the auto-filled rows (Site Master: Site ID, Tower Owner, Owner ID, Latitude, Longitude, Region, Site Type, SOW; the Procurement assignment of the day: Vendor / Contractor and AAT SE; a CW permit or B3: Access Valid; tasks and field work of the day: Planned Work and Actual Work), the manual values over them, Reason and Remark, the counts and the flags `below_target` and `reason_missing`, plus `next_working_day` (weekend Friday and Saturday, holidays of the calendar). (2) `PATCH`, `POST` and `DELETE` under `/daily-plans/{date}/regions/{region_id}/sites` change a row, add a site or remove one: L1 of the new Matrix row `daily_plan` (or a System Admin), `If-Match` = the plan version (`0` before the first change), a row below target without a reason is 422 (`/reason` `required`), a locked day is 409 `plan_locked`, every change audited with before and after. (3) `POST .../lock` (L2 of the row or a System Admin; 422 with the sites that lack a reason) freezes the day; `POST .../unlock` is an admin override (System Admin or a delegate of `overrides.unlock` for the region, reason, step-up, flagged). (4) `GET /daily-plans/export` downloads both tables as one Excel sheet in the exact column order of the owner's sheet (audited). (5) `GET`/`PUT /settings/daily-plan`: visible columns and their order per tab, default region scope, automatic lock time, reminder hour (System Admin or an all-regions `admin.settings` delegate, reason, `If-Match`, closed body). The automatic lock and the reminder (notification kind `daily_plan_reminder`) run in the background job.
     - 0.15.61 (2026-11-23): the system-settings routes the web called that no controller served are served by the API (migration 0145, mirror `db/sql/144_settings_screens_api.sql`; CHANGELOG 197). Additive. (1) `GET /settings/dlp`, `POST /settings/dlp/versions`: the versions of `dlp.months.cw` and `dlp.months.te` (seed version 1: CW 3, TE 12); a version takes effect today or later and never before the latest version (field errors `in_the_past`, `before_latest_version`, `out_of_range`, `unknown_key`), so a PAC keeps the version in force on its date (the SLA start event `DLP:<task>:<key>` adds the months in force on the PAC date). (2) `GET`/`PUT /settings/idle-task-alert`: `working_days` is the existing dashboard idle limit `stale_idle_days` (one setting, Q523); `enabled` is new; the ETag moves when either screen changes it. (3) `GET`/`PUT /settings/notification-policy` and `GET /settings/notification-policy/catalogue`: closed schema validated in the database (`unknown_key` at the path of the key, the cross-field rule on both paths, `invalid_timezone`, `mandatory_locked`, `not_eligible_recipient`, `unknown_type`, `unknown_column`, `duplicate`); the security and system rows and `rate_cap_per_hour` need a System Admin (403 `delegate_forbidden`) and a step-up. (4) `POST /settings/holidays/import`: the approved template `TPL-HOLIDAYS` only (`template_kind` `holidays`, ADR 0011), applied at once: 202 with `status` `applied`, `counts.create` and `counts.unchanged`, and `affected_open_tasks`; one bad row refuses the file (`errors[]` with `path` `/rows/<line>/<field>`); any other file is 422 `template_rejected`. `Template.template_kind` lists `list_values` (0.15.23) and `holidays`. Numbered 0.15.61 because 0.15.53 to 0.15.58 are used by other branches.
     - 0.15.60 (2026-11-23): the last users, groups and sign-in routes of the web on the real API (migration 0143, mirror `db/sql/142_users_groups_api.sql`; CHANGELOG 193; 0.15.53 to 0.15.56 are reserved by other branches). Additive. (1) `GET`, `PUT /users/{user_id}/mfa-exemption` and `POST .../revoke` are served (`idm_set_mfa_exempt`, `idm_mfa_exemption_state`): a System Admin, or a delegate holding `users.administer` for all regions (the delegable right `users.two_factor`, Q620); reason and the acting admin's own step-up; nobody exempts themselves (403 `self_beneficiary`); an admin or a delegate is exempted by a System Admin only (403 `action_forbidden`); `until` must be in the future (422 `must_be_future`) or null (until revoked); a second PUT changes the exemption in force; revoking with no exemption in force is 409 `invalid_transition`. The user gets an in-app notice (`mfa_exemption`) and a mail. `User.mfa_exempt` and `mfa_exempt_until` are filled. The check is GSDN Workspace's own (setting `require_mfa`, default false): when it is on, a local account without two-factor and without an exemption in force gets 401 `mfa_required` at sign-in and at step-up; an exemption whose `until` has passed no longer counts. Entra Conditional Access is not affected. (2) `POST /groups` is served (`idm_group_create`): `groups.create` for all regions and step-up; `member_ids` also need `groups.edit` for all regions; the caller among the members is 403 `self_beneficiary`; a pending or unknown member is 422 with `errors[].path` `/member_ids/<index>`; a name equal to another group's name ignoring case is 409 `duplicate` (Q622); the create is atomic. (3) `POST /me/notify-admins` is served (`me_notify_admins`): reachable by a pending account; plain text only (422 `markup_not_allowed` for `<`, `>` or an HTML entity, Q624); one request per `notify_admins.cooldown_minutes` (default 60, Q623), else 429 `rate_limited` with `Retry-After`; an in-app notice of the new kind `assignment_request` and a mail to every active System Admin. (4) `POST /auth/employee-id` is served but, until the M365 sign-in and the staff registry exist on the server (Q625), answers 409 `invalid_transition` to every session whatever ID is typed (no enumeration); the format is still checked (422) and the calls are rate limited like sign-in (429).
     - 0.15.58 (2026-11-23): the Master import reads "Pending" and "N/A" as the owner means them, skips placeholder rows, routes the GECOL requests of PR-PO to GECOL, derives an empty Order Status and selects the one candidate with a contract sign-off (owner decisions 2026-11-22 and 2026-11-23; migration 0144, mirror `db/sql/143_master_import_na_routing.sql`; CHANGELOG 195). Additive, Master paths only (the Master import and comparison, and the TPL-MASTER upload; manual entry and the other templates are unchanged). (1) `Override.kind` `master_na` (entity `task`): a task whose actual date column holds N/A in the Master file is N/A when its batch is sent, an admin override made by a rule (no `acted_by`), revertible through `POST /overrides/{override_id}/revert` (System Admin, reason, step-up) and never applied again once reverted; never a milestone, a task with a date, a person's step, a register record in review, approved, or held by a gate; and only when the uploader holds the rights of an entry of that task, at the staging and again at the send (the import and edit regions of the task and its entry level L1, or a System Admin when the level has no holder). (2) `ImportBatch.import_notes` (`ImportNote[]`, counts only, never a value): `pending_as_empty`, `na_as_empty`, `na_task_requested`, `na_task_not_applicable`, `na_task_marked`, `na_task_not_marked`, `placeholder_rows_skipped`, `routed_to_gecol`, `routed_from_procurement`, `order_status_derived`, `order_status_not_derived`, `selected_set_by_import`, `selection_date_from_contract`, `selected_not_set`; the same list rides on `MasterImportOutcome.batches[].import_notes`, and `MasterImportOutcome.register_notes` carries the register ones with the sheet. Batch rows carry the matching warnings (`master_na_requested`, `master_na_not_applicable`, `master_na_ignored`, `master_na_marked`, `master_na_not_marked`, `routed_from_procurement`, `order_status_derived`, `selected_set_by_import`, `selection_date_from_contract`) and a conflicting GECOL request the error `gecol_one_per_site`. A register sheet of placeholders only is in `skipped` with reason `no_rows`. (3) An empty Order Status of a PR-PO row becomes `Active` (`Completed` only when the row holds a delivery / completion date, a field PR-PO does not have today; values in the setting `imports.master_order_status_derived`, changed by definer code only), and a candidate selected by the import with an empty Selection Date takes its Contract Sign-off Date (warning `selection_date_from_contract`) (owner decisions 2026-11-23).
@@ -230,6 +231,8 @@ tags:
     description: "Registry of Aljeel staff: search, hover card with visibility, maintenance, import, field visibility."
   - name: absences
     description: "Informational absence records (B12b)."
+  - name: daily-plan
+    description: "My Work > Daily Plan: the daily progress and the plan of the next working day, one plan per region per day (plan W7, 0.15.67)."
   - name: reassignment
     description: "Lead decisions on tasks of absent or idle people: reassign, act on behalf, keep (B12b)."
   - name: mfa-exemption
@@ -7277,6 +7280,238 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/IdleTaskAlertSetting'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /daily-plans:
+    get:
+      tags: [daily-plan]
+      operationId: getDailyPlans
+      summary: The plans of one day (one per region the caller sees)
+      description: |
+        0.15.67 (migration 0149). Any signed-in user, for the regions of the session (the regions the person's assignments cover; a System Admin or an all-regions assignment sees all). `region_id` (repeatable) narrows the regions. The rows of a locked day are the frozen copy taken at the lock. `version` of each plan is the If-Match of its changes (0 before the first change).
+      x-db-path: daily_plan_json
+      parameters:
+      - {name: date, in: query, required: true, schema: {type: string, format: date}}
+      - {name: region_id, in: query, required: false, schema: {type: array, items: {type: integer}}, style: form, explode: true}
+      responses:
+        '200':
+          description: The day.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DailyPlanDay'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /daily-plans/export:
+    get:
+      tags: [daily-plan]
+      operationId: exportDailyPlans
+      summary: Export Daily Progress and Tomorrow Plan as Excel
+      description: |
+        0.15.67. One sheet with the two tables of the owner's sheet: "Daily Progress <date>" (No, Site ID, Tower Owner, Owner ID, Latitude, Longitude, Region, Site Type, SOW, Vendor / Contractor Name, AAT SE, Planned Work, Actual Work, Reason (if not reach target)) and "Tomorrow Plan <next working day>" (No, Site ID, Tower Owner, Owner ID, Latitude, Longitude, Region, Site Type, SOW, Vendor / Contractor Name, AAT SE, Access Valid, Planned Work, Remark), always in this order. `site_id` (repeatable) keeps the rows of the current view. Audited (`daily_plan.exported`).
+      x-db-path: dp_export_json
+      parameters:
+      - {name: date, in: query, required: true, schema: {type: string, format: date}}
+      - {name: region_id, in: query, required: false, schema: {type: array, items: {type: integer}}, style: form, explode: true}
+      - {name: site_id, in: query, required: false, schema: {type: array, items: {type: string, format: uuid}}, style: form, explode: true}
+      responses:
+        '200':
+          description: The workbook.
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: {type: string, format: binary}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /daily-plans/{date}/regions/{region_id}/sites:
+    post:
+      tags: [daily-plan]
+      operationId: addDailyPlanSite
+      summary: Add a site to the plan by hand (or bring back a removed one)
+      description: 'L1 of the Matrix row `daily_plan` in the region, or a System Admin; unlocked day. The site must be active and in the region (422 `/site_code` `not_in_region`); a site already in the plan is 409 `duplicate`. Audited.'
+      x-db-path: dp_add_site
+      parameters:
+      - {name: date, in: path, required: true, schema: {type: string, format: date}}
+      - {name: region_id, in: path, required: true, schema: {type: integer}}
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [site_code]
+              additionalProperties: false
+              properties:
+                site_code: {type: string, maxLength: 60}
+      responses:
+        '200':
+          description: The plan of the region after the change.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DailyPlanDay'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /daily-plans/{date}/regions/{region_id}/sites/{site_id}:
+    patch:
+      tags: [daily-plan]
+      operationId: saveDailyPlanRow
+      summary: Change a row (manual values over the auto-filled columns, Reason, Remark)
+      description: |
+        L1 of the Matrix row `daily_plan` in the region, or a System Admin; unlocked day (409 `plan_locked`). `overrides` sets the manual value of an auto-filled column (`null` goes back to the auto value; Site ID, Site Name and Region cannot be changed: `read_only`). On a day up to today a row whose Actual Work has fewer lines than its Planned Work needs a Reason (422, `/reason` `required`). Audited with before and after.
+      x-db-path: dp_save_row
+      parameters:
+      - {name: date, in: path, required: true, schema: {type: string, format: date}}
+      - {name: region_id, in: path, required: true, schema: {type: integer}}
+      - {name: site_id, in: path, required: true, schema: {type: string, format: uuid}}
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/DailyPlanRowInput'}
+      responses:
+        '200':
+          description: The plan of the region after the change.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DailyPlanDay'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+    delete:
+      tags: [daily-plan]
+      operationId: removeDailyPlanSite
+      summary: Remove a site from the plan
+      description: 'L1 of the row, unlocked day. A site added by hand leaves the plan; an auto-filled one is marked removed (it comes back with POST). Audited.'
+      x-db-path: dp_remove_site
+      parameters:
+      - {name: date, in: path, required: true, schema: {type: string, format: date}}
+      - {name: region_id, in: path, required: true, schema: {type: integer}}
+      - {name: site_id, in: path, required: true, schema: {type: string, format: uuid}}
+      - {$ref: '#/components/parameters/IfMatch'}
+      responses:
+        '200':
+          description: The plan of the region after the change.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DailyPlanDay'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /daily-plans/{date}/regions/{region_id}/lock:
+    post:
+      tags: [daily-plan]
+      operationId: lockDailyPlan
+      summary: Lock the day (L2)
+      description: 'L2 of the Matrix row `daily_plan` in the region, or a System Admin. Every row below target needs its reason first (422, `errors[].path` `/rows/<site_code>/reason`). The rows are frozen as they are. Audited.'
+      x-db-path: dp_lock
+      parameters:
+      - {name: date, in: path, required: true, schema: {type: string, format: date}}
+      - {name: region_id, in: path, required: true, schema: {type: integer}}
+      - {$ref: '#/components/parameters/IfMatch'}
+      responses:
+        '200':
+          description: The plan of the region after the change.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DailyPlanDay'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /daily-plans/{date}/regions/{region_id}/unlock:
+    post:
+      tags: [daily-plan]
+      operationId: unlockDailyPlan
+      summary: Reopen a locked day (admin override)
+      description: 'A System Admin, or a delegate of `overrides.unlock` for the region; reason and step-up; the audit row is flagged admin override. A day reopened this way is never locked again by the automatic lock.'
+      x-db-path: dp_unlock
+      x-step-up: true
+      parameters:
+      - {name: date, in: path, required: true, schema: {type: string, format: date}}
+      - {name: region_id, in: path, required: true, schema: {type: integer}}
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WithReason'}
+      responses:
+        '200':
+          description: The plan of the region after the change.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DailyPlanDay'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /settings/daily-plan:
+    get:
+      tags: [settings, daily-plan]
+      operationId: getDailyPlanSettings
+      summary: Settings > My Work > Daily Plan
+      description: Every signed-in user (the screen reads its columns).
+      x-db-path: dp_settings_json
+      responses:
+        '200':
+          description: Setting.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DailyPlanSettings'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+    put:
+      tags: [settings, daily-plan]
+      operationId: setDailyPlanSettings
+      summary: Set the Daily Plan settings
+      description: |
+        System Admin or a delegate of `admin.settings` edit for all regions, a reason and If-Match. Closed body (`unknown_key`): `columns.progress` and `columns.tomorrow` are lists of known columns without repeats that hold `site_code` (`unknown_column`, `duplicate`, `site_code_required`); `default_region_scope` `mine` or `all`; `auto_lock_time` `HH:MM` or null; `reminder_hour` 0 to 23 or null (`out_of_range`). Audited (`daily_plan_settings_update`, before and after).
+      x-db-path: admin_set_daily_plan_settings
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - {$ref: '#/components/schemas/WithReason'}
+              - {$ref: '#/components/schemas/DailyPlanSettingsInput'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DailyPlanSettings'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
@@ -14974,6 +15209,7 @@ components:
         - rate_limited
         - account_locked
         - freeze_active
+        - plan_locked
         - insufficient_stock
         - item_in_use
         - role_in_use
@@ -18447,6 +18683,135 @@ components:
         version: { type: integer }
         updated_at: { type: string, format: date-time }
         updated_by: { $ref: '#/components/schemas/UserRef' }
+    # ---------------------------------------------------------- daily plan (0.15.67)
+    DailyPlanColumn:
+      type: string
+      enum: [no, site_code, site_name, tower_owner, owner_id, latitude, longitude, region, site_type, sow, contractor, aat_se, access_valid, planned_work, actual_work, reason, remark]
+    DailyPlanItem:
+      type: object
+      required: [kind, code, label]
+      properties:
+        kind: {type: string, enum: [task, field_work]}
+        code: {type: string}
+        label: {type: string}
+        label_ar: {type: string}
+    DailyPlanRow:
+      type: object
+      required: [region_id, site_id, site_code, origin, values, auto, overridden, planned_count, actual_count, below_target, reason_missing, frozen]
+      properties:
+        region_id: {type: integer}
+        site_id: {type: string, format: uuid}
+        site_code: {type: string}
+        site_name: {type: [string, 'null']}
+        origin: {type: string, enum: [auto, added], description: 'auto = filled from system data; added = added by hand.'}
+        values:
+          description: The value shown in each column (the manual value over the auto one).
+          type: object
+          properties:
+            site_code: {type: [string, 'null']}
+            site_name: {type: [string, 'null']}
+            region: {type: [string, 'null']}
+            tower_owner: {type: [string, 'null']}
+            owner_id: {type: [string, 'null']}
+            latitude: {type: [string, 'null']}
+            longitude: {type: [string, 'null']}
+            site_type: {type: [string, 'null']}
+            sow: {type: [string, 'null']}
+            contractor: {type: [string, 'null']}
+            aat_se: {type: [string, 'null']}
+            access_valid: {type: [string, 'null'], description: 'Yes, Yes (to YYYY-MM-DD) or No.'}
+            planned_work: {type: [string, 'null'], description: 'One item per line.'}
+            actual_work: {type: [string, 'null'], description: 'One item per line.'}
+        auto:
+          description: The auto-filled value of each column that may be changed by hand.
+          type: object
+          additionalProperties: {type: [string, 'null']}
+        overridden:
+          type: array
+          items: {type: string}
+          description: The columns holding a manual value.
+        reason: {type: [string, 'null']}
+        remark: {type: [string, 'null']}
+        planned_items: {type: array, items: {$ref: '#/components/schemas/DailyPlanItem'}}
+        actual_items: {type: array, items: {$ref: '#/components/schemas/DailyPlanItem'}}
+        planned_count: {type: integer}
+        actual_count: {type: integer}
+        below_target: {type: boolean, description: 'On a day up to today, fewer actual items than planned items.'}
+        reason_missing: {type: boolean}
+        frozen: {type: boolean, description: 'The copy taken when the day was locked.'}
+    DailyPlanRegion:
+      type: object
+      required: [region_id, plan_date, version, locked, row_count, reason_missing_count, can_edit, can_lock, can_unlock]
+      properties:
+        region_id: {type: integer}
+        region_code: {type: string}
+        region_name_en: {type: string}
+        region_name_ar: {type: [string, 'null']}
+        plan_date: {type: string, format: date}
+        version: {type: integer, description: 'If-Match of the changes; 0 before the first change.'}
+        locked: {type: boolean}
+        lock_kind: {type: [string, 'null'], enum: [manual, auto, null]}
+        locked_at: {type: [string, 'null'], format: date-time}
+        locked_by: {oneOf: [{$ref: '#/components/schemas/UserRef'}, {type: 'null'}]}
+        unlocked_at: {type: [string, 'null'], format: date-time}
+        unlocked_by: {oneOf: [{$ref: '#/components/schemas/UserRef'}, {type: 'null'}]}
+        updated_at: {type: [string, 'null'], format: date-time}
+        updated_by: {oneOf: [{$ref: '#/components/schemas/UserRef'}, {type: 'null'}]}
+        row_count: {type: integer}
+        reason_missing_count: {type: integer}
+        can_edit: {type: boolean}
+        can_lock: {type: boolean}
+        can_unlock: {type: boolean}
+    DailyPlanDay:
+      type: object
+      required: [date, today, is_workday, next_working_day, previous_working_day, my_region_ids, plans, rows]
+      properties:
+        date: {type: string, format: date}
+        today: {type: string, format: date}
+        is_workday: {type: boolean}
+        next_working_day: {type: string, format: date}
+        previous_working_day: {type: string, format: date}
+        my_region_ids: {type: array, items: {type: integer}, description: 'The regions where the caller holds L1 or L2 of the Daily Plan.'}
+        plans: {type: array, items: {$ref: '#/components/schemas/DailyPlanRegion'}}
+        rows: {type: array, items: {$ref: '#/components/schemas/DailyPlanRow'}}
+    DailyPlanRowInput:
+      type: object
+      additionalProperties: false
+      properties:
+        overrides:
+          type: object
+          description: 'column: text, or null to go back to the auto value.'
+          additionalProperties: {type: [string, 'null']}
+        reason: {type: [string, 'null'], maxLength: 1000}
+        remark: {type: [string, 'null'], maxLength: 1000}
+    DailyPlanSettingsInput:
+      type: object
+      required: [columns, default_region_scope, auto_lock_time, reminder_hour]
+      properties:
+        columns:
+          type: object
+          required: [progress, tomorrow]
+          properties:
+            progress: {type: array, items: {$ref: '#/components/schemas/DailyPlanColumn'}}
+            tomorrow: {type: array, items: {$ref: '#/components/schemas/DailyPlanColumn'}}
+        default_region_scope: {type: string, enum: [mine, all]}
+        auto_lock_time: {type: [string, 'null'], pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$'}
+        reminder_hour: {type: [integer, 'null'], minimum: 0, maximum: 23}
+    DailyPlanSettings:
+      allOf:
+      - {$ref: '#/components/schemas/DailyPlanSettingsInput'}
+      - type: object
+        required: [version, known_columns, default_columns]
+        properties:
+          version: {type: integer}
+          known_columns: {type: array, items: {$ref: '#/components/schemas/DailyPlanColumn'}}
+          default_columns:
+            type: object
+            properties:
+              progress: {type: array, items: {$ref: '#/components/schemas/DailyPlanColumn'}}
+              tomorrow: {type: array, items: {$ref: '#/components/schemas/DailyPlanColumn'}}
+          updated_at: {type: string, format: date-time}
+          updated_by: {$ref: '#/components/schemas/UserRef'}
     # ---------------------------------------------------------- MFA exemption
     MfaExemption:
       type: object
