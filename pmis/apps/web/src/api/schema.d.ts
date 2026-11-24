@@ -13768,7 +13768,7 @@ export interface components {
             name_en: string;
             name_ar?: string | null;
             module_key: components["schemas"]["ModuleKey"];
-            /** @description false = global rows (risks, meetings, project-wide change requests). */
+            /** @description false = global rows (risks, meetings, project-wide change requests). 0.15.68: only a site-scoped register offers the map layout (its records carry a site and its coordinates). */
             site_scoped: boolean;
             multiple_per_site?: boolean;
             /** @description For example pr, po, wo for procurement. */
@@ -16180,7 +16180,7 @@ export interface components {
             /** @description True when more values match than `limit`. */
             truncated: boolean;
         };
-        /** @description A list screen (0.12.12): `sites`, `sites-stream`, `site-tasks`, `register-<register key>`, `audit-log`, `field-changes`, `security-log`, `system-log` (0.15.2), `tasks-board` (0.15.32, F5). 0.15.45: `GET /saved-views/filter-fields` also takes `site360-<menu>` (menu: master, design_acq, sow, cw, te, hoto, dismantle, om) and `dashboard`. 0.15.49: these two screens have saved views too (the module of `site360-<menu>` is `sites`, the module of `dashboard` is `dashboard`, and a `dashboard` view also needs the Site Register right). */
+        /** @description A list screen (0.12.12): `sites`, `sites-stream`, `site-tasks`, `register-<register key>`, `audit-log`, `field-changes`, `security-log`, `system-log` (0.15.2), `tasks-board` (0.15.32, F5). 0.15.45: `GET /saved-views/filter-fields` also takes `site360-<menu>` (menu: master, design_acq, sow, cw, te, hoto, dismantle, om) and `dashboard`. 0.15.49: these two screens have saved views too (the module of `site360-<menu>` is `sites`, the module of `dashboard` is `dashboard`, and a `dashboard` view also needs the Site Register right). 0.15.68: a `register-<register key>` view keeps the layout in `filters` (`layout`, `board_by`, `lane`; see the version note). */
         SavedViewScreenKey: string;
         /** @description Column control of the screen: order, hidden columns, widths in px and density. Hiding a column never changes a permission. */
         SavedViewColumns: {
