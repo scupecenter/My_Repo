@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, HttpCode, Param, Post, Put, Res } from '@nestjs/common';
+import { Body, Controller, Get, Headers, HttpCode, Param, Post, Put, Query, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import type { AuthContext } from '../auth/auth.types';
 import { Auth } from '../auth/decorators';
@@ -7,7 +7,7 @@ import { DataResetService } from './data-reset.service';
 
 type Json = Record<string, unknown>;
 
-/** Project data reset in Settings (contract tag `settings`, 0.15.62, migration 0146). The session guard is global; the database decides every right. */
+/** Project data reset in Settings (contract tag `settings`, 0.15.62, migration 0146; selectable scope 0.15.71, migration 0152). The session guard is global; the database decides every right. */
 @Controller('settings/data-reset')
 export class DataResetController {
   constructor(private readonly svc: DataResetService) {}
@@ -20,6 +20,12 @@ export class DataResetController {
   @Get()
   state(): Promise<Json> {
     return this.svc.state();
+  }
+
+  /** Contract 0.15.71: the dry run of a chosen scope (`?parts=a,b`). */
+  @Get('plan')
+  plan(@Query('parts') parts: unknown): Promise<Json> {
+    return this.svc.plan(parts);
   }
 
   @Put('settings')

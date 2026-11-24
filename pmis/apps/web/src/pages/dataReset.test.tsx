@@ -83,12 +83,66 @@ describe('Settings, data reset', () => {
     expect(screen.getByTestId('dr-backup')).toHaveAttribute('data-ok', 'false');
   });
 
+  it('the scope picker: everything by default, chosen parts take their dependents along with a note, the identity parts carry a red warning (0.15.71)', async () => {
+    await signIn('pm'); await stepUpDone();
+    const u = userEvent.setup();
+    page();
+    expect(await screen.findByTestId('dr-scope')).toHaveAttribute('data-mode', 'everything');
+    expect(screen.getByTestId('dr-scope-everything')).toBeChecked();
+    await u.click(screen.getByTestId('dr-scope-custom'));
+    expect(screen.getByTestId('dr-scope-none')).toHaveTextContent(en.dr.none_chosen);
+    await u.type(screen.getByTestId('dr-reason'), 'Owner decision: reset the orders only');
+    await u.type(screen.getByTestId('dr-phrase'), 'RESET pmis');
+    expect(screen.getByTestId('dr-submit')).toBeDisabled();                  // nothing chosen
+    await u.click(screen.getByTestId('dr-part-procurement'));
+    expect(screen.getByTestId('dr-part-row-car_dispatcher')).toHaveAttribute('data-added', 'true');
+    expect(screen.getByTestId('dr-part-car_dispatcher')).toBeDisabled();     // taken along while procurement is chosen
+    expect(screen.getByTestId('dr-scope-added')).toHaveTextContent('Car Dispatcher bookings (the vehicles stay), Financial Advances');
+    expect(screen.getByTestId('dr-part-row-sites')).toHaveAttribute('data-selected', 'false');
+    expect(screen.getByTestId('dr-part-count-procurement')).toHaveTextContent('14 rows');
+    expect(screen.queryByTestId('dr-scope-identity')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId('dr-plan-note')).toHaveTextContent(en.dr.plan_scope_note));
+    await u.click(screen.getByTestId('dr-part-users'));
+    expect(screen.getByTestId('dr-scope-identity')).toHaveTextContent('Users: deactivate every account except the System Admins');
+    expect(screen.getByTestId('dr-part-count-users')).toHaveTextContent('23 accounts');
+    await waitFor(() => expect(screen.getByTestId('dr-plan-accounts')).toHaveTextContent('23 accounts would be deactivated'));
+    expect(screen.getByTestId('dr-submit')).toBeEnabled();
+    await u.click(screen.getByTestId('dr-submit'));
+    expect(await screen.findByTestId('dr-request-scope')).toHaveAttribute('data-everything', 'false');
+    expect(screen.getByTestId('dr-request-scope-part-procurement')).toHaveTextContent('Procurement');
+    expect(screen.getByTestId('dr-request-scope-part-car_dispatcher')).toHaveTextContent(en.dr.added_badge);
+    expect(screen.getByTestId('dr-request-scope-identity')).toBeInTheDocument();
+  });
+
+  it('the approver sees the scope read-only with its counts and approves exactly it', async () => {
+    await signIn('pm'); await stepUpDone();
+    await api.post('/__mock/data-reset/request-by-other', { body: { parts: ['issues', 'staff'] } });
+    const u = userEvent.setup();
+    page();
+    const scope = await screen.findByTestId('dr-request-scope');
+    expect(within(scope).getByTestId('dr-request-scope-part-issues')).toHaveTextContent('Issue Log · 5 rows');
+    expect(within(scope).getByTestId('dr-request-scope-identity')).toHaveTextContent('Staff registry and absences');
+    expect(within(scope).getByTestId('dr-request-scope-hash').textContent).toMatch(/^[0-9a-f]{12}$/);
+    expect(screen.queryByTestId('dr-scope')).not.toBeInTheDocument();       // no picker while a request is open
+    await u.click(screen.getByTestId('dr-approve'));
+    const dialog = screen.getByTestId('dr-approve-dialog');
+    expect(dialog).toHaveTextContent(en.dr.approve_scope);
+    expect(within(dialog).getByTestId('dr-request-scope-part-staff')).toBeInTheDocument();
+    await u.type(screen.getByTestId('dr-approve-dialog-reason'), 'Agreed with the owner today');
+    await u.click(screen.getByTestId('dr-approve-dialog-submit'));
+    await waitFor(() => expect(screen.getByTestId('dr-request')).toHaveAttribute('data-status', 'approved'));
+  });
+
   it('is in Arabic too', async () => {
     await signIn('pm');
     page({ locale: 'ar' });
     expect(await screen.findByTestId('dr-danger')).toHaveTextContent(ar.dr.title);
     expect(screen.getByTestId('settings-section-data-reset')).toHaveTextContent(ar.settings.section_data_reset);
     expect(screen.getByTestId('dr-submit')).toHaveTextContent(ar.dr.submit);
+    expect(screen.getByTestId('dr-scope')).toHaveTextContent(ar.dr.everything);
+    await userEvent.setup().click(screen.getByTestId('dr-scope-custom'));
+    expect(screen.getByTestId('dr-part-row-sites')).toHaveTextContent('المواقع ومهامها');
+    expect(screen.getByTestId('dr-scope-group-identity')).toHaveTextContent(ar.dr.group_identity);
   });
 
   it('is hidden from a user who is not a System Admin, and refused if opened directly', async () => {
@@ -101,7 +155,7 @@ describe('Settings, data reset', () => {
 
   it('has every text in English and Arabic', () => {
     expect(Object.keys(ar.dr).sort()).toEqual(Object.keys(en.dr).sort());
-    for (const k of ['single_admin', 'backup_missing', 'request_expired', 'reset_running', 'storage_not_supported', 'maintenance'] as const) {
+    for (const k of ['single_admin', 'backup_missing', 'request_expired', 'reset_running', 'storage_not_supported', 'maintenance', 'scope_changed'] as const) {
       expect(en.errors[k]).toBeTruthy();
       expect(ar.errors[k]).toBeTruthy();
     }

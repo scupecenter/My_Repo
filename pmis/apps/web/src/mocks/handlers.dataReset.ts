@@ -1,9 +1,11 @@
 // Mock of the project data reset in Settings (contract 0.15.62, migration 0146), synthetic data only. The mock `pm` account is the only System Admin a
 // test signs in as; a second, synthetic System Admin ("Second Admin") exists so a request can be made. A test that needs the approver's view makes the
-// request with `POST /__mock/data-reset/request-by-other`. A run completes at once.
+// request with `POST /__mock/data-reset/request-by-other` (body `{parts}` for a scoped one). A run completes at once. Contract 0.15.71: the catalogue of
+// parts with a synthetic dependency map (the database's closure rule: a part is added when one of its depends_on is chosen), the dry run of a scope, the scope
+// and its hash on the request, and the approval bound to that hash (409 scope_changed otherwise).
 import { http, HttpResponse } from 'msw';
 import { API_BASE } from '@/api/client';
-import type { DataResetRequest, DataResetState } from '@/api/dataReset';
+import { closureOf, type DataResetPart, type DataResetPlan, type DataResetRequest, type DataResetScope, type DataResetState } from '@/api/dataReset';
 import { db, stepUpValid, viewer } from './db';
 import { guard, problem, stepUp } from './handlers';
 import { uid } from './ids';
@@ -29,15 +31,56 @@ function st(): St {
 }
 
 const TABLES: DataResetState['plan']['tables'] = [
-  { table: 'sites', action: 'delete', rows: 12, delete: 12, keep: 0 },
-  { table: 'task_instances', action: 'delete', rows: 540, delete: 540, keep: 0 },
-  { table: 'notifications', action: 'delete', rows: 87, delete: 87, keep: 0 },
-  { table: 'register_records', action: 'mixed', rows: 64, delete: 58, keep: 6 },
-  { table: 'document_files', action: 'mixed', rows: 33, delete: 31, keep: 2 },
-  { table: 'users', action: 'keep', rows: 25, delete: 0, keep: 25 },
-  { table: 'settings', action: 'keep', rows: 40, delete: 0, keep: 40 },
-  { table: 'audit_log', action: 'log', rows: 5120, delete: 0, keep: 5120 },
+  { table: 'sites', action: 'delete', part: 'sites', rows: 12, delete: 12, keep: 0 },
+  { table: 'task_instances', action: 'delete', part: 'sites', rows: 540, delete: 540, keep: 0 },
+  { table: 'notifications', action: 'delete', part: 'notifications', rows: 87, delete: 87, keep: 0 },
+  { table: 'issues', action: 'delete', part: 'issues', rows: 5, delete: 5, keep: 0 },
+  { table: 'register_records', action: 'mixed', part: '*', rows: 64, delete: 58, keep: 6 },
+  { table: 'document_files', action: 'mixed', part: '*', rows: 33, delete: 31, keep: 2 },
+  { table: 'users', action: 'optional', part: 'users', rows: 25, delete: 23, keep: 2 },
+  { table: 'settings', action: 'keep', part: null, rows: 40, delete: 0, keep: 40 },
+  { table: 'audit_log', action: 'log', part: null, rows: 5120, delete: 0, keep: 5120 },
 ];
+
+type P = [code: string, group: DataResetPart['group'], en: string, ar: string, deps: string[], rows: number];
+const CATALOGUE: P[] = [
+  ['sites', 'project', 'Sites, tasks, milestones, gates and baselines', 'المواقع ومهامها ومعالمها وبواباتها والخطط الأساسية', [], 560],
+  ['documents', 'project', 'Documents and generated forms (Library)', 'المستندات والنماذج المولّدة (المكتبة)', ['sites'], 33],
+  ['imports', 'project', 'Imports, upload batches and exports', 'الاستيرادات ودفعات الرفع والتصديرات', ['sites'], 9],
+  ['notifications', 'project', 'Notifications, inbox and follows', 'الإشعارات وصندوق الوارد والمتابعات', [], 87],
+  ['daily_plan', 'project', 'Daily Plan', 'الخطة اليومية', ['sites'], 4],
+  ['kpi', 'project', 'Project Status and KPI snapshots', 'حالة المشروع ولقطات مؤشرات الأداء', ['sites'], 6],
+  ['procurement', 'registers', 'Procurement (PR / PO / WO, assignments)', 'المشتريات (PR / PO / WO والتكليفات)', ['sites'], 14],
+  ['issues', 'registers', 'Issue Log', 'سجل المشاكل', ['sites'], 5],
+  ['risks', 'registers', 'Risk Register', 'سجل المخاطر', ['sites'], 3],
+  ['car_dispatcher', 'registers', 'Car Dispatcher bookings (the vehicles stay)', 'حجوزات السيارات (تبقى المركبات)', ['sites', 'procurement'], 2],
+  ['financial_advances', 'registers', 'Financial Advances', 'العهد المالية', ['sites', 'procurement'], 2],
+  ['users', 'identity', 'Users: deactivate every account except the System Admins', 'المستخدمون: تعطيل كل الحسابات عدا مديري النظام', [], 23],
+  ['roles', 'identity', 'Roles, groups and delegations (role definitions and profiles stay)', 'الأدوار والمجموعات والتفويضات (تبقى تعريفات الأدوار والملفات)', [], 31],
+  ['staff', 'identity', 'Staff registry and absences', 'سجل الموظفين والغيابات', [], 40],
+];
+const IDENT = ['users', 'roles', 'staff'];
+const EVERYTHING = CATALOGUE.filter((c) => c[1] !== 'identity').map((c) => c[0]).sort();
+const hashOf = (parts: string[]) => [...parts].sort().join(',').split('').reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 7).toString(16).padStart(8, '0').repeat(8);
+function scopeOf(requested: string[] | null): DataResetScope {
+  const parts = requested ? closureOf(requested, CATALOGUE.map(([code, , , , deps]) => ({ code, depends_on: deps }))) : EVERYTHING;
+  const req = requested ? [...new Set(requested)].sort() : parts;
+  return { version: 1, requested: req, parts, added: parts.filter((p) => !req.includes(p)), everything: EVERYTHING.every((p) => parts.includes(p)),
+    identity: parts.filter((p) => IDENT.includes(p)), hash: hashOf(parts) };
+}
+function planOf(requested: string[] | null): DataResetPlan {
+  const scope = scopeOf(requested), sel = new Set(scope.parts ?? []), req = new Set(scope.requested ?? []);
+  const tables = TABLES.map((t) => (sel.has(t.part ?? '') || (t.part === '*' && sel.has('sites')) ? t : { ...t, delete: 0, keep: t.rows }));
+  return {
+    scope, tables, files: sel.has('documents') ? 31 : 0,
+    delete_rows: tables.reduce((n, t) => n + (t.table === 'users' ? 0 : t.delete), 0), keep_rows: tables.reduce((n, t) => n + t.keep, 0),
+    accounts_to_deactivate: sel.has('users') ? 23 : 0, error: null,
+    parts: CATALOGUE.map(([code, group, label_en, label_ar, deps, rows]) => ({
+      code, group, kind: group === 'identity' ? 'identity' : 'project', label_en, label_ar, depends_on: deps,
+      dependents: CATALOGUE.filter((c) => c[4].includes(code)).map((c) => c[0]), rows, tables: {}, requested: req.has(code), selected: sel.has(code),
+      added: sel.has(code) && !req.has(code) })),
+  };
+}
 
 function view(): DataResetState {
   const s = st(), r = s.request, mine = r?.requested_by.id === me().id;
@@ -45,7 +88,7 @@ function view(): DataResetState {
     database: 'pmis', confirmation_phrase: PHRASE, settings: s.settings, system_admins_active: 2, single_admin: false, script_running: false, maintenance: false,
     backup: { ok: s.backupOk, max_age_hours: s.settings.backup_max_age_hours,
       last_success: { system_log_id: 1, at: new Date(Date.now() - (s.backupOk ? 3 : 30) * 3_600_000).toISOString(), type: 'full', mode: 'full', repository: '1', stanza: 'gsdn-pmis' }, last_problem: null },
-    plan: { tables: r && r.status === 'completed' ? [] : TABLES, delete_rows: 728, keep_rows: 5193, files: 31 },
+    plan: r && r.status === 'completed' ? { ...planOf(null), tables: [] } : planOf(null), everything: EVERYTHING,
     request: r, last_request: s.last,
     can: { request: !r, approve: r?.status === 'requested' && !mine, start: r?.status === 'approved' && (mine || r.approved_by?.id === me().id), cancel: !!r && ['requested', 'approved'].includes(r.status), retry_files: false },
     storage: { driver: 'local', supported: true },
@@ -57,11 +100,14 @@ function admin() {
   if (!isSystemAdmin()) return problem(403, 'action_forbidden', 'Action not allowed', { detail: 'Only a System Admin may use the project data reset.' });
   return null;
 }
-const fresh = (by: DataResetRequest['requested_by'], reason: string, minutes: number): DataResetRequest => ({
+const fresh = (by: DataResetRequest['requested_by'], reason: string, minutes: number, parts: string[] | null = null): DataResetRequest => ({
   id: crypto.randomUUID(), status: 'requested', version: 1, database_name: 'pmis', requested_by: by, requested_at: now(), request_reason: reason,
   expires_at: new Date(Date.now() + minutes * 60_000).toISOString(), expired: false, approved_by: null, approved_at: null, approve_reason: null, cancelled_by: null,
   cancelled_at: null, cancel_reason: null, run_by: null, run_started_at: null, db_committed_at: null, finished_at: null, stalled: false, backup: null,
-  plan_at_request: { delete_rows: 728, files: 31, sites: 12 }, result: null, quarantine_dir: null, error: null,
+  plan_at_request: { delete_rows: planOf(parts).delete_rows, files: planOf(parts).files, sites: 12,
+    parts: Object.fromEntries(CATALOGUE.filter((c) => (scopeOf(parts).parts ?? []).includes(c[0])).map((c) => [c[0], c[5]])) },
+  scope: scopeOf(parts), scope_hash: scopeOf(parts).hash ?? null, approved_scope_hash: null,
+  result: null, quarantine_dir: null, error: null,
   files: { total: 0, moved: 0, missing: 0, refused: 0, pending: 0, problems: [] },
 });
 const json = (r: DataResetRequest, status = 200) => HttpResponse.json(r, { status, headers: { ETag: `"${r.version}"` } });
@@ -75,7 +121,18 @@ const reason = (b: { reason?: string }, min: number) =>
   ((b.reason ?? '').trim().length < min ? problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '/reason', code: 'required' }] as never }) : null);
 
 export const dataResetHandlers = [
-  http.post(`${B}/__mock/data-reset/request-by-other`, () => { st().request = fresh(OTHER, 'Owner decision: start the real data load', 30); return HttpResponse.json(st().request); }),
+  http.post(`${B}/__mock/data-reset/request-by-other`, async ({ request }) => {
+    const b = (await request.json().catch(() => ({}))) as { parts?: string[] } | null;
+    st().request = fresh(OTHER, 'Owner decision: start the real data load', 30, b?.parts ?? null);
+    return HttpResponse.json(st().request);
+  }),
+  http.get(`${B}/settings/data-reset/plan`, ({ request }) => {
+    const g = admin(); if (g) return g;
+    const raw = new URL(request.url).searchParams.get('parts');
+    const parts = raw ? raw.split(',') : null;
+    if (parts?.some((p) => !CATALOGUE.some((c) => c[0] === p))) return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '/parts', code: 'unknown_part' }] as never });
+    return HttpResponse.json(planOf(parts));
+  }),
   http.post(`${B}/__mock/data-reset/backup`, async ({ request }) => { st().backupOk = ((await request.json()) as { ok: boolean }).ok; return HttpResponse.json({}); }),
   http.get(`${B}/settings/data-reset`, () => admin() ?? HttpResponse.json(view())),
   http.get(`${B}/settings/data-reset/requests/:id`, ({ params }) => {
@@ -86,12 +143,15 @@ export const dataResetHandlers = [
   http.post(`${B}/settings/data-reset/requests`, async ({ request }) => {
     const g = admin(); if (g) return g;
     if (!stepUpValid()) return stepUp();
-    const b = await request.json() as { reason?: string; confirm_text?: string };
+    const b = await request.json() as { reason?: string; confirm_text?: string; parts?: string[] };
     const bad = reason(b, 10); if (bad) return bad;
+    if (b.parts && (b.parts.length === 0 || b.parts.some((p) => !CATALOGUE.some((c) => c[0] === p)))) {
+      return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '/parts', code: b.parts.length ? 'unknown_part' : 'required' }] as never });
+    }
     if (b.confirm_text !== PHRASE) return problem(422, 'confirmation_mismatch', 'The typed confirmation does not match', { detail: `Type ${PHRASE} to confirm.` });
     const s = st();
     if (s.request) return problem(409, 'invalid_transition', 'Not possible now', { detail: 'Another data reset request is open.' });
-    s.request = fresh(me(), b.reason!.trim(), s.settings.request_expiry_minutes);
+    s.request = fresh(me(), b.reason!.trim(), s.settings.request_expiry_minutes, b.parts ?? null);
     return json(s.request, 201);
   }),
   http.post(`${B}/settings/data-reset/requests/:id/approve`, async ({ params, request }) => {
@@ -100,10 +160,12 @@ export const dataResetHandlers = [
     const r = st().request;
     if (!r || r.id !== params.id) return problem(404, 'not_found', 'Not found');
     const v = version(request, r); if (v) return v;
-    const bad = reason(await request.json() as { reason?: string }, 10); if (bad) return bad;
+    const body = await request.json() as { reason?: string; scope_hash?: string };
+    const bad = reason(body, 10); if (bad) return bad;
+    if (body.scope_hash && body.scope_hash !== r.scope_hash) return problem(409, 'scope_changed', 'Not possible now', { detail: 'The scope you approve is not the scope of this request.' });
     if (r.requested_by.id === me().id) return problem(403, 'self_approval_forbidden', 'You may not approve this yourself', { detail: 'A different System Admin must approve the reset.' });
     if (r.status !== 'requested') return problem(409, 'invalid_transition', 'Not possible now');
-    Object.assign(r, { status: 'approved', version: r.version + 1, approved_by: me(), approved_at: now(), approve_reason: 'approved' });
+    Object.assign(r, { status: 'approved', version: r.version + 1, approved_by: me(), approved_at: now(), approve_reason: 'approved', approved_scope_hash: r.scope_hash });
     return json(r);
   }),
   http.post(`${B}/settings/data-reset/requests/:id/cancel`, async ({ params, request }) => {

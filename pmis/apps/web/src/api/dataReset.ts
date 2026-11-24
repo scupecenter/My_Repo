@@ -7,6 +7,29 @@ export type DataResetState = S['DataResetState'];
 export type DataResetRequest = S['DataResetRequest'];
 export type DataResetSettings = S['DataResetSettings'];
 export type DataResetPlanTable = S['DataResetPlanTable'];
+export type DataResetPlan = S['DataResetPlan'];
+export type DataResetPart = S['DataResetPart'];
+export type DataResetScope = S['DataResetScope'];
+
+/**
+ * Contract 0.15.71 (migration 0152): the closure of a choice as the screen shows it before asking the server (every part that depends on a chosen part
+ * is added, until nothing changes). The server computes the same closure and is the authority: the request stores the server's, never this one.
+ */
+export function closureOf(chosen: readonly string[], catalogue: readonly Pick<DataResetPart, 'code' | 'depends_on'>[]): string[] {
+  const s = new Set(chosen);
+  for (let grew = true; grew;) {
+    grew = false;
+    for (const p of catalogue) if (!s.has(p.code) && p.depends_on.some((d) => s.has(d))) { s.add(p.code); grew = true; }
+  }
+  return [...s].sort();
+}
+
+/** The dry run of a chosen scope (null = everything): counts per part and per table. */
+export const useDataResetPlan = (parts: string[] | null, enabled = true) =>
+  useQuery({
+    queryKey: ['data-reset', 'plan', parts?.join(',') ?? '*'], enabled: enabled && (parts === null || parts.length > 0), retry: false, refetchOnWindowFocus: false,
+    queryFn: () => api.get<DataResetPlan>('/settings/data-reset/plan', { query: { parts: parts?.join(',') } }),
+  });
 
 /** Statuses during which the screen polls (the run happens in the background on the server). */
 export const RUNNING = new Set(['running', 'files_pending']);
@@ -31,9 +54,12 @@ function useAct<B>(fn: (b: B) => Promise<unknown>) {
   return useMutation<unknown, ApiError, B>({ mutationFn: fn, onSettled: () => qc.invalidateQueries({ queryKey: ['data-reset'] }) });
 }
 
-export const useRequestDataReset = () => useAct((b: { reason: string; confirm_text: string }) => api.post('/settings/data-reset/requests', { body: b }));
+export const useRequestDataReset = () =>
+  useAct((b: { reason: string; confirm_text: string; parts?: string[] }) => api.post('/settings/data-reset/requests', { body: b }));
+/** The approver sends the scope hash they saw (0.15.71): a request whose scope is not that one is refused (409 scope_changed). */
 export const useApproveDataReset = () =>
-  useAct((b: { id: string; version: number; reason: string }) => api.post(`/settings/data-reset/requests/${b.id}/approve`, { body: { reason: b.reason }, version: b.version }));
+  useAct((b: { id: string; version: number; reason: string; scope_hash?: string | null }) =>
+    api.post(`/settings/data-reset/requests/${b.id}/approve`, { body: b.scope_hash ? { reason: b.reason, scope_hash: b.scope_hash } : { reason: b.reason }, version: b.version }));
 export const useCancelDataReset = () =>
   useAct((b: { id: string; version: number; reason: string }) => api.post(`/settings/data-reset/requests/${b.id}/cancel`, { body: { reason: b.reason }, version: b.version }));
 export const useRunDataReset = () =>

@@ -42,7 +42,11 @@ INSERT INTO ids VALUES
   ('draft', 'a0000000-0000-4000-8000-000000000054'),
   ('mi_run', 'a0000000-0000-4000-8000-000000000055'),
   ('mov', 'a0000000-0000-4000-8000-000000000060'),
-  ('saved_view', 'a0000000-0000-4000-8000-000000000070');
+  ('saved_view', 'a0000000-0000-4000-8000-000000000070'),
+  ('user3', 'a0000000-0000-4000-8000-000000000003'),
+  ('group_matrix', 'a0000000-0000-4000-8000-000000000013'),
+  ('assignment', 'a0000000-0000-4000-8000-000000000014'),
+  ('delegation', 'a0000000-0000-4000-8000-000000000015');
 CREATE FUNCTION pg_temp.i(p text) RETURNS uuid LANGUAGE sql AS $$ SELECT id FROM pg_temp.ids WHERE name = p $$;
 
 -- ---- identity (KEEP) ---------------------------------------------------------------------------------------------------------------------
@@ -55,6 +59,21 @@ INSERT INTO user_recovery_codes (user_id, code_hash) VALUES (pg_temp.i('user2'),
 INSERT INTO groups (id, name) VALUES (pg_temp.i('group'), 'CW Approvers Tripoli (synthetic)');
 INSERT INTO group_members (group_id, user_id) VALUES (pg_temp.i('group'), pg_temp.i('user2'));
 INSERT INTO absences (user_id, kind, from_date, to_date, recorded_by) VALUES (pg_temp.i('user2'), 'annual', date '2026-12-01', date '2026-12-05', pg_temp.i('user2'));
+-- the identity parts of migration 0152 (KEEP unless chosen): a pending account, a role assignment, a delegation, a group the Responsibility Matrix names,
+-- a staff registry card
+INSERT INTO users (id, email, display_name, employee_id, status, updated_at)
+VALUES (pg_temp.i('user3'), 'reset.pending@example.test', 'Reset Pending (synthetic)', '9103', 'pending_assignment', now());
+INSERT INTO groups (id, name) VALUES (pg_temp.i('group_matrix'), 'TE Approvers Tripoli (synthetic)');
+INSERT INTO group_members (group_id, user_id) VALUES (pg_temp.i('group_matrix'), pg_temp.i('user2'));
+INSERT INTO matrix_cell_assignees (cell_id, kind, ref_id) SELECT id, 'group', pg_temp.i('group_matrix') FROM matrix_cells ORDER BY id LIMIT 1;
+INSERT INTO user_role_assignments (id, user_id, role_id, permission_level, all_regions, all_modules, assigned_by)
+VALUES (pg_temp.i('assignment'), pg_temp.i('user2'), (SELECT id FROM roles WHERE code = 'CW_TL'), 'entry', false, true, pg_temp.i('admin'));
+INSERT INTO user_role_assignment_regions (assignment_id, region_id) VALUES (pg_temp.i('assignment'), 1);
+INSERT INTO delegations (id, from_user_id, target_kind, target_user_id, is_full, all_regions, valid_from, reason)
+VALUES (pg_temp.i('delegation'), pg_temp.i('admin'), 'user', pg_temp.i('user2'), false, true, now() - interval '1 day', 'synthetic delegation');
+INSERT INTO delegation_grants (delegation_id, module_key, action) VALUES (pg_temp.i('delegation'), 'sites', 'view');
+INSERT INTO staff_registry (employee_id, name_en, name_ar, email, phone, position, region)
+VALUES ('9102', 'Reset Engineer (synthetic)', 'مهندس تجريبي', 'reset.engineer@example.test', '+218 91 000 0102', 'Site Engineer', 'Tripoli');
 INSERT INTO user_sessions (token_hash, user_id, auth_method, csrf_token, expires_at) VALUES
   (repeat('1', 64), pg_temp.i('admin'), 'local', 'csrf-1', now() + interval '1 hour'),
   (repeat('2', 64), pg_temp.i('user2'), 'local', 'csrf-2', now() + interval '1 hour');

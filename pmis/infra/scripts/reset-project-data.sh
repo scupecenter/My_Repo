@@ -6,6 +6,11 @@
 # Run as root on the server:
 #   sudo bash pmis/infra/scripts/reset-project-data.sh                       dry run (the default): counts per table, changes nothing
 #   sudo bash pmis/infra/scripts/reset-project-data.sh --execute --reason "Owner request 2026-11-23: start the real data load"
+#   sudo bash pmis/infra/scripts/reset-project-data.sh --parts issues,risks        dry run of a chosen scope (migration 0152)
+#
+# --parts a,b,c resets only the chosen parts (codes of data_reset_parts(), docs/ops/data-reset.md "Parts"); the database adds every part that depends
+# on them and prints the scope. Without --parts the script resets everything as before (every project part, no identity part). The identity parts
+# (users, roles, staff) are never in the default; with --parts users the System Admins and the break-glass account are never deactivated.
 #
 # --execute asks for the confirmation phrase "RESET <database>" on the terminal. Without a terminal it refuses, unless both
 # --yes-i-have-a-backup <dump> (an existing pg_dump -Fc file that pg_restore --list reads) and --confirm "RESET <database>" are given.
@@ -39,7 +44,7 @@ usage() {
   exit "${1:-0}"
 }
 
-MODE=dry REASON='' OWN_BACKUP='' CONFIRM=''
+MODE=dry REASON='' OWN_BACKUP='' CONFIRM='' PARTS=''
 while [[ $# -gt 0 ]]; do
   case $1 in
     --dry-run) MODE=dry ;;
@@ -47,12 +52,14 @@ while [[ $# -gt 0 ]]; do
     --reason) [[ $# -ge 2 ]] || die "--reason needs a text"; REASON=$2; shift ;;
     --yes-i-have-a-backup) [[ $# -ge 2 ]] || die "--yes-i-have-a-backup needs the path of a pg_dump -Fc file"; OWN_BACKUP=$2; shift ;;
     --confirm) [[ $# -ge 2 ]] || die "--confirm needs the phrase"; CONFIRM=$2; shift ;;
+    --parts) [[ $# -ge 2 ]] || die "--parts needs a comma-separated list of part codes"; PARTS=$2; shift ;;
     -h|--help) usage 0 ;;
     *) echo "Unknown option: $1" >&2; usage 2 ;;
   esac
   shift
 done
 
+[[ -z $PARTS || $PARTS =~ ^[a-z_]+(,[a-z_]+)*$ ]] || die "--parts takes part codes separated by commas (for example issues,risks)."
 [[ -n ${PSQL_CMD-} || $EUID -eq 0 ]] || die "Run as root: sudo bash $0 ${MODE/dry/--dry-run}"
 [[ -r $SQL_FILE ]] || die "$SQL_FILE is missing (run the script from the repository checkout)."
 [[ -r $CONF_DIR/pmis.env ]] || die "No installation found ($CONF_DIR/pmis.env is missing)."
@@ -77,10 +84,12 @@ psql_su() {
   fi
 }
 
-# print_plan FILE: the PLAN lines of the SQL output as a table
+# print_plan FILE: the SCOPE line and the PLAN lines of the SQL output as a table
 print_plan() {
-  awk -F'|' '$1 == "PLAN" {
-      a = ($3 == "delete") ? "DELETE" : ($3 == "mixed") ? "MIXED" : ($3 == "log") ? "KEEP-LOG" : "KEEP";
+  awk -F'|' '$1 == "SCOPE" { printf "  Scope: %s\n", $2; if ($3 != "") printf "  Added by the dependencies: %s\n", $3; printf "\n" }
+    $1 == "PLAN" {
+      a = ($3 == "delete" || $3 == "mixed" || $3 == "optional") && $5 > 0 ? (($6 > 0) ? "MIXED" : "DELETE") : ($3 == "log") ? "KEEP-LOG" : "KEEP";
+      if ($2 == "users" && $5 > 0) { printf "  %-8s %-30s %10d accounts to deactivate\n", "DISABLE", $2, $5; next }
       if (a == "DELETE") { printf "  %-8s %-30s %10d rows to delete\n", a, $2, $5; del += $5 }
       else if (a == "MIXED") { printf "  %-8s %-30s %10d rows to delete, %d kept\n", a, $2, $5, $6; del += $5 }
       else { printf "  %-8s %-30s %10d rows kept\n", a, $2, $4 }
@@ -106,7 +115,7 @@ trap cleanup EXIT
 # ------------------------------------------------------------------------------------------------------------------------------------------------
 echo "GSDN Workspace project data reset: database $DB_NAME (port $DB_PORT), documents in $STORAGE_DIR"
 echo
-psql_su -v execute=false < "$SQL_FILE" > "$WORK/plan.txt" || die "The dry run failed (see the message above). Nothing was changed."
+psql_su -v execute=false -v parts="$PARTS" < "$SQL_FILE" > "$WORK/plan.txt" || die "The dry run failed (see the message above). Nothing was changed."
 print_plan "$WORK/plan.txt"
 echo
 if [[ $MODE == dry ]]; then
@@ -194,7 +203,7 @@ tar -tf "$TAR" >/dev/null || die "tar -t cannot read $TAR. Nothing was changed."
 
 echo "Resetting the project data (one transaction)."
 OPERATOR=${SUDO_USER:-$(id -un)}
-if ! psql_su -v execute=true -v reason="$REASON" -v operator="$OPERATOR" -v backup="$DUMP" < "$SQL_FILE" > "$WORK/reset.txt"; then
+if ! psql_su -v execute=true -v parts="$PARTS" -v reason="$REASON" -v operator="$OPERATOR" -v backup="$DUMP" < "$SQL_FILE" > "$WORK/reset.txt"; then
   die "The reset failed and was rolled back: nothing was changed (see the message above). The backups stay in $BACKUP_DIR."
 fi
 cp "$WORK/reset.txt" "$LOG"; chmod 600 "$LOG"
