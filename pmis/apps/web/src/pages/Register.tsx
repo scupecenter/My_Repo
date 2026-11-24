@@ -7,13 +7,16 @@ import {
   FileUp,
   ListChecks,
   Lock,
+  Map as MapIcon,
   Plus,
   RotateCcw,
+  Table2,
+  TableProperties,
   Unlock,
   Warehouse as WarehouseIcon,
   Ruler,
 } from "lucide-react";
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Link,
@@ -51,6 +54,16 @@ import {
 import { HlcLegacyDialog } from "@/components/P4cPanels";
 import { fieldLabel, showValue } from "@/components/RegisterFields";
 import { RegisterDrawer, STATE_TONE } from "@/components/RegisterDrawer";
+import {
+  ALL_CAP,
+  defaultBoardBy,
+  layoutsOf,
+  RegisterBoard,
+  RegisterMap,
+  RegisterWide,
+  type RegisterLane,
+  type RegisterLayout,
+} from "@/components/RegisterViews";
 import { useToast } from "@/components/Toast";
 import { MoreMenu, PageHeader } from "@/components/PageHeader";
 import { DisplayMenu, displayAttrs, PastedChip, ROWNO_COL, RowNo, SearchBox, ShownFooter, TableCount, TableToolbar } from "@/components/TableStandard";
@@ -84,17 +97,28 @@ import { registerErrorMessage } from "@/lib/registerErrors";
 import { isLive, OWNER_NOTE } from "@/lib/registerForms";
 
 const RF_KEYS = ["q", "region_id", "state", "record_type"] as const;
-const VIEW_EMPTY: RecordFilters = {
+// W2: a saved view also keeps the layout (list, wide, board, map) and the board's grouping and swimlane, as #185 does for Site Master
+const LAYOUT_KEYS = ["layout", "board_by", "lane"] as const;
+type RegisterView = RecordFilters & {
+  advanced?: FilterTree;
+  layout?: string;
+  board_by?: string;
+  lane?: string;
+};
+const VIEW_EMPTY: RegisterView = {
   q: "",
   region_id: "",
   state: "",
   record_type: "",
+  layout: "",
+  board_by: "",
+  lane: "",
 };
 // P10: the saved-views control (and its share dialog, people picker and role/group queries) loads on its own, after the records, so it never
 // delays the first paint of the list.
 const SavedViews = lazy(() =>
   import("@/components/SavedViews").then((m) => ({
-    default: m.SavedViews<RecordFilters & { advanced?: FilterTree }>,
+    default: m.SavedViews<RegisterView>,
   })),
 );
 // F3 (0.15.31): the AND/OR filter builder loads with the saved views.
@@ -149,6 +173,19 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
   // The list ("vertical") is the only visible view (owner request 2026-11-22): the Excel-like Grid has no button any more and opens only when
   // `?view=grid` is in the URL (hidden).
   const view: "vertical" | "grid" = sp.get("view") === "grid" ? "grid" : "vertical";
+  // W2 (plan 2026-11-23-next-ui-cleanup): the same view switcher as Site Master. The list is the default; the wide table and the board on every
+  // register, the map only where the records carry a site. The layout lives in the URL (layout=wide|board|map) and in saved views.
+  const layouts = layoutsOf(def);
+  const layoutParam = sp.get("layout") ?? "";
+  const layout: RegisterLayout = (layouts as string[]).includes(layoutParam)
+    ? (layoutParam as RegisterLayout)
+    : "list";
+  const boardBy = sp.get("board_by") || defaultBoardBy(def);
+  const lane: RegisterLane =
+    sp.get("lane") === "region" ||
+    (sp.get("lane") === "type" && !!def.record_types?.length)
+      ? (sp.get("lane") as RegisterLane)
+      : "none";
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const regions = useRegions();
   // F16: As-Built splits CW BOQ / TE BOQ and Dismantle splits CW / TE by record_type (the server filter); the first tab is the default.
@@ -195,11 +232,23 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
       : []),
   ];
   const items = list.data?.pages.flatMap((p) => p.items) ?? [];
+  // the board and the map show every record of the filters (their column counts and sites must not depend on paging), up to ALL_CAP records
+  const needAll = view === "vertical" && (layout === "board" || layout === "map");
+  const { hasNextPage, isFetchingNextPage, fetchNextPage } = list;
+  useEffect(() => {
+    if (needAll && hasNextPage && !isFetchingNextPage && items.length < ALL_CAP)
+      void fetchNextPage();
+  }, [needAll, hasNextPage, isFetchingNextPage, items.length, fetchNextPage]);
   // W8 item 6 (0.15.68): the counts come from the server: every record of the register the caller may see, and those matching the filters and the search
   const first = list.data?.pages[0] as CountedPage<(typeof items)[number]> | undefined;
   const total = first?.counts?.filtered ?? first?.page.total ?? items.length;
   const screenTotal = first?.counts?.total ?? total;
   const noun = key === "issues" ? "issues" : "records";
+  const real0 = items.filter((r) => !r.id.startsWith("tmp-"));
+  const partial =
+    needAll && !list.isFetchingNextPage && real0.length < total
+      ? { shown: real0.length, total }
+      : null;
   // The catalogue only lists fields the caller may see, so a permission-hidden field never becomes a column (plan G1).
   const fieldCols = def.fields.filter((x) => x.in_list);
   const defs: ColDef[] = [
@@ -232,6 +281,9 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
       },
       { replace: true },
     );
+  // the switcher of Site Master: a layout button opens its layout, pressed again it returns to the list
+  const toggleLayout = (x: RegisterLayout) =>
+    setParams({ layout: layout === x ? "" : x });
   const rname = (id?: number | null) => {
     const r = regions.data?.find((x) => x.id === id);
     return (i18n.language === "ar" && r?.name_ar) || r?.name_en || "-";
@@ -558,13 +610,19 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
           <Suspense fallback={null}>
             <SavedViews
               screen={`register-${key}`}
-              value={{ ...f, ...(advTree ? { advanced: advTree } : {}) }}
+              value={{
+                ...f,
+                layout: layout === "list" ? "" : layout,
+                board_by: layout === "board" ? (sp.get("board_by") ?? "") : "",
+                lane: layout === "board" ? (sp.get("lane") ?? "") : "",
+                ...(advTree ? { advanced: advTree } : {}),
+              }}
               empty={VIEW_EMPTY}
               table={tbl}
               onApply={(v) =>
                 setParams({
                   ...Object.fromEntries(
-                    RF_KEYS.map((k) => [
+                    [...RF_KEYS, ...LAYOUT_KEYS].map((k) => [
                       k,
                       String((v as Record<string, unknown>)[k] ?? ""),
                     ]),
@@ -593,6 +651,71 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
             {activeFilters > 0 && <span className="chip bg-accentSoft text-accentText" data-testid="toolbar-active-filters">{t("states.filters")} {activeFilters}</span>}
             <TableCount testid="register-count" noun={noun} total={screenTotal} filtered={total} active={activeFilters > 0} selected={picked.size} onClear={clearAll} />
           </span>
+        }
+        switcher={
+          view === "vertical" ? (
+            <>
+              {layouts.includes("map") && (
+                <button
+                  type="button"
+                  className="btn px-2 py-1 text-xs"
+                  data-testid="register-layout-map"
+                  aria-pressed={layout === "map"}
+                  onClick={() => toggleLayout("map")}
+                >
+                  {layout === "map" ? (
+                    <>
+                      <Table2 size={14} />
+                      {t("sites.table")}
+                    </>
+                  ) : (
+                    <>
+                      <MapIcon size={14} />
+                      {t("sites.map")}
+                    </>
+                  )}
+                </button>
+              )}
+              <button
+                type="button"
+                className="btn px-2 py-1 text-xs"
+                data-testid="register-layout-board"
+                aria-pressed={layout === "board"}
+                onClick={() => toggleLayout("board")}
+              >
+                {layout === "board" ? (
+                  <>
+                    <Table2 size={14} />
+                    {t("sites.table")}
+                  </>
+                ) : (
+                  <>
+                    <Columns3 size={14} />
+                    {t("board.board")}
+                  </>
+                )}
+              </button>
+              <button
+                type="button"
+                className="btn px-2 py-1 text-xs"
+                data-testid="register-layout-wide"
+                aria-pressed={layout === "wide"}
+                onClick={() => toggleLayout("wide")}
+              >
+                {layout === "wide" ? (
+                  <>
+                    <Table2 size={14} />
+                    {t("sites.table")}
+                  </>
+                ) : (
+                  <>
+                    <TableProperties size={14} />
+                    {t("sites.wide")}
+                  </>
+                )}
+              </button>
+            </>
+          ) : undefined
         }
         primary={
           <button
@@ -795,6 +918,50 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
       )}
       {view === "vertical" && (
         <>
+          {layout === "wide" && (
+            <RegisterWide
+              def={def}
+              records={real}
+              admin={admin}
+              regionName={(id) => rname(id as number | null)}
+              onOpen={setRecord}
+              onSave={(r, code, value) =>
+                save.mutateAsync({ record: r, patch: { data: { [code]: value } } })
+              }
+              errorText={(e) => registerErrorMessage(t, e)}
+              display={tbl.display}
+              height={Math.max(320, (typeof window === "undefined" ? 800 : window.innerHeight) - 260)}
+              current={recordId}
+              picked={picked}
+              onPick={flip}
+              onPickAll={() =>
+                setPicked(allPicked ? new Set() : new Set(real.map((r) => r.id)))
+              }
+              hasMore={false /* the "Load more" of the page below serves every layout */}
+              loadingMore={list.isFetchingNextPage}
+              onMore={() => void list.fetchNextPage()}
+              loaded={list.isSuccess}
+              filtered={activeFilters > 0}
+              onClear={clearAll}
+            />
+          )}
+          {layout === "board" && (
+            <RegisterBoard
+              def={def}
+              records={real}
+              by={boardBy}
+              onBy={(x) => setParams({ board_by: x === defaultBoardBy(def) ? "" : x })}
+              lane={lane}
+              onLane={(x) => setParams({ lane: x === "none" ? "" : x })}
+              regionName={(id) => rname(id as number | null)}
+              onOpen={setRecord}
+              partial={partial}
+            />
+          )}
+          {layout === "map" && (
+            <RegisterMap records={real} regionId={f.region_id} partial={partial} />
+          )}
+          {layout === "list" && (
           <div className="card gx overflow-hidden" {...displayAttrs(tbl.display)} data-testid="register-list-card">
             <div
               className="relative max-h-[calc(100vh-18rem)] min-h-40 overflow-auto"
@@ -895,6 +1062,10 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
               </div>
             </div>
           </div>
+          )}
+          {layout !== "list" && list.isError && (
+            <ErrorState onRetry={() => void list.refetch()} />
+          )}
           <BulkBar
             testid="register-bulk"
             count={picked.size}
@@ -969,9 +1140,6 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
           />
         </>
       )}
-      <p className="mt-2 text-sm text-mute" data-testid="register-footer-count">
-        {t("registers.count_of", { shown: real.length, total })}
-      </p>
       <ShownFooter shown={real.length} filtered={total} />
       {list.hasNextPage && (
         <button

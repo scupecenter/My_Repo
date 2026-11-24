@@ -84,7 +84,7 @@ W1 decision: the single tab row takes its phases from the published workflow ver
 | # | Workstream | Status | PR |
 |---|------------|--------|----|
 | W1 | Site page: one clear tab row instead of two overlapping rows | Done | #199 |
-| W2 | Registers & Logs: the same view options as Site Master (wide table, board, density, map where it applies) | Pending | |
+| W2 | Registers & Logs: the same view options as Site Master (wide table, board, density, map where it applies) | Done (branch `claude/w2-register-views`, built on W8; contract 0.15.69, no migration, CHANGELOG 204) | #204 |
 | W3 | Settings > Site360: remove the tab and the name; move what is still useful into Settings > Workflow | Done | #198 |
 | W4 | Dead or stuck screens: Settings > Alerts and Security stay on "Loading..."; audit every menu and tab | Done | #201 |
 | W5 | Library menu (Forms and Archive); Data entry > Templates stays as it is | Done (branch `claude/w5-library`, contract 0.15.70, migration 0151, CHANGELOG 205) | this PR |
@@ -135,6 +135,40 @@ Do:
 6. Tests: vitest per layout on two registers (one with and one without coordinates); an e2e that switches layouts on Procurement in ar and en.
 
 Acceptance: every register in Registers & Logs offers the same view switcher as Site Master, except where a layout does not apply (Map without coordinates, Board without status); saved views remember the layout.
+
+Result (2026-11-24, branch `claude/w2-register-views`, on top of W8). Choices made under the House rules:
+- **One wide table.** `components/WideTable.tsx` is the wide table of Site Master generalised (columns, rows, a cell adapter and an `onSave` adapter); `SitesWideTable.tsx` is now a thin adapter over it with the same behaviour and test ids. The register adapter (`components/RegisterViews.tsx`, `RegisterWide`) shows every field of the register the caller may see (the catalogue never lists a hidden field), in the register's order, under its form section (header row 1; "Record" and "Workflow" for region, type, state and ball in court), with # and Site ID frozen (a register without sites shows "Record" there and a "-" code). LTR table and scroller in both locales.
+- **Inline edit = the register grid's rule** (owner decision W2): an inline type (text, number, date, list; a list with no fixed values or that allows other values is typed as text), not `read_only` for the caller, the column and the record not locked unless a System Admin, and `edit` in the record's `allowed_actions`; plus the form's own "does not apply" rules (`isHidden`, `typeHides`). The save is `useUpdateRecord` (PATCH with If-Match the record version); a refusal keeps the editor open with the register's own error text. Every read-only cell says why in its tooltip.
+- **One board.** `components/Board.tsx` (`BoardGrid`) is the grid of the Site Master board (columns with counts and WIP note, swimlanes, cells, "N more"); `SitesBoard.tsx` uses it unchanged. The register board's columns follow the register's status field (owner decision W2): its single-value field named `status`, `..._status` or `stage` (Procurement Order Status, Permit Status, HLC Fiber Status, Issue Status, Quality Stage, ...), the first one shown in the list by default; columns are the list values in order, then values found outside the list, then "Not set". The approval state (entry, in review, in approval, approved, voided) is always offered and is the default where the register has no status field (so Board applies to every register). Swimlanes: none, region, record type. Read only like the Site Master board: a card opens the record drawer.
+- **One map.** The register map is the Site Master `SiteMap` with a new outer scope `site_codes`: the sites of the records of the current filters. Only a register with `site_scoped` offers it. It reads the sites the caller may see (`GET /dashboard/site-map`), so a record's site outside them is never drawn.
+- The board and the map load every record of the filters (pages of 100, up to 2000), so their counts match the server count; above it they say "Showing the first 2000 of N".
+- Saved views of `register-<key>` keep `layout`, `board_by` and `lane` as quick parameters of `filters` (contract 0.15.69, documentation only: the server already stores quick parameters as given). No API, migration, setting or permission change; no new table.
+- Also fixed: the register footer showed the missing key `registers.count_of` (removed: the W8 "Showing 50 of 120" footer covers it), and the Site Master board error showed the missing key `common.error`.
+
+Register list (W2):
+
+| Register | Route | List | Wide table | Board (default columns) | Map |
+|---|---|---|---|---|---|
+| Procurement (PR / PO / WO) | /registers/procurement | done | done | done (Order Status) | done |
+| Contractors | /registers/contractors | done | done | done (Status of the company; Contract Status and Team Status on demand) | not applicable: companies, teams and contracts have no site |
+| GECOL Power | /registers/gecol | done | done | done (approval state; its status field if the catalogue has one) | done |
+| HLC Fiber | /registers/hlc | done | done | done (Fiber Status) | done |
+| Permits & HSE | /registers/permits_hse | done | done | done (Status) | done |
+| Warehouse | /registers/warehouse | done | done | done (Transaction Status) | not applicable: stock movements are not site records (`site_scoped` false) |
+| Quality Control | /registers/quality | done | done | done (Stage) | done |
+| Issue Log | /registers/issues | done | done | done (Issue Status) | done |
+| Risk Register | /registers/risks | done | done | done (Status) | not applicable: project-wide risks |
+| Change Control Log | /registers/change_control | done | done | done (approval state) | done |
+| Readiness & Handover | /registers/readiness_handover | done | done | done (approval state) | done |
+| As-Built | /registers/as_built | done | done | done (Rectifier Status) | done |
+| Meetings | /registers/meetings | done | done | done (approval state) | not applicable: project-wide meetings |
+| RF & Design | /registers/rf_design | done | done | done (TSSR Status) | done |
+| Acquisition | /registers/acquisition | done | done | done (approval state) | done |
+| Dismantle | /registers/dismantle | done | done | done (approval state) | done |
+| Car Dispatcher | /registers/car_dispatcher | done | done | done (Vehicle Status) | not applicable: vehicles and bookings have no site |
+| Financial Advances | /registers/financial_advances | done | done | done (approval state) | done |
+
+The default board column is read at run time from the register's catalogue (the server's field list, as the caller may see it); the column above names the field of the seed. The list is in `lib/siteDataScreens.ts` (`REGISTER_SCREENS`), and the guard `tableStandard.test.tsx` renders each register and fails when its toolbar, count, Board or Wide table button is missing, or its Map button does not match the table above.
 
 ## W3. Settings > Site360 (owner image 5)
 
@@ -388,6 +422,7 @@ Total: roughly 7 PRs and several CI cycles each. This does not fit in one short 
 ## Log
 
 - 2026-11-24: W5 done on branch `claude/w5-library` (migration 0151, mirror `db/sql/150_library.sql`, contract 0.15.70, CHANGELOG 205), built on W8. Library > Forms and Archive, Settings > Documents > Document types, Form templates and Archive (see the W5 result). New tables `library_form_templates` (KEEP) and `library_generated_docs` (DELETE) are classified in `data_reset_plan()` / `data_reset_core()` (redefined from 0149). Choices: the grant `library.forms` create is "Documents: generate"; O&M groups the documents of a task of the O&M work view; the form template upload is multipart (the JSON body limit is 100 KB and the owner's CW forms are about 480 KB); print and download are HTML until the Chromium PDF is built; a security review replaced the deny-list check of templates by an allow-list re-serializer.
+- 2026-11-24: W2 done on branch `claude/w2-register-views` (built on W8; contract 0.15.69 documentation only, no migration, CHANGELOG 204): the shared WideTable and BoardGrid, the register wide table with inline edit through the record update, the register board by its status field (or the approval state), the register map narrowed to the records' sites, saved views with the layout, every register in `siteDataScreens.ts` and the guard. Choice noted: the status field is the register's single-value field named `status`, `..._status` or `stage`; the approval state is always offered, so Board applies to every register; Map only where `site_scoped`.
 - 2026-11-24: W7 done on branch `claude/w7-daily-plan` (migration 0149, mirror `db/sql/148_daily_plan.sql`, contract 0.15.67, CHANGELOG 203). My Work > Daily Plan (`/my-work/daily-plan`) with the Progress and Tomorrow tabs; one plan per region per day (`daily_plans`, `daily_plan_rows`, row security by region, doors only); the Matrix row `daily_plan` (L1 Site Engineers CW/TE and CW/TE Team Leads, L2 CW/TE Team Leads; held through the module `daily_plan` or `sites`); Settings > My Work > Daily Plan (columns and order per tab, default region scope, automatic lock time, reminder hour; the job `dp_tick` every 5 minutes). Choices made where the plan was silent, following what the system already does:
   - The sidebar has sub-menus only for Site Master, so Daily Plan is its own entry in the Work group, right after My Work, at `/my-work/daily-plan`.
   - "Actual below Planned" counts the items (one per line of the cell): planned = tasks with a planned date or planned start that day plus field work scheduled that day; actual = tasks with an actual date that day plus field work that ended that day. A manual Planned or Actual Work cell counts its lines. Only days up to today can be below target.

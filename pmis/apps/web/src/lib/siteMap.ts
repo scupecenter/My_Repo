@@ -101,12 +101,15 @@ export const activeCount = (f: MapFilters): number => LIST_KEYS.filter((k) => f[
 
 /** The dashboard's own filters (region, cluster, scenario, stream) narrow the map too: they are the outer scope. */
 /** `filter` (0.15.45) is the unified filter tree (JSON) that the server applies to the dashboard endpoints, the map included; the other keys narrow the loaded sites in the browser. */
-export interface OuterScope { region_id?: string; cluster_code?: string; scenario?: string; stream?: string; filter?: string }
+/** `site_codes` (W2): a register's map draws only the sites of its records (the records of the register's current filters), so the map and the list agree. */
+export interface OuterScope { region_id?: string; cluster_code?: string; scenario?: string; stream?: string; filter?: string; site_codes?: string[] }
 
 /** The sites that pass the filters, leaving out one list filter (`except`) for the counts of its own options. Cancelled sites only when the status filter asks. */
 export function applyFilters(items: SiteMapItem[], f: MapFilters, outer: OuterScope = {}, except?: ListKey): SiteMapItem[] {
   const q = f.q.trim().toLowerCase();
+  const only = outer.site_codes ? new Set(outer.site_codes) : null;
   return items.filter((s) => {
+    if (only && !only.has(s.site_code)) return false;
     if (outer.region_id && String(s.region_id) !== outer.region_id) return false;
     if (outer.cluster_code && s.cluster_code !== outer.cluster_code) return false;
     if (outer.scenario && s.delivery_scenario !== outer.scenario) return false;
