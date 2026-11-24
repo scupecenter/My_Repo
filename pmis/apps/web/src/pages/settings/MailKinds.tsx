@@ -6,6 +6,7 @@ import { useMailKinds, useSetMailKinds } from '@/api/settings';
 import { errText, FormDialog } from '@/components/FormDialog';
 import { useToast } from '@/components/Toast';
 import { fieldErrors } from '@/lib/fields';
+import { QueryFallback } from '@/components/States';
 
 /**
  * Settings, Mail kinds (Q441, contract 0.14.2): which notification kinds are also mailed. System Admin only; saving needs a reason and step-up. The list is the kinds
@@ -18,7 +19,7 @@ export function MailKinds() {
   const [draft, setDraft] = useState<string[] | null>(null);
   const [open, setOpen] = useState(false);
   if (q.isError && q.error instanceof ApiError && q.error.status === 403) return <p role="alert" className="card p-4 text-sm text-lateInk" data-testid="mail-kinds-forbidden">{t('mailKinds.forbidden')}</p>;
-  if (!q.data) return <p>{t('common.loading')}</p>;
+  if (!q.data) return <QueryFallback queries={[q]} testid="mail-kinds-loading" />;
   const cur = q.data;
   const known = new Set(cur.catalogue.map((c) => c.kind));
   const base = cur.kinds.filter((k) => known.has(k));

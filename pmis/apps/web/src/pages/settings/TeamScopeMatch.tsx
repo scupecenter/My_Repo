@@ -6,6 +6,7 @@ import type { SpecializationGroup, TeamScopeMatchInput, TeamSpecialization } fro
 import { errText, FormDialog } from '@/components/FormDialog';
 import { useToast } from '@/components/Toast';
 import { fieldErrors } from '@/lib/fields';
+import { QueryFallback } from '@/components/States';
 
 type Row = { scope: string; exempt: boolean; allowed: string[]; allowed_groups: SpecializationGroup[] };
 type Spec = TeamSpecialization & { is_new?: boolean };
@@ -31,7 +32,7 @@ export function TeamScopeMatch({ readOnly = false }: { readOnly?: boolean }) {
     scopes: q.data.scopes.map((s) => ({ scope: s.scope, exempt: s.exempt ?? false, allowed: s.allowed, allowed_groups: s.allowed_groups ?? [] })),
   } : null);
   const errs = fieldErrors(set.error);
-  if (!cur) return <section className="card p-4" data-testid="page-team-scope">…</section>;
+  if (!cur) return <section className="card p-4" data-testid="page-team-scope"><QueryFallback queries={[q]} testid="tsm-loading" /></section>;
   const editable = !readOnly && !!q.data?.can_edit;
   const spec = (code: string) => cur.catalogue.find((c) => c.code === code);
   // 0.13.0 (Q292): a specialization may belong to both groups (Dismantle is CW and TE); `group` is only the first one

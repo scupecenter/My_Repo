@@ -4,6 +4,7 @@ import { useContractorRules, useSetContractorRules, useTeamScopeMatch } from '@/
 import { errText, FormDialog } from '@/components/FormDialog';
 import { useToast } from '@/components/Toast';
 import { fieldErrors } from '@/lib/fields';
+import { QueryFallback } from '@/components/States';
 
 type Form = { lead: string; roles: string; scopes: string[]; internal: string; closed: string };
 const list = (s: string) => s.split(/[,;،]/).map((x) => x.trim()).filter(Boolean);
@@ -26,6 +27,8 @@ export function ContractorRules() {
   const errs = fieldErrors(set.error);
   const n = Number(v.lead), bad = !Number.isInteger(n) || n < 0 || n > 365;
   const err = (p: string) => errs[p] && <p role="alert" className="text-xs text-lateInk">{t(`fieldError.${errs[p]}`, { defaultValue: errs[p] })}</p>;
+  // a failed read must not show an empty form that looks like the saved rules (W4 of the 2026-11-23 plan)
+  if (!q.data) return <section className="card p-4" data-testid="page-contractor-rules"><QueryFallback queries={[q]} testid="cr-loading" /></section>;
   return (
     <section className="card space-y-3 p-4" data-testid="page-contractor-rules">
       <h2 className="font-bold">{t('contractorRules.title')}</h2>

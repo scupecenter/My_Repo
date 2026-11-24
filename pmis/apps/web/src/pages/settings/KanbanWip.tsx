@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useKanbanWip, useSetKanbanWip } from '@/api/boards';
 import { errText, FormDialog } from '@/components/FormDialog';
 import { useToast } from '@/components/Toast';
+import { QueryFallback } from '@/components/States';
 
 const MIN = 1;
 const MAX = 10000;
@@ -18,7 +19,7 @@ export function KanbanWip() {
   const q = useKanbanWip(), set = useSetKanbanWip();
   const [draft, setDraft] = useState<Record<string, string> | null>(null);
   const [open, setOpen] = useState(false);
-  if (!q.data) return <p>{q.isError ? t('common.error') : t('common.loading')}</p>;
+  if (!q.data) return <QueryFallback queries={[q]} testid="wip-loading" />;
   const cur = q.data;
   const values: Record<string, string> = draft ?? Object.fromEntries(cur.columns.map((c) => [c.code, cur.limits[c.code] ? String(cur.limits[c.code]) : '']));
   const bad = (v: string) => v.trim() !== '' && (!/^[0-9]+$/.test(v.trim()) || Number(v) < MIN || Number(v) > MAX);

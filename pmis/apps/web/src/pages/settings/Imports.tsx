@@ -4,6 +4,7 @@ import { useImportsSettings, useSetImportsSettings } from '@/api/settings';
 import { errText, FormDialog } from '@/components/FormDialog';
 import { useToast } from '@/components/Toast';
 import { fieldErrors } from '@/lib/fields';
+import { QueryFallback } from '@/components/States';
 
 const MIN = 10;
 const MAX = 500;
@@ -19,7 +20,7 @@ export function Imports() {
   const q = useImportsSettings(), set = useSetImportsSettings();
   const [draft, setDraft] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
-  if (!q.data) return <p>{q.isError ? t('common.error') : t('common.loading')}</p>;
+  if (!q.data) return <QueryFallback queries={[q]} testid="imports-loading" />;
   const cur = q.data;
   const text = draft ?? String(cur.async_rows);
   const n = Number(text);

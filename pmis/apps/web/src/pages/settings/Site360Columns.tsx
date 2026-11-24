@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 import { SITE360_MOVABLE_MENUS, useSetSite360ColumnSections, useSite360Sections } from '@/api/site360';
 import { errText, FormDialog } from '@/components/FormDialog';
 import { useToast } from '@/components/Toast';
 
 /**
- * Settings, SITE 360 columns (contract 0.15.21, F15): the admin chooses the SITE 360 menus of each Master column. A column may be in
+ * Settings > Workflow > Columns (W3, 2026-11-24; before: the Site360 tab). Contract 0.15.21, F15: the admin chooses the Site Master menus of each Master column.
+ * Unlike the task form of the Workflow Studio, it lists every column in Master order, whatever feeds it (site fields, scope flags, registers, formulas). A column may be in
  * several menus. The status columns are in every menu and cannot change. The change needs a reason and step-up; the API audits it.
  * Global settings live here (Administration > Settings); the grid toolbar keeps only the per-user view items.
  */
@@ -36,7 +38,11 @@ export function Site360Columns() {
 
   return (
     <div data-testid="site360-columns">
-      <p className="mb-3 text-sm text-mute">{t('site360cols.hint')}</p>
+      <h2 className="mb-1 text-xl font-bold">{t('site360cols.title')}</h2>
+      <p className="mb-1 text-sm text-mute">{t('site360cols.hint')}</p>
+      <p className="mb-3 text-sm text-mute" data-testid="site360cols-studio-note">
+        {t('site360cols.studio_note')} <Link to="/admin/settings/workflow/editor" className="text-accentText underline" data-testid="site360cols-studio-link">{t('site360cols.studio_link')}</Link>
+      </p>
       <div className="card overflow-auto">
         <table className="w-full text-sm" aria-label={t('site360cols.title')}>
           <thead>

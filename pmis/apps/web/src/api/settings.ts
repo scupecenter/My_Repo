@@ -169,7 +169,7 @@ export const useSetTeamScopeMatch = () => {
 
 // ---------------------------------------------------------------- notification policy and retention
 export const usePolicy = () => useQuery({ queryKey: ['policy'], queryFn: () => api.get<NotificationPolicy>('/settings/notification-policy') });
-export const useCatalogue = () => useQuery({ queryKey: ['catalogue'], staleTime: Infinity, queryFn: () => api.get<{ items: NotificationTypeDef[] }>('/settings/notification-policy/catalogue').then((r) => r.items) });
+export const useCatalogue = () => useQuery({ queryKey: ['notification-catalogue'], staleTime: Infinity, queryFn: () => api.get<{ items: NotificationTypeDef[] }>('/settings/notification-policy/catalogue').then((r) => r.items) });
 export const useSetPolicy = () => {
   const qc = useQueryClient();
   return useMutation<NotificationPolicy, ApiError, { version: number; body: NotificationPolicyInput }>({

@@ -171,7 +171,7 @@ records of the Contractors register (companies, teams, contracts) and the vehicl
 | matrix_cells | KEEP | Responsibility Matrix rows. |
 | matrix_cell_assignees | KEEP | Matrix holders. |
 | matrix_state | KEEP | Matrix revision (ETag). |
-| settings | KEEP | All settings, UI identity and notification policy included. |
+| settings | KEEP | All settings, UI identity and notification policy included, and `table.display` (the Display defaults of the site-data tables, migration 0148, W8: configuration; no new table). |
 | nav_item_catalogue | KEEP | Menu keys. |
 | master_columns | KEEP | Master columns. |
 | master_header_aliases | KEEP | Accepted Master header aliases. |
