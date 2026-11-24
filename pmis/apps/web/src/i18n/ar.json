@@ -5544,5 +5544,26 @@
       }
     },
     "inputs_after": "أضف أعمدة Site Master التي تملؤها هذه المهمة من نموذجها بعد أن تدخل المهمة في المسودة."
+  },
+  "tstd": {
+    "count_all": "{{total}} {{noun}}",
+    "count_of": "<b>{{filtered}}</b> من {{total}} {{noun}}",
+    "count_of_plain": "{{filtered}} من {{total}} {{noun}}",
+    "selected": "{{count}} محدد",
+    "clear": "مسح عوامل التصفية",
+    "showing": "يُعرض {{shown}} من {{filtered}}",
+    "noun_sites": "موقعًا",
+    "noun_records": "سجلًا",
+    "noun_issues": "مشكلة",
+    "noun_tasks": "مهمة",
+    "noun_items": "عنصرًا",
+    "rowno": "#",
+    "rowno_hint": "رقم الصف حسب الترتيب والتصفية الحالية",
+    "search_sites": "ابحث، أو الصق أرقام المواقع",
+    "search_hint": "كلمة واحدة تبحث في الرمز والاسم. الصق عدة أرقام مواقع (من Excel، مفصولة بمسافات أو أسطر أو فواصل أو فواصل منقوطة) لإيجاد كل واحد منها.",
+    "pasted": "المواقع: {{pasted}} ملصقًا، {{found}} موجودًا",
+    "not_found": "غير موجود ({{count}})",
+    "not_found_title": "أرقام مواقع غير موجودة",
+    "too_many": "1000 رقم موقع على الأكثر في البحث الواحد."
   }
 }

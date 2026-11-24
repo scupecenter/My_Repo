@@ -19,7 +19,9 @@ export function reconcile(p: Prefs, defs: ColDef[]): Prefs {
 export function visibleCols(p: Prefs, defs: ColDef[], auto: Record<string, number> = {}): (ColDef & { px: number })[] {
   const by = new Map(defs.map((d) => [d.id, d]));
   const all = p.order.map((id) => by.get(id)).filter((d): d is ColDef => !!d && !d.forbidden && (d.pinned || !p.hidden.includes(d.id)));
-  return [...all.filter((d) => d.pinned), ...all.filter((d) => !d.pinned)].map((d) => ({ ...d, px: p.width[d.id] ?? auto[d.id] ?? d.w }));
+  // W8: the row number column (`rowno`) is always the first frozen column, whatever order was stored before it existed
+  const pinned = all.filter((d) => d.pinned);
+  return [...pinned.filter((d) => d.id === 'rowno'), ...pinned.filter((d) => d.id !== 'rowno'), ...all.filter((d) => !d.pinned)].map((d) => ({ ...d, px: p.width[d.id] ?? auto[d.id] ?? d.w }));
 }
 
 export function moveCol(p: Prefs, defs: ColDef[], id: string, delta: -1 | 1): Prefs {

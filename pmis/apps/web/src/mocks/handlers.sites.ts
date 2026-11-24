@@ -41,19 +41,26 @@ function withRegisterFields(grid: SiteTasks, site: number): SiteTasks {
   return { ...grid, stages: grid.stages.map((st) => ({ ...st, tasks: st.tasks.map((t) => ({ ...t, register_fields: fieldOf(t.task_code, t.site_id) })) })) };
 }
 
+/** W8: the number of sites of a stream or a view (the screen's total) does not change within a test run's mock data. */
+const scopeCache = new Map<string, number>();
+
 export const siteHandlers = [
   http.get(`${B}/regions`, () => (viewer() ? HttpResponse.json({ items: REGIONS.map(([en, ar], i) => ({ id: i + 1, code: en, name_en: en, name_ar: ar, visible: true })) }) : problem(401, 'unauthenticated', 'Sign in required'))),
 
   http.get(`${B}/sites`, ({ request }) => {
     const g = guard(); if (g) return g;
     const u = new URL(request.url).searchParams;
-    const q = (u.get('q') ?? '').toLowerCase(), regions = u.getAll('region_id').map(Number), limit = Math.min(Number(u.get('limit') ?? 50), 200), start = Number(u.get('cursor') ?? 0);
+    // W8 item 5 (0.15.64): one token = contains on code and name; two or more tokens (spaces, new lines, tabs, commas, semicolons) = each Site ID exactly
+    const tokens = [...new Set((u.get('q') ?? '').split(/[\s,;]+/).map((x) => x.trim().toUpperCase()).filter(Boolean))];
+    if (tokens.length > 1000) return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '/q', code: 'too_many_codes' }] });
+    const list = tokens.length > 1 ? tokens : null;
+    const q = list ? '' : (u.get('q') ?? '').trim().toLowerCase(), regions = u.getAll('region_id').map(Number), limit = Math.min(Number(u.get('limit') ?? 50), 200), start = Number(u.get('cursor') ?? 0);
     const sc = u.get('scenario'), st = u.get('overall_status'), stage = u.get('stage_code'), stream = u.get('stream');
     if (stream && !STREAMS.some((x) => x.code === stream)) return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '/stream', code: 'unknown_stream' }] });
     const view = u.get('view'), bucket = u.get('bucket'), coords = u.get('coordinates');
     if (view && !VIEWS.some((x) => x.code === view)) return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '/view', code: 'unknown_view' }] });
     const all = Array.from({ length: SITE_COUNT }, (_, i) => siteMeta(i)).filter((m) =>
-      (!q || `${m.code} ${m.name}`.toLowerCase().includes(q)) && (!regions.length || regions.includes(m.region_id)) && (!sc || m.scenario === sc) && (!st || m.status === st)
+      (!list || list.includes(m.code.toUpperCase())) && (!q || `${m.code} ${m.name}`.toLowerCase().includes(q)) && (!regions.length || regions.includes(m.region_id)) && (!sc || m.scenario === sc) && (!st || m.status === st)
       && (coords !== 'missing' || (!hasValidCoords(m.i) && m.status !== 'cancelled')) && (coords !== 'valid' || hasValidCoords(m.i)));
     // with a stream: rail and counts cover that stream only, and sites where it does not apply are left out (contract 0.4.1)
     const items = all.map((m) => listItem(m.i, stream ?? undefined, view ?? undefined))
@@ -68,7 +75,13 @@ export const siteHandlers = [
     const wl = u.get('workflow_locks'), dg = u.get('data_gaps');
     const items2 = items.filter((x) => (!wl || (wl === 'open') === (x.workflow_locks === false)) && (!dg || (dg === 'with') === ((x.data_gaps ?? 0) > 0)));
     const slice = items2.slice(start, start + limit), next = start + limit < items2.length ? String(start + limit) : null;
-    return HttpResponse.json({ items: slice, page: { limit, next_cursor: next, total: items2.length } });
+    // W8 item 6: total = every site of the screen (a stream or a view keeps its own sites), filtered = the rows above
+    const scopeTotal = !stream && !view ? SITE_COUNT : (scopeCache.get(`${stream}|${view}`) ?? scopeCache.set(`${stream}|${view}`, Array.from({ length: SITE_COUNT }, (_, i) => listItem(i, stream ?? undefined, view ?? undefined))
+      .filter((x) => !view || scopedTasks(siteIndex(x.id), stream ?? undefined, view).some((t) => t.state !== 'na'))
+      .filter((x) => !stream || x.streams?.find((s) => s.code === stream)?.state !== 'na').length).get(`${stream}|${view}`)!);
+    const codes = new Set(Array.from({ length: SITE_COUNT }, (_, i) => siteMeta(i).code.toUpperCase()));
+    const search = list ? { pasted: list.length, found: list.filter((c) => codes.has(c)).length, not_found: list.filter((c) => !codes.has(c)) } : undefined;
+    return HttpResponse.json({ items: slice, page: { limit, next_cursor: next, total: items2.length }, counts: { total: scopeTotal, filtered: items2.length }, ...(search ? { search } : {}) });
   }),
   http.get(`${B}/sites/:id`, ({ params }) => {
     const g = guard(); if (g) return g;

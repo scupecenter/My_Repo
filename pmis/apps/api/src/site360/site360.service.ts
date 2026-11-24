@@ -4,6 +4,7 @@ import { z } from 'zod';
 import type { AuthContext } from '../auth/auth.types';
 import { StepUpService } from '../auth/step-up.service';
 import { ProblemException } from '../common/problem';
+import { parseSiteSearch, pastedSearchResult, siteSearchCond, type PastedSearchDto } from '../common/site-search';
 import { parse } from '../common/zod';
 import { AccessService } from '../access/access.service';
 import { DbService } from '../db/db.service';
@@ -94,6 +95,10 @@ export class Site360Service {
     if (regs !== null) where.push(Prisma.sql`s.region_id = ANY(${regs}::int[])`);
     const base = Prisma.sql`${Prisma.join(where, ' AND ')}`;
     const filters: Prisma.Sql[] = [];
+    // W8 item 5 (0.15.64): the search box: one token = contains on Site ID, Site Owner ID and name; a pasted list = exact Site ID or Site Owner ID
+    const search = parseSiteSearch(oneString(q, 'q'));
+    const byText = siteSearchCond(search);
+    if (byText) filters.push(byText);
     const codes = csvParam(q, 'site_code', 200);
     if (codes.length) filters.push(Prisma.sql`s.site_code = ANY(${codes}::text[])`);
     const regionIds = csvParam(q, 'region_id', 7).map((x) => {
@@ -210,10 +215,12 @@ export class Site360Service {
       attachParentOrds(tasks, cells, parentCatalogue);
     }
     const c = counts[0] ?? { total: 0, filtered: 0 };
+    const pasted = await pastedSearchResult(this.db.tx, search, base);
     return {
       menu: menuItem,
       total: c.total,
       filtered: c.filtered,
+      ...(pasted ? { search: pasted } : {}),
       offset,
       limit,
       rows: page.map((r, i) => {
@@ -420,6 +427,7 @@ export interface Site360RowsDto {
   menu: Site360MenuItem;
   total: number;
   filtered: number;
+  search?: PastedSearchDto;
   offset: number;
   limit: number;
   rows: { site_id: string; site_code: string; row_no: number; values: Record<string, string | null>; cells: Record<string, EditCell> }[];

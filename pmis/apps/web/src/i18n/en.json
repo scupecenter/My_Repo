@@ -5476,5 +5476,26 @@
       }
     },
     "inputs_after": "Add the Site Master columns this task fills from its form, once the task is in the draft."
+  },
+  "tstd": {
+    "count_all": "{{total}} {{noun}}",
+    "count_of": "<b>{{filtered}}</b> of {{total}} {{noun}}",
+    "count_of_plain": "{{filtered}} of {{total}} {{noun}}",
+    "selected": "{{count}} selected",
+    "clear": "Clear filters",
+    "showing": "Showing {{shown}} of {{filtered}}",
+    "noun_sites": "sites",
+    "noun_records": "records",
+    "noun_issues": "issues",
+    "noun_tasks": "tasks",
+    "noun_items": "items",
+    "rowno": "#",
+    "rowno_hint": "Row number in the current sort and filter",
+    "search_sites": "Search, or paste Site IDs",
+    "search_hint": "One word searches code and name. Paste several Site IDs (from Excel, separated by spaces, lines, commas or semicolons) to find each of them.",
+    "pasted": "Sites: {{pasted}} pasted, {{found}} found",
+    "not_found": "Not found ({{count}})",
+    "not_found_title": "Site IDs not found",
+    "too_many": "At most 1000 Site IDs in one search."
   }
 }

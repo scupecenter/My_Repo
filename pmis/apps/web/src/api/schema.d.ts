@@ -9277,6 +9277,7 @@ export interface components {
             total: number;
             /** @description Sites that match the filters. */
             filtered: number;
+            search?: components["schemas"]["PastedSearch"];
             offset: number;
             limit: number;
             rows: {
@@ -9443,6 +9444,17 @@ export interface components {
         PageEnvelope: {
             items: unknown[];
             page: components["schemas"]["PageInfo"];
+        };
+        /** @description 0.15.64 (W8 item 6). The counts of the toolbar, from the server, never from the loaded rows. `total`: every row the caller may see on this screen (region scope B3 and row security; a stream or a view keeps its own rows). `filtered`: the rows that match the filters and the search (the rows paging walks through and Export writes). */
+        ListCounts: {
+            total: number;
+            filtered: number;
+        };
+        /** @description 0.15.64 (W8 item 5). The result of a pasted list in `q`: the distinct codes pasted, how many name a site the caller may see on this screen (whatever the other filters), and the codes that name none, in paste order (upper case). A site outside the caller's regions is reported as not found, so the answer reveals nothing the caller may not see. */
+        PastedSearch: {
+            pasted: number;
+            found: number;
+            not_found: string[];
         };
         PageInfo: {
             limit: number;
@@ -17675,6 +17687,8 @@ export interface components {
         };
     };
     parameters: {
+        /** @description 0.15.64 (W8 item 5). The search box of a site-data list. One token: contains, ignoring case, on the Site ID, the Site Owner ID and the name (and the other text columns the list names). Two or more tokens separated by spaces, new lines, tabs, commas or semicolons (cells copied from Excel): a pasted list, each token matches the Site ID or the Site Owner ID exactly, ignoring case, one row per site, duplicates ignored. At most 1000 distinct codes: 422 `validation_failed` with `too_many_codes` at `/q`. The caller's regions and row security still apply; the answer carries `search` for a list. */
+        SiteSearch: string;
         /** @description 0.15.30 (F2). Only tasks whose SLA colour is one of these: green (within the minimum), amber (between the minimum and the maximum), red (past the maximum), none (no measured clock). Repeat the parameter or separate with commas. */
         SlaColourFilter: ("green" | "amber" | "red" | "none")[];
         /** @description 0.15.30 (F2). true = only stale tasks (idle for at least `stale_after_wd` working days); false = only tasks that are not stale. */
@@ -20772,8 +20786,8 @@ export interface operations {
             query?: {
                 /** @description 0.15.31 (F3): a `FilterTree` as one JSON string (at most 8000 characters), compiled on the server against the whitelist of this list. 422 `validation_failed` with `unknown_field` (also for a field hidden from the caller by a field rule), `invalid_operator`, `invalid_value`, `too_deep` or `too_many`. The caller's regions and row security still apply. */
                 filter?: components["parameters"]["FilterTree"];
-                /** @description Site code, owner ID or name. */
-                q?: string;
+                /** @description 0.15.64 (W8 item 5). The search box of a site-data list. One token: contains, ignoring case, on the Site ID, the Site Owner ID and the name (and the other text columns the list names). Two or more tokens separated by spaces, new lines, tabs, commas or semicolons (cells copied from Excel): a pasted list, each token matches the Site ID or the Site Owner ID exactly, ignoring case, one row per site, duplicates ignored. At most 1000 distinct codes: 422 `validation_failed` with `too_many_codes` at `/q`. The caller's regions and row security still apply; the answer carries `search` for a list. */
+                q?: components["parameters"]["SiteSearch"];
                 /** @description 0.15.19 (F4): a pasted list of Site IDs, separated by commas, spaces or new lines (at most 500). Keeps only those sites; the match ignores case. IDs out of reach or unknown simply match nothing here (see POST /search/site-ids for the list of IDs not found). */
                 site_codes?: string;
                 region_id?: components["schemas"]["RegionId"][];
@@ -20823,6 +20837,8 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["PageEnvelope"] & {
                         items?: components["schemas"]["SiteListItem"][];
+                        counts?: components["schemas"]["ListCounts"];
+                        search?: components["schemas"]["PastedSearch"];
                     };
                 };
             };
@@ -27328,6 +27344,8 @@ export interface operations {
             query?: {
                 /** @description 0.15.31 (F3): a `FilterTree` as one JSON string (at most 8000 characters), compiled on the server against the whitelist of this list. 422 `validation_failed` with `unknown_field` (also for a field hidden from the caller by a field rule), `invalid_operator`, `invalid_value`, `too_deep` or `too_many`. The caller's regions and row security still apply. */
                 filter?: components["parameters"]["FilterTree"];
+                /** @description 0.15.64 (W8 item 5). The search box of a site-data list. One token: contains, ignoring case, on the Site ID, the Site Owner ID and the name (and the other text columns the list names). Two or more tokens separated by spaces, new lines, tabs, commas or semicolons (cells copied from Excel): a pasted list, each token matches the Site ID or the Site Owner ID exactly, ignoring case, one row per site, duplicates ignored. At most 1000 distinct codes: 422 `validation_failed` with `too_many_codes` at `/q`. The caller's regions and row security still apply; the answer carries `search` for a list. */
+                q?: components["parameters"]["SiteSearch"];
                 /** @description Site IDs, comma-separated (multi Site ID search, exact match). */
                 site_code?: string;
                 /** @description Region numbers 1 to 7, comma-separated. */

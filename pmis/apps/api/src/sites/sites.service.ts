@@ -2,13 +2,14 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { AccessService } from '../access/access.service';
 import type { AuthContext } from '../auth/auth.types';
-import { decodeCursor, encodeCursor, likePattern, parseLimit } from '../common/cursor';
+import { decodeCursor, encodeCursor, parseLimit } from '../common/cursor';
 import { z } from 'zod';
 import { checkIfMatch, contentVersion } from '../common/etag';
 import { mapDbError } from '../common/db-errors';
 import { parse, uuidSchema } from '../common/zod';
 import { ProblemException, problems } from '../common/problem';
 import { oneParam } from '../common/query';
+import { parseSiteSearch, pastedSearchResult, siteSearchCond } from '../common/site-search';
 import { DbService } from '../db/db.service';
 import { FilterCatalogService } from '../views/filter-catalog.service';
 import { HAS_COORDINATES } from '../dashboard/site-map.service';
@@ -315,14 +316,41 @@ export class SitesService {
       for (const p of page) p.data_gaps = m.get(p.id) ?? 0;
     }
     const items = await this.listItems(page, stream, view);
+    // W8 item 6 (0.15.64): `counts.total` = every site the caller may see on this screen (active, the caller's regions; a stream or a view keeps
+    // the sites with work in it), `counts.filtered` = the sites that match the filters and the search. Both read in the caller's transaction (RLS).
+    const filtered = rows[0] ? Number(rows[0].total) : offset > 0 ? await this.countFiltered(where, post, stream, view) : 0;
+    const scope: Prisma.Sql[] = [Prisma.sql`s.is_active`];
+    if (regions !== null) scope.push(Prisma.sql`s.region_id = ANY(${regions}::int[])`);
+    const total = await this.countFiltered(scope, (stream || view) ? [Prisma.sql`coalesce(ss.has_work, false)`] : [], stream, view);
+    const search = await pastedSearchResult(this.db.tx, parseSiteSearch(oneParam(q, 'q')), Prisma.join(scope, ' AND '));
     return {
       items,
       page: {
         limit,
         next_cursor: rows.length > limit ? encodeCursor([String(offset + limit)]) : null,
-        total: rows[0] ? Number(rows[0].total) : 0,
+        total: filtered,
       },
+      counts: { total, filtered },
+      ...(search ? { search } : {}),
     };
+  }
+
+  /** The number of sites for a site condition and the stage conditions of GET /sites (the same CTEs as the list, so the counts and the rows agree). */
+  private async countFiltered(where: Prisma.Sql[], post: Prisma.Sql[], stream: string | undefined, view: string | undefined): Promise<number> {
+    if (post.length === 0) {
+      const r0 = await this.db.tx.$queryRaw<{ n: bigint }[]>(Prisma.sql`
+        SELECT count(*) AS n FROM sites s JOIN workflow_definitions wd ON wd.id = s.workflow_version_id LEFT JOIN clusters c ON c.id = s.cluster_id
+        WHERE ${Prisma.join(where, ' AND ')}`);
+      return Number(r0[0]?.n ?? 0);
+    }
+    const r = await this.db.tx.$queryRaw<{ n: bigint }[]>(Prisma.sql`
+      WITH vis AS (
+        SELECT s.* FROM sites s JOIN workflow_definitions wd ON wd.id = s.workflow_version_id LEFT JOIN clusters c ON c.id = s.cluster_id
+        WHERE ${Prisma.join(where, ' AND ')}
+      ), ${siteStageCtes(stream, view)}
+      SELECT count(*) AS n FROM vis LEFT JOIN ss ON ss.site_id = vis.id
+      ${post.length > 0 ? Prisma.sql`WHERE ${Prisma.join(post, ' AND ')}` : Prisma.empty}`);
+    return Number(r[0]?.n ?? 0);
   }
 
   /**
@@ -364,7 +392,8 @@ export class SitesService {
    * same sites for the same query.
    */
   async baseWhere(auth: AuthContext, q: Record<string, unknown>, regions: number[] | null): Promise<Prisma.Sql[]> {
-    const text = oneParam(q, 'q')?.trim();
+    // W8 item 5 (0.15.64): one token = contains on code, owner ID and name; a pasted list = exact Site ID or Site Owner ID, ignoring case
+    const search = parseSiteSearch(oneParam(q, 'q'));
     const scenario = oneParam(q, 'scenario');
     const status = oneParam(q, 'overall_status');
     const cluster = oneParam(q, 'cluster_code');
@@ -388,7 +417,8 @@ export class SitesService {
     const siteCodes = (oneParam(q, 'site_codes') ?? '').split(/[\s,]+/).map((c) => c.trim().toUpperCase()).filter(Boolean);
     if (siteCodes.length > 500) throw problems.validation([{ path: '/site_codes', code: 'invalid', message: 'At most 500 Site IDs.' }]);
     if (siteCodes.length > 0) where.push(Prisma.sql`upper(s.site_code) = ANY(${siteCodes}::text[])`);
-    if (text) where.push(Prisma.sql`(s.site_code ILIKE ${likePattern(text)} OR s.owner_site_id ILIKE ${likePattern(text)} OR s.name ILIKE ${likePattern(text)})`);
+    const byText = siteSearchCond(search);
+    if (byText) where.push(byText);
     if (scenario) where.push(Prisma.sql`s.delivery_scenario::text = ${scenario}`);
     if (status) where.push(Prisma.sql`s.overall_status::text = ${status}`);
     if (cluster) where.push(Prisma.sql`c.cluster_code = ${cluster}`);

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.61
+  version: 0.15.64
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -30,6 +30,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.64 (2026-11-24): W8 of plan `docs/plans/2026-11-23-next-ui-cleanup.md` (CHANGELOG 201; 0.15.62 and 0.15.63 are used by other branches). Additive. (1) The search parameter `SiteSearch` (`q`) of the site-data lists reads a pasted list: two or more tokens separated by spaces, new lines, tabs, commas or semicolons match Site ID or Site Owner ID exactly, ignoring case, one row per site; at most 1000 distinct codes (422 `too_many_codes` at `/q`). One token keeps the "contains" search. `GET /sites` and `GET /site360/{menu}/rows` (new `q`) read it on the server, so paging, counts and Export follow it. (2) `search` (`PastedSearch`: `pasted`, `found`, `not_found`) in the answer when `q` is a list; a code is found when it names a site the caller may see on the screen (region scope, row security), whatever the other filters. (3) `counts` (`ListCounts`: `total` every row the caller may see on the screen, `filtered` the rows matching the filters and the search) in the answer of `GET /sites`; `GET /site360/{menu}/rows` already had both.
     - 0.15.61 (2026-11-23): the system-settings routes the web called that no controller served are served by the API (migration 0145, mirror `db/sql/144_settings_screens_api.sql`; CHANGELOG 197). Additive. (1) `GET /settings/dlp`, `POST /settings/dlp/versions`: the versions of `dlp.months.cw` and `dlp.months.te` (seed version 1: CW 3, TE 12); a version takes effect today or later and never before the latest version (field errors `in_the_past`, `before_latest_version`, `out_of_range`, `unknown_key`), so a PAC keeps the version in force on its date (the SLA start event `DLP:<task>:<key>` adds the months in force on the PAC date). (2) `GET`/`PUT /settings/idle-task-alert`: `working_days` is the existing dashboard idle limit `stale_idle_days` (one setting, Q523); `enabled` is new; the ETag moves when either screen changes it. (3) `GET`/`PUT /settings/notification-policy` and `GET /settings/notification-policy/catalogue`: closed schema validated in the database (`unknown_key` at the path of the key, the cross-field rule on both paths, `invalid_timezone`, `mandatory_locked`, `not_eligible_recipient`, `unknown_type`, `unknown_column`, `duplicate`); the security and system rows and `rate_cap_per_hour` need a System Admin (403 `delegate_forbidden`) and a step-up. (4) `POST /settings/holidays/import`: the approved template `TPL-HOLIDAYS` only (`template_kind` `holidays`, ADR 0011), applied at once: 202 with `status` `applied`, `counts.create` and `counts.unchanged`, and `affected_open_tasks`; one bad row refuses the file (`errors[]` with `path` `/rows/<line>/<field>`); any other file is 422 `template_rejected`. `Template.template_kind` lists `list_values` (0.15.23) and `holidays`. Numbered 0.15.61 because 0.15.53 to 0.15.58 are used by other branches.
     - 0.15.60 (2026-11-23): the last users, groups and sign-in routes of the web on the real API (migration 0143, mirror `db/sql/142_users_groups_api.sql`; CHANGELOG 193; 0.15.53 to 0.15.56 are reserved by other branches). Additive. (1) `GET`, `PUT /users/{user_id}/mfa-exemption` and `POST .../revoke` are served (`idm_set_mfa_exempt`, `idm_mfa_exemption_state`): a System Admin, or a delegate holding `users.administer` for all regions (the delegable right `users.two_factor`, Q620); reason and the acting admin's own step-up; nobody exempts themselves (403 `self_beneficiary`); an admin or a delegate is exempted by a System Admin only (403 `action_forbidden`); `until` must be in the future (422 `must_be_future`) or null (until revoked); a second PUT changes the exemption in force; revoking with no exemption in force is 409 `invalid_transition`. The user gets an in-app notice (`mfa_exemption`) and a mail. `User.mfa_exempt` and `mfa_exempt_until` are filled. The check is GSDN Workspace's own (setting `require_mfa`, default false): when it is on, a local account without two-factor and without an exemption in force gets 401 `mfa_required` at sign-in and at step-up; an exemption whose `until` has passed no longer counts. Entra Conditional Access is not affected. (2) `POST /groups` is served (`idm_group_create`): `groups.create` for all regions and step-up; `member_ids` also need `groups.edit` for all regions; the caller among the members is 403 `self_beneficiary`; a pending or unknown member is 422 with `errors[].path` `/member_ids/<index>`; a name equal to another group's name ignoring case is 409 `duplicate` (Q622); the create is atomic. (3) `POST /me/notify-admins` is served (`me_notify_admins`): reachable by a pending account; plain text only (422 `markup_not_allowed` for `<`, `>` or an HTML entity, Q624); one request per `notify_admins.cooldown_minutes` (default 60, Q623), else 429 `rate_limited` with `Retry-After`; an in-app notice of the new kind `assignment_request` and a mail to every active System Admin. (4) `POST /auth/employee-id` is served but, until the M365 sign-in and the staff registry exist on the server (Q625), answers 409 `invalid_transition` to every session whatever ID is typed (no enumeration); the format is still checked (422) and the calls are rate limited like sign-in (429).
     - 0.15.58 (2026-11-23): the Master import reads "Pending" and "N/A" as the owner means them, skips placeholder rows, routes the GECOL requests of PR-PO to GECOL, derives an empty Order Status and selects the one candidate with a contract sign-off (owner decisions 2026-11-22 and 2026-11-23; migration 0144, mirror `db/sql/143_master_import_na_routing.sql`; CHANGELOG 195). Additive, Master paths only (the Master import and comparison, and the TPL-MASTER upload; manual entry and the other templates are unchanged). (1) `Override.kind` `master_na` (entity `task`): a task whose actual date column holds N/A in the Master file is N/A when its batch is sent, an admin override made by a rule (no `acted_by`), revertible through `POST /overrides/{override_id}/revert` (System Admin, reason, step-up) and never applied again once reverted; never a milestone, a task with a date, a person's step, a register record in review, approved, or held by a gate; and only when the uploader holds the rights of an entry of that task, at the staging and again at the send (the import and edit regions of the task and its entry level L1, or a System Admin when the level has no holder). (2) `ImportBatch.import_notes` (`ImportNote[]`, counts only, never a value): `pending_as_empty`, `na_as_empty`, `na_task_requested`, `na_task_not_applicable`, `na_task_marked`, `na_task_not_marked`, `placeholder_rows_skipped`, `routed_to_gecol`, `routed_from_procurement`, `order_status_derived`, `order_status_not_derived`, `selected_set_by_import`, `selection_date_from_contract`, `selected_not_set`; the same list rides on `MasterImportOutcome.batches[].import_notes`, and `MasterImportOutcome.register_notes` carries the register ones with the sheet. Batch rows carry the matching warnings (`master_na_requested`, `master_na_not_applicable`, `master_na_ignored`, `master_na_marked`, `master_na_not_marked`, `routed_from_procurement`, `order_status_derived`, `selected_set_by_import`, `selection_date_from_contract`) and a conflicting GECOL request the error `gecol_one_per_site`. A register sheet of placeholders only is in `skipped` with reason `no_rows`. (3) An empty Order Status of a PR-PO row becomes `Active` (`Completed` only when the row holds a delivery / completion date, a field PR-PO does not have today; values in the setting `imports.master_order_status_derived`, changed by definer code only), and a candidate selected by the import with an empty Selection Date takes its Contract Sign-off Date (warning `selection_date_from_contract`) (owner decisions 2026-11-23).
@@ -3012,7 +3013,7 @@ paths:
         Every item carries `streams`: the status of the site in each stream of its workflow version.
       parameters:
         - $ref: '#/components/parameters/FilterTree'
-        - { name: q, in: query, description: 'Site code, owner ID or name.', schema: { type: string } }
+        - $ref: '#/components/parameters/SiteSearch'
         - { name: site_codes, in: query, description: '0.15.19 (F4): a pasted list of Site IDs, separated by commas, spaces or new lines (at most 500). Keeps only those sites; the match ignores case. IDs out of reach or unknown simply match nothing here (see POST /search/site-ids for the list of IDs not found).', schema: { type: string, maxLength: 8000 } }
         - name: region_id
           in: query
@@ -3057,6 +3058,8 @@ paths:
                   - type: object
                     properties:
                       items: { type: array, items: { $ref: '#/components/schemas/SiteListItem' } }
+                      counts: { $ref: '#/components/schemas/ListCounts' }
+                      search: { $ref: '#/components/schemas/PastedSearch' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
     post:
@@ -8612,6 +8615,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/FilterTree'
         - { name: menu, in: path, required: true, description: 'The SITE 360 menu.', schema: { type: string, enum: [master, design_acq, sow, cw, te, hoto, dismantle, om] } }
+        - $ref: '#/components/parameters/SiteSearch'
         - { name: site_code, in: query, required: false, description: 'Site IDs, comma-separated (multi Site ID search, exact match).', schema: { type: string, maxLength: 4000 } }
         - { name: region_id, in: query, required: false, description: 'Region numbers 1 to 7, comma-separated.', schema: { type: string, maxLength: 40 } }
         - { name: sub_region, in: query, required: false, schema: { type: string, maxLength: 4000 } }
@@ -14156,6 +14160,12 @@ components:
       schema: { type: string, examples: ['"7"'] }
 
   parameters:
+    SiteSearch:
+      name: q
+      in: query
+      required: false
+      description: '0.15.64 (W8 item 5). The search box of a site-data list. One token: contains, ignoring case, on the Site ID, the Site Owner ID and the name (and the other text columns the list names). Two or more tokens separated by spaces, new lines, tabs, commas or semicolons (cells copied from Excel): a pasted list, each token matches the Site ID or the Site Owner ID exactly, ignoring case, one row per site, duplicates ignored. At most 1000 distinct codes: 422 `validation_failed` with `too_many_codes` at `/q`. The caller''s regions and row security still apply; the answer carries `search` for a list.'
+      schema: { type: string, maxLength: 40000 }
     SlaColourFilter:
       name: sla_colour
       in: query
@@ -14782,6 +14792,7 @@ components:
         menu: { $ref: '#/components/schemas/Site360MenuItem' }
         total: { type: integer, minimum: 0, description: 'Sites the caller may see.' }
         filtered: { type: integer, minimum: 0, description: 'Sites that match the filters.' }
+        search: { $ref: '#/components/schemas/PastedSearch' }
         offset: { type: integer, minimum: 0 }
         limit: { type: integer, minimum: 1, maximum: 200 }
         rows:
@@ -15016,6 +15027,23 @@ components:
       properties:
         items: { type: array, items: {} }
         page: { $ref: '#/components/schemas/PageInfo' }
+    ListCounts:
+      type: object
+      additionalProperties: false
+      required: [total, filtered]
+      description: '0.15.64 (W8 item 6). The counts of the toolbar, from the server, never from the loaded rows. `total`: every row the caller may see on this screen (region scope B3 and row security; a stream or a view keeps its own rows). `filtered`: the rows that match the filters and the search (the rows paging walks through and Export writes).'
+      properties:
+        total: { type: integer, minimum: 0 }
+        filtered: { type: integer, minimum: 0 }
+    PastedSearch:
+      type: object
+      additionalProperties: false
+      required: [pasted, found, not_found]
+      description: '0.15.64 (W8 item 5). The result of a pasted list in `q`: the distinct codes pasted, how many name a site the caller may see on this screen (whatever the other filters), and the codes that name none, in paste order (upper case). A site outside the caller''s regions is reported as not found, so the answer reveals nothing the caller may not see.'
+      properties:
+        pasted: { type: integer, minimum: 0, maximum: 1000 }
+        found: { type: integer, minimum: 0, maximum: 1000 }
+        not_found: { type: array, maxItems: 1000, items: { type: string } }
     PageInfo:
       type: object
       required: [limit, next_cursor]

@@ -11,6 +11,8 @@ export type Site360Rows = components['schemas']['Site360Rows'];
 
 /** Filters, sort and paging of the grid rows (contract 0.15.21, `GET /site360/{menu}/rows`). Multi values are comma-separated. */
 export interface Site360RowsQuery {
+  /** W8 item 5 (0.15.64): the search box: one token = contains on code and name; a pasted list = exact Site ID or Site Owner ID */
+  q?: string;
   site_code?: string;
   /** 0.15.31 (F3): the AND/OR filter tree as JSON, compiled by the server */
   filter?: string;
