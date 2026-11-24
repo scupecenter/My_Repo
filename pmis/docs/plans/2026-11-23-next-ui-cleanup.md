@@ -86,7 +86,7 @@ W1 decision: the single tab row takes its phases from the published workflow ver
 | W1 | Site page: one clear tab row instead of two overlapping rows | Done | #199 |
 | W2 | Registers & Logs: the same view options as Site Master (wide table, board, density, map where it applies) | Pending | |
 | W3 | Settings > Site360: remove the tab and the name; move what is still useful into Settings > Workflow | Done | #198 |
-| W4 | Dead or stuck screens: Settings > Alerts and Security stay on "Loading..."; audit every menu and tab | Pending | |
+| W4 | Dead or stuck screens: Settings > Alerts and Security stay on "Loading..."; audit every menu and tab | Done | this PR |
 | W5 | Library menu (Forms and Archive); Data entry > Templates stays as it is | Pending | |
 | W7 | Daily Progress and Tomorrow Plan: a screen in the system, copyable to email | Pending | |
 | W8 | Site lists and the site task table: row numbers everywhere, three-level headers, list-style task table, display options (font size, alignment, density, wrap) | Pending | |
@@ -172,6 +172,55 @@ Do:
 4. Add a guard: a test that renders every Settings tab and section in hybrid mode and fails if any stays on "Loading..." after the queries settle.
 
 Acceptance: no screen stays on "Loading..."; each one either works or says "not available" clearly; the audit table is filled in.
+
+### W4 findings (2026-11-24)
+
+How it was checked: a local NestJS API on a fresh database with every migration (synthetic bootstrap admin), the web in hybrid mode (`VITE_USE_MOCKS=true`, `VITE_REAL_API=auth-users`, `/api` proxied to that API), and a browser that opened every sidebar entry, every Settings tab and every Settings section twice: as a System Admin, and as a delegate who holds `admin.settings` edit for all regions but is not a System Admin and does not hold `users.edit`. Each screen was read after its requests settled; the table lists the API answers that were not 2xx.
+
+Root cause of owner image 6. Since #188-#194 every route of these screens is served (`NOT_AVAILABLE` is empty), and as a System Admin Alerts, Staff field visibility and Log retention all render with real data. The screens were still able to hang, for one reason in the web: they returned "Loading..." whenever their data was missing (`if (!q.data) return Loading`), and a failed read leaves the data missing for ever. In the owner's screenshot the reads answered 501 `not_available` (the routes were then in `NOT_AVAILABLE`); today the same screens hang on a 403 for anyone who opens Settings without the right of that screen. A second defect: the notification-type catalogue (`api/settings.ts`) and the permission catalogue (`api/admin.ts`) shared the query key `['catalogue']`, so Alerts read the permission catalogue after Delegation or Permission profiles had loaded it (and the other way round).
+
+Fix: one shared fallback, `QueryFallback` in `components/States.tsx`: "Loading..." only while a read is pending; a refused read (403) shows the standard "no access" state, a 501 `not_available` shows "Not available yet" with the hybrid note, any other error shows the error with Retry. Every Settings screen that could hang now uses it. The notification catalogue has its own key (`notification-catalogue`). `common.error` (a key that did not exist, shown raw by Board WIP, Identity and Imports) is gone with it. No backend route was missing: no API, migration or contract change.
+
+Settings (tabs and sections):
+
+| Screen | State as System Admin | State as `admin.settings` delegate, before | Cause | Fix PR |
+|--------|-----------------------|---------------------------------------------|-------|--------|
+| Calendar | works | works | | |
+| Workflow > Editor | works | works (read-only); `GET /workflow/site-migrations` 403 is not shown | | |
+| Workflow > Columns (W3) | works | works | | |
+| Workflow > Freeze | works | works | | |
+| Workflow > Idle | works | works | | |
+| Workflow > Board | works | works | | this PR: a failed read showed the raw key `common.error` |
+| SLA > Rules | works | says "not allowed" (403 on `/settings/sla-rules`, `/settings/sla-rule-sets`) | the set editor hung on a failed read | this PR |
+| SLA > DLP | works | works | | |
+| Weights | works | looked empty: "no versions" (403 on `/settings/weight-sets`) | a failed list read looked like an empty list | this PR: "no access" |
+| Registers > Columns | works | says "Something went wrong" (403 on a register's fields) | | |
+| Registers > Contractors | works | showed an empty form as if it were the saved rules (403) | the form rendered without data | this PR: "no access" |
+| Registers > GECOL | works | **stuck** on "…" (403 on `/settings/gecol-order-warnings`) | no error branch | this PR |
+| Registers > Team / scope | works | **stuck** on "…" (403 on `/settings/team-scope-match`); the same component on Reports > Contractors | no error branch | this PR |
+| DDL | works | works | | |
+| Documents > Document types | works | says "not allowed" (403) | | |
+| Documents > Mail | works | says "only a System Admin" (403); a 501 would have hung | no branch for errors other than 403 | this PR |
+| Data > Imports | works | works | | this PR: raw `common.error` on a failed read |
+| Data > Historical | works | works | | this PR: same fallback |
+| Alerts | works (25 types, real policy) | works | owner image 6: 501 before #194, then a 403 or 501 hung; the catalogue key clash | this PR |
+| Security > Staff field visibility | works | **stuck** on "Loading..." (403: System Admin or `users.edit` for all regions, contract 0.15.56) | no error branch | this PR: "no access" |
+| Security > Log retention | works | **stuck** on "Loading..." (403 `module_forbidden`) | no error branch | this PR: "no access" |
+| Dashboard | works | **stuck** on "Loading..." (403 on `/settings/dashboard`) | no error branch | this PR: "no access" |
+| Identity & themes | works | works | | this PR: raw `common.error` on a failed read |
+
+Menu items (sidebar). As a System Admin every entry works with the real API. The delegate's menu lists only My Work, Inbox and Messages; the other entries opened by link either redirect to My Work (registers without the module) or show their own "no access" or error state; none stays on "Loading...".
+
+| Screen | State | Cause | Fix PR |
+|--------|-------|-------|--------|
+| My Work, Inbox, Approvals, Workload, Status updates, Dashboard, Messages, Absence & cover | works | | |
+| Site Master and its six menus (Design & Acquisition, SOW, CW, TE, HOTO, O&M) | works | | |
+| Registers & Logs: Dismantle, Procurement, GECOL Power, HLC Fiber, Permits & HSE, Warehouse, Quality Control, Issue Log, Risk Register, Change Control Log, Readiness & Handover, As-Built, Meetings, RF & Design, Acquisition, Contractors, Car Dispatcher, Financial Advances, Contractor reports | works | | Contractor reports: this PR (its team / scope table could hang) |
+| Data entry > Templates | works | | |
+| Administration: Users & Roles (users, assignments, roles, permission profiles, groups, delegation, Responsibility Matrix), Online now, Announcements, Settings | works | | |
+| Logs: Audit Log, Field changes, Security log, System Log, Online sessions, Security alerts, Job runs, Deployments, Monthly activity report, Integrity checks, Mail delivery | works | | |
+
+Guard: `src/pages/settingsNoEndlessLoading.test.tsx` renders every tab and section of `SETTINGS_TABS` (a new one is covered at once) three times: with the served data, with every read answering 403, and with every read answering 501 `not_available` as the hybrid build does for a route with no API. It fails if "Loading..." (en or ar), a busy marker or a lone "…" is still on screen once the queries have settled. On the code before this PR it fails for Registers > GECOL and Team / scope, Documents > Mail, Alerts, both Security sections and Dashboard.
 
 ## W5. Library (Forms and Archive) (owner image 7 and request)
 
@@ -303,6 +352,7 @@ Total: roughly 7 PRs and several CI cycles each. This does not fit in one short 
 
 ## Log
 
+- 2026-11-24: W4 done. Alerts and Security render with the real API since #188-#194; they (and Registers > GECOL and Team / scope, Dashboard, Documents > Mail) still hung on "Loading..." when a read failed (403 for a delegate, 501 in hybrid mode). One shared fallback (`QueryFallback`) shows "no access", "not available" or the error instead; the notification catalogue no longer shares a query key with the permission catalogue. Audit table and guard test in the W4 section. No migration, no contract change. CHANGELOG 199.
 - 2026-11-24: W3 done: the Settings tab Site360 is removed; its Master column menus moved to Settings > Workflow > Columns (same API, same right); old `site360` and `site360-columns` links redirect there; user-visible "SITE 360" and "Site360" in i18n now read "Site Master" (en) and "ماستر المواقع" (ar). No migration, no contract change. CHANGELOG 202.
 - 2026-11-24: W1 done. The site page has one phase row, built from the streams and views of the site's published workflow version. Row A was the stream row in pages/Site.tsx, not a component; Row B was ViewTabs (see the W1 finding). Front end only; no contract change. CHANGELOG 200.
 - 2026-11-24: W8 item 6: total / filtered / shown counts on every site-data screen.

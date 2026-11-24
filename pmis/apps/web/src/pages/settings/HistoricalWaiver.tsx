@@ -5,6 +5,7 @@ import { useHistoricalWaiver, useSetHistoricalWaiver } from '@/api/historicalWai
 import { errText, FormDialog } from '@/components/FormDialog';
 import { useToast } from '@/components/Toast';
 import { fieldErrors } from '@/lib/fields';
+import { QueryFallback } from '@/components/States';
 
 /**
  * Settings, historical load (contract 0.14.3, decision on owner question Q462). The one-time waiver that lets a System Admin accept the historical tasks of the
@@ -23,8 +24,7 @@ export function HistoricalWaiver() {
   const today = new Date().toISOString().slice(0, 10);
   const when = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleString(i18n.language === 'ar' ? 'ar' : 'en-GB', { dateStyle: 'medium', timeStyle: 'short' }) : '—');
   const done = (msg: string) => ({ onSuccess: () => { toast(msg); setDialog(null); setCutoff(''); } });
-  if (q.isError) return <section className="card p-4" data-testid="page-historical-waiver"><p role="alert" className="text-lateInk">{t('errors.generic')}</p></section>;
-  if (!w) return <section className="card p-4" data-testid="page-historical-waiver">…</section>;
+  if (!w) return <section className="card p-4" data-testid="page-historical-waiver"><QueryFallback queries={[q]} testid="hw-loading" /></section>;
 
   return (
     <section className="card space-y-3 p-4" data-testid="page-historical-waiver" data-open={w.open ? 'true' : 'false'}>
