@@ -233,7 +233,7 @@ Do:
    Rules for the menu:
    - It is stored per user and per screen, and saved views keep it.
    - Defaults come from Settings > Dashboard or a new Settings > Display section in the general Settings, per the owner rule.
-   - Build it once as a shared table toolbar and settings layer. The same toolbar (row numbers, + Filter, saved views, search, view switcher where it applies, columns, density, Display, Export) appears in the same order on every one of these screens.
+   - Build it once as a shared table toolbar and settings layer. The same toolbar (row numbers, + Filter, saved views, search, count (item 6), view switcher where it applies, columns, density, Display, Export) appears in the same order on every one of these screens.
    - List every data screen in the PR with its state (done / not applicable and why). A guard test fails when a site-data table renders without the shared toolbar. The toolbar is complete on each of these screens: + Filter with all its fields and AND/OR, saved views, search, columns, density, Display, Export, row numbers, and the view switcher where it applies.
 5. **Search by a pasted list of sites (owner request 2026-11-23, screenshot: "BG009 BG010 BG012" in the search box gives no rows).** Today the search treats the whole text as one phrase.
    - When the text holds two or more tokens (separated by spaces, new lines, tabs, commas or semicolons, as when cells are copied from Excel), the search matches each token exactly against Site ID and Site Owner ID, case-insensitive, and returns every match, one row per site.
@@ -250,7 +250,8 @@ Do:
    - Total = every site the user may see on that screen (region scope applies). Filtered = rows matching the current filters and search, server-side. Shown = rows loaded on the page.
    - Arabic: "120 من 469 موقعًا" and "يُعرض 50 من 120".
    - The numbers come from the server (a total and a filtered count in the list response; add them to the contract where missing), never from the loaded rows. Export uses the filtered set.
-   - The same component appears on every screen in item 4's scope (all site lists, every register and log, My Work, Approvals, the Daily Plan, the Archive). Registers use their own noun ("records", "issues") with the same pattern.
+   - The same component appears on every screen in item 4's scope, with no exception: Site Master and every sub-menu (list and wide table), the site Tasks table, every register and log that lists sites, My Work, Approvals, the Daily Plan, the Archive lists and the dashboard drill-downs that list sites. Registers use their own noun ("records", "issues") with the same pattern; the site Tasks table counts tasks ("12 of 45 tasks").
+   - The count is part of the shared toolbar of item 4, so the item 4 guard test also fails when a site-data screen renders without it, and the PR's screen list shows the count state of each screen.
 7. Tests: vitest for the counts (unfiltered, filtered, partly loaded, selected), the row numbers across pages, the three-level header merge, the task list layout, the display menu (persisted and applied) and the pasted-list search (spaces, new lines, mixed case, not-found list); API tests for the multi-token search on the site lists; update the e2e for the wide table and the site page.
 
 Acceptance:
