@@ -9,7 +9,7 @@
 #   weekly   full backup to DB_BACKUP_WEEKLY_REPO (the weekly copy, 8 kept)
 #   monthly  full backup to DB_BACKUP_MONTHLY_REPO (the monthly copy, 12 kept)
 # Every repository is tried even when another one fails. The exit status is 1 when any of them failed.
-# Each run writes one job_runs row (name db_basebackup), shown in Logs > Job runs.
+# Each run writes one job_runs row (name db_basebackup), shown in Logs > Job runs, and a successful one a System Log row (source backup, event backup_ok).
 #
 # Run by the timers as postgres, or by hand: sudo -u postgres /usr/local/lib/gsdn-pmis/db-backup.sh full
 set -euo pipefail
@@ -48,6 +48,14 @@ for r in $REPOS; do
 done
 
 DETAIL="{\"mode\":\"$MODE\",\"ok\":\"${OK# }\",\"failed\":\"${FAILED# }\"}"
+# A successful backup (to at least one repository) is also written to the System Log: source backup, level info, context script db-backup,
+# event backup_ok, type full or diff. The project data reset in Settings (migration 0146) runs only after such a row within its window.
+if [[ -n $OK ]]; then
+  CTX="{\"script\":\"db-backup\",\"event\":\"backup_ok\",\"mode\":\"$MODE\",\"type\":\"$TYPE\",\"repos\":\"${OK# }\",\"failed\":\"${FAILED# }\",\"stanza\":\"$DB_BACKUP_STANZA\"}"
+  db_psql -v msg="Database backup completed ($MODE, $TYPE) to repository ${OK# }" -v ctx="$CTX" >/dev/null 2>&1 <<'SQL' || echo "db-backup: could not write the System Log row" >&2
+SELECT log_system_write('info'::text, 'backup', :'msg'::text, :'ctx'::jsonb, NULL, NULL);
+SQL
+fi
 if [[ -z $FAILED ]]; then
   db_job_finish "$RUN_ID" ok "" "" "$DETAIL"
   exit 0

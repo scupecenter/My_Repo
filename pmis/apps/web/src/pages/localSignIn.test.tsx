@@ -357,6 +357,10 @@ describe('hybrid mode list', () => {
       'GET /staff-registry/visibility', 'PUT /staff-registry/visibility', 'GET /staff-registry/:employeeId', 'PATCH /staff-registry/:employeeId',
       // contract 0.15.60
       'GET /users/:id/mfa-exemption', 'PUT /users/:id/mfa-exemption', 'POST /users/:id/mfa-exemption/revoke', 'POST /groups', 'POST /me/notify-admins', 'POST /auth/employee-id',
+      // contract 0.15.62 (migration 0146): the project data reset in Settings
+      'GET /settings/data-reset', 'PUT /settings/data-reset/settings', 'POST /settings/data-reset/requests', 'GET /settings/data-reset/requests/:id',
+      'POST /settings/data-reset/requests/:id/approve', 'POST /settings/data-reset/requests/:id/cancel', 'POST /settings/data-reset/requests/:id/run',
+      'POST /settings/data-reset/requests/:id/retry-files',
     ]);
     expect(realApiHandlers(false)).toHaveLength(0);
     expect(realApiHandlers(true)).toHaveLength(REAL_API_AUTH_USERS.length);

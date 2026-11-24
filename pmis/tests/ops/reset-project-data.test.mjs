@@ -197,6 +197,19 @@ function main() {
   const planOut = psql(superUrl, { file: sqlFile, vars: { execute: 'false' } }).out;
   const plan = new Map(planOut.split('\n').filter((l) => l.startsWith('PLAN|')).map((l) => { const p = l.split('|'); return [p[1], { action: p[2], rows: +p[3], del: +p[4], kept: +p[5] }]; }));
   check('plan: every table has a decision', [...before.keys()].every((t) => plan.has(t)), [...before.keys()].filter((t) => !plan.has(t)).join(', '));
+  // The contract page names the same decision for every table (migration 0146: the plan is data_reset_plan(), shared with Settings > Data reset).
+  const docPlan = new Map();
+  let sec = null;
+  for (const line of readFileSync(join(pmis, 'docs', 'ops', 'data-reset.md'), 'utf8').split('\n')) {
+    const h = /^###\s+(.*)$/.exec(line);
+    if (h) { sec = /\(DELETE\)/.test(h[1]) ? 'delete' : /^MIXED/.test(h[1]) ? 'mixed' : /^Logs/.test(h[1]) ? 'log' : /\(KEEP/.test(h[1]) ? 'keep' : null; continue; }
+    if (/^##\s/.test(line)) { sec = null; continue; }
+    const m = /^\| ([a-z_][a-z0-9_]*) \|/.exec(line);
+    if (sec && m) docPlan.set(m[1], sec);
+  }
+  const docDiff = [...plan].filter(([t, p]) => docPlan.get(t) !== p.action).map(([t, p]) => `${t}: plan ${p.action}, page ${docPlan.get(t) ?? 'missing'}`)
+    .concat([...docPlan.keys()].filter((t) => !plan.has(t)).map((t) => `${t}: on the page, not in the plan`));
+  check('contract: docs/ops/data-reset.md lists every table of the plan with the same decision', docDiff.length === 0, docDiff.join('; '));
   const auditMax = q('SELECT max(id) FROM audit_log;');
   const secMax = q('SELECT max(id) FROM security_log;');
   const oldAudit = digest(`SELECT a::text FROM audit_log a WHERE id <= ${auditMax}`);

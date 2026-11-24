@@ -3,6 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { appModuleFor } from './app.module';
 import { requestIdMiddleware, securityHeaders } from './common/request-id';
+import { MaintenanceService } from './settings/maintenance.service';
 import type { AppConfig } from './config/config';
 
 export const API_PREFIX = 'api/v1';
@@ -19,6 +20,8 @@ export async function createApp(config: AppConfig, opts: { logger?: boolean } = 
   app.useBodyParser('json', { limit: '100kb' });
   app.use(requestIdMiddleware);
   app.use(securityHeaders);
+  // 0146: while a project data reset runs, every route but the progress reads answers 503 (before the session guard and the request transaction)
+  app.use(app.get(MaintenanceService).middleware());
   app.setGlobalPrefix(API_PREFIX);
   if (opts.logger !== false) {
     const log = new Logger('http');
