@@ -22,7 +22,7 @@ vi.mock('../src/settings/data-reset-files', async (orig) => {
 });
 import { q } from './calc-helpers';
 import { BOOTSTRAP_ADMIN } from './global-setup';
-import { Api, startApp } from './helpers';
+import { Api, loggedIn, startApp } from './helpers';
 import { Actor, actor, plainAdmin } from './wf-helpers';
 import { DataResetService } from '../src/settings/data-reset.service';
 import { MaintenanceService } from '../src/settings/maintenance.service';
@@ -32,7 +32,8 @@ import { IntegrityService } from '../src/logs/integrity.service';
 /**
  * Migration 0146 (contract 0.15.62): the project data reset in Settings with two System Admins. The suite runs in its own database (TEST_DATABASE_URL_DRST)
  * and its own document store: it loads the synthetic project data of tests/ops/reset-seed.sql, then requests, approves and runs the reset, which empties the
- * project tables and ends every session but the runner's.
+ * project tables and ends every session but the runner's. Migration 0152 (contract 0.15.71): the scope (parts, closure computed by the database, hash binding of
+ * the approval, per-part counts) and, after the full run, a scoped run of the identity parts.
  */
 const SEED = resolve(__dirname, '..', '..', '..', 'tests', 'ops', 'reset-seed.sql');
 const PROJECT_KEYS = ['docs/2026/11/project-task-file', 'docs/2026/11/project-snag-photo', 'exports/2026/11/project-export-file', 'imports/2026/11/project-master-file'];
@@ -134,11 +135,25 @@ describe('the state of the screen', () => {
     expect(res.body.system_admins_active).toBeGreaterThanOrEqual(4);
     const tables = new Map<string, { action: string; delete: number; keep: number }>(res.body.plan.tables.map((t: { table: string }) => [t.table, t]));
     expect(tables.get('sites')).toMatchObject({ action: 'delete', delete: 2, keep: 0 });
-    expect(tables.get('users')).toMatchObject({ action: 'keep', delete: 0 });
+    expect(tables.get('users')).toMatchObject({ action: 'optional', delete: 0 });
     expect(tables.get('register_records')).toMatchObject({ action: 'mixed', keep: 2 });
     expect(tables.get('audit_log')?.action).toBe('log');
     expect(res.body.plan.files).toBe(4);
     expect(res.body.plan.error).toBeNull();
+  });
+
+  it('carries the catalogue of parts with their labels, dependencies and rows; everything is every project part, no identity part', async () => {
+    const res = await admin1.api.call('get', '/settings/data-reset');
+    const parts = new Map<string, any>(res.body.plan.parts.map((p: { code: string }) => [p.code, p]));
+    expect(parts.get('sites')).toMatchObject({ kind: 'project', depends_on: [], selected: true, label_ar: expect.any(String) });
+    expect(parts.get('sites').dependents).toEqual(expect.arrayContaining(['issues', 'documents', 'imports', 'procurement']));
+    expect(parts.get('car_dispatcher')).toMatchObject({ depends_on: ['sites', 'procurement'] });
+    expect(parts.get('procurement').rows).toBeGreaterThan(0);
+    expect(parts.get('procurement').tables).toMatchObject({ procurement_records: 1 });
+    for (const code of ['users', 'roles', 'staff']) expect(parts.get(code)).toMatchObject({ kind: 'identity', selected: false });
+    expect(res.body.everything).not.toContain('users');
+    expect(res.body.plan.scope).toMatchObject({ everything: true, identity: [], hash: expect.stringMatching(/^[0-9a-f]{64}$/) });
+    expect(res.body.plan.tables.find((t: { table: string }) => t.table === 'users')).toMatchObject({ action: 'optional', part: 'users', delete: 0 });
   });
 
   it('a table that a later migration added without a decision stops the plan: the screen says which one', async () => {
@@ -213,6 +228,72 @@ describe('request, approve, cancel, expire', () => {
     expect(c.body).toMatchObject({ status: 'cancelled', cancelled_by: { id: admin2.user.id }, cancel_reason: 'Not this week' });
     const a = await post(admin2, `/requests/${res.body.id}/approve`, { reason: 'Second admin agrees with it' }, etag(c));
     expect(a.status).toBe(409);
+  });
+});
+
+
+describe('the scope of a request (0.15.71)', () => {
+  let id = '';
+  let hash = '';
+
+  it('the dry run of a scope counts per part and per table; the database adds the dependent parts', async () => {
+    const res = await admin1.api.call('get', '/settings/data-reset/plan?parts=procurement');
+    expect(res.status).toBe(200);
+    expect(res.body.scope).toMatchObject({ requested: ['procurement'], parts: ['car_dispatcher', 'financial_advances', 'procurement'],
+      added: ['car_dispatcher', 'financial_advances'], everything: false });
+    const tables = new Map<string, { delete: number; keep: number }>(res.body.tables.map((t: { table: string }) => [t.table, t]));
+    expect(tables.get('sites')).toMatchObject({ delete: 0 });
+    expect(tables.get('procurement_records')).toMatchObject({ delete: 1 });
+    expect(tables.get('vehicle_reservations')).toMatchObject({ delete: 1 });
+    expect(tables.get('register_records')).toMatchObject({ delete: 3 });
+    const parts = new Map<string, any>(res.body.parts.map((p: { code: string }) => [p.code, p]));
+    expect(parts.get('car_dispatcher')).toMatchObject({ selected: true, added: true, requested: false });
+    expect(parts.get('sites')).toMatchObject({ selected: false });
+    const ids = await admin1.api.call('get', '/settings/data-reset/plan?parts=users');
+    expect(ids.body.accounts_to_deactivate).toBeGreaterThan(0);
+    expect(ids.body.delete_rows).toBe(0);
+    expect((await admin1.api.call('get', '/settings/data-reset/plan?parts=nonsense')).status).toBe(422);
+    expect((await admin1.api.call('get', '/settings/data-reset/plan?parts=sites;drop')).status).toBe(422);
+    expect((await plain.api.call('get', '/settings/data-reset/plan?parts=users')).status).toBe(403);
+  });
+
+  it('refuses an empty list and an unknown part', async () => {
+    const empty = await post(admin1, '/requests', { reason: 'A scoped synthetic request', confirm_text: phrase, parts: [] });
+    expect(empty.status).toBe(422);
+    expect(empty.body.errors[0]).toMatchObject({ path: '/parts', code: 'required' });
+    const unknown = await post(admin1, '/requests', { reason: 'A scoped synthetic request', confirm_text: phrase, parts: ['audit_log'] });
+    expect(unknown.status).toBe(422);
+    expect(unknown.body.errors[0]).toMatchObject({ path: '/parts', code: 'unknown_part' });
+    expect(await q(db, `SELECT 1 FROM data_reset_requests WHERE status = 'requested'`)).toHaveLength(0);
+  });
+
+  it('stores the closure the database computed (the client cannot skip a dependent) and its hash', async () => {
+    const res = await post(admin1, '/requests', { reason: 'A scoped synthetic request', confirm_text: phrase, parts: ['procurement'] });
+    expect(res.status).toBe(201);
+    id = res.body.id;
+    hash = res.body.scope_hash;
+    expect(hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(res.body.scope).toMatchObject({ parts: ['car_dispatcher', 'financial_advances', 'procurement'], added: ['car_dispatcher', 'financial_advances'] });
+    expect(res.body.plan_at_request.parts).toMatchObject({ procurement: expect.any(Number), car_dispatcher: expect.any(Number) });
+    const row = await q<{ requested_parts: string[]; scope_hash: string }>(db, 'SELECT requested_parts, scope_hash FROM data_reset_requests WHERE id = $1', [id]);
+    expect(row[0]).toMatchObject({ requested_parts: ['procurement'], scope_hash: hash });
+    expect(await q(db, `SELECT 1 FROM audit_log WHERE action = 'data_reset_request' AND entity_id = $1 AND after -> 'scope' ->> 'hash' = $2`, [id, hash])).toHaveLength(1);
+  });
+
+  it('refuses an approval of another scope (409 scope_changed); the approval binds to the hash', async () => {
+    const r = await admin2.api.call('get', `/settings/data-reset/requests/${id}`);
+    const other = await post(admin2, `/requests/${id}/approve`, { reason: 'Second admin agrees with it', scope_hash: 'a'.repeat(64) }, etag(r));
+    expect(other.status).toBe(409);
+    expect(other.body.code).toBe('scope_changed');
+    expect((await post(admin2, `/requests/${id}/approve`, { reason: 'Second admin agrees with it', scope_hash: 'XYZ' }, etag(r))).status).toBe(422);
+    const ok = await post(admin2, `/requests/${id}/approve`, { reason: 'Second admin agrees with it', scope_hash: hash }, etag(r));
+    expect(ok.status).toBe(200);
+    expect(ok.body).toMatchObject({ status: 'approved', approved_scope_hash: hash, scope_hash: hash });
+    // the scope and the approved hash never change, not even for the superuser
+    await expect(db.query(`UPDATE data_reset_requests SET requested_parts = ARRAY['users'] WHERE id = $1`, [id])).rejects.toThrow(/never changes/);
+    await expect(db.query(`UPDATE data_reset_requests SET approved_scope_hash = $2 WHERE id = $1`, [id, 'b'.repeat(64)])).rejects.toThrow(/never changes|data_reset_scope_bound/);
+    const c = await post(admin1, `/requests/${id}/cancel`, { reason: 'Scope test only' }, etag(ok));
+    expect(c.status).toBe(200);
   });
 });
 
@@ -389,7 +470,8 @@ describe('the run', () => {
     // one audit row of the reset, by the runner, with the two admins; both chains verify
     const audit = await q<{ actor_id: string; after: any }>(db, `SELECT actor_id, after FROM audit_log WHERE action = 'project_data_reset'`);
     expect(audit).toHaveLength(1);
-    expect(audit[0]).toMatchObject({ actor_id: runner.user.id, after: { via: 'settings', request_id: id, requested_by: admin1.user.id, approved_by: admin2.user.id, deleted: { sites: 2 } } });
+    expect(audit[0]).toMatchObject({ actor_id: runner.user.id, after: { via: 'settings', request_id: id, requested_by: admin1.user.id, approved_by: admin2.user.id, deleted: { sites: 2 },
+      scope: { everything: true, identity: [] } } });
     for (const log of ['audit', 'security']) {
       const start = await runner.api.call('post', '/admin/log-integrity/runs', { log });
       expect(start.status).toBe(202);
@@ -425,6 +507,52 @@ describe('the run', () => {
     expect(again.status).toBe(409);
     expect((await post(runner, `/requests/${id}/retry-files`, { reason: 'Try the files again' })).status).toBe(409);
     expect(await q(db, `SELECT 1 FROM audit_log WHERE action = 'project_data_reset'`)).toHaveLength(1);
+  });
+});
+
+
+describe('a scoped run of the identity parts (0.15.71)', () => {
+  it('deactivates every account but the System Admins, removes assignments, delegations and groups, empties the staff registry; admins keep their rights', async () => {
+    // the full run ended every session but the runner's: both admins sign in again
+    const a1 = await loggedIn(app, admin1.user);
+    expect((await a1.stepUp(admin1.user.password)).status).toBe(200);
+    const a2 = await loggedIn(app, admin2.user);
+    expect((await a2.stepUp(admin2.user.password)).status).toBe(200);
+    const g = await q<{ id: string }>(db, `INSERT INTO groups (name) VALUES ('Synthetic reviewers') RETURNING id`);
+    await db.query('INSERT INTO group_members (group_id, user_id) VALUES ($1, $2)', [g[0]!.id, plain.user.id]);
+    const res = await a1.call('post', '/settings/data-reset/requests', { reason: 'Owner decision: a fresh team on the new project', confirm_text: phrase, parts: ['users', 'roles', 'staff'] });
+    expect(res.status).toBe(201);
+    expect(res.body.scope).toMatchObject({ parts: ['roles', 'staff', 'users'], identity: ['roles', 'staff', 'users'], everything: false });
+    expect(res.body.plan_at_request.accounts_to_deactivate).toBeGreaterThanOrEqual(2);
+    const ok = await a2.call('post', `/settings/data-reset/requests/${res.body.id}/approve`, { reason: 'Second admin agrees with it', scope_hash: res.body.scope_hash },
+      { 'If-Match': etag(res) });
+    expect(ok.status).toBe(200);
+    await backupRow(0);
+    const run = await a1.call('post', `/settings/data-reset/requests/${res.body.id}/run`, { confirm_text: phrase }, { 'If-Match': etag(ok) });
+    expect(run.status).toBe(202);
+    await settle();
+    const got = await a1.call('get', `/settings/data-reset/requests/${res.body.id}`);
+    expect(got.body.status).toBe('completed');
+    expect(got.body.result.identity.users.deactivated).toBeGreaterThanOrEqual(2);
+    const status = async (u: string) => (await q<{ status: string }>(db, 'SELECT status FROM users WHERE id = $1', [u]))[0]!.status;
+    for (const u of [plain.user.id, deleg.user.id]) expect(await status(u)).toBe('disabled');
+    for (const u of [admin1.user.id, admin2.user.id, admin3.user.id, adminNoStep.user.id]) {
+      expect(await status(u)).toBe('active');
+      expect((await q<{ a: boolean }>(db, 'SELECT app_user_is_system_admin($1) AS a', [u]))[0]!.a).toBe(true);
+    }
+    expect(await q(db, 'SELECT 1 FROM user_role_assignments')).toHaveLength(0);
+    expect(await q(db, 'SELECT 1 FROM delegations')).toHaveLength(0);
+    expect(await q(db, 'SELECT 1 FROM groups WHERE id = $1', [g[0]!.id])).toHaveLength(0);
+    expect(await q(db, 'SELECT 1 FROM staff_registry')).toHaveLength(0);
+    expect(Number((await q<{ n: string }>(db, 'SELECT count(*) n FROM roles'))[0]!.n)).toBeGreaterThan(0);
+    // the deactivated accounts are signed out; the runner works on
+    expect((await plain.api.call('get', '/auth/session')).status).toBe(401);
+    const st = await a1.call('get', '/settings/data-reset');
+    expect(st.status).toBe(200);
+    expect(st.body.plan.accounts_to_deactivate).toBe(0);
+    const audit = await q<{ after: any }>(db, `SELECT after FROM audit_log WHERE action = 'project_data_reset' ORDER BY id DESC LIMIT 1`);
+    expect(audit[0]!.after).toMatchObject({ scope: { parts: ['roles', 'staff', 'users'] }, identity: { users: { deactivated: expect.any(Number) } } });
+    expect(audit[0]!.after.identity.users.accounts.map((x: { id: string }) => x.id)).not.toContain(admin1.user.id);
   });
 });
 

@@ -555,6 +555,7 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/settings/data-reset'],
   ['put', '/settings/data-reset/settings'],
   ['post', '/settings/data-reset/requests'],
+  ['get', '/settings/data-reset/plan'],
   ['get', '/settings/data-reset/requests/:id'],
   ['post', '/settings/data-reset/requests/:id/approve'],
   ['post', '/settings/data-reset/requests/:id/cancel'],

@@ -379,7 +379,8 @@
     "plan_incomplete": "A table has no decision in the reset plan: the server must be updated first.",
     "storage_not_supported": "The documents are in S3/MinIO: the reset cannot move them from here.",
     "quarantine_unavailable": "The quarantine folder cannot be made in the document store. Nothing was changed.",
-    "maintenance": "A project data reset is running. Try again in a few minutes."
+    "maintenance": "A project data reset is running. Try again in a few minutes.",
+    "scope_changed": "The scope is not the one you saw, or what it takes along changed. Read the request again or make a new one."
   },
   "common": {
     "search": "Search",
@@ -5653,7 +5654,30 @@
     "settings": "Settings of the reset",
     "settings_values": "A request stays open {{minutes}} minutes; the last backup may be at most {{hours}} hours old.",
     "expiry_label": "Request expiry (minutes, 5 to 240)",
-    "hours_label": "Backup window (hours, 1 to 72)"
+    "hours_label": "Backup window (hours, 1 to 72)",
+    "scope": "What to reset",
+    "scope_hint": "Choose the parts to reset. A part that others depend on takes them along: the database adds them and the approver sees exactly this scope.",
+    "everything": "Everything (as today)",
+    "everything_hint": "Every project part: sites, tasks, documents, registers, imports, notifications, the Daily Plan and the KPI snapshots. Users, roles and the staff registry stay.",
+    "custom": "Choose the parts",
+    "group_project": "Project data",
+    "group_registers": "Registers",
+    "group_identity": "People and access (optional)",
+    "rows_one": "{{count}} row",
+    "rows_other": "{{count}} rows",
+    "accounts_one": "{{count}} account",
+    "accounts_other": "{{count}} accounts",
+    "added_note": "Also reset, because they depend on what you chose: {{parts}}.",
+    "added_badge": "added",
+    "none_chosen": "Choose at least one part.",
+    "identity_warning": "People and access are changed too: {{parts}}. Accounts are deactivated (never deleted) except the System Admins, the requester and the approver; role assignments, groups other than System Admins and delegations are deleted; the staff registry and the absences are emptied. Role definitions, permission profiles and the System Admins group stay.",
+    "scope_title": "Scope of this request",
+    "scope_everything": "Everything (as today)",
+    "scope_legacy": "Everything (a request made before scopes existed)",
+    "scope_hash": "Scope fingerprint",
+    "approve_scope": "You approve exactly this scope. If it changed, the approval is refused and a new request is needed.",
+    "plan_scope_note": "Counted for the chosen scope.",
+    "accounts_note": "{{count}} accounts would be deactivated."
   },
   "dailyPlan": {
     "title": "Daily Plan",

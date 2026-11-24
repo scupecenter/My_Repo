@@ -144,11 +144,11 @@ SELECT concat_ws('|', data_reset_deleting(), data_reset_maintenance());
 -- @end
 
 -- @case DR-16
--- @title Control: the shape of the functions (owners, SECURITY DEFINER, search_path ending in pg_temp, PUBLIC revoked), the doors of pmis_app, no table right of pmis_app
+-- @title Control: the shape of the functions (owners, SECURITY DEFINER, search_path ending in pg_temp, PUBLIC revoked), the doors of pmis_app, no table right of pmis_app (0152: two data_reset_core, the scope doors)
 -- @category settings-data-reset
 -- @actor ALICE
 -- @region 1
--- @expect output 3|26|12|0|0
+-- @expect output 4|30|12|0|0
 SELECT concat_ws('|',
   (SELECT count(*) FROM pg_proc p WHERE p.proname IN ('data_reset_core', 'data_reset_delete_unkept', 'data_reset_deleting')
      AND p.prosecdef AND pg_get_userbyid(p.proowner) = 'pmis_reset_owner' AND p.proconfig::text LIKE '%pg_temp%'),
@@ -163,4 +163,104 @@ SELECT concat_ws('|',
        'data_reset_lock_request', 'data_reset_backup', 'data_reset_err') AND has_function_privilege('pmis_app', p.oid, 'EXECUTE')),
   (SELECT count(*) FROM information_schema.table_privileges WHERE grantee = 'pmis_app'
      AND table_name IN ('data_reset_requests', 'data_reset_request_files', 'data_reset_marker')));
+-- @end
+
+-- Migration 0152 (contract 0.15.71): the selectable reset. The closure of the chosen parts is computed by the database; the scoped core and the identity
+-- writes (deactivating accounts, removing assignments, groups and delegations) are never callable by pmis_app.
+
+-- @case DR-17
+-- @title The System Admin calls the scoped reset core directly with one part (no request, no second admin, no backup check)
+-- @category settings-data-reset
+-- @actor ADMIN
+-- @region *
+-- @expect error 42501 permission denied for function
+SELECT data_reset_core(true, 'Reset of one part without the doors', '{}'::jsonb, NULL, NULL, ARRAY['issues'], NULL);
+-- @end
+
+-- @case DR-18
+-- @title The System Admin calls the identity writes of the reset directly to deactivate every account, admins included
+-- @category settings-data-reset
+-- @actor ADMIN
+-- @region *
+-- @expect error 42501 permission denied for function
+SELECT idm_data_reset_identity(ARRAY['users', 'roles'], NULL);
+-- @end
+
+-- @case DR-19
+-- @title Alice calls the identity writes of the reset to empty the System Admins group
+-- @category settings-data-reset
+-- @actor ALICE
+-- @region 1
+-- @expect error 42501 permission denied for function
+SELECT idm_data_reset_identity(ARRAY['roles'], ARRAY['{{ALICE}}'::uuid]);
+-- @end
+
+-- @case DR-20
+-- @title A client-supplied scope cannot skip dependents: choosing the sites takes every site-scoped part along
+-- @category settings-data-reset
+-- @actor ALICE
+-- @region 1
+-- @expect output acquisition,as_built,car_dispatcher,change_control,daily_plan,deliverables,dismantle,documents,financial_advances,gecol,hlc,imports,issues,kpi,meetings,permits,procurement,quality,readiness,rf_design,risks,sites,warehouse
+SELECT array_to_string(data_reset_closure(ARRAY['sites']), ',');
+-- @end
+
+-- @case DR-21
+-- @title A client-supplied scope cannot skip dependents: procurement takes the bookings and the advances along; the identity parts stay out of everything
+-- @category settings-data-reset
+-- @actor ALICE
+-- @region 1
+-- @expect output car_dispatcher,financial_advances,procurement|false
+SELECT array_to_string(data_reset_closure(ARRAY['procurement']), ',') || '|' || (data_reset_closure(NULL) && ARRAY['users', 'roles', 'staff'])::text;
+-- @end
+
+-- @case DR-22
+-- @title An unknown part code is refused by the closure
+-- @category settings-data-reset
+-- @actor ALICE
+-- @region 1
+-- @expect error 22023 unknown part
+SELECT data_reset_closure(ARRAY['sites', 'audit_log']);
+-- @end
+
+-- @case DR-23
+-- @title Alice runs the dry run of a scope (the counts are for System Admins only)
+-- @category settings-data-reset
+-- @actor ALICE
+-- @region 1
+-- @expect error P0001 wf:data_reset.*action_forbidden
+SELECT data_reset_dry_run(ARRAY['users']);
+-- @end
+
+-- @case DR-24
+-- @title A delegate of the System Admin (all regions) requests a scoped reset of the users, or approves with a scope hash
+-- @category settings-data-reset
+-- @actor DEL_ALL
+-- @region *
+-- @expect error P0001 wf:data_reset.*(action_forbidden|delegate_forbidden)
+SELECT admin_data_reset_request('A delegate asks to deactivate everyone', 'RESET ' || current_database(), ARRAY['users']),
+       admin_data_reset_approve(gen_random_uuid(), 'A delegate approves a scope', 1, repeat('a', 64));
+-- @end
+
+-- @case DR-25
+-- @title The System Admin rewrites the scope or the approved hash of a request directly (an approval of a changed scope)
+-- @category settings-data-reset
+-- @actor ADMIN
+-- @region *
+-- @expect error 42501 permission denied
+UPDATE data_reset_requests SET requested_parts = ARRAY['users'], scope_hash = repeat('b', 64), approved_scope_hash = repeat('b', 64);
+-- @end
+
+-- @case DR-26
+-- @title Control: the scoped core and the identity writes have the right owners and callers (reset role and identity owner only), the guard of an approved scope is in place
+-- @category settings-data-reset
+-- @actor ALICE
+-- @region 1
+-- @expect output t|t|f|f|t|3
+SELECT concat_ws('|',
+  (SELECT pg_get_userbyid(p.proowner) = 'pmis_identity_owner' AND p.prosecdef AND p.proconfig::text LIKE '%pg_temp%' FROM pg_proc p WHERE p.proname = 'idm_data_reset_identity'),
+  (SELECT has_function_privilege('pmis_reset_owner', p.oid, 'EXECUTE') FROM pg_proc p WHERE p.proname = 'idm_data_reset_identity'),
+  (SELECT has_function_privilege('pmis_definer', p.oid, 'EXECUTE') OR has_function_privilege('pmis_app', p.oid, 'EXECUTE') FROM pg_proc p WHERE p.proname = 'idm_data_reset_identity'),
+  (SELECT bool_or(has_function_privilege('pmis_app', p.oid, 'EXECUTE')) FROM pg_proc p WHERE p.proname IN ('data_reset_core', 'data_reset_user_kept', 'data_reset_group_kept', 'data_reset_check_scope', 'data_reset_plan_json')),
+  (SELECT has_function_privilege('pmis_app', 'data_reset_dry_run(text[])', 'EXECUTE')),
+  (SELECT count(*) FROM pg_constraint c WHERE c.conrelid = 'data_reset_requests'::regclass AND c.conname IN ('data_reset_scope_shape', 'data_reset_scope_bound', 'data_reset_scope_approved')));
 -- @end

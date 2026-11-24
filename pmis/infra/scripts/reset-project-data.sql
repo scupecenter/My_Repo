@@ -4,7 +4,10 @@
 -- audit row) live in the database, and the Settings page (Settings > Data reset, two System Admins) calls the same function: there is one copy of the
 -- table list. This file is the operator's wrapper. Run it only through infra/scripts/reset-project-data.sh, as the superuser, while the API is stopped:
 --
---   psql -X -v ON_ERROR_STOP=1 -At -F '|' -v execute=false -v reason='...' -v operator='...' -v backup='...' -d pmis -f reset-project-data.sql
+--   psql -X -v ON_ERROR_STOP=1 -At -F '|' -v execute=false -v reason='...' -v operator='...' -v backup='...' [-v parts=a,b] -d pmis -f reset-project-data.sql
+--
+-- parts (migration 0152): a comma-separated list of part codes (data_reset_parts(); docs/ops/data-reset.md, "Parts"). Empty or unset: everything as
+--   before 0152 (every project part, no identity part). The database adds the dependent parts (data_reset_closure) and prints them on the SCOPE line.
 --
 -- execute=false (dry run): counts only, then ROLLBACK. Nothing is written but the session's own temporary tables, and no lock stronger than a read
 --   lock is taken, so it is safe while the API runs.
@@ -13,7 +16,7 @@
 --   project_data_reset, counts only) on the audit hash chain, checks the chains moved exactly as expected; then COMMIT. It refuses while a reset approved in
 --   Settings waits to run or runs, and Settings refuses while this one runs (the advisory lock 353383097684 of data_reset_core).
 --
--- Output lines (for the script): PLAN|table|action|rows_now|rows_to_delete|rows_kept, FILE|storage_key (execute only: the stored objects of the
+-- Output lines (for the script): SCOPE|parts|added by the dependencies|hash, PART|code|rows, PLAN|table|action|rows_now|rows_to_delete|rows_kept, FILE|storage_key (execute only: the stored objects of the
 -- deleted rows, to be moved to the quarantine directory after the commit), DONE|audit_id|sessions_ended|files.
 --
 -- The Audit Log, the security log, their chains, the System Log and the other logs are never deleted or altered: they are KEEP tables, and their own
@@ -38,6 +41,10 @@
 \else
   \set backup ''
 \endif
+\if :{?parts}
+\else
+  \set parts ''
+\endif
 
 SET client_min_messages = warning;
 BEGIN;   -- READ COMMITTED: data_reset_core locks every table of the plan first, then each statement sees all that was committed before the locks
@@ -47,14 +54,15 @@ SELECT set_config('pmis.reset_execute', :'execute', true) \g /dev/null
 SELECT set_config('pmis.reset_reason', :'reason', true) \g /dev/null
 SELECT set_config('pmis.reset_operator', :'operator', true) \g /dev/null
 SELECT set_config('pmis.reset_backup', :'backup', true) \g /dev/null
+SELECT set_config('pmis.reset_parts', :'parts', true) \g /dev/null
 
 DO $$
 BEGIN
   IF NOT (SELECT rolsuper FROM pg_roles WHERE rolname = current_user) THEN
     RAISE EXCEPTION 'reset-project-data: run as the database superuser (sudo -u postgres psql)';
   END IF;
-  IF to_regprocedure('public.data_reset_core(boolean,text,jsonb,uuid,uuid)') IS NULL THEN
-    RAISE EXCEPTION 'reset-project-data: the database has no data_reset_core (migration 0146 is not applied): update the server first';
+  IF to_regprocedure('public.data_reset_core(boolean,text,jsonb,uuid,uuid,text[],uuid[])') IS NULL THEN
+    RAISE EXCEPTION 'reset-project-data: the database has no selectable data_reset_core (migration 0152 is not applied): update the server first';
   END IF;
 END $$;
 
@@ -64,7 +72,12 @@ SELECT public.data_reset_core(current_setting('pmis.reset_execute')::boolean, cu
     'operator', nullif(current_setting('pmis.reset_operator'), ''),
     'backup', nullif(current_setting('pmis.reset_backup'), ''),
     'via', 'infra/scripts/reset-project-data.sh') END,
-  NULL, NULL) AS r;
+  NULL, NULL, string_to_array(nullif(current_setting('pmis.reset_parts'), ''), ','), NULL) AS r;
+
+SELECT 'SCOPE', array_to_string(ARRAY(SELECT jsonb_array_elements_text(r -> 'scope' -> 'parts')), ','),
+       array_to_string(ARRAY(SELECT jsonb_array_elements_text(r -> 'scope' -> 'added')), ','), r -> 'scope' ->> 'hash'
+FROM reset_out;
+SELECT 'PART', e ->> 'code', e ->> 'rows' FROM reset_out, jsonb_array_elements(r -> 'parts') AS e ORDER BY e ->> 'code';
 
 SELECT 'PLAN', e ->> 'tbl', e ->> 'action', e ->> 'rows', e ->> 'delete', e ->> 'keep'
 FROM reset_out, jsonb_array_elements(r -> 'plan') WITH ORDINALITY AS x(e, n) ORDER BY n;

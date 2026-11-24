@@ -5302,6 +5302,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/data-reset/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Dry run of a chosen scope (System Admin only)
+         * @description 0.15.71 (migration 0152, `data_reset_dry_run`). A System Admin acting without delegation. Counts what a scope would reset, per part and per table, without
+         *     changing anything: the closure of the chosen parts (the dependent parts are added and listed in `scope.added`), its hash, the rows to delete and to keep,
+         *     the accounts to deactivate (`users` part) and the files to move. No `parts`: everything.
+         */
+        get: operations["getDataResetPlan"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/data-reset/settings": {
         parameters: {
             query?: never;
@@ -5380,7 +5402,7 @@ export interface paths {
         put?: never;
         /**
          * Approve the request (a second, different System Admin)
-         * @description 0.15.62. A System Admin acting without delegation who is not the requester and not in the requester's session (403 `self_approval_forbidden`), a reason of at least 10 characters, a step-up and If-Match. The request must be `requested` (409 `invalid_transition`) and not expired (409 `request_expired`). Approval does not run anything. Audited (`data_reset_approve`) and in the security log.
+         * @description 0.15.62; scope 0.15.71 (the approval binds to the request's `scope_hash`; 409 `scope_changed` when the approver saw another scope or the closure of the requested parts changed). A System Admin acting without delegation who is not the requester and not in the requester's session (403 `self_approval_forbidden`), a reason of at least 10 characters, a step-up and If-Match. The request must be `requested` (409 `invalid_transition`) and not expired (409 `request_expired`). Approval does not run anything. Audited (`data_reset_approve`) and in the security log.
          */
         post: operations["approveDataReset"];
         delete?: never;
@@ -10300,7 +10322,7 @@ export interface components {
             conflicts?: components["schemas"]["ScopeConflict"][];
         };
         /** @enum {string} */
-        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "plan_locked" | "insufficient_stock" | "item_in_use" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "invalid_code" | "invalid_enrol_code" | "enrol_code_expired" | "password_change_required" | "weak_password" | "internal_error" | "team_scope_mismatch" | "two_factor_enforced" | "scope_scenario_conflict" | "too_many_rows" | "integrity_too_large" | "mail_not_configured" | "self_approval_forbidden" | "document_rule_pending" | "file_pending_scan" | "list_not_configured" | "list_parent_mismatch" | "email_not_verified" | "batch_processing" | "vehicle_already_reserved" | "upload_processing" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "invitation_invalid" | "system_field" | "conversion_unconfirmed" | "column_in_use" | "input_already_mapped" | "field_already_mapped" | "single_admin" | "backup_missing" | "request_expired" | "reset_running" | "plan_incomplete" | "storage_not_supported" | "quarantine_unavailable" | "maintenance";
+        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "plan_locked" | "insufficient_stock" | "item_in_use" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "invalid_code" | "invalid_enrol_code" | "enrol_code_expired" | "password_change_required" | "weak_password" | "internal_error" | "team_scope_mismatch" | "two_factor_enforced" | "scope_scenario_conflict" | "too_many_rows" | "integrity_too_large" | "mail_not_configured" | "self_approval_forbidden" | "document_rule_pending" | "file_pending_scan" | "list_not_configured" | "list_parent_mismatch" | "email_not_verified" | "batch_processing" | "vehicle_already_reserved" | "upload_processing" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "invitation_invalid" | "system_field" | "conversion_unconfirmed" | "column_in_use" | "input_already_mapped" | "field_already_mapped" | "single_admin" | "backup_missing" | "request_expired" | "reset_running" | "plan_incomplete" | "storage_not_supported" | "quarantine_unavailable" | "maintenance" | "scope_changed";
         PageEnvelope: {
             items: unknown[];
             page: components["schemas"]["PageInfo"];
@@ -14353,11 +14375,75 @@ export interface components {
         };
         DataResetPlanTable: {
             table: string;
-            /** @enum {string} */
-            action: "delete" | "mixed" | "keep" | "log";
+            /**
+             * @description `optional` (0.15.71): KEEP unless its identity part is chosen.
+             * @enum {string}
+             */
+            action: "delete" | "mixed" | "optional" | "keep" | "log";
+            /** @description 0.15.71. The part the table belongs to; `*` when its rows belong to several parts; null for KEEP and log tables. */
+            part?: string | null;
             rows: number;
             delete: number;
             keep: number;
+        };
+        /** @description A part code of the catalogue (`DataResetPart.code`), for example `sites`, `issues`, `users`. */
+        DataResetPartCode: string;
+        DataResetPart: {
+            code: components["schemas"]["DataResetPartCode"];
+            /** @enum {string} */
+            group: "project" | "registers" | "identity";
+            /**
+             * @description `identity` parts are never in everything.
+             * @enum {string}
+             */
+            kind: "project" | "identity";
+            label_en: string;
+            label_ar: string;
+            /** @description When one of these is reset, this part is reset too. */
+            depends_on: components["schemas"]["DataResetPartCode"][];
+            /** @description The parts reset with this one. */
+            dependents: components["schemas"]["DataResetPartCode"][];
+            /** @description Rows of this part now (a row of several parts counts in each); for `users`, the accounts to deactivate. */
+            rows: number;
+            /** @description The rows per table. */
+            tables: {
+                [key: string]: number;
+            };
+            /** @description Chosen in the scope of this plan. */
+            requested: boolean;
+            /** @description In the closure of the scope. */
+            selected: boolean;
+            /** @description In the closure only because a chosen part takes it along. */
+            added: boolean;
+        };
+        DataResetScope: {
+            /** @description 1; 0 for a request made before 0.15.71 (`legacy`: everything as it was then). */
+            version?: number;
+            legacy?: boolean;
+            requested?: components["schemas"]["DataResetPartCode"][];
+            /** @description The normalised closure (sorted codes). */
+            parts?: components["schemas"]["DataResetPartCode"][];
+            added?: components["schemas"]["DataResetPartCode"][];
+            /** @description Every project part is in the closure. */
+            everything?: boolean;
+            /** @description The identity parts of the closure. */
+            identity?: components["schemas"]["DataResetPartCode"][];
+            /** @description SHA-256 of the closure. */
+            hash?: string;
+        };
+        DataResetPlan: {
+            scope: components["schemas"]["DataResetScope"];
+            tables: components["schemas"]["DataResetPlanTable"][];
+            delete_rows: number;
+            keep_rows: number;
+            /** @description 0.15.71. Accounts the `users` part deactivates (rows kept). */
+            accounts_to_deactivate?: number;
+            /** @description Stored files of the rows that would be deleted (moved, never deleted). */
+            files: number;
+            /** @description Why the plan cannot be counted (a table without a decision, a right missing); a run is then refused (409 `plan_incomplete`). The tables are empty while a run is open. */
+            error?: string | null;
+            /** @description 0.15.71. The catalogue in screen order, with the rows of each part and whether the scope selects it. */
+            parts: components["schemas"]["DataResetPart"][];
         };
         DataResetFiles: {
             total: number;
@@ -14408,10 +14494,15 @@ export interface components {
             backup?: {
                 [key: string]: unknown;
             } | null;
-            /** @description `delete_rows`, `files` and `sites` when the request was made. */
+            /** @description `delete_rows`, `files`, `sites`, and since 0.15.71 `accounts_to_deactivate` and `parts` (rows per selected part) when the request was made. */
             plan_at_request?: {
                 [key: string]: unknown;
             } | null;
+            scope?: components["schemas"]["DataResetScope"];
+            /** @description 0.15.71. SHA-256 of the normalised closure; null for a request made before 0.15.71 (everything). */
+            scope_hash?: string | null;
+            /** @description 0.15.71. The hash the approval bound to (always equal to `scope_hash`). */
+            approved_scope_hash?: string | null;
             /** @description `audit_id` (the `project_data_reset` row on the Audit Log chain), `sessions_ended`, `deleted` (rows per table). */
             result?: {
                 [key: string]: unknown;
@@ -14432,15 +14523,9 @@ export interface components {
             script_running: boolean;
             maintenance: boolean;
             backup: components["schemas"]["DataResetBackup"];
-            plan: {
-                tables: components["schemas"]["DataResetPlanTable"][];
-                delete_rows: number;
-                keep_rows: number;
-                /** @description Stored files of the rows that would be deleted (moved, never deleted). */
-                files: number;
-                /** @description Why the plan cannot be counted (a table without a decision, a right missing); a run is then refused (409 `plan_incomplete`). The tables are empty while a run is open. */
-                error?: string | null;
-            };
+            plan: components["schemas"]["DataResetPlan"];
+            /** @description 0.15.71. The parts of "everything (as today)". */
+            everything?: components["schemas"]["DataResetPartCode"][];
             request: components["schemas"]["DataResetRequest"] | null;
             last_request: components["schemas"]["DataResetRequest"] | null;
             can: {
@@ -28316,6 +28401,32 @@ export interface operations {
             403: components["responses"]["Forbidden"];
         };
     };
+    getDataResetPlan: {
+        parameters: {
+            query?: {
+                /** @description Comma-separated part codes (for example `issues,risks`). */
+                parts?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The plan of the scope. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataResetPlan"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
     setDataResetSettings: {
         parameters: {
             query?: never;
@@ -28365,6 +28476,8 @@ export interface operations {
                 "application/json": {
                     reason: string;
                     confirm_text: components["schemas"]["ConfirmText"];
+                    /** @description 0.15.71. The parts to reset (codes of `DataResetState.plan.parts`). Absent: everything as before (every project part, no identity part). The database adds the dependent parts; unknown codes are 422 `validation_failed` (`/parts`, `unknown_part`). */
+                    parts?: components["schemas"]["DataResetPartCode"][];
                 };
             };
         };
@@ -28428,6 +28541,8 @@ export interface operations {
             content: {
                 "application/json": {
                     reason: string;
+                    /** @description 0.15.71. The `scope_hash` of the request the approver read. When sent and different, 409 `scope_changed`. The approval binds to the request's hash either way. */
+                    scope_hash?: string;
                 };
             };
         };

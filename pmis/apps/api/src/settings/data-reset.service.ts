@@ -17,8 +17,12 @@ import { MaintenanceService } from './maintenance.service';
 type Json = Record<string, unknown>;
 
 const confirm = z.string().max(200);
-const requestBody = z.object({ reason: z.string().max(2000), confirm_text: confirm }).strict();
+/** A part code of the catalogue (`data_reset_parts`); the database decides which exist and adds the dependent parts. */
+const partCode = z.string().regex(/^[a-z_]{2,40}$/);
+const requestBody = z.object({ reason: z.string().max(2000), confirm_text: confirm, parts: z.array(partCode).max(64).optional() }).strict();
 const reasonBody = z.object({ reason: z.string().max(2000) }).strict();
+const approveBody = z.object({ reason: z.string().max(2000), scope_hash: z.string().regex(/^[0-9a-f]{64}$/).optional() }).strict();
+const partsQuery = z.string().regex(/^[a-z_]{2,40}(,[a-z_]{2,40}){0,63}$/).optional();
 const runBody = z.object({ confirm_text: confirm }).strict();
 const settingsBody = z.object({ reason: z.string().max(2000), request_expiry_minutes: z.unknown(), backup_max_age_hours: z.unknown() }).passthrough();
 
@@ -69,6 +73,13 @@ export class DataResetService {
     return { ...r, storage: this.storage() };
   }
 
+  /** The dry run of a chosen scope (contract 0.15.71): counts per part and per table, the closure and its hash. No parts: everything. */
+  plan(rawParts: unknown): Promise<Json> {
+    const q = parse(partsQuery, typeof rawParts === 'string' && rawParts !== '' ? rawParts : undefined);
+    const parts = q ? q.split(',') : null;
+    return this.one(Prisma.sql`SELECT data_reset_dry_run(${parts}::text[]) AS r`);
+  }
+
   get(rawId: string): Promise<Json> {
     const id = parse(uuidSchema, rawId);
     return this.one(Prisma.sql`SELECT data_reset_request_get(${id}::uuid) AS r`);
@@ -77,15 +88,17 @@ export class DataResetService {
   async request(auth: AuthContext, raw: unknown): Promise<Json> {
     const b = parse(requestBody, raw);
     await this.stepUp.require(auth);
-    return this.one(Prisma.sql`SELECT admin_data_reset_request(${b.reason}::text, ${b.confirm_text}::text) AS r`);
+    // no parts = everything (as before 0.15.71); the database computes the closure, the client's list is only the choice
+    const parts = b.parts ?? null;
+    return this.one(Prisma.sql`SELECT admin_data_reset_request(${b.reason}::text, ${b.confirm_text}::text, ${parts}::text[]) AS r`);
   }
 
   async approve(auth: AuthContext, rawId: string, ifMatch: string | undefined, raw: unknown): Promise<Json> {
     const id = parse(uuidSchema, rawId);
-    const b = parse(reasonBody, raw);
+    const b = parse(approveBody, raw);
     const v = this.version(ifMatch);
     await this.stepUp.require(auth);
-    return this.one(Prisma.sql`SELECT admin_data_reset_approve(${id}::uuid, ${b.reason}::text, ${v}::int) AS r`);
+    return this.one(Prisma.sql`SELECT admin_data_reset_approve(${id}::uuid, ${b.reason}::text, ${v}::int, ${b.scope_hash ?? null}::text) AS r`);
   }
 
   async cancel(auth: AuthContext, rawId: string, ifMatch: string | undefined, raw: unknown): Promise<Json> {

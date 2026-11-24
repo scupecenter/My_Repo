@@ -3,18 +3,87 @@
 Owner request (2026-11-23): "reset all data in the system except the users and accounts". Scope approved by the owner the same day: keep identity,
 configuration, the staff registry and all logs; delete the project data (sites and everything hanging off them, registers, documents, imports,
 notifications, snapshots). Owner decisions 2026-11-24: the same reset is also a function of Settings, run by two System Admins (four eyes), and only
-after a recent successful database backup.
+after a recent successful database backup. Owner decision 2026-11-24 (migration 0152, contract 0.15.71): the reset is **selectable**. The requesting
+System Admin chooses what is reset (the parts below); the two approving System Admins see and approve exactly that scope. "Everything (as today)" stays
+one click and is the default of the operator script; three optional identity parts (users, roles, staff) are never part of it.
 
 This page is the reviewable contract of the reset, both ways. Both say the same as this page, table for table, because both call one database function:
 
 | File | What it is |
 |---|---|
-| `apps/api/prisma/migrations/0146_settings_data_reset/migration.sql` (mirror `db/sql/145_settings_data_reset.sql`) | The plan `data_reset_plan()` (every table with its decision) and the reset `data_reset_core()` (counts, deletes, checks, session end, audit row), shared by both ways; the Settings doors `admin_data_reset_*`. |
+| `apps/api/prisma/migrations/0146_settings_data_reset/migration.sql` (mirror `db/sql/145_settings_data_reset.sql`) | The reset role, the request tables, the guards and the Settings doors `admin_data_reset_*`. |
+| `apps/api/prisma/migrations/0152_data_reset_scope/migration.sql` (mirror `db/sql/151_data_reset_scope.sql`) | The latest plan `data_reset_plan()` (every table with its decision, its part and the parts of its rows), the catalogue `data_reset_parts()` and the closure `data_reset_closure()`, the reset `data_reset_core()` (counts per table and per part, deletes, checks, session end, audit row), the identity writes `idm_data_reset_identity()`, the scope of a request and its hash. |
 | `infra/scripts/reset-project-data.sh` | The operator way. Run as root on the server. Dry run by default; `--execute` backs up, stops the API, resets, quarantines the files. |
 | `infra/scripts/reset-project-data.sql` | The operator's database wrapper: one transaction around `data_reset_core`, printing the plan, the files and the result. |
-| Settings > Data > Data reset (`apps/web/src/pages/settings/DataReset.tsx`, `apps/api/src/settings/data-reset.*`) | The in-app way (contract 0.15.62): request, approve, run, progress, result. |
+| Settings > Data > Data reset (`apps/web/src/pages/settings/DataReset.tsx`, `apps/api/src/settings/data-reset.*`) | The in-app way (contract 0.15.62, scope 0.15.71): choose the parts, request, approve, run, progress, result. |
 | `tests/ops/reset-project-data.test.mjs` | Test of the operator way on a scratch database built from every migration, with synthetic data (`tests/ops/reset-seed.sql`); it also checks that this page lists every table of `data_reset_plan()` with the same decision. |
 | `apps/api/test/settings-data-reset.test.ts`, `tests/db-security/cases/E10_settings_data_reset.sql` | Tests of the Settings way (the API on the same synthetic data) and the database refusals. |
+
+## Parts (what can be reset)
+
+The catalogue is `data_reset_parts()`: a stable code, the labels EN/AR and `depends_on`. **When a part is reset, every part that depends on it is reset
+too.** The database computes the closure (`data_reset_closure`): the API passes the codes the requester ticked and never trusts any other list; the
+screen shows the parts the closure added as a warning before the request. Every site-scoped part depends on `sites`, so choosing the sites resets every
+register, the documents, the imports, the Daily Plan and the KPI snapshots with them. "Everything (as today)" is every project part (no list = everything).
+
+| Code | Part | Depends on (reset with) | Tables (rows that go) |
+|---|---|---|---|
+| `sites` | Sites, tasks, milestones, gates and baselines | none | sites, clusters, task_instances and their steps, level holders and votes, delay periods, cover decisions, admin overrides, gate state and events, site snapshots, workflow migrations, site drafts, baselines; follows of sites (watches); task comments, task drafts, two-level conversions of tasks; the site creation register. |
+| `documents` | Documents and generated forms (Library) | sites | document slots and files of tasks and sites, task and record snapshots, site overrides, Library generated documents; also the documents of project records (a record's documents go with its register too). Company and team documents stay. |
+| `imports` | Imports, upload batches and exports | sites | import batches no kept row points at, their rows and background runs, uploads, the legacy Master reconciliation, export jobs, transient markers. A batch that tasks, site drafts or register records point at goes only with them. |
+| `notifications` | Notifications, inbox and follows | none | notifications, watches. (`mail_outbox` is a log: KEEP.) |
+| `daily_plan` | Daily Plan | sites | daily_plans, daily_plan_rows. |
+| `kpi` | Project Status and KPI snapshots | sites | progress_snapshots, dash_snapshot_runs, ps_manual_values, ps_manual_plans. |
+| `procurement` | Procurement (PR / PO / WO, assignments) | sites | its register records (procurement, procurement_hlc) with their steps, holders, locks and scope checks, procurement_records, assignment_readiness, HLC links to its orders, its documents, comments and drafts. |
+| `gecol`, `hlc`, `permits`, `warehouse`, `quality`, `issues`, `risks`, `change_control`, `readiness`, `as_built`, `meetings`, `rf_design`, `acquisition`, `dismantle`, `deliverables` | One register each | sites | the register records of that register (permits: all four Permits & HSE registers; quality: Quality and Quality TE) with their steps, holders, locks, documents, comments and drafts, and its typed tables: gecol_records; hlc_records, hlc_legacy_migrations, hlc_pr_links; permit_records; wh_movements, wh_movement_lines, warehouse_serials, warehouse_site_qty; quality_inspections, snags, snag_photos, snag_level_voters; issues; risks; change_requests, site_scope_exceptions; readiness_handover; as_built_records; meetings, meeting_actions; rf_design_records; acquisition_candidates. |
+| `car_dispatcher` | Car Dispatcher bookings (the vehicles stay) | sites, procurement | booking records, vehicle_reservations. |
+| `financial_advances` | Financial Advances | sites, procurement | advance, expense and settlement records. |
+| `users` | Users: deactivate every account except the System Admins | none (optional, never in everything) | `users` rows stay; status `disabled`. |
+| `roles` | Roles, groups and delegations | none (optional) | user_role_assignments with their regions, modules and profiles; delegations with their grants and regions; groups but the System Admins group, with their members. |
+| `staff` | Staff registry and absences | none (optional) | staff_registry, absences. |
+
+The Contractors register (companies, teams, contracts) and the vehicles of the Car Dispatcher are master data: kept by every scope (no part), as before.
+A register key without a part (a register added by a later migration) stops the reset like an unclassified table (`data_reset_register_part`).
+
+**Shared tables.** The MIXED tables are split row by row: each row has the parts of what it belongs to (`parts_expr` of the plan, computed before any
+delete), and goes when they overlap the closure. A slot or file of a register record belongs to that register and to `documents`; a comment, a lock,
+a step or a draft to its record or its task; an import batch to what points at it (with the sites part when several parts point at it); an envelope
+(`stored_object_meta`) to the files it protects. The checks are the same for every scope: a row of the scope left behind, or a kept row lost, rolls
+everything back.
+
+**Kept tasks are recalculated.** When the sites are kept but a register that feeds their dates goes (Change Control, Permits & HSE), the delete
+triggers of those registers recalculate the milestones and gate states of the kept sites, as any change of those registers does. The reset accepts
+exactly that: new gate states, calculated milestone steps and gate events of kept sites, and audit rows `milestone_prefill`, `milestone_calculated`,
+`milestone_recalculated`; any other row written by the system meanwhile rolls the reset back.
+
+### The identity parts and their safeguards
+
+- **users**: every account is deactivated (status `disabled`, as Users & Roles does), except the members of a System Admins group (whatever their
+  status), the break-glass account, accounts already disabled, soft-deleted or purged, and always the requester, the approver and the runner. The rows
+  stay (audit attribution, task history); every session ends (`project_data_reset`); one summarised audit row lists the accounts (id and employee ID,
+  `after.identity.users`). A deactivated account is reactivated later through the normal path (Users & Roles, `idm_set_user_status`). The saved views
+  shared by a deactivated owner move to the direct manager, as on every deactivation (`sv_owner_left`; its audit rows `saved_view.owner_left` are
+  accepted by the checks).
+- **roles**: role assignments (and their regions, modules and profiles), delegations (and their grants and regions), and every group other than a
+  System Admins group, with its members. Role definitions, their defaults, permission profiles, their grants and field rules stay. A group that kept
+  configuration still names (a holder of the Responsibility Matrix, a staff registry visibility entry) is emptied, not deleted, so no kept row names a
+  deleted group (its matrix cells then have no holder from it and go to the System Admins as "no holder").
+- **staff**: the staff registry and the absences are emptied. The visibility settings (`staff_registry_visibility_*`) stay: they name roles, groups and
+  users, and none of those is deleted (a group they name is kept). Without registry rows a first sign-in that checks the employee ID finds nothing until
+  the registry is loaded again.
+- The System Admins group and its members are never touched, so the last-admin guard (`idm_last_admin_check`) holds and no System Admin loses admin
+  rights. The identity writes go through `idm_data_reset_identity` (owner `pmis_identity_owner`, as every `idm_*` function; the 0009 backstops let only
+  that role write users, groups and group members, and no trigger is weakened). It runs only inside a running reset (`data_reset_deleting`) and only the
+  reset role may execute it. The staff registry guard (`people_staff_no_delete`) lets the reset role through inside the running reset, like the other
+  delete guards since 0146.
+
+### The scope of a request
+
+The request stores the requested parts, the normalised closure (`scope`, jsonb) and its SHA-256 (`scope_hash`). The approver sees the scope read-only
+with its counts and sends the `scope_hash` they saw: a different hash is 409 `scope_changed`. The approval records `approved_scope_hash` (a CHECK keeps it
+equal to `scope_hash`); start and execute check again that the closure of the requested parts is still the stored one (a newer version of the dependency
+map refuses with 409 `scope_changed`). The scope of a request never changes (row guard): a changed scope is a new request. A request without parts is
+everything. `GET /settings/data-reset/plan?parts=...` (`data_reset_dry_run`) counts a scope per part and per table without changing anything.
 
 ## Which way
 
@@ -30,10 +99,10 @@ Every step is a System Admin acting without delegation (a delegate gets 403 on e
 a live session of their own, with a step-up (`stepup_max_age_seconds`). Every write is audited with before and after and written to the security log
 (event `project_data_reset`, `detail.step` = `request`, `approve`, `cancel`, `start`, `completed`, `failed`, `files`).
 
-1. **Request** (`POST /settings/data-reset/requests`): a reason of at least 10 characters and the typed phrase `RESET <database>`. Refused while another
+1. **Request** (`POST /settings/data-reset/requests`): the parts (none = everything; see "Parts"), a reason of at least 10 characters and the typed phrase `RESET <database>`. Refused while another
    request is open (one open request at a time, a unique index), with fewer than two active System Admins, or while a reset runs. The request expires
    after `data_reset.settings.request_expiry_minutes` (default 30). The other active System Admins are told in-app.
-2. **Approve** (`POST .../approve`, If-Match): a DIFFERENT System Admin (another user and another session, checked by the database and by a CHECK
+2. **Approve** (`POST .../approve`, If-Match, the `scope_hash` shown): a DIFFERENT System Admin (another user and another session, checked by the database and by a CHECK
    constraint; 403 `self_approval_forbidden`), with a reason of at least 10 characters. Approving runs nothing.
 3. **Cancel** (`POST .../cancel`, If-Match): any System Admin, with a reason, while the request is requested or approved.
 4. **Run** (`POST .../run`, If-Match): the requester or the approver (decision: either of the two people who agreed, never a third admin), with the
@@ -93,7 +162,12 @@ audit row and anything written after the target time.
 ```bash
 sudo bash pmis/infra/scripts/reset-project-data.sh                 # dry run: per table, rows to delete and rows kept; changes nothing
 sudo bash pmis/infra/scripts/reset-project-data.sh --execute --reason "Owner request 2026-11-23: start the real data load"
+sudo bash pmis/infra/scripts/reset-project-data.sh --parts issues,risks             # dry run of a chosen scope (the database adds the dependent parts)
 ```
+
+`--parts a,b` (codes of "Parts", separated by commas) resets only the closure of those parts; the dry run prints the scope and what the dependencies
+added. Without `--parts` the script resets everything as before 0152 (every project part, no identity part). With `--parts users` the script has no
+requester or approver: the System Admins and the break-glass account are the accounts kept.
 
 `--execute` on a terminal asks for the phrase `RESET <database>` (for example `RESET pmis`). Without a terminal it refuses, unless both
 `--yes-i-have-a-backup <dump>` (an existing `pg_dump -Fc` file that `pg_restore --list` reads) and `--confirm "RESET <database>"` are given.
@@ -130,7 +204,8 @@ anything. No other definer function gains these rights.
 
 1. Only with execute: a reason of at least 10 characters; the advisory lock `353383097684` (one reset at a time, the script and Settings alike); for the
    script, no Settings request approved or running; `lock_timeout` 60 s.
-2. Coverage: every base table of the `public` schema must be in the plan, every table of the plan must exist, the reset role must hold its rights on
+2. Coverage: every base table of the `public` schema must be in the plan, every table of the plan must exist, every table that may lose rows must
+   have a place in the delete order, every register key a part, the reset role (and for the identity parts the identity owner) must hold its rights on
    each, and no trigger of a plan table may be disabled; otherwise the reset stops (a table added by a later migration has to be classified here and in
    `data_reset_plan` first, and granted to the reset role).
 3. Only with execute: locks on every table of the plan, in name order: EXCLUSIVE on the DELETE and MIXED tables, SHARE on the KEEP and log tables.
@@ -179,7 +254,6 @@ records of the Contractors register (companies, teams, contracts) and the vehicl
 
 | Table | Decision | Reason |
 |---|---|---|
-| users | KEEP | Accounts (the employee ID on the account is the staff registry link; there is no separate registry table on main). |
 | local_credentials | KEEP | Passwords: users sign in as before. |
 | user_totp | KEEP | Two-factor secrets and the enforced flag. |
 | user_recovery_codes | KEEP | Two-factor recovery codes. |
@@ -194,25 +268,33 @@ records of the Contractors register (companies, teams, contracts) and the vehicl
 | role_default_regions | KEEP | Role defaults. |
 | role_default_modules | KEEP | Role defaults. |
 | role_aliases | KEEP | Master StaffRole to role mapping (reference data). |
-| user_role_assignments | KEEP | Role assignments. |
-| user_role_assignment_regions | KEEP | Assignment scope. |
-| user_role_assignment_modules | KEEP | Assignment scope. |
-| user_role_assignment_profiles | KEEP | Assignment profiles. |
 | permission_profiles | KEEP | Permission profiles. |
 | permission_grants | KEEP | Grants of the profiles. |
 | field_permissions | KEEP | Field-level rules. |
-| groups | KEEP | Groups, System Admins included. |
-| group_members | KEEP | Group members. |
-| delegations | KEEP | Delegations. |
-| delegation_grants | KEEP | Delegated actions. |
-| delegation_regions | KEEP | Delegated regions. |
 | departments | KEEP | Departments (direct managers and MFA exemptions are columns of `users`). |
-| staff_registry | KEEP | The staff registry (0142): employee cards, kept like accounts. |
-| staff_registry_visibility_state | KEEP | Staff registry visibility settings (0142). |
+| staff_registry_visibility_state | KEEP | Staff registry visibility settings (0142); kept by the `staff` part too (they name roles, groups and users, never a registry row). |
 | staff_registry_visibility_fields | KEEP | Staff registry per-field defaults (0142). |
 | staff_registry_visibility_entries | KEEP | Staff registry allow/deny entries (0142). |
 | pmis_context_keys | KEEP | Session-context signing keys. |
-| absences | KEEP | Staff absence records (migration 0140): they concern people, not sites; kept on the safe side (see Open). |
+
+### Optional parts (KEEP unless chosen)
+
+KEEP in "everything" and in every scope without the part; with the part, the action of the last column.
+
+| Table | Decision | With the part |
+|---|---|---|
+| users | KEEP unless `users` | Deactivated (status `disabled`), never deleted; the System Admins, the break-glass account, the requester, the approver and the runner never. |
+| user_role_assignments | KEEP unless `roles` | Deleted. |
+| user_role_assignment_regions | KEEP unless `roles` | Deleted. |
+| user_role_assignment_modules | KEEP unless `roles` | Deleted. |
+| user_role_assignment_profiles | KEEP unless `roles` | Deleted (the profiles themselves stay). |
+| delegations | KEEP unless `roles` | Deleted. |
+| delegation_grants | KEEP unless `roles` | Deleted. |
+| delegation_regions | KEEP unless `roles` | Deleted. |
+| groups | KEEP unless `roles` | Deleted, but a System Admins group, and a group the matrix or a staff visibility entry names (emptied). |
+| group_members | KEEP unless `roles` | Deleted, but the members of a System Admins group. |
+| staff_registry | KEEP unless `staff` | Deleted (the guard lets only the running reset through). |
+| absences | KEEP unless `staff` | Deleted. |
 
 ### Configuration (KEEP)
 
@@ -444,7 +526,9 @@ Outside the `public` schema nothing is touched (`pmis_admin.migrations`, the ins
 - **Quarantine retention.** Project documents are kept for the life of the project plus 10 years (non-functional requirements). The quarantine
   directory and the two backups should be kept (in the encrypted backup store) until the owner decides; the script never deletes them.
 - **Backup encryption.** `pre-reset-*.dump` and the tar are written root-only (0600) but not encrypted; copy them to the encrypted backup store.
-- **Absences** (`absences`, migration 0140) are kept: they belong to people, not to sites, and past and planned leave stays useful for the
-  new project. If the owner sees them as project data, they move to DELETE (nothing references them).
-- **Staff registry.** There is no separate staff registry table on main (the employee ID lives on `users`); when it is added it must be
-  classified KEEP here and in the plan, or the reset refuses to run.
+- **Absences and the staff registry** stay in "everything"; since 0152 the optional `staff` part empties both (owner decision 2026-11-24).
+- **Contractors.** The Contractors register (companies, teams, contracts) is master data and has no part: no scope deletes it. If the owner wants it
+  selectable, its part must also decide the companies (`external_parties`) its approval wrote.
+- **mail_outbox** stays a log in every scope, also with the `notifications` part (queued mails of deleted notifications may still be sent).
+- **Invitations** (`user_invitations`) stay with the `roles` part: an open invitation may name a group or role assignment that the part removed; it
+  should be revoked and sent again after such a reset (not automated).

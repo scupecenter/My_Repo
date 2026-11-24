@@ -1,11 +1,11 @@
 import { AlertOctagon, DatabaseBackup, ShieldCheck } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '@/api/client';
 import {
-  RUNNING, useApproveDataReset, useCancelDataReset, useDataReset, useDataResetRequest, useRequestDataReset, useRetryDataResetFiles, useRunDataReset,
-  useSetDataResetSettings, type DataResetPlanTable, type DataResetRequest,
+  closureOf, RUNNING, useApproveDataReset, useCancelDataReset, useDataReset, useDataResetPlan, useDataResetRequest, useRequestDataReset, useRetryDataResetFiles,
+  useRunDataReset, useSetDataResetSettings, type DataResetPart, type DataResetPlanTable, type DataResetRequest,
 } from '@/api/dataReset';
 import { errText, FormDialog } from '@/components/FormDialog';
 import { useToast } from '@/components/Toast';
@@ -16,7 +16,9 @@ type Dialog = 'approve' | 'cancel' | 'run' | 'retry' | 'settings' | null;
  * Settings > Data > Data reset (owner decisions 2026-11-24, contract 0.15.62, migration 0146). The most destructive function of the system: a System Admin
  * requests the reset of the project data (reason, step-up, the typed phrase), a DIFFERENT System Admin approves it, then one of the two runs it once a
  * successful database backup of the last hours is recorded. The plan (what is deleted and what is kept, with counts) is the same list as the operator script.
- * The server decides every right; this screen only offers what the state allows.
+ * The server decides every right; this screen only offers what the state allows. Contract 0.15.71 (migration 0152): the requester chooses the scope (the parts),
+ * the parts that depend on a chosen part are added with a visible note (the server computes the same closure and stores it with its hash), and the approver
+ * sees that scope read-only with its counts and approves exactly it.
  */
 export function DataReset() {
   const { t, i18n } = useTranslation();
@@ -37,6 +39,10 @@ export function DataReset() {
   const [typed, setTyped] = useState('');
   const [runTyped, setRunTyped] = useState('');
   const [cfg, setCfgForm] = useState<{ expiry: string; hours: string } | null>(null);
+  const [mode, setMode] = useState<'everything' | 'custom'>('everything');
+  const [chosen, setChosen] = useState<string[]>([]);
+  const requested = mode === 'custom' ? [...chosen].sort() : null;
+  const dry = useDataResetPlan(requested, mode === 'custom' && !!s && !open);
   const when = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleString(i18n.language === 'ar' ? 'ar' : 'en-GB', { dateStyle: 'medium', timeStyle: 'short' }) : '—');
   const close = () => setDialog(null);
 
@@ -46,9 +52,13 @@ export function DataReset() {
   }
   if (!s) return <section className="card p-4" data-testid="page-data-reset">…</section>;
 
-  const del = s.plan.tables.filter((x) => x.action === 'delete');
-  const mixed = s.plan.tables.filter((x) => x.action === 'mixed');
-  const kept = s.plan.tables.filter((x) => x.action === 'keep' || x.action === 'log');
+  const catalogue = s.plan.parts ?? [];
+  const shown = mode === 'custom' && !req ? (dry.data ?? null) : s.plan;
+  const tables = shown?.tables ?? [];
+  const del = tables.filter((x) => x.delete > 0 && x.keep === 0 && x.table !== 'users');
+  const mixed = tables.filter((x) => x.delete > 0 && x.keep > 0 && x.table !== 'users');
+  const kept = tables.filter((x) => x.delete === 0);
+  const scopeOk = mode === 'everything' || chosen.length > 0;
   const reasonOk = reason.trim().length >= 10;
   const phraseOk = typed === s.confirmation_phrase;
   const last = s.last_request;
@@ -83,10 +93,11 @@ export function DataReset() {
       </section>
 
       {s.plan.error && <p className="card p-3 text-sm text-lateInk" role="alert" data-testid="dr-plan-error">{t('dr.plan_error', { error: s.plan.error })}</p>}
-      {!running && s.plan.tables.length > 0 && (
-        <section className="card space-y-3 p-4" data-testid="dr-plan">
+      {!running && shown && tables.length > 0 && (
+        <section className="card space-y-3 p-4" data-testid="dr-plan" data-scope={mode}>
           <h3 className="font-bold">{t('dr.plan')}</h3>
-          <p className="text-sm text-mute">{t('dr.plan_note', { rows: s.plan.delete_rows, files: s.plan.files })}</p>
+          <p className="text-sm text-mute" data-testid="dr-plan-note">{t('dr.plan_note', { rows: shown.delete_rows, files: shown.files })}{mode === 'custom' && !req ? ` ${t('dr.plan_scope_note')}` : ''}</p>
+          {(shown.accounts_to_deactivate ?? 0) > 0 && <p className="text-sm font-semibold text-lateInk" data-testid="dr-plan-accounts">{t('dr.accounts_note', { count: shown.accounts_to_deactivate })}</p>}
           <div className="grid gap-4 md:grid-cols-2">
             <PlanTable testid="dr-plan-delete" title={t('dr.deleted')} rows={[...del, ...mixed]} col={(r) => (r.action === 'mixed' ? t('dr.mixed_cell', { del: r.delete, keep: r.keep }) : String(r.delete))} />
             <details className="rounded-md border border-line p-2" data-testid="dr-plan-keep">
@@ -101,6 +112,7 @@ export function DataReset() {
         <section className="card space-y-3 p-4" data-testid="dr-request" data-status={req.status}>
           <h3 className="flex items-center gap-2 font-bold"><ShieldCheck size={18} aria-hidden />{t('dr.request')}</h3>
           <p className="font-semibold" data-testid="dr-request-status">{t(`dr.status_${req.status}`)}</p>
+          <ScopeView r={req} catalogue={catalogue} />
           <dl className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 text-sm">
             <dt>{t('dr.requested_by')}</dt><dd data-testid="dr-requested-by">{req.requested_by.display_name} · {when(req.requested_at)}</dd>
             <dt>{t('common.reason')}</dt><dd>{req.request_reason}</dd>
@@ -122,6 +134,8 @@ export function DataReset() {
       ) : (
         <section className="card space-y-3 p-4" data-testid="dr-form">
           <h3 className="font-bold">{t('dr.new_request')}</h3>
+          <ScopePicker catalogue={catalogue} mode={mode} setMode={setMode} chosen={chosen} setChosen={setChosen} disabled={!s.can.request}
+            closure={mode === 'everything' ? (s.everything ?? []) : (dry.data?.scope.parts ?? closureOf(chosen, catalogue))} />
           <label className="block text-sm font-semibold">{t('dr.reason_label')}
             <textarea className="input mt-1 min-h-16 font-normal" data-testid="dr-reason" value={reason} onChange={(e) => setReason(e.target.value)} disabled={!s.can.request} />
           </label>
@@ -129,8 +143,9 @@ export function DataReset() {
             <input className="input mt-1 font-normal" dir="ltr" data-testid="dr-phrase" value={typed} onChange={(e) => setTyped(e.target.value)} disabled={!s.can.request} autoComplete="off" />
           </label>
           {ask.isError && <p role="alert" className="text-sm text-lateInk" data-testid="dr-form-error">{errText(ask.error, t)}</p>}
-          <button className="btn btn-danger" data-testid="dr-submit" disabled={!s.can.request || !reasonOk || !phraseOk || ask.isPending}
-            onClick={() => ask.mutate({ reason: reason.trim(), confirm_text: typed }, { onSuccess: () => { toast(t('dr.requested_toast')); setReason(''); setTyped(''); } })}>
+          <button className="btn btn-danger" data-testid="dr-submit" disabled={!s.can.request || !reasonOk || !phraseOk || !scopeOk || ask.isPending}
+            onClick={() => ask.mutate({ reason: reason.trim(), confirm_text: typed, ...(requested ? { parts: requested } : {}) },
+              { onSuccess: () => { toast(t('dr.requested_toast')); setReason(''); setTyped(''); setMode('everything'); setChosen([]); } })}>
             {t('dr.submit')}
           </button>
         </section>
@@ -149,8 +164,10 @@ export function DataReset() {
       </section>
 
       {dialog === 'approve' && req && (
-        <ReasonDialog testid="dr-approve-dialog" title={t('dr.approve_title')} hint={t('dr.approve_hint')} min={10} busy={approve.isPending} error={approve.isError ? errText(approve.error, t) : null} onClose={close}
-          onSubmit={(r) => approve.mutate({ id: req.id, version: req.version, reason: r }, { onSuccess: () => { toast(t('dr.approved_toast')); close(); } })} />
+        <ReasonDialog testid="dr-approve-dialog" title={t('dr.approve_title')} hint={`${t('dr.approve_hint')} ${t('dr.approve_scope')}`} min={10} busy={approve.isPending} error={approve.isError ? errText(approve.error, t) : null} onClose={close}
+          onSubmit={(r) => approve.mutate({ id: req.id, version: req.version, reason: r, scope_hash: req.scope_hash }, { onSuccess: () => { toast(t('dr.approved_toast')); close(); } })}>
+          <ScopeView r={req} catalogue={catalogue} />
+        </ReasonDialog>
       )}
       {dialog === 'cancel' && req && (
         <FormDialog open onClose={close} testid="dr-cancel-dialog" title={t('dr.cancel_title')} busy={cancel.isPending} error={cancel.isError ? errText(cancel.error, t) : null}
@@ -225,8 +242,8 @@ function Result({ r, when }: { r: DataResetRequest; when: (s: string | null | un
   );
 }
 
-function ReasonDialog({ testid, title, hint, min, busy, error, onClose, onSubmit }: {
-  testid: string; title: string; hint: string; min: number; busy: boolean; error: string | null; onClose: () => void; onSubmit: (reason: string) => void;
+function ReasonDialog({ testid, title, hint, min, busy, error, onClose, onSubmit, children }: {
+  testid: string; title: string; hint: string; min: number; busy: boolean; error: string | null; onClose: () => void; onSubmit: (reason: string) => void; children?: ReactNode;
 }) {
   const { t } = useTranslation();
   const [r, setR] = useState('');
@@ -234,9 +251,112 @@ function ReasonDialog({ testid, title, hint, min, busy, error, onClose, onSubmit
     <FormDialog open onClose={onClose} testid={testid} title={title} withReason={false} busy={busy} error={error} disabled={r.trim().length < min} submitLabel={title}
       onSubmit={() => onSubmit(r.trim())}>
       <p className="text-sm text-mute">{hint}</p>
+      {children}
       <label className="block text-sm font-semibold">{t('dr.reason_label')}
         <textarea className="input mt-1 min-h-16 font-normal" data-testid={`${testid}-reason`} value={r} onChange={(e) => setR(e.target.value)} />
       </label>
     </FormDialog>
+  );
+}
+
+const IDENTITY = new Set(['users', 'roles', 'staff']);
+const GROUPS = ['project', 'registers', 'identity'] as const;
+const label = (p: Pick<DataResetPart, 'label_en' | 'label_ar'> | undefined, code: string, lang: string) => (p ? (lang === 'ar' ? p.label_ar : p.label_en) : code);
+
+/**
+ * The scope picker: "Everything (as today)" or grouped checkboxes. Ticking a part shows the parts that depend on it as ticked and marked "added" with a note
+ * (the closure); they cannot be unticked while what takes them along is chosen. The identity parts carry a red warning.
+ */
+function ScopePicker({ catalogue, mode, setMode, chosen, setChosen, closure, disabled }: {
+  catalogue: DataResetPart[]; mode: 'everything' | 'custom'; setMode: (m: 'everything' | 'custom') => void; chosen: string[]; setChosen: (c: string[]) => void;
+  closure: string[]; disabled: boolean;
+}) {
+  const { t, i18n } = useTranslation();
+  const lang = i18n.language;
+  const inScope = new Set(closure);
+  const added = mode === 'custom' ? catalogue.filter((p) => inScope.has(p.code) && !chosen.includes(p.code)) : [];
+  const identity = catalogue.filter((p) => IDENTITY.has(p.code) && inScope.has(p.code));
+  const toggle = (code: string) => setChosen(chosen.includes(code) ? chosen.filter((c) => c !== code) : [...chosen, code]);
+  const count = (p: DataResetPart) => (p.code === 'users' ? t('dr.accounts', { count: p.rows }) : t('dr.rows', { count: p.rows }));
+  return (
+    <fieldset className="space-y-2 rounded-md border border-line p-3" data-testid="dr-scope" data-mode={mode} disabled={disabled}>
+      <legend className="px-1 text-sm font-semibold">{t('dr.scope')}</legend>
+      <p className="text-sm text-mute">{t('dr.scope_hint')}</p>
+      <label className="flex items-start gap-2 text-sm">
+        <input type="radio" name="dr-scope-mode" className="mt-1" data-testid="dr-scope-everything" checked={mode === 'everything'} onChange={() => setMode('everything')} />
+        <span><span className="font-semibold">{t('dr.everything')}</span><span className="block text-mute">{t('dr.everything_hint')}</span></span>
+      </label>
+      <label className="flex items-center gap-2 text-sm">
+        <input type="radio" name="dr-scope-mode" data-testid="dr-scope-custom" checked={mode === 'custom'} onChange={() => setMode('custom')} />
+        <span className="font-semibold">{t('dr.custom')}</span>
+      </label>
+      {mode === 'custom' && (
+        <div className="grid gap-3 ps-6 md:grid-cols-3">
+          {GROUPS.map((g) => (
+            <div key={g} className={`space-y-1 rounded-md p-2 ${g === 'identity' ? 'border border-lateInk/40 bg-lateBg' : 'bg-card2'}`} data-testid={`dr-scope-group-${g}`}>
+              <h4 className={`text-sm font-semibold ${g === 'identity' ? 'text-lateInk' : ''}`}>{t(`dr.group_${g}`)}</h4>
+              {catalogue.filter((p) => p.group === g).map((p) => {
+                const isAdded = inScope.has(p.code) && !chosen.includes(p.code);
+                return (
+                  <label key={p.code} className="flex items-start gap-2 text-sm" data-testid={`dr-part-row-${p.code}`} data-selected={inScope.has(p.code) ? 'true' : 'false'} data-added={isAdded ? 'true' : 'false'}>
+                    <input type="checkbox" className="mt-1" data-testid={`dr-part-${p.code}`} checked={inScope.has(p.code)} disabled={isAdded} onChange={() => toggle(p.code)} />
+                    <span className="min-w-0">
+                      <span className={IDENTITY.has(p.code) ? 'font-semibold text-lateInk' : ''}>{label(p, p.code, lang)}</span>
+                      {isAdded && <span className="ms-1 rounded bg-lateBg px-1 text-xs text-lateInk" data-testid={`dr-part-added-${p.code}`}>{t('dr.added_badge')}</span>}
+                      <span className="block text-xs text-mute" data-testid={`dr-part-count-${p.code}`}>{count(p)}</span>
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      )}
+      {mode === 'custom' && chosen.length === 0 && <p className="text-sm text-lateInk" data-testid="dr-scope-none">{t('dr.none_chosen')}</p>}
+      {added.length > 0 && (
+        <p role="status" className="rounded-md border border-lateInk/40 bg-lateBg p-2 text-sm text-lateInk" data-testid="dr-scope-added">
+          {t('dr.added_note', { parts: added.map((p) => label(p, p.code, lang)).join(', ') })}
+        </p>
+      )}
+      {identity.length > 0 && (
+        <p role="alert" className="flex items-start gap-2 rounded-md border border-lateInk bg-lateBg p-2 text-sm font-semibold text-lateInk" data-testid="dr-scope-identity">
+          <AlertOctagon size={16} className="mt-0.5 shrink-0" aria-hidden />
+          {t('dr.identity_warning', { parts: identity.map((p) => label(p, p.code, lang)).join(', ') })}
+        </p>
+      )}
+    </fieldset>
+  );
+}
+
+/** The scope of a request, read-only (requester, approver, runner): the parts with their rows when requested, what the dependencies added, the hash. */
+function ScopeView({ r, catalogue }: { r: DataResetRequest; catalogue: DataResetPart[] }) {
+  const { t, i18n } = useTranslation();
+  const lang = i18n.language;
+  const sc = r.scope;
+  const byCode = new Map(catalogue.map((p) => [p.code, p]));
+  const order = (c: string) => { const i = catalogue.findIndex((p) => p.code === c); return i < 0 ? catalogue.length : i; };
+  const rows = ((r.plan_at_request ?? {}) as { parts?: Record<string, number> }).parts ?? {};
+  const parts = sc?.parts ?? [];
+  const added = new Set(sc?.added ?? []);
+  const identity = (sc?.identity ?? []).map((c) => label(byCode.get(c), c, lang));
+  return (
+    <div className="space-y-1 rounded-md border border-line p-2 text-sm" data-testid="dr-request-scope" data-everything={sc?.everything ? 'true' : 'false'}>
+      <h4 className="font-semibold">{t('dr.scope_title')}</h4>
+      {sc?.legacy ? <p data-testid="dr-request-scope-legacy">{t('dr.scope_legacy')}</p> : (
+        <>
+          {sc?.everything && identity.length === 0 && <p className="font-semibold" data-testid="dr-request-scope-everything">{t('dr.scope_everything')}</p>}
+          <ul className="flex flex-wrap gap-1">
+            {[...parts].sort((a, b) => order(a) - order(b)).map((c) => (
+              <li key={c} data-testid={`dr-request-scope-part-${c}`} className={`rounded px-1.5 py-0.5 text-xs ${IDENTITY.has(c) ? 'bg-lateBg font-semibold text-lateInk' : 'bg-card2'}`}>
+                {label(byCode.get(c), c, lang)}{c in rows ? ` · ${c === 'users' ? t('dr.accounts', { count: rows[c] }) : t('dr.rows', { count: rows[c] })}` : ''}
+                {added.has(c) && <span className="ms-1 text-lateInk">({t('dr.added_badge')})</span>}
+              </li>
+            ))}
+          </ul>
+          {identity.length > 0 && <p role="alert" className="font-semibold text-lateInk" data-testid="dr-request-scope-identity">{t('dr.identity_warning', { parts: identity.join(', ') })}</p>}
+          {r.scope_hash && <p className="text-xs text-mute">{t('dr.scope_hash')}: <span className="mono" dir="ltr" data-testid="dr-request-scope-hash">{r.scope_hash.slice(0, 12)}</span></p>}
+        </>
+      )}
+    </div>
   );
 }
