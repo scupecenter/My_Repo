@@ -2,19 +2,93 @@
 
 Owner request (2026-11-23): "reset all data in the system except the users and accounts". Scope approved by the owner the same day: keep identity,
 configuration, the staff registry and all logs; delete the project data (sites and everything hanging off them, registers, documents, imports,
-notifications, snapshots).
+notifications, snapshots). Owner decisions 2026-11-24: the same reset is also a function of Settings, run by two System Admins (four eyes), and only
+after a recent successful database backup.
 
-This page is the reviewable contract of the operator script. The script must say the same as this page, table for table:
+This page is the reviewable contract of the reset, both ways. Both say the same as this page, table for table, because both call one database function:
 
 | File | What it is |
 |---|---|
-| `infra/scripts/reset-project-data.sh` | Run as root on the server. Dry run by default; `--execute` backs up, stops the API, resets, quarantines the files. |
-| `infra/scripts/reset-project-data.sql` | The database part: the plan (`reset_plan`), the deletes, the checks, the session end and the audit row, in one transaction. |
-| `tests/ops/reset-project-data.test.mjs` | Test on a scratch database built from every migration, with synthetic data (`tests/ops/reset-seed.sql`). |
+| `apps/api/prisma/migrations/0146_settings_data_reset/migration.sql` (mirror `db/sql/145_settings_data_reset.sql`) | The plan `data_reset_plan()` (every table with its decision) and the reset `data_reset_core()` (counts, deletes, checks, session end, audit row), shared by both ways; the Settings doors `admin_data_reset_*`. |
+| `infra/scripts/reset-project-data.sh` | The operator way. Run as root on the server. Dry run by default; `--execute` backs up, stops the API, resets, quarantines the files. |
+| `infra/scripts/reset-project-data.sql` | The operator's database wrapper: one transaction around `data_reset_core`, printing the plan, the files and the result. |
+| Settings > Data > Data reset (`apps/web/src/pages/settings/DataReset.tsx`, `apps/api/src/settings/data-reset.*`) | The in-app way (contract 0.15.62): request, approve, run, progress, result. |
+| `tests/ops/reset-project-data.test.mjs` | Test of the operator way on a scratch database built from every migration, with synthetic data (`tests/ops/reset-seed.sql`); it also checks that this page lists every table of `data_reset_plan()` with the same decision. |
+| `apps/api/test/settings-data-reset.test.ts`, `tests/db-security/cases/E10_settings_data_reset.sql` | Tests of the Settings way (the API on the same synthetic data) and the database refusals. |
 
-No migration and no contract change: the script uses the existing tables, triggers and audit chain.
+## Which way
 
-## How to run it
+- **Two or more active System Admins:** Settings > Data > Data reset (below). Nothing is done on the server by hand; the backup is the nightly
+  pgBackRest backup that the System Log records.
+- **One active System Admin** (the screen says so; a request is refused with 409 `single_admin`): the operator script on the server. There is no bypass.
+- Both are never run at the same time: they share the advisory lock `353383097684` of `data_reset_core`. The script refuses while a reset approved in
+  Settings waits to run or runs; Settings refuses (409 `reset_running`) while the script runs, and the script stops the API anyway.
+
+## In Settings (two System Admins)
+
+Every step is a System Admin acting without delegation (a delegate gets 403 on every route; the menu entry is hidden for everyone but System Admins), in
+a live session of their own, with a step-up (`stepup_max_age_seconds`). Every write is audited with before and after and written to the security log
+(event `project_data_reset`, `detail.step` = `request`, `approve`, `cancel`, `start`, `completed`, `failed`, `files`).
+
+1. **Request** (`POST /settings/data-reset/requests`): a reason of at least 10 characters and the typed phrase `RESET <database>`. Refused while another
+   request is open (one open request at a time, a unique index), with fewer than two active System Admins, or while a reset runs. The request expires
+   after `data_reset.settings.request_expiry_minutes` (default 30). The other active System Admins are told in-app.
+2. **Approve** (`POST .../approve`, If-Match): a DIFFERENT System Admin (another user and another session, checked by the database and by a CHECK
+   constraint; 403 `self_approval_forbidden`), with a reason of at least 10 characters. Approving runs nothing.
+3. **Cancel** (`POST .../cancel`, If-Match): any System Admin, with a reason, while the request is requested or approved.
+4. **Run** (`POST .../run`, If-Match): the requester or the approver (decision: either of the two people who agreed, never a third admin), with the
+   typed phrase again, while the request is approved and not expired. Refused (409, nothing changes) when:
+   - the System Log has no successful database backup within `data_reset.settings.backup_max_age_hours` (default 24; `backup_missing`, see "Backup rule");
+   - the documents are in S3/MinIO (`storage_not_supported`; see Open);
+   - the quarantine directory cannot be made inside the document store (`quarantine_unavailable`);
+   - a table has no decision in the plan (`plan_incomplete`), or a reset runs (`reset_running`).
+
+   The API answers 202 and runs the database part in the background, as the runner, in a transaction of its own (one hour at most):
+   `admin_data_reset_execute` calls `data_reset_core` (the transaction below) and keeps the runner's own session; every other session ends. Afterwards
+   the API moves the files (below) and records each outcome on the request. The screen follows `GET /settings/data-reset/requests/{id}` every two
+   seconds.
+5. **Result and restore**: the screen shows the audit row id, the sessions ended, the files moved, missing and refused, the quarantine directory, and
+   the restore steps (below).
+
+States: `requested` → `approved` → `running` → `files_pending` → `completed`; `cancelled`, `expired` (closed by the next door that meets it), `failed`
+(the transaction rolled back: nothing was reset; the error is on the request). A request is evidence: never deleted, a closed one never changes.
+
+**Maintenance.** While a run's transaction is open (`data_reset_maintenance()`: a request `running` for less than two minutes, or the advisory lock
+held), every API route except `GET /settings/data-reset`, `GET /settings/data-reset/requests/{id}`, `GET /auth/session` and `GET /health` answers 503
+`maintenance` (`Retry-After: 30`), before the session guard and before any transaction. The run waits until the requests already in flight in its
+process have finished (15 seconds at most). A run whose API process stopped holds no lock: after two minutes it no longer counts, the screen shows it as
+interrupted (`stalled`), and Cancel closes it as failed (nothing was reset, the transaction died with the process).
+
+**The database part runs once.** `admin_data_reset_execute` refuses a request that is not `running` or was already committed, a caller that is not the
+runner in the runner's session, and a start older than two minutes; a second start of the same request is 409 or 412 (the version moved).
+
+**Files.** After the commit the API (the owner of the store) moves the stored files of the deleted rows into `<STORAGE_DIR>/.pre-reset-<UTC timestamp>`
+with the rules of `reset-project-data-quarantine.sh` (`apps/api/src/settings/data-reset-files.ts`): the key format, no empty, `.` or `..` component, no
+symbolic link on any component, a regular file only, the resolved path inside the resolved store, never over an existing file, never a delete. A refused
+or missing key is left in place and recorded. The list is written next to it (`<quarantine>.manifest`) and on the request (`data_reset_request_files`).
+The quarantine is inside the store, not beside it as with the script, because the API may write only the store (systemd `ReadWritePaths`; the data root
+is root 0755) and so the move stays a rename on one filesystem; no storage key can name it (a key never starts with a dot). If the move fails as a
+whole (the store cannot be read), the request stays `files_pending`: `POST .../retry-files` (any System Admin, reason, step-up, audited) moves the keys
+still pending; the database part is never run again. A key found already in the quarantine counts as moved.
+
+**Backup rule.** `infra/backup/db-backup.sh` writes, after a successful pgBackRest backup to at least one repository, one System Log row: source `backup`,
+level `info`, message `Database backup completed (<mode>, <type>) to repository <n>`, context `{"script": "db-backup", "event": "backup_ok", "mode",
+"type", "repos", "failed", "stanza"}`. The run needs such a row with `type` `full` or `diff` younger than `backup_max_age_hours`. Before migration 0146
+the scripts wrote only a `job_runs` row on success and System Log rows only for problems (`db-backup-check.sh`, level `error`, and `info` "healthy
+again"), so a server needs the updated `db-backup.sh` and one backup after it. The source `backup` is reserved for the server's scripts:
+`log_system_write` refuses it from a `pmis_app` session, so the API (or anything that holds its connection) can never fake a backup. The screen shows the
+last success (time, type, repository) and the latest backup-check error newer than it.
+
+**Settings.** `data_reset.settings` (guarded: only `admin_set_data_reset_settings`, a System Admin, reason, step-up, If-Match, never while a request is
+open): `request_expiry_minutes` 5 to 240 (default 30), `backup_max_age_hours` 1 to 72 (default 24).
+
+**Restore after a Settings reset** (the screen prints the paths): the database from the backup the run relied on, to the moment before the reset
+(`run_started_at`): `db-restore.sh --pgdata <scratch> --port <scratch port> --target-time '<run_started_at>' --keep-running` (infra/RUNBOOK.md, section
+8), then stop the API, replace the live database with a dump of the restored one (`pg_dump -Fc` from the scratch port, `dropdb`, `createdb`,
+`pg_restore --exit-on-error`), start the API; the files with `sudo -u gsdn-pmis cp -a -n <quarantine>/. <STORAGE_DIR>/`. A restore loses the reset's
+audit row and anything written after the target time.
+
+## How to run the operator script
 
 ```bash
 sudo bash pmis/infra/scripts/reset-project-data.sh                 # dry run: per table, rows to delete and rows kept; changes nothing
@@ -33,7 +107,7 @@ Steps of `--execute`, stopping at the first failure (nothing changes before step
 3. `systemctl stop gsdn-pmis-api`, then wait until no application connection is left (the service is started again on exit, whatever happens);
 4. full backup: `pg_dump -Fc` to `/var/backups/gsdn-pmis/pre-reset-<timestamp>.dump`, verified with `pg_restore --list` (the list must hold the
    `audit_log` and `users` data), and `tar` of the documents directory to `pre-reset-<timestamp>-files.tar`, verified with `tar -t`;
-5. `reset-project-data.sql` in ONE transaction (see below); its output is kept in `pre-reset-<timestamp>.log`;
+5. `reset-project-data.sql` in ONE transaction (`data_reset_core`, see below); its output is kept in `pre-reset-<timestamp>.log`;
 6. the stored files of the deleted rows are moved (`mv`, a rename on the same filesystem, never a delete) to
    `<STORAGE_DIR>-pre-reset-<timestamp>`, with a manifest `<...>.manifest` (MOVED / MISSING / REFUSED per key). The script stops before the
    backup if `STORAGE_DIR` is a mount point (the quarantine would be a copy, not a rename), if `STORAGE_DIR` or its parent is a symbolic link
@@ -48,41 +122,52 @@ Steps of `--execute`, stopping at the first failure (nothing changes before step
 Restore (printed by the script with the real paths): stop the API, `dropdb`, `createdb`, `pg_restore -d <db> --exit-on-error <dump>`,
 `cp -a -n <quarantine>/. <STORAGE_DIR>/`, start the API. A restore loses the reset's own audit row and anything written after the backup.
 
-## The transaction
+## The transaction (`data_reset_core`, both ways)
 
-1. Coverage: every base table of the `public` schema must be in the plan, and every table of the plan must exist; otherwise the reset stops
-   (a table added by a later migration has to be classified here and in the plan first).
-2. Counts before: total rows, and kept rows (the `keep_where` of the plan) for every table.
-3. Deletes in foreign-key order, never `TRUNCATE ... CASCADE`. The stored-object keys of the deleted rows are printed first (`FILE|key`); a key
-   that a kept row still names (a kept document file, a blank form, a template version) is never listed.
-4. Checks, before anything is added to the logs: every KEEP and log table has exactly its row count of before; every MIXED table holds exactly
-   its kept rows (none lost, none left over); every DELETE table is empty; `document_files_guard` is enabled again. Any difference:
-   `RAISE EXCEPTION`, everything rolls back.
-5. Every open session ends (`revoked_at = now()`, `revoke_reason = 'project_data_reset'`); the session trigger writes one `session_ended` row per
-   session to the security log, on its hash chain.
-6. One audit row, as the migrations write theirs (a direct insert with no actor, since the operator acts on the server, not as a signed-in user;
-   `log_audit_write` needs a signed-in actor): action `project_data_reset`, entity `system` / `project_data`, `before` = rows per DELETE and MIXED
-   table, `after` = rows deleted per table, kept rows per MIXED table, sessions ended, files quarantined, the operator's login and the backup path.
-   Counts only, never a value of a deleted row. The reason is the operator's `--reason`. The audit triggers seal it on the chain.
-7. Final check: the Audit Log and its chain grew by exactly one row (the reset row, sealed); the security log grew by exactly one row per ended
-   session; no other log moved. Then COMMIT.
+`data_reset_core` and `data_reset_plan` are owned by the role `pmis_reset_owner` (NOLOGIN, BYPASSRLS), the only role with SELECT on every table of the
+plan and DELETE on the DELETE and MIXED tables; EXECUTE is granted to `pmis_definer` (the Settings doors) only, and the superuser (the script) may call
+anything. No other definer function gains these rights.
 
-The transaction runs at REPEATABLE READ, so a timer that writes a job run meanwhile cannot make the counts differ.
+1. Only with execute: a reason of at least 10 characters; the advisory lock `353383097684` (one reset at a time, the script and Settings alike); for the
+   script, no Settings request approved or running; `lock_timeout` 60 s.
+2. Coverage: every base table of the `public` schema must be in the plan, every table of the plan must exist, the reset role must hold its rights on
+   each, and no trigger of a plan table may be disabled; otherwise the reset stops (a table added by a later migration has to be classified here and in
+   `data_reset_plan` first, and granted to the reset role).
+3. Only with execute: locks on every table of the plan, in name order: EXCLUSIVE on the DELETE and MIXED tables, SHARE on the KEEP and log tables.
+   Plain reads go on; every writer (a timer, a sign-in, another API process) waits until the commit. Then the marker `data_reset_marker` (the id of
+   this transaction). The transaction runs at READ COMMITTED (the script's wrapper and the API alike): every statement after the locks sees all that
+   was committed before them, and nothing can be committed into a table of the plan until the reset ends, so no row written just before the reset can
+   stay behind unseen, and no timer can change a count under the checks. The reset role holds UPDATE on the KEEP and log tables only because
+   `LOCK ... IN SHARE MODE` requires it; its code updates no KEEP table but `user_sessions` (to end the sessions).
+4. Counts before: total rows, and kept rows (the `keep_where` of the plan) for every table. A dry run returns here (the temporary tables are dropped).
+5. Deletes in foreign-key order, never `TRUNCATE`, no trigger disabled. The stored-object keys of the deleted rows are returned; a key that a kept row
+   still names (a kept document file, a blank form, a template version) is never listed.
+6. Checks, before anything is added to the logs: every KEEP and log table has exactly its row count of before; every MIXED table holds exactly
+   its kept rows (none lost, none left over); every DELETE table is empty. Any difference: `RAISE EXCEPTION`, everything rolls back.
+7. Every open session ends except the kept one (Settings: the runner's own session; the script: none kept) (`revoked_at = now()`,
+   `revoke_reason = 'project_data_reset'`, `revoked_by` = the runner in Settings, NULL for the script); the session trigger writes one row per session
+   to the security log, on its hash chain (`session_ended`, or `session_revoked_by_admin` when another admin ended it).
+8. One audit row: action `project_data_reset`, entity `system` / `project_data`, `before` = rows per DELETE and MIXED table, `after` = rows deleted per
+   table, kept rows per MIXED table, sessions ended, the kept session, files quarantined, and the caller's detail (the script: the operator's login, the
+   backup path, `via` the script; Settings: `via` `settings`, the request, the requester, the approver, the runner, the approval reason, the backup row,
+   the quarantine directory). Actor: none for the script (the operator acts on the server, as the migrations do), the runner in Settings. Counts only,
+   never a value of a deleted row. The reason is the operator's `--reason` or the request's reason. The audit triggers seal it on the chain.
+9. Final check: the Audit Log and its chain grew by exactly one row (the reset row, sealed); the security log grew by exactly one row per ended
+   session; no other log moved. The marker is removed. The caller commits.
+
+A dry run takes no lock stronger than a read lock and writes nothing but its own temporary tables, so it is safe while the API runs.
 
 ## Guards
 
 - The Audit Log, its chain and field changes, the security log and its chain, the System Log, job runs, deployments, the mail outbox and the
   integrity runs are KEEP: nothing in the reset deletes or updates them, and their own triggers refuse it anyway.
-- The row backstops of the workflow and register tables (`wf_backstop`, `reg_backstop`, `idm_backstop`) let the superuser through
-  (`app_is_seeding()`, the same path the migrations use); the reset runs only as the superuser.
-- `document_files_guard` refuses every DELETE ("a stored document file is never deleted; withdraw or supersede it"). It protects the normal
-  workflow; the owner's approved scope explicitly removes the documents of project data. It is switched off with `ALTER TABLE ... DISABLE TRIGGER`
-  for the one DELETE of the project files only, inside the transaction (the exclusive lock means no other session sees the table meanwhile), and
-  the checks fail the reset if it is not enabled again. The files themselves are not deleted: they are moved to the quarantine directory.
-- `task_delay_periods`, `ps_manual_values`, `ps_manual_plans`, `dash_snapshot_runs` ("rows are never deleted") and `snag_photos` ("a stored snag
-  photo is never deleted") are project data the owner asked to remove (delay periods, manual Project Status values and plans, KPI snapshot runs, QC
-  photos). Nothing references them; they are emptied with one `TRUNCATE` without CASCADE (row triggers do not fire on TRUNCATE; PostgreSQL refuses
-  a TRUNCATE of a table that another, not truncated, table references).
+- The row guards that refuse every DELETE (`doc_files_guard` "a stored document file is never deleted", `snag_photos_guard`, `dash_owner_rows_frozen`
+  of `task_delay_periods`, `ps_manual_values`, `ps_manual_plans`, `dash_snapshot_runs`) and the backstops (`reg_backstop`, `wf_backstop`) let a DELETE
+  through only when the current role is `pmis_reset_owner` AND `data_reset_marker` holds the id of the current transaction (`data_reset_deleting()`).
+  Only `data_reset_core` writes the marker (pmis_app has no right on it), inside its own transaction, and removes it before the commit; an
+  uncommitted marker is invisible to every other session. Before migration 0146 the script disabled `document_files_guard` and truncated the frozen
+  tables; it no longer does either. The files themselves are not deleted: they are moved to the quarantine directory.
+- The rows of `data_reset_requests` and `data_reset_request_files` are never deleted; a closed request and a decided file outcome never change.
 - Tables that are append-only by design and are logs stay KEEP (`status_transitions`, `status_updates`, `mail_outbox`; see Open).
 
 ## Decisions per table
@@ -201,6 +286,7 @@ records of the Contractors register (companies, teams, contracts) and the vehicl
 | team_scope_match_groups | KEEP | Team scope rules. |
 | team_scope_match_meta | KEEP | Team scope rules version. |
 | team_scope_match_scopes | KEEP | Team scope rules. |
+| data_reset_marker | KEEP | The marker of a running reset (migration 0146): empty outside the reset's own transaction. |
 
 ### Master data of companies, between users, preferences (KEEP)
 
@@ -243,6 +329,8 @@ records of the Contractors register (companies, teams, contracts) and the vehicl
 | mail_outbox | KEEP | Outgoing mail log with its own retention purge; see Open. |
 | status_transitions | KEEP | Approved state transitions (append-only by design, derived from step ledgers); see Open. |
 | status_updates | KEEP | Weekly status updates by region or team (append-only by design, never removed); see Open. |
+| data_reset_requests | KEEP | The requests of the Settings reset (migration 0146): who asked, who approved, who ran, the backup, the result. Evidence, never deleted. |
+| data_reset_request_files | KEEP | The files of each Settings reset and where they went (moved, missing, refused). Evidence, never deleted. |
 
 ### MIXED
 
@@ -333,8 +421,16 @@ Outside the `public` schema nothing is touched (`pmis_admin.migrations`, the ins
 
 ## Open
 
-- **MinIO storage.** The script quarantines files on local disk only; with `S3_ENDPOINT` set it stops before any change. A MinIO variant
-  (`mc mv` to a `pre-reset-<timestamp>/` prefix) is not written.
+- **MinIO storage.** The script and Settings quarantine files on local disk only; with `S3_ENDPOINT` set the script stops before any change and
+  Settings refuses the run (409 `storage_not_supported`). A MinIO variant (a copy to a `pre-reset-<timestamp>/` prefix, then a delete of the
+  originals once the copy is verified) is not written: a copy-then-delete is not the rename the rules ask for.
+- **Settings quarantine place.** `<STORAGE_DIR>/.pre-reset-<timestamp>` (inside the store) instead of the script's `<STORAGE_DIR>-pre-reset-<timestamp>`
+  (beside it), because the API cannot write the data root. If the owner wants the same place for both, the installer must give the service a
+  writable quarantine root on the same filesystem.
+- **Settings while a reset runs.** A compromised `pmis_app` can take the advisory lock `353383097684` itself and keep every route at 503 (a denial of
+  service, never a deletion); it can already do worse. Nothing in the API takes that lock outside `data_reset_core`.
+- **Backup rows.** A server needs the updated `db-backup.sh` (migration 0146 era) and one successful backup after it before a Settings run is
+  possible. The operator script keeps its own pre-reset `pg_dump`.
 - **External party contracts** (`external_party_contracts`, contract records of the Contractors register) are kept as master data of the
   companies. If the owner sees contracts as project data, they move to DELETE.
 - **status_transitions, status_updates, mail_outbox** stay (append-only by design). `status_transitions` then holds history of deleted tasks
