@@ -85,7 +85,7 @@ W1 decision: the single tab row takes its phases from the published workflow ver
 |---|------------|--------|----|
 | W1 | Site page: one clear tab row instead of two overlapping rows | Pending | |
 | W2 | Registers & Logs: the same view options as Site Master (wide table, board, density, map where it applies) | Pending | |
-| W3 | Settings > Site360: remove the tab and the name; move what is still useful into Settings > Workflow | Pending | |
+| W3 | Settings > Site360: remove the tab and the name; move what is still useful into Settings > Workflow | Done | this PR |
 | W4 | Dead or stuck screens: Settings > Alerts and Security stay on "Loading..."; audit every menu and tab | Pending | |
 | W5 | Library menu (Forms and Archive); Data entry > Templates stays as it is | Pending | |
 | W7 | Daily Progress and Tomorrow Plan: a screen in the system, copyable to email | Pending | |
@@ -137,6 +137,18 @@ Do:
 5. Tests: settingsRedirects and settingsScreens updated; the moved functions keep their tests.
 
 Acceptance: no "Site360" tab or label in Settings; nothing the tab did is lost; old links redirect.
+
+Step 1 finding (2026-11-24). What the Site360 tab (Site360Columns.tsx) and its API offered that Workflow Studio did not:
+
+| # | Function | Studio before W3 | Moved to |
+|---|----------|------------------|----------|
+| 1 | One list of every Master column in Master order (A to GE and the added columns), whatever feeds it | Studio lists only the columns whose source is a task, inside that task's form | Settings > Workflow > Columns (`workflow/columns`), the full list |
+| 2 | Change the menus of a column that no task feeds (site fields such as Site ID or Region, scope flags, register and formula columns) through `PATCH /site360/columns/{ord}/sections` with a reason | Not reachable: such a column is in no task form | Settings > Workflow > Columns, same dialog, same API, same right (`site360_col_can_admin` on the server) |
+| 3 | The status columns (FX:GE) shown as "Status (every menu)", with no edit | Shown only for task columns | Settings > Workflow > Columns |
+| 4 | The list is read from `GET /site360/sections` (menu names from the server, readable by anyone who opens Settings); only the save needs the right | `GET /site360/columns` answers 403 to anyone without the right | Kept as it was: the moved screen still reads `GET /site360/sections` |
+
+Nothing else: rename, type, dropdown list, deactivate, reactivate, delete and add of a column were already in Studio (task form and the "New Site Master column" tab), and stay there. The moved screen links to the Workflow editor for them. No API or contract change was needed.
+
 
 ## W4. Screens that stay on "Loading..." (owner image 6)
 
@@ -280,6 +292,7 @@ Total: roughly 7 PRs and several CI cycles each. This does not fit in one short 
 
 ## Log
 
+- 2026-11-24: W3 done: the Settings tab Site360 is removed; its Master column menus moved to Settings > Workflow > Columns (same API, same right); old `site360` and `site360-columns` links redirect there; user-visible "SITE 360" and "Site360" in i18n now read "Site Master" (en) and "ماستر المواقع" (ar). No migration, no contract change. CHANGELOG 202.
 - 2026-11-24: W8 item 6: total / filtered / shown counts on every site-data screen.
 - 2026-11-23: W8 item 5: search by a pasted list of Site IDs.
 - 2026-11-23: W8 added (row numbers, three-level headers, task list layout, one full table standard on every screen of site data).
