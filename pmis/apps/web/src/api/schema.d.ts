@@ -4608,7 +4608,7 @@ export interface paths {
         };
         /**
          * The plans of one day (one per region the caller sees)
-         * @description 0.15.67 (migration 0149). Any signed-in user, for the regions of the session (the regions the person's assignments cover; a System Admin or an all-regions assignment sees all). `region_id` (repeatable) narrows the regions. The rows of a locked day are the frozen copy taken at the lock. `version` of each plan is the If-Match of its changes (0 before the first change).
+         * @description 0.15.67 (migration 0149). For each region of the session (the regions the person's assignments cover; a System Admin or an all-regions assignment sees all) where the caller holds `view` on `daily_plan` or `sites` for that region (an assignment covering the region and the module, or a delegation covering the region); the other regions are left out, and with none left the answer is 403 `action_forbidden`. `region_id` (repeatable) narrows the regions. The rows of a locked day are the frozen copy taken at the lock. `version` of each plan is the If-Match of its changes (0 before the first change).
          */
         get: operations["getDailyPlans"];
         put?: never;
@@ -4628,7 +4628,7 @@ export interface paths {
         };
         /**
          * Export Daily Progress and Tomorrow Plan as Excel
-         * @description 0.15.67. One sheet with the two tables of the owner's sheet: "Daily Progress <date>" (No, Site ID, Tower Owner, Owner ID, Latitude, Longitude, Region, Site Type, SOW, Vendor / Contractor Name, AAT SE, Planned Work, Actual Work, Reason (if not reach target)) and "Tomorrow Plan <next working day>" (No, Site ID, Tower Owner, Owner ID, Latitude, Longitude, Region, Site Type, SOW, Vendor / Contractor Name, AAT SE, Access Valid, Planned Work, Remark), always in this order. `site_id` (repeatable) keeps the rows of the current view. Audited (`daily_plan.exported`).
+         * @description 0.15.67. One sheet with the two tables of the owner's sheet: "Daily Progress <date>" (No, Site ID, Tower Owner, Owner ID, Latitude, Longitude, Region, Site Type, SOW, Vendor / Contractor Name, AAT SE, Planned Work, Actual Work, Reason (if not reach target)) and "Tomorrow Plan <next working day>" (No, Site ID, Tower Owner, Owner ID, Latitude, Longitude, Region, Site Type, SOW, Vendor / Contractor Name, AAT SE, Access Valid, Planned Work, Remark), always in this order. `site_id` (repeatable) keeps the rows of the current view. Needs `view` and `export` on `daily_plan` or `sites` for each region exported (the others are left out; none left = 403 `action_forbidden`). Audited (`daily_plan.exported`).
          */
         get: operations["exportDailyPlans"];
         put?: never;

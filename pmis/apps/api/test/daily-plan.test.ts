@@ -4,7 +4,7 @@ import { randomBytes } from 'node:crypto';
 import type { Client as PgClient } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { startApp, superDb } from './helpers';
-import { Actor, actor, plainAdmin, taskDef } from './wf-helpers';
+import { Actor, actor, addAssignment, plainAdmin, taskDef } from './wf-helpers';
 
 /**
  * My Work > Daily Plan (plan W7, migration 0149, contract 0.15.67). Region 6 (GM), synthetic sites, people and orders only.
@@ -25,6 +25,8 @@ let l1: Actor;
 let l2: Actor;
 let viewer: Actor;
 let outsider: Actor;
+let noRight: Actor;
+let wrongRegionRight: Actor;
 let s1: { id: string; code: string };
 let s2: { id: string; code: string };
 let s3: { id: string; code: string };
@@ -71,10 +73,15 @@ beforeAll(async () => {
   app = await startApp();
   db = await superDb();
   admin = await plainAdmin(app, db);
-  l1 = await actor(app, db, { level: 'entry', regions: [REGION] });
+  // the Site Register rights (view, edit, approve) and export: the menu, the read and the export of the Daily Plan follow view and export on daily_plan or sites
+  l1 = await actor(app, db, { level: 'entry', regions: [REGION], grants: [['sites', 'view'], ['sites', 'edit'], ['sites', 'export'], ['approvals', 'view']] });
   l2 = await actor(app, db, { level: 'approve', regions: [REGION] });
   viewer = await actor(app, db, { level: 'entry', regions: [REGION] });
   outsider = await actor(app, db, { level: 'entry', regions: [5] });
+  // region 6 in scope, but no view on daily_plan or sites anywhere; and view on sites only through an assignment of region 5 next to a region-6 one without it
+  noRight = await actor(app, db, { level: 'entry', regions: [REGION], grants: [['approvals', 'view']] });
+  wrongRegionRight = await actor(app, db, { level: 'entry', regions: [REGION], grants: [['approvals', 'view']] });
+  await addAssignment(db, wrongRegionRight.user.id, { level: 'entry', regions: [5], grants: [['sites', 'view'], ['sites', 'export']] });
   await cell(1, l1.user.id);
   await cell(3, l2.user.id);
 
@@ -143,6 +150,28 @@ describe('pre-fill from system data', () => {
 });
 
 describe('region scope', () => {
+  it('the region in scope is not enough: without view on Daily Plan or Sites for the region the read, the export and every write are refused', async () => {
+    const r = await noRight.api.call('get', `/daily-plans?date=${D}&region_id=${REGION}`);
+    expect(r.status).toBe(403);
+    expect(r.body.code).toBe('action_forbidden');
+    expect((await noRight.api.call('get', `/daily-plans/export?date=${D}&region_id=${REGION}`)).status).toBe(403);
+    expect((await noRight.api.call('patch', `${base}/sites/${s1.id}`, { remark: 'x' }, { 'If-Match': '*' })).status).toBe(403);
+    expect((await noRight.api.call('post', `${base}/lock`, undefined, { 'If-Match': '*' })).status).toBe(403);
+    // a right held for another region does not open this one (scopes never cross): region 6 is left out, region 5 has no plan rows of this suite
+    const w = await wrongRegionRight.api.call('get', `/daily-plans?date=${D}`);
+    expect(w.status).toBe(200);
+    expect((w.body.plans as J[]).map((p) => p.region_id)).toEqual([5]);
+    expect((await wrongRegionRight.api.call('get', `/daily-plans?date=${D}&region_id=${REGION}`)).status).toBe(403);
+    expect((await wrongRegionRight.api.call('get', `/daily-plans/export?date=${D}&region_id=${REGION}`)).status).toBe(403);
+  });
+
+  it('export needs the export right as well as view (the viewer holds view, not export)', async () => {
+    expect((await get(viewer)).status).toBe(200);
+    const e = await viewer.api.call('get', `/daily-plans/export?date=${D}&region_id=${REGION}`);
+    expect(e.status).toBe(403);
+    expect(e.body.code).toBe('action_forbidden');
+  });
+
   it('a person of another region does not see the plan and cannot change it', async () => {
     const res = await outsider.api.call('get', `/daily-plans?date=${D}`);
     expect(res.status).toBe(200);

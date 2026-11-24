@@ -26,7 +26,7 @@
 - العقد 0.15.67: الوسم `daily-plan`، المسارات `GET /daily-plans`، `GET /daily-plans/export`، `POST`/`PATCH`/`DELETE /daily-plans/{date}/regions/{region_id}/sites[/{site_id}]`، `POST .../lock`، `POST .../unlock`، `GET`/`PUT /settings/daily-plan`، ورمز الخطأ `plan_locked` (409). وأعيد توليد `apps/web/src/api/schema.d.ts`.
 - الخادم: `DailyPlanController` و`DailyPlanSettingsController` و`DailyPlanService` (ملف Excel بجدولي اليوم والغد بترتيب المالك)، ووحدة `daily_plan` في شبكة الصلاحيات، ومفتاح التنقل `daily_plan` لمن يملك المواقع.
 - الواجهة: صفحة `/my-work/daily-plan` (حفظ العروض، «+ فلتر» بالمنطقة والمقاول ومهندس الإشراف ونطاق العمل، بحث، عدد، الكثافة، الأعمدة، تصدير، نسخ للبريد، إضافة موقع، تعديل صف، حذف صف، إقفال وفتح لكل منطقة، رابط الإعدادات لمن يملك الحق)، وتبويب الإعدادات «عملي» بقسم «الخطة اليومية»، بالعربية والإنجليزية، فاتح وداكن. الجدول جدول HTML بسيط لتغلّفه شريط الأدوات المشترك لـ W8 لاحقاً.
-- الاختبارات: `apps/api/test/daily-plan.test.ts` (12)، `apps/web/src/pages/dailyPlan.test.tsx` (9)، `apps/web/e2e/dailyPlan.spec.ts` (بالعربية والإنجليزية)، وحالات الأمان `tests/db-security/cases/E11_daily_plan.sql` (22).
+- الاختبارات: `apps/api/test/daily-plan.test.ts` (14)، `apps/web/src/pages/dailyPlan.test.tsx` (9)، `apps/web/e2e/dailyPlan.spec.ts` (بالعربية والإنجليزية)، وحالات الأمان `tests/db-security/cases/E11_daily_plan.sql` (26).
 
 ### تعديل
 - `sv_screen_module` و`sv_module_ok` (آخر تعريف 0138): الشاشة `daily-plan` تتبع وحدة `daily_plan`، ويكفي حق عرض المواقع لحفظ عروضها.
@@ -35,6 +35,7 @@
 - اختبارا المصفوفة والقائمة الجانبية يعرفان الصف والمدخل الجديدين.
 
 ### أمان
+- **تكافؤ البوابة مع القائمة (مراجعة أمنية 2026-11-24):** القراءة تحتاج، لكل منطقة، أن تكون المنطقة ضمن نطاق الجلسة **وأن** يملك المستخدم حق `view` على وحدة `daily_plan` أو `sites` لتلك المنطقة نفسها (`dp_right`: تكليف نشط يغطي المنطقة والوحدة، أو تفويض يغطي المنطقة)؛ تُستبعد المناطق الأخرى، وإن لم يبق شيء يُرفض الطلب (403 `action_forbidden`). التصدير يحتاج `export` أيضاً لكل منطقة. كل باب كتابة يحتاج حق العرض على المنطقة فوق مستوى المصفوفة.
 - كل دالة جديدة SECURITY DEFINER بمسار بحث ينتهي بـ `pg_temp`، مالكها `pmis_definer`، وسُحب حق PUBLIC؛ لـ `pmis_app` الأبواب العشرة فقط. كل باب يأخذ الفاعل من `app_actor()` ويتحقق من نطاق المنطقة ومستوى المصفوفة ومن الإصدار تحت قفل الصف، ويدقّق كل كتابة قبل/بعد. التصدير مدقَّق.
 
 ### مفتوح

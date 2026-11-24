@@ -41,7 +41,7 @@ UPDATE daily_plan_rows SET reason = 'forged';
 -- @end
 
 -- @case DP-05
--- @title Alice, not an L1 holder of the Daily Plan, changes a row of the Tripoli plan through the door
+-- @title Alice, with no view right and not an L1 holder of the Daily Plan, changes a row of the Tripoli plan through the door
 -- @category daily-plan
 -- @actor ALICE
 -- @region 1
@@ -178,14 +178,53 @@ SELECT daily_plan_json(DATE '2026-03-01', NULL);
 -- @end
 
 -- @case DP-20
--- @title Control: Alice reads the Tripoli plan (no row, version 0, not editable) and the default columns of the settings
+-- @title Alice, with Tripoli in her scope but no view on Daily Plan or Sites (her assignment has no profile), reads the Tripoli plan (security review 2026-11-24: gate parity)
 -- @category daily-plan
 -- @actor ALICE
 -- @region 1
--- @expect output 1|0|false|false|14
-SELECT concat_ws('|', jsonb_array_length(d -> 'plans'), d -> 'plans' -> 0 ->> 'version', d -> 'plans' -> 0 ->> 'can_edit', d -> 'plans' -> 0 ->> 'can_lock',
+-- @expect error P0001 wf:action_forbidden
+SELECT daily_plan_json(DATE '2026-03-01', ARRAY[1]);
+-- @end
+
+-- @case DP-23
+-- @title Alice, with no view on Daily Plan or Sites, exports the Tripoli plan
+-- @category daily-plan
+-- @actor ALICE
+-- @region 1
+-- @expect error P0001 wf:action_forbidden
+SELECT dp_export_json(DATE '2026-03-01', ARRAY[1], NULL);
+-- @end
+
+-- @case DP-24
+-- @title Alice, once given Sites view for Tripoli only (a delegation, no export), exports the Tripoli plan
+-- @category daily-plan
+-- @expect error P0001 wf:action_forbidden.*export
+\ctx ADMIN stepup=300
+SELECT idm_delegate('user', '{{ALICE}}', NULL, NULL, false, '[{"module":"sites","action":"view"}]'::jsonb, false, ARRAY[1], NULL, NULL, false, NULL, 'Sites view, Tripoli');
+\ctx ALICE
+SELECT dp_export_json(DATE '2026-03-01', ARRAY[1], NULL);
+-- @end
+
+-- @case DP-25
+-- @title Control: Alice with Sites view for Tripoli reads the Tripoli plan (version 0, not editable: no L1 of the Matrix row) and the default columns of the settings
+-- @category daily-plan
+-- @expect output 1|1|0|false|14
+\ctx ADMIN stepup=300
+SELECT idm_delegate('user', '{{ALICE}}', NULL, NULL, false, '[{"module":"sites","action":"view"}]'::jsonb, false, ARRAY[1], NULL, NULL, false, NULL, 'Sites view, Tripoli');
+\ctx ALICE
+SELECT concat_ws('|', jsonb_array_length(d -> 'plans'), d -> 'plans' -> 0 ->> 'region_id', d -> 'plans' -> 0 ->> 'version', d -> 'plans' -> 0 ->> 'can_edit',
   jsonb_array_length(s -> 'columns' -> 'progress'))
 FROM daily_plan_json(DATE '2026-03-01', ARRAY[1]) d, dp_settings_json() s;
+-- @end
+
+-- @case DP-26
+-- @title Alice with Sites view for Tripoli (the read is open to her) but not an L1 holder of the Matrix row changes a row
+-- @category daily-plan
+-- @expect error P0001 wf:action_forbidden.*L1 holders
+\ctx ADMIN stepup=300
+SELECT idm_delegate('user', '{{ALICE}}', NULL, NULL, false, '[{"module":"sites","action":"view"}]'::jsonb, false, ARRAY[1], NULL, NULL, false, NULL, 'Sites view, Tripoli');
+\ctx ALICE
+SELECT dp_save_row(1, DATE '2026-03-01', gen_random_uuid(), '{"remark": "forged"}'::jsonb, NULL);
 -- @end
 
 -- @case DP-21
@@ -205,9 +244,9 @@ SELECT concat_ws('|', daily_plan_json(DATE '2026-03-03', ARRAY[1]) -> 'plans' ->
 -- @category daily-plan
 -- @actor ALICE
 -- @region 1
--- @expect output 31|10|0
+-- @expect output 32|10|0
 SELECT concat_ws('|',
-  (SELECT count(*) FROM pg_proc p WHERE p.proname IN ('dp_columns_default', 'dp_columns_known', 'dp_override_keys', 'dp_cfg', 'dp_settings_json', 'admin_set_daily_plan_settings',
+  (SELECT count(*) FROM pg_proc p WHERE p.proname IN ('dp_right', 'dp_columns_default', 'dp_columns_known', 'dp_override_keys', 'dp_cfg', 'dp_settings_json', 'admin_set_daily_plan_settings',
        'dp_holders', 'dp_holds', 'dp_may_unlock', 'dp_count_lines', 'dp_site_auto', 'dp_auto_sites', 'dp_row_json', 'dp_live_rows', 'dp_rows', 'dp_plan_head', 'daily_plan_json',
        'dp_for_change', 'dp_require_entry', 'dp_stored', 'dp_touch', 'dp_audit_row', 'dp_save_row', 'dp_add_site', 'dp_remove_site', 'dp_freeze', 'dp_lock', 'dp_unlock',
        'dp_export_json', 'dp_local_now', 'dp_tick')

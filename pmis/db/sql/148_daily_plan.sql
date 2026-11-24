@@ -20,8 +20,11 @@
 --      register API lists it), seeded L1 Site Engineers (CW), Site Engineers (TE), CW Team Lead and TE Team Lead, L2 CW Team Lead and TE Team Lead. L1 of the
 --      region (or a System Admin) edits the rows and adds or removes sites; L2 of the region (or a System Admin) locks the day; a locked day is read-only except
 --      through an admin override (unlock: System Admin or a delegate of overrides.unlock for the region, reason, step-up, flagged admin override). A person holds
---      the row through the module daily_plan or sites. Reading follows the region scope of the session (the regions the person's assignments cover; the
---      Project Manager and the System Admins see all).
+--      the row through the module daily_plan or sites. Reading needs, per region, the region scope of the session (the regions the person's assignments
+--      cover; the Project Manager and the System Admins see all) AND the right view on the module daily_plan or sites held for that region (dp_right: a grant
+--      of an active assignment that covers the region and the module, or a delegation covering the region; the same gate as the menu and sv_module_ok);
+--      regions without it are left out, and with none left the read is refused. The export needs the right export as well, per region. Every write door
+--      needs the view right on the region too (dp_for_change), on top of its Matrix level.
 --   6. Settings > My Work > Daily Plan (setting daily_plan.settings, guarded): the visible columns and their order per tab, the default region scope, the time
 --      after which today's plan locks automatically (empty = never) and the hour of the reminder to the L1 holders when the next working day's plan is empty
 --      (empty = no reminder). admin_set_daily_plan_settings: System Admin or a delegate of admin.settings edit for all regions, reason, If-Match, closed body,
@@ -261,6 +264,28 @@ END $$;
 -- ---------------------------------------------------------------------------------------------------------------------
 -- 4. Who holds the Daily Plan row, and what a plan holds
 -- ---------------------------------------------------------------------------------------------------------------------
+-- Does the user hold the right p_action on the module daily_plan or sites for the region? A System Admin; a grant of a profile of an active assignment that
+-- covers the region and the module of the grant; or an active delegation covering the module and the action for the region (or all regions).
+CREATE OR REPLACE FUNCTION dp_right(p_user uuid, p_region integer, p_action "PermissionAction") RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
+  SELECT p_user IS NOT NULL AND (public.app_user_is_system_admin(p_user) OR EXISTS (
+    SELECT 1 FROM public.user_role_assignments ua
+    JOIN public.users u ON u.id = ua.user_id AND u.status = 'active' AND u.deleted_at IS NULL
+    JOIN public.user_role_assignment_profiles ap ON ap.assignment_id = ua.id
+    JOIN public.permission_profiles pp ON pp.id = ap.profile_id AND pp.is_active
+    JOIN public.permission_grants g ON g.profile_id = pp.id AND g.action = p_action
+    CROSS JOIN (VALUES ('daily_plan'), ('sites')) m(module_key)
+    WHERE ua.user_id = p_user AND ua.valid_from <= now() AND (ua.valid_to IS NULL OR ua.valid_to > now())
+      AND (ua.all_regions OR EXISTS (SELECT 1 FROM public.user_role_assignment_regions r WHERE r.assignment_id = ua.id AND r.region_id = p_region))
+      AND (g.module_key = '*' OR m.module_key = g.module_key OR m.module_key LIKE g.module_key || '.%')
+      AND (ua.all_modules OR EXISTS (SELECT 1 FROM public.user_role_assignment_modules x WHERE x.assignment_id = ua.id AND x.module_key = m.module_key))
+  ) OR EXISTS (
+    SELECT 1 FROM public.app_user_delegations(p_user) x(id) JOIN public.delegations d ON d.id = x.id
+    CROSS JOIN (VALUES ('daily_plan'), ('sites')) m(module_key)
+    WHERE public.deleg_covers(d.id, m.module_key, p_action)
+      AND (d.all_regions OR EXISTS (SELECT 1 FROM public.delegation_regions dr WHERE dr.delegation_id = d.id AND dr.region_id = p_region))))
+$$;
+
 -- The holders of L1 (entry) or L2 (approve) of the Daily Plan row in a region: the region cell over the global cell, held through the module daily_plan or sites.
 CREATE OR REPLACE FUNCTION dp_holders(p_region integer, p_kind text) RETURNS TABLE (user_id uuid)
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
@@ -476,13 +501,19 @@ DECLARE a uuid := public.app_actor(); plans jsonb := '[]'::jsonb; rows jsonb := 
 BEGIN
   IF a IS NULL THEN RAISE EXCEPTION 'daily plan: no signed-in actor' USING ERRCODE = 'insufficient_privilege'; END IF;
   IF p_date IS NULL THEN PERFORM public.wf_err('validation_failed', jsonb_build_object('errors', public.reg_err_item('/date', 'required', 'A date is required.'))); END IF;
-  FOR r IN SELECT g.id FROM public.regions g WHERE public.app_region_check(g.id) AND (p_regions IS NULL OR g.id = ANY (p_regions)) ORDER BY g.id LOOP
+  -- the regions of the session scope (narrowed to p_regions) where the actor holds view on daily_plan or sites; none left = refused
+  FOR r IN SELECT g.id FROM public.regions g
+           WHERE public.app_region_check(g.id) AND (p_regions IS NULL OR g.id = ANY (p_regions)) AND public.dp_right(a, g.id, 'view')
+           ORDER BY g.id LOOP
     rr := public.dp_rows(r.id, p_date);
     plans := plans || public.dp_plan_head(r.id, p_date, rr);
     rows := rows || rr;
   END LOOP;
+  IF jsonb_array_length(plans) = 0 THEN
+    PERFORM public.wf_err('action_forbidden', jsonb_build_object('detail', 'You may not open the Daily Plan of these regions (view on Daily Plan or Sites is needed there).'));
+  END IF;
   SELECT coalesce(array_agg(g.id ORDER BY g.id), ARRAY[]::integer[]) INTO mine FROM public.regions g
-  WHERE public.app_region_check(g.id) AND (public.dp_holds(a, g.id, 'entry') OR public.dp_holds(a, g.id, 'approve'));
+  WHERE public.app_region_check(g.id) AND public.dp_right(a, g.id, 'view') AND (public.dp_holds(a, g.id, 'entry') OR public.dp_holds(a, g.id, 'approve'));
   RETURN jsonb_build_object('date', p_date, 'today', public.cal_today(), 'is_workday', public.cal_is_workday(p_date),
     'next_working_day', public.cal_add_workdays(p_date, 1), 'previous_working_day', public.cal_add_workdays(p_date, -1),
     'my_region_ids', to_jsonb(mine), 'plans', plans, 'rows', rows);
@@ -496,6 +527,9 @@ BEGIN
   IF public.app_actor() IS NULL THEN RAISE EXCEPTION 'daily plan: no signed-in actor' USING ERRCODE = 'insufficient_privilege'; END IF;
   IF p_region IS NULL OR p_date IS NULL OR NOT EXISTS (SELECT 1 FROM public.regions g WHERE g.id = p_region) OR NOT public.app_region_check(p_region) THEN
     PERFORM public.wf_err('not_found', jsonb_build_object('detail', 'The plan does not exist or is not visible to you.'));
+  END IF;
+  IF NOT public.dp_right(public.app_actor(), p_region, 'view') THEN
+    PERFORM public.wf_err('action_forbidden', jsonb_build_object('detail', 'You may not open the Daily Plan of this region (view on Daily Plan or Sites is needed there).'));
   END IF;
   SELECT * INTO p FROM public.daily_plans WHERE region_id = p_region AND plan_date = p_date FOR UPDATE;
   IF p_version IS NOT NULL AND p_version <> coalesce(p.version, 0) THEN
@@ -749,18 +783,26 @@ END $$;
 -- the export is audited.
 CREATE OR REPLACE FUNCTION dp_export_json(p_date date, p_regions integer[], p_sites uuid[]) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
-DECLARE d jsonb; t jsonb; nxt date; keep jsonb;
+DECLARE d jsonb; t jsonb; nxt date; keep jsonb; a uuid := public.app_actor(); er integer[];
 BEGIN
-  d := public.daily_plan_json(p_date, p_regions);
+  IF a IS NULL THEN RAISE EXCEPTION 'daily plan: no signed-in actor' USING ERRCODE = 'insufficient_privilege'; END IF;
+  -- the regions asked (all the session sees when none) where the actor holds view AND export on daily_plan or sites; none left = refused
+  SELECT coalesce(array_agg(g.id ORDER BY g.id), ARRAY[]::integer[]) INTO er FROM public.regions g
+  WHERE public.app_region_check(g.id) AND (p_regions IS NULL OR g.id = ANY (p_regions))
+    AND public.dp_right(a, g.id, 'view') AND public.dp_right(a, g.id, 'export');
+  IF cardinality(er) = 0 THEN
+    PERFORM public.wf_err('action_forbidden', jsonb_build_object('detail', 'You may not export the Daily Plan of these regions (export on Daily Plan or Sites is needed there).'));
+  END IF;
+  d := public.daily_plan_json(p_date, er);
   nxt := (d ->> 'next_working_day')::date;
-  t := public.daily_plan_json(nxt, p_regions);
+  t := public.daily_plan_json(nxt, er);
   IF p_sites IS NOT NULL THEN
     d := jsonb_set(d, '{rows}', (SELECT coalesce(jsonb_agg(e), '[]'::jsonb) FROM jsonb_array_elements(d -> 'rows') e WHERE (e ->> 'site_id')::uuid = ANY (p_sites)));
     t := jsonb_set(t, '{rows}', (SELECT coalesce(jsonb_agg(e), '[]'::jsonb) FROM jsonb_array_elements(t -> 'rows') e WHERE (e ->> 'site_id')::uuid = ANY (p_sites)));
   END IF;
   keep := jsonb_build_object('progress', d, 'tomorrow', t);
   PERFORM public.log_audit_write('daily_plan.exported', 'daily_plan', p_date::text, NULL,
-    jsonb_build_object('date', p_date, 'next_working_day', nxt, 'region_ids', to_jsonb(coalesce(p_regions, ARRAY[]::integer[])),
+    jsonb_build_object('date', p_date, 'next_working_day', nxt, 'region_ids', to_jsonb(er),
                        'progress_rows', jsonb_array_length(d -> 'rows'), 'tomorrow_rows', jsonb_array_length(t -> 'rows'), 'filtered', p_sites IS NOT NULL), NULL);
   RETURN keep;
 END $$;
@@ -912,7 +954,7 @@ DECLARE f text;
 BEGIN
   FOREACH f IN ARRAY ARRAY[
     'dp_columns_default(text)', 'dp_columns_known()', 'dp_override_keys()', 'dp_cfg()', 'dp_settings_json()', 'admin_set_daily_plan_settings(jsonb,text,integer)',
-    'dp_holders(integer,text)', 'dp_holds(uuid,integer,text)', 'dp_may_unlock(uuid,integer)', 'dp_count_lines(text)', 'dp_site_auto(uuid,date)',
+    'dp_right(uuid,integer,"PermissionAction")', 'dp_holders(integer,text)', 'dp_holds(uuid,integer,text)', 'dp_may_unlock(uuid,integer)', 'dp_count_lines(text)', 'dp_site_auto(uuid,date)',
     'dp_auto_sites(integer,date)', 'dp_row_json(integer,date,uuid,daily_plan_rows)', 'dp_live_rows(integer,date)', 'dp_rows(integer,date)',
     'dp_plan_head(integer,date,jsonb)', 'daily_plan_json(date,integer[])', 'dp_for_change(integer,date,integer,boolean)', 'dp_require_entry(integer)',
     'dp_stored(uuid,uuid)', 'dp_touch(uuid,boolean)', 'dp_audit_row(daily_plan_rows)', 'dp_save_row(integer,date,uuid,jsonb,integer)',
