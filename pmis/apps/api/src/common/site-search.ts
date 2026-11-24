@@ -2,7 +2,7 @@ import { Prisma } from '@prisma/client';
 import { likePattern } from './cursor';
 import { problems } from './problem';
 
-/** W8 item 5 (contract 0.15.64): at most this many codes in one pasted list. */
+/** W8 item 5 (contract 0.15.68): at most this many codes in one pasted list. */
 export const MAX_PASTED_CODES = 1000;
 
 /**

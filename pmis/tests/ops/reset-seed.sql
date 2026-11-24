@@ -148,6 +148,9 @@ INSERT INTO as_built_records (site_id, region_id, quantities) VALUES (pg_temp.i(
 INSERT INTO task_level_voters (task_id, level, round, user_id) SELECT id, 2, 1, pg_temp.i('admin') FROM t1;
 INSERT INTO task_cover_decisions (bulk_action_id, task_id, region_id, decision, level, from_user_id, to_user_id, decided_by, reason)
 SELECT gen_random_uuid(), id, 1, 'reassign', 1, pg_temp.i('user2'), pg_temp.i('admin'), pg_temp.i('admin'), 'synthetic cover' FROM t1;
+-- the Daily Plan of a day (0149): a header and a row with a manual value (project data)
+INSERT INTO daily_plans (id, region_id, plan_date, created_by) VALUES ('a0000000-0000-4000-8000-0000000000d1', 1, date '2026-11-22', pg_temp.i('admin'));
+INSERT INTO daily_plan_rows (plan_id, region_id, site_id, origin, overrides, reason) VALUES ('a0000000-0000-4000-8000-0000000000d1', 1, pg_temp.i('site1'), 'added', '{"tower_owner": "Synthetic Owner"}', 'synthetic reason');
 INSERT INTO levels_conversions (entity_type, entity_id, converted_at, levels_before, migration, reason) SELECT 'task', id, now(), 3, '0054', 'synthetic' FROM t1;
 
 -- warehouse movements and stock (the item master stays)

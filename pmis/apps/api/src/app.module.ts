@@ -96,6 +96,9 @@ import { SettingsScreensController } from './settings/settings-screens.controlle
 import { SettingsScreensService } from './settings/settings-screens.service';
 import { HistoricalWaiverController } from './settings/historical-waiver.controller';
 import { HistoricalWaiverService } from './settings/historical-waiver.service';
+import { DataResetController } from './settings/data-reset.controller';
+import { DataResetService } from './settings/data-reset.service';
+import { MaintenanceService } from './settings/maintenance.service';
 import { Site360Controller } from './site360/site360.controller';
 import { Site360ColumnsController } from './site360/site360-columns.controller';
 import { Site360ColumnsService } from './site360/site360-columns.service';
@@ -163,6 +166,8 @@ import { ExportsController } from './exports/exports.controller';
 import { MasterExportService } from './exports/master-export.service';
 import { AbsencesController, ReassignmentController } from './reassignment/reassignment.controller';
 import { AbsencesService } from './reassignment/absences.service';
+import { DailyPlanController, DailyPlanSettingsController } from './daily-plan/daily-plan.controller';
+import { DailyPlanService } from './daily-plan/daily-plan.service';
 import { ReassignmentService } from './reassignment/reassignment.service';
 import { StaffRegistryController } from './staff-registry/staff-registry.controller';
 import { StaffRegistryService } from './staff-registry/staff-registry.service';
@@ -185,7 +190,9 @@ export function appModuleFor(config: AppConfig) {
       SearchController, // 0.15.17 (F4)
       ExportsController, // 0.15.34: Master-format export
       AbsencesController, ReassignmentController, // 0.15.54 (migration 0140): absences and the lead decisions (B12b)
+      DailyPlanController, DailyPlanSettingsController, // 0.15.67 (migration 0149): My Work > Daily Plan (W7)
       StaffRegistryController, // 0.15.56 (0142): staff registry card, visibility, edit
+      DataResetController, // 0.15.62 (0146): project data reset in Settings, two System Admins
     ],
     providers: [
       { provide: APP_CONFIG, useValue: config },
@@ -206,7 +213,9 @@ export function appModuleFor(config: AppConfig) {
       SearchService, // 0.15.17 (F4)
       MasterExportService, // 0.15.34
       AbsencesService, ReassignmentService, // 0.15.54 (migration 0140)
+      DailyPlanService, // 0.15.67 (migration 0149)
       StaffRegistryService, // 0.15.56 (0142)
+      DataResetService, MaintenanceService, // 0.15.62 (0146)
       { provide: APP_GUARD, useClass: SessionGuard },
       { provide: APP_INTERCEPTOR, useClass: TxInterceptor },
       { provide: APP_FILTER, useClass: ProblemFilter },

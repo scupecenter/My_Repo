@@ -4583,13 +4583,13 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Defaults of the Display menu of the site-data tables (0.15.64, W8)
-         * @description 0.15.64 (migration 0148). Every signed-in user: each site-data screen starts from these defaults until the user picks their own Display options (kept per user and per screen in the browser and in saved views). Without a saved value: size `md`, align `start`, density `comfortable`, wrap false, zebra true.
+         * Defaults of the Display menu of the site-data tables (0.15.68, W8)
+         * @description 0.15.68 (migration 0148). Every signed-in user: each site-data screen starts from these defaults until the user picks their own Display options (kept per user and per screen in the browser and in saved views). Without a saved value: size `md`, align `start`, density `comfortable`, wrap false, zebra true.
          */
         get: operations["getTableDisplaySetting"];
         /**
          * Set the defaults of the Display menu (Administration > Settings > Display)
-         * @description 0.15.64 (migration 0148): System Admin or a delegate of `admin.settings` edit for all regions (403 `action_forbidden` otherwise), a reason of at least 3 characters and If-Match. Closed body: `defaults` with every key (`unknown_key` at its path, `invalid` for a value outside its list). Audited (`table_display_update`, before and after). A user's own Display choice and a saved view keep their values; the defaults apply where the user has none.
+         * @description 0.15.68 (migration 0148): System Admin or a delegate of `admin.settings` edit for all regions (403 `action_forbidden` otherwise), a reason of at least 3 characters and If-Match. Closed body: `defaults` with every key (`unknown_key` at its path, `invalid` for a value outside its list). Audited (`table_display_update`, before and after). A user's own Display choice and a saved view keep their values; the defaults apply where the user has none.
          */
         put: operations["setTableDisplaySetting"];
         post?: never;
@@ -4616,6 +4616,154 @@ export interface paths {
          * @description 0.15.61 (migration 0145): System Admin or a delegate of `admin.settings` edit for all regions, a reason and If-Match. Closed body (`unknown_key`; `working_days` 1 to 30, `out_of_range`). `working_days` is the dashboard idle limit `stale_idle_days` (`PUT /settings/dashboard`, the stale flag and the stale-task counter use the same value, Q523): it is one setting, so the ETag of this resource moves when either screen changes it. Audited (`idle_task_alert_update`, before and after).
          */
         put: operations["setIdleTaskAlertSetting"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/daily-plans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The plans of one day (one per region the caller sees)
+         * @description 0.15.67 (migration 0149). For each region of the session (the regions the person's assignments cover; a System Admin or an all-regions assignment sees all) where the caller holds `view` on `daily_plan` or `sites` for that region (an assignment covering the region and the module, or a delegation covering the region); the other regions are left out, and with none left the answer is 403 `action_forbidden`. `region_id` (repeatable) narrows the regions. The rows of a locked day are the frozen copy taken at the lock. `version` of each plan is the If-Match of its changes (0 before the first change).
+         */
+        get: operations["getDailyPlans"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/daily-plans/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Daily Progress and Tomorrow Plan as Excel
+         * @description 0.15.67. One sheet with the two tables of the owner's sheet: "Daily Progress <date>" (No, Site ID, Tower Owner, Owner ID, Latitude, Longitude, Region, Site Type, SOW, Vendor / Contractor Name, AAT SE, Planned Work, Actual Work, Reason (if not reach target)) and "Tomorrow Plan <next working day>" (No, Site ID, Tower Owner, Owner ID, Latitude, Longitude, Region, Site Type, SOW, Vendor / Contractor Name, AAT SE, Access Valid, Planned Work, Remark), always in this order. `site_id` (repeatable) keeps the rows of the current view. Needs `view` and `export` on `daily_plan` or `sites` for each region exported (the others are left out; none left = 403 `action_forbidden`). Audited (`daily_plan.exported`).
+         */
+        get: operations["exportDailyPlans"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/daily-plans/{date}/regions/{region_id}/sites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add a site to the plan by hand (or bring back a removed one)
+         * @description L1 of the Matrix row `daily_plan` in the region, or a System Admin; unlocked day. The site must be active and in the region (422 `/site_code` `not_in_region`); a site already in the plan is 409 `duplicate`. Audited.
+         */
+        post: operations["addDailyPlanSite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/daily-plans/{date}/regions/{region_id}/sites/{site_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove a site from the plan
+         * @description L1 of the row, unlocked day. A site added by hand leaves the plan; an auto-filled one is marked removed (it comes back with POST). Audited.
+         */
+        delete: operations["removeDailyPlanSite"];
+        options?: never;
+        head?: never;
+        /**
+         * Change a row (manual values over the auto-filled columns, Reason, Remark)
+         * @description L1 of the Matrix row `daily_plan` in the region, or a System Admin; unlocked day (409 `plan_locked`). `overrides` sets the manual value of an auto-filled column (`null` goes back to the auto value; Site ID, Site Name and Region cannot be changed: `read_only`). On a day up to today a row whose Actual Work has fewer lines than its Planned Work needs a Reason (422, `/reason` `required`). Audited with before and after.
+         */
+        patch: operations["saveDailyPlanRow"];
+        trace?: never;
+    };
+    "/daily-plans/{date}/regions/{region_id}/lock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Lock the day (L2)
+         * @description L2 of the Matrix row `daily_plan` in the region, or a System Admin. Every row below target needs its reason first (422, `errors[].path` `/rows/<site_code>/reason`). The rows are frozen as they are. Audited.
+         */
+        post: operations["lockDailyPlan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/daily-plans/{date}/regions/{region_id}/unlock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reopen a locked day (admin override)
+         * @description A System Admin, or a delegate of `overrides.unlock` for the region; reason and step-up; the audit row is flagged admin override. A day reopened this way is never locked again by the automatic lock.
+         */
+        post: operations["unlockDailyPlan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/daily-plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Settings > My Work > Daily Plan
+         * @description Every signed-in user (the screen reads its columns).
+         */
+        get: operations["getDailyPlanSettings"];
+        /**
+         * Set the Daily Plan settings
+         * @description System Admin or a delegate of `admin.settings` edit for all regions, a reason and If-Match. Closed body (`unknown_key`): `columns.progress` and `columns.tomorrow` are lists of known columns without repeats that hold `site_code` (`unknown_column`, `duplicate`, `site_code_required`); `default_region_scope` `mine` or `all`; `auto_lock_time` `HH:MM` or null; `reminder_hour` 0 to 23 or null (`out_of_range`). Audited (`daily_plan_settings_update`, before and after).
+         */
+        put: operations["setDailyPlanSettings"];
         post?: never;
         delete?: never;
         options?: never;
@@ -5122,6 +5270,192 @@ export interface paths {
          * @description Needs a written reason and step-up. The lift is audited. Required typed confirmation (0.2.5, per CLAUDE.md), `confirm_text` must equal `structural-freeze`, else 422 `confirmation_mismatch`.
          */
         post: operations["liftStructuralFreeze"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/data-reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Project data reset (System Admin only)
+         * @description 0.15.62 (migration 0146, `data_reset_state_json`). A System Admin acting without delegation only (403 `action_forbidden` or `delegate_forbidden` otherwise; the
+         *     menu entry is hidden for everyone else). The plan is the one list of the operator script and of this page (`data_reset_plan`): every table with its decision and the
+         *     rows that would be deleted and kept now. `backup` is the latest successful database backup recorded in the System Log (source `backup`, level `info`, written by
+         *     `infra/backup/db-backup.sh`); a run is refused unless it is younger than `settings.backup_max_age_hours`. `single_admin` is true while fewer than two System Admins
+         *     are active: then no request can be made and the reset is done on the server with `infra/scripts/reset-project-data.sh`. `request` is the open request, `last_request`
+         *     the latest closed one (with its result and the restore instructions on the page). `storage` tells whether the documents are on local disk (the only store the file move
+         *     supports) or in S3/MinIO (a run is then refused, 409 `storage_not_supported`).
+         */
+        get: operations["getDataReset"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/data-reset/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * The request expiry and the backup window of the data reset
+         * @description 0.15.62 (guarded setting `data_reset.settings`). System Admin acting without delegation, reason, step-up and If-Match (the version of `settings`). Closed body (`unknown_key`); `request_expiry_minutes` 5 to 240 (default 30), `backup_max_age_hours` 1 to 72 (default 24), else `out_of_range`. Refused while a request is open (409 `invalid_transition`). Audited (`data_reset_settings_update`, before and after).
+         */
+        put: operations["setDataResetSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/data-reset/requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request the project data reset (first System Admin)
+         * @description 0.15.62. A System Admin acting without delegation (403 `delegate_forbidden` for a delegate), a reason of at least 10 characters, a step-up and the typed phrase
+         *     `RESET <database>` (`confirmation_phrase` of the state; 422 `confirmation_mismatch`). Refused with 409 `single_admin` while fewer than two System Admins are active, 409
+         *     `invalid_transition` while another request is open, 409 `reset_running` while the operator script runs. The request expires after `settings.request_expiry_minutes`
+         *     (default 30). Every other active System Admin is told in-app. Audited (`data_reset_request`) and written to the security log (`project_data_reset`, step `request`).
+         */
+        post: operations["requestDataReset"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/data-reset/requests/{request_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * One data reset request (progress and result)
+         * @description 0.15.62. A System Admin acting without delegation. Answered also while the reset runs (the only routes not refused with 503 then, with `GET /settings/data-reset`), so the runner can follow the progress.
+         */
+        get: operations["getDataResetRequest"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/data-reset/requests/{request_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve the request (a second, different System Admin)
+         * @description 0.15.62. A System Admin acting without delegation who is not the requester and not in the requester's session (403 `self_approval_forbidden`), a reason of at least 10 characters, a step-up and If-Match. The request must be `requested` (409 `invalid_transition`) and not expired (409 `request_expired`). Approval does not run anything. Audited (`data_reset_approve`) and in the security log.
+         */
+        post: operations["approveDataReset"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/data-reset/requests/{request_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel the request (either System Admin)
+         * @description 0.15.62. Any System Admin acting without delegation, a reason, a step-up and If-Match, while the request is `requested` or `approved` (status `cancelled`). A run whose transaction died before its commit (the API stopped; `stalled` true) is closed the same way as `failed`; nothing was reset. Audited (`data_reset_cancel`) and in the security log.
+         */
+        post: operations["cancelDataReset"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/data-reset/requests/{request_id}/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start the approved reset (the requester or the approver)
+         * @description 0.15.62. The System Admin who made the request or the one who approved it (403 `action_forbidden` for anyone else), acting without delegation, a step-up, the typed
+         *     phrase again (422 `confirmation_mismatch`) and If-Match, while the request is `approved` and not expired. Refused with 409 `backup_missing` unless the System Log
+         *     records a successful database backup within `backup_max_age_hours`, 409 `storage_not_supported` when the documents are in S3/MinIO, 409 `quarantine_unavailable`
+         *     when the quarantine directory cannot be made in the store, 409 `plan_incomplete` when a table has no decision, 409 `reset_running` while a reset runs.
+         *     Answers 202 with the request in `running` and runs in the background: one database transaction (`admin_data_reset_execute`, `data_reset_core`) that deletes the
+         *     project data with the guards of the operator script and ends every session except the runner's; while it runs every other route answers 503 `maintenance`. After the
+         *     commit the API moves the stored files of the deleted rows into `quarantine_dir` (never deleted; status `files_pending`, then `completed`). A failure before the commit
+         *     leaves everything as it was (status `failed`, `error`). Poll `GET /settings/data-reset/requests/{request_id}`.
+         */
+        post: operations["runDataReset"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/data-reset/requests/{request_id}/retry-files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Move the files still pending after a reset (the database part never runs again)
+         * @description 0.15.62. Any System Admin acting without delegation, a reason and a step-up, while the request is `files_pending` (409 `invalid_transition` otherwise). Moves the keys still `pending` into the same quarantine directory with the same rules; a key already moved, missing or refused is never tried again. Audited (`data_reset_files_retry`).
+         */
+        post: operations["retryDataResetFiles"];
         delete?: never;
         options?: never;
         head?: never;
@@ -9464,17 +9798,17 @@ export interface components {
             conflicts?: components["schemas"]["ScopeConflict"][];
         };
         /** @enum {string} */
-        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "insufficient_stock" | "item_in_use" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "invalid_code" | "invalid_enrol_code" | "enrol_code_expired" | "password_change_required" | "weak_password" | "internal_error" | "team_scope_mismatch" | "two_factor_enforced" | "scope_scenario_conflict" | "too_many_rows" | "integrity_too_large" | "mail_not_configured" | "self_approval_forbidden" | "document_rule_pending" | "file_pending_scan" | "list_not_configured" | "list_parent_mismatch" | "email_not_verified" | "batch_processing" | "vehicle_already_reserved" | "upload_processing" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "invitation_invalid" | "system_field" | "conversion_unconfirmed" | "column_in_use" | "input_already_mapped" | "field_already_mapped";
+        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "plan_locked" | "insufficient_stock" | "item_in_use" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "invalid_code" | "invalid_enrol_code" | "enrol_code_expired" | "password_change_required" | "weak_password" | "internal_error" | "team_scope_mismatch" | "two_factor_enforced" | "scope_scenario_conflict" | "too_many_rows" | "integrity_too_large" | "mail_not_configured" | "self_approval_forbidden" | "document_rule_pending" | "file_pending_scan" | "list_not_configured" | "list_parent_mismatch" | "email_not_verified" | "batch_processing" | "vehicle_already_reserved" | "upload_processing" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "invitation_invalid" | "system_field" | "conversion_unconfirmed" | "column_in_use" | "input_already_mapped" | "field_already_mapped" | "single_admin" | "backup_missing" | "request_expired" | "reset_running" | "plan_incomplete" | "storage_not_supported" | "quarantine_unavailable" | "maintenance";
         PageEnvelope: {
             items: unknown[];
             page: components["schemas"]["PageInfo"];
         };
-        /** @description 0.15.64 (W8 item 6). The counts of the toolbar, from the server, never from the loaded rows. `total`: every row the caller may see on this screen (region scope B3 and row security; a stream or a view keeps its own rows). `filtered`: the rows that match the filters and the search (the rows paging walks through and Export writes). */
+        /** @description 0.15.68 (W8 item 6). The counts of the toolbar, from the server, never from the loaded rows. `total`: every row the caller may see on this screen (region scope B3 and row security; a stream or a view keeps its own rows). `filtered`: the rows that match the filters and the search (the rows paging walks through and Export writes). */
         ListCounts: {
             total: number;
             filtered: number;
         };
-        /** @description 0.15.64 (W8 item 5). The result of a pasted list in `q`: the distinct codes pasted, how many name a site the caller may see on this screen (whatever the other filters), and the codes that name none, in paste order (upper case). A site outside the caller's regions is reported as not found, so the answer reveals nothing the caller may not see. */
+        /** @description 0.15.68 (W8 item 5). The result of a pasted list in `q`: the distinct codes pasted, how many name a site the caller may see on this screen (whatever the other filters), and the codes that name none, in paste order (upper case). A site outside the caller's regions is reported as not found, so the answer reveals nothing the caller may not see. */
         PastedSearch: {
             pasted: number;
             found: number;
@@ -13238,7 +13572,7 @@ export interface components {
                 issues: ("scope_not_specified" | "past_end_date")[];
             }[];
         };
-        /** @description 0.15.64 (W8 item 4). The Display options of a site-data table: text size, alignment of the text cells, row density, wrap long text, zebra rows. */
+        /** @description 0.15.68 (W8 item 4). The Display options of a site-data table: text size, alignment of the text cells, row density, wrap long text, zebra rows. */
         TableDisplay: {
             /** @enum {string} */
             size: "sm" | "md" | "lg";
@@ -13261,6 +13595,135 @@ export interface components {
             /** @description Default 2. */
             working_days: number;
             version: number;
+            /** Format: date-time */
+            updated_at?: string;
+            updated_by?: components["schemas"]["UserRef"];
+        };
+        /** @enum {string} */
+        DailyPlanColumn: "no" | "site_code" | "site_name" | "tower_owner" | "owner_id" | "latitude" | "longitude" | "region" | "site_type" | "sow" | "contractor" | "aat_se" | "access_valid" | "planned_work" | "actual_work" | "reason" | "remark";
+        DailyPlanItem: {
+            /** @enum {string} */
+            kind: "task" | "field_work";
+            code: string;
+            label: string;
+            label_ar?: string;
+        };
+        DailyPlanRow: {
+            region_id: number;
+            /** Format: uuid */
+            site_id: string;
+            site_code: string;
+            site_name?: string | null;
+            /**
+             * @description auto = filled from system data; added = added by hand.
+             * @enum {string}
+             */
+            origin: "auto" | "added";
+            /** @description The value shown in each column (the manual value over the auto one). */
+            values: {
+                site_code?: string | null;
+                site_name?: string | null;
+                region?: string | null;
+                tower_owner?: string | null;
+                owner_id?: string | null;
+                latitude?: string | null;
+                longitude?: string | null;
+                site_type?: string | null;
+                sow?: string | null;
+                contractor?: string | null;
+                aat_se?: string | null;
+                /** @description Yes, Yes (to YYYY-MM-DD) or No. */
+                access_valid?: string | null;
+                /** @description One item per line. */
+                planned_work?: string | null;
+                /** @description One item per line. */
+                actual_work?: string | null;
+            };
+            /** @description The auto-filled value of each column that may be changed by hand. */
+            auto: {
+                [key: string]: string | null;
+            };
+            /** @description The columns holding a manual value. */
+            overridden: string[];
+            reason?: string | null;
+            remark?: string | null;
+            planned_items?: components["schemas"]["DailyPlanItem"][];
+            actual_items?: components["schemas"]["DailyPlanItem"][];
+            planned_count: number;
+            actual_count: number;
+            /** @description On a day up to today, fewer actual items than planned items. */
+            below_target: boolean;
+            reason_missing: boolean;
+            /** @description The copy taken when the day was locked. */
+            frozen: boolean;
+        };
+        DailyPlanRegion: {
+            region_id: number;
+            region_code?: string;
+            region_name_en?: string;
+            region_name_ar?: string | null;
+            /** Format: date */
+            plan_date: string;
+            /** @description If-Match of the changes; 0 before the first change. */
+            version: number;
+            locked: boolean;
+            /** @enum {string|null} */
+            lock_kind?: "manual" | "auto" | null;
+            /** Format: date-time */
+            locked_at?: string | null;
+            locked_by?: components["schemas"]["UserRef"] | null;
+            /** Format: date-time */
+            unlocked_at?: string | null;
+            unlocked_by?: components["schemas"]["UserRef"] | null;
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+            row_count: number;
+            reason_missing_count: number;
+            can_edit: boolean;
+            can_lock: boolean;
+            can_unlock: boolean;
+        };
+        DailyPlanDay: {
+            /** Format: date */
+            date: string;
+            /** Format: date */
+            today: string;
+            is_workday: boolean;
+            /** Format: date */
+            next_working_day: string;
+            /** Format: date */
+            previous_working_day: string;
+            /** @description The regions where the caller holds L1 or L2 of the Daily Plan. */
+            my_region_ids: number[];
+            plans: components["schemas"]["DailyPlanRegion"][];
+            rows: components["schemas"]["DailyPlanRow"][];
+        };
+        DailyPlanRowInput: {
+            /** @description column: text, or null to go back to the auto value. */
+            overrides?: {
+                [key: string]: string | null;
+            };
+            reason?: string | null;
+            remark?: string | null;
+        };
+        DailyPlanSettingsInput: {
+            columns: {
+                progress: components["schemas"]["DailyPlanColumn"][];
+                tomorrow: components["schemas"]["DailyPlanColumn"][];
+            };
+            /** @enum {string} */
+            default_region_scope: "mine" | "all";
+            auto_lock_time: string | null;
+            reminder_hour: number | null;
+        };
+        DailyPlanSettings: components["schemas"]["DailyPlanSettingsInput"] & {
+            version: number;
+            known_columns: components["schemas"]["DailyPlanColumn"][];
+            default_columns: {
+                progress?: components["schemas"]["DailyPlanColumn"][];
+                tomorrow?: components["schemas"]["DailyPlanColumn"][];
+            };
             /** Format: date-time */
             updated_at?: string;
             updated_by?: components["schemas"]["UserRef"];
@@ -13353,6 +13816,144 @@ export interface components {
             weekend_days: number[];
             affected_open_tasks: number;
             version: number;
+        };
+        DataResetSettings: {
+            /** @description Minutes a request stays open (default 30). */
+            request_expiry_minutes: number;
+            /** @description Age limit of the last successful database backup (default 24). */
+            backup_max_age_hours: number;
+            version: number;
+        };
+        DataResetBackup: {
+            /** @description A successful backup is recorded within `max_age_hours`. */
+            ok: boolean;
+            max_age_hours: number;
+            /** @description The latest System Log row of source `backup`, level `info`, `context.script` = `db-backup`, `context.event` = `backup_ok`, `context.type` full or diff. */
+            last_success?: {
+                system_log_id?: number;
+                /** Format: date-time */
+                at: string;
+                /** @description full or diff. */
+                type?: string | null;
+                /** @description full, diff, weekly or monthly (db-backup.sh mode). */
+                mode?: string | null;
+                /** @description The pgBackRest repositories that took it. */
+                repository?: string | null;
+                stanza?: string | null;
+            } | null;
+            /** @description The latest error of the backup check, when newer than the last success. */
+            last_problem?: {
+                system_log_id?: number;
+                /** Format: date-time */
+                at?: string;
+                message?: string;
+            } | null;
+        };
+        DataResetPlanTable: {
+            table: string;
+            /** @enum {string} */
+            action: "delete" | "mixed" | "keep" | "log";
+            rows: number;
+            delete: number;
+            keep: number;
+        };
+        DataResetFiles: {
+            total: number;
+            moved: number;
+            missing: number;
+            refused: number;
+            pending: number;
+            /** @description The first 200 keys missing or refused (left in place, never deleted). */
+            problems: {
+                storage_key?: string;
+                /** @enum {string} */
+                outcome?: "missing" | "refused";
+                detail?: string | null;
+            }[];
+        };
+        DataResetRequest: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            status: "requested" | "approved" | "running" | "files_pending" | "completed" | "failed" | "cancelled" | "expired";
+            version: number;
+            database_name: string;
+            requested_by: components["schemas"]["UserRef"];
+            /** Format: date-time */
+            requested_at: string;
+            request_reason: string;
+            /** Format: date-time */
+            expires_at: string;
+            expired: boolean;
+            approved_by?: components["schemas"]["UserRef"] | null;
+            /** Format: date-time */
+            approved_at?: string | null;
+            approve_reason?: string | null;
+            cancelled_by?: components["schemas"]["UserRef"] | null;
+            /** Format: date-time */
+            cancelled_at?: string | null;
+            cancel_reason?: string | null;
+            run_by?: components["schemas"]["UserRef"] | null;
+            /** Format: date-time */
+            run_started_at?: string | null;
+            /** Format: date-time */
+            db_committed_at?: string | null;
+            /** Format: date-time */
+            finished_at?: string | null;
+            /** @description Running, but its transaction died before the commit (nothing was reset); cancel closes it as failed. */
+            stalled: boolean;
+            /** @description The backup the run relied on (`DataResetBackup.last_success`). */
+            backup?: {
+                [key: string]: unknown;
+            } | null;
+            /** @description `delete_rows`, `files` and `sites` when the request was made. */
+            plan_at_request?: {
+                [key: string]: unknown;
+            } | null;
+            /** @description `audit_id` (the `project_data_reset` row on the Audit Log chain), `sessions_ended`, `deleted` (rows per table). */
+            result?: {
+                [key: string]: unknown;
+            } | null;
+            /** @description Where the files of the deleted rows were moved (inside the store, `<STORAGE_DIR>/.pre-reset-<timestamp>`). */
+            quarantine_dir?: string | null;
+            error?: string | null;
+            files: components["schemas"]["DataResetFiles"];
+        };
+        DataResetState: {
+            database: string;
+            /** @description `RESET <database>`: typed to request and again to run. */
+            confirmation_phrase: string;
+            settings: components["schemas"]["DataResetSettings"];
+            system_admins_active: number;
+            /** @description Fewer than two active System Admins: no request; the operator script on the server is the way. */
+            single_admin: boolean;
+            script_running: boolean;
+            maintenance: boolean;
+            backup: components["schemas"]["DataResetBackup"];
+            plan: {
+                tables: components["schemas"]["DataResetPlanTable"][];
+                delete_rows: number;
+                keep_rows: number;
+                /** @description Stored files of the rows that would be deleted (moved, never deleted). */
+                files: number;
+                /** @description Why the plan cannot be counted (a table without a decision, a right missing); a run is then refused (409 `plan_incomplete`). The tables are empty while a run is open. */
+                error?: string | null;
+            };
+            request: components["schemas"]["DataResetRequest"] | null;
+            last_request: components["schemas"]["DataResetRequest"] | null;
+            can: {
+                request?: boolean;
+                approve?: boolean;
+                start?: boolean;
+                cancel?: boolean;
+                retry_files?: boolean;
+            };
+            storage: {
+                /** @enum {string} */
+                driver: "local" | "s3";
+                /** @description false with S3/MinIO: a run is refused (409 `storage_not_supported`). */
+                supported: boolean;
+            };
         };
         StructuralFreeze: {
             /** @description true while today is inside the window and the freeze is not lifted. Structural workflow changes then answer 409 `freeze_active`. */
@@ -13768,7 +14369,7 @@ export interface components {
             name_en: string;
             name_ar?: string | null;
             module_key: components["schemas"]["ModuleKey"];
-            /** @description false = global rows (risks, meetings, project-wide change requests). 0.15.68: only a site-scoped register offers the map layout (its records carry a site and its coordinates). */
+            /** @description false = global rows (risks, meetings, project-wide change requests). 0.15.69: only a site-scoped register offers the map layout (its records carry a site and its coordinates). */
             site_scoped: boolean;
             multiple_per_site?: boolean;
             /** @description For example pr, po, wo for procurement. */
@@ -15579,7 +16180,7 @@ export interface components {
             security_log_days: number;
         };
         /** @enum {string} */
-        SecurityEvent: "sign_in_started" | "sign_in_succeeded" | "callback_account_mismatch" | "sign_in_failed" | "sign_in_locked" | "sign_in_rate_limited" | "signed_out" | "session_expired" | "session_ended" | "session_revoked_by_admin" | "mfa_exemption_granted" | "mfa_exemption_revoked" | "step_up_passed" | "step_up_failed" | "break_glass_used" | "two_factor_passed" | "two_factor_failed" | "recovery_code_used" | "two_factor_enrolled" | "password_changed" | "password_reset";
+        SecurityEvent: "sign_in_started" | "sign_in_succeeded" | "callback_account_mismatch" | "sign_in_failed" | "sign_in_locked" | "sign_in_rate_limited" | "signed_out" | "session_expired" | "session_ended" | "session_revoked_by_admin" | "mfa_exemption_granted" | "mfa_exemption_revoked" | "step_up_passed" | "step_up_failed" | "break_glass_used" | "two_factor_passed" | "two_factor_failed" | "recovery_code_used" | "two_factor_enrolled" | "password_changed" | "password_reset" | "project_data_reset";
         /** @enum {string} */
         SecurityOutcome: "success" | "failure" | "info";
         SecurityLogEntry: {
@@ -16062,7 +16663,7 @@ export interface components {
             revoked_count: number;
         };
         /** @enum {string} */
-        NotificationKind: "task_assigned" | "task_returned" | "task_approved" | "approval_due" | "reassigned" | "absence_alert" | "idle_task_alert" | "no_holder" | "holiday_tentative" | "delegation" | "mfa_exemption" | "template_updated" | "import_batch" | "system" | "mention" | "followed_change" | "task_rejected" | "no_eligible_holder" | "register_assigned" | "register_rejected" | "gate_closed_again" | "sla_negative_duration" | "email_change_requested" | "email_change_decided" | "security_alert" | "snag_raised" | "snag_review" | "snag_rejected" | "snag_closed" | "levels_converted" | "permit_transferred" | "phone_change_requested" | "phone_change_decided" | "security_notice" | "site_region_moved" | "assignment_request";
+        NotificationKind: "task_assigned" | "task_returned" | "task_approved" | "approval_due" | "reassigned" | "absence_alert" | "idle_task_alert" | "no_holder" | "holiday_tentative" | "delegation" | "mfa_exemption" | "template_updated" | "import_batch" | "system" | "mention" | "followed_change" | "task_rejected" | "no_eligible_holder" | "register_assigned" | "register_rejected" | "gate_closed_again" | "sla_negative_duration" | "email_change_requested" | "email_change_decided" | "security_alert" | "snag_raised" | "snag_review" | "snag_rejected" | "snag_closed" | "levels_converted" | "permit_transferred" | "phone_change_requested" | "phone_change_decided" | "security_notice" | "site_region_moved" | "assignment_request" | "data_reset_request";
         Notification: {
             /** Format: uuid */
             id: string;
@@ -16180,7 +16781,7 @@ export interface components {
             /** @description True when more values match than `limit`. */
             truncated: boolean;
         };
-        /** @description A list screen (0.12.12): `sites`, `sites-stream`, `site-tasks`, `register-<register key>`, `audit-log`, `field-changes`, `security-log`, `system-log` (0.15.2), `tasks-board` (0.15.32, F5). 0.15.45: `GET /saved-views/filter-fields` also takes `site360-<menu>` (menu: master, design_acq, sow, cw, te, hoto, dismantle, om) and `dashboard`. 0.15.49: these two screens have saved views too (the module of `site360-<menu>` is `sites`, the module of `dashboard` is `dashboard`, and a `dashboard` view also needs the Site Register right). 0.15.68: a `register-<register key>` view keeps the layout in `filters` (`layout`, `board_by`, `lane`; see the version note). */
+        /** @description A list screen (0.12.12): `sites`, `sites-stream`, `site-tasks`, `register-<register key>`, `audit-log`, `field-changes`, `security-log`, `system-log` (0.15.2), `tasks-board` (0.15.32, F5). 0.15.45: `GET /saved-views/filter-fields` also takes `site360-<menu>` (menu: master, design_acq, sow, cw, te, hoto, dismantle, om) and `dashboard`. 0.15.49: these two screens have saved views too (the module of `site360-<menu>` is `sites`, the module of `dashboard` is `dashboard`, and a `dashboard` view also needs the Site Register right). 0.15.69: a `register-<register key>` view keeps the layout in `filters` (`layout`, `board_by`, `lane`; see the version note). */
         SavedViewScreenKey: string;
         /** @description Column control of the screen: order, hidden columns, widths in px and density. Hiding a column never changes a permission. */
         SavedViewColumns: {
@@ -16190,11 +16791,11 @@ export interface components {
                 [key: string]: number;
             };
             /**
-             * @description 0.15.64 adds `normal` (the middle density of the Display menu).
+             * @description 0.15.68 adds `normal` (the middle density of the Display menu).
              * @enum {string}
              */
             density?: "comfortable" | "normal" | "compact";
-            /** @description 0.15.64 (W8 item 4): the Display options of the view (any subset; the missing ones follow the user and the defaults). */
+            /** @description 0.15.68 (W8 item 4): the Display options of the view (any subset; the missing ones follow the user and the defaults). */
             display?: {
                 /** @enum {string} */
                 size?: "sm" | "md" | "lg";
@@ -17719,6 +18320,16 @@ export interface components {
                 "application/problem+json": components["schemas"]["Problem"];
             };
         };
+        /** @description 0.15.62. A project data reset is running (`maintenance`); try again after `Retry-After` seconds. */
+        ServiceUnavailable: {
+            headers: {
+                "Retry-After"?: number;
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
         /** @description Rate limited or account locked (`rate_limited`, `account_locked`). */
         TooManyRequests: {
             headers: {
@@ -17741,7 +18352,7 @@ export interface components {
         };
     };
     parameters: {
-        /** @description 0.15.64 (W8 item 5). The search box of a site-data list. One token: contains, ignoring case, on the Site ID, the Site Owner ID and the name (and the other text columns the list names). Two or more tokens separated by spaces, new lines, tabs, commas or semicolons (cells copied from Excel): a pasted list, each token matches the Site ID or the Site Owner ID exactly, ignoring case, one row per site, duplicates ignored. At most 1000 distinct codes: 422 `validation_failed` with `too_many_codes` at `/q`. The caller's regions and row security still apply; the answer carries `search` for a list. */
+        /** @description 0.15.68 (W8 item 5). The search box of a site-data list. One token: contains, ignoring case, on the Site ID, the Site Owner ID and the name (and the other text columns the list names). Two or more tokens separated by spaces, new lines, tabs, commas or semicolons (cells copied from Excel): a pasted list, each token matches the Site ID or the Site Owner ID exactly, ignoring case, one row per site, duplicates ignored. At most 1000 distinct codes: 422 `validation_failed` with `too_many_codes` at `/q`. The caller's regions and row security still apply; the answer carries `search` for a list. */
         SiteSearch: string;
         /** @description 0.15.30 (F2). Only tasks whose SLA colour is one of these: green (within the minimum), amber (between the minimum and the maximum), red (past the maximum), none (no measured clock). Repeat the parameter or separate with commas. */
         SlaColourFilter: ("green" | "amber" | "red" | "none")[];
@@ -19148,7 +19759,7 @@ export interface operations {
                 sla_colour?: components["parameters"]["SlaColourFilter"];
                 /** @description 0.15.30 (F2). true = only stale tasks (idle for at least `stale_after_wd` working days); false = only tasks that are not stale. */
                 stale?: components["parameters"]["StaleFilter"];
-                /** @description 0.15.64 (W8 item 5). The search box of a site-data list. One token: contains, ignoring case, on the Site ID, the Site Owner ID and the name (and the other text columns the list names). Two or more tokens separated by spaces, new lines, tabs, commas or semicolons (cells copied from Excel): a pasted list, each token matches the Site ID or the Site Owner ID exactly, ignoring case, one row per site, duplicates ignored. At most 1000 distinct codes: 422 `validation_failed` with `too_many_codes` at `/q`. The caller's regions and row security still apply; the answer carries `search` for a list. */
+                /** @description 0.15.68 (W8 item 5). The search box of a site-data list. One token: contains, ignoring case, on the Site ID, the Site Owner ID and the name (and the other text columns the list names). Two or more tokens separated by spaces, new lines, tabs, commas or semicolons (cells copied from Excel): a pasted list, each token matches the Site ID or the Site Owner ID exactly, ignoring case, one row per site, duplicates ignored. At most 1000 distinct codes: 422 `validation_failed` with `too_many_codes` at `/q`. The caller's regions and row security still apply; the answer carries `search` for a list. */
                 q?: components["parameters"]["SiteSearch"];
                 /** @description 0.15.31 (F3): a `FilterTree` as one JSON string (at most 8000 characters), compiled on the server against the whitelist of this list. 422 `validation_failed` with `unknown_field` (also for a field hidden from the caller by a field rule), `invalid_operator`, `invalid_value`, `too_deep` or `too_many`. The caller's regions and row security still apply. */
                 filter?: components["parameters"]["FilterTree"];
@@ -19162,7 +19773,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Tasks. 0.15.64: `counts.total` = the tasks of the bucket, `counts.filtered` = those matching the search, the timing filters and the `filter` tree (the whitelist of the screen `tasks-board`). */
+            /** @description Tasks. 0.15.68: `counts.total` = the tasks of the bucket, `counts.filtered` = those matching the search, the timing filters and the `filter` tree (the whitelist of the screen `tasks-board`). */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -20846,7 +21457,7 @@ export interface operations {
             query?: {
                 /** @description 0.15.31 (F3): a `FilterTree` as one JSON string (at most 8000 characters), compiled on the server against the whitelist of this list. 422 `validation_failed` with `unknown_field` (also for a field hidden from the caller by a field rule), `invalid_operator`, `invalid_value`, `too_deep` or `too_many`. The caller's regions and row security still apply. */
                 filter?: components["parameters"]["FilterTree"];
-                /** @description 0.15.64 (W8 item 5). The search box of a site-data list. One token: contains, ignoring case, on the Site ID, the Site Owner ID and the name (and the other text columns the list names). Two or more tokens separated by spaces, new lines, tabs, commas or semicolons (cells copied from Excel): a pasted list, each token matches the Site ID or the Site Owner ID exactly, ignoring case, one row per site, duplicates ignored. At most 1000 distinct codes: 422 `validation_failed` with `too_many_codes` at `/q`. The caller's regions and row security still apply; the answer carries `search` for a list. */
+                /** @description 0.15.68 (W8 item 5). The search box of a site-data list. One token: contains, ignoring case, on the Site ID, the Site Owner ID and the name (and the other text columns the list names). Two or more tokens separated by spaces, new lines, tabs, commas or semicolons (cells copied from Excel): a pasted list, each token matches the Site ID or the Site Owner ID exactly, ignoring case, one row per site, duplicates ignored. At most 1000 distinct codes: 422 `validation_failed` with `too_many_codes` at `/q`. The caller's regions and row security still apply; the answer carries `search` for a list. */
                 q?: components["parameters"]["SiteSearch"];
                 /** @description 0.15.19 (F4): a pasted list of Site IDs, separated by commas, spaces or new lines (at most 500). Keeps only those sites; the match ignores case. IDs out of reach or unknown simply match nothing here (see POST /search/site-ids for the list of IDs not found). */
                 site_codes?: string;
@@ -22543,7 +23154,7 @@ export interface operations {
                 tab?: "all" | "review" | "approve";
                 region_id?: components["schemas"]["RegionId"][];
                 stage_code?: string;
-                /** @description 0.15.64 (W8 item 5). The search box of a site-data list. One token: contains, ignoring case, on the Site ID, the Site Owner ID and the name (and the other text columns the list names). Two or more tokens separated by spaces, new lines, tabs, commas or semicolons (cells copied from Excel): a pasted list, each token matches the Site ID or the Site Owner ID exactly, ignoring case, one row per site, duplicates ignored. At most 1000 distinct codes: 422 `validation_failed` with `too_many_codes` at `/q`. The caller's regions and row security still apply; the answer carries `search` for a list. */
+                /** @description 0.15.68 (W8 item 5). The search box of a site-data list. One token: contains, ignoring case, on the Site ID, the Site Owner ID and the name (and the other text columns the list names). Two or more tokens separated by spaces, new lines, tabs, commas or semicolons (cells copied from Excel): a pasted list, each token matches the Site ID or the Site Owner ID exactly, ignoring case, one row per site, duplicates ignored. At most 1000 distinct codes: 422 `validation_failed` with `too_many_codes` at `/q`. The caller's regions and row security still apply; the answer carries `search` for a list. */
                 q?: components["parameters"]["SiteSearch"];
                 group_only?: boolean;
                 /** @description 0.15.30 (F2). Only tasks whose SLA colour is one of these: green (within the minimum), amber (between the minimum and the maximum), red (past the maximum), none (no measured clock). Repeat the parameter or separate with commas. */
@@ -22562,7 +23173,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Inbox. 0.15.64: `counts.total` = every item of the caller's inbox (all tabs, no filter), `counts.filtered` = the items matching the tab, the filters, the `filter` tree (the whitelist of the screen `tasks-board`) and the search. */
+            /** @description Inbox. 0.15.68: `counts.total` = every item of the caller's inbox (all tabs, no filter), `counts.filtered` = the items matching the tab, the filters, the `filter` tree (the whitelist of the screen `tasks-board`) and the search. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -25926,6 +26537,297 @@ export interface operations {
             428: components["responses"]["PreconditionRequired"];
         };
     };
+    getDailyPlans: {
+        parameters: {
+            query: {
+                date: string;
+                region_id?: number[];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The day. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DailyPlanDay"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    exportDailyPlans: {
+        parameters: {
+            query: {
+                date: string;
+                region_id?: number[];
+                site_id?: string[];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The workbook. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    addDailyPlanSite: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                date: string;
+                region_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    site_code: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The plan of the region after the change. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DailyPlanDay"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    removeDailyPlanSite: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                date: string;
+                region_id: number;
+                site_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The plan of the region after the change. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DailyPlanDay"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    saveDailyPlanRow: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                date: string;
+                region_id: number;
+                site_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DailyPlanRowInput"];
+            };
+        };
+        responses: {
+            /** @description The plan of the region after the change. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DailyPlanDay"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    lockDailyPlan: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                date: string;
+                region_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The plan of the region after the change. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DailyPlanDay"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    unlockDailyPlan: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                date: string;
+                region_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"];
+            };
+        };
+        responses: {
+            /** @description The plan of the region after the change. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DailyPlanDay"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getDailyPlanSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Setting. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DailyPlanSettings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setDailyPlanSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"] & components["schemas"]["DailyPlanSettingsInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DailyPlanSettings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
     listScenarioRules: {
         parameters: {
             query?: never;
@@ -26890,6 +27792,274 @@ export interface operations {
             428: components["responses"]["PreconditionRequired"];
         };
     };
+    getDataReset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The state. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataResetState"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setDataResetSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"] & {
+                    request_expiry_minutes: number;
+                    backup_max_age_hours: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataResetSettings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    requestDataReset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: string;
+                    confirm_text: components["schemas"]["ConfirmText"];
+                };
+            };
+        };
+        responses: {
+            /** @description Requested. */
+            201: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataResetRequest"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    getDataResetRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The request. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataResetRequest"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    approveDataReset: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Approved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataResetRequest"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    cancelDataReset: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"];
+            };
+        };
+        responses: {
+            /** @description Cancelled. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataResetRequest"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    runDataReset: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    confirm_text: components["schemas"]["ConfirmText"];
+                };
+            };
+        };
+        responses: {
+            /** @description Started. */
+            202: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataResetRequest"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    retryDataResetFiles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"];
+            };
+        };
+        responses: {
+            /** @description The move ran; the request after it. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataResetRequest"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
     getImportsSettings: {
         parameters: {
             query?: never;
@@ -27466,7 +28636,7 @@ export interface operations {
             query?: {
                 /** @description 0.15.31 (F3): a `FilterTree` as one JSON string (at most 8000 characters), compiled on the server against the whitelist of this list. 422 `validation_failed` with `unknown_field` (also for a field hidden from the caller by a field rule), `invalid_operator`, `invalid_value`, `too_deep` or `too_many`. The caller's regions and row security still apply. */
                 filter?: components["parameters"]["FilterTree"];
-                /** @description 0.15.64 (W8 item 5). The search box of a site-data list. One token: contains, ignoring case, on the Site ID, the Site Owner ID and the name (and the other text columns the list names). Two or more tokens separated by spaces, new lines, tabs, commas or semicolons (cells copied from Excel): a pasted list, each token matches the Site ID or the Site Owner ID exactly, ignoring case, one row per site, duplicates ignored. At most 1000 distinct codes: 422 `validation_failed` with `too_many_codes` at `/q`. The caller's regions and row security still apply; the answer carries `search` for a list. */
+                /** @description 0.15.68 (W8 item 5). The search box of a site-data list. One token: contains, ignoring case, on the Site ID, the Site Owner ID and the name (and the other text columns the list names). Two or more tokens separated by spaces, new lines, tabs, commas or semicolons (cells copied from Excel): a pasted list, each token matches the Site ID or the Site Owner ID exactly, ignoring case, one row per site, duplicates ignored. At most 1000 distinct codes: 422 `validation_failed` with `too_many_codes` at `/q`. The caller's regions and row security still apply; the answer carries `search` for a list. */
                 q?: components["parameters"]["SiteSearch"];
                 /** @description Site IDs, comma-separated (multi Site ID search, exact match). */
                 site_code?: string;
@@ -28425,7 +29595,7 @@ export interface operations {
                 entity_id?: string;
                 /** @description Default false = the latest version of each logical record. */
                 all_versions?: boolean;
-                /** @description 0.15.64 (W8 item 5). The search box of a site-data list. One token: contains, ignoring case, on the Site ID, the Site Owner ID and the name (and the other text columns the list names). Two or more tokens separated by spaces, new lines, tabs, commas or semicolons (cells copied from Excel): a pasted list, each token matches the Site ID or the Site Owner ID exactly, ignoring case, one row per site, duplicates ignored. At most 1000 distinct codes: 422 `validation_failed` with `too_many_codes` at `/q`. The caller's regions and row security still apply; the answer carries `search` for a list. */
+                /** @description 0.15.68 (W8 item 5). The search box of a site-data list. One token: contains, ignoring case, on the Site ID, the Site Owner ID and the name (and the other text columns the list names). Two or more tokens separated by spaces, new lines, tabs, commas or semicolons (cells copied from Excel): a pasted list, each token matches the Site ID or the Site Owner ID exactly, ignoring case, one row per site, duplicates ignored. At most 1000 distinct codes: 422 `validation_failed` with `too_many_codes` at `/q`. The caller's regions and row security still apply; the answer carries `search` for a list. */
                 q?: components["parameters"]["SiteSearch"];
                 limit?: components["parameters"]["Limit"];
                 /** @description Opaque cursor from `page.next_cursor`. */
@@ -28440,7 +29610,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Records. 0.15.64: `counts.total` = the latest version of every record of the register the caller may see, `counts.filtered` = those matching the filters and the search. */
+            /** @description Records. 0.15.68: `counts.total` = the latest version of every record of the register the caller may see, `counts.filtered` = those matching the filters and the search. */
             200: {
                 headers: {
                     [name: string]: unknown;

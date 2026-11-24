@@ -1,4 +1,4 @@
--- 0148_table_display_settings: the defaults of the Display menu of the site-data tables (W8 item 4 of plan 2026-11-23-next-ui-cleanup, contract 0.15.64,
+-- 0148_table_display_settings: the defaults of the Display menu of the site-data tables (W8 item 4 of plan 2026-11-23-next-ui-cleanup, contract 0.15.68,
 -- CHANGELOG 201). Mirror: db/sql/147_table_display_settings.sql (kept byte-identical).
 --
 -- The Display menu (text size, alignment of text cells, row density, wrap long text, zebra rows) is stored per user and per screen in the browser and
@@ -91,7 +91,7 @@ CREATE TRIGGER b_settings_tdisp_delete BEFORE DELETE ON settings FOR EACH ROW
 INSERT INTO audit_log (action, entity_type, entity_id, after, reason)
 VALUES ('table_display_settings_applied', 'workflow', NULL,
         jsonb_build_object('table_display', 'table.display with admin_set_table_display; read by every signed-in user'),
-        'Display defaults of the site-data tables (migration 0148, contract 0.15.64).');
+        'Display defaults of the site-data tables (migration 0148, contract 0.15.68).');
 
 DO $$
 DECLARE f text;

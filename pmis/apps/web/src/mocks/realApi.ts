@@ -519,6 +519,16 @@ export const REAL_API_AUTH_USERS = [
   ['put', '/settings/notification-policy'],
   ['post', '/settings/holidays/import'],
   // Contract 0.15.54 (migration 0140; apps/api: reassignment): absence records and the lead decisions on tasks (B12b, B14).
+  // Contract 0.15.67 (migration 0149): My Work > Daily Plan and its settings.
+  ['get', '/daily-plans'],
+  ['get', '/daily-plans/export'],
+  ['post', '/daily-plans/:date/regions/:regionId/sites'],
+  ['patch', '/daily-plans/:date/regions/:regionId/sites/:siteId'],
+  ['delete', '/daily-plans/:date/regions/:regionId/sites/:siteId'],
+  ['post', '/daily-plans/:date/regions/:regionId/lock'],
+  ['post', '/daily-plans/:date/regions/:regionId/unlock'],
+  ['get', '/settings/daily-plan'],
+  ['put', '/settings/daily-plan'],
   ['get', '/absences'],
   ['post', '/absences'],
   ['get', '/absences/:id'],
@@ -541,6 +551,15 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/groups'],
   ['post', '/me/notify-admins'],
   ['post', '/auth/employee-id'],
+  // Contract 0.15.62 (migration 0146; apps/api: settings): the project data reset in Settings, with two System Admins.
+  ['get', '/settings/data-reset'],
+  ['put', '/settings/data-reset/settings'],
+  ['post', '/settings/data-reset/requests'],
+  ['get', '/settings/data-reset/requests/:id'],
+  ['post', '/settings/data-reset/requests/:id/approve'],
+  ['post', '/settings/data-reset/requests/:id/cancel'],
+  ['post', '/settings/data-reset/requests/:id/run'],
+  ['post', '/settings/data-reset/requests/:id/retry-files'],
 ] as const;
 
 /** `GET /users/deleted` and `GET /users/picker` are other operations that the `:id` pattern would swallow; they stay mocked. */

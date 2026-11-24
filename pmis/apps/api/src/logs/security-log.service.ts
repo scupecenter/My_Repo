@@ -9,7 +9,7 @@ export type SecurityEvent =
   | 'sign_in_started' | 'sign_in_succeeded' | 'callback_account_mismatch' | 'sign_in_failed' | 'sign_in_locked' | 'sign_in_rate_limited'
   | 'signed_out' | 'session_expired' | 'session_ended' | 'session_revoked_by_admin' | 'mfa_exemption_granted' | 'mfa_exemption_revoked'
   | 'step_up_passed' | 'step_up_failed' | 'break_glass_used' | 'two_factor_passed' | 'two_factor_failed' | 'recovery_code_used'
-  | 'two_factor_enrolled' | 'password_changed' | 'password_reset';
+  | 'two_factor_enrolled' | 'password_changed' | 'password_reset' | 'project_data_reset';
 export type SecurityOutcome = 'success' | 'failure' | 'info';
 
 export interface SecurityWrite {

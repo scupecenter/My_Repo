@@ -74,7 +74,7 @@ export class ApprovalsService {
     const tab = oneParam(q, 'tab') ?? 'all';
     if (!['all', 'review', 'approve'].includes(tab)) throw problems.validation([{ path: '/tab', code: 'invalid', message: 'tab is all, review or approve.' }]);
     const stage = oneParam(q, 'stage_code');
-    // W8 item 5 (0.15.64): one token = contains on site and task; a pasted list = each Site ID or Site Owner ID exactly
+    // W8 item 5 (0.15.68): one token = contains on site and task; a pasted list = each Site ID or Site Owner ID exactly
     const search = parseSiteSearch(oneParam(q, 'q'));
     const groupOnly = boolParam(q, 'group_only');
     const regionFilter = this.intList(q, 'region_id');
@@ -105,7 +105,7 @@ export class ApprovalsService {
     )`;
     conds.push(actable);
     scopeConds.push(actable);
-    // W8 item 6 (0.15.64): total = every item of the caller's inbox (all tabs, no filter), filtered = the items matching the tab, filters and search
+    // W8 item 6 (0.15.68): total = every item of the caller's inbox (all tabs, no filter), filtered = the items matching the tab, filters and search
     const counts = { total: await this.view.count(Prisma.join(scopeConds, ' AND ')), filtered: await this.view.count(Prisma.join(conds, ' AND ')) };
     // found / not found: the regions of the inbox (Approvals AND Sites view), as the rows themselves
     const pasted = await pastedSearchResult(this.db.tx, search, siteScope(regions, sitesRegions));

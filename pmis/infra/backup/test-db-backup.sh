@@ -108,6 +108,9 @@ late_check() { as_pg env DB_BACKUP_ENV="$ENVF" BACKUP_LATE_HOURS=0 bash "$HERE/d
 run_as_pg "$HERE/db-backup.sh" full >"$WORK/full.out" 2>&1 || { cat "$WORK/full.out"; die "full backup failed"; }
 [[ $(sqlt "SELECT count(*) FROM job_runs WHERE name='db_basebackup' AND outcome='ok'") == 1 ]] || die "job_runs row for the full backup missing"
 ok "full backup recorded in job_runs"
+[[ $(sqlt "SELECT count(*) FROM system_log WHERE source='backup' AND level='info' AND context->>'script'='db-backup' AND context->>'event'='backup_ok' AND context->>'type'='full' AND context->>'repos'='1'") == 1 ]] \
+  || die "the successful full backup did not write its System Log row (source backup, event backup_ok)"
+ok "full backup recorded in the System Log (the precondition of the data reset in Settings)"
 
 sqlt "INSERT INTO evidence SELECT 2, g FROM generate_series(1, 500) g; SELECT pg_switch_wal();" >/dev/null
 sleep 1
@@ -125,11 +128,11 @@ if late_check >"$WORK/check1.out" 2>&1; then
 fi
 [[ $(sqlt "SELECT count(*) FROM system_log WHERE source='backup' AND level='error'") == 1 ]] || die "late backup did not raise a System Log row"
 late_check >/dev/null 2>&1 || true
-[[ $(sqlt "SELECT count(*) FROM system_log WHERE source='backup'") == 1 ]] || die "the same problem was logged twice"
+[[ $(sqlt "SELECT count(*) FROM system_log WHERE source='backup' AND context->>'script'='db-backup-check'") == 1 ]] || die "the same problem was logged twice"
 ok "late backup alerts once and is not repeated"
 
 run_as_pg "$HERE/db-backup-check.sh" >"$WORK/check2.out" 2>&1 || { cat "$WORK/check2.out"; die "healthy check failed"; }
-[[ $(sqlt "SELECT count(*) FROM system_log WHERE level='info'") == 1 ]] || die "recovery was not logged"
+[[ $(sqlt "SELECT count(*) FROM system_log WHERE level='info' AND context->>'script'='db-backup-check'") == 1 ]] || die "recovery was not logged"
 ok "healthy check passes and logs the recovery"
 
 # Negative: the restore must refuse the live port and the live data directory.

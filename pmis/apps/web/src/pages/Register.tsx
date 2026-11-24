@@ -239,7 +239,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
     if (needAll && hasNextPage && !isFetchingNextPage && items.length < ALL_CAP)
       void fetchNextPage();
   }, [needAll, hasNextPage, isFetchingNextPage, items.length, fetchNextPage]);
-  // W8 item 6 (0.15.64): the counts come from the server: every record of the register the caller may see, and those matching the filters and the search
+  // W8 item 6 (0.15.68): the counts come from the server: every record of the register the caller may see, and those matching the filters and the search
   const first = list.data?.pages[0] as CountedPage<(typeof items)[number]> | undefined;
   const total = first?.counts?.filtered ?? first?.page.total ?? items.length;
   const screenTotal = first?.counts?.total ?? total;

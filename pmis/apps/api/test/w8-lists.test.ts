@@ -8,7 +8,7 @@ import { actor, addAssignment, makeSite, makeTask, setCell } from './wf-helpers'
 import { G } from './reg-helpers';
 
 /**
- * W8 items 5 and 6 (contract 0.15.64) on the other site-data lists: the register records, the Approvals inbox and My Work read the pasted list
+ * W8 items 5 and 6 (contract 0.15.68) on the other site-data lists: the register records, the Approvals inbox and My Work read the pasted list
  * of Site IDs on the server and answer the total and the filtered counts, with the caller's rights (region scope B3, the matrix, row security).
  */
 const PREFIX = `W8L${randomBytes(3).toString('hex').toUpperCase()}`;

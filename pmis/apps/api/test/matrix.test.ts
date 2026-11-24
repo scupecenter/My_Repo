@@ -39,7 +39,7 @@ interface Row { kind: string; code: string; register_key: string | null; approva
 interface MatrixBody { workflow_version: number; version: number; stages: Row[] }
 
 const REGISTER_CODES = ['site_creation', 'procurement', 'procurement_hlc', 'contractors', 'rf_design', 'acquisition', 'gecol', 'hlc', 'permits_hse', 'permits_hse_te', 'permits_hse_acq', 'permits_hse_om', 'warehouse', 'quality', 'quality_te', 'issues', 'risks', 'change_control',
-  'readiness_handover', 'as_built', 'meetings', 'deliverables', 'car_dispatcher', 'financial_advances'];
+  'readiness_handover', 'as_built', 'meetings', 'deliverables', 'car_dispatcher', 'financial_advances', 'daily_plan'];
 /** Built in migration 0019: the registers suite owns their level count and region cells (it changes them while this suite runs). Migration 0035 (Q90) gives them their L2 holders.
  *  quality_te: the Matrix row of the TE stream of QC snags (migration 0056, Q230), seeded as a copy of the Quality row.
  *  permits_hse_te: the Matrix row of the TE stream of Permits & HSE (migration 0050, Q90), L1 Site Engineers (TE), L2 TE Team Lead.
@@ -110,7 +110,8 @@ describe('GET /matrix', () => {
         expect(c.assignees.length).toBeGreaterThan(0);
       }
       // the Site creation row (0070) was never a 3-level row: it has no middle cell
-      if (code !== 'site_creation') expect(cellOf(m, code, 2).used, `${code} middle cell`).toBe(false);
+      // the Daily Plan row (0149) was seeded on two levels too
+      if (code !== 'site_creation' && code !== 'daily_plan') expect(cellOf(m, code, 2).used, `${code} middle cell`).toBe(false);
     }
     // Q44: RF & Design and Acquisition take the stage-1 holders
     for (const code of ['rf_design', 'acquisition']) {
@@ -870,7 +871,7 @@ describe('the seed of the register rows', () => {
       await calc.query(seed);
 
       const rows = await calc.query(`SELECT count(*)::int AS n FROM register_definitions WHERE register_key = ANY($1::text[])`, [[...REGISTER_CODES, 'dismantle']]);
-      expect(rows.rows[0].n).toBe(25);
+      expect(rows.rows[0].n).toBe(26); // 0149: the Daily Plan row
       const back = await calc.query(`SELECT count(*)::int AS n FROM matrix_cells c JOIN matrix_cell_assignees a ON a.cell_id = c.id WHERE c.register_key = 'deliverables'`);
       expect(back.rows[0].n).toBeGreaterThanOrEqual(3);
       const kept = await calc.query(`SELECT (SELECT count(*)::int FROM matrix_cell_assignees a JOIN matrix_cells c ON c.id = a.cell_id WHERE c.register_key = 'warehouse' AND c.level = 1) AS emptied,
@@ -884,7 +885,7 @@ describe('the seed of the register rows', () => {
       const n1 = (await calc.query('SELECT count(*)::int AS n FROM matrix_cells')).rows[0].n;
       await calc.query(seed);
       expect((await calc.query('SELECT count(*)::int AS n FROM matrix_cells')).rows[0].n).toBe(n1);
-      expect((await calc.query('SELECT count(*)::int AS n FROM register_definitions')).rows[0].n).toBe(25);
+      expect((await calc.query('SELECT count(*)::int AS n FROM register_definitions')).rows[0].n).toBe(26); // 0149: the Daily Plan row
     } finally {
       await calc.end();
     }
