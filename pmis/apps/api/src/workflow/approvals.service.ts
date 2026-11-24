@@ -6,7 +6,7 @@ import { AccessService } from '../access/access.service';
 import type { AuthContext } from '../auth/auth.types';
 import { StepUpService } from '../auth/step-up.service';
 import { decodeCursor, encodeCursor, parseLimit } from '../common/cursor';
-import { parseSiteSearch, pastedSearchResult, siteSearchCond } from '../common/site-search';
+import { parseSiteSearch, pastedSearchResult, siteScope, siteSearchCond } from '../common/site-search';
 import { FilterCatalogService } from '../views/filter-catalog.service';
 import { IdempotencyService } from '../common/idempotency.service';
 import { ProblemException, problems } from '../common/problem';
@@ -107,7 +107,8 @@ export class ApprovalsService {
     scopeConds.push(actable);
     // W8 item 6 (0.15.64): total = every item of the caller's inbox (all tabs, no filter), filtered = the items matching the tab, filters and search
     const counts = { total: await this.view.count(Prisma.join(scopeConds, ' AND ')), filtered: await this.view.count(Prisma.join(conds, ' AND ')) };
-    const pasted = await pastedSearchResult(this.db.tx, search, sitesRegions === null ? Prisma.sql`s.is_active` : Prisma.sql`s.is_active AND s.region_id = ANY(${sitesRegions}::int[])`);
+    // found / not found: the regions of the inbox (Approvals AND Sites view), as the rows themselves
+    const pasted = await pastedSearchResult(this.db.tx, search, siteScope(regions, sitesRegions));
     if (cursor) {
       conds.push(Prisma.sql`(coalesce(t.level_opened_at, t.updated_at), t.id) > (${cursor[0] as string}::timestamptz, ${cursor[1] as string}::uuid)`);
     }

@@ -38,6 +38,17 @@ export function siteSearchCond(s: SiteSearch, alias = 's', extra: Prisma.Sql[] =
   return Prisma.sql`(${a}.site_code ILIKE ${p} OR ${a}.owner_site_id ILIKE ${p} OR ${a}.name ILIKE ${p}${more.length ? Prisma.join(more, '') : Prisma.empty})`;
 }
 
+/**
+ * The scope of the "found / not found" answer on `sites s`: active sites in EVERY given region set (the intersection; null = no limit from
+ * that set, an empty set = nothing). Pass the regions of the screen's own module AND the caller's `sites` view regions, so the answer never
+ * says whether a site exists in a region where the caller may not see sites (security review 2026-11-24).
+ */
+export function siteScope(...regionSets: (number[] | null)[]): Prisma.Sql {
+  const conds: Prisma.Sql[] = [Prisma.sql`s.is_active`];
+  for (const r of regionSets) if (r !== null) conds.push(Prisma.sql`s.region_id = ANY(${r}::int[])`);
+  return Prisma.join(conds, ' AND ');
+}
+
 /** What a pasted search found, as the chip shows it ("Sites: 3 pasted, 2 found") with the codes not found. */
 export interface PastedSearchDto {
   pasted: number;

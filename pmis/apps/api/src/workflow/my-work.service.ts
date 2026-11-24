@@ -6,7 +6,7 @@ import { decodeTypedCursor, encodeCursor, parseLimit } from '../common/cursor';
 import { problems } from '../common/problem';
 import { TS_TEXT, oneParam } from '../common/query';
 import { DbService } from '../db/db.service';
-import { parseSiteSearch, pastedSearchResult, siteSearchCond, type PastedSearchDto } from '../common/site-search';
+import { parseSiteSearch, pastedSearchResult, siteScope, siteSearchCond, type PastedSearchDto } from '../common/site-search';
 import { FilterCatalogService } from '../views/filter-catalog.service';
 import { TaskSummaryDto, TaskViewService, taskSelect, timingFilters } from './task-view.service';
 
@@ -70,7 +70,8 @@ export class MyWorkService {
     const adv = await this.filters.fromQuery('tasks-board', q);
     if (adv) conds.push(adv);
     const counts = { total: await this.view.count(Prisma.join(scope, ' AND ')), filtered: await this.view.count(Prisma.join(conds, ' AND ')) };
-    const pasted = await pastedSearchResult(this.db.tx, search, regions === null ? Prisma.sql`s.is_active` : Prisma.sql`s.is_active AND s.region_id = ANY(${regions}::int[])`);
+    // found / not found: the caller's Sites view regions, as the rows themselves
+    const pasted = await pastedSearchResult(this.db.tx, search, siteScope(regions));
     const key = Prisma.raw('coalesce(t.level_opened_at, t.updated_at)');
     if (cursor) conds.push(Prisma.sql`(${key}, t.id) > (${cursor[0] as string}::timestamptz, ${cursor[1] as string}::uuid)`);
 

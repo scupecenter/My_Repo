@@ -5,7 +5,7 @@ import { AccessService, DbAction } from '../access/access.service';
 import type { AuthContext } from '../auth/auth.types';
 import { StepUpService } from '../auth/step-up.service';
 import { decodeCursor, decodeTypedCursor, encodeCursor, likePattern, parseLimit } from '../common/cursor';
-import { parseSiteSearch, pastedSearchResult, type PastedSearchDto } from '../common/site-search';
+import { parseSiteSearch, pastedSearchResult, siteScope, type PastedSearchDto } from '../common/site-search';
 import { mapDbError } from '../common/db-errors';
 import { parseIfMatch } from '../common/etag';
 import { ProblemException, problems } from '../common/problem';
@@ -427,7 +427,8 @@ export class RegistersService {
       SELECT count(*) AS n FROM register_records r LEFT JOIN sites s ON s.id = r.site_id LEFT JOIN task_instances ti ON ti.id = r.task_id
       LEFT JOIN task_definitions td ON td.id = ti.task_def_id WHERE ${Prisma.join(c, ' AND ')}`))[0]?.n ?? 0);
     const counts = { total: await count(scope), filtered: await count(conds) };
-    const pasted = await pastedSearchResult(this.db.tx, search, regs === null ? Prisma.sql`s.is_active` : Prisma.sql`s.is_active AND s.region_id = ANY(${regs}::int[])`);
+    // found / not found: sites in the register's regions AND in the caller's Sites view regions (never a region where the caller cannot see sites)
+    const pasted = search.kind === 'list' ? await pastedSearchResult(this.db.tx, search, siteScope(regs, await this.access.regions('sites', 'view'))) : undefined;
     if (cursor) conds.push(Prisma.sql`(r.created_at, r.id) < (${cursor[0] as string}::timestamptz, ${cursor[1] as string}::uuid)`);
     const rows = await this.db.tx.$queryRaw<RecordRow[]>(
       this.baseSelect(auth, Prisma.join(conds, ' AND '), Prisma.sql`ORDER BY r.created_at DESC, r.id DESC LIMIT ${limit + 1}`));

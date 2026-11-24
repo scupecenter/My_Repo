@@ -9,7 +9,7 @@ import { mapDbError } from '../common/db-errors';
 import { parse, uuidSchema } from '../common/zod';
 import { ProblemException, problems } from '../common/problem';
 import { oneParam } from '../common/query';
-import { parseSiteSearch, pastedSearchResult, siteSearchCond } from '../common/site-search';
+import { parseSiteSearch, pastedSearchResult, siteScope, siteSearchCond } from '../common/site-search';
 import { DbService } from '../db/db.service';
 import { FilterCatalogService } from '../views/filter-catalog.service';
 import { HAS_COORDINATES } from '../dashboard/site-map.service';
@@ -322,7 +322,8 @@ export class SitesService {
     const scope: Prisma.Sql[] = [Prisma.sql`s.is_active`];
     if (regions !== null) scope.push(Prisma.sql`s.region_id = ANY(${regions}::int[])`);
     const total = await this.countFiltered(scope, (stream || view) ? [Prisma.sql`coalesce(ss.has_work, false)`] : [], stream, view);
-    const search = await pastedSearchResult(this.db.tx, parseSiteSearch(oneParam(q, 'q')), Prisma.join(scope, ' AND '));
+    // found / not found: the caller's Sites view regions, as the rows themselves
+    const search = await pastedSearchResult(this.db.tx, parseSiteSearch(oneParam(q, 'q')), siteScope(regions));
     return {
       items,
       page: {

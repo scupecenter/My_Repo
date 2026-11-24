@@ -4,7 +4,8 @@ import type { Client as PgClient } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { startApp, superDb } from './helpers';
 import { createRec, otherSite, PROC, recPath, team } from './reg-helpers';
-import { actor, makeSite, makeTask, setCell } from './wf-helpers';
+import { actor, addAssignment, makeSite, makeTask, setCell } from './wf-helpers';
+import { G } from './reg-helpers';
 
 /**
  * W8 items 5 and 6 (contract 0.15.64) on the other site-data lists: the register records, the Approvals inbox and My Work read the pasted list
@@ -33,6 +34,7 @@ describe('W8: the register list', () => {
     await createRec(t2, PROC);
     await createRec(t3, PROC);
     const away = await makeSite(db, 5, { prefix: PREFIX });
+    await addAssignment(db, t.entry.user.id, { level: 'view', grants: G('sites', 'view'), regions: [4], modules: null }); // found = a site the caller may see
     const q = encodeURIComponent(`${t.site.code.toLowerCase()}\n${t2.site.code} ${away.code} ${PREFIX}-NONE`);
     const res = await t.entry.api.call('get', `${recPath('procurement')}?limit=100&q=${q}`);
     expect(res.status).toBe(200);
@@ -49,6 +51,39 @@ describe('W8: the register list', () => {
     expect(plain.body.counts.total).toBe(res.body.counts.total);
     expect(plain.body.counts.filtered).toBe(plain.body.counts.total);
     expect((await t.entry.api.call('get', `${recPath('procurement')}?q=${encodeURIComponent(Array.from({ length: 1001 }, (_, i) => `X${i}`).join(' '))}`)).status).toBe(422);
+  });
+});
+
+describe('W8: the not-found list follows the Sites view regions (security review 2026-11-24)', () => {
+  it('a user with the register in two regions but Sites view in one gets the other region\'s codes as "not found"', async () => {
+    const t = await team(app, db, 'procurement', 'procurement', 4);
+    const s5 = await makeSite(db, 5, { prefix: PREFIX });
+    const u = await actor(app, db, { level: 'view', grants: G('procurement', 'view'), regions: [4, 5], modules: null });
+    await addAssignment(db, u.user.id, { level: 'view', grants: G('sites', 'view'), regions: [4], modules: null });
+    const q = encodeURIComponent(`${t.site.code} ${s5.code}`);
+    const res = await u.api.call('get', `${recPath('procurement')}?limit=100&q=${q}`);
+    expect(res.status).toBe(200);
+    expect(res.body.search).toEqual({ pasted: 2, found: 1, not_found: [s5.code] });
+    // with Sites view in both regions the same code is found
+    const both = await actor(app, db, { level: 'view', grants: G('procurement', 'view'), regions: [4, 5], modules: null });
+    await addAssignment(db, both.user.id, { level: 'view', grants: G('sites', 'view'), regions: [4, 5], modules: null });
+    const res2 = await both.api.call('get', `${recPath('procurement')}?limit=100&q=${q}`);
+    expect(res2.body.search).toEqual({ pasted: 2, found: 2, not_found: [] });
+    // and a register user without any Sites view finds nothing, yet still reads the register
+    const none = await actor(app, db, { level: 'view', grants: G('procurement', 'view'), regions: [4, 5], modules: null });
+    const res3 = await none.api.call('get', `${recPath('procurement')}?limit=100&q=${q}`);
+    expect(res3.status).toBe(200);
+    expect(res3.body.search.found).toBe(0);
+  });
+
+  it('Approvals: a site the caller may see but in a region where the caller has no Approvals is "not found"', async () => {
+    const s7 = await makeSite(db, 7, { prefix: PREFIX });
+    const a = await actor(app, db, { level: 'approve', grants: [...G('sites', 'view'), ...G('approvals', 'view')], regions: [REGION], modules: null });
+    await addAssignment(db, a.user.id, { level: 'view', grants: G('sites', 'view'), regions: [7], modules: null });
+    const s2 = await makeSite(db, REGION, { prefix: PREFIX });
+    const res = await a.api.call('get', `/approvals?limit=200&q=${encodeURIComponent(`${s2.code} ${s7.code}`)}`);
+    expect(res.status).toBe(200);
+    expect(res.body.search).toEqual({ pasted: 2, found: 1, not_found: [s7.code] });
   });
 });
 

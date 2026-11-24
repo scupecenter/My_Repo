@@ -4,7 +4,7 @@ import { z } from 'zod';
 import type { AuthContext } from '../auth/auth.types';
 import { StepUpService } from '../auth/step-up.service';
 import { ProblemException } from '../common/problem';
-import { parseSiteSearch, pastedSearchResult, siteSearchCond, type PastedSearchDto } from '../common/site-search';
+import { parseSiteSearch, pastedSearchResult, siteScope, siteSearchCond, type PastedSearchDto } from '../common/site-search';
 import { parse } from '../common/zod';
 import { AccessService } from '../access/access.service';
 import { DbService } from '../db/db.service';
@@ -215,7 +215,8 @@ export class Site360Service {
       attachParentOrds(tasks, cells, parentCatalogue);
     }
     const c = counts[0] ?? { total: 0, filtered: 0 };
-    const pasted = await pastedSearchResult(this.db.tx, search, base);
+    // found / not found: the caller's Sites view regions (`regs`), as the rows themselves
+    const pasted = await pastedSearchResult(this.db.tx, search, siteScope(regs));
     return {
       menu: menuItem,
       total: c.total,
