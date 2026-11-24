@@ -1,10 +1,11 @@
 import { screen, waitFor } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { Route, Routes } from 'react-router-dom';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { siteIdOf } from '@/mocks/sites';
 import { renderApp, signIn } from '@/test/utils';
-import { SITE_DATA_SCREENS } from '@/lib/siteDataScreens';
+import { REGISTER_SCREENS, SITE_DATA_SCREENS } from '@/lib/siteDataScreens';
+import { REGISTER_KEYS_LIVE } from '@/lib/registerForms';
 import { Approvals } from './Approvals';
 import { MyWork } from './MyWork';
 import { RegisterPage } from './Register';
@@ -16,6 +17,9 @@ import { Sites } from './Sites';
  * the server count, Display and Export, plus the column chooser and density on a table with columns, and the # column where rows are shown.
  * A screen added to SITE_DATA_SCREENS as `done` without a case here fails too.
  */
+// ECharts draws in the browser; here the chart (the map layout of a register) is a placeholder.
+vi.mock('@/components/EChart', () => ({ EChart: ({ label, testid }: { label: string; testid?: string }) => <div role="img" aria-label={label} data-testid={testid} /> }));
+
 const SITE = siteIdOf(0);
 const SiteAt = () => <Routes><Route path="/sites/:siteId" element={<Site />} /></Routes>;
 const Reg = () => <Routes><Route path="/registers/:key" element={<RegisterPage />} /></Routes>;
@@ -34,6 +38,11 @@ const CASES: Record<string, { ui: () => ReactElement; route: string; rows: boole
   'my-work': { ui: () => <MyWork />, route: '/my-work', rows: true },
   approvals: { ui: () => <Approvals />, route: '/approvals', rows: true },
   'dashboard-drilldowns': { ui: () => <Sites />, route: '/sites?dashboard_status=in_progress&ref_date=2026-11-01', rows: true },
+  // W2: every register and log on its own (the # column is checked on Procurement above: some registers have no seed rows), and its layouts
+  ...Object.fromEntries(REGISTER_SCREENS.map((r) => [`register-${r.key}`, { ui: () => <Reg />, route: `/registers/${r.key}`, rows: false }])),
+  'register-wide': { ui: () => <Reg />, route: '/registers/procurement?layout=wide', rows: false },
+  'register-board': { ui: () => <Reg />, route: '/registers/procurement?layout=board', rows: false },
+  'register-map': { ui: () => <Reg />, route: '/registers/procurement?layout=map', rows: false },
 };
 
 describe('W8 guard: the table standard on every site-data screen', () => {
@@ -42,6 +51,10 @@ describe('W8 guard: the table standard on every site-data screen', () => {
       if (s.state === 'done') expect(CASES[s.id], s.id).toBeDefined();
       else expect(s.note.length, s.id).toBeGreaterThan(10);
     }
+  });
+
+  it('W2: every live register of Registers & Logs is in the list', () => {
+    expect(REGISTER_SCREENS.map((r) => r.key).sort()).toEqual([...REGISTER_KEYS_LIVE].sort());
   });
 
   for (const s of SITE_DATA_SCREENS.filter((x) => x.state === 'done')) {
@@ -59,6 +72,12 @@ describe('W8 guard: the table standard on every site-data screen', () => {
         for (const a of ['data-has-columns', 'data-has-density']) expect(bar.hasAttribute(a), `${s.id} ${a}`).toBe(true);
       }
       expect(bar.querySelector('[data-table-count]'), `${s.id} count`).not.toBeNull();
+      // W2: a register offers the view switcher of Site Master: Board and Wide table everywhere, Map where its records carry a site
+      const reg = REGISTER_SCREENS.find((r) => s.id === `register-${r.key}`);
+      if (reg) {
+        for (const b of ['board', 'wide']) expect(bar.querySelector(`[data-testid="register-layout-${b}"]`), `${s.id} ${b}`).not.toBeNull();
+        expect(!!bar.querySelector('[data-testid="register-layout-map"]'), `${s.id} map`).toBe(reg.site);
+      }
       if (c.rows) await waitFor(() => expect(screen.getAllByTestId('row-no').length, `${s.id} #`).toBeGreaterThan(0), { timeout: 4000 });
     }, 15_000);
   }

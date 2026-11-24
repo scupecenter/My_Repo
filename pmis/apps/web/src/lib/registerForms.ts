@@ -19,6 +19,8 @@ const SECTION_ID: Record<string, string> = {
   Execution: 'execution',
 };
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'details';
+/** The id of a field section (its translated title is `regSections.<id>`); a field without a section (a custom field) is in `details`. */
+export const sectionIdOf = (section: string | null | undefined): string => (section ? (SECTION_ID[section] ?? slug(section)) : 'details');
 
 /** Permit types of the permit-to-work kind are the `PTW - ...` codes of the permit type list. */
 const isPtw = (d: Data) => typeof d.permit_type === 'string' && d.permit_type.startsWith('PTW');
