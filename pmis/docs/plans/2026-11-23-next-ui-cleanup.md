@@ -86,7 +86,7 @@ W1 decision: the single tab row takes its phases from the published workflow ver
 | W1 | Site page: one clear tab row instead of two overlapping rows | Done | #199 |
 | W2 | Registers & Logs: the same view options as Site Master (wide table, board, density, map where it applies) | Pending | |
 | W3 | Settings > Site360: remove the tab and the name; move what is still useful into Settings > Workflow | Done | #198 |
-| W4 | Dead or stuck screens: Settings > Alerts and Security stay on "Loading..."; audit every menu and tab | Done | this PR |
+| W4 | Dead or stuck screens: Settings > Alerts and Security stay on "Loading..."; audit every menu and tab | Done | #201 |
 | W5 | Library menu (Forms and Archive); Data entry > Templates stays as it is | Pending | |
 | W7 | Daily Progress and Tomorrow Plan: a screen in the system, copyable to email | Pending | |
 | W8 | Site lists and the site task table: row numbers everywhere, three-level headers, list-style task table, display options (font size, alignment, density, wrap) | Done (branch `claude/w8-table-standard`, contract 0.15.64, migration 0148, CHANGELOG 201); the Daily Plan (W7) and the Archive (W5) adopt it when they are built | |
