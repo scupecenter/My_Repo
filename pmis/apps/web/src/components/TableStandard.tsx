@@ -151,3 +151,70 @@ export const ROWNO_COL: ColDef = { id: ROWNO_ID, w: 52, min: 40, max: 80, pinned
 export function RowNo({ n }: { n: number }) {
   return <span className="mono block text-end text-mute tabular-nums" data-testid="row-no" data-row-no={n}>{n}</span>;
 }
+
+/** A Master column header without the "Group / " (or "Section / ") prefix that some sources repeat: the group sits in its own header row (W8 item 2). */
+export function bareHeader(c: { header: string; group_top?: string | null; group_mid?: string | null }): string {
+  let h = c.header.trim();
+  for (const g of [c.group_mid, c.group_top]) {
+    if (!g) continue;
+    const p = `${g.trim()} /`;
+    if (h.toLowerCase().startsWith(p.toLowerCase())) h = h.slice(p.length).trim();
+  }
+  return h || c.header;
+}
+
+export type HeaderRun = { key: string; label: string; span: number; ids: string[]; pinned: boolean };
+/**
+ * Adjacent columns with the same value merge into one header cell (W8 item 2). Frozen columns never merge with the columns after them, so the
+ * merged cell can stay frozen with them. `level` reads the section (row 1) or the group (row 2) of a column id; null = no value.
+ * With `parent`, a run also breaks where the parent changes, so a group never crosses two sections.
+ */
+export function headerRuns(cols: { id: string; pinned?: boolean }[], level: (id: string) => string | null, parent?: (id: string) => string | null): HeaderRun[] {
+  const runs: HeaderRun[] = [];
+  for (const c of cols) {
+    const label = level(c.id) ?? '';
+    const pinned = !!c.pinned;
+    const last = runs[runs.length - 1];
+    const sameParent = !parent || !last || (parent(last.ids[0]!) ?? '') === (parent(c.id) ?? '');
+    if (last && last.label === label && last.pinned === pinned && sameParent) { last.span += 1; last.ids.push(c.id); }
+    else runs.push({ key: `${runs.length}-${c.id}`, label, span: 1, ids: [c.id], pinned });
+  }
+  return runs;
+}
+
+/**
+ * The section and group rows above the column headers of a grouped list (W8 item 2): row 1 the section, row 2 the group, then the header row of
+ * the list shows the column name only. Adjacent equal headers merge; a column without a group leaves its group cell empty and open towards its
+ * column header, so the name reads as spanning both rows. The tracks are the list's own, so the cells line up with the columns.
+ */
+export function GroupBands({ cols, sel, section, group, selW, testid = 'list-bands' }: {
+  cols: { id: string; px: number; pinned?: boolean }[];
+  sel: boolean;
+  selW: number;
+  section: (id: string) => string | null;
+  group: (id: string) => string | null;
+  testid?: string;
+}) {
+  const tracksCss = `${sel ? `${selW}px ` : ''}${cols.map((c) => `${c.px}px`).join(' ')}`;
+  const minWidth = cols.reduce((n, c) => n + c.px, sel ? selW : 0);
+  // a frozen run sticks where its first column sticks: after the select box and the frozen columns before it
+  const at = (id: string) => { let x = sel ? selW : 0; for (const c of cols) { if (c.id === id) break; if (c.pinned) x += c.px; } return x; };
+  const row = (runs: HeaderRun[], kind: 'section' | 'group') => (
+    <div role="row" className={`gx-head grid items-stretch text-xs font-semibold ${kind === 'section' ? 'text-mute' : ''}`} style={{ gridTemplateColumns: tracksCss, minWidth, height: 26 }} data-testid={`${testid}-${kind}`}>
+      {sel && <div className="sticky start-0 z-10 bg-inherit" aria-hidden />}
+      {runs.map((r) => (
+        <div key={r.key} role="columnheader" aria-colspan={r.span} data-testid={`${testid}-${kind}-cell`} data-span={r.span}
+          className={`truncate border-e border-line px-2 leading-[26px] ${r.label || kind === 'section' ? 'border-b' : ''} ${r.pinned ? 'sticky z-10 bg-inherit' : ''}`}
+          style={{ gridColumn: `span ${r.span}`, ...(r.pinned ? { insetInlineStart: at(r.ids[0]!) } : {}) }} title={r.label || undefined}>
+          {r.label}
+        </div>
+      ))}
+    </div>
+  );
+  return (
+    <>
+      {row(headerRuns(cols, section), 'section')}
+      {row(headerRuns(cols, group, section), 'group')}
+    </>
+  );
+}

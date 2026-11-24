@@ -21,8 +21,8 @@ import { SavedViews } from '@/components/SavedViews';
 import { UnifiedFilter, type ExtraField } from '@/components/UnifiedFilter';
 import { decodeFilter, encodeFilter, type FilterTree } from '@/api/views';
 import { MoreMenu, PageHeader } from '@/components/PageHeader';
-import { PastedChip, ROWNO_COL, RowNo, SearchBox, ShownFooter, TableCount, TableToolbar } from '@/components/TableStandard';
-import { BulkBar, ColumnMenu, DensityToggle, Empty, gxRow, HeaderRow, pin, SelectBox, StatusChip, tracks, totalWidth, Trunc, useAutoFit, useTablePrefs } from '@/components/TableKit';
+import { bareHeader, GroupBands, PastedChip, ROWNO_COL, RowNo, SearchBox, ShownFooter, TableCount, TableToolbar } from '@/components/TableStandard';
+import { BulkBar, ColumnMenu, DensityToggle, Empty, gxRow, HeaderRow, pin, SEL_W, SelectBox, StatusChip, tracks, totalWidth, Trunc, useAutoFit, useTablePrefs } from '@/components/TableKit';
 import { Tip } from '@/components/Tip';
 import type { FitSample } from '@/lib/tablePrefs';
 import { useToast } from '@/components/Toast';
@@ -207,7 +207,8 @@ export function Sites() {
   }, [nRows, scrollKey]);
   const rname = (id: number) => { const r = regions.data?.find((x) => x.id === id); return (i18n.language === 'ar' && r?.name_ar) || r?.name_en || String(id); };
   const stageName = (code?: string | null) => (code ? t(`stage.${code}`, { defaultValue: code }) : '—');
-  const label = (id: string) => (mCol(id) ? mCol(id)!.header : LABEL[id] ? t(LABEL[id]) : id);
+  // W8 item 2: a Master column shows its name only; its section and group are the two header rows above it
+  const label = (id: string) => (mCol(id) ? bareHeader(mCol(id)!) : LABEL[id] ? t(LABEL[id]) : id);
   const hint = (id: string) => { const c = mCol(id); return c ? [c.group_top, c.group_mid].filter(Boolean).join(' / ') || undefined : undefined; };
   const cols = tbl.cols, W = totalWidth(cols, true);
   const linkTo = (s: SiteListItem) => `/sites/${s.id}${new URLSearchParams([...(real ? [['stream', stream]] : []), ...(view ? [['view', view]] : [])]).toString().replace(/^(?=.)/, '?')}`;
@@ -399,7 +400,10 @@ export function Sites() {
       ) : menuList ? (
         <div className="card gx overflow-hidden" data-menu={menuKey} data-density={tbl.density} data-testid="site360-list">
           <div ref={scroller} data-testid="sites-scroll" className="relative overflow-auto" style={{ height: viewport }} onScroll={(e) => { v.onScroll(e); sessionStorage.setItem(scrollKey, String(e.currentTarget.scrollTop)); }}>
+            <div className="sticky top-0 z-20" data-testid="site360-list-head">
+            <GroupBands cols={cols} sel selW={SEL_W} testid="list-bands" section={(id) => mCol(id)?.group_top ?? null} group={(id) => mCol(id)?.group_mid ?? null} />
             <HeaderRow api={tbl} label={label} hint={hint} select={{ checked: allPicked, indeterminate: picked.size > 0, onChange: () => setPicked(allPicked ? new Set() : new Set(allCodes)), label: t('table.select_all'), testid: 'sites-select-all' }} />
+            </div>
             <div data-testid="sites-list" role="list" className="relative" style={{ height: v.total, minWidth: W }}>
               {mRows.slice(v.start, v.end).map((r, k) => {
                 const on = picked.has(r.site_code), cur = sel === r.site_code;

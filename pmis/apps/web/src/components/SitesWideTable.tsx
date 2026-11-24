@@ -7,6 +7,7 @@ import type { Site360MenuItem } from '@/api/site360';
 import { errText } from '@/components/FormDialog';
 import type { Site360CellTarget } from '@/components/Site360Grid';
 import { EmptyState, NoResults } from '@/components/States';
+import { bareHeader } from '@/components/TableStandard';
 import { optionsOf } from '@/lib/siteBulkEdit';
 import { fmtDate } from '@/lib/time';
 
@@ -26,7 +27,7 @@ export function inputOf(target: Site360CellTarget, raw: string): WideInput {
 }
 
 const STATUSES = ['not_started', 'in_progress', 'on_hold', 'completed', 'cancelled'];
-const HEAD = 32; // px: height of one header row, so the second header row sticks right under the first
+const HEAD = 30; // px: height of one header row, so the second and third header rows stick right under the first
 const NUM_W = 80, ID_W = 110;
 
 /**
@@ -46,8 +47,16 @@ export function SitesWideTable({ menu, rows, hasMore, loadingMore, onMore, loade
   const [editing, setEditing] = useState<{ site: string; ord: number; draft: string; error: string | null; pending: boolean } | null>(null);
   // # (ord 1) and Site ID (ord 2) are the two frozen columns; every other column of the menu follows in Master order
   const cols = [...menu.columns].filter((c) => c.ord !== 1 && c.ord !== 2).sort((a, b) => a.ord - b.ord);
+  // W8 item 2: three header rows: the section (row 1), the group (row 2), the column name only (row 3). Adjacent equal headers merge; a column
+  // without a group spans rows 2 and 3; a group never crosses two sections.
   const groups: { top: string; n: number }[] = [];
   for (const c of cols) { const top = c.group_top ?? ''; const last = groups[groups.length - 1]; if (last && last.top === top) last.n += 1; else groups.push({ top, n: 1 }); }
+  const mids: { top: string; mid: string | null; n: number; ord: number }[] = [];
+  for (const c of cols) {
+    const top = c.group_top ?? '', mid = c.group_mid?.trim() ? c.group_mid : null, last = mids[mids.length - 1];
+    if (last && mid !== null && last.mid === mid && last.top === top) last.n += 1; else mids.push({ top, mid, n: 1, ord: c.ord });
+  }
+  const noGroup = new Set(cols.filter((c) => !c.group_mid?.trim()).map((c) => c.ord));
   const text = (ord: number, r: WideRow): string => {
     const raw = r.values[String(ord)] ?? '';
     if (!raw) return '';
@@ -100,12 +109,20 @@ export function SitesWideTable({ menu, rows, hasMore, loadingMore, onMore, loade
         <table dir="ltr" aria-label={t('sites.wide_label')} className="border-separate border-spacing-0 text-sm" data-menu={menu.key} data-testid="sites-wide-table">
           <thead>
             <tr style={{ height: HEAD }}>
-              <th rowSpan={2} scope="col" className={`${th} text-center`} style={{ ...stick(0, 40), top: 0, width: NUM_W, minWidth: NUM_W }} data-testid="wide-col-num"><span className="flex items-center justify-center gap-1"><input type="checkbox" className="h-4 w-4" aria-label={t('table.select_all')} data-testid="wide-select-all" checked={rows.length > 0 && rows.every((r) => picked.has(r.site_code))} onChange={onPickAll} />#</span></th>
-              <th rowSpan={2} scope="col" className={`${th} text-start`} style={{ ...stick(NUM_W, 40), top: 0, width: ID_W, minWidth: ID_W }} data-testid="wide-col-site">{menu.columns.find((c) => c.ord === 2)?.header ?? t('sites.code')}</th>
+              <th rowSpan={3} scope="col" className={`${th} text-center`} style={{ ...stick(0, 40), top: 0, width: NUM_W, minWidth: NUM_W }} data-testid="wide-col-num"><span className="flex items-center justify-center gap-1"><input type="checkbox" className="h-4 w-4" aria-label={t('table.select_all')} data-testid="wide-select-all" checked={rows.length > 0 && rows.every((r) => picked.has(r.site_code))} onChange={onPickAll} />#</span></th>
+              <th rowSpan={3} scope="col" className={`${th} text-start`} style={{ ...stick(NUM_W, 40), top: 0, width: ID_W, minWidth: ID_W }} data-testid="wide-col-site">{(() => { const c = menu.columns.find((x) => x.ord === 2); return c ? bareHeader(c) : t('sites.code'); })()}</th>
               {groups.map((g, i) => <th key={i} colSpan={g.n} scope="colgroup" className={`${th} text-start text-mute`} style={{ position: 'sticky', top: 0, zIndex: 30, height: HEAD }} data-testid="wide-group">{g.top}</th>)}
             </tr>
             <tr style={{ height: HEAD }}>
-              {cols.map((c) => <th key={c.ord} scope="col" title={c.group_mid ?? undefined} className={`${th} text-start`} style={{ position: 'sticky', top: HEAD, zIndex: 30, height: HEAD, minWidth: c.ord === 4 ? 220 : 150 }} data-testid={`wide-col-${c.ord}`}>{c.header}</th>)}
+              {mids.map((g) => {
+                const col = cols.find((c) => c.ord === g.ord)!;
+                return g.mid === null
+                  ? <th key={g.ord} rowSpan={2} scope="col" className={`${th} text-start`} style={{ position: 'sticky', top: HEAD, zIndex: 30, height: HEAD * 2, minWidth: col.ord === 4 ? 220 : 150 }} data-testid={`wide-col-${col.ord}`} data-span-rows="2">{bareHeader(col)}</th>
+                  : <th key={g.ord} colSpan={g.n} scope="colgroup" className={`${th} text-start`} style={{ position: 'sticky', top: HEAD, zIndex: 30, height: HEAD }} data-testid="wide-subgroup" data-span={g.n}>{g.mid}</th>;
+              })}
+            </tr>
+            <tr style={{ height: HEAD }}>
+              {cols.filter((c) => !noGroup.has(c.ord)).map((c) => <th key={c.ord} scope="col" title={[c.group_top, c.group_mid].filter(Boolean).join(' / ') || undefined} className={`${th} text-start font-normal`} style={{ position: 'sticky', top: HEAD * 2, zIndex: 30, height: HEAD, minWidth: c.ord === 4 ? 220 : 150 }} data-testid={`wide-col-${c.ord}`}>{bareHeader(c)}</th>)}
             </tr>
           </thead>
           <tbody>
@@ -130,7 +147,7 @@ export function SitesWideTable({ menu, rows, hasMore, loadingMore, onMore, loade
                           <span className="flex items-center gap-1">
                             {(() => {
                               const kind = inputOf(target, raw(c.ord, r));
-                              const common = { autoFocus: true, 'aria-label': c.header, 'aria-invalid': editing.error ? true : undefined, disabled: editing.pending, 'data-testid': `wide-input-${r.site_code}-${c.ord}`, 'data-input': kind } as const;
+                              const common = { autoFocus: true, 'aria-label': bareHeader(c), 'aria-invalid': editing.error ? true : undefined, disabled: editing.pending, 'data-testid': `wide-input-${r.site_code}-${c.ord}`, 'data-input': kind } as const;
                               const keys = (e: React.KeyboardEvent) => { if (e.key === 'Enter') void save(r, c.ord, target); if (e.key === 'Escape') setEditing(null); };
                               if (kind === 'list') {
                                 const noParent = target.parent_ord !== undefined && !optionsOf(target, r.values).length;
@@ -156,7 +173,7 @@ export function SitesWideTable({ menu, rows, hasMore, loadingMore, onMore, loade
                           {editing.error && <span role="alert" className="max-w-72 whitespace-normal text-xs text-red-600" data-testid={`wide-error-${r.site_code}-${c.ord}`}>{editing.error}</span>}
                           </span>
                         ) : target?.editable ? (
-                          <button type="button" disabled={busy} className="group flex w-full items-center gap-1 text-start hover:text-accentText focus-visible:ring-2 focus-visible:ring-accent" aria-label={`${t('sites.wide_edit')}: ${c.header}`} data-testid={`wide-edit-${r.site_code}-${c.ord}`}
+                          <button type="button" disabled={busy} className="group flex w-full items-center gap-1 text-start hover:text-accentText focus-visible:ring-2 focus-visible:ring-accent" aria-label={`${t('sites.wide_edit')}: ${bareHeader(c)}`} data-testid={`wide-edit-${r.site_code}-${c.ord}`}
                             onClick={() => setEditing({ site: r.site_id, ord: c.ord, draft: initial(c.ord, r, target), error: null, pending: false })}>
                             {shown}<Pencil size={12} className="ms-auto text-mute opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100" aria-hidden />
                           </button>
