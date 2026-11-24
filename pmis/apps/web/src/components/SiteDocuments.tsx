@@ -6,6 +6,7 @@ import { downloadDocument, useDocuments, zipDownload, type DocFilters, type Docu
 import type { PipelineNode } from '@/api/types';
 import { DocumentsGrid } from './DocumentsGrid';
 import { useToast } from './Toast';
+import { SiteLifecycle } from '@/pages/library/Archive';
 
 const TONE: Record<string, string> = { approved: 'bg-doneBg text-doneInk', uploaded: 'bg-openBg text-openInk', in_review: 'bg-waitBg text-waitInk', rejected: 'bg-lateBg text-lateInk', missing: 'bg-lockBg text-lockInk', not_required: 'bg-lockBg text-lockInk' };
 const KINDS = ['scanned_document', 'photo', 'email', 'report', 'excel_template', 'generated_form'] as const;
@@ -48,6 +49,8 @@ export function SiteDocuments({ siteId, stages }: { siteId: string; stages: Pipe
   if (view === 'grid') return <>{viewToggle}<DocumentsGrid /></>;
   return (
     <section data-testid="site-documents" aria-label={t('docs.tab')}>
+      {/* W5-5: the lifecycle of the site's documents (due, generated, signed and uploaded, in review, approved), the same rows as Library > Archive */}
+      <SiteLifecycle siteId={siteId} />
       {viewToggle}
       <div className="mb-3 flex flex-wrap items-end gap-2" data-testid="docs-filters">
         <label className="text-sm">{t('docs.f_stage')}

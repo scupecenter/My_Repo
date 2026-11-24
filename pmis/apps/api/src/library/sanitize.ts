@@ -60,6 +60,7 @@ export interface SanitizeResult {
 /** CSS of a style element or attribute: no comments, no `<`, no escapes, no @import, no expression or binding, url() only to embedded fonts and images. */
 export function sanitizeCss(css: string, removed: string[], template = false): string {
   // the marker of a kept url() (below) never comes from the input
+  // eslint-disable-next-line no-control-regex
   let out = css.replace(/\u0001/g, '').replace(/\/\*[\s\S]*?(\*\/|$)/g, ' ');
   if (out.includes('\\')) { removed.push('css: escape'); out = out.replace(/\\/g, ''); }
   if (out.includes('<')) { removed.push('css: <'); out = out.replace(/</g, ''); }
@@ -75,6 +76,7 @@ export function sanitizeCss(css: string, removed: string[], template = false): s
   out = out.replace(/url\s*\(/gi, () => { removed.push('css: url()'); return 'none('; });
   out = out.replace(/(image-set|src)\s*\(/gi, (m) => { removed.push(`css: ${m.toLowerCase()}`); return 'none('; });
   // the url() kept above carry a marker until here, so the second pass does not meet them
+  // eslint-disable-next-line no-control-regex
   return out.replace(/\u0001\(/g, 'url(');
 }
 

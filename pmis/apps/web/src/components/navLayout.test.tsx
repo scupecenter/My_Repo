@@ -24,7 +24,7 @@ const live = () => screen.getByTestId('nav-edit-live').textContent ?? '';
 describe('the layout model (lib/navLayout)', () => {
   it('the default is the six groups of the code with their screens in NAV order', () => {
     const d = defaultLayout();
-    expect(d.headings.map((h) => h.id)).toEqual(['work', 'site_register', 'registers', 'data', 'admin', 'logs']);
+    expect(d.headings.map((h) => h.id)).toEqual(['work', 'site_register', 'registers', 'data', 'library', 'admin', 'logs']);
     expect(d.headings[1]).toMatchObject({ name_en: 'Site Master', name_ar: 'ماستر المواقع', children: ['sites'] });
     expect(d.headings[0]!.children).toEqual(['my_work', 'daily_plan', 'inbox', 'approvals', 'workload', 'status_updates', 'dashboard', 'messages', 'absence']);
     expect(resolveLayout(null)).toEqual(d);
@@ -34,9 +34,10 @@ describe('the layout model (lib/navLayout)', () => {
     const read = (m: string) => readFileSync(path(process.cwd(), `../api/prisma/migrations/${m}/migration.sql`), 'utf8');
     const list = /unnest\(\s*ARRAY\[([^\]]+)\]/.exec(read('0081_nav_layout'))![1]!.match(/'([^']+)'/g)!.map((s) => s.slice(1, -1));
     // Later releases add their screens in their own migration (0082: the System Log), one INSERT ... VALUES row per key: (key, default group, ord, added_in).
-    // 0149: My Work > Daily Plan
-    const added = ['0082_nav_system_log', '0149_daily_plan'].flatMap((m) => [...read(m).matchAll(/INSERT INTO nav_item_catalogue[^;]*?VALUES\s*\('([^']+)',\s*'([^']+)'/g)].map((x) => ({ key: x[1]!, group: x[2]! })));
-    expect(added).toEqual([{ key: 'logs.system', group: 'logs' }, { key: 'daily_plan', group: 'work' }]);
+    // 0149: My Work > Daily Plan; 0151 (W5): Library > Forms and Archive (two rows of one INSERT)
+    const added = ['0082_nav_system_log', '0149_daily_plan', '0151_library'].flatMap((m) => [...read(m).matchAll(/INSERT INTO nav_item_catalogue[^;]*?VALUES([^;]*);/g)]
+      .flatMap((x) => [...x[1]!.matchAll(/\('([^']+)',\s*'([^']+)'/g)].map((y) => ({ key: y[1]!, group: y[2]! }))));
+    expect(added).toEqual([{ key: 'logs.system', group: 'logs' }, { key: 'daily_plan', group: 'work' }, { key: 'library.forms', group: 'library' }, { key: 'library.archive', group: 'library' }]);
     expect([...list, ...added.map((a) => a.key)].sort()).toEqual(NAV_SIDE.map((n) => n.key).sort());
     for (const a of added) expect(NAV_SIDE.find((n) => n.key === a.key)?.group).toBe(a.group);
     expect(cleanNavLayout(defaultLayout()).errors).toEqual([]);
@@ -92,17 +93,17 @@ describe('the layout model (lib/navLayout)', () => {
     l = dropOn(l, itemRef('templates'), itemRef('sites'))!; // another list: before the target
     expect(l.headings[1]!.children).toEqual(['templates', 'sites']);
     l = dropOn(l, headRef(sub), headRef('logs'))!;
-    expect(l.headings[5]!.children.at(-1)).toMatchObject({ id: sub });
+    expect(l.headings[6]!.children.at(-1)).toMatchObject({ id: sub });
     expect(dropOn(l, headRef(sub), itemRef('gecol'))).toBeNull();
     expect(dropOn(l, headRef('work'), headRef('logs'))!.headings.map((h) => h.id).at(-1)).toBe('work');
   });
 
   it('deleting a heading never deletes a screen: a sub-heading gives its screens to its main heading, a main heading to Other', () => {
     let l = addSub(defaultLayout(), 'admin', { name_en: 'People', name_ar: 'الأشخاص', icon: null });
-    const sub = (l.headings[4]!.children.at(-1) as { id: string }).id;
+    const sub = (l.headings[5]!.children.at(-1) as { id: string }).id;
     l = dropOn(l, itemRef('admin.users'), `end:${sub}`)!;
     l = removeHeading(l, sub)!;
-    expect(l.headings[4]!.children).toEqual(['admin.settings', 'announcements', 'admin.users']);
+    expect(l.headings[5]!.children).toEqual(['admin.settings', 'announcements', 'admin.users']);
     l = removeHeading(l, 'admin')!;
     expect(l.headings.at(-1)).toMatchObject({ id: OTHER_ID, children: ['admin.settings', 'announcements', 'admin.users'] });
     expect(removeHeading(l, OTHER_ID)).toBeNull(); // Other with screens stays
@@ -224,7 +225,7 @@ describe('the side menu with a shared layout', () => {
     key('h:logs', 'ArrowUp');
     key('h:logs', 'Enter');
     expect([...screen.getByTestId('nav-edit-tree').children].map((li) => li.getAttribute('data-testid'))).toEqual(
-      ['work', 'site_register', 'registers', 'data', 'logs', 'admin'].map((id) => `nav-edit-heading-${id}`));
+      ['work', 'site_register', 'registers', 'data', 'library', 'logs', 'admin'].map((id) => `nav-edit-heading-${id}`));
 
     await u.click(screen.getByTestId('nav-edit-save'));
     const dlg = await screen.findByTestId('nav-edit-confirm');
@@ -252,14 +253,14 @@ describe('the side menu with a shared layout', () => {
     await u.selectOptions(within(dlg).getByTestId('nav-heading-icon'), 'site');
     await u.click(within(dlg).getByTestId('nav-heading-dialog-submit'));
     await waitFor(() => expect(screen.queryByTestId('nav-heading-dialog')).not.toBeInTheDocument());
-    expect(screen.getByTestId('nav-edit-name-h7')).toHaveTextContent('Field work');
+    expect(screen.getByTestId('nav-edit-name-h8')).toHaveTextContent('Field work');
 
-    await u.click(screen.getByTestId('nav-edit-add-sub-h7'));
+    await u.click(screen.getByTestId('nav-edit-add-sub-h8'));
     dlg = await screen.findByTestId('nav-heading-dialog');
     await u.type(within(dlg).getByTestId('nav-heading-en'), 'Power');
     await u.type(within(dlg).getByTestId('nav-heading-ar'), 'الطاقة');
     await u.click(within(dlg).getByTestId('nav-heading-dialog-submit'));
-    await waitFor(() => expect(screen.getByTestId('nav-edit-heading-h8')).toHaveAttribute('data-depth', '2'));
+    await waitFor(() => expect(screen.getByTestId('nav-edit-heading-h9')).toHaveAttribute('data-depth', '2'));
 
     // move "Mail delivery" (last of Logs) down: into the next main heading (Field work), then into its sub-heading Power
     key('i:logs.mail', ' ');
@@ -268,12 +269,12 @@ describe('the side menu with a shared layout', () => {
     key('i:logs.mail', 'ArrowDown');
     expect(live()).toMatch(/in Power/);
     key('i:logs.mail', ' ');
-    expect(screen.getByTestId('nav-edit-heading-h8')).toContainElement(screen.getByTestId('nav-edit-item-logs.mail'));
+    expect(screen.getByTestId('nav-edit-heading-h9')).toContainElement(screen.getByTestId('nav-edit-item-logs.mail'));
 
     // deleting the sub-heading moves its screen to the main heading; deleting the main heading moves it to Other
+    await u.click(screen.getByTestId('nav-edit-delete-h9'));
+    expect(editItems('h8')).toEqual(['logs.mail']);
     await u.click(screen.getByTestId('nav-edit-delete-h8'));
-    expect(editItems('h7')).toEqual(['logs.mail']);
-    await u.click(screen.getByTestId('nav-edit-delete-h7'));
     expect(editItems(OTHER_ID)).toEqual(['logs.mail']);
     expect(live()).toMatch(/moved to Other/);
     expect(screen.getByTestId('nav-edit-delete-other')).toBeDisabled();

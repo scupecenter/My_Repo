@@ -6,6 +6,7 @@ import { siteIdOf } from '@/mocks/sites';
 import { renderApp, signIn } from '@/test/utils';
 import { SITE_DATA_SCREENS } from '@/lib/siteDataScreens';
 import { Approvals } from './Approvals';
+import { ArchiveList } from './library/Archive';
 import { MyWork } from './MyWork';
 import { RegisterPage } from './Register';
 import { Site } from './Site';
@@ -18,6 +19,7 @@ import { Sites } from './Sites';
  */
 const SITE = siteIdOf(0);
 const SiteAt = () => <Routes><Route path="/sites/:siteId" element={<Site />} /></Routes>;
+const Arch = () => <Routes><Route path="/library/archive/:docCode" element={<ArchiveList />} /></Routes>;
 const Reg = () => <Routes><Route path="/registers/:key" element={<RegisterPage />} /></Routes>;
 
 const CASES: Record<string, { ui: () => ReactElement; route: string; rows: boolean; before?: () => void }> = {
@@ -33,6 +35,7 @@ const CASES: Record<string, { ui: () => ReactElement; route: string; rows: boole
   registers: { ui: () => <Reg />, route: '/registers/procurement', rows: true },
   'my-work': { ui: () => <MyWork />, route: '/my-work', rows: true },
   approvals: { ui: () => <Approvals />, route: '/approvals', rows: true },
+  'library-archive': { ui: () => <Arch />, route: '/library/archive/A1', rows: true },
   'dashboard-drilldowns': { ui: () => <Sites />, route: '/sites?dashboard_status=in_progress&ref_date=2026-11-01', rows: true },
 };
 

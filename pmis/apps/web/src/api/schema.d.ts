@@ -9800,6 +9800,7 @@ export interface components {
             site_name?: string | null;
             region_id?: components["schemas"]["RegionId"];
             region_name?: string | null;
+            region_name_ar?: string | null;
             cluster?: string | null;
             /** Format: uuid */
             doc_type_id?: string;

@@ -36,7 +36,8 @@ describe('F19: Settings tabs and old routes', () => {
     ['historical-waiver', '/admin/settings/data/historical'],
     ['sla', '/admin/settings/sla/rules'],
     ['workflow', '/admin/settings/workflow/editor'],
-    ['documents', '/admin/settings/documents/library'],
+    ['documents', '/admin/settings/documents/types'],
+    ['documents/library', '/admin/settings/documents/types'],
     ['calendar', '/admin/settings/calendar'],
     ['site360', '/admin/settings/workflow/columns'],
     ['site360-columns', '/admin/settings/workflow/columns'],
@@ -84,7 +85,9 @@ describe('F19: Settings tabs and old routes', () => {
   it('hides the mail kinds section from a user who is not a System Admin, and keeps the Documents tab', async () => {
     await signIn('engineer');
     at('/admin/settings/documents/library');
-    expect(await screen.findByTestId('settings-section-documents-library')).toBeInTheDocument();
+    expect(await screen.findByTestId('settings-section-documents-types')).toBeInTheDocument();
+    expect(screen.getByTestId('settings-section-documents-forms')).toBeInTheDocument();
+    expect(screen.getByTestId('settings-section-documents-archive')).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByTestId('settings-section-documents-mail')).toBeNull());
     expect(screen.getByTestId('settings-tab-documents')).toBeInTheDocument();
   });

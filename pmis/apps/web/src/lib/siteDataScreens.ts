@@ -30,6 +30,6 @@ export const SITE_DATA_SCREENS: SiteDataScreen[] = [
   { id: 'approvals', route: '/approvals', state: 'done', kind: 'list', note: 'Approvals inbox (master-detail list: no column chooser); counts, search and the filter tree from GET /approvals; Export current view as CSV in the browser.' },
   { id: 'dashboard-drilldowns', route: '/sites?dashboard_status=...', state: 'done', kind: 'grid', note: 'Dashboard drill-downs open Site Master with their filter (dashboard_status, milestone_reached, cluster): the Site Master toolbar and counts.' },
   { id: 'daily-plan', route: '/my-work/daily-plan', state: 'not_applicable', note: 'Not built yet (W7). It must use TableToolbar from the start.' },
-  { id: 'library-archive', route: '/library/archive', state: 'not_applicable', note: 'Not built yet (W5). Its archive lists must use TableToolbar from the start.' },
+  { id: 'library-archive', route: '/library/archive/:docCode', state: 'done', kind: 'grid', note: 'Library > Archive, the list of one document type (W5): saved views, search with the pasted list, + Filter (screen library-archive), server counts (GET /library/archive/rows), columns, density, Display, Export current view (every page, CSV), bulk zip, the # column.' },
   { id: 'site-master-grid', route: '/sites?section=cw&layout=grid', state: 'not_applicable', note: 'The hidden Excel-like grid (no button since 2026-11-22, kept for its source panel): its own header, totals row and counts.' },
 ];

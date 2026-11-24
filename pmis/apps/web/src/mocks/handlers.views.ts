@@ -113,7 +113,17 @@ const TASK_FIELDS: FF[] = [
   { key: 'due_date', label_en: 'Due date', label_ar: 'تاريخ الاستحقاق', type: 'date' },
 ];
 
-const fieldsOf = (screen: string) => screen === 'sites' || screen === 'sites-stream' ? withGroup(SITE_FIELDS, 'columns')
+/** W5 (0.15.70): the Archive list of Library > Archive (the builtin fields of the screen library-archive). */
+const ARCHIVE_FIELDS: FF[] = [
+  { key: 'site_code', label_en: 'Site ID', label_ar: 'رمز الموقع', type: 'text' },
+  { key: 'region_id', label_en: 'Region', label_ar: 'المنطقة', type: 'enum', options: REGION_OPTS },
+  { key: 'status', label_en: 'Status', label_ar: 'الحالة', type: 'enum', options: en(['due', 'generated', 'signed_uploaded', 'in_review', 'approved', 'rejected', 'superseded']) },
+  { key: 'doc_number', label_en: 'Document number', label_ar: 'رقم المستند', type: 'text' },
+  { key: 'task_code', label_en: 'Task code', label_ar: 'رمز المهمة', type: 'text' },
+  { key: 'uploaded_at', label_en: 'Upload date', label_ar: 'تاريخ الرفع', type: 'date' },
+];
+
+const fieldsOf = (screen: string) => screen === 'library-archive' ? withGroup(ARCHIVE_FIELDS, 'fields') : screen === 'sites' || screen === 'sites-stream' ? withGroup(SITE_FIELDS, 'columns')
   : screen === 'dashboard' ? withGroup(SITE_FIELDS.filter((f) => f.key !== 'workflow_locks'), 'columns')
   : /^site360-[a-z0-9_]+$/.test(screen) ? withGroup([...SITE_FIELDS, ...MENU_FIELDS], 'columns')
   : screen === 'site-tasks' || screen === 'tasks-board' ? withGroup(TASK_FIELDS, 'fields') : /^register-/.test(screen) ? withGroup(REGISTER_FIELDS, 'fields') : null;

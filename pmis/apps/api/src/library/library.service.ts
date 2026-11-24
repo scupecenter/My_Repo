@@ -344,7 +344,7 @@ export class LibraryMenuService {
         counts: { total: c.total, approved: c.approved, waiting_review: c.waiting, missing: c.missing, generated: c.generated, files: c.files } });
       byGroup.set(g.key, grp);
     }
-    const out = [...byGroup.values()].sort((a, b) => a.rank - b.rank || a.key.localeCompare(b.key)).map(({ rank: _r, ...g }) => g);
+    const out = [...byGroup.values()].sort((a, b) => a.rank - b.rank || a.key.localeCompare(b.key)).map((g) => ({ key: g.key, name_en: g.name_en, name_ar: g.name_ar, cards: g.cards }));
     return { groups: out, can_configure: configure };
   }
 

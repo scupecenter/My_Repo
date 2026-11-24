@@ -15563,6 +15563,7 @@ components:
         site_name: {type: [string, 'null']}
         region_id: {$ref: '#/components/schemas/RegionId'}
         region_name: {type: [string, 'null']}
+        region_name_ar: {type: [string, 'null']}
         cluster: {type: [string, 'null']}
         doc_type_id: {type: string, format: uuid}
         doc_code: {type: string}
