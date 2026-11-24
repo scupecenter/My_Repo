@@ -316,7 +316,7 @@ export class SitesService {
       for (const p of page) p.data_gaps = m.get(p.id) ?? 0;
     }
     const items = await this.listItems(page, stream, view);
-    // W8 item 6 (0.15.64): `counts.total` = every site the caller may see on this screen (active, the caller's regions; a stream or a view keeps
+    // W8 item 6 (0.15.68): `counts.total` = every site the caller may see on this screen (active, the caller's regions; a stream or a view keeps
     // the sites with work in it), `counts.filtered` = the sites that match the filters and the search. Both read in the caller's transaction (RLS).
     const filtered = rows[0] ? Number(rows[0].total) : offset > 0 ? await this.countFiltered(where, post, stream, view) : 0;
     const scope: Prisma.Sql[] = [Prisma.sql`s.is_active`];
@@ -393,7 +393,7 @@ export class SitesService {
    * same sites for the same query.
    */
   async baseWhere(auth: AuthContext, q: Record<string, unknown>, regions: number[] | null): Promise<Prisma.Sql[]> {
-    // W8 item 5 (0.15.64): one token = contains on code, owner ID and name; a pasted list = exact Site ID or Site Owner ID, ignoring case
+    // W8 item 5 (0.15.68): one token = contains on code, owner ID and name; a pasted list = exact Site ID or Site Owner ID, ignoring case
     const search = parseSiteSearch(oneParam(q, 'q'));
     const scenario = oneParam(q, 'scenario');
     const status = oneParam(q, 'overall_status');

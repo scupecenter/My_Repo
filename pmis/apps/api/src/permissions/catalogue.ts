@@ -22,6 +22,8 @@ export const MODULES: ModuleDef[] = [
   { key: 'sites', name_en: 'Sites', screens: [{ key: 'sites.documents', name_en: 'Site documents' }], actions: OPERATIONAL },
   { key: 'approvals', name_en: 'Approvals', actions: ['view', 'approve', 'view_audit'] },
   { key: 'my_work', name_en: 'My Work', actions: ['view'] },
+  // 0149 (W7): My Work > Daily Plan; who edits and who locks is the Matrix row daily_plan (L1, L2), the unlock is the override overrides.unlock
+  { key: 'daily_plan', name_en: 'Daily Plan', actions: ['view', 'export'] },
   { key: 'dashboard', name_en: 'Dashboard', actions: READ_ONLY },
   { key: 'reports', name_en: 'Reports', actions: READ_ONLY },
   { key: 'templates', name_en: 'Templates', actions: ['view', 'create', 'edit', 'import', 'download_documents'] },

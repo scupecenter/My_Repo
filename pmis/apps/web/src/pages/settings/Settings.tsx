@@ -16,6 +16,7 @@ import { ContractorRules } from './ContractorRules';
 import { Lists } from './Lists';
 import { RegisterColumns } from './RegisterColumns';
 import { HistoricalWaiver } from './HistoricalWaiver';
+import { DataReset } from './DataReset';
 import { Imports } from './Imports';
 import { KanbanWip } from './KanbanWip';
 import { Studio } from './studio/Studio';
@@ -23,6 +24,7 @@ import { Site360Columns } from './Site360Columns';
 import { DashboardSettings } from './DashboardSettings';
 import { Identity } from './Identity';
 import { DisplaySettings } from './DisplaySettings';
+import { DailyPlanSettings } from './DailyPlanSettings';
 
 export interface SettingsSection { key: string; adminOnly?: boolean }
 export interface SettingsTab { key: string; sections: SettingsSection[] }
@@ -36,13 +38,15 @@ export const SETTINGS_TABS: readonly SettingsTab[] = [
   { key: 'registers', sections: [{ key: 'columns' }, { key: 'contractors' }, { key: 'gecol' }, { key: 'team-scope' }] },
   { key: 'ddl', sections: [] },
   { key: 'documents', sections: [{ key: 'library' }, { key: 'mail', adminOnly: true }] },
-  { key: 'data', sections: [{ key: 'imports' }, { key: 'historical' }] },
+  { key: 'data', sections: [{ key: 'imports' }, { key: 'historical' }, { key: 'reset', adminOnly: true }] },
   { key: 'alerts', sections: [] },
   { key: 'security', sections: [{ key: 'staff' }, { key: 'retention' }] },
   { key: 'dashboard', sections: [] },
   // W8 item 4 (owner rule: settings live in the general Settings): the defaults of the Display menu of the site-data tables
   { key: 'display', sections: [] },
   { key: 'identity', sections: [] },
+  // 0149 (W7): Settings > My Work > Daily Plan
+  { key: 'my-work', sections: [{ key: 'daily-plan' }] },
 ];
 
 /**
@@ -117,6 +121,10 @@ export function SettingsRoutes() {
         <Route path="dashboard" element={<DashboardSettings />} />
         <Route path="display" element={<DisplaySettings />} />
         <Route path="identity" element={<Identity />} />
+        <Route path="my-work" element={<TabFrame tab="my-work" />}>
+          <Route index element={<Navigate to="daily-plan" replace />} />
+          <Route path="daily-plan" element={<DailyPlanSettings />} />
+        </Route>
         <Route path="workflow" element={<TabFrame tab="workflow" />}>
           <Route index element={<Navigate to="editor" replace />} />
           <Route path="editor" element={<Studio />} />
@@ -146,6 +154,7 @@ export function SettingsRoutes() {
           <Route index element={<Navigate to="imports" replace />} />
           <Route path="imports" element={<Imports />} />
           <Route path="historical" element={<HistoricalWaiver />} />
+          <Route path="reset" element={<DataReset />} />
         </Route>
         <Route path="security" element={<TabFrame tab="security" />}>
           <Route index element={<Navigate to="staff" replace />} />

@@ -76,7 +76,7 @@ export function Shell() {
     return items.some((i) => i.key === n.key) ? [n] : [];
   });
   const pending = notes.data?.unread_count ?? 0;
-  const current = inPeople ? NAV.find((n) => n.key === 'admin.users') : NAV.find((n) => loc.pathname.startsWith(n.to));
+  const current = inPeople ? NAV.find((n) => n.key === 'admin.users') : [...NAV].sort((a, b) => b.to.length - a.to.length).find((n) => loc.pathname.startsWith(n.to));
   // saved on the server (PATCH /me/preferences, 0.15.42); the cached /me is updated so the effects above do not switch it back
   const savePref = (p: { locale?: 'en' | 'ar'; theme?: 'light' | 'dark' }) => {
     qc.setQueryData<typeof me.data>(['me'], (d) => (d ? { ...d, user: { ...d.user, ...p } } : d));

@@ -6,7 +6,7 @@ import { startApp, superDb } from './helpers';
 import { actor, makeSite, Site } from './wf-helpers';
 
 /**
- * W8 (contract 0.15.64): the search box reads a pasted list of Site IDs on the server (items 5) and the lists answer the total and the filtered
+ * W8 (contract 0.15.68): the search box reads a pasted list of Site IDs on the server (items 5) and the lists answer the total and the filtered
  * counts (item 6), on GET /sites and GET /site360/{menu}/rows. Region scope: a site of another region is never counted, never returned and is
  * reported as not found.
  */

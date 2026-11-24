@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # GSDN Workspace: reset the PROJECT DATA of a server, keeping users, accounts and configuration (owner request, scope approved 2026-11-23).
-# The contract (every table, KEEP / DELETE / MIXED, with the reason) is docs/ops/data-reset.md; the database part is reset-project-data.sql.
+# The contract (every table, KEEP / DELETE / MIXED, with the reason) is docs/ops/data-reset.md; the database part is reset-project-data.sql, a
+# wrapper of data_reset_core (migration 0146). With two or more System Admins the same reset is also offered in Settings > Data reset (four eyes).
 #
 # Run as root on the server:
 #   sudo bash pmis/infra/scripts/reset-project-data.sh                       dry run (the default): counts per table, changes nothing
@@ -13,7 +14,9 @@
 #   2. stops the API (gsdn-pmis-api) and waits until no application connection is left (it is started again on exit, whatever happens);
 #   3. takes a full backup: pg_dump -Fc to /var/backups/gsdn-pmis/pre-reset-<timestamp>.dump, verified with pg_restore --list,
 #      and a tar of the documents directory (STORAGE_DIR, default /var/lib/gsdn-pmis/files), verified with tar -t;
-#   4. runs reset-project-data.sql in ONE transaction (deletes, keep checks, ends every session, one audit row on the hash chain);
+#   4. runs reset-project-data.sql in ONE transaction (deletes, keep checks, ends every session, one audit row on the hash chain): it calls
+#      data_reset_core (migration 0146), the same database function as Settings > Data reset, so both use one plan; it refuses while a reset
+#      approved in Settings waits to run or runs, and Settings refuses while this one runs;
 #   5. moves (never deletes) the stored files of the deleted rows to <STORAGE_DIR>-pre-reset-<timestamp> on the same filesystem;
 #      as the owner of the store (runuser), refusing symbolic links, ".." and paths that leave the store (reset-project-data-quarantine.sh);
 #   6. starts the API and prints the summary, the restore commands and how to delete the quarantine later.

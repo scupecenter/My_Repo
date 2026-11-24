@@ -17,7 +17,9 @@ export type ErrorCode =
   | 'batch_processing' | 'vehicle_already_reserved' | 'upload_processing'
   | 'column_in_use' | 'input_already_mapped' | 'field_already_mapped'
   | 'system_field' | 'conversion_blocked' | 'conversion_unconfirmed' | 'section_not_empty'
-  | 'list_parent_mismatch' | 'freeze_active' | 'workflow_invalid' | 'master_impact_unconfirmed' | 'stale_preview' | 'invitation_invalid' | 'register_locked';
+  | 'list_parent_mismatch' | 'plan_locked' | 'freeze_active' | 'workflow_invalid' | 'master_impact_unconfirmed' | 'stale_preview' | 'invitation_invalid' | 'register_locked'
+  // 0146 (0.15.62): the project data reset in Settings
+  | 'single_admin' | 'backup_missing' | 'request_expired' | 'reset_running' | 'plan_incomplete' | 'storage_not_supported' | 'quarantine_unavailable' | 'maintenance';
 
 export interface FieldError {
   path: string;
@@ -94,6 +96,14 @@ const TITLES: Record<string, string> = {
   conversion_blocked: 'Some values cannot be converted',
   conversion_unconfirmed: 'Confirm the conversion',
   section_not_empty: 'The section is not empty',
+  single_admin: 'A second System Admin is needed',
+  backup_missing: 'No recent successful database backup',
+  request_expired: 'The request expired',
+  reset_running: 'A reset is running',
+  plan_incomplete: 'The reset plan does not cover every table',
+  storage_not_supported: 'The document store is not supported here',
+  quarantine_unavailable: 'The quarantine directory cannot be made',
+  maintenance: 'A project data reset is running',
 };
 
 export const problemTitle = (code: string): string => TITLES[code] ?? code;

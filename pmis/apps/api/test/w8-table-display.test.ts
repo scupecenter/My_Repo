@@ -6,7 +6,7 @@ import { G } from './reg-helpers';
 import { Actor, actor, plainAdmin } from './wf-helpers';
 
 /**
- * W8 item 4 (migration 0148, contract 0.15.64): the defaults of the Display menu are a general setting (Administration > Settings > Display), read by
+ * W8 item 4 (migration 0148, contract 0.15.68): the defaults of the Display menu are a general setting (Administration > Settings > Display), read by
  * every signed-in user, written by a System Admin or an all-regions delegate of admin.settings with a reason and If-Match, audited; saved views keep the
  * Display options of a view and the middle density.
  */

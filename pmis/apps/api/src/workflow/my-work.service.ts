@@ -60,7 +60,7 @@ export class MyWorkService {
       if (bucket === 'late') conds.push(Prisma.sql`sl.colour = 'red'`);
       if (bucket === 'do_now') conds.push(Prisma.sql`coalesce(sl.colour, 'none') <> 'red'`);
     }
-    // W8 (0.15.64): total = the bucket as it is; the search (one token: contains on site and task; a pasted list: each Site ID), the F2 timing
+    // W8 (0.15.68): total = the bucket as it is; the search (one token: contains on site and task; a pasted list: each Site ID), the F2 timing
     // filters and the + Filter tree (the tasks board whitelist) narrow it to the filtered count
     const scope = [...conds];
     const search = parseSiteSearch(oneParam(q, 'q'));

@@ -408,7 +408,7 @@ export class RegistersService {
       if (!uuidSchema.safeParse(entity).success) throw problems.validation([{ path: '/entity_id', code: 'invalid', message: 'entity_id is a uuid.' }]);
       conds.push(Prisma.sql`r.entity_id = ${entity}::uuid`);
     }
-    // W8 item 5 (0.15.64): one token = contains on the Site ID and the record's values; a pasted list = each Site ID or Site Owner ID exactly
+    // W8 item 5 (0.15.68): one token = contains on the Site ID and the record's values; a pasted list = each Site ID or Site Owner ID exactly
     const search = parseSiteSearch(oneParam(q, 'q'));
     if (search.kind === 'contains') conds.push(Prisma.sql`(s.site_code ILIKE ${likePattern(search.text)} OR reg_data_for(r.id, r.register_key, r.record_type, r.entity_id, r.data)::text ILIKE ${likePattern(search.text)})`);
     else if (search.kind === 'list') conds.push(Prisma.sql`(upper(s.site_code) = ANY(${search.codes}::text[]) OR upper(s.owner_site_id) = ANY(${search.codes}::text[]))`);
@@ -422,7 +422,7 @@ export class RegistersService {
     // F3 (0.15.31): the AND/OR filter of a saved view, compiled on the server against the register's whitelist; the visibility above stays
     const adv = await this.filters.fromQuery(`register-${key}`, q);
     if (adv) conds.push(adv);
-    // W8 item 6 (0.15.64): the counts, read with the caller's rights (the visibility above and row security), before the cursor narrows the rows
+    // W8 item 6 (0.15.68): the counts, read with the caller's rights (the visibility above and row security), before the cursor narrows the rows
     const count = async (c: Prisma.Sql[]): Promise<number> => Number((await this.db.tx.$queryRaw<{ n: bigint }[]>(Prisma.sql`
       SELECT count(*) AS n FROM register_records r LEFT JOIN sites s ON s.id = r.site_id LEFT JOIN task_instances ti ON ti.id = r.task_id
       LEFT JOIN task_definitions td ON td.id = ti.task_def_id WHERE ${Prisma.join(c, ' AND ')}`))[0]?.n ?? 0);

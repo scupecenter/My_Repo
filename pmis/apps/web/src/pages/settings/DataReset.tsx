@@ -1,0 +1,242 @@
+import { AlertOctagon, DatabaseBackup, ShieldCheck } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useQueryClient } from '@tanstack/react-query';
+import { ApiError } from '@/api/client';
+import {
+  RUNNING, useApproveDataReset, useCancelDataReset, useDataReset, useDataResetRequest, useRequestDataReset, useRetryDataResetFiles, useRunDataReset,
+  useSetDataResetSettings, type DataResetPlanTable, type DataResetRequest,
+} from '@/api/dataReset';
+import { errText, FormDialog } from '@/components/FormDialog';
+import { useToast } from '@/components/Toast';
+
+type Dialog = 'approve' | 'cancel' | 'run' | 'retry' | 'settings' | null;
+
+/**
+ * Settings > Data > Data reset (owner decisions 2026-11-24, contract 0.15.62, migration 0146). The most destructive function of the system: a System Admin
+ * requests the reset of the project data (reason, step-up, the typed phrase), a DIFFERENT System Admin approves it, then one of the two runs it once a
+ * successful database backup of the last hours is recorded. The plan (what is deleted and what is kept, with counts) is the same list as the operator script.
+ * The server decides every right; this screen only offers what the state allows.
+ */
+export function DataReset() {
+  const { t, i18n } = useTranslation();
+  const toast = useToast();
+  const qc = useQueryClient();
+  const q = useDataReset();
+  const s = q.data;
+  const open = s?.request ?? null;
+  const live = useDataResetRequest(open?.id ?? null, !!open && RUNNING.has(open.status));
+  const req: DataResetRequest | null = live.data ?? open;
+  const running = !!req && RUNNING.has(req.status);
+  useEffect(() => { if (live.data && !RUNNING.has(live.data.status)) void qc.invalidateQueries({ queryKey: ['data-reset'] }); }, [live.data, qc]);
+
+  const ask = useRequestDataReset(), approve = useApproveDataReset(), cancel = useCancelDataReset(), run = useRunDataReset();
+  const retry = useRetryDataResetFiles(), setCfg = useSetDataResetSettings();
+  const [dialog, setDialog] = useState<Dialog>(null);
+  const [reason, setReason] = useState('');
+  const [typed, setTyped] = useState('');
+  const [runTyped, setRunTyped] = useState('');
+  const [cfg, setCfgForm] = useState<{ expiry: string; hours: string } | null>(null);
+  const when = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleString(i18n.language === 'ar' ? 'ar' : 'en-GB', { dateStyle: 'medium', timeStyle: 'short' }) : '—');
+  const close = () => setDialog(null);
+
+  if (q.isError) {
+    const forbidden = q.error instanceof ApiError && q.error.status === 403;
+    return <section className="card p-4" data-testid="page-data-reset"><p role="alert" className="text-lateInk" data-testid="dr-forbidden">{forbidden ? t('dr.admin_only') : t('errors.generic')}</p></section>;
+  }
+  if (!s) return <section className="card p-4" data-testid="page-data-reset">…</section>;
+
+  const del = s.plan.tables.filter((x) => x.action === 'delete');
+  const mixed = s.plan.tables.filter((x) => x.action === 'mixed');
+  const kept = s.plan.tables.filter((x) => x.action === 'keep' || x.action === 'log');
+  const reasonOk = reason.trim().length >= 10;
+  const phraseOk = typed === s.confirmation_phrase;
+  const last = s.last_request;
+
+  return (
+    <div className="space-y-4" data-testid="page-data-reset" data-status={req?.status ?? 'none'}>
+      <section className="rounded-md border border-lateInk/40 bg-lateBg p-4 text-lateInk" role="alert" data-testid="dr-danger">
+        <h2 className="flex items-center gap-2 text-lg font-bold"><AlertOctagon size={20} aria-hidden />{t('dr.title')}</h2>
+        <p className="mt-1 text-sm">{t('dr.danger', { db: s.database })}</p>
+        <ul className="mt-2 list-disc space-y-1 ps-5 text-sm">
+          <li>{t('dr.rule_two_admins')}</li>
+          <li>{t('dr.rule_backup', { hours: s.settings.backup_max_age_hours })}</li>
+          <li>{t('dr.rule_sessions')}</li>
+          <li>{t('dr.rule_files')}</li>
+          <li>{t('dr.rule_expiry', { minutes: s.settings.request_expiry_minutes })}</li>
+        </ul>
+      </section>
+
+      {s.single_admin && <p className="card p-3 text-sm" data-testid="dr-single-admin">{t('dr.single_admin')}</p>}
+      {!s.storage.supported && <p className="card p-3 text-sm text-lateInk" data-testid="dr-storage">{t('dr.storage_s3')}</p>}
+      {s.script_running && <p className="card p-3 text-sm" data-testid="dr-script">{t('dr.script_running')}</p>}
+
+      <section className="card space-y-1 p-4" data-testid="dr-backup" data-ok={s.backup.ok ? 'true' : 'false'}>
+        <h3 className="flex items-center gap-2 font-bold"><DatabaseBackup size={18} aria-hidden />{t('dr.backup')}</h3>
+        {s.backup.last_success ? (
+          <p className="text-sm" data-testid="dr-backup-last">{t('dr.backup_last', { when: when(s.backup.last_success.at), type: s.backup.last_success.type ?? '—', repo: s.backup.last_success.repository ?? '—' })}</p>
+        ) : <p className="text-sm" data-testid="dr-backup-none">{t('dr.backup_none')}</p>}
+        <p className={`text-sm font-semibold ${s.backup.ok ? 'text-doneInk' : 'text-lateInk'}`} data-testid="dr-backup-state">
+          {s.backup.ok ? t('dr.backup_ok', { hours: s.backup.max_age_hours }) : t('dr.backup_missing', { hours: s.backup.max_age_hours })}
+        </p>
+        {s.backup.last_problem && <p className="text-sm text-lateInk" data-testid="dr-backup-problem">{t('dr.backup_problem', { when: when(s.backup.last_problem.at), message: s.backup.last_problem.message ?? '' })}</p>}
+      </section>
+
+      {s.plan.error && <p className="card p-3 text-sm text-lateInk" role="alert" data-testid="dr-plan-error">{t('dr.plan_error', { error: s.plan.error })}</p>}
+      {!running && s.plan.tables.length > 0 && (
+        <section className="card space-y-3 p-4" data-testid="dr-plan">
+          <h3 className="font-bold">{t('dr.plan')}</h3>
+          <p className="text-sm text-mute">{t('dr.plan_note', { rows: s.plan.delete_rows, files: s.plan.files })}</p>
+          <div className="grid gap-4 md:grid-cols-2">
+            <PlanTable testid="dr-plan-delete" title={t('dr.deleted')} rows={[...del, ...mixed]} col={(r) => (r.action === 'mixed' ? t('dr.mixed_cell', { del: r.delete, keep: r.keep }) : String(r.delete))} />
+            <details className="rounded-md border border-line p-2" data-testid="dr-plan-keep">
+              <summary className="cursor-pointer text-sm font-semibold">{t('dr.kept', { count: kept.length })}</summary>
+              <PlanTable testid="dr-plan-keep-table" title="" rows={kept} col={(r) => String(r.keep)} />
+            </details>
+          </div>
+        </section>
+      )}
+
+      {req ? (
+        <section className="card space-y-3 p-4" data-testid="dr-request" data-status={req.status}>
+          <h3 className="flex items-center gap-2 font-bold"><ShieldCheck size={18} aria-hidden />{t('dr.request')}</h3>
+          <p className="font-semibold" data-testid="dr-request-status">{t(`dr.status_${req.status}`)}</p>
+          <dl className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 text-sm">
+            <dt>{t('dr.requested_by')}</dt><dd data-testid="dr-requested-by">{req.requested_by.display_name} · {when(req.requested_at)}</dd>
+            <dt>{t('common.reason')}</dt><dd>{req.request_reason}</dd>
+            {req.approved_by && <><dt>{t('dr.approved_by')}</dt><dd data-testid="dr-approved-by">{req.approved_by.display_name} · {when(req.approved_at)}</dd></>}
+            {(req.status === 'requested' || req.status === 'approved') && <><dt>{t('dr.expires')}</dt><dd data-testid="dr-expires">{when(req.expires_at)}</dd></>}
+            {req.run_by && <><dt>{t('dr.run_by')}</dt><dd>{req.run_by.display_name} · {when(req.run_started_at)}</dd></>}
+          </dl>
+          {req.status === 'requested' && !s.can.approve && <p className="text-sm text-mute" data-testid="dr-wait-other">{t('dr.wait_other')}</p>}
+          {running && <p className="text-sm" data-testid="dr-progress">{req.status === 'running' ? t('dr.progress_db') : t('dr.progress_files', { done: req.files.moved + req.files.missing + req.files.refused, total: req.files.total })}</p>}
+          {req.stalled && <p className="text-sm text-lateInk" data-testid="dr-stalled">{t('dr.stalled')}</p>}
+          <div className="flex flex-wrap gap-2">
+            {s.can.approve && <button className="btn btn-danger" data-testid="dr-approve" onClick={() => { approve.reset(); setDialog('approve'); }}>{t('dr.approve')}</button>}
+            {s.can.start && <button className="btn btn-danger" data-testid="dr-run" disabled={!s.backup.ok || !s.storage.supported} onClick={() => { run.reset(); setRunTyped(''); setDialog('run'); }}>{t('dr.run')}</button>}
+            {s.can.cancel && <button className="btn" data-testid="dr-cancel" onClick={() => { cancel.reset(); setDialog('cancel'); }}>{t('dr.cancel')}</button>}
+            {req.status === 'files_pending' && s.can.retry_files && <button className="btn" data-testid="dr-retry-files" onClick={() => { retry.reset(); setDialog('retry'); }}>{t('dr.retry_files')}</button>}
+          </div>
+          {s.can.start && !s.backup.ok && <p className="text-sm text-lateInk" data-testid="dr-run-blocked">{t('dr.backup_missing', { hours: s.backup.max_age_hours })}</p>}
+        </section>
+      ) : (
+        <section className="card space-y-3 p-4" data-testid="dr-form">
+          <h3 className="font-bold">{t('dr.new_request')}</h3>
+          <label className="block text-sm font-semibold">{t('dr.reason_label')}
+            <textarea className="input mt-1 min-h-16 font-normal" data-testid="dr-reason" value={reason} onChange={(e) => setReason(e.target.value)} disabled={!s.can.request} />
+          </label>
+          <label className="block text-sm font-semibold">{t('dr.type_phrase', { phrase: s.confirmation_phrase })}
+            <input className="input mt-1 font-normal" dir="ltr" data-testid="dr-phrase" value={typed} onChange={(e) => setTyped(e.target.value)} disabled={!s.can.request} autoComplete="off" />
+          </label>
+          {ask.isError && <p role="alert" className="text-sm text-lateInk" data-testid="dr-form-error">{errText(ask.error, t)}</p>}
+          <button className="btn btn-danger" data-testid="dr-submit" disabled={!s.can.request || !reasonOk || !phraseOk || ask.isPending}
+            onClick={() => ask.mutate({ reason: reason.trim(), confirm_text: typed }, { onSuccess: () => { toast(t('dr.requested_toast')); setReason(''); setTyped(''); } })}>
+            {t('dr.submit')}
+          </button>
+        </section>
+      )}
+
+      {last?.status === 'completed' && !req && <Result r={last} when={when} />}
+      {last && last.status !== 'completed' && !req && (
+        <p className="card p-3 text-sm text-mute" data-testid="dr-last">{t('dr.last', { status: t(`dr.status_${last.status}`), when: when(last.finished_at ?? last.requested_at) })}{last.error ? ` — ${last.error}` : ''}</p>
+      )}
+      {req && (req.status === 'files_pending') && <Result r={req} when={when} />}
+
+      <section className="card space-y-2 p-4" data-testid="dr-settings">
+        <h3 className="font-bold">{t('dr.settings')}</h3>
+        <p className="text-sm" data-testid="dr-settings-values">{t('dr.settings_values', { minutes: s.settings.request_expiry_minutes, hours: s.settings.backup_max_age_hours })}</p>
+        <button className="btn" data-testid="dr-settings-edit" disabled={!!req} onClick={() => { setCfg.reset(); setCfgForm({ expiry: String(s.settings.request_expiry_minutes), hours: String(s.settings.backup_max_age_hours) }); setDialog('settings'); }}>{t('common.edit')}</button>
+      </section>
+
+      {dialog === 'approve' && req && (
+        <ReasonDialog testid="dr-approve-dialog" title={t('dr.approve_title')} hint={t('dr.approve_hint')} min={10} busy={approve.isPending} error={approve.isError ? errText(approve.error, t) : null} onClose={close}
+          onSubmit={(r) => approve.mutate({ id: req.id, version: req.version, reason: r }, { onSuccess: () => { toast(t('dr.approved_toast')); close(); } })} />
+      )}
+      {dialog === 'cancel' && req && (
+        <FormDialog open onClose={close} testid="dr-cancel-dialog" title={t('dr.cancel_title')} busy={cancel.isPending} error={cancel.isError ? errText(cancel.error, t) : null}
+          onSubmit={(r) => cancel.mutate({ id: req.id, version: req.version, reason: r }, { onSuccess: () => { toast(t('dr.cancelled_toast')); close(); } })} />
+      )}
+      {dialog === 'retry' && req && (
+        <FormDialog open onClose={close} testid="dr-retry-dialog" title={t('dr.retry_files')} busy={retry.isPending} error={retry.isError ? errText(retry.error, t) : null}
+          onSubmit={(r) => retry.mutate({ id: req.id, reason: r }, { onSuccess: close })} />
+      )}
+      {dialog === 'run' && req && (
+        <FormDialog open onClose={close} testid="dr-run-dialog" title={t('dr.run_title')} withReason={false} submitLabel={t('dr.run')} busy={run.isPending}
+          disabled={runTyped !== s.confirmation_phrase} error={run.isError ? errText(run.error, t) : null}
+          onSubmit={() => run.mutate({ id: req.id, version: req.version, confirm_text: runTyped }, { onSuccess: () => { toast(t('dr.started_toast')); close(); } })}>
+          <p className="text-sm text-lateInk">{t('dr.run_hint', { db: s.database })}</p>
+          <label className="block text-sm font-semibold">{t('dr.type_phrase', { phrase: s.confirmation_phrase })}
+            <input className="input mt-1 font-normal" dir="ltr" data-testid="dr-run-phrase" value={runTyped} onChange={(e) => setRunTyped(e.target.value)} autoComplete="off" />
+          </label>
+        </FormDialog>
+      )}
+      {dialog === 'settings' && cfg && (
+        <FormDialog open onClose={close} testid="dr-settings-dialog" title={t('dr.settings')} busy={setCfg.isPending} error={setCfg.isError ? errText(setCfg.error, t) : null}
+          onSubmit={(r) => setCfg.mutate({ version: s.settings.version, reason: r, request_expiry_minutes: Number(cfg.expiry), backup_max_age_hours: Number(cfg.hours) }, { onSuccess: () => { toast(t('settings.audited')); close(); } })}>
+          <label className="block text-sm font-semibold">{t('dr.expiry_label')}
+            <input type="number" min={5} max={240} className="input mt-1 font-normal" data-testid="dr-expiry" value={cfg.expiry} onChange={(e) => setCfgForm({ ...cfg, expiry: e.target.value })} />
+          </label>
+          <label className="block text-sm font-semibold">{t('dr.hours_label')}
+            <input type="number" min={1} max={72} className="input mt-1 font-normal" data-testid="dr-hours" value={cfg.hours} onChange={(e) => setCfgForm({ ...cfg, hours: e.target.value })} />
+          </label>
+        </FormDialog>
+      )}
+    </div>
+  );
+}
+
+function PlanTable({ rows, title, col, testid }: { rows: DataResetPlanTable[]; title: string; col: (r: DataResetPlanTable) => string; testid: string }) {
+  const { t } = useTranslation();
+  return (
+    <div className="overflow-x-auto">
+      {title && <h4 className="mb-1 text-sm font-semibold">{title}</h4>}
+      <table className="w-full text-sm" data-testid={testid}>
+        <thead className="text-mute"><tr><th className="p-1 text-start">{t('dr.col_table')}</th><th className="p-1 text-end">{t('dr.col_rows')}</th></tr></thead>
+        <tbody>{rows.map((r) => <tr key={r.table} className="border-t border-line" data-testid={`dr-row-${r.table}`}><td className="mono p-1 text-xs" dir="ltr">{r.table}</td><td className="p-1 text-end">{col(r)}</td></tr>)}</tbody>
+      </table>
+    </div>
+  );
+}
+
+/** The result of a run and how to restore what was there before (the database from the backup, the files from the quarantine). */
+function Result({ r, when }: { r: DataResetRequest; when: (s: string | null | undefined) => string }) {
+  const { t } = useTranslation();
+  const res = (r.result ?? {}) as { audit_id?: number; sessions_ended?: number };
+  const qd = r.quarantine_dir ?? '<STORAGE_DIR>/.pre-reset-<timestamp>';
+  return (
+    <section className="card space-y-2 p-4" data-testid="dr-result" data-status={r.status}>
+      <h3 className="font-bold">{t('dr.result')}</h3>
+      <ul className="list-disc space-y-1 ps-5 text-sm">
+        <li data-testid="dr-result-when">{t('dr.result_when', { when: when(r.db_committed_at), audit: res.audit_id ?? '—' })}</li>
+        <li data-testid="dr-result-sessions">{t('dr.result_sessions', { count: res.sessions_ended ?? 0 })}</li>
+        <li data-testid="dr-result-files">{t('dr.result_files', { moved: r.files.moved, missing: r.files.missing, refused: r.files.refused, pending: r.files.pending, total: r.files.total })}</li>
+        <li>{t('dr.result_quarantine')} <span className="mono text-xs" dir="ltr" data-testid="dr-result-quarantine">{qd}</span></li>
+      </ul>
+      <h4 className="pt-2 text-sm font-semibold">{t('dr.restore')}</h4>
+      <p className="text-sm text-mute">{t('dr.restore_note')}</p>
+      <pre className="overflow-x-auto rounded-md bg-card2 p-3 text-xs" dir="ltr" data-testid="dr-restore">{[
+        `# 1. ${t('dr.restore_db')}`,
+        `sudo -u postgres /usr/local/lib/gsdn-pmis/db-restore.sh --pgdata /var/restore/pmis-pgdata --port 55433 --target-time '${r.run_started_at ?? '<before the reset>'}' --keep-running`,
+        `# 2. ${t('dr.restore_swap')}`,
+        `# 3. ${t('dr.restore_files')}`,
+        `sudo -u gsdn-pmis cp -a -n ${qd}/. <STORAGE_DIR>/`,
+      ].join('\n')}</pre>
+    </section>
+  );
+}
+
+function ReasonDialog({ testid, title, hint, min, busy, error, onClose, onSubmit }: {
+  testid: string; title: string; hint: string; min: number; busy: boolean; error: string | null; onClose: () => void; onSubmit: (reason: string) => void;
+}) {
+  const { t } = useTranslation();
+  const [r, setR] = useState('');
+  return (
+    <FormDialog open onClose={onClose} testid={testid} title={title} withReason={false} busy={busy} error={error} disabled={r.trim().length < min} submitLabel={title}
+      onSubmit={() => onSubmit(r.trim())}>
+      <p className="text-sm text-mute">{hint}</p>
+      <label className="block text-sm font-semibold">{t('dr.reason_label')}
+        <textarea className="input mt-1 min-h-16 font-normal" data-testid={`${testid}-reason`} value={r} onChange={(e) => setR(e.target.value)} />
+      </label>
+    </FormDialog>
+  );
+}
