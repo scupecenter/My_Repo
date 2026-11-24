@@ -5,7 +5,9 @@ import { z } from 'zod';
 import { AccessService } from '../access/access.service';
 import type { AuthContext } from '../auth/auth.types';
 import { StepUpService } from '../auth/step-up.service';
-import { decodeCursor, encodeCursor, likePattern, parseLimit } from '../common/cursor';
+import { decodeCursor, encodeCursor, parseLimit } from '../common/cursor';
+import { parseSiteSearch, pastedSearchResult, siteScope, siteSearchCond } from '../common/site-search';
+import { FilterCatalogService } from '../views/filter-catalog.service';
 import { IdempotencyService } from '../common/idempotency.service';
 import { ProblemException, problems } from '../common/problem';
 import { TS_TEXT, boolParam, oneParam } from '../common/query';
@@ -56,6 +58,7 @@ export class ApprovalsService {
     private readonly view: TaskViewService,
     private readonly workflow: WorkflowService,
     private readonly idem: IdempotencyService,
+    private readonly filters: FilterCatalogService,
   ) {}
 
   /**
@@ -71,7 +74,8 @@ export class ApprovalsService {
     const tab = oneParam(q, 'tab') ?? 'all';
     if (!['all', 'review', 'approve'].includes(tab)) throw problems.validation([{ path: '/tab', code: 'invalid', message: 'tab is all, review or approve.' }]);
     const stage = oneParam(q, 'stage_code');
-    const text = oneParam(q, 'q')?.trim();
+    // W8 item 5 (0.15.68): one token = contains on site and task; a pasted list = each Site ID or Site Owner ID exactly
+    const search = parseSiteSearch(oneParam(q, 'q'));
     const groupOnly = boolParam(q, 'group_only');
     const regionFilter = this.intList(q, 'region_id');
     const me = auth.user.id;
@@ -82,16 +86,29 @@ export class ApprovalsService {
     if (sitesRegions !== null) conds.push(Prisma.sql`t.region_id = ANY(${sitesRegions}::int[])`);
     if (regionFilter.length > 0) conds.push(Prisma.sql`t.region_id = ANY(${regionFilter}::int[])`);
     if (stage) conds.push(Prisma.sql`st.code = ${stage}`);
-    if (text) conds.push(Prisma.sql`(s.site_code ILIKE ${likePattern(text)} OR s.name ILIKE ${likePattern(text)} OR td.name_en ILIKE ${likePattern(text)} OR td.code ILIKE ${likePattern(text)})`);
+    const byText = siteSearchCond(search, 's', [Prisma.sql`td.name_en`, Prisma.sql`td.code`]);
+    if (byText) conds.push(byText);
     if (tab !== 'all') conds.push(Prisma.sql`k.kind = ${tab}`);
     conds.push(...timingFilters(q)); // F2: sla_colour and stale
-    conds.push(Prisma.sql`(
+    // W8 item 4: the + Filter tree of the inbox (the whitelist of the tasks board, aliases t, s, td, st)
+    const adv = await this.filters.fromQuery('tasks-board', q);
+    if (adv) conds.push(adv);
+    const scopeConds: Prisma.Sql[] = [Prisma.sql`t.state IN ('in_review', 'in_approval')`];
+    if (regions !== null) scopeConds.push(Prisma.sql`t.region_id = ANY(${regions}::int[])`);
+    if (sitesRegions !== null) scopeConds.push(Prisma.sql`t.region_id = ANY(${sitesRegions}::int[])`);
+    const actable = Prisma.sql`(
       (k.rule::text = 'all_members' AND EXISTS (SELECT 1 FROM task_level_voters v WHERE v.task_id = t.id AND v.level = t.current_level AND v.round = t.level_round
                                                AND v.user_id = ${me}::uuid AND v.voted_at IS NULL))
       OR (k.rule::text <> 'all_members' AND wf_is_eligible(t.id, k.kind, ${me}::uuid)
           AND (t.ball_in_court_user_id IS NULL OR t.ball_in_court_user_id = ${me}::uuid OR NOT wf_is_eligible(t.id, k.kind, t.ball_in_court_user_id)))
       OR (${auth.state.isAdmin}::boolean AND k.has_holder = false)
-    )`);
+    )`;
+    conds.push(actable);
+    scopeConds.push(actable);
+    // W8 item 6 (0.15.68): total = every item of the caller's inbox (all tabs, no filter), filtered = the items matching the tab, filters and search
+    const counts = { total: await this.view.count(Prisma.join(scopeConds, ' AND ')), filtered: await this.view.count(Prisma.join(conds, ' AND ')) };
+    // found / not found: the regions of the inbox (Approvals AND Sites view), as the rows themselves
+    const pasted = await pastedSearchResult(this.db.tx, search, siteScope(regions, sitesRegions));
     if (cursor) {
       conds.push(Prisma.sql`(coalesce(t.level_opened_at, t.updated_at), t.id) > (${cursor[0] as string}::timestamptz, ${cursor[1] as string}::uuid)`);
     }
@@ -149,7 +166,7 @@ export class ApprovalsService {
     if (groupOnly === true) items = items.filter((i) => i.via_group !== undefined);
     const last = page[page.length - 1];
     const lastExtra = last ? extras.find((e) => e.id === last.id) : undefined;
-    return { items, page: { limit, next_cursor: rows.length > limit && lastExtra ? encodeCursor([lastExtra.ts, lastExtra.id]) : null } };
+    return { items, page: { limit, next_cursor: rows.length > limit && lastExtra ? encodeCursor([lastExtra.ts, lastExtra.id]) : null }, counts, ...(pasted ? { search: pasted } : {}) };
   }
 
   private intList(q: Record<string, unknown>, key: string): number[] {

@@ -16,7 +16,7 @@ describe('F19: Settings tabs and old routes', () => {
   beforeEach(async () => { await signIn('pm'); });
 
   it('has the 11 one-word tabs of the plan plus the F20 dashboard tab', () => {
-    expect(SETTINGS_TABS.map((t) => t.key)).toEqual(['calendar', 'workflow', 'sla', 'weights', 'registers', 'ddl', 'documents', 'data', 'alerts', 'security', 'dashboard', 'identity', 'my-work']); // 0149 (W7): Settings > My Work > Daily Plan
+    expect(SETTINGS_TABS.map((t) => t.key)).toEqual(['calendar', 'workflow', 'sla', 'weights', 'registers', 'ddl', 'documents', 'data', 'alerts', 'security', 'dashboard', 'display', 'identity', 'my-work']); // 0148 (W8): Display; 0149 (W7): Settings > My Work > Daily Plan
   });
 
   it.each([

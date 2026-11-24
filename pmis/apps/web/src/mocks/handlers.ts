@@ -49,6 +49,21 @@ export function recordStep(t: MockTask, action: string, note?: string, skipped: 
   if (action === 'reject') t.comments = [...(t.comments ?? []), { id: crypto.randomUUID(), author: who, body: note ?? '', is_rejection_note: true, created_at: at }];
 }
 
+/** W8 (0.15.64): the search of the task lists: one token = contains on site and task; a pasted list = each Site ID exactly, ignoring case. */
+function siteSearch(u: URLSearchParams): Response | { keep: (t: { site_code?: string | null; name_en?: string; task_code?: string }) => boolean; search?: { pasted: number; found: number; not_found: string[] } } {
+  const tokens = [...new Set((u.get('q') ?? '').split(/[\s,;]+/).map((x) => x.trim().toUpperCase()).filter(Boolean))];
+  if (tokens.length > 1000) return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '/q', code: 'too_many_codes' }] });
+  if (tokens.length > 1) {
+    const known = new Set(db().tasks.map((x) => (x.site_code ?? '').toUpperCase()));
+    return { keep: (x) => tokens.includes((x.site_code ?? '').toUpperCase()), search: { pasted: tokens.length, found: tokens.filter((c) => known.has(c)).length, not_found: tokens.filter((c) => !known.has(c)) } };
+  }
+  const one = (u.get('q') ?? '').trim().toLowerCase();
+  return { keep: (x) => !one || `${x.site_code ?? ''} ${x.name_en ?? ''} ${x.task_code ?? ''}`.toLowerCase().includes(one) };
+}
+/** A page with the counts of W8 item 6: total = the screen's rows, filtered = the rows after the filters and the search. */
+const counted = <T,>(all: T[], items: T[], search?: { pasted: number; found: number; not_found: string[] }) =>
+  HttpResponse.json({ items, page: { limit: 200, next_cursor: null, total: items.length }, counts: { total: all.length, filtered: items.length }, ...(search ? { search } : {}) });
+
 export const handlers = [
   // ---- auth: identical response whether or not the identifier matches; registry email never derived or exposed.
   http.get(`${B}/auth/login`, ({ request }) => {
@@ -105,20 +120,23 @@ export const handlers = [
     const v = viewer()!;
     const u = new URL(request.url).searchParams, bucket = u.get('bucket');
     const keep = timingFilter(u); // F2 (0.15.30): sla_colour and stale
-    if (bucket === 'late') return page(v.key === 'pm' ? db().extra.filter((t) => t.sla?.colour === 'red').map(toSummary).filter(keep) : []);
-    if (bucket === 'do_now') return page(approvalsFor().map(toSummary).filter(keep));
-    const waiting = db().tasks.filter((t) => (t.state === 'in_review' || t.state === 'in_approval') && t.submitted_by === v.employee_id && !canAct(t.level_kind));
-    return page(waiting.map(toSummary).filter(keep));
+    const s = siteSearch(u); if (s instanceof Response) return s;
+    const all = bucket === 'late' ? (v.key === 'pm' ? db().extra.filter((t) => t.sla?.colour === 'red').map(toSummary) : [])
+      : bucket === 'do_now' ? approvalsFor().map(toSummary)
+      : db().tasks.filter((t) => (t.state === 'in_review' || t.state === 'in_approval') && t.submitted_by === v.employee_id && !canAct(t.level_kind)).map(toSummary);
+    return counted(all, all.filter(keep).filter((x) => s.keep(x)), s.search);
   }),
 
   // ---- approvals
   http.get(`${B}/approvals`, ({ request }) => {
     const g = guard(); if (g) return g;
     const u = new URL(request.url).searchParams;
-    const tab = u.get('tab') ?? 'all', q = (u.get('q') ?? '').toLowerCase();
+    const tab = u.get('tab') ?? 'all';
     const keep = timingFilter(u); // F2 (0.15.30): sla_colour and stale
-    const items = approvalsFor().filter((t) => (tab === 'all' || t.level_kind === tab) && (!q || `${t.site_code} ${t.name_en} ${t.task_code}`.toLowerCase().includes(q)));
-    return page(items.map(toApproval).filter((a) => keep(a.task)));
+    const s = siteSearch(u); if (s instanceof Response) return s;
+    const all = approvalsFor().map(toApproval);
+    const items = all.filter((a) => (tab === 'all' || a.level_kind === tab) && s.keep(a.task));
+    return counted(all, items.filter((a) => keep(a.task)), s.search);
   }),
   http.post(`${B}/approvals/bulk`, async ({ request }) => {
     const g = guard(); if (g) return g;

@@ -224,14 +224,23 @@ export const registerHandlers = [
     const def = defOf(params.key as string);
     if (!def || !viewer()!.nav.includes(def.module_key)) return problem(404, 'not_found', 'Register not found');
     const u = new URL(request.url).searchParams;
-    const q = (u.get('q') ?? '').toLowerCase(), region = u.get('region_id'), state = u.get('state'), type = u.get('record_type'), site = u.get('site_id');
+    // W8 item 5 (0.15.64): one token = contains; a pasted list = each Site ID exactly, ignoring case
+    const tokens = [...new Set((u.get('q') ?? '').split(/[\s,;]+/).map((x) => x.trim().toUpperCase()).filter(Boolean))];
+    if (tokens.length > 1000) return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '/q', code: 'too_many_codes' }] });
+    const pasted = tokens.length > 1 ? tokens : null;
+    const q = pasted ? '' : (u.get('q') ?? '').trim().toLowerCase(), region = u.get('region_id'), state = u.get('state'), type = u.get('record_type'), site = u.get('site_id');
     const limit = Math.min(Number(u.get('limit') ?? 50), 200), start = Number(u.get('cursor') ?? 0);
     const entity = u.get('entity_id'), allVersions = u.get('all_versions') === 'true';
     const all = R().records.filter((r) => r.register_key === def.register_key && (!entity || r.entity_id === entity) && (allVersions || entity || isLatest(r))).map(toRecord).filter((r) =>
       (!state || r.state === state) && (!type || r.record_type === type) && (!site || r.site_id === site) && (!region || String(r.region_id) === region)
-      && (!q || `${r.site_code ?? ''} ${Object.values(r.data).filter((x) => typeof x === 'string').join(' ')}`.toLowerCase().includes(q)));
+      && (!q || `${r.site_code ?? ''} ${Object.values(r.data).filter((x) => typeof x === 'string').join(' ')}`.toLowerCase().includes(q))
+      && (!pasted || pasted.includes((r.site_code ?? '').toUpperCase())));
     const items = all.slice(start, start + limit);
-    return HttpResponse.json({ items, page: { limit, next_cursor: start + limit < all.length ? String(start + limit) : null, total: all.length } });
+    // W8 item 6: total = the latest records of the register, filtered = those above
+    const screenTotal = R().records.filter((r) => r.register_key === def.register_key && (allVersions || entity || isLatest(r))).length;
+    const codes = new Set(Array.from({ length: SITE_COUNT }, (_, i) => siteMeta(i).code.toUpperCase()));
+    const search = pasted ? { pasted: pasted.length, found: pasted.filter((c) => codes.has(c)).length, not_found: pasted.filter((c) => !codes.has(c)) } : undefined;
+    return HttpResponse.json({ items, page: { limit, next_cursor: start + limit < all.length ? String(start + limit) : null, total: all.length }, counts: { total: screenTotal, filtered: all.length }, ...(search ? { search } : {}) });
   }),
   http.post(`${B}/registers/:key/records`, async ({ params, request }) => {
     const g = guard(); if (g) return g;

@@ -1,6 +1,6 @@
-import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { api, ApiError, setCsrfToken } from './client';
-import type { ApprovalItem, BulkResult, Me, Notification, Page, Session, StaffCard, TaskDetail, TaskSummary, TransitionResult } from './types';
+import type { ApprovalItem, BulkResult, CountedPage, Me, Notification, Page, Session, StaffCard, TaskDetail, TaskSummary, TransitionResult } from './types';
 
 export const useSession = () =>
   useQuery({
@@ -21,14 +21,16 @@ export const useSession = () =>
 
 export const useMe = (enabled: boolean) => useQuery({ queryKey: ['me'], enabled, queryFn: () => api.get<Me>('/me') });
 
-export const useMyTasks = (bucket: 'late' | 'do_now' | 'waiting') =>
-  useQuery({ queryKey: ['my-work', bucket], queryFn: () => api.get<Page<TaskSummary>>('/me/tasks', { query: { bucket } }) });
+/** W8 (0.15.64): `q` (one word or a pasted list of Site IDs) and `filter` (the + Filter tree, tasks-board whitelist) on the server; the answer has the counts. */
+export const useMyTasks = (bucket: 'late' | 'do_now' | 'waiting', f: { q?: string; filter?: string } = {}) =>
+  useQuery({ queryKey: ['my-work', bucket, f.q ?? '', f.filter ?? ''], placeholderData: keepPreviousData,
+    queryFn: () => api.get<CountedPage<TaskSummary>>('/me/tasks', { query: { bucket, limit: 200, ...(f.q?.trim() ? { q: f.q.trim() } : {}), ...(f.filter ? { filter: f.filter } : {}) } }) });
 
-/** F2 (0.15.30): `colours` and `stale` filter the inbox on the server (sla_colour, stale). */
-export const useApprovals = (tab: string, q: string, f: { colours?: string[]; stale?: boolean } = {}) =>
+/** F2 (0.15.30): `colours` and `stale` filter the inbox on the server (sla_colour, stale); W8 (0.15.64): `filter` (the + Filter tree) too, and the answer has the counts. */
+export const useApprovals = (tab: string, q: string, f: { colours?: string[]; stale?: boolean; filter?: string } = {}) =>
   useQuery({
-    queryKey: ['approvals', tab, q, f.colours?.join(',') ?? '', f.stale ?? null],
-    queryFn: () => api.get<Page<ApprovalItem>>('/approvals', { query: { tab, q, ...(f.colours?.length ? { sla_colour: f.colours.join(',') } : {}), ...(f.stale ? { stale: 'true' } : {}) } }),
+    queryKey: ['approvals', tab, q, f.colours?.join(',') ?? '', f.stale ?? null, f.filter ?? ''], placeholderData: keepPreviousData,
+    queryFn: () => api.get<CountedPage<ApprovalItem>>('/approvals', { query: { tab, q, limit: 200, ...(f.colours?.length ? { sla_colour: f.colours.join(',') } : {}), ...(f.stale ? { stale: 'true' } : {}), ...(f.filter ? { filter: f.filter } : {}) } }),
   });
 
 export const useTask = (id: string | null) =>

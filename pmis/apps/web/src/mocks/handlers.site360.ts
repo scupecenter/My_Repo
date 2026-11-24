@@ -80,9 +80,15 @@ function batchesOf(filter: string | null): string[] | null {
   } catch { return null; }
 }
 
-function rowsFor(key: string, offset: number, limit: number, batches: string[] | null = null) {
+function rowsFor(key: string, offset: number, limit: number, batches: string[] | null = null, q = '') {
   const cols = COLS.filter((c) => key === 'master' || c.sections.includes(key) || c.sections.includes('status') || IDENT.includes(c.ord));
-  const list = batches ? SITES.filter((x) => batches.includes(x.batch)) : SITES;
+  // W8 item 5 (0.15.64): one token = contains on code and name; a pasted list = each Site ID exactly, ignoring case
+  const tokens = [...new Set(q.split(/[\s,;]+/).map((x) => x.trim().toUpperCase()).filter(Boolean))];
+  const pasted = tokens.length > 1 ? tokens : null;
+  const one = pasted ? '' : q.trim().toLowerCase();
+  const list = (batches ? SITES.filter((x) => batches.includes(x.batch)) : SITES)
+    .filter((x) => (!pasted || pasted.includes(x.code.toUpperCase())) && (!one || x.code.toLowerCase().includes(one) || x.name.toLowerCase().includes(one)));
+  const search = pasted ? { pasted: pasted.length, found: pasted.filter((c) => SITES.some((x) => x.code === c)).length, not_found: pasted.filter((c) => !SITES.some((x) => x.code === c)) } : undefined;
   const page = list.slice(offset, offset + limit);
   const values = (site: (typeof SITES)[number]) => {
     const v: Record<string, string | null> = {};
@@ -99,6 +105,7 @@ function rowsFor(key: string, offset: number, limit: number, batches: string[] |
   return {
     total: SITES.length,
     filtered: list.length,
+    ...(search ? { search } : {}),
     offset,
     limit,
     rows: page.map((site, i) => ({ site_id: site.id, site_code: site.code, row_no: offset + i + 1, values: values(site), cells: wideCells(SITES.indexOf(site) + 1, cols) })),
@@ -136,7 +143,7 @@ export const site360Handlers = [
     const url = new URL(request.url);
     const offset = Number(url.searchParams.get('offset') ?? 0);
     const limit = Number(url.searchParams.get('limit') ?? 50);
-    return HttpResponse.json(rowsFor(String(params.menu), offset, limit, batchesOf(url.searchParams.get('filter'))));
+    return HttpResponse.json(rowsFor(String(params.menu), offset, limit, batchesOf(url.searchParams.get('filter')), url.searchParams.get('q') ?? ''));
   }),
 ];
 

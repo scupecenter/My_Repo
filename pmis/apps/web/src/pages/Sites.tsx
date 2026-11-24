@@ -10,7 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMe } from '@/api/hooks';
 import { downloadTemplate, useTemplates } from '@/api/registers';
-import { useRegions, useSites, useStageCodes, useStreams, useViews } from '@/api/sites';
+import { useRegions, useSiteCounts, useSites, useStageCodes, useStreams, useViews } from '@/api/sites';
 import { batchPath } from '@/api/types';
 import { TemplateUploadDialog } from '@/components/TemplateUploadDialog';
 import { LocksDialog } from '@/components/WorkflowLocks';
@@ -20,8 +20,9 @@ import { ExportDialog, ExportViewButton } from '@/components/ExportDialog';
 import { SavedViews } from '@/components/SavedViews';
 import { UnifiedFilter, type ExtraField } from '@/components/UnifiedFilter';
 import { decodeFilter, encodeFilter, type FilterTree } from '@/api/views';
-import { MoreMenu, PageHeader, Toolbar } from '@/components/PageHeader';
-import { BulkBar, ColumnMenu, DensityToggle, Empty, gxRow, HeaderRow, pin, SelectBox, StatusChip, tracks, totalWidth, Trunc, useAutoFit, useTablePrefs } from '@/components/TableKit';
+import { MoreMenu, PageHeader } from '@/components/PageHeader';
+import { bareHeader, DisplayMenu, displayAttrs, GroupBands, PastedChip, ROWNO_COL, RowNo, SearchBox, ShownFooter, TableCount, TableToolbar, WRAP_EXTRA } from '@/components/TableStandard';
+import { BulkBar, ColumnMenu, DensityToggle, Empty, gxRow, HeaderRow, pin, SEL_W, SelectBox, StatusChip, tracks, totalWidth, Trunc, useAutoFit, useTablePrefs } from '@/components/TableKit';
 import { Tip } from '@/components/Tip';
 import type { FitSample } from '@/lib/tablePrefs';
 import { useToast } from '@/components/Toast';
@@ -36,10 +37,10 @@ import { SITE360_MASTER, SITE360_NAV } from '@/lib/site360Menus';
 import { fmtDate } from '@/lib/time';
 import { DEFAULT_STREAMS, DEFAULT_VIEWS, DISMANTLE_CODE, isRealStream, statusOf, streamName, viewName } from '@/lib/streams';
 
-const ROWS = { comfortable: 52, compact: 38 } as const;
-const DEFS_ALL: ColDef[] = [{ id: 'code', w: 100, min: 70, pinned: true }, { id: 'name', w: 220, min: 100, max: 340, pinned: true }, { id: 'region', w: 120, min: 80, max: 240 }, { id: 'scenario', w: 120, min: 80 }, { id: 'status', w: 130, min: 90 }, { id: 'pipeline', w: 170, min: 120 }, { id: 'late', w: 80, min: 60 }, { id: 'locks', w: 100, min: 70 }, { id: 'gaps', w: 100, min: 70 }];
-const DEFS_STREAM: ColDef[] = [{ id: 'code', w: 100, min: 70, pinned: true }, { id: 'name', w: 220, min: 100, max: 340, pinned: true }, { id: 'region', w: 120, min: 80, max: 240 }, { id: 'stream_status', w: 130, min: 90 }, { id: 'stage', w: 150, min: 90 }, { id: 'progress', w: 90, min: 60 }, { id: 'late', w: 80, min: 60 }, { id: 'milestone', w: 120, min: 90 }];
-const LABEL: Record<string, string> = { code: 'sites.code', name: 'sites.name', region: 'sites.region', scenario: 'sites.scenario', status: 'sites.status', pipeline: 'sites.pipeline', late: 'sites.late', stream_status: 'sites.stream_status', stage: 'sites.current_stage', progress: 'sites.progress', milestone: 'sites.milestone', locks: 'sites.locks', gaps: 'sites.gaps' };
+const ROWS = { comfortable: 52, normal: 45, compact: 38 } as const;
+const DEFS_ALL: ColDef[] = [ROWNO_COL, { id: 'code', w: 100, min: 70, pinned: true }, { id: 'name', w: 220, min: 100, max: 340, pinned: true }, { id: 'region', w: 120, min: 80, max: 240 }, { id: 'scenario', w: 120, min: 80 }, { id: 'status', w: 130, min: 90 }, { id: 'pipeline', w: 170, min: 120 }, { id: 'late', w: 80, min: 60 }, { id: 'locks', w: 100, min: 70 }, { id: 'gaps', w: 100, min: 70 }];
+const DEFS_STREAM: ColDef[] = [ROWNO_COL, { id: 'code', w: 100, min: 70, pinned: true }, { id: 'name', w: 220, min: 100, max: 340, pinned: true }, { id: 'region', w: 120, min: 80, max: 240 }, { id: 'stream_status', w: 130, min: 90 }, { id: 'stage', w: 150, min: 90 }, { id: 'progress', w: 90, min: 60 }, { id: 'late', w: 80, min: 60 }, { id: 'milestone', w: 120, min: 90 }];
+const LABEL: Record<string, string> = { rowno: 'tstd.rowno', code: 'sites.code', name: 'sites.name', region: 'sites.region', scenario: 'sites.scenario', status: 'sites.status', pipeline: 'sites.pipeline', late: 'sites.late', stream_status: 'sites.stream_status', stage: 'sites.current_stage', progress: 'sites.progress', milestone: 'sites.milestone', locks: 'sites.locks', gaps: 'sites.gaps' };
 const F_KEYS = ['q', 'region_id', 'scenario', 'overall_status', 'stage_code'] as const;
 // P10: what a saved view of the Site Register keeps (the filters of the URL, the quick filter included).
 const VIEW_EMPTY = { q: '', region_id: '', scenario: '', overall_status: '', stage_code: '', bucket: '' };
@@ -78,6 +79,8 @@ export function Sites() {
   const adv = sp.get('adv') ?? '';
   const advTree = decodeFilter(adv);
   const gridQuery = {
+    // W8 item 5: the search box goes to the server (one word: contains; a pasted list: each Site ID), so paging, the counts and Export follow it
+    q: sp.get('q')?.trim() || undefined,
     site_code: sp.get('site_code') || sp.get('site_codes') || undefined,
     filter: adv || undefined,
     region_id: sp.get('region_id') || undefined,
@@ -172,29 +175,27 @@ export function Sites() {
   const naItems = real ? (allQ.data?.pages.flatMap((p) => p.items) ?? []).filter((s) => statusOf(s.streams, stream)?.state === 'na') : [];
   const items = dismantle ? [] : showNa && real ? [...inStream, ...naItems] : inStream;
   const total = (q.data?.pages[0]?.page.total ?? inStream.length) + (showNa && real ? naItems.length : 0);
+  // W8 item 6: the counts of the toolbar come from the server: the list's own answer, the rows of a menu, or (map, board) a one-row call with the same filters
+  const countsQ = useSiteCounts({ ...f, ...extra, ...(bucket ? { bucket } : {}), ...(coordinates ? { coordinates } : {}), ...(real ? { stream } : {}), ...(view ? { view } : {}) }, !dismantle && (asMap || asBoard));
   const stageCodesQ = useStageCodes(); // the menu lists do not load the site list, so the stage filter reads the stages of the workflow from one site
   const stageOptions = (inStream[0] ?? q.data?.pages[0]?.items[0])?.rail.map((r) => r.code) ?? stageCodesQ.data ?? [];
 
   // The list of a menu: its rows (the quick filter works on the loaded rows) and its columns. Site ID and Site Name stay frozen; the # column is not drawn.
-  const mRows = useMemo(() => {
-    const n = f.q.trim().toLowerCase();
-    return n ? gridRows.filter((r) => r.site_code.toLowerCase().includes(n) || (r.values['4'] ?? '').toLowerCase().includes(n)) : gridRows;
-  }, [gridRowsQ.data, f.q]); // eslint-disable-line react-hooks/exhaustive-deps
+  const mRows = useMemo(() => gridRows, [gridRowsQ.data]); // eslint-disable-line react-hooks/exhaustive-deps
   const mCols = useMemo(() => (menu?.columns ?? []).filter((c) => c.ord !== 1), [menu]);
-  const defsMenu: ColDef[] = mCols.map((c) => (c.ord === 2 ? { id: 'c2', w: 110, min: 70, pinned: true } : c.ord === 4 ? { id: 'c4', w: 220, min: 100, max: 340, pinned: true } : { id: `c${c.ord}`, w: 150, min: 70, max: 400 }));
+  const defsMenu: ColDef[] = [ROWNO_COL, ...mCols.map((c) => (c.ord === 2 ? { id: 'c2', w: 110, min: 70, pinned: true } : c.ord === 4 ? { id: 'c4', w: 220, min: 100, max: 340, pinned: true } : { id: `c${c.ord}`, w: 150, min: 70, max: 400 }))];
   const mCol = (id: string) => mCols.find((c) => `c${c.ord}` === id);
-  const tbl = useTablePrefs(menuList ? `sites-menu-${menuKey}` : real ? 'sites-stream' : 'sites', menuList ? defsMenu : real ? DEFS_STREAM : DEFS_ALL);
+  // per user and per screen (W8 item 4: the Display options too); the wide table of a menu keeps its own
+  const tbl = useTablePrefs(menuList ? `sites-menu-${menuKey}` : asWide ? `sites-wide-${menuKey}` : real ? 'sites-stream' : 'sites', menuList ? defsMenu : real ? DEFS_STREAM : DEFS_ALL);
   const fromRows = menuList || asWide; // the rows come from GET /site360/{menu}/rows
   const nRows = fromRows ? mRows.length : items.length;
-  const ROW = ROWS[tbl.density];
+  const ROW = ROWS[tbl.density] + (tbl.display.wrap ? WRAP_EXTRA : 0);
   const viewport = Math.max(320, (typeof window === 'undefined' ? 800 : window.innerHeight) - 380);
   const v = useVirtual(nRows, ROW, viewport);
   const { hasNextPage, isFetchingNextPage, fetchNextPage } = q;
   useEffect(() => { if (hasNextPage && !isFetchingNextPage && v.end >= inStream.length - 20) void fetchNextPage(); }, [v.end, inStream.length, hasNextPage, isFetchingNextPage, fetchNextPage]);
   const { hasNextPage: moreRows, isFetchingNextPage: fetchingRows, fetchNextPage: nextRows } = gridRowsQ;
   useEffect(() => { if (menuList && moreRows && !fetchingRows && v.end >= mRows.length - 20) void nextRows(); }, [menuList, moreRows, fetchingRows, v.end, mRows.length, nextRows]);
-  // The wide table does not scroll in pages: while the quick search is typed, the rest of the pages load so the search covers every site of the menu, not only the first 200.
-  useEffect(() => { if (asWide && f.q.trim() && moreRows && !fetchingRows) void nextRows(); }, [asWide, f.q, moreRows, fetchingRows, nextRows]);
   const scroller = useRef<HTMLDivElement>(null);
   const restored = useRef(false);
   const scrollKey = `pmis.scroll.sites.${stream || 'ALL'}`;
@@ -207,7 +208,8 @@ export function Sites() {
   }, [nRows, scrollKey]);
   const rname = (id: number) => { const r = regions.data?.find((x) => x.id === id); return (i18n.language === 'ar' && r?.name_ar) || r?.name_en || String(id); };
   const stageName = (code?: string | null) => (code ? t(`stage.${code}`, { defaultValue: code }) : '—');
-  const label = (id: string) => (mCol(id) ? mCol(id)!.header : LABEL[id] ? t(LABEL[id]) : id);
+  // W8 item 2: a Master column shows its name only; its section and group are the two header rows above it
+  const label = (id: string) => (mCol(id) ? bareHeader(mCol(id)!) : LABEL[id] ? t(LABEL[id]) : id);
   const hint = (id: string) => { const c = mCol(id); return c ? [c.group_top, c.group_mid].filter(Boolean).join(' / ') || undefined : undefined; };
   const cols = tbl.cols, W = totalWidth(cols, true);
   const linkTo = (s: SiteListItem) => `/sites/${s.id}${new URLSearchParams([...(real ? [['stream', stream]] : []), ...(view ? [['view', view]] : [])]).toString().replace(/^(?=.)/, '?')}`;
@@ -240,10 +242,20 @@ export function Sites() {
   const siteMenu = menuList || asWide || (!!menu && layout === 'grid');
   const savedScreen = siteMenu ? `site360-${menuKey}` : real ? 'sites-stream' : 'sites';
 
+  // W8 item 6: total = every site the caller may see on this screen, filtered = the rows matching the filters and the search (server counts)
+  const listPage = q.data?.pages[0];
+  const counts = asMap || asBoard
+    ? { total: countsQ.data?.total, filtered: countsQ.data?.filtered }
+    : fromRows ? { total: gridTotal, filtered: gridFiltered }
+    // a stream's N/A sites, when shown, are part of the screen: they join both numbers
+    : { total: (listPage?.counts?.total ?? listPage?.page.total ?? 0) + (showNa && real ? naItems.length : 0), filtered: total };
+  const pasted = asMap || asBoard ? countsQ.data?.search : fromRows ? gridPages[0]?.search : listPage?.search;
+
   // The text each cell shows, for sizing the columns to their content (null = not measurable: the pipeline rail keeps its default width).
   const fitText = (id: string, s: SiteListItem): FitSample | null => {
     const st = statusOf(s.streams, stream);
     switch (id) {
+      case 'rowno': return null;
       case 'code': return s.site_code;
       case 'name': return s.name_ar ? `${s.name}  ${s.name_ar}` : s.name;
       case 'region': return rname(s.region_id);
@@ -302,32 +314,37 @@ export function Sites() {
             onClick={() => downloadTemplate(newTpl.template_id).then((n) => toast(t('grid.downloaded', { name: n })), (e) => toast(registerErrorMessage(t, e), 'err'))}><FileDown size={14} />{t('sites.download_template')}</button>
           <button type="button" className="btn px-2 py-1 text-xs" data-testid="sites-template-upload" onClick={() => setUpSites(true)}><FileUp size={14} />{t('sites.upload_template')}</button></>}
         </span>)}</>} />
-      <Toolbar activeFilters={activeFilters} activeLabel={t('states.filters')}
-        filters={<>
-        {/* a menu keeps its own saved views (contract 0.15.49): the tree, the quick filters, the layout and the column order of the list */}
+      {/* W8: the shared table toolbar, in the same order on every site-data screen */}
+      <TableToolbar testid="sites-toolbar"
+        views={/* a menu keeps its own saved views (contract 0.15.49): the tree, the quick filters, the layout and the column order of the list */
         <SavedViews screen={savedScreen}
           value={siteMenu
             ? { q: f.q, region_id: f.region_id, scenario: f.scenario, overall_status: f.overall_status, site_codes: siteCodes || sp.get('site_code') || '', layout: asWide ? 'wide' : 'list', ...(advTree ? { advanced: advTree } : {}) }
             : { ...f, bucket, ...(advTree ? { advanced: advTree } : {}) }}
-          empty={siteMenu ? MENU_VIEW_EMPTY : VIEW_EMPTY} table={siteMenu && !menuList ? undefined : tbl}
+          empty={siteMenu ? MENU_VIEW_EMPTY : VIEW_EMPTY} table={siteMenu && layout === 'grid' ? undefined : tbl}
           onApply={(v) => {
             const r = v as Record<string, unknown>;
             const pick = (keys: string[]) => Object.fromEntries(keys.map((k) => [k, String(r[k] ?? '')]));
             setParams(siteMenu
               ? { ...pick(['q', 'region_id', 'scenario', 'overall_status', 'site_codes']), site_code: '', layout: r.layout === 'wide' ? 'wide' : '', adv: encodeFilter(r.advanced as FilterTree | undefined), sel: '' }
               : { ...pick(Object.keys(VIEW_EMPTY)), adv: encodeFilter(r.advanced as FilterTree | undefined), sel: '' });
-          }} />
-        <input className="input max-w-64" data-testid="sites-search" placeholder={t('sites.search')} aria-label={t('sites.search')} value={f.q} onChange={(e) => set('q')(e.target.value)} />
-        <UnifiedFilter screen={filterScreen} value={advTree} onChange={(tree) => setParams({ adv: encodeFilter(tree), sel: '' })} extras={extras} onClearAll={clearAll} />
-        {real && (
-          <label className="flex items-center gap-2 text-sm" title={t('sites.na_hint')}>
-            <input type="checkbox" data-testid="sites-show-na" checked={showNa} onChange={(e) => setShowNa(e.target.checked)} />
-            <span data-testid="sites-show-na-label">{t('sites.show_na', { count: naItems.length })}</span>
-          </label>
-        )}
+          }} />}
+        search={<SearchBox testid="sites-search" value={f.q} onChange={set('q')} />}
+        filter={<UnifiedFilter screen={filterScreen} value={advTree} onChange={(tree) => setParams({ adv: encodeFilter(tree), sel: '' })} extras={extras} onClearAll={clearAll} />}
+        extra={<>
+          <PastedChip search={pasted} />
+          {real && (
+            <label className="flex items-center gap-2 text-sm" title={t('sites.na_hint')}>
+              <input type="checkbox" data-testid="sites-show-na" checked={showNa} onChange={(e) => setShowNa(e.target.checked)} />
+              <span data-testid="sites-show-na-label">{t('sites.show_na', { count: naItems.length })}</span>
+            </label>
+          )}
         </>}
-        count={<span className="text-sm text-mute" data-testid="sites-count">{t('sites.count', { count: menuList || asWide ? (gridFiltered ?? mRows.length) : total })}</span>}
-        tools={<>
+        count={<span className="flex items-center gap-2">
+          {activeFilters > 0 && <span className="chip bg-accentSoft text-accentText" data-testid="toolbar-active-filters">{t('states.filters')} {activeFilters}</span>}
+          <TableCount testid="sites-count" noun="sites" total={counts.total} filtered={counts.filtered} active={activeFilters > 0} selected={picked.size} onClear={clearAll} />
+        </span>}
+        switcher={<>
         <button type="button" className="btn px-2 py-1 text-xs" data-testid="sites-layout" aria-pressed={asMap} onClick={() => setParams({ layout: asMap ? '' : 'map', sel: '' })}>
           {asMap ? <><Table2 size={14} />{t('sites.table')}</> : <><MapIcon size={14} />{t('sites.map')}</>}
         </button>
@@ -337,14 +354,15 @@ export function Sites() {
         <button type="button" className="btn px-2 py-1 text-xs" data-testid="sites-layout-wide" aria-pressed={asWide} onClick={() => setParams({ layout: asWide ? '' : 'wide' })}>
           {asWide ? <><Table2 size={14} />{t('sites.table')}</> : <><TableProperties size={14} />{t('sites.wide')}</>}
         </button>
-        <DensityToggle api={tbl} />
-        <ColumnMenu api={tbl} label={label} />
-        <ExportViewButton testid="sites-export-view" source="sites" filters={viewFilters} columns={SITE_COLUMNS} />
-        <MoreMenu items={[
+        </>}
+        density={<DensityToggle api={tbl} />}
+        display={<DisplayMenu api={tbl} />}
+        columns={<ColumnMenu api={tbl} label={label} />}
+        exporter={<ExportViewButton testid="sites-export-view" source="sites" filters={viewFilters} columns={SITE_COLUMNS} />}
+        more={<MoreMenu items={[
           { id: 'export', label: t('export.open'), icon: <Download size={16} />, testid: 'sites-export', onSelect: () => setExp(true) },
           { id: 'reset', label: t('table.reset'), icon: <RotateCcw size={16} />, testid: 'sites-reset-cols', onSelect: tbl.reset },
-        ]} />
-        </>} />
+        ]} />} />
       {dismantle ? (
         <Navigate to="/registers/dismantle" replace />
       ) : asBoard ? (
@@ -375,15 +393,19 @@ export function Sites() {
         </div>
       ) : asWide && menu ? (
         <div className="space-y-2">
-          <SitesWideTable menu={menu} rows={mRows} sel={sel} height={viewport + 120} loaded={gridRowsQ.isSuccess} filtered={activeFilters > 0} onClear={clearAll} busy={saveCell.isPending}
+          <SitesWideTable display={tbl.display} menu={menu} rows={mRows} sel={sel} height={viewport + 120} loaded={gridRowsQ.isSuccess} filtered={activeFilters > 0} onClear={clearAll} busy={saveCell.isPending}
             onEdit={(e) => saveCell.mutateAsync({ task_id: e.target.task_id, version: e.target.version, field: e.target.field, values: e.target.values, value: e.value })}
             picked={picked} onPick={flip} onPickAll={() => setPicked(allPicked ? new Set() : new Set(allCodes))}
             hasMore={!!gridRowsQ.hasNextPage} loadingMore={gridRowsQ.isFetchingNextPage} onMore={() => void gridRowsQ.fetchNextPage()} />
+          <ShownFooter shown={mRows.length} filtered={gridFiltered} />
         </div>
       ) : menuList ? (
-        <div className="card gx overflow-hidden" data-menu={menuKey} data-density={tbl.density} data-testid="site360-list">
+        <div className="card gx overflow-hidden" data-menu={menuKey} {...displayAttrs(tbl.display)} data-testid="site360-list">
           <div ref={scroller} data-testid="sites-scroll" className="relative overflow-auto" style={{ height: viewport }} onScroll={(e) => { v.onScroll(e); sessionStorage.setItem(scrollKey, String(e.currentTarget.scrollTop)); }}>
+            <div className="sticky top-0 z-20" data-testid="site360-list-head">
+            <GroupBands cols={cols} sel selW={SEL_W} testid="list-bands" section={(id) => mCol(id)?.group_top ?? null} group={(id) => mCol(id)?.group_mid ?? null} />
             <HeaderRow api={tbl} label={label} hint={hint} select={{ checked: allPicked, indeterminate: picked.size > 0, onChange: () => setPicked(allPicked ? new Set() : new Set(allCodes)), label: t('table.select_all'), testid: 'sites-select-all' }} />
+            </div>
             <div data-testid="sites-list" role="list" className="relative" style={{ height: v.total, minWidth: W }}>
               {mRows.slice(v.start, v.end).map((r, k) => {
                 const on = picked.has(r.site_code), cur = sel === r.site_code;
@@ -393,7 +415,7 @@ export function Sites() {
                     <div className="sticky start-0 z-20 h-0 w-9"><span className="absolute start-0 top-0 flex w-9 items-center justify-center bg-inherit" style={{ height: ROW }}><SelectBox checked={on} onChange={() => flip(r.site_code)} label={t('table.select_row', { code: r.site_code })} testid={`site-select-${r.site_code}`} /></span></div>
                     <Link to={`/sites/${r.site_id}`} data-testid={`site-row-${r.site_code}`} onClick={() => setParams({ sel: r.site_code })} className="grid h-full items-center bg-inherit" style={{ gridTemplateColumns: tracks(cols, true) }}>
                       <span aria-hidden />
-                      {cols.map((c) => { const p = pin(c, true, cols); const col = mCol(c.id); const txt = col ? mText(col.ord, r) : ''; return <span key={c.id} data-col={c.id} className={`min-w-0 px-2 ${p.className}`} style={p.style}>{col?.ord === 2 ? <b className="mono">{txt}</b> : col?.ord === 182 && txt ? <StatusChip tone={TONE[r.values['182'] ?? '']} text={txt}>{txt}</StatusChip> : txt ? <Trunc text={txt} /> : <Empty />}</span>; })}
+                      {cols.map((c) => { const p = pin(c, true, cols); const col = mCol(c.id); const txt = col ? mText(col.ord, r) : ''; return <span key={c.id} data-col={c.id} className={`min-w-0 px-2 ${p.className}`} style={p.style}>{c.id === 'rowno' ? <RowNo n={r.row_no ?? v.start + k + 1} /> : col?.ord === 2 ? <b className="mono">{txt}</b> : col?.ord === 182 && txt ? <StatusChip tone={TONE[r.values['182'] ?? '']} text={txt}>{txt}</StatusChip> : txt ? <Trunc text={txt} /> : <Empty />}</span>; })}
                     </Link>
                   </div>
                 );
@@ -401,10 +423,12 @@ export function Sites() {
               {gridRowsQ.isSuccess && !mRows.length && (activeFilters ? <NoResults testid="sites-empty" onClear={clearAll} /> : <EmptyState testid="sites-empty" title={t('sites.empty')} />)}
             </div>
           </div>
-          {gridRowsQ.hasNextPage ? <button type="button" className="btn m-2" data-testid="site360-more" disabled={gridRowsQ.isFetchingNextPage} onClick={() => void gridRowsQ.fetchNextPage()}>{t('site360.more')}</button> : null}
+          <ShownFooter shown={mRows.length} filtered={gridFiltered}>
+            {gridRowsQ.hasNextPage ? <button type="button" className="btn" data-testid="site360-more" disabled={gridRowsQ.isFetchingNextPage} onClick={() => void gridRowsQ.fetchNextPage()}>{t('site360.more')}</button> : null}
+          </ShownFooter>
         </div>
       ) : (
-        <div className="card gx overflow-hidden" data-stream={stream || 'ALL'} data-density={tbl.density}>
+        <div className="card gx overflow-hidden" data-stream={stream || 'ALL'} {...displayAttrs(tbl.display)} data-testid="sites-list-card">
           <div ref={scroller} data-testid="sites-scroll" className="relative overflow-auto" style={{ height: viewport }} onScroll={(e) => { v.onScroll(e); sessionStorage.setItem(scrollKey, String(e.currentTarget.scrollTop)); }}>
             <HeaderRow api={tbl} label={label} select={{ checked: allPicked, indeterminate: picked.size > 0, onChange: () => setPicked(allPicked ? new Set() : new Set(allCodes)), label: t('table.select_all'), testid: 'sites-select-all' }} />
             <div data-testid="sites-list" role="list" className="relative" style={{ height: v.total, minWidth: W }}>
@@ -418,7 +442,7 @@ export function Sites() {
                     <div className="sticky start-0 z-20 h-0 w-9"><span className="absolute start-0 top-0 flex w-9 items-center justify-center bg-inherit" style={{ height: ROW }}><SelectBox checked={on} onChange={() => flip(s.site_code)} label={t('table.select_row', { code: s.site_code })} testid={`site-select-${s.site_code}`} /></span></div>
                     <Link to={linkTo(s)} data-testid={`site-row-${s.site_code}`} data-stream-state={st?.state} onClick={() => setParams({ sel: s.site_code })} className="grid h-full items-center bg-inherit" style={{ gridTemplateColumns: tracks(cols, true) }}>
                       <span aria-hidden />
-                      {cols.map((c) => { const p = pin(c, true, cols); return <span key={c.id} data-col={c.id} className={`min-w-0 px-2 ${p.className}`} style={p.style}>{cell(c.id, s)}</span>; })}
+                      {cols.map((c) => { const p = pin(c, true, cols); return <span key={c.id} data-col={c.id} className={`min-w-0 px-2 ${p.className}`} style={p.style}>{c.id === 'rowno' ? <RowNo n={v.start + k + 1} /> : cell(c.id, s)}</span>; })}
                     </Link>
                   </div>
                 );
@@ -426,6 +450,7 @@ export function Sites() {
               {q.isSuccess && !items.length && (activeFilters ? <NoResults testid="sites-empty" onClear={clearAll} /> : <EmptyState testid="sites-empty" title={t('sites.empty')} />)}
             </div>
           </div>
+          <ShownFooter shown={items.length} filtered={total} />
         </div>
       )}
       <BulkBar testid="sites-bulk" count={picked.size} loaded={nRows} total={fromRows ? (gridFiltered ?? nRows) : total} onClear={() => setPicked(new Set())}>

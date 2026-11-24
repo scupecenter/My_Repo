@@ -256,7 +256,7 @@ records of the Contractors register (companies, teams, contracts) and the vehicl
 | matrix_cells | KEEP | Responsibility Matrix rows. |
 | matrix_cell_assignees | KEEP | Matrix holders. |
 | matrix_state | KEEP | Matrix revision (ETag). |
-| settings | KEEP | All settings, UI identity, notification policy and the Daily Plan settings (`daily_plan.settings`, migration 0149) included. |
+| settings | KEEP | All settings, UI identity, notification policy, the Daily Plan settings (`daily_plan.settings`, migration 0149) and `table.display` (the Display defaults of the site-data tables, migration 0148, W8: configuration; no new table) included. |
 | nav_item_catalogue | KEEP | Menu keys. |
 | master_columns | KEEP | Master columns. |
 | master_header_aliases | KEEP | Accepted Master header aliases. |

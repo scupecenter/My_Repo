@@ -52,7 +52,9 @@ import { HlcLegacyDialog } from "@/components/P4cPanels";
 import { fieldLabel, showValue } from "@/components/RegisterFields";
 import { RegisterDrawer, STATE_TONE } from "@/components/RegisterDrawer";
 import { useToast } from "@/components/Toast";
-import { MoreMenu, PageHeader, Toolbar } from "@/components/PageHeader";
+import { MoreMenu, PageHeader } from "@/components/PageHeader";
+import { DisplayMenu, displayAttrs, PastedChip, ROWNO_COL, RowNo, SearchBox, ShownFooter, TableCount, TableToolbar } from "@/components/TableStandard";
+import type { CountedPage } from "@/api/types";
 import {
   ActiveChips,
   BulkBar,
@@ -193,10 +195,15 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
       : []),
   ];
   const items = list.data?.pages.flatMap((p) => p.items) ?? [];
-  const total = list.data?.pages[0]?.page.total ?? items.length;
+  // W8 item 6 (0.15.68): the counts come from the server: every record of the register the caller may see, and those matching the filters and the search
+  const first = list.data?.pages[0] as CountedPage<(typeof items)[number]> | undefined;
+  const total = first?.counts?.filtered ?? first?.page.total ?? items.length;
+  const screenTotal = first?.counts?.total ?? total;
+  const noun = key === "issues" ? "issues" : "records";
   // The catalogue only lists fields the caller may see, so a permission-hidden field never becomes a column (plan G1).
   const fieldCols = def.fields.filter((x) => x.in_list);
   const defs: ColDef[] = [
+    ROWNO_COL,
     { id: "site", w: 100, min: 70, pinned: true },
     { id: "region", w: 110, min: 70, max: 240 },
     { id: "type", w: 80, min: 60 },
@@ -250,6 +257,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
       ? fieldLabel(fc, i18n.language)
       : t(
           {
+            rowno: "tstd.rowno",
             site: "sites.code",
             region: "sites.region",
             type: "registers.record_type",
@@ -375,6 +383,8 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
       return txt === ", " ? null : txt;
     }
     switch (id) {
+      case "rowno":
+        return null;
       case "site":
         return r.site_code ?? null;
       case "region":
@@ -541,52 +551,47 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
           ))}
         </div>
       )}
-      <Toolbar
-        activeFilters={activeFilters}
-        activeLabel={t("states.filters")}
-        filters={
-          <>
-            {viewsReady && (
-              <Suspense fallback={null}>
-                <SavedViews
-                  screen={`register-${key}`}
-                  value={{ ...f, ...(advTree ? { advanced: advTree } : {}) }}
-                  empty={VIEW_EMPTY}
-                  table={tbl}
-                  onApply={(v) =>
-                    setParams({
-                      ...Object.fromEntries(
-                        RF_KEYS.map((k) => [
-                          k,
-                          String((v as Record<string, unknown>)[k] ?? ""),
-                        ]),
-                      ),
-                      adv: encodeFilter(v.advanced),
-                    })
-                  }
-                />
-                <UnifiedFilter
-                  screen={`register-${key}`}
-                  value={advTree}
-                  onChange={(tree) => setParams({ adv: encodeFilter(tree) })}
-                  onClearAll={clearAll}
-                  extras={filterExtras}
-                />
-              </Suspense>
-            )}
-            <input
-              className="input max-w-64"
-              data-testid="register-search"
-              placeholder={t("registers.search")}
-              aria-label={t("registers.search")}
-              value={f.q}
-              onChange={(e) => set("q")(e.target.value)}
+      {/* W8: the shared table toolbar of the site-data screens (registers that list sites) */}
+      <TableToolbar
+        testid="register-toolbar"
+        views={viewsReady ? (
+          <Suspense fallback={null}>
+            <SavedViews
+              screen={`register-${key}`}
+              value={{ ...f, ...(advTree ? { advanced: advTree } : {}) }}
+              empty={VIEW_EMPTY}
+              table={tbl}
+              onApply={(v) =>
+                setParams({
+                  ...Object.fromEntries(
+                    RF_KEYS.map((k) => [
+                      k,
+                      String((v as Record<string, unknown>)[k] ?? ""),
+                    ]),
+                  ),
+                  adv: encodeFilter(v.advanced),
+                })
+              }
             />
-          </>
-        }
+          </Suspense>
+        ) : undefined}
+        search={<SearchBox testid="register-search" value={f.q} onChange={set("q")} placeholder={t("registers.search")} />}
+        filter={viewsReady ? (
+          <Suspense fallback={null}>
+            <UnifiedFilter
+              screen={`register-${key}`}
+              value={advTree}
+              onChange={(tree) => setParams({ adv: encodeFilter(tree) })}
+              onClearAll={clearAll}
+              extras={filterExtras}
+            />
+          </Suspense>
+        ) : <span data-testid="register-filter-pending" />}
+        extra={<PastedChip search={first?.search} />}
         count={
-          <span className="text-sm text-mute" data-testid="register-count">
-            {t("sites.count", { count: total })}
+          <span className="flex items-center gap-2">
+            {activeFilters > 0 && <span className="chip bg-accentSoft text-accentText" data-testid="toolbar-active-filters">{t("states.filters")} {activeFilters}</span>}
+            <TableCount testid="register-count" noun={noun} total={screenTotal} filtered={total} active={activeFilters > 0} selected={picked.size} onClear={clearAll} />
           </span>
         }
         primary={
@@ -599,10 +604,10 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
             {t("registers.new")}
           </button>
         }
-        tools={
-          <>
-            {view === "vertical" && <DensityToggle api={tbl} />}
-            {view === "vertical" && <ColumnMenu api={tbl} label={label} />}
+        density={view === "vertical" ? <DensityToggle api={tbl} /> : undefined}
+        columns={view === "vertical" ? <ColumnMenu api={tbl} label={label} /> : undefined}
+        display={view === "vertical" ? <DisplayMenu api={tbl} /> : undefined}
+        exporter={
             <ExportViewButton
               testid="register-export"
               source={key}
@@ -619,6 +624,8 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
                   .map((c) => c.id.slice(2)),
               ]}
             />
+        }
+        more={
             <MoreMenu
               items={[
                 {
@@ -715,7 +722,6 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
                 },
               ]}
             />
-          </>
         }
       />
       {tpl && (
@@ -789,7 +795,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
       )}
       {view === "vertical" && (
         <>
-          <div className="card gx overflow-hidden" data-density={tbl.density}>
+          <div className="card gx overflow-hidden" {...displayAttrs(tbl.display)} data-testid="register-list-card">
             <div
               className="relative max-h-[calc(100vh-18rem)] min-h-40 overflow-auto"
               data-testid="register-scroll"
@@ -855,12 +861,6 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
                             testid={`reg-select-${r.id}`}
                           />
                         )}
-                        <span
-                          data-testid="reg-row-no"
-                          className="tabular-nums text-xs text-mute"
-                        >
-                          {i + 1}
-                        </span>
                       </div>
                       {tbl.cols.map((c) => {
                         const p = pin(c, true, tbl.cols);
@@ -871,7 +871,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
                             className={`min-w-0 px-2 ${p.className}`}
                             style={p.style}
                           >
-                            {cell(c.id, r)}
+                            {c.id === "rowno" ? <span data-testid="reg-row-no"><RowNo n={i + 1} /></span> : cell(c.id, r)}
                           </div>
                         );
                       })}
@@ -972,6 +972,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
       <p className="mt-2 text-sm text-mute" data-testid="register-footer-count">
         {t("registers.count_of", { shown: real.length, total })}
       </p>
+      <ShownFooter shown={real.length} filtered={total} />
       {list.hasNextPage && (
         <button
           className="btn mt-3"

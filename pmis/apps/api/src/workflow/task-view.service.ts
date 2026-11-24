@@ -312,6 +312,12 @@ export class TaskViewService {
     return this.db.tx.$queryRaw<TaskRow[]>(sql);
   }
 
+  /** W8 item 6: the number of tasks of taskSelect(where), read with the caller's rights (the counts of My Work and the Approvals inbox). */
+  async count(where: Prisma.Sql): Promise<number> {
+    const r = await this.db.tx.$queryRaw<{ n: bigint }[]>(Prisma.sql`SELECT count(*) AS n FROM (${taskSelect(where)}) x`);
+    return Number(r[0]?.n ?? 0);
+  }
+
   /** TaskSummary items for rows (holders, claimants and external parties are looked up in three batched queries). */
   async summaries(rows: TaskRow[]): Promise<TaskSummaryDto[]> {
     const cells = [...new Set(rows.map((r) => r.cell_id).filter((x): x is string => !!x))];

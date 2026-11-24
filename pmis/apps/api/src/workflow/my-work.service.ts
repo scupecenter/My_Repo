@@ -6,6 +6,8 @@ import { decodeTypedCursor, encodeCursor, parseLimit } from '../common/cursor';
 import { problems } from '../common/problem';
 import { TS_TEXT, oneParam } from '../common/query';
 import { DbService } from '../db/db.service';
+import { parseSiteSearch, pastedSearchResult, siteScope, siteSearchCond, type PastedSearchDto } from '../common/site-search';
+import { FilterCatalogService } from '../views/filter-catalog.service';
 import { TaskSummaryDto, TaskViewService, taskSelect, timingFilters } from './task-view.service';
 
 const BUCKETS = ['late', 'do_now', 'waiting'] as const;
@@ -26,9 +28,10 @@ export class MyWorkService {
     private readonly db: DbService,
     private readonly access: AccessService,
     private readonly view: TaskViewService,
+    private readonly filters: FilterCatalogService,
   ) {}
 
-  async list(auth: AuthContext, q: Record<string, unknown>): Promise<{ items: TaskSummaryDto[]; page: { limit: number; next_cursor: string | null } }> {
+  async list(auth: AuthContext, q: Record<string, unknown>): Promise<{ items: TaskSummaryDto[]; page: { limit: number; next_cursor: string | null }; counts: { total: number; filtered: number }; search?: PastedSearchDto }> {
     const regions = await this.access.requireRegions('sites', 'view');
     const limit = parseLimit(oneParam(q, 'limit'));
     const bucket = oneParam(q, 'bucket');
@@ -57,7 +60,18 @@ export class MyWorkService {
       if (bucket === 'late') conds.push(Prisma.sql`sl.colour = 'red'`);
       if (bucket === 'do_now') conds.push(Prisma.sql`coalesce(sl.colour, 'none') <> 'red'`);
     }
+    // W8 (0.15.68): total = the bucket as it is; the search (one token: contains on site and task; a pasted list: each Site ID), the F2 timing
+    // filters and the + Filter tree (the tasks board whitelist) narrow it to the filtered count
+    const scope = [...conds];
+    const search = parseSiteSearch(oneParam(q, 'q'));
+    const byText = siteSearchCond(search, 's', [Prisma.sql`td.name_en`, Prisma.sql`td.code`]);
+    if (byText) conds.push(byText);
     conds.push(...timingFilters(q));
+    const adv = await this.filters.fromQuery('tasks-board', q);
+    if (adv) conds.push(adv);
+    const counts = { total: await this.view.count(Prisma.join(scope, ' AND ')), filtered: await this.view.count(Prisma.join(conds, ' AND ')) };
+    // found / not found: the caller's Sites view regions, as the rows themselves
+    const pasted = await pastedSearchResult(this.db.tx, search, siteScope(regions));
     const key = Prisma.raw('coalesce(t.level_opened_at, t.updated_at)');
     if (cursor) conds.push(Prisma.sql`(${key}, t.id) > (${cursor[0] as string}::timestamptz, ${cursor[1] as string}::uuid)`);
 
@@ -71,6 +85,6 @@ export class MyWorkService {
         Prisma.sql`SELECT ${Prisma.raw(TS_TEXT('coalesce(t.level_opened_at, t.updated_at)'))} AS ts FROM task_instances t WHERE t.id = ${last.id}::uuid`);
       if (ts[0]) next = encodeCursor([ts[0].ts, last.id]);
     }
-    return { items, page: { limit, next_cursor: next } };
+    return { items, page: { limit, next_cursor: next }, counts, ...(pasted ? { search: pasted } : {}) };
   }
 }

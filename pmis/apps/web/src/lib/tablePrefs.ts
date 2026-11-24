@@ -2,24 +2,44 @@ import { loadPref, savePref } from './localPref';
 
 /** A column of a list screen. `forbidden` = hidden by permission: never shown, never offered, never stored as visible (plan G1/G11). */
 export type ColDef = { id: string; w: number; min?: number; max?: number; pinned?: boolean; forbidden?: boolean; off?: boolean };
-export type Density = 'comfortable' | 'compact';
-export type Prefs = { order: string[]; hidden: string[]; width: Record<string, number>; density: Density };
+export type Density = 'comfortable' | 'normal' | 'compact';
+export const DENSITIES: Density[] = ['compact', 'normal', 'comfortable'];
+export const isDensity = (d: unknown): d is Density => d === 'comfortable' || d === 'normal' || d === 'compact';
+/** W8 item 4: the Display menu of a site-data table (the density is the column prefs' own). */
+export type DisplayOpts = { size: 'sm' | 'md' | 'lg'; align: 'start' | 'center'; wrap: boolean; zebra: boolean };
+export type Display = DisplayOpts & { density: Density };
+/** The look before W8, used until Settings > Display answers (and when it cannot be read). */
+export const DISPLAY_SEED: Display = { size: 'md', align: 'start', density: 'comfortable', wrap: false, zebra: true };
+/** Only the known Display keys with a valid value (a stored or saved value from an older build is dropped, never trusted). */
+export function cleanDisplay(d: unknown): Partial<DisplayOpts> | undefined {
+  if (!d || typeof d !== 'object') return undefined;
+  const x = d as Record<string, unknown>, out: Partial<DisplayOpts> = {};
+  if (x.size === 'sm' || x.size === 'md' || x.size === 'lg') out.size = x.size;
+  if (x.align === 'start' || x.align === 'center') out.align = x.align;
+  if (typeof x.wrap === 'boolean') out.wrap = x.wrap;
+  if (typeof x.zebra === 'boolean') out.zebra = x.zebra;
+  return Object.keys(out).length ? out : undefined;
+}
+/** `density` and `display` are the user's own choices; unset = the defaults of Settings > Display. */
+export type Prefs = { order: string[]; hidden: string[]; width: Record<string, number>; density?: Density; display?: Partial<DisplayOpts> };
 
-export const EMPTY_PREFS: Prefs = { order: [], hidden: [], width: {}, density: 'comfortable' };
+export const EMPTY_PREFS: Prefs = { order: [], hidden: [], width: {} };
 export const prefsKey = (screen: string, user: string) => `pmis.table.${screen}.${user}`;
 
 /** Merge stored prefs with the current column list: unknown ids are dropped, new ones appended, forbidden ones removed. */
 export function reconcile(p: Prefs, defs: ColDef[]): Prefs {
   const ok = new Set(defs.filter((d) => !d.forbidden).map((d) => d.id));
   const order = [...p.order.filter((id) => ok.has(id)), ...defs.filter((d) => ok.has(d.id) && !p.order.includes(d.id)).map((d) => d.id)];
-  return { order, hidden: p.hidden.filter((id) => ok.has(id)), width: Object.fromEntries(Object.entries(p.width).filter(([id]) => ok.has(id))), density: p.density === 'compact' ? 'compact' : 'comfortable' };
+  return { order, hidden: p.hidden.filter((id) => ok.has(id)), width: Object.fromEntries(Object.entries(p.width).filter(([id]) => ok.has(id))), ...(isDensity(p.density) ? { density: p.density } : {}), ...(cleanDisplay(p.display) ? { display: cleanDisplay(p.display) } : {}) };
 }
 
 /** Visible columns in order; pinned (identity) columns always come first and cannot be hidden. */
 export function visibleCols(p: Prefs, defs: ColDef[], auto: Record<string, number> = {}): (ColDef & { px: number })[] {
   const by = new Map(defs.map((d) => [d.id, d]));
   const all = p.order.map((id) => by.get(id)).filter((d): d is ColDef => !!d && !d.forbidden && (d.pinned || !p.hidden.includes(d.id)));
-  return [...all.filter((d) => d.pinned), ...all.filter((d) => !d.pinned)].map((d) => ({ ...d, px: p.width[d.id] ?? auto[d.id] ?? d.w }));
+  // W8: the row number column (`rowno`) is always the first frozen column, whatever order was stored before it existed
+  const pinned = all.filter((d) => d.pinned);
+  return [...pinned.filter((d) => d.id === 'rowno'), ...pinned.filter((d) => d.id !== 'rowno'), ...all.filter((d) => !d.pinned)].map((d) => ({ ...d, px: p.width[d.id] ?? auto[d.id] ?? d.w }));
 }
 
 export function moveCol(p: Prefs, defs: ColDef[], id: string, delta: -1 | 1): Prefs {

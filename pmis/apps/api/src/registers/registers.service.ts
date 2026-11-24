@@ -5,6 +5,7 @@ import { AccessService, DbAction } from '../access/access.service';
 import type { AuthContext } from '../auth/auth.types';
 import { StepUpService } from '../auth/step-up.service';
 import { decodeCursor, decodeTypedCursor, encodeCursor, likePattern, parseLimit } from '../common/cursor';
+import { parseSiteSearch, pastedSearchResult, siteScope, type PastedSearchDto } from '../common/site-search';
 import { mapDbError } from '../common/db-errors';
 import { parseIfMatch } from '../common/etag';
 import { ProblemException, problems } from '../common/problem';
@@ -379,7 +380,7 @@ export class RegistersService {
     return { row, def };
   }
 
-  async listRecords(auth: AuthContext, key: string, q: Record<string, unknown>): Promise<{ items: unknown[]; page: { limit: number; next_cursor: string | null } }> {
+  async listRecords(auth: AuthContext, key: string, q: Record<string, unknown>): Promise<{ items: unknown[]; page: { limit: number; next_cursor: string | null }; counts: { total: number; filtered: number }; search?: PastedSearchDto }> {
     const def = await this.definition(key);
     const regs = await this.access.requireRegions(def.module_key, 'view');
     const limit = parseLimit(oneParam(q, 'limit'));
@@ -407,20 +408,33 @@ export class RegistersService {
       if (!uuidSchema.safeParse(entity).success) throw problems.validation([{ path: '/entity_id', code: 'invalid', message: 'entity_id is a uuid.' }]);
       conds.push(Prisma.sql`r.entity_id = ${entity}::uuid`);
     }
-    const text = oneParam(q, 'q');
-    if (text) conds.push(Prisma.sql`(s.site_code ILIKE ${likePattern(text)} OR reg_data_for(r.id, r.register_key, r.record_type, r.entity_id, r.data)::text ILIKE ${likePattern(text)})`);
+    // W8 item 5 (0.15.68): one token = contains on the Site ID and the record's values; a pasted list = each Site ID or Site Owner ID exactly
+    const search = parseSiteSearch(oneParam(q, 'q'));
+    if (search.kind === 'contains') conds.push(Prisma.sql`(s.site_code ILIKE ${likePattern(search.text)} OR reg_data_for(r.id, r.register_key, r.record_type, r.entity_id, r.data)::text ILIKE ${likePattern(search.text)})`);
+    else if (search.kind === 'list') conds.push(Prisma.sql`(upper(s.site_code) = ANY(${search.codes}::text[]) OR upper(s.owner_site_id) = ANY(${search.codes}::text[]))`);
+    // the screen: the latest version of each record of the register the caller may see (W8 item 6: the total counts these)
+    const scope: Prisma.Sql[] = [Prisma.sql`r.register_key = ${key}`, this.visibility(regs)];
     if (oneParam(q, 'all_versions') !== 'true' && entity === undefined) {
-      conds.push(Prisma.sql`NOT EXISTS (SELECT 1 FROM register_records n WHERE n.entity_id = r.entity_id AND n.version_no > r.version_no)`);
+      const latest = Prisma.sql`NOT EXISTS (SELECT 1 FROM register_records n WHERE n.entity_id = r.entity_id AND n.version_no > r.version_no)`;
+      conds.push(latest);
+      scope.push(latest);
     }
     // F3 (0.15.31): the AND/OR filter of a saved view, compiled on the server against the register's whitelist; the visibility above stays
     const adv = await this.filters.fromQuery(`register-${key}`, q);
     if (adv) conds.push(adv);
+    // W8 item 6 (0.15.68): the counts, read with the caller's rights (the visibility above and row security), before the cursor narrows the rows
+    const count = async (c: Prisma.Sql[]): Promise<number> => Number((await this.db.tx.$queryRaw<{ n: bigint }[]>(Prisma.sql`
+      SELECT count(*) AS n FROM register_records r LEFT JOIN sites s ON s.id = r.site_id LEFT JOIN task_instances ti ON ti.id = r.task_id
+      LEFT JOIN task_definitions td ON td.id = ti.task_def_id WHERE ${Prisma.join(c, ' AND ')}`))[0]?.n ?? 0);
+    const counts = { total: await count(scope), filtered: await count(conds) };
+    // found / not found: sites in the register's regions AND in the caller's Sites view regions (never a region where the caller cannot see sites)
+    const pasted = search.kind === 'list' ? await pastedSearchResult(this.db.tx, search, siteScope(regs, await this.access.regions('sites', 'view'))) : undefined;
     if (cursor) conds.push(Prisma.sql`(r.created_at, r.id) < (${cursor[0] as string}::timestamptz, ${cursor[1] as string}::uuid)`);
     const rows = await this.db.tx.$queryRaw<RecordRow[]>(
       this.baseSelect(auth, Prisma.join(conds, ' AND '), Prisma.sql`ORDER BY r.created_at DESC, r.id DESC LIMIT ${limit + 1}`));
     const page = rows.slice(0, limit);
     const last = page[page.length - 1];
-    return { items: await this.dtos(auth, page), page: { limit, next_cursor: rows.length > limit && last ? encodeCursor([last.ts, last.id]) : null } };
+    return { items: await this.dtos(auth, page), page: { limit, next_cursor: rows.length > limit && last ? encodeCursor([last.ts, last.id]) : null }, counts, ...(pasted ? { search: pasted } : {}) };
   }
 
   async get(auth: AuthContext, key: string, id: string, info?: TransitionInfo): Promise<Record<string, unknown>> {

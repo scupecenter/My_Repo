@@ -23,7 +23,14 @@ const columnsSchema = z.object({
   order: z.array(colId).max(200).optional(),
   hidden: z.array(colId).max(200).optional(),
   width: z.record(colId, z.number().int().min(40).max(1000)).optional(),
-  density: z.enum(['comfortable', 'compact']).optional(),
+  density: z.enum(['comfortable', 'normal', 'compact']).optional(),
+  // W8 item 4 (0.15.68): the Display options of the view
+  display: z.object({
+    size: z.enum(['sm', 'md', 'lg']).optional(),
+    align: z.enum(['start', 'center']).optional(),
+    wrap: z.boolean().optional(),
+    zebra: z.boolean().optional(),
+  }).strict().optional(),
 }).strict();
 const sortSchema = z.array(z.object({ id: colId, dir: z.enum(['asc', 'desc']) }).strict()).max(5);
 const filtersSchema = z.record(z.string().max(100), z.unknown()).refine((f) => Object.keys(f).length <= 50, { message: 'At most 50 filters.' });

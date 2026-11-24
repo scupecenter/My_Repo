@@ -7,13 +7,19 @@ import type { ApprovalItem } from '@/api/types';
 import { Holders } from '@/components/HolderChip';
 import { PersonTag } from '@/components/PersonTag';
 import { RejectDialog } from '@/components/RejectDialog';
-import { QuickFilter } from '@/components/TableKit';
+import { QuickFilter, useTablePrefs } from '@/components/TableKit';
+import { DisplayMenu, displayAttrs, ExportCsvButton, PastedChip, RowNo, SearchBox, TableCount, TableToolbar } from '@/components/TableStandard';
+import { SavedViews } from '@/components/SavedViews';
+import { UnifiedFilter } from '@/components/UnifiedFilter';
+import { decodeFilter, encodeFilter, type FilterTree } from '@/api/views';
 import { BallSince, ExternalParty, SlaOverrun, StaleBadge, TIMING_SORTS, sortByTiming, type TimingSort } from '@/components/TaskTiming';
 import { useToast } from '@/components/Toast';
 import { taskErrorMessage } from '@/lib/taskErrors';
 
 const TABS = ['all', 'review', 'approve'] as const;
 const COLOURS = ['red', 'amber', 'green'] as const;
+const VIEW_EMPTY = { tab: 'all', q: '', colours: '', stale: '' };
+const NO_COLS: never[] = [];
 
 export function Approvals() {
   const { t } = useTranslation();
@@ -27,7 +33,11 @@ export function Approvals() {
   const [colours, setColours] = useState<string[]>([]);
   const [stale, setStale] = useState(false);
   const [sort, setSort] = useState<TimingSort>('');
-  const list = useApprovals(tab, q, { colours, stale });
+  // W8: the + Filter tree (tasks-board whitelist) goes to the server with the search; the Display options are per user (screen approvals)
+  const [adv, setAdv] = useState('');
+  const advTree = decodeFilter(adv);
+  const tbl = useTablePrefs('approvals', NO_COLS);
+  const list = useApprovals(tab, q, { colours, stale, filter: adv || undefined });
   const decide = useDecide();
   const bulk = useBulk();
   const items = sortByTiming(list.data?.items ?? [], sort, (i) => i.task);
@@ -52,11 +62,24 @@ export function Approvals() {
     });
 
   const allChecked = items.length > 0 && picked.length === items.length;
+  const active = !!(q.trim() || adv || colours.length || stale || tab !== 'all');
+  const clearAll = () => { setQ(''); setAdv(''); setColours([]); setStale(false); setTab('all'); };
 
   return (
     <div data-testid="page-approvals">
       <h1 className="text-2xl font-bold">{t('approvals.title')}</h1>
       <p className="mb-4 text-mute">{t('approvals.subtitle')}</p>
+      {/* W8: the shared toolbar (a master-detail list: no column chooser; the Display options apply to the list) */}
+      <TableToolbar testid="approvals-toolbar" kind="list"
+        views={<SavedViews screen="approvals" value={{ tab, q, colours: colours.join(','), stale: stale ? 'true' : '', ...(advTree ? { advanced: advTree } : {}) }} empty={VIEW_EMPTY} table={tbl}
+          onApply={(v) => { const r = v as Record<string, unknown>; setTab((TABS as readonly string[]).includes(String(r.tab)) ? (r.tab as (typeof TABS)[number]) : 'all'); setQ(String(r.q ?? '')); setColours(String(r.colours ?? '').split(',').filter(Boolean)); setStale(r.stale === 'true'); setAdv(encodeFilter(r.advanced as FilterTree | undefined)); }} />}
+        search={<SearchBox testid="approvals-filter" value={q} onChange={setQ} placeholder={t('approvals.filter')} />}
+        filter={<UnifiedFilter screen="tasks-board" value={advTree} onChange={(tree) => setAdv(encodeFilter(tree))} onClearAll={clearAll} />}
+        extra={<PastedChip search={list.data?.search} />}
+        count={<TableCount testid="approvals-count" noun="tasks" total={list.data?.counts?.total ?? items.length} filtered={list.data?.counts?.filtered ?? items.length} active={active} selected={picked.length} onClear={clearAll} />}
+        display={<DisplayMenu api={tbl} />}
+        exporter={<ExportCsvButton testid="approvals-export" name="approvals" head={['#', t('sites.code'), t('grid.code'), t('grid.task'), t('approvals.entered_by'), t('approvals.sla')]}
+          rows={() => items.map((i, k) => [k + 1, i.task.site_code, i.task.task_code, i.task.name_en, i.submitted_by?.display_name ?? '', i.task.sla?.colour ?? ''])} />} />
       <div className="grid gap-4 lg:grid-cols-[minmax(320px,5fr)_7fr]">
         <section className="card overflow-hidden">
           <div role="tablist" className="flex border-b border-line">
@@ -69,7 +92,6 @@ export function Approvals() {
           </div>
           <div className="flex items-center gap-3 border-b border-line p-3">
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" data-testid="approval-select-all" checked={allChecked} onChange={() => setChecked(allChecked ? new Set() : new Set(items.map((i) => i.task.id)))} />{t('approvals.select_all')}</label>
-            <input className="input" data-testid="approvals-filter" placeholder={t('approvals.filter')} value={q} onChange={(e) => setQ(e.target.value)} />
           </div>
           <div role="toolbar" aria-label={t('timing.filters')} className="flex flex-wrap items-center gap-2 border-b border-line p-3" data-testid="approvals-timing">
             {COLOURS.map((c) => <QuickFilter key={c} testid={`approvals-colour-${c}`} on={colours.includes(c)} onClick={() => setColours((x) => (x.includes(c) ? x.filter((y) => y !== c) : [...x, c]))}>{t(`timing.filter_${c}`)}</QuickFilter>)}
@@ -93,10 +115,12 @@ export function Approvals() {
               <ul>{report.map((r) => <li key={r.ref} data-testid={`bulk-issue-${r.code}`}><b className="mono">{r.site}</b> · {t(r.kind === 'failed' ? 'approvals.bulk_failed' : 'approvals.bulk_skipped')}: {r.message}</li>)}</ul>
             </div>
           )}
-          <ul data-testid="approvals-list">
-            {items.map((i) => (
+          <ul data-testid="approvals-list" {...displayAttrs(tbl.display)}>
+            {items.map((i, k) => (
               <li key={i.task.id} data-testid={`approval-row-${i.task.id}`} data-site={i.task.site_code} aria-selected={sel === i.task.id}
-                className={`flex items-center gap-3 border-b border-line p-3 ${sel === i.task.id ? 'bg-openBg' : 'hover:bg-hover'}`}>
+                role="listitem" data-zebra={k % 2 ? '1' : '0'}
+                className={`flex items-center gap-3 border-b border-line ${tbl.display.density === 'compact' ? 'p-1.5' : tbl.display.density === 'normal' ? 'p-2' : 'p-3'} ${sel === i.task.id ? 'bg-openBg' : tbl.display.zebra && k % 2 ? 'bg-card2 hover:bg-hover' : 'hover:bg-hover'}`}>
+                <span data-col="rowno" className="w-6 shrink-0"><RowNo n={k + 1} /></span>
                 <input type="checkbox" aria-label={i.task.site_code} data-testid={`approval-check-${i.task.id}`} checked={checked.has(i.task.id)}
                   onChange={() => setChecked((c) => { const n = new Set(c); if (n.has(i.task.id)) n.delete(i.task.id); else n.add(i.task.id); return n; })} />
                 <button className="flex-1 text-start" data-testid={`approval-open-${i.task.id}`} onClick={() => setSel(i.task.id)}>

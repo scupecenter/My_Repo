@@ -1,4 +1,5 @@
 // Synthetic state for phase 3b: calendar, rules, freeze, DLP, notification policy, retention, sessions, security log.
+import type { TableDisplaySetting } from '@/api/display';
 import type {
   ActiveSession, ContractorRules, ContractorsCompletenessReport, DlpSettings, IdleTaskAlertSetting, LogRetention, NotificationPolicy, NotificationTypeDef, SecurityLogEntry, SlaRuleSet, SlaTaskRule,
   StaffVisibility, TaskDefinition, TeamScopeMatch, TeamScopeMismatchReport, WeightSet, WorkflowGate, WorkflowMilestone,
@@ -96,6 +97,8 @@ export function initCfg() {
       { version: 2, cw_months: 3, te_months: 12, effective_from: '2026-09-01', reason: 'Contract terms', changed_by: ref('1001'), changed_at: '2026-09-01T08:00:00Z' },
       { version: 1, cw_months: 3, te_months: 12, effective_from: '2026-01-01', reason: 'Seed', changed_by: ref('1001'), changed_at: '2026-01-01T08:00:00Z' }] } as DlpSettings,
     idle: { enabled: true, working_days: 2, version: 1 } as IdleTaskAlertSetting,
+    // 0.15.64 (W8): the defaults of the Display menu of the site-data tables (null until read, then the seed)
+    tableDisplay: undefined as TableDisplaySetting | undefined,
     // Q97 seed of migration 0043 as converted by 0061 (P4b, Q143, Q144): the 8 catalogue codes, the old column CW as the group CW, HLC takes a Fiber team.
     scopeMatch: {
       specializations: SPEC_SEED.map((s) => s.code),

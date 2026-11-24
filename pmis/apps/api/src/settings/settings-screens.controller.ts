@@ -5,7 +5,7 @@ import { Auth } from '../auth/decorators';
 import { etagHeader } from '../common/etag';
 import { SettingsScreensService } from './settings-screens.service';
 
-/** DLP, idle-task alert and notification policy (contract tag `settings`, 0.15.61, migration 0145). The session guard is global; the database checks the rights. */
+/** DLP, idle-task alert, notification policy (contract tag `settings`, 0.15.61, migration 0145) and the table display defaults (0.15.68, migration 0148). The session guard is global; the database checks the rights. */
 @Controller('settings')
 export class SettingsScreensController {
   constructor(private readonly screens: SettingsScreensService) {}
@@ -31,6 +31,20 @@ export class SettingsScreensController {
   @Put('idle-task-alert')
   async setIdle(@Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response) {
     const r = await this.screens.setIdle(ifMatch, body);
+    res.setHeader('ETag', etagHeader(r.version));
+    return r;
+  }
+
+  @Get('table-display')
+  async tableDisplay(@Res({ passthrough: true }) res: Response) {
+    const r = await this.screens.tableDisplay();
+    res.setHeader('ETag', etagHeader(r.version));
+    return r;
+  }
+
+  @Put('table-display')
+  async setTableDisplay(@Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response) {
+    const r = await this.screens.setTableDisplay(ifMatch, body);
     res.setHeader('ETag', etagHeader(r.version));
     return r;
   }

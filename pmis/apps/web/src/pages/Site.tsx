@@ -19,8 +19,13 @@ import { DataGapsChip, LocksChip } from '@/components/WorkflowLocks';
 import { Pipeline } from '@/components/Pipeline';
 import { TaskDrawer } from '@/components/TaskDrawer';
 import { ExportViewButton } from '@/components/ExportDialog';
-import { TaskGrid } from '@/components/TaskGrid';
+import { TaskGrid, taskMatches } from '@/components/TaskGrid';
+import { SavedViews } from '@/components/SavedViews';
+import { UnifiedFilter } from '@/components/UnifiedFilter';
+import { decodeFilter, encodeFilter, type FilterTree } from '@/api/views';
 import { TaskRow } from '@/components/TaskRow';
+import { DisplayMenu, displayAttrs, SearchBox, TableCount, TableToolbar } from '@/components/TableStandard';
+import { useTablePrefs } from '@/components/TableKit';
 import { loadPref, savePref } from '@/lib/localPref';
 import { phaseEmpty, phaseFromUrl, phaseQuery, sitePhases, type SitePhase } from '@/lib/sitePhases';
 import { statusOf } from '@/lib/streams';
@@ -29,7 +34,10 @@ const TONE: Record<string, string> = { completed: 'bg-doneBg text-doneInk', in_p
 const STREAM_TONE: Record<string, string> = { done: 'bg-doneBg text-doneInk', in_progress: 'bg-openBg text-openInk', not_started: 'bg-lockBg text-lockInk', na: 'bg-lockBg text-lockInk' };
 
 // ExportColumnCode values (stable codes of the `tasks` part).
-const LAYOUT_KEY = 'pmis.site.layout'; // per-viewer choice: Excel-like row (default, owner request 2026-11-08) or the list
+// per-viewer choice (W8 item 3): the list like the Site Master lists (default) or the Timeline (the task-as-column row of 2026-11-08), remembered
+const LAYOUT_KEY = 'pmis.site.layout';
+const NO_COLS: never[] = [];
+const TIMELINE_VIEW_EMPTY = { tq: '' };
 const TASK_COLUMNS: TasksExportColumnCode[] = ['site_code', 'task_code', 'task_name', 'task_state', 'due_date', 'sla_status'];
 
 export function Site() {
@@ -46,7 +54,7 @@ export function Site() {
   const phase = phaseFromUrl(phases, stream, view);
   const pq = phaseQuery(phase);
   const dismantle = !!phase?.placeholder;
-  const grid = useSiteTasks(siteId, pq.stream, !!s && !dismantle, pq.view);
+  const grid = useSiteTasks(siteId, pq.stream, !!s && !dismantle, pq.view, sp.get('tadv') || null);
   // a view-only phase (O&M) is disabled when none of its tasks applies: that needs the unfiltered grid (the same query as All)
   const allGrid = useSiteTasks(siteId, null, !!s && phases.some((p) => !p.stream && !p.placeholder), null);
   const empty = (p: SitePhase) => phaseEmpty(p, s?.streams, allGrid.data);
@@ -58,7 +66,9 @@ export function Site() {
   const docsTab = section !== ''; // a section other than the task grid
   const taskId = sp.get('task');
   const [ids, setIds] = useState<string[]>([]);
-  const [layout, setLayout] = useState<'row' | 'list'>(() => (loadPref<string>(LAYOUT_KEY, 'row') === 'list' ? 'list' : 'row'));
+  // the Timeline keeps its own Display options (per user and per screen)
+  const timeline = useTablePrefs('task-timeline', NO_COLS);
+  const [layout, setLayout] = useState<'row' | 'list'>(() => (['row', 'timeline'].includes(loadPref<string>(LAYOUT_KEY, 'list')) ? 'row' : 'list'));
   const setParam = (k: string, v: string | null) => setSp((p) => { const n = new URLSearchParams(p); if (v) n.set(k, v); else n.delete(k); return n; }, { replace: true });
   // a stream phase is written as `stream=`, a view-only phase as `view=`, so the links of the Site Master list keep working
   const setPhase = (x: SitePhase | null) => setSp((p) => { const n = new URLSearchParams(p); n.delete('stage'); n.delete('stream'); n.delete('view'); if (x) n.set(x.stream || x.placeholder ? 'stream' : 'view', x.code); return n; }, { replace: true });
@@ -73,6 +83,20 @@ export function Site() {
   const filtered = !!phase && !phase.placeholder;
   const phaseCodes = new Set((grid.data?.stages ?? []).filter((x) => !pq.view || x.tasks.length > 0).map((x) => x.code));
   const nodes = (s?.pipeline ?? []).filter((n) => !filtered || (n.kind === 'milestone' ? phaseCodes.has(n.code) : false));
+
+  const taskTotal = stages.reduce((n, x) => n + x.tasks.length, 0);
+  // W8: the Timeline takes the same search (tq) and + Filter tree (tadv, on the server) as the list
+  const tq = sp.get('tq') ?? '';
+  const tadvTree = decodeFilter(sp.get('tadv') ?? '');
+  const rowStages = tq ? stages.map((x) => ({ ...x, tasks: x.tasks.filter((k) => taskMatches(k, tq, (i18n.language === 'ar' && k.name_ar) || k.name_en)) })) : stages;
+  // W8 item 3: List (default) or Timeline, remembered per user; both sit in the shared toolbar with Export current view
+  const switcher = (
+    <div className="flex rounded-md border border-line" role="group" aria-label={t('site.layout')} data-testid="site-layout">
+      {([['list', 'list'], ['row', 'timeline']] as const).map(([l, name]) => <button key={l} type="button" aria-pressed={layout === l} data-testid={`site-layout-${name}`} onClick={() => { setLayout(l); savePref(LAYOUT_KEY, name); }} className={`px-2 py-1 text-xs ${layout === l ? 'bg-sideOn font-semibold text-accentText' : 'text-mute hover:bg-hover'}`}>{t(`tstd.layout_${name}`)}</button>)}
+    </div>
+  );
+  const exporter = <ExportViewButton testid="grid-export-view" source="tasks" filters={{ site_id: siteId, ...(stage ? { stage_code: stage } : {}), ...(pq.stream ? { stream: pq.stream } : {}), ...(pq.view ? { view: pq.view } : {}), ...(sp.get('tadv') ? { filter: sp.get('tadv') } : {}) }} columns={TASK_COLUMNS} />;
+  const displayMenu = <DisplayMenu api={timeline} />;
 
   return (
     <div data-testid="page-site">
@@ -122,16 +146,19 @@ export function Site() {
         </>
       )}
       {!docsTab && <>
-      <div className="mb-2 flex items-center gap-2"><h2 className="me-auto font-semibold">{t('site.tasks')}{stage && <button className="btn ms-2 px-2 py-0.5 text-xs" data-testid="stage-clear" onClick={() => setParam('stage', null)}>{t('site.all_stages')}</button>}</h2>
-        <div className="flex rounded-md border border-line" role="group" aria-label={t('site.layout')}>
-          {(['row', 'list'] as const).map((l) => <button key={l} type="button" aria-pressed={layout === l} data-testid={`site-layout-${l}`} onClick={() => { setLayout(l); savePref(LAYOUT_KEY, l); }} className={`px-2 py-1 text-xs ${layout === l ? 'bg-sideOn font-semibold text-accentText' : 'text-mute hover:bg-hover'}`}>{t(`site.layout_${l}`)}</button>)}
-        </div>
-        <ExportViewButton testid="grid-export-view" source="tasks" filters={{ site_id: siteId, ...(stage ? { stage_code: stage } : {}) }} columns={TASK_COLUMNS} /></div>
+      <div className="mb-2 flex items-center gap-2"><h2 className="me-auto font-semibold">{t('site.tasks')}{stage && <button className="btn ms-2 px-2 py-0.5 text-xs" data-testid="stage-clear" onClick={() => setParam('stage', null)}>{t('site.all_stages')}</button>}</h2></div>
+      {layout === 'row' && !dismantle && <TableToolbar testid="task-row-toolbar" kind="list"
+        views={<SavedViews screen="site-tasks" value={{ tq, ...(tadvTree ? { advanced: tadvTree } : {}) }} empty={TIMELINE_VIEW_EMPTY} table={timeline}
+          onApply={(x) => { const r = x as Record<string, unknown>; setSp((p) => { const n = new URLSearchParams(p); const v = String(r.tq ?? ''); if (v) n.set('tq', v); else n.delete('tq'); const enc = encodeFilter(r.advanced as FilterTree | undefined); if (enc) n.set('tadv', enc); else n.delete('tadv'); return n; }, { replace: true }); }} />}
+        search={<SearchBox testid="task-row-search" value={tq} onChange={(x) => setParam('tq', x || null)} placeholder={t('tstd.search_tasks')} />}
+        filter={<UnifiedFilter screen="site-tasks" value={tadvTree} onChange={(tree) => setParam('tadv', encodeFilter(tree) || null)} onClearAll={() => setSp((p) => { const n = new URLSearchParams(p); n.delete('tq'); n.delete('tadv'); return n; }, { replace: true })} />}
+        count={<TableCount testid="task-row-count" noun="tasks" total={taskTotal} filtered={rowStages.reduce((n, x) => n + x.tasks.length, 0)} active={!!(tq || tadvTree)} onClear={() => setSp((p) => { const n = new URLSearchParams(p); n.delete('tq'); n.delete('tadv'); return n; }, { replace: true })} />}
+        switcher={switcher} display={displayMenu} exporter={exporter} />}
       {dismantle ? <p className="card p-6 text-mute" data-testid="site-dismantle-todo">{t('site.dismantle_todo')}</p>
         : off ? <p className="card p-6 text-mute" data-testid="site-stream-na">{t('site.stream_na')}</p>
         : grid.isLoading || !s ? <p className="text-mute">{t('common.loading')}</p>
-        : layout === 'row' ? <TaskRow stages={stages} selected={taskId ?? sp.get('row')} onVisible={setIds} onOpen={(id) => setSp((p) => { const n = new URLSearchParams(p); n.set('task', id); n.set('row', id); return n; }, { replace: true })} />
-        : <TaskGrid key={`${phase?.code ?? ''}|${stage ?? 'all'}`} siteId={siteId} stages={stages} selected={taskId ?? sp.get('row')} onVisible={setIds} onOpen={(id) => setSp((p) => { const n = new URLSearchParams(p); n.set('task', id); n.set('row', id); return n; }, { replace: true })} />}
+        : layout === 'row' ? <div {...displayAttrs(timeline.display)} data-testid="task-row-display"><TaskRow stages={rowStages} selected={taskId ?? sp.get('row')} onVisible={setIds} onOpen={(id) => setSp((p) => { const n = new URLSearchParams(p); n.set('task', id); n.set('row', id); return n; }, { replace: true })} /></div>
+        : <TaskGrid key={`${phase?.code ?? ''}|${stage ?? 'all'}`} siteId={siteId} stages={stages} switcher={switcher} exporter={exporter} selected={taskId ?? sp.get('row')} onVisible={setIds} onOpen={(id) => setSp((p) => { const n = new URLSearchParams(p); n.set('task', id); n.set('row', id); return n; }, { replace: true })} />}
       {layout === 'list' && <p className="mt-2 text-xs text-mute">{t('grid.keys')}</p>}
       </>}
       <TaskDrawer nav={{ ids, onGo: (id) => setSp((p) => { const n = new URLSearchParams(p); n.set('task', id); n.set('row', id); return n; }, { replace: true }) }} registerFields={grid.data?.stages.flatMap((x) => x.tasks).find((x) => x.id === taskId)?.register_fields} taskId={taskId} onClose={() => setParam('task', null)} />

@@ -1,6 +1,6 @@
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { api, ApiError } from './client';
-import type { Comment, DocumentFile, Group, Matrix, MatrixPatch, Page, Region, Role, SiteDetail, SiteImportStatus, SiteWorkflowLocksResult, SiteDraft, SiteDraftInput, SiteListItem, SiteTasks, Stream, ViewRef, TaskDetail, TaskEntryPatch, TaskSummary, TransitionResult, UserPickerItem, WorkflowStep } from './types';
+import type { Comment, CountedPage, DocumentFile, Group, Matrix, MatrixPatch, Page, Region, Role, SiteDetail, SiteImportStatus, SiteWorkflowLocksResult, SiteDraft, SiteDraftInput, SiteListItem, SiteTasks, Stream, ViewRef, TaskDetail, TaskEntryPatch, TaskSummary, TransitionResult, UserPickerItem, WorkflowStep } from './types';
 
 export type SiteFilters = { q: string; region_id: string; scenario: string; overall_status: string; stage_code: string; stream?: string; view?: string; bucket?: string; coordinates?: string;
   /** 0.15.4: locked / open */ workflow_locks?: string; /** 0.15.4: with / without */ data_gaps?: string;
@@ -31,9 +31,14 @@ export const useRegions = () => useQuery({ queryKey: ['regions'], staleTime: Inf
 export const useSites = (f: SiteFilters, enabled = true) =>
   useInfiniteQuery({
     queryKey: ['sites', f], initialPageParam: '' as string, placeholderData: keepPreviousData, enabled,
-    queryFn: ({ pageParam }) => api.get<Page<SiteListItem>>('/sites', { query: { ...f, limit: 100, cursor: pageParam } }),
+    queryFn: ({ pageParam }) => api.get<CountedPage<SiteListItem>>('/sites', { query: { ...f, limit: 100, cursor: pageParam } }),
     getNextPageParam: (last) => last.page.next_cursor ?? undefined,
   });
+
+/** W8 item 6: only the counts and the pasted-list result of `GET /sites` for the same filters (one row), for the layouts that do not load the list (map, board). */
+export const useSiteCounts = (f: SiteFilters, enabled = true) =>
+  useQuery({ queryKey: ['sites', 'counts', f], enabled, placeholderData: keepPreviousData,
+    queryFn: () => api.get<CountedPage<SiteListItem>>('/sites', { query: { ...f, limit: 1 } }).then((r) => ({ total: r.counts?.total ?? r.page.total, filtered: r.counts?.filtered ?? r.page.total, search: r.search })) });
 
 /** The streams of the workflow version, read from the first site (one tiny call); the tabs fall back to the seed list. */
 const useFirstSite = <T,>(select: (s: SiteListItem | undefined) => T) =>
@@ -45,8 +50,9 @@ export const useStageCodes = () => useFirstSite((s) => s?.rail.map((r) => r.code
 export const useViews = () => useFirstSite((s) => s?.views as ViewRef[] | undefined);
 
 export const useSite = (id: string) => useQuery({ queryKey: ['site', id], queryFn: () => api.get<SiteDetail>(`/sites/${id}`) });
-export const useSiteTasks = (id: string, stream?: string | null, enabled = true, view?: string | null) =>
-  useQuery({ queryKey: ['site-tasks', id, stream ?? '', view ?? ''], enabled, queryFn: () => api.get<SiteTasks>(`/sites/${id}/tasks`, { query: { stream, view } }) });
+/** `filter` (W8): the + Filter tree of the site's task list, compiled by the server against the `site-tasks` whitelist. */
+export const useSiteTasks = (id: string, stream?: string | null, enabled = true, view?: string | null, filter?: string | null) =>
+  useQuery({ queryKey: ['site-tasks', id, stream ?? '', view ?? '', filter ?? ''], enabled, placeholderData: keepPreviousData, queryFn: () => api.get<SiteTasks>(`/sites/${id}/tasks`, { query: { stream, view, ...(filter ? { filter } : {}) } }) });
 export const useHistory = (id: string) => useQuery({ queryKey: ['task-history', id], queryFn: () => api.get<Page<WorkflowStep>>(`/tasks/${id}/history`) });
 export const useComments = (id: string) => useQuery({ queryKey: ['task-comments', id], queryFn: () => api.get<Page<Comment>>(`/tasks/${id}/comments`) });
 

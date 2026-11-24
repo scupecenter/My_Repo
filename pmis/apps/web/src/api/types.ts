@@ -28,6 +28,10 @@ export type StatusUpdateInput = S['StatusUpdateInput'];
 export type StatusHealth = S['StatusHealth'];
 export type TransitionResult = S['TransitionResult'];
 export type Page<T> = { items: T[]; page: S['PageInfo'] };
+/** W8 (0.15.64): the counts of a site-data list (every row the caller may see, the rows matching the filters) and the result of a pasted list of Site IDs. */
+export type ListCounts = S['ListCounts'];
+export type PastedSearchResult = S['PastedSearch'];
+export type CountedPage<T> = Page<T> & { counts?: ListCounts; search?: PastedSearchResult };
 export type Region = S['Region'];
 export type SiteListItem = S['SiteListItem'];
 export type SiteDetail = S['SiteDetail'];
