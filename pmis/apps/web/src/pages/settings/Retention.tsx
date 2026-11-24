@@ -7,6 +7,7 @@ import { useToast } from '@/components/Toast';
 import { fieldErrors } from '@/lib/fields';
 import { isReduction, RETENTION_MIN, retentionErrors } from '@/lib/policy';
 import { FieldErr } from './Calendar';
+import { QueryFallback } from '@/components/States';
 
 export function Retention() {
   const { t } = useTranslation();
@@ -15,7 +16,7 @@ export function Retention() {
   const [f, setF] = useState<{ sys: string; sec: string } | null>(null);
   const [open, setOpen] = useState(false);
   const cur = q.data;
-  if (!cur) return <p>{t('common.loading')}</p>;
+  if (!cur) return <QueryFallback queries={[q]} testid="ret-loading" />;
   const v = f ?? { sys: String(cur.system_log_days), sec: String(cur.security_log_days) };
   const next = { system_log_days: Number(v.sys), security_log_days: Number(v.sec) };
   const errs = { ...fieldErrors(set.error), ...retentionErrors(next) };

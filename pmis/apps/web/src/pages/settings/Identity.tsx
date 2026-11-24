@@ -6,6 +6,7 @@ import { errText, FormDialog } from '@/components/FormDialog';
 import { useToast } from '@/components/Toast';
 import { BRAND_SWATCHES, BRANDS, type Brand } from '@/lib/brands';
 import { fmtDateTime } from '@/lib/time';
+import { QueryFallback } from '@/components/States';
 
 /** A small picture of a design (its light tokens): a sidebar with an active entry, a page with a card, an accent button and a soft chip. */
 export function BrandPreview({ brand }: { brand: Brand }) {
@@ -44,7 +45,7 @@ export function Identity() {
   const q = useUiIdentity(), set = useSetUiIdentity();
   const [draft, setDraft] = useState<{ brand: Brand; allow: boolean } | null>(null);
   const [open, setOpen] = useState(false);
-  if (!q.data) return <p>{q.isError ? t('common.error') : t('common.loading')}</p>;
+  if (!q.data) return <QueryFallback queries={[q]} testid="identity-loading" />;
   const cur = q.data;
   const v = draft ?? { brand: cur.default_brand, allow: cur.allow_user_choice };
   const dirty = v.brand !== cur.default_brand || v.allow !== cur.allow_user_choice;

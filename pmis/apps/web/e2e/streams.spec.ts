@@ -7,8 +7,10 @@ test.beforeEach(async ({ page }) => { await page.addInitScript(() => { if (!loca
 // Site Register streams (owner decision 2026-11-15: the sidebar shows only the six SITE 360 sub-menus under Site Master; the stream filter is reached by its old URL, ?stream=).
 // EN/light and AR/dark (RTL, dark tokens), against the mock layer.
 const CASES = [
-  { locale: 'en', theme: 'light', title: 'Site Master', cw: 'Civil Works', cwMenu: 'CW', dismantle: 'Dismantle', na: /Show N\/A sites \(\d+\)/ },
-  { locale: 'ar', theme: 'dark', title: 'ماستر المواقع', cw: 'الأعمال المدنية', cwMenu: 'الأعمال المدنية', dismantle: 'الفك', na: /إظهار المواقع غير المنطبقة \(\d+\)/ },
+  { locale: 'en', theme: 'light', title: 'Site Master', cw: 'Civil Works', cwMenu: 'CW', dismantle: 'Dismantle', na: /Show N\/A sites \(\d+\)/,
+    phases: ['All', 'Design & Acquisition', 'Civil Works', 'Installation (TE)', 'O&M', 'Handover & Closure', 'Dismantle'] },
+  { locale: 'ar', theme: 'dark', title: 'ماستر المواقع', cw: 'الأعمال المدنية', cwMenu: 'الأعمال المدنية', dismantle: 'الفك', na: /إظهار المواقع غير المنطبقة \(\d+\)/,
+    phases: ['الكل', 'التصميم والاستحواذ', 'الأعمال المدنية', 'التركيبات', 'التشغيل والصيانة', 'التسليم والإغلاق', 'الفك'] },
 ] as const;
 
 for (const c of CASES) {
@@ -49,8 +51,10 @@ for (const c of CASES) {
     await page.getByTestId('sites-show-na').check();
     await expect(page.getByTestId('sites-count')).toHaveText(new RegExp(String(before + na)));
 
-    // the site page keeps the stream and shows its grid and pipeline
+    // the site page keeps the stream as its phase (one tab row, W1) and shows its grid and pipeline
     await row.click();
+    await expect(page.getByTestId('site-phase-tab-CW')).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByTestId('site-phase-tabs').getByRole('tab')).toHaveText(c.phases);
     await expect(page.getByTestId('site-stream-summary')).toBeVisible();
     await expect(page.locator('[data-testid^="pipe-node-"]')).toHaveCount(3);
     await expect(page.getByTestId('grid-stage-cw')).toBeVisible();
@@ -91,11 +95,12 @@ for (const c of VIEW_CASES) {
     await expect(page.getByRole('heading', { level: 1 })).toContainText(c.te);
     await expect(page.getByTestId('view-tabs')).toHaveCount(0);
 
-    // the site page keeps the view; the O&M view holds only B14
+    // the site page opens the matching phase of its one phase row (W1); the O&M phase holds only B14
     await page.getByTestId('site-row-TR101').click();
-    await expect(page.getByTestId('site-view-tabs-TE')).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByTestId('site-phase-tab-TE')).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByTestId('site-view-tabs')).toHaveCount(0);
     await expect(page.getByTestId('grid-stage-te_installation')).toBeVisible();
-    await page.getByTestId('site-view-tabs-OM').click();
+    await page.getByTestId('site-phase-tab-OM').click();
     await expect(page.getByTestId('grid-stage-final_closure')).toBeVisible();
     await expect(page.getByTestId('grid-stage-te_installation')).toHaveCount(0);
   });

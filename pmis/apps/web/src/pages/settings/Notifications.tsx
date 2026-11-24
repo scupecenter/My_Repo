@@ -8,6 +8,7 @@ import { useToast } from '@/components/Toast';
 import { fieldErrors } from '@/lib/fields';
 import { isLocked, LIMITS, thresholdErrors } from '@/lib/policy';
 import { FieldErr } from './Calendar';
+import { QueryFallback } from '@/components/States';
 
 type Draft = { enabled: boolean; timezone: string; digest_hour: number | ''; follow: boolean; work_days: number[]; thresholds: Record<keyof NotificationThresholds, number | ''>; matrix: NotificationPolicyRow[] };
 const fromPolicy = (p: NotificationPolicy): Draft => ({ enabled: p.enabled, timezone: p.timezone, digest_hour: p.digest_hour, follow: p.work_days_follow_calendar, work_days: p.work_days, thresholds: { ...p.thresholds }, matrix: p.matrix.map((r) => ({ ...r, channels: { ...r.channels }, cells: r.cells.map((c) => ({ ...c })) })) });
@@ -18,8 +19,8 @@ export function Notifications() {
   const pol = usePolicy(), cat = useCatalogue(), save = useSetPolicy();
   const [draft, setDraft] = useState<Draft | null>(null);
   const [open, setOpen] = useState(false);
+  if (!pol.data || !cat.data) return <QueryFallback queries={[pol, cat]} testid="np-loading" />;
   const p = pol.data;
-  if (!p || !cat.data) return <p>{t('common.loading')}</p>;
   const d = draft ?? fromPolicy(p);
   const ar = i18n.language === 'ar';
   const set = (patch: Partial<Draft>) => setDraft({ ...d, ...patch });

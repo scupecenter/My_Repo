@@ -7,6 +7,7 @@ import type { MatrixAssigneeT, StaffFieldVisibility, StaffVisibility as SV, User
 import { errText, FormDialog } from '@/components/FormDialog';
 import { PeoplePicker } from '@/components/PeoplePicker';
 import { useToast } from '@/components/Toast';
+import { QueryFallback } from '@/components/States';
 
 type F = 'email' | 'phone';
 
@@ -36,7 +37,7 @@ export function StaffVisibility() {
   const [draft, setDraft] = useState<SV['fields'] | null>(null);
   const [open, setOpen] = useState(false);
   const [emp, setEmp] = useState(''), [hidden, setHidden] = useState<F[]>([]), [hOpen, setHOpen] = useState(false);
-  if (!q.data) return <p>{t('common.loading')}</p>;
+  if (!q.data) return <QueryFallback queries={[q]} testid="sv-loading" />;
   const d = draft ?? q.data.fields;
   const patch = (f: F, v: Partial<StaffFieldVisibility>) => setDraft({ ...d, [f]: { ...d[f], ...v } });
   return (

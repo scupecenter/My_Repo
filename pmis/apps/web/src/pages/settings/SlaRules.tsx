@@ -24,6 +24,7 @@ import { fieldErrors } from "@/lib/fields";
 import { tripoliToday } from "@/lib/today";
 import { FieldErr } from "./Calendar";
 import { SlaBulkAdmin } from "./SlaRuleAdmin";
+import { QueryFallback } from "@/components/States";
 
 const SCENARIOS: DeliveryScenario[] = [
   "new_build",
@@ -223,7 +224,9 @@ function Editor({ id, pin }: { id: string; pin: () => void }) {
     etag = q.data?.etag ?? 0;
   if (!set)
     return (
-      <section className="card p-4 text-mute">{t("common.loading")}</section>
+      <section className="card p-4">
+        <QueryFallback queries={[q]} testid="sla-editor-loading" />
+      </section>
     );
   const ar = i18n.language === "ar",
     name = (n: string, a?: string | null) => (ar && a) || n;
