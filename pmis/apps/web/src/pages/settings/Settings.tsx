@@ -16,6 +16,7 @@ import { ContractorRules } from './ContractorRules';
 import { Lists } from './Lists';
 import { RegisterColumns } from './RegisterColumns';
 import { HistoricalWaiver } from './HistoricalWaiver';
+import { DataReset } from './DataReset';
 import { Imports } from './Imports';
 import { KanbanWip } from './KanbanWip';
 import { Studio } from './studio/Studio';
@@ -36,7 +37,7 @@ export const SETTINGS_TABS: readonly SettingsTab[] = [
   { key: 'ddl', sections: [] },
   { key: 'site360', sections: [] },
   { key: 'documents', sections: [{ key: 'library' }, { key: 'mail', adminOnly: true }] },
-  { key: 'data', sections: [{ key: 'imports' }, { key: 'historical' }] },
+  { key: 'data', sections: [{ key: 'imports' }, { key: 'historical' }, { key: 'reset', adminOnly: true }] },
   { key: 'alerts', sections: [] },
   { key: 'security', sections: [{ key: 'staff' }, { key: 'retention' }] },
   { key: 'dashboard', sections: [] },
@@ -141,6 +142,7 @@ export function SettingsRoutes() {
           <Route index element={<Navigate to="imports" replace />} />
           <Route path="imports" element={<Imports />} />
           <Route path="historical" element={<HistoricalWaiver />} />
+          <Route path="reset" element={<DataReset />} />
         </Route>
         <Route path="security" element={<TabFrame tab="security" />}>
           <Route index element={<Navigate to="staff" replace />} />

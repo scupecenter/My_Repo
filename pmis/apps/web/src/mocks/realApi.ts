@@ -538,6 +538,15 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/groups'],
   ['post', '/me/notify-admins'],
   ['post', '/auth/employee-id'],
+  // Contract 0.15.62 (migration 0146; apps/api: settings): the project data reset in Settings, with two System Admins.
+  ['get', '/settings/data-reset'],
+  ['put', '/settings/data-reset/settings'],
+  ['post', '/settings/data-reset/requests'],
+  ['get', '/settings/data-reset/requests/:id'],
+  ['post', '/settings/data-reset/requests/:id/approve'],
+  ['post', '/settings/data-reset/requests/:id/cancel'],
+  ['post', '/settings/data-reset/requests/:id/run'],
+  ['post', '/settings/data-reset/requests/:id/retry-files'],
 ] as const;
 
 /** `GET /users/deleted` and `GET /users/picker` are other operations that the `:id` pattern would swallow; they stay mocked. */
