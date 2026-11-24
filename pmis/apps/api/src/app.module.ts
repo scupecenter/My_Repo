@@ -60,6 +60,8 @@ import { LibraryService } from './documents/library.service';
 import { StorageService } from './documents/storage.service';
 import { StorageJobsService } from './documents/storage-jobs.service';
 import { ZipService } from './documents/zip.service';
+import { LibraryMenuController } from './library/library.controller';
+import { LibraryMenuService } from './library/library.service';
 import { DbService } from './db/db.service';
 import { SnagsController } from './qc/snags.controller';
 import { SnagsService } from './qc/snags.service';
@@ -193,6 +195,7 @@ export function appModuleFor(config: AppConfig) {
       DailyPlanController, DailyPlanSettingsController, // 0.15.67 (migration 0149): My Work > Daily Plan (W7)
       StaffRegistryController, // 0.15.56 (0142): staff registry card, visibility, edit
       DataResetController, // 0.15.62 (0146): project data reset in Settings, two System Admins
+      LibraryMenuController, // 0.15.70 (0151, W5): Library > Forms and Archive
     ],
     providers: [
       { provide: APP_CONFIG, useValue: config },
@@ -216,6 +219,7 @@ export function appModuleFor(config: AppConfig) {
       DailyPlanService, // 0.15.67 (migration 0149)
       StaffRegistryService, // 0.15.56 (0142)
       DataResetService, MaintenanceService, // 0.15.62 (0146)
+      LibraryMenuService, // 0.15.70 (0151, W5)
       { provide: APP_GUARD, useClass: SessionGuard },
       { provide: APP_INTERCEPTOR, useClass: TxInterceptor },
       { provide: APP_FILTER, useClass: ProblemFilter },

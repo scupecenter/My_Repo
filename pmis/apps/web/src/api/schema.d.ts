@@ -7489,6 +7489,288 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/library/forms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Library > Forms, every approved document form (0.15.70, W5)
+         * @description 0.15.70 (migration 0151). Anyone who may view site documents (`sites.documents` view). The approved form templates (one per code, the version in force) and the Document Library types with an uploaded blank form (download only, `kind` `blank_form`). `can_configure` is true for a System Admin or an all-regions delegate of `document_types` edit (the page links to Settings > Documents).
+         */
+        get: operations["listLibraryForms"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/library/forms/{template_id}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The auto-filled preview of a form for a site (no number taken)
+         * @description 0.15.70. Who: the L1 holder of the site's task of the form (`trigger_task_code`), or a holder of "Documents: generate" (grant `library.forms` `create`) for the site's region; the task must be open (open, entry or returned), else 409 `invalid_transition`. A System Admin or an all-regions delegate of `document_types` edit may also preview a draft version and a site whose task is not open. The document number reads `PREVIEW`. Rendered by the server from the template placeholders (`{{path}}`, `{{#each}}`, `{{#if}}`); the HTML is shown in a sandboxed frame without scripts.
+         */
+        post: operations["previewLibraryForm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/library/forms/{template_id}/generate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Generate the filled document of a site (the copy enters the Archive as "generated")
+         * @description 0.15.70. The same rights and task rule as the preview (an approved form only). Takes the next number of the form's sequence (`doc_sequences`, never reused), fills the template with the site data, keeps the file and the data, and writes an audit row (`library_document_generate`). Print it, sign and stamp it, then upload the signed copy into the task's document slot (`POST /tasks/{task_id}/slots/{slot_id}/files`); the L2 holder approves it with the task, as before.
+         */
+        post: operations["generateLibraryDocument"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/library/generated/{doc_id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                doc_id: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * The file of a generated document (download, print or view; audited)
+         * @description 0.15.70. Who: `download_documents` on `sites.documents` in the region, the person who generated it, or anyone who may generate it. Every call writes an audit row (`library_document_download`) with its `purpose`. Served as `text/html` with a restrictive Content-Security-Policy (no script, no network) and `X-Content-Type-Options: nosniff`.
+         */
+        get: operations["downloadLibraryDocument"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/library/generated/{doc_id}/void": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                doc_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Void a wrong generated document with a reason (the number stays issued)
+         * @description 0.15.70. The person who generated it, anyone who may generate it, or a System Admin. Step-up. Audited (`library_document_void`, before and after).
+         */
+        post: operations["voidLibraryDocument"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/library/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Library > Archive, one card per document type with a file or a generated document, grouped by stream
+         * @description 0.15.70. `sites.documents` view; counted inside the caller's regions (B3, row security) and, for documents of a register record, the register's own module (as `GET /documents`). A card shows a document type that has at least one file or one generated document; `approved`, `waiting_review` (uploaded or in review) and `missing` (due, generated or rejected) count the document slots. Groups follow the stream of the task the document sits on (Design & Acquisition, Civil Works, Installation (TE), O&M for the tasks of a work view that is not a stream, Handover & Closure, Dismantle, Registers). The setting `library.archive` hides and orders cards; a caller who may change it (`can_configure`) also receives the hidden cards with `hidden` true.
+         */
+        get: operations["getLibraryArchive"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/library/archive/rows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The Archive list (one row per document of a site; superseded versions on request)
+         * @description 0.15.70. `sites.documents` view; the caller's regions and register modules apply. One row per document slot of a site (a task's or a register record's), with its lifecycle status: `due` (the task opened, nothing yet), `generated` (a filled copy was generated), `signed_uploaded`, `in_review`, `approved`, `rejected`; `superseded` rows are the older file versions (with `include_superseded` or the status filter). `q` searches the Site ID, the Site Owner ID, the site name, the document number and the file name; a pasted list of Site IDs finds each site (W8 item 5). `filter` is the AND/OR tree of the screen `library-archive` (`GET /saved-views/filter-fields?screen_key=library-archive`). `counts` come from the server. Sorted by site, document and version.
+         */
+        get: operations["listLibraryArchiveRows"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/library/archive/zip": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bulk download of the Archive list as a zip, by its filter
+         * @description 0.15.70. `download_documents` on `sites.documents`. The files of the rows that match the same parameters as `GET /library/archive/rows` (the uploaded files; due and generated rows have none) go to the existing zip export (`POST /exports/zip` with `file_ids`; job, manifest, audit rows `document_zip_start` and `document_zip_download`). More files than the `zip_limit` of `library.archive` answer 422 `too_many_files`; none answer 422 `no_files`.
+         */
+        post: operations["startLibraryArchiveZip"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/library/form-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Settings > Documents > Form templates, every version of every form
+         * @description 0.15.70. System Admin or an all-regions delegate of `document_types` edit (403 otherwise).
+         */
+        get: operations["listLibraryFormTemplates"];
+        put?: never;
+        /**
+         * Upload a form or a new version of it (a draft)
+         * @description 0.15.70. System Admin or an all-regions delegate of `document_types` edit; a reason. The HTML may use `{{path}}`, `{{#each list}}..{{/each}}` and `{{#if path}}..{{else}}..{{/if}}` over the data of the form (`site`, `region`, `task`, `doc`, `template`, `generated_by`) and `fields.<name>` of `bindings`; the file must come through the allow-list of printable forms unchanged in substance (tags such as table, div, span, p, b, img with an embedded `data:image` source, input checkbox or radio, style with embedded `data:` fonts and images only; attributes such as class, style, colspan, dir; no script, frame, svg, link, form, event handler, `srcdoc`, external URL, `@import`, CSS `expression` or escape, whatever the spelling), else 422 `unsafe_html` with what it would remove; the database repeats a deny-list behind it. Every filled copy (preview and generation) goes through the same allow-list again. The numbering pattern takes the tokens of the numbering service (`{YYYY}`, `{YY}`, `{SEQ:n}` exactly once). Field errors: `unknown_key`, `invalid`, `required`, `unknown_document`, `unknown_task`, `invalid_path`, `sequence_token`, `year_required`. Audited (`library_form_template_save`).
+         */
+        post: operations["createLibraryFormTemplate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/library/form-templates/{template_id}/html": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * The HTML of one version (to start a new version from it)
+         * @description 0.15.70. Configuration right only.
+         */
+        get: operations["getLibraryFormTemplateHtml"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/library/form-templates/{template_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve a draft version (it replaces the version in force)
+         * @description 0.15.70. Configuration right, a reason and a step-up. The previous approved version of the code is retired; the numbering pattern becomes the pattern of the form's sequence (the counter continues). 409 `invalid_transition` when the version is not a draft; 409 `duplicate` when a warehouse sequence already uses the form code. Audited (`library_form_template_approve`, before and after).
+         */
+        post: operations["approveLibraryFormTemplate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/library/form-templates/{template_id}/retire": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retire a version (it leaves Library > Forms; generated documents keep it)
+         * @description 0.15.70. Configuration right, a reason and a step-up. Audited (`library_form_template_retire`).
+         */
+        post: operations["retireLibraryFormTemplate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/library-archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Settings > Documents > Archive (visible cards and their order, default columns, bulk zip limit)
+         * @description 0.15.70 (migration 0151). Every signed-in user. Without a saved value: nothing hidden, no order (stream order, then code), every column, zip limit 500.
+         */
+        get: operations["getLibraryArchiveSetting"];
+        /**
+         * Set the Archive cards, default columns and zip limit
+         * @description 0.15.70: System Admin or a delegate of `admin.settings` edit for all regions, a reason and If-Match. Closed body, every key required: `hidden` and `order` (document codes; `unknown_document`, `duplicate`), `default_columns` (`unknown_column`), `zip_limit` 1..5000 (`out_of_range`); `unknown_key` at its path. Audited (`library_archive_update`, before and after).
+         */
+        put: operations["setLibraryArchiveSetting"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/warehouse/dispatch-status": {
         parameters: {
             query?: never;
@@ -9350,6 +9632,226 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * @description 0.15.70 (W5). The lifecycle of a site document: due (its task opened), generated (a filled copy was generated), signed_uploaded (the signed copy is uploaded), in_review (submitted with the task), approved, rejected (returned); superseded is an older file version.
+         * @enum {string}
+         */
+        LibraryDocStatus: "due" | "generated" | "signed_uploaded" | "in_review" | "approved" | "rejected" | "superseded";
+        LibraryForm: {
+            /** @description The template id (kind `html`) or the document type id (kind `blank_form`). */
+            id: string;
+            /**
+             * @description `html`: filled by the system (preview, generate, print). `blank_form`: an uploaded blank form of the Document Library, download only.
+             * @enum {string}
+             */
+            kind: "html" | "blank_form";
+            code: string;
+            name_en: string;
+            name_ar?: string | null;
+            version?: number | null;
+            /** Format: uuid */
+            doc_type_id?: string;
+            doc_code: string;
+            doc_name_en: string;
+            doc_name_ar?: string | null;
+            trigger_task_code?: string | null;
+            trigger_task_name_en?: string | null;
+            trigger_task_name_ar?: string | null;
+            numbering_pattern?: string | null;
+            /** Format: uuid */
+            blank_form_file_id?: string | null;
+            /** @description Who approved the version in force. */
+            owner?: components["schemas"]["UserRef"] | null;
+            /** Format: date-time */
+            updated_at?: string | null;
+        };
+        /** @description The fields of a form template (the multipart upload of `POST /library/form-templates` sends them as text, with the HTML as the file). */
+        LibraryFormTemplateInput: {
+            code: string;
+            name_en: string;
+            name_ar?: string | null;
+            /** @description The Document Library type the form produces. */
+            doc_code: string;
+            /** @description The task that triggers the document: it is due when this task opens. */
+            trigger_task_code: string;
+            /** @example SSR-{YYYY}-{SEQ:4} */
+            numbering_pattern: string;
+            /**
+             * @default yearly
+             * @enum {string}
+             */
+            numbering_reset: "never" | "yearly";
+            html: string;
+            /** @description Extra placeholders `fields.<name>`: name to a data path such as `site.tower_owner`. */
+            bindings?: {
+                [key: string]: string;
+            };
+        };
+        LibraryFormTemplate: {
+            /** Format: uuid */
+            id: string;
+            code: string;
+            version: number;
+            name_en: string;
+            name_ar?: string | null;
+            /** Format: uuid */
+            doc_type_id?: string;
+            doc_code: string;
+            doc_name_en?: string;
+            doc_name_ar?: string | null;
+            trigger_task_code: string;
+            trigger_task_name_en?: string | null;
+            trigger_task_name_ar?: string | null;
+            numbering_pattern: string;
+            /** @enum {string} */
+            numbering_reset?: "never" | "yearly";
+            bindings?: {
+                [key: string]: string;
+            };
+            placeholders?: string[];
+            /** @enum {string} */
+            status: "draft" | "approved" | "retired";
+            sha256?: string;
+            size_bytes?: number;
+            created_by?: components["schemas"]["UserRef"] | null;
+            /** Format: date-time */
+            created_at?: string;
+            approved_by?: components["schemas"]["UserRef"] | null;
+            /** Format: date-time */
+            approved_at?: string | null;
+            /** Format: date-time */
+            retired_at?: string | null;
+            /** Format: date-time */
+            updated_at?: string;
+        };
+        LibraryFormPreview: {
+            /** @description The filled form (number `PREVIEW`). */
+            html: string;
+            /** Format: uuid */
+            task_id: string | null;
+            /** @description Placeholders with no value for this site. */
+            warnings: string[];
+        };
+        LibraryGeneratedDocument: {
+            /** Format: uuid */
+            id: string;
+            number: string;
+            /** @enum {string} */
+            status: "generated" | "voided";
+            /** Format: uuid */
+            template_id?: string;
+            template_code?: string;
+            template_version?: number;
+            /** Format: uuid */
+            site_id: string;
+            site_code: string;
+            region_id?: components["schemas"]["RegionId"];
+            /** Format: uuid */
+            task_id: string;
+            task_code?: string;
+            doc_code: string;
+            remarks?: string | null;
+            sha256?: string | null;
+            size_bytes?: number;
+            generated_by?: components["schemas"]["UserRef"] | null;
+            /** Format: date-time */
+            generated_at: string;
+            void_reason?: string | null;
+            voided_by?: components["schemas"]["UserRef"] | null;
+            /** Format: date-time */
+            voided_at?: string | null;
+            warnings?: string[];
+        };
+        LibraryArchiveCard: {
+            doc_code: string;
+            /** Format: uuid */
+            doc_type_id: string;
+            name_en: string;
+            name_ar?: string | null;
+            hidden: boolean;
+            counts: {
+                total: number;
+                approved: number;
+                waiting_review: number;
+                missing: number;
+                generated: number;
+                files: number;
+            };
+        };
+        LibraryArchive: {
+            can_configure: boolean;
+            groups: {
+                /** @description The stream code, OM for a work view that is not a stream, DISMANTLE or REGISTERS. */
+                key: string;
+                name_en: string;
+                name_ar?: string | null;
+                cards: components["schemas"]["LibraryArchiveCard"][];
+            }[];
+        };
+        LibraryArchiveRow: {
+            /** @description Stable row key (the slot, or the file of a superseded row). */
+            key: string;
+            /** Format: uuid */
+            slot_id: string;
+            status: components["schemas"]["LibraryDocStatus"];
+            /** Format: uuid */
+            site_id: string;
+            site_code: string;
+            site_name?: string | null;
+            region_id?: components["schemas"]["RegionId"];
+            region_name?: string | null;
+            region_name_ar?: string | null;
+            cluster?: string | null;
+            /** Format: uuid */
+            doc_type_id?: string;
+            doc_code: string;
+            doc_name_en?: string;
+            doc_name_ar?: string | null;
+            candidate_label?: string | null;
+            /** @description The number of the latest generated copy. */
+            doc_number?: string | null;
+            /** Format: uuid */
+            generated_id?: string | null;
+            version?: number | null;
+            /** Format: uuid */
+            task_id?: string | null;
+            task_code?: string | null;
+            task_name_en?: string | null;
+            task_name_ar?: string | null;
+            register_key?: string | null;
+            /** Format: uuid */
+            file_id?: string | null;
+            /** Format: uuid */
+            file_group_id?: string | null;
+            file_name?: string | null;
+            mime_type?: string | null;
+            file_count?: number;
+            uploaded_by?: components["schemas"]["UserRef"] | null;
+            /** Format: date-time */
+            uploaded_at?: string | null;
+            approved_by?: components["schemas"]["UserRef"] | null;
+            /** Format: date */
+            approved_at?: string | null;
+            /** Format: date-time */
+            generated_at?: string | null;
+            /**
+             * Format: uuid
+             * @description The approved form that produces this document type on this task, if any.
+             */
+            form_id?: string | null;
+        };
+        LibraryArchiveConfig: {
+            hidden: string[];
+            order: string[];
+            default_columns: ("site" | "site_name" | "region" | "cluster" | "doc_type" | "doc_number" | "version" | "status" | "task" | "uploaded_by" | "uploaded_at" | "approved_by" | "approved_at")[];
+            zip_limit: number;
+        };
+        LibraryArchiveSetting: components["schemas"]["LibraryArchiveConfig"] & {
+            version: number;
+            /** Format: date-time */
+            updated_at?: string;
+            updated_by?: components["schemas"]["UserRef"];
+        };
         /**
          * @description The section of a Master column. `status` columns are in every menu.
          * @enum {string}
@@ -31796,6 +32298,476 @@ export interface operations {
             404: components["responses"]["NotFound"];
             413: components["responses"]["PayloadTooLarge"];
             422: components["responses"]["Unprocessable"];
+        };
+    };
+    listLibraryForms: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Forms. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["LibraryForm"][];
+                        can_configure: boolean;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    previewLibraryForm: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    site_id: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Preview. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LibraryFormPreview"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    generateLibraryDocument: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    site_id: string;
+                    remarks?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Generated. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LibraryGeneratedDocument"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    downloadLibraryDocument: {
+        parameters: {
+            query?: {
+                purpose?: "download" | "print" | "view";
+            };
+            header?: never;
+            path: {
+                doc_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The HTML file. */
+            200: {
+                headers: {
+                    "Content-Disposition"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    voidLibraryDocument: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                doc_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"];
+            };
+        };
+        responses: {
+            /** @description Voided. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LibraryGeneratedDocument"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getLibraryArchive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cards. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LibraryArchive"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    listLibraryArchiveRows: {
+        parameters: {
+            query?: {
+                doc_code?: string;
+                site_id?: string;
+                status?: components["schemas"]["LibraryDocStatus"];
+                include_superseded?: boolean;
+                /** @description 0.15.68 (W8 item 5). The search box of a site-data list. One token: contains, ignoring case, on the Site ID, the Site Owner ID and the name (and the other text columns the list names). Two or more tokens separated by spaces, new lines, tabs, commas or semicolons (cells copied from Excel): a pasted list, each token matches the Site ID or the Site Owner ID exactly, ignoring case, one row per site, duplicates ignored. At most 1000 distinct codes: 422 `validation_failed` with `too_many_codes` at `/q`. The caller's regions and row security still apply; the answer carries `search` for a list. */
+                q?: components["parameters"]["SiteSearch"];
+                /** @description JSON of the filter tree (`FilterTree`). */
+                filter?: string;
+                limit?: components["parameters"]["Limit"];
+                /** @description Opaque cursor from `page.next_cursor`. */
+                cursor?: components["parameters"]["Cursor"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Rows. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageEnvelope"] & {
+                        items?: components["schemas"]["LibraryArchiveRow"][];
+                        counts: components["schemas"]["ListCounts"];
+                        search?: components["schemas"]["PastedSearch"];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    startLibraryArchiveZip: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    doc_code?: string;
+                    /** Format: uuid */
+                    site_id?: string;
+                    status?: components["schemas"]["LibraryDocStatus"];
+                    include_superseded?: boolean;
+                    q?: string;
+                    filter?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Job started (`kind` `zip_export`). */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Job"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listLibraryFormTemplates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Versions, newest first per code. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["LibraryFormTemplate"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    createLibraryFormTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /**
+                     * Format: binary
+                     * @description The HTML template (.html, UTF-8, 3 MB at most).
+                     */
+                    file: string;
+                    reason: string;
+                    code: string;
+                    name_en: string;
+                    name_ar?: string;
+                    /** @description The Document Library type the form produces. */
+                    doc_code: string;
+                    /** @description The task that triggers the document: it is due when this task opens. */
+                    trigger_task_code: string;
+                    /** @example SSR-{YYYY}-{SEQ:4} */
+                    numbering_pattern: string;
+                    /**
+                     * @default yearly
+                     * @enum {string}
+                     */
+                    numbering_reset?: "never" | "yearly";
+                    /** @description JSON object: extra placeholders `fields.<name>`, name to a data path such as `site.tower_owner`. */
+                    bindings?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The draft version. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LibraryFormTemplate"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getLibraryFormTemplateHtml: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The template. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        html: string;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    approveLibraryFormTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"];
+            };
+        };
+        responses: {
+            /** @description Approved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LibraryFormTemplate"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    retireLibraryFormTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"];
+            };
+        };
+        responses: {
+            /** @description Retired. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LibraryFormTemplate"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    getLibraryArchiveSetting: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Setting. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LibraryArchiveSetting"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setLibraryArchiveSetting: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"] & components["schemas"]["LibraryArchiveConfig"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LibraryArchiveSetting"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
         };
     };
     listSiteDispatch: {

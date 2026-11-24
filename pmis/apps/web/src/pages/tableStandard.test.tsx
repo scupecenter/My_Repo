@@ -7,6 +7,7 @@ import { renderApp, signIn } from '@/test/utils';
 import { REGISTER_SCREENS, SITE_DATA_SCREENS } from '@/lib/siteDataScreens';
 import { REGISTER_KEYS_LIVE } from '@/lib/registerForms';
 import { Approvals } from './Approvals';
+import { ArchiveList } from './library/Archive';
 import { MyWork } from './MyWork';
 import { RegisterPage } from './Register';
 import { Site } from './Site';
@@ -22,6 +23,7 @@ vi.mock('@/components/EChart', () => ({ EChart: ({ label, testid }: { label: str
 
 const SITE = siteIdOf(0);
 const SiteAt = () => <Routes><Route path="/sites/:siteId" element={<Site />} /></Routes>;
+const Arch = () => <Routes><Route path="/library/archive/:docCode" element={<ArchiveList />} /></Routes>;
 const Reg = () => <Routes><Route path="/registers/:key" element={<RegisterPage />} /></Routes>;
 
 const CASES: Record<string, { ui: () => ReactElement; route: string; rows: boolean; before?: () => void }> = {
@@ -37,6 +39,7 @@ const CASES: Record<string, { ui: () => ReactElement; route: string; rows: boole
   registers: { ui: () => <Reg />, route: '/registers/procurement', rows: true },
   'my-work': { ui: () => <MyWork />, route: '/my-work', rows: true },
   approvals: { ui: () => <Approvals />, route: '/approvals', rows: true },
+  'library-archive': { ui: () => <Arch />, route: '/library/archive/A1', rows: true },
   'dashboard-drilldowns': { ui: () => <Sites />, route: '/sites?dashboard_status=in_progress&ref_date=2026-11-01', rows: true },
   // W2: every register and log on its own (the # column is checked on Procurement above: some registers have no seed rows), and its layouts
   ...Object.fromEntries(REGISTER_SCREENS.map((r) => [`register-${r.key}`, { ui: () => <Reg />, route: `/registers/${r.key}`, rows: false }])),

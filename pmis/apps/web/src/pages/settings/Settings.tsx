@@ -2,6 +2,8 @@ import { useTranslation } from 'react-i18next';
 import { NavLink, Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom';
 import { Calendar } from './Calendar';
 import { DocumentLibrary } from './DocumentLibrary';
+import { FormTemplates } from './FormTemplates';
+import { ArchiveSettings } from './ArchiveSettings';
 import { Notifications } from './Notifications';
 import { Retention } from './Retention';
 import { Dlp, Freeze, Idle } from './Rules';
@@ -37,7 +39,8 @@ export const SETTINGS_TABS: readonly SettingsTab[] = [
   { key: 'weights', sections: [] },
   { key: 'registers', sections: [{ key: 'columns' }, { key: 'contractors' }, { key: 'gecol' }, { key: 'team-scope' }] },
   { key: 'ddl', sections: [] },
-  { key: 'documents', sections: [{ key: 'library' }, { key: 'mail', adminOnly: true }] },
+  // W5: the Document Library section is now named Document types (the old documents/library route redirects); Form templates and Archive are new
+  { key: 'documents', sections: [{ key: 'types' }, { key: 'forms' }, { key: 'archive' }, { key: 'mail', adminOnly: true }] },
   { key: 'data', sections: [{ key: 'imports' }, { key: 'historical' }, { key: 'reset', adminOnly: true }] },
   { key: 'alerts', sections: [] },
   { key: 'security', sections: [{ key: 'staff' }, { key: 'retention' }] },
@@ -146,8 +149,11 @@ export function SettingsRoutes() {
           <Route path="team-scope" element={<TeamScopeMatch />} />
         </Route>
         <Route path="documents" element={<TabFrame tab="documents" />}>
-          <Route index element={<Navigate to="library" replace />} />
-          <Route path="library" element={<DocumentLibrary />} />
+          <Route index element={<Navigate to="types" replace />} />
+          <Route path="types" element={<DocumentLibrary />} />
+          <Route path="library" element={<LegacyRedirect to="documents/types" />} />
+          <Route path="forms" element={<FormTemplates />} />
+          <Route path="archive" element={<ArchiveSettings />} />
           <Route path="mail" element={<MailKinds />} />
         </Route>
         <Route path="data" element={<TabFrame tab="data" />}>

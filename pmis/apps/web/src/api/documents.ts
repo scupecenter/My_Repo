@@ -78,6 +78,8 @@ export const downloadDocument = (fileId: string) => downloadFile(`/files/${fileI
 // ------------------------------------------------------------------------------------------------------------- the site Documents tab
 export interface DocFilters {
   site_id?: string; stage_code?: string; task_code?: string; doc_code?: string; kind?: string; slot_status?: string; q?: string; include_superseded?: boolean;
+  /** the versions of one file (W5: the version history of the Archive list) */
+  file_group_id?: string;
 }
 export const useDocuments = (f: DocFilters) =>
   useQuery({
