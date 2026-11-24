@@ -1319,3 +1319,23 @@ BEGIN
   EXECUTE 'GRANT EXECUTE ON FUNCTION data_reset_core(boolean,text,jsonb,uuid,uuid) TO pmis_definer';
   EXECUTE 'GRANT SELECT, DELETE ON public.daily_plans, public.daily_plan_rows TO pmis_reset_owner';
 END $$;
+
+-- ---------------------------------------------------------------------------------------------------------------------
+-- Mail notification kinds (Q441): the reminder kind daily_plan_reminder joins mail_kind_catalogue, so an admin can choose to mail it.
+-- Redefined from its latest definition (0143); the only change is the new kind at the end. CREATE OR REPLACE keeps the owner and the grants of 0140.
+-- ---------------------------------------------------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION mail_kind_catalogue() RETURNS jsonb
+LANGUAGE sql IMMUTABLE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
+  SELECT jsonb_agg(jsonb_build_object('kind', k, 'recommended', ord <= 6) ORDER BY ord)
+  FROM unnest(ARRAY[
+    'task_assigned', 'register_assigned', 'snag_review', 'task_rejected', 'register_rejected', 'snag_rejected',
+    'email_change_decided', 'email_change_requested', 'followed_change', 'gate_closed_again', 'holiday_tentative', 'import_batch', 'levels_converted', 'mention',
+    'no_eligible_holder', 'order_team_mismatch', 'party_type_review', 'permit_transferred', 'phone_change_decided', 'phone_change_requested', 'site_draft_approved',
+    'site_draft_assigned', 'site_draft_returned', 'site_region_moved', 'sla_negative_duration', 'snag_closed', 'snag_raised', 'team_safety_cert',
+    'absence_alert', 'reassigned',
+    'mfa_exemption', 'assignment_request',
+    'daily_plan_reminder'
+  ]) WITH ORDINALITY AS t(k, ord)
+$$;
+ALTER FUNCTION mail_kind_catalogue() OWNER TO pmis_definer;
+REVOKE ALL ON FUNCTION mail_kind_catalogue() FROM PUBLIC;
