@@ -16,7 +16,7 @@ describe('F19: Settings tabs and old routes', () => {
   beforeEach(async () => { await signIn('pm'); });
 
   it('has the 11 one-word tabs of the plan plus the F20 dashboard tab', () => {
-    expect(SETTINGS_TABS.map((t) => t.key)).toEqual(['calendar', 'workflow', 'sla', 'weights', 'registers', 'ddl', 'site360', 'documents', 'data', 'alerts', 'security', 'dashboard', 'identity']);
+    expect(SETTINGS_TABS.map((t) => t.key)).toEqual(['calendar', 'workflow', 'sla', 'weights', 'registers', 'ddl', 'site360', 'documents', 'data', 'alerts', 'security', 'dashboard', 'display', 'identity']);
   });
 
   it.each([

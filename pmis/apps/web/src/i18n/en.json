@@ -1090,7 +1090,8 @@
     "section_data_historical": "Historical load",
     "section_security_staff": "Staff field visibility",
     "section_security_retention": "Log retention",
-    "tab_identity": "Identity & themes"
+    "tab_identity": "Identity & themes",
+    "tab_display": "Display"
   },
   "scopeMatch": {
     "title": "Team / scope match (Procurement)",
@@ -2362,7 +2363,8 @@
     "filter_dash_status": "Dashboard status: {{v}}",
     "filter_reached": "Milestone reached: {{v}}",
     "filter_ref_date": "As of {{v}}",
-    "filter_cluster": "Cluster: {{v}}"
+    "filter_cluster": "Cluster: {{v}}",
+    "normal": "Normal"
   },
   "twoFactor": {
     "badge_label": "2FA",
@@ -5502,6 +5504,24 @@
     "sla_due": "SLA due date",
     "search_tasks": "Search tasks, or paste task codes",
     "layout_list": "List",
-    "layout_timeline": "Timeline"
+    "layout_timeline": "Timeline",
+    "display": "Display",
+    "display_size": "Text size",
+    "display_align": "Alignment of text cells",
+    "display_density": "Row density",
+    "display_wrap": "Wrap long text",
+    "display_zebra": "Zebra rows",
+    "display_reset": "Back to the defaults",
+    "display_settings": "Defaults in Settings",
+    "size_sm": "Small",
+    "size_md": "Normal",
+    "size_lg": "Large",
+    "align_start": "Start",
+    "align_center": "Center",
+    "settings_title": "Display of the site tables",
+    "settings_note": "The defaults of the Display menu on every screen that shows site data (Site Master and its menus, the site task list, registers, My Work, Approvals). A user's own choice and a saved view keep their values.",
+    "settings_updated": "Last changed by {{name}} at {{at}}",
+    "settings_read_only": "Only a System Admin or a delegate of the settings can change these defaults.",
+    "preview_name": "A long synthetic site name that shows how long text is drawn"
   }
 }

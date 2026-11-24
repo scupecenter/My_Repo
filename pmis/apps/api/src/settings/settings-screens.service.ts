@@ -76,6 +76,19 @@ export class SettingsScreensService {
     return this.one(Prisma.sql`SELECT admin_set_idle_task_alert(${JSON.stringify(rest)}::jsonb, ${reason}::text, ${version}::int) AS j`);
   }
 
+  // ------------------------------------------------------------------ table display (W8, migration 0148)
+  /** GET /settings/table-display (every signed-in user: every site-data table starts from these defaults) */
+  tableDisplay(): Promise<{ version: number }> {
+    return this.one(Prisma.sql`SELECT table_display_json() AS j`);
+  }
+
+  /** PUT /settings/table-display (If-Match) */
+  setTableDisplay(ifMatch: string | undefined, raw: unknown): Promise<{ version: number }> {
+    const version = parseIfMatch(ifMatch);
+    const { reason, rest } = split(raw);
+    return this.one(Prisma.sql`SELECT admin_set_table_display(${JSON.stringify(rest)}::jsonb, ${reason}::text, ${version}::int) AS j`);
+  }
+
   // ------------------------------------------------------------------ notification policy
   /** GET /settings/notification-policy (view on admin.settings) */
   policy(): Promise<{ version: number }> {

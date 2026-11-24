@@ -1,8 +1,13 @@
 import * as Popover from '@radix-ui/react-popover';
-import { Copy, Search } from 'lucide-react';
+import { Copy, Download, Search, SlidersHorizontal } from 'lucide-react';
 import type { ClipboardEvent, ReactNode } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
-import type { ColDef } from '@/lib/tablePrefs';
+import { Link } from 'react-router-dom';
+import { useMe } from '@/api/hooks';
+import type { Me } from '@/api/types';
+import { DENSITIES, type ColDef, type Display } from '@/lib/tablePrefs';
+import type { TableApi } from './TableKit';
+import { Tip } from './Tip';
 
 /**
  * W8 of plan 2026-11-23-next-ui-cleanup: the one table standard of every screen that shows site data. The same toolbar, in the same order, on
@@ -12,8 +17,10 @@ import type { ColDef } from '@/lib/tablePrefs';
  */
 export type TableNoun = 'sites' | 'records' | 'issues' | 'tasks' | 'items';
 
-export function TableToolbar({ testid, views, search, filter, extra, count, switcher, columns, density, display, exporter, primary, more }: {
+export function TableToolbar({ testid, views, search, filter, extra, count, switcher, columns, density, display, exporter, primary, more, kind = 'grid' }: {
   testid: string;
+  /** `grid` = a table with columns (columns and density are part of the standard); `list` = a master-detail card list (Approvals), where they do not apply */
+  kind?: 'grid' | 'list';
   views?: ReactNode;
   search?: ReactNode;
   filter?: ReactNode;
@@ -31,7 +38,7 @@ export function TableToolbar({ testid, views, search, filter, extra, count, swit
   more?: ReactNode;
 }) {
   return (
-    <div role="toolbar" className="mb-3 flex flex-wrap items-center gap-2" data-testid={testid} data-table-standard=""
+    <div role="toolbar" className="mb-3 flex flex-wrap items-center gap-2" data-testid={testid} data-table-standard={kind}
       data-has-search={search ? '' : undefined} data-has-filter={filter ? '' : undefined} data-has-views={views ? '' : undefined}
       data-has-columns={columns ? '' : undefined} data-has-density={density ? '' : undefined} data-has-display={display ? '' : undefined}
       data-has-export={exporter ? '' : undefined}>
@@ -216,5 +223,90 @@ export function GroupBands({ cols, sel, section, group, selW, testid = 'list-ban
       {row(headerRuns(cols, section), 'section')}
       {row(headerRuns(cols, group, section), 'group')}
     </>
+  );
+}
+
+/** A System Admin, or a delegate of admin.settings edit: who sees the link to Settings > Display (the server checks the right again on save). */
+export const canEditDisplayDefaults = (me: Me | undefined) => !!me && (!!me.is_system_admin || me.effective.grants.some((g) => g.module_key === 'admin.settings' && (g.action as string) === 'edit'));
+
+/** The data attributes that draw the Display options on a table container (styles in index.css, `[data-tsize]` and the others). */
+export function displayAttrs(d: Display): Record<string, string> {
+  return { 'data-tsize': d.size, 'data-talign': d.align, 'data-twrap': d.wrap ? '1' : '0', 'data-tzebra': d.zebra ? '1' : '0', 'data-density': d.density };
+}
+
+/** Extra pixels of a virtualised row when long text wraps on two lines. */
+export const WRAP_EXTRA = 18;
+
+/**
+ * The Display menu of the toolbar (W8 item 4): text size, alignment of text cells, row density, wrap long text, zebra rows. Stored per user and per
+ * screen with the column prefs (so saved views keep it); unset options follow the defaults of Administration > Settings > Display, which the menu
+ * links to for the users who may change them.
+ */
+export function DisplayMenu({ api }: { api: TableApi }) {
+  const { t } = useTranslation();
+  const me = useMe(true).data;
+  const d = api.display;
+  const radio = <T extends string>(name: string, values: readonly T[], cur: T, set: (v: T) => void, label: (v: T) => string) => (
+    <div className="space-y-1" role="radiogroup" aria-label={t(`tstd.display_${name}`)}>
+      <div className="text-xs font-semibold text-mute">{t(`tstd.display_${name}`)}</div>
+      <div className="flex flex-wrap gap-1">
+        {values.map((v) => (
+          <button key={v} type="button" role="radio" aria-checked={cur === v} data-testid={`display-${name}-${v}`} onClick={() => set(v)}
+            className={`btn px-2 py-1 text-xs ${cur === v ? 'bg-accentSoft text-accentText' : ''}`}>{label(v)}</button>
+        ))}
+      </div>
+    </div>
+  );
+  return (
+    <Popover.Root>
+      <Tip text={t('tstd.display')}>
+        <Popover.Trigger asChild>
+          <button type="button" className="btn" data-testid="display-menu" aria-label={t('tstd.display')}><SlidersHorizontal size={16} /></button>
+        </Popover.Trigger>
+      </Tip>
+      <Popover.Portal>
+        <Popover.Content align="end" sideOffset={6} className="card z-50 w-72 space-y-3 p-3 text-sm shadow-lg" data-testid="display-panel">
+          {radio('size', ['sm', 'md', 'lg'] as const, d.size, (v) => api.setDisplay({ size: v }), (v) => t(`tstd.size_${v}`))}
+          {radio('align', ['start', 'center'] as const, d.align, (v) => api.setDisplay({ align: v }), (v) => t(`tstd.align_${v}`))}
+          {radio('density', DENSITIES, d.density, (v) => api.setDensity(v), (v) => t(`table.${v}`))}
+          <label className="flex items-center gap-2"><input type="checkbox" data-testid="display-wrap" checked={d.wrap} onChange={(e) => api.setDisplay({ wrap: e.target.checked })} />{t('tstd.display_wrap')}</label>
+          <label className="flex items-center gap-2"><input type="checkbox" data-testid="display-zebra" checked={d.zebra} onChange={(e) => api.setDisplay({ zebra: e.target.checked })} />{t('tstd.display_zebra')}</label>
+          <div className="flex items-center gap-2 border-t border-line pt-2">
+            <button type="button" className="btn px-2 py-1 text-xs" data-testid="display-reset" onClick={api.resetDisplay}>{t('tstd.display_reset')}</button>
+            {canEditDisplayDefaults(me) && <Link to="/admin/settings/display" className="ms-auto text-xs text-link" data-testid="display-settings-link">{t('tstd.display_settings')}</Link>}
+          </div>
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
+  );
+}
+
+/** One cell of a CSV line: quoted when it holds a separator, a quote or a new line; a leading formula sign is neutralised (CSV injection). */
+export function csvCell(v: unknown): string {
+  let s = v === null || v === undefined ? '' : String(v);
+  if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+  return /[",\r\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+export const toCsv = (head: string[], rows: unknown[][]) => [head, ...rows].map((r) => r.map(csvCell).join(',')).join('\r\n');
+
+/**
+ * Export current view of a list that the server export service does not cover (My Work, Approvals): the rows of the view as they stand (the
+ * server's filtered set, every page loaded), as a UTF-8 CSV with a BOM so Excel reads Arabic. The download stays in the browser.
+ */
+export function ExportCsvButton({ testid, name, head, rows }: { testid: string; name: string; head: string[]; rows: () => unknown[][] }) {
+  const { t } = useTranslation();
+  const go = () => {
+    const blob = new Blob(['﻿', toCsv(head, rows())], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${name}.csv`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  };
+  return (
+    <Tip text={t('tstd.export_view')}>
+      <button type="button" className="btn" data-testid={testid} aria-label={t('tstd.export_view')} onClick={go}><Download size={16} /></button>
+    </Tip>
   );
 }

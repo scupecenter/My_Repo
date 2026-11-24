@@ -22,6 +22,7 @@ import { Studio } from './studio/Studio';
 import { Site360Columns } from './Site360Columns';
 import { DashboardSettings } from './DashboardSettings';
 import { Identity } from './Identity';
+import { DisplaySettings } from './DisplaySettings';
 
 export interface SettingsSection { key: string; adminOnly?: boolean }
 export interface SettingsTab { key: string; sections: SettingsSection[] }
@@ -40,6 +41,8 @@ export const SETTINGS_TABS: readonly SettingsTab[] = [
   { key: 'alerts', sections: [] },
   { key: 'security', sections: [{ key: 'staff' }, { key: 'retention' }] },
   { key: 'dashboard', sections: [] },
+  // W8 item 4 (owner rule: settings live in the general Settings): the defaults of the Display menu of the site-data tables
+  { key: 'display', sections: [] },
   { key: 'identity', sections: [] },
 ];
 
@@ -112,6 +115,7 @@ export function SettingsRoutes() {
         <Route path="alerts" element={<Notifications />} />
         <Route path="site360" element={<Site360Columns />} />
         <Route path="dashboard" element={<DashboardSettings />} />
+        <Route path="display" element={<DisplaySettings />} />
         <Route path="identity" element={<Identity />} />
         <Route path="workflow" element={<TabFrame tab="workflow" />}>
           <Route index element={<Navigate to="editor" replace />} />

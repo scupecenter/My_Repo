@@ -509,6 +509,9 @@ export const REAL_API_AUTH_USERS = [
   // holidays import (TPL-HOLIDAYS). They answered 501 not_available until the API served them.
   ['get', '/settings/dlp'],
   ['post', '/settings/dlp/versions'],
+  // Contract 0.15.64 (migration 0148, W8): the defaults of the Display menu of the site-data tables
+  ['get', '/settings/table-display'],
+  ['put', '/settings/table-display'],
   ['get', '/settings/idle-task-alert'],
   ['put', '/settings/idle-task-alert'],
   ['get', '/settings/notification-policy/catalogue'],

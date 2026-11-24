@@ -21,7 +21,7 @@ import { SavedViews } from '@/components/SavedViews';
 import { UnifiedFilter, type ExtraField } from '@/components/UnifiedFilter';
 import { decodeFilter, encodeFilter, type FilterTree } from '@/api/views';
 import { MoreMenu, PageHeader } from '@/components/PageHeader';
-import { bareHeader, GroupBands, PastedChip, ROWNO_COL, RowNo, SearchBox, ShownFooter, TableCount, TableToolbar } from '@/components/TableStandard';
+import { bareHeader, DisplayMenu, displayAttrs, GroupBands, PastedChip, ROWNO_COL, RowNo, SearchBox, ShownFooter, TableCount, TableToolbar, WRAP_EXTRA } from '@/components/TableStandard';
 import { BulkBar, ColumnMenu, DensityToggle, Empty, gxRow, HeaderRow, pin, SEL_W, SelectBox, StatusChip, tracks, totalWidth, Trunc, useAutoFit, useTablePrefs } from '@/components/TableKit';
 import { Tip } from '@/components/Tip';
 import type { FitSample } from '@/lib/tablePrefs';
@@ -37,7 +37,7 @@ import { SITE360_MASTER, SITE360_NAV } from '@/lib/site360Menus';
 import { fmtDate } from '@/lib/time';
 import { DEFAULT_STREAMS, DEFAULT_VIEWS, DISMANTLE_CODE, isRealStream, statusOf, streamName, viewName } from '@/lib/streams';
 
-const ROWS = { comfortable: 52, compact: 38 } as const;
+const ROWS = { comfortable: 52, normal: 45, compact: 38 } as const;
 const DEFS_ALL: ColDef[] = [ROWNO_COL, { id: 'code', w: 100, min: 70, pinned: true }, { id: 'name', w: 220, min: 100, max: 340, pinned: true }, { id: 'region', w: 120, min: 80, max: 240 }, { id: 'scenario', w: 120, min: 80 }, { id: 'status', w: 130, min: 90 }, { id: 'pipeline', w: 170, min: 120 }, { id: 'late', w: 80, min: 60 }, { id: 'locks', w: 100, min: 70 }, { id: 'gaps', w: 100, min: 70 }];
 const DEFS_STREAM: ColDef[] = [ROWNO_COL, { id: 'code', w: 100, min: 70, pinned: true }, { id: 'name', w: 220, min: 100, max: 340, pinned: true }, { id: 'region', w: 120, min: 80, max: 240 }, { id: 'stream_status', w: 130, min: 90 }, { id: 'stage', w: 150, min: 90 }, { id: 'progress', w: 90, min: 60 }, { id: 'late', w: 80, min: 60 }, { id: 'milestone', w: 120, min: 90 }];
 const LABEL: Record<string, string> = { rowno: 'tstd.rowno', code: 'sites.code', name: 'sites.name', region: 'sites.region', scenario: 'sites.scenario', status: 'sites.status', pipeline: 'sites.pipeline', late: 'sites.late', stream_status: 'sites.stream_status', stage: 'sites.current_stage', progress: 'sites.progress', milestone: 'sites.milestone', locks: 'sites.locks', gaps: 'sites.gaps' };
@@ -185,10 +185,11 @@ export function Sites() {
   const mCols = useMemo(() => (menu?.columns ?? []).filter((c) => c.ord !== 1), [menu]);
   const defsMenu: ColDef[] = [ROWNO_COL, ...mCols.map((c) => (c.ord === 2 ? { id: 'c2', w: 110, min: 70, pinned: true } : c.ord === 4 ? { id: 'c4', w: 220, min: 100, max: 340, pinned: true } : { id: `c${c.ord}`, w: 150, min: 70, max: 400 }))];
   const mCol = (id: string) => mCols.find((c) => `c${c.ord}` === id);
-  const tbl = useTablePrefs(menuList ? `sites-menu-${menuKey}` : real ? 'sites-stream' : 'sites', menuList ? defsMenu : real ? DEFS_STREAM : DEFS_ALL);
+  // per user and per screen (W8 item 4: the Display options too); the wide table of a menu keeps its own
+  const tbl = useTablePrefs(menuList ? `sites-menu-${menuKey}` : asWide ? `sites-wide-${menuKey}` : real ? 'sites-stream' : 'sites', menuList ? defsMenu : real ? DEFS_STREAM : DEFS_ALL);
   const fromRows = menuList || asWide; // the rows come from GET /site360/{menu}/rows
   const nRows = fromRows ? mRows.length : items.length;
-  const ROW = ROWS[tbl.density];
+  const ROW = ROWS[tbl.density] + (tbl.display.wrap ? WRAP_EXTRA : 0);
   const viewport = Math.max(320, (typeof window === 'undefined' ? 800 : window.innerHeight) - 380);
   const v = useVirtual(nRows, ROW, viewport);
   const { hasNextPage, isFetchingNextPage, fetchNextPage } = q;
@@ -320,7 +321,7 @@ export function Sites() {
           value={siteMenu
             ? { q: f.q, region_id: f.region_id, scenario: f.scenario, overall_status: f.overall_status, site_codes: siteCodes || sp.get('site_code') || '', layout: asWide ? 'wide' : 'list', ...(advTree ? { advanced: advTree } : {}) }
             : { ...f, bucket, ...(advTree ? { advanced: advTree } : {}) }}
-          empty={siteMenu ? MENU_VIEW_EMPTY : VIEW_EMPTY} table={siteMenu && !menuList ? undefined : tbl}
+          empty={siteMenu ? MENU_VIEW_EMPTY : VIEW_EMPTY} table={siteMenu && layout === 'grid' ? undefined : tbl}
           onApply={(v) => {
             const r = v as Record<string, unknown>;
             const pick = (keys: string[]) => Object.fromEntries(keys.map((k) => [k, String(r[k] ?? '')]));
@@ -355,6 +356,7 @@ export function Sites() {
         </button>
         </>}
         density={<DensityToggle api={tbl} />}
+        display={<DisplayMenu api={tbl} />}
         columns={<ColumnMenu api={tbl} label={label} />}
         exporter={<ExportViewButton testid="sites-export-view" source="sites" filters={viewFilters} columns={SITE_COLUMNS} />}
         more={<MoreMenu items={[
@@ -391,14 +393,14 @@ export function Sites() {
         </div>
       ) : asWide && menu ? (
         <div className="space-y-2">
-          <SitesWideTable menu={menu} rows={mRows} sel={sel} height={viewport + 120} loaded={gridRowsQ.isSuccess} filtered={activeFilters > 0} onClear={clearAll} busy={saveCell.isPending}
+          <SitesWideTable display={tbl.display} menu={menu} rows={mRows} sel={sel} height={viewport + 120} loaded={gridRowsQ.isSuccess} filtered={activeFilters > 0} onClear={clearAll} busy={saveCell.isPending}
             onEdit={(e) => saveCell.mutateAsync({ task_id: e.target.task_id, version: e.target.version, field: e.target.field, values: e.target.values, value: e.value })}
             picked={picked} onPick={flip} onPickAll={() => setPicked(allPicked ? new Set() : new Set(allCodes))}
             hasMore={!!gridRowsQ.hasNextPage} loadingMore={gridRowsQ.isFetchingNextPage} onMore={() => void gridRowsQ.fetchNextPage()} />
           <ShownFooter shown={mRows.length} filtered={gridFiltered} />
         </div>
       ) : menuList ? (
-        <div className="card gx overflow-hidden" data-menu={menuKey} data-density={tbl.density} data-testid="site360-list">
+        <div className="card gx overflow-hidden" data-menu={menuKey} {...displayAttrs(tbl.display)} data-testid="site360-list">
           <div ref={scroller} data-testid="sites-scroll" className="relative overflow-auto" style={{ height: viewport }} onScroll={(e) => { v.onScroll(e); sessionStorage.setItem(scrollKey, String(e.currentTarget.scrollTop)); }}>
             <div className="sticky top-0 z-20" data-testid="site360-list-head">
             <GroupBands cols={cols} sel selW={SEL_W} testid="list-bands" section={(id) => mCol(id)?.group_top ?? null} group={(id) => mCol(id)?.group_mid ?? null} />
@@ -426,7 +428,7 @@ export function Sites() {
           </ShownFooter>
         </div>
       ) : (
-        <div className="card gx overflow-hidden" data-stream={stream || 'ALL'} data-density={tbl.density}>
+        <div className="card gx overflow-hidden" data-stream={stream || 'ALL'} {...displayAttrs(tbl.display)} data-testid="sites-list-card">
           <div ref={scroller} data-testid="sites-scroll" className="relative overflow-auto" style={{ height: viewport }} onScroll={(e) => { v.onScroll(e); sessionStorage.setItem(scrollKey, String(e.currentTarget.scrollTop)); }}>
             <HeaderRow api={tbl} label={label} select={{ checked: allPicked, indeterminate: picked.size > 0, onChange: () => setPicked(allPicked ? new Set() : new Set(allCodes)), label: t('table.select_all'), testid: 'sites-select-all' }} />
             <div data-testid="sites-list" role="list" className="relative" style={{ height: v.total, minWidth: W }}>

@@ -4575,6 +4575,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/table-display": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Defaults of the Display menu of the site-data tables (0.15.64, W8)
+         * @description 0.15.64 (migration 0148). Every signed-in user: each site-data screen starts from these defaults until the user picks their own Display options (kept per user and per screen in the browser and in saved views). Without a saved value: size `md`, align `start`, density `comfortable`, wrap false, zebra true.
+         */
+        get: operations["getTableDisplaySetting"];
+        /**
+         * Set the defaults of the Display menu (Administration > Settings > Display)
+         * @description 0.15.64 (migration 0148): System Admin or a delegate of `admin.settings` edit for all regions (403 `action_forbidden` otherwise), a reason of at least 3 characters and If-Match. Closed body: `defaults` with every key (`unknown_key` at its path, `invalid` for a value outside its list). Audited (`table_display_update`, before and after). A user's own Display choice and a saved view keep their values; the defaults apply where the user has none.
+         */
+        put: operations["setTableDisplaySetting"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/idle-task-alert": {
         parameters: {
             query?: never;
@@ -13214,6 +13238,24 @@ export interface components {
                 issues: ("scope_not_specified" | "past_end_date")[];
             }[];
         };
+        /** @description 0.15.64 (W8 item 4). The Display options of a site-data table: text size, alignment of the text cells, row density, wrap long text, zebra rows. */
+        TableDisplay: {
+            /** @enum {string} */
+            size: "sm" | "md" | "lg";
+            /** @enum {string} */
+            align: "start" | "center";
+            /** @enum {string} */
+            density: "compact" | "normal" | "comfortable";
+            wrap: boolean;
+            zebra: boolean;
+        };
+        TableDisplaySetting: {
+            defaults: components["schemas"]["TableDisplay"];
+            version: number;
+            /** Format: date-time */
+            updated_at?: string;
+            updated_by?: components["schemas"]["UserRef"];
+        };
         IdleTaskAlertSetting: {
             enabled: boolean;
             /** @description Default 2. */
@@ -16147,8 +16189,20 @@ export interface components {
             width?: {
                 [key: string]: number;
             };
-            /** @enum {string} */
-            density?: "comfortable" | "compact";
+            /**
+             * @description 0.15.64 adds `normal` (the middle density of the Display menu).
+             * @enum {string}
+             */
+            density?: "comfortable" | "normal" | "compact";
+            /** @description 0.15.64 (W8 item 4): the Display options of the view (any subset; the missing ones follow the user and the defaults). */
+            display?: {
+                /** @enum {string} */
+                size?: "sm" | "md" | "lg";
+                /** @enum {string} */
+                align?: "start" | "center";
+                wrap?: boolean;
+                zebra?: boolean;
+            };
         };
         SavedViewSort: {
             id: string;
@@ -19094,6 +19148,10 @@ export interface operations {
                 sla_colour?: components["parameters"]["SlaColourFilter"];
                 /** @description 0.15.30 (F2). true = only stale tasks (idle for at least `stale_after_wd` working days); false = only tasks that are not stale. */
                 stale?: components["parameters"]["StaleFilter"];
+                /** @description 0.15.64 (W8 item 5). The search box of a site-data list. One token: contains, ignoring case, on the Site ID, the Site Owner ID and the name (and the other text columns the list names). Two or more tokens separated by spaces, new lines, tabs, commas or semicolons (cells copied from Excel): a pasted list, each token matches the Site ID or the Site Owner ID exactly, ignoring case, one row per site, duplicates ignored. At most 1000 distinct codes: 422 `validation_failed` with `too_many_codes` at `/q`. The caller's regions and row security still apply; the answer carries `search` for a list. */
+                q?: components["parameters"]["SiteSearch"];
+                /** @description 0.15.31 (F3): a `FilterTree` as one JSON string (at most 8000 characters), compiled on the server against the whitelist of this list. 422 `validation_failed` with `unknown_field` (also for a field hidden from the caller by a field rule), `invalid_operator`, `invalid_value`, `too_deep` or `too_many`. The caller's regions and row security still apply. */
+                filter?: components["parameters"]["FilterTree"];
                 limit?: components["parameters"]["Limit"];
                 /** @description Opaque cursor from `page.next_cursor`. */
                 cursor?: components["parameters"]["Cursor"];
@@ -19104,7 +19162,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Tasks. */
+            /** @description Tasks. 0.15.64: `counts.total` = the tasks of the bucket, `counts.filtered` = those matching the search, the timing filters and the `filter` tree (the whitelist of the screen `tasks-board`). */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -19112,6 +19170,8 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["PageEnvelope"] & {
                         items?: components["schemas"]["TaskSummary"][];
+                        counts?: components["schemas"]["ListCounts"];
+                        search?: components["schemas"]["PastedSearch"];
                     };
                 };
             };
@@ -22483,12 +22543,15 @@ export interface operations {
                 tab?: "all" | "review" | "approve";
                 region_id?: components["schemas"]["RegionId"][];
                 stage_code?: string;
-                q?: string;
+                /** @description 0.15.64 (W8 item 5). The search box of a site-data list. One token: contains, ignoring case, on the Site ID, the Site Owner ID and the name (and the other text columns the list names). Two or more tokens separated by spaces, new lines, tabs, commas or semicolons (cells copied from Excel): a pasted list, each token matches the Site ID or the Site Owner ID exactly, ignoring case, one row per site, duplicates ignored. At most 1000 distinct codes: 422 `validation_failed` with `too_many_codes` at `/q`. The caller's regions and row security still apply; the answer carries `search` for a list. */
+                q?: components["parameters"]["SiteSearch"];
                 group_only?: boolean;
                 /** @description 0.15.30 (F2). Only tasks whose SLA colour is one of these: green (within the minimum), amber (between the minimum and the maximum), red (past the maximum), none (no measured clock). Repeat the parameter or separate with commas. */
                 sla_colour?: components["parameters"]["SlaColourFilter"];
                 /** @description 0.15.30 (F2). true = only stale tasks (idle for at least `stale_after_wd` working days); false = only tasks that are not stale. */
                 stale?: components["parameters"]["StaleFilter"];
+                /** @description 0.15.31 (F3): a `FilterTree` as one JSON string (at most 8000 characters), compiled on the server against the whitelist of this list. 422 `validation_failed` with `unknown_field` (also for a field hidden from the caller by a field rule), `invalid_operator`, `invalid_value`, `too_deep` or `too_many`. The caller's regions and row security still apply. */
+                filter?: components["parameters"]["FilterTree"];
                 limit?: components["parameters"]["Limit"];
                 /** @description Opaque cursor from `page.next_cursor`. */
                 cursor?: components["parameters"]["Cursor"];
@@ -22499,7 +22562,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Inbox. */
+            /** @description Inbox. 0.15.64: `counts.total` = every item of the caller's inbox (all tabs, no filter), `counts.filtered` = the items matching the tab, the filters, the `filter` tree (the whitelist of the screen `tasks-board`) and the search. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -22507,6 +22570,8 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["PageEnvelope"] & {
                         items?: components["schemas"]["ApprovalItem"][];
+                        counts?: components["schemas"]["ListCounts"];
+                        search?: components["schemas"]["PastedSearch"];
                     };
                 };
             };
@@ -25743,6 +25808,63 @@ export interface operations {
             403: components["responses"]["Forbidden"];
         };
     };
+    getTableDisplaySetting: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Setting. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TableDisplaySetting"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setTableDisplaySetting: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"] & {
+                    defaults: components["schemas"]["TableDisplay"];
+                };
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TableDisplaySetting"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
     getIdleTaskAlertSetting: {
         parameters: {
             query?: never;
@@ -28303,7 +28425,8 @@ export interface operations {
                 entity_id?: string;
                 /** @description Default false = the latest version of each logical record. */
                 all_versions?: boolean;
-                q?: string;
+                /** @description 0.15.64 (W8 item 5). The search box of a site-data list. One token: contains, ignoring case, on the Site ID, the Site Owner ID and the name (and the other text columns the list names). Two or more tokens separated by spaces, new lines, tabs, commas or semicolons (cells copied from Excel): a pasted list, each token matches the Site ID or the Site Owner ID exactly, ignoring case, one row per site, duplicates ignored. At most 1000 distinct codes: 422 `validation_failed` with `too_many_codes` at `/q`. The caller's regions and row security still apply; the answer carries `search` for a list. */
+                q?: components["parameters"]["SiteSearch"];
                 limit?: components["parameters"]["Limit"];
                 /** @description Opaque cursor from `page.next_cursor`. */
                 cursor?: components["parameters"]["Cursor"];
@@ -28317,7 +28440,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Records. */
+            /** @description Records. 0.15.64: `counts.total` = the latest version of every record of the register the caller may see, `counts.filtered` = those matching the filters and the search. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -28325,6 +28448,8 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["PageEnvelope"] & {
                         items?: components["schemas"]["RegisterRecord"][];
+                        counts?: components["schemas"]["ListCounts"];
+                        search?: components["schemas"]["PastedSearch"];
                     };
                 };
             };

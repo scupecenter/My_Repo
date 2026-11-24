@@ -7,7 +7,8 @@ import type { Site360MenuItem } from '@/api/site360';
 import { errText } from '@/components/FormDialog';
 import type { Site360CellTarget } from '@/components/Site360Grid';
 import { EmptyState, NoResults } from '@/components/States';
-import { bareHeader } from '@/components/TableStandard';
+import { bareHeader, displayAttrs } from '@/components/TableStandard';
+import type { Display } from '@/lib/tablePrefs';
 import { optionsOf } from '@/lib/siteBulkEdit';
 import { fmtDate } from '@/lib/time';
 
@@ -37,7 +38,9 @@ const NUM_W = 80, ID_W = 110;
  * Editing (owner decision 2026-11-22): a task-backed cell the API marks editable opens a typed inline editor (click or Enter), Save or Esc; one edit changes
  * only that site's cell, through the same save path as the grid (the same rights, locks, gate rules and errors). Other cells stay plain, with the reason in a tooltip.
  */
-export function SitesWideTable({ menu, rows, hasMore, loadingMore, onMore, loaded, filtered, onClear, sel, onEdit, busy, height, picked, onPick, onPickAll }: {
+export function SitesWideTable({ display, menu, rows, hasMore, loadingMore, onMore, loaded, filtered, onClear, sel, onEdit, busy, height, picked, onPick, onPickAll }: {
+  /** W8 item 4: the Display options of the screen (text size, alignment, density, wrap, zebra) */
+  display?: Display;
   menu: Site360MenuItem; rows: WideRow[]; hasMore: boolean; loadingMore: boolean; onMore: () => void; loaded: boolean; filtered: boolean; onClear: () => void;
   sel: string; onEdit: (e: WideEdit) => Promise<unknown>; busy?: boolean; height: number;
   /** the selected sites (Site IDs) for the bulk bar: a checkbox in the frozen # cell of each row and a select-all in its header */
@@ -103,7 +106,7 @@ export function SitesWideTable({ menu, rows, hasMore, loadingMore, onMore, loade
   const stick = (left: number, z: number) => ({ position: 'sticky' as const, insetInlineStart: left, zIndex: z });
   const th = 'border-b border-e border-line bg-card2 px-2 text-xs font-semibold whitespace-nowrap';
   return (
-    <div className="card overflow-hidden" data-testid="sites-wide">
+    <div className="card overflow-hidden" data-testid="sites-wide" {...(display ? displayAttrs(display) : {})}>
       {/* dir=ltr on the scroller too: in the Arabic UI an RTL scroller would open the LTR table at its right end (the last stages) */}
       <div dir="ltr" className="overflow-auto" style={{ maxHeight: height }} data-testid="sites-wide-scroll">
         <table dir="ltr" aria-label={t('sites.wide_label')} className="border-separate border-spacing-0 text-sm" data-menu={menu.key} data-testid="sites-wide-table">
@@ -128,7 +131,7 @@ export function SitesWideTable({ menu, rows, hasMore, loadingMore, onMore, loade
           <tbody>
             {rows.map((r, i) => {
               const cur = sel === r.site_code;
-              const bg = cur ? 'bg-accentSoft' : i % 2 ? 'bg-card2' : 'bg-card';
+              const bg = cur ? 'bg-accentSoft' : i % 2 && display?.zebra !== false ? 'bg-card2' : 'bg-card';
               return (
                 <tr key={r.site_id} data-testid={`wide-row-${r.site_code}`} data-selected={cur || undefined} className={`hover:bg-hover ${bg}`} onClick={() => undefined}>
                   <td className={`border-b border-e border-line px-2 text-center text-mute ${bg}`} style={stick(0, 20)}><span className="flex items-center justify-center gap-1"><input type="checkbox" className="h-4 w-4" aria-label={t('table.select_row', { code: r.site_code })} data-testid={`wide-select-${r.site_code}`} checked={picked.has(r.site_code)} onChange={() => onPick(r.site_code)} />{r.row_no ?? i + 1}</span></td>
@@ -141,7 +144,7 @@ export function SitesWideTable({ menu, rows, hasMore, loadingMore, onMore, loade
                     const isEditing = !!target && editing?.site === r.site_id && editing.ord === c.ord;
                     const reason = target && !target.editable ? t('sites.wide_locked') : !target && c.source_kind === 'derived' ? t('sites.wide_computed') : undefined;
                     return (
-                      <td key={c.ord} data-col={c.ord} data-editable={target?.editable ? 'true' : undefined} title={reason} className="border-b border-e border-line px-2 py-1.5 whitespace-nowrap" data-testid={target ? `wide-cell-${r.site_code}-${c.ord}` : undefined}>
+                      <td key={c.ord} data-col={c.ord} data-editable={target?.editable ? 'true' : undefined} title={reason} className={`border-b border-e border-line px-2 ${display?.density === 'compact' ? 'py-0.5' : display?.density === 'normal' ? 'py-1' : 'py-1.5'} ${display?.wrap ? 'max-w-72 whitespace-normal' : 'whitespace-nowrap'}`} data-testid={target ? `wide-cell-${r.site_code}-${c.ord}` : undefined}>
                         {isEditing && target && editing ? (
                           <span className="flex flex-col gap-0.5">
                           <span className="flex items-center gap-1">

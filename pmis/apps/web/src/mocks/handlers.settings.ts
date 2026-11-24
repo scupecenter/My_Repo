@@ -10,11 +10,14 @@ import { db, identity, save, stepUpValid, viewer } from './db';
 import { BRANDS, isBrand } from '@/lib/brands';
 import { guard, page, problem, stepUp } from './handlers';
 import { byId, uid } from './ids';
+import type { TableDisplaySetting } from '@/api/display';
 import { CALENDAR_CODES, CATALOGUE, COMPLETENESS, MAIL_KIND_CATALOGUE, MISMATCH, initCfg, GATES, MILESTONES, OPEN_TASKS, SCENARIOS, START_EVENT_CODES, TASK_DEFS, type SlaSetRec, type WeightRec } from './settingsData';
 
 const B = API_BASE;
 const TODAY = '2026-10-25';
 const C = () => db().cfg;
+/** W8 (0.15.64): the defaults of the Display menu, the seed look until an admin saves them. */
+const TD = () => (C().tableDisplay ??= { defaults: { size: 'md', align: 'start', density: 'comfortable', wrap: false, zebra: true }, version: 0 } as TableDisplaySetting);
 /** A mock store saved before 0.9.1 has no match table, one saved before 0.12.9 no catalogue: start it from the seed. */
 const SM = () => (C().scopeMatch?.catalogue ? C().scopeMatch : (C().scopeMatch = initCfg().scopeMatch));
 const CR = () => (C().contractorRules ??= initCfg().contractorRules);
@@ -731,6 +734,26 @@ export const settingsHandlers = [
     const v = { version: C().dlp.current.version + 1, cw_months: b.cw_months!, te_months: b.te_months!, effective_from: b.effective_from!, reason: b.reason!.trim(), changed_by: me(), changed_at: new Date().toISOString() };
     C().dlp = { current: v, history: [v, ...C().dlp.history] }; save();
     return HttpResponse.json(v, { status: 201 });
+  }),
+  // 0.15.64 (W8 item 4, migration 0148): the defaults of the Display menu; read by every signed-in user, saved by an admin with a reason and If-Match
+  http.get(`${B}/settings/table-display`, () => { const g = guard(); if (g) return g; return HttpResponse.json(TD(), tag(TD().version)); }),
+  http.put(`${B}/settings/table-display`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    const p = ver(request, TD().version); if (p) return p;
+    const b = await body<{ defaults?: Record<string, unknown>; reason?: string } & Record<string, unknown>>(request);
+    const errs: { path: string; code: string }[] = [];
+    for (const k of Object.keys(b)) if (k !== 'defaults' && k !== 'reason') errs.push({ path: `/${k}`, code: 'unknown_key' });
+    const d = b.defaults ?? {};
+    for (const k of Object.keys(d)) if (!['size', 'align', 'density', 'wrap', 'zebra'].includes(k)) errs.push({ path: `/defaults/${k}`, code: 'unknown_key' });
+    if (!['sm', 'md', 'lg'].includes(String(d.size))) errs.push({ path: '/defaults/size', code: 'invalid' });
+    if (!['start', 'center'].includes(String(d.align))) errs.push({ path: '/defaults/align', code: 'invalid' });
+    if (!['compact', 'normal', 'comfortable'].includes(String(d.density))) errs.push({ path: '/defaults/density', code: 'invalid' });
+    if (typeof d.wrap !== 'boolean') errs.push({ path: '/defaults/wrap', code: 'invalid' });
+    if (typeof d.zebra !== 'boolean') errs.push({ path: '/defaults/zebra', code: 'invalid' });
+    if ((b.reason ?? '').trim().length < 3) errs.push({ path: '/reason', code: 'required' });
+    if (errs.length) return fields(...errs);
+    C().tableDisplay = { defaults: d as TableDisplaySetting['defaults'], version: TD().version + 1, updated_by: me(), updated_at: new Date().toISOString() }; save();
+    return HttpResponse.json(TD(), tag(TD().version));
   }),
   http.get(`${B}/settings/idle-task-alert`, () => { const g = guard(); if (g) return g; return HttpResponse.json(C().idle, tag(C().idle.version)); }),
   http.put(`${B}/settings/idle-task-alert`, async ({ request }) => {

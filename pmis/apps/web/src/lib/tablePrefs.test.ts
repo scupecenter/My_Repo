@@ -91,12 +91,14 @@ describe("column prefs: width and hidden defaults", () => {
     expect(defaultHidden(DEFS)).toEqual(["extra"]);
   });
 
-  it("turns an unknown density back into comfortable", () => {
+  it("drops an unknown density, so the table follows the defaults of Settings > Display (W8)", () => {
     const p = reconcile(
       { ...EMPTY_PREFS, density: "tiny" as unknown as "compact" },
       DEFS,
     );
-    expect(p.density).toBe("comfortable");
+    expect(p.density).toBeUndefined();
+    expect(reconcile({ ...EMPTY_PREFS, density: "normal" }, DEFS).density).toBe("normal");
+    expect(reconcile({ ...EMPTY_PREFS, display: { size: "lg", font: 1 } as never }, DEFS).display).toEqual({ size: "lg" });
   });
 });
 
@@ -120,7 +122,7 @@ describe("column prefs: per-user storage", () => {
     const p = loadPrefs("sites", "u1", DEFS);
     expect(p.width).toEqual({});
     expect(p.hidden).toEqual(["extra"]);
-    expect(p.density).toBe("comfortable");
+    expect(p.density).toBeUndefined(); // W8: no choice of the user, the defaults of Settings > Display apply
   });
 
   it("never throws when storage is blocked or full", () => {

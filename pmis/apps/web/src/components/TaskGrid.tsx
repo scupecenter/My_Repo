@@ -15,7 +15,7 @@ import { OverrideBadge } from './OverrideBadge';
 import { MoreMenu } from './PageHeader';
 import { EmptyState, NoResults } from './States';
 import { ActiveChips, BulkBar, ColumnMenu, DensityToggle, Empty, HEADER_H, HeaderRow, NotApplicable, pin, QuickFilter, SelectBox, totalWidth, tracks, Trunc, useTablePrefs } from './TableKit';
-import { ROWNO_COL, RowNo, SearchBox, TableCount, TableToolbar } from './TableStandard';
+import { DisplayMenu, displayAttrs, ROWNO_COL, RowNo, SearchBox, TableCount, TableToolbar, WRAP_EXTRA } from './TableStandard';
 import { SavedViews } from './SavedViews';
 import { UnifiedFilter } from './UnifiedFilter';
 import { decodeFilter, encodeFilter, type FilterTree } from '@/api/views';
@@ -24,7 +24,7 @@ import { useToast } from './Toast';
 import { useVirtual } from './useVirtual';
 import { BallSince, ExternalParty, SlaOverrun, StaleBadge, TIMING_SORTS, ballHolders, sortByTiming, type TimingSort } from './TaskTiming';
 
-const ROWS = { comfortable: 56, compact: 40 } as const;
+const ROWS = { comfortable: 56, normal: 48, compact: 40 } as const;
 const DATE_FIELD = { plan: 'planned_date', actual: 'actual_date' } as const;
 type DateCol = keyof typeof DATE_FIELD;
 // Column ids double as the saved-preference keys; `code` is the pinned identity column.
@@ -99,10 +99,10 @@ export function taskMatches(x: TaskSummary, q: string, name: string): boolean {
   return x.task_code.toLowerCase().includes(n) || name.toLowerCase().includes(n) || x.name_en.toLowerCase().includes(n);
 }
 
-export function TaskGrid({ siteId, stages, onOpen, selected, onVisible, switcher, exporter, display }: {
+export function TaskGrid({ siteId, stages, onOpen, selected, onVisible, switcher, exporter }: {
   siteId: string; stages: SiteTasks['stages']; onOpen: (id: string) => void; selected?: string | null; onVisible?: (ids: string[]) => void;
-  /** W8: the layout switcher (List, Timeline), Export current view and the Display menu of the site page, in the shared toolbar */
-  switcher?: ReactNode; exporter?: ReactNode; display?: ReactNode;
+  /** W8: the layout switcher (List, Timeline) and Export current view of the site page, in the shared toolbar */
+  switcher?: ReactNode; exporter?: ReactNode;
 }) {
   const { t, i18n } = useTranslation();
   const toast = useToast();
@@ -118,7 +118,7 @@ export function TaskGrid({ siteId, stages, onOpen, selected, onVisible, switcher
   const box = useRef<HTMLDivElement>(null);
   const cancelled = useRef(false); // Esc unmounts the input; its blur must not save
   const ar = i18n.language === 'ar';
-  const ROW = ROWS[api2.density];
+  const ROW = ROWS[api2.density] + (api2.display.wrap ? WRAP_EXTRA : 0);
   const hasSel = true;
 
   // Quick filters work on the loaded tasks of this site (the grid loads them all); the URL keeps them (plan F9).
@@ -264,7 +264,7 @@ export function TaskGrid({ siteId, stages, onOpen, selected, onVisible, switcher
         switcher={switcher}
         columns={<ColumnMenu api={api2} label={label} />}
         density={<DensityToggle api={api2} />}
-        display={display}
+        display={<DisplayMenu api={api2} />}
         exporter={exporter}
         more={<MoreMenu items={[{ id: 'reset', label: t('table.reset'), testid: 'more-reset-cols', onSelect: api2.reset }]} />} />
       <div role="toolbar" aria-label={t('table.quick')} className="mb-2 flex flex-wrap items-center gap-2" data-testid="task-grid-tools">
@@ -285,7 +285,7 @@ export function TaskGrid({ siteId, stages, onOpen, selected, onVisible, switcher
         </label>
       </div>
       <ActiveChips chips={chips} onClear={clearAll} />
-      <div className="card overflow-hidden" data-testid="task-grid" data-density={api2.density}>
+      <div className="card overflow-hidden" data-testid="task-grid" {...displayAttrs(api2.display)}>
         <div ref={box} role="grid" tabIndex={0} aria-label={t('grid.title')} aria-rowcount={rows.length} aria-multiselectable data-testid="task-grid-body" className="relative overflow-auto outline-none focus-visible:ring-2 focus-visible:ring-accent" style={{ height: viewport }}
           onScroll={(e) => { v.onScroll(e); sessionStorage.setItem(`pmis.scroll.grid.${siteId}`, String(e.currentTarget.scrollTop)); }} onKeyDown={onKey}>
           <HeaderRow api={api2} label={label} testid="task-grid-head" select={{ checked: allPicked, indeterminate: picked.size > 0, onChange: () => setPicked(allPicked ? new Set() : new Set(allIds)), label: t('table.select_all'), testid: 'grid-select-all' }} />
@@ -304,7 +304,7 @@ export function TaskGrid({ siteId, stages, onOpen, selected, onVisible, switcher
               const task = r.task, name = (ar && task.name_ar) || task.name_en, on = picked.has(task.id), cur = selected === task.id;
               return (
                 <div key={task.id} role="row" aria-rowindex={ix + 1} aria-selected={on || cur} data-testid={`grid-row-${task.id}`} data-task={task.task_code} data-state={task.state} data-current={cur || undefined}
-                  className={`absolute inset-x-0 grid items-center border-b border-line text-sm ${on ? 'bg-accentSoft' : active.row === ix ? 'bg-hover' : 'bg-card'} ${cur ? 'ring-2 ring-inset ring-accent' : ''}`} style={{ ...pos, gridTemplateColumns: tracks(cols, hasSel) }}>
+                  data-zebra={(rowNo.get(task.id) ?? 0) % 2 === 0 ? '1' : '0'} className={`absolute inset-x-0 grid items-center border-b border-line text-sm ${on ? 'bg-accentSoft' : active.row === ix ? 'bg-hover' : api2.display.zebra && (rowNo.get(task.id) ?? 0) % 2 === 0 ? 'bg-card2' : 'bg-card'} ${cur ? 'ring-2 ring-inset ring-accent' : ''}`} style={{ ...pos, gridTemplateColumns: tracks(cols, hasSel) }}>
                   <div className="sticky start-0 z-10 flex justify-center bg-inherit"><SelectBox checked={on} onChange={() => flipPick(task.id)} label={t('table.select_row', { code: task.task_code })} testid={`grid-select-${task.id}`} /></div>
                   {cols.map((c) => { const p = pin(c, hasSel, cols); return <div key={c.id} data-col={c.id} className={`min-w-0 px-2 ${p.className}`} style={p.style}>{c.id === 'rowno' ? <RowNo n={rowNo.get(task.id) ?? ix + 1} /> : cell(c.id, task, ix, name)}</div>; })}
                 </div>

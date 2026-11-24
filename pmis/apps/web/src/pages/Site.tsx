@@ -21,7 +21,8 @@ import { TaskDrawer } from '@/components/TaskDrawer';
 import { ExportViewButton } from '@/components/ExportDialog';
 import { TaskGrid } from '@/components/TaskGrid';
 import { TaskRow } from '@/components/TaskRow';
-import { TableCount, TableToolbar } from '@/components/TableStandard';
+import { DisplayMenu, displayAttrs, TableCount, TableToolbar } from '@/components/TableStandard';
+import { useTablePrefs } from '@/components/TableKit';
 import { loadPref, savePref } from '@/lib/localPref';
 import { DISMANTLE_CODE, isRealStream, statusOf, streamName, withDismantle } from '@/lib/streams';
 
@@ -31,6 +32,7 @@ const STREAM_TONE: Record<string, string> = { done: 'bg-doneBg text-doneInk', in
 // ExportColumnCode values (stable codes of the `tasks` part).
 // per-viewer choice (W8 item 3): the list like the Site Master lists (default) or the Timeline (the task-as-column row of 2026-11-08), remembered
 const LAYOUT_KEY = 'pmis.site.layout';
+const NO_COLS: never[] = [];
 const TASK_COLUMNS: TasksExportColumnCode[] = ['site_code', 'task_code', 'task_name', 'task_state', 'due_date', 'sla_status'];
 
 export function Site() {
@@ -53,6 +55,8 @@ export function Site() {
   const docsTab = section !== ''; // a section other than the task grid
   const taskId = sp.get('task');
   const [ids, setIds] = useState<string[]>([]);
+  // the Timeline keeps its own Display options (per user and per screen)
+  const timeline = useTablePrefs('task-timeline', NO_COLS);
   const [layout, setLayout] = useState<'row' | 'list'>(() => (['row', 'timeline'].includes(loadPref<string>(LAYOUT_KEY, 'list')) ? 'row' : 'list'));
   const setParam = (k: string, v: string | null) => setSp((p) => { const n = new URLSearchParams(p); if (v) n.set(k, v); else n.delete(k); return n; }, { replace: true });
   const setStream = (code: string) => setSp((p) => { const n = new URLSearchParams(p); n.delete('stage'); if (code) n.set('stream', code); else n.delete('stream'); return n; }, { replace: true });
@@ -74,7 +78,7 @@ export function Site() {
     </div>
   );
   const exporter = <ExportViewButton testid="grid-export-view" source="tasks" filters={{ site_id: siteId, ...(stage ? { stage_code: stage } : {}), ...(real ? { stream } : {}), ...(view ? { view } : {}), ...(sp.get('tadv') ? { filter: sp.get('tadv') } : {}) }} columns={TASK_COLUMNS} />;
-  const displayMenu = null;
+  const displayMenu = <DisplayMenu api={timeline} />;
 
   return (
     <div data-testid="page-site">
@@ -135,8 +139,8 @@ export function Site() {
       {dismantle ? <p className="card p-6 text-mute" data-testid="site-dismantle-todo">{t('site.dismantle_todo')}</p>
         : st?.state === 'na' ? <p className="card p-6 text-mute" data-testid="site-stream-na">{t('site.stream_na')}</p>
         : grid.isLoading ? <p className="text-mute">{t('common.loading')}</p>
-        : layout === 'row' ? <TaskRow stages={stages} selected={taskId ?? sp.get('row')} onVisible={setIds} onOpen={(id) => setSp((p) => { const n = new URLSearchParams(p); n.set('task', id); n.set('row', id); return n; }, { replace: true })} />
-        : <TaskGrid key={`${stream}|${view}|${stage ?? 'all'}`} siteId={siteId} stages={stages} switcher={switcher} exporter={exporter} display={displayMenu} selected={taskId ?? sp.get('row')} onVisible={setIds} onOpen={(id) => setSp((p) => { const n = new URLSearchParams(p); n.set('task', id); n.set('row', id); return n; }, { replace: true })} />}
+        : layout === 'row' ? <div {...displayAttrs(timeline.display)} data-testid="task-row-display"><TaskRow stages={stages} selected={taskId ?? sp.get('row')} onVisible={setIds} onOpen={(id) => setSp((p) => { const n = new URLSearchParams(p); n.set('task', id); n.set('row', id); return n; }, { replace: true })} /></div>
+        : <TaskGrid key={`${stream}|${view}|${stage ?? 'all'}`} siteId={siteId} stages={stages} switcher={switcher} exporter={exporter} selected={taskId ?? sp.get('row')} onVisible={setIds} onOpen={(id) => setSp((p) => { const n = new URLSearchParams(p); n.set('task', id); n.set('row', id); return n; }, { replace: true })} />}
       {layout === 'list' && <p className="mt-2 text-xs text-mute">{t('grid.keys')}</p>}
       </>}
       <TaskDrawer nav={{ ids, onGo: (id) => setSp((p) => { const n = new URLSearchParams(p); n.set('task', id); n.set('row', id); return n; }, { replace: true }) }} registerFields={grid.data?.stages.flatMap((x) => x.tasks).find((x) => x.id === taskId)?.register_fields} taskId={taskId} onClose={() => setParam('task', null)} />

@@ -21,6 +21,7 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { useSession } from "@/api/hooks";
+import { useTableDisplayDefaults } from "@/api/display";
 import {
   defaultHidden,
   dropCol,
@@ -36,7 +37,11 @@ import {
   visibleCols,
   type ColDef,
   type Density,
+  type Display,
+  type DisplayOpts,
   type Prefs,
+  cleanDisplay,
+  isDensity,
 } from "@/lib/tablePrefs";
 import { Tip } from "./Tip";
 
@@ -50,6 +55,10 @@ export function useTablePrefs(screen: string, defs: ColDef[]) {
   const base = useMemo(() => loadPrefs(screen, user, defs), [sig]); // eslint-disable-line react-hooks/exhaustive-deps
   const [own, setOwn] = useState<{ sig: string; p: Prefs } | null>(null);
   const prefs = own?.sig === sig ? own.p : base;
+  // W8 item 4: the user's own density and Display options win; unset ones follow Settings > Display
+  const defaults = useTableDisplayDefaults();
+  const density: Density = prefs.density ?? defaults.density;
+  const display: Display = { ...defaults, ...prefs.display, density };
   // Auto-fit widths (measured from the header and the loaded rows). They only fill in where the user has not dragged a width, and are never stored.
   const [auto, setAutoRaw] = useState<{ sig: string; m: Record<string, number> }>({ sig, m: {} });
   const autoNow = auto.sig === sig ? auto.m : NO_AUTO;
@@ -62,7 +71,9 @@ export function useTablePrefs(screen: string, defs: ColDef[]) {
     prefs,
     defs,
     cols: visibleCols(prefs, defs, autoNow),
-    density: prefs.density,
+    density,
+    /** W8 item 4: text size, alignment, density, wrap and zebra rows, as the table draws them now */
+    display,
     /** Raises the auto width of the given columns (never lowers it, so rows loading later do not make the grid jump). */
     setAuto: (m: Record<string, number>) =>
       setAutoRaw((a) => {
@@ -82,15 +93,19 @@ export function useTablePrefs(screen: string, defs: ColDef[]) {
     toggle: (id: string) => set((p) => toggleCol(p, defs, id)),
     resize: (id: string, px: number) => set((p) => resizeCol(p, defs, id, px)),
     setDensity: (d: Density) => set((p) => ({ ...p, density: d })),
+    setDisplay: (d: Partial<DisplayOpts>) => set((p) => ({ ...p, display: { ...p.display, ...d } })),
+    /** Back to the defaults of Settings > Display (the columns keep their order and widths) */
+    resetDisplay: () => set((p) => ({ order: p.order, hidden: p.hidden, width: p.width })),
     reset: () =>
-      set(() => ({ order: [], hidden: [], width: {}, density: "comfortable" })),
+      set(() => ({ order: [], hidden: [], width: {} })),
     /** Applies the columns of a saved view (P10): unknown or forbidden columns are dropped by reconcile. */
     apply: (c: Partial<Prefs>) =>
       set(() => ({
         order: c.order ?? [],
         hidden: c.hidden ?? defaultHidden(defs),
         width: c.width ?? {},
-        density: c.density === "compact" ? "compact" : "comfortable",
+        ...(isDensity(c.density) ? { density: c.density } : {}),
+        ...(cleanDisplay(c.display) ? { display: cleanDisplay(c.display) } : {}),
       })),
   };
 }
@@ -536,7 +551,7 @@ export function ColumnMenu({
             role="radiogroup"
             aria-label={t("table.density")}
           >
-            {(["comfortable", "compact"] as const).map((d) => (
+            {(["comfortable", "normal", "compact"] as const).map((d) => (
               <button
                 key={d}
                 type="button"
@@ -720,4 +735,4 @@ export function QuickFilter({
 }
 
 /** Row-height class for the two densities of non-virtualised lists. */
-export const rowPad = (d: Density) => (d === "compact" ? "py-1" : "py-3");
+export const rowPad = (d: Density) => (d === "compact" ? "py-1" : d === "normal" ? "py-2" : "py-3");
