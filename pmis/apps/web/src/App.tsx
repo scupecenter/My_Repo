@@ -22,6 +22,7 @@ import { Login, USE_MOCKS } from '@/pages/Login';
 import { MockM365, MockStepUp, StepUpDone } from '@/pages/MockM365';
 import { MatrixPage } from '@/pages/Matrix';
 import { MyWork } from '@/pages/MyWork';
+import { DailyPlan } from '@/pages/DailyPlan';
 import { RegisterPage } from '@/pages/Register';
 import { RegisterBatch } from '@/pages/RegisterBatch';
 import { TemplatesPage } from '@/pages/Templates';
@@ -83,6 +84,7 @@ function gated(session: Session) {
         <Route path="change-password" element={<ChangePassword />} />
         <Route path="profile" element={<Profile />} />
         <Route path="my-work" element={<MyWork />} />
+        <Route path="my-work/daily-plan" element={<DailyPlan />} />
         <Route path="approvals" element={<Approvals />} />
         <Route path="inbox" element={<Inbox />} />
         <Route path="workload" element={<Workload />} />

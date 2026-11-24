@@ -256,7 +256,7 @@ records of the Contractors register (companies, teams, contracts) and the vehicl
 | matrix_cells | KEEP | Responsibility Matrix rows. |
 | matrix_cell_assignees | KEEP | Matrix holders. |
 | matrix_state | KEEP | Matrix revision (ETag). |
-| settings | KEEP | All settings, UI identity and notification policy included. |
+| settings | KEEP | All settings, UI identity, notification policy and the Daily Plan settings (`daily_plan.settings`, migration 0149) included. |
 | nav_item_catalogue | KEEP | Menu keys. |
 | master_columns | KEEP | Master columns. |
 | master_header_aliases | KEEP | Accepted Master header aliases. |
@@ -361,6 +361,8 @@ records of the Contractors register (companies, teams, contracts) and the vehicl
 | clusters | Clusters are created by site creation and carry the KPI Acceptance date per cluster. |
 | task_instances | Site tasks. |
 | task_cover_decisions | Lead decisions on a task (keep, reassign, act on behalf; migration 0140); they follow their task. |
+| daily_plans | My Work > Daily Plan: one plan header per region and day (version, lock, reminder; migration 0149). Project data. |
+| daily_plan_rows | The manual values, reasons, remarks, added and removed sites and the frozen rows of a locked day (migration 0149); they follow their plan and their site. |
 | workflow_steps | Task step ledger. |
 | task_level_actors | Task level holders. |
 | task_level_voters | Task level votes. |

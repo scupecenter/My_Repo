@@ -23,6 +23,7 @@ import { Studio } from './studio/Studio';
 import { Site360Columns } from './Site360Columns';
 import { DashboardSettings } from './DashboardSettings';
 import { Identity } from './Identity';
+import { DailyPlanSettings } from './DailyPlanSettings';
 
 export interface SettingsSection { key: string; adminOnly?: boolean }
 export interface SettingsTab { key: string; sections: SettingsSection[] }
@@ -41,6 +42,8 @@ export const SETTINGS_TABS: readonly SettingsTab[] = [
   { key: 'security', sections: [{ key: 'staff' }, { key: 'retention' }] },
   { key: 'dashboard', sections: [] },
   { key: 'identity', sections: [] },
+  // 0149 (W7): Settings > My Work > Daily Plan
+  { key: 'my-work', sections: [{ key: 'daily-plan' }] },
 ];
 
 /**
@@ -114,6 +117,10 @@ export function SettingsRoutes() {
         <Route path="alerts" element={<Notifications />} />
         <Route path="dashboard" element={<DashboardSettings />} />
         <Route path="identity" element={<Identity />} />
+        <Route path="my-work" element={<TabFrame tab="my-work" />}>
+          <Route index element={<Navigate to="daily-plan" replace />} />
+          <Route path="daily-plan" element={<DailyPlanSettings />} />
+        </Route>
         <Route path="workflow" element={<TabFrame tab="workflow" />}>
           <Route index element={<Navigate to="editor" replace />} />
           <Route path="editor" element={<Studio />} />

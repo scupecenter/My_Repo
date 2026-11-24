@@ -14,6 +14,8 @@ export const NAV_KEYS = [
   // Registers & Logs and the Dismantle sub-menu of SITE 360: a System Admin (or a full delegate) sees every register.
   'procurement', 'gecol', 'hlc', 'permits_hse', 'warehouse', 'quality', 'issues', 'risks', 'change_control', 'readiness',
   'as_built', 'meetings', 'rf_design', 'acquisition', 'contractors', 'car_dispatcher', 'financial_advances', 'dismantle',
+  // 0149 (W7): My Work > Daily Plan
+  'daily_plan',
 ] as const;
 
 /** Every action of the contract's PermissionAction (a System Admin holds all of them on every module). */
@@ -147,6 +149,8 @@ export class MeService {
     // Phase 4b: the inbox is for every active user; the status updates follow Sites; the workload and time-in-state view needs Reports as well as Sites.
     nav.add('inbox');
     if (nav.has('sites')) nav.add('status_updates');
+    // 0149 (W7): the Daily Plan lists sites; the Site Register right opens it as well as its own module (the region scope applies in the database)
+    if (nav.has('sites')) nav.add('daily_plan');
     if (nav.has('sites') && nav.has('reports')) nav.add('workload');
     if (await this.access.canSendAnnouncements()) nav.add('announcements');
     return { grants: effGrants, nav: [...nav].sort(), matrix_levels: [...levels.values()] };

@@ -4599,6 +4599,154 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/daily-plans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The plans of one day (one per region the caller sees)
+         * @description 0.15.67 (migration 0149). For each region of the session (the regions the person's assignments cover; a System Admin or an all-regions assignment sees all) where the caller holds `view` on `daily_plan` or `sites` for that region (an assignment covering the region and the module, or a delegation covering the region); the other regions are left out, and with none left the answer is 403 `action_forbidden`. `region_id` (repeatable) narrows the regions. The rows of a locked day are the frozen copy taken at the lock. `version` of each plan is the If-Match of its changes (0 before the first change).
+         */
+        get: operations["getDailyPlans"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/daily-plans/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Daily Progress and Tomorrow Plan as Excel
+         * @description 0.15.67. One sheet with the two tables of the owner's sheet: "Daily Progress <date>" (No, Site ID, Tower Owner, Owner ID, Latitude, Longitude, Region, Site Type, SOW, Vendor / Contractor Name, AAT SE, Planned Work, Actual Work, Reason (if not reach target)) and "Tomorrow Plan <next working day>" (No, Site ID, Tower Owner, Owner ID, Latitude, Longitude, Region, Site Type, SOW, Vendor / Contractor Name, AAT SE, Access Valid, Planned Work, Remark), always in this order. `site_id` (repeatable) keeps the rows of the current view. Needs `view` and `export` on `daily_plan` or `sites` for each region exported (the others are left out; none left = 403 `action_forbidden`). Audited (`daily_plan.exported`).
+         */
+        get: operations["exportDailyPlans"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/daily-plans/{date}/regions/{region_id}/sites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add a site to the plan by hand (or bring back a removed one)
+         * @description L1 of the Matrix row `daily_plan` in the region, or a System Admin; unlocked day. The site must be active and in the region (422 `/site_code` `not_in_region`); a site already in the plan is 409 `duplicate`. Audited.
+         */
+        post: operations["addDailyPlanSite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/daily-plans/{date}/regions/{region_id}/sites/{site_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove a site from the plan
+         * @description L1 of the row, unlocked day. A site added by hand leaves the plan; an auto-filled one is marked removed (it comes back with POST). Audited.
+         */
+        delete: operations["removeDailyPlanSite"];
+        options?: never;
+        head?: never;
+        /**
+         * Change a row (manual values over the auto-filled columns, Reason, Remark)
+         * @description L1 of the Matrix row `daily_plan` in the region, or a System Admin; unlocked day (409 `plan_locked`). `overrides` sets the manual value of an auto-filled column (`null` goes back to the auto value; Site ID, Site Name and Region cannot be changed: `read_only`). On a day up to today a row whose Actual Work has fewer lines than its Planned Work needs a Reason (422, `/reason` `required`). Audited with before and after.
+         */
+        patch: operations["saveDailyPlanRow"];
+        trace?: never;
+    };
+    "/daily-plans/{date}/regions/{region_id}/lock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Lock the day (L2)
+         * @description L2 of the Matrix row `daily_plan` in the region, or a System Admin. Every row below target needs its reason first (422, `errors[].path` `/rows/<site_code>/reason`). The rows are frozen as they are. Audited.
+         */
+        post: operations["lockDailyPlan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/daily-plans/{date}/regions/{region_id}/unlock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reopen a locked day (admin override)
+         * @description A System Admin, or a delegate of `overrides.unlock` for the region; reason and step-up; the audit row is flagged admin override. A day reopened this way is never locked again by the automatic lock.
+         */
+        post: operations["unlockDailyPlan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/daily-plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Settings > My Work > Daily Plan
+         * @description Every signed-in user (the screen reads its columns).
+         */
+        get: operations["getDailyPlanSettings"];
+        /**
+         * Set the Daily Plan settings
+         * @description System Admin or a delegate of `admin.settings` edit for all regions, a reason and If-Match. Closed body (`unknown_key`): `columns.progress` and `columns.tomorrow` are lists of known columns without repeats that hold `site_code` (`unknown_column`, `duplicate`, `site_code_required`); `default_region_scope` `mine` or `all`; `auto_lock_time` `HH:MM` or null; `reminder_hour` 0 to 23 or null (`out_of_range`). Audited (`daily_plan_settings_update`, before and after).
+         */
+        put: operations["setDailyPlanSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/scenario-rules": {
         parameters: {
             query?: never;
@@ -9625,7 +9773,7 @@ export interface components {
             conflicts?: components["schemas"]["ScopeConflict"][];
         };
         /** @enum {string} */
-        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "insufficient_stock" | "item_in_use" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "invalid_code" | "invalid_enrol_code" | "enrol_code_expired" | "password_change_required" | "weak_password" | "internal_error" | "team_scope_mismatch" | "two_factor_enforced" | "scope_scenario_conflict" | "too_many_rows" | "integrity_too_large" | "mail_not_configured" | "self_approval_forbidden" | "document_rule_pending" | "file_pending_scan" | "list_not_configured" | "list_parent_mismatch" | "email_not_verified" | "batch_processing" | "vehicle_already_reserved" | "upload_processing" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "invitation_invalid" | "system_field" | "conversion_unconfirmed" | "column_in_use" | "input_already_mapped" | "field_already_mapped" | "single_admin" | "backup_missing" | "request_expired" | "reset_running" | "plan_incomplete" | "storage_not_supported" | "quarantine_unavailable" | "maintenance";
+        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "plan_locked" | "insufficient_stock" | "item_in_use" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "invalid_code" | "invalid_enrol_code" | "enrol_code_expired" | "password_change_required" | "weak_password" | "internal_error" | "team_scope_mismatch" | "two_factor_enforced" | "scope_scenario_conflict" | "too_many_rows" | "integrity_too_large" | "mail_not_configured" | "self_approval_forbidden" | "document_rule_pending" | "file_pending_scan" | "list_not_configured" | "list_parent_mismatch" | "email_not_verified" | "batch_processing" | "vehicle_already_reserved" | "upload_processing" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "invitation_invalid" | "system_field" | "conversion_unconfirmed" | "column_in_use" | "input_already_mapped" | "field_already_mapped" | "single_admin" | "backup_missing" | "request_expired" | "reset_running" | "plan_incomplete" | "storage_not_supported" | "quarantine_unavailable" | "maintenance";
         PageEnvelope: {
             items: unknown[];
             page: components["schemas"]["PageInfo"];
@@ -13393,6 +13541,135 @@ export interface components {
             /** @description Default 2. */
             working_days: number;
             version: number;
+            /** Format: date-time */
+            updated_at?: string;
+            updated_by?: components["schemas"]["UserRef"];
+        };
+        /** @enum {string} */
+        DailyPlanColumn: "no" | "site_code" | "site_name" | "tower_owner" | "owner_id" | "latitude" | "longitude" | "region" | "site_type" | "sow" | "contractor" | "aat_se" | "access_valid" | "planned_work" | "actual_work" | "reason" | "remark";
+        DailyPlanItem: {
+            /** @enum {string} */
+            kind: "task" | "field_work";
+            code: string;
+            label: string;
+            label_ar?: string;
+        };
+        DailyPlanRow: {
+            region_id: number;
+            /** Format: uuid */
+            site_id: string;
+            site_code: string;
+            site_name?: string | null;
+            /**
+             * @description auto = filled from system data; added = added by hand.
+             * @enum {string}
+             */
+            origin: "auto" | "added";
+            /** @description The value shown in each column (the manual value over the auto one). */
+            values: {
+                site_code?: string | null;
+                site_name?: string | null;
+                region?: string | null;
+                tower_owner?: string | null;
+                owner_id?: string | null;
+                latitude?: string | null;
+                longitude?: string | null;
+                site_type?: string | null;
+                sow?: string | null;
+                contractor?: string | null;
+                aat_se?: string | null;
+                /** @description Yes, Yes (to YYYY-MM-DD) or No. */
+                access_valid?: string | null;
+                /** @description One item per line. */
+                planned_work?: string | null;
+                /** @description One item per line. */
+                actual_work?: string | null;
+            };
+            /** @description The auto-filled value of each column that may be changed by hand. */
+            auto: {
+                [key: string]: string | null;
+            };
+            /** @description The columns holding a manual value. */
+            overridden: string[];
+            reason?: string | null;
+            remark?: string | null;
+            planned_items?: components["schemas"]["DailyPlanItem"][];
+            actual_items?: components["schemas"]["DailyPlanItem"][];
+            planned_count: number;
+            actual_count: number;
+            /** @description On a day up to today, fewer actual items than planned items. */
+            below_target: boolean;
+            reason_missing: boolean;
+            /** @description The copy taken when the day was locked. */
+            frozen: boolean;
+        };
+        DailyPlanRegion: {
+            region_id: number;
+            region_code?: string;
+            region_name_en?: string;
+            region_name_ar?: string | null;
+            /** Format: date */
+            plan_date: string;
+            /** @description If-Match of the changes; 0 before the first change. */
+            version: number;
+            locked: boolean;
+            /** @enum {string|null} */
+            lock_kind?: "manual" | "auto" | null;
+            /** Format: date-time */
+            locked_at?: string | null;
+            locked_by?: components["schemas"]["UserRef"] | null;
+            /** Format: date-time */
+            unlocked_at?: string | null;
+            unlocked_by?: components["schemas"]["UserRef"] | null;
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+            row_count: number;
+            reason_missing_count: number;
+            can_edit: boolean;
+            can_lock: boolean;
+            can_unlock: boolean;
+        };
+        DailyPlanDay: {
+            /** Format: date */
+            date: string;
+            /** Format: date */
+            today: string;
+            is_workday: boolean;
+            /** Format: date */
+            next_working_day: string;
+            /** Format: date */
+            previous_working_day: string;
+            /** @description The regions where the caller holds L1 or L2 of the Daily Plan. */
+            my_region_ids: number[];
+            plans: components["schemas"]["DailyPlanRegion"][];
+            rows: components["schemas"]["DailyPlanRow"][];
+        };
+        DailyPlanRowInput: {
+            /** @description column: text, or null to go back to the auto value. */
+            overrides?: {
+                [key: string]: string | null;
+            };
+            reason?: string | null;
+            remark?: string | null;
+        };
+        DailyPlanSettingsInput: {
+            columns: {
+                progress: components["schemas"]["DailyPlanColumn"][];
+                tomorrow: components["schemas"]["DailyPlanColumn"][];
+            };
+            /** @enum {string} */
+            default_region_scope: "mine" | "all";
+            auto_lock_time: string | null;
+            reminder_hour: number | null;
+        };
+        DailyPlanSettings: components["schemas"]["DailyPlanSettingsInput"] & {
+            version: number;
+            known_columns: components["schemas"]["DailyPlanColumn"][];
+            default_columns: {
+                progress?: components["schemas"]["DailyPlanColumn"][];
+                tomorrow?: components["schemas"]["DailyPlanColumn"][];
+            };
             /** Format: date-time */
             updated_at?: string;
             updated_by?: components["schemas"]["UserRef"];
@@ -26111,6 +26388,297 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["IdleTaskAlertSetting"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getDailyPlans: {
+        parameters: {
+            query: {
+                date: string;
+                region_id?: number[];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The day. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DailyPlanDay"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    exportDailyPlans: {
+        parameters: {
+            query: {
+                date: string;
+                region_id?: number[];
+                site_id?: string[];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The workbook. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    addDailyPlanSite: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                date: string;
+                region_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    site_code: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The plan of the region after the change. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DailyPlanDay"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    removeDailyPlanSite: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                date: string;
+                region_id: number;
+                site_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The plan of the region after the change. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DailyPlanDay"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    saveDailyPlanRow: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                date: string;
+                region_id: number;
+                site_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DailyPlanRowInput"];
+            };
+        };
+        responses: {
+            /** @description The plan of the region after the change. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DailyPlanDay"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    lockDailyPlan: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                date: string;
+                region_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The plan of the region after the change. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DailyPlanDay"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    unlockDailyPlan: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                date: string;
+                region_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"];
+            };
+        };
+        responses: {
+            /** @description The plan of the region after the change. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DailyPlanDay"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getDailyPlanSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Setting. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DailyPlanSettings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setDailyPlanSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"] & components["schemas"]["DailyPlanSettingsInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DailyPlanSettings"];
                 };
             };
             401: components["responses"]["Unauthorized"];

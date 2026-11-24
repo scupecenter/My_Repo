@@ -3,6 +3,7 @@ import { ArrowLeft, Plus, Search, SlidersHorizontal, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  hasFilterBuilder,
   useFilterFields,
   type FilterCondition,
   type FilterOperator,
@@ -731,7 +732,8 @@ export function UnifiedFilter({
     if (open && !step) searchRef.current?.focus();
   }, [open, step]);
 
-  if (!q.isSuccess) return null;
+  // a screen without server fields (0149, the Daily Plan) filters on its page extras only
+  if (hasFilterBuilder(screen) && !q.isSuccess) return null;
 
   const orMixed = !!value && value.op === "or" && value.items.length > 1;
   const condOf = (key: string) =>

@@ -24,6 +24,10 @@ export class JobRunsService implements OnApplicationBootstrap, OnModuleDestroy {
     const a = setInterval(() => void this.evaluateAlerts(), ALERT_EVERY_MS);
     const p = setInterval(() => void this.purge(), PURGE_EVERY_MS);
     const w = setInterval(() => void this.expireHistoricalWaiver(), ALERT_EVERY_MS);
+    // 0149 (W7): the automatic lock of the Daily Plan and the reminder of an empty next working day (dp_tick, idempotent)
+    const dp = setInterval(() => void this.dailyPlanTick(), ALERT_EVERY_MS);
+    dp.unref();
+    this.timers.push(dp);
     a.unref();
     p.unref();
     w.unref();
@@ -84,6 +88,11 @@ export class JobRunsService implements OnApplicationBootstrap, OnModuleDestroy {
   /** Q462 (migration 0073): the historical-load waiver closes itself 30 days after it was opened (audited). The effective state never waits for this job. */
   expireHistoricalWaiver(): Promise<number | null> {
     return this.run('historical_waiver_expire', async (tx) => ((await tx.$queryRaw<{ c: boolean }[]>`SELECT hw_waiver_expire() AS c`)[0]?.c ? 1 : 0));
+  }
+
+  /** 0149 (W7): dp_tick locks today's Daily Plans after the set time and reminds the L1 holders of an empty next working day (once per region and day). */
+  dailyPlanTick(): Promise<number | null> {
+    return this.run('daily_plan', async (tx) => Number((await tx.$queryRaw<{ n: number }[]>`SELECT dp_tick() AS n`)[0]?.n ?? 0));
   }
 
   purge(): Promise<number | null> {

@@ -17,7 +17,7 @@ export type ErrorCode =
   | 'batch_processing' | 'vehicle_already_reserved' | 'upload_processing'
   | 'column_in_use' | 'input_already_mapped' | 'field_already_mapped'
   | 'system_field' | 'conversion_blocked' | 'conversion_unconfirmed' | 'section_not_empty'
-  | 'list_parent_mismatch' | 'freeze_active' | 'workflow_invalid' | 'master_impact_unconfirmed' | 'stale_preview' | 'invitation_invalid' | 'register_locked'
+  | 'list_parent_mismatch' | 'plan_locked' | 'freeze_active' | 'workflow_invalid' | 'master_impact_unconfirmed' | 'stale_preview' | 'invitation_invalid' | 'register_locked'
   // 0146 (0.15.62): the project data reset in Settings
   | 'single_admin' | 'backup_missing' | 'request_expired' | 'reset_running' | 'plan_incomplete' | 'storage_not_supported' | 'quarantine_unavailable' | 'maintenance';
 
