@@ -104,18 +104,18 @@ describe('Task grid', () => {
   });
 });
 
-describe('Site page: Excel-like row (2026-11-08)', () => {
-  it('opens on the horizontal row, opens the drawer from a task column, and switches to the list', async () => {
+describe('Site page: list by default, Timeline as the second option (W8 item 3)', () => {
+  it('opens on the list, switches to the Timeline (the 2026-11-08 row), remembers it, and opens the drawer from a task column', async () => {
     localStorage.removeItem('pmis.site.layout');
     await signIn('reviewer');
     renderApp(<SiteAt />, siteRoute());
+    expect(await screen.findByTestId(`grid-open-${A1}`)).toBeInTheDocument();
+    expect(screen.getByTestId('site-layout-list')).toHaveAttribute('aria-pressed', 'true');
+    await userEvent.click(screen.getByTestId('site-layout-timeline'));
     const row = await screen.findByTestId('task-row');
     expect(row.querySelectorAll('[data-testid^="row-stage-"]').length).toBeGreaterThan(0);
-    await userEvent.click(screen.getByTestId('site-layout-list'));
-    expect(await screen.findByTestId(`grid-open-${A1}`)).toBeInTheDocument();
-    expect(localStorage.getItem('pmis.site.layout')).toBe('"list"');
-    await userEvent.click(screen.getByTestId('site-layout-row'));
-    await userEvent.click(within(await screen.findByTestId('task-row')).getByTestId(`row-open-${A1}`));
+    expect(localStorage.getItem('pmis.site.layout')).toBe('"timeline"');
+    await userEvent.click(within(row).getByTestId(`row-open-${A1}`));
     expect(await screen.findByTestId('task-drawer')).toBeInTheDocument();
   });
 });

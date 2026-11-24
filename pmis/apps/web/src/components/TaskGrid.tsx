@@ -1,6 +1,6 @@
 import * as Popover from '@radix-ui/react-popover';
 import { ChevronDown, ChevronRight, Download, FileText, Lock, Upload, UserX } from 'lucide-react';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ApiError } from '@/api/client';
 import { downloadTemplate, useUploadBatch } from '@/api/registers';
@@ -14,7 +14,12 @@ import { Holders } from './HolderChip';
 import { OverrideBadge } from './OverrideBadge';
 import { MoreMenu } from './PageHeader';
 import { EmptyState, NoResults } from './States';
-import { ActiveChips, BulkBar, ColumnMenu, Empty, HEADER_H, HeaderRow, NotApplicable, pin, QuickFilter, SelectBox, totalWidth, tracks, Trunc, useTablePrefs } from './TableKit';
+import { ActiveChips, BulkBar, ColumnMenu, DensityToggle, Empty, HEADER_H, HeaderRow, NotApplicable, pin, QuickFilter, SelectBox, totalWidth, tracks, Trunc, useTablePrefs } from './TableKit';
+import { ROWNO_COL, RowNo, SearchBox, TableCount, TableToolbar } from './TableStandard';
+import { SavedViews } from './SavedViews';
+import { UnifiedFilter } from './UnifiedFilter';
+import { decodeFilter, encodeFilter, type FilterTree } from '@/api/views';
+import { fmtDate } from '@/lib/time';
 import { useToast } from './Toast';
 import { useVirtual } from './useVirtual';
 import { BallSince, ExternalParty, SlaOverrun, StaleBadge, TIMING_SORTS, ballHolders, sortByTiming, type TimingSort } from './TaskTiming';
@@ -23,16 +28,19 @@ const ROWS = { comfortable: 56, compact: 40 } as const;
 const DATE_FIELD = { plan: 'planned_date', actual: 'actual_date' } as const;
 type DateCol = keyof typeof DATE_FIELD;
 // Column ids double as the saved-preference keys; `code` is the pinned identity column.
+// W8 item 3: the list of the site page, like the Site Master lists: #, Code, Task, Status, Plan, Actual, SLA (due and state), Ball in court,
+// Documents (missing), Last update; the template buttons stay as the last column.
 const DEFS: ColDef[] = [
-  { id: 'code', w: 72, min: 56, pinned: true }, { id: 'task', w: 240, min: 120 }, { id: 'ball', w: 200, min: 100 }, { id: 'plan', w: 120, min: 100 }, { id: 'actual', w: 120, min: 100 },
-  { id: 'sla', w: 140, min: 90 }, { id: 'status', w: 140, min: 90 }, { id: 'docs', w: 80, min: 64 }, { id: 'template', w: 100, min: 84 },
+  ROWNO_COL, { id: 'code', w: 72, min: 56, pinned: true }, { id: 'task', w: 240, min: 120 }, { id: 'status', w: 140, min: 90 }, { id: 'plan', w: 120, min: 100 }, { id: 'actual', w: 120, min: 100 },
+  { id: 'sla', w: 190, min: 90 }, { id: 'ball', w: 200, min: 100 }, { id: 'docs', w: 110, min: 64 }, { id: 'updated', w: 110, min: 90 }, { id: 'template', w: 100, min: 84 },
 ];
-const LABEL: Record<string, string> = { code: 'grid.code', task: 'grid.task', ball: 'grid.ball', plan: 'grid.plan', actual: 'grid.actual', sla: 'grid.sla', status: 'grid.status', docs: 'grid.docs', template: 'grid.template' };
+const LABEL: Record<string, string> = { rowno: 'tstd.rowno', updated: 'tstd.last_update', code: 'grid.code', task: 'grid.task', ball: 'grid.ball', plan: 'grid.plan', actual: 'grid.actual', sla: 'grid.sla', status: 'grid.status', docs: 'grid.docs', template: 'grid.template' };
 const QUICK = {
   late: (x: TaskSummary) => x.sla?.colour === 'red', docs: (x: TaskSummary) => !!x.slots_required && (x.slots_filled ?? 0) < x.slots_required,
   // F2 (0.15.30): near the SLA limit (amber) and stale (idle for the stale limit)
   amber: (x: TaskSummary) => x.sla?.colour === 'amber', stale: (x: TaskSummary) => !!x.stale,
 } as const;
+const TASK_VIEW_EMPTY = { tq: '', tf: '', tb: '', ts: '' };
 const QUICK_LABEL: Record<string, string> = { late: 'table.late', docs: 'table.missing_docs', amber: 'timing.filter_amber', stale: 'timing.filter_stale' };
 type Quick = keyof typeof QUICK;
 export const STATE_TONE: Record<string, string> = { approved: 'bg-doneBg text-doneInk', entry: 'bg-openBg text-openInk', open: 'bg-openBg text-openInk', in_review: 'bg-waitBg text-waitInk', in_approval: 'bg-waitBg text-waitInk', locked: 'bg-lockBg text-lockInk', na: 'bg-lockBg text-lockInk' };
@@ -82,7 +90,20 @@ function TemplateButtons({ task }: { task: TaskSummary }) {
   );
 }
 
-export function TaskGrid({ siteId, stages, onOpen, selected, onVisible }: { siteId: string; stages: SiteTasks['stages']; onOpen: (id: string) => void; selected?: string | null; onVisible?: (ids: string[]) => void }) {
+/** Search of the task list (W8 item 5, on the loaded tasks of the site, which the grid loads whole): one word = contains on code and name; a pasted list = each task code. */
+export function taskMatches(x: TaskSummary, q: string, name: string): boolean {
+  const tokens = q.split(/[\s,;]+/).map((y) => y.trim()).filter(Boolean);
+  if (!tokens.length) return true;
+  if (tokens.length > 1) return tokens.some((y) => y.toUpperCase() === x.task_code.toUpperCase());
+  const n = tokens[0]!.toLowerCase();
+  return x.task_code.toLowerCase().includes(n) || name.toLowerCase().includes(n) || x.name_en.toLowerCase().includes(n);
+}
+
+export function TaskGrid({ siteId, stages, onOpen, selected, onVisible, switcher, exporter, display }: {
+  siteId: string; stages: SiteTasks['stages']; onOpen: (id: string) => void; selected?: string | null; onVisible?: (ids: string[]) => void;
+  /** W8: the layout switcher (List, Timeline), Export current view and the Display menu of the site page, in the shared toolbar */
+  switcher?: ReactNode; exporter?: ReactNode; display?: ReactNode;
+}) {
   const { t, i18n } = useTranslation();
   const toast = useToast();
   const patch = useDatePatch(siteId);
@@ -114,10 +135,15 @@ export function TaskGrid({ siteId, stages, onOpen, selected, onVisible }: { site
     for (const st of stages) for (const x of st.tasks) for (const h of ballHolders(x)) m.set(h.id, h.label);
     return [...m.entries()].sort((a, b) => a[1].localeCompare(b[1]));
   }, [stages]);
-  const shown = useMemo(() => stages.map((st) => ({ ...st, shown: sortByTiming(st.tasks.filter((x) => quick.every((q) => QUICK[q](x)) && (!holder || ballHolders(x).some((h) => h.id === holder))), sortKey, (x) => x) })), [stages, qkey, holder, sortKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  // W8: the search (tq) and the + Filter tree (tadv, compiled by the server on GET /sites/{id}/tasks) live in the URL like the quick filters
+  const tq = sp.get('tq') ?? '';
+  const tadv = sp.get('tadv') ?? '';
+  const advTree = decodeFilter(tadv);
+  const shown = useMemo(() => stages.map((st) => ({ ...st, shown: sortByTiming(st.tasks.filter((x) => quick.every((q) => QUICK[q](x)) && (!holder || ballHolders(x).some((h) => h.id === holder)) && taskMatches(x, tq, (ar && x.name_ar) || x.name_en)), sortKey, (x) => x) })), [stages, qkey, holder, sortKey, tq, ar]); // eslint-disable-line react-hooks/exhaustive-deps
   const totalTasks = stages.reduce((n, st) => n + st.tasks.length, 0);
   const shownTasks = shown.flatMap((st) => st.shown);
   const listKey = shownTasks.map((x) => x.id).join(',');
+  const rowNo = useMemo(() => new Map(shownTasks.map((x, i) => [x.id, i + 1])), [listKey]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { onVisible?.(listKey ? listKey.split(',') : []); }, [listKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const rows = useMemo<Row[]>(() => shown.flatMap((s) => {
@@ -205,13 +231,14 @@ export function TaskGrid({ siteId, stages, onOpen, selected, onVisible }: { site
       case 'ball': return <span className="flex flex-wrap items-center gap-1">{task.state === 'approved' || task.state === 'na' ? (task.state === 'na' ? <NotApplicable /> : <Empty />) : <><Holders holders={task.ball_in_court?.holders ?? []} /><ExternalParty task={task} /><BallSince task={task} /></>}{task.holder_absent && <span className="chip bg-waitBg text-waitInk" data-testid={`absent-${task.id}`}><UserX size={12} className="me-1" />{t('grid.absent')}</span>}</span>;
       case 'plan': case 'actual': return dateCell(task, id, ix);
       case 'sla': return task.sla?.measured === false ? <span className="chip bg-lockBg text-lockInk" data-testid={`sla-not-measured-${task.id}`}>{t('sla.not_measured')}</span>
-        : task.sla?.max_wd != null ? <span className="inline-flex flex-wrap items-center gap-1"><span data-testid={`sla-${task.id}`} data-colour={task.sla.colour} className={`chip ${SLA_TONE[task.sla.colour ?? 'none']}`}>{task.sla.min_wd}–{task.sla.max_wd} {t('approvals.wd')}{task.sla.colour === 'red' ? ` · ${t('grid.late')}` : ''}</span>
+        : task.sla?.max_wd != null ? <span className="inline-flex flex-wrap items-center gap-1">{task.sla.due_date && <span className="mono text-xs" data-testid={`sla-due-${task.id}`} title={t('tstd.sla_due')}>{fmtDate(task.sla.due_date, i18n.language)}</span>}<span data-testid={`sla-${task.id}`} data-colour={task.sla.colour} className={`chip ${SLA_TONE[task.sla.colour ?? 'none']}`}>{task.sla.min_wd}–{task.sla.max_wd} {t('approvals.wd')}{task.sla.colour === 'red' ? ` · ${t('grid.late')}` : ''}</span>
           <SlaOverrun task={task} />
           {/* 0.12.0 (D4b): a tentative holiday inside the period; Q135: Pending SLA Confirmation */}
           {task.sla.due_date_tentative && <span className="chip bg-waitBg text-waitInk" data-testid={`sla-tentative-${task.id}`} title={t('sla.tentative_title', { dates: (task.sla.tentative_holidays ?? []).join(', ') })}>{t('sla.tentative_date')}</span>}
           {task.sla.pending_confirmation && <span className="chip bg-waitBg text-waitInk" data-testid={`sla-pending-${task.id}`}>{t('sla.pending_confirmation')}</span>}</span> : <Empty />;
       case 'status': return <span className="flex flex-wrap items-center gap-1"><span className={`chip ${STATE_TONE[task.state]}`}>{t(`taskState.${task.state}`)}</span>{task.state === 'locked' && <WhyLocked task={task} />}<StaleBadge task={task} />{task.historical_no_documents ? <OverrideBadge taskId={task.id} /> : task.historical_direct_approved ? <OverrideBadge taskId={task.id} direct /> : task.lock_bypassed ? <OverrideBadge taskId={task.id} bypass={task.lock_bypass_reason} /> : null}</span>;
-      case 'docs': return <span className={`chip ${task.slots_required && task.slots_filled === task.slots_required ? 'bg-doneBg text-doneInk' : 'bg-lockBg text-lockInk'}`} data-testid={`slots-${task.id}`}><FileText size={12} className="me-1" />{task.slots_filled ?? 0}/{task.slots_required ?? 0}</span>;
+      case 'docs': { const missing = Math.max(0, (task.slots_required ?? 0) - (task.slots_filled ?? 0)); return <span className="flex items-center gap-1"><span className={`chip ${task.slots_required && task.slots_filled === task.slots_required ? 'bg-doneBg text-doneInk' : 'bg-lockBg text-lockInk'}`} data-testid={`slots-${task.id}`}><FileText size={12} className="me-1" />{task.slots_filled ?? 0}/{task.slots_required ?? 0}</span>{missing > 0 && <span className="chip bg-lateBg text-lateInk" data-testid={`docs-missing-${task.id}`} title={t('tstd.docs_missing', { count: missing })}>-{missing}</span>}</span>; }
+      case 'updated': return task.last_activity_at ? <span className="mono text-xs" data-testid={`updated-${task.id}`} title={task.last_activity_at}>{fmtDate(task.last_activity_at.slice(0, 10), i18n.language)}</span> : <Empty />;
       default: return <TemplateButtons task={task} />;
     }
   };
@@ -220,13 +247,26 @@ export function TaskGrid({ siteId, stages, onOpen, selected, onVisible }: { site
     ...quick.map((q) => ({ key: `tf-${q}`, label: `${t(QUICK_LABEL[q])} ${t('table.loaded_only')}`, onRemove: () => setQuick(quick.filter((x) => x !== q)) })),
     ...(holder ? [{ key: 'tb', label: `${t('timing.holder')}: ${holderOptions.find(([id]) => id === holder)?.[1] ?? '…'}`, onRemove: () => setParam('tb', '') }] : []),
   ];
-  const clearAll = () => setSp((p) => { const n = new URLSearchParams(p); n.delete('tf'); n.delete('tb'); return n; }, { replace: true });
+  const clearAll = () => setSp((p) => { const n = new URLSearchParams(p); for (const k of ['tf', 'tb', 'tq', 'tadv']) n.delete(k); return n; }, { replace: true });
   const copy = () => { void navigator.clipboard?.writeText(pickedTasks.map((x) => x.task_code).join('\n')); toast(t('table.copied', { count: pickedTasks.length })); };
   const downloads = pickedTasks.filter((x) => x.template_id);
   const downAll = async () => { let n = 0; for (const x of downloads) { try { await downloadTemplate(x.template_id ?? '', { taskId: x.id }); n += 1; } catch { toast(t('errors.generic'), 'err'); break; } } if (n) toast(t('table.tpl_done', { count: n })); };
 
   return (
     <div data-testid="task-grid-wrap">
+      {/* W8 item 3: the shared table toolbar of the site-data screens; the quick filters of the loaded tasks stay in the row below */}
+      <TableToolbar testid="task-grid-toolbar"
+        views={<SavedViews screen="site-tasks" value={{ tq, tf: qkey, tb: holder, ts: sortKey, ...(advTree ? { advanced: advTree } : {}) }} empty={TASK_VIEW_EMPTY} table={api2}
+          onApply={(x) => { const r = x as Record<string, unknown>; setSp((p) => { const n = new URLSearchParams(p); for (const k of ['tq', 'tf', 'tb', 'ts'] as const) { const val = String(r[k] ?? ''); if (val) n.set(k, val); else n.delete(k); } const enc = encodeFilter(r.advanced as FilterTree | undefined); if (enc) n.set('tadv', enc); else n.delete('tadv'); return n; }, { replace: true }); }} />}
+        search={<SearchBox testid="task-grid-search" value={tq} onChange={(x) => setParam('tq', x)} placeholder={t('tstd.search_tasks')} />}
+        filter={<UnifiedFilter screen="site-tasks" value={advTree} onChange={(tree) => setParam('tadv', encodeFilter(tree))} onClearAll={clearAll} />}
+        count={<TableCount testid="task-grid-count" noun="tasks" total={totalTasks} filtered={shownTasks.length} active={!!(tq || tadv || quick.length || holder)} selected={picked.size} onClear={clearAll} />}
+        switcher={switcher}
+        columns={<ColumnMenu api={api2} label={label} />}
+        density={<DensityToggle api={api2} />}
+        display={display}
+        exporter={exporter}
+        more={<MoreMenu items={[{ id: 'reset', label: t('table.reset'), testid: 'more-reset-cols', onSelect: api2.reset }]} />} />
       <div role="toolbar" aria-label={t('table.quick')} className="mb-2 flex flex-wrap items-center gap-2" data-testid="task-grid-tools">
         <QuickFilter testid="tf-late" on={quick.includes('late')} onClick={() => toggleQuick('late')}>{t('table.late')} {t('table.loaded_only')}</QuickFilter>
         <QuickFilter testid="tf-docs" on={quick.includes('docs')} onClick={() => toggleQuick('docs')}>{t('table.missing_docs')} {t('table.loaded_only')}</QuickFilter>
@@ -243,10 +283,6 @@ export function TaskGrid({ siteId, stages, onOpen, selected, onVisible }: { site
             {TIMING_SORTS.map((k) => <option key={k} value={k}>{t(`timing.sort_${k}`)}</option>)}
           </select>
         </label>
-        <span className="ms-auto flex gap-2">
-          <ColumnMenu api={api2} label={label} />
-          <MoreMenu items={[{ id: 'reset', label: t('table.reset'), testid: 'more-reset-cols', onSelect: api2.reset }]} />
-        </span>
       </div>
       <ActiveChips chips={chips} onClear={clearAll} />
       <div className="card overflow-hidden" data-testid="task-grid" data-density={api2.density}>
@@ -270,7 +306,7 @@ export function TaskGrid({ siteId, stages, onOpen, selected, onVisible }: { site
                 <div key={task.id} role="row" aria-rowindex={ix + 1} aria-selected={on || cur} data-testid={`grid-row-${task.id}`} data-task={task.task_code} data-state={task.state} data-current={cur || undefined}
                   className={`absolute inset-x-0 grid items-center border-b border-line text-sm ${on ? 'bg-accentSoft' : active.row === ix ? 'bg-hover' : 'bg-card'} ${cur ? 'ring-2 ring-inset ring-accent' : ''}`} style={{ ...pos, gridTemplateColumns: tracks(cols, hasSel) }}>
                   <div className="sticky start-0 z-10 flex justify-center bg-inherit"><SelectBox checked={on} onChange={() => flipPick(task.id)} label={t('table.select_row', { code: task.task_code })} testid={`grid-select-${task.id}`} /></div>
-                  {cols.map((c) => { const p = pin(c, hasSel); return <div key={c.id} data-col={c.id} className={`min-w-0 px-2 ${p.className}`} style={p.style}>{cell(c.id, task, ix, name)}</div>; })}
+                  {cols.map((c) => { const p = pin(c, hasSel, cols); return <div key={c.id} data-col={c.id} className={`min-w-0 px-2 ${p.className}`} style={p.style}>{c.id === 'rowno' ? <RowNo n={rowNo.get(task.id) ?? ix + 1} /> : cell(c.id, task, ix, name)}</div>; })}
                 </div>
               );
             })}

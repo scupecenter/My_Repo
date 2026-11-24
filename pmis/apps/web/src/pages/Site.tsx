@@ -21,6 +21,7 @@ import { TaskDrawer } from '@/components/TaskDrawer';
 import { ExportViewButton } from '@/components/ExportDialog';
 import { TaskGrid } from '@/components/TaskGrid';
 import { TaskRow } from '@/components/TaskRow';
+import { TableCount, TableToolbar } from '@/components/TableStandard';
 import { loadPref, savePref } from '@/lib/localPref';
 import { DISMANTLE_CODE, isRealStream, statusOf, streamName, withDismantle } from '@/lib/streams';
 
@@ -28,7 +29,8 @@ const TONE: Record<string, string> = { completed: 'bg-doneBg text-doneInk', in_p
 const STREAM_TONE: Record<string, string> = { done: 'bg-doneBg text-doneInk', in_progress: 'bg-openBg text-openInk', not_started: 'bg-lockBg text-lockInk', na: 'bg-lockBg text-lockInk' };
 
 // ExportColumnCode values (stable codes of the `tasks` part).
-const LAYOUT_KEY = 'pmis.site.layout'; // per-viewer choice: Excel-like row (default, owner request 2026-11-08) or the list
+// per-viewer choice (W8 item 3): the list like the Site Master lists (default) or the Timeline (the task-as-column row of 2026-11-08), remembered
+const LAYOUT_KEY = 'pmis.site.layout';
 const TASK_COLUMNS: TasksExportColumnCode[] = ['site_code', 'task_code', 'task_name', 'task_state', 'due_date', 'sla_status'];
 
 export function Site() {
@@ -42,7 +44,7 @@ export function Site() {
   const tabs = withDismantle(s?.streams);
   const real = !!stream && isRealStream(stream, s?.streams);
   const dismantle = stream === DISMANTLE_CODE && !real;
-  const grid = useSiteTasks(siteId, real ? stream : null, !dismantle, view || null);
+  const grid = useSiteTasks(siteId, real ? stream : null, !dismantle, view || null, sp.get('tadv') || null);
   const stage = sp.get('stage');
   // the Warehouse section (D6) shows only to a caller who may view the Warehouse of the site's region
   const dispatch = useSiteDispatch(siteId);
@@ -51,7 +53,7 @@ export function Site() {
   const docsTab = section !== ''; // a section other than the task grid
   const taskId = sp.get('task');
   const [ids, setIds] = useState<string[]>([]);
-  const [layout, setLayout] = useState<'row' | 'list'>(() => (loadPref<string>(LAYOUT_KEY, 'row') === 'list' ? 'list' : 'row'));
+  const [layout, setLayout] = useState<'row' | 'list'>(() => (['row', 'timeline'].includes(loadPref<string>(LAYOUT_KEY, 'list')) ? 'row' : 'list'));
   const setParam = (k: string, v: string | null) => setSp((p) => { const n = new URLSearchParams(p); if (v) n.set(k, v); else n.delete(k); return n; }, { replace: true });
   const setStream = (code: string) => setSp((p) => { const n = new URLSearchParams(p); n.delete('stage'); if (code) n.set('stream', code); else n.delete('stream'); return n; }, { replace: true });
   const setView = (code: string) => setSp((p) => { const n = new URLSearchParams(p); n.delete('stage'); if (code) n.set('view', code); else n.delete('view'); return n; }, { replace: true });
@@ -63,6 +65,16 @@ export function Site() {
   // the pipeline shows the milestones of the chosen stream only (stage code = milestone code)
   const streamCodes = new Set((grid.data?.stages ?? []).map((x) => x.code));
   const nodes = (s?.pipeline ?? []).filter((n) => !real || (n.kind === 'milestone' ? streamCodes.has(n.code) : false));
+
+  const taskTotal = stages.reduce((n, x) => n + x.tasks.length, 0);
+  // W8 item 3: List (default) or Timeline, remembered per user; both sit in the shared toolbar with Export current view
+  const switcher = (
+    <div className="flex rounded-md border border-line" role="group" aria-label={t('site.layout')} data-testid="site-layout">
+      {([['list', 'list'], ['row', 'timeline']] as const).map(([l, name]) => <button key={l} type="button" aria-pressed={layout === l} data-testid={`site-layout-${name}`} onClick={() => { setLayout(l); savePref(LAYOUT_KEY, name); }} className={`px-2 py-1 text-xs ${layout === l ? 'bg-sideOn font-semibold text-accentText' : 'text-mute hover:bg-hover'}`}>{t(`tstd.layout_${name}`)}</button>)}
+    </div>
+  );
+  const exporter = <ExportViewButton testid="grid-export-view" source="tasks" filters={{ site_id: siteId, ...(stage ? { stage_code: stage } : {}), ...(real ? { stream } : {}), ...(view ? { view } : {}), ...(sp.get('tadv') ? { filter: sp.get('tadv') } : {}) }} columns={TASK_COLUMNS} />;
+  const displayMenu = null;
 
   return (
     <div data-testid="page-site">
@@ -118,16 +130,13 @@ export function Site() {
         </>
       )}
       {!docsTab && <>
-      <div className="mb-2 flex items-center gap-2"><h2 className="me-auto font-semibold">{t('site.tasks')}{stage && <button className="btn ms-2 px-2 py-0.5 text-xs" data-testid="stage-clear" onClick={() => setParam('stage', null)}>{t('site.all_stages')}</button>}</h2>
-        <div className="flex rounded-md border border-line" role="group" aria-label={t('site.layout')}>
-          {(['row', 'list'] as const).map((l) => <button key={l} type="button" aria-pressed={layout === l} data-testid={`site-layout-${l}`} onClick={() => { setLayout(l); savePref(LAYOUT_KEY, l); }} className={`px-2 py-1 text-xs ${layout === l ? 'bg-sideOn font-semibold text-accentText' : 'text-mute hover:bg-hover'}`}>{t(`site.layout_${l}`)}</button>)}
-        </div>
-        <ExportViewButton testid="grid-export-view" source="tasks" filters={{ site_id: siteId, ...(stage ? { stage_code: stage } : {}) }} columns={TASK_COLUMNS} /></div>
+      <div className="mb-2 flex items-center gap-2"><h2 className="me-auto font-semibold">{t('site.tasks')}{stage && <button className="btn ms-2 px-2 py-0.5 text-xs" data-testid="stage-clear" onClick={() => setParam('stage', null)}>{t('site.all_stages')}</button>}</h2></div>
+      {layout === 'row' && !dismantle && <TableToolbar testid="task-row-toolbar" count={<TableCount testid="task-row-count" noun="tasks" total={taskTotal} filtered={taskTotal} active={false} />} switcher={switcher} display={displayMenu} exporter={exporter} />}
       {dismantle ? <p className="card p-6 text-mute" data-testid="site-dismantle-todo">{t('site.dismantle_todo')}</p>
         : st?.state === 'na' ? <p className="card p-6 text-mute" data-testid="site-stream-na">{t('site.stream_na')}</p>
         : grid.isLoading ? <p className="text-mute">{t('common.loading')}</p>
         : layout === 'row' ? <TaskRow stages={stages} selected={taskId ?? sp.get('row')} onVisible={setIds} onOpen={(id) => setSp((p) => { const n = new URLSearchParams(p); n.set('task', id); n.set('row', id); return n; }, { replace: true })} />
-        : <TaskGrid key={`${stream}|${view}|${stage ?? 'all'}`} siteId={siteId} stages={stages} selected={taskId ?? sp.get('row')} onVisible={setIds} onOpen={(id) => setSp((p) => { const n = new URLSearchParams(p); n.set('task', id); n.set('row', id); return n; }, { replace: true })} />}
+        : <TaskGrid key={`${stream}|${view}|${stage ?? 'all'}`} siteId={siteId} stages={stages} switcher={switcher} exporter={exporter} display={displayMenu} selected={taskId ?? sp.get('row')} onVisible={setIds} onOpen={(id) => setSp((p) => { const n = new URLSearchParams(p); n.set('task', id); n.set('row', id); return n; }, { replace: true })} />}
       {layout === 'list' && <p className="mt-2 text-xs text-mute">{t('grid.keys')}</p>}
       </>}
       <TaskDrawer nav={{ ids, onGo: (id) => setSp((p) => { const n = new URLSearchParams(p); n.set('task', id); n.set('row', id); return n; }, { replace: true }) }} registerFields={grid.data?.stages.flatMap((x) => x.tasks).find((x) => x.id === taskId)?.register_fields} taskId={taskId} onClose={() => setParam('task', null)} />

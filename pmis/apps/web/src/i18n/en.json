@@ -5496,6 +5496,12 @@
     "pasted": "Sites: {{pasted}} pasted, {{found}} found",
     "not_found": "Not found ({{count}})",
     "not_found_title": "Site IDs not found",
-    "too_many": "At most 1000 Site IDs in one search."
+    "too_many": "At most 1000 Site IDs in one search.",
+    "last_update": "Last update",
+    "docs_missing": "{{count}} document(s) missing",
+    "sla_due": "SLA due date",
+    "search_tasks": "Search tasks, or paste task codes",
+    "layout_list": "List",
+    "layout_timeline": "Timeline"
   }
 }

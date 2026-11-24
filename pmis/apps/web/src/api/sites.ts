@@ -50,8 +50,9 @@ export const useStageCodes = () => useFirstSite((s) => s?.rail.map((r) => r.code
 export const useViews = () => useFirstSite((s) => s?.views as ViewRef[] | undefined);
 
 export const useSite = (id: string) => useQuery({ queryKey: ['site', id], queryFn: () => api.get<SiteDetail>(`/sites/${id}`) });
-export const useSiteTasks = (id: string, stream?: string | null, enabled = true, view?: string | null) =>
-  useQuery({ queryKey: ['site-tasks', id, stream ?? '', view ?? ''], enabled, queryFn: () => api.get<SiteTasks>(`/sites/${id}/tasks`, { query: { stream, view } }) });
+/** `filter` (W8): the + Filter tree of the site's task list, compiled by the server against the `site-tasks` whitelist. */
+export const useSiteTasks = (id: string, stream?: string | null, enabled = true, view?: string | null, filter?: string | null) =>
+  useQuery({ queryKey: ['site-tasks', id, stream ?? '', view ?? '', filter ?? ''], enabled, placeholderData: keepPreviousData, queryFn: () => api.get<SiteTasks>(`/sites/${id}/tasks`, { query: { stream, view, ...(filter ? { filter } : {}) } }) });
 export const useHistory = (id: string) => useQuery({ queryKey: ['task-history', id], queryFn: () => api.get<Page<WorkflowStep>>(`/tasks/${id}/history`) });
 export const useComments = (id: string) => useQuery({ queryKey: ['task-comments', id], queryFn: () => api.get<Page<Comment>>(`/tasks/${id}/comments`) });
 
