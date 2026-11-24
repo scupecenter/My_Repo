@@ -35,13 +35,16 @@ for (const c of CASES) {
     await expect(page.getByTestId('daily-plan-shown-date')).toContainText('2026-11-23');
     await expect(page.getByTestId('daily-plan-th-access_valid')).toBeVisible();
 
+    await page.bringToFront(); // the clipboard API refuses writes from a page without focus (parallel CI workers)
     await page.getByTestId('daily-plan-copy').click();
-    const html = await page.evaluate(async () => {
+    // the copy is asynchronous: wait until the HTML table is on the clipboard (CI can read it before the write has finished)
+    const readHtml = () => page.evaluate(async () => {
       const items = await navigator.clipboard.read();
       const it = items.find((x) => x.types.includes('text/html'));
       return it ? await (await it.getType('text/html')).text() : '';
     });
-    expect(html).toContain('<table');
+    await expect.poll(readHtml, { timeout: 10_000 }).toContain('<table');
+    const html = await readHtml();
     expect(html).toContain('Daily Progress 2026-11-22');
     expect(html).toContain('Tomorrow Plan 2026-11-23');
   });
