@@ -98,7 +98,7 @@ describe('Site Master: streams', () => {
     expect(await screen.findAllByTestId(/^pipe-node-/)).toHaveLength(3);
     expect(screen.queryByTestId('grid-stage-site_release')).toBeNull();
     expect(await screen.findByTestId('grid-stage-cw')).toBeInTheDocument();
-    await userEvent.click(screen.getByTestId('site-stream-tab-ALL'));
+    await userEvent.click(screen.getByTestId('site-phase-tab-ALL'));
     expect(await screen.findAllByTestId(/^pipe-node-/)).toHaveLength(10);
   });
 
@@ -139,13 +139,14 @@ describe('SITE 360: views (contract 0.4.7)', () => {
     expect(await screen.findByTestId('sites-empty')).toBeInTheDocument(); // stream CW and view TE share no task
   });
 
-  it('on the site page the view tabs still move with the arrow keys (mirrored in RTL)', async () => {
+  it('on the site page the one phase row moves with the arrow keys (W1: the view tabs are phases of that row)', async () => {
     await signIn('pm');
     renderApp(<SiteAt />, { route: `/sites/${siteIdOf(0)}` });
-    const all = await screen.findByTestId('site-view-tabs-ALL');
+    const all = await screen.findByTestId('site-phase-tab-ALL');
     all.focus();
     await userEvent.keyboard('{ArrowRight}');
-    expect(screen.getByTestId('site-view-tabs-CW')).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByTestId('site-phase-tab-DESIGN_ACQ')).toHaveAttribute('aria-selected', 'true');
+    expect(screen.queryByTestId('site-view-tabs')).toBeNull();
   });
 
   it('the real 0.4.7 shapes: B15 in CW, D18 in TE, B14 in OM (O&M not assigned); stage 1 and Z1 only in All work', async () => {
@@ -164,14 +165,15 @@ describe('SITE 360: views (contract 0.4.7)', () => {
     await expect(api.get('/sites', { query: { view: 'NOPE' } })).rejects.toMatchObject({ status: 422 });
   });
 
-  it('the site page grid follows the view and the stream together (intersection)', async () => {
+  it('an old ?view=TE link opens the TE phase of the site page; O&M is its own phase', async () => {
     await signIn('pm');
     renderApp(<SiteAt />, { route: `/sites/${siteIdOf(0)}?view=TE` });
     expect(await screen.findByTestId('grid-stage-te_installation')).toBeInTheDocument();
+    expect(screen.getByTestId('site-phase-tab-TE')).toHaveAttribute('aria-selected', 'true');
     expect(screen.queryByTestId('grid-stage-cw')).toBeNull();
-    await userEvent.click(await screen.findByTestId('site-view-tabs-OM'));
+    await userEvent.click(await screen.findByTestId('site-phase-tab-OM'));
     await waitFor(() => expect(screen.queryByTestId('grid-stage-te_installation')).toBeNull());
-    await userEvent.click(screen.getByTestId('site-view-tabs-ALL'));
+    await userEvent.click(screen.getByTestId('site-phase-tab-ALL'));
     expect(await screen.findByTestId('grid-stage-cw')).toBeInTheDocument();
   });
 });

@@ -12,6 +12,21 @@ const OPEN_DURING_RESET: RegExp[] = [
 const CHECK_EVERY_MS = 1000;
 
 /**
+ * The path as Express routes it, so the maintenance check cannot be bypassed by a different spelling: Express matches routes case-insensitively and
+ * decodes percent-escapes, so the check lowercases, decodes (an invalid escape keeps the raw text) and collapses repeated slashes before matching.
+ * Every path under /api/ is refused during a reset except the exact reads of OPEN_DURING_RESET.
+ */
+export function normalisePath(url: string): string {
+  let p = url.split('?')[0]?.split('#')[0] ?? '';
+  try {
+    p = decodeURIComponent(p);
+  } catch {
+    /* keep the raw path */
+  }
+  return p.toLowerCase().replace(/\\/g, '/').replace(/\/{2,}/g, '/');
+}
+
+/**
  * Maintenance mode of the project data reset (migration 0146). While a reset's database transaction is open, every route except the reads above answers 503
  * `maintenance`. Two sources: this process's own run (set by DataResetService at once), and the database (`data_reset_maintenance()`: a request in
  * `running` or the advisory lock of a reset held, e.g. by another API process), read at most once a second.
@@ -56,9 +71,9 @@ export class MaintenanceService {
   /** Express middleware, before the session guard and the request transaction. */
   middleware() {
     return (req: Request, res: Response, next: NextFunction): void => {
-      const path = (req.originalUrl ?? req.url ?? '').split('?')[0] ?? '';
-      const open = req.method === 'GET' && OPEN_DURING_RESET.some((re) => re.test(path));
-      if (open || !path.startsWith('/api/v1/')) {
+      const path = normalisePath(req.originalUrl ?? req.url ?? '');
+      const open = req.method === 'GET' && !path.includes('/..') && OPEN_DURING_RESET.some((re) => re.test(path));
+      if (open || !path.startsWith('/api/')) {
         next();
         return;
       }

@@ -11,6 +11,7 @@ import {
 import { errText, FormDialog } from "@/components/FormDialog";
 import { useToast } from "@/components/Toast";
 import { moveRow, tabRows, toLayout, type CardRow } from "../dashboardLayout";
+import { QueryFallback } from '@/components/States';
 
 const TABS: DashboardTab[] = ["pmo", "cw", "te"];
 type Thresholds = DashboardSettingsInput["thresholds"];
@@ -55,9 +56,7 @@ export function DashboardSettings() {
   if (!q.data)
     return (
       <section className="card p-4" data-testid="page-dashboard-settings">
-        <p className="text-mute" role="status">
-          {t("common.loading")}
-        </p>
+        <QueryFallback queries={[q]} testid="dash-settings-loading" />
       </section>
     );
   const s = q.data;

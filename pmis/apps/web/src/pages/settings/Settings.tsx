@@ -30,12 +30,11 @@ export interface SettingsTab { key: string; sections: SettingsSection[] }
 /** The tabs of Administration > Settings (F19, and the dashboard tab of F20). Tabs with sections show a sub-navigation inside the tab. */
 export const SETTINGS_TABS: readonly SettingsTab[] = [
   { key: 'calendar', sections: [] },
-  { key: 'workflow', sections: [{ key: 'editor' }, { key: 'freeze' }, { key: 'idle' }, { key: 'board' }] },
+  { key: 'workflow', sections: [{ key: 'editor' }, { key: 'columns' }, { key: 'freeze' }, { key: 'idle' }, { key: 'board' }] },
   { key: 'sla', sections: [{ key: 'rules' }, { key: 'dlp' }] },
   { key: 'weights', sections: [] },
   { key: 'registers', sections: [{ key: 'columns' }, { key: 'contractors' }, { key: 'gecol' }, { key: 'team-scope' }] },
   { key: 'ddl', sections: [] },
-  { key: 'site360', sections: [] },
   { key: 'documents', sections: [{ key: 'library' }, { key: 'mail', adminOnly: true }] },
   { key: 'data', sections: [{ key: 'imports' }, { key: 'historical' }, { key: 'reset', adminOnly: true }] },
   { key: 'alerts', sections: [] },
@@ -63,7 +62,9 @@ export const LEGACY_SETTINGS_PATHS: Readonly<Record<string, string>> = {
   'mail-kinds': 'documents/mail',
   imports: 'data/imports',
   'historical-waiver': 'data/historical',
-  'site360-columns': 'site360',
+  // W3 (2026-11-24): the Site360 tab is gone; its Master column menus live in Settings > Workflow > Columns, with the same rights.
+  site360: 'workflow/columns',
+  'site360-columns': 'workflow/columns',
 };
 
 function Layout() {
@@ -111,12 +112,12 @@ export function SettingsRoutes() {
         <Route path="weights" element={<WeightSets />} />
         <Route path="ddl" element={<Lists />} />
         <Route path="alerts" element={<Notifications />} />
-        <Route path="site360" element={<Site360Columns />} />
         <Route path="dashboard" element={<DashboardSettings />} />
         <Route path="identity" element={<Identity />} />
         <Route path="workflow" element={<TabFrame tab="workflow" />}>
           <Route index element={<Navigate to="editor" replace />} />
           <Route path="editor" element={<Studio />} />
+          <Route path="columns" element={<Site360Columns />} />
           <Route path="freeze" element={<Freeze />} />
           <Route path="idle" element={<Idle />} />
           <Route path="board" element={<KanbanWip />} />

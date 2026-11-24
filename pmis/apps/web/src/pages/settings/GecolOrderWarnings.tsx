@@ -5,6 +5,7 @@ import { useGecolOrderWarnings, useSetGecolOrderWarnings, type GecolOrderWarning
 import { errText, FormDialog } from '@/components/FormDialog';
 import { useToast } from '@/components/Toast';
 import { fieldErrors } from '@/lib/fields';
+import { QueryFallback } from '@/components/States';
 
 /**
  * Settings, GECOL order warnings (contract 0.12.11, Q151). Each chain lists GECOL dates in their expected order; a later step dated before an earlier one
@@ -18,7 +19,7 @@ export function GecolOrderWarnings() {
   const [open, setOpen] = useState(false);
   const cur: GecolOrderWarningsInput | null = draft ?? (q.data ? { enabled: q.data.enabled, chains: q.data.chains, billing_after: q.data.billing_after ?? null } : null);
   const errs = fieldErrors(set.error);
-  if (!cur || !q.data) return <section className="card p-4" data-testid="page-gecol-order">…</section>;
+  if (!cur || !q.data) return <section className="card p-4" data-testid="page-gecol-order"><QueryFallback queries={[q]} testid="gow-loading" /></section>;
   const fields = q.data.fields;
   const label = (code: string) => { const f = fields.find((x) => x.code === code); return (i18n.language === 'ar' && f?.label_ar) || f?.label_en || code; };
   const setChain = (i: number, chain: string[]) => setDraft({ ...cur, chains: cur.chains.map((c, j) => (j === i ? chain : c)) });

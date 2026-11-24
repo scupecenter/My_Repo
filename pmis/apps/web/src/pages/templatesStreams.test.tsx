@@ -40,7 +40,7 @@ describe('Templates page: Site Register templates', () => {
     for (const id of ['TPL-MASTER', 'TPL-SITE-DA', 'TPL-SITE-CW', 'TPL-SITE-TE', 'TPL-SITE-CL', 'TPL-PO', 'TPL-GECOL']) expect(await screen.findByTestId(`tpl-row-${id}`)).toBeInTheDocument();
     expect(screen.getByTestId('tpl-row-TPL-SITE-CW')).toHaveAttribute('data-kind', 'stream');
     expect(screen.getByTestId('tpl-row-TPL-SITE-CW')).toHaveAttribute('data-stream', 'CW');
-    expect(screen.getByTestId('tpl-kind-TPL-SITE-CW')).toHaveTextContent('SITE 360 stream');
+    expect(screen.getByTestId('tpl-kind-TPL-SITE-CW')).toHaveTextContent('Site Master stream');
     expect(screen.getByTestId('tpl-kind-TPL-MASTER')).toHaveTextContent('Whole Master');
     expect(screen.queryByTestId('tpl-kind-TPL-GECOL')).not.toBeInTheDocument();
     expect(screen.getByTestId('tpl-version-TPL-SITE-CW')).toHaveTextContent('v1');
