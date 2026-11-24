@@ -5252,6 +5252,192 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/data-reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Project data reset (System Admin only)
+         * @description 0.15.62 (migration 0146, `data_reset_state_json`). A System Admin acting without delegation only (403 `action_forbidden` or `delegate_forbidden` otherwise; the
+         *     menu entry is hidden for everyone else). The plan is the one list of the operator script and of this page (`data_reset_plan`): every table with its decision and the
+         *     rows that would be deleted and kept now. `backup` is the latest successful database backup recorded in the System Log (source `backup`, level `info`, written by
+         *     `infra/backup/db-backup.sh`); a run is refused unless it is younger than `settings.backup_max_age_hours`. `single_admin` is true while fewer than two System Admins
+         *     are active: then no request can be made and the reset is done on the server with `infra/scripts/reset-project-data.sh`. `request` is the open request, `last_request`
+         *     the latest closed one (with its result and the restore instructions on the page). `storage` tells whether the documents are on local disk (the only store the file move
+         *     supports) or in S3/MinIO (a run is then refused, 409 `storage_not_supported`).
+         */
+        get: operations["getDataReset"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/data-reset/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * The request expiry and the backup window of the data reset
+         * @description 0.15.62 (guarded setting `data_reset.settings`). System Admin acting without delegation, reason, step-up and If-Match (the version of `settings`). Closed body (`unknown_key`); `request_expiry_minutes` 5 to 240 (default 30), `backup_max_age_hours` 1 to 72 (default 24), else `out_of_range`. Refused while a request is open (409 `invalid_transition`). Audited (`data_reset_settings_update`, before and after).
+         */
+        put: operations["setDataResetSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/data-reset/requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request the project data reset (first System Admin)
+         * @description 0.15.62. A System Admin acting without delegation (403 `delegate_forbidden` for a delegate), a reason of at least 10 characters, a step-up and the typed phrase
+         *     `RESET <database>` (`confirmation_phrase` of the state; 422 `confirmation_mismatch`). Refused with 409 `single_admin` while fewer than two System Admins are active, 409
+         *     `invalid_transition` while another request is open, 409 `reset_running` while the operator script runs. The request expires after `settings.request_expiry_minutes`
+         *     (default 30). Every other active System Admin is told in-app. Audited (`data_reset_request`) and written to the security log (`project_data_reset`, step `request`).
+         */
+        post: operations["requestDataReset"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/data-reset/requests/{request_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * One data reset request (progress and result)
+         * @description 0.15.62. A System Admin acting without delegation. Answered also while the reset runs (the only routes not refused with 503 then, with `GET /settings/data-reset`), so the runner can follow the progress.
+         */
+        get: operations["getDataResetRequest"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/data-reset/requests/{request_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve the request (a second, different System Admin)
+         * @description 0.15.62. A System Admin acting without delegation who is not the requester and not in the requester's session (403 `self_approval_forbidden`), a reason of at least 10 characters, a step-up and If-Match. The request must be `requested` (409 `invalid_transition`) and not expired (409 `request_expired`). Approval does not run anything. Audited (`data_reset_approve`) and in the security log.
+         */
+        post: operations["approveDataReset"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/data-reset/requests/{request_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel the request (either System Admin)
+         * @description 0.15.62. Any System Admin acting without delegation, a reason, a step-up and If-Match, while the request is `requested` or `approved` (status `cancelled`). A run whose transaction died before its commit (the API stopped; `stalled` true) is closed the same way as `failed`; nothing was reset. Audited (`data_reset_cancel`) and in the security log.
+         */
+        post: operations["cancelDataReset"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/data-reset/requests/{request_id}/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start the approved reset (the requester or the approver)
+         * @description 0.15.62. The System Admin who made the request or the one who approved it (403 `action_forbidden` for anyone else), acting without delegation, a step-up, the typed
+         *     phrase again (422 `confirmation_mismatch`) and If-Match, while the request is `approved` and not expired. Refused with 409 `backup_missing` unless the System Log
+         *     records a successful database backup within `backup_max_age_hours`, 409 `storage_not_supported` when the documents are in S3/MinIO, 409 `quarantine_unavailable`
+         *     when the quarantine directory cannot be made in the store, 409 `plan_incomplete` when a table has no decision, 409 `reset_running` while a reset runs.
+         *     Answers 202 with the request in `running` and runs in the background: one database transaction (`admin_data_reset_execute`, `data_reset_core`) that deletes the
+         *     project data with the guards of the operator script and ends every session except the runner's; while it runs every other route answers 503 `maintenance`. After the
+         *     commit the API moves the stored files of the deleted rows into `quarantine_dir` (never deleted; status `files_pending`, then `completed`). A failure before the commit
+         *     leaves everything as it was (status `failed`, `error`). Poll `GET /settings/data-reset/requests/{request_id}`.
+         */
+        post: operations["runDataReset"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/data-reset/requests/{request_id}/retry-files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Move the files still pending after a reset (the database part never runs again)
+         * @description 0.15.62. Any System Admin acting without delegation, a reason and a step-up, while the request is `files_pending` (409 `invalid_transition` otherwise). Moves the keys still `pending` into the same quarantine directory with the same rules; a key already moved, missing or refused is never tried again. Audited (`data_reset_files_retry`).
+         */
+        post: operations["retryDataResetFiles"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/imports": {
         parameters: {
             query?: never;
@@ -9587,7 +9773,7 @@ export interface components {
             conflicts?: components["schemas"]["ScopeConflict"][];
         };
         /** @enum {string} */
-        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "plan_locked" | "insufficient_stock" | "item_in_use" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "invalid_code" | "invalid_enrol_code" | "enrol_code_expired" | "password_change_required" | "weak_password" | "internal_error" | "team_scope_mismatch" | "two_factor_enforced" | "scope_scenario_conflict" | "too_many_rows" | "integrity_too_large" | "mail_not_configured" | "self_approval_forbidden" | "document_rule_pending" | "file_pending_scan" | "list_not_configured" | "list_parent_mismatch" | "email_not_verified" | "batch_processing" | "vehicle_already_reserved" | "upload_processing" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "invitation_invalid" | "system_field" | "conversion_unconfirmed" | "column_in_use" | "input_already_mapped" | "field_already_mapped";
+        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "plan_locked" | "insufficient_stock" | "item_in_use" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "invalid_code" | "invalid_enrol_code" | "enrol_code_expired" | "password_change_required" | "weak_password" | "internal_error" | "team_scope_mismatch" | "two_factor_enforced" | "scope_scenario_conflict" | "too_many_rows" | "integrity_too_large" | "mail_not_configured" | "self_approval_forbidden" | "document_rule_pending" | "file_pending_scan" | "list_not_configured" | "list_parent_mismatch" | "email_not_verified" | "batch_processing" | "vehicle_already_reserved" | "upload_processing" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "invitation_invalid" | "system_field" | "conversion_unconfirmed" | "column_in_use" | "input_already_mapped" | "field_already_mapped" | "single_admin" | "backup_missing" | "request_expired" | "reset_running" | "plan_incomplete" | "storage_not_supported" | "quarantine_unavailable" | "maintenance";
         PageEnvelope: {
             items: unknown[];
             page: components["schemas"]["PageInfo"];
@@ -13577,6 +13763,144 @@ export interface components {
             affected_open_tasks: number;
             version: number;
         };
+        DataResetSettings: {
+            /** @description Minutes a request stays open (default 30). */
+            request_expiry_minutes: number;
+            /** @description Age limit of the last successful database backup (default 24). */
+            backup_max_age_hours: number;
+            version: number;
+        };
+        DataResetBackup: {
+            /** @description A successful backup is recorded within `max_age_hours`. */
+            ok: boolean;
+            max_age_hours: number;
+            /** @description The latest System Log row of source `backup`, level `info`, `context.script` = `db-backup`, `context.event` = `backup_ok`, `context.type` full or diff. */
+            last_success?: {
+                system_log_id?: number;
+                /** Format: date-time */
+                at: string;
+                /** @description full or diff. */
+                type?: string | null;
+                /** @description full, diff, weekly or monthly (db-backup.sh mode). */
+                mode?: string | null;
+                /** @description The pgBackRest repositories that took it. */
+                repository?: string | null;
+                stanza?: string | null;
+            } | null;
+            /** @description The latest error of the backup check, when newer than the last success. */
+            last_problem?: {
+                system_log_id?: number;
+                /** Format: date-time */
+                at?: string;
+                message?: string;
+            } | null;
+        };
+        DataResetPlanTable: {
+            table: string;
+            /** @enum {string} */
+            action: "delete" | "mixed" | "keep" | "log";
+            rows: number;
+            delete: number;
+            keep: number;
+        };
+        DataResetFiles: {
+            total: number;
+            moved: number;
+            missing: number;
+            refused: number;
+            pending: number;
+            /** @description The first 200 keys missing or refused (left in place, never deleted). */
+            problems: {
+                storage_key?: string;
+                /** @enum {string} */
+                outcome?: "missing" | "refused";
+                detail?: string | null;
+            }[];
+        };
+        DataResetRequest: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            status: "requested" | "approved" | "running" | "files_pending" | "completed" | "failed" | "cancelled" | "expired";
+            version: number;
+            database_name: string;
+            requested_by: components["schemas"]["UserRef"];
+            /** Format: date-time */
+            requested_at: string;
+            request_reason: string;
+            /** Format: date-time */
+            expires_at: string;
+            expired: boolean;
+            approved_by?: components["schemas"]["UserRef"] | null;
+            /** Format: date-time */
+            approved_at?: string | null;
+            approve_reason?: string | null;
+            cancelled_by?: components["schemas"]["UserRef"] | null;
+            /** Format: date-time */
+            cancelled_at?: string | null;
+            cancel_reason?: string | null;
+            run_by?: components["schemas"]["UserRef"] | null;
+            /** Format: date-time */
+            run_started_at?: string | null;
+            /** Format: date-time */
+            db_committed_at?: string | null;
+            /** Format: date-time */
+            finished_at?: string | null;
+            /** @description Running, but its transaction died before the commit (nothing was reset); cancel closes it as failed. */
+            stalled: boolean;
+            /** @description The backup the run relied on (`DataResetBackup.last_success`). */
+            backup?: {
+                [key: string]: unknown;
+            } | null;
+            /** @description `delete_rows`, `files` and `sites` when the request was made. */
+            plan_at_request?: {
+                [key: string]: unknown;
+            } | null;
+            /** @description `audit_id` (the `project_data_reset` row on the Audit Log chain), `sessions_ended`, `deleted` (rows per table). */
+            result?: {
+                [key: string]: unknown;
+            } | null;
+            /** @description Where the files of the deleted rows were moved (inside the store, `<STORAGE_DIR>/.pre-reset-<timestamp>`). */
+            quarantine_dir?: string | null;
+            error?: string | null;
+            files: components["schemas"]["DataResetFiles"];
+        };
+        DataResetState: {
+            database: string;
+            /** @description `RESET <database>`: typed to request and again to run. */
+            confirmation_phrase: string;
+            settings: components["schemas"]["DataResetSettings"];
+            system_admins_active: number;
+            /** @description Fewer than two active System Admins: no request; the operator script on the server is the way. */
+            single_admin: boolean;
+            script_running: boolean;
+            maintenance: boolean;
+            backup: components["schemas"]["DataResetBackup"];
+            plan: {
+                tables: components["schemas"]["DataResetPlanTable"][];
+                delete_rows: number;
+                keep_rows: number;
+                /** @description Stored files of the rows that would be deleted (moved, never deleted). */
+                files: number;
+                /** @description Why the plan cannot be counted (a table without a decision, a right missing); a run is then refused (409 `plan_incomplete`). The tables are empty while a run is open. */
+                error?: string | null;
+            };
+            request: components["schemas"]["DataResetRequest"] | null;
+            last_request: components["schemas"]["DataResetRequest"] | null;
+            can: {
+                request?: boolean;
+                approve?: boolean;
+                start?: boolean;
+                cancel?: boolean;
+                retry_files?: boolean;
+            };
+            storage: {
+                /** @enum {string} */
+                driver: "local" | "s3";
+                /** @description false with S3/MinIO: a run is refused (409 `storage_not_supported`). */
+                supported: boolean;
+            };
+        };
         StructuralFreeze: {
             /** @description true while today is inside the window and the freeze is not lifted. Structural workflow changes then answer 409 `freeze_active`. */
             active: boolean;
@@ -15802,7 +16126,7 @@ export interface components {
             security_log_days: number;
         };
         /** @enum {string} */
-        SecurityEvent: "sign_in_started" | "sign_in_succeeded" | "callback_account_mismatch" | "sign_in_failed" | "sign_in_locked" | "sign_in_rate_limited" | "signed_out" | "session_expired" | "session_ended" | "session_revoked_by_admin" | "mfa_exemption_granted" | "mfa_exemption_revoked" | "step_up_passed" | "step_up_failed" | "break_glass_used" | "two_factor_passed" | "two_factor_failed" | "recovery_code_used" | "two_factor_enrolled" | "password_changed" | "password_reset";
+        SecurityEvent: "sign_in_started" | "sign_in_succeeded" | "callback_account_mismatch" | "sign_in_failed" | "sign_in_locked" | "sign_in_rate_limited" | "signed_out" | "session_expired" | "session_ended" | "session_revoked_by_admin" | "mfa_exemption_granted" | "mfa_exemption_revoked" | "step_up_passed" | "step_up_failed" | "break_glass_used" | "two_factor_passed" | "two_factor_failed" | "recovery_code_used" | "two_factor_enrolled" | "password_changed" | "password_reset" | "project_data_reset";
         /** @enum {string} */
         SecurityOutcome: "success" | "failure" | "info";
         SecurityLogEntry: {
@@ -16285,7 +16609,7 @@ export interface components {
             revoked_count: number;
         };
         /** @enum {string} */
-        NotificationKind: "task_assigned" | "task_returned" | "task_approved" | "approval_due" | "reassigned" | "absence_alert" | "idle_task_alert" | "no_holder" | "holiday_tentative" | "delegation" | "mfa_exemption" | "template_updated" | "import_batch" | "system" | "mention" | "followed_change" | "task_rejected" | "no_eligible_holder" | "register_assigned" | "register_rejected" | "gate_closed_again" | "sla_negative_duration" | "email_change_requested" | "email_change_decided" | "security_alert" | "snag_raised" | "snag_review" | "snag_rejected" | "snag_closed" | "levels_converted" | "permit_transferred" | "phone_change_requested" | "phone_change_decided" | "security_notice" | "site_region_moved" | "assignment_request";
+        NotificationKind: "task_assigned" | "task_returned" | "task_approved" | "approval_due" | "reassigned" | "absence_alert" | "idle_task_alert" | "no_holder" | "holiday_tentative" | "delegation" | "mfa_exemption" | "template_updated" | "import_batch" | "system" | "mention" | "followed_change" | "task_rejected" | "no_eligible_holder" | "register_assigned" | "register_rejected" | "gate_closed_again" | "sla_negative_duration" | "email_change_requested" | "email_change_decided" | "security_alert" | "snag_raised" | "snag_review" | "snag_rejected" | "snag_closed" | "levels_converted" | "permit_transferred" | "phone_change_requested" | "phone_change_decided" | "security_notice" | "site_region_moved" | "assignment_request" | "data_reset_request";
         Notification: {
             /** Format: uuid */
             id: string;
@@ -17924,6 +18248,16 @@ export interface components {
         /** @description Validation failed (`validation_failed`, `list_parent_mismatch`, `note_required`, `mandatory_slots_missing`, `mandatory_fields_missing`, `open_snags`, `empty_cell`, `workflow_invalid`, `master_impact_unconfirmed`, `file_rejected`, `template_rejected`, `insufficient_stock`, `confirmation_mismatch`). */
         Unprocessable: {
             headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description 0.15.62. A project data reset is running (`maintenance`); try again after `Retry-After` seconds. */
+        ServiceUnavailable: {
+            headers: {
+                "Retry-After"?: number;
                 [name: string]: unknown;
             };
             content: {
@@ -27318,6 +27652,274 @@ export interface operations {
             412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getDataReset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The state. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataResetState"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setDataResetSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"] & {
+                    request_expiry_minutes: number;
+                    backup_max_age_hours: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataResetSettings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    requestDataReset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: string;
+                    confirm_text: components["schemas"]["ConfirmText"];
+                };
+            };
+        };
+        responses: {
+            /** @description Requested. */
+            201: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataResetRequest"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    getDataResetRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The request. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataResetRequest"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    approveDataReset: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Approved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataResetRequest"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    cancelDataReset: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"];
+            };
+        };
+        responses: {
+            /** @description Cancelled. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataResetRequest"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    runDataReset: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    confirm_text: components["schemas"]["ConfirmText"];
+                };
+            };
+        };
+        responses: {
+            /** @description Started. */
+            202: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataResetRequest"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    retryDataResetFiles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"];
+            };
+        };
+        responses: {
+            /** @description The move ran; the request after it. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataResetRequest"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            503: components["responses"]["ServiceUnavailable"];
         };
     };
     getImportsSettings: {
