@@ -242,13 +242,22 @@ Do:
    - The search applies on the server (GET /sites, GET /site360/{menu}/rows, the register lists and the other site-data lists), so paging, count and Export follow it. Keep it in saved views.
    - A paste of up to 1000 codes is accepted.
    - It works on every screen in item 4's scope.
-6. Tests: vitest for the row numbers across pages, the three-level header merge, the task list layout, the display menu (persisted and applied) and the pasted-list search (spaces, new lines, mixed case, not-found list); API tests for the multi-token search on the site lists; update the e2e for the wide table and the site page.
+6. **Total, filtered and shown counts (owner request 2026-11-24).** Today the toolbar shows one number ("469 sites") that does not change when a filter or search applies.
+   - Place: the same spot as today, right after the filter chips and before the view switcher (Map, Board, Wide table).
+   - Text: "469 sites" when nothing is filtered. With a filter or search: "120 of 469 sites", with the filtered number in bold and a small "Clear filters" link.
+   - The list footer beside "Load more" shows "Showing 50 of 120". It disappears when everything is loaded.
+   - Selected rows add "· 3 selected".
+   - Total = every site the user may see on that screen (region scope applies). Filtered = rows matching the current filters and search, server-side. Shown = rows loaded on the page.
+   - Arabic: "120 من 469 موقعًا" and "يُعرض 50 من 120".
+   - The numbers come from the server (a total and a filtered count in the list response; add them to the contract where missing), never from the loaded rows. Export uses the filtered set.
+   - The same component appears on every screen in item 4's scope (all site lists, every register and log, My Work, Approvals, the Daily Plan, the Archive). Registers use their own noun ("records", "issues") with the same pattern.
+7. Tests: vitest for the counts (unfiltered, filtered, partly loaded, selected), the row numbers across pages, the three-level header merge, the task list layout, the display menu (persisted and applied) and the pasted-list search (spaces, new lines, mixed case, not-found list); API tests for the multi-token search on the site lists; update the e2e for the wide table and the site page.
 
 Acceptance:
 - Every site list shows `#` first.
 - Wide-table headers show section, group and column on three rows, without the "Group / Column" repetition.
 - The site Tasks table opens as a list like Site Master.
-- Pasting several Site IDs into the search box shows each of those sites in its own row. The same complete toolbar (filters included) and Display menu (text size, alignment, density, wrap, zebra rows, remembered) appear on every screen that shows site data.
+- The toolbar shows total, filtered and shown counts. Pasting several Site IDs into the search box shows each of those sites in its own row. The same complete toolbar (filters included) and Display menu (text size, alignment, density, wrap, zebra rows, remembered) appear on every screen that shows site data.
 
 ## W6. Documentation
 
@@ -270,6 +279,7 @@ Total: roughly 7 PRs and several CI cycles each. This does not fit in one short 
 
 ## Log
 
+- 2026-11-24: W8 item 6: total / filtered / shown counts on every site-data screen.
 - 2026-11-23: W8 item 5: search by a pasted list of Site IDs.
 - 2026-11-23: W8 added (row numbers, three-level headers, task list layout, one full table standard on every screen of site data).
 - 2026-11-23: the new main menu is named Library (المكتبة) with Forms (النماذج) and Archive (الأرشيف); Settings > Documents > Library is renamed Document types.
