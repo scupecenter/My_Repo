@@ -60,6 +60,8 @@ import { LibraryService } from './documents/library.service';
 import { StorageService } from './documents/storage.service';
 import { StorageJobsService } from './documents/storage-jobs.service';
 import { ZipService } from './documents/zip.service';
+import { LibraryMenuController } from './library/library.controller';
+import { LibraryMenuService } from './library/library.service';
 import { DbService } from './db/db.service';
 import { SnagsController } from './qc/snags.controller';
 import { SnagsService } from './qc/snags.service';
@@ -186,6 +188,7 @@ export function appModuleFor(config: AppConfig) {
       ExportsController, // 0.15.34: Master-format export
       AbsencesController, ReassignmentController, // 0.15.54 (migration 0140): absences and the lead decisions (B12b)
       StaffRegistryController, // 0.15.56 (0142): staff registry card, visibility, edit
+      LibraryMenuController, // 0.15.69 (0151, W5): Library > Forms and Archive
     ],
     providers: [
       { provide: APP_CONFIG, useValue: config },
@@ -207,6 +210,7 @@ export function appModuleFor(config: AppConfig) {
       MasterExportService, // 0.15.34
       AbsencesService, ReassignmentService, // 0.15.54 (migration 0140)
       StaffRegistryService, // 0.15.56 (0142)
+      LibraryMenuService, // 0.15.69 (0151, W5)
       { provide: APP_GUARD, useClass: SessionGuard },
       { provide: APP_INTERCEPTOR, useClass: TxInterceptor },
       { provide: APP_FILTER, useClass: ProblemFilter },

@@ -20,6 +20,8 @@ const CONFIG = ['view', 'create', 'edit', 'delete'];
 
 export const MODULES: ModuleDef[] = [
   { key: 'sites', name_en: 'Sites', screens: [{ key: 'sites.documents', name_en: 'Site documents' }], actions: OPERATIONAL },
+  // W5 (0.15.69): Library > Forms. `create` on library.forms is "Documents: generate" (a filled document for a site of the region), besides the L1 holder of the task.
+  { key: 'library', name_en: 'Library', screens: [{ key: 'library.forms', name_en: 'Forms (Documents: generate)' }, { key: 'library.archive', name_en: 'Archive' }], actions: ['view', 'create'] },
   { key: 'approvals', name_en: 'Approvals', actions: ['view', 'approve', 'view_audit'] },
   { key: 'my_work', name_en: 'My Work', actions: ['view'] },
   { key: 'dashboard', name_en: 'Dashboard', actions: READ_ONLY },
