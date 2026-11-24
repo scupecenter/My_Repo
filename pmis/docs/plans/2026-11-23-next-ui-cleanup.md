@@ -83,9 +83,9 @@ W1 decision: the single tab row takes its phases from the published workflow ver
 
 | # | Workstream | Status | PR |
 |---|------------|--------|----|
-| W1 | Site page: one clear tab row instead of two overlapping rows | Pending | |
+| W1 | Site page: one clear tab row instead of two overlapping rows | Done | #199 |
 | W2 | Registers & Logs: the same view options as Site Master (wide table, board, density, map where it applies) | Pending | |
-| W3 | Settings > Site360: remove the tab and the name; move what is still useful into Settings > Workflow | Done | this PR |
+| W3 | Settings > Site360: remove the tab and the name; move what is still useful into Settings > Workflow | Done | #198 |
 | W4 | Dead or stuck screens: Settings > Alerts and Security stay on "Loading..."; audit every menu and tab | Pending | |
 | W5 | Library menu (Forms and Archive); Data entry > Templates stays as it is | Pending | |
 | W7 | Daily Progress and Tomorrow Plan: a screen in the system, copyable to email | Pending | |
@@ -110,6 +110,17 @@ Do:
 5. Tests: vitest for the single row (labels in workflow order, disabled phase, old `stream=` link); update the existing Site page tests and the e2e that use `site-stream-tab-*`.
 
 Acceptance: one tab row; no duplicated labels; the order matches Settings > Workflow; Arabic and English, light and dark.
+
+Finding for step 1 (2026-11-24, W1 PR). The two rows above were described the wrong way round:
+- **Row A is `site-stream-tabs` in pages/Site.tsx** (All, Design & Acquisition, Civil Works, Installation (TE), Handover & Closure, Dismantle). It filters by **stream**: the stage group of the task (`stage_definitions.stream_code`, table `workflow_streams`, migration 0015), through `GET /sites/{id}/tasks?stream=`. Civil Works is greyed when the site's `StreamStatus.state` is `na` (no counting task in the stream). Dismantle is a placeholder added by `withDismantle` in lib/streams.ts (owner decision Q41): the API has no DISMANTLE stream, so the tab lists nothing.
+- **Row B is components/ViewTabs.tsx (`site-view-tabs`)** (All work, Civil Works, Installation (TE), O&M). It filters by **work view** (tables `workflow_views` and `workflow_view_members`, migration 0023, Q98) through `?view=`. A view is a set of stages plus single tasks: the CW view adds CW FAC (B15), the TE view adds the HOTO stage and TE FAC (D18), and the O&M view holds CW DLP (B14), plus both FACs when `views.om_team_assigned` is on.
+- Neither row is a milestone group. Both already follow the site's own workflow version: they come from `streams[]` and `views[]` of `GET /sites/{id}`, which belong to the version and are copied into each new draft. Studio and Settings > Workflow have no screen for streams or views; Studio edits milestones, gates and tasks only.
+
+What W1 does with this:
+- The one row merges the streams and the views of the site's published version. The streams come first, in their sort order. A view with the code of a stream (CW, TE) is the same phase. Any other view (O&M) goes right after the phase of the view before it. The seed gives: All, Design & Acquisition, Civil Works, Installation (TE), O&M, Handover & Closure, Dismantle. Nothing is hard-coded, so another version shows its own list.
+- A stream phase filters by stream (`stream=` in the URL), so the stream summary, the task grid and the pipeline count the same tasks. A view-only phase (O&M) filters by view (`view=`). CW FAC, HOTO and TE FAC therefore appear under Handover & Closure (their stream) and under All, no longer under Civil Works or Installation (TE).
+- Old `stream=` links open the phase of that stream. Old `view=` links open the phase of that view (`view=CW` opens Civil Works). When both are given, `stream=` wins.
+- A phase with no applicable task is disabled with a tooltip: a stream whose status is `na`, a view with no task that is not N/A, and the Dismantle placeholder. An old link to a disabled phase shows "This phase does not apply to this site."
 
 ## W2. View options in Registers & Logs (owner images 3-4)
 
@@ -293,6 +304,7 @@ Total: roughly 7 PRs and several CI cycles each. This does not fit in one short 
 ## Log
 
 - 2026-11-24: W3 done: the Settings tab Site360 is removed; its Master column menus moved to Settings > Workflow > Columns (same API, same right); old `site360` and `site360-columns` links redirect there; user-visible "SITE 360" and "Site360" in i18n now read "Site Master" (en) and "ماستر المواقع" (ar). No migration, no contract change. CHANGELOG 202.
+- 2026-11-24: W1 done. The site page has one phase row, built from the streams and views of the site's published workflow version. Row A was the stream row in pages/Site.tsx, not a component; Row B was ViewTabs (see the W1 finding). Front end only; no contract change. CHANGELOG 200.
 - 2026-11-24: W8 item 6: total / filtered / shown counts on every site-data screen.
 - 2026-11-23: W8 item 5: search by a pasted list of Site IDs.
 - 2026-11-23: W8 added (row numbers, three-level headers, task list layout, one full table standard on every screen of site data).
