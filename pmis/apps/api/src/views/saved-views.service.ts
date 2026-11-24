@@ -24,7 +24,7 @@ const columnsSchema = z.object({
   hidden: z.array(colId).max(200).optional(),
   width: z.record(colId, z.number().int().min(40).max(1000)).optional(),
   density: z.enum(['comfortable', 'normal', 'compact']).optional(),
-  // W8 item 4 (0.15.64): the Display options of the view
+  // W8 item 4 (0.15.68): the Display options of the view
   display: z.object({
     size: z.enum(['sm', 'md', 'lg']).optional(),
     align: z.enum(['start', 'center']).optional(),

@@ -1,5 +1,5 @@
 import { Prisma } from '@prisma/client';
-import { ProblemException, FieldError, problems } from './problem';
+import { ProblemException, FieldError, problems, type ErrorCode } from './problem';
 
 interface PgInfo {
   sqlstate?: string;
@@ -162,6 +162,9 @@ export function mapWfError(message: string): ProblemException | null {
         detail: detail ?? 'A critical list of this register has no value yet.',
         extra: { lists: Array.isArray(extra.lists) ? extra.lists : [] },
       });
+    case 'plan_locked':
+      // 0149 (W7): the day of the Daily Plan is locked; only an admin override reopens it
+      return new ProblemException(409, 'plan_locked', { detail: detail ?? 'The day is locked: only an admin override reopens it.' });
     case 'freeze_active':
       return new ProblemException(409, 'freeze_active', { detail: detail ?? 'Structural changes are frozen.' });
     case 'column_in_use':
@@ -189,6 +192,18 @@ export function mapWfError(message: string): ProblemException | null {
       return new ProblemException(422, 'master_impact_unconfirmed', {
         detail: detail ?? 'Confirm the Master impact to continue.', extra: { confirmation_phrase: typeof extra.confirmation_phrase === 'string' ? extra.confirmation_phrase : 'master-impact' },
       });
+    case 'data_reset': {
+      // 0146 (0.15.62): the doors of the project data reset name their own status and code
+      const status = [403, 404, 409, 412, 422, 503].includes(Number(extra.status)) ? Number(extra.status) : 409;
+      const code = (typeof extra.code === 'string' && /^[a-z_]{3,40}$/.test(extra.code) ? extra.code : 'invalid_transition') as ErrorCode;
+      const errors = extra.errors;
+      const rest = Object.fromEntries(Object.entries(extra).filter(([k]) => !['status', 'code', 'detail', 'errors'].includes(k)));
+      return new ProblemException(status, code, {
+        detail: detail ?? 'This is not possible in the current state.',
+        errors: Array.isArray(errors) ? (errors as FieldError[]) : undefined,
+        extra: Object.keys(rest).length > 0 ? rest : undefined,
+      });
+    }
     case 'validation_failed':
       return new ProblemException(422, 'validation_failed', {
         detail: detail ?? 'The request is not valid.',

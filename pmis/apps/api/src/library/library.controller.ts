@@ -1,4 +1,6 @@
-import { Body, Controller, Get, Headers, HttpCode, Param, Post, Put, Query, Res } from '@nestjs/common';
+import { Body, Controller, Get, Headers, HttpCode, Param, Post, Put, Query, Res, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import type { Response } from 'express';
 import type { AuthContext } from '../auth/auth.types';
 import { Auth } from '../auth/decorators';
@@ -8,7 +10,7 @@ import { ZipService } from '../documents/zip.service';
 import { LibraryMenuService } from './library.service';
 import { FORM_CSP } from './render';
 
-/** W5 (contract 0.15.69, migration 0151): Library > Forms and Archive, Settings > Documents > Form templates and Archive. The database checks the rights. */
+/** W5 (contract 0.15.70, migration 0151): Library > Forms and Archive, Settings > Documents > Form templates and Archive. The database checks the rights. */
 @Controller()
 export class LibraryMenuController {
   constructor(
@@ -76,10 +78,12 @@ export class LibraryMenuController {
     return this.lib.templates();
   }
 
+  /** multipart/form-data: the HTML file in `file` (3 MB at most), the other fields as text, `bindings` as JSON text. */
   @Post('library/form-templates')
   @HttpCode(201)
-  saveTemplate(@Body() body: unknown) {
-    return this.lib.saveTemplate(body);
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 3_000_000, files: 1, fields: 12, parts: 14, fieldSize: 20_000 } }))
+  saveTemplate(@UploadedFile() file: { buffer: Buffer; originalname: string } | undefined, @Body() body: Record<string, unknown> | undefined) {
+    return this.lib.saveTemplateUpload(file, body);
   }
 
   @Get('library/form-templates/:id/html')

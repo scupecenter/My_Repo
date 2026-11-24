@@ -351,12 +351,20 @@ describe('hybrid mode list', () => {
       'GET /boards/sites', 'GET /boards/tasks', 'GET /settings/kanban-wip', 'PUT /settings/kanban-wip', 'GET /settings/dashboard', 'PUT /settings/dashboard', 'GET /dashboard/extras', 'PUT /dashboard/pipeline-variant', 'POST /project-status/manual-items/:item_code/plan', 'GET /documents/grid', 'GET /documents/grid/view', 'PUT /documents/grid/view', 'POST /sites/:site_id/document-overrides', 'POST /document-overrides/:override_id/revert', 'POST /files/:file_id/move', 'POST /document-library/:doc_type_id/delete', 'GET /registers/:key/records/:id/time-in-state', 'GET /reports/state-durations', 'GET /users/invitations', 'POST /users/invitations', 'POST /users/invitations/:id/resend', 'POST /users/invitations/:id/revoke', 'GET /invitations/:token', 'POST /invitations/:token/accept', 'POST /registers/car_dispatcher/records/:id/extend', 'POST /registers/financial_advances/records/:id/top-up', 'GET /fleet/availability', 'GET /registers/procurement/records/:id/readiness', 'POST /list-catalogues/:code/values/import', 'GET /warehouse/items', 'POST /warehouse/items', 'GET /warehouse/items/:id', 'PATCH /warehouse/items/:id', 'GET /warehouse/stock', 'GET /warehouse/movements', 'POST /warehouse/movements', 'GET /warehouse/movements/:id', 'POST /warehouse/movements/:id/cancel', 'GET /as-built/items', 'POST /as-built/items', 'GET /as-built/items/:id', 'PATCH /as-built/items/:id', 'POST /tasks/:id/overrides', 'POST /overrides/:override_id/revert', 'GET /me/tasks', 'GET /exports/parts', 'POST /exports/master', 'GET /exports/master', 'GET /exports/master/:id/download',
       'GET /settings/dlp', 'POST /settings/dlp/versions', 'GET /settings/table-display', 'PUT /settings/table-display', 'GET /settings/idle-task-alert', 'PUT /settings/idle-task-alert', 'GET /settings/notification-policy/catalogue', 'GET /settings/notification-policy', 'PUT /settings/notification-policy', 'POST /settings/holidays/import',
       // 0.15.54 (migration 0140): absences and the lead decisions (B12b)
+      // 0.15.67 (migration 0149): My Work > Daily Plan
+      'GET /daily-plans', 'GET /daily-plans/export', 'POST /daily-plans/:date/regions/:regionId/sites', 'PATCH /daily-plans/:date/regions/:regionId/sites/:siteId',
+      'DELETE /daily-plans/:date/regions/:regionId/sites/:siteId', 'POST /daily-plans/:date/regions/:regionId/lock', 'POST /daily-plans/:date/regions/:regionId/unlock',
+      'GET /settings/daily-plan', 'PUT /settings/daily-plan',
       'GET /absences', 'POST /absences', 'GET /absences/:id', 'PATCH /absences/:id', 'DELETE /absences/:id', 'GET /reassignments/alerts', 'GET /reassignments/eligible-users',
       'POST /tasks/reassign', 'POST /tasks/:id/act-on-behalf',
       // 0.15.56 (migration 0142): the staff registry card, its visibility settings and the edit of a row
       'GET /staff-registry/visibility', 'PUT /staff-registry/visibility', 'GET /staff-registry/:employeeId', 'PATCH /staff-registry/:employeeId',
       // contract 0.15.60
       'GET /users/:id/mfa-exemption', 'PUT /users/:id/mfa-exemption', 'POST /users/:id/mfa-exemption/revoke', 'POST /groups', 'POST /me/notify-admins', 'POST /auth/employee-id',
+      // contract 0.15.62 (migration 0146): the project data reset in Settings
+      'GET /settings/data-reset', 'PUT /settings/data-reset/settings', 'POST /settings/data-reset/requests', 'GET /settings/data-reset/requests/:id',
+      'POST /settings/data-reset/requests/:id/approve', 'POST /settings/data-reset/requests/:id/cancel', 'POST /settings/data-reset/requests/:id/run',
+      'POST /settings/data-reset/requests/:id/retry-files',
     ]);
     expect(realApiHandlers(false)).toHaveLength(0);
     expect(realApiHandlers(true)).toHaveLength(REAL_API_AUTH_USERS.length);

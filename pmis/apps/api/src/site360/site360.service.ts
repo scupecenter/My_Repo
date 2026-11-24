@@ -95,7 +95,7 @@ export class Site360Service {
     if (regs !== null) where.push(Prisma.sql`s.region_id = ANY(${regs}::int[])`);
     const base = Prisma.sql`${Prisma.join(where, ' AND ')}`;
     const filters: Prisma.Sql[] = [];
-    // W8 item 5 (0.15.64): the search box: one token = contains on Site ID, Site Owner ID and name; a pasted list = exact Site ID or Site Owner ID
+    // W8 item 5 (0.15.68): the search box: one token = contains on Site ID, Site Owner ID and name; a pasted list = exact Site ID or Site Owner ID
     const search = parseSiteSearch(oneString(q, 'q'));
     const byText = siteSearchCond(search);
     if (byText) filters.push(byText);

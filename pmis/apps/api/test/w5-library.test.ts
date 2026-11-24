@@ -1,5 +1,7 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { Client as PgClient } from 'pg';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { PDF, docFlow, slotOf, upload, type DocFlow } from './doc-helpers';
 import { delegate, startApp, superDbDocs } from './helpers';
@@ -7,7 +9,7 @@ import { G } from './reg-helpers';
 import { type Actor, actor, makeSite, makeTask, plainAdmin } from './wf-helpers';
 
 /**
- * W5 of plan 2026-11-23-next-ui-cleanup (migration 0151, contract 0.15.69): Library > Forms and Archive on the documents database (the seeded Document
+ * W5 of plan 2026-11-23-next-ui-cleanup (migration 0151, contract 0.15.70): Library > Forms and Archive on the documents database (the seeded Document
  * Library is active there). Who generates (L1 of the task, or "Documents: generate" for the region), the task rule, numbering, the rendered and escaped
  * file, audited downloads, void, the Archive cards and list with the lifecycle, the zip limit, the form templates and the Archive setting.
  */
@@ -18,6 +20,23 @@ let flow: DocFlow;
 let TPL: string;
 const R = 7; // Sebha: the documents suites of the other files use other regions
 const CODE = `W5-SSR-${Date.now() % 100000}`;
+/** Markup that a regex deny-list lets through (review of 2026-11-24): each must be refused by the allow-list. */
+const BYPASS = [
+  '<p>x</p><svg/onload=alert(1)>',
+  '<a href="java&#115;cript:alert(1)">x</a>',
+  '<img src=x/onerror=alert(1)>',
+  '<img src="x"/onerror="alert(1)">',
+  '<iframe srcdoc="&lt;script&gt;alert(1)&lt;/script&gt;"></iframe>',
+  '<div srcdoc="x">a</div>',
+  '<img src="data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==">',
+  '<style>body{background:url(https://example.test/x.png)}</style>',
+  '<style>@import url(//example.test/a.css);</style>',
+  '<p style="background:u\\72l(x)">t</p>',
+  '<p style="width:expression(alert(1))">t</p>',
+  '<form action="https://example.test"><input type="submit"></form>',
+  '<link rel="stylesheet" href="https://example.test/a.css">',
+  '<meta http-equiv="refresh" content="0;url=https://example.test">',
+];
 const HTML = '<html><body><h1>Survey {{doc.ref_no}}</h1><p class="site">{{site.id}} {{site.name}}</p><p>{{site.region_name}} {{fields.owner}}</p>'
   + '{{#if site.region_is.SEBHA}}<b>south</b>{{else}}<b>other</b>{{/if}}<p>{{task.code}} {{generated_by.name}}</p></body></html>';
 
@@ -39,6 +58,15 @@ const text = async (api: Actor['api'], path: string) => api.call('get', path).bu
   res.on('data', (c: Buffer) => { s += c.toString('utf8'); });
   res.on('end', () => cb(null, s));
 });
+/** POST /library/form-templates is multipart: the HTML file and the fields (bindings as JSON text). */
+const saveTpl = (who: Actor, body: Record<string, unknown>) => {
+  const t = who.api.call('post', '/library/form-templates');
+  for (const [k, v] of Object.entries(body)) {
+    if (k === 'html' || v === undefined) continue;
+    t.field(k, typeof v === 'object' ? JSON.stringify(v) : String(v));
+  }
+  return t.attach('file', Buffer.from(String(body.html ?? ''), 'utf8'), { filename: 'form.html', contentType: 'text/html' });
+};
 const audit = async (action: string, id: string) => (await db.query('SELECT actor_id, after, site_id FROM audit_log WHERE action = $1 AND entity_id = $2 ORDER BY id', [action, id])).rows;
 
 describe('W5: form templates (Settings > Documents > Form templates)', () => {
@@ -46,12 +74,22 @@ describe('W5: form templates (Settings > Documents > Form templates)', () => {
     const plain = await actor(app, db, { level: 'view', grants: G('sites', 'view'), regions: [R], modules: null });
     expect((await plain.api.call('get', '/library/form-templates')).status).toBe(403);
     const good = { code: CODE, name_en: 'Site survey report', name_ar: 'تقرير المسح', doc_code: 'A2', trigger_task_code: 'A2', numbering_pattern: 'SSR-{YYYY}-{SEQ:4}', html: HTML, bindings: { owner: 'site.tower_owner' }, reason: 'W5 test form' };
-    expect((await plain.api.call('post', '/library/form-templates', good)).status).toBe(403);
-    const bad = await admin.api.call('post', '/library/form-templates', { ...good, code: 'x', doc_code: 'NOPE', trigger_task_code: 'ZZ9', numbering_pattern: 'SSR-{YYYY}', html: '<p onclick="x()">hello world, a form</p>', bindings: { owner: 'secret.thing' }, extra: 1 });
+    expect((await saveTpl(plain, good)).status).toBe(403);
+    const bad = await saveTpl(admin, { ...good, code: 'x', doc_code: 'NOPE', trigger_task_code: 'ZZ9', numbering_pattern: 'SSR-{YYYY}', html: '<p class="x">hello world, a form</p>', bindings: { owner: 'secret.thing' }, extra: 1 });
     expect(bad.status).toBe(422);
-    expect(codes(bad)).toEqual(['/bindings/owner:invalid_path', '/code:invalid', '/doc_code:unknown_document', '/extra:unknown_key', '/html:unsafe_html', '/numbering_pattern:sequence_token', '/trigger_task_code:unknown_task']);
-    expect((await admin.api.call('post', '/library/form-templates', { ...good, reason: undefined })).status).toBe(422);
-    const c = await admin.api.call('post', '/library/form-templates', good);
+    expect(codes(bad)).toEqual(['/bindings/owner:invalid_path', '/code:invalid', '/doc_code:unknown_document', '/extra:unknown_key', '/numbering_pattern:sequence_token', '/trigger_task_code:unknown_task']);
+    // the allow-list refuses markup a browser could run, however it is spelled (parser differentials of a deny-list)
+    for (const html of BYPASS) {
+      const r = await saveTpl(admin, { ...good, html });
+      expect(r.status, html).toBe(422);
+      expect(codes(r), html).toEqual(['/html:unsafe_html']);
+    }
+    // the database repeats a deny-list behind the API (defence in depth): see tests/db-security/cases/E12_library.sql (LIB-19)
+    // the owner's CW forms pass the allow-list as they are
+    const cw = await saveTpl(admin, { ...good, code: `${CODE}-FAC`, html: readFileSync(join(__dirname, '..', '..', '..', 'design', 'forms', 'templates', 'GSDN_CW_FAC.tpl.html'), 'utf8') });
+    expect(cw.status, JSON.stringify(cw.body.errors ?? '')).toBe(201);
+    expect((await saveTpl(admin, { ...good, reason: undefined })).status).toBe(422);
+    const c = await saveTpl(admin, good);
     expect(c.status).toBe(201);
     expect(c.body).toMatchObject({ code: CODE, version: 1, status: 'draft', doc_code: 'A2', trigger_task_code: 'A2' });
     expect(c.body.placeholders).toEqual(expect.arrayContaining(['doc.ref_no', 'site.id', 'site.region_is.SEBHA']));

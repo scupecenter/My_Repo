@@ -23,7 +23,7 @@ const TS_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}:?\d{
 export const VIAS = ['manual', 'template', 'bulk', 'api', 'job'] as const;
 const SEC_EVENTS = ['sign_in_started', 'sign_in_succeeded', 'callback_account_mismatch', 'sign_in_failed', 'sign_in_locked', 'sign_in_rate_limited', 'signed_out',
   'session_expired', 'session_ended', 'session_revoked_by_admin', 'mfa_exemption_granted', 'mfa_exemption_revoked', 'step_up_passed', 'step_up_failed',
-  'break_glass_used', 'two_factor_passed', 'two_factor_failed', 'recovery_code_used', 'two_factor_enrolled', 'password_changed', 'password_reset'];
+  'break_glass_used', 'two_factor_passed', 'two_factor_failed', 'recovery_code_used', 'two_factor_enrolled', 'password_changed', 'password_reset', 'project_data_reset'];
 /** "Online" = real activity inside this window (contract ActiveSession.status). */
 export const PRESENCE_MINUTES = 5;
 /** Rows per log export file (owner answer Q170): a larger export is refused with 422 `too_many_rows`, never cut. */

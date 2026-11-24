@@ -1,4 +1,4 @@
--- The Library menu, Forms and Archive (W5, migration 0151, contract 0.15.69): the form templates (library_form_templates, written only by
+-- The Library menu, Forms and Archive (W5, migration 0151, contract 0.15.70): the form templates (library_form_templates, written only by
 -- lib_form_template_save / _approve / _retire with the Document Library right for all regions), the documents generated for sites
 -- (library_generated_docs, written only by lib_generate, lib_generated_attach and lib_generated_void; the file read only through lib_generated_read,
 -- which audits every read) and the guarded setting library.archive (admin_set_library_archive). Who generates: the L1 holder of the task, or
@@ -190,4 +190,28 @@ WHERE n.nspname = 'public' AND p.prosecdef AND pg_get_userbyid(p.proowner) = 'pm
                     'lib_form_template_approve', 'lib_form_template_retire', 'lib_form_template_html', 'lib_check_generate', 'lib_preview', 'lib_generate', 'lib_generated_attach',
                     'lib_generated_read', 'lib_generated_void', 'library_archive_json', 'admin_set_library_archive')
   AND has_function_privilege('pmis_app', p.oid, 'EXECUTE') = (p.proname NOT IN ('lib_require_config', 'lib_site_task', 'lib_form_context', 'lib_check_generate'));
+-- @end
+
+-- @case LIB-19
+-- @title Defence in depth behind the API allow-list: the System Admin calls the save door with markup a simple deny-list misses (svg/onload, an encoded javascript: scheme, srcdoc, a CSS import, a data:text/html image, expression, link, form); every one is refused unsafe_html
+-- @category library
+-- @expect output ok
+\ctx ADMIN stepup=300
+DO $$
+DECLARE h text; msg text;
+BEGIN
+  FOREACH h IN ARRAY ARRAY[
+    '<p>x</p><svg/onload=alert(1)>', '<a href="java&#115;cript:alert(1)">x</a>', '<img src="x"/onerror="alert(1)">', '<div srcdoc="x">a</div>',
+    '<style>@import url(//example.test/a.css);</style>', '<img src="data:text/html;base64,PHNjcmlwdD4=">', '<p style="width:expression(alert(1))">t</p>',
+    '<link rel="stylesheet" href="https://example.test/a.css">', '<form action="https://example.test"></form>'] LOOP
+    msg := NULL;
+    BEGIN
+      PERFORM lib_form_template_save(jsonb_build_object('code', 'SEC-F2', 'name_en', 'Sec form', 'doc_code', 'A1', 'trigger_task_code', 'A1',
+        'numbering_pattern', 'SECG-{YYYY}-{SEQ:4}', 'html', '<p>{{site.id}} filled form</p>' || h), 'Bypass attempt');
+    EXCEPTION WHEN OTHERS THEN msg := SQLERRM;
+    END;
+    IF msg IS NULL OR position('unsafe_html' IN msg) = 0 THEN RAISE EXCEPTION 'accepted or refused for another reason: % (%)', h, msg; END IF;
+  END LOOP;
+END $$;
+SELECT 'ok';
 -- @end

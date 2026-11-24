@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.69
+  version: 0.15.70
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -25,13 +25,16 @@ info:
     - **Current screen (0.10.0)**: real (non-live) requests may carry `X-PMIS-Screen: /app/route`; it becomes the session's `current_screen` in Online now.
     - **Live polling (0.2.5)**: requests sent by a timer (notification bell, online-now list) carry the header `X-PMIS-Live: 1`. The server must not extend the idle timeout for them; only real user activity does. They also do not update `last_activity_at`.
     - **Long jobs** answer 202 with a `Job`; poll `GET /jobs/{job_id}`.
+    - **Maintenance (0.15.62)**: while a project data reset started in Settings runs its database transaction, every route except `GET /settings/data-reset`, `GET /settings/data-reset/requests/{request_id}`, `GET /auth/session` and `GET /health` answers 503 `maintenance` (`Retry-After`).
     - **Database paths**: `x-db-path` names the SECURITY DEFINER function that performs the write (ADR 0003 §7). The API never writes
       identity or permission tables directly.
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
-    - 0.15.69 (2026-11-24): W5 of plan `docs/plans/2026-11-23-next-ui-cleanup.md`, the Library menu with Forms and Archive (migration 0151, mirror `db/sql/150_library.sql`; CHANGELOG 205; 0.15.65 to 0.15.68 are used by other branches). Additive. (1) Library > Forms: `GET /library/forms` (the approved forms and the uploaded blank forms), `POST /library/forms/{template_id}/preview` (auto-filled, no number) and `POST /library/forms/{template_id}/generate` (numbered by the existing numbering service, kept, audited; the copy is "generated" in the Archive), `GET /library/generated/{doc_id}/download` (`purpose` download, print or view; audited) and `POST /library/generated/{doc_id}/void` (step-up). Who generates: the L1 holder of the task the document belongs to, or a holder of "Documents: generate" (grant `library.forms` `create`) for the region, while that task is open; the L2 holder approves the signed upload with the task, as before. (2) Library > Archive: `GET /library/archive` (one card per Document Library type with a file or a generated document, grouped by stream, counts approved, waiting review and missing), `GET /library/archive/rows` (the list: lifecycle `LibraryDocStatus`, the W8 search, the filter tree of the screen `library-archive`, server counts) and `POST /library/archive/zip` (bulk zip of the filtered files through the existing zip export, limit from the setting). Previews and version history reuse `GET /files/{file_id}/download` and `GET /documents?file_group_id=`. (3) Settings > Documents > Form templates: `GET`/`POST /library/form-templates`, `GET .../{template_id}/html`, `POST .../{template_id}/approve` and `.../retire` (System Admin or an all-regions delegate of `document_types` edit, reason, step-up for approve and retire, audited). (4) Settings > Documents > Archive: `GET`/`PUT /settings/library-archive` (guarded key `library.archive`). (5) Saved views and the filter builder accept the screen `library-archive` (module `sites.documents`). The CW warehouse forms of `/generated-forms` and `/form-templates` (DN, RN, PAC, FAC, snag list with warehouse lines) stay as specified and are not served yet.
-    - 0.15.64 (2026-11-24): W8 of plan `docs/plans/2026-11-23-next-ui-cleanup.md` (CHANGELOG 201; 0.15.62 and 0.15.63 are used by other branches). Additive. (1) The search parameter `SiteSearch` (`q`) of the site-data lists reads a pasted list: two or more tokens separated by spaces, new lines, tabs, commas or semicolons match Site ID or Site Owner ID exactly, ignoring case, one row per site; at most 1000 distinct codes (422 `too_many_codes` at `/q`). One token keeps the "contains" search. `GET /sites` and `GET /site360/{menu}/rows` (new `q`) read it on the server, so paging, counts and Export follow it. (2) `search` (`PastedSearch`: `pasted`, `found`, `not_found`) in the answer when `q` is a list; a code is found when it names a site the caller may see on the screen (region scope, row security), whatever the other filters. (3) `counts` (`ListCounts`: `total` every row the caller may see on the screen, `filtered` the rows matching the filters and the search) in the answer of `GET /sites`; `GET /site360/{menu}/rows` already had both. (4) `GET`/`PUT /settings/table-display` (migration 0148, mirror `db/sql/147_table_display_settings.sql`): the defaults of the Display menu (`TableDisplay`: size, align, density, wrap, zebra), read by every signed-in user, written by a System Admin or an all-regions delegate of `admin.settings` with a reason and If-Match, audited. (5) `SavedViewColumns.density` takes `normal` and `SavedViewColumns.display` keeps the Display options of a view. (6) The same `q`, `counts` and `search` on `GET /registers/{register_key}/records`, `GET /approvals` and `GET /me/tasks`; the last two also take the `filter` tree (the whitelist of `tasks-board`).
+    - 0.15.70 (2026-11-24): W5 of plan `docs/plans/2026-11-23-next-ui-cleanup.md`, the Library menu with Forms and Archive (migration 0151, mirror `db/sql/150_library.sql`; CHANGELOG 205; 0.15.69 is reserved for W2). Additive. (1) Library > Forms: `GET /library/forms` (the approved forms and the uploaded blank forms), `POST /library/forms/{template_id}/preview` (auto-filled, no number) and `POST /library/forms/{template_id}/generate` (numbered by the existing numbering service, kept, audited; the copy is "generated" in the Archive), `GET /library/generated/{doc_id}/download` (`purpose` download, print or view; audited) and `POST /library/generated/{doc_id}/void` (step-up). Who generates: the L1 holder of the task the document belongs to, or a holder of "Documents: generate" (grant `library.forms` `create`) for the region, while that task is open; the L2 holder approves the signed upload with the task, as before. (2) Library > Archive: `GET /library/archive` (one card per Document Library type with a file or a generated document, grouped by stream, counts approved, waiting review and missing), `GET /library/archive/rows` (the list: lifecycle `LibraryDocStatus`, the W8 search, the filter tree of the screen `library-archive`, server counts) and `POST /library/archive/zip` (bulk zip of the filtered files through the existing zip export, limit from the setting). Previews and version history reuse `GET /files/{file_id}/download` and `GET /documents?file_group_id=`. (3) Settings > Documents > Form templates: `GET`/`POST /library/form-templates`, `GET .../{template_id}/html`, `POST .../{template_id}/approve` and `.../retire` (System Admin or an all-regions delegate of `document_types` edit, reason, step-up for approve and retire, audited). (4) Settings > Documents > Archive: `GET`/`PUT /settings/library-archive` (guarded key `library.archive`). (5) Saved views and the filter builder accept the screen `library-archive` (module `sites.documents`). The CW warehouse forms of `/generated-forms` and `/form-templates` (DN, RN, PAC, FAC, snag list with warehouse lines) stay as specified and are not served yet.
+    - 0.15.68 (2026-11-24): W8 of plan `docs/plans/2026-11-23-next-ui-cleanup.md` (CHANGELOG 201; renumbered from 0.15.64 at the merge with main, which holds 0.15.62 to 0.15.67). Additive. (1) The search parameter `SiteSearch` (`q`) of the site-data lists reads a pasted list: two or more tokens separated by spaces, new lines, tabs, commas or semicolons match Site ID or Site Owner ID exactly, ignoring case, one row per site; at most 1000 distinct codes (422 `too_many_codes` at `/q`). One token keeps the "contains" search. `GET /sites` and `GET /site360/{menu}/rows` (new `q`) read it on the server, so paging, counts and Export follow it. (2) `search` (`PastedSearch`: `pasted`, `found`, `not_found`) in the answer when `q` is a list; a code is found when it names a site the caller may see on the screen (region scope, row security), whatever the other filters. (3) `counts` (`ListCounts`: `total` every row the caller may see on the screen, `filtered` the rows matching the filters and the search) in the answer of `GET /sites`; `GET /site360/{menu}/rows` already had both. (4) `GET`/`PUT /settings/table-display` (migration 0148, mirror `db/sql/147_table_display_settings.sql`): the defaults of the Display menu (`TableDisplay`: size, align, density, wrap, zebra), read by every signed-in user, written by a System Admin or an all-regions delegate of `admin.settings` with a reason and If-Match, audited. (5) `SavedViewColumns.density` takes `normal` and `SavedViewColumns.display` keeps the Display options of a view. (6) The same `q`, `counts` and `search` on `GET /registers/{register_key}/records`, `GET /approvals` and `GET /me/tasks`; the last two also take the `filter` tree (the whitelist of `tasks-board`).
+    - 0.15.67 (2026-11-24): My Work > Daily Plan, the daily progress and the plan of the next working day (plan W7, owner decisions 2026-11-23; migration 0149, mirror `db/sql/148_daily_plan.sql`; CHANGELOG 203; 0.15.62 to 0.15.66 are used by other branches). Additive. New tag `daily-plan`: (1) `GET /daily-plans?date=&region_id=` returns one plan per region per day for the regions the caller sees (the Project Manager and the System Admins see all), with the auto-filled rows (Site Master: Site ID, Tower Owner, Owner ID, Latitude, Longitude, Region, Site Type, SOW; the Procurement assignment of the day: Vendor / Contractor and AAT SE; a CW permit or B3: Access Valid; tasks and field work of the day: Planned Work and Actual Work), the manual values over them, Reason and Remark, the counts and the flags `below_target` and `reason_missing`, plus `next_working_day` (weekend Friday and Saturday, holidays of the calendar). (2) `PATCH`, `POST` and `DELETE` under `/daily-plans/{date}/regions/{region_id}/sites` change a row, add a site or remove one: `view` on `daily_plan` or `sites` for the region and L1 of the new Matrix row `daily_plan` (or a System Admin), `If-Match` = the plan version (`0` before the first change), a row below target without a reason is 422 (`/reason` `required`), a locked day is 409 `plan_locked`, every change audited with before and after. (3) `POST .../lock` (L2 of the row or a System Admin; 422 with the sites that lack a reason) freezes the day; `POST .../unlock` is an admin override (System Admin or a delegate of `overrides.unlock` for the region, reason, step-up, flagged). (4) `GET /daily-plans/export` downloads both tables as one Excel sheet in the exact column order of the owner's sheet (`export` on `daily_plan` or `sites` per region, audited). Reading needs `view` on `daily_plan` or `sites` for the region, as the menu does. (5) `GET`/`PUT /settings/daily-plan`: visible columns and their order per tab, default region scope, automatic lock time, reminder hour (System Admin or an all-regions `admin.settings` delegate, reason, `If-Match`, closed body). The automatic lock and the reminder (notification kind `daily_plan_reminder`) run in the background job.
+    - 0.15.62 (2026-11-24): the project data reset in Settings, with two System Admins (owner decisions 2026-11-24; migration 0146, mirror `db/sql/145_settings_data_reset.sql`; CHANGELOG 198). Additive. New paths `GET /settings/data-reset`, `PUT /settings/data-reset/settings`, `POST /settings/data-reset/requests`, `GET /settings/data-reset/requests/{request_id}`, `POST .../approve`, `POST .../cancel`, `POST .../run` (202) and `POST .../retry-files`; schemas `DataResetState`, `DataResetRequest`, `DataResetSettings`, `DataResetBackup`, `DataResetPlanTable`, `DataResetFiles`. Every route is for a System Admin acting without delegation (403 `delegate_forbidden` for a delegate). A request needs a reason, a step-up and the typed phrase `RESET <database>`; a different System Admin approves (403 `self_approval_forbidden` for the requester), with their own step-up and reason; the requester or the approver starts the run (step-up, the phrase again, If-Match). A request expires after `data_reset.settings.request_expiry_minutes` (default 30; 409 `request_expired`); either admin cancels. With fewer than two active System Admins a request is 409 `single_admin` (the operator script on the server is the way). A run is refused unless the System Log records a successful database backup within `backup_max_age_hours` (default 24; 409 `backup_missing`), with documents in S3/MinIO (409 `storage_not_supported`), or while the operator script runs (409 `reset_running`). While a run's database transaction is open every route but the two reads answers 503 `maintenance` (`components/responses/ServiceUnavailable`). New `ErrorCode` values `single_admin`, `backup_missing`, `request_expired`, `reset_running`, `plan_incomplete`, `storage_not_supported`, `quarantine_unavailable`, `maintenance`; `NotificationKind` `data_reset_request`; `SecurityEvent` `project_data_reset`.
     - 0.15.61 (2026-11-23): the system-settings routes the web called that no controller served are served by the API (migration 0145, mirror `db/sql/144_settings_screens_api.sql`; CHANGELOG 197). Additive. (1) `GET /settings/dlp`, `POST /settings/dlp/versions`: the versions of `dlp.months.cw` and `dlp.months.te` (seed version 1: CW 3, TE 12); a version takes effect today or later and never before the latest version (field errors `in_the_past`, `before_latest_version`, `out_of_range`, `unknown_key`), so a PAC keeps the version in force on its date (the SLA start event `DLP:<task>:<key>` adds the months in force on the PAC date). (2) `GET`/`PUT /settings/idle-task-alert`: `working_days` is the existing dashboard idle limit `stale_idle_days` (one setting, Q523); `enabled` is new; the ETag moves when either screen changes it. (3) `GET`/`PUT /settings/notification-policy` and `GET /settings/notification-policy/catalogue`: closed schema validated in the database (`unknown_key` at the path of the key, the cross-field rule on both paths, `invalid_timezone`, `mandatory_locked`, `not_eligible_recipient`, `unknown_type`, `unknown_column`, `duplicate`); the security and system rows and `rate_cap_per_hour` need a System Admin (403 `delegate_forbidden`) and a step-up. (4) `POST /settings/holidays/import`: the approved template `TPL-HOLIDAYS` only (`template_kind` `holidays`, ADR 0011), applied at once: 202 with `status` `applied`, `counts.create` and `counts.unchanged`, and `affected_open_tasks`; one bad row refuses the file (`errors[]` with `path` `/rows/<line>/<field>`); any other file is 422 `template_rejected`. `Template.template_kind` lists `list_values` (0.15.23) and `holidays`. Numbered 0.15.61 because 0.15.53 to 0.15.58 are used by other branches.
     - 0.15.60 (2026-11-23): the last users, groups and sign-in routes of the web on the real API (migration 0143, mirror `db/sql/142_users_groups_api.sql`; CHANGELOG 193; 0.15.53 to 0.15.56 are reserved by other branches). Additive. (1) `GET`, `PUT /users/{user_id}/mfa-exemption` and `POST .../revoke` are served (`idm_set_mfa_exempt`, `idm_mfa_exemption_state`): a System Admin, or a delegate holding `users.administer` for all regions (the delegable right `users.two_factor`, Q620); reason and the acting admin's own step-up; nobody exempts themselves (403 `self_beneficiary`); an admin or a delegate is exempted by a System Admin only (403 `action_forbidden`); `until` must be in the future (422 `must_be_future`) or null (until revoked); a second PUT changes the exemption in force; revoking with no exemption in force is 409 `invalid_transition`. The user gets an in-app notice (`mfa_exemption`) and a mail. `User.mfa_exempt` and `mfa_exempt_until` are filled. The check is GSDN Workspace's own (setting `require_mfa`, default false): when it is on, a local account without two-factor and without an exemption in force gets 401 `mfa_required` at sign-in and at step-up; an exemption whose `until` has passed no longer counts. Entra Conditional Access is not affected. (2) `POST /groups` is served (`idm_group_create`): `groups.create` for all regions and step-up; `member_ids` also need `groups.edit` for all regions; the caller among the members is 403 `self_beneficiary`; a pending or unknown member is 422 with `errors[].path` `/member_ids/<index>`; a name equal to another group's name ignoring case is 409 `duplicate` (Q622); the create is atomic. (3) `POST /me/notify-admins` is served (`me_notify_admins`): reachable by a pending account; plain text only (422 `markup_not_allowed` for `<`, `>` or an HTML entity, Q624); one request per `notify_admins.cooldown_minutes` (default 60, Q623), else 429 `rate_limited` with `Retry-After`; an in-app notice of the new kind `assignment_request` and a mail to every active System Admin. (4) `POST /auth/employee-id` is served but, until the M365 sign-in and the staff registry exist on the server (Q625), answers 409 `invalid_transition` to every session whatever ID is typed (no enumeration); the format is still checked (422) and the calls are rate limited like sign-in (429).
     - 0.15.58 (2026-11-23): the Master import reads "Pending" and "N/A" as the owner means them, skips placeholder rows, routes the GECOL requests of PR-PO to GECOL, derives an empty Order Status and selects the one candidate with a contract sign-off (owner decisions 2026-11-22 and 2026-11-23; migration 0144, mirror `db/sql/143_master_import_na_routing.sql`; CHANGELOG 195). Additive, Master paths only (the Master import and comparison, and the TPL-MASTER upload; manual entry and the other templates are unchanged). (1) `Override.kind` `master_na` (entity `task`): a task whose actual date column holds N/A in the Master file is N/A when its batch is sent, an admin override made by a rule (no `acted_by`), revertible through `POST /overrides/{override_id}/revert` (System Admin, reason, step-up) and never applied again once reverted; never a milestone, a task with a date, a person's step, a register record in review, approved, or held by a gate; and only when the uploader holds the rights of an entry of that task, at the staging and again at the send (the import and edit regions of the task and its entry level L1, or a System Admin when the level has no holder). (2) `ImportBatch.import_notes` (`ImportNote[]`, counts only, never a value): `pending_as_empty`, `na_as_empty`, `na_task_requested`, `na_task_not_applicable`, `na_task_marked`, `na_task_not_marked`, `placeholder_rows_skipped`, `routed_to_gecol`, `routed_from_procurement`, `order_status_derived`, `order_status_not_derived`, `selected_set_by_import`, `selection_date_from_contract`, `selected_not_set`; the same list rides on `MasterImportOutcome.batches[].import_notes`, and `MasterImportOutcome.register_notes` carries the register ones with the sheet. Batch rows carry the matching warnings (`master_na_requested`, `master_na_not_applicable`, `master_na_ignored`, `master_na_marked`, `master_na_not_marked`, `routed_from_procurement`, `order_status_derived`, `selected_set_by_import`, `selection_date_from_contract`) and a conflicting GECOL request the error `gecol_one_per_site`. A register sheet of placeholders only is in `skipped` with reason `no_rows`. (3) An empty Order Status of a PR-PO row becomes `Active` (`Completed` only when the row holds a delivery / completion date, a field PR-PO does not have today; values in the setting `imports.master_order_status_derived`, changed by definer code only), and a candidate selected by the import with an empty Selection Date takes its Contract Sign-off Date (warning `selection_date_from_contract`) (owner decisions 2026-11-23).
@@ -232,6 +235,8 @@ tags:
     description: "Registry of Aljeel staff: search, hover card with visibility, maintenance, import, field visibility."
   - name: absences
     description: "Informational absence records (B12b)."
+  - name: daily-plan
+    description: "My Work > Daily Plan: the daily progress and the plan of the next working day, one plan per region per day (plan W7, 0.15.67)."
   - name: reassignment
     description: "Lead decisions on tasks of absent or idle people: reassign, act on behalf, keep (B12b)."
   - name: mfa-exemption
@@ -1454,7 +1459,7 @@ paths:
         - $ref: '#/components/parameters/Cursor'
       responses:
         '200':
-          description: 'Tasks. 0.15.64: `counts.total` = the tasks of the bucket, `counts.filtered` = those matching the search, the timing filters and the `filter` tree (the whitelist of the screen `tasks-board`).'
+          description: 'Tasks. 0.15.68: `counts.total` = the tasks of the bucket, `counts.filtered` = those matching the search, the timing filters and the `filter` tree (the whitelist of the screen `tasks-board`).'
           content:
             application/json:
               schema:
@@ -4500,7 +4505,7 @@ paths:
         - $ref: '#/components/parameters/Cursor'
       responses:
         '200':
-          description: 'Inbox. 0.15.64: `counts.total` = every item of the caller''s inbox (all tabs, no filter), `counts.filtered` = the items matching the tab, the filters, the `filter` tree (the whitelist of the screen `tasks-board`) and the search.'
+          description: 'Inbox. 0.15.68: `counts.total` = every item of the caller''s inbox (all tabs, no filter), `counts.filtered` = the items matching the tab, the filters, the `filter` tree (the whitelist of the screen `tasks-board`) and the search.'
           content:
             application/json:
               schema:
@@ -7249,8 +7254,8 @@ paths:
     get:
       tags: [settings]
       operationId: getTableDisplaySetting
-      summary: Defaults of the Display menu of the site-data tables (0.15.64, W8)
-      description: '0.15.64 (migration 0148). Every signed-in user: each site-data screen starts from these defaults until the user picks their own Display options (kept per user and per screen in the browser and in saved views). Without a saved value: size `md`, align `start`, density `comfortable`, wrap false, zebra true.'
+      summary: Defaults of the Display menu of the site-data tables (0.15.68, W8)
+      description: '0.15.68 (migration 0148). Every signed-in user: each site-data screen starts from these defaults until the user picks their own Display options (kept per user and per screen in the browser and in saved views). Without a saved value: size `md`, align `start`, density `comfortable`, wrap false, zebra true.'
       responses:
         '200':
           description: Setting.
@@ -7266,7 +7271,7 @@ paths:
       operationId: setTableDisplaySetting
       summary: Set the defaults of the Display menu (Administration > Settings > Display)
       description: |
-        0.15.64 (migration 0148): System Admin or a delegate of `admin.settings` edit for all regions (403 `action_forbidden` otherwise), a reason of at least 3 characters and If-Match. Closed body: `defaults` with every key (`unknown_key` at its path, `invalid` for a value outside its list). Audited (`table_display_update`, before and after). A user's own Display choice and a saved view keep their values; the defaults apply where the user has none.
+        0.15.68 (migration 0148): System Admin or a delegate of `admin.settings` edit for all regions (403 `action_forbidden` otherwise), a reason of at least 3 characters and If-Match. Closed body: `defaults` with every key (`unknown_key` at its path, `invalid` for a value outside its list). Audited (`table_display_update`, before and after). A user's own Display choice and a saved view keep their values; the defaults apply where the user has none.
       x-db-path: admin_set_table_display
       parameters:
       - {$ref: '#/components/parameters/IfMatch'}
@@ -7338,6 +7343,238 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/IdleTaskAlertSetting'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /daily-plans:
+    get:
+      tags: [daily-plan]
+      operationId: getDailyPlans
+      summary: The plans of one day (one per region the caller sees)
+      description: |
+        0.15.67 (migration 0149). For each region of the session (the regions the person's assignments cover; a System Admin or an all-regions assignment sees all) where the caller holds `view` on `daily_plan` or `sites` for that region (an assignment covering the region and the module, or a delegation covering the region); the other regions are left out, and with none left the answer is 403 `action_forbidden`. `region_id` (repeatable) narrows the regions. The rows of a locked day are the frozen copy taken at the lock. `version` of each plan is the If-Match of its changes (0 before the first change).
+      x-db-path: daily_plan_json
+      parameters:
+      - {name: date, in: query, required: true, schema: {type: string, format: date}}
+      - {name: region_id, in: query, required: false, schema: {type: array, items: {type: integer}}, style: form, explode: true}
+      responses:
+        '200':
+          description: The day.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DailyPlanDay'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /daily-plans/export:
+    get:
+      tags: [daily-plan]
+      operationId: exportDailyPlans
+      summary: Export Daily Progress and Tomorrow Plan as Excel
+      description: |
+        0.15.67. One sheet with the two tables of the owner's sheet: "Daily Progress <date>" (No, Site ID, Tower Owner, Owner ID, Latitude, Longitude, Region, Site Type, SOW, Vendor / Contractor Name, AAT SE, Planned Work, Actual Work, Reason (if not reach target)) and "Tomorrow Plan <next working day>" (No, Site ID, Tower Owner, Owner ID, Latitude, Longitude, Region, Site Type, SOW, Vendor / Contractor Name, AAT SE, Access Valid, Planned Work, Remark), always in this order. `site_id` (repeatable) keeps the rows of the current view. Needs `view` and `export` on `daily_plan` or `sites` for each region exported (the others are left out; none left = 403 `action_forbidden`). Audited (`daily_plan.exported`).
+      x-db-path: dp_export_json
+      parameters:
+      - {name: date, in: query, required: true, schema: {type: string, format: date}}
+      - {name: region_id, in: query, required: false, schema: {type: array, items: {type: integer}}, style: form, explode: true}
+      - {name: site_id, in: query, required: false, schema: {type: array, items: {type: string, format: uuid}}, style: form, explode: true}
+      responses:
+        '200':
+          description: The workbook.
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: {type: string, format: binary}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /daily-plans/{date}/regions/{region_id}/sites:
+    post:
+      tags: [daily-plan]
+      operationId: addDailyPlanSite
+      summary: Add a site to the plan by hand (or bring back a removed one)
+      description: 'L1 of the Matrix row `daily_plan` in the region, or a System Admin; unlocked day. The site must be active and in the region (422 `/site_code` `not_in_region`); a site already in the plan is 409 `duplicate`. Audited.'
+      x-db-path: dp_add_site
+      parameters:
+      - {name: date, in: path, required: true, schema: {type: string, format: date}}
+      - {name: region_id, in: path, required: true, schema: {type: integer}}
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [site_code]
+              additionalProperties: false
+              properties:
+                site_code: {type: string, maxLength: 60}
+      responses:
+        '200':
+          description: The plan of the region after the change.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DailyPlanDay'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /daily-plans/{date}/regions/{region_id}/sites/{site_id}:
+    patch:
+      tags: [daily-plan]
+      operationId: saveDailyPlanRow
+      summary: Change a row (manual values over the auto-filled columns, Reason, Remark)
+      description: |
+        L1 of the Matrix row `daily_plan` in the region, or a System Admin; unlocked day (409 `plan_locked`). `overrides` sets the manual value of an auto-filled column (`null` goes back to the auto value; Site ID, Site Name and Region cannot be changed: `read_only`). On a day up to today a row whose Actual Work has fewer lines than its Planned Work needs a Reason (422, `/reason` `required`). Audited with before and after.
+      x-db-path: dp_save_row
+      parameters:
+      - {name: date, in: path, required: true, schema: {type: string, format: date}}
+      - {name: region_id, in: path, required: true, schema: {type: integer}}
+      - {name: site_id, in: path, required: true, schema: {type: string, format: uuid}}
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/DailyPlanRowInput'}
+      responses:
+        '200':
+          description: The plan of the region after the change.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DailyPlanDay'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+    delete:
+      tags: [daily-plan]
+      operationId: removeDailyPlanSite
+      summary: Remove a site from the plan
+      description: 'L1 of the row, unlocked day. A site added by hand leaves the plan; an auto-filled one is marked removed (it comes back with POST). Audited.'
+      x-db-path: dp_remove_site
+      parameters:
+      - {name: date, in: path, required: true, schema: {type: string, format: date}}
+      - {name: region_id, in: path, required: true, schema: {type: integer}}
+      - {name: site_id, in: path, required: true, schema: {type: string, format: uuid}}
+      - {$ref: '#/components/parameters/IfMatch'}
+      responses:
+        '200':
+          description: The plan of the region after the change.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DailyPlanDay'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /daily-plans/{date}/regions/{region_id}/lock:
+    post:
+      tags: [daily-plan]
+      operationId: lockDailyPlan
+      summary: Lock the day (L2)
+      description: 'L2 of the Matrix row `daily_plan` in the region, or a System Admin. Every row below target needs its reason first (422, `errors[].path` `/rows/<site_code>/reason`). The rows are frozen as they are. Audited.'
+      x-db-path: dp_lock
+      parameters:
+      - {name: date, in: path, required: true, schema: {type: string, format: date}}
+      - {name: region_id, in: path, required: true, schema: {type: integer}}
+      - {$ref: '#/components/parameters/IfMatch'}
+      responses:
+        '200':
+          description: The plan of the region after the change.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DailyPlanDay'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /daily-plans/{date}/regions/{region_id}/unlock:
+    post:
+      tags: [daily-plan]
+      operationId: unlockDailyPlan
+      summary: Reopen a locked day (admin override)
+      description: 'A System Admin, or a delegate of `overrides.unlock` for the region; reason and step-up; the audit row is flagged admin override. A day reopened this way is never locked again by the automatic lock.'
+      x-db-path: dp_unlock
+      x-step-up: true
+      parameters:
+      - {name: date, in: path, required: true, schema: {type: string, format: date}}
+      - {name: region_id, in: path, required: true, schema: {type: integer}}
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WithReason'}
+      responses:
+        '200':
+          description: The plan of the region after the change.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DailyPlanDay'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /settings/daily-plan:
+    get:
+      tags: [settings, daily-plan]
+      operationId: getDailyPlanSettings
+      summary: Settings > My Work > Daily Plan
+      description: Every signed-in user (the screen reads its columns).
+      x-db-path: dp_settings_json
+      responses:
+        '200':
+          description: Setting.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DailyPlanSettings'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+    put:
+      tags: [settings, daily-plan]
+      operationId: setDailyPlanSettings
+      summary: Set the Daily Plan settings
+      description: |
+        System Admin or a delegate of `admin.settings` edit for all regions, a reason and If-Match. Closed body (`unknown_key`): `columns.progress` and `columns.tomorrow` are lists of known columns without repeats that hold `site_code` (`unknown_column`, `duplicate`, `site_code_required`); `default_region_scope` `mine` or `all`; `auto_lock_time` `HH:MM` or null; `reminder_hour` 0 to 23 or null (`out_of_range`). Audited (`daily_plan_settings_update`, before and after).
+      x-db-path: admin_set_daily_plan_settings
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - {$ref: '#/components/schemas/WithReason'}
+              - {$ref: '#/components/schemas/DailyPlanSettingsInput'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DailyPlanSettings'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
@@ -8157,6 +8394,264 @@ paths:
         '412': {$ref: '#/components/responses/PreconditionFailed'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /settings/data-reset:
+    get:
+      tags: [settings]
+      operationId: getDataReset
+      summary: Project data reset (System Admin only)
+      description: |
+        0.15.62 (migration 0146, `data_reset_state_json`). A System Admin acting without delegation only (403 `action_forbidden` or `delegate_forbidden` otherwise; the
+        menu entry is hidden for everyone else). The plan is the one list of the operator script and of this page (`data_reset_plan`): every table with its decision and the
+        rows that would be deleted and kept now. `backup` is the latest successful database backup recorded in the System Log (source `backup`, level `info`, written by
+        `infra/backup/db-backup.sh`); a run is refused unless it is younger than `settings.backup_max_age_hours`. `single_admin` is true while fewer than two System Admins
+        are active: then no request can be made and the reset is done on the server with `infra/scripts/reset-project-data.sh`. `request` is the open request, `last_request`
+        the latest closed one (with its result and the restore instructions on the page). `storage` tells whether the documents are on local disk (the only store the file move
+        supports) or in S3/MinIO (a run is then refused, 409 `storage_not_supported`).
+      x-db-path: data_reset_state_json
+      responses:
+        '200':
+          description: The state.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DataResetState'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /settings/data-reset/settings:
+    put:
+      tags: [settings]
+      operationId: setDataResetSettings
+      summary: The request expiry and the backup window of the data reset
+      description: 0.15.62 (guarded setting `data_reset.settings`). System Admin acting without delegation, reason, step-up and If-Match (the version of `settings`). Closed body (`unknown_key`); `request_expiry_minutes` 5 to 240 (default 30), `backup_max_age_hours` 1 to 72 (default 24), else `out_of_range`. Refused while a request is open (409 `invalid_transition`). Audited (`data_reset_settings_update`, before and after).
+      x-step-up: true
+      x-db-path: admin_set_data_reset_settings
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - {$ref: '#/components/schemas/WithReason'}
+              - type: object
+                required: [request_expiry_minutes, backup_max_age_hours]
+                properties:
+                  request_expiry_minutes: {type: integer, minimum: 5, maximum: 240}
+                  backup_max_age_hours: {type: integer, minimum: 1, maximum: 72}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DataResetSettings'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /settings/data-reset/requests:
+    post:
+      tags: [settings]
+      operationId: requestDataReset
+      summary: Request the project data reset (first System Admin)
+      description: |
+        0.15.62. A System Admin acting without delegation (403 `delegate_forbidden` for a delegate), a reason of at least 10 characters, a step-up and the typed phrase
+        `RESET <database>` (`confirmation_phrase` of the state; 422 `confirmation_mismatch`). Refused with 409 `single_admin` while fewer than two System Admins are active, 409
+        `invalid_transition` while another request is open, 409 `reset_running` while the operator script runs. The request expires after `settings.request_expiry_minutes`
+        (default 30). Every other active System Admin is told in-app. Audited (`data_reset_request`) and written to the security log (`project_data_reset`, step `request`).
+      x-step-up: true
+      x-db-path: admin_data_reset_request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [reason, confirm_text]
+              properties:
+                reason: {type: string, minLength: 10, maxLength: 2000}
+                confirm_text: {$ref: '#/components/schemas/ConfirmText'}
+      responses:
+        '201':
+          description: Requested.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DataResetRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /settings/data-reset/requests/{request_id}:
+    parameters:
+    - {name: request_id, in: path, required: true, schema: {type: string, format: uuid}}
+    get:
+      tags: [settings]
+      operationId: getDataResetRequest
+      summary: One data reset request (progress and result)
+      description: 0.15.62. A System Admin acting without delegation. Answered also while the reset runs (the only routes not refused with 503 then, with `GET /settings/data-reset`), so the runner can follow the progress.
+      x-db-path: data_reset_request_get
+      responses:
+        '200':
+          description: The request.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DataResetRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /settings/data-reset/requests/{request_id}/approve:
+    parameters:
+    - {name: request_id, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      tags: [settings]
+      operationId: approveDataReset
+      summary: Approve the request (a second, different System Admin)
+      description: 0.15.62. A System Admin acting without delegation who is not the requester and not in the requester's session (403 `self_approval_forbidden`), a reason of at least 10 characters, a step-up and If-Match. The request must be `requested` (409 `invalid_transition`) and not expired (409 `request_expired`). Approval does not run anything. Audited (`data_reset_approve`) and in the security log.
+      x-step-up: true
+      x-db-path: admin_data_reset_approve
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [reason]
+              properties:
+                reason: {type: string, minLength: 10, maxLength: 2000}
+      responses:
+        '200':
+          description: Approved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DataResetRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /settings/data-reset/requests/{request_id}/cancel:
+    parameters:
+    - {name: request_id, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      tags: [settings]
+      operationId: cancelDataReset
+      summary: Cancel the request (either System Admin)
+      description: 0.15.62. Any System Admin acting without delegation, a reason, a step-up and If-Match, while the request is `requested` or `approved` (status `cancelled`). A run whose transaction died before its commit (the API stopped; `stalled` true) is closed the same way as `failed`; nothing was reset. Audited (`data_reset_cancel`) and in the security log.
+      x-step-up: true
+      x-db-path: admin_data_reset_cancel
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WithReason'}
+      responses:
+        '200':
+          description: Cancelled.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DataResetRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /settings/data-reset/requests/{request_id}/run:
+    parameters:
+    - {name: request_id, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      tags: [settings]
+      operationId: runDataReset
+      summary: Start the approved reset (the requester or the approver)
+      description: |
+        0.15.62. The System Admin who made the request or the one who approved it (403 `action_forbidden` for anyone else), acting without delegation, a step-up, the typed
+        phrase again (422 `confirmation_mismatch`) and If-Match, while the request is `approved` and not expired. Refused with 409 `backup_missing` unless the System Log
+        records a successful database backup within `backup_max_age_hours`, 409 `storage_not_supported` when the documents are in S3/MinIO, 409 `quarantine_unavailable`
+        when the quarantine directory cannot be made in the store, 409 `plan_incomplete` when a table has no decision, 409 `reset_running` while a reset runs.
+        Answers 202 with the request in `running` and runs in the background: one database transaction (`admin_data_reset_execute`, `data_reset_core`) that deletes the
+        project data with the guards of the operator script and ends every session except the runner's; while it runs every other route answers 503 `maintenance`. After the
+        commit the API moves the stored files of the deleted rows into `quarantine_dir` (never deleted; status `files_pending`, then `completed`). A failure before the commit
+        leaves everything as it was (status `failed`, `error`). Poll `GET /settings/data-reset/requests/{request_id}`.
+      x-step-up: true
+      x-db-path: admin_data_reset_start
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [confirm_text]
+              properties:
+                confirm_text: {$ref: '#/components/schemas/ConfirmText'}
+      responses:
+        '202':
+          description: Started.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DataResetRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /settings/data-reset/requests/{request_id}/retry-files:
+    parameters:
+    - {name: request_id, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      tags: [settings]
+      operationId: retryDataResetFiles
+      summary: Move the files still pending after a reset (the database part never runs again)
+      description: 0.15.62. Any System Admin acting without delegation, a reason and a step-up, while the request is `files_pending` (409 `invalid_transition` otherwise). Moves the keys still `pending` into the same quarantine directory with the same rules; a key already moved, missing or refused is never tried again. Audited (`data_reset_files_retry`).
+      x-step-up: true
+      x-db-path: admin_data_reset_files_claim
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WithReason'}
+      responses:
+        '202':
+          description: The move ran; the request after it.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DataResetRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
   /settings/imports:
     get:
       tags: [settings]
@@ -9524,7 +10019,7 @@ paths:
       - {$ref: '#/components/parameters/Cursor'}
       responses:
         '200':
-          description: 'Records. 0.15.64: `counts.total` = the latest version of every record of the register the caller may see, `counts.filtered` = those matching the filters and the search.'
+          description: 'Records. 0.15.68: `counts.total` = the latest version of every record of the register the caller may see, `counts.filtered` = those matching the filters and the search.'
           content:
             application/json:
               schema:
@@ -11351,8 +11846,8 @@ paths:
     get:
       tags: [library]
       operationId: listLibraryForms
-      summary: Library > Forms, every approved document form (0.15.69, W5)
-      description: '0.15.69 (migration 0151). Anyone who may view site documents (`sites.documents` view). The approved form templates (one per code, the version in force) and the Document Library types with an uploaded blank form (download only, `kind` `blank_form`). `can_configure` is true for a System Admin or an all-regions delegate of `document_types` edit (the page links to Settings > Documents).'
+      summary: Library > Forms, every approved document form (0.15.70, W5)
+      description: '0.15.70 (migration 0151). Anyone who may view site documents (`sites.documents` view). The approved form templates (one per code, the version in force) and the Document Library types with an uploaded blank form (download only, `kind` `blank_form`). `can_configure` is true for a System Admin or an all-regions delegate of `document_types` edit (the page links to Settings > Documents).'
       responses:
         '200':
           description: Forms.
@@ -11375,7 +11870,7 @@ paths:
       tags: [library]
       operationId: previewLibraryForm
       summary: The auto-filled preview of a form for a site (no number taken)
-      description: '0.15.69. Who: the L1 holder of the site''s task of the form (`trigger_task_code`), or a holder of "Documents: generate" (grant `library.forms` `create`) for the site''s region; the task must be open (open, entry or returned), else 409 `invalid_transition`. A System Admin or an all-regions delegate of `document_types` edit may also preview a draft version and a site whose task is not open. The document number reads `PREVIEW`. Rendered by the server from the template placeholders (`{{path}}`, `{{#each}}`, `{{#if}}`); the HTML is shown in a sandboxed frame without scripts.'
+      description: '0.15.70. Who: the L1 holder of the site''s task of the form (`trigger_task_code`), or a holder of "Documents: generate" (grant `library.forms` `create`) for the site''s region; the task must be open (open, entry or returned), else 409 `invalid_transition`. A System Admin or an all-regions delegate of `document_types` edit may also preview a draft version and a site whose task is not open. The document number reads `PREVIEW`. Rendered by the server from the template placeholders (`{{path}}`, `{{#each}}`, `{{#if}}`); the HTML is shown in a sandboxed frame without scripts.'
       x-db-path: lib_preview
       requestBody:
         required: true
@@ -11405,7 +11900,7 @@ paths:
       tags: [library]
       operationId: generateLibraryDocument
       summary: Generate the filled document of a site (the copy enters the Archive as "generated")
-      description: '0.15.69. The same rights and task rule as the preview (an approved form only). Takes the next number of the form''s sequence (`doc_sequences`, never reused), fills the template with the site data, keeps the file and the data, and writes an audit row (`library_document_generate`). Print it, sign and stamp it, then upload the signed copy into the task''s document slot (`POST /tasks/{task_id}/slots/{slot_id}/files`); the L2 holder approves it with the task, as before.'
+      description: '0.15.70. The same rights and task rule as the preview (an approved form only). Takes the next number of the form''s sequence (`doc_sequences`, never reused), fills the template with the site data, keeps the file and the data, and writes an audit row (`library_document_generate`). Print it, sign and stamp it, then upload the signed copy into the task''s document slot (`POST /tasks/{task_id}/slots/{slot_id}/files`); the L2 holder approves it with the task, as before.'
       x-db-path: lib_generate
       parameters:
       - {$ref: '#/components/parameters/IdempotencyKey'}
@@ -11438,7 +11933,7 @@ paths:
       tags: [library]
       operationId: downloadLibraryDocument
       summary: The file of a generated document (download, print or view; audited)
-      description: '0.15.69. Who: `download_documents` on `sites.documents` in the region, the person who generated it, or anyone who may generate it. Every call writes an audit row (`library_document_download`) with its `purpose`. Served as `text/html` with a restrictive Content-Security-Policy (no script, no network) and `X-Content-Type-Options: nosniff`.'
+      description: '0.15.70. Who: `download_documents` on `sites.documents` in the region, the person who generated it, or anyone who may generate it. Every call writes an audit row (`library_document_download`) with its `purpose`. Served as `text/html` with a restrictive Content-Security-Policy (no script, no network) and `X-Content-Type-Options: nosniff`.'
       x-db-path: lib_generated_read
       parameters:
       - name: purpose
@@ -11462,7 +11957,7 @@ paths:
       tags: [library]
       operationId: voidLibraryDocument
       summary: Void a wrong generated document with a reason (the number stays issued)
-      description: '0.15.69. The person who generated it, anyone who may generate it, or a System Admin. Step-up. Audited (`library_document_void`, before and after).'
+      description: '0.15.70. The person who generated it, anyone who may generate it, or a System Admin. Step-up. Audited (`library_document_void`, before and after).'
       x-step-up: true
       x-db-path: lib_generated_void
       requestBody:
@@ -11486,7 +11981,7 @@ paths:
       tags: [library]
       operationId: getLibraryArchive
       summary: Library > Archive, one card per document type with a file or a generated document, grouped by stream
-      description: '0.15.69. `sites.documents` view; counted inside the caller''s regions (B3, row security) and, for documents of a register record, the register''s own module (as `GET /documents`). A card shows a document type that has at least one file or one generated document; `approved`, `waiting_review` (uploaded or in review) and `missing` (due, generated or rejected) count the document slots. Groups follow the stream of the task the document sits on (Design & Acquisition, Civil Works, Installation (TE), O&M for the tasks of a work view that is not a stream, Handover & Closure, Dismantle, Registers). The setting `library.archive` hides and orders cards; a caller who may change it (`can_configure`) also receives the hidden cards with `hidden` true.'
+      description: '0.15.70. `sites.documents` view; counted inside the caller''s regions (B3, row security) and, for documents of a register record, the register''s own module (as `GET /documents`). A card shows a document type that has at least one file or one generated document; `approved`, `waiting_review` (uploaded or in review) and `missing` (due, generated or rejected) count the document slots. Groups follow the stream of the task the document sits on (Design & Acquisition, Civil Works, Installation (TE), O&M for the tasks of a work view that is not a stream, Handover & Closure, Dismantle, Registers). The setting `library.archive` hides and orders cards; a caller who may change it (`can_configure`) also receives the hidden cards with `hidden` true.'
       responses:
         '200':
           description: Cards.
@@ -11500,7 +11995,7 @@ paths:
       tags: [library]
       operationId: listLibraryArchiveRows
       summary: The Archive list (one row per document of a site; superseded versions on request)
-      description: '0.15.69. `sites.documents` view; the caller''s regions and register modules apply. One row per document slot of a site (a task''s or a register record''s), with its lifecycle status: `due` (the task opened, nothing yet), `generated` (a filled copy was generated), `signed_uploaded`, `in_review`, `approved`, `rejected`; `superseded` rows are the older file versions (with `include_superseded` or the status filter). `q` searches the Site ID, the Site Owner ID, the site name, the document number and the file name; a pasted list of Site IDs finds each site (W8 item 5). `filter` is the AND/OR tree of the screen `library-archive` (`GET /saved-views/filter-fields?screen_key=library-archive`). `counts` come from the server. Sorted by site, document and version.'
+      description: '0.15.70. `sites.documents` view; the caller''s regions and register modules apply. One row per document slot of a site (a task''s or a register record''s), with its lifecycle status: `due` (the task opened, nothing yet), `generated` (a filled copy was generated), `signed_uploaded`, `in_review`, `approved`, `rejected`; `superseded` rows are the older file versions (with `include_superseded` or the status filter). `q` searches the Site ID, the Site Owner ID, the site name, the document number and the file name; a pasted list of Site IDs finds each site (W8 item 5). `filter` is the AND/OR tree of the screen `library-archive` (`GET /saved-views/filter-fields?screen_key=library-archive`). `counts` come from the server. Sorted by site, document and version.'
       parameters:
       - {name: doc_code, in: query, schema: {type: string, maxLength: 40}}
       - {name: site_id, in: query, schema: {type: string, format: uuid}}
@@ -11534,7 +12029,7 @@ paths:
       tags: [library]
       operationId: startLibraryArchiveZip
       summary: Bulk download of the Archive list as a zip, by its filter
-      description: '0.15.69. `download_documents` on `sites.documents`. The files of the rows that match the same parameters as `GET /library/archive/rows` (the uploaded files; due and generated rows have none) go to the existing zip export (`POST /exports/zip` with `file_ids`; job, manifest, audit rows `document_zip_start` and `document_zip_download`). More files than the `zip_limit` of `library.archive` answer 422 `too_many_files`; none answer 422 `no_files`.'
+      description: '0.15.70. `download_documents` on `sites.documents`. The files of the rows that match the same parameters as `GET /library/archive/rows` (the uploaded files; due and generated rows have none) go to the existing zip export (`POST /exports/zip` with `file_ids`; job, manifest, audit rows `document_zip_start` and `document_zip_download`). More files than the `zip_limit` of `library.archive` answer 422 `too_many_files`; none answer 422 `no_files`.'
       parameters:
       - {$ref: '#/components/parameters/IdempotencyKey'}
       requestBody:
@@ -11565,7 +12060,7 @@ paths:
       tags: [library]
       operationId: listLibraryFormTemplates
       summary: Settings > Documents > Form templates, every version of every form
-      description: '0.15.69. System Admin or an all-regions delegate of `document_types` edit (403 otherwise).'
+      description: '0.15.70. System Admin or an all-regions delegate of `document_types` edit (403 otherwise).'
       responses:
         '200':
           description: Versions, newest first per code.
@@ -11584,16 +12079,26 @@ paths:
       tags: [library]
       operationId: createLibraryFormTemplate
       summary: Upload a form or a new version of it (a draft)
-      description: '0.15.69. System Admin or an all-regions delegate of `document_types` edit; a reason. The HTML may use `{{path}}`, `{{#each list}}..{{/each}}` and `{{#if path}}..{{else}}..{{/if}}` over the data of the form (`site`, `region`, `task`, `doc`, `template`, `generated_by`) and `fields.<name>` of `bindings`; scripts, frames, event handlers and `javascript:` links are refused (422 `unsafe_html`). The numbering pattern takes the tokens of the numbering service (`{YYYY}`, `{YY}`, `{SEQ:n}` exactly once). Field errors: `unknown_key`, `invalid`, `required`, `unknown_document`, `unknown_task`, `invalid_path`, `sequence_token`, `year_required`. Audited (`library_form_template_save`).'
+      description: '0.15.70. System Admin or an all-regions delegate of `document_types` edit; a reason. The HTML may use `{{path}}`, `{{#each list}}..{{/each}}` and `{{#if path}}..{{else}}..{{/if}}` over the data of the form (`site`, `region`, `task`, `doc`, `template`, `generated_by`) and `fields.<name>` of `bindings`; the file must come through the allow-list of printable forms unchanged in substance (tags such as table, div, span, p, b, img with an embedded `data:image` source, input checkbox or radio, style with embedded `data:` fonts and images only; attributes such as class, style, colspan, dir; no script, frame, svg, link, form, event handler, `srcdoc`, external URL, `@import`, CSS `expression` or escape, whatever the spelling), else 422 `unsafe_html` with what it would remove; the database repeats a deny-list behind it. Every filled copy (preview and generation) goes through the same allow-list again. The numbering pattern takes the tokens of the numbering service (`{YYYY}`, `{YY}`, `{SEQ:n}` exactly once). Field errors: `unknown_key`, `invalid`, `required`, `unknown_document`, `unknown_task`, `invalid_path`, `sequence_token`, `year_required`. Audited (`library_form_template_save`).'
       x-db-path: lib_form_template_save
       requestBody:
         required: true
         content:
-          application/json:
+          multipart/form-data:
             schema:
-              allOf:
-              - {$ref: '#/components/schemas/WithReason'}
-              - {$ref: '#/components/schemas/LibraryFormTemplateInput'}
+              type: object
+              required: [file, reason, code, name_en, doc_code, trigger_task_code, numbering_pattern]
+              properties:
+                file: {type: string, format: binary, description: 'The HTML template (.html, UTF-8, 3 MB at most).'}
+                reason: {type: string}
+                code: {type: string, pattern: '^[A-Z0-9][A-Z0-9-]{1,40}$'}
+                name_en: {type: string, maxLength: 200}
+                name_ar: {type: string, maxLength: 200}
+                doc_code: {type: string, description: 'The Document Library type the form produces.'}
+                trigger_task_code: {type: string, description: 'The task that triggers the document: it is due when this task opens.'}
+                numbering_pattern: {type: string, minLength: 6, maxLength: 80, examples: ['SSR-{YYYY}-{SEQ:4}']}
+                numbering_reset: {type: string, enum: [never, yearly], default: yearly}
+                bindings: {type: string, description: 'JSON object: extra placeholders `fields.<name>`, name to a data path such as `site.tower_owner`.'}
       responses:
         '201':
           description: The draft version.
@@ -11610,7 +12115,7 @@ paths:
       tags: [library]
       operationId: getLibraryFormTemplateHtml
       summary: The HTML of one version (to start a new version from it)
-      description: '0.15.69. Configuration right only.'
+      description: '0.15.70. Configuration right only.'
       responses:
         '200':
           description: The template.
@@ -11631,7 +12136,7 @@ paths:
       tags: [library]
       operationId: approveLibraryFormTemplate
       summary: Approve a draft version (it replaces the version in force)
-      description: '0.15.69. Configuration right, a reason and a step-up. The previous approved version of the code is retired; the numbering pattern becomes the pattern of the form''s sequence (the counter continues). 409 `invalid_transition` when the version is not a draft; 409 `duplicate` when a warehouse sequence already uses the form code. Audited (`library_form_template_approve`, before and after).'
+      description: '0.15.70. Configuration right, a reason and a step-up. The previous approved version of the code is retired; the numbering pattern becomes the pattern of the form''s sequence (the counter continues). 409 `invalid_transition` when the version is not a draft; 409 `duplicate` when a warehouse sequence already uses the form code. Audited (`library_form_template_approve`, before and after).'
       x-step-up: true
       x-db-path: lib_form_template_approve
       requestBody:
@@ -11657,7 +12162,7 @@ paths:
       tags: [library]
       operationId: retireLibraryFormTemplate
       summary: Retire a version (it leaves Library > Forms; generated documents keep it)
-      description: '0.15.69. Configuration right, a reason and a step-up. Audited (`library_form_template_retire`).'
+      description: '0.15.70. Configuration right, a reason and a step-up. Audited (`library_form_template_retire`).'
       x-step-up: true
       x-db-path: lib_form_template_retire
       requestBody:
@@ -11680,7 +12185,7 @@ paths:
       tags: [settings]
       operationId: getLibraryArchiveSetting
       summary: Settings > Documents > Archive (visible cards and their order, default columns, bulk zip limit)
-      description: '0.15.69 (migration 0151). Every signed-in user. Without a saved value: nothing hidden, no order (stream order, then code), every column, zip limit 500.'
+      description: '0.15.70 (migration 0151). Every signed-in user. Without a saved value: nothing hidden, no order (stream order, then code), every column, zip limit 500.'
       responses:
         '200':
           description: Setting.
@@ -11694,7 +12199,7 @@ paths:
       tags: [settings]
       operationId: setLibraryArchiveSetting
       summary: Set the Archive cards, default columns and zip limit
-      description: '0.15.69: System Admin or a delegate of `admin.settings` edit for all regions, a reason and If-Match. Closed body, every key required: `hidden` and `order` (document codes; `unknown_document`, `duplicate`), `default_columns` (`unknown_column`), `zip_limit` 1..5000 (`out_of_range`); `unknown_key` at its path. Audited (`library_archive_update`, before and after).'
+      description: '0.15.70: System Admin or a delegate of `admin.settings` edit for all regions, a reason and If-Match. Closed body, every key required: `hidden` and `order` (document codes; `unknown_document`, `duplicate`), `default_columns` (`unknown_column`), `zip_limit` 1..5000 (`out_of_range`); `unknown_key` at its path. Audited (`library_archive_update`, before and after).'
       x-db-path: admin_set_library_archive
       parameters:
       - {$ref: '#/components/parameters/IfMatch'}
@@ -14594,7 +15099,7 @@ components:
       name: q
       in: query
       required: false
-      description: '0.15.64 (W8 item 5). The search box of a site-data list. One token: contains, ignoring case, on the Site ID, the Site Owner ID and the name (and the other text columns the list names). Two or more tokens separated by spaces, new lines, tabs, commas or semicolons (cells copied from Excel): a pasted list, each token matches the Site ID or the Site Owner ID exactly, ignoring case, one row per site, duplicates ignored. At most 1000 distinct codes: 422 `validation_failed` with `too_many_codes` at `/q`. The caller''s regions and row security still apply; the answer carries `search` for a list.'
+      description: '0.15.68 (W8 item 5). The search box of a site-data list. One token: contains, ignoring case, on the Site ID, the Site Owner ID and the name (and the other text columns the list names). Two or more tokens separated by spaces, new lines, tabs, commas or semicolons (cells copied from Excel): a pasted list, each token matches the Site ID or the Site Owner ID exactly, ignoring case, one row per site, duplicates ignored. At most 1000 distinct codes: 422 `validation_failed` with `too_many_codes` at `/q`. The caller''s regions and row security still apply; the answer carries `search` for a list.'
       schema: { type: string, maxLength: 40000 }
     SlaColourFilter:
       name: sla_colour
@@ -14885,6 +15390,13 @@ components:
       content:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problem' }
+    ServiceUnavailable:
+      description: 0.15.62. A project data reset is running (`maintenance`); try again after `Retry-After` seconds.
+      headers:
+        Retry-After: { schema: { type: integer } }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
     TooManyRequests:
       description: Rate limited or account locked (`rate_limited`, `account_locked`).
       headers:
@@ -14904,7 +15416,7 @@ components:
     LibraryDocStatus:
       type: string
       enum: [due, generated, signed_uploaded, in_review, approved, rejected, superseded]
-      description: '0.15.69 (W5). The lifecycle of a site document: due (its task opened), generated (a filled copy was generated), signed_uploaded (the signed copy is uploaded), in_review (submitted with the task), approved, rejected (returned); superseded is an older file version.'
+      description: '0.15.70 (W5). The lifecycle of a site document: due (its task opened), generated (a filled copy was generated), signed_uploaded (the signed copy is uploaded), in_review (submitted with the task), approved, rejected (returned); superseded is an older file version.'
     LibraryForm:
       type: object
       additionalProperties: false
@@ -14929,6 +15441,7 @@ components:
         updated_at: {type: [string, 'null'], format: date-time}
     LibraryFormTemplateInput:
       type: object
+      description: 'The fields of a form template (the multipart upload of `POST /library/form-templates` sends them as text, with the HTML as the file).'
       additionalProperties: false
       required: [code, name_en, doc_code, trigger_task_code, numbering_pattern, html]
       properties:
@@ -15610,6 +16123,7 @@ components:
         - rate_limited
         - account_locked
         - freeze_active
+        - plan_locked
         - insufficient_stock
         - item_in_use
         - role_in_use
@@ -15646,6 +16160,14 @@ components:
         - column_in_use
         - input_already_mapped
         - field_already_mapped
+        - single_admin
+        - backup_missing
+        - request_expired
+        - reset_running
+        - plan_incomplete
+        - storage_not_supported
+        - quarantine_unavailable
+        - maintenance
     PageEnvelope:
       type: object
       required: [items, page]
@@ -15656,7 +16178,7 @@ components:
       type: object
       additionalProperties: false
       required: [total, filtered]
-      description: '0.15.64 (W8 item 6). The counts of the toolbar, from the server, never from the loaded rows. `total`: every row the caller may see on this screen (region scope B3 and row security; a stream or a view keeps its own rows). `filtered`: the rows that match the filters and the search (the rows paging walks through and Export writes).'
+      description: '0.15.68 (W8 item 6). The counts of the toolbar, from the server, never from the loaded rows. `total`: every row the caller may see on this screen (region scope B3 and row security; a stream or a view keeps its own rows). `filtered`: the rows that match the filters and the search (the rows paging walks through and Export writes).'
       properties:
         total: { type: integer, minimum: 0 }
         filtered: { type: integer, minimum: 0 }
@@ -15664,7 +16186,7 @@ components:
       type: object
       additionalProperties: false
       required: [pasted, found, not_found]
-      description: '0.15.64 (W8 item 5). The result of a pasted list in `q`: the distinct codes pasted, how many name a site the caller may see on this screen (whatever the other filters), and the codes that name none, in paste order (upper case). A site outside the caller''s regions is reported as not found, so the answer reveals nothing the caller may not see.'
+      description: '0.15.68 (W8 item 5). The result of a pasted list in `q`: the distinct codes pasted, how many name a site the caller may see on this screen (whatever the other filters), and the codes that name none, in paste order (upper case). A site outside the caller''s regions is reported as not found, so the answer reveals nothing the caller may not see.'
       properties:
         pasted: { type: integer, minimum: 0, maximum: 1000 }
         found: { type: integer, minimum: 0, maximum: 1000 }
@@ -19095,7 +19617,7 @@ components:
       type: object
       additionalProperties: false
       required: [size, align, density, wrap, zebra]
-      description: '0.15.64 (W8 item 4). The Display options of a site-data table: text size, alignment of the text cells, row density, wrap long text, zebra rows.'
+      description: '0.15.68 (W8 item 4). The Display options of a site-data table: text size, alignment of the text cells, row density, wrap long text, zebra rows.'
       properties:
         size: { type: string, enum: [sm, md, lg] }
         align: { type: string, enum: [start, center] }
@@ -19119,6 +19641,135 @@ components:
         version: { type: integer }
         updated_at: { type: string, format: date-time }
         updated_by: { $ref: '#/components/schemas/UserRef' }
+    # ---------------------------------------------------------- daily plan (0.15.67)
+    DailyPlanColumn:
+      type: string
+      enum: [no, site_code, site_name, tower_owner, owner_id, latitude, longitude, region, site_type, sow, contractor, aat_se, access_valid, planned_work, actual_work, reason, remark]
+    DailyPlanItem:
+      type: object
+      required: [kind, code, label]
+      properties:
+        kind: {type: string, enum: [task, field_work]}
+        code: {type: string}
+        label: {type: string}
+        label_ar: {type: string}
+    DailyPlanRow:
+      type: object
+      required: [region_id, site_id, site_code, origin, values, auto, overridden, planned_count, actual_count, below_target, reason_missing, frozen]
+      properties:
+        region_id: {type: integer}
+        site_id: {type: string, format: uuid}
+        site_code: {type: string}
+        site_name: {type: [string, 'null']}
+        origin: {type: string, enum: [auto, added], description: 'auto = filled from system data; added = added by hand.'}
+        values:
+          description: The value shown in each column (the manual value over the auto one).
+          type: object
+          properties:
+            site_code: {type: [string, 'null']}
+            site_name: {type: [string, 'null']}
+            region: {type: [string, 'null']}
+            tower_owner: {type: [string, 'null']}
+            owner_id: {type: [string, 'null']}
+            latitude: {type: [string, 'null']}
+            longitude: {type: [string, 'null']}
+            site_type: {type: [string, 'null']}
+            sow: {type: [string, 'null']}
+            contractor: {type: [string, 'null']}
+            aat_se: {type: [string, 'null']}
+            access_valid: {type: [string, 'null'], description: 'Yes, Yes (to YYYY-MM-DD) or No.'}
+            planned_work: {type: [string, 'null'], description: 'One item per line.'}
+            actual_work: {type: [string, 'null'], description: 'One item per line.'}
+        auto:
+          description: The auto-filled value of each column that may be changed by hand.
+          type: object
+          additionalProperties: {type: [string, 'null']}
+        overridden:
+          type: array
+          items: {type: string}
+          description: The columns holding a manual value.
+        reason: {type: [string, 'null']}
+        remark: {type: [string, 'null']}
+        planned_items: {type: array, items: {$ref: '#/components/schemas/DailyPlanItem'}}
+        actual_items: {type: array, items: {$ref: '#/components/schemas/DailyPlanItem'}}
+        planned_count: {type: integer}
+        actual_count: {type: integer}
+        below_target: {type: boolean, description: 'On a day up to today, fewer actual items than planned items.'}
+        reason_missing: {type: boolean}
+        frozen: {type: boolean, description: 'The copy taken when the day was locked.'}
+    DailyPlanRegion:
+      type: object
+      required: [region_id, plan_date, version, locked, row_count, reason_missing_count, can_edit, can_lock, can_unlock]
+      properties:
+        region_id: {type: integer}
+        region_code: {type: string}
+        region_name_en: {type: string}
+        region_name_ar: {type: [string, 'null']}
+        plan_date: {type: string, format: date}
+        version: {type: integer, description: 'If-Match of the changes; 0 before the first change.'}
+        locked: {type: boolean}
+        lock_kind: {type: [string, 'null'], enum: [manual, auto, null]}
+        locked_at: {type: [string, 'null'], format: date-time}
+        locked_by: {oneOf: [{$ref: '#/components/schemas/UserRef'}, {type: 'null'}]}
+        unlocked_at: {type: [string, 'null'], format: date-time}
+        unlocked_by: {oneOf: [{$ref: '#/components/schemas/UserRef'}, {type: 'null'}]}
+        updated_at: {type: [string, 'null'], format: date-time}
+        updated_by: {oneOf: [{$ref: '#/components/schemas/UserRef'}, {type: 'null'}]}
+        row_count: {type: integer}
+        reason_missing_count: {type: integer}
+        can_edit: {type: boolean}
+        can_lock: {type: boolean}
+        can_unlock: {type: boolean}
+    DailyPlanDay:
+      type: object
+      required: [date, today, is_workday, next_working_day, previous_working_day, my_region_ids, plans, rows]
+      properties:
+        date: {type: string, format: date}
+        today: {type: string, format: date}
+        is_workday: {type: boolean}
+        next_working_day: {type: string, format: date}
+        previous_working_day: {type: string, format: date}
+        my_region_ids: {type: array, items: {type: integer}, description: 'The regions where the caller holds L1 or L2 of the Daily Plan.'}
+        plans: {type: array, items: {$ref: '#/components/schemas/DailyPlanRegion'}}
+        rows: {type: array, items: {$ref: '#/components/schemas/DailyPlanRow'}}
+    DailyPlanRowInput:
+      type: object
+      additionalProperties: false
+      properties:
+        overrides:
+          type: object
+          description: 'column: text, or null to go back to the auto value.'
+          additionalProperties: {type: [string, 'null']}
+        reason: {type: [string, 'null'], maxLength: 1000}
+        remark: {type: [string, 'null'], maxLength: 1000}
+    DailyPlanSettingsInput:
+      type: object
+      required: [columns, default_region_scope, auto_lock_time, reminder_hour]
+      properties:
+        columns:
+          type: object
+          required: [progress, tomorrow]
+          properties:
+            progress: {type: array, items: {$ref: '#/components/schemas/DailyPlanColumn'}}
+            tomorrow: {type: array, items: {$ref: '#/components/schemas/DailyPlanColumn'}}
+        default_region_scope: {type: string, enum: [mine, all]}
+        auto_lock_time: {type: [string, 'null'], pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$'}
+        reminder_hour: {type: [integer, 'null'], minimum: 0, maximum: 23}
+    DailyPlanSettings:
+      allOf:
+      - {$ref: '#/components/schemas/DailyPlanSettingsInput'}
+      - type: object
+        required: [version, known_columns, default_columns]
+        properties:
+          version: {type: integer}
+          known_columns: {type: array, items: {$ref: '#/components/schemas/DailyPlanColumn'}}
+          default_columns:
+            type: object
+            properties:
+              progress: {type: array, items: {$ref: '#/components/schemas/DailyPlanColumn'}}
+              tomorrow: {type: array, items: {$ref: '#/components/schemas/DailyPlanColumn'}}
+          updated_at: {type: string, format: date-time}
+          updated_by: {$ref: '#/components/schemas/UserRef'}
     # ---------------------------------------------------------- MFA exemption
     MfaExemption:
       type: object
@@ -19204,6 +19855,135 @@ components:
         affected_open_tasks: { type: integer }
         version: { type: integer }
     # ---------------------------------------------------------- freeze and DLP
+    DataResetSettings:
+      type: object
+      required: [request_expiry_minutes, backup_max_age_hours, version]
+      properties:
+        request_expiry_minutes: {type: integer, description: 'Minutes a request stays open (default 30).'}
+        backup_max_age_hours: {type: integer, description: 'Age limit of the last successful database backup (default 24).'}
+        version: {type: integer}
+    DataResetBackup:
+      type: object
+      required: [ok, max_age_hours]
+      properties:
+        ok: {type: boolean, description: 'A successful backup is recorded within `max_age_hours`.'}
+        max_age_hours: {type: integer}
+        last_success:
+          description: 'The latest System Log row of source `backup`, level `info`, `context.script` = `db-backup`, `context.event` = `backup_ok`, `context.type` full or diff.'
+          oneOf:
+          - type: object
+            required: [at]
+            properties:
+              system_log_id: {type: integer}
+              at: {type: string, format: date-time}
+              type: {type: [string, 'null'], description: 'full or diff.'}
+              mode: {type: [string, 'null'], description: 'full, diff, weekly or monthly (db-backup.sh mode).'}
+              repository: {type: [string, 'null'], description: 'The pgBackRest repositories that took it.'}
+              stanza: {type: [string, 'null']}
+          - type: 'null'
+        last_problem:
+          description: 'The latest error of the backup check, when newer than the last success.'
+          oneOf:
+          - type: object
+            properties:
+              system_log_id: {type: integer}
+              at: {type: string, format: date-time}
+              message: {type: string}
+          - type: 'null'
+    DataResetPlanTable:
+      type: object
+      required: [table, action, rows, delete, keep]
+      properties:
+        table: {type: string}
+        action: {type: string, enum: [delete, mixed, keep, log]}
+        rows: {type: integer}
+        delete: {type: integer}
+        keep: {type: integer}
+    DataResetFiles:
+      type: object
+      required: [total, moved, missing, refused, pending, problems]
+      properties:
+        total: {type: integer}
+        moved: {type: integer}
+        missing: {type: integer}
+        refused: {type: integer}
+        pending: {type: integer}
+        problems:
+          type: array
+          description: 'The first 200 keys missing or refused (left in place, never deleted).'
+          items:
+            type: object
+            properties:
+              storage_key: {type: string}
+              outcome: {type: string, enum: [missing, refused]}
+              detail: {type: [string, 'null']}
+    DataResetRequest:
+      type: object
+      required: [id, status, version, database_name, requested_by, requested_at, request_reason, expires_at, expired, stalled, files]
+      properties:
+        id: {type: string, format: uuid}
+        status: {type: string, enum: [requested, approved, running, files_pending, completed, failed, cancelled, expired]}
+        version: {type: integer}
+        database_name: {type: string}
+        requested_by: {$ref: '#/components/schemas/UserRef'}
+        requested_at: {type: string, format: date-time}
+        request_reason: {type: string}
+        expires_at: {type: string, format: date-time}
+        expired: {type: boolean}
+        approved_by: {oneOf: [{$ref: '#/components/schemas/UserRef'}, {type: 'null'}]}
+        approved_at: {type: [string, 'null'], format: date-time}
+        approve_reason: {type: [string, 'null']}
+        cancelled_by: {oneOf: [{$ref: '#/components/schemas/UserRef'}, {type: 'null'}]}
+        cancelled_at: {type: [string, 'null'], format: date-time}
+        cancel_reason: {type: [string, 'null']}
+        run_by: {oneOf: [{$ref: '#/components/schemas/UserRef'}, {type: 'null'}]}
+        run_started_at: {type: [string, 'null'], format: date-time}
+        db_committed_at: {type: [string, 'null'], format: date-time}
+        finished_at: {type: [string, 'null'], format: date-time}
+        stalled: {type: boolean, description: 'Running, but its transaction died before the commit (nothing was reset); cancel closes it as failed.'}
+        backup: {type: [object, 'null'], additionalProperties: true, description: 'The backup the run relied on (`DataResetBackup.last_success`).'}
+        plan_at_request: {type: [object, 'null'], additionalProperties: true, description: '`delete_rows`, `files` and `sites` when the request was made.'}
+        result: {type: [object, 'null'], additionalProperties: true, description: '`audit_id` (the `project_data_reset` row on the Audit Log chain), `sessions_ended`, `deleted` (rows per table).'}
+        quarantine_dir: {type: [string, 'null'], description: 'Where the files of the deleted rows were moved (inside the store, `<STORAGE_DIR>/.pre-reset-<timestamp>`).'}
+        error: {type: [string, 'null']}
+        files: {$ref: '#/components/schemas/DataResetFiles'}
+    DataResetState:
+      type: object
+      required: [database, confirmation_phrase, settings, system_admins_active, single_admin, script_running, maintenance, backup, plan, request, last_request, can, storage]
+      properties:
+        database: {type: string}
+        confirmation_phrase: {type: string, description: '`RESET <database>`: typed to request and again to run.'}
+        settings: {$ref: '#/components/schemas/DataResetSettings'}
+        system_admins_active: {type: integer}
+        single_admin: {type: boolean, description: 'Fewer than two active System Admins: no request; the operator script on the server is the way.'}
+        script_running: {type: boolean}
+        maintenance: {type: boolean}
+        backup: {$ref: '#/components/schemas/DataResetBackup'}
+        plan:
+          type: object
+          required: [tables, delete_rows, keep_rows, files]
+          properties:
+            tables: {type: array, items: {$ref: '#/components/schemas/DataResetPlanTable'}}
+            delete_rows: {type: integer}
+            keep_rows: {type: integer}
+            files: {type: integer, description: 'Stored files of the rows that would be deleted (moved, never deleted).'}
+            error: {type: [string, 'null'], description: 'Why the plan cannot be counted (a table without a decision, a right missing); a run is then refused (409 `plan_incomplete`). The tables are empty while a run is open.'}
+        request: {oneOf: [{$ref: '#/components/schemas/DataResetRequest'}, {type: 'null'}]}
+        last_request: {oneOf: [{$ref: '#/components/schemas/DataResetRequest'}, {type: 'null'}]}
+        can:
+          type: object
+          properties:
+            request: {type: boolean}
+            approve: {type: boolean}
+            start: {type: boolean}
+            cancel: {type: boolean}
+            retry_files: {type: boolean}
+        storage:
+          type: object
+          required: [driver, supported]
+          properties:
+            driver: {type: string, enum: [local, s3]}
+            supported: {type: boolean, description: 'false with S3/MinIO: a run is refused (409 `storage_not_supported`).'}
     StructuralFreeze:
       type: object
       required: [active, version]
@@ -21347,7 +22127,7 @@ components:
         security_log_days: { type: integer, minimum: 365, maximum: 3650 }
     SecurityEvent:
       type: string
-      enum: [sign_in_started, sign_in_succeeded, callback_account_mismatch, sign_in_failed, sign_in_locked, sign_in_rate_limited, signed_out, session_expired, session_ended, session_revoked_by_admin, mfa_exemption_granted, mfa_exemption_revoked, step_up_passed, step_up_failed, break_glass_used, two_factor_passed, two_factor_failed, recovery_code_used, two_factor_enrolled, password_changed, password_reset]
+      enum: [sign_in_started, sign_in_succeeded, callback_account_mismatch, sign_in_failed, sign_in_locked, sign_in_rate_limited, signed_out, session_expired, session_ended, session_revoked_by_admin, mfa_exemption_granted, mfa_exemption_revoked, step_up_passed, step_up_failed, break_glass_used, two_factor_passed, two_factor_failed, recovery_code_used, two_factor_enrolled, password_changed, password_reset, project_data_reset]
     SecurityOutcome:
       type: string
       enum: [success, failure, info]
@@ -21715,7 +22495,7 @@ components:
     # ---------------------------------------------------------- notifications and logs
     NotificationKind:
       type: string
-      enum: [task_assigned, task_returned, task_approved, approval_due, reassigned, absence_alert, idle_task_alert, no_holder, holiday_tentative, delegation, mfa_exemption, template_updated, import_batch, system, mention, followed_change, task_rejected, no_eligible_holder, register_assigned, register_rejected, gate_closed_again, sla_negative_duration, email_change_requested, email_change_decided, security_alert, snag_raised, snag_review, snag_rejected, snag_closed, levels_converted, permit_transferred, phone_change_requested, phone_change_decided, security_notice, site_region_moved, assignment_request]
+      enum: [task_assigned, task_returned, task_approved, approval_due, reassigned, absence_alert, idle_task_alert, no_holder, holiday_tentative, delegation, mfa_exemption, template_updated, import_batch, system, mention, followed_change, task_rejected, no_eligible_holder, register_assigned, register_rejected, gate_closed_again, sla_negative_duration, email_change_requested, email_change_decided, security_alert, snag_raised, snag_review, snag_rejected, snag_closed, levels_converted, permit_transferred, phone_change_requested, phone_change_decided, security_notice, site_region_moved, assignment_request, data_reset_request]
     Notification:
       type: object
       required: [id, kind, title, created_at, read_at]
@@ -21864,11 +22644,11 @@ components:
         order: {type: array, maxItems: 200, items: {type: string, maxLength: 100}}
         hidden: {type: array, maxItems: 200, items: {type: string, maxLength: 100}}
         width: {type: object, additionalProperties: {type: integer, minimum: 40, maximum: 1000}}
-        density: {type: string, enum: [comfortable, normal, compact], description: '0.15.64 adds `normal` (the middle density of the Display menu).'}
+        density: {type: string, enum: [comfortable, normal, compact], description: '0.15.68 adds `normal` (the middle density of the Display menu).'}
         display:
           type: object
           additionalProperties: false
-          description: '0.15.64 (W8 item 4): the Display options of the view (any subset; the missing ones follow the user and the defaults).'
+          description: '0.15.68 (W8 item 4): the Display options of the view (any subset; the missing ones follow the user and the defaults).'
           properties:
             size: { type: string, enum: [sm, md, lg] }
             align: { type: string, enum: [start, center] }

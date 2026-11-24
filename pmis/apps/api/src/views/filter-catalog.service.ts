@@ -413,7 +413,7 @@ export class FilterCatalogService {
   }
 
   /**
-   * W5 (0.15.69): the Archive list of Library > Archive. Built-in fields over the alias `s` of the archive rows (LibraryService.ROWS: one row per site
+   * W5 (0.15.70): the Archive list of Library > Archive. Built-in fields over the alias `s` of the archive rows (LibraryService.ROWS: one row per site
    * document, with its lifecycle status); region scope, the register modules and row security are applied by the list beside the compiled condition.
    */
   private async archive(): Promise<Built> {

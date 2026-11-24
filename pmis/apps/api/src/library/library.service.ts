@@ -14,6 +14,7 @@ import { DocumentsService, SITE_DOCS } from '../documents/documents.service';
 import { FilterCatalogService } from '../views/filter-catalog.service';
 import { TaskViewService, type UserRefDto } from '../workflow/task-view.service';
 import { formData, renderForm } from './render';
+import { checkTemplate, sanitizeHtml } from './sanitize';
 
 export const ARCHIVE_SCREEN = 'library-archive';
 const STATUSES = ['due', 'generated', 'signed_uploaded', 'in_review', 'approved', 'rejected', 'superseded'] as const;
@@ -127,7 +128,7 @@ const GROUP_RANK: Record<string, number> = { DESIGN_ACQ: 10, CW: 20, TE: 30, OM:
 const dateOnly = (v: string | Date | null): string | null => (v === null ? null : v instanceof Date ? v.toISOString().slice(0, 10) : String(v).slice(0, 10));
 
 /**
- * W5 of plan 2026-11-23-next-ui-cleanup (contract 0.15.69, migration 0151): the Library menu. Forms lists the approved forms, previews and generates a
+ * W5 of plan 2026-11-23-next-ui-cleanup (contract 0.15.70, migration 0151): the Library menu. Forms lists the approved forms, previews and generates a
  * filled document of a site (the database checks who, numbers it and audits it; this service renders the template). Archive counts and lists every
  * document of the sites by type, with its lifecycle, and starts the bulk zip through the existing zip export. The document slots, files, downloads,
  * version history and zips are the existing ones (DocumentsService, ZipService).
@@ -199,7 +200,8 @@ export class LibraryMenuService {
     const r = await this.one<{ data: Record<string, unknown>; html: string; bindings: Record<string, string>; task_id: string | null }>(
       Prisma.sql`SELECT lib_preview(${id}::uuid, ${b.site_id}::uuid) AS j`);
     const out = renderForm(r.html, formData(r.data, r.bindings));
-    return { html: out.html, task_id: r.task_id ?? null, warnings: out.missing };
+    // the filled copy goes through the allow-list again (the template was checked on save; the data is escaped by the renderer)
+    return { html: sanitizeHtml(out.html).html, task_id: r.task_id ?? null, warnings: out.missing };
   }
 
   /** POST /library/forms/{id}/generate: the database numbers and keeps it (audited); the file is rendered here and attached in the same transaction. */
@@ -209,7 +211,7 @@ export class LibraryMenuService {
     const g = await this.one<{ id: string; data: Record<string, unknown>; html: string; bindings: Record<string, string> }>(
       Prisma.sql`SELECT lib_generate(${id}::uuid, ${b.site_id}::uuid, ${b.remarks ?? null}::text) AS j`);
     const out = renderForm(g.html, formData(g.data, g.bindings));
-    const doc = await this.one<Record<string, unknown>>(Prisma.sql`SELECT lib_generated_attach(${g.id}::uuid, ${out.html}::text) AS j`);
+    const doc = await this.one<Record<string, unknown>>(Prisma.sql`SELECT lib_generated_attach(${g.id}::uuid, ${sanitizeHtml(out.html).html}::text) AS j`);
     return { ...doc, warnings: out.missing };
   }
 
@@ -241,10 +243,33 @@ export class LibraryMenuService {
     return { html: await this.one<string>(Prisma.sql`SELECT lib_form_template_html(${id}::uuid) AS j`) };
   }
 
+  /** POST /library/form-templates (multipart): the HTML file and the fields of the form; the database checks them (closed body, field errors). */
+  async saveTemplateUpload(file: { buffer: Buffer; originalname: string } | undefined, body: Record<string, unknown> | undefined) {
+    if (!file) throw problems.validation([{ path: '/file', code: 'required', message: 'Send the HTML template as the multipart field "file".' }]);
+    const html = file.buffer.toString('utf8');
+    if (html.includes('\u0000') || !/\.(html?|htm)$/i.test(file.originalname || '')) {
+      throw problems.validation([{ path: '/file', code: 'invalid', message: 'An HTML file (.html), UTF-8 text.' }]);
+    }
+    const raw: Record<string, unknown> = { ...(body ?? {}), html };
+    if (typeof raw.bindings === 'string') {
+      try { raw.bindings = JSON.parse(raw.bindings); } catch { throw problems.validation([{ path: '/bindings', code: 'invalid', message: 'JSON object of name to data path.' }]); }
+    }
+    for (const k of ['name_ar']) if (raw[k] === '') raw[k] = null;
+    return this.saveTemplate(raw);
+  }
+
   async saveTemplate(raw: unknown) {
     if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) throw problems.validation([{ path: '/', code: 'invalid', message: 'The body is a JSON object.' }]);
     const { reason, ...rest } = raw as Record<string, unknown>;
     if (reason !== undefined && typeof reason !== 'string') throw problems.validation([{ path: '/reason', code: 'invalid', message: 'The reason is text.' }]);
+    // the allow-list of sanitize.ts first (the database repeats a deny-list as defence in depth): anything it would remove refuses the template
+    if (typeof rest.html === 'string') {
+      const bad = checkTemplate(rest.html);
+      if (bad.length) {
+        throw problems.validation([{ path: '/html', code: 'unsafe_html', message: `Not allowed in a form: ${bad.slice(0, 20).join(', ')}.` }],
+          'The form holds markup outside the allow-list of printable forms (no script, frame, link, event handler, external URL or CSS import).');
+      }
+    }
     return this.one(Prisma.sql`SELECT lib_form_template_save(${JSON.stringify(rest)}::jsonb, ${(reason as string | undefined) ?? null}::text) AS j`);
   }
 

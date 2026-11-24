@@ -26,7 +26,7 @@ describe('the layout model (lib/navLayout)', () => {
     const d = defaultLayout();
     expect(d.headings.map((h) => h.id)).toEqual(['work', 'site_register', 'registers', 'data', 'admin', 'logs']);
     expect(d.headings[1]).toMatchObject({ name_en: 'Site Master', name_ar: 'ماستر المواقع', children: ['sites'] });
-    expect(d.headings[0]!.children).toEqual(['my_work', 'inbox', 'approvals', 'workload', 'status_updates', 'dashboard', 'messages', 'absence']);
+    expect(d.headings[0]!.children).toEqual(['my_work', 'daily_plan', 'inbox', 'approvals', 'workload', 'status_updates', 'dashboard', 'messages', 'absence']);
     expect(resolveLayout(null)).toEqual(d);
   });
 
@@ -34,8 +34,9 @@ describe('the layout model (lib/navLayout)', () => {
     const read = (m: string) => readFileSync(path(process.cwd(), `../api/prisma/migrations/${m}/migration.sql`), 'utf8');
     const list = /unnest\(\s*ARRAY\[([^\]]+)\]/.exec(read('0081_nav_layout'))![1]!.match(/'([^']+)'/g)!.map((s) => s.slice(1, -1));
     // Later releases add their screens in their own migration (0082: the System Log), one INSERT ... VALUES row per key: (key, default group, ord, added_in).
-    const added = [...read('0082_nav_system_log').matchAll(/INSERT INTO nav_item_catalogue[^;]*?VALUES\s*\('([^']+)',\s*'([^']+)'/g)].map((m) => ({ key: m[1]!, group: m[2]! }));
-    expect(added).toEqual([{ key: 'logs.system', group: 'logs' }]);
+    // 0149: My Work > Daily Plan
+    const added = ['0082_nav_system_log', '0149_daily_plan'].flatMap((m) => [...read(m).matchAll(/INSERT INTO nav_item_catalogue[^;]*?VALUES\s*\('([^']+)',\s*'([^']+)'/g)].map((x) => ({ key: x[1]!, group: x[2]! })));
+    expect(added).toEqual([{ key: 'logs.system', group: 'logs' }, { key: 'daily_plan', group: 'work' }]);
     expect([...list, ...added.map((a) => a.key)].sort()).toEqual(NAV_SIDE.map((n) => n.key).sort());
     for (const a of added) expect(NAV_SIDE.find((n) => n.key === a.key)?.group).toBe(a.group);
     expect(cleanNavLayout(defaultLayout()).errors).toEqual([]);
@@ -87,7 +88,7 @@ describe('the layout model (lib/navLayout)', () => {
     expect(l.headings[2]!.children).not.toContain('gecol');
     expect(l.headings[2]!.children.at(-1)).toMatchObject({ children: ['gecol'] });
     l = dropOn(l, itemRef('my_work'), itemRef('approvals'))!; // the same list: takes the place of the target
-    expect(l.headings[0]!.children.slice(0, 3)).toEqual(['inbox', 'approvals', 'my_work']);
+    expect(l.headings[0]!.children.slice(0, 4)).toEqual(['daily_plan', 'inbox', 'approvals', 'my_work']);
     l = dropOn(l, itemRef('templates'), itemRef('sites'))!; // another list: before the target
     expect(l.headings[1]!.children).toEqual(['templates', 'sites']);
     l = dropOn(l, headRef(sub), headRef('logs'))!;
@@ -201,22 +202,23 @@ describe('the side menu with a shared layout', () => {
     app();
     await u.click(await screen.findByTestId('nav-edit'));
     expect(screen.getByTestId('nav-editor')).toBeInTheDocument();
-    expect(editItems('work').slice(0, 3)).toEqual(['my_work', 'inbox', 'approvals']);
+    expect(editItems('work').slice(0, 4)).toEqual(['my_work', 'daily_plan', 'inbox', 'approvals']);
     key('i:approvals', ' ');
-    expect(live()).toMatch(/Approvals picked up: position 3 of 8 in Work/);
+    expect(live()).toMatch(/Approvals picked up: position 4 of 9 in Work/);
     key('i:approvals', 'ArrowUp');
     key('i:approvals', 'ArrowUp');
-    expect(live()).toMatch(/Approvals: position 1 of 8 in Work/);
+    key('i:approvals', 'ArrowUp');
+    expect(live()).toMatch(/Approvals: position 1 of 9 in Work/);
     key('i:approvals', ' ');
-    expect(live()).toMatch(/Approvals dropped at position 1 of 8 in Work/);
-    expect(editItems('work').slice(0, 3)).toEqual(['approvals', 'my_work', 'inbox']);
+    expect(live()).toMatch(/Approvals dropped at position 1 of 9 in Work/);
+    expect(editItems('work').slice(0, 4)).toEqual(['approvals', 'my_work', 'daily_plan', 'inbox']);
     expect(screen.getByTestId('nav-edit-handle-i:approvals')).toHaveFocus();
     // Escape puts a move back
     key('i:inbox', ' ');
     key('i:inbox', 'ArrowDown');
     key('i:inbox', 'Escape');
     expect(live()).toMatch(/Move cancelled/);
-    expect(editItems('work').slice(0, 3)).toEqual(['approvals', 'my_work', 'inbox']);
+    expect(editItems('work').slice(0, 4)).toEqual(['approvals', 'my_work', 'daily_plan', 'inbox']);
     // a main heading moves among the main headings
     key('h:logs', ' ');
     key('h:logs', 'ArrowUp');
@@ -231,7 +233,7 @@ describe('the side menu with a shared layout', () => {
     await u.type(within(dlg).getByTestId('nav-edit-confirm-reason'), 'Approvals first, as the owner asked');
     await u.click(within(dlg).getByTestId('nav-edit-confirm-submit'));
     await waitFor(() => expect(screen.queryByTestId('nav-editor')).not.toBeInTheDocument());
-    expect(keysIn('nav-group-work').slice(0, 3)).toEqual(['nav-approvals', 'nav-my_work', 'nav-inbox']);
+    expect(keysIn('nav-group-work').slice(0, 4)).toEqual(['nav-approvals', 'nav-my_work', 'nav-daily_plan', 'nav-inbox']);
     expect((db().cfg.navLayout.layout as Layout).headings[0]!.children.slice(0, 2)).toEqual(['approvals', 'my_work']);
     expect(db().cfg.navLayout.version).toBe(2);
   }, 30_000);

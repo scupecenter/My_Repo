@@ -1,5 +1,5 @@
 /**
- * W5 (contract 0.15.69): the renderer of the Library forms. The same template language as the CW forms of design/forms (render.js, the "mini"
+ * W5 (contract 0.15.70): the renderer of the Library forms. The same template language as the CW forms of design/forms (render.js, the "mini"
  * renderer): `{{path}}` (HTML-escaped), `{{{path}}}`, `{{#each list}}..{{else}}..{{/each}}`, `{{#if path}}..{{else}}..{{/if}}`, `{{this}}` and
  * dotted paths. There are no helpers and nothing is evaluated.
  *

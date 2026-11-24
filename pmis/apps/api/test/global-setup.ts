@@ -287,6 +287,12 @@ export default async function setup(): Promise<() => Promise<void>> {
   const ssaDb = await buildDatabase(adminUrl, ssa, appPassword);
   process.env.TEST_DATABASE_URL_SSA = ssaDb.appUrl;
   process.env.TEST_SUPER_URL_SSA = ssaDb.superUrl;
+  // The data reset database (migration 0146): the suite resets the project data of its database (sites, tasks, registers, documents) and ends every session
+  // in it, so no other suite may share it.
+  const drst = `${dbName}_drst`;
+  const drstDb = await buildDatabase(adminUrl, drst, appPassword);
+  process.env.TEST_DATABASE_URL_DRST = drstDb.appUrl;
+  process.env.TEST_SUPER_URL_DRST = drstDb.superUrl;
   process.env.TEST_DATABASE_URL = main.appUrl;
   process.env.TEST_SUPER_URL = main.superUrl;
   process.env.TEST_DATABASE_URL_SOLO = one.appUrl;
@@ -345,6 +351,7 @@ export default async function setup(): Promise<() => Promise<void>> {
     await a.query(`DROP DATABASE IF EXISTS ${ssa} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${slaDb_} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${f20k} WITH (FORCE)`);
+    await a.query(`DROP DATABASE IF EXISTS ${drst} WITH (FORCE)`);
     await a.end();
   };
 }
