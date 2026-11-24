@@ -89,7 +89,7 @@ W1 decision: the single tab row takes its phases from the published workflow ver
 | W4 | Dead or stuck screens: Settings > Alerts and Security stay on "Loading..."; audit every menu and tab | Pending | |
 | W5 | Library menu (Forms and Archive); Data entry > Templates stays as it is | Pending | |
 | W7 | Daily Progress and Tomorrow Plan: a screen in the system, copyable to email | Pending | |
-| W8 | Site lists and the site task table: row numbers everywhere, three-level headers, list-style task table, display options (font size, alignment, density, wrap) | Pending | |
+| W8 | Site lists and the site task table: row numbers everywhere, three-level headers, list-style task table, display options (font size, alignment, density, wrap) | Done (branch `claude/w8-table-standard`, contract 0.15.64, migration 0148, CHANGELOG 201); the Daily Plan (W7) and the Archive (W5) adopt it when they are built | |
 | W6 | CHANGELOG, CLAUDE.md navigation notes and this file updated | Pending | |
 
 Suggested order: W4 first (it may expose broken APIs that W3/W5 depend on), then W1, W8, W3, W7, W2, W5, W6. W8 builds the shared table options that W2 then reuses on registers. W2 and W5 are the largest.
@@ -254,6 +254,33 @@ Do:
    - The count is part of the shared toolbar of item 4, so the item 4 guard test also fails when a site-data screen renders without it, and the PR's screen list shows the count state of each screen.
 7. Tests: vitest for the counts (unfiltered, filtered, partly loaded, selected), the row numbers across pages, the three-level header merge, the task list layout, the display menu (persisted and applied) and the pasted-list search (spaces, new lines, mixed case, not-found list); API tests for the multi-token search on the site lists; update the e2e for the wide table and the site page.
 
+Result (2026-11-24, branch `claude/w8-table-standard`). The shared layer is `apps/web/src/components/TableStandard.tsx` (TableToolbar, TableCount, ShownFooter, SearchBox, PastedChip, the `#` column, GroupBands, DisplayMenu, ExportCsvButton) on top of TableKit; the screen list lives in `apps/web/src/lib/siteDataScreens.ts` and the guard is `apps/web/src/pages/tableStandard.test.tsx`. Choices made under the House rules:
+- The `#` column is the first frozen data column; the row checkbox stays at the very start, as in the wide table, where `#` and the checkbox share the first cell.
+- "Found" in the pasted-list chip means a site the caller may see on the screen (region scope and row security), whatever the other filters, so the chip never calls a visible site "not found" and never reveals a site of another region.
+- The total of a stream or a work view is the sites with work in it (the screen itself); a drill-down, a bucket or a stage is a filter.
+- My Work and Approvals have no server export source, so their "Export current view" writes the rows of the view (the server's filtered set) to a CSV in the browser, with formulas neutralised. Approvals is a master-detail card list: it has no column chooser; its Display options apply to the list.
+- The Display defaults are a new tab Administration > Settings > Display (GET/PUT `/settings/table-display`, migration 0148, guarded key `table.display`, System Admin or an all-regions delegate of `admin.settings`, reason, If-Match, audit before and after). No matrix row is needed: the menu changes the look only, never data.
+
+Screen list (W8 item 4):
+
+| Screen | Route | State | Toolbar | Count | Notes |
+|---|---|---|---|---|---|
+| Site Master | /sites | done | complete | server (GET /sites `counts`) | pipeline, locks, gaps |
+| Site Master stream | /sites?stream=CW | done | complete | server | N/A sites join both numbers when shown |
+| Site Master work view | /sites?view=CW | done | complete | server | |
+| Site Master sub-menus (Design & Acquisition, SOW, CW, TE, HOTO, O&M) | /sites?section=... | done | complete | server (GET /site360/{menu}/rows) | three header levels; search moved to the server |
+| Wide table (Master and every sub-menu) | ...&layout=wide | done | complete | server | three header rows, `#` with the checkbox |
+| Map and Board layouts | ...&layout=map, board | done | complete (switcher) | server (one-row GET /sites) | no rows, so no `#` |
+| Site Tasks table, List (default) | /sites/:id | done | complete | "x of y tasks" | grouped by milestone, Timeline as second option |
+| Site Tasks table, Timeline | /sites/:id | done | views, search, + Filter, count, Display, Export | same | columns are the tasks: no column chooser |
+| Every register and log | /registers/:key | done | complete | server (GET /registers/{key}/records `counts`) | noun "issues" on the Issue Log |
+| My Work | /my-work | done | complete | server (GET /me/tasks `counts`) | buckets as groups; CSV export in the browser |
+| Approvals | /approvals | done | views, search, + Filter, count, Display, Export | server (GET /approvals `counts`) | master-detail list; CSV export in the browser |
+| Dashboard drill-downs | /sites?dashboard_status=... | done | Site Master toolbar | server | they open Site Master with their filter |
+| Daily Plan | (W7) | not applicable yet | | | not built; must use TableToolbar |
+| Library > Archive lists | (W5) | not applicable yet | | | not built; must use TableToolbar |
+| Excel-like grid (hidden) | ...&layout=grid | not applicable | | its own counts | no button since 2026-11-22 |
+
 Acceptance:
 - Every site list shows `#` first.
 - Wide-table headers show section, group and column on three rows, without the "Group / Column" repetition.
@@ -280,6 +307,7 @@ Total: roughly 7 PRs and several CI cycles each. This does not fit in one short 
 
 ## Log
 
+- 2026-11-24: W8 done on branch `claude/w8-table-standard` (contract 0.15.64, migration 0148 with mirror `db/sql/147_table_display_settings.sql`, CHANGELOG 201), in five commits: (a) shared toolbar, `#`, server counts and the pasted-list search; (b) three header levels; (c) the site Tasks list with Timeline; (d) the Display menu and Settings > Display; (e) registers, My Work, Approvals, the guard test and the screen list above. Cluster ID codes of the owner's Excel file are still to be loaded by the owner (Master upload or admin edit); no code needed.
 - 2026-11-24: W8 item 6: total / filtered / shown counts on every site-data screen.
 - 2026-11-23: W8 item 5: search by a pasted list of Site IDs.
 - 2026-11-23: W8 added (row numbers, three-level headers, task list layout, one full table standard on every screen of site data).

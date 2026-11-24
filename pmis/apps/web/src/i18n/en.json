@@ -292,7 +292,8 @@
     "wd": "wd",
     "bulk_issues": "Not done",
     "bulk_skipped": "Skipped",
-    "bulk_failed": "Failed"
+    "bulk_failed": "Failed",
+    "bucket": "Bucket"
   },
   "stepUp": {
     "title": "Re-authentication needed",
@@ -5522,6 +5523,8 @@
     "settings_note": "The defaults of the Display menu on every screen that shows site data (Site Master and its menus, the site task list, registers, My Work, Approvals). A user's own choice and a saved view keep their values.",
     "settings_updated": "Last changed by {{name}} at {{at}}",
     "settings_read_only": "Only a System Admin or a delegate of the settings can change these defaults.",
-    "preview_name": "A long synthetic site name that shows how long text is drawn"
+    "preview_name": "A long synthetic site name that shows how long text is drawn",
+    "since": "Since",
+    "export_view": "Export current view"
   }
 }

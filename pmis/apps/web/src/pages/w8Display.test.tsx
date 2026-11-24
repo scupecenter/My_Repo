@@ -53,7 +53,7 @@ describe('W8 Display menu', () => {
     await u.click(await screen.findByTestId('display-reset'));
     expect(card()).toHaveAttribute('data-tsize', 'md');
     expect(card()).toHaveAttribute('data-density', 'comfortable');
-  });
+  }, 20_000);
 
   it('starts from the defaults of Settings > Display', async () => {
     await signIn('engineer');

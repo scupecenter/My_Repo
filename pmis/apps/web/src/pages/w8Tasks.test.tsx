@@ -46,7 +46,7 @@ describe('W8 site task list', () => {
     await signIn('reviewer');
     const seen: string[] = [];
     server.events.on('request:start', ({ request }) => { const x = new URL(request.url); if (x.pathname.endsWith('/tasks') && x.searchParams.get('filter')) seen.push(x.searchParams.get('filter')!); });
-    const tree = encodeURIComponent(JSON.stringify({ op: 'and', items: [{ field: 'state', op: 'eq', value: 'open' }] }));
+    const tree = encodeURIComponent(JSON.stringify({ op: 'and', items: [{ field: 'state', operator: 'is', value: 'open' }] }));
     renderApp(<SiteAt />, { route: `/sites/${SITE}?tadv=${tree}` });
     await screen.findByTestId(`grid-open-${A1}`);
     await waitFor(() => expect(seen.length).toBeGreaterThan(0));

@@ -19,9 +19,12 @@ import { DataGapsChip, LocksChip } from '@/components/WorkflowLocks';
 import { Pipeline } from '@/components/Pipeline';
 import { TaskDrawer } from '@/components/TaskDrawer';
 import { ExportViewButton } from '@/components/ExportDialog';
-import { TaskGrid } from '@/components/TaskGrid';
+import { TaskGrid, taskMatches } from '@/components/TaskGrid';
+import { SavedViews } from '@/components/SavedViews';
+import { UnifiedFilter } from '@/components/UnifiedFilter';
+import { decodeFilter, encodeFilter, type FilterTree } from '@/api/views';
 import { TaskRow } from '@/components/TaskRow';
-import { DisplayMenu, displayAttrs, TableCount, TableToolbar } from '@/components/TableStandard';
+import { DisplayMenu, displayAttrs, SearchBox, TableCount, TableToolbar } from '@/components/TableStandard';
 import { useTablePrefs } from '@/components/TableKit';
 import { loadPref, savePref } from '@/lib/localPref';
 import { DISMANTLE_CODE, isRealStream, statusOf, streamName, withDismantle } from '@/lib/streams';
@@ -33,6 +36,7 @@ const STREAM_TONE: Record<string, string> = { done: 'bg-doneBg text-doneInk', in
 // per-viewer choice (W8 item 3): the list like the Site Master lists (default) or the Timeline (the task-as-column row of 2026-11-08), remembered
 const LAYOUT_KEY = 'pmis.site.layout';
 const NO_COLS: never[] = [];
+const TIMELINE_VIEW_EMPTY = { tq: '' };
 const TASK_COLUMNS: TasksExportColumnCode[] = ['site_code', 'task_code', 'task_name', 'task_state', 'due_date', 'sla_status'];
 
 export function Site() {
@@ -71,6 +75,10 @@ export function Site() {
   const nodes = (s?.pipeline ?? []).filter((n) => !real || (n.kind === 'milestone' ? streamCodes.has(n.code) : false));
 
   const taskTotal = stages.reduce((n, x) => n + x.tasks.length, 0);
+  // W8: the Timeline takes the same search (tq) and + Filter tree (tadv, on the server) as the list
+  const tq = sp.get('tq') ?? '';
+  const tadvTree = decodeFilter(sp.get('tadv') ?? '');
+  const rowStages = tq ? stages.map((x) => ({ ...x, tasks: x.tasks.filter((k) => taskMatches(k, tq, (i18n.language === 'ar' && k.name_ar) || k.name_en)) })) : stages;
   // W8 item 3: List (default) or Timeline, remembered per user; both sit in the shared toolbar with Export current view
   const switcher = (
     <div className="flex rounded-md border border-line" role="group" aria-label={t('site.layout')} data-testid="site-layout">
@@ -135,11 +143,17 @@ export function Site() {
       )}
       {!docsTab && <>
       <div className="mb-2 flex items-center gap-2"><h2 className="me-auto font-semibold">{t('site.tasks')}{stage && <button className="btn ms-2 px-2 py-0.5 text-xs" data-testid="stage-clear" onClick={() => setParam('stage', null)}>{t('site.all_stages')}</button>}</h2></div>
-      {layout === 'row' && !dismantle && <TableToolbar testid="task-row-toolbar" count={<TableCount testid="task-row-count" noun="tasks" total={taskTotal} filtered={taskTotal} active={false} />} switcher={switcher} display={displayMenu} exporter={exporter} />}
+      {layout === 'row' && !dismantle && <TableToolbar testid="task-row-toolbar" kind="list"
+        views={<SavedViews screen="site-tasks" value={{ tq, ...(tadvTree ? { advanced: tadvTree } : {}) }} empty={TIMELINE_VIEW_EMPTY} table={timeline}
+          onApply={(x) => { const r = x as Record<string, unknown>; setSp((p) => { const n = new URLSearchParams(p); const v = String(r.tq ?? ''); if (v) n.set('tq', v); else n.delete('tq'); const enc = encodeFilter(r.advanced as FilterTree | undefined); if (enc) n.set('tadv', enc); else n.delete('tadv'); return n; }, { replace: true }); }} />}
+        search={<SearchBox testid="task-row-search" value={tq} onChange={(x) => setParam('tq', x || null)} placeholder={t('tstd.search_tasks')} />}
+        filter={<UnifiedFilter screen="site-tasks" value={tadvTree} onChange={(tree) => setParam('tadv', encodeFilter(tree) || null)} onClearAll={() => setSp((p) => { const n = new URLSearchParams(p); n.delete('tq'); n.delete('tadv'); return n; }, { replace: true })} />}
+        count={<TableCount testid="task-row-count" noun="tasks" total={taskTotal} filtered={rowStages.reduce((n, x) => n + x.tasks.length, 0)} active={!!(tq || tadvTree)} onClear={() => setSp((p) => { const n = new URLSearchParams(p); n.delete('tq'); n.delete('tadv'); return n; }, { replace: true })} />}
+        switcher={switcher} display={displayMenu} exporter={exporter} />}
       {dismantle ? <p className="card p-6 text-mute" data-testid="site-dismantle-todo">{t('site.dismantle_todo')}</p>
         : st?.state === 'na' ? <p className="card p-6 text-mute" data-testid="site-stream-na">{t('site.stream_na')}</p>
         : grid.isLoading ? <p className="text-mute">{t('common.loading')}</p>
-        : layout === 'row' ? <div {...displayAttrs(timeline.display)} data-testid="task-row-display"><TaskRow stages={stages} selected={taskId ?? sp.get('row')} onVisible={setIds} onOpen={(id) => setSp((p) => { const n = new URLSearchParams(p); n.set('task', id); n.set('row', id); return n; }, { replace: true })} /></div>
+        : layout === 'row' ? <div {...displayAttrs(timeline.display)} data-testid="task-row-display"><TaskRow stages={rowStages} selected={taskId ?? sp.get('row')} onVisible={setIds} onOpen={(id) => setSp((p) => { const n = new URLSearchParams(p); n.set('task', id); n.set('row', id); return n; }, { replace: true })} /></div>
         : <TaskGrid key={`${stream}|${view}|${stage ?? 'all'}`} siteId={siteId} stages={stages} switcher={switcher} exporter={exporter} selected={taskId ?? sp.get('row')} onVisible={setIds} onOpen={(id) => setSp((p) => { const n = new URLSearchParams(p); n.set('task', id); n.set('row', id); return n; }, { replace: true })} />}
       {layout === 'list' && <p className="mt-2 text-xs text-mute">{t('grid.keys')}</p>}
       </>}
