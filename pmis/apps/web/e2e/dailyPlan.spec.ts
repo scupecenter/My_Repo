@@ -11,6 +11,16 @@ const CASES = [
 for (const c of CASES) {
   test(`daily plan: progress, reason, tomorrow and copy for email (${c.locale}/${c.theme})`, async ({ page, context }) => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    // The system clipboard is shared by the parallel browsers of the run (one test overwrites the other's copy), so the page's own
+    // navigator.clipboard.write is captured instead: the test still checks what the app hands to the clipboard (an HTML table and a text part).
+    await page.addInitScript(() => {
+      const w = window as unknown as { __clip?: Record<string, string> };
+      navigator.clipboard.write = async (items: ClipboardItem[]) => {
+        const out: Record<string, string> = {};
+        for (const it of items) for (const t of it.types) out[t] = await (await it.getType(t)).text();
+        w.__clip = out;
+      };
+    });
     await page.addInitScript(([l, t]) => { localStorage.setItem('pmis.locale', l); localStorage.setItem('pmis.theme', t); }, [c.locale, c.theme]);
     await login(page, 'pm');
     await page.getByTestId('nav-daily_plan').click();
@@ -35,16 +45,11 @@ for (const c of CASES) {
     await expect(page.getByTestId('daily-plan-shown-date')).toContainText('2026-11-23');
     await expect(page.getByTestId('daily-plan-th-access_valid')).toBeVisible();
 
-    await page.bringToFront(); // the clipboard API refuses writes from a page without focus (parallel CI workers)
     await page.getByTestId('daily-plan-copy').click();
-    // the copy is asynchronous: wait until the HTML table is on the clipboard (CI can read it before the write has finished)
-    const readHtml = () => page.evaluate(async () => {
-      const items = await navigator.clipboard.read();
-      const it = items.find((x) => x.types.includes('text/html'));
-      return it ? await (await it.getType('text/html')).text() : '';
-    });
-    await expect.poll(readHtml, { timeout: 10_000 }).toContain('<table');
-    const html = await readHtml();
+    const readClip = (type: string) => page.evaluate((t) => (window as unknown as { __clip?: Record<string, string> }).__clip?.[t] ?? '', type);
+    await expect.poll(() => readClip('text/html'), { timeout: 10_000 }).toContain('<table');
+    const html = await readClip('text/html');
+    expect(await readClip('text/plain')).toContain('Daily Progress 2026-11-22');
     expect(html).toContain('Daily Progress 2026-11-22');
     expect(html).toContain('Tomorrow Plan 2026-11-23');
   });
