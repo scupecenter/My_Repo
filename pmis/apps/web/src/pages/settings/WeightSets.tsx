@@ -17,6 +17,7 @@ import { fieldErrors } from "@/lib/fields";
 import { tripoliToday } from "@/lib/today";
 import { sumOf, weightIssues } from "@/lib/weights";
 import { FieldErr } from "./Calendar";
+import { QueryError, QueryFallback } from "@/components/States";
 
 const CODES: WeightSetCode[] = [
   "project_status",
@@ -198,7 +199,9 @@ function Editor({ id, pin }: { id: string; pin: () => void }) {
     etag = q.data?.etag ?? 0;
   if (!set)
     return (
-      <section className="card p-4 text-mute">{t("common.loading")}</section>
+      <section className="card p-4">
+        <QueryFallback queries={[q]} testid="weights-editor-loading" />
+      </section>
     );
   const draft = set.status === "draft",
     view = acts ?? set.activities,
@@ -564,6 +567,17 @@ export function WeightSets() {
   const openDraft = (d?: WeightSet) => {
     if (d) setSel(d.id);
   };
+  // a failed read must not look like "no weight sets yet" (W4 of the 2026-11-23 plan)
+  if (all.isError)
+    return (
+      <div className="space-y-4" data-testid="page-weights">
+        <QueryError
+          error={all.error}
+          onRetry={() => void all.refetch()}
+          testid="weights-error"
+        />
+      </div>
+    );
   return (
     <div className="space-y-4" data-testid="page-weights">
       <section className="card space-y-2 p-4">

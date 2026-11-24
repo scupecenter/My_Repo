@@ -2309,7 +2309,10 @@
     "no_permission": "You do not have access to this",
     "no_permission_hint": "Ask a System Admin if you need it.",
     "retry": "Retry",
-    "filters": "Filters:"
+    "filters": "Filters:",
+    "not_available": "Not available yet",
+    "not_available_hint": "This screen is not connected to the server yet. Nothing was read or saved.",
+    "load_failed": "This screen could not be loaded."
   },
   "table": {
     "columns": "Columns",
