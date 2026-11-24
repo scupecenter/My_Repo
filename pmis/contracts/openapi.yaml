@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.69
+  version: 0.15.70
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -31,6 +31,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.70 (2026-11-24): W5 of plan `docs/plans/2026-11-23-next-ui-cleanup.md`, the Library menu with Forms and Archive (migration 0151, mirror `db/sql/150_library.sql`; CHANGELOG 205; 0.15.69 is reserved for W2). Additive. (1) Library > Forms: `GET /library/forms` (the approved forms and the uploaded blank forms), `POST /library/forms/{template_id}/preview` (auto-filled, no number) and `POST /library/forms/{template_id}/generate` (numbered by the existing numbering service, kept, audited; the copy is "generated" in the Archive), `GET /library/generated/{doc_id}/download` (`purpose` download, print or view; audited) and `POST /library/generated/{doc_id}/void` (step-up). Who generates: the L1 holder of the task the document belongs to, or a holder of "Documents: generate" (grant `library.forms` `create`) for the region, while that task is open; the L2 holder approves the signed upload with the task, as before. (2) Library > Archive: `GET /library/archive` (one card per Document Library type with a file or a generated document, grouped by stream, counts approved, waiting review and missing), `GET /library/archive/rows` (the list: lifecycle `LibraryDocStatus`, the W8 search, the filter tree of the screen `library-archive`, server counts) and `POST /library/archive/zip` (bulk zip of the filtered files through the existing zip export, limit from the setting). Previews and version history reuse `GET /files/{file_id}/download` and `GET /documents?file_group_id=`. (3) Settings > Documents > Form templates: `GET`/`POST /library/form-templates`, `GET .../{template_id}/html`, `POST .../{template_id}/approve` and `.../retire` (System Admin or an all-regions delegate of `document_types` edit, reason, step-up for approve and retire, audited). (4) Settings > Documents > Archive: `GET`/`PUT /settings/library-archive` (guarded key `library.archive`). (5) Saved views and the filter builder accept the screen `library-archive` (module `sites.documents`). The CW warehouse forms of `/generated-forms` and `/form-templates` (DN, RN, PAC, FAC, snag list with warehouse lines) stay as specified and are not served yet.
     - 0.15.69 (2026-11-24): W2 of plan `docs/plans/2026-11-23-next-ui-cleanup.md` (CHANGELOG 204; 0.15.62 to 0.15.68 are used by the work merged before it). Documentation only, no path, schema or rule changes. A saved view of a register screen (`register-<register key>`) keeps the layout of the screen's view switcher as quick parameters of `filters`, as `site360-<menu>` does since 0.15.49: `layout` = empty (the list), `wide`, `board` or `map`; `board_by` = the code of the register field the board's columns follow, or `state` (the approval state); `lane` = empty, `region` or `type`. They are stored as given, like any other quick parameter; the filter tree in `filters.advanced` keeps its validation. `RegisterDefinition.site_scoped` also decides whether the screen offers the map. Inline edits of the wide table use `PATCH /registers/{register_key}/records/{record_id}` with `If-Match`, the same route, rights, field rules and locks as the record form.
     - 0.15.68 (2026-11-24): W8 of plan `docs/plans/2026-11-23-next-ui-cleanup.md` (CHANGELOG 201; renumbered from 0.15.64 at the merge with main, which holds 0.15.62 to 0.15.67). Additive. (1) The search parameter `SiteSearch` (`q`) of the site-data lists reads a pasted list: two or more tokens separated by spaces, new lines, tabs, commas or semicolons match Site ID or Site Owner ID exactly, ignoring case, one row per site; at most 1000 distinct codes (422 `too_many_codes` at `/q`). One token keeps the "contains" search. `GET /sites` and `GET /site360/{menu}/rows` (new `q`) read it on the server, so paging, counts and Export follow it. (2) `search` (`PastedSearch`: `pasted`, `found`, `not_found`) in the answer when `q` is a list; a code is found when it names a site the caller may see on the screen (region scope, row security), whatever the other filters. (3) `counts` (`ListCounts`: `total` every row the caller may see on the screen, `filtered` the rows matching the filters and the search) in the answer of `GET /sites`; `GET /site360/{menu}/rows` already had both. (4) `GET`/`PUT /settings/table-display` (migration 0148, mirror `db/sql/147_table_display_settings.sql`): the defaults of the Display menu (`TableDisplay`: size, align, density, wrap, zebra), read by every signed-in user, written by a System Admin or an all-regions delegate of `admin.settings` with a reason and If-Match, audited. (5) `SavedViewColumns.density` takes `normal` and `SavedViewColumns.display` keeps the Display options of a view. (6) The same `q`, `counts` and `search` on `GET /registers/{register_key}/records`, `GET /approvals` and `GET /me/tasks`; the last two also take the `filter` tree (the whitelist of `tasks-board`).
     - 0.15.67 (2026-11-24): My Work > Daily Plan, the daily progress and the plan of the next working day (plan W7, owner decisions 2026-11-23; migration 0149, mirror `db/sql/148_daily_plan.sql`; CHANGELOG 203; 0.15.62 to 0.15.66 are used by other branches). Additive. New tag `daily-plan`: (1) `GET /daily-plans?date=&region_id=` returns one plan per region per day for the regions the caller sees (the Project Manager and the System Admins see all), with the auto-filled rows (Site Master: Site ID, Tower Owner, Owner ID, Latitude, Longitude, Region, Site Type, SOW; the Procurement assignment of the day: Vendor / Contractor and AAT SE; a CW permit or B3: Access Valid; tasks and field work of the day: Planned Work and Actual Work), the manual values over them, Reason and Remark, the counts and the flags `below_target` and `reason_missing`, plus `next_working_day` (weekend Friday and Saturday, holidays of the calendar). (2) `PATCH`, `POST` and `DELETE` under `/daily-plans/{date}/regions/{region_id}/sites` change a row, add a site or remove one: `view` on `daily_plan` or `sites` for the region and L1 of the new Matrix row `daily_plan` (or a System Admin), `If-Match` = the plan version (`0` before the first change), a row below target without a reason is 422 (`/reason` `required`), a locked day is 409 `plan_locked`, every change audited with before and after. (3) `POST .../lock` (L2 of the row or a System Admin; 422 with the sites that lack a reason) freezes the day; `POST .../unlock` is an admin override (System Admin or a delegate of `overrides.unlock` for the region, reason, step-up, flagged). (4) `GET /daily-plans/export` downloads both tables as one Excel sheet in the exact column order of the owner's sheet (`export` on `daily_plan` or `sites` per region, audited). Reading needs `view` on `daily_plan` or `sites` for the region, as the menu does. (5) `GET`/`PUT /settings/daily-plan`: visible columns and their order per tab, default region scope, automatic lock time, reminder hour (System Admin or an all-regions `admin.settings` delegate, reason, `If-Match`, closed body). The automatic lock and the reminder (notification kind `daily_plan_reminder`) run in the background job.
@@ -251,6 +252,8 @@ tags:
     description: "The site Documents tab, versions and bulk zip downloads (ADR 0008)."
   - name: templates
     description: "Approved templates, download with embedded ID and version, upload batches, row-wise approval (ADR 0005)."
+  - name: library
+    description: "Library menu (W5): Forms (generate, preview, print) and Archive (every site document by type, lifecycle, zip)."
   - name: forms
     description: "Generated forms DN, RN, PAC, FAC and snag list: template versions, numbering, PDFs."
   - name: warehouse
@@ -11840,6 +11843,388 @@ paths:
         '404': {$ref: '#/components/responses/NotFound'}
         '413': {$ref: '#/components/responses/PayloadTooLarge'}
         '422': {$ref: '#/components/responses/Unprocessable'}
+  /library/forms:
+    get:
+      tags: [library]
+      operationId: listLibraryForms
+      summary: Library > Forms, every approved document form (0.15.70, W5)
+      description: '0.15.70 (migration 0151). Anyone who may view site documents (`sites.documents` view). The approved form templates (one per code, the version in force) and the Document Library types with an uploaded blank form (download only, `kind` `blank_form`). `can_configure` is true for a System Admin or an all-regions delegate of `document_types` edit (the page links to Settings > Documents).'
+      responses:
+        '200':
+          description: Forms.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, can_configure]
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: '#/components/schemas/LibraryForm'}
+                  can_configure: {type: boolean}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /library/forms/{template_id}/preview:
+    parameters:
+    - {name: template_id, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      tags: [library]
+      operationId: previewLibraryForm
+      summary: The auto-filled preview of a form for a site (no number taken)
+      description: '0.15.70. Who: the L1 holder of the site''s task of the form (`trigger_task_code`), or a holder of "Documents: generate" (grant `library.forms` `create`) for the site''s region; the task must be open (open, entry or returned), else 409 `invalid_transition`. A System Admin or an all-regions delegate of `document_types` edit may also preview a draft version and a site whose task is not open. The document number reads `PREVIEW`. Rendered by the server from the template placeholders (`{{path}}`, `{{#each}}`, `{{#if}}`); the HTML is shown in a sandboxed frame without scripts.'
+      x-db-path: lib_preview
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [site_id]
+              properties:
+                site_id: {type: string, format: uuid}
+      responses:
+        '200':
+          description: Preview.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/LibraryFormPreview'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /library/forms/{template_id}/generate:
+    parameters:
+    - {name: template_id, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      tags: [library]
+      operationId: generateLibraryDocument
+      summary: Generate the filled document of a site (the copy enters the Archive as "generated")
+      description: '0.15.70. The same rights and task rule as the preview (an approved form only). Takes the next number of the form''s sequence (`doc_sequences`, never reused), fills the template with the site data, keeps the file and the data, and writes an audit row (`library_document_generate`). Print it, sign and stamp it, then upload the signed copy into the task''s document slot (`POST /tasks/{task_id}/slots/{slot_id}/files`); the L2 holder approves it with the task, as before.'
+      x-db-path: lib_generate
+      parameters:
+      - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [site_id]
+              properties:
+                site_id: {type: string, format: uuid}
+                remarks: {type: [string, 'null'], maxLength: 1000}
+      responses:
+        '201':
+          description: Generated.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/LibraryGeneratedDocument'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /library/generated/{doc_id}/download:
+    parameters:
+    - {name: doc_id, in: path, required: true, schema: {type: string, format: uuid}}
+    get:
+      tags: [library]
+      operationId: downloadLibraryDocument
+      summary: The file of a generated document (download, print or view; audited)
+      description: '0.15.70. Who: `download_documents` on `sites.documents` in the region, the person who generated it, or anyone who may generate it. Every call writes an audit row (`library_document_download`) with its `purpose`. Served as `text/html` with a restrictive Content-Security-Policy (no script, no network) and `X-Content-Type-Options: nosniff`.'
+      x-db-path: lib_generated_read
+      parameters:
+      - name: purpose
+        in: query
+        schema: {type: string, enum: [download, print, view], default: download}
+      responses:
+        '200':
+          description: The HTML file.
+          headers:
+            Content-Disposition: {schema: {type: string}}
+          content:
+            text/html:
+              schema: {type: string}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /library/generated/{doc_id}/void:
+    parameters:
+    - {name: doc_id, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      tags: [library]
+      operationId: voidLibraryDocument
+      summary: Void a wrong generated document with a reason (the number stays issued)
+      description: '0.15.70. The person who generated it, anyone who may generate it, or a System Admin. Step-up. Audited (`library_document_void`, before and after).'
+      x-step-up: true
+      x-db-path: lib_generated_void
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WithReason'}
+      responses:
+        '200':
+          description: Voided.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/LibraryGeneratedDocument'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /library/archive:
+    get:
+      tags: [library]
+      operationId: getLibraryArchive
+      summary: Library > Archive, one card per document type with a file or a generated document, grouped by stream
+      description: '0.15.70. `sites.documents` view; counted inside the caller''s regions (B3, row security) and, for documents of a register record, the register''s own module (as `GET /documents`). A card shows a document type that has at least one file or one generated document; `approved`, `waiting_review` (uploaded or in review) and `missing` (due, generated or rejected) count the document slots. Groups follow the stream of the task the document sits on (Design & Acquisition, Civil Works, Installation (TE), O&M for the tasks of a work view that is not a stream, Handover & Closure, Dismantle, Registers). The setting `library.archive` hides and orders cards; a caller who may change it (`can_configure`) also receives the hidden cards with `hidden` true.'
+      responses:
+        '200':
+          description: Cards.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/LibraryArchive'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /library/archive/rows:
+    get:
+      tags: [library]
+      operationId: listLibraryArchiveRows
+      summary: The Archive list (one row per document of a site; superseded versions on request)
+      description: '0.15.70. `sites.documents` view; the caller''s regions and register modules apply. One row per document slot of a site (a task''s or a register record''s), with its lifecycle status: `due` (the task opened, nothing yet), `generated` (a filled copy was generated), `signed_uploaded`, `in_review`, `approved`, `rejected`; `superseded` rows are the older file versions (with `include_superseded` or the status filter). `q` searches the Site ID, the Site Owner ID, the site name, the document number and the file name; a pasted list of Site IDs finds each site (W8 item 5). `filter` is the AND/OR tree of the screen `library-archive` (`GET /saved-views/filter-fields?screen_key=library-archive`). `counts` come from the server. Sorted by site, document and version.'
+      parameters:
+      - {name: doc_code, in: query, schema: {type: string, maxLength: 40}}
+      - {name: site_id, in: query, schema: {type: string, format: uuid}}
+      - {name: status, in: query, schema: {$ref: '#/components/schemas/LibraryDocStatus'}}
+      - {name: include_superseded, in: query, schema: {type: boolean}}
+      - {$ref: '#/components/parameters/SiteSearch'}
+      - {name: filter, in: query, schema: {type: string}, description: 'JSON of the filter tree (`FilterTree`).'}
+      - {$ref: '#/components/parameters/Limit'}
+      - {$ref: '#/components/parameters/Cursor'}
+      responses:
+        '200':
+          description: Rows.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - {$ref: '#/components/schemas/PageEnvelope'}
+                - type: object
+                  required: [counts]
+                  properties:
+                    items:
+                      type: array
+                      items: {$ref: '#/components/schemas/LibraryArchiveRow'}
+                    counts: {$ref: '#/components/schemas/ListCounts'}
+                    search: {$ref: '#/components/schemas/PastedSearch'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /library/archive/zip:
+    post:
+      tags: [library]
+      operationId: startLibraryArchiveZip
+      summary: Bulk download of the Archive list as a zip, by its filter
+      description: '0.15.70. `download_documents` on `sites.documents`. The files of the rows that match the same parameters as `GET /library/archive/rows` (the uploaded files; due and generated rows have none) go to the existing zip export (`POST /exports/zip` with `file_ids`; job, manifest, audit rows `document_zip_start` and `document_zip_download`). More files than the `zip_limit` of `library.archive` answer 422 `too_many_files`; none answer 422 `no_files`.'
+      parameters:
+      - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                doc_code: {type: string, maxLength: 40}
+                site_id: {type: string, format: uuid}
+                status: {$ref: '#/components/schemas/LibraryDocStatus'}
+                include_superseded: {type: boolean}
+                q: {type: string, maxLength: 20000}
+                filter: {type: string, maxLength: 8000}
+      responses:
+        '202':
+          description: Job started (`kind` `zip_export`).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Job'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /library/form-templates:
+    get:
+      tags: [library]
+      operationId: listLibraryFormTemplates
+      summary: Settings > Documents > Form templates, every version of every form
+      description: '0.15.70. System Admin or an all-regions delegate of `document_types` edit (403 otherwise).'
+      responses:
+        '200':
+          description: Versions, newest first per code.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: '#/components/schemas/LibraryFormTemplate'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      tags: [library]
+      operationId: createLibraryFormTemplate
+      summary: Upload a form or a new version of it (a draft)
+      description: '0.15.70. System Admin or an all-regions delegate of `document_types` edit; a reason. The HTML may use `{{path}}`, `{{#each list}}..{{/each}}` and `{{#if path}}..{{else}}..{{/if}}` over the data of the form (`site`, `region`, `task`, `doc`, `template`, `generated_by`) and `fields.<name>` of `bindings`; the file must come through the allow-list of printable forms unchanged in substance (tags such as table, div, span, p, b, img with an embedded `data:image` source, input checkbox or radio, style with embedded `data:` fonts and images only; attributes such as class, style, colspan, dir; no script, frame, svg, link, form, event handler, `srcdoc`, external URL, `@import`, CSS `expression` or escape, whatever the spelling), else 422 `unsafe_html` with what it would remove; the database repeats a deny-list behind it. Every filled copy (preview and generation) goes through the same allow-list again. The numbering pattern takes the tokens of the numbering service (`{YYYY}`, `{YY}`, `{SEQ:n}` exactly once). Field errors: `unknown_key`, `invalid`, `required`, `unknown_document`, `unknown_task`, `invalid_path`, `sequence_token`, `year_required`. Audited (`library_form_template_save`).'
+      x-db-path: lib_form_template_save
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, reason, code, name_en, doc_code, trigger_task_code, numbering_pattern]
+              properties:
+                file: {type: string, format: binary, description: 'The HTML template (.html, UTF-8, 3 MB at most).'}
+                reason: {type: string}
+                code: {type: string, pattern: '^[A-Z0-9][A-Z0-9-]{1,40}$'}
+                name_en: {type: string, maxLength: 200}
+                name_ar: {type: string, maxLength: 200}
+                doc_code: {type: string, description: 'The Document Library type the form produces.'}
+                trigger_task_code: {type: string, description: 'The task that triggers the document: it is due when this task opens.'}
+                numbering_pattern: {type: string, minLength: 6, maxLength: 80, examples: ['SSR-{YYYY}-{SEQ:4}']}
+                numbering_reset: {type: string, enum: [never, yearly], default: yearly}
+                bindings: {type: string, description: 'JSON object: extra placeholders `fields.<name>`, name to a data path such as `site.tower_owner`.'}
+      responses:
+        '201':
+          description: The draft version.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/LibraryFormTemplate'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /library/form-templates/{template_id}/html:
+    parameters:
+    - {name: template_id, in: path, required: true, schema: {type: string, format: uuid}}
+    get:
+      tags: [library]
+      operationId: getLibraryFormTemplateHtml
+      summary: The HTML of one version (to start a new version from it)
+      description: '0.15.70. Configuration right only.'
+      responses:
+        '200':
+          description: The template.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [html]
+                properties:
+                  html: {type: string}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /library/form-templates/{template_id}/approve:
+    parameters:
+    - {name: template_id, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      tags: [library]
+      operationId: approveLibraryFormTemplate
+      summary: Approve a draft version (it replaces the version in force)
+      description: '0.15.70. Configuration right, a reason and a step-up. The previous approved version of the code is retired; the numbering pattern becomes the pattern of the form''s sequence (the counter continues). 409 `invalid_transition` when the version is not a draft; 409 `duplicate` when a warehouse sequence already uses the form code. Audited (`library_form_template_approve`, before and after).'
+      x-step-up: true
+      x-db-path: lib_form_template_approve
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WithReason'}
+      responses:
+        '200':
+          description: Approved.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/LibraryFormTemplate'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /library/form-templates/{template_id}/retire:
+    parameters:
+    - {name: template_id, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      tags: [library]
+      operationId: retireLibraryFormTemplate
+      summary: Retire a version (it leaves Library > Forms; generated documents keep it)
+      description: '0.15.70. Configuration right, a reason and a step-up. Audited (`library_form_template_retire`).'
+      x-step-up: true
+      x-db-path: lib_form_template_retire
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WithReason'}
+      responses:
+        '200':
+          description: Retired.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/LibraryFormTemplate'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /settings/library-archive:
+    get:
+      tags: [settings]
+      operationId: getLibraryArchiveSetting
+      summary: Settings > Documents > Archive (visible cards and their order, default columns, bulk zip limit)
+      description: '0.15.70 (migration 0151). Every signed-in user. Without a saved value: nothing hidden, no order (stream order, then code), every column, zip limit 500.'
+      responses:
+        '200':
+          description: Setting.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/LibraryArchiveSetting'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+    put:
+      tags: [settings]
+      operationId: setLibraryArchiveSetting
+      summary: Set the Archive cards, default columns and zip limit
+      description: '0.15.70: System Admin or a delegate of `admin.settings` edit for all regions, a reason and If-Match. Closed body, every key required: `hidden` and `order` (document codes; `unknown_document`, `duplicate`), `default_columns` (`unknown_column`), `zip_limit` 1..5000 (`out_of_range`); `unknown_key` at its path. Audited (`library_archive_update`, before and after).'
+      x-db-path: admin_set_library_archive
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - {$ref: '#/components/schemas/WithReason'}
+              - {$ref: '#/components/schemas/LibraryArchiveConfig'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/LibraryArchiveSetting'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
   /warehouse/dispatch-status:
     get:
       tags: [warehouse]
@@ -15029,6 +15414,203 @@ components:
           schema: { $ref: '#/components/schemas/TransitionResult' }
 
   schemas:
+    LibraryDocStatus:
+      type: string
+      enum: [due, generated, signed_uploaded, in_review, approved, rejected, superseded]
+      description: '0.15.70 (W5). The lifecycle of a site document: due (its task opened), generated (a filled copy was generated), signed_uploaded (the signed copy is uploaded), in_review (submitted with the task), approved, rejected (returned); superseded is an older file version.'
+    LibraryForm:
+      type: object
+      additionalProperties: false
+      required: [id, kind, code, name_en, doc_code, doc_name_en]
+      properties:
+        id: {type: string, description: 'The template id (kind `html`) or the document type id (kind `blank_form`).'}
+        kind: {type: string, enum: [html, blank_form], description: '`html`: filled by the system (preview, generate, print). `blank_form`: an uploaded blank form of the Document Library, download only.'}
+        code: {type: string}
+        name_en: {type: string}
+        name_ar: {type: [string, 'null']}
+        version: {type: [integer, 'null']}
+        doc_type_id: {type: string, format: uuid}
+        doc_code: {type: string}
+        doc_name_en: {type: string}
+        doc_name_ar: {type: [string, 'null']}
+        trigger_task_code: {type: [string, 'null']}
+        trigger_task_name_en: {type: [string, 'null']}
+        trigger_task_name_ar: {type: [string, 'null']}
+        numbering_pattern: {type: [string, 'null']}
+        blank_form_file_id: {type: [string, 'null'], format: uuid}
+        owner: {oneOf: [{$ref: '#/components/schemas/UserRef'}, {type: 'null'}], description: 'Who approved the version in force.'}
+        updated_at: {type: [string, 'null'], format: date-time}
+    LibraryFormTemplateInput:
+      type: object
+      description: 'The fields of a form template (the multipart upload of `POST /library/form-templates` sends them as text, with the HTML as the file).'
+      additionalProperties: false
+      required: [code, name_en, doc_code, trigger_task_code, numbering_pattern, html]
+      properties:
+        code: {type: string, pattern: '^[A-Z0-9][A-Z0-9-]{1,40}$'}
+        name_en: {type: string, maxLength: 200}
+        name_ar: {type: [string, 'null'], maxLength: 200}
+        doc_code: {type: string, description: 'The Document Library type the form produces.'}
+        trigger_task_code: {type: string, description: 'The task that triggers the document: it is due when this task opens.'}
+        numbering_pattern: {type: string, minLength: 6, maxLength: 80, examples: ['SSR-{YYYY}-{SEQ:4}']}
+        numbering_reset: {type: string, enum: [never, yearly], default: yearly}
+        html: {type: string, maxLength: 3000000}
+        bindings: {type: object, additionalProperties: {type: string}, description: 'Extra placeholders `fields.<name>`: name to a data path such as `site.tower_owner`.'}
+    LibraryFormTemplate:
+      type: object
+      required: [id, code, version, name_en, doc_code, trigger_task_code, numbering_pattern, status]
+      properties:
+        id: {type: string, format: uuid}
+        code: {type: string}
+        version: {type: integer}
+        name_en: {type: string}
+        name_ar: {type: [string, 'null']}
+        doc_type_id: {type: string, format: uuid}
+        doc_code: {type: string}
+        doc_name_en: {type: string}
+        doc_name_ar: {type: [string, 'null']}
+        trigger_task_code: {type: string}
+        trigger_task_name_en: {type: [string, 'null']}
+        trigger_task_name_ar: {type: [string, 'null']}
+        numbering_pattern: {type: string}
+        numbering_reset: {type: string, enum: [never, yearly]}
+        bindings: {type: object, additionalProperties: {type: string}}
+        placeholders: {type: array, items: {type: string}}
+        status: {type: string, enum: [draft, approved, retired]}
+        sha256: {type: string}
+        size_bytes: {type: integer}
+        created_by: {oneOf: [{$ref: '#/components/schemas/UserRef'}, {type: 'null'}]}
+        created_at: {type: string, format: date-time}
+        approved_by: {oneOf: [{$ref: '#/components/schemas/UserRef'}, {type: 'null'}]}
+        approved_at: {type: [string, 'null'], format: date-time}
+        retired_at: {type: [string, 'null'], format: date-time}
+        updated_at: {type: string, format: date-time}
+    LibraryFormPreview:
+      type: object
+      required: [html, task_id, warnings]
+      properties:
+        html: {type: string, description: 'The filled form (number `PREVIEW`).'}
+        task_id: {type: [string, 'null'], format: uuid}
+        warnings: {type: array, items: {type: string}, description: 'Placeholders with no value for this site.'}
+    LibraryGeneratedDocument:
+      type: object
+      required: [id, number, status, site_id, site_code, task_id, doc_code, generated_at]
+      properties:
+        id: {type: string, format: uuid}
+        number: {type: string}
+        status: {type: string, enum: [generated, voided]}
+        template_id: {type: string, format: uuid}
+        template_code: {type: string}
+        template_version: {type: integer}
+        site_id: {type: string, format: uuid}
+        site_code: {type: string}
+        region_id: {$ref: '#/components/schemas/RegionId'}
+        task_id: {type: string, format: uuid}
+        task_code: {type: string}
+        doc_code: {type: string}
+        remarks: {type: [string, 'null']}
+        sha256: {type: [string, 'null']}
+        size_bytes: {type: integer}
+        generated_by: {oneOf: [{$ref: '#/components/schemas/UserRef'}, {type: 'null'}]}
+        generated_at: {type: string, format: date-time}
+        void_reason: {type: [string, 'null']}
+        voided_by: {oneOf: [{$ref: '#/components/schemas/UserRef'}, {type: 'null'}]}
+        voided_at: {type: [string, 'null'], format: date-time}
+        warnings: {type: array, items: {type: string}}
+    LibraryArchiveCard:
+      type: object
+      required: [doc_code, doc_type_id, name_en, counts, hidden]
+      properties:
+        doc_code: {type: string}
+        doc_type_id: {type: string, format: uuid}
+        name_en: {type: string}
+        name_ar: {type: [string, 'null']}
+        hidden: {type: boolean}
+        counts:
+          type: object
+          required: [total, approved, waiting_review, missing, generated, files]
+          properties:
+            total: {type: integer}
+            approved: {type: integer}
+            waiting_review: {type: integer}
+            missing: {type: integer}
+            generated: {type: integer}
+            files: {type: integer}
+    LibraryArchive:
+      type: object
+      required: [groups, can_configure]
+      properties:
+        can_configure: {type: boolean}
+        groups:
+          type: array
+          items:
+            type: object
+            required: [key, name_en, cards]
+            properties:
+              key: {type: string, description: 'The stream code, OM for a work view that is not a stream, DISMANTLE or REGISTERS.'}
+              name_en: {type: string}
+              name_ar: {type: [string, 'null']}
+              cards:
+                type: array
+                items: {$ref: '#/components/schemas/LibraryArchiveCard'}
+    LibraryArchiveRow:
+      type: object
+      required: [key, slot_id, status, site_id, site_code, doc_code]
+      properties:
+        key: {type: string, description: 'Stable row key (the slot, or the file of a superseded row).'}
+        slot_id: {type: string, format: uuid}
+        status: {$ref: '#/components/schemas/LibraryDocStatus'}
+        site_id: {type: string, format: uuid}
+        site_code: {type: string}
+        site_name: {type: [string, 'null']}
+        region_id: {$ref: '#/components/schemas/RegionId'}
+        region_name: {type: [string, 'null']}
+        region_name_ar: {type: [string, 'null']}
+        cluster: {type: [string, 'null']}
+        doc_type_id: {type: string, format: uuid}
+        doc_code: {type: string}
+        doc_name_en: {type: string}
+        doc_name_ar: {type: [string, 'null']}
+        candidate_label: {type: [string, 'null']}
+        doc_number: {type: [string, 'null'], description: 'The number of the latest generated copy.'}
+        generated_id: {type: [string, 'null'], format: uuid}
+        version: {type: [integer, 'null']}
+        task_id: {type: [string, 'null'], format: uuid}
+        task_code: {type: [string, 'null']}
+        task_name_en: {type: [string, 'null']}
+        task_name_ar: {type: [string, 'null']}
+        register_key: {type: [string, 'null']}
+        file_id: {type: [string, 'null'], format: uuid}
+        file_group_id: {type: [string, 'null'], format: uuid}
+        file_name: {type: [string, 'null']}
+        mime_type: {type: [string, 'null']}
+        file_count: {type: integer}
+        uploaded_by: {oneOf: [{$ref: '#/components/schemas/UserRef'}, {type: 'null'}]}
+        uploaded_at: {type: [string, 'null'], format: date-time}
+        approved_by: {oneOf: [{$ref: '#/components/schemas/UserRef'}, {type: 'null'}]}
+        approved_at: {type: [string, 'null'], format: date}
+        generated_at: {type: [string, 'null'], format: date-time}
+        form_id: {type: [string, 'null'], format: uuid, description: 'The approved form that produces this document type on this task, if any.'}
+    LibraryArchiveConfig:
+      type: object
+      additionalProperties: false
+      required: [hidden, order, default_columns, zip_limit]
+      properties:
+        hidden: {type: array, items: {type: string}, maxItems: 500}
+        order: {type: array, items: {type: string}, maxItems: 500}
+        default_columns:
+          type: array
+          minItems: 1
+          items: {type: string, enum: [site, site_name, region, cluster, doc_type, doc_number, version, status, task, uploaded_by, uploaded_at, approved_by, approved_at]}
+        zip_limit: {type: integer, minimum: 1, maximum: 5000}
+    LibraryArchiveSetting:
+      allOf:
+      - {$ref: '#/components/schemas/LibraryArchiveConfig'}
+      - type: object
+        required: [version]
+        properties:
+          version: {type: integer}
+          updated_at: {type: string, format: date-time}
+          updated_by: {$ref: '#/components/schemas/UserRef'}
     Site360Section:
       type: string
       description: The section of a Master column. `status` columns are in every menu.

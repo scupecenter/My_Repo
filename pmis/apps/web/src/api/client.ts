@@ -123,6 +123,20 @@ export function parseFilename(cd: string | null): string {
   return name || 'download';
 }
 
+/** Fetch a text file (an HTML form of the Library, contract 0.15.70) with the session cookie; the server audits the read. */
+export async function fetchText(path: string, query?: RequestOptions['query']): Promise<string> {
+  const res = await fetch(buildUrl(path, query), { credentials: 'include', headers: { Accept: 'text/html' } });
+  if (!res.ok) throw new ApiError(res.status, await toProblem(res));
+  return res.text();
+}
+
+/** Fetch a file as a Blob (an in-page preview of an image or a PDF; the server audits the download). */
+export async function fetchBlob(path: string, query?: RequestOptions['query']): Promise<Blob> {
+  const res = await fetch(buildUrl(path, query), { credentials: 'include' });
+  if (!res.ok) throw new ApiError(res.status, await toProblem(res));
+  return res.blob();
+}
+
 /** Fetch a file with the session cookie and hand it to the browser as a download. Returns the file name. */
 export async function downloadFile(path: string, query?: RequestOptions['query']): Promise<string> {
   const res = await fetch(buildUrl(path, query), { credentials: 'include' });

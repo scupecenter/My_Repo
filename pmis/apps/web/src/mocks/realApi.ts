@@ -560,6 +560,22 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/settings/data-reset/requests/:id/cancel'],
   ['post', '/settings/data-reset/requests/:id/run'],
   ['post', '/settings/data-reset/requests/:id/retry-files'],
+  // Contract 0.15.70 (migration 0151; apps/api: library): Library > Forms and Archive, Settings > Documents > Form templates and Archive (W5).
+  ['get', '/library/forms'],
+  ['post', '/library/forms/:id/preview'],
+  ['post', '/library/forms/:id/generate'],
+  ['get', '/library/generated/:id/download'],
+  ['post', '/library/generated/:id/void'],
+  ['get', '/library/archive'],
+  ['get', '/library/archive/rows'],
+  ['post', '/library/archive/zip'],
+  ['get', '/library/form-templates'],
+  ['post', '/library/form-templates'],
+  ['get', '/library/form-templates/:id/html'],
+  ['post', '/library/form-templates/:id/approve'],
+  ['post', '/library/form-templates/:id/retire'],
+  ['get', '/settings/library-archive'],
+  ['put', '/settings/library-archive'],
 ] as const;
 
 /** `GET /users/deleted` and `GET /users/picker` are other operations that the `:id` pattern would swallow; they stay mocked. */

@@ -190,7 +190,7 @@ function typed(text: Prisma.Sql, t: FilterFieldType): Prisma.Sql {
   return text;
 }
 
-export type FilterScreen = 'sites' | 'dashboard' | 'site-tasks' | 'tasks-board' | `register-${string}` | `site360-${string}`;
+export type FilterScreen = 'sites' | 'dashboard' | 'site-tasks' | 'tasks-board' | 'library-archive' | `register-${string}` | `site360-${string}`;
 
 @Injectable()
 export class FilterCatalogService {
@@ -201,7 +201,7 @@ export class FilterCatalogService {
 
   /** The screens with a filter builder. Other saved-view screens (the logs) keep their simple filters. */
   static supports(screen: string): boolean {
-    return isSitesLike(screen) || screen === 'site-tasks' || screen === 'tasks-board' || /^register-[a-z0-9_]{2,60}$/.test(screen);
+    return isSitesLike(screen) || screen === 'site-tasks' || screen === 'tasks-board' || screen === 'library-archive' || /^register-[a-z0-9_]{2,60}$/.test(screen);
   }
 
   /**
@@ -408,6 +408,41 @@ export class FilterCatalogService {
         field('actual_date', 'Actual date', 'التاريخ الفعلي', 'date', Prisma.sql`t.actual_date`, undefined, G.dates),
         field('late', 'Late', 'متأخرة', 'bool', Prisma.sql`(t.state NOT IN ('approved', 'na', 'skipped', 'locked') AND t.due_date IS NOT NULL AND t.due_date < cal_today())`, undefined, G.task),
         field('counts_toward_milestone', 'Counts toward the milestone', 'تُحتسب في المعلم', 'bool', Prisma.sql`td.counts_toward_milestone`, undefined, G.task),
+      ],
+    };
+  }
+
+  /**
+   * W5 (0.15.70): the Archive list of Library > Archive. Built-in fields over the alias `s` of the archive rows (LibraryService.ROWS: one row per site
+   * document, with its lifecycle status); region scope, the register modules and row security are applied by the list beside the compiled condition.
+   */
+  private async archive(): Promise<Built> {
+    const regions = await this.regionOptions();
+    const doc = { key: 'document', label_en: 'Document', label_ar: 'المستند' };
+    return {
+      wants: new Map(),
+      fields: [
+        field('site_code', 'Site ID', 'رمز الموقع', 'text', Prisma.sql`s.site_code`, undefined, G.site),
+        field('site_name', 'Site name', 'اسم الموقع', 'text', Prisma.sql`s.name`, undefined, G.site),
+        field('region_id', 'Region', 'المنطقة', 'enum', Prisma.sql`s.region_id::text`, regions, G.site),
+        field('cluster', 'Cluster', 'المجموعة', 'text', Prisma.sql`s.cluster`, undefined, G.site),
+        field('status', 'Status', 'الحالة', 'enum', Prisma.sql`s.status`, [
+          { value: 'due', label_en: 'Due', label_ar: 'مستحق' },
+          { value: 'generated', label_en: 'Generated', label_ar: 'مُولَّد' },
+          { value: 'signed_uploaded', label_en: 'Signed and uploaded', label_ar: 'موقَّع ومرفوع' },
+          { value: 'in_review', label_en: 'In review', label_ar: 'قيد المراجعة' },
+          { value: 'approved', label_en: 'Approved', label_ar: 'معتمد' },
+          { value: 'rejected', label_en: 'Rejected', label_ar: 'مرفوض' },
+          { value: 'superseded', label_en: 'Superseded', label_ar: 'نسخة سابقة' },
+        ], doc),
+        field('doc_number', 'Document number', 'رقم المستند', 'text', Prisma.sql`s.doc_number`, undefined, doc),
+        field('version', 'Version', 'الإصدار', 'number', Prisma.sql`s.version`, undefined, doc),
+        field('file_name', 'File name', 'اسم الملف', 'text', Prisma.sql`s.file_name`, undefined, doc),
+        field('candidate_label', 'Candidate', 'المرشح', 'text', Prisma.sql`s.candidate_label`, undefined, doc),
+        field('task_code', 'Task code', 'رمز المهمة', 'text', Prisma.sql`s.task_code`, undefined, G.task),
+        field('uploaded_at', 'Upload date', 'تاريخ الرفع', 'date', Prisma.sql`(s.uploaded_at AT TIME ZONE 'Africa/Tripoli')::date`, undefined, G.dates),
+        field('approved_at', 'Approval date', 'تاريخ الاعتماد', 'date', Prisma.sql`s.approved_at`, undefined, G.dates),
+        field('generated_at', 'Generation date', 'تاريخ التوليد', 'date', Prisma.sql`(s.generated_at AT TIME ZONE 'Africa/Tripoli')::date`, undefined, G.dates),
       ],
     };
   }
@@ -638,6 +673,8 @@ export class FilterCatalogService {
         ? await this.sites()
         : screen === 'site-tasks' || screen === 'tasks-board'
           ? await this.tasks()
+          : screen === 'library-archive'
+            ? await this.archive()
           : await this.register(screen.slice('register-'.length));
     const hidden = new Set(
       await this.hidden(

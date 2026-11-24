@@ -15,7 +15,7 @@ import { Tip } from './Tip';
  * Export and More. Each piece is a slot so a screen passes its own components (its saved-view screen, its filter fields, its export source);
  * the order and the look come from here. The guard test (tableStandard.test.tsx) fails when a site-data table renders without it.
  */
-export type TableNoun = 'sites' | 'records' | 'issues' | 'tasks' | 'items';
+export type TableNoun = 'sites' | 'records' | 'issues' | 'tasks' | 'items' | 'documents';
 
 export function TableToolbar({ testid, views, search, filter, extra, count, switcher, columns, density, display, exporter, primary, more, kind = 'grid' }: {
   testid: string;

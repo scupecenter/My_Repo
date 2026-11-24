@@ -26,6 +26,8 @@ import { DailyPlan } from '@/pages/DailyPlan';
 import { RegisterPage } from '@/pages/Register';
 import { RegisterBatch } from '@/pages/RegisterBatch';
 import { TemplatesPage } from '@/pages/Templates';
+import { LibraryForms } from '@/pages/library/Forms';
+import { ArchiveList, LibraryArchive } from '@/pages/library/Archive';
 import { ReconciliationPage } from '@/pages/Reconciliation';
 import { TemplateMappingPage } from '@/pages/TemplateMapping';
 import { AsBuiltItems } from '@/pages/AsBuiltItems';
@@ -100,6 +102,11 @@ function gated(session: Session) {
         <Route path="as-built/items" element={<AsBuiltItems />} />
         <Route path="registers/:key/batches/:batchId" element={<RegisterBatch />} />
         <Route path="templates" element={<TemplatesPage />} />
+        {/* W5: Library (Forms and Archive) */}
+        <Route path="library" element={<Navigate to="/library/forms" replace />} />
+        <Route path="library/forms" element={<LibraryForms />} />
+        <Route path="library/archive" element={<LibraryArchive />} />
+        <Route path="library/archive/:docCode" element={<ArchiveList />} />
         <Route path="templates/batches/:batchId" element={<RegisterBatch />} />
         <Route path="templates/master-import" element={<ReconciliationPage />} />
         <Route path="templates/mapping" element={<TemplateMappingPage />} />

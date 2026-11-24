@@ -248,6 +248,7 @@ records of the Contractors register (companies, teams, contracts) and the vehicl
 | document_type_drafts | KEEP | Unpublished library drafts (configuration in progress). |
 | document_type_placements | KEEP | Where a document type applies. |
 | document_blank_forms | KEEP | Blank forms (their stored files stay). |
+| library_form_templates | KEEP | The document forms of Library > Forms and their versions (W5, migration 0151): configuration. |
 | template_definitions | KEEP | Templates. |
 | template_versions | KEEP | Template versions (their stored files stay). |
 | template_parts | KEEP | Sheet names of TPL-MASTER. |
@@ -404,6 +405,7 @@ records of the Contractors register (companies, teams, contracts) and the vehicl
 | document_site_overrides | Document "not required" per site. |
 | document_task_snapshots | Snapshot of a task's documents. |
 | document_export_jobs | Export jobs, Master and log exports (files quarantined). |
+| library_generated_docs | Documents generated for sites in Library > Forms (W5, migration 0151; the file is kept in the row, nothing to quarantine). Their numbers stay issued in doc_number_issues (KEEP), so a number is never reused after a reset. |
 | import_batch_jobs | Background runs of batches. |
 | import_uploads | Background uploads. |
 | master_reconciliation_runs | Legacy Master uploads (stored file quarantined). |

@@ -14,7 +14,7 @@ export interface NavHead { id: string; name_en: string; name_ar: string; icon: s
 export interface Layout { headings: NavHead[] }
 
 /** The default headings, in order (the groups of navItems.ts). */
-export const DEFAULT_GROUPS = ['work', 'site_register', 'registers', 'data', 'admin', 'logs'] as const;
+export const DEFAULT_GROUPS = ['work', 'site_register', 'registers', 'data', 'library', 'admin', 'logs'] as const;
 export const OTHER_ID = 'other';
 export const NAME_MAX = 60;
 export const MAX_MAIN = 30;
@@ -72,6 +72,7 @@ export function resolveLayout(saved: unknown, nav: readonly NavItem[] = NAV_SIDE
     out.push({ ...h, children });
   }
   if (!out.length) return defaultLayout(nav);
+  addLibrary(out, nav, used);
   for (const n of nav) {
     if (used.has(n.key)) continue;
     const target = findHeading({ headings: out }, n.group) ?? findHeading({ headings: out }, OTHER_ID) ?? (out.push(otherHeading()), out[out.length - 1]!);
@@ -79,6 +80,21 @@ export function resolveLayout(saved: unknown, nav: readonly NavItem[] = NAV_SIDE
   }
   moveDismantle(out);
   return { headings: out };
+}
+
+/**
+ * W5: a layout saved before the Library menu existed gets the heading Library (Forms, Archive) right after the heading that holds Templates (Data entry), or
+ * before Administration, so the new screens do not land in "Other". A layout that already places them, or has a heading library, is left alone.
+ */
+function addLibrary(out: NavHead[], nav: readonly NavItem[], used: Set<string>) {
+  const keys = nav.filter((n) => n.group === 'library' && !used.has(n.key)).map((n) => n.key);
+  if (!keys.length || out.some((h) => h.id === 'library')) return;
+  const holds = (h: NavHead, k: string) => h.children.some((c) => (isSub(c) ? c.children.includes(k) : c === k));
+  const after = out.findIndex((h) => holds(h, 'templates'));
+  const admin = out.findIndex((h) => h.id === 'admin' || holds(h, 'admin.settings'));
+  const at = after >= 0 ? after + 1 : admin >= 0 ? admin : out.length;
+  out.splice(at, 0, { id: 'library', name_en: groupName('library', en), name_ar: groupName('library', ar), icon: null, children: keys });
+  for (const k of keys) used.add(k);
 }
 
 /**

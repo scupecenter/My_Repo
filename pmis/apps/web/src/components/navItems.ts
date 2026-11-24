@@ -1,6 +1,6 @@
 import type { Concept } from '@/lib/icons';
 
-export const NAV: { key: string; to: string; icon: Concept; group: 'work' | 'site_register' | 'registers' | 'data' | 'admin' | 'logs' }[] = [
+export const NAV: { key: string; to: string; icon: Concept; group: 'work' | 'site_register' | 'registers' | 'data' | 'library' | 'admin' | 'logs' }[] = [
   { key: 'my_work', to: '/my-work', icon: 'home', group: 'work' },
   // 0149 (W7): My Work > Daily Plan
   { key: 'daily_plan', to: '/my-work/daily-plan', icon: 'dailyPlan', group: 'work' },
@@ -31,6 +31,9 @@ export const NAV: { key: string; to: string; icon: Concept; group: 'work' | 'sit
   { key: 'financial_advances', to: '/registers/financial_advances', icon: 'procurement', group: 'registers' },
   { key: 'contractor_reports', to: '/reports/contractors', icon: 'report', group: 'registers' },
   { key: 'templates', to: '/templates', icon: 'document', group: 'data' },
+  // W5 (owner decision 2026-11-23): the main menu Library, between Data entry and Administration
+  { key: 'library.forms', to: '/library/forms', icon: 'forms', group: 'library' },
+  { key: 'library.archive', to: '/library/archive', icon: 'archive', group: 'library' },
   { key: 'admin.users', to: '/admin/users', icon: 'people', group: 'admin' },
   { key: 'admin.roles', to: '/admin/roles', icon: 'role', group: 'admin' },
   { key: 'admin.groups', to: '/admin/groups', icon: 'group', group: 'admin' },
@@ -63,7 +66,7 @@ export const ANY_OF: Record<string, string[]> = { contractor_reports: ['procurem
  * Entries opened by `view` on a module that is not a screen of the server's module list (the rule of the API: a System Admin, or view on the module; a full
  * delegation holds view on every module). The System Log (owner request 2026-11-09): GET /system-log answers 403 to anyone else (log_can_read_ops).
  */
-export const BY_MODULE_VIEW: Record<string, string> = { 'logs.system': 'admin.system_log' };
+export const BY_MODULE_VIEW: Record<string, string> = { 'logs.system': 'admin.system_log', 'library.forms': 'sites.documents', 'library.archive': 'sites.documents' };
 /** Entries only a System Admin sees (the server answers 403 to anyone else). */
 export const ADMIN_ONLY = new Set(['logs.online', 'logs.alerts', 'logs.job_runs', 'logs.deployments', 'logs.integrity', 'logs.mail']);
 export type NavItem = (typeof NAV)[number];

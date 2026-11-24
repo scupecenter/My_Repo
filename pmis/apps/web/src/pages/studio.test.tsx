@@ -58,7 +58,7 @@ describe('Workflow Studio', () => {
     expect(screen.getByTestId('studio-after-A1')).toBeInTheDocument();
     expect(screen.getByTestId('studio-before-A4')).toBeInTheDocument();
     expect(await screen.findByTestId('studio-col-table')).toBeInTheDocument();
-    expect(screen.getByTestId('studio-docs-link')).toHaveAttribute('href', '/admin/settings/documents/library');
+    expect(screen.getByTestId('studio-docs-link')).toHaveAttribute('href', '/admin/settings/documents/types');
     await u.type(screen.getByTestId('studio-search'), 'po email');
     expect(screen.getByTestId('studio-task-B2')).toBeInTheDocument();
     expect(screen.queryByTestId('studio-row-MS1')).toBeNull();

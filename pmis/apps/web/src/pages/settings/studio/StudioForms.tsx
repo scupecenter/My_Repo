@@ -154,7 +154,7 @@ export function TaskForm({ c, code }: { c: Ctx; code: string }) {
 
       <StudioCard title={t('wfe.documents')} testid="studio-card-docs">
         <p className="text-sm">{t('studio.has_documents')}: <b data-testid="studio-has-docs">{task.has_documents ? t('common.yes') : t('common.no')}</b></p>
-        <Link className="inline-flex min-h-11 items-center text-sm text-link underline" to="/admin/settings/documents/library" data-testid="studio-docs-link">{t('studio.open_library')}</Link>
+        <Link className="inline-flex min-h-11 items-center text-sm text-link underline" to="/admin/settings/documents/types" data-testid="studio-docs-link">{t('studio.open_library')}</Link>
       </StudioCard>
 
       <TaskColumnsCard c={c} code={code} />
