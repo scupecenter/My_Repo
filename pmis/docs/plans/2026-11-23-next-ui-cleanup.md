@@ -83,9 +83,9 @@ W1 decision: the single tab row takes its phases from the published workflow ver
 
 | # | Workstream | Status | PR |
 |---|------------|--------|----|
-| W1 | Site page: one clear tab row instead of two overlapping rows | Done | this PR |
+| W1 | Site page: one clear tab row instead of two overlapping rows | Done | #199 |
 | W2 | Registers & Logs: the same view options as Site Master (wide table, board, density, map where it applies) | Pending | |
-| W3 | Settings > Site360: remove the tab and the name; move what is still useful into Settings > Workflow | Done | this PR |
+| W3 | Settings > Site360: remove the tab and the name; move what is still useful into Settings > Workflow | Done | #198 |
 | W4 | Dead or stuck screens: Settings > Alerts and Security stay on "Loading..."; audit every menu and tab | Pending | |
 | W5 | Library menu (Forms and Archive); Data entry > Templates stays as it is | Pending | |
 | W7 | Daily Progress and Tomorrow Plan: a screen in the system, copyable to email | Pending | |
