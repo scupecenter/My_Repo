@@ -16,7 +16,7 @@ describe('F19: Settings tabs and old routes', () => {
   beforeEach(async () => { await signIn('pm'); });
 
   it('has the 11 one-word tabs of the plan plus the F20 dashboard tab', () => {
-    expect(SETTINGS_TABS.map((t) => t.key)).toEqual(['calendar', 'workflow', 'sla', 'weights', 'registers', 'ddl', 'site360', 'documents', 'data', 'alerts', 'security', 'dashboard', 'identity']);
+    expect(SETTINGS_TABS.map((t) => t.key)).toEqual(['calendar', 'workflow', 'sla', 'weights', 'registers', 'ddl', 'documents', 'data', 'alerts', 'security', 'dashboard', 'identity']);
   });
 
   it.each([
@@ -38,6 +38,8 @@ describe('F19: Settings tabs and old routes', () => {
     ['workflow', '/admin/settings/workflow/editor'],
     ['documents', '/admin/settings/documents/library'],
     ['calendar', '/admin/settings/calendar'],
+    ['site360', '/admin/settings/workflow/columns'],
+    ['site360-columns', '/admin/settings/workflow/columns'],
   ])('old /admin/settings/%s opens %s', async (old, target) => {
     at(`/admin/settings/${old}`);
     await waitFor(() => expect(probe()).toBe(target));
@@ -65,16 +67,18 @@ describe('F19: Settings tabs and old routes', () => {
     expect(screen.getByTestId('settings-tab-registers')).toHaveClass('btn-accent');
   });
 
-  it('opens the SITE 360 columns screen in the Site360 tab', async () => {
-    at('/admin/settings/site360');
-    expect(await screen.findByTestId('site360-columns')).toBeInTheDocument();
-    expect(screen.getByTestId('settings-tab-site360')).toHaveTextContent('Site360');
-  });
-
-  it('redirects the old SITE 360 columns route to the Site360 tab', async () => {
+  it('W3: no Site360 tab; the old Site360 routes open Workflow > Columns', async () => {
     at('/admin/settings/site360-columns');
     expect(await screen.findByTestId('site360-columns')).toBeInTheDocument();
-    expect(screen.getByTestId('settings-tab-site360')).toHaveClass('btn-accent');
+    expect(screen.queryByTestId('settings-tab-site360')).toBeNull();
+    expect(screen.getByTestId('settings-tab-workflow')).toHaveClass('btn-accent');
+    expect(screen.getByTestId('settings-section-workflow-columns')).toHaveClass('btn-accent');
+    expect(screen.getByTestId('page-settings')).not.toHaveTextContent(/Site360|SITE 360/);
+  });
+
+  it('the Workflow tab still opens the editor first', async () => {
+    at('/admin/settings/workflow');
+    await waitFor(() => expect(probe()).toBe('/admin/settings/workflow/editor'));
   });
 
   it('hides the mail kinds section from a user who is not a System Admin, and keeps the Documents tab', async () => {
