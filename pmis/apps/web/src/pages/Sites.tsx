@@ -4,7 +4,7 @@ import { Site360Grid, type Site360GridRow } from '@/components/Site360Grid';
 import { Site360SourcePanel } from '@/components/Site360Source';
 import { useRefreshSite360Rows, useSaveSite360Cell, useSite360RowsPaged, useSite360Sections } from '@/api/site360';
 import { SitesBulkEdit } from '@/components/SitesBulkEdit';
-import { Columns3, Download, FileDown, FilePlus2, FileUp, Map as MapIcon, Pencil, RotateCcw, Table2, TableProperties } from 'lucide-react';
+import { Columns3, Download, FileDown, FileSpreadsheet, FilePlus2, FileUp, Map as MapIcon, Pencil, RotateCcw, Table2, TableProperties } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
@@ -145,10 +145,13 @@ export function Sites() {
   // Site creation (contract 0.14.0, Q460): the New sites template is listed only for those who may create sites
   const me = useMe(true).data;
   const newTpl = useTemplates().data?.find((x) => x.template_id === 'TPL-SITE-NEW');
+  const allTpls = useTemplates().data;
+  const menuTpl = allTpls?.find((x) => (stream ? x.template_kind === 'stream' && x.stream === stream : x.template_kind === 'master'));
   const canCreate = isAdmin(me) || !!me?.effective.grants.some((g) => g.module_key === 'sites' && (g.action as string) === 'create');
   // 0.15.4: who may switch the workflow locks (a System Admin or the delegated right to unlock); the server checks the region of every site
   const canUnlock = isAdmin(me) || !!me?.effective.grants.some((g) => g.module_key === 'overrides.unlock' && (g.action as string) === 'administer');
   const [upSites, setUpSites] = useState(false);
+  const [upMenu, setUpMenu] = useState(false);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [bulkEdit, setBulkEdit] = useState(false);
   const refreshRows = useRefreshSite360Rows(menuKey || undefined);
@@ -307,9 +310,15 @@ export function Sites() {
 
   return (
     <div data-testid="page-sites">
-      <PageHeader title={subMenu ? `${t('sites.title')}: ${subMenu}` : t('sites.title')} subtitle={t('sites.subtitle')} context={<>{(canCreate || newTpl) && (
+      <PageHeader title={subMenu ? `${t('sites.title')}: ${subMenu}` : t('sites.title')} subtitle={t('sites.subtitle')} context={<>{(canCreate || newTpl || menuTpl) && (
         <span className="ms-auto flex flex-wrap gap-1" data-testid="sites-create-actions">
           {canCreate && <Link className="btn btn-primary px-2 py-1 text-xs" to="/sites/new" data-testid="sites-new"><FilePlus2 size={14} />{t('sites.new_site')}</Link>}
+          {menuTpl && <>
+            <button type="button" className="btn px-2 py-1 text-xs" data-testid="sites-menu-template-blank"
+              onClick={() => downloadTemplate(menuTpl.template_id).then((n) => toast(t('grid.downloaded', { name: n })), (e) => toast(registerErrorMessage(t, e), 'err'))}><FileDown size={14} />{t('sites.menu_template_blank')}</button>
+            <button type="button" className="btn px-2 py-1 text-xs" data-testid="sites-menu-template-filled"
+              onClick={() => { const ids = (fromRows ? mRows.map((r) => r.site_id) : items.map((x) => x.id)).slice(0, 500); if (!ids.length) { toast(t('sites.menu_template_none'), 'err'); return; } void downloadTemplate(menuTpl.template_id, { prefill: true, siteIds: ids }).then((n) => toast(t('grid.downloaded', { name: n })), (e) => toast(registerErrorMessage(t, e), 'err')); }}><FileSpreadsheet size={14} />{t('sites.menu_template_filled')}</button>
+            <button type="button" className="btn px-2 py-1 text-xs" data-testid="sites-menu-template-upload" onClick={() => setUpMenu(true)}><FileUp size={14} />{t('sites.menu_template_upload')}</button></>}
           {newTpl && <><button type="button" className="btn px-2 py-1 text-xs" data-testid="sites-template-download"
             onClick={() => downloadTemplate(newTpl.template_id).then((n) => toast(t('grid.downloaded', { name: n })), (e) => toast(registerErrorMessage(t, e), 'err'))}><FileDown size={14} />{t('sites.download_template')}</button>
           <button type="button" className="btn px-2 py-1 text-xs" data-testid="sites-template-upload" onClick={() => setUpSites(true)}><FileUp size={14} />{t('sites.upload_template')}</button></>}
@@ -465,6 +474,8 @@ export function Sites() {
       <ExportDialog open={exp} onClose={() => setExp(false)} />
       {locksDlg !== null && <LocksDialog target={{ site_ids: menu && layout === 'grid' ? gridSel.map((r) => r.id) : fromRows ? mRows.filter((x) => picked.has(x.site_code)).map((x) => x.site_id) : items.filter((x) => picked.has(x.site_code)).map((x) => x.id) }} locked={locksDlg} count={menu && layout === 'grid' ? gridSel.length : picked.size} testid="sites-locks-dialog"
         onClose={() => { setLocksDlg(null); setPicked(new Set()); }} />}
+      {upMenu && menuTpl && <TemplateUploadDialog open onClose={() => setUpMenu(false)} templateId={menuTpl.template_id} templateName={`${(i18n.language === 'ar' && menuTpl.name_ar) || menuTpl.name_en} · v${menuTpl.current_version}`}
+        kind={menuTpl.template_kind === 'master' ? 'master' : 'stream'} onDone={(b) => { setUpMenu(false); toast(t('grid.uploaded')); nav(batchPath(b)); }} />}
       {upSites && newTpl && <TemplateUploadDialog open onClose={() => setUpSites(false)} templateId={newTpl.template_id} templateName={`${(i18n.language === 'ar' && newTpl.name_ar) || newTpl.name_en} · v${newTpl.current_version}`}
         kind="sites" onDone={(b) => { setUpSites(false); toast(t('grid.uploaded')); nav(batchPath(b)); }} />}
     </div>
