@@ -113,6 +113,29 @@ describe('P7 in the Warehouse screen', () => {
     expect(patched).toMatchObject({ body: { data: { remark: 'checked at the gate' } } });
   });
 
+  it('reverses a posted delivery note with a counterpart return note through POST /warehouse/movements', async () => {
+    await signIn('pm');
+    let posted: { body: { record_type: string; reason: string; lines: unknown[] } } | null = null;
+    const l = { item_id: '11111111-1111-4111-8111-111111111111', item_code: 'ANT-900', qty: 4 };
+    const dn = { id: 'c1', doc_no: 'DN-2026-0500', record_type: 'te_dn', kind: 'issue', status: 'posted', site_id: '22222222-2222-4222-8222-222222222222', site_code: 'TRP-001', register_record_id: 'e1', lines: [l], version: 1, doc_no_locked: true, reserved: false, created_at: '2026-10-20T08:00:00Z' };
+    server.use(
+      http.get(`${API_BASE}/warehouse/movements`, () => HttpResponse.json({ items: [dn], next_cursor: null })),
+      http.post(`${API_BASE}/warehouse/movements`, async ({ request }) => { posted = { body: (await request.json()) as never }; return HttpResponse.json({ ...dn, id: 'c2', doc_no: 'RN-2026-0501', record_type: 'te_rn', status: 'pending' }); }),
+    );
+    show('/warehouse');
+    const u = userEvent.setup();
+    await u.click(await screen.findByTestId('wh-tab-movements'));
+    await u.click(await screen.findByTestId('wh-mv-reverse-open-DN-2026-0500'));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByTestId('wh-mv-reverse-lines')).toHaveTextContent('ANT-900');
+    await u.click(screen.getByTestId('wh-mv-reverse-submit'));
+    expect(await screen.findByTestId('wh-mv-reverse-reason-error')).toBeInTheDocument();
+    await u.type(screen.getByTestId('wh-mv-reverse-reason'), 'Wrong site');
+    await u.click(screen.getByTestId('wh-mv-reverse-submit'));
+    await waitFor(() => expect(screen.queryByTestId('wh-mv-reverse')).not.toBeInTheDocument());
+    expect(posted).toMatchObject({ body: { record_type: 'te_rn', reason: 'Wrong site', lines: [{ qty: 4 }] } });
+  });
+
   it('shows the lock of a posted Doc No. (Q106)', async () => {
     await signIn('pm');
     show('/warehouse');

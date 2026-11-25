@@ -6,8 +6,8 @@ import { ApiError } from '@/api/client';
 import { useMe } from '@/api/hooks';
 import { useRegisterRecord, useUpdateRecord } from '@/api/registers';
 import { useRegions } from '@/api/sites';
-import type { StockLevel, WarehouseItem } from '@/api/types';
-import { useConfigGaps, useDispatchList, useMovements, useQuarantineExit, useSaveItem, useStock, useWhItems, type QuarantineExitBody } from '@/api/warehouse';
+import type { StockLevel, StockMovement, WarehouseItem } from '@/api/types';
+import { useConfigGaps, useDispatchList, useMovements, useQuarantineExit, useReverseMovement, useSaveItem, useStock, useWhItems, type QuarantineExitBody } from '@/api/warehouse';
 import { NEED_TONE } from '@/components/SiteDispatch';
 import { errText, FormDialog } from '@/components/FormDialog';
 import { InlinePanel } from '@/components/InlinePanel';
@@ -152,6 +152,7 @@ function Movements() {
   const [status, setStatus] = useState('');
   const list = useMovements(status);
   const [editing, setEditing] = useState<string | null>(null);
+  const [reversing, setReversing] = useState<string | null>(null);
   // DN and RN, and the quarantine exits (Q270); the other documents (PL, OPEN, ADJ) have no site and are kept in the register.
   const items = (list.data?.items ?? []).filter((m) => m.kind === 'issue' || m.kind === 'return' || m.kind === 'quarantine_exit');
   return (
@@ -174,9 +175,11 @@ function Movements() {
                 <td className="px-3 py-2"><span className={`chip ${TONE[m.status]}`} data-testid={`wh-mv-status-${m.doc_no ?? m.id}`}>{t(`wh.st_${m.status}`)}</span></td>
                 <td className="px-3 py-2 text-end">{m.register_record_id && (m.status === 'pending'
                   ? <button className="btn" data-testid={`wh-mv-edit-open-${m.doc_no ?? m.id}`} onClick={() => setEditing(m.id)}><Pencil size={14} />{t('wh.mv_edit')}</button>
-                  : <span className="inline-flex items-center gap-1 text-xs text-mute" data-testid={`wh-mv-lock-${m.doc_no ?? m.id}`} title={t(`wh.mv_locked_${m.status}`, { defaultValue: '' })}><Lock size={12} />{t(m.status === 'posted' ? 'wh.mv_locked_posted' : 'wh.mv_locked_cancelled')}</span>)}</td>
+                  : <span className="inline-flex items-center gap-1 text-xs text-mute" data-testid={`wh-mv-lock-${m.doc_no ?? m.id}`} title={t(`wh.mv_locked_${m.status}`, { defaultValue: '' })}><Lock size={12} />{t(m.status === 'posted' ? 'wh.mv_locked_posted' : 'wh.mv_locked_cancelled')}</span>)}
+                  {m.status === 'posted' && m.site_id && COUNTERPART[m.record_type ?? ''] && <button className="btn ms-2" data-testid={`wh-mv-reverse-open-${m.doc_no ?? m.id}`} onClick={() => setReversing(m.id)}>{t('wh.mv_reverse')}</button>}</td>
               </tr>
               {editing === m.id && m.register_record_id && <tr><td colSpan={6} className="p-2"><MovementEdit recordId={m.register_record_id} doc={m.doc_no ?? ''} onClose={() => setEditing(null)} /></td></tr>}
+              {reversing === m.id && <tr><td colSpan={6} className="p-2"><ReverseMovement m={m} onClose={() => setReversing(null)} /></td></tr>}
               </Fragment>
             ))}
           </tbody>
@@ -209,6 +212,27 @@ function MovementEdit({ recordId, doc, onClose }: { recordId: string; doc: strin
       <label className="block text-sm font-semibold">{t('wh.mv_remark')}
         <input className="input mt-1 font-normal" data-testid="wh-mv-edit-remark" value={val('remark')} onChange={(e) => setF({ ...f, remark: e.target.value })} /></label>
       <p className="text-xs text-mute">{t('wh.mv_lines_note')}</p>
+    </InlinePanel>
+  );
+}
+
+const COUNTERPART: Record<string, 'te_dn' | 'cw_dn' | 'te_rn' | 'cw_rn'> = { te_dn: 'te_rn', cw_dn: 'cw_rn', te_rn: 'te_dn', cw_rn: 'cw_dn' };
+
+/**
+ * Posted document: no direct edit. The correction is a reversal movement (the counterpart document with the same lines) that goes through the normal
+ * creation and approval. Serial numbers are not copied: a serial-tracked item is refused by the server with its own message and is corrected by a new document.
+ */
+function ReverseMovement({ m, onClose }: { m: StockMovement; onClose: () => void }) {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const rev = useReverseMovement();
+  const rt = COUNTERPART[m.record_type ?? ''];
+  return (
+    <InlinePanel onClose={onClose} testid="wh-mv-reverse" title={t('wh.mv_reverse_title', { doc: m.doc_no ?? '' })} busy={rev.isPending} disabled={!rt || !m.site_id}
+      error={rev.isError ? registerErrorMessage(t, rev.error) : null}
+      onSubmit={(reason) => rt && m.site_id && rev.mutate({ record_type: rt, site_id: m.site_id, reason, remark: t('wh.mv_reverse_remark', { doc: m.doc_no ?? '' }), lines: m.lines.map((l) => ({ item_id: l.item_id, qty: l.qty })) }, { onSuccess: (r) => { toast(t('wh.mv_reverse_done', { doc: r.doc_no ?? '' }), 'ok'); onClose(); } })}>
+      <p className="text-sm text-mute">{t('wh.mv_reverse_note', { type: (rt ?? '').toUpperCase() })}</p>
+      <ul className="list-disc ps-5 text-sm" data-testid="wh-mv-reverse-lines">{m.lines.map((l) => <li key={l.item_id}><b className="mono">{l.item_code}</b> {l.qty}</li>)}</ul>
     </InlinePanel>
   );
 }

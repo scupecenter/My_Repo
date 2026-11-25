@@ -2320,7 +2320,12 @@
     "mv_lines_note": "Quantities and items are not edited here: cancel this pending document and create a new one. Stock is computed from the movements only.",
     "mv_locked_posted": "Locked: a posted document is not edited. Correct it with a reversal movement, which goes through the normal approval.",
     "mv_locked_cancelled": "Locked: a cancelled document is not edited.",
-    "mv_saved": "Saved"
+    "mv_saved": "Saved",
+    "mv_reverse": "Reverse",
+    "mv_reverse_title": "Reverse document {{doc}}",
+    "mv_reverse_note": "Creates a {{type}} document with the same lines. It waits for the normal approval; the posted document is not changed. Stock changes only when the new document is posted.",
+    "mv_reverse_remark": "Reversal of {{doc}}",
+    "mv_reverse_done": "Reversal {{doc}} created, waiting for approval"
   },
   "asb": {
     "title": "As-Built items",
