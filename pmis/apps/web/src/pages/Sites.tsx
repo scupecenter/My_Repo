@@ -144,7 +144,7 @@ export function Sites() {
   const nav = useNavigate();
   // Site creation (contract 0.14.0, Q460): the New sites template is listed only for those who may create sites
   const me = useMe(true).data;
-  const newTpl = useTemplates().data?.find((x) => x.template_id === 'TPL-SITE-NEW');
+  const newTpl = useTemplates().data?.find((x) => x.template_id === 'TPL-NEW-SITES');
   const allTpls = useTemplates().data;
   const menuTpl = allTpls?.find((x) => (stream ? x.template_kind === 'stream' && x.stream === stream : x.template_kind === 'master'));
   const canCreate = isAdmin(me) || !!me?.effective.grants.some((g) => g.module_key === 'sites' && (g.action as string) === 'create');

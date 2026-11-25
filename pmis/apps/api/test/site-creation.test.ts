@@ -386,29 +386,29 @@ describe('rights', () => {
 describe('the bulk way: the approved template "New sites"', () => {
   it('is listed, downloads with the hidden _tpl sheet, and has no landlord or contact column', async () => {
     const list = await l1.api.call('get', '/templates');
-    const t = list.body.items.find((x: { template_id: string }) => x.template_id === 'TPL-SITE-NEW');
+    const t = list.body.items.find((x: { template_id: string }) => x.template_id === 'TPL-NEW-SITES');
     expect(t).toMatchObject({ template_kind: 'sites', module_key: 'sites', name_en: 'New sites' });
     // a caller who may not create sites does not see it
     const viewer = await actor(app, db, { level: 'entry', regions: [R], grants: [['sites', 'view'], ['templates', 'view']] });
-    expect((await viewer.api.call('get', '/templates')).body.items.map((x: { template_id: string }) => x.template_id)).not.toContain('TPL-SITE-NEW');
-    const dl = await downloadTemplate(l1.api, 'TPL-SITE-NEW');
+    expect((await viewer.api.call('get', '/templates')).body.items.map((x: { template_id: string }) => x.template_id)).not.toContain('TPL-NEW-SITES');
+    const dl = await downloadTemplate(l1.api, 'TPL-NEW-SITES');
     expect(dl.status).toBe(200);
     const wb = await load(dl.buffer);
     const tpl = wb.getWorksheet('_tpl')!;
     expect(tpl.state).toBe('veryHidden');
     const kv = new Map<string, string>();
     tpl.eachRow((row) => kv.set(String(row.getCell(1).value), String(row.getCell(2).value)));
-    expect(kv.get('template_id')).toBe('TPL-SITE-NEW');
+    expect(kv.get('template_id')).toBe('TPL-NEW-SITES');
     expect(Number(kv.get('version'))).toBeGreaterThanOrEqual(1);
     const headers = (wb.getWorksheet('Data')!.getRow(1).values as unknown[]).slice(1).map(String);
     expect(headers).toEqual(expect.arrayContaining(['Site ID', 'Region', 'Site Name (EN)', 'Site Name (AR)', 'Cluster', 'Delivery Scenario', 'Tower Erection', 'Overall Status', 'Latitude', 'RF Survey Date']));
     expect(headers.join('|').toLowerCase()).not.toMatch(/landlord|owner name|contact|phone|e-?mail/);
-    expect((await downloadTemplate(viewer.api, 'TPL-SITE-NEW')).status).toBe(403);
+    expect((await downloadTemplate(viewer.api, 'TPL-NEW-SITES')).status).toBe(403);
   });
 
   it('stages a file: valid rows, a duplicate Site ID, an unknown region, a Cancelled row; the preview shows each row; nothing is a site yet', async () => {
     const a = code(), b = code(), c = code(), dupIn = code(), existing = (await createSite()).code;
-    const file = await fillTemplate((await downloadTemplate(l1.api, 'TPL-SITE-NEW')).buffer, [
+    const file = await fillTemplate((await downloadTemplate(l1.api, 'TPL-NEW-SITES')).buffer, [
       { 'Site ID': a, Region: 'Sebha Area', 'Site Name (EN)': 'Bulk A', 'Site Name (AR)': 'موقع أ', 'Delivery Scenario': 'New Build', Cluster: `CLB-${TAG}`, 'Tower Erection': 'Yes', Latitude: 27.04, Longitude: 14.43 },
       { 'Site ID': b, Region: 'Sebha', 'Site Name (EN)': 'Bulk B', 'Delivery Scenario': 'Expansion', 'RF Survey Date': new Date('2026-03-02T00:00:00.000Z') },
       { 'Site ID': c, Region: 'Sebha', 'Site Name (EN)': 'Bulk C (cancelled)', 'Delivery Scenario': 'New Build', 'Overall Status': 'Cancelled' },
@@ -418,7 +418,7 @@ describe('the bulk way: the approved template "New sites"', () => {
     ]);
     const up = await uploadFile(l1.api, file);
     expect(up.status).toBe(202);
-    expect(up.body).toMatchObject({ template_id: 'TPL-SITE-NEW', status: 'validated', entity: 'site', register_key: null, counts: { create: 3, error: 3 } });
+    expect(up.body).toMatchObject({ template_id: 'TPL-NEW-SITES', status: 'validated', entity: 'site', register_key: null, counts: { create: 3, error: 3 } });
     const rows = (await l1.api.call('get', `/import-batches/${up.body.id}/rows?limit=50`)).body.items as Record<string, any>[];
     expect(rows.map((r) => r.action)).toEqual(['create', 'create', 'create', 'error', 'error', 'error']);
     expect(rows[0]).toMatchObject({ key: a, site_code: a, diff: { site_code: { old: null, new: a }, region_id: { old: null, new: R }, name_ar: { old: null, new: 'موقع أ' } } });
@@ -431,7 +431,7 @@ describe('the bulk way: the approved template "New sites"', () => {
 
   it('sends a batch, L2 approves one row, then the rest at once; a return needs a note; the cancelled row is cancelled; step-up and rights are checked', async () => {
     const [a, b, c, d] = [code(), code(), code(), code()];
-    const file = await fillTemplate((await downloadTemplate(l1.api, 'TPL-SITE-NEW')).buffer, [
+    const file = await fillTemplate((await downloadTemplate(l1.api, 'TPL-NEW-SITES')).buffer, [
       { 'Site ID': a, Region: 'Sebha', 'Site Name (EN)': 'Bulk A', 'Site Name (AR)': 'موقع أ', 'Delivery Scenario': 'New Build', Cluster: `CLB2-${TAG}` },
       { 'Site ID': b, Region: 'Sebha', 'Site Name (EN)': 'Bulk B', 'Delivery Scenario': 'Hot Swap' },
       { 'Site ID': c, Region: 'Sebha', 'Site Name (EN)': 'Bulk C', 'Delivery Scenario': 'New Build', 'Overall Status': 'Cancelled' },
@@ -517,7 +517,7 @@ describe('the bulk way: the approved template "New sites"', () => {
     await siteCell(R, 'approve', [l2.user.id, both.user.id]);
     try {
       const x = code();
-      const file = await fillTemplate((await downloadTemplate(both.api, 'TPL-SITE-NEW')).buffer, [{ 'Site ID': x, Region: 'Sebha', 'Site Name (EN)': 'Self', 'Delivery Scenario': 'New Build' }]);
+      const file = await fillTemplate((await downloadTemplate(both.api, 'TPL-NEW-SITES')).buffer, [{ 'Site ID': x, Region: 'Sebha', 'Site Name (EN)': 'Self', 'Delivery Scenario': 'New Build' }]);
       const up = await uploadFile(both.api, file);
       const sent = await both.api.call('post', `/import-batches/${up.body.id}/submit`, undefined, { 'If-Match': etag(up) });
       expect(sent.status).toBe(200);
@@ -529,7 +529,7 @@ describe('the bulk way: the approved template "New sites"', () => {
       await siteCell(R, 'approve', [l2.user.id]);
     }
     const y = code();
-    const file2 = await fillTemplate((await downloadTemplate(l1.api, 'TPL-SITE-NEW')).buffer, [{ 'Site ID': y, Region: 'Sebha', 'Site Name (EN)': 'Dropped', 'Delivery Scenario': 'New Build' }]);
+    const file2 = await fillTemplate((await downloadTemplate(l1.api, 'TPL-NEW-SITES')).buffer, [{ 'Site ID': y, Region: 'Sebha', 'Site Name (EN)': 'Dropped', 'Delivery Scenario': 'New Build' }]);
     const up2 = await uploadFile(l1.api, file2);
     const gone = await l1.api.call('post', `/import-batches/${up2.body.id}/decisions`, { action: 'discard', scope: 'all' }, { 'If-Match': etag(up2) });
     expect(gone.status).toBe(200);
@@ -538,7 +538,7 @@ describe('the bulk way: the approved template "New sites"', () => {
   });
 
   it('refuses a file of an old or foreign template and writes the reason to the System Log', async () => {
-    const fresh = (await downloadTemplate(l1.api, 'TPL-SITE-NEW')).buffer;
+    const fresh = (await downloadTemplate(l1.api, 'TPL-NEW-SITES')).buffer;
     const row = { 'Site ID': code(), Region: 'Sebha', 'Site Name (EN)': 'X', 'Delivery Scenario': 'New Build' };
     const reasons = async (reason: string): Promise<number> => (await q<{ n: number }>(db, `SELECT count(*)::int AS n FROM system_log WHERE source = 'template-check' AND context ->> 'reason' = $1 AND user_id = $2`, [reason, l1.user.id]))[0]!.n;
 
@@ -559,7 +559,7 @@ describe('the bulk way: the approved template "New sites"', () => {
     const r4 = await uploadFile(l1.api, fresh, 'refused.xlsx', { template_id: 'TPL-GECOL' });
     expect(r4.body).toMatchObject({ code: 'template_rejected', reason: 'wrong_template' });
     // the first version of a template whose typed columns changed: an old file is refused with the list of changes
-    const v = await q<{ id: string }>(db, `SELECT v.id FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-SITE-NEW' AND v.is_current`);
+    const v = await q<{ id: string }>(db, `SELECT v.id FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-NEW-SITES' AND v.is_current`);
     expect(v).toHaveLength(1);
     for (const reason of ['tpl_invalid', 'checksum_mismatch', 'tpl_missing', 'wrong_template']) expect(await reasons(reason)).toBeGreaterThan(0);
     // nothing was staged
@@ -567,12 +567,12 @@ describe('the bulk way: the approved template "New sites"', () => {
   });
 
   it('a new template version refuses a file of the old version when a typed column changed, and accepts it when only a list changed', async () => {
-    const old = (await downloadTemplate(l1.api, 'TPL-SITE-NEW')).buffer;
-    const cur = (await q<{ version: number }>(db, `SELECT current_version AS version FROM template_definitions WHERE template_id = 'TPL-SITE-NEW'`))[0]!.version;
+    const old = (await downloadTemplate(l1.api, 'TPL-NEW-SITES')).buffer;
+    const cur = (await q<{ version: number }>(db, `SELECT current_version AS version FROM template_definitions WHERE template_id = 'TPL-NEW-SITES'`))[0]!.version;
     // a list value of the Site Type list changes: the version moves, a typed column (the list) changes, so the old file is refused
     await db.query(`INSERT INTO list_values (catalogue_code, code, label_en, sort_order) VALUES ('SiteType', $1, $1, 500)`, [`Probe${TAG}`]);
     try {
-      const now = (await q<{ version: number }>(db, `SELECT current_version AS version FROM template_definitions WHERE template_id = 'TPL-SITE-NEW'`))[0]!.version;
+      const now = (await q<{ version: number }>(db, `SELECT current_version AS version FROM template_definitions WHERE template_id = 'TPL-NEW-SITES'`))[0]!.version;
       expect(now).toBeGreaterThan(cur);
       const file = await fillTemplate(old, [{ 'Site ID': code(), Region: 'Sebha', 'Site Name (EN)': 'Old file', 'Delivery Scenario': 'New Build' }]);
       const res = await uploadFile(l1.api, file, 'refused-old.xlsx');

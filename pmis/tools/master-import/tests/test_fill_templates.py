@@ -23,7 +23,7 @@ HEADERS = ['Site ID', 'Candidate', 'TSS Date', 'Selected', 'Owner / Landlord', '
 GREY = PatternFill('solid', fgColor='FFD0D5D8')
 
 
-def make_template(path, template_id='TPL-ACQ', tamper_checksum=False, with_tpl=True, prefilled=False, kind='acquisition'):
+def make_template(path, template_id='TPL-ACQUISITION', tamper_checksum=False, with_tpl=True, prefilled=False, kind='acquisition'):
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = 'Data'
@@ -80,7 +80,7 @@ def make_maps(d):
     d = Path(d)
     (d / 'index.csv').write_text(
         'register,template_id,master_sheet,header_row,first_data_row,site_header,key_headers,key_any_of,site_scoped\n'
-        'acquisition,TPL-ACQ,Acquisition,1,3,Site ID,Site ID|Candidate,,yes\n', encoding='utf-8')
+        'acquisition,TPL-ACQUISITION,Acquisition,1,3,Site ID,Site ID|Candidate,,yes\n', encoding='utf-8')
     (d / 'acquisition.csv').write_text(
         'template_header,master_header,master_column,transform,personal,notes\n'
         'Site ID,Site ID,B,site_id,,\n'
@@ -113,7 +113,7 @@ class FillTests(unittest.TestCase):
         return ft.main(args)
 
     def filled(self):
-        return openpyxl.load_workbook(self.out / 'TPL-ACQ_v3_filled.xlsx')
+        return openpyxl.load_workbook(self.out / 'TPL-ACQUISITION_v3_filled.xlsx')
 
     def rows(self):
         return [
@@ -144,14 +144,14 @@ class FillTests(unittest.TestCase):
     def test_skipped_rows_and_report(self):
         make_master(self.master, self.rows())
         self.run_tool()
-        md = (self.out / 'TPL-ACQ_v3_summary.md').read_text()
+        md = (self.out / 'TPL-ACQUISITION_v3_summary.md').read_text()
         self.assertIn('Rows copied: 4', md)
         self.assertIn('duplicate_key: 6', md)
         self.assertIn('site_not_in_master: 7', md)
         self.assertIn('no_site_id: 8', md)
         self.assertIn('Values outside their list (copied as found): 2', md)  # Z and Maybe
         self.assertIn('B5', md)
-        with open(self.out / 'TPL-ACQ_v3_report.csv', encoding='utf-8') as f:
+        with open(self.out / 'TPL-ACQUISITION_v3_report.csv', encoding='utf-8') as f:
             rows = list(csv.DictReader(f))
         changed = [r for r in rows if r['event'] == 'changed' and r['template_cell'] == 'C2']
         self.assertEqual(len(changed), 1)
@@ -165,7 +165,7 @@ class FillTests(unittest.TestCase):
         for r in range(2, 8):
             self.assertIsNone(ws.cell(r, 7).value)  # Calculated
             self.assertIsNone(ws.cell(r, 8).value)  # Record ID
-        md = (self.out / 'TPL-ACQ_v3_summary.md').read_text()
+        md = (self.out / 'TPL-ACQUISITION_v3_summary.md').read_text()
         self.assertIn('Grey, not filled', md)
 
     def test_personal_columns_skipped_by_default(self):
@@ -174,17 +174,17 @@ class FillTests(unittest.TestCase):
         ws = self.filled()['Data']
         self.assertIsNone(ws['E2'].value)
         self.assertIsNone(ws['F2'].value)
-        text = (self.out / 'TPL-ACQ_v3_summary.md').read_text() + (self.out / 'TPL-ACQ_v3_report.csv').read_text()
+        text = (self.out / 'TPL-ACQUISITION_v3_summary.md').read_text() + (self.out / 'TPL-ACQUISITION_v3_report.csv').read_text()
         self.assertNotIn('Fake Landlord', text)
         self.assertNotIn('0910000001', text)
-        self.assertRegex((self.out / 'TPL-ACQ_v3_summary.md').read_text(), r'Owner / Landlord \| 0 \| 0 \| 2')
+        self.assertRegex((self.out / 'TPL-ACQUISITION_v3_summary.md').read_text(), r'Owner / Landlord \| 0 \| 0 \| 2')
 
     def test_include_personal_copies_but_never_prints(self):
         make_master(self.master, self.rows())
         self.run_tool('--include-personal')
         ws = self.filled()['Data']
         self.assertEqual(ws['E2'].value, 'Fake Landlord One')
-        text = (self.out / 'TPL-ACQ_v3_summary.md').read_text() + (self.out / 'TPL-ACQ_v3_report.csv').read_text()
+        text = (self.out / 'TPL-ACQUISITION_v3_summary.md').read_text() + (self.out / 'TPL-ACQUISITION_v3_report.csv').read_text()
         self.assertNotIn('Fake Landlord', text)
         self.assertNotIn('0910000001', text)
 
@@ -196,7 +196,7 @@ class FillTests(unittest.TestCase):
         t = wb['_tpl']
         self.assertEqual(t.sheet_state, 'veryHidden')
         self.assertEqual({t.cell(r, 1).value: t.cell(r, 2).value for r in range(1, 6)},
-                         {'template_id': 'TPL-ACQ', 'version': 3, 'kind': 'acquisition', 'data_sheet': 'Data',
+                         {'template_id': 'TPL-ACQUISITION', 'version': 3, 'kind': 'acquisition', 'data_sheet': 'Data',
                           'header_checksum': hashlib.sha256('\x1f'.join(HEADERS).encode()).hexdigest()})
         # header row, list validations and protection survive
         self.assertEqual([wb['Data'].cell(1, i).value for i in range(1, 9)], HEADERS)
@@ -232,10 +232,10 @@ class FillTests(unittest.TestCase):
         make_master(self.master, self.rows())
         self.assertEqual(self.run_tool(), 0)
         self.assertEqual(self.run_tool(), 2)  # output already there
-        # an output folder equal to the template folder would write TPL-ACQ_v3_filled.xlsx: allowed only if it is not an input
+        # an output folder equal to the template folder would write TPL-ACQUISITION_v3_filled.xlsx: allowed only if it is not an input
         clash = self.dir / 'clash'
         clash.mkdir()
-        inp = clash / 'TPL-ACQ_v3_filled.xlsx'
+        inp = clash / 'TPL-ACQUISITION_v3_filled.xlsx'
         make_template(inp)
         args = ['--master', str(self.master), '--out', str(clash), '--maps', str(self.maps), str(inp)]
         self.assertEqual(ft.main(args), 2)
@@ -266,7 +266,7 @@ class FillTests(unittest.TestCase):
         cell = self.filled()['Data']['B2']
         self.assertEqual(cell.value, '=HYPERLINK("http://example.invalid","x")')
         self.assertEqual(cell.data_type, 's')  # never a live formula
-        with open(self.out / 'TPL-ACQ_v3_report.csv', encoding='utf-8') as f:
+        with open(self.out / 'TPL-ACQUISITION_v3_report.csv', encoding='utf-8') as f:
             rows = list(csv.DictReader(f))
         kept = [r for r in rows if r['event'] == 'formula_text_kept']
         self.assertEqual(len(kept), 1)
@@ -276,20 +276,20 @@ class FillTests(unittest.TestCase):
 
     def test_shipped_maps_are_consistent(self):
         reg = ft.load_registers(ft.DEFAULT_MAPS)
-        self.assertEqual(set(reg), {'TPL-RF', 'TPL-ACQ', 'TPL-PRM', 'TPL-PO', 'TPL-GECOL', 'TPL-HLC', 'TPL-ASB', 'TPL-RSK'})
+        self.assertEqual(set(reg), {'TPL-RF', 'TPL-ACQUISITION', 'TPL-PERMITS', 'TPL-PROCUREMENT', 'TPL-GECOL', 'TPL-HLC', 'TPL-AS-BUILT', 'TPL-RISKS'})
         for tid, r in reg.items():
             heads = [c['template_header'] for c in r['columns']]
             self.assertEqual(len(heads), len(set(heads)), tid)
             self.assertTrue(any(h == r['site_header'] for h in heads), tid)
             for k in r['key_headers'].split('|'):
                 self.assertIn(k, heads, tid)
-        acq = {c['template_header']: c for c in reg['TPL-ACQ']['columns']}
+        acq = {c['template_header']: c for c in reg['TPL-ACQUISITION']['columns']}
         for h in ('Owner / Landlord', 'Contact Person', 'Phone', 'E-mail'):
             self.assertEqual(acq[h]['personal'], 'yes')
         # the As-Built TE columns are the te_part record (a fixed value: the key is Site ID and Record Type)
-        asb = {c['template_header']: c for c in reg['TPL-ASB']['columns']}
+        asb = {c['template_header']: c for c in reg['TPL-AS-BUILT']['columns']}
         self.assertEqual(asb['Record Type']['transform'], 'const:te_part')
-        self.assertEqual(reg['TPL-ASB']['key_headers'], 'Site ID|Record Type')
+        self.assertEqual(reg['TPL-AS-BUILT']['key_headers'], 'Site ID|Record Type')
 
 
 class DateAndProcurementTests(unittest.TestCase):
@@ -302,7 +302,7 @@ class DateAndProcurementTests(unittest.TestCase):
         self.maps.mkdir()
         (self.maps / 'index.csv').write_text(
             'register,template_id,master_sheet,header_row,first_data_row,site_header,key_headers,key_any_of,site_scoped,needs_headers\n'
-            'procurement,TPL-PO,PR-PO,1,2,Site ID,Site ID|PO / WO No.,,yes,Delivery|Team\n', encoding='utf-8')
+            'procurement,TPL-PROCUREMENT,PR-PO,1,2,Site ID,Site ID|PO / WO No.,,yes,Delivery|Team\n', encoding='utf-8')
         (self.maps / 'procurement.csv').write_text(
             'template_header,master_header,master_column,transform,personal,notes\n'
             'Site ID,Site ID,B,site_id,,\nRecord Type,PO No.,C,record_type_po_pr,,\nPO / WO No.,PO No.,C,,,\n'
@@ -323,7 +323,7 @@ class DateAndProcurementTests(unittest.TestCase):
         dv.add('B2:B300')
         dv2.add('F2:F300')
         t = wb.create_sheet('_tpl')
-        for i, (k, v) in enumerate([('template_id', 'TPL-PO'), ('version', 1), ('kind', 'procurement'), ('data_sheet', 'Data'),
+        for i, (k, v) in enumerate([('template_id', 'TPL-PROCUREMENT'), ('version', 1), ('kind', 'procurement'), ('data_sheet', 'Data'),
                                      ('header_checksum', hashlib.sha256('\x1f'.join(self.PO_HEADERS).encode()).hexdigest())], 1):
             t.cell(i, 1, k)
             t.cell(i, 2, v)
@@ -352,32 +352,32 @@ class DateAndProcurementTests(unittest.TestCase):
 
     def test_day_first_by_default_and_reported(self):
         self.assertEqual(self.run_tool(), 0)
-        ws = openpyxl.load_workbook(self.out / 'TPL-PO_v1_filled.xlsx')['Data']
+        ws = openpyxl.load_workbook(self.out / 'TPL-PROCUREMENT_v1_filled.xlsx')['Data']
         self.assertEqual(ws['F2'].value, dt.datetime(2025, 6, 5))
         self.assertEqual(ws['F3'].value, dt.datetime(2025, 6, 13))
         self.assertEqual(ws['F4'].value, dt.datetime(2025, 7, 1))
-        with open(self.out / 'TPL-PO_v1_report.csv', encoding='utf-8') as f:
+        with open(self.out / 'TPL-PROCUREMENT_v1_report.csv', encoding='utf-8') as f:
             rows = [r for r in csv.DictReader(f) if r['event'] == 'date_day_first_assumed']
         self.assertEqual([(r['template_cell'], r['old'], r['new']) for r in rows], [('F2', '05/06/2025', '2025-06-05')])
-        self.assertIn('read day first', (self.out / 'TPL-PO_v1_summary.md').read_text())
+        self.assertIn('read day first', (self.out / 'TPL-PROCUREMENT_v1_summary.md').read_text())
 
     def test_month_first_flag(self):
         self.assertEqual(self.run_tool('--month-first'), 0)
-        ws = openpyxl.load_workbook(self.out / 'TPL-PO_v1_filled.xlsx')['Data']
+        ws = openpyxl.load_workbook(self.out / 'TPL-PROCUREMENT_v1_filled.xlsx')['Data']
         self.assertEqual(ws['F2'].value, dt.datetime(2025, 5, 6))
         self.assertEqual(ws['F3'].value, dt.datetime(2025, 6, 13))  # unambiguous: unchanged
-        with open(self.out / 'TPL-PO_v1_report.csv', encoding='utf-8') as f:
+        with open(self.out / 'TPL-PROCUREMENT_v1_report.csv', encoding='utf-8') as f:
             events = [r['event'] for r in csv.DictReader(f)]
         self.assertIn('date_month_first_assumed', events)
         self.assertNotIn('date_day_first_assumed', events)
 
     def test_record_type_derived_and_needs_delivery_team(self):
         self.run_tool()
-        ws = openpyxl.load_workbook(self.out / 'TPL-PO_v1_filled.xlsx')['Data']
+        ws = openpyxl.load_workbook(self.out / 'TPL-PROCUREMENT_v1_filled.xlsx')['Data']
         self.assertEqual([ws['B2'].value, ws['B3'].value, ws['B4'].value], ['po', 'pr', 'po'])
         self.assertIsNone(ws['D2'].value)
         self.assertIsNone(ws['E2'].value)
-        with open(self.out / 'TPL-PO_v1_report.csv', encoding='utf-8') as f:
+        with open(self.out / 'TPL-PROCUREMENT_v1_report.csv', encoding='utf-8') as f:
             needs = [r['template_cell'] for r in csv.DictReader(f) if r['event'] == 'needs_delivery_team']
         self.assertEqual(sorted(needs), ['D2', 'D3', 'D4', 'E2', 'E3', 'E4'])
 

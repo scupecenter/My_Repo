@@ -454,7 +454,7 @@ export const registerHandlers = [
     const key = REGISTER_TEMPLATES[tpl];
     const reject = (reason: string, title: string) => problem(422, 'template_rejected', title, { reason, detail: title } as never);
     const stream = STREAM_TEMPLATES[tpl];
-    if (tpl === 'TPL-SITE-NEW') {
+    if (tpl === 'TPL-NEW-SITES') {
       // contract 0.14.0 (Q460): a New sites file is one batch of site rows; the task_id of a task upload is refused
       if (!['pm', 'reviewer'].includes(viewer()?.key ?? '')) return problem(403, 'action_forbidden', 'You need create on sites and import on templates to import new sites.');
       if (fd.get('task_id')) return reject('wrong_template', 'The New sites template is not used from a task.');
@@ -477,7 +477,7 @@ export const registerHandlers = [
       if (text.includes('notpl')) return reject('tpl_missing', 'This file is not an approved PMIS template: the hidden _tpl sheet is missing.');
       if (text.includes('retired')) return reject('outdated_version', `This file was made from version 1 of ${tpl}; the current version is 2. Download the template again.`);
       if (text.includes('tampered')) return reject('checksum_mismatch', 'The header row of the file was changed.');
-      if (text.includes('otherstream')) return reject('wrong_template', `This file is the template ${tpl === 'TPL-SITE-CW' ? 'TPL-SITE-TE' : 'TPL-SITE-CW'}, but ${tpl} was selected.`);
+      if (text.includes('otherstream')) return reject('wrong_template', `This file is the template ${tpl === 'TPL-CIVIL' ? 'TPL-INSTALL' : 'TPL-CIVIL'}, but ${tpl} was selected.`);
       if (stream) {
         const b = makeStreamBatch(stream, tpl, f.name);
         const hl = fd.get('historical_load_reason');
@@ -496,7 +496,7 @@ export const registerHandlers = [
         R().batches.unshift(b); save();
         return HttpResponse.json(toBatch(b), { status: 202, headers: { ETag: `"${b.version}"` } });
       }
-      const gid = crypto.randomUUID(), parts = [makeStreamBatch('CW', 'TPL-SITE-CW', f.name, gid), makeStreamBatch('TE', 'TPL-SITE-TE', f.name, gid), makeBatch('gecol', 'TPL-GECOL', f.name)];
+      const gid = crypto.randomUUID(), parts = [makeStreamBatch('CW', 'TPL-CIVIL', f.name, gid), makeStreamBatch('TE', 'TPL-INSTALL', f.name, gid), makeBatch('gecol', 'TPL-GECOL', f.name)];
       Object.assign(parts[2]!, { group_id: gid, part_sheet: 'GECOL' });
       const bigRows = /bigmaster(\d+)/.exec(text);
       if (bigRows) {
@@ -868,7 +868,7 @@ function makeSiteBatch(file_name: string, many?: number): MockBatch {
     const SC = ['new_build', 'expansion', 'hot_swap', 'cold_swap', 'relocation'], FL = ['yes', 'no', 'na'];
     for (let i = 1; i <= many; i += 1) rows.push(row(i + 1, `BIG-${String(i).padStart(4, '0')}`, { site_code: `BIG-${String(i).padStart(4, '0')}`, region_id: (i % 7) + 1, name: `Big site ${i}`, delivery_scenario: SC[i % SC.length], scope_tower_erection: FL[i % 3] }));
   }
-  return { id: crypto.randomUUID(), register_key: null, entity: 'site', template_id: 'TPL-SITE-NEW', file_name, status: 'validated', version: 1, created: Date.now(), uploaded_by: viewer()!.employee_id ?? '9999', uploaded_at: new Date().toISOString(), rows };
+  return { id: crypto.randomUUID(), register_key: null, entity: 'site', template_id: 'TPL-NEW-SITES', file_name, status: 'validated', version: 1, created: Date.now(), uploaded_by: viewer()!.employee_id ?? '9999', uploaded_at: new Date().toISOString(), rows };
 }
 function toRow(r: MockBatchRow): ImportRow {
   const m = r.site_index !== null ? siteMeta(r.site_index) : null, rec = r.record_id ? R().records.find((x) => x.id === r.record_id) : undefined;

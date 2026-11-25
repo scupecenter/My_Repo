@@ -672,10 +672,10 @@ describe('Q267: a System Admin cancels an approved Quality snag record entered b
 describe('Q296: the task fields of the stream templates read the CompletionStatus catalogue', () => {
   const columnOf = async (field: string): Promise<{ options: string[] }> => {
     const cols = (await q<{ columns: { field?: string; options?: string[] }[] }>(
-      `SELECT v.columns FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-SITE-CW' AND v.is_current`))[0]!.columns;
+      `SELECT v.columns FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-CIVIL' AND v.is_current`))[0]!.columns;
     return cols.find((c) => c.field === field) as { options: string[] };
   };
-  const version = async (): Promise<number> => (await q<{ v: number }>(`SELECT current_version AS v FROM template_definitions WHERE template_id = 'TPL-SITE-CW'`))[0]!.v;
+  const version = async (): Promise<number> => (await q<{ v: number }>(`SELECT current_version AS v FROM template_definitions WHERE template_id = 'TPL-CIVIL'`))[0]!.v;
 
   it('links the Done / Pending / N/A fields to the catalogue and leaves the other lists alone; the mapping screen says so', async () => {
     const rows = await q<{ field_key: string; list_catalogue: string | null; options: string[] }>(`SELECT field_key, list_catalogue, options FROM template_task_fields WHERE field_type = 'list' ORDER BY task_code, field_key`);

@@ -60,7 +60,7 @@ const etag = (res: { headers: Record<string, unknown> }): string => String(res.h
 /** A file of `count` valid rows (New Build, Hot Swap and Expansion mixed) uploaded by `who`. Returns the batch and the Site IDs. */
 async function bigBatch(who: Actor, count: number): Promise<{ id: string; tag: string; codes: string[] }> {
   const codes = Array.from({ length: count }, () => code());
-  const file = await fillTemplate((await downloadTemplate(who.api, 'TPL-SITE-NEW')).buffer, codes.map((c, i) => ({
+  const file = await fillTemplate((await downloadTemplate(who.api, 'TPL-NEW-SITES')).buffer, codes.map((c, i) => ({
     'Site ID': c, Region: 'Benghazi', 'Site Name (EN)': `Async ${i + 1}`, 'Delivery Scenario': i % 5 === 0 ? 'Hot Swap' : i % 7 === 0 ? 'Expansion' : 'New Build',
   })));
   const up = await uploadFile(who.api, file);

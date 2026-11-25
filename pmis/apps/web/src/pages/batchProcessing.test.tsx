@@ -25,7 +25,7 @@ afterEach(() => { Object.assign(BATCH_POLL, SAVED); });
 
 const ID = '0b3c9f3e-0000-4000-8000-0000000000bb';
 const processing = (over: Partial<ImportBatch> = {}): ImportBatch => ({
-  id: ID, template_id: 'TPL-SITE-NEW', template_version: 1, source: 'template', file_name: 'new-sites.xlsx', status: 'processing', current_level: 2, levels_required: 2, register_key: null, entity: 'site',
+  id: ID, template_id: 'TPL-NEW-SITES', template_version: 1, source: 'template', file_name: 'new-sites.xlsx', status: 'processing', current_level: 2, levels_required: 2, register_key: null, entity: 'site',
   note: null, counts: { create: 469, update: 0, unchanged: 0, error: 0, pending: 369, approved: 100, rejected: 0, held: 0 }, job_id: null, task_id: null, site_id: null,
   progress: { job_id: 'j1', kind: 'submit', state: 'running', rows_total: 469, rows_done: 100, percent: 21, submitted: 100, approved: 100, rejected: 0, failed: 0, started_at: '2026-11-05T08:00:00.000Z', updated_at: '2026-11-05T08:00:10.000Z', finished_at: null, error: null },
   uploaded_by: { id: '1', display_name: 'Entry User', employee_id: '4001' }, uploaded_at: '2026-11-05T08:00:00.000Z', version: 3, ...over,

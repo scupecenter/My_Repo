@@ -136,10 +136,10 @@ INSERT INTO secsuite_ids VALUES ('BATCH_BEN', '00000000-0000-4000-8000-0000000b0
 -- Stream batches (migration 0051): one Benghazi batch uploaded by Bob and one Tripoli batch uploaded by Carol, each with one task row of the CW stream.
 INSERT INTO import_batches (id, template_version_id, file_name, file_sha256, uploaded_by, region_scope, stream_code, part_sheet, status, rows_total)
 SELECT '00000000-0000-4000-8000-0000000b0003', v.id, 'sec-stream-ben.xlsx', 'x', '00000000-0000-4000-8000-00000000a003', ARRAY[5], 'CW', 'Data', 'in_approval', 1
-FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-SITE-CW' AND v.is_current;
+FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-CIVIL' AND v.is_current;
 INSERT INTO import_batches (id, template_version_id, file_name, file_sha256, uploaded_by, region_scope, stream_code, part_sheet, status, rows_total)
 SELECT '00000000-0000-4000-8000-0000000b0004', v.id, 'sec-stream-tri.xlsx', 'x', '00000000-0000-4000-8000-00000000a004', ARRAY[1], 'CW', 'Data', 'in_approval', 1
-FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-SITE-CW' AND v.is_current;
+FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-CIVIL' AND v.is_current;
 INSERT INTO import_batch_rows (id, batch_id, row_no, region_id, target_entity, action, payload, decision, task_code, ord) VALUES
   ('00000000-0000-4000-8000-0000000b1004', '00000000-0000-4000-8000-0000000b0003', 2, 5, 'task', 'update', '{}', 'pending', 'B4', 1),
   ('00000000-0000-4000-8000-0000000b1005', '00000000-0000-4000-8000-0000000b0004', 2, 1, 'task', 'update', '{}', 'pending', 'B4', 1);

@@ -173,12 +173,12 @@ export const REGISTER_DEFS: RegisterDefinition[] = [
   more('rf_design', 'RF Design', 'تصميم RF', 'rf_design', true), more('acquisition', 'Acquisition', 'الاستحواذ', 'acquisition', true), dismantle, carDispatcher, financialAdvances,
 ];
 /** The template of each register (contract 0.7.0: one `TPL-*` per register, issued by the database). Only these four have a sample upload in the mock. */
-export const REGISTER_TEMPLATES: Record<string, RegisterKey> = { 'TPL-PO': 'procurement', 'TPL-GECOL': 'gecol', 'TPL-HLC': 'hlc', 'TPL-PRM': 'permits_hse' };
+export const REGISTER_TEMPLATES: Record<string, RegisterKey> = { 'TPL-PROCUREMENT': 'procurement', 'TPL-GECOL': 'gecol', 'TPL-HLC': 'hlc', 'TPL-PERMITS': 'permits_hse' };
 /** Contract 0.11.5: one Site Register template per stream, and the whole Master (kind master). */
-export const STREAM_TEMPLATES: Record<string, 'DESIGN_ACQ' | 'CW' | 'TE' | 'CLOSURE'> = { 'TPL-SITE-DA': 'DESIGN_ACQ', 'TPL-SITE-CW': 'CW', 'TPL-SITE-TE': 'TE', 'TPL-SITE-CL': 'CLOSURE' };
+export const STREAM_TEMPLATES: Record<string, 'DESIGN_ACQ' | 'CW' | 'TE' | 'CLOSURE'> = { 'TPL-DESIGN-ACQ': 'DESIGN_ACQ', 'TPL-CIVIL': 'CW', 'TPL-INSTALL': 'TE', 'TPL-CLOSURE': 'CLOSURE' };
 export const TEMPLATE_OF_REGISTER: Record<string, string> = {
-  procurement: 'TPL-PO', contractors: 'TPL-CTR', rf_design: 'TPL-RF', acquisition: 'TPL-ACQ', gecol: 'TPL-GECOL', hlc: 'TPL-HLC', permits_hse: 'TPL-PRM', warehouse: 'TPL-WH',
-  quality: 'TPL-QLT', issues: 'TPL-ISS', risks: 'TPL-RSK', change_control: 'TPL-CHG', readiness_handover: 'TPL-RDY', as_built: 'TPL-ASB', meetings: 'TPL-MTG', dismantle: 'TPL-DIS',
+  procurement: 'TPL-PROCUREMENT', contractors: 'TPL-CONTRACTORS', rf_design: 'TPL-RF', acquisition: 'TPL-ACQUISITION', gecol: 'TPL-GECOL', hlc: 'TPL-HLC', permits_hse: 'TPL-PERMITS', warehouse: 'TPL-WAREHOUSE',
+  quality: 'TPL-QUALITY', issues: 'TPL-ISSUES', risks: 'TPL-RISKS', change_control: 'TPL-CHANGES', readiness_handover: 'TPL-READINESS', as_built: 'TPL-AS-BUILT', meetings: 'TPL-MEETINGS', dismantle: 'TPL-DISMANTLE',
 };
 
 export type MockRecord = {

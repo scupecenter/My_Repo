@@ -59,7 +59,7 @@ const submit = async (api: Api, id: string, version: number | string): Promise<R
 describe('Save Draft / Planning and Submit for Review (Q206)', () => {
   it('a draft row needs no actual date: the plan is saved, the pending task is not started, nothing goes to L2; a submit row still needs its actual date', async () => {
     const t = await streamTeam(app, db, { B4: 'open' }, { region: R });
-    const buf = await filled(t.entry.api, 'TPL-SITE-CW', [{ 'Site ID': t.site.code, 'B4 CW Survey Planned': day('2026-02-01'), 'B4 AAT SE Name': 'Eng Draft' }]);
+    const buf = await filled(t.entry.api, 'TPL-CIVIL', [{ 'Site ID': t.site.code, 'B4 CW Survey Planned': day('2026-02-01'), 'B4 AAT SE Name': 'Eng Draft' }]);
     const sub = await upload(t.entry.api, buf);
     expect((await rowsOf(t.entry.api, sub.id))[0]!.errors[0]).toMatchObject({ code: 'actual_date_required' });
     const draft = await upload(t.entry.api, buf, { mode: 'draft' });
@@ -84,12 +84,12 @@ describe('Save Draft / Planning and Submit for Review (Q206)', () => {
 describe('the actual start of a pending task (Q209)', () => {
   it('a task with an Actual Start column needs it (never today); a single-event task starts on its actual date', async () => {
     const t = await streamTeam(app, db, { B11: 'open', B4: 'open' }, { region: R });
-    const noStart = await upload(t.entry.api, await filled(t.entry.api, 'TPL-SITE-CW', [{ 'Site ID': t.site.code, 'B11 CW Actual End': day('2026-02-10') }]));
+    const noStart = await upload(t.entry.api, await filled(t.entry.api, 'TPL-CIVIL', [{ 'Site ID': t.site.code, 'B11 CW Actual End': day('2026-02-10') }]));
     const r1 = byTask(await rowsOf(t.entry.api, noStart.id), 'B11');
     expect(r1).toMatchObject({ action: 'error' });
     expect(r1.errors[0]).toMatchObject({ code: 'actual_start_required' });
     expect(r1.errors[0].message).toContain('never uses today');
-    const ok = await upload(t.entry.api, await filled(t.entry.api, 'TPL-SITE-CW', [{
+    const ok = await upload(t.entry.api, await filled(t.entry.api, 'TPL-CIVIL', [{
       'Site ID': t.site.code, 'B11 CW Actual Start': day('2026-02-03'), 'B11 CW Actual End': day('2026-02-10'), 'B4 CW Survey Actual': day('2026-01-20'),
     }]));
     const sent = await submit(t.entry.api, ok.id, ok.version);
@@ -141,14 +141,14 @@ describe('the template mapping screen (Q207)', () => {
     expect(view.status).toBe(200);
     expect(view.body.can_edit).toBe(true);
     expect(view.body.fields.find((f: { task_code: string; field_key: string }) => f.task_code === 'B10' && f.field_key === 'actual_start')).toMatchObject({ master_col: 'BL', projection: 'earliest' });
-    const v0 = (await q<{ v: number }>(db, `SELECT current_version AS v FROM template_definitions WHERE template_id = 'TPL-SITE-CW'`))[0]!.v;
+    const v0 = (await q<{ v: number }>(db, `SELECT current_version AS v FROM template_definitions WHERE template_id = 'TPL-CIVIL'`))[0]!.v;
     const change = { op: 'upsert', task_code: 'B6', field_key: 'v:layout_ref', label: 'Layout Ref', field_type: 'text' };
     const test = await admin.api.call('post', '/template-mapping', { changes: [change], reason: 'add the layout reference', dry_run: true });
     expect(test.status).toBe(200);
     expect(test.body).toMatchObject({ dry_run: true, changes: 1 });
-    expect(test.body.impact.find((i: { template_id: string }) => i.template_id === 'TPL-SITE-CW')).toMatchObject({ columns_added: ['B6 Layout Ref'], version_before: v0, version_after: v0 + 1 });
+    expect(test.body.impact.find((i: { template_id: string }) => i.template_id === 'TPL-CIVIL')).toMatchObject({ columns_added: ['B6 Layout Ref'], version_before: v0, version_after: v0 + 1 });
     expect((await q(db, `SELECT 1 FROM template_task_fields WHERE task_code = 'B6' AND field_key = 'v:layout_ref'`))).toHaveLength(0);   // a test changes nothing
-    expect((await q<{ v: number }>(db, `SELECT current_version AS v FROM template_definitions WHERE template_id = 'TPL-SITE-CW'`))[0]!.v).toBe(v0);
+    expect((await q<{ v: number }>(db, `SELECT current_version AS v FROM template_definitions WHERE template_id = 'TPL-CIVIL'`))[0]!.v).toBe(v0);
 
     // a field the workflow sets never becomes typed
     const bad = await admin.api.call('post', '/template-mapping', { changes: [{ op: 'upsert', task_code: 'B7', field_key: 'submitted_date', label: 'x', read_only: false }], reason: 'try', dry_run: true });
@@ -161,7 +161,7 @@ describe('the template mapping screen (Q207)', () => {
     try {
       const saved = await admin.api.call('post', '/template-mapping', { changes: [change], reason: 'add the layout reference' });
       expect(saved.status).toBe(200);
-      const cur = await q<{ version: number; reason: string }>(db, `SELECT v.version, v.reason FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-SITE-CW' AND v.is_current`);
+      const cur = await q<{ version: number; reason: string }>(db, `SELECT v.version, v.reason FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-CIVIL' AND v.is_current`);
       expect(cur[0]).toEqual({ version: v0 + 1, reason: 'add the layout reference' });
       expect((await q(db, `SELECT 1 FROM audit_log WHERE action = 'template_mapping.save' AND reason = 'add the layout reference'`)).length).toBeGreaterThan(0);
     } finally {

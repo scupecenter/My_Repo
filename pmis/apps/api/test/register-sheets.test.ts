@@ -5,7 +5,7 @@ import { isPersonal, loadRegisterMaps, normaliseValue, parseDateText } from '../
 describe('register sheets of the legacy Master (0093)', () => {
   it('ships the eight register maps, with the personal columns marked', () => {
     const maps = loadRegisterMaps();
-    expect(maps.map((m) => m.template_id).sort()).toEqual(['TPL-ACQ', 'TPL-ASB', 'TPL-GECOL', 'TPL-HLC', 'TPL-PO', 'TPL-PRM', 'TPL-RF', 'TPL-RSK']);
+    expect(maps.map((m) => m.template_id).sort()).toEqual(['TPL-ACQUISITION', 'TPL-AS-BUILT', 'TPL-GECOL', 'TPL-HLC', 'TPL-PROCUREMENT', 'TPL-PERMITS', 'TPL-RF', 'TPL-RISKS']);
     expect(maps.find((m) => m.register === 'risks')!.site_scoped).toBe(false);
     const acq = maps.find((m) => m.register === 'acquisition')!;
     for (const h of ['Owner / Landlord', 'Contact Person', 'Phone', 'E-mail']) expect(isPersonal(acq.columns.find((c) => c.template_header === h)!)).toBe(true);

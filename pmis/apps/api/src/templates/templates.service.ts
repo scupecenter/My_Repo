@@ -117,6 +117,13 @@ export class TemplatesService {
     return rows[0] ?? null;
   }
 
+  /** 0155: the template that an old ID (from before the rename) stands for, active ones only. */
+  async byPreviousId(oldId: string): Promise<{ template_id: string; name: string; current_version: number } | null> {
+    const rows = await this.db.tx.$queryRaw<{ template_id: string; name: string; current_version: number }[]>(Prisma.sql`
+      SELECT template_id, name, current_version FROM template_definitions WHERE ${oldId}::text = ANY(previous_ids) AND is_active`);
+    return rows[0] ?? null;
+  }
+
   /** The versions of one template: the lookup an upload makes. */
   async version(templateId: string, version: number): Promise<{ id: string; is_current: boolean; columns: TplColumn[]; header_checksum: string } | null> {
     const rows = await this.db.tx.$queryRaw<{ id: string; is_current: boolean; columns: TplColumn[]; header_checksum: string }[]>(Prisma.sql`
@@ -239,7 +246,7 @@ export class TemplatesService {
   }
 
   /**
-   * TPL-SITE-NEW (0.14.0, Q460): one row per new site, empty (a new site has nothing to pre-fill). The columns are the identity and scope of a site; there is no landlord,
+   * TPL-NEW-SITES (0.14.0, Q460): one row per new site, empty (a new site has nothing to pre-fill). The columns are the identity and scope of a site; there is no landlord,
    * contact, phone or e-mail column (Q469). The upload becomes a batch whose rows are site drafts for L2.
    */
   private async downloadNewSites(auth: AuthContext, t: TemplateRow): Promise<{ buffer: Buffer; fileName: string }> {
@@ -373,7 +380,7 @@ export class TemplatesService {
 
   // ------------------------------------------------------------------ Site Register stream templates and TPL-MASTER
   /**
-   * TPL-SITE-DA, -CW, -TE, -CL (Q73) and TPL-MASTER: one row per site, the task fields of the stream (or of the whole Master) in Master column order.
+   * TPL-DESIGN-ACQ, -CW, -TE, -CL (Q73) and TPL-MASTER: one row per site, the task fields of the stream (or of the whole Master) in Master column order.
    * Calculated columns, the dates the workflow sets itself and the fields another register owns are grey and locked: they are shown, never read.
    * The download can be pre-filled for the caller's regions (the current values of the tasks and, read only, of the registers).
    */

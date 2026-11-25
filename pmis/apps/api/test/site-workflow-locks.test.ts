@@ -402,13 +402,13 @@ describe('the historical load: no locks, missing data as warnings, every site wi
     const hist = await makeSite(db, R, { prefix: 'WLT' });
     for (const s of [held, hist]) { await makeTask(db, s, 'B3', 'open'); await makeTask(db, s, 'B4', 'locked'); }
     expect((await openWaiver(t.admin)).status).toBe(200);
-    const plainUp = await uploadFile(t.admin.api, await filled(t.admin.api, 'TPL-SITE-CW', [{ 'Site ID': held.code, 'B4 CW Survey Actual': day('2026-02-10') }]), 'f.xlsx');
+    const plainUp = await uploadFile(t.admin.api, await filled(t.admin.api, 'TPL-CIVIL', [{ 'Site ID': held.code, 'B4 CW Survey Actual': day('2026-02-10') }]), 'f.xlsx');
     expect([201, 202]).toContain(plainUp.status);
     const pr = (await t.admin.api.call('get', `/import-batches/${plainUp.body.id}/rows`)).body.items as { task_code: string; hold_reason: string | null }[];
     expect(pr.find((r) => r.task_code === 'B4')!.hold_reason).toBe('predecessor_open');
     expect(await locksOf(held.id)).toBe(true);
 
-    const hUp = await uploadFile(t.admin.api, await filled(t.admin.api, 'TPL-SITE-CW', [{ 'Site ID': hist.code, 'B4 CW Survey Actual': day('2026-02-10') }]), 'f.xlsx', { historical_load_reason: REASON });
+    const hUp = await uploadFile(t.admin.api, await filled(t.admin.api, 'TPL-CIVIL', [{ 'Site ID': hist.code, 'B4 CW Survey Actual': day('2026-02-10') }]), 'f.xlsx', { historical_load_reason: REASON });
     expect([201, 202]).toContain(hUp.status);
     const hr = (await t.admin.api.call('get', `/import-batches/${hUp.body.id}/rows`)).body.items as { task_code: string; hold_reason: string | null; action: string }[];
     const h4 = hr.find((r) => r.task_code === 'B4')!;
@@ -651,7 +651,7 @@ describe('a new site created Open', () => {
     expect((await q<{ n: string }>(db, `SELECT count(*)::text AS n FROM task_instances ti JOIN task_definitions td ON td.id = ti.task_def_id
       WHERE ti.site_id = $1 AND ti.state = 'locked' AND NOT td.is_milestone_task AND td.code !~ '^(E[0-9]|MOB-)'`, [made.id]))[0]!.n).toBe('0');
     // the New sites template carries the column
-    const tpl = await q<{ cols: { code: string; options?: string[] }[] }>(db, `SELECT v.columns AS cols FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-SITE-NEW' AND v.is_current`);
+    const tpl = await q<{ cols: { code: string; options?: string[] }[] }>(db, `SELECT v.columns AS cols FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-NEW-SITES' AND v.is_current`);
     expect(tpl[0]!.cols.find((c) => c.code === 'workflow_locks')).toMatchObject({ options: ['Locked', 'Open'] });
   });
 });

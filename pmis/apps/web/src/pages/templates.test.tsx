@@ -30,7 +30,7 @@ describe('Templates page', () => {
     }));
     renderApp(<Routed />, { route: '/templates' });
     const u = userEvent.setup();
-    for (const id of ['TPL-PO', 'TPL-GECOL', 'TPL-HLC', 'TPL-PRM']) expect(await screen.findByTestId(`tpl-row-${id}`)).toBeInTheDocument();
+    for (const id of ['TPL-PROCUREMENT', 'TPL-GECOL', 'TPL-HLC', 'TPL-PERMITS']) expect(await screen.findByTestId(`tpl-row-${id}`)).toBeInTheDocument();
     expect(screen.getByTestId('tpl-version-TPL-GECOL')).toHaveTextContent('v1');
     expect(screen.getByTestId('tpl-streams-note')).toHaveTextContent(/stream templates/);
     await u.click(screen.getByTestId('tpl-download-TPL-GECOL'));
@@ -45,14 +45,14 @@ describe('Templates page', () => {
     const first = renderApp(<Routed />, { route: '/templates' });
     const u = userEvent.setup();
     expect(await screen.findByTestId('batches-empty')).toBeInTheDocument();
-    await u.click(await screen.findByTestId('tpl-upload-TPL-PO'));
+    await u.click(await screen.findByTestId('tpl-upload-TPL-PROCUREMENT'));
     await u.upload(await screen.findByTestId('template-upload-file'), new File(['x'], 'orders.xlsx'));
     await u.click(screen.getByTestId('template-upload-submit'));
     await screen.findByTestId('page-register-batch');
     expect(await screen.findByTestId('batch-status')).toHaveTextContent('Checked');
     const list = await api.get<{ items: ImportBatch[] }>('/import-batches', { query: { status: 'validated', register_key: 'procurement' } });
     expect(list.items).toHaveLength(1);
-    expect(list.items[0]).toMatchObject({ template_id: 'TPL-PO', register_key: 'procurement', status: 'validated', levels_required: 2 });
+    expect(list.items[0]).toMatchObject({ template_id: 'TPL-PROCUREMENT', register_key: 'procurement', status: 'validated', levels_required: 2 });
     // the list page
     await signIn('pm');
     first.unmount();

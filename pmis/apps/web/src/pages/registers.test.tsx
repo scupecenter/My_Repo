@@ -290,7 +290,7 @@ describe('Template entry', () => {
     const err = await screen.findByTestId('template-upload-error');
     expect(err).toHaveAttribute('data-reason', 'outdated_version');
     expect(err).toHaveTextContent('older version of the template');
-    expect(screen.getByTestId('template-upload-detail')).toHaveTextContent('version 1 of TPL-PO; the current version is 2');
+    expect(screen.getByTestId('template-upload-detail')).toHaveTextContent('version 1 of TPL-PROCUREMENT; the current version is 2');
     expect(err).toHaveTextContent('written to the System Log');
     expect(screen.getByTestId('template-upload-dialog')).toBeInTheDocument();                       // the dialog stays open, no batch page
     await u.upload(screen.getByTestId('template-upload-file'), new File(['notpl'], 'plain.xlsx'));

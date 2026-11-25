@@ -26,10 +26,10 @@ for (const c of CASES) {
       // download: blank, then pre-filled
       await openMore(page);
       const [blank] = await Promise.all([page.waitForEvent('download'), page.getByTestId('register-template-download').click()]);
-      expect(blank.suggestedFilename()).toBe('TPL-PO_v1.xlsx');
+      expect(blank.suggestedFilename()).toBe('TPL-PROCUREMENT_v1.xlsx');
       await openMore(page);
       const [filled] = await Promise.all([page.waitForEvent('download'), page.getByTestId('register-template-prefill').click()]);
-      expect(filled.suggestedFilename()).toBe('TPL-PO_v1_prefilled.xlsx');
+      expect(filled.suggestedFilename()).toBe('TPL-PROCUREMENT_v1_prefilled.xlsx');
 
       // an old version is refused in the dialog, with the reason, and no batch is made
       await openMore(page);
@@ -63,7 +63,7 @@ for (const c of CASES) {
       await page.getByTestId('nav-templates').click();
       await expect(page.getByTestId('page-templates')).toBeVisible();
       await expect(page.locator('[data-testid^="batch-list-row-"][data-status="approved"]')).toHaveCount(1);
-      await expect(page.getByTestId('tpl-version-TPL-PO')).toContainText('v1');
+      await expect(page.getByTestId('tpl-version-TPL-PROCUREMENT')).toContainText('v1');
     });
   });
 }
