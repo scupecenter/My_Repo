@@ -3871,7 +3871,10 @@
     "type_link": "Link",
     "type_document": "Document",
     "type_computed": "Computed (read-only)",
-    "type_child_list": "Child list"
+    "type_child_list": "Child list",
+    "code_generated": "Technical ID (made for you: {{code}})",
+    "code_hint": "Made from the English name. Only change it if you must; it cannot be changed later.",
+    "code_fixed": "It never changes. To change what people see, change the name instead. That is free."
   },
   "lists": {
     "colour": "Colour",
