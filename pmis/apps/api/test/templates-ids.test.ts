@@ -69,9 +69,10 @@ describe('pre-fill by the filters of the Sites list', () => {
     const ok = await downloadTemplate(admin.api, 'TPL-MASTER', `?filters=${encodeURIComponent(JSON.stringify({ q: site.code }))}`);
     expect(ok.status).toBe(200);
     const wb = await load(ok.buffer);
-    const ws = wb.getWorksheet('Data')!;
-    const codes: string[] = [];
-    ws.eachRow((r, n) => { if (n > 1) codes.push(String(r.getCell(1).text)); });
-    expect(codes.join(' ')).toContain(site.code);
+    // the data part sheets come first in the book (Instructions, Columns and Lists follow them)
+    const ws = wb.worksheets[0]!;
+    const cells: string[] = [];
+    ws.eachRow((r, n) => { if (n > 1) r.eachCell((c) => cells.push(String(c.text))); });
+    expect(cells.join(' ')).toContain(site.code);
   });
 });
