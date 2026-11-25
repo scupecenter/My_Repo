@@ -46,6 +46,9 @@ const applyBody = z.object({
   historical_load: z.object({
     reason: z.string().trim().min(3).max(2000), approve_directly: z.boolean().optional(), registers: z.boolean().optional(), reapply: z.boolean().optional(),
   }).strict().optional(),
+  // 0155 (owner request 2026-11-25, Q350): create the sites of the file that are not in GSDN Workspace first (a System Admin, or the holder of both L1 and L2 of
+  // the Matrix row site_creation), then enter their task dates and register rows
+  create_sites: z.boolean().optional(),
 }).strict().superRefine((b, ctx) => {
   if (b.historical_load?.approve_directly && b.mode !== 'submit') {
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['mode'], message: 'Approving directly is for the submit mode of the historical load.' });
@@ -63,6 +66,9 @@ interface RunRow {
   applying: Record<string, unknown> | null;
   applied_before_id: string | null; applied_before_at: Date | null;
 }
+
+/** 0155: who may use the option "Create the sites that are not in GSDN Workspace from the Master" (mcs_offer, decided by the database). */
+interface CreateSitesOffer { allowed: boolean; admin: boolean; regions: number[]; reason: string | null }
 
 interface DiffRow {
   id: string; ord: number; sheet: string; row_no: number | null; source_ref: string | null; site_code: string | null; site_id: string | null; region_id: number | null;
@@ -239,8 +245,16 @@ export class MasterImportService {
       WHERE ${where} ${tail}`;
   }
 
+  /** 0155: the offer of the option to create the missing sites (the database decides: a System Admin, or the holder of both levels of site_creation). */
+  private async createSitesOffer(): Promise<CreateSitesOffer> {
+    const r = await this.db.tx.$queryRaw<{ o: CreateSitesOffer | null }[]>(Prisma.sql`SELECT mcs_offer() AS o`);
+    const o = r[0]?.o;
+    return { allowed: o?.allowed === true, admin: o?.admin === true, regions: Array.isArray(o?.regions) ? o.regions : [], reason: o?.reason ?? null };
+  }
+
   private async runDtos(rows: RunRow[]): Promise<Record<string, unknown>[]> {
     const refs = await this.view.userRefs([...new Set(rows.flatMap((r) => [r.created_by, r.applied_by]).filter((x): x is string => !!x))]);
+    const offer = rows.length > 0 ? await this.createSitesOffer() : null;
     return rows.map((r) => ({
       id: r.id, file_name: r.file_name, file_sha256: r.file_sha256, file_size: Number(r.file_size), status: r.status, structure: r.structure, summary: r.summary,
       created_by: refs.get(r.created_by) ?? { id: r.created_by }, created_at: r.created_at,
@@ -254,6 +268,8 @@ export class MasterImportService {
       applying: r.applying ?? null,
       // 0122: another run applied the same file (same SHA-256): a plain apply is refused; a System Admin may re-apply it with direct approval
       applied_before: r.applied_before_id ? { run_id: r.applied_before_id, applied_at: r.applied_before_at } : null,
+      // 0155: whether the caller may create the sites of the file that are not in GSDN Workspace (the reason when not)
+      create_sites_offer: offer,
     }));
   }
 
@@ -360,6 +376,12 @@ export class MasterImportService {
       if (!a[0]?.ok) throw problems.forbidden('action_forbidden', 'Only a System Admin can accept a batch without documents (historical load).');
       await this.stepUp.require(auth);
     }
+    if (body.create_sites) {
+      // 0155: a System Admin, or the holder of both L1 and L2 of the Matrix row site_creation, then a step-up; the database checks both again, and every row
+      const offer = await this.createSitesOffer();
+      if (!offer.allowed) throw problems.forbidden('action_forbidden', offer.reason ?? 'You may not create sites from the Master.');
+      await this.stepUp.require(auth);
+    }
     const stepOk = Boolean(await this.stepUp.validUntil(auth));
     const hl = body.historical_load;
     // 0093: the register sheets are read here, from the file stored with the run (never from the request); the database checks the file's SHA-256 again
@@ -368,7 +390,9 @@ export class MasterImportService {
       ? { reason: hl.reason, ...(hl.approve_directly ? { approve_directly: true } : {}), ...(hl.registers ? { registers: true } : {}), ...(hl.reapply ? { reapply: true } : {}) }
       : null;
     // 0075: a staged batch with more rows than imports.async_rows is sent in the background (its run is started here once the request commits)
-    const outcome = await this.call<Record<string, unknown>>(auth, registers
+    const outcome = await this.call<Record<string, unknown>>(auth, body.create_sites
+      ? Prisma.sql`SELECT mi_apply_run(${id}::uuid, ${version}::int, ${body.mode}::text, ${body.reason}::text, ${stepOk}::boolean, ${hist ? JSON.stringify(hist) : null}::jsonb, ${registers ? JSON.stringify(registers) : null}::jsonb, true) AS r`
+      : registers
       ? Prisma.sql`SELECT mi_apply_run(${id}::uuid, ${version}::int, ${body.mode}::text, ${body.reason}::text, ${stepOk}::boolean, ${JSON.stringify(hist)}::jsonb, ${JSON.stringify(registers)}::jsonb) AS r`
       : hist
         ? Prisma.sql`SELECT mi_apply_run(${id}::uuid, ${version}::int, ${body.mode}::text, ${body.reason}::text, ${stepOk}::boolean, ${JSON.stringify(hist)}::jsonb) AS r`

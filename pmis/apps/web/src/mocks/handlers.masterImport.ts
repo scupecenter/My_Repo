@@ -46,6 +46,8 @@ function st(): State {
       summary: { rows: 3, sites_matched: 2, sites_unknown: 1, cells_compared: 220, matches: 214, diffs: 3, missing_in_pmis: 1, missing_in_master: 0, exceptions: 2, applicable: 2, staff_mapped: 0, staff_rows: 2 },
       created_by: { id: uid('1001'), display_name: 'Project Manager', employee_id: '1001' }, created_at: '2026-11-04T07:30:00Z', applied_by: null, applied_at: null,
       apply_reason: null, apply_mode: null, group_id: null, outcome: null, has_file: true, version: 1,
+      // 0.15.73: the mock's System Admin may create the sites of the file that are not in GSDN Workspace
+      create_sites_offer: { allowed: true, admin: true, regions: [1, 2, 3, 4, 5, 6, 7], reason: null },
     };
     const d = (id: string, o: Partial<MasterImportDiff>): MasterImportDiff => ({ id, sheet: 'Master', row_no: 5, source_ref: 'Master!5', site_code: 'TR-0001', site_id: null, region_id: 1,
       master_col: null, header: null, field: null, master_value: null, pmis_value: null, kind: 'diff', reason: 'value_differs', applicable: false, resolution: 'open',
@@ -136,7 +138,8 @@ export const masterImportHandlers = [
     const g = adminOnly(); if (g) return g;
     const r = st().runs.find((x) => x.id === params.id);
     if (!r) return problem(404, 'not_found', 'Not found');
-    const body = await request.json() as { mode?: string; reason?: string; historical_load?: { reason?: string; approve_directly?: boolean; registers?: boolean; reapply?: boolean }; approve_directly?: unknown; registers?: unknown; reapply?: unknown };
+    const body = await request.json() as { mode?: string; reason?: string; historical_load?: { reason?: string; approve_directly?: boolean; registers?: boolean; reapply?: boolean }; approve_directly?: unknown; registers?: unknown; reapply?: unknown;
+      create_sites?: boolean };
     if (body.reapply !== undefined) return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '', code: 'unrecognized_keys', message: 'Unrecognized key: reapply' }] });   // 0.15.36: only inside historical_load
     if (body.historical_load?.reapply && !body.historical_load.approve_directly) {
       return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '/historical_load/approve_directly', code: 'custom', message: 'Re-applying a file that was already applied is done with the direct approval.' }] });
@@ -149,6 +152,8 @@ export const masterImportHandlers = [
     if (r.status === 'applying') return problem(409, 'upload_processing', 'The file is being checked', { detail: 'This file is being applied in the background. Wait until it ends.', run_id: r.id } as never);
     if (r.status === 'staging') return problem(409, 'upload_processing', 'The file is being checked', { detail: 'The file is still being compared. Wait until the comparison ends.', run_id: r.id } as never);
     if (!stepUpValid()) return stepUp();
+    // 0.15.73: create the missing sites first: a System Admin or the holder of both levels of site_creation (the mock: its System Admin)
+    if (body.create_sites && !isSystemAdmin()) return problem(403, 'action_forbidden', 'Action not allowed', { detail: 'Only a System Admin, or a person who holds both L1 and L2 of the Site creation row of the Matrix, can create sites from the Master without a second person.' });
     if (body.historical_load) {
       // Q462 (0.14.3): a System Admin, the submit mode, a reason, the waiver open
       if (!isSystemAdmin()) return problem(403, 'action_forbidden', 'Action not allowed', { detail: 'Only a System Admin can accept a batch without documents (historical load).' });
@@ -171,7 +176,10 @@ export const masterImportHandlers = [
         approved: direct && !big && !draft ? 1 : 0,
         ...(big ? { queued: true, job_id: uid('job'), rows: rowsToSend } : {}) }] as Record<string, unknown>[], skipped: [] as Record<string, unknown>[],
       registers: false, register_notes: [] as Record<string, unknown>[],
-      reapply, discarded: (reapply ? [{ id: uid('batch'), stream_code: 'CW', register_key: null, status_before: 'in_approval', rows_rejected: 1, rows_sent_open: 0 }] : []) as Record<string, unknown>[] };
+      reapply, discarded: (reapply ? [{ id: uid('batch'), stream_code: 'CW', register_key: null, status_before: 'in_approval', rows_rejected: 1, rows_sent_open: 0 }] : []) as Record<string, unknown>[],
+      // 0.15.73: the Site ID of the file that is not in GSDN Workspace (XX-9999, row 7) is created first
+      ...(body.create_sites ? { create_sites: { batch_id: uid('batch'), created: [{ row_no: 7, site_code: 'XX-9999', site_id: uid('site'), region_id: 1, self_approval: true }], skipped: [],
+        created_count: 1, skipped_count: 0 } } : {}) };
     if (body.historical_load?.registers && !draft) {
       // 0.15.11: the register sheets of the same file, one register batch each; the sheets the file lacks are skipped with their reason
       outcome.registers = true;

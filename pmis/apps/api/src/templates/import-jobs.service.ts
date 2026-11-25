@@ -66,6 +66,8 @@ export interface JobProgress {
  * uploader's signed context; the resume job takes the uploads left in `parsing` too.
  * 0086 (owner report 2026-11-11): the apply of a big Master import (POST /master-import/runs/:id/apply, status `applying`) runs here too, as one transaction
  * (mi_apply_step); the resume job takes the applies left running.
+ * 0155 (owner request 2026-11-25): with the option create_sites, the steps first stage the New sites batch of the file and create its sites 25 at a time,
+ * each step its own transaction (state running), then the last step applies the run as before.
  */
 @Injectable()
 export class ImportJobsService implements OnApplicationBootstrap, OnModuleDestroy {
@@ -255,7 +257,8 @@ export class ImportJobsService implements OnApplicationBootstrap, OnModuleDestro
         SELECT mi_apply_step(${job.job_id}::uuid) AS r`);
     }, { maxWait: 10_000, timeout: MI_APPLY_TIMEOUT_MS });
     const p = r[0]?.r;
-    const state = p?.state === 'done' || p?.state === 'failed' || p?.state === 'busy' ? p.state : 'failed';
+    // 0155: 'running' while the sites of the file are created in chunks (one step per chunk), then the apply itself in the last step
+    const state = p?.state === 'done' || p?.state === 'failed' || p?.state === 'busy' || p?.state === 'running' ? p.state : 'failed';
     if (state === 'done') {
       const queued = (p?.outcome?.batches ?? []).filter((b) => b.queued && typeof b.job_id === 'string').map((b) => b.job_id as string);
       this.kickInOrder(queued);
