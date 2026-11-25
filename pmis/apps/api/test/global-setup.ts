@@ -293,6 +293,12 @@ export default async function setup(): Promise<() => Promise<void>> {
   const drstDb = await buildDatabase(adminUrl, drst, appPassword);
   process.env.TEST_DATABASE_URL_DRST = drstDb.appUrl;
   process.env.TEST_SUPER_URL_DRST = drstDb.superUrl;
+  // The Master create-sites database (migration 0155): the suite opens the historical-load waiver, replaces the cells of the Matrix row site_creation and
+  // changes imports.async_rows to create the sites of a file in the background (every other suite reads the threshold), so it shares no database.
+  const mcs = `${dbName}_mcs`;
+  const mcsDb = await buildDatabase(adminUrl, mcs, appPassword);
+  process.env.TEST_DATABASE_URL_MCS = mcsDb.appUrl;
+  process.env.TEST_SUPER_URL_MCS = mcsDb.superUrl;
   process.env.TEST_DATABASE_URL = main.appUrl;
   process.env.TEST_SUPER_URL = main.superUrl;
   process.env.TEST_DATABASE_URL_SOLO = one.appUrl;
@@ -352,6 +358,7 @@ export default async function setup(): Promise<() => Promise<void>> {
     await a.query(`DROP DATABASE IF EXISTS ${slaDb_} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${f20k} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${drst} WITH (FORCE)`);
+    await a.query(`DROP DATABASE IF EXISTS ${mcs} WITH (FORCE)`);
     await a.end();
   };
 }

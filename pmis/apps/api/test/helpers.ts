@@ -102,6 +102,13 @@ export async function superDbHrap(): Promise<PgClient> {
   return c;
 }
 
+/** Superuser connection to the Master create-sites database (migration 0155; see global-setup). */
+export async function superDbMcs(): Promise<PgClient> {
+  const c = new PgClient({ connectionString: process.env.TEST_SUPER_URL_MCS });
+  await c.connect();
+  return c;
+}
+
 /** Superuser connection to the historical register-tasks database (migration 0123; see global-setup). */
 export async function superDbHrtk(): Promise<PgClient> {
   const c = new PgClient({ connectionString: process.env.TEST_SUPER_URL_HRTK });
