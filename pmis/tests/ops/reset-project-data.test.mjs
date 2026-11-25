@@ -245,6 +245,15 @@ function main() {
   }
   console.log(`database ${dbName} built and seeded`);
 
+  // ---- 0. the System Log source backup (0146, 0153): the server's backup scripts run as the postgres superuser and must write it; the API
+  // (pmis_app) never may. pg_has_role answers true for a superuser on every role, which made 0146 refuse the scripts too (owner report
+  // 2026-11-25: "db-backup: could not write the System Log row"). The probe row uses event backup_probe, so it never counts as a backup.
+  const probe = `SELECT log_system_write('info', 'backup', 'probe', '{"script":"db-backup","event":"backup_probe"}'::jsonb, NULL, NULL);`;
+  const su = psql(superUrl, { input: probe, check: false });
+  check('backup log: the postgres superuser (the backup scripts) writes a System Log row of source backup', su.status === 0, (su.err || '').trim());
+  const app = psql(appUrl, { input: probe, check: false });
+  check('backup log: pmis_app (the API) is still refused the source backup', app.status !== 0 && /backup scripts only/.test(app.err), (app.err || app.out).trim());
+
   // ---- 1. dry run through the shell script: plan printed, nothing changed --------------------------------------------------------------
   const conf = mkdtempSync(join(tmpdir(), 'pmis-reset-conf-'));
   try {
