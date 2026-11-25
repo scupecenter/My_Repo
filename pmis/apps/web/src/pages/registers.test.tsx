@@ -32,7 +32,7 @@ describe('Register list', () => {
     await waitFor(() => expect(within(row).getByText('Tripoli')).toBeInTheDocument());
     expect(screen.getByTestId(`reg-state-${recId(1)}`)).toHaveTextContent('Approved');
     expect(screen.getByTestId(`reg-state-${recId(2)}`)).toHaveTextContent('In review');
-    expect(screen.getByTestId('register-export')).toBeInTheDocument();
+    expect(screen.getByTestId('register-tools')).toBeInTheDocument();
     expect(screen.getByTestId('register-owner-note')).toHaveTextContent(/HLC Fiber Team enters the HLC purchase requests here/);
     expect(await screen.findByTestId('filter-add')).toBeInTheDocument(); // the unified filter replaced the separate selects
     expect(screen.queryByTestId('register-filter-state')).toBeNull();
@@ -205,9 +205,9 @@ describe('GECOL and HLC ownership (Q56, Q55)', () => {
 
 describe('Template entry', () => {
   const uploadThroughDialog = async (u: ReturnType<typeof userEvent.setup>, name: string, body = 'x') => {
-    await u.click(await screen.findByTestId('more-menu')); // secondary tools live in "More" (plan T3)
-    await waitFor(() => expect(screen.getByTestId('register-template-upload')).toBeEnabled());
-    await u.click(screen.getByTestId('register-template-upload'));
+    await u.click(await screen.findByTestId('register-tools')); // templates and export share one menu
+    await waitFor(() => expect(screen.getByTestId('register-tools-upload')).toBeEnabled());
+    await u.click(screen.getByTestId('register-tools-upload'));
     await u.upload(await screen.findByTestId('template-upload-file'), new File([body], name));
     await u.click(screen.getByTestId('template-upload-submit'));
   };
@@ -217,10 +217,10 @@ describe('Template entry', () => {
     await api.post('/__mock/step-up');
     renderApp(<Routed />, at('procurement'));
     const u = userEvent.setup();
-    await u.click(await screen.findByTestId('more-menu'));
-    await waitFor(() => expect(screen.getByTestId('register-template-upload')).toBeEnabled());
-    expect(screen.getByTestId('register-template-download')).toBeEnabled();
-    expect(screen.getByTestId('register-template-prefill')).toBeEnabled();
+    await u.click(await screen.findByTestId('register-tools'));
+    await waitFor(() => expect(screen.getByTestId('register-tools-upload')).toBeEnabled());
+    expect(screen.getByTestId('register-tools-blank')).toBeEnabled();
+    expect(screen.getByTestId('register-tools-filled')).toBeEnabled();
     await u.keyboard('{Escape}');
     await uploadThroughDialog(u, 'filled.xlsx');
     await screen.findByTestId('page-register-batch');

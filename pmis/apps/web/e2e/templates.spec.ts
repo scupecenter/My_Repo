@@ -8,7 +8,7 @@ const CASES = [
   { locale: 'ar', theme: 'dark', refused: 'إصدار أقدم', checked: 'تم الفحص', inFlow: 'قيد الاعتماد', approved: 'معتمد' },
 ] as const;
 
-const openMore = async (page: Page) => { await page.getByTestId('more-menu').click(); await expect(page.getByTestId('more-panel')).toBeVisible(); };
+const openMore = async (page: Page) => { await page.getByTestId('register-tools').click(); await expect(page.getByTestId('register-tools-panel')).toBeVisible(); };
 
 for (const c of CASES) {
   test.describe(`${c.locale}/${c.theme}`, () => {
@@ -25,15 +25,15 @@ for (const c of CASES) {
 
       // download: blank, then pre-filled
       await openMore(page);
-      const [blank] = await Promise.all([page.waitForEvent('download'), page.getByTestId('register-template-download').click()]);
+      const [blank] = await Promise.all([page.waitForEvent('download'), page.getByTestId('register-tools-blank').click()]);
       expect(blank.suggestedFilename()).toBe('TPL-PROCUREMENT_v1.xlsx');
       await openMore(page);
-      const [filled] = await Promise.all([page.waitForEvent('download'), page.getByTestId('register-template-prefill').click()]);
+      const [filled] = await Promise.all([page.waitForEvent('download'), page.getByTestId('register-tools-filled').click()]);
       expect(filled.suggestedFilename()).toBe('TPL-PROCUREMENT_v1_prefilled.xlsx');
 
       // an old version is refused in the dialog, with the reason, and no batch is made
       await openMore(page);
-      await page.getByTestId('register-template-upload').click();
+      await page.getByTestId('register-tools-upload').click();
       await expect(page.getByTestId('template-upload-dialog')).toBeVisible();
       await page.getByTestId('template-upload-file').setInputFiles({ name: 'old.xlsx', mimeType: 'application/octet-stream', buffer: Buffer.from('retired') });
       await page.getByTestId('template-upload-submit').click();

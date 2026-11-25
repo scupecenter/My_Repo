@@ -5916,5 +5916,6 @@
     "saved": "Saved.",
     "reason": "Reason",
     "no_cards": "No document type has a file yet; cards appear here once they do."
-  }
+  },
+  "tplmenu": { "title": "Templates & export" }
 }

@@ -2,10 +2,6 @@ import {
   ArrowRightLeft,
   Columns3,
   Download,
-  FileDown,
-  FileSpreadsheet,
-  FileUp,
-  ListChecks,
   Lock,
   Map as MapIcon,
   Plus,
@@ -41,7 +37,7 @@ import { decodeFilter, encodeFilter, type FilterTree } from "@/api/views";
 import { useRegions } from "@/api/sites";
 import type { ExtraField } from "@/components/UnifiedFilter";
 import type { RegisterDefinition, RegisterRecord } from "@/api/types";
-import { ExportViewButton } from "@/components/ExportDialog";
+import { TemplateExportMenu } from "@/components/TemplateExportMenu";
 import { GridCellEditor, INLINE_TYPES } from "@/components/GridCellEditor";
 import { RegisterGrid } from "@/components/RegisterGrid";
 import { RejectDialog } from "@/components/RejectDialog";
@@ -731,9 +727,15 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
         columns={view === "vertical" ? <ColumnMenu api={tbl} label={label} /> : undefined}
         display={view === "vertical" ? <DisplayMenu api={tbl} /> : undefined}
         exporter={
-            <ExportViewButton
-              testid="register-export"
+            <TemplateExportMenu
+              testid="register-tools"
+              exportTestid="register-export"
               source={key}
+              hasTemplate={!!tpl}
+              onBlank={() => void down(false)}
+              onFilled={() => void down(true)}
+              onUpload={() => setUploading(true)}
+              onBatches={() => nav(`/templates?register=${key}`)}
               filters={Object.fromEntries(
                 Object.entries({ ...f, ...(adv ? { filter: adv } : {}) }).filter(([, x]) => x),
               )}
@@ -751,37 +753,6 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
         more={
             <MoreMenu
               items={[
-                {
-                  id: "tpl-down",
-                  label: t("registers.template_download"),
-                  icon: <FileDown size={16} />,
-                  testid: "register-template-download",
-                  disabled: !tpl,
-                  onSelect: () => void down(false),
-                },
-                {
-                  id: "tpl-prefill",
-                  label: t("registers.template_prefill"),
-                  icon: <FileSpreadsheet size={16} />,
-                  testid: "register-template-prefill",
-                  disabled: !tpl,
-                  onSelect: () => void down(true),
-                },
-                {
-                  id: "tpl-up",
-                  label: t("registers.template_upload"),
-                  icon: <FileUp size={16} />,
-                  testid: "register-template-upload",
-                  disabled: !tpl,
-                  onSelect: () => setUploading(true),
-                },
-                {
-                  id: "tpl-batches",
-                  label: t("registers.template_batches"),
-                  icon: <ListChecks size={16} />,
-                  testid: "register-template-batches",
-                  onSelect: () => nav(`/templates?register=${key}`),
-                },
                 ...(key === "as_built"
                   ? [
                       {
