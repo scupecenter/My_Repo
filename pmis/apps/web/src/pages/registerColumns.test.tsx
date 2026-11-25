@@ -102,5 +102,7 @@ describe('register columns page: drag and drop, add before and after', () => {
     await u.click(screen.getByTestId(`regcols-before-${second}`));
     expect(await screen.findByTestId('column-dialog')).toBeInTheDocument();
     expect(within(screen.getByTestId('column-dialog')).getByTestId('col-code')).toBeInTheDocument();
+    expect(within(screen.getByTestId('column-dialog')).getByTestId('column-add-impact')).toHaveTextContent(/new version of the register template/i);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();   // in the page, not a modal
   });
 });

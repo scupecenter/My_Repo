@@ -3893,7 +3893,9 @@
     "stream_note": "Columns of the {{stream}} stream, in Master order. Same rules as the Workflow Studio: reason, approval and audit.",
     "stream_add": "Add a column (Workflow Studio)",
     "add_before": "Add a column before {{code}}",
-    "add_after": "Add a column after {{code}}"
+    "add_after": "Add a column after {{code}}",
+    "add_impact_tpl": "Impact: a new version of the register template is issued with this column. Files made from the old template still upload; the new column stays empty in them. Existing records keep this column empty until filled.",
+    "add_impact": "Impact: existing records keep this column empty until filled. It is not in the template, so no new template version is issued."
   },
   "lists": {
     "colour": "Colour",

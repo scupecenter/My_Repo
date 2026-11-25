@@ -105,6 +105,7 @@ function ColumnForm({ open, onClose, registerKey, column, columns, sections, pla
   const flip = (k: keyof typeof vis) => setVis((v) => ({ ...v, [k]: !v[k] }));
   return (
     <FormDialog inline open={open} onClose={onClose} testid="column-dialog" wide title={edit ? t('regcols.edit_title', { code: column!.code }) : t('regcols.add_title')} onSubmit={(r) => void submit(r)} busy={busy} disabled={!ready} error={err}>
+      {!edit && <p className="rounded border border-line bg-card2 p-2 text-sm" data-testid="column-add-impact">{t(vis.in_template ? 'regcols.add_impact_tpl' : 'regcols.add_impact')}</p>}
       {locked && <p className="rounded border border-line bg-card2 p-2 text-sm" data-testid="column-protected">{t('regcols.protected_note', { reason: column!.system_reason ?? '' })}</p>}
       <div className="grid gap-3 sm:grid-cols-2">
         <div><label className="text-sm font-semibold" htmlFor="col-en">{t('regcols.label_en')}</label>
