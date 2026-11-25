@@ -57,7 +57,7 @@ export const warehouseHandlers = [
   http.get(`${B}/warehouse/items`, ({ request }) => {
     const g = guard(); if (g) return g;
     const u = new URL(request.url).searchParams, q = u.get('q') ?? '', cat = u.get('category');
-    return page(W().items.filter((x) => (u.get('include_inactive') === 'true' || x.is_active) && (!cat || x.category === cat) && has(q, x.code, x.name_en, x.name_ar)));
+    return page(W().items.filter((x) => (u.get('include_inactive') === 'true' || x.is_active) && (!cat || x.category === cat) && has(q, x.code, x.name_en, x.name_ar)).map((x) => ({ ...x, deletable: !W().inUse.includes(x.code) && !W().stock.some((s) => s.item_code === x.code) && !x.as_built_item_code })));
   }),
   http.post(`${B}/warehouse/items`, async ({ request }) => {
     const g = guard(); if (g) return g;
@@ -89,6 +89,17 @@ export const warehouseHandlers = [
       Object.entries(custom as Record<string, unknown>).forEach(([k, v]) => { if (v === null) delete cur[k]; else cur[k] = v; });
     }
     return HttpResponse.json(it, tag(it.version));
+  }),
+  http.delete(`${B}/warehouse/items/:id`, ({ params, request }) => {
+    const g = guard(); if (g) return g;
+    if (!admin()) return problem(403, 'forbidden', 'Not allowed');
+    const it = W().items.find((x) => x.id === params.id);
+    if (!it) return problem(404, 'not_found', 'Item not found');
+    const s = stale(request, it.version); if (s) return s;
+    if ((new URL(request.url).searchParams.get('reason') ?? '').trim().length < 3) return problem(422, 'validation_failed', 'Reason is required');
+    if (W().inUse.includes(it.code) || W().stock.some((x) => x.item_code === it.code) || it.as_built_item_code) return problem(409, 'item_in_use', 'Item has data: deactivate it instead');
+    W().items.splice(W().items.indexOf(it), 1);
+    return HttpResponse.json({ id: it.id, deleted: true });
   }),
   http.get(`${B}/warehouse/stock`, ({ request }) => {
     const g = guard(); if (g) return g;

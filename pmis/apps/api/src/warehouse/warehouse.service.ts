@@ -215,6 +215,7 @@ interface ItemRow {
   code_source: string;
   need_rules: unknown;
   custom: Record<string, unknown>;
+  deletable: boolean;
 }
 
 const ITEM_SELECT = Prisma.sql`
@@ -223,7 +224,7 @@ const ITEM_SELECT = Prisma.sql`
     (SELECT ab.code FROM as_built_items ab WHERE ab.warehouse_item_id = i.id) AS as_built_item_code,
     coalesce((SELECT jsonb_agg(jsonb_build_object('id', n.id, 'need_unit', n.need_unit, 'quantity', n.quantity::float8, 'status', n.status, 'quantity_rule', n.quantity_rule, 'applies_when', n.applies_when)
                               ORDER BY n.sort_order, n.id) FROM warehouse_item_need_rules n WHERE n.item_id = i.id), '[]'::jsonb) AS need_rules,
-    coalesce(i.custom, '{}'::jsonb) AS custom
+    coalesce(i.custom, '{}'::jsonb) AS custom, wh_item_deletable(i.id) AS deletable
   FROM warehouse_items i`;
 
 interface MovementRow {
@@ -424,6 +425,18 @@ export class WarehouseService {
       );
     }
     return this.getItem(auth, id);
+  }
+
+  /** 0160: a real delete of an item with no data (admin, reason, audited, version check); an item with data answers 409 item_in_use and can only be deactivated. */
+  async deleteItem(auth: AuthContext, rawId: string, ifMatch: string | undefined, reason: unknown): Promise<{ id: string; deleted: true }> {
+    const version = parseIfMatch(ifMatch);
+    await this.access.requireAdmin("warehouse_items", "edit");
+    const id = parse(uuidSchema, rawId);
+    const why = parse(z.string().trim().min(3).max(500), reason);
+    return this.call<{ id: string; deleted: true }>(
+      auth,
+      Prisma.sql`SELECT admin_delete_warehouse_item(${id}::uuid, ${why}::text, ${version}::int) AS r`,
+    );
   }
 
   // ------------------------------------------------------------------ P6: custom columns of the item master (field_definitions of warehouse_item)

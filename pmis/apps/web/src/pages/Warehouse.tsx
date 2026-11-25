@@ -8,7 +8,7 @@ import { useRegisterRecord, useUpdateRecord } from '@/api/registers';
 import { useRegions } from '@/api/sites';
 import type { StockLevel, StockMovement, WarehouseItem } from '@/api/types';
 import { useItemColumns, type ItemColumn } from '@/api/warehouseColumns';
-import { useConfigGaps, useDispatchList, useMovements, useQuarantineExit, useReverseMovement, useSaveItem, useStock, useWhItems, type QuarantineExitBody } from '@/api/warehouse';
+import { useConfigGaps, useDeleteItem, useDispatchList, useMovements, useQuarantineExit, useReverseMovement, useSaveItem, useStock, useWhItems, type QuarantineExitBody } from '@/api/warehouse';
 import { NEED_TONE } from '@/components/SiteDispatch';
 import { errText, FormDialog } from '@/components/FormDialog';
 import { InlinePanel } from '@/components/InlinePanel';
@@ -17,7 +17,7 @@ import { hasGrant, isAdmin } from '@/lib/perm';
 import { registerErrorMessage } from '@/lib/registerErrors';
 
 type Tab = 'items' | 'movements' | 'stock' | 'dispatch' | 'gaps';
-type Dlg = { mode: 'new' } | { mode: 'edit' | 'off'; item: WarehouseItem } | null;
+type Dlg = { mode: 'new' } | { mode: 'edit' | 'off' | 'del'; item: WarehouseItem } | null;
 type Rule = NonNullable<WarehouseItem['need_rules']>[number];
 type Form = { code: string; name_en: string; name_ar: string; uom: string; category: string; serial_tracked: boolean; code_source: string; rules: Rule[] };
 const EMPTY: Form = { code: '', name_en: '', name_ar: '', uom: '', category: '', serial_tracked: false, code_source: 'internal_provisional', rules: [] };
@@ -35,6 +35,7 @@ function Items() {
   const [inactive, setInactive] = useState(false);
   const list = useWhItems({ q, include_inactive: inactive });
   const save = useSaveItem<WarehouseItem>('/warehouse/items', 'wh-items');
+  const del = useDeleteItem();
   const [dlg, setDlg] = useState<Dlg>(null);
   const [f, setF] = useState<Form>(EMPTY);
   const cols = useItemColumns().data ?? [];
@@ -58,6 +59,10 @@ function Items() {
     if (!dlg) return;
     const item = dlg.mode === 'new' ? undefined : dlg.item;
     let body: Record<string, unknown>;
+    if (dlg.mode === 'del') {
+      del.mutate({ item: dlg.item, reason }, { onSuccess: close, onError: (e) => { close(); toast(registerErrorMessage(t, e), 'err'); } });
+      return;
+    }
     if (dlg.mode === 'off') body = { is_active: false, reason };
     else {
       const all: Record<string, unknown> = { name_en: f.name_en.trim(), name_ar: f.name_ar.trim() || null, uom: f.uom.trim(), category: f.category.trim() || null, serial_tracked: f.serial_tracked, code_source: f.code_source };
@@ -116,7 +121,7 @@ function Items() {
                 <td className="px-3 py-2"><span className={`chip ${x.is_active ? 'bg-doneBg text-doneInk' : 'bg-lockBg text-lockInk'}`}>{t(x.is_active ? 'wh.active' : 'wh.inactive')}</span></td>
                 <td className="px-3 py-2 text-end">{admin && x.is_active && <>
                   <button className="btn" data-testid={`wh-edit-${x.code}`} onClick={() => open({ mode: 'edit', item: x })}>{t('wh.edit')}</button>{' '}
-                  <button className="btn" data-testid={`wh-off-${x.code}`} onClick={() => open({ mode: 'off', item: x })}>{t('wh.deactivate')}</button></>}</td>
+                  <button className="btn" data-testid={`wh-off-${x.code}`} onClick={() => open({ mode: 'off', item: x })}>{t('wh.deactivate')}</button>{x.deletable && <>{' '}<button className="btn" data-testid={`wh-del-${x.code}`} onClick={() => open({ mode: 'del', item: x })}>{t('wh.delete')}</button></>}</>}</td>
               </tr>
             ))}
           </tbody>
@@ -125,10 +130,10 @@ function Items() {
         {list.isError && <p role="alert" className="p-6 text-center text-lateInk">{t('errors.generic')}</p>}
       </div>
       {dlg && (
-        <FormDialog open onClose={close} testid="wh-dialog" busy={save.isPending} error={err} onSubmit={submit}
-          title={t(dlg.mode === 'new' ? 'wh.new_title' : dlg.mode === 'edit' ? 'wh.edit_title' : 'wh.deactivate_title')}
-          disabled={dlg.mode !== 'off' && (!f.code.trim() || !f.name_en.trim() || !f.uom.trim())}>
-          {dlg.mode === 'off' ? <p>{name(dlg.item)} ({dlg.item.code})</p> : <>
+        <FormDialog open onClose={close} testid="wh-dialog" busy={save.isPending || del.isPending} error={err} onSubmit={submit}
+          title={t(dlg.mode === 'new' ? 'wh.new_title' : dlg.mode === 'edit' ? 'wh.edit_title' : dlg.mode === 'del' ? 'wh.delete_title' : 'wh.deactivate_title')}
+          disabled={dlg.mode !== 'off' && dlg.mode !== 'del' && (!f.code.trim() || !f.name_en.trim() || !f.uom.trim())}>
+          {dlg.mode === 'off' || dlg.mode === 'del' ? <p>{name(dlg.item)} ({dlg.item.code}){dlg.mode === 'del' && <span className="block text-mute" data-testid="wh-del-note">{t('wh.delete_note')}</span>}</p> : <>
             {Fld({ k: 'code', label: t('wh.code'), disabled: dlg.mode === 'edit' })}
             {Fld({ k: 'name_en', label: t('wh.name_en') })}
             {Fld({ k: 'name_ar', label: t('wh.name_ar'), dir: 'rtl' })}

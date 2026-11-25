@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Headers,
   HttpCode,
@@ -125,6 +126,17 @@ export class WarehouseController {
     const r = await this.wh.updateItem(auth, id, ifMatch, body);
     res.setHeader("ETag", etagHeader(r.version));
     return r;
+  }
+
+  @Delete("items/:id")
+  @HttpCode(200)
+  deleteItem(
+    @Auth() auth: AuthContext,
+    @Param("id") id: string,
+    @Headers("if-match") ifMatch: string | undefined,
+    @Query("reason") reason: unknown,
+  ) {
+    return this.wh.deleteItem(auth, id, ifMatch, reason);
   }
 
   @Get("stock")

@@ -491,6 +491,7 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/warehouse/items'],
   ['get', '/warehouse/items/:id'],
   ['patch', '/warehouse/items/:id'],
+  ['delete', '/warehouse/items/:id'],
   ['get', '/warehouse/stock'],
   ['get', '/warehouse/movements'],
   ['post', '/warehouse/movements'],

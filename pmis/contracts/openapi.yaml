@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.76
+  version: 0.15.77
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -31,6 +31,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.77 (2026-11-25): Real delete of a warehouse item that has no data (owner decision 2026-11-25): `DELETE /warehouse/items/{item_id}?reason=` (System Admin or the `warehouse_items` delegate, reason, If-Match, audited). Allowed only when no movement line (any status), serial, site quantity or As-Built link points to the item; otherwise 409 `item_in_use` and the item can only be deactivated (PATCH `is_active: false`, unchanged). The item answer carries `deletable` (read-only). Migration 0160.
     - 0.15.76 (2026-11-25): Extra columns of the item master (P6, owner approval 2026-11-25: use the existing engine, no new table). `field_definitions` of `warehouse_item` get an admin door: `GET/POST /warehouse/item-columns` and `PATCH /warehouse/item-columns/{code}` (System Admin or the `fields` delegate, reason, If-Match; types text, number, date, bool; hide keeps the values; a type with values cannot change). The item answer carries `custom` (code to value) and `PATCH /warehouse/items/{item_id}` accepts `custom` (same reason and If-Match; the database checks each value against its column). Migration 0159. Dropdown columns come later.
     - 0.15.75 (2026-11-25): Site Master rename, steps 2 to 4 (owner approval 2026-11-25; migration 0158, mirror `db/sql/157_site_master_db_names.sql`). The database names `site360_*` become `site_master_*`; saved views of the screens `site360-<menu>` are stored as `site-master-<menu>` and every request still accepts the old key for one release (it is read as the new one); the dashboard counter list `site360_menus` is also sent as `site_master_menus` (the old name is deprecated and stays one release); the audit action of new events of the Master column doors is `site_master.column_*` (older audit rows keep `site_master.column_*`). `x-db-path` names are the new function names.
     - 0.15.74 (2026-11-25): Site 360 is renamed Site Master (owner decision 2026-11-25, PR #214). The paths `/site360/*` become `/site-master/*`; the old paths still answer for one release (each path carries `x-deprecated-alias`). The schema names `Site360*` become `SiteMaster*` (names only, no change on the wire). No other change in this step; the later steps of the rename (database names, saved-view keys, field names) are listed with their own versions.
@@ -12977,6 +12978,35 @@ paths:
         '412': {$ref: '#/components/responses/PreconditionFailed'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '428': {$ref: '#/components/responses/PreconditionRequired'}
+    delete:
+      tags: [warehouse]
+      operationId: deleteWarehouseItem
+      summary: Delete an item that has no data (deactivate is the other way)
+      description: Allowed only when no movement line, serial, site quantity or As-Built link points to the item (`deletable`). Otherwise 409 `item_in_use`; deactivate it instead.
+      x-db-path: admin_delete_warehouse_item
+      parameters:
+      - name: reason
+        in: query
+        required: true
+        schema: {type: string, minLength: 3}
+      - {$ref: '#/components/parameters/IfMatch'}
+      responses:
+        '200':
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, deleted]
+                properties:
+                  id: {type: string, format: uuid}
+                  deleted: {type: boolean}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
   /warehouse/stock:
     get:
       tags: [warehouse]
@@ -21642,6 +21672,7 @@ components:
             code: { type: string }
             as_built_item_code: { type: [string, 'null'], readOnly: true, description: 'The As-Built item linked to this item (Q74).' }
             custom: { type: object, additionalProperties: true, description: 'Values of the extra columns (P6).' }
+            deletable: { type: boolean, readOnly: true, description: 'True when nothing points to the item, so it can be deleted for real (0160).' }
             version: { type: integer }
     WarehouseItemInput:
       allOf:

@@ -8172,7 +8172,11 @@ export interface paths {
         get: operations["getWarehouseItem"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete an item that has no data (deactivate is the other way)
+         * @description Allowed only when no movement line, serial, site quantity or As-Built link points to the item (`deletable`). Otherwise 409 `item_in_use`; deactivate it instead.
+         */
+        delete: operations["deleteWarehouseItem"];
         options?: never;
         head?: never;
         /** Edit or deactivate (never deleted) */
@@ -16055,6 +16059,8 @@ export interface components {
             custom?: {
                 [key: string]: unknown;
             };
+            /** @description True when nothing points to the item, so it can be deleted for real (0160). */
+            readonly deletable?: boolean;
             version: number;
         };
         WarehouseItemInput: components["schemas"]["WarehouseItemFields"] & components["schemas"]["WithReason"] & {
@@ -33877,6 +33883,44 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    deleteWarehouseItem: {
+        parameters: {
+            query: {
+                reason: string;
+            };
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description Warehouse item. */
+                item_id: components["parameters"]["WarehouseItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        deleted: boolean;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            428: components["responses"]["PreconditionRequired"];
         };
     };
     updateWarehouseItem: {
