@@ -104,3 +104,7 @@ PRs: #214 templates; P2 Table basics; P3 Settings and columns; P4 Inline and bat
 ## Settings in place (status)
 - Done: `InlinePanel` (same reason rule and testids as FormDialog); `FormDialog inline` used by Calendar (row-level), Document types, Lists, SLA rules, Weight sets, Site Master columns, Register columns, Workflow structure. Data reset and Historical waiver keep their step-up flow.
 - Left: position of some panels is at the end of their section (scrolled into view), row-level placement only for Calendar so far.
+
+## Inline and batch edit (status)
+- Done: registers wide table: inline edit existed; added Undo (8 s, same edit path); batch mode (draft in /me/drafts record.batch.<register>, bar, review, Save all with partial save and conflict by version, Discard all, leave warning, confirm above 50, 7-day expiry).
+- Left: batch for Sites and the 6 streams (Sites already has a one-column bulk edit), pending-changes chip for Change Control cells, coordinates editor, one-click new version of an approved record.

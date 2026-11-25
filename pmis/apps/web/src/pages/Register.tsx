@@ -64,6 +64,8 @@ import {
   type RegisterLayout,
 } from "@/components/RegisterViews";
 import { useToast } from "@/components/Toast";
+import { BatchEditBar } from "@/components/BatchEditBar";
+import { useBatchEdit } from "@/lib/useBatchEdit";
 import { MoreMenu, PageHeader } from "@/components/PageHeader";
 import { DisplayMenu, displayAttrs, PastedChip, ROWNO_COL, RowNo, SearchBox, ShownFooter, TableCount, TableToolbar } from "@/components/TableStandard";
 import type { CountedPage } from "@/api/types";
@@ -210,6 +212,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
     ...(adv ? { filter: adv } : {}),
   });
   const save = useUpdateRecord(key);
+  const batch = useBatchEdit<RegisterRecord>(key, true, () => toast(t("batch.resumed")));
   // 0.15.22: a System Admin edits a locked row or column (the database exempts admins too); everyone else sees it read-only.
   const me = useMe(true).data;
   const admin = !!me?.is_system_admin;
@@ -868,14 +871,38 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
       {view === "vertical" && (
         <>
           {layout === "wide" && (
+            <div className="mb-2 space-y-2">
+              {!batch.on ? (
+                <button type="button" className="btn" data-testid="batch-start" onClick={() => batch.setOn(true)}>{t("batch.start")}</button>
+              ) : (
+                <BatchEditBar
+                  draft={batch.draft}
+                  results={batch.results}
+                  busy={batch.busy}
+                  fieldLabel={(c) => { const f = def.fields.find((x) => x.code === c); return f ? fieldLabel(f, i18n.language) : c; }}
+                  valueText={(_c, v) => (v === null || v === undefined ? "" : String(v))}
+                  onSave={() => void batch.saveAll((id) => real.find((x) => x.id === id), (r, data) => save.mutateAsync({ record: r, patch: { data } }), (e) => registerErrorMessage(t, e)).then((out) => { const ok = out.filter((o) => o.status === "saved").length; if (ok) toast(t("batch.saved_n", { count: ok })); })}
+                  onDiscard={batch.discard}
+                  onExit={() => batch.setOn(false)}
+                />
+              )}
+            </div>
+          )}
+          {layout === "wide" && (
             <RegisterWide
               def={def}
               records={real}
               admin={admin}
               regionName={(id) => rname(id as number | null)}
               onOpen={setRecord}
+              pending={batch.on ? Object.fromEntries(Object.entries(batch.draft.changes).map(([id, r]) => [id, r.set])) : undefined}
               onSave={async (r, code, value) => {
                 const before = r.data[code];
+                if (batch.on) {
+                  // batch mode: the edit waits in the draft; nothing is saved until Save all
+                  batch.edit(r, r.site_code ?? r.id.slice(0, 8), code, before, value);
+                  return null;
+                }
                 const saved = await save.mutateAsync({ record: r, patch: { data: { [code]: value } } });
                 // undo for 8 seconds: the same edit path puts the old value back (the server may refuse it)
                 toast(t("registers.inline_saved"), "ok", {

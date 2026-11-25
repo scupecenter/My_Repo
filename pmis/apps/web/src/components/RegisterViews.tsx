@@ -77,7 +77,9 @@ type WRow = WideTableRow & { rec: RegisterRecord };
  * rule as its grid: an inline field type, not read-only for the caller, the column and the record not locked unless a System Admin, and `edit` in
  * the record's own actions), saved through the register's own save path (`onSave`: PATCH with If-Match the record version).
  */
-export function RegisterWide({ def, records, admin, regionName, onOpen, onSave, errorText, display, height, current, picked, onPick, onPickAll, hasMore, loadingMore, onMore, loaded, filtered, onClear }: {
+export function RegisterWide({ pending, def, records, admin, regionName, onOpen, onSave, errorText, display, height, current, picked, onPick, onPickAll, hasMore, loadingMore, onMore, loaded, filtered, onClear }: {
+  /** Batch edit: the value waiting in the draft for a record and a field, shown in the cell with a Pending chip. */
+  pending?: Record<string, Record<string, { to: unknown }>>;
   def: RegisterDefinition; records: RegisterRecord[]; admin: boolean; regionName: (id: number | null | undefined) => string;
   onOpen: (id: string) => void; onSave: (r: RegisterRecord, code: string, value: unknown) => Promise<unknown>; errorText: (e: unknown) => string;
   display: Display; height: number; current: string | null;
@@ -109,7 +111,8 @@ export function RegisterWide({ def, records, admin, regionName, onOpen, onSave, 
     }
     const f = byCode.get(c.key);
     if (!f) return { text: '' };
-    const v = r.data[f.code];
+    const wait = pending?.[r.id]?.[f.code];
+    const v = wait ? wait.to : r.data[f.code];
     const text = valueText(f, v, lang, t);
     if (isHidden(key, f.code, r.data, def) || typeHides(key, r.record_type ?? '', f)) return { text, reason: t('regviews.why_not_applies') };
     const input = inputOf(f);
@@ -120,7 +123,7 @@ export function RegisterWide({ def, records, admin, regionName, onOpen, onSave, 
       : !input ? t('regviews.why_in_record') : undefined;
     if (reason || !input) return { text, reason, target: true };
     const initial = v === undefined || v === null ? '' : String(v);
-    return { text, target: true, edit: { input, initial, options: (f.options ?? []).map((o) => ({ value: o.value, label: (lang === 'ar' && o.label_ar) || o.label_en })) } };
+    return { text, ...(wait ? { node: <span data-testid={`wide-pending-${r.id}-${f.code}`}>{text}<span className="chip ms-1 bg-waitBg text-waitInk">{t('batch.pending_chip')}</span></span> } : {}), target: true, edit: { input, initial, options: (f.options ?? []).map((o) => ({ value: o.value, label: (lang === 'ar' && o.label_ar) || o.label_en })) } };
   };
   const rows: WRow[] = records.map((r, i) => ({ id: r.id, key: r.id, code: r.site_code ?? '-', rowNo: i + 1, rec: r }));
   return (

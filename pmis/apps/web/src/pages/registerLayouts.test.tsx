@@ -109,6 +109,32 @@ describe('W2 Procurement (records with a site): the view switcher of Site Master
     await u.keyboard('{Escape}');
   }, T);
 
+  it('wide table batch edit: edits wait in a draft with a Pending chip, nothing is saved until Save all, then one PATCH per record', async () => {
+    await signIn('pm');
+    const u = userEvent.setup();
+    const patches: string[] = [];
+    const on = ({ request }: { request: Request }) => { if (request.method === 'PATCH') patches.push(request.url); };
+    server.events.on('request:start', on);
+    renderApp(<App />, { route: '/registers/procurement?layout=wide' });
+    await screen.findByTestId(`wide-row-${ENTRY}`);
+    await u.click(await screen.findByTestId('batch-start'));
+    expect(screen.getByTestId('batch-count')).toHaveTextContent('0');
+    await u.click(screen.getByTestId(`wide-edit-${ENTRY}-f:po_wo_no`));
+    const input = screen.getByTestId(`wide-input-${ENTRY}-f:po_wo_no`);
+    await u.clear(input);
+    await u.type(input, 'WO-BATCH-1');
+    await u.click(screen.getByTestId(`wide-save-${ENTRY}-f:po_wo_no`));
+    expect(await screen.findByTestId(`wide-pending-${ENTRY}-po_wo_no`)).toHaveTextContent('WO-BATCH-1');
+    expect(screen.getByTestId('batch-count')).toHaveTextContent('1 changes');
+    expect(patches).toHaveLength(0);
+    await u.click(screen.getByTestId('batch-review'));
+    expect(screen.getByTestId('batch-review-list')).toHaveTextContent('WO-BATCH-1');
+    await u.click(screen.getByTestId('batch-save'));
+    await waitFor(() => expect(patches).toHaveLength(1));
+    await waitFor(() => expect(screen.getByTestId('batch-count')).toHaveTextContent('0 changes'));
+    server.events.removeListener('request:start', on);
+  }, T);
+
   it('wide table: a refused save keeps the editor open and says why', async () => {
     await signIn('pm');
     const u = userEvent.setup();
