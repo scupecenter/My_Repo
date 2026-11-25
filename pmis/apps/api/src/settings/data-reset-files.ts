@@ -47,8 +47,18 @@ export async function checkStore(store: string): Promise<string> {
  */
 export async function makeQuarantine(store: string, stamp = quarantineStamp()): Promise<string> {
   const real = await checkStore(store);
-  const dir = join(real, `${QUARANTINE_PREFIX}${stamp}`);
-  await fs.mkdir(dir, { mode: 0o700 });
+  // The stamp has one-second resolution: a second run in the same second (seen in CI) found the directory already there and was refused with
+  // 409 quarantine_unavailable. mkdir without `recursive` fails on an existing name, so a taken name is never reused: try -2, -3, ...
+  let dir = '';
+  for (let n = 1; ; n++) {
+    dir = join(real, `${QUARANTINE_PREFIX}${stamp}${n === 1 ? '' : `-${n}`}`);
+    try {
+      await fs.mkdir(dir, { mode: 0o700 });
+      break;
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== 'EEXIST' || n >= 100) throw e;
+    }
+  }
   const [d, s] = await Promise.all([fs.lstat(dir), fs.stat(real)]);
   if (!d.isDirectory() || d.isSymbolicLink()) throw new Error(`${dir} is not a plain directory`);
   if (d.dev !== s.dev) throw new Error(`${dir} is not on the filesystem of the store (a move would be a copy)`);
