@@ -16,15 +16,16 @@ describe('Site Master wide table', () => {
   it('the toggle sets layout=wide, keeps the other params and the default stays the list', async () => {
     await signIn('pm');
     renderApp(<App />, { route: '/sites?region_id=1' });
-    const btn = await screen.findByTestId('sites-layout-wide');
-    expect(btn).toHaveAttribute('aria-pressed', 'false');
+    const menu = await screen.findByTestId('sites-view');
+    await userEvent.click(menu);
+    expect(await screen.findByTestId('sites-layout-wide')).toHaveAttribute('aria-checked', 'false');
     expect(await screen.findByTestId('sites-list')).toBeTruthy();
     expect(screen.queryByTestId('sites-wide')).toBeNull();
-    await userEvent.click(btn);
+    await userEvent.click(screen.getByTestId('sites-layout-wide'));
     expect(await screen.findByTestId('sites-wide-table')).toBeTruthy();
     expect(screen.getByTestId('where').textContent).toContain('layout=wide');
     expect(screen.getByTestId('where').textContent).toContain('region_id=1');
-    expect(screen.getByTestId('sites-layout-wide')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('sites-view')).toHaveAttribute('aria-label', expect.stringContaining('Wide table'));
   });
 
   it('Site Master: #, Site ID, Site Information, the last stage, all in Master order, LTR, two frozen columns, empty cells say Not entered', async () => {
@@ -73,7 +74,7 @@ describe('Site Master wide table', () => {
     await screen.findByTestId('wide-row-S360-001');
     const row = screen.getByTestId('wide-row-S360-001');
     expect(within(row).getAllByText(/غير مُدخل/).length).toBeGreaterThan(0);
-    expect(screen.getByTestId('sites-layout-wide')).toHaveTextContent(/[؀-ۿ]/);
+    expect(screen.getByTestId('sites-view').getAttribute('aria-label')).toMatch(/[؀-ۿ]/);
     expect(screen.getByTestId('sites-wide-table')).toHaveAttribute('dir', 'ltr');
   });
 

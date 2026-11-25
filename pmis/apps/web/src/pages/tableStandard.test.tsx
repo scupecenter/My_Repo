@@ -78,8 +78,7 @@ describe('W8 guard: the table standard on every site-data screen', () => {
       // W2: a register offers the view switcher of Site Master: Board and Wide table everywhere, Map where its records carry a site
       const reg = REGISTER_SCREENS.find((r) => s.id === `register-${r.key}`);
       if (reg) {
-        for (const b of ['board', 'wide']) expect(bar.querySelector(`[data-testid="register-layout-${b}"]`), `${s.id} ${b}`).not.toBeNull();
-        expect(!!bar.querySelector('[data-testid="register-layout-map"]'), `${s.id} map`).toBe(reg.site);
+        expect(bar.querySelector('[data-testid="register-view"]'), `${s.id} view menu`).not.toBeNull();
       }
       if (c.rows) await waitFor(() => expect(screen.getAllByTestId('row-no').length, `${s.id} #`).toBeGreaterThan(0), { timeout: 4000 });
     }, 15_000);

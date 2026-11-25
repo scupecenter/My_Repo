@@ -4,7 +4,7 @@ import { Site360Grid, type Site360GridRow } from '@/components/Site360Grid';
 import { Site360SourcePanel } from '@/components/Site360Source';
 import { useRefreshSite360Rows, useSaveSite360Cell, useSite360RowsPaged, useSite360Sections } from '@/api/site360';
 import { SitesBulkEdit } from '@/components/SitesBulkEdit';
-import { Columns3, Download, FileDown, FilePlus2, FileUp, Map as MapIcon, Pencil, RotateCcw, Table2, TableProperties } from 'lucide-react';
+import { Columns3, Download, Grid3x3, FileDown, FilePlus2, FileUp, Map as MapIcon, Pencil, RotateCcw, Table2, TableProperties } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
@@ -18,6 +18,8 @@ import { isAdmin } from '@/lib/perm';
 import { registerErrorMessage } from '@/lib/registerErrors';
 import { ExportDialog, ExportViewButton } from '@/components/ExportDialog';
 import { TemplateExportMenu } from '@/components/TemplateExportMenu';
+import { ViewMenu, type ViewOption } from '@/components/ViewMenu';
+import { useRememberedView } from '@/lib/viewPreference';
 import { SavedViews } from '@/components/SavedViews';
 import { UnifiedFilter, type ExtraField } from '@/components/UnifiedFilter';
 import { decodeFilter, encodeFilter, type FilterTree } from '@/api/views';
@@ -140,6 +142,17 @@ export function Sites() {
   const activeFilters = Object.values(f).filter(Boolean).length + (bucket ? 1 : 0) + (coordinates ? 1 : 0) + (locks ? 1 : 0) + (gaps ? 1 : 0) + (advTree ? 1 : 0) + (dashStatus ? 1 : 0) + (reached ? 1 : 0) + (cluster ? 1 : 0);
   const setParams = (kv: Record<string, string>) => setSp((p) => { const n = new URLSearchParams(p); for (const [k, v] of Object.entries(kv)) { if (v) n.set(k, v); else n.delete(k); } return n; }, { replace: true });
   const set = (k: keyof typeof f) => (v: string) => setParams({ [k]: v, sel: '' });
+  // One View menu replaces the row of layout buttons (list, wide table, grid, board, map); the choice is kept per user on the server.
+  const viewOptions: ViewOption[] = [
+    { id: 'list', label: t('view.list'), hint: t('view.list_hint'), icon: <Table2 size={14} />, testid: 'sites-layout-list' },
+    { id: 'wide', label: t('sites.wide'), hint: t('view.wide_hint'), icon: <TableProperties size={14} />, testid: 'sites-layout-wide' },
+    { id: 'grid', label: t('view.grid'), hint: t('view.grid_hint'), icon: <Grid3x3 size={14} />, testid: 'sites-layout-grid' },
+    { id: 'board', label: t('board.board'), hint: t('view.board_hint'), icon: <Columns3 size={14} />, testid: 'sites-layout-board' },
+    { id: 'map', label: t('sites.map'), hint: t('view.map_hint'), icon: <MapIcon size={14} />, testid: 'sites-layout' },
+  ];
+  const applyView = (id: string) => setParams({ layout: id === 'list' ? '' : id, sel: '' });
+  const remember = useRememberedView('sites', sp.has('layout') || !!section, (l) => viewOptions.some((o) => o.id === l), applyView);
+  const pickView = (id: string) => { applyView(id); remember(id); };
   const clearAll = () => setParams({ ...Object.fromEntries(F_KEYS.map((k) => [k, ''])), bucket: '', coordinates: '', workflow_locks: '', data_gaps: '', site_codes: '', site_code: '', adv: '', dashboard_status: '', milestone_reached: '', ref_date: '', cluster_code: '', sel: '' });
   const toast = useToast();
   const nav = useNavigate();
@@ -348,17 +361,7 @@ export function Sites() {
           {activeFilters > 0 && <span className="chip bg-accentSoft text-accentText" data-testid="toolbar-active-filters">{t('states.filters')} {activeFilters}</span>}
           <TableCount testid="sites-count" noun="sites" total={counts.total} filtered={counts.filtered} active={activeFilters > 0} selected={picked.size} onClear={clearAll} />
         </span>}
-        switcher={<>
-        <button type="button" className="btn px-2 py-1 text-xs" data-testid="sites-layout" aria-pressed={asMap} onClick={() => setParams({ layout: asMap ? '' : 'map', sel: '' })}>
-          {asMap ? <><Table2 size={14} />{t('sites.table')}</> : <><MapIcon size={14} />{t('sites.map')}</>}
-        </button>
-        <button type="button" className="btn px-2 py-1 text-xs" data-testid="sites-layout-board" aria-pressed={asBoard} onClick={() => setParams({ layout: asBoard ? '' : 'board', sel: '' })}>
-          {asBoard ? <><Table2 size={14} />{t('sites.table')}</> : <><Columns3 size={14} />{t('board.board')}</>}
-        </button>
-        <button type="button" className="btn px-2 py-1 text-xs" data-testid="sites-layout-wide" aria-pressed={asWide} onClick={() => setParams({ layout: asWide ? '' : 'wide' })}>
-          {asWide ? <><Table2 size={14} />{t('sites.table')}</> : <><TableProperties size={14} />{t('sites.wide')}</>}
-        </button>
-        </>}
+        switcher={<ViewMenu testid="sites-view" title={t('view.title')} value={asMap ? 'map' : asBoard ? 'board' : asWide ? 'wide' : layout === 'grid' ? 'grid' : 'list'} options={viewOptions} onChange={pickView} />}
         density={<DensityToggle api={tbl} />}
         display={<DisplayMenu api={tbl} />}
         columns={<ColumnMenu api={tbl} label={label} />}

@@ -5936,5 +5936,18 @@
   },
   "tplmenu": {
     "title": "Templates & export"
+  },
+  "view": {
+    "title": "View",
+    "list": "List",
+    "list_hint": "One row per item, the usual table",
+    "wide": "Wide table",
+    "wide_hint": "All columns side by side",
+    "grid": "Grid (editable)",
+    "grid_hint": "Edit cells in the table",
+    "board": "Board",
+    "board_hint": "Cards by milestone or status",
+    "map": "Map",
+    "map_hint": "Items on the map"
   }
 }

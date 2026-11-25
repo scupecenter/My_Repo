@@ -2,6 +2,7 @@ import {
   ArrowRightLeft,
   Columns3,
   Download,
+  Grid3x3,
   Lock,
   Map as MapIcon,
   Plus,
@@ -38,6 +39,8 @@ import { useRegions } from "@/api/sites";
 import type { ExtraField } from "@/components/UnifiedFilter";
 import type { RegisterDefinition, RegisterRecord } from "@/api/types";
 import { TemplateExportMenu } from "@/components/TemplateExportMenu";
+import { ViewMenu, type ViewOption } from "@/components/ViewMenu";
+import { useRememberedView } from "@/lib/viewPreference";
 import { GridCellEditor, INLINE_TYPES } from "@/components/GridCellEditor";
 import { RegisterGrid } from "@/components/RegisterGrid";
 import { RejectDialog } from "@/components/RejectDialog";
@@ -277,9 +280,23 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
       },
       { replace: true },
     );
-  // the switcher of Site Master: a layout button opens its layout, pressed again it returns to the list
-  const toggleLayout = (x: RegisterLayout) =>
-    setParams({ layout: layout === x ? "" : x });
+  // One View menu replaces the row of layout buttons: list, wide table, grid, board and (where the records carry a site) map. The choice is kept per
+  // user and register on the server (lib/viewPreference).
+  const viewOptions: ViewOption[] = [
+    { id: "list", label: t("view.list"), hint: t("view.list_hint"), icon: <Table2 size={14} />, testid: "register-layout-list" },
+    { id: "wide", label: t("sites.wide"), hint: t("view.wide_hint"), icon: <TableProperties size={14} />, testid: "register-layout-wide" },
+    { id: "grid", label: t("view.grid"), hint: t("view.grid_hint"), icon: <Grid3x3 size={14} />, testid: "register-layout-grid" },
+    { id: "board", label: t("board.board"), hint: t("view.board_hint"), icon: <Columns3 size={14} />, testid: "register-layout-board" },
+    ...(layouts.includes("map") ? [{ id: "map", label: t("sites.map"), hint: t("view.map_hint"), icon: <MapIcon size={14} />, testid: "register-layout-map" }] : []),
+  ];
+  const applyView = (id: string) => setParams({ view: id === "grid" ? "grid" : "", layout: id === "grid" || id === "list" ? "" : id });
+  const remember = useRememberedView(
+    `register-${key}`,
+    sp.has("layout") || sp.has("view"),
+    (l) => viewOptions.some((o) => o.id === l),
+    applyView,
+  );
+  const pickView = (id: string) => { applyView(id); remember(id); };
   const rname = (id?: number | null) => {
     const r = regions.data?.find((x) => x.id === id);
     return (i18n.language === "ar" && r?.name_ar) || r?.name_en || "-";
@@ -649,69 +666,13 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
           </span>
         }
         switcher={
-          view === "vertical" ? (
-            <>
-              {layouts.includes("map") && (
-                <button
-                  type="button"
-                  className="btn px-2 py-1 text-xs"
-                  data-testid="register-layout-map"
-                  aria-pressed={layout === "map"}
-                  onClick={() => toggleLayout("map")}
-                >
-                  {layout === "map" ? (
-                    <>
-                      <Table2 size={14} />
-                      {t("sites.table")}
-                    </>
-                  ) : (
-                    <>
-                      <MapIcon size={14} />
-                      {t("sites.map")}
-                    </>
-                  )}
-                </button>
-              )}
-              <button
-                type="button"
-                className="btn px-2 py-1 text-xs"
-                data-testid="register-layout-board"
-                aria-pressed={layout === "board"}
-                onClick={() => toggleLayout("board")}
-              >
-                {layout === "board" ? (
-                  <>
-                    <Table2 size={14} />
-                    {t("sites.table")}
-                  </>
-                ) : (
-                  <>
-                    <Columns3 size={14} />
-                    {t("board.board")}
-                  </>
-                )}
-              </button>
-              <button
-                type="button"
-                className="btn px-2 py-1 text-xs"
-                data-testid="register-layout-wide"
-                aria-pressed={layout === "wide"}
-                onClick={() => toggleLayout("wide")}
-              >
-                {layout === "wide" ? (
-                  <>
-                    <Table2 size={14} />
-                    {t("sites.table")}
-                  </>
-                ) : (
-                  <>
-                    <TableProperties size={14} />
-                    {t("sites.wide")}
-                  </>
-                )}
-              </button>
-            </>
-          ) : undefined
+          <ViewMenu
+            testid="register-view"
+            title={t("view.title")}
+            value={view === "grid" ? "grid" : layout}
+            options={viewOptions}
+            onChange={pickView}
+          />
         }
         primary={
           <button

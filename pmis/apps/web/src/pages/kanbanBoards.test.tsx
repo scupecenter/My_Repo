@@ -34,6 +34,7 @@ describe('sites board (SITE 360)', () => {
     server.use(http.get(`${API_BASE}/boards/sites`, ({ request }) => { seen.push(new URL(request.url).search); }));
     const u = userEvent.setup();
     renderApp(<Sites />, { route: '/sites?layout=list&region_id=1' });
+    await u.click(await screen.findByTestId('sites-view'));
     await u.click(await screen.findByTestId('sites-layout-board'));
     const board = await screen.findByTestId('sites-board');
     await within(board).findByTestId('board-col-site_release');
