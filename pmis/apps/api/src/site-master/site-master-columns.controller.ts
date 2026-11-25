@@ -23,7 +23,7 @@ import {
 type Json = Record<string, unknown>;
 
 /** Workflow Studio S2 (contract 0.15.43): the admin of the Site Master columns. The database decides who may (System Admin or an all-regions delegate of `fields` edit). */
-@Controller('site360/columns')
+@Controller(['site-master/columns', 'site360/columns'])
 export class SiteMasterColumnsController {
   constructor(private readonly cols: SiteMasterColumnsService) {}
 

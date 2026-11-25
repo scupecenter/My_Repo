@@ -4,7 +4,7 @@ import { Auth } from '../auth/decorators';
 import { SiteMasterService } from './site-master.service';
 
 /** Site Master menus and the menus of each Master column (contract tag `sites`, 0.15.21, F15). */
-@Controller('site360')
+@Controller(['site-master', 'site360'])
 export class SiteMasterController {
   constructor(private readonly svc: SiteMasterService) {}
 
