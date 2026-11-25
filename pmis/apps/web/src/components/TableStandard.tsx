@@ -274,7 +274,7 @@ export function DisplayMenu({ api }: { api: TableApi }) {
           <label className="flex items-center gap-2"><input type="checkbox" data-testid="display-zebra" checked={d.zebra} onChange={(e) => api.setDisplay({ zebra: e.target.checked })} />{t('tstd.display_zebra')}</label>
           <div className="flex items-center gap-2 border-t border-line pt-2">
             <button type="button" className="btn px-2 py-1 text-xs" data-testid="display-reset" onClick={api.resetDisplay}>{t('tstd.display_reset')}</button>
-            {canEditDisplayDefaults(me) && <Link to="/admin/settings/display" className="ms-auto text-xs text-link" data-testid="display-settings-link">{t('tstd.display_settings')}</Link>}
+            {canEditDisplayDefaults(me) && <Link to="/admin/settings/screens/tables" className="ms-auto text-xs text-link" data-testid="display-settings-link">{t('tstd.display_settings')}</Link>}
           </div>
         </Popover.Content>
       </Popover.Portal>

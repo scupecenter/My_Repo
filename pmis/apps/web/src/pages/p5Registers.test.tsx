@@ -21,7 +21,7 @@ describe('Settings, lists (Q104)', () => {
     const u = userEvent.setup();
     settings();
     expect(await screen.findByTestId('lists-row-TeamSpecialization')).toBeInTheDocument();
-    expect(screen.getByTestId('settings-tab-ddl')).toHaveTextContent('DDL');
+    expect(screen.getByTestId('settings-section-registers-lists')).toHaveClass('btn-accent');
     expect(screen.getByTestId('lists-status-TeamSpecialization')).toHaveTextContent('Confirmed');
     expect(screen.getByTestId('lists-critical-TeamSpecialization')).toBeInTheDocument();
     expect(screen.getByTestId('lists-status-RiskStatus')).toHaveTextContent('Pending review');
@@ -64,7 +64,7 @@ describe('Settings, lists (Q104)', () => {
     await signIn('pm');
     settings({ locale: 'ar' });
     expect(await screen.findByTestId('lists-status-TeamSpecialization')).toHaveTextContent('معتمدة');
-    expect(screen.getByTestId('settings-tab-ddl')).toHaveTextContent('DDL');
+    expect(screen.getByTestId('settings-section-registers-lists')).toHaveClass('btn-accent');
     expect(screen.getByTestId('lists-new')).toHaveTextContent('قائمة جديدة');
   });
 });

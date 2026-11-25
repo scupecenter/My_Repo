@@ -51,7 +51,7 @@ const render = (path: string) => renderApp(<Routes><Route path="/admin/settings/
 
 describe('W4 guard: no Settings tab or section stays on "Loading..."', () => {
   it('covers every tab and section of SETTINGS_TABS', () => {
-    expect(PATHS).toContain('alerts');
+    expect(PATHS).toContain('alerts/policy');
     expect(PATHS).toContain('security/staff');
     expect(PATHS).toContain('security/retention');
     expect(PATHS.length).toBeGreaterThanOrEqual(20);

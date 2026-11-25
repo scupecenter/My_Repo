@@ -33,23 +33,21 @@ export interface SettingsTab { key: string; sections: SettingsSection[] }
 
 /** The tabs of Administration > Settings (F19, and the dashboard tab of F20). Tabs with sections show a sub-navigation inside the tab. */
 export const SETTINGS_TABS: readonly SettingsTab[] = [
-  { key: 'calendar', sections: [] },
+  // Settings merge (owner approved 2026-11-25): Calendar + SLA rules + Weights all feed the SLA clock
+  { key: 'sla', sections: [{ key: 'rules' }, { key: 'calendar' }, { key: 'weights' }] },
   { key: 'workflow', sections: [{ key: 'editor' }, { key: 'columns' }, { key: 'freeze' }, { key: 'idle' }, { key: 'board' }] },
-  { key: 'sla', sections: [{ key: 'rules' }, { key: 'dlp' }] },
-  { key: 'weights', sections: [] },
-  { key: 'registers', sections: [{ key: 'columns' }, { key: 'contractors' }, { key: 'gecol' }, { key: 'team-scope' }] },
-  { key: 'ddl', sections: [] },
+  // Lists (the dropdown catalogues, old ddl tab) now sit next to the register columns that use them
+  { key: 'registers', sections: [{ key: 'columns' }, { key: 'lists' }, { key: 'contractors' }, { key: 'gecol' }, { key: 'team-scope' }] },
   // W5: the Document Library section is now named Document types (the old documents/library route redirects); Form templates and Archive are new
-  { key: 'documents', sections: [{ key: 'types' }, { key: 'forms' }, { key: 'archive' }, { key: 'mail', adminOnly: true }] },
+  { key: 'documents', sections: [{ key: 'types' }, { key: 'forms' }, { key: 'archive' }] },
   { key: 'data', sections: [{ key: 'imports' }, { key: 'historical' }, { key: 'reset', adminOnly: true }] },
-  { key: 'alerts', sections: [] },
-  { key: 'security', sections: [{ key: 'staff' }, { key: 'retention' }] },
-  { key: 'dashboard', sections: [] },
-  // W8 item 4 (owner rule: settings live in the general Settings): the defaults of the Display menu of the site-data tables
-  { key: 'display', sections: [] },
+  // Notification policy + Mail kinds (admin only): both are what is sent to people
+  { key: 'alerts', sections: [{ key: 'policy' }, { key: 'mail', adminOnly: true }] },
+  // DLP months is a data-protection rule, so it moved here from SLA
+  { key: 'security', sections: [{ key: 'staff' }, { key: 'retention' }, { key: 'dlp' }] },
+  // Screens: what users see by default (Dashboard, Display menu of the tables, My Work Daily Plan)
+  { key: 'screens', sections: [{ key: 'dashboard' }, { key: 'tables' }, { key: 'daily-plan' }] },
   { key: 'identity', sections: [] },
-  // 0149 (W7): Settings > My Work > Daily Plan
-  { key: 'my-work', sections: [{ key: 'daily-plan' }] },
 ];
 
 /**
@@ -59,16 +57,25 @@ export const SETTINGS_TABS: readonly SettingsTab[] = [
 export const LEGACY_SETTINGS_PATHS: Readonly<Record<string, string>> = {
   freeze: 'workflow/freeze',
   idle: 'workflow/idle',
-  dlp: 'sla/dlp',
-  notifications: 'alerts',
+  dlp: 'security/dlp',
+  notifications: 'alerts/policy',
   retention: 'security/retention',
   'staff-visibility': 'security/staff',
   'team-scope': 'registers/team-scope',
-  lists: 'ddl',
+  lists: 'registers/lists',
+  ddl: 'registers/lists',
+  calendar: 'sla/calendar',
+  weights: 'sla/weights',
+  dashboard: 'screens/dashboard',
+  display: 'screens/tables',
+  'my-work': 'screens/daily-plan',
+  'my-work/daily-plan': 'screens/daily-plan',
+  'sla/dlp': 'security/dlp',
   'contractor-rules': 'registers/contractors',
   'gecol-order': 'registers/gecol',
   'register-columns': 'registers/columns',
-  'mail-kinds': 'documents/mail',
+  'mail-kinds': 'alerts/mail',
+  'documents/mail': 'alerts/mail',
   imports: 'data/imports',
   'historical-waiver': 'data/historical',
   // W3 (2026-11-24): the SiteMaster tab is gone; its Master column menus live in Settings > Workflow > Columns, with the same rights.
@@ -116,17 +123,18 @@ export function SettingsRoutes() {
   return (
     <Routes>
       <Route element={<Layout />}>
-        <Route index element={<Navigate to="calendar" replace />} />
-        <Route path="calendar" element={<Calendar />} />
-        <Route path="weights" element={<WeightSets />} />
-        <Route path="ddl" element={<Lists />} />
-        <Route path="alerts" element={<Notifications />} />
-        <Route path="dashboard" element={<DashboardSettings />} />
-        <Route path="display" element={<DisplaySettings />} />
+        <Route index element={<Navigate to="sla" replace />} />
         <Route path="identity" element={<Identity />} />
-        <Route path="my-work" element={<TabFrame tab="my-work" />}>
-          <Route index element={<Navigate to="daily-plan" replace />} />
+        <Route path="screens" element={<TabFrame tab="screens" />}>
+          <Route index element={<Navigate to="dashboard" replace />} />
+          <Route path="dashboard" element={<DashboardSettings />} />
+          <Route path="tables" element={<DisplaySettings />} />
           <Route path="daily-plan" element={<DailyPlanSettings />} />
+        </Route>
+        <Route path="alerts" element={<TabFrame tab="alerts" />}>
+          <Route index element={<Navigate to="policy" replace />} />
+          <Route path="policy" element={<Notifications />} />
+          <Route path="mail" element={<MailKinds />} />
         </Route>
         <Route path="workflow" element={<TabFrame tab="workflow" />}>
           <Route index element={<Navigate to="editor" replace />} />
@@ -139,11 +147,13 @@ export function SettingsRoutes() {
         <Route path="sla" element={<TabFrame tab="sla" />}>
           <Route index element={<Navigate to="rules" replace />} />
           <Route path="rules" element={<SlaRules />} />
-          <Route path="dlp" element={<Dlp />} />
+          <Route path="calendar" element={<Calendar />} />
+          <Route path="weights" element={<WeightSets />} />
         </Route>
         <Route path="registers" element={<TabFrame tab="registers" />}>
           <Route index element={<Navigate to="columns" replace />} />
           <Route path="columns" element={<RegisterColumns />} />
+          <Route path="lists" element={<Lists />} />
           <Route path="contractors" element={<ContractorRules />} />
           <Route path="gecol" element={<GecolOrderWarnings />} />
           <Route path="team-scope" element={<TeamScopeMatch />} />
@@ -154,7 +164,6 @@ export function SettingsRoutes() {
           <Route path="library" element={<LegacyRedirect to="documents/types" />} />
           <Route path="forms" element={<FormTemplates />} />
           <Route path="archive" element={<ArchiveSettings />} />
-          <Route path="mail" element={<MailKinds />} />
         </Route>
         <Route path="data" element={<TabFrame tab="data" />}>
           <Route index element={<Navigate to="imports" replace />} />
@@ -166,6 +175,7 @@ export function SettingsRoutes() {
           <Route index element={<Navigate to="staff" replace />} />
           <Route path="staff" element={<StaffVisibility />} />
           <Route path="retention" element={<Retention />} />
+          <Route path="dlp" element={<Dlp />} />
         </Route>
         {Object.entries(LEGACY_SETTINGS_PATHS).map(([old, to]) => <Route key={old} path={old} element={<LegacyRedirect to={to} />} />)}
       </Route>

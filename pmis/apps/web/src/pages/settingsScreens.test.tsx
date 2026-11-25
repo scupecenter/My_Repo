@@ -96,7 +96,7 @@ describe('Q441: the mail notification kinds (Settings, Mail kinds)', () => {
     await signIn('pm');
     settings('documents/mail');
     expect(await screen.findByTestId('page-mail-kinds')).toBeInTheDocument();
-    expect(screen.getByTestId('settings-section-documents-mail')).toHaveTextContent('Mail kinds');
+    expect(screen.getByTestId('settings-section-alerts-mail')).toHaveTextContent('Mail kinds');
     const six = ['task_assigned', 'register_assigned', 'snag_review', 'task_rejected', 'register_rejected', 'snag_rejected'];
     for (const k of six) expect(screen.getByTestId(`mail-kind-recommended-${k}`)).toHaveTextContent('Recommended');
     expect(screen.queryByTestId('mail-kind-recommended-mention')).toBeNull();
@@ -146,8 +146,8 @@ describe('Q441: the mail notification kinds (Settings, Mail kinds)', () => {
     await signIn('engineer');
     settings('calendar');
     expect(await screen.findByTestId('page-settings')).toBeInTheDocument();
-    expect(screen.getByTestId('settings-tab-calendar')).toBeInTheDocument();
-    await waitFor(() => expect(screen.queryByTestId('settings-section-documents-mail')).toBeNull());
+    expect(screen.getByTestId('settings-tab-sla')).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByTestId('settings-section-alerts-mail')).toBeNull());
   });
 
   it('is in Arabic when the locale is Arabic', async () => {
@@ -155,6 +155,6 @@ describe('Q441: the mail notification kinds (Settings, Mail kinds)', () => {
     settings('documents/mail', { locale: 'ar' });
     expect(await screen.findByTestId('page-mail-kinds')).toHaveTextContent('أنواع الإشعارات المرسلة بالبريد');
     expect(screen.getByTestId('mail-kind-recommended-task_assigned')).toHaveTextContent('موصى به');
-    expect(screen.getByTestId('settings-section-documents-mail')).toHaveTextContent('أنواع البريد');
+    expect(screen.getByTestId('settings-section-alerts-mail')).toHaveTextContent('أنواع البريد');
   });
 });
