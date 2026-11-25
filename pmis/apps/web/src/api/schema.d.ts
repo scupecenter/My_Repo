@@ -5831,7 +5831,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/site360/sections": {
+    "/site-master/sections": {
         parameters: {
             query?: never;
             header?: never;
@@ -5839,10 +5839,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * The SITE 360 menus and the Master columns of each (0.15.21, F15)
-         * @description 0.15.21. The seven menus of SITE 360 in the order of the menu. Each menu lists the Master columns of its section, in Master order, and the status columns (in every menu). `bands` is the 3-level grid header: a phase band, its groups, and the Master column ords of each group. `frozen_ords` are the identity columns that stay on screen when the grid scrolls (# to Site Name by default; the user can change them on screen). `can_move` is true for a System Admin, who may move a column with `PATCH /site360/columns/{ord}/section`. Needs the `sites` view in a region.
+         * The Site Master menus and the Master columns of each (0.15.21, F15)
+         * @description 0.15.21. The seven menus of Site Master in the order of the menu. Each menu lists the Master columns of its section, in Master order, and the status columns (in every menu). `bands` is the 3-level grid header: a phase band, its groups, and the Master column ords of each group. `frozen_ords` are the identity columns that stay on screen when the grid scrolls (# to Site Name by default; the user can change them on screen). `can_move` is true for a System Admin, who may move a column with `PATCH /site-master/columns/{ord}/section`. Needs the `sites` view in a region.
          */
-        get: operations["getSite360Sections"];
+        get: operations["getSiteMasterSections"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5851,7 +5851,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/site360/{menu}/rows": {
+    "/site-master/{menu}/rows": {
         parameters: {
             query?: never;
             header?: never;
@@ -5859,11 +5859,11 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * The grid rows of one SITE 360 menu, one page at a time (0.15.21, F15)
+         * The grid rows of one Site Master menu, one page at a time (0.15.21, F15)
          * @description 0.15.45: `filter` is compiled against the screen `site360-<menu>` of `GET /saved-views/filter-fields` (the `sites` fields and the Master columns of the menu as `m:<ord>`, typed date, number, bool, enum or text); a condition on a Master column is set-based (one derived table per column used) and reads only what the caller may see.
-         *     0.15.21. The rows of one menu (`master`, `design_acq`, `sow`, `cw`, `te`, `hoto`, `dismantle`, `om`) with the Master values of its columns, read from the set-based view `site360_master_values` (one query per page, no per-site path). `menu` gives the columns, bands and frozen columns as `GET /site360/sections`. Each row has `row_no`, the running number of the rows in view (the # column), and `values` keyed by the Master column order (ord); a value is `null` when the column has no source yet. `total` counts the sites the caller may see (region scope, B3); `filtered` counts the sites that match the filters. Filters are multi-value (comma-separated): Site ID, region, sub region, phase, batch, scenario, delivery model, status, milestone. The contractor filter (`contractor`) is in 0.15.21 item (5). `sort` takes a site field or `ord:<n>` of a column of the menu. Needs the `sites` view in a region; reading only, every value is written through the site and task paths.
+         *     0.15.21. The rows of one menu (`master`, `design_acq`, `sow`, `cw`, `te`, `hoto`, `dismantle`, `om`) with the Master values of its columns, read from the set-based view `site360_master_values` (one query per page, no per-site path). `menu` gives the columns, bands and frozen columns as `GET /site-master/sections`. Each row has `row_no`, the running number of the rows in view (the # column), and `values` keyed by the Master column order (ord); a value is `null` when the column has no source yet. `total` counts the sites the caller may see (region scope, B3); `filtered` counts the sites that match the filters. Filters are multi-value (comma-separated): Site ID, region, sub region, phase, batch, scenario, delivery model, status, milestone. The contractor filter (`contractor`) is in 0.15.21 item (5). `sort` takes a site field or `ord:<n>` of a column of the menu. Needs the `sites` view in a region; reading only, every value is written through the site and task paths.
          */
-        get: operations["getSite360Rows"];
+        get: operations["getSiteMasterRows"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5872,7 +5872,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/site360/sites/{site_id}/sources": {
+    "/site-master/sites/{site_id}/sources": {
         parameters: {
             query?: never;
             header?: never;
@@ -5889,7 +5889,7 @@ export interface paths {
          *     site custom field hidden by a field rule) answers `hidden: true` with the kind and no value, record or task id. A column with no source in the
          *     system is `not_tracked`; a column with a source but no value for this site has the column's kind and a null value.
          */
-        get: operations["getSite360SiteSources"];
+        get: operations["getSiteMasterSiteSources"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5898,7 +5898,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/site360/columns": {
+    "/site-master/columns": {
         parameters: {
             query?: never;
             header?: never;
@@ -5915,7 +5915,7 @@ export interface paths {
          *     `is_protected` marks a column the system depends on (the Site ID and the row number, the identity and scope columns, calculated columns, milestones, baselines,
          *     register-fed columns and the status columns): it allows only a rename and its menus. An original column keeps its letter, order, band, group and place.
          */
-        get: operations["listSite360Columns"];
+        get: operations["listSiteMasterColumns"];
         put?: never;
         /**
          * Add a Site Master column after any column (0.15.43, Workflow Studio S2)
@@ -5934,30 +5934,30 @@ export interface paths {
          *     System Admin, or a delegate of `fields` edit for all regions; a reason and a step-up; audited `site360.column_created` with after. The new column has no value
          *     yet. 409 `duplicate` when the header exists, 409 `input_already_mapped` or `field_already_mapped` when the source already feeds a column, 422 `unknown_task`.
          */
-        post: operations["createSite360Column"];
+        post: operations["createSiteMasterColumn"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/site360/columns/{ord}": {
+    "/site-master/columns/{ord}": {
         parameters: {
             query?: never;
             header?: never;
             path: {
                 /** @description The Master column order (1 to 187 original, 188 and up added; A = 1). */
-                ord: components["parameters"]["Site360ColumnOrd"];
+                ord: components["parameters"]["SiteMasterColumnOrd"];
             };
             cookie?: never;
         };
         /**
          * One Site Master column with its usage (0.15.43, Workflow Studio S2)
-         * @description 0.15.43. The column as in `GET /site360/columns`, with `value_count` (the number of sites that hold a value in it; null when protected) and `delete_mode`: `hard` (an added column that never held a
+         * @description 0.15.43. The column as in `GET /site-master/columns`, with `value_count` (the number of sites that hold a value in it; null when protected) and `delete_mode`: `hard` (an added column that never held a
          *     value: `DELETE` removes it), `deactivate` (it holds values or is an original column that is not protected) or `blocked` (protected). The ETag is the column's
          *     `version`. Same permission as the list.
          */
-        get: operations["getSite360Column"];
+        get: operations["getSiteMasterColumn"];
         put?: never;
         post?: never;
         /**
@@ -5969,14 +5969,14 @@ export interface paths {
          *     at that position so the letters of the others stay true. `If-Match` is required. System Admin, or a delegate of `fields` edit for all regions; a step-up; audited
          *     `site360.column_deleted` with before.
          */
-        delete: operations["deleteSite360Column"];
+        delete: operations["deleteSiteMasterColumn"];
         options?: never;
         head?: never;
         /**
          * Rename, retype, change the list, band, group or place of a Site Master column (0.15.43, Workflow Studio S2)
          * @description 0.15.43 (migration 0133). Send the keys to change and a `reason`. Rename (`name_en`, `name_ar`; the header `Group / Name` follows), change the type (`value_type`)
          *     and the dropdown list (`list_catalogue`, null clears it), move the column (`after_ord`, the same placement rules as the creation) and change its band and group.
-         *     A protected column allows only the rename (its menus change with `PATCH /site360/columns/{ord}/sections`); any other key is 409 `system_field`. An original
+         *     A protected column allows only the rename (its menus change with `PATCH /site-master/columns/{ord}/sections`); any other key is 409 `system_field`. An original
          *     column keeps its letter, order, band, group and place: `group_top`, `group_mid` and `after_ord` on one are 409 `system_field`; its type and list can change
          *     when it is not protected (a task input column). A column filled by a task input changes the input's own type and list (`template_task_fields.field_type`,
          *     `list_catalogue`), so the task form, the stream templates and the Master import follow, and the templates are issued again with a new version; a date key of a
@@ -5987,16 +5987,16 @@ export interface paths {
          *     required (428, 412). System Admin, or a delegate of `fields` edit for all regions; a reason and a step-up; one audit row with before and after
          *     (`site360.column_updated`). Changing nothing is 409 `invalid_transition`.
          */
-        patch: operations["updateSite360Column"];
+        patch: operations["updateSiteMasterColumn"];
         trace?: never;
     };
-    "/site360/columns/{ord}/type-preview": {
+    "/site-master/columns/{ord}/type-preview": {
         parameters: {
             query?: never;
             header?: never;
             path: {
                 /** @description The Master column order (1 to 187 original, 188 and up added; A = 1). */
-                ord: components["parameters"]["Site360ColumnOrd"];
+                ord: components["parameters"]["SiteMasterColumnOrd"];
             };
             cookie?: never;
         };
@@ -6009,20 +6009,20 @@ export interface paths {
          *     a code, a label or an alias of an active value of the list, and text accepts everything. `samples` gives up to 50 of the failing values with their site. Same
          *     permission as the list. The answer is the `conversion` of the 409 `conversion_unconfirmed` of the PATCH.
          */
-        post: operations["previewSite360ColumnType"];
+        post: operations["previewSiteMasterColumnType"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/site360/columns/{ord}/deactivate": {
+    "/site-master/columns/{ord}/deactivate": {
         parameters: {
             query?: never;
             header?: never;
             path: {
                 /** @description The Master column order (1 to 187 original, 188 and up added; A = 1). */
-                ord: components["parameters"]["Site360ColumnOrd"];
+                ord: components["parameters"]["SiteMasterColumnOrd"];
             };
             cookie?: never;
         };
@@ -6034,20 +6034,20 @@ export interface paths {
          *     reactivated. A protected column cannot be deactivated (409 `system_field`); an inactive one is 409 `invalid_transition`. `If-Match` is required. System Admin,
          *     or a delegate of `fields` edit for all regions; a reason and a step-up; audited `site360.column_deactivated`.
          */
-        post: operations["deactivateSite360Column"];
+        post: operations["deactivateSiteMasterColumn"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/site360/columns/{ord}/reactivate": {
+    "/site-master/columns/{ord}/reactivate": {
         parameters: {
             query?: never;
             header?: never;
             path: {
                 /** @description The Master column order (1 to 187 original, 188 and up added; A = 1). */
-                ord: components["parameters"]["Site360ColumnOrd"];
+                ord: components["parameters"]["SiteMasterColumnOrd"];
             };
             cookie?: never;
         };
@@ -6058,14 +6058,14 @@ export interface paths {
          * @description 0.15.43. The column returns to its menus, the grid and the export at its place and with its letter. An active column is 409 `invalid_transition`. `If-Match`
          *     is required. System Admin, or a delegate of `fields` edit for all regions; a reason and a step-up; audited `site360.column_reactivated`.
          */
-        post: operations["reactivateSite360Column"];
+        post: operations["reactivateSiteMasterColumn"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/site360/columns/{ord}/sections": {
+    "/site-master/columns/{ord}/sections": {
         parameters: {
             query?: never;
             header?: never;
@@ -6079,10 +6079,10 @@ export interface paths {
         options?: never;
         head?: never;
         /**
-         * Replace the SITE 360 menus of one Master column (0.15.21, F15)
+         * Replace the Site Master menus of one Master column (0.15.21, F15)
          * @description 0.15.21. Only a System Admin (`admin.settings` edit, checked in the database) may change the menus of a column. The body replaces the whole set; a column may be in several menus. The step-up is required and the reason is mandatory. The status columns are in every menu and cannot be changed (422 `validation_failed`, `/sections`). Audited with the menus before and after.
          */
-        patch: operations["setSite360ColumnSections"];
+        patch: operations["setSiteMasterColumnSections"];
         trace?: never;
     };
     "/settings/gecol-order-warnings": {
@@ -9176,7 +9176,7 @@ export interface paths {
          *     critical 20 to 25. Only open and in-progress risks are counted. Closed and N/A risks are left out.
          *     **Decisions.** `act_now` is an open risk in band high or critical; `watch` is any other open risk. The tags change no status, owner or date.
          *     **Data quality.** The gaps of each site as `site_data_gaps` reports them (a task without its actual date, a missing delivery scenario). Cancelled sites are left out.
-         *     **Counters (0.15.24).** `counters` holds the SLA breaches and at-risk tasks of the open tasks (task states open, entry, in review, in approval and rejected), by stage, using the SLA status of each task (red past the maximum, amber past the warning share); the data quality KPI (sites with a gap of the sites checked); and every KPI of the dashboard catalogue with its value, its saved thresholds and its colour. A KPI with no value (no base, or no monthly target) is listed in `pending_kpis` and has a null value; since 0.15.29 all seven former gaps have a source, and `site360_menus` counts the sites per SITE 360 view. The same B3 scope applies (sites of the caller's regions; `available: false` without `sites.view`).
+         *     **Counters (0.15.24).** `counters` holds the SLA breaches and at-risk tasks of the open tasks (task states open, entry, in review, in approval and rejected), by stage, using the SLA status of each task (red past the maximum, amber past the warning share); the data quality KPI (sites with a gap of the sites checked); and every KPI of the dashboard catalogue with its value, its saved thresholds and its colour. A KPI with no value (no base, or no monthly target) is listed in `pending_kpis` and has a null value; since 0.15.29 all seven former gaps have a source, and `site360_menus` counts the sites per Site Master view. The same B3 scope applies (sites of the caller's regions; `available: false` without `sites.view`).
          */
         get: operations["getDashboardExtras"];
         put?: never;
@@ -9881,10 +9881,10 @@ export interface components {
          * @description The section of a Master column. `status` columns are in every menu.
          * @enum {string}
          */
-        Site360Section: "design_acq" | "sow" | "cw" | "te" | "hoto" | "dismantle" | "om" | "status";
+        SiteMasterSection: "design_acq" | "sow" | "cw" | "te" | "hoto" | "dismantle" | "om" | "status";
         /** @enum {string} */
-        Site360Menu: "master" | "design_acq" | "sow" | "cw" | "te" | "hoto" | "dismantle" | "om";
-        Site360Column: {
+        SiteMasterMenu: "master" | "design_acq" | "sow" | "cw" | "te" | "hoto" | "dismantle" | "om";
+        SiteMasterColumn: {
             ord: number;
             /** @description The column letter in the Master sheet (A to GE; GF and up for an added column, 0.15.43). */
             letter: string;
@@ -9894,18 +9894,18 @@ export interface components {
             group_mid: string | null;
             /** @description The field (row 3 of the Master sheet). */
             header: string;
-            /** @description The SITE 360 menus of the column (a set). `status` means every menu. */
-            sections: components["schemas"]["Site360Section"][];
+            /** @description The Site Master menus of the column (a set). `status` means every menu. */
+            sections: components["schemas"]["SiteMasterSection"][];
             /** @description True for a Phase Gate column (highlighted in the grid). */
             is_phase_gate: boolean;
-            source_kind?: components["schemas"]["Site360SourceKind"];
+            source_kind?: components["schemas"]["SiteMasterSourceKind"];
             /** @description 0.15.35. A short English note of the rule of the column. */
             source_note?: string | null;
             /** @description 0.15.43. The place of the column on the grid (the columns of a menu are listed in this order). */
             display_order?: number;
             /** @description 0.15.43. The Arabic name of the column. */
             name_ar?: string | null;
-            value_type?: components["schemas"]["Site360ColumnType"];
+            value_type?: components["schemas"]["SiteMasterColumnType"];
             /** @description 0.15.43. The dropdown list of a `list` column. */
             list_catalogue?: string | null;
             /** @description 0.15.43. True for a column an admin added (ord 188 and up). */
@@ -9917,12 +9917,12 @@ export interface components {
          *     `derived` (a workbook formula over other values), `custom_field` (a site custom field carrying the column), `not_tracked` (no source in the system).
          * @enum {string}
          */
-        Site360SourceKind: "site" | "task" | "milestone" | "register" | "baseline" | "derived" | "custom_field" | "not_tracked";
-        Site360CellSource: {
+        SiteMasterSourceKind: "site" | "task" | "milestone" | "register" | "baseline" | "derived" | "custom_field" | "not_tracked";
+        SiteMasterCellSource: {
             ord: number;
             letter: string;
             header: string;
-            kind: components["schemas"]["Site360SourceKind"];
+            kind: components["schemas"]["SiteMasterSourceKind"];
             /** @description The rule of the column (source_note). */
             note: string | null;
             /** @description The value shown in the grid; null when there is none or when hidden. */
@@ -9961,14 +9961,14 @@ export interface components {
                 record_id: string;
             };
         };
-        Site360SiteSources: {
+        SiteMasterSiteSources: {
             /** Format: uuid */
             site_id: string;
             site_code: string;
-            menu: components["schemas"]["Site360Menu"];
-            cells: components["schemas"]["Site360CellSource"][];
+            menu: components["schemas"]["SiteMasterMenu"];
+            cells: components["schemas"]["SiteMasterCellSource"][];
         };
-        Site360Band: {
+        SiteMasterBand: {
             name: string | null;
             is_phase_gate: boolean;
             groups: {
@@ -9976,23 +9976,23 @@ export interface components {
                 ords: number[];
             }[];
         };
-        Site360MenuItem: {
-            key: components["schemas"]["Site360Menu"];
+        SiteMasterMenuItem: {
+            key: components["schemas"]["SiteMasterMenu"];
             name_en: string;
             name_ar: string;
             /** @description The columns of the menu in Master order (status columns included). */
-            columns: components["schemas"]["Site360Column"][];
+            columns: components["schemas"]["SiteMasterColumn"][];
             /** @description The 3-level header of the menu (phase band, group, field). */
-            bands: components["schemas"]["Site360Band"][];
+            bands: components["schemas"]["SiteMasterBand"][];
             /** @description The identity columns frozen by default (# to Site Name, ords 1 to 4). */
             frozen_ords: number[];
         };
-        Site360Sections: {
-            items: components["schemas"]["Site360MenuItem"][];
+        SiteMasterSections: {
+            items: components["schemas"]["SiteMasterMenuItem"][];
             /** @description True for a System Admin. */
             can_move: boolean;
         };
-        Site360ColumnSectionsRequest: {
+        SiteMasterColumnSectionsRequest: {
             sections: ("design_acq" | "sow" | "cw" | "te" | "hoto" | "dismantle" | "om")[];
             reason: string;
         };
@@ -10001,10 +10001,10 @@ export interface components {
          *     the task inputs (`template_task_fields.field_type`).
          * @enum {string}
          */
-        Site360ColumnType: "text" | "number" | "date" | "list" | "yes_no";
+        SiteMasterColumnType: "text" | "number" | "date" | "list" | "yes_no";
         /** @description 0.15.43. Where the values of a column come from. */
-        Site360ColumnSource: {
-            kind: components["schemas"]["Site360SourceKind"];
+        SiteMasterColumnSource: {
+            kind: components["schemas"]["SiteMasterSourceKind"];
             /** @description The rule of the column (source_note). */
             note: string | null;
             /** @description kind task: the task whose input fills the column. */
@@ -10024,7 +10024,7 @@ export interface components {
             site_field_label?: string;
         };
         /** @description 0.15.43 (migration 0133). A Site Master column as the Workflow Studio manages it. */
-        Site360ColumnAdmin: {
+        SiteMasterColumnAdmin: {
             /** @description The Master order (A = 1). The 187 original columns are 1 to 187; an added column takes the next free order, so its letter is GF, GG, ... and it is exported after the 187. */
             ord: number;
             letter: string;
@@ -10038,12 +10038,12 @@ export interface components {
             name_en: string | null;
             name_ar: string | null;
             header: string;
-            value_type: components["schemas"]["Site360ColumnType"];
+            value_type: components["schemas"]["SiteMasterColumnType"];
             /** @description The dropdown list (`GET /list-catalogues`) of a `list` column. */
             list_catalogue: string | null;
-            source: components["schemas"]["Site360ColumnSource"];
-            /** @description The SITE 360 menus of the column (`status` = every menu). Change them with `PATCH /site360/columns/{ord}/sections`. */
-            sections: components["schemas"]["Site360Section"][];
+            source: components["schemas"]["SiteMasterColumnSource"];
+            /** @description The Site Master menus of the column (`status` = every menu). Change them with `PATCH /site-master/columns/{ord}/sections`. */
+            sections: components["schemas"]["SiteMasterSection"][];
             /** @description The system depends on the column: only a rename and its menus can change. */
             is_protected: boolean;
             protected_reason: string | null;
@@ -10054,7 +10054,7 @@ export interface components {
             version: number;
         };
         /** @description 0.15.43. A column with its usage. */
-        Site360ColumnDetail: components["schemas"]["Site360ColumnAdmin"] & {
+        SiteMasterColumnDetail: components["schemas"]["SiteMasterColumnAdmin"] & {
             /** @description The number of sites that hold a value in the column; null for a protected column (the system fills it, it is never counted). */
             value_count: number | null;
             /**
@@ -10063,16 +10063,16 @@ export interface components {
              */
             delete_mode: "hard" | "deactivate" | "blocked";
         };
-        Site360ColumnList: {
-            items: components["schemas"]["Site360ColumnAdmin"][];
+        SiteMasterColumnList: {
+            items: components["schemas"]["SiteMasterColumnAdmin"][];
             /** @description The bands and groups of the active columns in display order, to choose the place of a new column. */
             bands: {
                 name: string | null;
                 groups: (string | null)[];
             }[];
-            types: components["schemas"]["Site360ColumnType"][];
+            types: components["schemas"]["SiteMasterColumnType"][];
         };
-        Site360ColumnTaskInputSource: {
+        SiteMasterColumnTaskInputSource: {
             /** @enum {string} */
             kind: "task_input";
             /** @description A task code of the workflow (any version). */
@@ -10080,7 +10080,7 @@ export interface components {
             /** @description An existing input that no column uses is linked; a missing key is created (a `v:<key>` input or a date key). Omit it to create a new `v:` input from the column name. */
             field_key?: string;
         };
-        Site360ColumnSiteFieldSource: {
+        SiteMasterColumnSiteFieldSource: {
             /** @enum {string} */
             kind: "site_field";
             /**
@@ -10089,7 +10089,7 @@ export interface components {
              */
             field_id: string;
         };
-        Site360ColumnCreate: {
+        SiteMasterColumnCreate: {
             name_en: string;
             name_ar?: string | null;
             /** @description The band. */
@@ -10098,23 +10098,23 @@ export interface components {
             group_mid?: string | null;
             /** @description The column it sits after (any column, active or not). */
             after_ord: number;
-            value_type?: components["schemas"]["Site360ColumnType"];
+            value_type?: components["schemas"]["SiteMasterColumnType"];
             /** @description Required for `list`, refused for any other type. */
             list_catalogue?: string | null;
-            source: components["schemas"]["Site360ColumnTaskInputSource"] | components["schemas"]["Site360ColumnSiteFieldSource"];
+            source: components["schemas"]["SiteMasterColumnTaskInputSource"] | components["schemas"]["SiteMasterColumnSiteFieldSource"];
             /** @description The menus; by default the menus of the column it sits after (without status). */
             sections?: ("design_acq" | "sow" | "cw" | "te" | "hoto" | "dismantle" | "om")[];
             reason: string;
         };
         /** @description Send at least one key besides `reason` and `confirm_unconvertible`. */
-        Site360ColumnUpdate: {
+        SiteMasterColumnUpdate: {
             name_en?: string;
             name_ar?: string | null;
             group_top?: string;
             group_mid?: string | null;
             /** @description Move the column to sit after this one (an added column only). */
             after_ord?: number;
-            value_type?: components["schemas"]["Site360ColumnType"];
+            value_type?: components["schemas"]["SiteMasterColumnType"];
             list_catalogue?: string | null;
             /**
              * @description Accept that values that do not fit the new type or list stay as they are (409 `conversion_unconfirmed` otherwise).
@@ -10123,15 +10123,15 @@ export interface components {
             confirm_unconvertible: boolean;
             reason: string;
         };
-        Site360ColumnTypePreviewRequest: {
-            value_type: components["schemas"]["Site360ColumnType"];
+        SiteMasterColumnTypePreviewRequest: {
+            value_type: components["schemas"]["SiteMasterColumnType"];
             list_catalogue?: string | null;
         };
-        Site360ColumnTypePreview: {
+        SiteMasterColumnTypePreview: {
             ord: number;
             letter: string;
-            from_type: components["schemas"]["Site360ColumnType"];
-            to_type: components["schemas"]["Site360ColumnType"];
+            from_type: components["schemas"]["SiteMasterColumnType"];
+            to_type: components["schemas"]["SiteMasterColumnType"];
             from_list: string | null;
             to_list: string | null;
             /** @description Non-empty values the column holds in all sites. */
@@ -10145,10 +10145,10 @@ export interface components {
                 reason: "not_a_number" | "not_a_date" | "not_yes_no" | "not_in_list";
             }[];
         };
-        Site360ColumnReasonRequest: {
+        SiteMasterColumnReasonRequest: {
             reason: string;
         };
-        Site360ColumnDeleted: {
+        SiteMasterColumnDeleted: {
             ord: number;
             letter: string;
             /** @enum {boolean} */
@@ -10156,8 +10156,8 @@ export interface components {
             /** @description True when the task input the column created was deleted with it. */
             removed_input: boolean;
         };
-        Site360Rows: {
-            menu: components["schemas"]["Site360MenuItem"];
+        SiteMasterRows: {
+            menu: components["schemas"]["SiteMasterMenuItem"];
             /** @description Sites the caller may see. */
             total: number;
             /** @description Sites that match the filters. */
@@ -18686,7 +18686,7 @@ export interface components {
             sla_by_stage: components["schemas"]["DashboardSlaStage"][] | null;
             /** @description Active sites in scope (cancelled sites left out). */
             sites_total: number | null;
-            /** @description 0.15.29: the sites per SITE 360 view (workflow views CW, TE, OM), in view order. A site counts once per view when it has a task of the view that is not n/a or skipped. Null without sites.view. */
+            /** @description 0.15.29: the sites per Site Master view (workflow views CW, TE, OM), in view order. A site counts once per view when it has a task of the view that is not n/a or skipped. Null without sites.view. */
             site360_menus: {
                 code: string;
                 name_en: string;
@@ -19028,7 +19028,7 @@ export interface components {
         /** @description The ETag last read. */
         IfMatch: string;
         /** @description The Master column order (1 to 187 original, 188 and up added; A = 1). */
-        Site360ColumnOrd: number;
+        SiteMasterColumnOrd: number;
         IdempotencyKey: string;
         /** @description Sent as `1` by timer-driven polling (notification bell, online-now list). The server does not count the request as user activity: it neither extends the idle timeout nor updates `last_activity_at`. Only real user activity does. */
         LivePoll: "1";
@@ -29304,7 +29304,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
-    getSite360Sections: {
+    getSiteMasterSections: {
         parameters: {
             query?: never;
             header?: never;
@@ -29319,14 +29319,14 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Site360Sections"];
+                    "application/json": components["schemas"]["SiteMasterSections"];
                 };
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
         };
     };
-    getSite360Rows: {
+    getSiteMasterRows: {
         parameters: {
             query?: {
                 /** @description 0.15.31 (F3): a `FilterTree` as one JSON string (at most 8000 characters), compiled on the server against the whitelist of this list. 422 `validation_failed` with `unknown_field` (also for a field hidden from the caller by a field rule), `invalid_operator`, `invalid_value`, `too_deep` or `too_many`. The caller's regions and row security still apply. */
@@ -29367,7 +29367,7 @@ export interface operations {
             };
             header?: never;
             path: {
-                /** @description The SITE 360 menu. */
+                /** @description The Site Master menu. */
                 menu: "master" | "design_acq" | "sow" | "cw" | "te" | "hoto" | "dismantle" | "om";
             };
             cookie?: never;
@@ -29380,7 +29380,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Site360Rows"];
+                    "application/json": components["schemas"]["SiteMasterRows"];
                 };
             };
             400: components["responses"]["BadRequest"];
@@ -29389,11 +29389,11 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
         };
     };
-    getSite360SiteSources: {
+    getSiteMasterSiteSources: {
         parameters: {
             query?: {
-                /** @description Limit the cells to the columns of one SITE 360 menu. */
-                menu?: components["schemas"]["Site360Menu"];
+                /** @description Limit the cells to the columns of one Site Master menu. */
+                menu?: components["schemas"]["SiteMasterMenu"];
             };
             header?: never;
             path: {
@@ -29409,7 +29409,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Site360SiteSources"];
+                    "application/json": components["schemas"]["SiteMasterSiteSources"];
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -29418,7 +29418,7 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
         };
     };
-    listSite360Columns: {
+    listSiteMasterColumns: {
         parameters: {
             query?: {
                 /** @description true (default) also lists the deactivated columns. */
@@ -29436,14 +29436,14 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Site360ColumnList"];
+                    "application/json": components["schemas"]["SiteMasterColumnList"];
                 };
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
         };
     };
-    createSite360Column: {
+    createSiteMasterColumn: {
         parameters: {
             query?: never;
             header?: never;
@@ -29452,7 +29452,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["Site360ColumnCreate"];
+                "application/json": components["schemas"]["SiteMasterColumnCreate"];
             };
         };
         responses: {
@@ -29463,7 +29463,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Site360ColumnDetail"];
+                    "application/json": components["schemas"]["SiteMasterColumnDetail"];
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -29473,13 +29473,13 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
         };
     };
-    getSite360Column: {
+    getSiteMasterColumn: {
         parameters: {
             query?: never;
             header?: never;
             path: {
                 /** @description The Master column order (1 to 187 original, 188 and up added; A = 1). */
-                ord: components["parameters"]["Site360ColumnOrd"];
+                ord: components["parameters"]["SiteMasterColumnOrd"];
             };
             cookie?: never;
         };
@@ -29492,7 +29492,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Site360ColumnDetail"];
+                    "application/json": components["schemas"]["SiteMasterColumnDetail"];
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -29500,7 +29500,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
-    deleteSite360Column: {
+    deleteSiteMasterColumn: {
         parameters: {
             query: {
                 reason: string;
@@ -29511,7 +29511,7 @@ export interface operations {
             };
             path: {
                 /** @description The Master column order (1 to 187 original, 188 and up added; A = 1). */
-                ord: components["parameters"]["Site360ColumnOrd"];
+                ord: components["parameters"]["SiteMasterColumnOrd"];
             };
             cookie?: never;
         };
@@ -29523,7 +29523,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Site360ColumnDeleted"];
+                    "application/json": components["schemas"]["SiteMasterColumnDeleted"];
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -29535,7 +29535,7 @@ export interface operations {
             428: components["responses"]["PreconditionRequired"];
         };
     };
-    updateSite360Column: {
+    updateSiteMasterColumn: {
         parameters: {
             query?: never;
             header: {
@@ -29544,13 +29544,13 @@ export interface operations {
             };
             path: {
                 /** @description The Master column order (1 to 187 original, 188 and up added; A = 1). */
-                ord: components["parameters"]["Site360ColumnOrd"];
+                ord: components["parameters"]["SiteMasterColumnOrd"];
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["Site360ColumnUpdate"];
+                "application/json": components["schemas"]["SiteMasterColumnUpdate"];
             };
         };
         responses: {
@@ -29561,7 +29561,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Site360ColumnDetail"];
+                    "application/json": components["schemas"]["SiteMasterColumnDetail"];
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -29573,19 +29573,19 @@ export interface operations {
             428: components["responses"]["PreconditionRequired"];
         };
     };
-    previewSite360ColumnType: {
+    previewSiteMasterColumnType: {
         parameters: {
             query?: never;
             header?: never;
             path: {
                 /** @description The Master column order (1 to 187 original, 188 and up added; A = 1). */
-                ord: components["parameters"]["Site360ColumnOrd"];
+                ord: components["parameters"]["SiteMasterColumnOrd"];
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["Site360ColumnTypePreviewRequest"];
+                "application/json": components["schemas"]["SiteMasterColumnTypePreviewRequest"];
             };
         };
         responses: {
@@ -29595,7 +29595,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Site360ColumnTypePreview"];
+                    "application/json": components["schemas"]["SiteMasterColumnTypePreview"];
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -29604,7 +29604,7 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
         };
     };
-    deactivateSite360Column: {
+    deactivateSiteMasterColumn: {
         parameters: {
             query?: never;
             header: {
@@ -29613,13 +29613,13 @@ export interface operations {
             };
             path: {
                 /** @description The Master column order (1 to 187 original, 188 and up added; A = 1). */
-                ord: components["parameters"]["Site360ColumnOrd"];
+                ord: components["parameters"]["SiteMasterColumnOrd"];
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["Site360ColumnReasonRequest"];
+                "application/json": components["schemas"]["SiteMasterColumnReasonRequest"];
             };
         };
         responses: {
@@ -29630,7 +29630,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Site360ColumnDetail"];
+                    "application/json": components["schemas"]["SiteMasterColumnDetail"];
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -29642,7 +29642,7 @@ export interface operations {
             428: components["responses"]["PreconditionRequired"];
         };
     };
-    reactivateSite360Column: {
+    reactivateSiteMasterColumn: {
         parameters: {
             query?: never;
             header: {
@@ -29651,13 +29651,13 @@ export interface operations {
             };
             path: {
                 /** @description The Master column order (1 to 187 original, 188 and up added; A = 1). */
-                ord: components["parameters"]["Site360ColumnOrd"];
+                ord: components["parameters"]["SiteMasterColumnOrd"];
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["Site360ColumnReasonRequest"];
+                "application/json": components["schemas"]["SiteMasterColumnReasonRequest"];
             };
         };
         responses: {
@@ -29668,7 +29668,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Site360ColumnDetail"];
+                    "application/json": components["schemas"]["SiteMasterColumnDetail"];
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -29680,29 +29680,29 @@ export interface operations {
             428: components["responses"]["PreconditionRequired"];
         };
     };
-    setSite360ColumnSections: {
+    setSiteMasterColumnSections: {
         parameters: {
             query?: never;
             header?: never;
             path: {
                 /** @description The Master column order (1 to 187 original, 188 and up added; A = 1). */
-                ord: components["parameters"]["Site360ColumnOrd"];
+                ord: components["parameters"]["SiteMasterColumnOrd"];
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["Site360ColumnSectionsRequest"];
+                "application/json": components["schemas"]["SiteMasterColumnSectionsRequest"];
             };
         };
         responses: {
-            /** @description The column with its new menus; the menus are read again with `GET /site360/sections`. */
+            /** @description The column with its new menus; the menus are read again with `GET /site-master/sections`. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Site360Column"];
+                    "application/json": components["schemas"]["SiteMasterColumn"];
                 };
             };
             401: components["responses"]["Unauthorized"];

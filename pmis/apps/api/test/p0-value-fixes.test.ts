@@ -27,7 +27,7 @@ afterAll(async () => {
 const site = (region = 1, over: { status?: string; cluster?: string; scenario?: string } = {}): Promise<Site> => makeSite(db, region, { prefix: TAG, ...over });
 const moduleOf = async (key: string): Promise<string> => (await db.query(`SELECT module_key FROM register_definitions WHERE register_key = $1`, [key])).rows[0].module_key as string;
 const rowValues = async (api: Awaited<ReturnType<typeof actor>>['api'], codes: string[]): Promise<Map<string, Record<string, string | null>>> => {
-  const res = await api.call('get', `/site360/master/rows?site_code=${codes.join(',')}&limit=200`);
+  const res = await api.call('get', `/site-master/master/rows?site_code=${codes.join(',')}&limit=200`);
   expect(res.status).toBe(200);
   return new Map(res.body.rows.map((r: { site_code: string; values: Record<string, string | null> }) => [r.site_code, r.values]));
 };
@@ -85,9 +85,9 @@ describe('Site Master AJ / AK: the contractor of the first CW, Tower Erection or
     expect(v.get(te.code)!['37']).toBe(`${name}-TE team`);
     expect(v.get(sa.code)!['36']).toBe(`${name}-SA`);
     // the contractor filter reads the same column
-    const hit = await a.api.call('get', `/site360/master/rows?site_code=${te.code},${sa.code}&contractor=${encodeURIComponent(`${name}-TE`)}`);
+    const hit = await a.api.call('get', `/site-master/master/rows?site_code=${te.code},${sa.code}&contractor=${encodeURIComponent(`${name}-TE`)}`);
     expect(hit.body.filtered).toBe(1);
-    const miss = await a.api.call('get', `/site360/master/rows?site_code=${te.code},${sa.code}&contractor=${encodeURIComponent(`${name}-REJ`)}`);
+    const miss = await a.api.call('get', `/site-master/master/rows?site_code=${te.code},${sa.code}&contractor=${encodeURIComponent(`${name}-REJ`)}`);
     expect(miss.body.filtered).toBe(0);
   });
 
@@ -125,7 +125,7 @@ describe('Site Master grid status filter', () => {
     const hold = await site(1, { status: 'on_hold' });
     const prog = await site(1, { status: 'in_progress' });
     const a = await actor(app, db, { regions: [1] });
-    const res = await a.api.call('get', `/site360/master/rows?site_code=${hold.code},${prog.code}&status=on_hold`);
+    const res = await a.api.call('get', `/site-master/master/rows?site_code=${hold.code},${prog.code}&status=on_hold`);
     expect(res.status).toBe(200);
     expect(res.body.filtered).toBe(1);
     expect(res.body.rows.map((r: { site_code: string }) => r.site_code)).toEqual([hold.code]);

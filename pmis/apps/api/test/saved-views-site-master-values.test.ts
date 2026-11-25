@@ -56,7 +56,7 @@ const rowCodes = async (
 ): Promise<string[]> => {
   const res = await a.api.call(
     'get',
-    `/site360/${menu}/rows?limit=200&${q(tree)}`,
+    `/site-master/${menu}/rows?limit=200&${q(tree)}`,
   );
   expect(res.status, JSON.stringify(res.body)).toBe(200);
   return (res.body.rows as { site_code: string }[])

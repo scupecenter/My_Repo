@@ -16,7 +16,7 @@ export const isStreamKey = (k: string) => k.startsWith(STREAM_PREFIX) && (STREAM
 
 /**
  * Settings > Registers > Columns for a Site Master stream: the columns of the stream in Master order, with the same row actions and rules as the Workflow
- * Studio (rename, type, dropdown list, menus, hide, delete). Writes go through the same /site360/columns endpoints: reason, step-up, version and audit unchanged.
+ * Studio (rename, type, dropdown list, menus, hide, delete). Writes go through the same /site-master/columns endpoints: reason, step-up, version and audit unchanged.
  */
 export function StreamColumns({ menu }: { menu: StreamMenu }) {
   const { t, i18n } = useTranslation();

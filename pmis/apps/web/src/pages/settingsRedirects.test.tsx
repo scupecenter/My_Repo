@@ -74,7 +74,7 @@ describe('F19: Settings tabs and old routes', () => {
     expect(screen.queryByTestId('settings-tab-site360')).toBeNull();
     expect(screen.getByTestId('settings-tab-workflow')).toHaveClass('btn-accent');
     expect(screen.getByTestId('settings-section-workflow-columns')).toHaveClass('btn-accent');
-    expect(screen.getByTestId('page-settings')).not.toHaveTextContent(/Site360|SITE 360|Site 360/);
+    expect(screen.getByTestId('page-settings')).not.toHaveTextContent(/SiteMaster|SITE 360|Site 360/);
   });
 
   it('the Workflow tab still opens the editor first', async () => {

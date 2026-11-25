@@ -44,7 +44,7 @@ export const SITE_DATA_SCREENS: SiteDataScreen[] = [
   { id: 'site-master', route: '/sites', state: 'done', kind: 'grid', note: 'Site Master main list (pipeline, locks, gaps); counts and the pasted list from GET /sites.' },
   { id: 'site-master-stream', route: '/sites?stream=CW', state: 'done', kind: 'grid', note: 'A stream of Site Master (N/A sites join both numbers when shown).' },
   { id: 'site-master-view', route: '/sites?view=CW', state: 'done', kind: 'grid', note: 'A work view of Site Master.' },
-  { id: 'site-master-menu', route: '/sites?section=cw', state: 'done', kind: 'grid', note: 'Every Site Master sub-menu (Design & Acquisition, SOW, CW, TE, HOTO, O&M) as a grouped list; rows and counts from GET /site360/{menu}/rows.' },
+  { id: 'site-master-menu', route: '/sites?section=cw', state: 'done', kind: 'grid', note: 'Every Site Master sub-menu (Design & Acquisition, SOW, CW, TE, HOTO, O&M) as a grouped list; rows and counts from GET /site-master/{menu}/rows.' },
   { id: 'site-master-wide', route: '/sites?section=master&layout=wide', state: 'done', kind: 'grid', note: 'The wide table of Site Master and of every sub-menu (three header rows).' },
   { id: 'site-master-map', route: '/sites?layout=map', state: 'done', kind: 'grid', note: 'Map layout: the same toolbar; the count comes from a one-row GET /sites with the same filters.' },
   { id: 'site-master-board', route: '/sites?layout=board', state: 'done', kind: 'grid', note: 'Board layout: the same toolbar and count.' },

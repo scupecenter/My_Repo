@@ -77,33 +77,33 @@ afterAll(async () => {
 describe('permissions', () => {
   it('refuses a plain user on every endpoint with 403 action_forbidden', async () => {
     const calls = [
-      plain.api.call('get', '/site360/columns'),
-      plain.api.call('get', '/site360/columns/2'),
-      plain.api.call('post', '/site360/columns', body()),
+      plain.api.call('get', '/site-master/columns'),
+      plain.api.call('get', '/site-master/columns/2'),
+      plain.api.call('post', '/site-master/columns', body()),
       plain.api.call(
         'patch',
-        '/site360/columns/2',
+        '/site-master/columns/2',
         { name_en: 'x1', reason: REASON },
         ifMatch(1),
       ),
-      plain.api.call('post', '/site360/columns/2/type-preview', {
+      plain.api.call('post', '/site-master/columns/2/type-preview', {
         value_type: 'text',
       }),
       plain.api.call(
         'post',
-        '/site360/columns/2/deactivate',
+        '/site-master/columns/2/deactivate',
         { reason: REASON },
         ifMatch(1),
       ),
       plain.api.call(
         'post',
-        '/site360/columns/2/reactivate',
+        '/site-master/columns/2/reactivate',
         { reason: REASON },
         ifMatch(1),
       ),
       plain.api.call(
         'delete',
-        `/site360/columns/188?reason=${encodeURIComponent(REASON)}`,
+        `/site-master/columns/188?reason=${encodeURIComponent(REASON)}`,
         undefined,
         ifMatch(1),
       ),
@@ -115,25 +115,25 @@ describe('permissions', () => {
   });
 
   it('refuses a delegate of the custom fields who covers one region only', async () => {
-    const res = await regionDelegateApi.call('get', '/site360/columns');
+    const res = await regionDelegateApi.call('get', '/site-master/columns');
     expect(res.status).toBe(403);
-    const w = await regionDelegateApi.call('post', '/site360/columns', body());
+    const w = await regionDelegateApi.call('post', '/site-master/columns', body());
     expect(w.status).toBe(403);
   });
 
   it('lets a delegate of the custom fields for all regions read the columns', async () => {
-    const res = await delegateApi.call('get', '/site360/columns');
+    const res = await delegateApi.call('get', '/site-master/columns');
     expect(res.status).toBe(200);
     expect(res.body.items.length).toBeGreaterThanOrEqual(187);
   });
 
   it('asks for the step-up after the permission: an admin without it is 401 step_up_required, a plain user stays 403', async () => {
-    const res = await noStep.api.call('post', '/site360/columns', body());
+    const res = await noStep.api.call('post', '/site-master/columns', body());
     expect(res.status).toBe(401);
     expect(res.body.code).toBe('step_up_required');
     const upd = await noStep.api.call(
       'patch',
-      '/site360/columns/2',
+      '/site-master/columns/2',
       { name_en: 'x2', reason: REASON },
       ifMatch(1),
     );
@@ -141,18 +141,18 @@ describe('permissions', () => {
   });
 
   it('needs If-Match on the writes of one column: missing is 428', async () => {
-    const upd = await admin.api.call('patch', '/site360/columns/2', {
+    const upd = await admin.api.call('patch', '/site-master/columns/2', {
       name_en: 'x3',
       reason: REASON,
     });
     expect(upd.status).toBe(428);
-    const off = await admin.api.call('post', '/site360/columns/2/deactivate', {
+    const off = await admin.api.call('post', '/site-master/columns/2/deactivate', {
       reason: REASON,
     });
     expect(off.status).toBe(428);
     const del = await admin.api.call(
       'delete',
-      `/site360/columns/188?reason=${encodeURIComponent(REASON)}`,
+      `/site-master/columns/188?reason=${encodeURIComponent(REASON)}`,
     );
     expect(del.status).toBe(428);
   });
@@ -160,7 +160,7 @@ describe('permissions', () => {
 
 describe('the list of the columns', () => {
   it('lists the 187 original columns in display order with their bands, types and protection', async () => {
-    const res = await admin.api.call('get', '/site360/columns');
+    const res = await admin.api.call('get', '/site-master/columns');
     expect(res.status).toBe(200);
     const items = res.body.items as {
       ord: number;
@@ -200,7 +200,7 @@ describe('the list of the columns', () => {
   });
 
   it('reads one column with its ETag, value_count and delete_mode (null count and blocked for a protected column)', async () => {
-    const res = await admin.api.call('get', '/site360/columns/2');
+    const res = await admin.api.call('get', '/site-master/columns/2');
     expect(res.status).toBe(200);
     expect(res.headers.etag).toMatch(/^"\d+"$/);
     expect(res.body).toMatchObject({
@@ -210,10 +210,10 @@ describe('the list of the columns', () => {
       value_count: null,
       delete_mode: 'blocked',
     });
-    expect((await admin.api.call('get', '/site360/columns/999')).status).toBe(
+    expect((await admin.api.call('get', '/site-master/columns/999')).status).toBe(
       404,
     );
-    expect((await admin.api.call('get', '/site360/columns/abc')).status).toBe(
+    expect((await admin.api.call('get', '/site-master/columns/abc')).status).toBe(
       422,
     );
   });
@@ -223,54 +223,54 @@ describe('adding a column', () => {
   it('refuses a bad place, a reserved band, a missing type or list and an unknown task, with field-level errors', async () => {
     const split = await admin.api.call(
       'post',
-      '/site360/columns',
+      '/site-master/columns',
       body({ after_ord: 10, group_top: 'PRE-CW' }),
     );
     expect(split.status).toBe(422);
     expect(errorsOf(split)).toContain('placement_splits_band');
     const reserved = await admin.api.call(
       'post',
-      '/site360/columns',
+      '/site-master/columns',
       body({ group_top: 'STATUS' }),
     );
     expect(reserved.status).toBe(422);
     expect(errorsOf(reserved)).toContain('reserved_band');
     const noType = await admin.api.call(
       'post',
-      '/site360/columns',
+      '/site-master/columns',
       body({ value_type: undefined }),
     );
     expect(noType.status).toBe(422);
     expect(errorsOf(noType)).toContain('/value_type');
     const noList = await admin.api.call(
       'post',
-      '/site360/columns',
+      '/site-master/columns',
       body({ value_type: 'list' }),
     );
     expect(noList.status).toBe(422);
     expect(errorsOf(noList)).toContain('list_required');
     const listOnText = await admin.api.call(
       'post',
-      '/site360/columns',
+      '/site-master/columns',
       body({ list_catalogue: 'Whatever' }),
     );
     expect(listOnText.status).toBe(422);
     expect(errorsOf(listOnText)).toContain('list_not_allowed');
     const task = await admin.api.call(
       'post',
-      '/site360/columns',
+      '/site-master/columns',
       body({ source: { kind: 'task_input', task_code: 'NO-SUCH-TASK' } }),
     );
     expect(task.status).toBe(422);
     expect(errorsOf(task)).toContain('unknown_task');
     const after = await admin.api.call(
       'post',
-      '/site360/columns',
+      '/site-master/columns',
       body({ after_ord: 999 }),
     );
     expect(after.status).toBe(422);
     expect(errorsOf(after)).toContain('unknown_column');
-    const unknown = await admin.api.call('post', '/site360/columns', {
+    const unknown = await admin.api.call('post', '/site-master/columns', {
       ...body(),
       color: 'red',
     });
@@ -281,7 +281,7 @@ describe('adding a column', () => {
   });
 
   it('adds a column after the last one with a new task input: it takes the letter GF and the next Master order, and is audited', async () => {
-    const res = await admin.api.call('post', '/site360/columns', body());
+    const res = await admin.api.call('post', '/site-master/columns', body());
     expect(res.status).toBe(201);
     expect(res.headers.etag).toBe('"1"');
     expect(res.body).toMatchObject({
@@ -345,7 +345,7 @@ describe('adding a column', () => {
   it('refuses the same header again (409 duplicate) and the same input again (409 input_already_mapped)', async () => {
     const dup = await admin.api.call(
       'post',
-      '/site360/columns',
+      '/site-master/columns',
       body({
         source: {
           kind: 'task_input',
@@ -358,7 +358,7 @@ describe('adding a column', () => {
     expect(dup.body.code).toBe('duplicate');
     const again = await admin.api.call(
       'post',
-      '/site360/columns',
+      '/site-master/columns',
       body({
         name_en: `Other name ${TAG}`,
         source: {
@@ -382,7 +382,7 @@ describe('adding a column', () => {
     );
     const master = await admin.api.call(
       'get',
-      `/site360/master/rows?site_code=${site.code}`,
+      `/site-master/master/rows?site_code=${site.code}`,
     );
     expect(master.status).toBe(200);
     const cols = master.body.menu.columns as {
@@ -400,7 +400,7 @@ describe('adding a column', () => {
     expect(master.body.rows[0].values['188']).toBe('PR-001');
     const cw = await admin.api.call(
       'get',
-      `/site360/cw/rows?site_code=${site.code}`,
+      `/site-master/cw/rows?site_code=${site.code}`,
     );
     expect(cw.body.menu.columns.map((c: { ord: number }) => c.ord)).toContain(
       188,
@@ -408,7 +408,7 @@ describe('adding a column', () => {
     expect(cw.body.rows[0].values['188']).toBe('PR-001');
     const te = await admin.api.call(
       'get',
-      `/site360/te/rows?site_code=${site.code}`,
+      `/site-master/te/rows?site_code=${site.code}`,
     );
     expect(
       te.body.menu.columns.map((c: { ord: number }) => c.ord),
@@ -421,14 +421,14 @@ describe('adding a column', () => {
   });
 
   it('counts the sites that hold a value and refuses a delete with 409 column_in_use', async () => {
-    const res = await admin.api.call('get', `/site360/columns/${first.ord}`);
+    const res = await admin.api.call('get', `/site-master/columns/${first.ord}`);
     expect(res.body).toMatchObject({
       value_count: 1,
       delete_mode: 'deactivate',
     });
     const del = await admin.api.call(
       'delete',
-      `/site360/columns/${first.ord}?reason=${encodeURIComponent(REASON)}`,
+      `/site-master/columns/${first.ord}?reason=${encodeURIComponent(REASON)}`,
       undefined,
       ifMatch(first.version),
     );
@@ -445,7 +445,7 @@ describe('type change with a preview', () => {
   it('previews the values that would not convert to a number, with the site and the reason', async () => {
     const res = await admin.api.call(
       'post',
-      `/site360/columns/${first.ord}/type-preview`,
+      `/site-master/columns/${first.ord}/type-preview`,
       { value_type: 'number' },
     );
     expect(res.status).toBe(200);
@@ -462,7 +462,7 @@ describe('type change with a preview', () => {
     ]);
     const toText = await admin.api.call(
       'post',
-      `/site360/columns/${first.ord}/type-preview`,
+      `/site-master/columns/${first.ord}/type-preview`,
       { value_type: 'text' },
     );
     expect(toText.body).toMatchObject({
@@ -476,21 +476,21 @@ describe('type change with a preview', () => {
   it('refuses a list without a list and an unknown list in the preview, and a protected column', async () => {
     const noList = await admin.api.call(
       'post',
-      `/site360/columns/${first.ord}/type-preview`,
+      `/site-master/columns/${first.ord}/type-preview`,
       { value_type: 'list' },
     );
     expect(noList.status).toBe(422);
     expect(errorsOf(noList)).toContain('list_required');
     const unknown = await admin.api.call(
       'post',
-      `/site360/columns/${first.ord}/type-preview`,
+      `/site-master/columns/${first.ord}/type-preview`,
       { value_type: 'list', list_catalogue: 'NoSuchList' },
     );
     expect(unknown.status).toBe(422);
     expect(errorsOf(unknown)).toContain('unknown_list');
     const protectedCol = await admin.api.call(
       'post',
-      '/site360/columns/2/type-preview',
+      '/site-master/columns/2/type-preview',
       { value_type: 'number' },
     );
     expect(protectedCol.status).toBe(409);
@@ -500,7 +500,7 @@ describe('type change with a preview', () => {
   it('answers 409 conversion_unconfirmed with the preview, then converts once confirmed: the task input follows, the value stays, the ETag moves', async () => {
     const un = await admin.api.call(
       'patch',
-      `/site360/columns/${first.ord}`,
+      `/site-master/columns/${first.ord}`,
       { value_type: 'number', reason: REASON },
       ifMatch(first.version),
     );
@@ -511,7 +511,7 @@ describe('type change with a preview', () => {
     });
     const ok = await admin.api.call(
       'patch',
-      `/site360/columns/${first.ord}`,
+      `/site-master/columns/${first.ord}`,
       { value_type: 'number', confirm_unconvertible: true, reason: REASON },
       ifMatch(first.version),
     );
@@ -549,14 +549,14 @@ describe('type change with a preview', () => {
   it('answers 412 for a stale ETag and 409 invalid_transition when nothing changes', async () => {
     const stale = await admin.api.call(
       'patch',
-      `/site360/columns/${first.ord}`,
+      `/site-master/columns/${first.ord}`,
       { name_en: `Stale ${TAG}`, reason: REASON },
       ifMatch(1),
     );
     expect(stale.status).toBe(412);
     const same = await admin.api.call(
       'patch',
-      `/site360/columns/${first.ord}`,
+      `/site-master/columns/${first.ord}`,
       { value_type: 'number', reason: REASON },
       ifMatch(first.version),
     );
@@ -567,7 +567,7 @@ describe('type change with a preview', () => {
   it('turns the column back to text without a prompt: every value fits', async () => {
     const res = await admin.api.call(
       'patch',
-      `/site360/columns/${first.ord}`,
+      `/site-master/columns/${first.ord}`,
       { value_type: 'text', reason: REASON },
       ifMatch(first.version),
     );
@@ -581,7 +581,7 @@ describe('rename and the protected columns', () => {
   it('renames an added column in English and Arabic: the header follows', async () => {
     const res = await admin.api.call(
       'patch',
-      `/site360/columns/${first.ord}`,
+      `/site-master/columns/${first.ord}`,
       { name_en: `Studio Renamed ${TAG}`, name_ar: 'اسم جديد', reason: REASON },
       ifMatch(first.version),
     );
@@ -595,10 +595,10 @@ describe('rename and the protected columns', () => {
   });
 
   it('lets a protected column be renamed but not retyped, moved or deactivated (409 system_field)', async () => {
-    const before = (await admin.api.call('get', '/site360/columns/2')).body;
+    const before = (await admin.api.call('get', '/site-master/columns/2')).body;
     const type = await admin.api.call(
       'patch',
-      '/site360/columns/2',
+      '/site-master/columns/2',
       { value_type: 'number', reason: REASON },
       ifMatch(before.version),
     );
@@ -606,7 +606,7 @@ describe('rename and the protected columns', () => {
     expect(type.body.code).toBe('system_field');
     const off = await admin.api.call(
       'post',
-      '/site360/columns/2/deactivate',
+      '/site-master/columns/2/deactivate',
       { reason: REASON },
       ifMatch(before.version),
     );
@@ -614,7 +614,7 @@ describe('rename and the protected columns', () => {
     expect(off.body.code).toBe('system_field');
     const del = await admin.api.call(
       'delete',
-      `/site360/columns/2?reason=${encodeURIComponent(REASON)}`,
+      `/site-master/columns/2?reason=${encodeURIComponent(REASON)}`,
       undefined,
       ifMatch(before.version),
     );
@@ -622,7 +622,7 @@ describe('rename and the protected columns', () => {
     expect(del.body.code).toBe('system_field');
     const rename = await admin.api.call(
       'patch',
-      '/site360/columns/2',
+      '/site-master/columns/2',
       { name_ar: `معرف ${TAG}`, reason: REASON },
       ifMatch(before.version),
     );
@@ -632,10 +632,10 @@ describe('rename and the protected columns', () => {
   });
 
   it('keeps the place of an original column: band, group and position cannot change', async () => {
-    const col = (await admin.api.call('get', '/site360/columns/10')).body;
+    const col = (await admin.api.call('get', '/site-master/columns/10')).body;
     const move = await admin.api.call(
       'patch',
-      '/site360/columns/10',
+      '/site-master/columns/10',
       { after_ord: 20, reason: REASON },
       ifMatch(col.version),
     );
@@ -643,7 +643,7 @@ describe('rename and the protected columns', () => {
     expect(move.body.code).toBe('system_field');
     const band = await admin.api.call(
       'patch',
-      '/site360/columns/10',
+      '/site-master/columns/10',
       { group_top: 'Elsewhere', reason: REASON },
       ifMatch(col.version),
     );
@@ -653,14 +653,14 @@ describe('rename and the protected columns', () => {
   it('refuses an unknown key and an empty change with 422', async () => {
     const unknown = await admin.api.call(
       'patch',
-      `/site360/columns/${first.ord}`,
+      `/site-master/columns/${first.ord}`,
       { color: 'red', reason: REASON },
       ifMatch(first.version),
     );
     expect(unknown.status).toBe(422);
     const empty = await admin.api.call(
       'patch',
-      `/site360/columns/${first.ord}`,
+      `/site-master/columns/${first.ord}`,
       { reason: REASON },
       ifMatch(first.version),
     );
@@ -669,22 +669,22 @@ describe('rename and the protected columns', () => {
 });
 
 describe('the menus of an added column', () => {
-  it('changes them with PATCH /site360/columns/{ord}/sections, which now takes any order and bumps the version', async () => {
+  it('changes them with PATCH /site-master/columns/{ord}/sections, which now takes any order and bumps the version', async () => {
     const res = await admin.api.call(
       'patch',
-      `/site360/columns/${first.ord}/sections`,
+      `/site-master/columns/${first.ord}/sections`,
       { sections: ['cw', 'te'], reason: REASON },
     );
     expect(res.status).toBe(200);
     expect(res.body.sections).toEqual(['cw', 'te']);
-    const col = (await admin.api.call('get', `/site360/columns/${first.ord}`))
+    const col = (await admin.api.call('get', `/site-master/columns/${first.ord}`))
       .body;
     expect(col.sections).toEqual(['cw', 'te']);
     expect(col.version).toBe(first.version + 1);
     first.version = col.version;
     const te = await admin.api.call(
       'get',
-      `/site360/te/rows?site_code=${siteCode}`,
+      `/site-master/te/rows?site_code=${siteCode}`,
     );
     expect(te.body.menu.columns.map((c: { ord: number }) => c.ord)).toContain(
       188,
@@ -696,29 +696,29 @@ describe('the menus of an added column', () => {
       (
         await plain.api.call(
           'patch',
-          `/site360/columns/${first.ord}/sections`,
+          `/site-master/columns/${first.ord}/sections`,
           { sections: ['cw'], reason: REASON },
         )
       ).status,
     ).toBe(403);
     const status = await admin.api.call(
       'patch',
-      '/site360/columns/187/sections',
+      '/site-master/columns/187/sections',
       { sections: ['cw'], reason: REASON },
     );
     expect(status.status).toBe(422);
   });
 
   it('uses the one right of the column doors (owner decision 2026-11-22): fields edit for all regions, not admin.settings', async () => {
-    const ok = await delegateApi.call('patch', `/site360/columns/${first.ord}/sections`, { sections: ['cw', 'te'], reason: REASON });
+    const ok = await delegateApi.call('patch', `/site-master/columns/${first.ord}/sections`, { sections: ['cw', 'te'], reason: REASON });
     expect(ok.status).toBe(200);
-    first.version = (await admin.api.call('get', `/site360/columns/${first.ord}`)).body.version;
-    expect((await regionDelegateApi.call('patch', `/site360/columns/${first.ord}/sections`, { sections: ['cw'], reason: REASON })).status).toBe(403);
+    first.version = (await admin.api.call('get', `/site-master/columns/${first.ord}`)).body.version;
+    expect((await regionDelegateApi.call('patch', `/site-master/columns/${first.ord}/sections`, { sections: ['cw'], reason: REASON })).status).toBe(403);
     const s = await actor(app, db, { level: 'entry' });
     await delegate(db, s.user.id, [['admin.settings', 'edit']]);
-    expect((await s.api.call('patch', `/site360/columns/${first.ord}/sections`, { sections: ['cw'], reason: REASON })).status).toBe(403);
-    expect((await s.api.call('get', '/site360/sections')).body.can_move).toBe(false);
-    expect((await delegateApi.call('get', '/site360/sections')).body.can_move).toBe(true);
+    expect((await s.api.call('patch', `/site-master/columns/${first.ord}/sections`, { sections: ['cw'], reason: REASON })).status).toBe(403);
+    expect((await s.api.call('get', '/site-master/sections')).body.can_move).toBe(false);
+    expect((await delegateApi.call('get', '/site-master/sections')).body.can_move).toBe(true);
   });
 });
 
@@ -739,7 +739,7 @@ describe('moving a column and a site field source', () => {
     );
     const res = await admin.api.call(
       'post',
-      '/site360/columns',
+      '/site-master/columns',
       body({
         name_en: `Studio Field Col ${TAG}`,
         after_ord: first.ord,
@@ -764,12 +764,12 @@ describe('moving a column and a site field source', () => {
     second = { ord: res.body.ord, version: res.body.version };
     const rows = await admin.api.call(
       'get',
-      `/site360/master/rows?site_code=${siteCode}`,
+      `/site-master/master/rows?site_code=${siteCode}`,
     );
     expect(rows.body.rows[0].values['189']).toBe('from-field');
     const dup = await admin.api.call(
       'post',
-      '/site360/columns',
+      '/site-master/columns',
       body({
         name_en: `Studio Field Col 2 ${TAG}`,
         after_ord: first.ord,
@@ -784,7 +784,7 @@ describe('moving a column and a site field source', () => {
   it('adds a column after any column inside its band: the next columns shift in display order, not in Master order', async () => {
     const res = await admin.api.call(
       'post',
-      '/site360/columns',
+      '/site-master/columns',
       body({
         name_en: `Studio Between ${TAG}`,
         after_ord: first.ord,
@@ -801,7 +801,7 @@ describe('moving a column and a site field source', () => {
       letter: 'GH',
       display_order: 189,
     });
-    const list = (await admin.api.call('get', '/site360/columns')).body
+    const list = (await admin.api.call('get', '/site-master/columns')).body
       .items as { ord: number; display_order: number }[];
     expect(list.slice(187).map((c) => [c.ord, c.display_order])).toEqual([
       [188, 188],
@@ -810,17 +810,17 @@ describe('moving a column and a site field source', () => {
     ]);
     second = {
       ord: second.ord,
-      version: (await admin.api.call('get', `/site360/columns/${second.ord}`))
+      version: (await admin.api.call('get', `/site-master/columns/${second.ord}`))
         .body.version,
     };
   });
 
   it('moves a column after another one and refuses a move that splits a band', async () => {
-    const col = (await admin.api.call('get', `/site360/columns/${first.ord}`))
+    const col = (await admin.api.call('get', `/site-master/columns/${first.ord}`))
       .body;
     const split = await admin.api.call(
       'patch',
-      `/site360/columns/${first.ord}`,
+      `/site-master/columns/${first.ord}`,
       { after_ord: 20, reason: REASON },
       ifMatch(col.version),
     );
@@ -828,13 +828,13 @@ describe('moving a column and a site field source', () => {
     expect(errorsOf(split)).toContain('placement_splits_band');
     const move = await admin.api.call(
       'patch',
-      `/site360/columns/${first.ord}`,
+      `/site-master/columns/${first.ord}`,
       { after_ord: second.ord, reason: REASON },
       ifMatch(col.version),
     );
     expect(move.status).toBe(200);
     expect(move.body.ord).toBe(first.ord);
-    const list = (await admin.api.call('get', '/site360/columns')).body
+    const list = (await admin.api.call('get', '/site-master/columns')).body
       .items as { ord: number; display_order: number }[];
     expect(list.slice(187).map((c) => c.ord)).toEqual([190, 189, 188]);
     first.version = move.body.version;
@@ -896,7 +896,7 @@ describe('deactivate, reactivate and delete', () => {
   it('deactivates a column: it leaves the menus and the grid, its values and letter stay; again is 409 invalid_transition', async () => {
     const res = await admin.api.call(
       'post',
-      `/site360/columns/${first.ord}/deactivate`,
+      `/site-master/columns/${first.ord}/deactivate`,
       { reason: REASON },
       ifMatch(first.version),
     );
@@ -905,24 +905,24 @@ describe('deactivate, reactivate and delete', () => {
     first.version = res.body.version;
     const rows = await admin.api.call(
       'get',
-      `/site360/master/rows?site_code=${siteCode}`,
+      `/site-master/master/rows?site_code=${siteCode}`,
     );
     expect(
       rows.body.menu.columns.map((c: { ord: number }) => c.ord),
     ).not.toContain(first.ord);
     expect(
       (
-        await admin.api.call('get', '/site360/columns?include_inactive=false')
+        await admin.api.call('get', '/site-master/columns?include_inactive=false')
       ).body.items.map((c: { ord: number }) => c.ord),
     ).not.toContain(first.ord);
     expect(
-      (await admin.api.call('get', '/site360/columns')).body.items.map(
+      (await admin.api.call('get', '/site-master/columns')).body.items.map(
         (c: { ord: number }) => c.ord,
       ),
     ).toContain(first.ord);
     const again = await admin.api.call(
       'post',
-      `/site360/columns/${first.ord}/deactivate`,
+      `/site-master/columns/${first.ord}/deactivate`,
       { reason: REASON },
       ifMatch(first.version),
     );
@@ -941,7 +941,7 @@ describe('deactivate, reactivate and delete', () => {
   it('reactivates it at the same place with the same letter', async () => {
     const res = await admin.api.call(
       'post',
-      `/site360/columns/${first.ord}/reactivate`,
+      `/site-master/columns/${first.ord}/reactivate`,
       { reason: REASON },
       ifMatch(first.version),
     );
@@ -950,7 +950,7 @@ describe('deactivate, reactivate and delete', () => {
     first.version = res.body.version;
     const again = await admin.api.call(
       'post',
-      `/site360/columns/${first.ord}/reactivate`,
+      `/site-master/columns/${first.ord}/reactivate`,
       { reason: REASON },
       ifMatch(first.version),
     );
@@ -958,25 +958,25 @@ describe('deactivate, reactivate and delete', () => {
   });
 
   it('deletes an added column that never held a value, with its task input, and refuses a stale ETag first', async () => {
-    const col = (await admin.api.call('get', '/site360/columns/190')).body;
+    const col = (await admin.api.call('get', '/site-master/columns/190')).body;
     expect(col).toMatchObject({ value_count: 0, delete_mode: 'hard' });
     const stale = await admin.api.call(
       'delete',
-      `/site360/columns/190?reason=${encodeURIComponent(REASON)}`,
+      `/site-master/columns/190?reason=${encodeURIComponent(REASON)}`,
       undefined,
       ifMatch(col.version + 5),
     );
     expect(stale.status).toBe(412);
     const short = await admin.api.call(
       'delete',
-      '/site360/columns/190?reason=ab',
+      '/site-master/columns/190?reason=ab',
       undefined,
       ifMatch(col.version),
     );
     expect(short.status).toBe(422);
     const del = await admin.api.call(
       'delete',
-      `/site360/columns/190?reason=${encodeURIComponent(REASON)}`,
+      `/site-master/columns/190?reason=${encodeURIComponent(REASON)}`,
       undefined,
       ifMatch(col.version),
     );
@@ -987,7 +987,7 @@ describe('deactivate, reactivate and delete', () => {
       deleted: true,
       removed_input: true,
     });
-    expect((await admin.api.call('get', '/site360/columns/190')).status).toBe(
+    expect((await admin.api.call('get', '/site-master/columns/190')).status).toBe(
       404,
     );
     expect(
@@ -1009,10 +1009,10 @@ describe('deactivate, reactivate and delete', () => {
   });
 
   it('never deletes an original column (409 system_field); a deleted last column frees its letter and order', async () => {
-    const col = (await admin.api.call('get', '/site360/columns/150')).body;
+    const col = (await admin.api.call('get', '/site-master/columns/150')).body;
     const del = await admin.api.call(
       'delete',
-      `/site360/columns/150?reason=${encodeURIComponent(REASON)}`,
+      `/site-master/columns/150?reason=${encodeURIComponent(REASON)}`,
       undefined,
       ifMatch(col.version),
     );
@@ -1021,7 +1021,7 @@ describe('deactivate, reactivate and delete', () => {
     // the letters stay: the next added column takes the free order after the highest one that exists (189 is the last now)
     const next = await admin.api.call(
       'post',
-      '/site360/columns',
+      '/site-master/columns',
       body({
         name_en: `Studio Next ${TAG}`,
         after_ord: 189,
@@ -1037,10 +1037,10 @@ describe('deactivate, reactivate and delete', () => {
   });
 
   it('checks the permission before the existence of the column', async () => {
-    expect((await plain.api.call('get', '/site360/columns/999')).status).toBe(
+    expect((await plain.api.call('get', '/site-master/columns/999')).status).toBe(
       403,
     );
-    expect((await admin.api.call('get', '/site360/columns/999')).status).toBe(
+    expect((await admin.api.call('get', '/site-master/columns/999')).status).toBe(
       404,
     );
   });

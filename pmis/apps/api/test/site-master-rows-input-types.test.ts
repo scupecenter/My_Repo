@@ -6,7 +6,7 @@ import { cellInput } from '../src/site-master/site-master.service';
 import { startApp, superDb } from './helpers';
 import { actor, makeSite, makeTask } from './wf-helpers';
 
-/** Typed inline editors (0.15.48): each editable cell of GET /site360/{menu}/rows carries input_type, and list cells their options. */
+/** Typed inline editors (0.15.48): each editable cell of GET /site-master/{menu}/rows carries input_type, and list cells their options. */
 const PREFIX = `S360T${randomBytes(3).toString('hex').toUpperCase()}`;
 let app: NestExpressApplication;
 let db: PgClient;
@@ -45,12 +45,12 @@ describe('cellInput (the editor kind of a field)', () => {
   });
 });
 
-describe('GET /site360/{menu}/rows: input_type and options', () => {
+describe('GET /site-master/{menu}/rows: input_type and options', () => {
   it('a date cell says date and carries no options', async () => {
     const s = await makeSite(db, 1, { prefix: PREFIX });
     await makeTask(db, s, dateMap.task_code, 'open', { actualDate: '2026-03-10' });
     const a = await actor(app, db, { regions: [1] });
-    const res = await a.api.call('get', `/site360/master/rows?site_code=${s.code}`);
+    const res = await a.api.call('get', `/site-master/master/rows?site_code=${s.code}`);
     expect(res.status).toBe(200);
     const cell = res.body.rows[0].cells[String(dateMap.ord)];
     expect(cell.input_type).toBe('date');
@@ -62,7 +62,7 @@ describe('GET /site360/{menu}/rows: input_type and options', () => {
     const s = await makeSite(db, 1, { prefix: PREFIX });
     await makeTask(db, s, listMap.task_code, 'open');
     const a = await actor(app, db, { regions: [1] });
-    const res = await a.api.call('get', `/site360/master/rows?site_code=${s.code}`);
+    const res = await a.api.call('get', `/site-master/master/rows?site_code=${s.code}`);
     expect(res.status).toBe(200);
     const cell = res.body.rows[0].cells[String(listMap.ord)];
     expect(cell.input_type).toBe('list');

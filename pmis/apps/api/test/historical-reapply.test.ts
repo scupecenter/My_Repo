@@ -295,7 +295,7 @@ describe('0122: the overall status of a site follows its milestones', () => {
     const map = await admin.api.call('get', '/dashboard/site-map');
     expect(map.status).toBe(200);
     expect((map.body.items as { site_code: string; overall_status: string }[]).find((x) => x.site_code === s.code)).toMatchObject({ overall_status: 'in_progress' });
-    const s360 = await admin.api.call('get', `/site360/master/rows?site_code=${s.code}`);
+    const s360 = await admin.api.call('get', `/site-master/master/rows?site_code=${s.code}`);
     expect(s360.status).toBe(200);
     expect(s360.body.rows[0].values['182']).toBe('in_progress');
     const list = await admin.api.call('get', `/sites?overall_status=in_progress&q=${s.code}`);

@@ -47,7 +47,7 @@ function menu(key: string, name_en: string, name_ar: string) {
   };
 }
 
-/** Three synthetic sites in the shape of GET /site360/{menu}/rows: the values are keyed by the menu's column order. */
+/** Three synthetic sites in the shape of GET /site-master/{menu}/rows: the values are keyed by the menu's column order. */
 const SITES = [
   { id: 'a0000000-0000-4000-8000-000000000001', code: 'S360-001', name: 'Synthetic site one', region: 'Tripoli', milestone: 'Site Release', status: 'in_progress', phase: 'Phase 1', model: 'outsourced', batch: 'B1' },
   { id: 'a0000000-0000-4000-8000-000000000002', code: 'S360-002', name: 'Synthetic site two', region: 'Middle', milestone: 'CW Completion', status: 'on_hold', phase: 'Phase 2', model: 'internal', batch: 'B3' },
@@ -113,7 +113,7 @@ function rowsFor(key: string, offset: number, limit: number, batches: string[] |
   };
 }
 
-/** The cells of GET /site360/sites/{site_id}/sources for a synthetic site: value, kind, origin and the ids to open the source. */
+/** The cells of GET /site-master/sites/{site_id}/sources for a synthetic site: value, kind, origin and the ids to open the source. */
 function sourcesFor(site: (typeof SITES)[number], key: string) {
   const cols = COLS.filter((c) => key === 'master' || c.sections.includes(key) || c.sections.includes('status') || IDENT.includes(c.ord));
   const vals = rowsFor(key, SITES.indexOf(site), 1).rows[0]!.values;
@@ -131,15 +131,15 @@ function sourcesFor(site: (typeof SITES)[number], key: string) {
 
 export const siteMasterHandlers = [
   // 0.15.35 (P1 Master): the source of every Master cell of one synthetic site
-  http.get(`${API_BASE}/site360/sites/:siteId/sources`, ({ params, request }) => {
+  http.get(`${API_BASE}/site-master/sites/:siteId/sources`, ({ params, request }) => {
     const site = SITES.find((x) => x.id === params.siteId);
     if (!site) return HttpResponse.json({ type: 'about:blank', title: 'Not found', status: 404, code: 'not_found' }, { status: 404 });
     const key = new URL(request.url).searchParams.get('menu') ?? 'master';
     return HttpResponse.json({ site_id: site.id, site_code: site.code, menu: key, cells: sourcesFor(site, key) });
   }),
-  http.get(`${API_BASE}/site360/sections`, () =>
+  http.get(`${API_BASE}/site-master/sections`, () =>
     HttpResponse.json({ items: MENUS.map(([k, en, ar]) => menu(k, en, ar)), can_move: false })),
-  http.get(`${API_BASE}/site360/:menu/rows`, ({ params, request }) => {
+  http.get(`${API_BASE}/site-master/:menu/rows`, ({ params, request }) => {
     const url = new URL(request.url);
     const offset = Number(url.searchParams.get('offset') ?? 0);
     const limit = Number(url.searchParams.get('limit') ?? 50);

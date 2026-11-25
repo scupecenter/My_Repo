@@ -35,13 +35,13 @@ function record(): { method: string; path: string; body: unknown; ifMatch: strin
   const log: { method: string; path: string; body: unknown; ifMatch: string | null }[] = [];
   const on = (method: string) => async ({ request }: { request: Request }) => {
     const text = await request.clone().text();
-    log.push({ method, path: new URL(request.url).pathname.replace(/^.*\/site360/, ''), body: text ? JSON.parse(text) : null, ifMatch: request.headers.get('If-Match') });
+    log.push({ method, path: new URL(request.url).pathname.replace(/^.*\/site-master/, ''), body: text ? JSON.parse(text) : null, ifMatch: request.headers.get('If-Match') });
     return undefined;
   };
   server.use(
-    http.post(`${API_BASE}/site360/columns`, on('POST')), http.patch(`${API_BASE}/site360/columns/:ord`, on('PATCH')), http.post(`${API_BASE}/site360/columns/:ord/type-preview`, on('POST')),
-    http.post(`${API_BASE}/site360/columns/:ord/deactivate`, on('POST')), http.post(`${API_BASE}/site360/columns/:ord/reactivate`, on('POST')), http.delete(`${API_BASE}/site360/columns/:ord`, on('DELETE')),
-    http.patch(`${API_BASE}/site360/columns/:ord/sections`, on('PATCH')),
+    http.post(`${API_BASE}/site-master/columns`, on('POST')), http.patch(`${API_BASE}/site-master/columns/:ord`, on('PATCH')), http.post(`${API_BASE}/site-master/columns/:ord/type-preview`, on('POST')),
+    http.post(`${API_BASE}/site-master/columns/:ord/deactivate`, on('POST')), http.post(`${API_BASE}/site-master/columns/:ord/reactivate`, on('POST')), http.delete(`${API_BASE}/site-master/columns/:ord`, on('DELETE')),
+    http.patch(`${API_BASE}/site-master/columns/:ord/sections`, on('PATCH')),
   );
   return log;
 }
@@ -305,7 +305,7 @@ describe('Workflow Studio, Site Master columns of a task', () => {
     await u.click(screen.getByTestId('studio-col-rename-17'));
     const ren = await screen.findByTestId('studio-col-rename-dialog');
     // somebody else renames it first: the column is at version 2
-    await api.patch('/site360/columns/17', { version: 1, body: { name_en: 'Changed elsewhere', reason: REASON } });
+    await api.patch('/site-master/columns/17', { version: 1, body: { name_en: 'Changed elsewhere', reason: REASON } });
     await u.clear(within(ren).getByTestId('studio-col-name-en'));
     await u.type(within(ren).getByTestId('studio-col-name-en'), 'My name');
     await asked(u, 'studio-col-rename-dialog');

@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { startApp, superDb } from './helpers';
 import { actor, makeSite, makeTask, setCell, Site } from './wf-helpers';
 
-/** GET /site360/{menu}/rows (0.15.50): the stage, mine, late, workflow locks and data gaps filters mean what they mean in GET /sites (same SQL, sites.service). */
+/** GET /site-master/{menu}/rows (0.15.50): the stage, mine, late, workflow locks and data gaps filters mean what they mean in GET /sites (same SQL, sites.service). */
 const PREFIX = `S360F${randomBytes(3).toString('hex').toUpperCase()}`;
 const REGION = 6;
 let app: NestExpressApplication;
@@ -42,13 +42,13 @@ async function fixture() {
   return { late, fine, open };
 }
 
-describe('GET /site360/{menu}/rows: the filters of GET /sites', () => {
+describe('GET /site-master/{menu}/rows: the filters of GET /sites', () => {
   it('late, stage, workflow locks: the same sites as GET /sites, on the master menu and a sub-menu', async () => {
     const { late, fine, open } = await fixture();
     const a = await actor(app, db, { regions: [REGION] });
     const ids = created.join(',');
     const rows = async (menu: string, qs: string) => {
-      const res = await a.api.call('get', `/site360/${menu}/rows?site_code=${ids}&limit=200&${qs}`);
+      const res = await a.api.call('get', `/site-master/${menu}/rows?site_code=${ids}&limit=200&${qs}`);
       expect(res.status, qs).toBe(200);
       return rowCodes(res.body);
     };
@@ -67,7 +67,7 @@ describe('GET /site360/{menu}/rows: the filters of GET /sites', () => {
     expect(await rows('master', 'workflow_locks=open')).toEqual(await sites('workflow_locks=open'));
 
     // a filter narrows the count and keeps the total of the sites the caller may see
-    const res = await a.api.call('get', `/site360/master/rows?site_code=${ids}&limit=200&bucket=late`);
+    const res = await a.api.call('get', `/site-master/master/rows?site_code=${ids}&limit=200&bucket=late`);
     expect(res.body.filtered).toBe(1);
     expect(res.body.total).toBeGreaterThanOrEqual(3);
   });
@@ -76,7 +76,7 @@ describe('GET /site360/{menu}/rows: the filters of GET /sites', () => {
     await fixture();
     const a = await actor(app, db, { regions: [REGION] });
     const ids = created.join(',');
-    const rows = async (qs: string) => rowCodes((await a.api.call('get', `/site360/master/rows?site_code=${ids}&limit=200&${qs}`)).body);
+    const rows = async (qs: string) => rowCodes((await a.api.call('get', `/site-master/master/rows?site_code=${ids}&limit=200&${qs}`)).body);
     const sites = async (qs: string) => listCodes((await a.api.call('get', `/sites?site_codes=${ids}&limit=200&${qs}`)).body);
     const withGaps = await rows('data_gaps=with');
     const without = await rows('data_gaps=without');
@@ -91,7 +91,7 @@ describe('GET /site360/{menu}/rows: the filters of GET /sites', () => {
     await setCell(db, 'B1', REGION, 'entry', { user: [me.user.id] });
     const other = await actor(app, db, { regions: [REGION] });
     const ids = [late.code, fine.code, open.code].join(','); // this fixture only: the earlier fixtures of the file hold open B1 work of the same region too
-    const rows = async (who: typeof me) => rowCodes((await who.api.call('get', `/site360/master/rows?site_code=${ids}&limit=200&bucket=mine`)).body);
+    const rows = async (who: typeof me) => rowCodes((await who.api.call('get', `/site-master/master/rows?site_code=${ids}&limit=200&bucket=mine`)).body);
     const mineList = async (who: typeof me) => listCodes((await who.api.call('get', `/sites?site_codes=${ids}&limit=200&bucket=mine`)).body);
     expect(await rows(me)).toEqual([fine.code, late.code].sort());
     expect(await rows(me)).not.toContain(open.code);
@@ -103,11 +103,11 @@ describe('GET /site360/{menu}/rows: the filters of GET /sites', () => {
     const { late, fine, open } = await fixture();
     const a = await actor(app, db, { regions: [REGION] });
     const ids = [late.code, fine.code, open.code].join(','); // this fixture only, earlier fixtures have late sites too
-    const ok = await a.api.call('get', `/site360/master/rows?site_code=${ids}&limit=200&bucket=late&stage_code=MS2&workflow_locks=locked&scenario=new_build&region_id=${REGION}`);
+    const ok = await a.api.call('get', `/site-master/master/rows?site_code=${ids}&limit=200&bucket=late&stage_code=MS2&workflow_locks=locked&scenario=new_build&region_id=${REGION}`);
     expect(ok.status).toBe(200);
     expect(rowCodes(ok.body)).toEqual([late.code]);
-    expect((await a.api.call('get', `/site360/master/rows?bucket=nope`)).status).toBe(422);
-    expect((await a.api.call('get', `/site360/master/rows?workflow_locks=maybe`)).status).toBe(422);
-    expect((await a.api.call('get', `/site360/master/rows?data_gaps=some`)).status).toBe(422);
+    expect((await a.api.call('get', `/site-master/master/rows?bucket=nope`)).status).toBe(422);
+    expect((await a.api.call('get', `/site-master/master/rows?workflow_locks=maybe`)).status).toBe(422);
+    expect((await a.api.call('get', `/site-master/master/rows?data_gaps=some`)).status).toBe(422);
   });
 });

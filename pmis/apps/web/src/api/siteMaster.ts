@@ -3,13 +3,13 @@ import { api } from '@/api/client';
 import type { components } from '@/api/schema';
 
 /** Site Master menus and the Master columns of each (contract 0.15.21, F15). */
-export type SiteMasterSections = components['schemas']['Site360Sections'];
-export type SiteMasterMenuItem = components['schemas']['Site360MenuItem'];
-export type SiteMasterMenu = components['schemas']['Site360Menu'];
-export type SiteMasterBand = components['schemas']['Site360Band'];
-export type SiteMasterRows = components['schemas']['Site360Rows'];
+export type SiteMasterSections = components['schemas']['SiteMasterSections'];
+export type SiteMasterMenuItem = components['schemas']['SiteMasterMenuItem'];
+export type SiteMasterMenu = components['schemas']['SiteMasterMenu'];
+export type SiteMasterBand = components['schemas']['SiteMasterBand'];
+export type SiteMasterRows = components['schemas']['SiteMasterRows'];
 
-/** Filters, sort and paging of the grid rows (contract 0.15.21, `GET /site360/{menu}/rows`). Multi values are comma-separated. */
+/** Filters, sort and paging of the grid rows (contract 0.15.21, `GET /site-master/{menu}/rows`). Multi values are comma-separated. */
 export interface SiteMasterRowsQuery {
   /** W8 item 5 (0.15.64): the search box: one token = contains on code and name; a pasted list = exact Site ID or Site Owner ID */
   q?: string;
@@ -42,28 +42,28 @@ export interface SiteMasterRowsQuery {
 export const SITE_MASTER_MENU_KEYS: SiteMasterMenu[] = ['master', 'design_acq', 'sow', 'cw', 'te', 'hoto', 'dismantle', 'om'];
 
 export const useSiteMasterSections = () =>
-  useQuery({ queryKey: ['site-master-sections'], queryFn: () => api.get<SiteMasterSections>('/site360/sections') });
+  useQuery({ queryKey: ['site-master-sections'], queryFn: () => api.get<SiteMasterSections>('/site-master/sections') });
 
 /** One page of a menu's rows with the Master values of its columns; the values are read from the set-based view, one query per page. */
 export const useSiteMasterRows = (menu: string | undefined, query: SiteMasterRowsQuery) =>
   useQuery({
     queryKey: ['site-master-rows', menu, query],
     enabled: !!menu,
-    queryFn: () => api.get<SiteMasterRows>(`/site360/${menu}/rows`, { query: { ...query } }),
+    queryFn: () => api.get<SiteMasterRows>(`/site-master/${menu}/rows`, { query: { ...query } }),
   });
 
 /** The source of one Master cell (contract 0.15.35): kind, origin and the ids to open the source record. */
-export type SiteMasterCellSource = components['schemas']['Site360CellSource'];
-export type SiteMasterSiteSources = components['schemas']['Site360SiteSources'];
-export type SiteMasterSourceKind = components['schemas']['Site360SourceKind'];
+export type SiteMasterCellSource = components['schemas']['SiteMasterCellSource'];
+export type SiteMasterSiteSources = components['schemas']['SiteMasterSiteSources'];
+export type SiteMasterSourceKind = components['schemas']['SiteMasterSourceKind'];
 
-/** Every Master cell of one site with its value and source (`GET /site360/sites/{site_id}/sources`); asked per site when a cell is opened, cached. */
+/** Every Master cell of one site with its value and source (`GET /site-master/sites/{site_id}/sources`); asked per site when a cell is opened, cached. */
 export const useSiteMasterSiteSources = (siteId: string | null | undefined, menu?: string) =>
   useQuery({
     queryKey: ['site-master-sources', siteId, menu ?? 'master'],
     enabled: !!siteId,
     staleTime: 30_000,
-    queryFn: () => api.get<SiteMasterSiteSources>(`/site360/sites/${siteId}/sources`, { query: menu ? { menu } : {} }),
+    queryFn: () => api.get<SiteMasterSiteSources>(`/site-master/sites/${siteId}/sources`, { query: menu ? { menu } : {} }),
   });
 
 /** The app route that opens the source record of a cell, or null when there is none to open (a formula over many rows, a hidden value, not tracked). */
@@ -79,12 +79,12 @@ export function siteMasterSourceHref(siteId: string, c: SiteMasterCellSource): s
 /** The Site Master menus a Master column may be in (the status columns are in every menu and cannot change). */
 export const SITE_MASTER_MOVABLE_MENUS = ['design_acq', 'sow', 'cw', 'te', 'hoto', 'dismantle', 'om'] as const;
 
-/** Replaces the menus of one Master column (`PATCH /site360/columns/{ord}/sections`): System Admin, a reason, step-up. */
+/** Replaces the menus of one Master column (`PATCH /site-master/columns/{ord}/sections`): System Admin, a reason, step-up. */
 export const useSetSiteMasterColumnSections = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (v: { ord: number; sections: string[]; reason: string }) =>
-      api.patch<unknown>(`/site360/columns/${v.ord}/sections`, { body: { sections: v.sections, reason: v.reason } }),
+      api.patch<unknown>(`/site-master/columns/${v.ord}/sections`, { body: { sections: v.sections, reason: v.reason } }),
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: ['site-master-sections'] });
       void qc.invalidateQueries({ queryKey: ['site-master-rows'] });
@@ -99,7 +99,7 @@ export const useSiteMasterRowsPaged = (menu: string | undefined, query: Omit<Sit
     queryKey: ['site-master-rows-paged', menu, query],
     enabled: !!menu,
     initialPageParam: 0,
-    queryFn: ({ pageParam }) => api.get<SiteMasterRows>(`/site360/${menu}/rows`, { query: { ...query, offset: pageParam, limit } }),
+    queryFn: ({ pageParam }) => api.get<SiteMasterRows>(`/site-master/${menu}/rows`, { query: { ...query, offset: pageParam, limit } }),
     getNextPageParam: (last) => (last.offset + last.limit < last.filtered ? last.offset + last.limit : undefined),
   });
 };

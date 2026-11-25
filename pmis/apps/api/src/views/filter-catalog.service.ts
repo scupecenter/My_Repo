@@ -24,10 +24,10 @@ import {
  * F3 (contract 0.15.31): the whitelist of filter fields of each list screen, and the one entry point the lists use to compile a filter tree.
  *
  * Built-in fields are constants of this file with fixed SQL over the aliases of each list query:
- *   - sites, sites-stream: `s` = sites (GET /sites, GET /site360/{menu}/rows);
+ *   - sites, sites-stream: `s` = sites (GET /sites, GET /site-master/{menu}/rows);
  *   - dashboard (0.15.45): the same fields as `sites`; the dashboard endpoints narrow their site set with it;
  *   - site360-<menu> (0.15.45): the `sites` fields plus the Master columns of the menu (`m:<ord>`, the value of site360_master_values; one derived table per
- *     column used, joined by GET /site360/{menu}/rows);
+ *     column used, joined by GET /site-master/{menu}/rows);
  *   - site-tasks, tasks-board: `t` = task_instances, `td` = task_definitions, `st` = stage_definitions, `s` = sites (GET /sites/{id}/tasks; F5 GET /boards/tasks);
  *   - register-<key>: `r` = register_records, `s` = sites (GET /registers/{key}/records).
  * Data-defined fields come from the configuration: `f:<code>` the active fields of a register (its own and its custom fields), `c:<code>` the

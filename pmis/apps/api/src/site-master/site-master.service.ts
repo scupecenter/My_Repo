@@ -52,7 +52,7 @@ export class SiteMasterService {
   }
 
   /**
-   * GET /site360/{menu}/rows (contract 0.15.21, F15, migration 0104): one page of a menu's rows. Visibility (B3), the filters, the sort and the
+   * GET /site-master/{menu}/rows (contract 0.15.21, F15, migration 0104): one page of a menu's rows. Visibility (B3), the filters, the sort and the
    * paging are in SQL; the values come from the set-based view site360_master_values in one query for the page (no per-site path).
    */
   async rows(auth: AuthContext, rawMenu: string, q: Record<string, unknown>): Promise<SiteMasterRowsDto> {
@@ -254,7 +254,7 @@ export class SiteMasterService {
   }
 
   /**
-   * GET /site360/sites/{site_id}/sources (contract 0.15.35, migration 0121): the value and the source of every Master column of one site (or of one
+   * GET /site-master/sites/{site_id}/sources (contract 0.15.35, migration 0121): the value and the source of every Master column of one site (or of one
    * menu's columns). Per site, not per page, so a page of 1000 sites stays light: the grid asks for it when a cell is opened. The source comes from
    * the same branch of site360_master_values that computes the value, read with the caller's rights (row security): a site outside the caller's
    * regions answers 404, and a value hidden by the register's module view (B3) or by a field rule gives the source kind without value or id.

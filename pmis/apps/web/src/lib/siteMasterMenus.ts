@@ -1,5 +1,5 @@
 /**
- * The eight Site Master menus in menu order (names as the API sends them in `GET /site360/sections`).
+ * The eight Site Master menus in menu order (names as the API sends them in `GET /site-master/sections`).
  * The `master` entry is a section key only (`/sites?section=master`): the sidebar shows it as the parent entry "Site Master", not as a sub-menu.
  */
 export const SITE_MASTER_NAV: { key: string; en: string; ar: string }[] = [

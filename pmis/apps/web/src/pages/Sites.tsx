@@ -66,17 +66,17 @@ export function Sites() {
   // opens only when ?layout=grid is in the URL (hidden, kept for its source panel and tests).
   const section = sp.get('section') ?? '';
   const layout = sp.get('layout') === 'grid' ? 'grid' : 'list';
-  // Wide table (owner request 2026-11-22): read-only, the Master columns of the menu left to right; it reads the same GET /site360/{menu}/rows as the grid
+  // Wide table (owner request 2026-11-22): read-only, the Master columns of the menu left to right; it reads the same GET /site-master/{menu}/rows as the grid
   const asWide = sp.get('layout') === 'wide';
   const siteMasterQ = useSiteMasterSections();
-  // Each sub-menu keeps its OWN columns (GET /site360/sections) and values (GET /site360/{menu}/rows) in the calm list style of this page (owner request
+  // Each sub-menu keeps its OWN columns (GET /site-master/sections) and values (GET /site-master/{menu}/rows) in the calm list style of this page (owner request
   // 2026-11-22): no band or group rows, no inline editing. Site Master itself shows the generic list with the pipeline, workflow locks, data gaps and the
   // stage/mine/late/locks/gaps filters (owner answer 2026-11-22 "bring them back"); a stream or a work view (?stream=, ?view=) keeps it too.
   const menuKey = section || ((layout === 'grid' || asWide) && !stream && !view ? SITE_MASTER_MASTER : '');
   const lay = sp.get('layout');
   const menuList = !!section && lay !== 'list' && lay !== 'grid' && lay !== 'map' && lay !== 'board' && !asWide && !siteMasterQ.isError;
   const menu = menuKey ? siteMasterQ.data?.items.find((m) => m.key === menuKey) : undefined;
-  // The grid reads its rows from GET /site360/{menu}/rows (one page, the same URL filters as the list), so the grid and the list share the source.
+  // The grid reads its rows from GET /site-master/{menu}/rows (one page, the same URL filters as the list), so the grid and the list share the source.
   // Multi Site ID search (paste a list, comma or newline separated) is kept in the URL as site_code, like the other filters.
   // F3 (0.15.31): the AND/OR filter tree lives in the URL as JSON (adv) and goes to the server as `filter`, which compiles it
   const adv = sp.get('adv') ?? '';
@@ -88,7 +88,7 @@ export function Sites() {
     filter: adv || undefined,
     region_id: sp.get('region_id') || undefined,
     scenario: sp.get('scenario') || undefined,
-    // the grid reads `status` (GET /site360/{menu}/rows); the page keeps the shared URL key overall_status (audit A finding 11)
+    // the grid reads `status` (GET /site-master/{menu}/rows); the page keeps the shared URL key overall_status (audit A finding 11)
     status: sp.get('overall_status') || undefined,
     // 0.15.50: the list filters of GET /sites that the rows endpoint now takes with the same meaning: stage, mine/late, workflow locks, data gaps
     stage_code: sp.get('stage_code') || undefined,
@@ -204,7 +204,7 @@ export function Sites() {
   const mCol = (id: string) => mCols.find((c) => `c${c.ord}` === id);
   // per user and per screen (W8 item 4: the Display options too); the wide table of a menu keeps its own
   const tbl = useTablePrefs(menuList ? `sites-menu-${menuKey}` : asWide ? `sites-wide-${menuKey}` : real ? 'sites-stream' : 'sites', menuList ? defsMenu : real ? DEFS_STREAM : DEFS_ALL);
-  const fromRows = menuList || asWide; // the rows come from GET /site360/{menu}/rows
+  const fromRows = menuList || asWide; // the rows come from GET /site-master/{menu}/rows
   const nRows = fromRows ? mRows.length : items.length;
   const ROW = ROWS[tbl.density] + (tbl.display.wrap ? WRAP_EXTRA : 0);
   const viewport = Math.max(320, (typeof window === 'undefined' ? 800 : window.innerHeight) - 380);

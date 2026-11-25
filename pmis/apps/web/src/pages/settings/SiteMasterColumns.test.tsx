@@ -10,7 +10,7 @@ import { SettingsRoutes } from './Settings';
 
 /**
  * Settings > Workflow > Columns (W3; before: the SiteMaster tab). Contract 0.15.21, F15: every Master column with its Site Master menus, changed in one
- * dialog with a reason (`PATCH /site360/columns/{ord}/sections`, the same right as before: site360_col_can_admin on the server).
+ * dialog with a reason (`PATCH /site-master/columns/{ord}/sections`, the same right as before: site360_col_can_admin on the server).
  */
 function Probe() {
   const l = useLocation();
@@ -30,7 +30,7 @@ describe('Settings > Workflow > Columns (Site Master columns)', () => {
     expect(screen.getByTestId('settings-section-workflow-columns')).toHaveClass('btn-accent');
     expect(screen.getByTestId('settings-section-workflow-columns')).toHaveTextContent('Columns');
     expect(screen.getByTestId('site-master-columns')).toHaveTextContent('Site Master columns');
-    expect(screen.getByTestId('site-master-columns')).not.toHaveTextContent(/Site360|SITE 360|Site 360/);
+    expect(screen.getByTestId('site-master-columns')).not.toHaveTextContent(/SiteMaster|SITE 360|Site 360/);
     expect(screen.getByTestId('siteMasterCols-studio-link')).toHaveAttribute('href', '/admin/settings/workflow/editor');
   });
 
@@ -45,7 +45,7 @@ describe('Settings > Workflow > Columns (Site Master columns)', () => {
 
   it('saves the new menus with the reason through the same API', async () => {
     const sent: unknown[] = [];
-    server.use(http.patch(`${API_BASE}/site360/columns/:ord/sections`, async ({ params, request }) => {
+    server.use(http.patch(`${API_BASE}/site-master/columns/:ord/sections`, async ({ params, request }) => {
       sent.push({ ord: Number(params.ord), ...(await request.json() as object) });
       return HttpResponse.json({ ord: Number(params.ord), sections: ['cw', 'te'] });
     }));
@@ -60,7 +60,7 @@ describe('Settings > Workflow > Columns (Site Master columns)', () => {
     await waitFor(() => expect(screen.queryByTestId('siteMasterCols-dialog')).toBeNull());
   });
 
-  it.each(['/admin/settings/site360', '/admin/settings/site-master-columns'])('the old link %s opens Workflow > Columns', async (old) => {
+  it.each(['/admin/settings/site-master', '/admin/settings/site-master-columns'])('the old link %s opens Workflow > Columns', async (old) => {
     await signIn('pm');
     screenAt(old);
     expect(await screen.findByTestId('site-master-columns')).toBeInTheDocument();

@@ -35,12 +35,24 @@ const site = async (region: number, over: { scenario?: string; status?: string }
 };
 const mine = (): string => created.join(',');
 
-describe('GET /site360/{menu}/rows: the page and its values', () => {
+describe('GET /site-master/{menu}/rows: the page and its values', () => {
+  it('the old path /site360/{menu}/rows still answers for one release, with the same rows as /site-master/{menu}/rows', async () => {
+    const s = await site(1);
+    const a = await actor(app, db, { regions: [1] });
+    const now = await a.api.call('get', `/site-master/master/rows?site_code=${s.code}`);
+    const old = await a.api.call('get', `/site360/master/rows?site_code=${s.code}`);
+    expect(now.status).toBe(200);
+    expect(old.status).toBe(200);
+    expect(old.body.rows.map((r: { site_code: string }) => r.site_code)).toEqual(now.body.rows.map((r: { site_code: string }) => r.site_code));
+    expect((await a.api.call('get', '/site360/sections')).status).toBe(200);
+    expect((await a.api.call('get', '/site-master/sections')).status).toBe(200);
+  });
+
   it('returns the menu columns and, per row, the identity and the actual date of a task from the view', async () => {
     const s = await site(1);
     await makeTask(db, s, dateMap.task_code, 'open', { actualDate: '2026-03-10' });
     const a = await actor(app, db, { regions: [1] });
-    const res = await a.api.call('get', `/site360/master/rows?site_code=${s.code}`);
+    const res = await a.api.call('get', `/site-master/master/rows?site_code=${s.code}`);
     expect(res.status).toBe(200);
     expect(res.body.menu.key).toBe('master');
     expect(res.body.menu.frozen_ords).toEqual([1, 2, 3, 4]);
@@ -60,7 +72,7 @@ describe('GET /site360/{menu}/rows: the page and its values', () => {
     const locked = await site(1);
     await makeTask(db, locked, dateMap.task_code, 'locked');
     const a = await actor(app, db, { regions: [1] });
-    const res = await a.api.call('get', `/site360/master/rows?site_code=${open.code},${locked.code}`);
+    const res = await a.api.call('get', `/site-master/master/rows?site_code=${open.code},${locked.code}`);
     expect(res.status).toBe(200);
     const byCode = new Map<string, { cells: Record<string, { task_id: string; version: number; editable: boolean; field?: string }> }>(
       res.body.rows.map((r: { site_code: string; cells: unknown }) => [r.site_code, r as never]),
@@ -76,7 +88,7 @@ describe('GET /site360/{menu}/rows: the page and its values', () => {
 
   it('keeps the menu columns: a menu lists its own columns, the identity and the status columns only', async () => {
     const a = await actor(app, db, { regions: [1] });
-    const res = await a.api.call('get', `/site360/design_acq/rows?site_code=${mine()}`);
+    const res = await a.api.call('get', `/site-master/design_acq/rows?site_code=${mine()}`);
     expect(res.status).toBe(200);
     const ords = res.body.menu.columns.map((c: { ord: number }) => c.ord);
     expect(ords).toContain(2);
@@ -90,10 +102,10 @@ describe('GET /site360/{menu}/rows: the page and its values', () => {
     const tripoli = await site(1, { scenario: 'expansion' });
     const other = await site(1, { scenario: 'new_build' });
     const a = await actor(app, db, { regions: [1] });
-    const all = await a.api.call('get', `/site360/master/rows?limit=5`);
+    const all = await a.api.call('get', `/site-master/master/rows?limit=5`);
     expect(all.body.total).toBeGreaterThanOrEqual(2);
     expect(all.body.filtered).toBe(all.body.total);
-    const filtered = await a.api.call('get', `/site360/master/rows?site_code=${tripoli.code},${other.code}&scenario=expansion`);
+    const filtered = await a.api.call('get', `/site-master/master/rows?site_code=${tripoli.code},${other.code}&scenario=expansion`);
     expect(filtered.body.filtered).toBe(1);
     expect(filtered.body.rows.map((r: { site_code: string }) => r.site_code)).toEqual([tripoli.code]);
     expect(filtered.body.total).toBe(all.body.total);
@@ -101,8 +113,8 @@ describe('GET /site360/{menu}/rows: the page and its values', () => {
 
   it('pages in the database: offset, limit and running row numbers', async () => {
     const a = await actor(app, db, { regions: [1] });
-    const p1 = await a.api.call('get', `/site360/master/rows?site_code=${mine()}&sort=site_code&limit=1&offset=0`);
-    const p2 = await a.api.call('get', `/site360/master/rows?site_code=${mine()}&sort=site_code&limit=1&offset=1`);
+    const p1 = await a.api.call('get', `/site-master/master/rows?site_code=${mine()}&sort=site_code&limit=1&offset=0`);
+    const p2 = await a.api.call('get', `/site-master/master/rows?site_code=${mine()}&sort=site_code&limit=1&offset=1`);
     expect(p1.body.filtered).toBe(created.length);
     expect(created.length).toBeGreaterThanOrEqual(3);
     expect(p1.body.rows[0].row_no).toBe(1);
@@ -112,10 +124,10 @@ describe('GET /site360/{menu}/rows: the page and its values', () => {
 
   it('sorts by a site field and by a Master column of the menu, descending', async () => {
     const a = await actor(app, db, { regions: [1] });
-    const byCode = await a.api.call('get', `/site360/master/rows?site_code=${mine()}&sort=site_code&dir=desc&limit=200`);
+    const byCode = await a.api.call('get', `/site-master/master/rows?site_code=${mine()}&sort=site_code&dir=desc&limit=200`);
     const codes = byCode.body.rows.map((r: { site_code: string }) => r.site_code);
     expect(codes).toEqual([...codes].sort().reverse());
-    const byOrd = await a.api.call('get', `/site360/master/rows?site_code=${mine()}&sort=ord:${dateMap.ord}&limit=200`);
+    const byOrd = await a.api.call('get', `/site-master/master/rows?site_code=${mine()}&sort=ord:${dateMap.ord}&limit=200`);
     expect(byOrd.status).toBe(200);
     const ordValues = byOrd.body.rows.map((r: { values: Record<string, string | null> }) => r.values[String(dateMap.ord)]);
     const set = ordValues.filter((v: string | null) => v !== null);
@@ -127,7 +139,7 @@ describe('GET /site360/{menu}/rows: the page and its values', () => {
     const user = await makeUser(db, { status: 'active' });
     await addAssignment(db, user.id, { level: 'entry', regions: [1], modules: null, grants: [['sites', 'view']] });
     const api = await loggedIn(app, user);
-    const res = await api.call('get', `/site360/master/rows?site_code=${benghazi.code}`);
+    const res = await api.call('get', `/site-master/master/rows?site_code=${benghazi.code}`);
     expect(res.status).toBe(200);
     expect(res.body.filtered).toBe(0);
     expect(res.body.rows).toEqual([]);
@@ -137,12 +149,12 @@ describe('GET /site360/{menu}/rows: the page and its values', () => {
     const s = await site(1);
     await db.query(`INSERT INTO issues (site_id, region_id, title, detail, raised_date, status) VALUES ($1, 1, 'Access road blocked', 'Gate closed', DATE '2026-04-02', 'open')`, [s.id]);
     const a = await actor(app, db, { regions: [1], grants: [['sites', 'view'], ['issues', 'view']] });
-    const res = await a.api.call('get', `/site360/master/rows?site_code=${s.code}`);
+    const res = await a.api.call('get', `/site-master/master/rows?site_code=${s.code}`);
     expect(res.status).toBe(200);
     const values = res.body.rows[0].values;
     expect(values['183']).toBe('Access road blocked');
     const hidden = await actor(app, db, { regions: [1], grants: [['sites', 'view']] });
-    const none = await hidden.api.call('get', `/site360/master/rows?site_code=${s.code}`);
+    const none = await hidden.api.call('get', `/site-master/master/rows?site_code=${s.code}`);
     expect(none.body.rows[0].values['183']).toBeNull();
     expect(values['185']).toBe('2026-04-02');
     expect(values['186']).toBe('open');
@@ -151,10 +163,10 @@ describe('GET /site360/{menu}/rows: the page and its values', () => {
 
   it('answers 422 for an unknown menu, sort or a page size over 200', async () => {
     const a = await actor(app, db, { regions: [1] });
-    expect((await a.api.call('get', '/site360/nope/rows')).status).toBe(422);
-    expect((await a.api.call('get', '/site360/master/rows?sort=drop_table')).status).toBe(422);
-    expect((await a.api.call('get', '/site360/master/rows?limit=500')).status).toBe(422);
-    expect((await a.api.call('get', '/site360/master/rows?region_id=9')).status).toBe(422);
+    expect((await a.api.call('get', '/site-master/nope/rows')).status).toBe(422);
+    expect((await a.api.call('get', '/site-master/master/rows?sort=drop_table')).status).toBe(422);
+    expect((await a.api.call('get', '/site-master/master/rows?limit=500')).status).toBe(422);
+    expect((await a.api.call('get', '/site-master/master/rows?region_id=9')).status).toBe(422);
   });
 });
 
@@ -171,7 +183,7 @@ describe('performance: one page of 1000 sites stays under 2 seconds', () => {
       WHERE s.site_code LIKE $2 || '%'`, [dateMap.task_code, PERF]);
     const admin = await actor(app, db, { regions: null });
     const t0 = Date.now();
-    const first = await admin.api.call('get', `/site360/master/rows?region_id=1,2,3,4,5,6,7&limit=50&sort=site_code`);
+    const first = await admin.api.call('get', `/site-master/master/rows?region_id=1,2,3,4,5,6,7&limit=50&sort=site_code`);
     const firstMs = Date.now() - t0;
     expect(first.status).toBe(200);
     expect(first.body.total).toBeGreaterThanOrEqual(1000);
@@ -179,7 +191,7 @@ describe('performance: one page of 1000 sites stays under 2 seconds', () => {
     expect(first.body.rows).toHaveLength(50);
     expect(firstMs).toBeLessThan(2000);
     const t1 = Date.now();
-    const sorted = await admin.api.call('get', `/site360/master/rows?region_id=1,2,3,4,5,6,7&sort=ord:${dateMap.ord}&dir=desc&offset=50&limit=50`);
+    const sorted = await admin.api.call('get', `/site-master/master/rows?region_id=1,2,3,4,5,6,7&sort=ord:${dateMap.ord}&dir=desc&offset=50&limit=50`);
     const sortedMs = Date.now() - t1;
     expect(sorted.status).toBe(200);
     expect(sorted.body.rows[0].row_no).toBe(51);
@@ -187,7 +199,7 @@ describe('performance: one page of 1000 sites stays under 2 seconds', () => {
   });
 });
 
-describe('GET /site360/{menu}/rows: the calc columns of the procurement and GECOL registers (0107)', () => {
+describe('GET /site-master/{menu}/rows: the calc columns of the procurement and GECOL registers (0107)', () => {
   it('reads the contractor of the first active CW order (AJ, AK) and the GECOL status (BW), and filters by contractor', async () => {
     const s = await site(1);
     const name = `${PREFIX}-CON-${randomBytes(2).toString('hex')}`;
@@ -201,15 +213,15 @@ describe('GET /site360/{menu}/rows: the calc columns of the procurement and GECO
     const mod = (await db.query(`SELECT module_key FROM register_definitions WHERE register_key = 'procurement'`)).rows[0].module_key as string;
     const gecolMod = (await db.query(`SELECT module_key FROM register_definitions WHERE register_key = 'gecol'`)).rows[0].module_key as string;
     const a = await actor(app, db, { regions: [1], grants: [['sites', 'view'], [mod, 'view'], [gecolMod, 'view']] });
-    const res = await a.api.call('get', `/site360/master/rows?site_code=${s.code}`);
+    const res = await a.api.call('get', `/site-master/master/rows?site_code=${s.code}`);
     expect(res.status).toBe(200);
     expect(res.body.rows[0].values['36']).toBe(name);
     expect(res.body.rows[0].values['37']).toBe(`${name} team`);
     // 0119: BW is the workbook formula (the scope AC of this site is N/A); the unwritten gecol_records.status is no longer read
     expect(res.body.rows[0].values['75']).toBe('N/A');
-    const hit = await a.api.call('get', `/site360/master/rows?site_code=${s.code}&contractor=${encodeURIComponent(name)}`);
+    const hit = await a.api.call('get', `/site-master/master/rows?site_code=${s.code}&contractor=${encodeURIComponent(name)}`);
     expect(hit.body.filtered).toBe(1);
-    const miss = await a.api.call('get', `/site360/master/rows?site_code=${s.code}&contractor=${encodeURIComponent(`${name}-X`)}`);
+    const miss = await a.api.call('get', `/site-master/master/rows?site_code=${s.code}&contractor=${encodeURIComponent(`${name}-X`)}`);
     expect(miss.body.filtered).toBe(0);
   });
 
@@ -223,7 +235,7 @@ describe('GET /site360/{menu}/rows: the calc columns of the procurement and GECO
     const permMod = (await db.query(`SELECT module_key FROM register_definitions WHERE register_key = 'permits_hse'`)).rows[0].module_key as string;
     const hlcMod = (await db.query(`SELECT module_key FROM register_definitions WHERE register_key = 'hlc'`)).rows[0].module_key as string;
     const a = await actor(app, db, { regions: [1], grants: [['sites', 'view'], [permMod, 'view'], [hlcMod, 'view']] });
-    const res = await a.api.call('get', `/site360/master/rows?site_code=${s.code},${hlcSite.code}`);
+    const res = await a.api.call('get', `/site-master/master/rows?site_code=${s.code},${hlcSite.code}`);
     expect(res.status).toBe(200);
     const byCode = new Map<string, Record<string, string | null>>(res.body.rows.map((r: { site_code: string; values: Record<string, string | null> }) => [r.site_code, r.values]));
     expect(byCode.get(s.code)!['38']).toBe('2026-02-01');
@@ -238,9 +250,9 @@ describe('GET /site360/{menu}/rows: the calc columns of the procurement and GECO
     const party = (await db.query(`INSERT INTO external_parties (name, type, is_active) VALUES ($1, 'cw_contractor', true) RETURNING id`, [name])).rows[0].id as string;
     await db.query(`INSERT INTO procurement_records (site_id, region_id, scope, order_status, party_id) VALUES ($1, 1, 'CW', 'issued', $2)`, [s.id, party]);
     const a = await actor(app, db, { regions: [1], grants: [['sites', 'view']] });
-    const res = await a.api.call('get', `/site360/master/rows?site_code=${s.code}`);
+    const res = await a.api.call('get', `/site-master/master/rows?site_code=${s.code}`);
     expect(res.body.rows[0].values['36']).toBeNull();
-    const hit = await a.api.call('get', `/site360/master/rows?site_code=${s.code}&contractor=${encodeURIComponent(name)}`);
+    const hit = await a.api.call('get', `/site-master/master/rows?site_code=${s.code}&contractor=${encodeURIComponent(name)}`);
     expect(hit.body.filtered).toBe(0);
   });
 });

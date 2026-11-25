@@ -81,7 +81,7 @@ describe('Site Master wide table', () => {
   it('keeps the filters visible and sends the same URL filters as the sub-menu list to the rows endpoint', async () => {
     await signIn('pm');
     const urls: URL[] = [];
-    server.use(http.get(`${API_BASE}/site360/:menu/rows`, ({ request }) => { urls.push(new URL(request.url)); return HttpResponse.json({ total: 0, filtered: 0, offset: 0, limit: 200, rows: [] }); }));
+    server.use(http.get(`${API_BASE}/site-master/:menu/rows`, ({ request }) => { urls.push(new URL(request.url)); return HttpResponse.json({ total: 0, filtered: 0, offset: 0, limit: 200, rows: [] }); }));
     renderApp(<App />, { route: '/sites?section=te&layout=wide&region_id=1&scenario=expansion&overall_status=in_progress&q=abc' });
     await screen.findByTestId('sites-wide-table');
     // the unified filter (+ Filter) on the menu's screen, with the URL filters as chips
@@ -89,12 +89,12 @@ describe('Site Master wide table', () => {
     for (const k of ['q', 'region_id', 'scenario', 'overall_status']) expect(screen.getByTestId(`filter-chip-x-${k}`)).toBeTruthy();
     await waitFor(() => expect(urls.length).toBeGreaterThan(0));
     const p = urls[0]!.searchParams;
-    expect(urls[0]!.pathname).toContain('/site360/te/rows');
+    expect(urls[0]!.pathname).toContain('/site-master/te/rows');
     expect([p.get('region_id'), p.get('scenario'), p.get('status')]).toEqual(['1', 'expansion', 'in_progress']);
   });
 
   describe('editing', () => {
-    const rowsWithTargets = () => server.use(http.get(`${API_BASE}/site360/:menu/rows`, ({ request }) => {
+    const rowsWithTargets = () => server.use(http.get(`${API_BASE}/site-master/:menu/rows`, ({ request }) => {
       const values = { '4': 'Name', '5': 'Tripoli', '78': '2026-03-10', '33': 'outsourced' };
       return HttpResponse.json({ total: 2, filtered: 2, offset: 0, limit: 50, rows: [
         { site_id: 'a0000000-0000-4000-8000-000000000001', site_code: 'S360-001', row_no: 1, values, cells: { '78': { task_id: 'task-1', version: 3, editable: true, field: 'actual_date' }, '33': { task_id: 'task-1', version: 3, editable: false } } },
@@ -145,7 +145,7 @@ describe('Site Master wide table', () => {
       expect(screen.getByTestId('wide-input-S360-001-78')).toBeTruthy(); // the editor stays open with the draft
     });
 
-    const typed = () => server.use(http.get(`${API_BASE}/site360/:menu/rows`, () => HttpResponse.json({ total: 1, filtered: 1, offset: 0, limit: 50, rows: [
+    const typed = () => server.use(http.get(`${API_BASE}/site-master/:menu/rows`, () => HttpResponse.json({ total: 1, filtered: 1, offset: 0, limit: 50, rows: [
       { site_id: 'a0000000-0000-4000-8000-000000000001', site_code: 'S360-001', row_no: 1, values: { '4': 'Name', '24': '12', '33': 'B', '157': 'true' }, cells: {
         '24': { task_id: 'task-1', version: 3, editable: true, values: 'height', input_type: 'number' },
         '33': { task_id: 'task-1', version: 3, editable: true, values: 'grade', input_type: 'list', options: [{ value: 'A', label_en: 'Grade A', label_ar: 'الدرجة أ' }, { value: 'B', label_en: 'Grade B', label_ar: null }] },

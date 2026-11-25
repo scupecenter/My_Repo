@@ -4,7 +4,7 @@ import { stepUpValid, viewer } from './db';
 import { guard, problem, stepUp } from './handlers';
 
 /**
- * Contract 0.15.43 (Workflow Studio S2): the Site Master columns an admin manages. A small synthetic set in the shape of `GET /site360/columns`:
+ * Contract 0.15.43 (Workflow Studio S2): the Site Master columns an admin manages. A small synthetic set in the shape of `GET /site-master/columns`:
  * original columns (some protected, some filled by a task input), and added columns after GE (never held a value, holds values, deactivated).
  * Only the System Admin (account `pm`) writes; every write checks the reason, the column's version (If-Match) and the step-up, in that order.
  */
@@ -87,7 +87,7 @@ const readGate = () => { const g = guard(); if (g) return g; if (!canEdit()) ret
 const MENUS = ['design_acq', 'sow', 'cw', 'te', 'hoto', 'dismantle', 'om'];
 
 export const siteColumnHandlers = [
-  http.get(`${B}/site360/columns`, ({ request }) => {
+  http.get(`${B}/site-master/columns`, ({ request }) => {
     const r = readGate(); if (r) return r;
     const all = new URL(request.url).searchParams.get('include_inactive') !== 'false';
     const items = ordered().filter((c) => all || c.is_active);
@@ -99,7 +99,7 @@ export const siteColumnHandlers = [
     }
     return HttpResponse.json({ items: items.map(admin), bands, types: ['text', 'number', 'date', 'list', 'yes_no'] });
   }),
-  http.post(`${B}/site360/columns`, async ({ request }) => {
+  http.post(`${B}/site-master/columns`, async ({ request }) => {
     const g = guard(); if (g) return g;
     if (!canEdit()) return problem(403, 'action_forbidden', 'You need edit on fields.');
     const b = (await request.json()) as { name_en?: string; name_ar?: string | null; group_top?: string; group_mid?: string | null; after_ord?: number; value_type?: Type; list_catalogue?: string | null; sections?: string[]; reason?: string; source?: { kind: string; task_code?: string; field_key?: string; field_id?: string } };
@@ -129,19 +129,19 @@ export const siteColumnHandlers = [
     cols.push(c);
     return one(c, 201);
   }),
-  http.get(`${B}/site360/columns/:ord`, ({ params }) => {
+  http.get(`${B}/site-master/columns/:ord`, ({ params }) => {
     const r = readGate(); if (r) return r;
     const c = cols.find((x) => x.ord === Number(params.ord));
     return c ? one(c) : problem(404, 'not_found', 'The column does not exist.');
   }),
-  http.patch(`${B}/site360/columns/:ord/sections`, async ({ params, request }) => {
+  http.patch(`${B}/site-master/columns/:ord/sections`, async ({ params, request }) => {
     const b = (await request.json()) as { sections?: string[]; reason?: string };
     const k = gate(params, request, b, false); if ('r' in k) return k.r;
     if (k.c.sections.includes('status') || !b.sections?.length || b.sections.some((s) => !MENUS.includes(s))) return fieldErr('/sections', 'invalid');
     k.c.sections = [...b.sections]; k.c.version += 1;
     return HttpResponse.json({ ord: k.c.ord, letter: letterOf(k.c.ord), group_top: k.c.group_top, group_mid: k.c.group_mid, header: admin(k.c).header, sections: k.c.sections, is_phase_gate: false });
   }),
-  http.patch(`${B}/site360/columns/:ord`, async ({ params, request }) => {
+  http.patch(`${B}/site-master/columns/:ord`, async ({ params, request }) => {
     const b = (await request.json()) as { name_en?: string; name_ar?: string | null; value_type?: Type; list_catalogue?: string | null; group_top?: string; group_mid?: string | null; after_ord?: number; confirm_unconvertible?: boolean; reason?: string };
     const k = gate(params, request, b); if ('r' in k) return k.r;
     const c = k.c;
@@ -163,14 +163,14 @@ export const siteColumnHandlers = [
     c.value_type = type; c.list_catalogue = type === 'list' ? list : null; c.version += 1;
     return one(c);
   }),
-  http.delete(`${B}/site360/columns/:ord`, ({ params, request }) => {
+  http.delete(`${B}/site-master/columns/:ord`, ({ params, request }) => {
     const k = gate(params, request, { reason: new URL(request.url).searchParams.get('reason') }); if ('r' in k) return k.r;
     if (!k.c.is_added) return problem(409, 'system_field', 'An original column is never deleted.');
     if (k.c.values.length) return problem(409, 'column_in_use', 'The column holds values: deactivate it.', { why: 'has_values', count: k.c.values.length } as never);
     cols = cols.filter((x) => x.ord !== k.c.ord);
     return HttpResponse.json({ ord: k.c.ord, letter: letterOf(k.c.ord), deleted: true, removed_input: k.c.source.kind === 'task' });
   }),
-  http.post(`${B}/site360/columns/:ord/type-preview`, async ({ params, request }) => {
+  http.post(`${B}/site-master/columns/:ord/type-preview`, async ({ params, request }) => {
     const r = readGate(); if (r) return r;
     const c = cols.find((x) => x.ord === Number(params.ord));
     if (!c) return problem(404, 'not_found', 'The column does not exist.');
@@ -178,14 +178,14 @@ export const siteColumnHandlers = [
     if (!b.value_type) return fieldErr('/value_type', 'required');
     return HttpResponse.json(preview(c, b.value_type, b.list_catalogue ?? null));
   }),
-  http.post(`${B}/site360/columns/:ord/deactivate`, async ({ params, request }) => {
+  http.post(`${B}/site-master/columns/:ord/deactivate`, async ({ params, request }) => {
     const k = gate(params, request, (await request.json()) as { reason?: string }); if ('r' in k) return k.r;
     if (k.c.is_protected) return problem(409, 'system_field', 'A protected column cannot be deactivated.');
     if (!k.c.is_active) return problem(409, 'invalid_transition', 'The column is inactive already.');
     k.c.is_active = false; k.c.version += 1;
     return one(k.c);
   }),
-  http.post(`${B}/site360/columns/:ord/reactivate`, async ({ params, request }) => {
+  http.post(`${B}/site-master/columns/:ord/reactivate`, async ({ params, request }) => {
     const k = gate(params, request, (await request.json()) as { reason?: string }); if ('r' in k) return k.r;
     if (k.c.is_active) return problem(409, 'invalid_transition', 'The column is active already.');
     k.c.is_active = true; k.c.version += 1;

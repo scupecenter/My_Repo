@@ -84,7 +84,7 @@ describe('Site Master menus on the Sites page', () => {
   it('sends the status filter of the grid as `status`, the name the API reads (audit A finding 11)', { timeout: 30_000 }, async () => {
     await signIn('pm');
     const seen: URLSearchParams[] = [];
-    const on = ({ request }: { request: Request }) => { const u = new URL(request.url); if (u.pathname.endsWith('/site360/cw/rows')) seen.push(u.searchParams); };
+    const on = ({ request }: { request: Request }) => { const u = new URL(request.url); if (u.pathname.endsWith('/site-master/cw/rows')) seen.push(u.searchParams); };
     server.events.on('request:start', on);
     try {
       renderApp(<Sites />, { route: '/sites?section=cw&layout=grid&overall_status=on_hold' });

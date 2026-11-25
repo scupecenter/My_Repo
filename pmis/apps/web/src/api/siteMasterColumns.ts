@@ -5,16 +5,16 @@ import type { components } from './schema';
 type S = components['schemas'];
 
 /** Contract 0.15.43 (Workflow Studio S2): the Site Master columns as an admin manages them. */
-export type ColumnAdmin = S['Site360ColumnAdmin'];
-export type ColumnDetail = S['Site360ColumnDetail'];
-export type ColumnList = S['Site360ColumnList'];
-export type ColumnType = S['Site360ColumnType'];
-export type ColumnCreate = S['Site360ColumnCreate'];
+export type ColumnAdmin = S['SiteMasterColumnAdmin'];
+export type ColumnDetail = S['SiteMasterColumnDetail'];
+export type ColumnList = S['SiteMasterColumnList'];
+export type ColumnType = S['SiteMasterColumnType'];
+export type ColumnCreate = S['SiteMasterColumnCreate'];
 /** `confirm_unconvertible` has a default in the contract: optional here. */
-export type ColumnUpdate = Omit<S['Site360ColumnUpdate'], 'confirm_unconvertible'> & { confirm_unconvertible?: boolean };
+export type ColumnUpdate = Omit<S['SiteMasterColumnUpdate'], 'confirm_unconvertible'> & { confirm_unconvertible?: boolean };
 export type MenuKey = NonNullable<ColumnCreate['sections']>[number];
-export type ColumnTypePreview = S['Site360ColumnTypePreview'];
-export type ColumnDeleted = S['Site360ColumnDeleted'];
+export type ColumnTypePreview = S['SiteMasterColumnTypePreview'];
+export type ColumnDeleted = S['SiteMasterColumnDeleted'];
 export type SiteCustomFieldDef = S['CustomFieldDefinition'];
 
 export const COLUMN_TYPES: ColumnType[] = ['text', 'number', 'date', 'list', 'yes_no'];
@@ -23,7 +23,7 @@ export const TASK_INPUT_KEYS = ['planned_date', 'planned_start', 'actual_start',
 
 /** Every column with its place, type, list, source, menus and protection. Only a System Admin (or a `fields` delegate) reads it: 403 otherwise. */
 export const useColumnAdmin = () =>
-  useQuery({ queryKey: ['site-master-columns'], retry: false, queryFn: () => api.get<ColumnList>('/site360/columns') });
+  useQuery({ queryKey: ['site-master-columns'], retry: false, queryFn: () => api.get<ColumnList>('/site-master/columns') });
 
 /** One column with its usage (`delete_mode` says whether DELETE is allowed). Asked only for the added columns. */
 export const useColumnDetails = (ords: number[]) =>
@@ -32,7 +32,7 @@ export const useColumnDetails = (ords: number[]) =>
     enabled: ords.length > 0,
     retry: false,
     queryFn: async () => {
-      const rows = await Promise.all(ords.map((o) => api.get<ColumnDetail>(`/site360/columns/${o}`)));
+      const rows = await Promise.all(ords.map((o) => api.get<ColumnDetail>(`/site-master/columns/${o}`)));
       return Object.fromEntries(rows.map((r) => [r.ord, r])) as Record<number, ColumnDetail>;
     },
   });
@@ -44,7 +44,7 @@ export const useSiteCustomFields = (enabled = true) =>
 /** The preview writes nothing: a mutation only because it is a POST with a body. */
 export const usePreviewColumnType = () =>
   useMutation<ColumnTypePreview, ApiError, { ord: number; value_type: ColumnType; list_catalogue?: string | null }>({
-    mutationFn: ({ ord, ...body }) => api.post(`/site360/columns/${ord}/type-preview`, { body }),
+    mutationFn: ({ ord, ...body }) => api.post(`/site-master/columns/${ord}/type-preview`, { body }),
   });
 
 /**
@@ -74,13 +74,13 @@ function useColumnWrite<I extends { ord?: number }, O>(run: (input: I) => Promis
   });
 }
 
-export const useCreateColumn = () => useColumnWrite<ColumnCreate & { ord?: number }, ColumnDetail>((body) => api.post('/site360/columns', { body }));
+export const useCreateColumn = () => useColumnWrite<ColumnCreate & { ord?: number }, ColumnDetail>((body) => api.post('/site-master/columns', { body }));
 /** `version` is the column's version as read (sent as If-Match). */
 export const useUpdateColumn = () =>
-  useColumnWrite<{ ord: number; version: number; body: ColumnUpdate }, ColumnDetail>(({ ord, version, body }) => api.patch(`/site360/columns/${ord}`, { version, body }),
+  useColumnWrite<{ ord: number; version: number; body: ColumnUpdate }, ColumnDetail>(({ ord, version, body }) => api.patch(`/site-master/columns/${ord}`, { version, body }),
     ({ body }) => ({ ...(body.name_en !== undefined ? { name_en: body.name_en } : {}), ...(body.name_ar !== undefined ? { name_ar: body.name_ar } : {}) }));
-export const useDeactivateColumn = () => useColumnWrite<{ ord: number; version: number; reason: string }, ColumnDetail>(({ ord, version, reason }) => api.post(`/site360/columns/${ord}/deactivate`, { version, body: { reason } }), () => ({ is_active: false }));
-export const useReactivateColumn = () => useColumnWrite<{ ord: number; version: number; reason: string }, ColumnDetail>(({ ord, version, reason }) => api.post(`/site360/columns/${ord}/reactivate`, { version, body: { reason } }), () => ({ is_active: true }));
-export const useDeleteColumn = () => useColumnWrite<{ ord: number; version: number; reason: string }, ColumnDeleted>(({ ord, version, reason }) => api.del(`/site360/columns/${ord}`, { version, query: { reason } }));
+export const useDeactivateColumn = () => useColumnWrite<{ ord: number; version: number; reason: string }, ColumnDetail>(({ ord, version, reason }) => api.post(`/site-master/columns/${ord}/deactivate`, { version, body: { reason } }), () => ({ is_active: false }));
+export const useReactivateColumn = () => useColumnWrite<{ ord: number; version: number; reason: string }, ColumnDetail>(({ ord, version, reason }) => api.post(`/site-master/columns/${ord}/reactivate`, { version, body: { reason } }), () => ({ is_active: true }));
+export const useDeleteColumn = () => useColumnWrite<{ ord: number; version: number; reason: string }, ColumnDeleted>(({ ord, version, reason }) => api.del(`/site-master/columns/${ord}`, { version, query: { reason } }));
 export const useColumnSections = () =>
-  useColumnWrite<{ ord: number; sections: MenuKey[]; reason: string }, unknown>(({ ord, sections, reason }) => api.patch(`/site360/columns/${ord}/sections`, { body: { sections, reason } }), ({ sections }) => ({ sections }));
+  useColumnWrite<{ ord: number; sections: MenuKey[]; reason: string }, unknown>(({ ord, sections, reason }) => api.patch(`/site-master/columns/${ord}/sections`, { body: { sections, reason } }), ({ sections }) => ({ sections }));
