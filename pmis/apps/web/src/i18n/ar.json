@@ -5639,7 +5639,8 @@
     "preview_name": "اسم موقع تجريبي طويل يبيّن كيف يُعرض النص الطويل",
     "since": "منذ",
     "export_view": "تصدير العرض الحالي",
-    "noun_documents": "مستندًا"
+    "noun_documents": "مستندًا",
+    "display_pin": "تثبيت الأعمدة الأولى"
   },
   "regviews": {
     "group_record": "السجل",

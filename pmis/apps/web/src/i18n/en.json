@@ -5571,7 +5571,8 @@
     "preview_name": "A long synthetic site name that shows how long text is drawn",
     "since": "Since",
     "export_view": "Export current view",
-    "noun_documents": "documents"
+    "noun_documents": "documents",
+    "display_pin": "Freeze the first columns"
   },
   "regviews": {
     "group_record": "Record",

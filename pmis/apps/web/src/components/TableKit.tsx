@@ -55,6 +55,8 @@ export function useTablePrefs(screen: string, defs: ColDef[]) {
   const base = useMemo(() => loadPrefs(screen, user, defs), [sig]); // eslint-disable-line react-hooks/exhaustive-deps
   const [own, setOwn] = useState<{ sig: string; p: Prefs } | null>(null);
   const prefs = own?.sig === sig ? own.p : base;
+  // Display > "Freeze the first columns" off: the identity columns lose their pin for this person, on this screen
+  const eff = useMemo(() => (prefs.unpinned ? defs.map((d) => (d.pinned ? { ...d, pinned: false } : d)) : defs), [prefs.unpinned, defs]);
   // W8 item 4: the user's own density and Display options win; unset ones follow Settings > Display
   const defaults = useTableDisplayDefaults();
   const density: Density = prefs.density ?? defaults.density;
@@ -69,8 +71,8 @@ export function useTablePrefs(screen: string, defs: ColDef[]) {
   };
   return {
     prefs,
-    defs,
-    cols: visibleCols(prefs, defs, autoNow),
+    defs: eff,
+    cols: visibleCols(prefs, eff, autoNow),
     density,
     /** W8 item 4: text size, alignment, density, wrap and zebra rows, as the table draws them now */
     display,
@@ -86,16 +88,18 @@ export function useTablePrefs(screen: string, defs: ColDef[]) {
     /** Back to the auto width of one column (double click on its edge). */
     autoSize: (id: string) => set((p) => ({ ...p, width: Object.fromEntries(Object.entries(p.width).filter(([k]) => k !== id)) })),
     menuCols: prefs.order
-      .map((id) => defs.find((d) => d.id === id))
+      .map((id) => eff.find((d) => d.id === id))
       .filter((d): d is ColDef => !!d && !d.forbidden),
-    move: (id: string, d: -1 | 1) => set((p) => moveCol(p, defs, id, d)),
-    drop: (id: string, onto: string) => set((p) => dropCol(p, defs, id, onto)),
-    toggle: (id: string) => set((p) => toggleCol(p, defs, id)),
+    move: (id: string, d: -1 | 1) => set((p) => moveCol(p, p.unpinned ? eff : defs, id, d)),
+    drop: (id: string, onto: string) => set((p) => dropCol(p, p.unpinned ? eff : defs, id, onto)),
+    toggle: (id: string) => set((p) => toggleCol(p, p.unpinned ? eff : defs, id)),
+    /** Display > Freeze the first columns */
+    setPinned: (on: boolean) => set((p) => { const { unpinned: _u, ...rest } = p; return on ? rest : { ...rest, unpinned: true }; }),
     resize: (id: string, px: number) => set((p) => resizeCol(p, defs, id, px)),
     setDensity: (d: Density) => set((p) => ({ ...p, density: d })),
     setDisplay: (d: Partial<DisplayOpts>) => set((p) => ({ ...p, display: { ...p.display, ...d } })),
     /** Back to the defaults of Settings > Display (the columns keep their order and widths) */
-    resetDisplay: () => set((p) => ({ order: p.order, hidden: p.hidden, width: p.width })),
+    resetDisplay: () => set((p) => ({ order: p.order, hidden: p.hidden, width: p.width, ...(p.unpinned ? { unpinned: true } : {}) })),
     reset: () =>
       set(() => ({ order: [], hidden: [], width: {} })),
     /** Applies the columns of a saved view (P10): unknown or forbidden columns are dropped by reconcile. */
