@@ -199,7 +199,7 @@ export class ImportService {
 
     // 1. the hidden sheet
     const tplSheet = wb.worksheets.find((w) => w.name === TPL_SHEET);
-    if (!tplSheet) return this.reject(auth, requestId, 'tpl_missing', 'This file is not an approved PMIS template: the hidden _tpl sheet is missing. Download the template from GSDN Workspace.', ctx);
+    if (!tplSheet) return this.reject(auth, requestId, 'tpl_missing', 'This file is not an approved Workspace template: the hidden _tpl sheet is missing. Download the template from GSDN Workspace.', ctx);
     const kv = new Map<string, string>();
     tplSheet.eachRow((row) => {
       const k = this.text(row.getCell(1));

@@ -461,7 +461,7 @@ export const registerHandlers = [
       if (!f || typeof f === 'string' || f.size === 0) return problem(422, 'validation_failed', 'The file is empty', { errors: [{ path: '/file', code: 'required' }] });
       if (f.name !== 'blob' && !f.name.toLowerCase().endsWith('.xlsx')) return reject(f.name.toLowerCase().endsWith('.xlsm') ? 'macros_not_allowed' : 'not_xlsx', 'Only plain .xlsx workbooks are accepted.');
       const text = await f.text();
-      if (text.includes('notpl')) return reject('tpl_missing', 'This file is not an approved PMIS template: the hidden _tpl sheet is missing.');
+      if (text.includes('notpl')) return reject('tpl_missing', 'This file is not an approved Workspace template: the hidden _tpl sheet is missing.');
       if (text.includes('retired')) return reject('outdated_version', `This file was made from version 1 of ${tpl}; the current version is 2. Download the template again.`);
       if (text.includes('tampered')) return reject('checksum_mismatch', 'The header row of the file was changed.');
       const big = /bigsites(\d+)/.exec(text); // a test file of many new sites: `bigsites469`
@@ -474,7 +474,7 @@ export const registerHandlers = [
       if (!f || typeof f === 'string' || f.size === 0) return problem(422, 'validation_failed', 'The file is empty', { errors: [{ path: '/file', code: 'required' }] });
       if (f.name !== 'blob' && !f.name.toLowerCase().endsWith('.xlsx')) return reject(f.name.toLowerCase().endsWith('.xlsm') ? 'macros_not_allowed' : 'not_xlsx', 'Only plain .xlsx workbooks are accepted.');
       const text = await f.text();
-      if (text.includes('notpl')) return reject('tpl_missing', 'This file is not an approved PMIS template: the hidden _tpl sheet is missing.');
+      if (text.includes('notpl')) return reject('tpl_missing', 'This file is not an approved Workspace template: the hidden _tpl sheet is missing.');
       if (text.includes('retired')) return reject('outdated_version', `This file was made from version 1 of ${tpl}; the current version is 2. Download the template again.`);
       if (text.includes('tampered')) return reject('checksum_mismatch', 'The header row of the file was changed.');
       if (text.includes('otherstream')) return reject('wrong_template', `This file is the template ${tpl === 'TPL-CIVIL' ? 'TPL-INSTALL' : 'TPL-CIVIL'}, but ${tpl} was selected.`);
@@ -523,7 +523,7 @@ export const registerHandlers = [
     // (jsdom and undici have different File classes: a file that crossed the boundary may come back named "blob")
     if (f.name !== 'blob' && !f.name.toLowerCase().endsWith('.xlsx')) return reject(f.name.toLowerCase().endsWith('.xlsm') ? 'macros_not_allowed' : 'not_xlsx', 'Only plain .xlsx workbooks are accepted.');
     const text = await f.text();
-    if (text.includes('notpl')) return reject('tpl_missing', 'This file is not an approved PMIS template: the hidden _tpl sheet is missing.');
+    if (text.includes('notpl')) return reject('tpl_missing', 'This file is not an approved Workspace template: the hidden _tpl sheet is missing.');
     if (text.includes('retired')) return reject('outdated_version', `This file was made from version 1 of ${tpl}; the current version is 2. Download the template again.`);
     if (text.includes('tampered')) return reject('checksum_mismatch', 'The header row of the file was changed.');
     const b = makeBatch(key, tpl, f.name);

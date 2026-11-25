@@ -330,7 +330,7 @@ export class ListCataloguesService {
     const cellText = (cell: ExcelJS.Cell) => (cell.text ?? "").toString().trim();
 
     const tpl = wb.getWorksheet(TPL_SHEET);
-    if (!tpl) return reject("tpl_missing", "This file is not an approved PMIS template: the hidden _tpl sheet is missing.");
+    if (!tpl) return reject("tpl_missing", "This file is not an approved Workspace template: the hidden _tpl sheet is missing.");
     const kv = new Map<string, string>();
     tpl.eachRow((row) => {
       const k = cellText(row.getCell(1));
