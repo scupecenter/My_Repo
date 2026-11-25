@@ -139,6 +139,8 @@
     "move_down": "Move down",
     "resize": "Resize sidebar",
     "icons_only": "Icons only",
+    "pin_menu": "Pin the menu (always visible)",
+    "autohide_menu": "Hide the menu automatically",
     "full_menu": "Full menu",
     "sidebar_label": "Main menu",
     "close_menu": "Close menu",

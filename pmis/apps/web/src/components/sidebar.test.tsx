@@ -32,6 +32,52 @@ describe('Sidebar tree (N1-N12)', () => {
     expect(await screen.findByTestId('nav-warehouse')).toBeInTheDocument();
   });
 
+  it('hides the menu by itself: a rail that opens on hover, and a pin that keeps it, remembered after a reload', async () => {
+    const u = userEvent.setup();
+    app();
+    await screen.findByTestId('nav-my_work');
+    const side = screen.getByTestId('sidebar');
+    expect(side).toHaveAttribute('data-auto', 'false');
+    await u.click(screen.getByTestId('sidebar-pin'));
+    expect(side).toHaveAttribute('data-auto', 'true');
+    expect(side).toHaveStyle({ width: '56px' });
+    expect(screen.queryByTestId('sidebar-pin')).not.toBeInTheDocument();
+    expect(JSON.parse(localStorage.getItem('pmis.nav.auto') ?? 'false')).toBe(true);
+    await u.hover(side);
+    expect(await screen.findByTestId('sidebar-pin')).toHaveAttribute('aria-pressed', 'false');
+    expect(side).not.toHaveStyle({ width: '56px' });
+    await u.unhover(side);
+    expect(side).toHaveStyle({ width: '56px' });
+    cleanup();
+    app();
+    await screen.findByTestId('nav-my_work');
+    expect(screen.getByTestId('sidebar')).toHaveAttribute('data-auto', 'true');
+    await u.hover(screen.getByTestId('sidebar'));
+    fireEvent.click(await screen.findByTestId('sidebar-pin'));
+    await waitFor(() => expect(screen.getByTestId('sidebar')).toHaveAttribute('data-auto', 'false'));
+  });
+
+  it('opens the Site Master sub-menus on hover when the arrow has them closed, and in the icon rail', async () => {
+    const u = userEvent.setup();
+    app();
+    await screen.findByTestId('nav-sites');
+    await u.click(screen.getByTestId('nav-sites-toggle'));
+    expect(screen.queryByTestId('nav-site-master-te')).not.toBeInTheDocument();
+    await u.hover(screen.getByTestId('nav-sites'));
+    expect(await screen.findByTestId('nav-flyout-sites')).toBeInTheDocument();
+    expect(screen.getByTestId('nav-site-master-te')).toHaveAttribute('href', '/sites?section=te');
+    await u.unhover(screen.getByTestId('nav-sites'));
+    await waitFor(() => expect(screen.queryByTestId('nav-flyout-sites')).not.toBeInTheDocument());
+    // the arrow still opens them in place, and then there is no flyout
+    await u.click(screen.getByTestId('nav-sites-toggle'));
+    await u.hover(screen.getByTestId('nav-sites'));
+    expect(screen.queryByTestId('nav-flyout-sites')).not.toBeInTheDocument();
+    // the icon rail has no arrow: the hover is the way
+    await u.click(screen.getByTestId('topbar-collapse'));
+    await u.hover(screen.getByTestId('nav-sites'));
+    expect(await screen.findByTestId('nav-flyout-sites')).toBeInTheDocument();
+  });
+
   it('keeps working when localStorage is blocked', async () => {
     const u = userEvent.setup();
     const real = { get: Storage.prototype.getItem, set: Storage.prototype.setItem };

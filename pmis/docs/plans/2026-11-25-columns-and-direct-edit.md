@@ -112,3 +112,7 @@ PRs: #214 templates; P2 Table basics; P3 Settings and columns; P4 Inline and bat
 - Done: batch edit for the Site Master wide table (all menus/streams), same draft store (key record.batch.sites-<menu>), saved cell by cell through PATCH /tasks/{id} with the version.
 - Done: Sites board drag to the next column and 'Open action' button; only opens the existing task action (allowed_actions), several tasks = pick list, no API change.
 - Done: pending Change Control drafts of a site on the site page (state, old/new value, L2 return note), read from the existing change_control register list (site_id filter). Not done: chip inside the Site Master wide cells, map preview (skipped).
+
+## Sidebar: auto-hide and hover sub-menus (owner voice notes 22:27 and 22:28)
+- Auto-hide: `Shell` keeps the existing icon rail (56 px) and opens it over the page on hover or focus; a pin button keeps it open. Stored in the browser with the existing width and icons-only choices (`pmis.nav.auto`). Default: pinned, as before. Server-side storage (per user across devices) would need a contract change: not done, listed as left.
+- Hover sub-menus: `SubmenuFlyout` in `Sidebar.tsx` shows the same `SiteSubmenus` beside the Site Master row on hover or focus when the arrow has them closed and in the icon rail. Arrow, click and touch unchanged. Other headings unchanged.

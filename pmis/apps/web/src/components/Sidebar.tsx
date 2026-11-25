@@ -42,6 +42,33 @@ function SiteSubmenus({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
+/**
+ * Hover (and keyboard focus) on a parent row opens its sub-menus beside it, in the icon rail and when the arrow has them closed. The arrow, the click and
+ * touch keep working as before: this is only a faster way to the same links (SiteSubmenus), it adds no second menu.
+ */
+function SubmenuFlyout({ enabled, onNavigate, children }: { enabled: boolean; onNavigate?: () => void; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left?: number; right?: number } | null>(null);
+  const show = () => {
+    const r = ref.current?.getBoundingClientRect();
+    if (!enabled || !r) return;
+    const rtl = document.documentElement.dir === 'rtl';
+    setPos(rtl ? { top: r.top, right: window.innerWidth - r.left } : { top: r.top, left: r.right });
+  };
+  return (
+    <div ref={ref} onMouseEnter={show} onMouseLeave={() => setPos(null)} onFocus={show}
+      onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setPos(null); }}
+      onKeyDown={(e) => { if (e.key === 'Escape') setPos(null); }}>
+      {children}
+      {enabled && pos && (
+        <div className="fixed z-50 min-w-48 rounded-md border border-line bg-card p-1 shadow-lg" style={pos} data-testid="nav-flyout-sites">
+          <SiteSubmenus onNavigate={() => { setPos(null); onNavigate?.(); }} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Collapsible tree, favourites, recent items, filter, icon-only mode. Nav items arrive already filtered by the server's permission list. */
 export function SidebarBody({ items, compact, unread, alerts = 0, activeKey, onNavigate }: { items: NavItem[]; compact: boolean; unread: number; alerts?: number; activeKey: string | undefined; onNavigate?: () => void }) {
   const { t, i18n } = useTranslation();
@@ -119,10 +146,11 @@ export function SidebarBody({ items, compact, unread, alerts = 0, activeKey, onN
   const itemNode = (k: string) => {
     const n = byKey(k);
     if (!n) return null;
+    if (n.key === 'sites' && compact) return <SubmenuFlyout key={n.key} enabled onNavigate={onNavigate}>{row(n, { testid: `nav-${n.key}`, extra: pin(n) })}</SubmenuFlyout>;
     if (n.key !== 'sites' || compact) return row(n, { testid: `nav-${n.key}`, extra: pin(n) });
     return (
       <div key={n.key}>
-        {row(n, {
+        <SubmenuFlyout enabled={!sitesOpen} onNavigate={onNavigate}>{row(n, {
           testid: `nav-${n.key}`,
           active: loc.pathname.startsWith('/sites') && !subOn, plain: true,
           extra: (
@@ -133,7 +161,7 @@ export function SidebarBody({ items, compact, unread, alerts = 0, activeKey, onN
               {pin(n)}
             </>
           ),
-        })}
+        })}</SubmenuFlyout>
         {sitesOpen && <SiteSubmenus onNavigate={onNavigate} />}
       </div>
     );
