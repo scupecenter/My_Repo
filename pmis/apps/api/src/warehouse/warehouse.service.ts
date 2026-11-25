@@ -433,10 +433,16 @@ export class WarehouseService {
     await this.access.requireAdmin("warehouse_items", "edit");
     const id = parse(uuidSchema, rawId);
     const why = parse(z.string().trim().min(3).max(500), reason);
-    return this.call<{ id: string; deleted: true }>(
-      auth,
-      Prisma.sql`SELECT admin_delete_warehouse_item(${id}::uuid, ${why}::text, ${version}::int) AS r`,
-    );
+    try {
+      return await this.call<{ id: string; deleted: true }>(
+        auth,
+        Prisma.sql`SELECT admin_delete_warehouse_item(${id}::uuid, ${why}::text, ${version}::int) AS r`,
+      );
+    } catch (e) {
+      // the shared mapping answers item_in_use with 422 (other rules); here it is a conflict with the item's data
+      if (e instanceof ProblemException && e.code === "item_in_use") throw new ProblemException(409, "item_in_use", e.opts);
+      throw e;
+    }
   }
 
   // ------------------------------------------------------------------ P6: custom columns of the item master (field_definitions of warehouse_item)
