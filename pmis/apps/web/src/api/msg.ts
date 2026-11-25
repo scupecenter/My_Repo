@@ -159,3 +159,12 @@ export function useSetOrg(userId: string) {
 }
 
 export type { MessageItem };
+
+/** 0161: the admin edits the display name and the employee number of a user (`PATCH /users/{id}`; step-up by the client). E-mail and phone stay on the verified request flow. */
+export function useSetIdentity(user: UserDetail) {
+  const qc = useQueryClient();
+  return useMutation<UserDetail, ApiError, { display_name?: string; employee_id?: string; reason: string }>({
+    mutationFn: (body) => api.patch<UserDetail>(`/users/${user.id}`, { version: user.version, body }),
+    onSettled: () => { void qc.invalidateQueries({ queryKey: ['user', user.id] }); void qc.invalidateQueries({ queryKey: ['users'] }); },
+  });
+}

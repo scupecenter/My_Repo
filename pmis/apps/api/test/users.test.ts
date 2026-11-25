@@ -359,9 +359,23 @@ describe('PATCH /users/{id} (status)', () => {
     expect((await api.call('patch', `/users/${target.id}`, { reason: 'nothing to change' }, { 'If-Match': etag })).status).toBe(422);
     expect((await api.call('patch', `/users/${target.id}`, { status: 'gone', reason: 'bad status' }, { 'If-Match': etag })).status).toBe(422);
     expect((await api.call('patch', `/users/${target.id}`, { status: 'active' }, { 'If-Match': etag })).status).toBe(422); // reason is required
-    const emp = await api.call('patch', `/users/${target.id}`, { employee_id: '5555', reason: 'fix typo' }, { 'If-Match': etag });
-    expect(emp.status).toBe(422);
-    expect(emp.body.errors[0]).toMatchObject({ path: '/employee_id', code: 'not_supported' });
+    // 0161: the admin edits the display name and the employee number (audited, unique, never your own)
+    const other = await makeUser(db, { assigned: true });
+    const otherDetail = (await api.call('get', `/users/${other.id}`)).body as { employee_id: string | null };
+    const free = String(1000 + (Math.floor(Math.random() * 8000)));
+    const emp = await api.call('patch', `/users/${target.id}`, { employee_id: free, display_name: 'Renamed Person', reason: 'fix typo' }, { 'If-Match': etag });
+    expect(emp.status).toBe(200);
+    expect(emp.body).toMatchObject({ employee_id: free, display_name: 'Renamed Person' });
+    const audit = await db.query(`SELECT action, reason FROM audit_log WHERE entity_id = $1 AND action = 'user_identity'`, [target.id]);
+    expect(audit.rows[0]).toMatchObject({ reason: 'fix typo' });
+    if (otherDetail.employee_id) {
+      const dup = await api.call('patch', `/users/${target.id}`, { employee_id: otherDetail.employee_id, reason: 'duplicate try' }, { 'If-Match': String(emp.headers['etag']) });
+      expect(dup.status).toBe(409);
+    }
+    const bad = await api.call('patch', `/users/${target.id}`, { employee_id: '12', reason: 'short number' }, { 'If-Match': String(emp.headers['etag']) });
+    expect(bad.status).toBe(422);
+    const mineNow = await api.call('get', `/users/${admin.id}`);
+    expect((await api.call('patch', `/users/${admin.id}`, { employee_id: '9999', reason: 'own number' }, { 'If-Match': String(mineNow.headers['etag']) })).status).toBe(403);
   });
 
   it('a delegate (users.edit) cannot deactivate an admin', async () => {

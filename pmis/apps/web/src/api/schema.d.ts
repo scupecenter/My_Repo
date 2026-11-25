@@ -1212,8 +1212,9 @@ export interface paths {
         options?: never;
         head?: never;
         /**
-         * Change status or employee ID (admin)
+         * Change status, display name or employee ID (admin)
          * @description Deactivating a user (`status` suspended or disabled) ends all their sessions at once (security log `session_revoked_by_admin`). Claimed tasks return to the cell (AU-09). Tasks held at a level by the person do **not** move (B14, B12b): they stay on the person with `holder_account_status` = `deactivated`, the Team Lead is alerted at once (`holder_deactivated`, `GET /reassignments/alerts`) and decides with `POST /tasks/reassign` or `POST /tasks/{task_id}/act-on-behalf`. SLA never pauses or resets. A level left with no eligible active holder goes to the System Admins' inbox as "no holder" (B10).
+         *     Changing `display_name` or `employee_id` is audited (`user_identity`, old and new values). The employee number is 4 digits, unique (409 `duplicate`) and never your own (403). E-mail and phone are not changed here; they stay on the verified request flow.
          *     Refused with 409 `last_admin` if it would leave no active System Admin, and with `self_beneficiary` for the caller's own row.
          */
         patch: operations["updateUser"];
@@ -20962,6 +20963,7 @@ export interface operations {
                 "application/json": {
                     status?: components["schemas"]["UserStatus"];
                     employee_id?: components["schemas"]["EmployeeId"];
+                    display_name?: string;
                     reason: components["schemas"]["Reason"];
                 };
             };

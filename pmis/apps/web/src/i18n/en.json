@@ -1621,6 +1621,16 @@
     "activate_note": "This account is pending: it will be activated first.",
     "self": "You cannot change your own System Admin rights."
   },
+  "userIdentity": {
+    "open": "Edit name and ID",
+    "title": "Edit {{name}}",
+    "name": "Display name",
+    "employee_id": "Employee number (4 digits)",
+    "saved": "Saved",
+    "duplicate": "Another account already has this employee number.",
+    "note": "Saved with your reason and kept in the audit log. E-mail and phone change only through the verified request (Email changes, Phone changes).",
+    "self_note": "You cannot change your own employee number. E-mail and phone change only through the verified request."
+  },
   "peopleAdmin": {
     "tab_users": "Users",
     "tab_assignments": "Assignments",
