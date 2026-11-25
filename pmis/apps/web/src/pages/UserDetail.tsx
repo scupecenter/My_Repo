@@ -8,6 +8,7 @@ import { useRegions } from '@/api/sites';
 import type { Assignment, UserDetail, UserPickerItem } from '@/api/types';
 import { AssignDialog, LEVELS } from '@/components/AssignDialog';
 import { errText, FormDialog } from '@/components/FormDialog';
+import { IdentityDialog } from '@/components/IdentityDialog';
 import { OrgDialog } from '@/components/OrgDialog';
 import { PeoplePicker } from '@/components/PeoplePicker';
 import { PersonTag } from '@/components/PersonTag';
@@ -137,7 +138,7 @@ export function UserDetailPage() {
   const me = useMe(true), q = useUser(userId), regions = useRegions(), profiles = useProfiles(), groups = useGroups();
   const end = useEndAssignments(userId);
   const [sel, setSel] = useState<Set<string>>(new Set());
-  const [dlg, setDlg] = useState<null | 'assign' | 'edit' | 'end' | 'copy' | 'reset' | 'admin' | 'unadmin' | 'org' | 'tf_on' | 'tf_off' | 'tf_reset' | 'tf_code'>(null);
+  const [dlg, setDlg] = useState<null | 'assign' | 'edit' | 'end' | 'copy' | 'reset' | 'identity' | 'admin' | 'unadmin' | 'org' | 'tf_on' | 'tf_off' | 'tf_reset' | 'tf_code'>(null);
   const ar = i18n.language === 'ar';
   if (q.isError) return <p role="alert" data-testid="user-missing">{t('errors.generic')}</p>;
   const u = q.data;
@@ -169,6 +170,9 @@ export function UserDetailPage() {
           <button className="btn" data-testid={isSysAdmin ? 'sysadmin-remove' : 'sysadmin-make'} disabled={u.id === me.data?.user.id}
             title={u.id === me.data?.user.id ? t('sysAdmin.self') : undefined} onClick={() => setDlg(isSysAdmin ? 'unadmin' : 'admin')}>
             <ShieldCheck size={16} />{t(isSysAdmin ? 'sysAdmin.remove' : 'sysAdmin.make')}</button>
+        )}
+        {canEditOrg && (
+          <button className="btn" data-testid="user-edit-identity" onClick={() => setDlg('identity')}><Pencil size={16} />{t('userIdentity.open')}</button>
         )}
         {isAdmin(me.data) && (
           <button className="btn" data-testid="user-reset-password" disabled={u.id === me.data?.user.id} title={u.id === me.data?.user.id ? t('resetPw.self') : undefined} onClick={() => setDlg('reset')}><KeyRound size={16} />{t('resetPw.open')}</button>
@@ -222,6 +226,7 @@ export function UserDetailPage() {
       {dlg === 'assign' && <AssignDialog open onClose={() => setDlg(null)} initialMode="person" initialPeople={[{ id: u.id, display_name: u.display_name, employee_id: u.employee_id ?? '' }]} />}
       {dlg === 'edit' && <EditDialog userId={userId} rows={chosen} onClose={() => { setDlg(null); setSel(new Set()); }} />}
       {dlg === 'org' && <OrgDialog user={u} onClose={() => setDlg(null)} />}
+      {dlg === 'identity' && <IdentityDialog user={u} isSelf={u.id === me.data?.user.id} onClose={() => setDlg(null)} />}
       {dlg === 'reset' && <ResetPasswordDialog user={u} onClose={() => setDlg(null)} />}
       {(dlg === 'tf_on' || dlg === 'tf_off' || dlg === 'tf_reset' || dlg === 'tf_code') && <TwoFactorDialog user={u} action={dlg === 'tf_on' ? 'on' : dlg === 'tf_off' ? 'off' : dlg === 'tf_reset' ? 'reset' : 'code'} onClose={() => setDlg(null)} />}
       {(dlg === 'admin' || dlg === 'unadmin') && adminGroupId && <SystemAdminDialog user={u} adminGroupId={adminGroupId} remove={dlg === 'unadmin'} onClose={() => setDlg(null)} />}

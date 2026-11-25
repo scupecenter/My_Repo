@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.75
+  version: 0.15.78
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -31,6 +31,9 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.78 (2026-11-25): `PATCH /users/{user_id}` also takes `display_name`; `employee_id` is now edited by the admin (4 digits, unique, audited as `user_identity`, never your own row). E-mail and phone stay on the verified request flow. No new endpoint.
+    - 0.15.77 (2026-11-25): Real delete of a warehouse item that has no data (owner decision 2026-11-25): `DELETE /warehouse/items/{item_id}?reason=` (System Admin or the `warehouse_items` delegate, reason, If-Match, audited). Allowed only when no movement line (any status), serial, site quantity or As-Built link points to the item; otherwise 409 `item_in_use` and the item can only be deactivated (PATCH `is_active: false`, unchanged). The item answer carries `deletable` (read-only). Migration 0160.
+    - 0.15.76 (2026-11-25): Extra columns of the item master (P6, owner approval 2026-11-25: use the existing engine, no new table). `field_definitions` of `warehouse_item` get an admin door: `GET/POST /warehouse/item-columns` and `PATCH /warehouse/item-columns/{code}` (System Admin or the `fields` delegate, reason, If-Match; types text, number, date, bool; hide keeps the values; a type with values cannot change). The item answer carries `custom` (code to value) and `PATCH /warehouse/items/{item_id}` accepts `custom` (same reason and If-Match; the database checks each value against its column). Migration 0159. Dropdown columns come later.
     - 0.15.75 (2026-11-25): Site Master rename, steps 2 to 4 (owner approval 2026-11-25; migration 0158, mirror `db/sql/157_site_master_db_names.sql`). The database names `site360_*` become `site_master_*`; saved views of the screens `site360-<menu>` are stored as `site-master-<menu>` and every request still accepts the old key for one release (it is read as the new one); the dashboard counter list `site360_menus` is also sent as `site_master_menus` (the old name is deprecated and stays one release); the audit action of new events of the Master column doors is `site_master.column_*` (older audit rows keep `site_master.column_*`). `x-db-path` names are the new function names.
     - 0.15.74 (2026-11-25): Site 360 is renamed Site Master (owner decision 2026-11-25, PR #214). The paths `/site360/*` become `/site-master/*`; the old paths still answer for one release (each path carries `x-deprecated-alias`). The schema names `Site360*` become `SiteMaster*` (names only, no change on the wire). No other change in this step; the later steps of the rename (database names, saved-view keys, field names) are listed with their own versions.
     - 0.15.73 (2026-11-25): the Master import creates the sites of its file that are not in GSDN Workspace, then enters their task dates and register rows, in one apply (owner request 2026-11-25; open question Q350; migration 0155, mirror `db/sql/154_master_create_sites.sql`; CHANGELOG 210). Additive and backward compatible: without the new field the apply is exactly as before. (1) `MasterImportApplyRequest.create_sites` (default false): before anything is entered, each Site ID of the file that is not a site of GSDN Workspace becomes a row of one New sites batch (`ImportBatch` entity `site`, `source` `master_import`, its file the run's file) and is created by the path of an approved New sites row: the Master identity and scope columns are mapped onto the New sites fields (B Site ID, C Site Owner ID, D Site Name, E Region, F Sub Region, G Cluster ID, H Latitude, I Longitude, J Site Type, K Site Scenario, S RF Survey Date, X Project Phase, Y Delivery Batch, Z Delivery Scenario, AA:AF the scope flags, AG CW Delivery Model, FZ Overall Status only when Cancelled), validated as a New sites row (a missing or unknown region or delivery scenario refuses the row; nothing is defaulted), then the site is created on the workflow version in force with the scenario applicability and an audit row `site_create` naming the run (`master_run_id`). A Site ID that exists (also cancelled, voided or deleted) is never touched: its row is skipped with the reason. Then the task columns and (with `historical_load.registers`) the register sheets are entered as before, the created sites included. (2) Who: a System Admin (never a delegate; the creation is flagged `admin_override` unless the admin also holds both levels), or a person who holds both L1 and L2 of the Matrix row `site_creation` in the region of the row (a self-approval, B5); the apply's step-up is required. Anyone else: 403 `action_forbidden`; a row of a region where the person does not hold both levels is skipped with the reason. `MasterImportRun.create_sites_offer` (`{allowed, admin, regions, reason}`) says whether the caller may use the option and why not. (3) Big runs: the sites to create count toward `imports.async_rows`; above it the apply runs in the background (202, status `applying`): the sites are created 25 per transaction first, visible in `MasterImportApplyProgress` (`phase` `create_sites` then `apply`, `create_total`, `create_done`), then the run is applied. A run stopped meanwhile keeps the sites created so far. (4) `MasterImportOutcome.create_sites`: `batch_id`, `created[]` (row, Site ID, site, region, self-approval), `skipped[]` (row, Site ID, code, reason, column, errors), `created_count`, `skipped_count`. (5) The batch is processed by the apply only: a send, a decision or a discard of it answers 409 `batch_processing`. (6) The 422 of a file whose rows belong to no site of GSDN Workspace now says how many sites are missing and names the option (or, with it, the first reasons why none could be created).
@@ -1864,12 +1867,13 @@ paths:
     patch:
       tags: [users]
       operationId: updateUser
-      summary: Change status or employee ID (admin)
+      summary: Change status, display name or employee ID (admin)
       description: |
         Deactivating a user (`status` suspended or disabled) ends all their sessions at once (security log `session_revoked_by_admin`). Claimed tasks return to the cell (AU-09). Tasks held at a level by the person do **not** move (B14, B12b): they stay on the person with `holder_account_status` = `deactivated`, the Team Lead is alerted at once (`holder_deactivated`, `GET /reassignments/alerts`) and decides with `POST /tasks/reassign` or `POST /tasks/{task_id}/act-on-behalf`. SLA never pauses or resets. A level left with no eligible active holder goes to the System Admins' inbox as "no holder" (B10).
+        Changing `display_name` or `employee_id` is audited (`user_identity`, old and new values). The employee number is 4 digits, unique (409 `duplicate`) and never your own (403). E-mail and phone are not changed here; they stay on the verified request flow.
         Refused with 409 `last_admin` if it would leave no active System Admin, and with `self_beneficiary` for the caller's own row.
       x-step-up: true
-      x-db-path: idm_set_user_status / idm_link_employee_id
+      x-db-path: idm_set_user_status / idm_set_user_identity
       parameters:
         - $ref: '#/components/parameters/IfMatch'
       requestBody:
@@ -1883,6 +1887,7 @@ paths:
               properties:
                 status: { $ref: '#/components/schemas/UserStatus' }
                 employee_id: { $ref: '#/components/schemas/EmployeeId' }
+                display_name: { type: string, minLength: 1, maxLength: 200 }
                 reason: { $ref: '#/components/schemas/Reason' }
       responses:
         '200':
@@ -12805,6 +12810,77 @@ paths:
         '412': {$ref: '#/components/responses/PreconditionFailed'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /warehouse/item-columns:
+    get:
+      tags: [warehouse]
+      operationId: listWarehouseItemColumns
+      summary: Extra columns of the item master (active ones for whoever reads the items; hidden ones too with `include_inactive` for the System Admin or the `fields` delegate)
+      parameters:
+      - name: include_inactive
+        in: query
+        schema: {type: boolean, default: false}
+      responses:
+        '200':
+          description: Columns, hidden ones included.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/WarehouseItemColumn' } }
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      tags: [warehouse]
+      operationId: createWarehouseItemColumn
+      summary: Add an extra column to the item master
+      x-db-path: admin_item_field_save
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WarehouseItemColumnCreate'}
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/WarehouseItemColumn'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /warehouse/item-columns/{code}:
+    parameters:
+    - name: code
+      in: path
+      required: true
+      schema: {type: string, pattern: '^[a-z][a-z0-9_]{1,40}$'}
+    patch:
+      tags: [warehouse]
+      operationId: updateWarehouseItemColumn
+      summary: Edit, order or hide an extra column (hiding keeps the values)
+      x-db-path: admin_item_field_save
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WarehouseItemColumnPatch'}
+      responses:
+        '200':
+          description: Updated.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/WarehouseItemColumn'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
   /warehouse/items:
     get:
       tags: [warehouse]
@@ -12904,6 +12980,35 @@ paths:
         '409': {$ref: '#/components/responses/Conflict'}
         '412': {$ref: '#/components/responses/PreconditionFailed'}
         '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+    delete:
+      tags: [warehouse]
+      operationId: deleteWarehouseItem
+      summary: Delete an item that has no data (deactivate is the other way)
+      description: Allowed only when no movement line, serial, site quantity or As-Built link points to the item (`deletable`). Otherwise 409 `item_in_use`; deactivate it instead.
+      x-db-path: admin_delete_warehouse_item
+      parameters:
+      - name: reason
+        in: query
+        required: true
+        schema: {type: string, minLength: 3}
+      - {$ref: '#/components/parameters/IfMatch'}
+      responses:
+        '200':
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, deleted]
+                properties:
+                  id: {type: string, format: uuid}
+                  deleted: {type: boolean}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
         '428': {$ref: '#/components/responses/PreconditionRequired'}
   /warehouse/stock:
     get:
@@ -21518,6 +21623,48 @@ components:
         need_rules: { type: array, items: { $ref: '#/components/schemas/NeedRule' } }
         code_source: { type: string, enum: [master, internal_provisional], description: 'Q107: master = the code of the Master WH sheet; internal_provisional = an internal code (CW-01..28, generated TE codes), not a confirmed manufacturer code.' }
         is_active: { type: boolean }
+        custom: { type: object, additionalProperties: { type: [string, number, boolean, 'null'] }, description: 'Values of the extra columns of the item master, by column code (P6). Send only the codes that change; null clears one.' }
+    WarehouseItemColumn:
+      type: object
+      required: [code, label_en, data_type, required, sort_order, in_templates, in_exports, in_list_filters, is_active, version, has_values]
+      properties:
+        code: { type: string, pattern: '^[a-z][a-z0-9_]{1,40}$' }
+        label_en: { type: string }
+        label_ar: { type: [string, 'null'] }
+        data_type: { type: string, enum: [text, number, date, bool] }
+        required: { type: boolean }
+        section: { type: [string, 'null'] }
+        sort_order: { type: integer }
+        in_templates: { type: boolean }
+        in_exports: { type: boolean }
+        in_list_filters: { type: boolean }
+        is_active: { type: boolean }
+        version: { type: integer }
+        has_values: { type: boolean }
+    WarehouseItemColumnPatch:
+      allOf:
+        - $ref: '#/components/schemas/WithReason'
+        - type: object
+          additionalProperties: false
+          properties:
+            label_en: { type: string, minLength: 1, maxLength: 120 }
+            label_ar: { type: [string, 'null'], maxLength: 120 }
+            data_type: { type: string, enum: [text, number, date, bool] }
+            required: { type: boolean }
+            section: { type: [string, 'null'], maxLength: 60 }
+            sort_order: { type: integer }
+            in_templates: { type: boolean }
+            in_exports: { type: boolean }
+            in_list_filters: { type: boolean }
+            is_active: { type: boolean }
+            reason: { $ref: '#/components/schemas/Reason' }
+    WarehouseItemColumnCreate:
+      allOf:
+        - $ref: '#/components/schemas/WarehouseItemColumnPatch'
+        - type: object
+          required: [code, label_en, data_type]
+          properties:
+            code: { type: string, pattern: '^[a-z][a-z0-9_]{1,40}$' }
     WarehouseItem:
       allOf:
         - $ref: '#/components/schemas/WarehouseItemFields'
@@ -21527,6 +21674,8 @@ components:
             id: { type: string, format: uuid }
             code: { type: string }
             as_built_item_code: { type: [string, 'null'], readOnly: true, description: 'The As-Built item linked to this item (Q74).' }
+            custom: { type: object, additionalProperties: true, description: 'Values of the extra columns (P6).' }
+            deletable: { type: boolean, readOnly: true, description: 'True when nothing points to the item, so it can be deleted for real (0160).' }
             version: { type: integer }
     WarehouseItemInput:
       allOf:

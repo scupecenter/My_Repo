@@ -35,6 +35,8 @@ const createSchema = z.object({
 const patchSchema = z.object({
   status: z.enum(['pending_assignment', 'active', 'suspended', 'disabled']).optional(),
   employee_id: employeeId.optional(),
+  /** 0161: the admin edits the display name. E-mail and phone stay on the verified request flow. */
+  display_name: z.string().trim().min(1).max(200).optional(),
   reason,
 }).strict();
 
@@ -202,25 +204,37 @@ export class UsersService {
 
   async patch(auth: AuthContext, id: string, ifMatch: string | undefined, raw: unknown): Promise<UserDetailDto> {
     const body = parse(patchSchema, raw);
-    if (body.status === undefined && body.employee_id === undefined) {
-      throw problems.validation([{ path: '/', code: 'min_properties', message: 'Send status (or employee_id) with the reason.' }]);
+    if (body.status === undefined && body.employee_id === undefined && body.display_name === undefined) {
+      throw problems.validation([{ path: '/', code: 'min_properties', message: 'Send status, employee_id or display_name with the reason.' }]);
     }
     await this.access.requireAdmin('users', 'edit');
     if (ifMatch === undefined || ifMatch.trim() === '') checkIfMatch(undefined, ''); // 428 before any other work
     await this.stepUp.require(auth);
-    if (body.employee_id !== undefined) {
-      // Contract: PATCH may change the employee ID, but no database path exists yet (idm_set_employee_id is for the user's own first link).
-      throw problems.validation([{ path: '/employee_id', code: 'not_supported', message: 'Changing the employee ID is not available yet.' }]);
-    }
     const current = await this.detail(id);
     if (!current) throw problems.notFound();
     checkIfMatch(ifMatch, current.version);
 
-    await this.db.tx.$executeRaw`SELECT idm_set_user_status(${id}::uuid, ${body.status}::"UserStatus", ${body.reason}::text)`;
-    await this.db.tx.$executeRaw`SET CONSTRAINTS ALL IMMEDIATE`;
-    if (body.status === 'suspended' || body.status === 'disabled') {
-      const ended = await this.sessions.revokeAll(id, auth.user.id, 'user_deactivated');
-      await this.syslog.write('info', 'session_revoked_by_admin', { target_user: id, sessions: ended, reason: 'user_deactivated' }, auth.user.id);
+    if (body.employee_id !== undefined || body.display_name !== undefined) {
+      // 0161: the name and the employee number, one audited change (the employee number is unique and never your own)
+      await this.db.tx.$executeRaw`SAVEPOINT user_identity`;
+      try {
+        await this.db.tx.$executeRaw`SELECT idm_set_user_identity(${id}::uuid, ${body.display_name ?? null}::text, ${body.employee_id ?? null}::text, ${body.reason}::text)`;
+        await this.db.tx.$executeRaw`RELEASE SAVEPOINT user_identity`;
+      } catch (e) {
+        await this.db.tx.$executeRaw`ROLLBACK TO SAVEPOINT user_identity`;
+        if (/employee_id_in_use/.test(String((e as { message?: string }).message ?? ''))) {
+          throw new ProblemException(409, 'duplicate', { detail: 'Another account already has this employee ID.' });
+        }
+        throw e;
+      }
+    }
+    if (body.status !== undefined) {
+      await this.db.tx.$executeRaw`SELECT idm_set_user_status(${id}::uuid, ${body.status}::"UserStatus", ${body.reason}::text)`;
+      await this.db.tx.$executeRaw`SET CONSTRAINTS ALL IMMEDIATE`;
+      if (body.status === 'suspended' || body.status === 'disabled') {
+        const ended = await this.sessions.revokeAll(id, auth.user.id, 'user_deactivated');
+        await this.syslog.write('info', 'session_revoked_by_admin', { target_user: id, sessions: ended, reason: 'user_deactivated' }, auth.user.id);
+      }
     }
     this.states.invalidate(id);
     const next = await this.detail(id);

@@ -1635,6 +1635,16 @@
     "activate_note": "This account is pending: it will be activated first.",
     "self": "You cannot change your own System Admin rights."
   },
+  "userIdentity": {
+    "open": "Edit name and ID",
+    "title": "Edit {{name}}",
+    "name": "Display name",
+    "employee_id": "Employee number (4 digits)",
+    "saved": "Saved",
+    "duplicate": "Another account already has this employee number.",
+    "note": "Saved with your reason and kept in the audit log. E-mail and phone change only through the verified request (Email changes, Phone changes).",
+    "self_note": "You cannot change your own employee number. E-mail and phone change only through the verified request."
+  },
   "peopleAdmin": {
     "tab_roles_profiles": "Roles and profiles",
     "tab_users": "Users",
@@ -2238,6 +2248,9 @@
     "show_inactive": "Show inactive",
     "new_item": "New item",
     "edit": "Edit",
+    "delete": "Delete",
+    "delete_note": "This item has no data. It will be deleted for real (it cannot be undone). Use Deactivate to keep it.",
+    "delete_title": "Delete item",
     "deactivate": "Deactivate",
     "new_title": "New item",
     "edit_title": "Edit item",
@@ -3803,6 +3816,28 @@
     "anchor_bad": "The external anchor does not match the chain.",
     "anchor_none": "No external anchor to compare yet.",
     "none": "No check has run yet."
+  },
+  "itemcols": {
+    "title": "Warehouse items",
+    "note": "Extra columns of the item master (text, number, date, yes/no). Every change needs a reason and is audited. Hiding a column keeps its values. A column that holds values cannot change type.",
+    "code": "Code",
+    "name": "Name",
+    "type": "Type",
+    "state": "State",
+    "name_en": "English name",
+    "name_ar": "Arabic name",
+    "add": "Add column",
+    "move": "Move column",
+    "hide": "Hide",
+    "show": "Show",
+    "up": "Move up",
+    "down": "Move down",
+    "empty": "No extra columns yet.",
+    "type_text": "Text",
+    "type_number": "Number",
+    "type_date": "Date",
+    "type_bool": "Yes / no",
+    "group": "Warehouse"
   },
   "regcols": {
     "title": "Register columns",

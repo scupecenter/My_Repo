@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Headers,
   HttpCode,
@@ -88,6 +89,32 @@ export class WarehouseController {
     return r;
   }
 
+  @Get("item-columns")
+  itemColumns(@Auth() auth: AuthContext, @Query() q: Record<string, unknown>) {
+    return this.wh.itemColumns(auth, q);
+  }
+
+  @Post("item-columns")
+  async createItemColumn(@Auth() auth: AuthContext, @Body() body: unknown, @Res({ passthrough: true }) res: Response) {
+    const r = (await this.wh.createItemColumn(auth, body)) as { version?: number };
+    res.status(201);
+    if (r.version) res.setHeader("ETag", etagHeader(r.version));
+    return r;
+  }
+
+  @Patch("item-columns/:code")
+  async updateItemColumn(
+    @Auth() auth: AuthContext,
+    @Param("code") code: string,
+    @Headers("if-match") ifMatch: string | undefined,
+    @Body() body: unknown,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const r = (await this.wh.updateItemColumn(auth, code, ifMatch, body)) as { version?: number };
+    if (r.version) res.setHeader("ETag", etagHeader(r.version));
+    return r;
+  }
+
   @Patch("items/:id")
   async updateItem(
     @Auth() auth: AuthContext,
@@ -99,6 +126,17 @@ export class WarehouseController {
     const r = await this.wh.updateItem(auth, id, ifMatch, body);
     res.setHeader("ETag", etagHeader(r.version));
     return r;
+  }
+
+  @Delete("items/:id")
+  @HttpCode(200)
+  deleteItem(
+    @Auth() auth: AuthContext,
+    @Param("id") id: string,
+    @Headers("if-match") ifMatch: string | undefined,
+    @Query("reason") reason: unknown,
+  ) {
+    return this.wh.deleteItem(auth, id, ifMatch, reason);
   }
 
   @Get("stock")

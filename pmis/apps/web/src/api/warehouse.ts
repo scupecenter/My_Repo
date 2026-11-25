@@ -55,3 +55,12 @@ export function useSaveItem<T extends Row>(base: string, key: string) {
     onSettled: () => void qc.invalidateQueries({ queryKey: [key] }),
   });
 }
+
+/** 0160: a real delete of an item with no data (the server refuses with 409 item_in_use when anything points to it). */
+export function useDeleteItem() {
+  const qc = useQueryClient();
+  return useMutation<{ id: string; deleted: boolean }, ApiError, { item: Row & { version: number }; reason: string }>({
+    mutationFn: ({ item, reason }) => api.del<{ id: string; deleted: boolean }>(`/warehouse/items/${item.id}`, { version: item.version, query: { reason } }),
+    onSettled: () => { void qc.invalidateQueries({ queryKey: ['wh-items'] }); void qc.invalidateQueries({ queryKey: ['wh-stock'] }); },
+  });
+}

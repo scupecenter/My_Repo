@@ -81,8 +81,19 @@ export const adminHandlers = [
     if (!stepUpValid()) return stepUp();
     const u = userBy(params.id as string);
     if (!u) return problem(404, 'not_found', 'User not found');
-    const b = (await request.json()) as { status?: MockUser['status']; reason?: string };
+    const b = (await request.json()) as { status?: MockUser['status']; reason?: string; display_name?: string; employee_id?: string };
     const r = noReason(b); if (r) return r;
+    if (b.employee_id !== undefined || b.display_name !== undefined) {
+      // 0161 (mock: only local accounts, whose id does not come from the employee number)
+      if (!u.local) return problem(422, 'validation_failed', 'The mock edits local accounts only');
+      if (b.employee_id !== undefined) {
+        if (!/^[0-9]{4}$/.test(b.employee_id)) return problem(422, 'validation_failed', 'Employee ID is 4 digits');
+        if (u.employee_id === viewer()!.employee_id) return problem(403, 'action_forbidden', 'Not for your own account');
+        if (A().users.some((x) => x !== u && x.employee_id === b.employee_id)) return problem(409, 'duplicate', 'Another account already has this employee ID.');
+        u.employee_id = b.employee_id;
+      }
+      if (b.display_name !== undefined) u.local.display_name = b.display_name;
+    }
     if ((b.status === 'suspended' || b.status === 'disabled') && u.employee_id === viewer()!.employee_id) return problem(403, 'self_beneficiary', 'Not for your own account');
     if ((b.status === 'suspended' || b.status === 'disabled') && lastAdmin(u)) return problem(409, 'last_admin', 'At least one active admin must remain');
     if (b.status) { u.status = b.status; if (b.status !== 'active') endSessions(u.employee_id); }

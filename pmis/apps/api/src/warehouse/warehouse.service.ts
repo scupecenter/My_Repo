@@ -92,8 +92,27 @@ const itemCreate = z
     is_active: true,
   })
   .strict();
+/** P6: the values of the custom columns of an item (field_definitions of warehouse_item): a code to a text, number, yes/no, or null to clear. The DB trigger checks them. */
+const customValues = z.record(z.string().regex(/^[a-z][a-z0-9_]{1,40}$/), z.union([z.string().max(2000), z.number(), z.boolean(), z.null()]));
+const itemColumnBody = z
+  .object({
+    label_en: z.string().trim().min(1).max(120),
+    label_ar: z.string().trim().max(120).nullable(),
+    data_type: z.enum(["text", "number", "date", "bool"]),
+    required: z.boolean(),
+    section: z.string().trim().max(60).nullable(),
+    sort_order: z.number().int().min(0).max(100000),
+    in_templates: z.boolean(),
+    in_exports: z.boolean(),
+    in_list_filters: z.boolean(),
+    is_active: z.boolean(),
+    reason,
+  })
+  .partial()
+  .strict();
+const itemColumnCreate = itemColumnBody.extend({ code: z.string().regex(/^[a-z][a-z0-9_]{1,40}$/) }).strict();
 const itemPatch = z
-  .object({ ...itemFields, reason })
+  .object({ ...itemFields, custom: customValues, reason })
   .partial({
     name_en: true,
     name_ar: true,
@@ -107,6 +126,7 @@ const itemPatch = z
     need_rules: true,
     code_source: true,
     is_active: true,
+    custom: true,
   })
   .strict()
   .refine((b) => Object.keys(b).length >= 2, {
@@ -194,6 +214,8 @@ interface ItemRow {
   as_built_item_code: string | null;
   code_source: string;
   need_rules: unknown;
+  custom: Record<string, unknown>;
+  deletable: boolean;
 }
 
 const ITEM_SELECT = Prisma.sql`
@@ -201,7 +223,8 @@ const ITEM_SELECT = Prisma.sql`
     i.contract_qty::float8 AS contract_qty, i.planned_delivery_date::text AS planned_delivery_date, i.progress_item_code, i.code_source, i.is_active, i.version,
     (SELECT ab.code FROM as_built_items ab WHERE ab.warehouse_item_id = i.id) AS as_built_item_code,
     coalesce((SELECT jsonb_agg(jsonb_build_object('id', n.id, 'need_unit', n.need_unit, 'quantity', n.quantity::float8, 'status', n.status, 'quantity_rule', n.quantity_rule, 'applies_when', n.applies_when)
-                              ORDER BY n.sort_order, n.id) FROM warehouse_item_need_rules n WHERE n.item_id = i.id), '[]'::jsonb) AS need_rules
+                              ORDER BY n.sort_order, n.id) FROM warehouse_item_need_rules n WHERE n.item_id = i.id), '[]'::jsonb) AS need_rules,
+    coalesce(i.custom, '{}'::jsonb) AS custom, wh_item_deletable(i.id) AS deletable
   FROM warehouse_items i`;
 
 interface MovementRow {
@@ -384,11 +407,78 @@ export class WarehouseService {
       Prisma.sql`SELECT id::text FROM warehouse_items WHERE id = ${id}::uuid`,
     );
     if (!exists[0]) throw problems.notFound("The item does not exist.");
-    await this.call(
-      auth,
-      Prisma.sql`SELECT admin_save_warehouse_item(${id}::uuid, ${JSON.stringify(this.toPatch(b))}::jsonb, ${b.reason}::text, ${version}::int) AS r`,
-    );
+    const { custom, ...core } = b;
+    const hasCore = Object.keys(this.toPatch(core)).length > 0;
+    let seen: number | null = version ?? null;
+    if (hasCore) {
+      const r = await this.call<{ version: number }>(
+        auth,
+        Prisma.sql`SELECT admin_save_warehouse_item(${id}::uuid, ${JSON.stringify(this.toPatch(core))}::jsonb, ${b.reason}::text, ${version}::int) AS r`,
+      );
+      seen = r.version;
+    }
+    if (custom && Object.keys(custom).length) {
+      // P6: the custom column values go through the same endpoint, reason and If-Match; the item version moves once more
+      await this.call(
+        auth,
+        Prisma.sql`SELECT admin_save_warehouse_item_custom(${id}::uuid, ${JSON.stringify(custom)}::jsonb, ${b.reason}::text, ${seen}::int) AS r`,
+      );
+    }
     return this.getItem(auth, id);
+  }
+
+  /** 0160: a real delete of an item with no data (admin, reason, audited, version check); an item with data answers 409 item_in_use and can only be deactivated. */
+  async deleteItem(auth: AuthContext, rawId: string, ifMatch: string | undefined, reason: unknown): Promise<{ id: string; deleted: true }> {
+    const version = parseIfMatch(ifMatch);
+    await this.access.requireAdmin("warehouse_items", "edit");
+    const id = parse(uuidSchema, rawId);
+    const why = parse(z.string().trim().min(3).max(500), reason);
+    try {
+      return await this.call<{ id: string; deleted: true }>(
+        auth,
+        Prisma.sql`SELECT admin_delete_warehouse_item(${id}::uuid, ${why}::text, ${version}::int) AS r`,
+      );
+    } catch (e) {
+      // the shared mapping answers item_in_use with 422 (other rules); here it is a conflict with the item's data
+      if (e instanceof ProblemException && e.code === "item_in_use") throw new ProblemException(409, "item_in_use", e.opts);
+      throw e;
+    }
+  }
+
+  // ------------------------------------------------------------------ P6: custom columns of the item master (field_definitions of warehouse_item)
+  async itemColumns(auth: AuthContext, q: Query): Promise<{ items: unknown[] }> {
+    const all = boolParam(q, "include_inactive");
+    if (all) await this.access.requireAdmin("fields", "edit");
+    else await this.access.requireModuleView(auth, "warehouse");
+    const items = await this.call<unknown[]>(
+      auth,
+      Prisma.sql`SELECT item_fields_json('warehouse_item', ${all}::boolean) AS r`,
+    );
+    return { items };
+  }
+
+  async createItemColumn(auth: AuthContext, raw: unknown): Promise<unknown> {
+    await this.access.requireAdmin("fields", "edit");
+    const { code, reason: why, ...patch } = parse(itemColumnCreate, raw);
+    return this.call(
+      auth,
+      Prisma.sql`SELECT admin_item_field_save('warehouse_item', ${code}::text, true, ${JSON.stringify(patch)}::jsonb, ${why ?? ""}::text, NULL::int) AS r`,
+    );
+  }
+
+  async updateItemColumn(
+    auth: AuthContext,
+    code: string,
+    ifMatch: string | undefined,
+    raw: unknown,
+  ): Promise<unknown> {
+    const version = parseIfMatch(ifMatch);
+    await this.access.requireAdmin("fields", "edit");
+    const { reason: why, ...patch } = parse(itemColumnBody, raw);
+    return this.call(
+      auth,
+      Prisma.sql`SELECT admin_item_field_save('warehouse_item', ${code}::text, false, ${JSON.stringify(patch)}::jsonb, ${why ?? ""}::text, ${version}::int) AS r`,
+    );
   }
 
   // ------------------------------------------------------------------ stock

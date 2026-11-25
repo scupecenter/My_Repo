@@ -1212,8 +1212,9 @@ export interface paths {
         options?: never;
         head?: never;
         /**
-         * Change status or employee ID (admin)
+         * Change status, display name or employee ID (admin)
          * @description Deactivating a user (`status` suspended or disabled) ends all their sessions at once (security log `session_revoked_by_admin`). Claimed tasks return to the cell (AU-09). Tasks held at a level by the person do **not** move (B14, B12b): they stay on the person with `holder_account_status` = `deactivated`, the Team Lead is alerted at once (`holder_deactivated`, `GET /reassignments/alerts`) and decides with `POST /tasks/reassign` or `POST /tasks/{task_id}/act-on-behalf`. SLA never pauses or resets. A level left with no eligible active holder goes to the System Admins' inbox as "no holder" (B10).
+         *     Changing `display_name` or `employee_id` is audited (`user_identity`, old and new values). The employee number is 4 digits, unique (409 `duplicate`) and never your own (403). E-mail and phone are not changed here; they stay on the verified request flow.
          *     Refused with 409 `last_admin` if it would leave no active System Admin, and with `self_beneficiary` for the caller's own row.
          */
         patch: operations["updateUser"];
@@ -8103,6 +8104,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/warehouse/item-columns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Extra columns of the item master (active ones for whoever reads the items; hidden ones too with `include_inactive` for the System Admin or the `fields` delegate) */
+        get: operations["listWarehouseItemColumns"];
+        put?: never;
+        /** Add an extra column to the item master */
+        post: operations["createWarehouseItemColumn"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/warehouse/item-columns/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Edit, order or hide an extra column (hiding keeps the values) */
+        patch: operations["updateWarehouseItemColumn"];
+        trace?: never;
+    };
     "/warehouse/items": {
         parameters: {
             query?: never;
@@ -8135,7 +8173,11 @@ export interface paths {
         get: operations["getWarehouseItem"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete an item that has no data (deactivate is the other way)
+         * @description Allowed only when no movement line, serial, site quantity or As-Built link points to the item (`deletable`). Otherwise 409 `item_in_use`; deactivate it instead.
+         */
+        delete: operations["deleteWarehouseItem"];
         options?: never;
         head?: never;
         /** Edit or deactivate (never deleted) */
@@ -15970,6 +16012,43 @@ export interface components {
              */
             code_source?: "master" | "internal_provisional";
             is_active?: boolean;
+            /** @description Values of the extra columns of the item master, by column code (P6). Send only the codes that change; null clears one. */
+            custom?: {
+                [key: string]: string | number | boolean | null;
+            };
+        };
+        WarehouseItemColumn: {
+            code: string;
+            label_en: string;
+            label_ar?: string | null;
+            /** @enum {string} */
+            data_type: "text" | "number" | "date" | "bool";
+            required: boolean;
+            section?: string | null;
+            sort_order: number;
+            in_templates: boolean;
+            in_exports: boolean;
+            in_list_filters: boolean;
+            is_active: boolean;
+            version: number;
+            has_values: boolean;
+        };
+        WarehouseItemColumnPatch: components["schemas"]["WithReason"] & {
+            label_en?: string;
+            label_ar?: string | null;
+            /** @enum {string} */
+            data_type?: "text" | "number" | "date" | "bool";
+            required?: boolean;
+            section?: string | null;
+            sort_order?: number;
+            in_templates?: boolean;
+            in_exports?: boolean;
+            in_list_filters?: boolean;
+            is_active?: boolean;
+            reason?: components["schemas"]["Reason"];
+        };
+        WarehouseItemColumnCreate: components["schemas"]["WarehouseItemColumnPatch"] & {
+            code: string;
         };
         WarehouseItem: components["schemas"]["WarehouseItemFields"] & {
             /** Format: uuid */
@@ -15977,6 +16056,12 @@ export interface components {
             code: string;
             /** @description The As-Built item linked to this item (Q74). */
             readonly as_built_item_code?: string | null;
+            /** @description Values of the extra columns (P6). */
+            custom?: {
+                [key: string]: unknown;
+            };
+            /** @description True when nothing points to the item, so it can be deleted for real (0160). */
+            readonly deletable?: boolean;
             version: number;
         };
         WarehouseItemInput: components["schemas"]["WarehouseItemFields"] & components["schemas"]["WithReason"] & {
@@ -20878,6 +20963,7 @@ export interface operations {
                 "application/json": {
                     status?: components["schemas"]["UserStatus"];
                     employee_id?: components["schemas"]["EmployeeId"];
+                    display_name?: string;
                     reason: components["schemas"]["Reason"];
                 };
             };
@@ -33624,6 +33710,95 @@ export interface operations {
             428: components["responses"]["PreconditionRequired"];
         };
     };
+    listWarehouseItemColumns: {
+        parameters: {
+            query?: {
+                include_inactive?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Columns, hidden ones included. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["WarehouseItemColumn"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    createWarehouseItemColumn: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WarehouseItemColumnCreate"];
+            };
+        };
+        responses: {
+            /** @description Created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WarehouseItemColumn"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    updateWarehouseItemColumn: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WarehouseItemColumnPatch"];
+            };
+        };
+        responses: {
+            /** @description Updated. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WarehouseItemColumn"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
     listWarehouseItems: {
         parameters: {
             query?: {
@@ -33710,6 +33885,44 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    deleteWarehouseItem: {
+        parameters: {
+            query: {
+                reason: string;
+            };
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description Warehouse item. */
+                item_id: components["parameters"]["WarehouseItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        deleted: boolean;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            428: components["responses"]["PreconditionRequired"];
         };
     };
     updateWarehouseItem: {

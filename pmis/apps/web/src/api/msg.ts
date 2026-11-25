@@ -160,6 +160,15 @@ export function useSetOrg(userId: string) {
 
 export type { MessageItem };
 
+/** 0161: the admin edits the display name and the employee number of a user (`PATCH /users/{id}`; step-up by the client). E-mail and phone stay on the verified request flow. */
+export function useSetIdentity(user: UserDetail) {
+  const qc = useQueryClient();
+  return useMutation<UserDetail, ApiError, { display_name?: string; employee_id?: string; reason: string }>({
+    mutationFn: (body) => api.patch<UserDetail>(`/users/${user.id}`, { version: user.version, body }),
+    onSettled: () => { void qc.invalidateQueries({ queryKey: ['user', user.id] }); void qc.invalidateQueries({ queryKey: ['users'] }); },
+  });
+}
+
 /**
  * The numbers beside Approvals and My Work in the menu: the totals the two lists already answer (`counts.total` of GET /approvals and of the do-now bucket of
  * GET /me/tasks, one row asked). Read again every minute like the unread messages; no new endpoint.
