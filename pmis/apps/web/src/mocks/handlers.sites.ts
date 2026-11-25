@@ -226,10 +226,10 @@ export const siteHandlers = [
     // contract 0.11.5: the whole Master and one template per stream, for people who may use the Site Register and the Templates page
     const site = v.nav.includes('sites') && v.nav.includes('templates') ? [
       ['TPL-MASTER', 'Master (all sheets)', 'الماستر الكامل (كل الأوراق)', 'master', null, 1],
-      ['TPL-DESIGN-ACQ', 'SITE 360: Design & Acquisition', 'الموقع 360: التصميم والاستحواذ', 'stream', 'DESIGN_ACQ', 3],
-      ['TPL-CIVIL', 'SITE 360: Civil Works', 'الموقع 360: الأعمال المدنية', 'stream', 'CW', 4],
-      ['TPL-INSTALL', 'SITE 360: Installation (TE)', 'الموقع 360: التركيبات', 'stream', 'TE', 5],
-      ['TPL-CLOSURE', 'SITE 360: Handover & Closure', 'الموقع 360: التسليم والإغلاق', 'stream', 'CLOSURE', 6],
+      ['TPL-DESIGN-ACQ', 'Site Master: Design & Acquisition', 'Site Master: التصميم والاستحواذ', 'stream', 'DESIGN_ACQ', 3],
+      ['TPL-CIVIL', 'Site Master: Civil Works', 'Site Master: الأعمال المدنية', 'stream', 'CW', 4],
+      ['TPL-INSTALL', 'Site Master: Installation (TE)', 'Site Master: التركيبات', 'stream', 'TE', 5],
+      ['TPL-CLOSURE', 'Site Master: Handover & Closure', 'Site Master: التسليم والإغلاق', 'stream', 'CLOSURE', 6],
     ].map(([id, en, ar, tk, stream]) => ({ template_id: id, name_en: en, name_ar: ar, kind: 'data_import', template_kind: tk, module_key: 'sites', register_key: null, stream, current_version: 1, issued_at: issued, is_active: true, versions })) : [];
     // contract 0.14.0 (Q460): the New sites template, for those who may create sites and use the Templates page (the engineer creates by hand only)
     const newSites = v.nav.includes('sites') && v.nav.includes('templates') && ['pm', 'reviewer'].includes(v.key) ? [{ template_id: 'TPL-NEW-SITES', name_en: 'New sites', name_ar: 'مواقع جديدة', kind: 'data_import', template_kind: 'sites', module_key: 'sites', register_key: null, stream: null, current_version: 1, issued_at: issued, is_active: true, versions }] : [];

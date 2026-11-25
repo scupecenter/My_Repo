@@ -57,7 +57,7 @@ export class Site360Service {
    */
   async rows(auth: AuthContext, rawMenu: string, q: Record<string, unknown>): Promise<Site360RowsDto> {
     if (!(SITE360_MENU_KEYS as readonly string[]).includes(rawMenu)) {
-      throw new ProblemException(422, 'validation_failed', { detail: 'Unknown SITE 360 menu.', errors: [{ path: '/menu', code: 'invalid' }] });
+      throw new ProblemException(422, 'validation_failed', { detail: 'Unknown Site Master menu.', errors: [{ path: '/menu', code: 'invalid' }] });
     }
     const menu = rawMenu as Site360Menu;
     const regs = await this.access.requireRegions('sites', 'view');
