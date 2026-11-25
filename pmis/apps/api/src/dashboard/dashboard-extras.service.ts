@@ -283,7 +283,7 @@ export class DashboardExtrasService {
     const breachTotal = sla_by_stage.reduce((a, r) => a + r.breach, 0);
     const atRiskTotal = sla_by_stage.reduce((a, r) => a + r.at_risk, 0);
     const src = await this.counterSources(siteWhere, reg, cfg);
-    const site360_menus = await this.site360Menus(siteWhere);
+    const site360_menus = await this.siteMasterMenus(siteWhere);
     const values: Record<string, number | null> = {
       sla_breach: sharePct(breachTotal, openTotal),
       sla_at_risk: sharePct(atRiskTotal, openTotal),
@@ -456,11 +456,11 @@ export class DashboardExtrasService {
   }
 
   /**
-   * F20 (migration 0113, contract 0.15.29): the sites per SITE 360 menu. The menus are the views of the workflow (workflow_views, migration 0023:
+   * F20 (migration 0113, contract 0.15.29): the sites per Site Master menu. The menus are the views of the workflow (workflow_views, migration 0023:
    * CW, TE, OM); a site is in a view when it has a task of the view that is not n/a or skipped. "All sites" is sites_total of the counters.
    * Design & Acquisition, Handover & Closure and Dismantle have no view in the schema, so they are not counted.
    */
-  private async site360Menus(siteWhere: Prisma.Sql) {
+  private async siteMasterMenus(siteWhere: Prisma.Sql) {
     const views = await this.db.tx.$queryRaw<
       {
         code: string;

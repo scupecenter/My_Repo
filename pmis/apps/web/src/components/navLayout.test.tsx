@@ -150,7 +150,7 @@ describe('the side menu with a shared layout', () => {
     expect(r3.headings[0]!.children).toEqual(['dismantle']);
   });
 
-  it('a saved SITE 360 heading holding sites and dismantle renders as the one Site Master row, with six sub-menus and Dismantle under Registers & Logs', async () => {
+  it('a saved Site Master heading holding sites and dismantle renders as the one Site Master row, with six sub-menus and Dismantle under Registers & Logs', async () => {
     const d = defaultLayout();
     store({ headings: d.headings.map((h) => (h.id === 'site_register' ? { ...h, name_en: 'SITE 360', name_ar: 'سايت 360', children: ['sites', 'dismantle'] } : h.id === 'registers' ? { ...h, children: h.children.filter((k) => k !== 'dismantle') } : h)) });
     await signIn('pm');
@@ -159,8 +159,8 @@ describe('the side menu with a shared layout', () => {
     expect(screen.queryByTestId('nav-group-toggle-site_register')).not.toBeInTheDocument();
     expect(screen.queryByText('SITE 360')).not.toBeInTheDocument();
     expect(screen.getByTestId('nav-sites')).toHaveTextContent(/^Site Master$/);
-    expect(screen.getByTestId('nav-site360-menus').querySelectorAll('a')).toHaveLength(6);
-    expect(screen.queryByTestId('nav-site360-dismantle')).not.toBeInTheDocument();
+    expect(screen.getByTestId('nav-site-master-menus').querySelectorAll('a')).toHaveLength(6);
+    expect(screen.queryByTestId('nav-site-master-dismantle')).not.toBeInTheDocument();
     expect(screen.getByTestId('nav-group-registers')).toContainElement(screen.getByTestId('nav-dismantle'));
     expect(screen.getByTestId('nav-group-site_register')).not.toContainElement(screen.getByTestId('nav-dismantle'));
   });

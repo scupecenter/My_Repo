@@ -22,7 +22,7 @@ import { DataReset } from './DataReset';
 import { Imports } from './Imports';
 import { KanbanWip } from './KanbanWip';
 import { Studio } from './studio/Studio';
-import { Site360Columns } from './Site360Columns';
+import { SiteMasterColumns } from './SiteMasterColumns';
 import { DashboardSettings } from './DashboardSettings';
 import { Identity } from './Identity';
 import { DisplaySettings } from './DisplaySettings';
@@ -71,9 +71,9 @@ export const LEGACY_SETTINGS_PATHS: Readonly<Record<string, string>> = {
   'mail-kinds': 'documents/mail',
   imports: 'data/imports',
   'historical-waiver': 'data/historical',
-  // W3 (2026-11-24): the Site360 tab is gone; its Master column menus live in Settings > Workflow > Columns, with the same rights.
+  // W3 (2026-11-24): the SiteMaster tab is gone; its Master column menus live in Settings > Workflow > Columns, with the same rights.
   site360: 'workflow/columns',
-  'site360-columns': 'workflow/columns',
+  'site-master-columns': 'workflow/columns',
 };
 
 function Layout() {
@@ -131,7 +131,7 @@ export function SettingsRoutes() {
         <Route path="workflow" element={<TabFrame tab="workflow" />}>
           <Route index element={<Navigate to="editor" replace />} />
           <Route path="editor" element={<Studio />} />
-          <Route path="columns" element={<Site360Columns />} />
+          <Route path="columns" element={<SiteMasterColumns />} />
           <Route path="freeze" element={<Freeze />} />
           <Route path="idle" element={<Idle />} />
           <Route path="board" element={<KanbanWip />} />

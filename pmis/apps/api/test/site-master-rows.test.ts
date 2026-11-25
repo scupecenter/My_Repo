@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { loggedIn, makeUser, startApp, superDb } from './helpers';
 import { actor, addAssignment, makeSite, makeTask, Site } from './wf-helpers';
 
-/** SITE 360 grid rows (0.15.21, F15, migration 0104): visibility, filters, sort, paging, the Master values and a 1000-site performance bound. */
+/** Site Master grid rows (0.15.21, F15, migration 0104): visibility, filters, sort, paging, the Master values and a 1000-site performance bound. */
 const PREFIX = `S360${randomBytes(3).toString('hex').toUpperCase()}`;
 let app: NestExpressApplication;
 let db: PgClient;

@@ -13,7 +13,7 @@ import { Sites } from './Sites';
 import { SettingsRoutes } from './settings/Settings';
 
 /**
- * F5 (contract 0.15.32): the SITE 360 board by milestone (read only, swimlanes, ageing, WIP warning) and the tasks board of My Work, where a
+ * F5 (contract 0.15.32): the Site Master board by milestone (read only, swimlanes, ageing, WIP warning) and the tasks board of My Work, where a
  * drop or the keyboard "Open action" menu only opens the task's existing action, and is refused when the server does not offer it.
  */
 const T = 30_000;
@@ -27,7 +27,7 @@ function writes(): string[] {
   return seen;
 }
 
-describe('sites board (SITE 360)', () => {
+describe('sites board (Site Master)', () => {
   it('shows a column per milestone and Closed, cards as links (no drag), ageing in working days, and the same filters as the list', async () => {
     await signIn('pm');
     const seen: string[] = [];

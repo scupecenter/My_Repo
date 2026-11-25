@@ -18,7 +18,7 @@
   "app": {
     "name": "GSDN Workspace"
   },
-  "site360": {
+  "siteMaster": {
     "menus": "Site Master menus",
     "gate": "gate",
     "freeze": "Freeze or unfreeze this column",
@@ -5171,7 +5171,7 @@
       "not_applicable": "Not applicable"
     }
   },
-  "site360cols": {
+  "siteMasterCols": {
     "title": "Site Master columns",
     "hint": "Each Master column belongs to one or more Site Master menus. Status columns are in every menu and cannot change.",
     "edit": "Edit menus",

@@ -2,7 +2,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { randomBytes } from 'node:crypto';
 import type { Client as PgClient } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { cellInput } from '../src/site360/site360.service';
+import { cellInput } from '../src/site-master/site-master.service';
 import { startApp, superDb } from './helpers';
 import { actor, makeSite, makeTask } from './wf-helpers';
 

@@ -9,7 +9,7 @@ const MIN = 1;
 const MAX = 10000;
 
 /**
- * Settings, Workflow, Board (F5, contract 0.15.32, migration 0118): the WIP limit of each milestone column of the SITE 360 board. No limit by
+ * Settings, Workflow, Board (F5, contract 0.15.32, migration 0118): the WIP limit of each milestone column of the Site Master board. No limit by
  * default. A limit is a warning on the board only: a column above it is marked, nothing is ever blocked or moved. Every signed-in user sees the
  * values; a System Admin or a delegate of settings edit for all regions changes them, with a reason (audited).
  */

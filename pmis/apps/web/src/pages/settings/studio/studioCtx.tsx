@@ -4,7 +4,7 @@ import {
   useCreateTask, useDiscardDraft, useGateLight, useInsertTask, useMilestoneLight, usePublish, useRemoveItem, useReorderTasks, useRemoveSlaRule, useReplaceStructure, useSaveSlaRule, useSetClosing, useSetWeight, useSetPredecessors, useSetSuccessors, useUpdateTask,
   type SlaWeightItem, type WeightTotal, type WorkflowVersion,
 } from '@/api/workflowEditor';
-import { useColumnSections, useCreateColumn, useDeactivateColumn, useDeleteColumn, useReactivateColumn, useUpdateColumn } from '@/api/site360Columns';
+import { useColumnSections, useCreateColumn, useDeactivateColumn, useDeleteColumn, useReactivateColumn, useUpdateColumn } from '@/api/siteMasterColumns';
 import { useToast } from '@/components/Toast';
 import { ReasonDialog } from '../wf/Forms';
 import type { Can, G, M, P } from '../wf/model';

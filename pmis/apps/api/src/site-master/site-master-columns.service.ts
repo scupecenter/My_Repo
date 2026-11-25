@@ -13,15 +13,15 @@ import {
   parseIncludeInactive,
   previewBody,
   reasonBody,
-  SITE360_COLUMN_TYPES,
+  SITE_MASTER_COLUMN_TYPES,
   updateColumnBody,
   type ColumnAdminRow,
   type ColumnBand,
-} from './site360-columns';
+} from './site-master-columns';
 
 type Json = Record<string, unknown>;
 
-export interface Site360ColumnListDto {
+export interface SiteMasterColumnListDto {
   items: (ColumnAdminRow & Json)[];
   bands: ColumnBand[];
   types: readonly string[];
@@ -33,7 +33,7 @@ export interface Site360ColumnListDto {
  * user gets 403, not 401), parses the request, adds the step-up and translates the database refusals.
  */
 @Injectable()
-export class Site360ColumnsService {
+export class SiteMasterColumnsService {
   constructor(
     private readonly db: DbService,
     private readonly stepUp: StepUpService,
@@ -81,7 +81,7 @@ export class Site360ColumnsService {
     return n;
   }
 
-  async list(q: Record<string, unknown>): Promise<Site360ColumnListDto> {
+  async list(q: Record<string, unknown>): Promise<SiteMasterColumnListDto> {
     const inc = parseIncludeInactive(q.include_inactive);
     if (inc === null)
       throw problems.validation([
@@ -99,7 +99,7 @@ export class Site360ColumnsService {
     return {
       items: list,
       bands: buildColumnBands(list),
-      types: SITE360_COLUMN_TYPES,
+      types: SITE_MASTER_COLUMN_TYPES,
     };
   }
 

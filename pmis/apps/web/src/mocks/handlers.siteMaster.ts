@@ -2,7 +2,7 @@ import { http, HttpResponse } from 'msw';
 import { API_BASE } from '@/api/client';
 
 /**
- * Synthetic SITE 360 menus (contract 0.15.21). A small subset of the 187 Master columns, with the same sections as the
+ * Synthetic Site Master menus (contract 0.15.21). A small subset of the 187 Master columns, with the same sections as the
  * API's defaults, so the grid can be tested. The real columns come from master_columns.
  */
 type Col = { ord: number; letter: string; group_top: string | null; group_mid: string | null; header: string; sections: string[]; source_kind: string; source_note?: string | null };
@@ -56,7 +56,7 @@ const SITES = [
 
 /**
  * Editable cells of the synthetic sites (wide table and bulk edit, 0.15.50): TE Access Date (78, a date) and CW Delivery Model (33, a list) are backed by a
- * synthetic task per site; the third site's date is locked. PATCH /tasks/wide-task-<ord>-<n> (site360WideHandlers) changes the stored value and the version.
+ * synthetic task per site; the third site's date is locked. PATCH /tasks/wide-task-<ord>-<n> (siteMasterWideHandlers) changes the stored value and the version.
  */
 const WIDE = new Map<string, { value: string | null; version: number }>();
 const wideKey = (ord: number, n: number) => `wide-task-${ord}-${n}`;
@@ -129,7 +129,7 @@ function sourcesFor(site: (typeof SITES)[number], key: string) {
   });
 }
 
-export const site360Handlers = [
+export const siteMasterHandlers = [
   // 0.15.35 (P1 Master): the source of every Master cell of one synthetic site
   http.get(`${API_BASE}/site360/sites/:siteId/sources`, ({ params, request }) => {
     const site = SITES.find((x) => x.id === params.siteId);
@@ -148,7 +148,7 @@ export const site360Handlers = [
 ];
 
 /** The save path of the synthetic cells above: PATCH /tasks/wide-task-<ord>-<n> with If-Match the version. Any other task id falls through to the task mock. */
-export const site360WideHandlers = [
+export const siteMasterWideHandlers = [
   http.patch(`${API_BASE}/tasks/:id`, async ({ params, request }) => {
     const m = /^wide-task-(\d+)-(\d+)$/.exec(String(params.id));
     if (!m) return undefined;

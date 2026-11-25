@@ -3,8 +3,8 @@ import { Prisma } from '@prisma/client';
 import { AccessService } from '../access/access.service';
 import { problems } from '../common/problem';
 import { DbService } from '../db/db.service';
-import { COLUMNS_SQL } from '../site360/site360-columns-sql';
-import { buildMenu, SITE360_MENUS, type Site360ColumnRow, type Site360Menu } from '../site360/site360-sections';
+import { COLUMNS_SQL } from '../site-master/site-master-columns-sql';
+import { buildMenu, SITE_MASTER_MENUS, type SiteMasterColumnRow, type SiteMasterMenu } from '../site-master/site-master-sections';
 import {
   compileFilter,
   FilterCatalog,
@@ -144,13 +144,13 @@ const VIEW_REGISTER_ORDS: Record<number, string> = {
   186: 'issues',
   187: 'issues',
 };
-const SITE360_MENU_KEYS: readonly string[] = SITE360_MENUS.map((m) => m.key);
+const SITE_MASTER_MENU_KEYS: readonly string[] = SITE_MASTER_MENUS.map((m) => m.key);
 /** The menu of a `site360-<menu>` screen, or null. */
-const site360Menu = (screen: string): Site360Menu | null => {
+const siteMasterMenu = (screen: string): SiteMasterMenu | null => {
   const m = /^site360-([a-z_]{2,20})$/.exec(screen)?.[1];
-  return m && SITE360_MENU_KEYS.includes(m) ? (m as Site360Menu) : null;
+  return m && SITE_MASTER_MENU_KEYS.includes(m) ? (m as SiteMasterMenu) : null;
 };
-const isSitesLike = (screen: string): boolean => screen === 'sites' || screen === 'sites-stream' || screen === 'dashboard' || site360Menu(screen) !== null;
+const isSitesLike = (screen: string): boolean => screen === 'sites' || screen === 'sites-stream' || screen === 'dashboard' || siteMasterMenu(screen) !== null;
 
 /** A register or custom field type, as the builder offers it. */
 function typeOf(t: string | null): FilterFieldType | null {
@@ -210,7 +210,7 @@ export class FilterCatalogService {
    */
   static modulesOf(screen: string): string[] | null {
     if (screen === 'dashboard') return ['dashboard', 'sites'];
-    return site360Menu(screen) ? ['sites'] : null;
+    return siteMasterMenu(screen) ? ['sites'] : null;
   }
 
   private async regionOptions() {
@@ -320,12 +320,12 @@ export class FilterCatalogService {
    * The fields of a site360-<menu> screen: the `sites` fields and the Master columns of the menu (the same columns, the same order and the same type
    * as the grid; a column the caller cannot see is left out). A Master column that is already a `sites` field is not offered twice.
    */
-  private async site360(menu: Site360Menu): Promise<Built> {
+  private async site360(menu: SiteMasterMenu): Promise<Built> {
     const built = await this.sites();
-    const rows = await this.db.tx.$queryRaw<Site360ColumnRow[]>(Prisma.sql`${COLUMNS_SQL} WHERE mc.is_active ORDER BY mc.display_order`);
+    const rows = await this.db.tx.$queryRaw<SiteMasterColumnRow[]>(Prisma.sql`${COLUMNS_SQL} WHERE mc.is_active ORDER BY mc.display_order`);
     const cols = buildMenu(menu, rows).columns.filter((c) => c.ord > 1 && !MASTER_ORD_IS_SITE_FIELD.has(c.ord) && c.source_kind !== 'not_tracked' && Number.isInteger(c.ord));
     if (!cols.length) return built;
-    const vis = await this.site360Visibility();
+    const vis = await this.siteMasterVisibility();
     const visibleKeys = [...vis.visible];
     const listOrds = cols.filter((c) => c.value_type === 'list').map((c) => c.ord);
     const fixed = new Map<number, string[]>();
@@ -371,7 +371,7 @@ export class FilterCatalogService {
   }
 
   /** The registers the caller may view, the Master columns filled by a site custom field the caller may not see, and the register of each register-owned column. */
-  private async site360Visibility(): Promise<{
+  private async siteMasterVisibility(): Promise<{
     visible: Set<string>;
     hiddenOrds: Set<number>;
     registerOf: Map<number, string>;
@@ -666,7 +666,7 @@ export class FilterCatalogService {
         },
       ]);
     }
-    const menu = site360Menu(screen);
+    const menu = siteMasterMenu(screen);
     const built = menu
       ? await this.site360(menu)
       : isSitesLike(screen)
@@ -832,7 +832,7 @@ interface Built {
 }
 
 /** The filter type of a Master column (0.15.45): the effective type of the column; a column with no type of its own that holds dates is a date. */
-function masterType(c: Site360ColumnRow & { group_top: string | null }): FilterFieldType | 'list' {
+function masterType(c: SiteMasterColumnRow & { group_top: string | null }): FilterFieldType | 'list' {
   switch (c.value_type) {
     case 'date':
       return 'date';

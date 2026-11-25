@@ -3,8 +3,8 @@ import { MoreHorizontal, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ApiError } from '@/api/client';
-import { useColumnDetails, useColumnAdmin, usePreviewColumnType, type ColumnAdmin, type ColumnType, type MenuKey } from '@/api/site360Columns';
-import { SITE360_MOVABLE_MENUS } from '@/api/site360';
+import { useColumnDetails, useColumnAdmin, usePreviewColumnType, type ColumnAdmin, type ColumnType, type MenuKey } from '@/api/siteMasterColumns';
+import { SITE_MASTER_MOVABLE_MENUS } from '@/api/siteMaster';
 import { useListCatalogues } from '@/api/lists';
 import { FormDialog } from '@/components/FormDialog';
 import { useToast } from '@/components/Toast';
@@ -160,7 +160,7 @@ function MenusDialog({ c, col, onClose }: { c: ColCtx; col: ColumnAdmin; onClose
   const { t } = useTranslation();
   const toast = useToast();
   const err = useColErr();
-  const [pick, setPick] = useState<MenuKey[]>(col.sections.filter((s): s is MenuKey => (SITE360_MOVABLE_MENUS as readonly string[]).includes(s)));
+  const [pick, setPick] = useState<MenuKey[]>(col.sections.filter((s): s is MenuKey => (SITE_MASTER_MOVABLE_MENUS as readonly string[]).includes(s)));
   const [error, setError] = useState<string | null>(null);
   const same = pick.length === col.sections.length && pick.every((s) => (col.sections as string[]).includes(s));
   return (
@@ -172,13 +172,13 @@ function MenusDialog({ c, col, onClose }: { c: ColCtx; col: ColumnAdmin; onClose
   );
 }
 
-/** The seven SITE 360 menus a column may be in, as checkboxes of 44px. */
+/** The seven Site Master menus a column may be in, as checkboxes of 44px. */
 export function MenuPicker({ value, onChange, prefix }: { value: MenuKey[]; onChange: (v: MenuKey[]) => void; prefix: string }) {
   const { t } = useTranslation();
   return (
     <fieldset className="grid gap-1 sm:grid-cols-2" data-testid={prefix}>
       <legend className="sr-only">{t('studio.columns.menus')}</legend>
-      {SITE360_MOVABLE_MENUS.map((m) => (
+      {SITE_MASTER_MOVABLE_MENUS.map((m) => (
         <label key={m} className="flex min-h-11 items-center gap-2 text-sm">
           <input type="checkbox" className="h-5 w-5" data-testid={`${prefix}-${m}`} checked={value.includes(m)} onChange={(e) => onChange(e.target.checked ? [...value, m] : value.filter((x) => x !== m))} />{t(`studio.columns.menu_${m}`)}
         </label>

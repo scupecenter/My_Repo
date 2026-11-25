@@ -4,17 +4,17 @@
  */
 import { z } from 'zod';
 
-export const SITE360_COLUMN_TYPES = [
+export const SITE_MASTER_COLUMN_TYPES = [
   'text',
   'number',
   'date',
   'list',
   'yes_no',
 ] as const;
-export type Site360ColumnType = (typeof SITE360_COLUMN_TYPES)[number];
+export type SiteMasterColumnType = (typeof SITE_MASTER_COLUMN_TYPES)[number];
 
 const reason = z.string().trim().min(3).max(1000);
-const type = z.enum(SITE360_COLUMN_TYPES);
+const type = z.enum(SITE_MASTER_COLUMN_TYPES);
 const menu = z.enum([
   'design_acq',
   'sow',

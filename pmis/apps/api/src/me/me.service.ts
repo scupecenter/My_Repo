@@ -11,7 +11,7 @@ export const NAV_KEYS = [
   'my_work', 'approvals', 'sites', 'dashboard', 'templates', 'admin.users', 'admin.roles', 'admin.groups', 'admin.delegation',
   'absence', 'admin.matrix', 'admin.settings', 'admin.security_log', 'admin.online', 'audit', 'messages', 'announcements',
   'inbox', 'workload', 'status_updates',
-  // Registers & Logs and the Dismantle sub-menu of SITE 360: a System Admin (or a full delegate) sees every register.
+  // Registers & Logs and the Dismantle sub-menu of Site Master: a System Admin (or a full delegate) sees every register.
   'procurement', 'gecol', 'hlc', 'permits_hse', 'warehouse', 'quality', 'issues', 'risks', 'change_control', 'readiness',
   'as_built', 'meetings', 'rf_design', 'acquisition', 'contractors', 'car_dispatcher', 'financial_advances', 'dismantle',
   // 0149 (W7): My Work > Daily Plan

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { attachParentOrds, cellInput } from '../src/site360/site360.service';
+import { attachParentOrds, cellInput } from '../src/site-master/site-master.service';
 
 /** Dependent lists (0.15.50): a child list cell names the column that holds its parent value; each option names its parent value. */
 describe('attachParentOrds', () => {

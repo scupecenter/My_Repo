@@ -43,7 +43,7 @@ describe('saved views of a Site Master sub-menu', () => {
     await signIn('pm');
     const u = userEvent.setup();
     renderApp(<Sites />, { route: '/sites?section=cw&region_id=1' });
-    await screen.findByTestId('site360-list');
+    await screen.findByTestId('site-master-list');
     expect(screen.getByTestId('saved-views')).toHaveAttribute(
       'data-screen',
       'site360-cw',
@@ -100,7 +100,7 @@ describe('saved views of a Site Master sub-menu', () => {
     const seen = watchRows();
     const u = userEvent.setup();
     renderApp(<Sites />, { route: '/sites?section=cw' });
-    await screen.findByTestId('site360-list');
+    await screen.findByTestId('site-master-list');
     await waitFor(() => expect(options()).toContain('CW B3 wide'));
     await u.selectOptions(
       screen.getByTestId('views-select'),
@@ -129,12 +129,12 @@ describe('saved views of a Site Master sub-menu', () => {
       screen.getByTestId('views-select'),
       screen.getByRole('option', { name: 'CW plain' }),
     );
-    expect(await screen.findByTestId('site360-list')).toBeInTheDocument();
+    expect(await screen.findByTestId('site-master-list')).toBeInTheDocument();
     await waitFor(() =>
       expect(screen.queryByTestId('filter-chip-x-region_id')).toBeNull(),
     );
     expect(screen.queryByTestId('filter-chip-0')).toBeNull();
-    expect(screen.queryByTestId('site360-grid')).toBeNull();
+    expect(screen.queryByTestId('site-master-grid')).toBeNull();
   }, 30_000);
 
   it('the generic Site Master list keeps the views of its own screen', async () => {

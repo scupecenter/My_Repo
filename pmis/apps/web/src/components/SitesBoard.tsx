@@ -6,7 +6,7 @@ import { useRegions } from '@/api/sites';
 import { BoardGrid } from './Board';
 
 /**
- * F5 (contract 0.15.32): the sites board of SITE 360, read only. One column per milestone plus Closed; a site sits in the first milestone
+ * F5 (contract 0.15.32): the sites board of Site Master, read only. One column per milestone plus Closed; a site sits in the first milestone
  * it has not reached, the server decides it. Swimlanes by region or contractor; the ageing is in working days (the server counts them);
  * a WIP limit only shows a warning. Nothing can be dragged: a card is a link to the site, so a site moves only through its own tasks.
  */
@@ -40,7 +40,7 @@ function Card({ c, region }: { c: SiteBoardCard; region: string }) {
   );
 }
 
-/** `query` holds the filters of the SITE 360 list (the F3 tree as `filter`), so the board and the list show the same sites. */
+/** `query` holds the filters of the Site Master list (the F3 tree as `filter`), so the board and the list show the same sites. */
 export function SitesBoard({ query, swimlane, onSwimlane }: { query: Record<string, string | undefined>; swimlane: Swimlane; onSwimlane: (s: Swimlane) => void }) {
   const { t, i18n } = useTranslation();
   const regions = useRegions();

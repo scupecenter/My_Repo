@@ -497,7 +497,7 @@ Built from the owner answers of 2026-11-04 (Q2, Q3, Q9, Q13, Q14, Q15, Q135, Q13
 | Q519 | **Decided 2026-11-08 by the product owner.** **Assignment members.** The engineers of a Procurement assignment are entered by hand or through the approved Procurement template. | None: decided. |
 | Q520 | **Decided 2026-11-08 by the product owner.** **MOB tasks on existing sites.** They stay locked until the admin opens them. | None: decided. |
 | Q521 | **Decided 2026-11-08 by the product owner.** **Product name.** The system is named **GSDN Workspace** (was GSDN Workspace). Display names only; folders, code identifiers, database roles and service names keep `pmis`. | None: decided. |
-| Q522 | **Decided 2026-11-08 by the product owner.** **SITE 360.** The Site Register main menu is named **SITE 360**; its first entry is "All sites" and its sub-sections carry no "Register" in their names (CW view: Civil Works, TE view: Installation (TE)). Registers & Logs keeps every other register as a sub-menu. | None: decided. |
+| Q522 | **Decided 2026-11-08 by the product owner.** **Site Master.** The Site Register main menu is named **Site Master**; its first entry is "All sites" and its sub-sections carry no "Register" in their names (CW view: Civil Works, TE view: Installation (TE)). Registers & Logs keeps every other register as a sub-menu. | None: decided. |
 
 ## F2: ball in court, SLA overrun in working days and the stale flag (migration 0114, contract 0.15.30)
 
@@ -507,7 +507,7 @@ Built from the owner answers of 2026-11-04 (Q2, Q3, Q9, Q13, Q14, Q15, Q135, Q13
 | Q560 | **F3, views shared with a region (migration 0117).** The plan says "share with a region" but not who is in a region. | A view shared with region R reaches every user whose own view right on the screen's module covers R; an all-regions holder and a System Admin cover every region. Recipients read only and see only the rows their own rights allow. A region-limited sharer may name only their own regions. |
 | Q561 | **F3, fields that cannot be filtered yet.** People, multi-value lists, files and child lists have no simple comparison. | Not offered by `GET /saved-views/filter-fields` in this version; a list catalogue field keeps the text operators. Revisit when F5 (kanban) needs them. |
 | Q562 | **F3, Export of the current view.** CLAUDE.md says the Export button exports exactly the current view with its filters. | The export service does not read the `filter` tree yet; the button exports the simple filters only. To add with the export service (the same compiler). |
-| Q563 | **F3, the task list of a site.** `GET /sites/{site_id}/tasks` accepts `filter` (screen `site-tasks`), but the site page has no saved-views bar. | Server only for now; the web builder is offered on SITE 360 and the registers. |
+| Q563 | **F3, the task list of a site.** `GET /sites/{site_id}/tasks` accepts `filter` (screen `site-tasks`), but the site page has no saved-views bar. | Server only for now; the web builder is offered on Site Master and the registers. |
 
 ## F5: sites board by milestone and tasks board by approval state (migration 0118, contract 0.15.32)
 

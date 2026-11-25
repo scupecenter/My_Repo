@@ -13,14 +13,14 @@ import {
   parseIncludeInactive,
   previewBody,
   reasonBody,
-  SITE360_COLUMN_TYPES,
+  SITE_MASTER_COLUMN_TYPES,
   updateColumnBody,
-} from '../src/site360/site360-columns';
+} from '../src/site-master/site-master-columns';
 import {
   displayOrder,
   menuColumns,
-  type Site360ColumnRow,
-} from '../src/site360/site360-sections';
+  type SiteMasterColumnRow,
+} from '../src/site-master/site-master-sections';
 
 /** Workflow Studio S2 (contract 0.15.43, migration 0133): the pure parts, with no database. */
 const REASON = 'Studio test change';
@@ -96,7 +96,7 @@ describe('create body', () => {
   });
 
   it('takes the five types of the task inputs', () => {
-    expect([...SITE360_COLUMN_TYPES]).toEqual([
+    expect([...SITE_MASTER_COLUMN_TYPES]).toEqual([
       'text',
       'number',
       'date',
@@ -180,8 +180,8 @@ describe('the menus follow the display order', () => {
   const row = (
     ord: number,
     display_order: number | undefined,
-    sections: Site360ColumnRow['sections'],
-  ): Site360ColumnRow => ({
+    sections: SiteMasterColumnRow['sections'],
+  ): SiteMasterColumnRow => ({
     ord,
     letter: `L${ord}`,
     group_top: 'B',

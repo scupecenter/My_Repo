@@ -40,7 +40,7 @@ describe('F19: Settings tabs and old routes', () => {
     ['documents/library', '/admin/settings/documents/types'],
     ['calendar', '/admin/settings/calendar'],
     ['site360', '/admin/settings/workflow/columns'],
-    ['site360-columns', '/admin/settings/workflow/columns'],
+    ['site-master-columns', '/admin/settings/workflow/columns'],
   ])('old /admin/settings/%s opens %s', async (old, target) => {
     at(`/admin/settings/${old}`);
     await waitFor(() => expect(probe()).toBe(target));
@@ -68,13 +68,13 @@ describe('F19: Settings tabs and old routes', () => {
     expect(screen.getByTestId('settings-tab-registers')).toHaveClass('btn-accent');
   });
 
-  it('W3: no Site360 tab; the old Site360 routes open Workflow > Columns', async () => {
-    at('/admin/settings/site360-columns');
-    expect(await screen.findByTestId('site360-columns')).toBeInTheDocument();
+  it('W3: no SiteMaster tab; the old SiteMaster routes open Workflow > Columns', async () => {
+    at('/admin/settings/site-master-columns');
+    expect(await screen.findByTestId('site-master-columns')).toBeInTheDocument();
     expect(screen.queryByTestId('settings-tab-site360')).toBeNull();
     expect(screen.getByTestId('settings-tab-workflow')).toHaveClass('btn-accent');
     expect(screen.getByTestId('settings-section-workflow-columns')).toHaveClass('btn-accent');
-    expect(screen.getByTestId('page-settings')).not.toHaveTextContent(/Site360|SITE 360/);
+    expect(screen.getByTestId('page-settings')).not.toHaveTextContent(/Site360|SITE 360|Site 360/);
   });
 
   it('the Workflow tab still opens the editor first', async () => {

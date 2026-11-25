@@ -11,7 +11,7 @@ import { RegisterBatch } from './RegisterBatch';
 import { RegisterPage } from './Register';
 import { TemplatesPage } from './Templates';
 
-/** Contract 0.11.5: the SITE 360 stream templates and TPL-MASTER on the Templates page, the upload dialog and the review of a batch of task rows. */
+/** Contract 0.11.5: the Site Master stream templates and TPL-MASTER on the Templates page, the upload dialog and the review of a batch of task rows. */
 const Routed = () => (
   <Routes>
     <Route path="/templates" element={<TemplatesPage />} />

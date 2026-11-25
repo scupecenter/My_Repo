@@ -1,8 +1,8 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { Site360MenuItem } from "@/api/site360";
+import type { SiteMasterMenuItem } from "@/api/siteMaster";
 
-export interface Site360GridRow {
+export interface SiteMasterGridRow {
   id: string;
   site_code: string;
   name?: string;
@@ -11,11 +11,11 @@ export interface Site360GridRow {
   /** The Master value of each column, keyed by the column order (ord); null when the column has no value. */
   values?: Record<string, string | null>;
   /** Inline edit targets of the task-backed columns, keyed by ord (contract 0.15.21, item 3). */
-  cells?: Record<string, Site360CellTarget>;
+  cells?: Record<string, SiteMasterCellTarget>;
 }
 
 /** The task behind a task-backed cell: the save goes to PATCH /tasks/{task_id} with the version (If-Match). */
-export interface Site360CellTarget {
+export interface SiteMasterCellTarget {
   task_id: string;
   version: number;
   editable: boolean;
@@ -29,10 +29,10 @@ export interface Site360CellTarget {
 }
 
 /** A value typed into a cell: the target and the new value (an empty text clears the value). */
-export interface Site360CellEdit {
-  row: Site360GridRow;
+export interface SiteMasterCellEdit {
+  row: SiteMasterGridRow;
   ord: number;
-  target: Site360CellTarget;
+  target: SiteMasterCellTarget;
   value: string;
 }
 
@@ -80,7 +80,7 @@ function numeric(text: string): number | null {
 }
 
 /**
- * The SITE 360 grid (F15), shared by the menus and the registers (F16): the Excel Master look.
+ * The Site Master grid (F15), shared by the menus and the registers (F16): the Excel Master look.
  * Dense rows, thin borders, three sticky header rows (phase band, group, field), Phase Gate columns narrow and shaded,
  * frozen identity columns with a shadow divider, collapsible phase bands, a totals row and a footer that reads
  * "N of M sites". The # column is the running number of the rows in view.
@@ -90,29 +90,29 @@ function numeric(text: string): number | null {
  * the column. Click a cell and shift-click another to select a rectangle; the footer then shows its cell count, its
  * numeric count and the sum. Sort and filter work on the rows loaded in this grid; the server pages the rest.
  */
-export function Site360Grid({
+export function SiteMasterGrid({
   menu,
   rows,
   total,
   filtered,
-  testid = "site360-grid",
+  testid = "site-master-grid",
   onEditCell,
   onSelectRows,
   onOpenCell,
 }: {
-  menu: Site360MenuItem;
-  rows: Site360GridRow[];
+  menu: SiteMasterMenuItem;
+  rows: SiteMasterGridRow[];
   /** Sites the caller may see (the footer's M). */
   total?: number;
   /** Sites that match the filters (the footer's N). */
   filtered?: number;
   testid?: string;
   /** Saves an inline edit of a task-backed cell; read-only cells never call it. */
-  onEditCell?: (edit: Site360CellEdit) => void;
+  onEditCell?: (edit: SiteMasterCellEdit) => void;
   /** The rows of the selected rectangle (empty when none), so a toolbar can act on those sites (lock, unlock). */
-  onSelectRows?: (rows: Site360GridRow[]) => void;
+  onSelectRows?: (rows: SiteMasterGridRow[]) => void;
   /** A click on one Master cell (not #): the page shows the cell's source (0.15.35, P1 Master). */
-  onOpenCell?: (row: Site360GridRow, ord: number) => void;
+  onOpenCell?: (row: SiteMasterGridRow, ord: number) => void;
 }) {
   const { i18n, t } = useTranslation();
   const ar = i18n.language === "ar";
@@ -223,7 +223,7 @@ export function Site360Grid({
       : undefined;
 
   /** The text of a cell: # is the running row number, Site ID and Site Name are the identity, the rest are the Master values. */
-  const value = (ord: number, index: number, row: Site360GridRow): string => {
+  const value = (ord: number, index: number, row: SiteMasterGridRow): string => {
     if (ord === 1) return String(row.row_no ?? index + 1);
     if (ord === 2) return row.site_code;
     if (ord === 4) return row.name ?? row.values?.["4"] ?? "";
@@ -320,7 +320,7 @@ export function Site360Grid({
               className="font-semibold"
             >
               {open ? "▾" : "▸"} {band.name ?? ""}{" "}
-              {band.is_phase_gate ? `(${t("site360.gate")})` : ""}
+              {band.is_phase_gate ? `(${t("siteMaster.gate")})` : ""}
             </button>
           </th>
         );
@@ -369,7 +369,7 @@ export function Site360Grid({
     const items = all.filter(
       (v) =>
         needle === "" ||
-        (v === "" ? t("site360.blanks") : v).toLowerCase().includes(needle),
+        (v === "" ? t("siteMaster.blanks") : v).toLowerCase().includes(needle),
     );
     return (
       <div
@@ -389,7 +389,7 @@ export function Site360Grid({
             }}
             className="text-start hover:underline"
           >
-            {t("site360.sort_asc")}
+            {t("siteMaster.sort_asc")}
           </button>
           <button
             type="button"
@@ -401,7 +401,7 @@ export function Site360Grid({
             }}
             className="text-start hover:underline"
           >
-            {t("site360.sort_desc")}
+            {t("siteMaster.sort_desc")}
           </button>
           <button
             type="button"
@@ -413,15 +413,15 @@ export function Site360Grid({
             }}
             className="text-start hover:underline"
           >
-            {t("site360.sort_clear")}
+            {t("siteMaster.sort_clear")}
           </button>
         </div>
         <div className="py-2">
-          <div className="mb-1 font-semibold">{t("site360.filter")}</div>
+          <div className="mb-1 font-semibold">{t("siteMaster.filter")}</div>
           <input
             type="search"
-            aria-label={t("site360.filter_search")}
-            placeholder={t("site360.filter_search")}
+            aria-label={t("siteMaster.filter_search")}
+            placeholder={t("siteMaster.filter_search")}
             value={filterSearch}
             onChange={(e) => setFilterSearch(e.target.value)}
             className="mb-1 h-6 w-full rounded border border-line bg-transparent px-1"
@@ -440,7 +440,7 @@ export function Site360Grid({
               }
               className="hover:underline"
             >
-              {t("site360.all")}
+              {t("siteMaster.all")}
             </button>
             <button
               type="button"
@@ -448,7 +448,7 @@ export function Site360Grid({
               onClick={() => setFilters((f) => ({ ...f, [ord]: [] }))}
               className="hover:underline"
             >
-              {t("site360.none_value")}
+              {t("siteMaster.none_value")}
             </button>
           </div>
           <ul className="max-h-48 overflow-auto">
@@ -462,7 +462,7 @@ export function Site360Grid({
                     data-testid={`${testid}-filter-value-${letter}`}
                   />
                   <span className="truncate">
-                    {v === "" ? t("site360.blanks") : v}
+                    {v === "" ? t("siteMaster.blanks") : v}
                   </span>
                 </label>
               </li>
@@ -476,7 +476,7 @@ export function Site360Grid({
           onClick={() => hideColumn(ord)}
           className="border-t border-line pt-2 text-start hover:underline"
         >
-          {t("site360.hide")}
+          {t("siteMaster.hide")}
         </button>
       </div>
     );
@@ -513,7 +513,7 @@ export function Site360Grid({
                     type="button"
                     aria-pressed={frozen.includes(ord)}
                     onClick={() => toggleFreeze(ord)}
-                    title={t("site360.freeze")}
+                    title={t("siteMaster.freeze")}
                     className="text-[10px] text-mute"
                     data-testid={`${testid}-freeze-${c.letter}`}
                   >
@@ -522,7 +522,7 @@ export function Site360Grid({
                 )}
                 <button
                   type="button"
-                  aria-label={t("site360.menu")}
+                  aria-label={t("siteMaster.menu")}
                   aria-expanded={menuOrd === ord}
                   onMouseDown={(e) => e.stopPropagation()}
                   onClick={() => {
@@ -540,8 +540,8 @@ export function Site360Grid({
             <span
               role="separator"
               aria-orientation="vertical"
-              aria-label={t("site360.resize")}
-              title={t("site360.resize")}
+              aria-label={t("siteMaster.resize")}
+              title={t("siteMaster.resize")}
               data-testid={`${testid}-resize-${c.letter}`}
               onPointerDown={(e) => {
                 e.preventDefault();
@@ -570,10 +570,10 @@ export function Site360Grid({
       return (
         <span
           className="italic text-mute"
-          title={t("site360.not_tracked_hint")}
+          title={t("siteMaster.not_tracked_hint")}
           data-testid={`${testid}-not-tracked`}
         >
-          {t("site360.not_tracked")}
+          {t("siteMaster.not_tracked")}
         </span>
       );
     if (text === "") return <span className="text-mute">-</span>;
@@ -647,7 +647,7 @@ export function Site360Grid({
             data-testid={`${testid}-show-hidden`}
             className="text-accentText hover:underline"
           >
-            {t("site360.show_hidden", { count: hiddenCount })}
+            {t("siteMaster.show_hidden", { count: hiddenCount })}
           </button>
         </div>
       ) : null}
@@ -756,7 +756,7 @@ export function Site360Grid({
                   style={{ ...stickyStyle(ord) }}
                 >
                   {i === 0
-                    ? t("site360.of", {
+                    ? t("siteMaster.of", {
                         count: filtered ?? shown.length,
                         total: total ?? filtered ?? rows.length,
                       })
@@ -770,7 +770,7 @@ export function Site360Grid({
                   colSpan={Math.max(1, visibleOrds.length)}
                   className="border border-line bg-sideOn/40 px-2 py-0.5 text-xs"
                 >
-                  {t("site360.selection", {
+                  {t("siteMaster.selection", {
                     count: selCells,
                     numbers: selNumbers,
                     sum: selSum.toLocaleString(ar ? "ar" : "en", {

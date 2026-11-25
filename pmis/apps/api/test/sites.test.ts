@@ -247,7 +247,7 @@ describe('GET /sites/{id} and the task grid', () => {
     expect(b.streams).toHaveLength(4);
     expect(b.current_milestone).toBe('MS1');
     expect(b.next_milestone).toBe('MS2');
-    // 0131: the stored columns (Master FX / FY, the SITE 360 grid and its milestone filter) hold the same values
+    // 0131: the stored columns (Master FX / FY, the Site Master grid and its milestone filter) hold the same values
     const stored = await db.query('SELECT current_milestone, next_milestone FROM sites WHERE id = $1', [s.id]);
     expect(stored.rows[0]).toEqual({ current_milestone: 'MS1', next_milestone: 'MS2' });
     expect((await admin.api.call('get', `/sites/${s.id}`)).headers.etag).toBe(res.headers.etag);

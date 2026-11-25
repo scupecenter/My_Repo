@@ -1,4 +1,4 @@
-# Site 360 restructure, SLA and weight in the workflow editor, dropdown lists (F14 to F18)
+# Site Master restructure, SLA and weight in the workflow editor, dropdown lists (F14 to F18)
 
 Owner request of 2026-11-15, based on the Master workbook (sheet Master: 187 columns, 3 header rows, frozen at column Z, SUBTOTAL row 4, 26 list validations, 24 conditional-format rules).
 Missing data in the workbook does not block work; it will be filled later.
@@ -7,7 +7,7 @@ Missing data in the workbook does not block work; it will be filled later.
 
 Every view below reads and writes the same records (site register, workflow steps, registers). An edit saved in Master shows in CW, TE, the task drawer and the dashboard without a refresh step, and the reverse. No view keeps its own copy. Lock/unlock, audit and permissions (B3 region and module) apply the same way in every view.
 
-Every Site 360 list and register gets the same toolbar: Grid (Excel-like) / Vertical (current) toggle, multi Site ID paste search, multi-value filters (same set as the dashboard: region, sub region, phase, batch, scenario, delivery model, contractor, owner, status, milestone), lock/unlock, download, template upload, add column, saved views.
+Every Site Master list and register gets the same toolbar: Grid (Excel-like) / Vertical (current) toggle, multi Site ID paste search, multi-value filters (same set as the dashboard: region, sub region, phase, batch, scenario, delivery model, contractor, owner, status, milestone), lock/unlock, download, template upload, add column, saved views.
 
 ## F14 SLA and project weight inside the workflow editor (branch from claude/wf-gaps)
 
@@ -17,7 +17,7 @@ Every Site 360 list and register gets the same toolbar: Grid (Excel-like) / Vert
 - Other places that get the same SLA and weight options: register steps (Car Dispatcher, Financial Advances and any register placed in a workflow), milestones, gates, document types with due dates, inspection templates, generated forms, and breach notifications in subscriptions.
 - CHANGELOG 145, contract 0.15.20, migrations 0099 (and 0100 if needed).
 
-## F15 Site 360 restructure and Master view (branch from main)
+## F15 Site Master restructure and Master view (branch from main)
 
 New menu, each with Grid / Vertical toggle and the shared toolbar:
 
@@ -36,7 +36,7 @@ Column ranges are the default mapping; admins can move a column between menus (c
 
 The grid matches the Master sheet look: phase band row, group row, field row, Phase Gate columns highlighted, frozen identity columns (# to Site Name by default, user can change), a totals row of visible rows (count, sum for numbers), conditional colours.
 
-This replaces the SITE 360 navigation of 2026-11-05 in `CLAUDE.md`; F15 updates that rule and adds a decision entry to `CHANGELOG.md`.
+This replaces the Site Master navigation of 2026-11-05 in `CLAUDE.md`; F15 updates that rule and adds a decision entry to `CHANGELOG.md`.
 
 CHANGELOG 146, contract 0.15.21, migration 0101 (section metadata).
 
@@ -72,7 +72,7 @@ From how the team used the Master sheet:
 
 ## Settings placement rule (owner decision 2026-11-15)
 
-- **Global settings live in one place: Administration > Settings**, as tabs. Anything that applies across the system goes there: work calendar, SLA rules (with the F14 bulk SLA admin inside the existing "SLA rules" tab, not a new tab), weight sets, lists (F17 extends the existing "Lists" tab), register columns, SITE 360 column-to-menu mapping (F15, new tab "SITE 360 columns"), workflow, document library, notification policy and the rest.
+- **Global settings live in one place: Administration > Settings**, as tabs. Anything that applies across the system goes there: work calendar, SLA rules (with the F14 bulk SLA admin inside the existing "SLA rules" tab, not a new tab), weight sets, lists (F17 extends the existing "Lists" tab), register columns, Site Master column-to-menu mapping (F15, new tab "Site Master columns"), workflow, document library, notification policy and the rest.
 - **Local settings stay inside their module** (a toolbar "settings" button or panel on that page): per-view items such as saved views, frozen columns, column width and order for the user, a register's own record options. They never duplicate a global setting; when a local screen needs a global one, it links to the Settings tab.
 - No setting exists in two places. A new feature first checks for an existing Settings tab and extends it.
 
@@ -98,9 +98,9 @@ Old routes redirect to the new tab and section. CHANGELOG 149, no contract chang
 
 ## F20 Dashboard follow-up (after #138)
 
-- The dashboard reads from the same sources as SITE 360 and the registers (site360_master_values view, task steps, register records); no own copy, so every edit anywhere shows on the dashboard.
+- The dashboard reads from the same sources as Site Master and the registers (site360_master_values view, task steps, register records); no own copy, so every edit anywhere shows on the dashboard.
 - New edit options on the dashboard: admin-set targets (sites per batch, monthly On-Air target), KPI thresholds (green/amber/red), which cards each tab shows and their order, saved filter sets; global ones in Settings, per-user layout local.
-- New counters: SLA breaches and at-risk (warning %) per stage; weighted progress vs plan (from F14 weights); sites per SITE 360 menu stage; locked rows/sites count; data quality (empty mandatory cells per menu); advances open after work closed and vehicle-ready rate (Car Dispatcher, Financial Advances); dismantle CW/TE pending; As-Built submitted vs PAC; time-in-state median/P85 (F1); stale tasks (idle N days).
+- New counters: SLA breaches and at-risk (warning %) per stage; weighted progress vs plan (from F14 weights); sites per Site Master menu stage; locked rows/sites count; data quality (empty mandatory cells per menu); advances open after work closed and vehicle-ready rate (Car Dispatcher, Financial Advances); dismantle CW/TE pending; As-Built submitted vs PAC; time-in-state median/P85 (F1); stale tasks (idle N days).
 - CHANGELOG 150, contract next free number at build time.
 
 ## Migration number registry (assign here before use)
@@ -108,7 +108,7 @@ Old routes redirect to the new tab and section. CHANGELOG 149, no contract chang
 | Number | Owner |
 |---|---|
 | 0099 | #139 F4 search (merged) |
-| 0101 | F15 SITE 360 sections |
+| 0101 | F15 Site Master sections |
 | 0102, 0105 | F17 dropdown lists |
 | 0103 | F16 register locks |
 | 0104, 0106, 0107 | F15 rows view and sources, calc columns |

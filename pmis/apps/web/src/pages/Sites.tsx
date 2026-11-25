@@ -1,8 +1,8 @@
 import type { SiteListItem, SitesExportColumnCode } from '@/api/types';
 import { errText } from '@/components/FormDialog';
-import { Site360Grid, type Site360GridRow } from '@/components/Site360Grid';
-import { Site360SourcePanel } from '@/components/Site360Source';
-import { useRefreshSite360Rows, useSaveSite360Cell, useSite360RowsPaged, useSite360Sections } from '@/api/site360';
+import { SiteMasterGrid, type SiteMasterGridRow } from '@/components/SiteMasterGrid';
+import { SiteMasterSourcePanel } from '@/components/SiteMasterSource';
+import { useRefreshSiteMasterRows, useSaveSiteMasterCell, useSiteMasterRowsPaged, useSiteMasterSections } from '@/api/siteMaster';
 import { SitesBulkEdit } from '@/components/SitesBulkEdit';
 import { Columns3, Download, Grid3x3, FileDown, FilePlus2, FileUp, Map as MapIcon, Pencil, RotateCcw, Table2, TableProperties } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -36,7 +36,7 @@ import { SiteMap } from '@/components/SiteMap';
 import { SitesWideTable } from '@/components/SitesWideTable';
 import { SitesBoard, SWIMLANES, type Swimlane } from '@/components/SitesBoard';
 import { useVirtual } from '@/components/useVirtual';
-import { SITE360_MASTER, SITE360_NAV } from '@/lib/site360Menus';
+import { SITE_MASTER_MASTER, SITE_MASTER_NAV } from '@/lib/siteMasterMenus';
 import { fmtDate } from '@/lib/time';
 import { DEFAULT_STREAMS, DEFAULT_VIEWS, DISMANTLE_CODE, isRealStream, statusOf, streamName, viewName } from '@/lib/streams';
 
@@ -62,20 +62,20 @@ export function Sites() {
   const [sp, setSp] = useSearchParams();
   const stream = sp.get('stream') ?? '';
   const view = sp.get('view') ?? '';
-  // SITE 360 menus (F15): ?section= picks a menu. The default is the normal list (owner request 2026-11-22); the Excel-like Grid has no button any more and
+  // Site Master menus (F15): ?section= picks a menu. The default is the normal list (owner request 2026-11-22); the Excel-like Grid has no button any more and
   // opens only when ?layout=grid is in the URL (hidden, kept for its source panel and tests).
   const section = sp.get('section') ?? '';
   const layout = sp.get('layout') === 'grid' ? 'grid' : 'list';
   // Wide table (owner request 2026-11-22): read-only, the Master columns of the menu left to right; it reads the same GET /site360/{menu}/rows as the grid
   const asWide = sp.get('layout') === 'wide';
-  const site360Q = useSite360Sections();
+  const siteMasterQ = useSiteMasterSections();
   // Each sub-menu keeps its OWN columns (GET /site360/sections) and values (GET /site360/{menu}/rows) in the calm list style of this page (owner request
   // 2026-11-22): no band or group rows, no inline editing. Site Master itself shows the generic list with the pipeline, workflow locks, data gaps and the
   // stage/mine/late/locks/gaps filters (owner answer 2026-11-22 "bring them back"); a stream or a work view (?stream=, ?view=) keeps it too.
-  const menuKey = section || ((layout === 'grid' || asWide) && !stream && !view ? SITE360_MASTER : '');
+  const menuKey = section || ((layout === 'grid' || asWide) && !stream && !view ? SITE_MASTER_MASTER : '');
   const lay = sp.get('layout');
-  const menuList = !!section && lay !== 'list' && lay !== 'grid' && lay !== 'map' && lay !== 'board' && !asWide && !site360Q.isError;
-  const menu = menuKey ? site360Q.data?.items.find((m) => m.key === menuKey) : undefined;
+  const menuList = !!section && lay !== 'list' && lay !== 'grid' && lay !== 'map' && lay !== 'board' && !asWide && !siteMasterQ.isError;
+  const menu = menuKey ? siteMasterQ.data?.items.find((m) => m.key === menuKey) : undefined;
   // The grid reads its rows from GET /site360/{menu}/rows (one page, the same URL filters as the list), so the grid and the list share the source.
   // Multi Site ID search (paste a list, comma or newline separated) is kept in the URL as site_code, like the other filters.
   // F3 (0.15.31): the AND/OR filter tree lives in the URL as JSON (adv) and goes to the server as `filter`, which compiles it
@@ -97,13 +97,13 @@ export function Sites() {
     data_gaps: sp.get('data_gaps') === 'with' ? 'with' : undefined,
     sort: 'site_code',
   };
-  const gridRowsQ = useSite360RowsPaged(menu && (layout === 'grid' || menuList || asWide) ? menuKey : undefined, gridQuery);
-  const saveCell = useSaveSite360Cell(menu && (layout === 'grid' || asWide) ? menuKey : undefined, gridQuery);
+  const gridRowsQ = useSiteMasterRowsPaged(menu && (layout === 'grid' || menuList || asWide) ? menuKey : undefined, gridQuery);
+  const saveCell = useSaveSiteMasterCell(menu && (layout === 'grid' || asWide) ? menuKey : undefined, gridQuery);
   const gridPages = gridRowsQ.data?.pages ?? [];
   const gridTotal = gridPages[0]?.total;
   const gridFiltered = gridPages[0]?.filtered;
   const gridRows = gridPages.flatMap((p) => p.rows);
-  // Stable identity per fetched page: Site360Grid reports its selection from an effect keyed on `rows`, so a new array on every render loops forever.
+  // Stable identity per fetched page: SiteMasterGrid reports its selection from an effect keyed on `rows`, so a new array on every render loops forever.
   const grid360Rows = useMemo(() => gridRows.map((r) => ({ id: r.site_id, site_code: r.site_code, row_no: r.row_no, values: r.values, cells: r.cells })), [gridRowsQ.data]); // eslint-disable-line react-hooks/exhaustive-deps
   const [siteIdsDraft, setSiteIdsDraft] = useState(() => (sp.get('site_code') ?? '').split(',').join('\n'));
   const applySiteIds = () => {
@@ -135,7 +135,7 @@ export function Sites() {
   const drill = { ...(dashStatus ? { dashboard_status: dashStatus } : {}), ...(reached ? { milestone_reached: reached } : {}), ...(refDate ? { ref_date: refDate } : {}), ...(cluster ? { cluster_code: cluster } : {}) };
   const extra = { ...(locks ? { workflow_locks: locks } : {}), ...(gaps ? { data_gaps: gaps } : {}), ...(siteCodes ? { site_codes: siteCodes } : {}), ...(adv ? { filter: adv } : {}), ...drill };
   const [locksDlg, setLocksDlg] = useState<null | boolean>(null);
-  const [gridSel, setGridSel] = useState<Site360GridRow[]>([]);
+  const [gridSel, setGridSel] = useState<SiteMasterGridRow[]>([]);
   // the cell whose source is shown under the grid (0.15.35, P1 Master): a click on a Master cell opens it
   const [srcCell, setSrcCell] = useState<{ siteId: string; siteCode: string; ord: number } | null>(null);
   const sel = sp.get('sel') ?? '';
@@ -168,14 +168,14 @@ export function Sites() {
   const [upMenu, setUpMenu] = useState(false);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [bulkEdit, setBulkEdit] = useState(false);
-  const refreshRows = useRefreshSite360Rows(menuKey || undefined);
+  const refreshRows = useRefreshSiteMasterRows(menuKey || undefined);
   const regions = useRegions();
   const viewsQ = useViews();
   const streamsQ = useStreams();
   // Name of the Site Register sub-menu that is open (sidebar request 2026-11-05): the view wins, else the stream; empty = all sites.
   const viewRef = view ? (viewsQ.data ?? DEFAULT_VIEWS).find((x) => x.code === view) : undefined;
   const streamRef = stream ? (streamsQ.data?.length ? streamsQ.data : DEFAULT_STREAMS).find((x) => x.code === stream) : undefined;
-  const navSection = section && section !== SITE360_MASTER ? SITE360_NAV.find((m) => m.key === section) : undefined;
+  const navSection = section && section !== SITE_MASTER_MASTER ? SITE_MASTER_NAV.find((m) => m.key === section) : undefined;
   const sectionName = navSection ? (i18n.language === 'ar' ? navSection.ar : navSection.en) : '';
   const subMenu = view ? (viewRef ? viewName(i18n.language, viewRef) : view) : streamRef ? streamName(t, i18n.language, streamRef) : sectionName;
   const real = !!stream && isRealStream(stream, streamsQ.data); // Dismantle has no API stream yet: nothing is fetched for it
@@ -385,21 +385,21 @@ export function Sites() {
       ) : menu && layout === 'grid' ? (
         <div className="space-y-2">
           <div className="flex flex-wrap items-start gap-2">
-            <textarea rows={2} className="input min-w-[240px] font-mono text-xs" value={siteIdsDraft} onChange={(e) => setSiteIdsDraft(e.target.value)} placeholder={t('site360.site_ids_placeholder')} aria-label={t('site360.site_ids')} data-testid="site360-site-ids" />
-            <button type="button" className="btn" data-testid="site360-site-ids-apply" onClick={applySiteIds}>{t('site360.site_ids_apply')}</button>
+            <textarea rows={2} className="input min-w-[240px] font-mono text-xs" value={siteIdsDraft} onChange={(e) => setSiteIdsDraft(e.target.value)} placeholder={t('siteMaster.site_ids_placeholder')} aria-label={t('siteMaster.site_ids')} data-testid="site-master-site-ids" />
+            <button type="button" className="btn" data-testid="site-master-site-ids-apply" onClick={applySiteIds}>{t('siteMaster.site_ids_apply')}</button>
           </div>
-          {saveCell.isError && <p role="alert" className="text-sm text-red-600" data-testid="site360-cell-error">{errText(saveCell.error, t)}</p>}
-          <div className="flex flex-wrap items-center gap-2" data-testid="site360-toolbar">
-            <ExportViewButton testid="site360-export-view" source="sites" filters={viewFilters} columns={SITE_COLUMNS} />
-            <Link className="btn px-2 py-1 text-xs" to="/templates" data-testid="site360-template-link">{t('site360.template_upload')}</Link>
+          {saveCell.isError && <p role="alert" className="text-sm text-red-600" data-testid="site-master-cell-error">{errText(saveCell.error, t)}</p>}
+          <div className="flex flex-wrap items-center gap-2" data-testid="site-master-toolbar">
+            <ExportViewButton testid="site-master-export-view" source="sites" filters={viewFilters} columns={SITE_COLUMNS} />
+            <Link className="btn px-2 py-1 text-xs" to="/templates" data-testid="site-master-template-link">{t('siteMaster.template_upload')}</Link>
             {canUnlock && gridSel.length > 0 && <>
-              <button type="button" className="btn" data-testid="site360-locks-open" onClick={() => setLocksDlg(false)}>{t('locks.bulk_open')}</button>
-              <button type="button" className="btn" data-testid="site360-locks-lock" onClick={() => setLocksDlg(true)}>{t('locks.bulk_lock')}</button>
+              <button type="button" className="btn" data-testid="site-master-locks-open" onClick={() => setLocksDlg(false)}>{t('locks.bulk_open')}</button>
+              <button type="button" className="btn" data-testid="site-master-locks-lock" onClick={() => setLocksDlg(true)}>{t('locks.bulk_lock')}</button>
             </>}
           </div>
-          <Site360Grid menu={menu} testid="site360-grid" onSelectRows={setGridSel} total={gridTotal} filtered={gridFiltered} rows={grid360Rows} onOpenCell={(r, ord) => setSrcCell({ siteId: r.id, siteCode: r.site_code, ord })} onEditCell={(e) => saveCell.mutate({ task_id: e.target.task_id, version: e.target.version, field: e.target.field, values: e.target.values, value: e.value })} />
-          {srcCell ? <Site360SourcePanel siteId={srcCell.siteId} siteCode={srcCell.siteCode} ord={srcCell.ord} onClose={() => setSrcCell(null)} /> : <p className="mt-1 text-xs text-mute" data-testid="site360-source-hint">{t('site360.src.hint')}</p>}
-          {gridRowsQ.hasNextPage ? <button type="button" className="btn" data-testid="site360-more" disabled={gridRowsQ.isFetchingNextPage} onClick={() => void gridRowsQ.fetchNextPage()}>{t('site360.more')}</button> : null}
+          <SiteMasterGrid menu={menu} testid="site-master-grid" onSelectRows={setGridSel} total={gridTotal} filtered={gridFiltered} rows={grid360Rows} onOpenCell={(r, ord) => setSrcCell({ siteId: r.id, siteCode: r.site_code, ord })} onEditCell={(e) => saveCell.mutate({ task_id: e.target.task_id, version: e.target.version, field: e.target.field, values: e.target.values, value: e.value })} />
+          {srcCell ? <SiteMasterSourcePanel siteId={srcCell.siteId} siteCode={srcCell.siteCode} ord={srcCell.ord} onClose={() => setSrcCell(null)} /> : <p className="mt-1 text-xs text-mute" data-testid="site-master-source-hint">{t('siteMaster.src.hint')}</p>}
+          {gridRowsQ.hasNextPage ? <button type="button" className="btn" data-testid="site-master-more" disabled={gridRowsQ.isFetchingNextPage} onClick={() => void gridRowsQ.fetchNextPage()}>{t('siteMaster.more')}</button> : null}
         </div>
       ) : asWide && menu ? (
         <div className="space-y-2">
@@ -410,9 +410,9 @@ export function Sites() {
           <ShownFooter shown={mRows.length} filtered={gridFiltered} />
         </div>
       ) : menuList ? (
-        <div className="card gx overflow-hidden" data-menu={menuKey} {...displayAttrs(tbl.display)} data-testid="site360-list">
+        <div className="card gx overflow-hidden" data-menu={menuKey} {...displayAttrs(tbl.display)} data-testid="site-master-list">
           <div ref={scroller} data-testid="sites-scroll" className="relative overflow-auto" style={{ height: viewport }} onScroll={(e) => { v.onScroll(e); sessionStorage.setItem(scrollKey, String(e.currentTarget.scrollTop)); }}>
-            <div className="sticky top-0 z-20" data-testid="site360-list-head">
+            <div className="sticky top-0 z-20" data-testid="site-master-list-head">
             <GroupBands cols={cols} sel selW={SEL_W} testid="list-bands" section={(id) => mCol(id)?.group_top ?? null} group={(id) => mCol(id)?.group_mid ?? null} />
             <HeaderRow api={tbl} label={label} hint={hint} select={{ checked: allPicked, indeterminate: picked.size > 0, onChange: () => setPicked(allPicked ? new Set() : new Set(allCodes)), label: t('table.select_all'), testid: 'sites-select-all' }} />
             </div>
@@ -434,7 +434,7 @@ export function Sites() {
             </div>
           </div>
           <ShownFooter shown={mRows.length} filtered={gridFiltered}>
-            {gridRowsQ.hasNextPage ? <button type="button" className="btn" data-testid="site360-more" disabled={gridRowsQ.isFetchingNextPage} onClick={() => void gridRowsQ.fetchNextPage()}>{t('site360.more')}</button> : null}
+            {gridRowsQ.hasNextPage ? <button type="button" className="btn" data-testid="site-master-more" disabled={gridRowsQ.isFetchingNextPage} onClick={() => void gridRowsQ.fetchNextPage()}>{t('siteMaster.more')}</button> : null}
           </ShownFooter>
         </div>
       ) : (

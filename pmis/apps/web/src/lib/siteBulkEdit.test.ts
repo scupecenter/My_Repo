@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@/api/client';
-import type { Site360CellTarget } from '@/components/Site360Grid';
+import type { SiteMasterCellTarget } from '@/components/SiteMasterGrid';
 import { anyMissingParent, columnKind, columnOptions, editableOrds, optionsOf, planBulk, runBulk, toValue, type BulkRow } from './siteBulkEdit';
 
-const city: Site360CellTarget = {
+const city: SiteMasterCellTarget = {
   task_id: 't', version: 1, editable: true, values: 'city', input_type: 'list', parent_ord: 40,
   options: [{ value: 'TIP', label_en: 'Tripoli', label_ar: null, parent: 'WEST' }, { value: 'MSR', label_en: 'Misrata', label_ar: null, parent: 'WEST' }, { value: 'BNG', label_en: 'Benghazi', label_ar: null, parent: 'EAST' }],
 };
-const row = (code: string, values: Record<string, string | null>, cells: Record<string, Site360CellTarget>): BulkRow => ({ site_id: `id-${code}`, site_code: code, values, cells });
+const row = (code: string, values: Record<string, string | null>, cells: Record<string, SiteMasterCellTarget>): BulkRow => ({ site_id: `id-${code}`, site_code: code, values, cells });
 
 describe('dependent lists: the options follow the parent value of the same row', () => {
   it('offers only the children of the parent value, none without a parent value, all without a parent column', () => {
@@ -25,7 +25,7 @@ describe('dependent lists: the options follow the parent value of the same row',
 });
 
 describe('planBulk', () => {
-  const date = (editable: boolean, v = 1): Site360CellTarget => ({ task_id: `t${v}`, version: v, editable, field: 'actual_date', input_type: 'date' });
+  const date = (editable: boolean, v = 1): SiteMasterCellTarget => ({ task_id: `t${v}`, version: v, editable, field: 'actual_date', input_type: 'date' });
   const rows = [
     row('S1', { '78': '2026-03-10' }, { '78': date(true, 1) }),
     row('S2', { '78': '2026-04-01' }, { '78': date(true, 2) }),
@@ -88,7 +88,7 @@ describe('runBulk', () => {
 });
 
 describe('clear a value (null)', () => {
-  const dateCell = (editable: boolean, v: number): Site360CellTarget => ({ task_id: `t${v}`, version: v, editable, field: 'actual_date', input_type: 'date' });
+  const dateCell = (editable: boolean, v: number): SiteMasterCellTarget => ({ task_id: `t${v}`, version: v, editable, field: 'actual_date', input_type: 'date' });
   const rows = [
     row('S1', { '78': '2026-03-10' }, { '78': dateCell(true, 1) }),
     row('S2', { '78': null }, { '78': dateCell(true, 2) }),

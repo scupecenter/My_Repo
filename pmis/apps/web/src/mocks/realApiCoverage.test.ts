@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { NOT_AVAILABLE, REAL_API_AUTH_USERS } from './realApi';
 
 /**
- * Owner report 2026-11-16: SITE 360, the workflow editor, register columns, holidays, SLA rule sets and search showed sample data on the server, because
+ * Owner report 2026-11-16: Site Master, the workflow editor, register columns, holidays, SLA rule sets and search showed sample data on the server, because
  * their API routes were never added to REAL_API_AUTH_USERS and the hybrid build kept answering them from the mocks. Every route a controller of
  * apps/api serves must be passed through to the real server.
  */

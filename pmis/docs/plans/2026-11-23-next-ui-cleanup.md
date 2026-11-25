@@ -172,13 +172,13 @@ The default board column is read at run time from the register's catalogue (the 
 
 ## W3. Settings > Site360 (owner image 5)
 
-The SITE 360 name was removed from navigation in #177. Settings still has a tab `site360` (pages/settings/Settings.tsx, SETTINGS_TABS) that renders Site360Columns.tsx. Workflow Studio (#179) already manages the SITE 360 columns.
+The Site Master name was removed from navigation in #177. Settings still has a tab `site360` (pages/settings/Settings.tsx, SETTINGS_TABS) that renders Site360Columns.tsx. Workflow Studio (#179) already manages the Site Master columns.
 
 Do:
 1. List every function Site360Columns.tsx and its API (GET/POST /site360/columns...) still offer that Studio does not. Write the list here.
 2. Move each missing function into Settings > Workflow (a section, or inside Studio's Columns view), with the same rights (site360_col_can_admin).
 3. Remove the `site360` tab. Add a legacy redirect `site360` and `site360-columns` to the new Workflow section in LEGACY_SETTINGS_PATHS.
-4. Replace user-visible "Site360" / "SITE 360" words in Settings and in i18n with "Site Master" (en) and its Arabic equivalent. Code identifiers and API paths stay.
+4. Replace user-visible "Site360" / "Site Master" words in Settings and in i18n with "Site Master" (en) and its Arabic equivalent. Code identifiers and API paths stay.
 5. Tests: settingsRedirects and settingsScreens updated; the moved functions keep their tests.
 
 Acceptance: no "Site360" tab or label in Settings; nothing the tab did is lost; old links redirect.
@@ -259,7 +259,7 @@ Guard: `src/pages/settingsNoEndlessLoading.test.tsx` renders every tab and secti
 ## W5. Library (Forms and Archive) (owner image 7 and request)
 
 Today "Data entry > Templates" (pages/Templates.tsx, "Templates and uploads") mixes:
-- input templates (Excel per register and per SITE 360 stream, upload and validate), and
+- input templates (Excel per register and per Site Master stream, upload and validate), and
 - approved project document forms recently uploaded so the system can fill them automatically when a document falls due. The user then prints, signs, stamps and re-uploads them. The library is under Settings > Documents > Library (DocumentLibrary.tsx).
 
 The owner wants this clear:
@@ -436,7 +436,7 @@ Total: roughly 7 PRs and several CI cycles each. This does not fit in one short 
   - Table standard: the screen uses the list pieces already on main (unified + Filter with page extras, saved views, search, count, density, columns, Export) and a plain `<table>`, so the shared table toolbar of W8 (row numbers, counts, Display menu) can wrap it later without a rewrite. `UnifiedFilter` now renders for a screen without server filter fields (its extras only).
 - 2026-11-24: W8 done on branch `claude/w8-table-standard` (contract 0.15.68, migration 0148 with mirror `db/sql/147_table_display_settings.sql`, CHANGELOG 201), in five commits: (a) shared toolbar, `#`, server counts and the pasted-list search; (b) three header levels; (c) the site Tasks list with Timeline; (d) the Display menu and Settings > Display; (e) registers, My Work, Approvals, the guard test and the screen list above. Cluster ID codes of the owner's Excel file are still to be loaded by the owner (Master upload or admin edit); no code needed.
 - 2026-11-24: W4 done. Alerts and Security render with the real API since #188-#194; they (and Registers > GECOL and Team / scope, Dashboard, Documents > Mail) still hung on "Loading..." when a read failed (403 for a delegate, 501 in hybrid mode). One shared fallback (`QueryFallback`) shows "no access", "not available" or the error instead; the notification catalogue no longer shares a query key with the permission catalogue. Audit table and guard test in the W4 section. No migration, no contract change. CHANGELOG 199.
-- 2026-11-24: W3 done: the Settings tab Site360 is removed; its Master column menus moved to Settings > Workflow > Columns (same API, same right); old `site360` and `site360-columns` links redirect there; user-visible "SITE 360" and "Site360" in i18n now read "Site Master" (en) and "ماستر المواقع" (ar). No migration, no contract change. CHANGELOG 202.
+- 2026-11-24: W3 done: the Settings tab Site360 is removed; its Master column menus moved to Settings > Workflow > Columns (same API, same right); old `site360` and `site360-columns` links redirect there; user-visible "Site Master" and "Site360" in i18n now read "Site Master" (en) and "ماستر المواقع" (ar). No migration, no contract change. CHANGELOG 202.
 - 2026-11-24: W1 done. The site page has one phase row, built from the streams and views of the site's published workflow version. Row A was the stream row in pages/Site.tsx, not a component; Row B was ViewTabs (see the W1 finding). Front end only; no contract change. CHANGELOG 200.
 - 2026-11-24: W8 item 6: total / filtered / shown counts on every site-data screen.
 - 2026-11-23: W8 item 5: search by a pasted list of Site IDs.

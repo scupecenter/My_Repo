@@ -331,7 +331,7 @@ describe('adding a column', () => {
       entity_type: string;
     }>(
       db,
-      `SELECT before, after, reason, entity_type FROM audit_log WHERE action = 'site360.column_created' AND entity_id = 'GF'`,
+      `SELECT before, after, reason, entity_type FROM audit_log WHERE action = 'siteMaster.column_created' AND entity_id = 'GF'`,
     );
     expect(au).toHaveLength(1);
     expect(au[0]).toMatchObject({
@@ -540,7 +540,7 @@ describe('type change with a preview', () => {
       after: { value_type: string };
     }>(
       db,
-      `SELECT before, after FROM audit_log WHERE action = 'site360.column_updated' AND entity_id = 'GF' AND after ->> 'value_type' = 'number'`,
+      `SELECT before, after FROM audit_log WHERE action = 'siteMaster.column_updated' AND entity_id = 'GF' AND after ->> 'value_type' = 'number'`,
     );
     expect(au[0]!.before.value_type).toBe('text');
     expect(au[0]!.after.value_type).toBe('number');
@@ -932,7 +932,7 @@ describe('deactivate, reactivate and delete', () => {
       (
         await q(
           db,
-          `SELECT 1 FROM audit_log WHERE action = 'site360.column_deactivated' AND entity_id = 'GF'`,
+          `SELECT 1 FROM audit_log WHERE action = 'siteMaster.column_deactivated' AND entity_id = 'GF'`,
         )
       ).length,
     ).toBe(1);
@@ -1001,7 +1001,7 @@ describe('deactivate, reactivate and delete', () => {
     ).toBe(0);
     const au = await q<{ before: { ord: number }; after: unknown }>(
       db,
-      `SELECT before, after FROM audit_log WHERE action = 'site360.column_deleted' AND entity_id = 'GH'`,
+      `SELECT before, after FROM audit_log WHERE action = 'siteMaster.column_deleted' AND entity_id = 'GH'`,
     );
     expect(au).toHaveLength(1);
     expect(au[0]!.before.ord).toBe(190);

@@ -23,12 +23,12 @@ export const TASK_INPUT_KEYS = ['planned_date', 'planned_start', 'actual_start',
 
 /** Every column with its place, type, list, source, menus and protection. Only a System Admin (or a `fields` delegate) reads it: 403 otherwise. */
 export const useColumnAdmin = () =>
-  useQuery({ queryKey: ['site360-columns'], retry: false, queryFn: () => api.get<ColumnList>('/site360/columns') });
+  useQuery({ queryKey: ['site-master-columns'], retry: false, queryFn: () => api.get<ColumnList>('/site360/columns') });
 
 /** One column with its usage (`delete_mode` says whether DELETE is allowed). Asked only for the added columns. */
 export const useColumnDetails = (ords: number[]) =>
   useQuery({
-    queryKey: ['site360-column-details', ords.join(',')],
+    queryKey: ['site-master-column-details', ords.join(',')],
     enabled: ords.length > 0,
     retry: false,
     queryFn: async () => {
@@ -57,17 +57,17 @@ function useColumnWrite<I extends { ord?: number }, O>(run: (input: I) => Promis
     mutationFn: run,
     onMutate: async (input) => {
       if (!patch || input.ord === undefined) return {};
-      await qc.cancelQueries({ queryKey: ['site360-columns'] });
-      const prev = qc.getQueryData<ColumnList>(['site360-columns']);
-      if (prev) qc.setQueryData<ColumnList>(['site360-columns'], { ...prev, items: prev.items.map((x) => (x.ord === input.ord ? { ...x, ...patch(input) } : x)) });
+      await qc.cancelQueries({ queryKey: ['site-master-columns'] });
+      const prev = qc.getQueryData<ColumnList>(['site-master-columns']);
+      if (prev) qc.setQueryData<ColumnList>(['site-master-columns'], { ...prev, items: prev.items.map((x) => (x.ord === input.ord ? { ...x, ...patch(input) } : x)) });
       return { prev };
     },
-    onError: (_e, _i, ctx) => { if (ctx?.prev) qc.setQueryData(['site360-columns'], ctx.prev); },
+    onError: (_e, _i, ctx) => { if (ctx?.prev) qc.setQueryData(['site-master-columns'], ctx.prev); },
     onSettled: () => {
-      void qc.invalidateQueries({ queryKey: ['site360-columns'] });
-      void qc.invalidateQueries({ queryKey: ['site360-column-details'] });
-      void qc.invalidateQueries({ queryKey: ['site360-sections'] });
-      void qc.invalidateQueries({ queryKey: ['site360-rows'] });
+      void qc.invalidateQueries({ queryKey: ['site-master-columns'] });
+      void qc.invalidateQueries({ queryKey: ['site-master-column-details'] });
+      void qc.invalidateQueries({ queryKey: ['site-master-sections'] });
+      void qc.invalidateQueries({ queryKey: ['site-master-rows'] });
       void qc.invalidateQueries({ queryKey: ['custom-fields'] });
       void qc.invalidateQueries({ queryKey: ['task-definitions'] });
     },

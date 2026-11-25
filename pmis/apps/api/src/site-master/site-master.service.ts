@@ -10,33 +10,33 @@ import { AccessService } from '../access/access.service';
 import { DbService } from '../db/db.service';
 import { FilterCatalogService } from '../views/filter-catalog.service';
 import { BUCKETS, siteLocksGapsConds, siteStageIds } from '../sites/sites.service';
-import { COLUMNS_SQL } from './site360-columns-sql';
-import { buildMenu, buildSite360, SITE360_MOVABLE, type Site360ColumnRow, type Site360Menu, type Site360MenuItem, type Site360SourceKind } from './site360-sections';
+import { COLUMNS_SQL } from './site-master-columns-sql';
+import { buildMenu, buildSiteMaster, SITE_MASTER_MOVABLE, type SiteMasterColumnRow, type SiteMasterMenu, type SiteMasterMenuItem, type SiteMasterSourceKind } from './site-master-sections';
 
 const setSchema = z.object({
-  sections: z.array(z.enum(SITE360_MOVABLE)).min(1).max(7),
+  sections: z.array(z.enum(SITE_MASTER_MOVABLE)).min(1).max(7),
   reason: z.string().trim().min(3).max(1000),
 }).strict();
 
-export interface Site360ColumnDto extends Site360ColumnRow {
+export interface SiteMasterColumnDto extends SiteMasterColumnRow {
   is_phase_gate: boolean;
 }
 
-/** SITE 360 menus (contract 0.15.21, F15). The column metadata is the one source; no second store. */
+/** Site Master menus (contract 0.15.21, F15). The column metadata is the one source; no second store. */
 @Injectable()
-export class Site360Service {
+export class SiteMasterService {
   constructor(private readonly db: DbService, private readonly stepUp: StepUpService, private readonly access: AccessService, private readonly filters: FilterCatalogService) {}
 
-  async sections(): Promise<{ items: Site360MenuItem[]; can_move: boolean }> {
-    const rows = await this.db.tx.$queryRaw<Site360ColumnRow[]>`
+  async sections(): Promise<{ items: SiteMasterMenuItem[]; can_move: boolean }> {
+    const rows = await this.db.tx.$queryRaw<SiteMasterColumnRow[]>`
       ${COLUMNS_SQL} WHERE mc.is_active ORDER BY mc.display_order`;
     const admin = await this.db.tx.$queryRaw<{ ok: boolean }[]>`
       SELECT coalesce(site360_col_can_admin(), false) AS ok`; // one right for every column change (owner decision 2026-11-22)
-    return { items: buildSite360(rows), can_move: admin[0]?.ok ?? false };
+    return { items: buildSiteMaster(rows), can_move: admin[0]?.ok ?? false };
   }
 
   /** Replaces the set of menus of one column (owner decision 2026-11-15: a column may be in several menus). */
-  async setSections(auth: AuthContext, rawOrd: unknown, raw: unknown): Promise<Site360ColumnDto> {
+  async setSections(auth: AuthContext, rawOrd: unknown, raw: unknown): Promise<SiteMasterColumnDto> {
     const ord = Number(rawOrd);
     if (!Number.isInteger(ord) || ord < 1 || ord > 1000) {
       throw new ProblemException(422, 'validation_failed', { detail: 'The column order must be 1 to 1000.', errors: [{ path: '/ord', code: 'invalid' }] });
@@ -45,7 +45,7 @@ export class Site360Service {
     await this.stepUp.require(auth);
     await this.db.tx.$queryRaw(Prisma.sql`
       SELECT site360_set_sections(${ord}::integer, ${b.sections}::text[], ${b.reason}::text) AS j`);
-    const rows = await this.db.tx.$queryRaw<Site360ColumnRow[]>`
+    const rows = await this.db.tx.$queryRaw<SiteMasterColumnRow[]>`
       ${COLUMNS_SQL} WHERE mc.ord = ${ord}`;
     const r = rows[0]!;
     return { ...r, is_phase_gate: r.group_top === 'Phase Gate' };
@@ -55,18 +55,18 @@ export class Site360Service {
    * GET /site360/{menu}/rows (contract 0.15.21, F15, migration 0104): one page of a menu's rows. Visibility (B3), the filters, the sort and the
    * paging are in SQL; the values come from the set-based view site360_master_values in one query for the page (no per-site path).
    */
-  async rows(auth: AuthContext, rawMenu: string, q: Record<string, unknown>): Promise<Site360RowsDto> {
-    if (!(SITE360_MENU_KEYS as readonly string[]).includes(rawMenu)) {
+  async rows(auth: AuthContext, rawMenu: string, q: Record<string, unknown>): Promise<SiteMasterRowsDto> {
+    if (!(SITE_MASTER_MENU_KEYS as readonly string[]).includes(rawMenu)) {
       throw new ProblemException(422, 'validation_failed', { detail: 'Unknown Site Master menu.', errors: [{ path: '/menu', code: 'invalid' }] });
     }
-    const menu = rawMenu as Site360Menu;
+    const menu = rawMenu as SiteMasterMenu;
     const regs = await this.access.requireRegions('sites', 'view');
     const offset = intParam(q, 'offset', 0, 1_000_000, 0);
     const limit = intParam(q, 'limit', 1, 200, 50);
     const dir = oneOf(q, 'dir', ['asc', 'desc'], 'asc');
     const sortKey = oneString(q, 'sort') ?? 'site_code';
 
-    const colRows = await this.db.tx.$queryRaw<Site360ColumnRow[]>`
+    const colRows = await this.db.tx.$queryRaw<SiteMasterColumnRow[]>`
       ${COLUMNS_SQL} WHERE mc.is_active ORDER BY mc.display_order`;
     const menuItem = buildMenu(menu, colRows);
     const menuOrds = menuItem.columns.map((c) => c.ord);
@@ -259,15 +259,15 @@ export class Site360Service {
    * the same branch of site360_master_values that computes the value, read with the caller's rights (row security): a site outside the caller's
    * regions answers 404, and a value hidden by the register's module view (B3) or by a field rule gives the source kind without value or id.
    */
-  async sources(auth: AuthContext, siteId: string, q: Record<string, unknown>): Promise<Site360SourcesDto> {
+  async sources(auth: AuthContext, siteId: string, q: Record<string, unknown>): Promise<SiteMasterSourcesDto> {
     if (!UUID_RE.test(siteId)) throw new ProblemException(404, 'not_found', { detail: 'Site not found.' });
-    const menu = oneOf(q, 'menu', SITE360_MENU_KEYS, 'master') as Site360Menu;
+    const menu = oneOf(q, 'menu', SITE_MASTER_MENU_KEYS, 'master') as SiteMasterMenu;
     const regs = await this.access.requireRegions('sites', 'view');
     const site = await this.db.tx.$queryRaw<{ id: string; site_code: string }[]>(Prisma.sql`
       SELECT s.id::text AS id, s.site_code FROM sites s
       WHERE s.id = ${siteId}::uuid AND s.is_active ${regs !== null ? Prisma.sql`AND s.region_id = ANY(${regs}::int[])` : Prisma.empty}`);
     if (!site[0]) throw new ProblemException(404, 'not_found', { detail: 'Site not found.' });
-    const colRows = await this.db.tx.$queryRaw<Site360ColumnRow[]>`
+    const colRows = await this.db.tx.$queryRaw<SiteMasterColumnRow[]>`
       ${COLUMNS_SQL} WHERE mc.is_active ORDER BY mc.display_order`;
     const cols = buildMenu(menu, colRows).columns;
     const ords = cols.map((c) => c.ord);
@@ -313,16 +313,16 @@ export class Site360Service {
     const feedVisible = await this.registerVisibility(auth, feedRows.map((r) => r.register_key));
     for (const r of feedRows) if (feedVisible.get(r.register_key)) feeds.set(r.register_key, r.id);
 
-    const cells: Site360CellSource[] = cols.map((c) => {
+    const cells: SiteMasterCellSource[] = cols.map((c) => {
       const v = byOrd.get(c.ord);
       const colKind = c.source_kind ?? 'derived';
-      const base: Site360CellSource = { ord: c.ord, letter: c.letter, header: c.header, kind: colKind, note: c.source_note ?? null, value: null, hidden: false, origin: null };
+      const base: SiteMasterCellSource = { ord: c.ord, letter: c.letter, header: c.header, kind: colKind, note: c.source_note ?? null, value: null, hidden: false, origin: null };
       if (c.ord === 1) return { ...base, kind: 'derived', origin: 'calculated' };
       if (!v) return base;
-      const kind = v.src_kind as Site360SourceKind;
+      const kind = v.src_kind as SiteMasterSourceKind;
       const hidden = (v.register_key !== null && visible.get(v.register_key) !== true) || (v.kind === 'custom_field' && hiddenFieldOrds.has(v.ord));
       if (hidden) return { ...base, kind, hidden: true, ...(v.register_key ? { register_key: v.register_key } : {}) };
-      const cell: Site360CellSource = { ...base, kind, value: v.value };
+      const cell: SiteMasterCellSource = { ...base, kind, value: v.value };
       if (v.src_field) cell.field = v.src_field;
       if (v.register_key) cell.register_key = v.register_key;
       if (v.src_ref === 'task' && v.src_id) {
@@ -412,7 +412,7 @@ export function attachParentOrds(
   }
 }
 
-const SITE360_MENU_KEYS = ['master', 'design_acq', 'sow', 'cw', 'te', 'hoto', 'dismantle', 'om'] as const;
+const SITE_MASTER_MENU_KEYS = ['master', 'design_acq', 'sow', 'cw', 'te', 'hoto', 'dismantle', 'om'] as const;
 
 /** Sort keys of the site fields (the join of the region is in the query). */
 const SORT_FIELDS: Record<string, string> = {
@@ -424,8 +424,8 @@ const SORT_FIELDS: Record<string, string> = {
   phase: 's.project_phase',
 };
 
-export interface Site360RowsDto {
-  menu: Site360MenuItem;
+export interface SiteMasterRowsDto {
+  menu: SiteMasterMenuItem;
   total: number;
   filtered: number;
   search?: PastedSearchDto;
@@ -486,18 +486,18 @@ interface TaskRef { id: string; code: string; name_en: string; name_ar: string |
 interface RecordRef { id: string; register_key: string; version_no: number; state: string; historical: boolean }
 
 /** How a value got into the system: an approved register record (or one still in review), the workflow, the historical import, a manual or admin entry, a formula. */
-export type Site360Origin = 'approved_record' | 'pending_record' | 'workflow' | 'historical_import' | 'manual' | 'calculated';
+export type SiteMasterOrigin = 'approved_record' | 'pending_record' | 'workflow' | 'historical_import' | 'manual' | 'calculated';
 
-/** The source of one Master cell (contract Site360CellSource). */
-export interface Site360CellSource {
+/** The source of one Master cell (contract SiteMasterCellSource). */
+export interface SiteMasterCellSource {
   ord: number;
   letter: string;
   header: string;
-  kind: Site360SourceKind;
+  kind: SiteMasterSourceKind;
   note: string | null;
   value: string | null;
   hidden: boolean;
-  origin: Site360Origin | null;
+  origin: SiteMasterOrigin | null;
   field?: string;
   register_key?: string;
   record_id?: string;
@@ -510,9 +510,9 @@ export interface Site360CellSource {
   fed_by?: { register_key: string; record_id: string };
 }
 
-export interface Site360SourcesDto {
+export interface SiteMasterSourcesDto {
   site_id: string;
   site_code: string;
-  menu: Site360Menu;
-  cells: Site360CellSource[];
+  menu: SiteMasterMenu;
+  cells: SiteMasterCellSource[];
 }

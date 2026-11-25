@@ -489,7 +489,7 @@ export class MasterExportService {
   }
 
   // ------------------------------------------------------------------ the Master sheet
-  /** The values of the Master columns of some sites, from the read model of SITE 360 (site360_master_values); register-owned values need the register's view grant in the site's region. */
+  /** The values of the Master columns of some sites, from the read model of Site Master (site360_master_values); register-owned values need the register's view grant in the site's region. */
   private async masterValues(auth: AuthContext, ids: string[], ords: number[], siteRegion: Map<string, number>): Promise<Map<string, Map<number, string | null>>> {
     const vals = await this.db.tx.$queryRaw<{ site_id: string; ord: number; value: string | null; register_key: string | null; kind: string | null }[]>(Prisma.sql`
       SELECT v.site_id::text AS site_id, v.ord, v.value, v.register_key, v.src_kind AS kind FROM site360_master_values v
@@ -577,7 +577,7 @@ export class MasterExportService {
     }
   }
 
-  /** "Export current view" of the Sites list or SITE 360: the rows of GET /sites with the same query, the chosen columns in screen order, Master header rows. */
+  /** "Export current view" of the Sites list or Site Master: the rows of GET /sites with the same query, the chosen columns in screen order, Master header rows. */
   private async masterViewSheet(
     wb: ReturnType<typeof workbookWriter>, auth: AuthContext, v: View, regs: number[] | null, regionsOf: Map<PartKey, number[] | null>,
   ): Promise<SheetCount> {

@@ -4,18 +4,18 @@ import { describe, expect, it } from 'vitest';
 import {
   buildBands,
   buildMenu,
-  buildSite360,
+  buildSiteMaster,
   colLetterToOrd,
   defaultSectionsByOrd,
   menuColumns,
-  SITE360_MENUS,
-  SITE360_DEFAULT_RANGES,
-  type Site360ColumnRow,
-  type Site360Section,
-} from '../src/site360/site360-sections';
+  SITE_MASTER_MENUS,
+  SITE_MASTER_DEFAULT_RANGES,
+  type SiteMasterColumnRow,
+  type SiteMasterSection,
+} from '../src/site-master/site-master-sections';
 
 // The Master layout as the migration seeds it: 187 columns, bands from the Master sheet row 1.
-function masterColumns(): Site360ColumnRow[] {
+function masterColumns(): SiteMasterColumnRow[] {
   const sec = defaultSectionsByOrd();
   const band = (o: number): string => {
     if (o === 1) return '#';
@@ -32,7 +32,7 @@ function masterColumns(): Site360ColumnRow[] {
     if (o <= 178) return 'DISMANTLE';
     return 'STATUS';
   };
-  const out: Site360ColumnRow[] = [];
+  const out: SiteMasterColumnRow[] = [];
   for (let o = 1; o <= 187; o++) {
     const letters = (n: number): string => {
       let s = '';
@@ -51,7 +51,7 @@ function masterColumns(): Site360ColumnRow[] {
   return out;
 }
 
-describe('SITE 360 default sections', () => {
+describe('Site Master default sections', () => {
   it('gives every Master column its default menu', () => {
     const m = defaultSectionsByOrd();
     expect(m.size).toBe(187);
@@ -60,7 +60,7 @@ describe('SITE 360 default sections', () => {
 
   it('keeps the ranges contiguous and without overlap', () => {
     const seen = new Set<number>();
-    for (const [from, to] of SITE360_DEFAULT_RANGES) {
+    for (const [from, to] of SITE_MASTER_DEFAULT_RANGES) {
       expect(from).toBeLessThanOrEqual(to);
       for (let o = from; o <= to; o++) {
         expect(seen.has(o)).toBe(false);
@@ -73,7 +73,7 @@ describe('SITE 360 default sections', () => {
   it('matches the ranges seeded by migration 0101', () => {
     const sql = readFileSync(join(__dirname, '..', 'prisma', 'migrations', '0101_site360_sections', 'migration.sql'), 'utf8');
     const seeded = [...sql.matchAll(/WHEN ord BETWEEN (\d+) AND (\d+) THEN '(\w+)'/g)].map((m) => [Number(m[1]), Number(m[2]), m[3]]);
-    expect(seeded).toEqual(SITE360_DEFAULT_RANGES.map(([a, b, s]) => [a, b, s]));
+    expect(seeded).toEqual(SITE_MASTER_DEFAULT_RANGES.map(([a, b, s]) => [a, b, s]));
   });
 
   it('reads Master letters as column orders', () => {
@@ -88,12 +88,12 @@ describe('SITE 360 default sections', () => {
   });
 });
 
-describe('SITE 360 menu columns', () => {
+describe('Site Master menu columns', () => {
   const cols = masterColumns();
 
   it('lists all 187 columns in Master, and the seven menus plus Master in order', () => {
     expect(menuColumns('master', cols)).toHaveLength(187);
-    expect(buildSite360(cols).map((m) => m.key)).toEqual(SITE360_MENUS.map((m) => m.key));
+    expect(buildSiteMaster(cols).map((m) => m.key)).toEqual(SITE_MASTER_MENUS.map((m) => m.key));
   });
 
   it('gives the CW menu W and AG:BY, with the SOW columns X:AF left to their own menu', () => {
@@ -104,14 +104,14 @@ describe('SITE 360 menu columns', () => {
   });
 
   it('shows the status columns and the identity columns in every menu', () => {
-    for (const m of SITE360_MENUS) {
+    for (const m of SITE_MASTER_MENUS) {
       const ords = menuColumns(m.key, cols).map((c) => c.ord);
       for (const o of [1, 2, 4, 180, 187]) expect(ords).toContain(o);
     }
   });
 
   it('freezes # to Site Name by default in every menu', () => {
-    for (const m of buildSite360(cols)) expect(m.frozen_ords).toEqual([1, 2, 3, 4]);
+    for (const m of buildSiteMaster(cols)) expect(m.frozen_ords).toEqual([1, 2, 3, 4]);
   });
 
   it('gives the SOW menu X to AF', () => {
@@ -120,9 +120,9 @@ describe('SITE 360 menu columns', () => {
   });
 });
 
-describe('SITE 360 grid header', () => {
+describe('Site Master grid header', () => {
   it('builds phase band, group and field, merging runs of the same band and group', () => {
-    const cols: Site360ColumnRow[] = [
+    const cols: SiteMasterColumnRow[] = [
       { ord: 1, letter: 'A', group_top: 'PRE-CW', group_mid: 'G1', header: 'a', sections: ['cw'] },
       { ord: 2, letter: 'B', group_top: 'PRE-CW', group_mid: 'G1', header: 'b', sections: ['cw'] },
       { ord: 3, letter: 'C', group_top: 'PRE-CW', group_mid: 'G2', header: 'c', sections: ['cw'] },
@@ -148,16 +148,16 @@ describe('SITE 360 grid header', () => {
   });
 
   it('builds an empty header for a menu with no section columns but keeps the status band', () => {
-    const cols = masterColumns().map((c) => ({ ...c, sections: ['design_acq'] as Site360Section[] }));
+    const cols = masterColumns().map((c) => ({ ...c, sections: ['design_acq'] as SiteMasterSection[] }));
     const dismantle = buildMenu('dismantle', cols);
     expect(dismantle.columns.every((c) => c.sections.includes('design_acq') || c.sections.includes('status') || c.ord <= 4)).toBe(true);
     expect(dismantle.bands.length).toBeGreaterThan(0);
   });
 });
 
-describe('SITE 360 column in several menus', () => {
+describe('Site Master column in several menus', () => {
   it('shows a column with HOTO and O&M in both menus', () => {
-    const cols = masterColumns().map((c) => (c.ord === 150 ? { ...c, sections: ['hoto', 'om'] as Site360Section[] } : c));
+    const cols = masterColumns().map((c) => (c.ord === 150 ? { ...c, sections: ['hoto', 'om'] as SiteMasterSection[] } : c));
     expect(menuColumns('hoto', cols).map((c) => c.ord)).toContain(150);
     expect(menuColumns('om', cols).map((c) => c.ord)).toContain(150);
     expect(menuColumns('cw', cols).map((c) => c.ord)).not.toContain(150);

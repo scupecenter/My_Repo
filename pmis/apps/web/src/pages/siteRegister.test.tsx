@@ -112,7 +112,7 @@ describe('Site Master: streams', () => {
   });
 });
 
-describe('SITE 360: views (contract 0.4.7)', () => {
+describe('Site Master: views (contract 0.4.7)', () => {
   it('titles the open view with the name from the API, in EN and AR, and shows no tab bars', async () => {
     await signIn('pm');
     for (const [view, en, ar] of [['CW', 'Civil Works', 'الأعمال المدنية'], ['TE', 'Installation (TE)', 'التركيبات'], ['OM', 'O&M', 'التشغيل والصيانة']]) {

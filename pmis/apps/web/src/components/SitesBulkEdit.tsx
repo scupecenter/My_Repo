@@ -1,7 +1,7 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { saveSite360Cell, type Site360MenuItem } from '@/api/site360';
+import { saveSiteMasterCell, type SiteMasterMenuItem } from '@/api/siteMaster';
 import { errText } from '@/components/FormDialog';
 import { anyMissingParent, columnKind, columnOptions, editableOrds, planBulk, runBulk, SKIP_REASONS, toValue, type BulkOutcome, type BulkPlan, type BulkRow } from '@/lib/siteBulkEdit';
 
@@ -12,7 +12,7 @@ type Phase = 'form' | 'running' | 'done';
  * many sites will change and how many are skipped, confirm; each eligible cell is then saved by the same call as a single inline edit (PATCH /tasks/{id} with
  * If-Match), a few at a time, and a summary lists saved, skipped and failed sites with the reasons. No new right: the server decides every cell.
  */
-export function SitesBulkEdit({ menu, rows, onClose, onRefresh }: { menu: Site360MenuItem; rows: BulkRow[]; onClose: (failed?: string[]) => void; onRefresh: () => Promise<unknown> }) {
+export function SitesBulkEdit({ menu, rows, onClose, onRefresh }: { menu: SiteMasterMenuItem; rows: BulkRow[]; onClose: (failed?: string[]) => void; onRefresh: () => Promise<unknown> }) {
   const { t, i18n } = useTranslation();
   const [ord, setOrd] = useState(0);
   const [draft, setDraft] = useState('');
@@ -34,7 +34,7 @@ export function SitesBulkEdit({ menu, rows, onClose, onRefresh }: { menu: Site36
   const confirm = async () => {
     if (!plan || (!clear && value === null) || !plan.change.length) return;
     setSnap(plan); setPhase('running'); setDone(0);
-    const res = await runBulk(plan.change, clear ? null : value, saveSite360Cell, { onProgress: setDone });
+    const res = await runBulk(plan.change, clear ? null : value, saveSiteMasterCell, { onProgress: setDone });
     await onRefresh();
     setOutcomes(res); setPhase('done');
   };

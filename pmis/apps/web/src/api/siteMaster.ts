@@ -2,15 +2,15 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import { api } from '@/api/client';
 import type { components } from '@/api/schema';
 
-/** SITE 360 menus and the Master columns of each (contract 0.15.21, F15). */
-export type Site360Sections = components['schemas']['Site360Sections'];
-export type Site360MenuItem = components['schemas']['Site360MenuItem'];
-export type Site360Menu = components['schemas']['Site360Menu'];
-export type Site360Band = components['schemas']['Site360Band'];
-export type Site360Rows = components['schemas']['Site360Rows'];
+/** Site Master menus and the Master columns of each (contract 0.15.21, F15). */
+export type SiteMasterSections = components['schemas']['Site360Sections'];
+export type SiteMasterMenuItem = components['schemas']['Site360MenuItem'];
+export type SiteMasterMenu = components['schemas']['Site360Menu'];
+export type SiteMasterBand = components['schemas']['Site360Band'];
+export type SiteMasterRows = components['schemas']['Site360Rows'];
 
 /** Filters, sort and paging of the grid rows (contract 0.15.21, `GET /site360/{menu}/rows`). Multi values are comma-separated. */
-export interface Site360RowsQuery {
+export interface SiteMasterRowsQuery {
   /** W8 item 5 (0.15.64): the search box: one token = contains on code and name; a pasted list = exact Site ID or Site Owner ID */
   q?: string;
   site_code?: string;
@@ -38,36 +38,36 @@ export interface Site360RowsQuery {
   limit?: number;
 }
 
-/** The eight SITE 360 menus in menu order: Master first, then the sections. */
-export const SITE360_MENU_KEYS: Site360Menu[] = ['master', 'design_acq', 'sow', 'cw', 'te', 'hoto', 'dismantle', 'om'];
+/** The eight Site Master menus in menu order: Master first, then the sections. */
+export const SITE_MASTER_MENU_KEYS: SiteMasterMenu[] = ['master', 'design_acq', 'sow', 'cw', 'te', 'hoto', 'dismantle', 'om'];
 
-export const useSite360Sections = () =>
-  useQuery({ queryKey: ['site360-sections'], queryFn: () => api.get<Site360Sections>('/site360/sections') });
+export const useSiteMasterSections = () =>
+  useQuery({ queryKey: ['site-master-sections'], queryFn: () => api.get<SiteMasterSections>('/site360/sections') });
 
 /** One page of a menu's rows with the Master values of its columns; the values are read from the set-based view, one query per page. */
-export const useSite360Rows = (menu: string | undefined, query: Site360RowsQuery) =>
+export const useSiteMasterRows = (menu: string | undefined, query: SiteMasterRowsQuery) =>
   useQuery({
-    queryKey: ['site360-rows', menu, query],
+    queryKey: ['site-master-rows', menu, query],
     enabled: !!menu,
-    queryFn: () => api.get<Site360Rows>(`/site360/${menu}/rows`, { query: { ...query } }),
+    queryFn: () => api.get<SiteMasterRows>(`/site360/${menu}/rows`, { query: { ...query } }),
   });
 
 /** The source of one Master cell (contract 0.15.35): kind, origin and the ids to open the source record. */
-export type Site360CellSource = components['schemas']['Site360CellSource'];
-export type Site360SiteSources = components['schemas']['Site360SiteSources'];
-export type Site360SourceKind = components['schemas']['Site360SourceKind'];
+export type SiteMasterCellSource = components['schemas']['Site360CellSource'];
+export type SiteMasterSiteSources = components['schemas']['Site360SiteSources'];
+export type SiteMasterSourceKind = components['schemas']['Site360SourceKind'];
 
 /** Every Master cell of one site with its value and source (`GET /site360/sites/{site_id}/sources`); asked per site when a cell is opened, cached. */
-export const useSite360SiteSources = (siteId: string | null | undefined, menu?: string) =>
+export const useSiteMasterSiteSources = (siteId: string | null | undefined, menu?: string) =>
   useQuery({
-    queryKey: ['site360-sources', siteId, menu ?? 'master'],
+    queryKey: ['site-master-sources', siteId, menu ?? 'master'],
     enabled: !!siteId,
     staleTime: 30_000,
-    queryFn: () => api.get<Site360SiteSources>(`/site360/sites/${siteId}/sources`, { query: menu ? { menu } : {} }),
+    queryFn: () => api.get<SiteMasterSiteSources>(`/site360/sites/${siteId}/sources`, { query: menu ? { menu } : {} }),
   });
 
 /** The app route that opens the source record of a cell, or null when there is none to open (a formula over many rows, a hidden value, not tracked). */
-export function site360SourceHref(siteId: string, c: Site360CellSource): string | null {
+export function siteMasterSourceHref(siteId: string, c: SiteMasterCellSource): string | null {
   if (c.hidden) return null;
   if (c.record_id && c.register_key) return `/registers/${c.register_key}?record=${c.record_id}`;
   if (c.task_id) return `/sites/${siteId}?task=${c.task_id}&row=${c.task_id}`;
@@ -76,39 +76,39 @@ export function site360SourceHref(siteId: string, c: Site360CellSource): string 
   return null;
 }
 
-/** The SITE 360 menus a Master column may be in (the status columns are in every menu and cannot change). */
-export const SITE360_MOVABLE_MENUS = ['design_acq', 'sow', 'cw', 'te', 'hoto', 'dismantle', 'om'] as const;
+/** The Site Master menus a Master column may be in (the status columns are in every menu and cannot change). */
+export const SITE_MASTER_MOVABLE_MENUS = ['design_acq', 'sow', 'cw', 'te', 'hoto', 'dismantle', 'om'] as const;
 
 /** Replaces the menus of one Master column (`PATCH /site360/columns/{ord}/sections`): System Admin, a reason, step-up. */
-export const useSetSite360ColumnSections = () => {
+export const useSetSiteMasterColumnSections = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (v: { ord: number; sections: string[]; reason: string }) =>
       api.patch<unknown>(`/site360/columns/${v.ord}/sections`, { body: { sections: v.sections, reason: v.reason } }),
     onSettled: () => {
-      void qc.invalidateQueries({ queryKey: ['site360-sections'] });
-      void qc.invalidateQueries({ queryKey: ['site360-rows'] });
+      void qc.invalidateQueries({ queryKey: ['site-master-sections'] });
+      void qc.invalidateQueries({ queryKey: ['site-master-rows'] });
     },
   });
 };
 
 /** The rows of a menu, page after page (200 at a time, the API maximum): each page is one query on the set-based view. */
-export const useSite360RowsPaged = (menu: string | undefined, query: Omit<Site360RowsQuery, 'offset'>) => {
+export const useSiteMasterRowsPaged = (menu: string | undefined, query: Omit<SiteMasterRowsQuery, 'offset'>) => {
   const limit = 200;
   return useInfiniteQuery({
-    queryKey: ['site360-rows-paged', menu, query],
+    queryKey: ['site-master-rows-paged', menu, query],
     enabled: !!menu,
     initialPageParam: 0,
-    queryFn: ({ pageParam }) => api.get<Site360Rows>(`/site360/${menu}/rows`, { query: { ...query, offset: pageParam, limit } }),
+    queryFn: ({ pageParam }) => api.get<SiteMasterRows>(`/site360/${menu}/rows`, { query: { ...query, offset: pageParam, limit } }),
     getNextPageParam: (last) => (last.offset + last.limit < last.filtered ? last.offset + last.limit : undefined),
   });
 };
 
 /** One cell edit: the task, its version (If-Match), the field (a date key or a key of the task values) and the new value (an empty text or null clears it). */
-export interface Site360CellSave { task_id: string; version: number; field?: 'planned_date' | 'actual_date' | 'actual_start'; values?: string; value: string | number | boolean | null }
+export interface SiteMasterCellSave { task_id: string; version: number; field?: 'planned_date' | 'actual_date' | 'actual_start'; values?: string; value: string | number | boolean | null }
 
 /** The one save path of a cell, `PATCH /tasks/{task_id}` with If-Match: used by the single inline edit and, once per site, by the bulk edit (0.15.50). */
-export const saveSite360Cell = (v: Site360CellSave) => {
+export const saveSiteMasterCell = (v: SiteMasterCellSave) => {
   const body = v.field
     ? { [v.field]: v.value === '' || v.value === null ? null : v.value }
     : { values: { [v.values ?? '']: v.value === '' || v.value === null ? null : v.value } };
@@ -116,22 +116,22 @@ export const saveSite360Cell = (v: Site360CellSave) => {
 };
 
 /** Saves an inline edit of a task-backed cell through the task entry (`PATCH /tasks/{task_id}`, If-Match the task version): the L1 rules, gates and audit of the task screen apply. */
-export const useSaveSite360Cell = (menu: string | undefined, query: Omit<Site360RowsQuery, 'offset'>) => {
+export const useSaveSiteMasterCell = (menu: string | undefined, query: Omit<SiteMasterRowsQuery, 'offset'>) => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: saveSite360Cell,
+    mutationFn: saveSiteMasterCell,
     onSettled: () => {
-      void qc.invalidateQueries({ queryKey: ['site360-rows-paged', menu, query] });
-      void qc.invalidateQueries({ queryKey: ['site360-rows', menu] });
+      void qc.invalidateQueries({ queryKey: ['site-master-rows-paged', menu, query] });
+      void qc.invalidateQueries({ queryKey: ['site-master-rows', menu] });
     },
   });
 };
 
 /** After a bulk edit: the rows of the menu are read again once (not once per saved cell), so the affected rows show their new values and versions. */
-export const useRefreshSite360Rows = (menu: string | undefined) => {
+export const useRefreshSiteMasterRows = (menu: string | undefined) => {
   const qc = useQueryClient();
   return () => Promise.all([
-    qc.invalidateQueries({ queryKey: ['site360-rows-paged', menu] }),
-    qc.invalidateQueries({ queryKey: ['site360-rows', menu] }),
+    qc.invalidateQueries({ queryKey: ['site-master-rows-paged', menu] }),
+    qc.invalidateQueries({ queryKey: ['site-master-rows', menu] }),
   ]);
 };

@@ -10,7 +10,7 @@ import { SiteDocuments } from '@/components/SiteDocuments';
 import { SiteFields } from '@/components/SiteFields';
 import { SiteIdentity } from '@/components/SiteIdentity';
 import { SiteSnags } from '@/components/SiteSnags';
-import { SiteMasterSources } from '@/components/Site360Source';
+import { SiteMasterSources } from '@/components/SiteMasterSource';
 import { SiteApplicability } from '@/components/SiteApplicability';
 import { SiteDispatchPanel } from '@/components/SiteDispatch';
 import { useSiteDispatch } from '@/api/warehouse';
@@ -120,7 +120,7 @@ export function Site() {
           <SiteFields site={s} />
           {cp && <div className="my-3 flex items-center gap-2 rounded-lg bg-openBg p-3 text-openInk" data-testid="cluster-progress"><Layers size={16} />{t('site.cluster', { code: cp.cluster_code, at: cp.sites_at_te_pac, total: cp.sites_total })}</div>}
           <div role="tablist" aria-label={t('site.sections')} className="mt-3 flex gap-1" data-testid="site-section-tabs">
-            {([['', t('site.tasks')], ['master', t('site360.src.tab')], ['documents', t('docs.tab')], ['snags', t('snags.tab')], ['scope', t('scope.tab')], ...(dispatch.isSuccess ? [['warehouse', t('wh.site_tab')] as const] : [])] as const).map(([k, label]) => (
+            {([['', t('site.tasks')], ['master', t('siteMaster.src.tab')], ['documents', t('docs.tab')], ['snags', t('snags.tab')], ['scope', t('scope.tab')], ...(dispatch.isSuccess ? [['warehouse', t('wh.site_tab')] as const] : [])] as const).map(([k, label]) => (
               <button key={k || 'tasks'} role="tab" aria-selected={k === section} data-testid={`site-section-${k || 'tasks'}`} onClick={() => setParam('tab', k || null)}
                 className={`rounded-md px-3 py-1 text-sm font-semibold ${k === section ? 'bg-accentSoft text-accentText' : 'text-mute hover:text-ink'}`}>{label}{k === 'snags' && (s.counts?.open_snags ?? 0) > 0 ? ` (${s.counts?.open_snags})` : ''}</button>
             ))}

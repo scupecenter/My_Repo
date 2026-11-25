@@ -6,7 +6,7 @@ import { useNavLayout } from '@/api/settings';
 import { ICONS, ICON_PROPS } from '@/lib/icons';
 import { loadPref, savePref } from '@/lib/localPref';
 import { headingIcon, headingName, keysOf, resolveLayout, type NavHead, type NavSub } from '@/lib/navLayout';
-import { SITE360_SUBMENUS } from '@/lib/site360Menus';
+import { SITE_MASTER_SUBMENUS } from '@/lib/siteMasterMenus';
 import { NavLayoutEditor } from './NavLayoutEditor';
 import type { NavItem } from './navItems';
 
@@ -26,7 +26,7 @@ export function siteSelection(pathname: string, search: string): { stream: strin
   return { stream: p.get('stream') ?? '', view: p.get('view') ?? '', section: p.get('section') ?? '' };
 }
 
-/** The six SITE 360 sub-menus under "Site Master" (owner decision 2026-11-15, F15; the Master parent is the entry itself). Each opens `/sites?section=`. */
+/** The six Site Master sub-menus under "Site Master" (owner decision 2026-11-15, F15; the Master parent is the entry itself). Each opens `/sites?section=`. */
 function SiteSubmenus({ onNavigate }: { onNavigate?: () => void }) {
   const { t, i18n } = useTranslation();
   const loc = useLocation();
@@ -36,8 +36,8 @@ function SiteSubmenus({ onNavigate }: { onNavigate?: () => void }) {
       className={`block rounded-md px-2 py-1.5 text-sm ${on ? 'bg-sideOn font-semibold text-accentText' : 'text-mute hover:bg-hover'}`}>{text}</Link>
   );
   return (
-    <div className="ms-6 border-s border-line ps-1" role="group" aria-label={t('site360.menus')} data-testid="nav-site360-menus">
-      {SITE360_SUBMENUS.map((m) => item(`nav-site360-${m.key}`, `/sites?section=${m.key}`, sel.section === m.key, i18n.language === 'ar' ? m.ar : m.en))}
+    <div className="ms-6 border-s border-line ps-1" role="group" aria-label={t('siteMaster.menus')} data-testid="nav-site-master-menus">
+      {SITE_MASTER_SUBMENUS.map((m) => item(`nav-site-master-${m.key}`, `/sites?section=${m.key}`, sel.section === m.key, i18n.language === 'ar' ? m.ar : m.en))}
     </div>
   );
 }
@@ -59,7 +59,7 @@ export function SidebarBody({ items, compact, unread, alerts = 0, activeKey, onN
   const label = (n: NavItem) => t(n.key === 'sites' ? 'nav.sites_all' : `nav.${n.key}`);
   const byKey = (k: string) => items.find((i) => i.key === k);
   const sel = siteSelection(loc.pathname, loc.search);
-  const subOn = SITE360_SUBMENUS.some((m) => m.key === sel.section);
+  const subOn = SITE_MASTER_SUBMENUS.some((m) => m.key === sel.section);
 
   // Recent items: adjust state while rendering when the active page changes (no effect needed).
   const [seen, setSeen] = useState<string | undefined>();
@@ -115,7 +115,7 @@ export function SidebarBody({ items, compact, unread, alerts = 0, activeKey, onN
   const favItems = favs.map(byKey).filter((x): x is NavItem => !!x);
   const recentItems = recent.filter((k) => k !== activeKey).map(byKey).filter((x): x is NavItem => !!x);
 
-  /** A screen of a heading. The Site Register entry "Site Master" carries the six SITE 360 sub-menus (no Dismantle); every other screen, Dismantle included, is a plain row (under Registers & Logs). */
+  /** A screen of a heading. The Site Register entry "Site Master" carries the six Site Master sub-menus (no Dismantle); every other screen, Dismantle included, is a plain row (under Registers & Logs). */
   const itemNode = (k: string) => {
     const n = byKey(k);
     if (!n) return null;

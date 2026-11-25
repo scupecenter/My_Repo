@@ -367,7 +367,7 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/master-import/runs/:id/sites'],
   ['get', '/import-batches/:id/sites'],
   // Owner report 2026-11-16: these routes are served by the API (workflow editor, register columns and fields, calendar and holidays, SLA rule sets,
-  // settings, SITE 360, global search, admin edits, user purge) but were missing here, so the hybrid build still answered them with sample data.
+  // settings, Site Master, global search, admin edits, user purge) but were missing here, so the hybrid build still answered them with sample data.
   ['get', '/settings/calendars'],
   ['get', '/settings/holidays'],
   ['post', '/settings/holidays'],

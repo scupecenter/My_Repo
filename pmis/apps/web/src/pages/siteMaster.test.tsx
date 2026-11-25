@@ -4,27 +4,27 @@ import { server } from '@/mocks/server';
 import { renderApp, signIn } from '@/test/utils';
 import { Sites } from './Sites';
 
-describe('SITE 360 menus on the Sites page', () => {
+describe('Site Master menus on the Sites page', () => {
   it('draws the CW menu as a grid with the three header rows and the totals row when ?layout=grid is in the URL', async () => {
     await signIn('pm');
     renderApp(<Sites />, { route: '/sites?section=cw&layout=grid' });
-    const grid = await screen.findByTestId('site360-grid');
+    const grid = await screen.findByTestId('site-master-grid');
     expect(grid.getAttribute('data-menu')).toBe('cw');
-    expect(screen.getByTestId('site360-grid-band-row')).toBeTruthy();
-    expect(screen.getByTestId('site360-grid-group-row')).toBeTruthy();
-    expect(screen.getByTestId('site360-grid-field-row')).toBeTruthy();
-    expect(screen.getByTestId('site360-grid-totals')).toBeTruthy();
+    expect(screen.getByTestId('site-master-grid-band-row')).toBeTruthy();
+    expect(screen.getByTestId('site-master-grid-group-row')).toBeTruthy();
+    expect(screen.getByTestId('site-master-grid-field-row')).toBeTruthy();
+    expect(screen.getByTestId('site-master-grid-totals')).toBeTruthy();
   });
 
   it('shows the list by default in a sub-menu, with no Grid/Vertical toggle and the sub-menu name in the title', async () => {
     await signIn('pm');
     renderApp(<Sites />, { route: '/sites?section=cw' });
-    expect(await screen.findByTestId('site360-list')).toBeTruthy();
-    expect(screen.queryByTestId('site360-grid')).toBeNull();
-    expect(screen.queryByTestId('site360-grid-band-row')).toBeNull();
-    expect(screen.queryByTestId('site360-layout')).toBeNull();
-    expect(screen.queryByTestId('site360-layout-grid')).toBeNull();
-    expect(screen.queryByTestId('site360-layout-vertical')).toBeNull();
+    expect(await screen.findByTestId('site-master-list')).toBeTruthy();
+    expect(screen.queryByTestId('site-master-grid')).toBeNull();
+    expect(screen.queryByTestId('site-master-grid-band-row')).toBeNull();
+    expect(screen.queryByTestId('site-master-layout')).toBeNull();
+    expect(screen.queryByTestId('site-master-layout-grid')).toBeNull();
+    expect(screen.queryByTestId('site-master-layout-vertical')).toBeNull();
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Site Master: CW');
   });
 
@@ -53,8 +53,8 @@ describe('SITE 360 menus on the Sites page', () => {
     await signIn('pm');
     renderApp(<Sites />, { route: '/sites' });
     expect(await screen.findByTestId('sites-list')).toBeTruthy();
-    expect(screen.queryByTestId('site360-list')).toBeNull();
-    expect(screen.queryByTestId('site360-grid')).toBeNull();
+    expect(screen.queryByTestId('site-master-list')).toBeNull();
+    expect(screen.queryByTestId('site-master-grid')).toBeNull();
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/^Site Master$/);
   });
 
@@ -68,7 +68,7 @@ describe('SITE 360 menus on the Sites page', () => {
   it('writes the sub-menu name in the Arabic title', async () => {
     await signIn('pm');
     renderApp(<Sites />, { route: '/sites?section=cw', locale: 'ar' });
-    await screen.findByTestId('site360-list');
+    await screen.findByTestId('site-master-list');
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('الأعمال المدنية');
   });
 
@@ -76,9 +76,9 @@ describe('SITE 360 menus on the Sites page', () => {
     await signIn('pm');
     renderApp(<Sites />, { route: '/sites?stream=CW' });
     await screen.findByTestId('page-sites');
-    expect(screen.queryByTestId('site360-grid')).toBeNull();
-    expect(screen.queryByTestId('site360-list')).toBeNull();
-    expect(screen.queryByTestId('site360-layout')).toBeNull();
+    expect(screen.queryByTestId('site-master-grid')).toBeNull();
+    expect(screen.queryByTestId('site-master-list')).toBeNull();
+    expect(screen.queryByTestId('site-master-layout')).toBeNull();
   });
 
   it('sends the status filter of the grid as `status`, the name the API reads (audit A finding 11)', { timeout: 30_000 }, async () => {
@@ -88,7 +88,7 @@ describe('SITE 360 menus on the Sites page', () => {
     server.events.on('request:start', on);
     try {
       renderApp(<Sites />, { route: '/sites?section=cw&layout=grid&overall_status=on_hold' });
-      await screen.findByTestId('site360-grid');
+      await screen.findByTestId('site-master-grid');
       await waitFor(() => expect(seen.length).toBeGreaterThan(0));
       expect(seen[0]!.get('status')).toBe('on_hold');
       expect(seen[0]!.has('overall_status')).toBe(false);

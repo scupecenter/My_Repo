@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { ApiError } from '@/api/client';
 import { useListCatalogues } from '@/api/lists';
-import { useColumnAdmin, useColumnDetails, useColumnSections, useDeactivateColumn, useDeleteColumn, useReactivateColumn, useUpdateColumn } from '@/api/site360Columns';
+import { useColumnAdmin, useColumnDetails, useColumnSections, useDeactivateColumn, useDeleteColumn, useReactivateColumn, useUpdateColumn } from '@/api/siteMasterColumns';
 import type { ColCtx } from './studio/studioCtx';
 import { useAsk } from './studio/studioCtx';
 import { colName, Dialogs, RowActions, type Dlg } from './studio/StudioColumns';

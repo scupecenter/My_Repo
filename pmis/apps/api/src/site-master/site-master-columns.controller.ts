@@ -16,16 +16,16 @@ import type { AuthContext } from '../auth/auth.types';
 import { Auth } from '../auth/decorators';
 import { etagHeader } from '../common/etag';
 import {
-  Site360ColumnsService,
-  type Site360ColumnListDto,
-} from './site360-columns.service';
+  SiteMasterColumnsService,
+  type SiteMasterColumnListDto,
+} from './site-master-columns.service';
 
 type Json = Record<string, unknown>;
 
 /** Workflow Studio S2 (contract 0.15.43): the admin of the Site Master columns. The database decides who may (System Admin or an all-regions delegate of `fields` edit). */
 @Controller('site360/columns')
-export class Site360ColumnsController {
-  constructor(private readonly cols: Site360ColumnsService) {}
+export class SiteMasterColumnsController {
+  constructor(private readonly cols: SiteMasterColumnsService) {}
 
   private tag(res: Response, r: Json): Json {
     if (typeof r.version === 'number')
@@ -34,7 +34,7 @@ export class Site360ColumnsController {
   }
 
   @Get()
-  list(@Query() q: Record<string, unknown>): Promise<Site360ColumnListDto> {
+  list(@Query() q: Record<string, unknown>): Promise<SiteMasterColumnListDto> {
     return this.cols.list(q);
   }
 

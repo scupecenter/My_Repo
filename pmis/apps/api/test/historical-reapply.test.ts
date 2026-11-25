@@ -283,7 +283,7 @@ describe('0122: re-apply a historical Master file with direct approval', () => {
 describe('0122: the overall status of a site follows its milestones', () => {
   const approve = (id: string, d: string) => db.query(`UPDATE task_instances SET state = 'approved', actual_date = $2::date, approved_date = $2::date, current_level = 3 WHERE id = $1`, [id, d]);
 
-  it('not_started, then in_progress (a task approved), then completed (the final milestone); the site map, SITE 360, the sites list and the dashboard follow', async () => {
+  it('not_started, then in_progress (a task approved), then completed (the final milestone); the site map, Site Master, the sites list and the dashboard follow', async () => {
     const admin = await plainAdmin(app, db);
     const s = await makeSite(db, R, { prefix: 'OST', status: 'not_started' });
     const b4 = await makeTask(db, s, 'B4', 'open');

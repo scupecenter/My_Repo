@@ -322,7 +322,7 @@ describe('the historical load: no locks, missing data as warnings, every site wi
     const only = await t.admin.api.call('get', `/master-import/runs/${run.body.id}/sites?gaps=only`);
     expect((only.body.items as { site_code: string }[]).map((x) => x.site_code)).toContain(full.code);
     expect((only.body.items as { site_code: string }[]).map((x) => x.site_code)).not.toContain(blank.code);
-    // the site page and SITE 360 show the gap
+    // the site page and Site Master show the gap
     const page = await t.admin.api.call('get', `/sites/${full.id}`);
     expect(page.body.data_gaps).toBeGreaterThan(0);
     expect(page.body.data_gap_items).toEqual(expect.arrayContaining([expect.objectContaining({ kind: 'missing_actual_date', task_code: 'B3', successor_code: 'B4' })]));
