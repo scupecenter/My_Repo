@@ -92,3 +92,34 @@ describe("Settings, lists: reorder the values in place", () => {
     expect(sent.every((x) => typeof x.body.sort_order === "number" && (x.body.reason ?? "").length >= 3)).toBe(true);
   });
 });
+
+describe("Settings, lists: quick rename and hide in the row", () => {
+  it("renames and hides a value in the row; Save needs a reason of 3 characters and sends the same PATCH as the full edit", async () => {
+    await signIn("pm");
+    const sent: { body: { label_en?: string; is_active?: boolean; reason?: string } }[] = [];
+    server.use(http.patch(`${API_BASE}/list-catalogues/:code/values/:id`, async ({ request }) => {
+      sent.push({ body: (await request.json()) as never });
+      return HttpResponse.json({ ok: true });
+    }));
+    const u = userEvent.setup();
+    settings();
+    const rows = await screen.findAllByTestId(/^lists-row-/);
+    await u.click(rows[0]!);
+    const quick = (await screen.findAllByTestId(/^lists-value-quick-/))[0]!;
+    await u.click(quick);
+    const code = quick.getAttribute("data-testid")!.replace("lists-value-quick-", "");
+    const en = screen.getByTestId(`lists-row-en-${code}`);
+    await u.clear(en);
+    await u.type(en, "Renamed here");
+    await u.click(screen.getByTestId(`lists-row-active-${code}`));
+    const save = screen.getByTestId(`lists-row-save-${code}`);
+    expect(save).toBeDisabled();
+    await u.type(screen.getByTestId(`lists-row-reason-${code}`), "ab");
+    expect(save).toBeDisabled();
+    await u.type(screen.getByTestId(`lists-row-reason-${code}`), "c");
+    await u.click(save);
+    await waitFor(() => expect(sent.length).toBe(1));
+    expect(sent[0]!.body).toMatchObject({ label_en: "Renamed here", reason: "abc" });
+    expect(typeof sent[0]!.body.is_active).toBe("boolean");
+  });
+});

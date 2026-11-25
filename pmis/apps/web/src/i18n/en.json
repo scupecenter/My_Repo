@@ -3972,7 +3972,8 @@
     "pending_hint": "The values of this list are a draft waiting for the owner's review.",
     "move_up": "Move {{code}} up",
     "move_down": "Move {{code}} down",
-    "reorder_reason": "Changed the order of the values"
+    "reorder_reason": "Changed the order of the values",
+    "quick_edit": "Quick edit {{code}} (rename, show or hide)"
   },
   "listErrors": {
     "critical_closed": "A critical list accepts only its own values.",
