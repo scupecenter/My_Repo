@@ -100,6 +100,3 @@ PRs: #214 templates; P2 Table basics; P3 Settings and columns; P4 Inline and bat
 - Same permissions, locks, Change Control (coordinates and names stay proposals needing L2), approvals, step-up and audit on every write path.
 - Hiding a column that holds data deactivates it: old values stay, new data only.
 - No new write path without the owner's approval.
-
-### Final stage (owner, 14:41)
-- [LAST] After the build: security review of the code in this PR, full check and full review. Findings are reported to the owner; only items inside this PR scope are fixed unless approved.
