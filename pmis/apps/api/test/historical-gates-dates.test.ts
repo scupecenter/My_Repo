@@ -88,7 +88,7 @@ const catchUp = async () => (await q<{ r: Record<string, any> }>(db, 'SELECT hgd
 
 /** Puts a site in the scope of the rule as an earlier historical load left it (fixture rows, triggers off): the task carries a historical direct-approval batch. */
 async function markHistorical(admin: Actor, siteId: string, code: string): Promise<void> {
-  const tv = (await q<{ id: string }>(db, `SELECT v.id::text AS id FROM template_versions v JOIN template_definitions dd ON dd.id = v.template_def_id WHERE dd.template_id = 'TPL-ACQ' AND v.is_current`))[0]!.id;
+  const tv = (await q<{ id: string }>(db, `SELECT v.id::text AS id FROM template_versions v JOIN template_definitions dd ON dd.id = v.template_def_id WHERE dd.template_id = 'TPL-ACQUISITION' AND v.is_current`))[0]!.id;
   await db.query('SET session_replication_role = replica');
   try {
     const b = (await q<{ id: string }>(db, `INSERT INTO import_batches (template_version_id, source, file_name, file_sha256, status, uploaded_by, register_key, mode,

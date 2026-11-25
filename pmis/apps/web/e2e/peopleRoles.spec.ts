@@ -7,15 +7,16 @@ for (const [locale, theme] of [['en', 'light'], ['ar', 'dark']] as const) {
     await page.addInitScript(([l, t]) => { localStorage.setItem('pmis.locale', l); localStorage.setItem('pmis.theme', t); }, [locale, theme]);
     await login(page, 'pm');
     await page.getByTestId('nav-admin.users').click();
-    await page.getByTestId('people-tab-assignments').click();
+    await page.getByTestId('people-tab-users').click(); // Assignments sit under Users (People merge)
+    await page.getByTestId('people-sub-assignments').click();
     await expect(page.getByTestId('page-assignments')).toBeVisible();
     if (locale === 'ar') {
-      await expect(page.getByTestId('people-tab-assignments')).toHaveText('الإسنادات');
-      await expect(page.getByTestId('people-tab-profiles')).toHaveText('ملفات الصلاحيات');
-      await expect(page.getByTestId('people-tab-delegation')).toHaveText('التفويضات');
+      await expect(page.getByTestId('people-sub-assignments')).toHaveText('الإسنادات');
+        await expect(page.getByTestId('people-tab-delegation')).toHaveText('التفويضات');
       await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
     }
-    await page.getByTestId('people-tab-profiles').click();
+    await page.getByTestId('people-tab-roles').click(); // Permission profiles sit under Roles (People merge)
+    await page.getByTestId('people-sub-profiles').click();
     await expect(page.getByTestId('page-profiles')).toBeVisible();
     await page.getByTestId('profile-new').click();
     await expect(page.getByTestId('grant-sites-view')).toBeVisible();

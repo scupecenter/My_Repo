@@ -71,7 +71,7 @@ const rowsOf = async (api: Api, id: string): Promise<Record<string, any>[]> => {
   return res.body.items;
 };
 const upl = async (a: Actor, rows: Record<string, ExcelJS.CellValue>[], fields: Record<string, string> = {}) => {
-  const buf = await filled(a.api, 'TPL-SITE-CW', rows);
+  const buf = await filled(a.api, 'TPL-CIVIL', rows);
   return uploadFile(a.api, buf, 'filled.xlsx', fields);
 };
 const send = (a: Actor, batch: { id: string; version: number }) => a.api.call('post', `/import-batches/${batch.id}/submit`, undefined, { 'If-Match': `"${batch.version}"` });
@@ -279,12 +279,12 @@ describe('a stream-template batch marked "historical load: accept without docume
     const dgApi = await loggedIn(app, dg);
     await dgApi.stepUp(dg.password);
     const dgActor: Actor = { user: dg, api: dgApi, roleId: '' };
-    const byDelegate = await uploadFile(dgApi, await filled(t.admin.api, 'TPL-SITE-CW', rows), 'x.xlsx', { historical_load_reason: REASON });
+    const byDelegate = await uploadFile(dgApi, await filled(t.admin.api, 'TPL-CIVIL', rows), 'x.xlsx', { historical_load_reason: REASON });
     expect(byDelegate.status).toBe(403);
     expect(byDelegate.body).toMatchObject({ code: 'action_forbidden' });
     void dgActor;
     const l1 = await actor(app, db, { grants: [...G('sites', 'view', 'edit'), ...G('templates', 'view', 'import')], regions: [R], modules: null });
-    const byHolder = await uploadFile(l1.api, await filled(t.admin.api, 'TPL-SITE-CW', rows), 'x.xlsx', { historical_load_reason: REASON });
+    const byHolder = await uploadFile(l1.api, await filled(t.admin.api, 'TPL-CIVIL', rows), 'x.xlsx', { historical_load_reason: REASON });
     expect(byHolder.status).toBe(403);
     // a System Admin without a fresh step-up
     const cold = await plainAdmin(app, db, false);

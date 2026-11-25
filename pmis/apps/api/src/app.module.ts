@@ -101,10 +101,10 @@ import { HistoricalWaiverService } from './settings/historical-waiver.service';
 import { DataResetController } from './settings/data-reset.controller';
 import { DataResetService } from './settings/data-reset.service';
 import { MaintenanceService } from './settings/maintenance.service';
-import { Site360Controller } from './site360/site360.controller';
-import { Site360ColumnsController } from './site360/site360-columns.controller';
-import { Site360ColumnsService } from './site360/site360-columns.service';
-import { Site360Service } from './site360/site360.service';
+import { SiteMasterController } from './site-master/site-master.controller';
+import { SiteMasterColumnsController } from './site-master/site-master-columns.controller';
+import { SiteMasterColumnsService } from './site-master/site-master-columns.service';
+import { SiteMasterService } from './site-master/site-master.service';
 import { P4cController } from './registers/p4c.controller';
 import { FleetController } from './registers/fleet.controller';
 import { FleetService } from './registers/fleet.service';
@@ -182,7 +182,7 @@ export function appModuleFor(config: AppConfig) {
       AnnouncementsController, MeAnnouncementsController, RegionsController, RolesController, PermissionsController, AssignmentsController,
       DelegationsController, SitesController, SiteDraftsController, TasksController, WorkflowEditorController, TaskDefinitionsController, CalendarController, SlaController, RegistersController, RegisterColumnsController, MatrixController, WarehouseController, AsBuiltItemsController, NumberSequencesController,
       NotificationsController, FollowController, StatusUpdatesController, InsightsController, TemplatesController, ImportBatchesController, DocumentsController, DocumentsGridController, LibraryController, SnagsController,
-      DashboardController, DashboardSettingsController, DelayPeriodsController, WeightsController, TeamScopeMatchController, GecolOrderWarningsController, MailKindsController, ImportsSettingsController, KanbanController, NavLayoutController, HistoricalWaiverController, Site360Controller, Site360ColumnsController, StructuralFreezeController, UiIdentityController, SettingsScreensController, P4cController, FleetController, AuditLogController, SecurityLogController, LogsAdminController,
+      DashboardController, DashboardSettingsController, DelayPeriodsController, WeightsController, TeamScopeMatchController, GecolOrderWarningsController, MailKindsController, ImportsSettingsController, KanbanController, NavLayoutController, HistoricalWaiverController, SiteMasterController, SiteMasterColumnsController, StructuralFreezeController, UiIdentityController, SettingsScreensController, P4cController, FleetController, AuditLogController, SecurityLogController, LogsAdminController,
       ScenarioSettingsController, SiteApplicabilityController, // P1 (0052)
       MailController, HealthController,
       ListCataloguesController,
@@ -205,7 +205,7 @@ export function appModuleFor(config: AppConfig) {
       DepartmentsService, MessagesService, AnnouncementsService, IdempotencyService, RegionsService, RolesService, PermissionsService,
       AssignmentsService, DelegationsService, SitesService, SiteLocksService, SiteDraftsService, TaskViewService, TaskDetailService, WorkflowEditorService, WorkflowService, ApprovalsService, MyWorkService, OverridesService, CalendarService, SlaService, JobsService, RegistersService, RegisterColumnsService, MatrixService, WarehouseService, WarehouseConfigService, AsBuiltItemsService,
       NotificationsService, FollowService, StatusUpdatesService, InsightsService, TemplatesService, ImportService, ImportJobsService, UploadInterceptor, StorageService, DocumentsService, DocsGridService, LibraryService, ZipService, StorageJobsService, SnagsService,
-      DashboardService, DashboardSettingsService, SiteMapService, ProjectStatusService, DelayPeriodsService, WeightsService, TeamScopeMatchService, GecolOrderWarningsService, MailKindsService, ImportsSettingsService, KanbanService, NavLayoutService, HistoricalWaiverService, Site360Service, Site360ColumnsService, StructuralFreezeService, UiIdentityService, SettingsScreensService, P4cService, FleetService, LogsService, SecurityLogService, JobRunsService, MailService, IntegrityService, DashboardExtrasService,
+      DashboardService, DashboardSettingsService, SiteMapService, ProjectStatusService, DelayPeriodsService, WeightsService, TeamScopeMatchService, GecolOrderWarningsService, MailKindsService, ImportsSettingsService, KanbanService, NavLayoutService, HistoricalWaiverService, SiteMasterService, SiteMasterColumnsService, StructuralFreezeService, UiIdentityService, SettingsScreensService, P4cService, FleetService, LogsService, SecurityLogService, JobRunsService, MailService, IntegrityService, DashboardExtrasService,
       ScenarioService, // P1 (0052)
       ListCataloguesService,
       // P8 mails (MailPort) go through P9's mail outbox

@@ -2,6 +2,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ApiError } from '@/api/client';
+import { InlinePanel } from './InlinePanel';
 
 /** Message for a failed call: a specific text for known problem codes, else the generic one. */
 export function errText(e: unknown, t: (k: string) => string) {
@@ -14,13 +15,14 @@ export function errText(e: unknown, t: (k: string) => string) {
 }
 
 /** Dialog with an optional mandatory reason (min 3 characters, as the contract says). `onSubmit` gets the trimmed reason. */
-export function FormDialog({ open, onClose, title, testid, children, onSubmit, submitLabel, busy, error, disabled, withReason = true, wide }: {
-  open: boolean; onClose: () => void; title: string; testid: string; children?: ReactNode; onSubmit: (reason: string) => void; submitLabel?: string; busy?: boolean; error?: string | null; disabled?: boolean; withReason?: boolean; wide?: boolean;
+export function FormDialog({ open, onClose, title, testid, children, onSubmit, submitLabel, busy, error, disabled, withReason = true, wide, inline }: {
+  open: boolean; onClose: () => void; title: string; testid: string; children?: ReactNode; onSubmit: (reason: string) => void; submitLabel?: string; busy?: boolean; error?: string | null; disabled?: boolean; withReason?: boolean; wide?: boolean; /** Settings, edit in place: render the form in the page (InlinePanel), not as a modal; same testids, same reason rule. */ inline?: boolean;
 }) {
   const { t } = useTranslation();
   const [reason, setReason] = useState('');
   const [touched, setTouched] = useState(false);
   const short = withReason && reason.trim().length < 3;
+  if (inline) return open ? <InlinePanel onClose={onClose} title={title} testid={testid} onSubmit={onSubmit} submitLabel={submitLabel} busy={busy} error={error} disabled={disabled} withReason={withReason}>{children}</InlinePanel> : null;
   return (
     <Dialog.Root open={open} onOpenChange={(o) => { if (!o) { setReason(''); setTouched(false); onClose(); } }}>
       <Dialog.Portal>

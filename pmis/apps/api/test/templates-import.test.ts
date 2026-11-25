@@ -103,7 +103,7 @@ describe('catalogue and download', () => {
 
   it('keeps the list fields as drop-downs and refuses a caller without the right (permission denied)', async () => {
     const t = await tplTeam(app, db, 'procurement', 'procurement', R);
-    const dl = await downloadTemplate(t.entry.api, 'TPL-PO');
+    const dl = await downloadTemplate(t.entry.api, 'TPL-PROCUREMENT');
     expect(dl.status).toBe(200);
     const wb = await load(dl.buffer);
     const lists = wb.getWorksheet('_lists')!;
@@ -117,14 +117,14 @@ describe('catalogue and download', () => {
 
     // no download right on templates: 403; no module right: 403; not an approved template: 404
     const noRight = await actor(app, db, { grants: [...G('procurement', 'view'), ...G('templates', 'view')], regions: [R], modules: null });
-    expect((await downloadTemplate(noRight.api, 'TPL-PO')).status).toBe(403);
+    expect((await downloadTemplate(noRight.api, 'TPL-PROCUREMENT')).status).toBe(403);
     const noModule = await actor(app, db, { grants: G('templates', 'view', 'download_documents'), regions: [R], modules: null });
-    const denied = await downloadTemplate(noModule.api, 'TPL-PO');
+    const denied = await downloadTemplate(noModule.api, 'TPL-PROCUREMENT');
     expect(denied.status).toBe(403);
     expect(denied.body).toMatchObject({ code: 'module_forbidden' });
     expect((await downloadTemplate(t.entry.api, 'TPL-NOPE')).status).toBe(404);
-    expect((await t.entry.api.raw('get', '/templates/TPL-PO/download')).status).toBe(200);
-    expect((await noRight.api.call('get', '/templates')).body.items.map((i: { template_id: string }) => i.template_id)).toEqual(['TPL-PO']);
+    expect((await t.entry.api.raw('get', '/templates/TPL-PROCUREMENT/download')).status).toBe(200);
+    expect((await noRight.api.call('get', '/templates')).body.items.map((i: { template_id: string }) => i.template_id)).toEqual(['TPL-PROCUREMENT']);
   });
 
   it('pre-fills the records in force, only inside the caller regions, and for one task site', async () => {
@@ -272,25 +272,25 @@ describe('upload: rejections are logged and make no batch', () => {
   it('reads a file of an older version by its column codes (a new column is no reason to refuse it), and a new download carries the new version', async () => {
     const admin = await plainAdmin(app, db);
     const before = await admin.api.call('get', '/templates');
-    const mtg = before.body.items.find((i: { template_id: string }) => i.template_id === 'TPL-MTG');
+    const mtg = before.body.items.find((i: { template_id: string }) => i.template_id === 'TPL-MEETINGS');
     const v0 = mtg.current_version as number;
-    const dl = await downloadTemplate(admin.api, 'TPL-MTG');
+    const dl = await downloadTemplate(admin.api, 'TPL-MEETINGS');
     expect(dl.status).toBe(200);
     // an admin adds a custom field that appears in templates: the next version is issued by the database
     const f = await db.query(`INSERT INTO field_definitions (entity_type, code, label_en, data_type, in_templates, is_active) VALUES ('meeting', 'tpl_probe_x', 'Probe field', 'text', true, true) RETURNING id`);
     try {
       const after = await admin.api.call('get', '/templates');
-      expect(after.body.items.find((i: { template_id: string }) => i.template_id === 'TPL-MTG').current_version).toBe(v0 + 1);
+      expect(after.body.items.find((i: { template_id: string }) => i.template_id === 'TPL-MEETINGS').current_version).toBe(v0 + 1);
       const res = await uploadFile(admin.api, dl.buffer);
       // 0095 (owner decision 2026-11-14): the older file is no longer refused for a new column; it is read by its column codes, and it only has no rows
       expect(res.status).toBe(422);
       expect(res.body).toMatchObject({ code: 'validation_failed' });
       // the new download carries the new column and the new version; the old version is retired
-      const fresh = await downloadTemplate(admin.api, 'TPL-MTG');
+      const fresh = await downloadTemplate(admin.api, 'TPL-MEETINGS');
       const wb = await load(fresh.buffer);
       expect(wb.getWorksheet('_tpl')!.getRow(2).getCell(2).value).toBe(v0 + 1);
       expect(wb.getWorksheet('Data')!.getRow(1).values).toContain('Probe field');
-      const states = await q<{ version: number; status: string }>(db, `SELECT version, status FROM templates WHERE template_id = 'TPL-MTG' ORDER BY version DESC LIMIT 2`);
+      const states = await q<{ version: number; status: string }>(db, `SELECT version, status FROM templates WHERE template_id = 'TPL-MEETINGS' ORDER BY version DESC LIMIT 2`);
       expect(states).toEqual([{ version: v0 + 1, status: 'active' }, { version: v0, status: 'retired' }]);
       // a file of the new version passes the template checks (it only has no rows)
       const empty = await uploadFile(admin.api, fresh.buffer);
@@ -298,14 +298,14 @@ describe('upload: rejections are logged and make no batch', () => {
       expect(empty.body).toMatchObject({ code: 'validation_failed' });
       // an unchanged field set issues no new version
       await db.query('SELECT tpl_sync_all()');
-      expect((await q<{ n: string }>(db, `SELECT count(*)::text AS n FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-MTG'`))[0]!.n).toBe(String(v0 + 1));
+      expect((await q<{ n: string }>(db, `SELECT count(*)::text AS n FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-MEETINGS'`))[0]!.n).toBe(String(v0 + 1));
     } finally {
       await db.query(`UPDATE field_definitions SET is_active = false WHERE id = $1`, [f.rows[0].id]);
     }
     // deactivating the field changed the set again: version v0 + 2, with the same columns as v0 but a new number
     const last = await admin.api.call('get', '/templates');
-    expect(last.body.items.find((i: { template_id: string }) => i.template_id === 'TPL-MTG').current_version).toBe(v0 + 2);
-    const au = await q(db, `SELECT 1 FROM audit_log WHERE action = 'template_version_issued' AND entity_id = 'TPL-MTG' AND (after ->> 'version')::int = $1`, [v0 + 1]);
+    expect(last.body.items.find((i: { template_id: string }) => i.template_id === 'TPL-MEETINGS').current_version).toBe(v0 + 2);
+    const au = await q(db, `SELECT 1 FROM audit_log WHERE action = 'template_version_issued' AND entity_id = 'TPL-MEETINGS' AND (after ->> 'version')::int = $1`, [v0 + 1]);
     expect(au).toHaveLength(1);
   });
 });
@@ -642,12 +642,12 @@ describe('a register without a site, and custom fields', () => {
       const c = await db.query(`INSERT INTO matrix_cells (register_key, level, rule, is_global, updated_at) VALUES ('meetings', $1, 'any_one', true, now()) RETURNING id`, [level]);
       await db.query(`INSERT INTO matrix_cell_assignees (cell_id, kind, ref_id) VALUES ($1, 'user', $2)`, [c.rows[0].id, user]);
     }
-    const before = (await entry.api.call('get', '/templates')).body.items.find((i: { template_id: string }) => i.template_id === 'TPL-MTG').current_version as number;
+    const before = (await entry.api.call('get', '/templates')).body.items.find((i: { template_id: string }) => i.template_id === 'TPL-MEETINGS').current_version as number;
     const f = await db.query(`INSERT INTO field_definitions (entity_type, code, label_en, data_type, in_templates, is_active) VALUES ('meeting', 'probe_note', 'Probe note', 'text', true, true) RETURNING id`);
     try {
-      const now = (await entry.api.call('get', '/templates')).body.items.find((i: { template_id: string }) => i.template_id === 'TPL-MTG').current_version as number;
+      const now = (await entry.api.call('get', '/templates')).body.items.find((i: { template_id: string }) => i.template_id === 'TPL-MEETINGS').current_version as number;
       expect(now).toBe(before + 1);
-      const dl = await downloadTemplate(entry.api, 'TPL-MTG');
+      const dl = await downloadTemplate(entry.api, 'TPL-MEETINGS');
       const headers = (await load(dl.buffer)).getWorksheet('Data')!.getRow(1).values as string[];
       expect(headers).toEqual(expect.arrayContaining(['Date', 'Title', 'Probe note', 'Record ID']));
       expect(headers).not.toContain('Site ID');                                // no site column for a register without a site
@@ -673,7 +673,7 @@ describe('a register without a site, and custom fields', () => {
     } finally {
       await db.query(`UPDATE field_definitions SET is_active = false WHERE id = $1`, [f.rows[0].id]);
     }
-    expect(((await entry.api.call('get', '/templates')).body.items.find((i: { template_id: string }) => i.template_id === 'TPL-MTG').current_version as number)).toBe(before + 2);
+    expect(((await entry.api.call('get', '/templates')).body.items.find((i: { template_id: string }) => i.template_id === 'TPL-MEETINGS').current_version as number)).toBe(before + 2);
   });
 });
 
@@ -704,7 +704,7 @@ describe('the database', () => {
     const cur = await q<{ template_id: string; n: string }>(db, `SELECT d.template_id, count(*) FILTER (WHERE v.is_current)::text AS n FROM template_definitions d JOIN template_versions v ON v.template_def_id = d.id GROUP BY 1`);
     expect(cur.length).toBeGreaterThanOrEqual(16);
     expect(cur.every((c) => c.n === '1')).toBe(true);
-    const v = await q<{ columns: { header: string }[]; header_checksum: string }>(db, `SELECT v.columns, v.header_checksum FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-PRM' AND v.is_current`);
+    const v = await q<{ columns: { header: string }[]; header_checksum: string }>(db, `SELECT v.columns, v.header_checksum FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-PERMITS' AND v.is_current`);
     expect(sha(v[0]!.columns.map((c) => c.header).join('\u001f'))).toBe(v[0]!.header_checksum);
   });
 });
@@ -746,7 +746,7 @@ describe('Procurement template carries the assignment members (Q519)', () => {
     const m1 = await actor(app, db, { regions: [R], modules: null });
     const m2 = await actor(app, db, { regions: [R], modules: null });
     const H2 = { site: 'Site ID', scope: 'Scope', delivery: 'Delivery', status: 'Order Status', start: 'Planned start', end: 'Planned end', members: 'Members (engineers)' };
-    const dl = await downloadTemplate(t.entry.api, 'TPL-PO');
+    const dl = await downloadTemplate(t.entry.api, 'TPL-PROCUREMENT');
     const base = { [H2.scope]: 'Survey', [H2.delivery]: 'In-House', [H2.status]: 'Open', [H2.start]: '2026-11-10', [H2.end]: '2026-11-12' };
     const sites = [t.site, await makeSite(db, R, { prefix: 'TPLM' }), await makeSite(db, R, { prefix: 'TPLM' }), await makeSite(db, R, { prefix: 'TPLM' })];
     const filled = await fillTemplate(dl.buffer, [

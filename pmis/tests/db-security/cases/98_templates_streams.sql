@@ -111,7 +111,7 @@ SELECT imp_stage_task_row('[]'::jsonb, '{}'::jsonb, NULL, NULL, NULL, NULL, NULL
 -- @actor ALICE
 -- @region 1
 -- @expect error 42501 permission denied for function
-SELECT imp_insert_task_batch((SELECT id FROM template_versions WHERE is_current LIMIT 1), 'TPL-SITE-CW', 'CW', 'x.xlsx', 'x', NULL, 'Data', '[]'::jsonb, NULL, NULL, 'template');
+SELECT imp_insert_task_batch((SELECT id FROM template_versions WHERE is_current LIMIT 1), 'TPL-CIVIL', 'CW', 'x.xlsx', 'x', NULL, 'Data', '[]'::jsonb, NULL, NULL, 'template');
 -- @end
 
 -- @case TS-13
@@ -138,7 +138,7 @@ SELECT imp_decide_stream_batch('{{BATCH_STREAM_TRI}}', NULL, 'approve', 'all', N
 -- @actor ALICE
 -- @region 1
 -- @expect error 42501 permission denied for function
-SELECT imp_stage_stream_batch('TPL-SITE-CW', 1, NULL, 'x.xlsx', 'x', NULL, '[]'::jsonb, NULL, NULL, NULL, NULL);  -- 0060 signature
+SELECT imp_stage_stream_batch('TPL-CIVIL', 1, NULL, 'x.xlsx', 'x', NULL, '[]'::jsonb, NULL, NULL, NULL, NULL);  -- 0060 signature
 -- @end
 
 -- @case TS-16
@@ -147,7 +147,7 @@ SELECT imp_stage_stream_batch('TPL-SITE-CW', 1, NULL, 'x.xlsx', 'x', NULL, '[]':
 -- @actor ALICE
 -- @region 1
 -- @expect error 42501 permission denied for function
-SELECT tpl_sync('TPL-SITE-CW', 'forged');
+SELECT tpl_sync('TPL-CIVIL', 'forged');
 -- @end
 
 -- @case TS-17
@@ -165,7 +165,7 @@ SELECT wf_step(gen_random_uuid(), 1, 'submit', '{{ALICE}}', NULL, 'open', 'entry
 -- @actor ALICE
 -- @region 1
 -- @expect error P0001 outdated_version
-SELECT imp_stage_batch('TPL-SITE-CW', 0, repeat('0', 64), 'x.xlsx', 'x', NULL, '[]'::jsonb);
+SELECT imp_stage_batch('TPL-CIVIL', 0, repeat('0', 64), 'x.xlsx', 'x', NULL, '[]'::jsonb);
 -- @end
 
 -- @case TS-19
@@ -174,8 +174,8 @@ SELECT imp_stage_batch('TPL-SITE-CW', 0, repeat('0', 64), 'x.xlsx', 'x', NULL, '
 -- @actor ALICE
 -- @region 1
 -- @expect error P0001 checksum_mismatch
-SELECT imp_stage_batch('TPL-SITE-CW',
-  (SELECT d.current_version FROM template_definitions d WHERE d.template_id = 'TPL-SITE-CW'), repeat('0', 64), 'x.xlsx', 'x', NULL, '[]'::jsonb);
+SELECT imp_stage_batch('TPL-CIVIL',
+  (SELECT d.current_version FROM template_definitions d WHERE d.template_id = 'TPL-CIVIL'), repeat('0', 64), 'x.xlsx', 'x', NULL, '[]'::jsonb);
 -- @end
 
 -- @case TS-20
@@ -184,9 +184,9 @@ SELECT imp_stage_batch('TPL-SITE-CW',
 -- @actor ALICE
 -- @region 1
 -- @expect error P0001 import_not_allowed
-SELECT imp_stage_batch('TPL-SITE-CW',
-  (SELECT d.current_version FROM template_definitions d WHERE d.template_id = 'TPL-SITE-CW'),
-  (SELECT v.header_checksum FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-SITE-CW' AND v.is_current),
+SELECT imp_stage_batch('TPL-CIVIL',
+  (SELECT d.current_version FROM template_definitions d WHERE d.template_id = 'TPL-CIVIL'),
+  (SELECT v.header_checksum FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-CIVIL' AND v.is_current),
   'x.xlsx', 'x', NULL, '[]'::jsonb);
 -- @end
 
@@ -194,7 +194,7 @@ SELECT imp_stage_batch('TPL-SITE-CW',
 -- @title An anonymous session stages a stream file
 -- @category templates-streams
 -- @expect error 42501 no signed-in actor
-SELECT imp_stage_batch('TPL-SITE-CW', 1, repeat('0', 64), 'x.xlsx', 'x', NULL, '[]'::jsonb);
+SELECT imp_stage_batch('TPL-CIVIL', 1, repeat('0', 64), 'x.xlsx', 'x', NULL, '[]'::jsonb);
 -- @end
 
 -- @case TS-22
@@ -230,7 +230,7 @@ SELECT imp_stage_master('TPL-MASTER',
 -- @actor ALICE
 -- @region 1
 -- @expect error P0001 template does not exist
-SELECT imp_stage_master('TPL-SITE-CW', 1, 'x.xlsx', 'x', '[]'::jsonb);
+SELECT imp_stage_master('TPL-CIVIL', 1, 'x.xlsx', 'x', '[]'::jsonb);
 -- @end
 
 -- @case TS-26
@@ -320,7 +320,7 @@ SELECT count(*) FROM master_columns;
 -- @actor BOB
 -- @region 1
 -- @expect output 5
-SELECT count(*) FROM templates WHERE status = 'active' AND template_id IN ('TPL-SITE-DA', 'TPL-SITE-CW', 'TPL-SITE-TE', 'TPL-SITE-CL', 'TPL-MASTER');
+SELECT count(*) FROM templates WHERE status = 'active' AND template_id IN ('TPL-DESIGN-ACQ', 'TPL-CIVIL', 'TPL-INSTALL', 'TPL-CLOSURE', 'TPL-MASTER');
 -- @end
 
 -- @case TS-36

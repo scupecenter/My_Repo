@@ -4,7 +4,7 @@ import { login } from './helpers';
 // These specs drive the list grid; the site page opens on the Excel-like row by default (2026-11-08).
 test.beforeEach(async ({ page }) => { await page.addInitScript(() => { if (!localStorage.getItem('pmis.site.layout')) localStorage.setItem('pmis.site.layout', '"list"'); }); });
 
-// Site Register streams (owner decision 2026-11-15: the sidebar shows only the six SITE 360 sub-menus under Site Master; the stream filter is reached by its old URL, ?stream=).
+// Site Register streams (owner decision 2026-11-15: the sidebar shows only the six Site Master sub-menus under Site Master; the stream filter is reached by its old URL, ?stream=).
 // EN/light and AR/dark (RTL, dark tokens), against the mock layer.
 const CASES = [
   { locale: 'en', theme: 'light', title: 'Site Master', cw: 'Civil Works', cwMenu: 'CW', dismantle: 'Dismantle', na: /Show N\/A sites \(\d+\)/,
@@ -24,10 +24,10 @@ for (const c of CASES) {
     await expect(page.getByTestId('nav-group-toggle-site_register')).toHaveCount(0); // the one Site Master row is the entry itself
     await expect(page.getByTestId('nav-sites')).toHaveText(c.title);
 
-    // the page has no tab bars; the sidebar shows the six SITE 360 sub-menus and no stream links
+    // the page has no tab bars; the sidebar shows the six Site Master sub-menus and no stream links
     await expect(page.getByTestId('stream-tabs')).toHaveCount(0);
     await expect(page.getByTestId('view-tabs')).toHaveCount(0);
-    await expect(page.getByTestId('nav-site360-cw')).toHaveText(c.cwMenu);
+    await expect(page.getByTestId('nav-site-master-cw')).toHaveText(c.cwMenu);
     await expect(page.locator('[data-testid^="nav-sites-stream-"]')).toHaveCount(0);
     await expect(page.getByTestId('nav-dismantle')).toHaveText(c.dismantle);
 
@@ -79,13 +79,13 @@ for (const c of VIEW_CASES) {
     await page.getByTestId('nav-sites').click();
     await expect(page.getByTestId('view-tabs')).toHaveCount(0);
 
-    // O&M from the sidebar: the menu opens its SITE 360 section (the normal list, no grid since 2026-11-22), is highlighted and named in the title
-    await page.getByTestId('nav-site360-om').click();
+    // O&M from the sidebar: the menu opens its Site Master section (the normal list, no grid since 2026-11-22), is highlighted and named in the title
+    await page.getByTestId('nav-site-master-om').click();
     await expect(page.getByTestId('sites-list')).toBeVisible();
-    await expect(page.getByTestId('site360-grid')).toHaveCount(0);
+    await expect(page.getByTestId('site-master-grid')).toHaveCount(0);
     await expect(page.getByRole('heading', { level: 1 })).toContainText(c.om);
-    await expect(page.getByTestId('nav-site360-om')).toHaveAttribute('aria-current', 'page');
-    await expect(page.getByTestId('nav-site360-om')).toHaveText(c.om);
+    await expect(page.getByTestId('nav-site-master-om')).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByTestId('nav-site-master-om')).toHaveText(c.om);
     await expect(page.locator('[data-testid^="nav-sites-view-"]')).toHaveCount(0);
 
     // an old ?view=TE link (history navigation inside the app) still opens the TE view

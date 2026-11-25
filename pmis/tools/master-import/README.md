@@ -6,7 +6,7 @@ Python 3 and `openpyxl` only (`pip install openpyxl`). Run it on your own comput
 
 ## Step by step
 
-1. **Download blank templates** from GSDN Workspace (Templates page): TPL-RF, TPL-ACQ, TPL-PRM, TPL-PO, TPL-GECOL, TPL-HLC, TPL-ASB, TPL-RSK, as many as you want to load. Do not edit them. A template that already has rows, or whose header row was changed, is refused.
+1. **Download blank templates** from GSDN Workspace (Templates page): TPL-RF, TPL-ACQUISITION, TPL-PERMITS, TPL-PROCUREMENT, TPL-GECOL, TPL-HLC, TPL-AS-BUILT, TPL-RISKS, as many as you want to load. Do not edit them. A template that already has rows, or whose header row was changed, is refused.
 2. **Save the Master as `.xlsx`** (values only, no macros). If Excel shows an external link, break it first (Data, Edit Links, Break Link). The tool does not follow links either way.
 3. **Run the tool** with a new, empty output folder:
 
@@ -14,7 +14,7 @@ Python 3 and `openpyxl` only (`pip install openpyxl`). Run it on your own comput
    python3 -I tools/master-import/fill-templates.py \
        --master /path/to/Master.xlsx \
        --out /path/to/filled \
-       /path/to/TPL-RF.xlsx /path/to/TPL-ACQ.xlsx /path/to/TPL-PRM.xlsx
+       /path/to/TPL-RF.xlsx /path/to/TPL-ACQUISITION.xlsx /path/to/TPL-PERMITS.xlsx
    ```
 
    Options: `--month-first` (read ambiguous text dates as mm/dd/yyyy; the default is day first, dd/mm/yyyy), `--include-personal` (see "Personal data" below), `--maps DIR` (another mapping folder), `--master-sheet`, `--master-site-col`, `--master-first-row` (where the valid Site IDs are, default sheet `Master`, column B, row 5), `--no-site-check`.

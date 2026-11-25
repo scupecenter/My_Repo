@@ -158,7 +158,7 @@ const stageNa = (r: StageRow): boolean => (r.has_ms && r.ms_na && !r.ms_done) ||
 /**
  * The per-site stage summary the stage, mine, late, waiting and closed filters read: `flags` (one row per active stage of a site, with its task counts) and
  * `ss` (one row per site: the current stage, late and waiting counts, next due date), over a CTE `vis` of sites (columns s.id and s.workflow_version_id).
- * Shared by GET /sites and GET /site360/{menu}/rows (0.15.50), so the two lists mean the same by "stage", "mine" and "late".
+ * Shared by GET /sites and GET /site-master/{menu}/rows (0.15.50), so the two lists mean the same by "stage", "mine" and "late".
  */
 export const siteStageCtes = (stream?: string, view?: string): Prisma.Sql => Prisma.sql`flags AS (
         SELECT s.id AS site_id, st.code, st.seq, a.late, a.waiting, a.next_due,
@@ -202,7 +202,7 @@ export function siteStageIds(userId: string, f: SiteStageFilter): Prisma.Sql | n
     SELECT vis.id FROM vis LEFT JOIN ss ON ss.site_id = vis.id WHERE ${Prisma.join(conds, ' AND ')}`;
 }
 
-/** The workflow locks (`locked`, `open`) and data gaps (`with`, `without`) filters on a sites row aliased `s`; shared by GET /sites and GET /site360/{menu}/rows (0.15.50). */
+/** The workflow locks (`locked`, `open`) and data gaps (`with`, `without`) filters on a sites row aliased `s`; shared by GET /sites and GET /site-master/{menu}/rows (0.15.50). */
 export function siteLocksGapsConds(locks?: string, gaps?: string): Prisma.Sql[] {
   const out: Prisma.Sql[] = [];
   if (locks) out.push(Prisma.sql`s.workflow_locks = ${locks === 'locked'}`);

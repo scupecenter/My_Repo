@@ -15,7 +15,7 @@ const COUNTERS_MOCK = {
 
   ],
   pending_kpis: [] as string[],
-  site360_menus: [
+  site_master_menus: [
     { code: 'CW', name_en: 'Civil Works', name_ar: 'الأعمال المدنية', sites: 96 },
     { code: 'TE', name_en: 'Installation (TE)', name_ar: 'التركيبات', sites: 88 },
     { code: 'OM', name_en: 'O&M', name_ar: 'التشغيل والصيانة', sites: 40 },

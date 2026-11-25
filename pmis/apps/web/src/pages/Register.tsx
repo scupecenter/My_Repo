@@ -2,10 +2,7 @@ import {
   ArrowRightLeft,
   Columns3,
   Download,
-  FileDown,
-  FileSpreadsheet,
-  FileUp,
-  ListChecks,
+  Grid3x3,
   Lock,
   Map as MapIcon,
   Plus,
@@ -41,7 +38,9 @@ import { decodeFilter, encodeFilter, type FilterTree } from "@/api/views";
 import { useRegions } from "@/api/sites";
 import type { ExtraField } from "@/components/UnifiedFilter";
 import type { RegisterDefinition, RegisterRecord } from "@/api/types";
-import { ExportViewButton } from "@/components/ExportDialog";
+import { TemplateExportMenu } from "@/components/TemplateExportMenu";
+import { ViewMenu, type ViewOption } from "@/components/ViewMenu";
+import { useRememberedView } from "@/lib/viewPreference";
 import { GridCellEditor, INLINE_TYPES } from "@/components/GridCellEditor";
 import { RegisterGrid } from "@/components/RegisterGrid";
 import { RejectDialog } from "@/components/RejectDialog";
@@ -65,6 +64,8 @@ import {
   type RegisterLayout,
 } from "@/components/RegisterViews";
 import { useToast } from "@/components/Toast";
+import { BatchEditBar } from "@/components/BatchEditBar";
+import { useBatchEdit } from "@/lib/useBatchEdit";
 import { MoreMenu, PageHeader } from "@/components/PageHeader";
 import { DisplayMenu, displayAttrs, PastedChip, ROWNO_COL, RowNo, SearchBox, ShownFooter, TableCount, TableToolbar } from "@/components/TableStandard";
 import type { CountedPage } from "@/api/types";
@@ -211,6 +212,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
     ...(adv ? { filter: adv } : {}),
   });
   const save = useUpdateRecord(key);
+  const batch = useBatchEdit<RegisterRecord>(key, true, () => toast(t("batchedit.resumed")));
   // 0.15.22: a System Admin edits a locked row or column (the database exempts admins too); everyone else sees it read-only.
   const me = useMe(true).data;
   const admin = !!me?.is_system_admin;
@@ -281,9 +283,23 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
       },
       { replace: true },
     );
-  // the switcher of Site Master: a layout button opens its layout, pressed again it returns to the list
-  const toggleLayout = (x: RegisterLayout) =>
-    setParams({ layout: layout === x ? "" : x });
+  // One View menu replaces the row of layout buttons: list, wide table, grid, board and (where the records carry a site) map. The choice is kept per
+  // user and register on the server (lib/viewPreference).
+  const viewOptions: ViewOption[] = [
+    { id: "list", label: t("view.list"), hint: t("view.list_hint"), icon: <Table2 size={14} />, testid: "register-layout-list" },
+    { id: "wide", label: t("sites.wide"), hint: t("view.wide_hint"), icon: <TableProperties size={14} />, testid: "register-layout-wide" },
+    { id: "grid", label: t("view.grid"), hint: t("view.grid_hint"), icon: <Grid3x3 size={14} />, testid: "register-layout-grid" },
+    { id: "board", label: t("board.board"), hint: t("view.board_hint"), icon: <Columns3 size={14} />, testid: "register-layout-board" },
+    ...(layouts.includes("map") ? [{ id: "map", label: t("sites.map"), hint: t("view.map_hint"), icon: <MapIcon size={14} />, testid: "register-layout-map" }] : []),
+  ];
+  const applyView = (id: string) => setParams({ view: id === "grid" ? "grid" : "", layout: id === "grid" || id === "list" ? "" : id });
+  const remember = useRememberedView(
+    `register-${key}`,
+    sp.has("layout") || sp.has("view"),
+    (l) => viewOptions.some((o) => o.id === l),
+    applyView,
+  );
+  const pickView = (id: string) => { applyView(id); remember(id); };
   const rname = (id?: number | null) => {
     const r = regions.data?.find((x) => x.id === id);
     return (i18n.language === "ar" && r?.name_ar) || r?.name_en || "-";
@@ -653,69 +669,13 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
           </span>
         }
         switcher={
-          view === "vertical" ? (
-            <>
-              {layouts.includes("map") && (
-                <button
-                  type="button"
-                  className="btn px-2 py-1 text-xs"
-                  data-testid="register-layout-map"
-                  aria-pressed={layout === "map"}
-                  onClick={() => toggleLayout("map")}
-                >
-                  {layout === "map" ? (
-                    <>
-                      <Table2 size={14} />
-                      {t("sites.table")}
-                    </>
-                  ) : (
-                    <>
-                      <MapIcon size={14} />
-                      {t("sites.map")}
-                    </>
-                  )}
-                </button>
-              )}
-              <button
-                type="button"
-                className="btn px-2 py-1 text-xs"
-                data-testid="register-layout-board"
-                aria-pressed={layout === "board"}
-                onClick={() => toggleLayout("board")}
-              >
-                {layout === "board" ? (
-                  <>
-                    <Table2 size={14} />
-                    {t("sites.table")}
-                  </>
-                ) : (
-                  <>
-                    <Columns3 size={14} />
-                    {t("board.board")}
-                  </>
-                )}
-              </button>
-              <button
-                type="button"
-                className="btn px-2 py-1 text-xs"
-                data-testid="register-layout-wide"
-                aria-pressed={layout === "wide"}
-                onClick={() => toggleLayout("wide")}
-              >
-                {layout === "wide" ? (
-                  <>
-                    <Table2 size={14} />
-                    {t("sites.table")}
-                  </>
-                ) : (
-                  <>
-                    <TableProperties size={14} />
-                    {t("sites.wide")}
-                  </>
-                )}
-              </button>
-            </>
-          ) : undefined
+          <ViewMenu
+            testid="register-view"
+            title={t("view.title")}
+            value={view === "grid" ? "grid" : layout}
+            options={viewOptions}
+            onChange={pickView}
+          />
         }
         primary={
           <button
@@ -731,9 +691,15 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
         columns={view === "vertical" ? <ColumnMenu api={tbl} label={label} /> : undefined}
         display={view === "vertical" ? <DisplayMenu api={tbl} /> : undefined}
         exporter={
-            <ExportViewButton
-              testid="register-export"
+            <TemplateExportMenu
+              testid="register-tools"
+              exportTestid="register-export"
               source={key}
+              hasTemplate={!!tpl}
+              onBlank={() => void down(false)}
+              onFilled={() => void down(true)}
+              onUpload={() => setUploading(true)}
+              onBatches={() => nav(`/templates?register=${key}`)}
               filters={Object.fromEntries(
                 Object.entries({ ...f, ...(adv ? { filter: adv } : {}) }).filter(([, x]) => x),
               )}
@@ -751,37 +717,6 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
         more={
             <MoreMenu
               items={[
-                {
-                  id: "tpl-down",
-                  label: t("registers.template_download"),
-                  icon: <FileDown size={16} />,
-                  testid: "register-template-download",
-                  disabled: !tpl,
-                  onSelect: () => void down(false),
-                },
-                {
-                  id: "tpl-prefill",
-                  label: t("registers.template_prefill"),
-                  icon: <FileSpreadsheet size={16} />,
-                  testid: "register-template-prefill",
-                  disabled: !tpl,
-                  onSelect: () => void down(true),
-                },
-                {
-                  id: "tpl-up",
-                  label: t("registers.template_upload"),
-                  icon: <FileUp size={16} />,
-                  testid: "register-template-upload",
-                  disabled: !tpl,
-                  onSelect: () => setUploading(true),
-                },
-                {
-                  id: "tpl-batches",
-                  label: t("registers.template_batches"),
-                  icon: <ListChecks size={16} />,
-                  testid: "register-template-batches",
-                  onSelect: () => nav(`/templates?register=${key}`),
-                },
                 ...(key === "as_built"
                   ? [
                       {
@@ -903,14 +838,31 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
                 field={fc}
                 value={r.data[fc.code]}
                 onClose={() => setEditing(null)}
-                onSave={(v) =>
+                onSave={(v) => {
+                  const before = r.data[fc.code];
                   save.mutate(
                     { record: r, patch: { data: { [fc.code]: v } } },
                     {
                       onError: (e) => toast(registerErrorMessage(t, e), "err"),
+                      // undo for 8 seconds: the same edit path puts the old value back (same permissions and rules; the server may refuse it)
+                      onSuccess: (saved) =>
+                        toast(t("registers.inline_saved"), "ok", {
+                          ms: 8000,
+                          action: {
+                            label: t("common.undo"),
+                            onClick: () =>
+                              save.mutate(
+                                { record: saved, patch: { data: { [fc.code]: before ?? null } } },
+                                {
+                                  onSuccess: () => toast(t("registers.inline_undone")),
+                                  onError: (e) => toast(registerErrorMessage(t, e), "err"),
+                                },
+                              ),
+                          },
+                        }),
                     },
-                  )
-                }
+                  );
+                }}
               />
             );
           }}
@@ -919,15 +871,56 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
       {view === "vertical" && (
         <>
           {layout === "wide" && (
+            <div className="mb-2 space-y-2">
+              {!batch.on ? (
+                <button type="button" className="btn" data-testid="batch-start" onClick={() => batch.setOn(true)}>{t("batchedit.start")}</button>
+              ) : (
+                <BatchEditBar
+                  draft={batch.draft}
+                  results={batch.results}
+                  busy={batch.busy}
+                  fieldLabel={(c) => { const f = def.fields.find((x) => x.code === c); return f ? fieldLabel(f, i18n.language) : c; }}
+                  valueText={(_c, v) => (v === null || v === undefined ? "" : String(v))}
+                  onSave={() => void batch.saveAll((id) => real.find((x) => x.id === id), (r, data) => save.mutateAsync({ record: r, patch: { data } }), (e) => registerErrorMessage(t, e)).then((out) => { const ok = out.filter((o) => o.status === "saved").length; if (ok) toast(t("batchedit.saved_n", { count: ok })); })}
+                  onDiscard={batch.discard}
+                  onExit={() => batch.setOn(false)}
+                />
+              )}
+            </div>
+          )}
+          {layout === "wide" && (
             <RegisterWide
               def={def}
               records={real}
               admin={admin}
               regionName={(id) => rname(id as number | null)}
               onOpen={setRecord}
-              onSave={(r, code, value) =>
-                save.mutateAsync({ record: r, patch: { data: { [code]: value } } })
-              }
+              pending={batch.on ? Object.fromEntries(Object.entries(batch.draft.changes).map(([id, r]) => [id, r.set])) : undefined}
+              onSave={async (r, code, value) => {
+                const before = r.data[code];
+                if (batch.on) {
+                  // batch mode: the edit waits in the draft; nothing is saved until Save all
+                  batch.edit(r, r.site_code ?? r.id.slice(0, 8), code, before, value);
+                  return null;
+                }
+                const saved = await save.mutateAsync({ record: r, patch: { data: { [code]: value } } });
+                // undo for 8 seconds: the same edit path puts the old value back (the server may refuse it)
+                toast(t("registers.inline_saved"), "ok", {
+                  ms: 8000,
+                  action: {
+                    label: t("common.undo"),
+                    onClick: () =>
+                      save.mutate(
+                        { record: saved, patch: { data: { [code]: before ?? null } } },
+                        {
+                          onSuccess: () => toast(t("registers.inline_undone")),
+                          onError: (e) => toast(registerErrorMessage(t, e), "err"),
+                        },
+                      ),
+                  },
+                });
+                return saved;
+              }}
               errorText={(e) => registerErrorMessage(t, e)}
               display={tbl.display}
               height={Math.max(320, (typeof window === "undefined" ? 800 : window.innerHeight) - 260)}

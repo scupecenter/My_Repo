@@ -49,7 +49,7 @@ export interface FilterField {
   /** 0.15.45: `options` holds the first values only (the data has more than the cap). */
   truncated?: boolean;
   group?: FilterGroupInfo;
-  /** 0.15.45 (site360-<menu>): the JOIN the expression needs (one derived table per Master column used), added to the FROM clause by the list. */
+  /** 0.15.45 (site-master-<menu>): the JOIN the expression needs (one derived table per Master column used), added to the FROM clause by the list. */
   join?: Prisma.Sql;
   /** The SQL of the field, built in this repository from fixed aliases; a field code inside it is a bound parameter. */
   expr: Prisma.Sql;

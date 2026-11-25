@@ -149,6 +149,7 @@ export class DashboardExtrasService {
         sla_totals: null,
         sla_by_stage: null,
         sites_total: null,
+        site_master_menus: null,
         site360_menus: null,
       },
       decisions: risk
@@ -283,7 +284,7 @@ export class DashboardExtrasService {
     const breachTotal = sla_by_stage.reduce((a, r) => a + r.breach, 0);
     const atRiskTotal = sla_by_stage.reduce((a, r) => a + r.at_risk, 0);
     const src = await this.counterSources(siteWhere, reg, cfg);
-    const site360_menus = await this.site360Menus(siteWhere);
+    const site_master_menus = await this.siteMasterMenus(siteWhere);
     const values: Record<string, number | null> = {
       sla_breach: sharePct(breachTotal, openTotal),
       sla_at_risk: sharePct(atRiskTotal, openTotal),
@@ -319,7 +320,8 @@ export class DashboardExtrasService {
       },
       sla_by_stage,
       sites_total: Number(siteRows[0]?.n ?? 0),
-      site360_menus,
+      site_master_menus,
+      site360_menus: site_master_menus, // deprecated name, one release (0.15.75)
     };
   }
 
@@ -456,11 +458,11 @@ export class DashboardExtrasService {
   }
 
   /**
-   * F20 (migration 0113, contract 0.15.29): the sites per SITE 360 menu. The menus are the views of the workflow (workflow_views, migration 0023:
+   * F20 (migration 0113, contract 0.15.29): the sites per Site Master menu. The menus are the views of the workflow (workflow_views, migration 0023:
    * CW, TE, OM); a site is in a view when it has a task of the view that is not n/a or skipped. "All sites" is sites_total of the counters.
    * Design & Acquisition, Handover & Closure and Dismantle have no view in the schema, so they are not counted.
    */
-  private async site360Menus(siteWhere: Prisma.Sql) {
+  private async siteMasterMenus(siteWhere: Prisma.Sql) {
     const views = await this.db.tx.$queryRaw<
       {
         code: string;

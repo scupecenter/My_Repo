@@ -1,14 +1,16 @@
-import { Lock, Plus } from 'lucide-react';
-import { useState } from 'react';
+import { Lock, Pencil, Plus } from 'lucide-react';
+import { Fragment, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { ApiError } from '@/api/client';
 import { useMe } from '@/api/hooks';
+import { useRegisterRecord, useUpdateRecord } from '@/api/registers';
 import { useRegions } from '@/api/sites';
-import type { StockLevel, WarehouseItem } from '@/api/types';
-import { useConfigGaps, useDispatchList, useMovements, useQuarantineExit, useSaveItem, useStock, useWhItems, type QuarantineExitBody } from '@/api/warehouse';
+import type { StockLevel, StockMovement, WarehouseItem } from '@/api/types';
+import { useConfigGaps, useDispatchList, useMovements, useQuarantineExit, useReverseMovement, useSaveItem, useStock, useWhItems, type QuarantineExitBody } from '@/api/warehouse';
 import { NEED_TONE } from '@/components/SiteDispatch';
 import { errText, FormDialog } from '@/components/FormDialog';
+import { InlinePanel } from '@/components/InlinePanel';
 import { useToast } from '@/components/Toast';
 import { hasGrant, isAdmin } from '@/lib/perm';
 import { registerErrorMessage } from '@/lib/registerErrors';
@@ -149,6 +151,8 @@ function Movements() {
   const { t } = useTranslation();
   const [status, setStatus] = useState('');
   const list = useMovements(status);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [reversing, setReversing] = useState<string | null>(null);
   // DN and RN, and the quarantine exits (Q270); the other documents (PL, OPEN, ADJ) have no site and are kept in the register.
   const items = (list.data?.items ?? []).filter((m) => m.kind === 'issue' || m.kind === 'return' || m.kind === 'quarantine_exit');
   return (
@@ -160,15 +164,23 @@ function Movements() {
       </div>
       <div className="card overflow-x-auto">
         <table className="w-full text-sm">
-          <thead><tr className="border-b border-line bg-card2 text-mute">{['doc_no', 'type', 'site', 'qty', 'status'].map((c) => <th key={c} className="px-3 py-2 text-start font-semibold">{t(`wh.${c}`)}</th>)}</tr></thead>
+          <thead><tr className="border-b border-line bg-card2 text-mute">{['doc_no', 'type', 'site', 'qty', 'status'].map((c) => <th key={c} className="px-3 py-2 text-start font-semibold">{t(`wh.${c}`)}</th>)}<th className="px-3 py-2" /></tr></thead>
           <tbody data-testid="wh-movement-list">
             {items.map((m) => (
-              <tr key={m.id} data-testid={`wh-mv-${m.doc_no ?? m.id}`} data-status={m.status} className="border-b border-line">
+              <Fragment key={m.id}>
+              <tr data-testid={`wh-mv-${m.doc_no ?? m.id}`} data-status={m.status} className="border-b border-line">
                 <td className="mono px-3 py-2 font-bold">{m.register_record_id ? <Link className="underline" to={`/registers/warehouse?record=${m.register_record_id}`}>{m.doc_no ?? '—'}</Link> : (m.doc_no ?? '—')}</td>
                 <td className="px-3 py-2">{(m.record_type ?? m.kind).toUpperCase()}{m.exit_kind && <span className="chip ms-2 bg-waitBg font-normal text-waitInk" data-testid={`wh-mv-exit-${m.doc_no ?? m.id}`} title={m.exit_reason ?? undefined}>{t(`wh.qx_${m.exit_kind}`)}</span>}{m.doc_no_locked && <Lock size={12} className="ms-1 inline text-mute" aria-label={t('wh.locked_hint')} data-testid={`wh-mv-locked-${m.doc_no ?? m.id}`} />}</td><td className="px-3 py-2">{m.site_code ?? '—'}</td>
                 <td className="px-3 py-2">{m.lines.reduce((a, l) => a + l.qty, 0)}</td>
                 <td className="px-3 py-2"><span className={`chip ${TONE[m.status]}`} data-testid={`wh-mv-status-${m.doc_no ?? m.id}`}>{t(`wh.st_${m.status}`)}</span></td>
+                <td className="px-3 py-2 text-end">{m.register_record_id && (m.status === 'pending'
+                  ? <button className="btn" data-testid={`wh-mv-edit-open-${m.doc_no ?? m.id}`} onClick={() => setEditing(m.id)}><Pencil size={14} />{t('wh.mv_edit')}</button>
+                  : <span className="inline-flex items-center gap-1 text-xs text-mute" data-testid={`wh-mv-lock-${m.doc_no ?? m.id}`} title={t(`wh.mv_locked_${m.status}`, { defaultValue: '' })}><Lock size={12} />{t(m.status === 'posted' ? 'wh.mv_locked_posted' : 'wh.mv_locked_cancelled')}</span>)}
+                  {m.status === 'posted' && m.site_id && COUNTERPART[m.record_type ?? ''] && <button className="btn ms-2" data-testid={`wh-mv-reverse-open-${m.doc_no ?? m.id}`} onClick={() => setReversing(m.id)}>{t('wh.mv_reverse')}</button>}</td>
               </tr>
+              {editing === m.id && m.register_record_id && <tr><td colSpan={6} className="p-2"><MovementEdit recordId={m.register_record_id} doc={m.doc_no ?? ''} onClose={() => setEditing(null)} /></td></tr>}
+              {reversing === m.id && <tr><td colSpan={6} className="p-2"><ReverseMovement m={m} onClose={() => setReversing(null)} /></td></tr>}
+              </Fragment>
             ))}
           </tbody>
         </table>
@@ -176,6 +188,52 @@ function Movements() {
         {list.isError && <p role="alert" className="p-6 text-center text-lateInk">{t('errors.generic')}</p>}
       </div>
     </div>
+  );
+}
+
+/**
+ * Pending document: edit in place through the existing register record edit path (PATCH /registers/warehouse/records/:id, same permissions, If-Match
+ * version and audit, no new write path; the register edit has no reason field, so none is asked; the server decides who may edit and when). Lines are not edited: stock is computed from the movements only.
+ */
+function MovementEdit({ recordId, doc, onClose }: { recordId: string; doc: string; onClose: () => void }) {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const rec = useRegisterRecord('warehouse', recordId);
+  const upd = useUpdateRecord('warehouse');
+  const cur = rec.data;
+  const [f, setF] = useState<{ doc_date?: string; remark?: string }>({});
+  const val = (k: 'doc_date' | 'remark') => f[k] ?? (typeof cur?.data?.[k] === 'string' ? (cur.data[k] as string) : '');
+  return (
+    <InlinePanel onClose={onClose} testid="wh-mv-edit" title={t('wh.mv_edit_title', { doc })} busy={upd.isPending || !cur} disabled={!cur || !Object.keys(f).length}
+      error={upd.isError ? registerErrorMessage(t, upd.error) : null}
+      withReason={false} onSubmit={() => cur && upd.mutate({ record: cur, patch: { data: f } }, { onSuccess: () => { toast(t('wh.mv_saved'), 'ok'); onClose(); } })}>
+      <label className="block text-sm font-semibold">{t('wh.mv_doc_date')}
+        <input type="date" className="input mt-1 font-normal" data-testid="wh-mv-edit-date" value={val('doc_date')} onChange={(e) => setF({ ...f, doc_date: e.target.value })} /></label>
+      <label className="block text-sm font-semibold">{t('wh.mv_remark')}
+        <input className="input mt-1 font-normal" data-testid="wh-mv-edit-remark" value={val('remark')} onChange={(e) => setF({ ...f, remark: e.target.value })} /></label>
+      <p className="text-xs text-mute">{t('wh.mv_lines_note')}</p>
+    </InlinePanel>
+  );
+}
+
+const COUNTERPART: Record<string, 'te_dn' | 'cw_dn' | 'te_rn' | 'cw_rn'> = { te_dn: 'te_rn', cw_dn: 'cw_rn', te_rn: 'te_dn', cw_rn: 'cw_dn' };
+
+/**
+ * Posted document: no direct edit. The correction is a reversal movement (the counterpart document with the same lines) that goes through the normal
+ * creation and approval. Serial numbers are not copied: a serial-tracked item is refused by the server with its own message and is corrected by a new document.
+ */
+function ReverseMovement({ m, onClose }: { m: StockMovement; onClose: () => void }) {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const rev = useReverseMovement();
+  const rt = COUNTERPART[m.record_type ?? ''];
+  return (
+    <InlinePanel onClose={onClose} testid="wh-mv-reverse" title={t('wh.mv_reverse_title', { doc: m.doc_no ?? '' })} busy={rev.isPending} disabled={!rt || !m.site_id}
+      error={rev.isError ? registerErrorMessage(t, rev.error) : null}
+      onSubmit={(reason) => rt && m.site_id && rev.mutate({ record_type: rt, site_id: m.site_id, reason, remark: t('wh.mv_reverse_remark', { doc: m.doc_no ?? '' }), lines: m.lines.map((l) => ({ item_id: l.item_id, qty: l.qty })) }, { onSuccess: (r) => { toast(t('wh.mv_reverse_done', { doc: r.doc_no ?? '' }), 'ok'); onClose(); } })}>
+      <p className="text-sm text-mute">{t('wh.mv_reverse_note', { type: (rt ?? '').toUpperCase() })}</p>
+      <ul className="list-disc ps-5 text-sm" data-testid="wh-mv-reverse-lines">{m.lines.map((l) => <li key={l.item_id}><b className="mono">{l.item_code}</b> {l.qty}</li>)}</ul>
+    </InlinePanel>
   );
 }
 

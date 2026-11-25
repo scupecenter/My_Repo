@@ -65,7 +65,7 @@ describe("admin approve as is", () => {
     const t = await streamTeam(app, db, { A2: "open" });
     const batch = await upload(
       t.entry.api,
-      await filled(t.entry.api, "TPL-SITE-DA", [
+      await filled(t.entry.api, "TPL-DESIGN-ACQ", [
         { "Site ID": t.site.code, "A2 Actual Date": day("2026-01-10") },
       ]),
     );
@@ -150,7 +150,7 @@ describe("admin approve as is", () => {
   it("approves every row as it is, whoever holds L2: incomplete rows are flagged, the rows of a non-holder are approved, each row is audited, the successor opens", async () => {
     const t = await streamTeam(app, db, { A2: "open", A5: "locked" });
     const t2 = await moreSite(db, t, { A2: "open", A5: "locked" });
-    const buf = await filled(t.entry.api, "TPL-SITE-DA", [
+    const buf = await filled(t.entry.api, "TPL-DESIGN-ACQ", [
       {
         "Site ID": t.site.code,
         "A2 Planned Date": day("2026-01-05"),
@@ -297,7 +297,7 @@ describe("admin approve as is", () => {
 
   it("approves a Save Draft / Planning batch: rows without an actual date are approved with what they have and flagged incomplete", async () => {
     const t = await streamTeam(app, db, { A2: "open", A5: "locked" });
-    const buf = await filled(t.entry.api, "TPL-SITE-DA", [
+    const buf = await filled(t.entry.api, "TPL-DESIGN-ACQ", [
       { "Site ID": t.site.code, "A2 Planned Date": day("2026-01-05") },
     ]);
     const res = await uploadFile(t.entry.api, buf, "filled.xlsx", { mode: "draft" });

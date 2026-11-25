@@ -137,3 +137,12 @@ describe("column prefs: per-user storage", () => {
     expect(() => storePrefs("sites", "u1", EMPTY_PREFS)).not.toThrow();
   });
 });
+
+describe("unpinned preference", () => {
+  it("is kept by reconcile only when true", () => {
+    const defs = [{ id: "a", label: "A", w: 80 }] as never;
+    const base = { order: ["a"], hidden: [], width: {} };
+    expect(reconcile({ ...base, unpinned: true }, defs).unpinned).toBe(true);
+    expect("unpinned" in reconcile({ ...base, unpinned: false }, defs)).toBe(false);
+  });
+});

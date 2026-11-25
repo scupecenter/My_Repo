@@ -104,16 +104,20 @@ function ColumnForm({ open, onClose, registerKey, column, columns, sections, pla
   const typeLabel = (x: RegisterColumnType) => t(`regcols.type_${x}`);
   const flip = (k: keyof typeof vis) => setVis((v) => ({ ...v, [k]: !v[k] }));
   return (
-    <FormDialog open={open} onClose={onClose} testid="column-dialog" wide title={edit ? t('regcols.edit_title', { code: column!.code }) : t('regcols.add_title')} onSubmit={(r) => void submit(r)} busy={busy} disabled={!ready} error={err}>
+    <FormDialog inline open={open} onClose={onClose} testid="column-dialog" wide title={edit ? t('regcols.edit_title', { code: column!.code }) : t('regcols.add_title')} onSubmit={(r) => void submit(r)} busy={busy} disabled={!ready} error={err}>
+      {!edit && <p className="rounded border border-line bg-card2 p-2 text-sm" data-testid="column-add-impact">{t(vis.in_template ? 'regcols.add_impact_tpl' : 'regcols.add_impact')}</p>}
       {locked && <p className="rounded border border-line bg-card2 p-2 text-sm" data-testid="column-protected">{t('regcols.protected_note', { reason: column!.system_reason ?? '' })}</p>}
       <div className="grid gap-3 sm:grid-cols-2">
         <div><label className="text-sm font-semibold" htmlFor="col-en">{t('regcols.label_en')}</label>
           <input id="col-en" data-testid="col-label-en" className="input mt-1" value={label_en} maxLength={200} onChange={(e) => setEn(e.target.value)} /></div>
         <div><label className="text-sm font-semibold" htmlFor="col-ar">{t('regcols.label_ar')}</label>
           <input id="col-ar" data-testid="col-label-ar" dir="rtl" className="input mt-1" value={label_ar} maxLength={200} onChange={(e) => setAr(e.target.value)} /></div>
-        {!edit && <div><label className="text-sm font-semibold" htmlFor="col-code">{t('regcols.code')}</label>
+        {!edit && <details data-testid="col-code-details" className="text-sm"><summary className="cursor-pointer text-mute">{t('regcols.code_generated', { code: finalCode || '-' })}</summary>
+          <label className="font-semibold" htmlFor="col-code">{t('regcols.code')}</label>
+
           <input id="col-code" data-testid="col-code" dir="ltr" className="input mono mt-1" value={finalCode} onChange={(e) => { setCodeTouched(true); setCode(e.target.value.toLowerCase()); }} aria-invalid={codeTaken} />
-          {codeTaken && <p role="alert" className="mt-1 text-sm text-lateInk" data-testid="col-code-taken">{t('regcols.code_taken')}</p>}</div>}
+          <p className="mt-1 text-mute">{t('regcols.code_hint')}</p></details>}
+        {edit && <p data-testid="col-code-fixed" className="text-sm"><span className="font-semibold">{t('regcols.code')}: </span><span dir="ltr" className="mono">{column!.code}</span> <span className="text-mute">{t('regcols.code_fixed')}</span></p>}
         <div><label className="text-sm font-semibold" htmlFor="col-type">{t('regcols.type')}</label>
           <select id="col-type" data-testid="col-type" className="input mt-1" value={type} disabled={locked} onChange={(e) => { setType(e.target.value as RegisterColumnType); setConfirm(false); }}>
             {[...new Set([...(edit && !COLUMN_TYPES.includes(column!.type) ? [column!.type] : []), ...COLUMN_TYPES])].map((x) => <option key={x} value={x}>{typeLabel(x)}</option>)}

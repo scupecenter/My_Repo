@@ -31,6 +31,7 @@ import { ArchiveList, LibraryArchive } from '@/pages/library/Archive';
 import { ReconciliationPage } from '@/pages/Reconciliation';
 import { TemplateMappingPage } from '@/pages/TemplateMapping';
 import { AsBuiltItems } from '@/pages/AsBuiltItems';
+import { MenuGroup } from './pages/MenuGroup';
 import { Warehouse } from '@/pages/Warehouse';
 import { Site } from '@/pages/Site';
 import { Sites } from '@/pages/Sites';
@@ -97,6 +98,7 @@ function gated(session: Session) {
         <Route path="sites" element={<Sites />} />
         <Route path="sites/new" element={<NewSite />} />
         <Route path="sites/:siteId" element={<Site />} />
+        <Route path="menu/:id" element={<MenuGroup />} />
         <Route path="registers/:key" element={<RegisterPage />} />
         <Route path="warehouse" element={<Warehouse />} />
         <Route path="as-built/items" element={<AsBuiltItems />} />

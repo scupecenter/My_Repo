@@ -15,7 +15,7 @@ import { NewSite } from './NewSite';
 import { Site } from './Site';
 import { Sites } from './Sites';
 
-/** Contract 0.15.4 (migration 0085): the per-site workflow locks (chip and switch, SITE 360 column, filter and bulk action, the New site field) and the sites of an import. */
+/** Contract 0.15.4 (migration 0085): the per-site workflow locks (chip and switch, Site Master column, filter and bulk action, the New site field) and the sites of an import. */
 const T = 30_000;
 const stepUpDone = () => api.post('/__mock/step-up');
 const SiteAt = () => <Routes><Route path="/sites/:siteId" element={<Site />} /></Routes>;
@@ -63,7 +63,7 @@ describe('the site page: Locks chip and switch', () => {
   }, T);
 });
 
-describe('SITE 360: the column, the filter and the bulk action', () => {
+describe('Site Master: the column, the filter and the bulk action', () => {
   it('shows the Workflow locks column, filters on Open, and opens the locks of the selected sites with one reason', async () => {
     await signIn('pm');
     const u = userEvent.setup();

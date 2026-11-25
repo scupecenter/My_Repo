@@ -54,7 +54,7 @@ let loader: Actor;
  */
 async function prodSite(prefix: string, o: { mw?: unknown; d10?: 'approved' | 'open'; noPrefill?: boolean } = {}): Promise<Site> {
   const s = await makeSite(db, R, { prefix, status: 'in_progress' });
-  const tv = (await q<{ id: string }>(db, `SELECT v.id::text AS id FROM template_versions v JOIN template_definitions dd ON dd.id = v.template_def_id WHERE dd.template_id = 'TPL-ACQ' AND v.is_current`))[0]!.id;
+  const tv = (await q<{ id: string }>(db, `SELECT v.id::text AS id FROM template_versions v JOIN template_definitions dd ON dd.id = v.template_def_id WHERE dd.template_id = 'TPL-ACQUISITION' AND v.is_current`))[0]!.id;
   await db.query('SET session_replication_role = replica');
   try {
     await makeTask(db, s, 'MS3', 'approved', { actualDate: o.noPrefill ? null : '2026-02-06' });

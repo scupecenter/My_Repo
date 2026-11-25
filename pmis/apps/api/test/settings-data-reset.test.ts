@@ -431,7 +431,7 @@ describe('the run', () => {
     expect([409, 412]).toContain(codes[1]);
     const won = a.status === 202 ? a : b;
     expect(won.body).toMatchObject({ status: 'running' });
-    expect(won.body.quarantine_dir).toMatch(/\/\.pre-reset-\d{8}-\d{6}$/);
+    expect(won.body.quarantine_dir).toMatch(/\/\.pre-reset-\d{8}-\d{6}(-\d+)?$/); // the code adds -2, -3 when a quarantine of the same second exists (data-reset-files.ts)
     await settle();
     const runner = won === a ? admin1 : admin2;
     const got = await runner.api.call('get', `/settings/data-reset/requests/${id}`);

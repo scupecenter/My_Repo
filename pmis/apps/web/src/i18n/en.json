@@ -18,7 +18,7 @@
   "app": {
     "name": "GSDN Workspace"
   },
-  "site360": {
+  "siteMaster": {
     "menus": "Site Master menus",
     "gate": "gate",
     "freeze": "Freeze or unfreeze this column",
@@ -84,6 +84,7 @@
     }
   },
   "nav": {
+    "group_home": "Dashboard",
     "group_work": "Work",
     "group_data": "Data entry",
     "group_admin": "Administration",
@@ -139,6 +140,9 @@
     "move_down": "Move down",
     "resize": "Resize sidebar",
     "icons_only": "Icons only",
+    "pin_menu": "Pin the menu (always visible)",
+    "waiting_count": "{{count}} waiting",
+    "autohide_menu": "Hide the menu automatically",
     "full_menu": "Full menu",
     "sidebar_label": "Main menu",
     "close_menu": "Close menu",
@@ -397,7 +401,8 @@
     "clear": "Clear",
     "yes": "Yes",
     "no": "No",
-    "soon_chip": "Soon"
+    "soon_chip": "Soon",
+    "undo": "Undo"
   },
   "sites": {
     "title": "Site Master",
@@ -424,6 +429,10 @@
     "progress": "Done / total",
     "milestone": "Milestone",
     "new_site": "New site",
+    "menu_template_blank": "Download blank template",
+    "menu_template_filled": "Download filled template (current filters)",
+    "menu_template_upload": "Upload template",
+    "menu_template_none": "No sites in the current list to fill.",
     "download_template": "Download template",
     "upload_template": "Upload",
     "coords_missing": "Without valid coordinates",
@@ -1062,7 +1071,7 @@
   "settings": {
     "audited": "Saved and audited with your reason.",
     "tab_calendar": "Calendar",
-    "tab_sla": "SLA",
+    "tab_sla": "SLA and time",
     "tab_weights": "Weights",
     "tab_freeze": "Structural freeze",
     "tab_dlp": "DLP months",
@@ -1082,9 +1091,19 @@
     "tab_imports": "Imports",
     "tab_workflow": "Workflow",
     "tab_registers": "Registers",
+    "tab_screens": "Screens",
+    "section_sla_calendar": "Calendar",
+    "section_sla_weights": "Weights",
+    "section_registers_lists": "Lists",
+    "section_alerts_policy": "Notification policy",
+    "section_alerts_mail": "Mail kinds",
+    "section_security_dlp": "DLP months",
+    "section_screens_dashboard": "Dashboard",
+    "section_screens_tables": "Tables (Display)",
+    "section_screens_daily-plan": "My Work (Daily Plan)",
     "tab_ddl": "DDL",
     "tab_data": "Data",
-    "tab_alerts": "Alerts",
+    "tab_alerts": "Notifications",
     "tab_security": "Security",
     "section_workflow_editor": "Workflow editor",
     "section_workflow_columns": "Columns",
@@ -1617,6 +1636,7 @@
     "self": "You cannot change your own System Admin rights."
   },
   "peopleAdmin": {
+    "tab_roles_profiles": "Roles and profiles",
     "tab_users": "Users",
     "tab_assignments": "Assignments",
     "tab_profiles": "Permission profiles"
@@ -1950,7 +1970,9 @@
     "scope_hlc_only": "You may enter scope HLC only (HLC Fiber Team).",
     "transfer": "Transfer the draft",
     "transferred": "The draft was moved to a qualified holder.",
-    "transfer_note": "The person holding this draft no longer holds Data Entry (L1) of the permit's stream. Transfer it so a qualified holder can finish it; nothing in it is lost."
+    "transfer_note": "The person holding this draft no longer holds Data Entry (L1) of the permit's stream. Transfer it so a qualified holder can finish it; nothing in it is lost.",
+    "inline_saved": "Saved. You can undo for 8 seconds.",
+    "inline_undone": "Change undone."
   },
   "regErrors": {
     "register_locked": "This is locked: only a System Admin can change it until it is unlocked.",
@@ -2308,7 +2330,20 @@
     "qx_err_unknown_serial": "A serial is unknown for this item.",
     "qx_err_not_serial_tracked": "This item is not serial-tracked: leave the serial numbers empty.",
     "qx_err_whole_units": "Pieces and sets cannot have a fraction.",
-    "qx_exit": "Quarantine exit"
+    "qx_exit": "Quarantine exit",
+    "mv_edit": "Edit",
+    "mv_edit_title": "Edit document {{doc}}",
+    "mv_doc_date": "Document date",
+    "mv_remark": "Remark",
+    "mv_lines_note": "Quantities and items are not edited here: cancel this pending document and create a new one. Stock is computed from the movements only.",
+    "mv_locked_posted": "Locked: a posted document is not edited. Correct it with a reversal movement, which goes through the normal approval.",
+    "mv_locked_cancelled": "Locked: a cancelled document is not edited.",
+    "mv_saved": "Saved",
+    "mv_reverse": "Reverse",
+    "mv_reverse_title": "Reverse document {{doc}}",
+    "mv_reverse_note": "Creates a {{type}} document with the same lines. It waits for the normal approval; the posted document is not changed. Stock changes only when the new document is posted.",
+    "mv_reverse_remark": "Reversal of {{doc}}",
+    "mv_reverse_done": "Reversal {{doc}} created, waiting for approval"
   },
   "asb": {
     "title": "As-Built items",
@@ -2517,6 +2552,7 @@
     "rule_flow": "Nothing is saved to the register until the rows go through the approval levels.",
     "file": "Filled template (.xlsx)",
     "upload": "Upload and check",
+    "download_current": "Download the current version",
     "rejection_logged": "This refusal was written to the System Log.",
     "kind_master": "Whole Master",
     "kind_stream": "Site Master stream",
@@ -2546,7 +2582,10 @@
     "kind_holidays": "Holidays (upload in Settings > Calendar)",
     "kind_list_values": "List values (upload in the list)",
     "rule_sites": "One row per new site. Each valid row becomes a site draft when you send the batch; no site exists until L2 approves it.",
-    "open_running": "This file is already being checked: open it"
+    "open_running": "This file is already being checked: open it",
+    "group_master": "Master and shared files",
+    "group_sections": "Sections",
+    "group_registers": "Registers and logs"
   },
   "follow": {
     "follow": "Follow",
@@ -3863,7 +3902,18 @@
     "type_link": "Link",
     "type_document": "Document",
     "type_computed": "Computed (read-only)",
-    "type_child_list": "Child list"
+    "type_child_list": "Child list",
+    "code_generated": "Technical ID (made for you: {{code}})",
+    "code_hint": "Made from the English name. Only change it if you must; it cannot be changed later.",
+    "code_fixed": "It never changes. To change what people see, change the name instead. That is free.",
+    "group_streams": "Site Master streams",
+    "group_registers": "Registers and logs",
+    "stream_note": "Columns of the {{stream}} stream, in Master order. Same rules as the Workflow Studio: reason, approval and audit.",
+    "stream_add": "Add a column (Workflow Studio)",
+    "add_before": "Add a column before {{code}}",
+    "add_after": "Add a column after {{code}}",
+    "add_impact_tpl": "Impact: a new version of the register template is issued with this column. Files made from the old template still upload; the new column stays empty in them. Existing records keep this column empty until filled.",
+    "add_impact": "Impact: existing records keep this column empty until filled. It is not in the template, so no new template version is issued."
   },
   "lists": {
     "colour": "Colour",
@@ -3934,7 +3984,11 @@
     "no_values": "No value yet.",
     "blocking": "No active value: approvals of the registers that use this list are blocked",
     "pending": "Draft list",
-    "pending_hint": "The values of this list are a draft waiting for the owner's review."
+    "pending_hint": "The values of this list are a draft waiting for the owner's review.",
+    "move_up": "Move {{code}} up",
+    "move_down": "Move {{code}} down",
+    "reorder_reason": "Changed the order of the values",
+    "quick_edit": "Quick edit {{code}} (rename, show or hide)"
   },
   "listErrors": {
     "critical_closed": "A critical list accepts only its own values.",
@@ -5151,7 +5205,7 @@
       "not_applicable": "Not applicable"
     }
   },
-  "site360cols": {
+  "siteMasterCols": {
     "title": "Site Master columns",
     "hint": "Each Master column belongs to one or more Site Master menus. Status columns are in every menu and cannot change.",
     "edit": "Edit menus",
@@ -5234,7 +5288,11 @@
     "wip_limit_label": "WIP limit",
     "wip_none": "No limit",
     "wip_range": "A whole number from {{min}} to {{max}}, or empty.",
-    "wip_confirm": "The new limits apply to the board at once. They only warn."
+    "wip_confirm": "The new limits apply to the board at once. They only warn.",
+    "sites_drop_note": "Dropping a site card on the next column only opens the task's own action; nothing changes until you confirm it.",
+    "site_next_only": "Only the next column: a site moves one milestone at a time.",
+    "site_drop_refused": "You cannot do that here: no action of yours moves a task of {{code}} on.",
+    "site_pick_title": "Which task of {{code}}?"
   },
   "brand": {
     "current": "Current (standard)",
@@ -5563,7 +5621,8 @@
     "preview_name": "A long synthetic site name that shows how long text is drawn",
     "since": "Since",
     "export_view": "Export current view",
-    "noun_documents": "documents"
+    "noun_documents": "documents",
+    "display_pin": "Freeze the first columns"
   },
   "regviews": {
     "group_record": "Record",
@@ -5925,5 +5984,55 @@
     "saved": "Saved.",
     "reason": "Reason",
     "no_cards": "No document type has a file yet; cards appear here once they do."
+  },
+  "tplmenu": {
+    "title": "Templates & export"
+  },
+  "view": {
+    "title": "View",
+    "list": "List",
+    "list_hint": "One row per item, the usual table",
+    "wide": "Wide table",
+    "wide_hint": "All columns side by side",
+    "grid": "Grid (editable)",
+    "grid_hint": "Edit cells in the table",
+    "board": "Board",
+    "board_hint": "Cards by milestone or status",
+    "map": "Map",
+    "map_hint": "Items on the map"
+  },
+  "batchedit": {
+    "title": "Batch edit",
+    "pending": "{{count}} changes waiting in {{records}} records",
+    "note": "Nothing is saved until you press Save all. The draft is kept for 7 days.",
+    "review": "Review",
+    "save_all": "Save all",
+    "discard_all": "Discard all",
+    "exit": "Leave batch mode",
+    "confirm_many": "Save {{count}} changes? Each record is saved on its own, with the same rules as a single edit.",
+    "conflict": "changed by someone else since you started; reload and edit again",
+    "record": "Record",
+    "field": "Field",
+    "was": "Was",
+    "now": "Now",
+    "start": "Batch edit",
+    "leave": "You have unsaved batch changes.",
+    "resumed": "Your unsaved batch changes were restored.",
+    "saved_n": "{{count}} records saved",
+    "pending_chip": "Pending"
+  },
+  "pendingChanges": {
+    "title": "Changes waiting for approval",
+    "draft": "Draft",
+    "waiting": "Waiting for L2",
+    "returned": "Returned",
+    "note": "Note: {{note}}",
+    "item": {
+      "name": "Name",
+      "name_ar": "Arabic name",
+      "coordinates": "Coordinates",
+      "region": "Region",
+      "cluster": "Cluster"
+    }
   }
 }

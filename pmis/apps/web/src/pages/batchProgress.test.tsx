@@ -21,7 +21,7 @@ const Routed = () => (
 
 const ID = '0b3c9f3e-0000-4000-8000-0000000000aa';
 const batch = (over: Partial<ImportBatch> = {}): ImportBatch => ({
-  id: ID, template_id: 'TPL-SITE-NEW', template_version: 1, source: 'template', file_name: 'new-sites.xlsx', status: 'validated', current_level: 1, levels_required: 2, register_key: null, entity: 'site',
+  id: ID, template_id: 'TPL-NEW-SITES', template_version: 1, source: 'template', file_name: 'new-sites.xlsx', status: 'validated', current_level: 1, levels_required: 2, register_key: null, entity: 'site',
   note: null, counts: { create: 469, update: 0, unchanged: 0, error: 0, pending: 0, approved: 0, rejected: 0, held: 0 }, job_id: null, task_id: null, site_id: null,
   uploaded_by: { id: '1', display_name: 'Entry User', employee_id: '4001' }, uploaded_at: '2026-11-02T08:00:00.000Z', version: 1, ...over,
 } as ImportBatch);

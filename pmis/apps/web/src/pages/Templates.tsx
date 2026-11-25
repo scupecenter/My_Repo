@@ -1,5 +1,5 @@
 import { FileDown, FileSpreadsheet, FileUp } from 'lucide-react';
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMe } from '@/api/hooks';
@@ -41,7 +41,10 @@ export function TemplatesPage() {
   const down = (x: Template, prefill: boolean) => downloadTemplate(x.template_id, { prefill }).then((n) => toast(t('grid.downloaded', { name: n })), (e) => toast(registerErrorMessage(t, e), 'err'));
   const set = (k: string, v: string) => setSp((p) => { const n = new URLSearchParams(p); if (v) n.set(k, v); else n.delete(k); return n; }, { replace: true });
   const all = (templates.data ?? []).filter((x) => x.register_key || x.stream || x.template_kind);
-  const entries = [...all.filter((x) => kindOf(x) !== 'register'), ...all.filter((x) => kindOf(x) === 'register')];
+  // Ahmed's grouping: the Master (and the new-sites, list and holiday files), then the sections (streams), then the registers and logs
+  const groupOf = (x: Template): 'master' | 'sections' | 'registers' => (kindOf(x) === 'register' ? 'registers' : kindOf(x) === 'stream' ? 'sections' : 'master');
+  const GROUPS = ['master', 'sections', 'registers'] as const;
+  const entries = GROUPS.flatMap((g) => all.filter((x) => groupOf(x) === g));
   const registers = all.filter((x) => kindOf(x) === 'register');
   const items: ImportBatch[] = batches.data?.items ?? [];
   const tplName = (id: string) => { const x = templates.data?.find((y) => y.template_id === id); return x ? nameOf(x) : id; };
@@ -59,10 +62,13 @@ export function TemplatesPage() {
           <table className="w-full min-w-[720px] text-sm" data-testid="tpl-table">
             <thead className="bg-card2 text-mute"><tr>{['name', 'id', 'version', 'issued', ''].map((c) => <th key={c} className="p-2 text-start">{c ? t(`tpl.col_${c}`) : ''}</th>)}</tr></thead>
             <tbody>
-              {entries.map((x) => {
+              {entries.map((x, i) => {
                 const kind = kindOf(x);
+                const g = groupOf(x);
                 return (
-                  <tr key={x.template_id} className="border-t border-line" data-testid={`tpl-row-${x.template_id}`} data-register={x.register_key ?? ''} data-kind={kind} data-stream={x.stream ?? ''}>
+                  <Fragment key={x.template_id}>
+                  {(i === 0 || groupOf(entries[i - 1]) !== g) && <tr className="bg-card2" data-testid={`tpl-group-${g}`}><th colSpan={5} scope="colgroup" className="p-2 text-start text-xs font-bold uppercase text-mute">{t(`tpl.group_${g}`)}</th></tr>}
+                  <tr className="border-t border-line" data-testid={`tpl-row-${x.template_id}`} data-register={x.register_key ?? ''} data-kind={kind} data-stream={x.stream ?? ''}>
                     <td className="p-2 font-semibold">
                       {nameOf(x)}
                       {kind !== 'register' && <span className="chip ms-2 bg-card2 text-mute" data-testid={`tpl-kind-${x.template_id}`}>{kind === 'master' ? t('tpl.kind_master') : kind === 'sites' ? t('tpl.kind_sites') : kind === 'holidays' ? t('tpl.kind_holidays') : kind === 'list_values' ? t('tpl.kind_list_values') : t('tpl.kind_stream')}</span>}
@@ -78,6 +84,7 @@ export function TemplatesPage() {
                       </span>
                     </td>
                   </tr>
+                  </Fragment>
                 );
               })}
             </tbody>

@@ -24,8 +24,14 @@ const T = 20_000;
 const ENTRY = recId(3); // the Procurement WO of site 2, in entry: editable by its L1
 const APPROVED = recId(1); // the Procurement PR of site 0, approved: read-only
 
+/** The View menu (one button, a menu of layouts): open it, pick a layout by its old test id. */
+async function pickView(u: ReturnType<typeof userEvent.setup>, prefix: string, id: string) {
+  await u.click(screen.getByTestId(`${prefix}-view`));
+  await u.click(await screen.findByTestId(`${prefix}-layout-${id}`));
+}
+
 describe('W2 Procurement (records with a site): the view switcher of Site Master', () => {
-  it('the toolbar shows Map, Board and Wide table after the count, in the order of Site Master, and the list stays the default', async () => {
+  it('the toolbar shows one View menu after the count and before New; its items are List, Wide table, Grid, Board and Map, and the list stays the default', async () => {
     await signIn('pm');
     renderApp(<App />, { route: '/registers/procurement' });
     await screen.findByTestId('register-list-card');
@@ -33,11 +39,11 @@ describe('W2 Procurement (records with a site): the view switcher of Site Master
     const ids = [...bar.querySelectorAll('[data-testid]')].map((e) => e.getAttribute('data-testid'));
     const at = (id: string) => ids.indexOf(id);
     expect(at('register-count')).toBeGreaterThan(-1);
-    expect(at('register-layout-map')).toBeGreaterThan(at('register-count'));
-    expect(at('register-layout-board')).toBeGreaterThan(at('register-layout-map'));
-    expect(at('register-layout-wide')).toBeGreaterThan(at('register-layout-board'));
-    expect(at('register-new')).toBeGreaterThan(at('register-layout-wide'));
-    for (const b of ['map', 'board', 'wide']) expect(screen.getByTestId(`register-layout-${b}`)).toHaveAttribute('aria-pressed', 'false');
+    expect(at('register-view')).toBeGreaterThan(at('register-count'));
+    expect(at('register-new')).toBeGreaterThan(at('register-view'));
+    expect(at('register-layout-wide')).toBe(-1); // the layouts live in the menu, not as buttons of the toolbar
+    await userEvent.click(screen.getByTestId('register-view'));
+    for (const b of ['list', 'wide', 'grid', 'board', 'map']) expect(await screen.findByTestId(`register-layout-${b}`)).toHaveAttribute('aria-checked', b === 'list' ? 'true' : 'false');
   }, T);
 
   it('wide table: one row per record, # and Site ID frozen, the form sections as header row 1, LTR in Arabic too', async () => {
@@ -45,7 +51,7 @@ describe('W2 Procurement (records with a site): the view switcher of Site Master
     const u = userEvent.setup();
     renderApp(<App />, { route: '/registers/procurement', locale: 'ar' });
     await screen.findByTestId('register-list-card');
-    await u.click(screen.getByTestId('register-layout-wide'));
+    await pickView(u, 'register', 'wide');
     const table = await screen.findByTestId('register-wide-table');
     expect(where()).toContain('layout=wide');
     expect(table).toHaveAttribute('dir', 'ltr');
@@ -91,10 +97,42 @@ describe('W2 Procurement (records with a site): the view switcher of Site Master
     const p = patches.find((x) => x.url.includes(`/registers/procurement/records/${ENTRY}`));
     expect(p).toBeDefined();
     expect(p!.ifMatch).toBeTruthy();
+    // undo (8 s): the same edit path puts the old value back
+    const undo = await screen.findByTestId('toast-action');
+    const before = patches.length;
+    await u.click(undo);
+    await waitFor(() => expect(patches.length).toBe(before + 1));
+    await waitFor(() => expect(screen.getByTestId(`wide-cell-${ENTRY}-f:po_wo_no`)).not.toHaveTextContent('WO-W2-7'));
     // a list field with values offers them in a select
     await u.click(screen.getByTestId(`wide-edit-${ENTRY}-f:scope`));
     expect(screen.getByTestId(`wide-input-${ENTRY}-f:scope`)).toHaveAttribute('data-input', 'list');
     await u.keyboard('{Escape}');
+  }, T);
+
+  it('wide table batch edit: edits wait in a draft with a Pending chip, nothing is saved until Save all, then one PATCH per record', async () => {
+    await signIn('pm');
+    const u = userEvent.setup();
+    const patches: string[] = [];
+    const on = ({ request }: { request: Request }) => { if (request.method === 'PATCH') patches.push(request.url); };
+    server.events.on('request:start', on);
+    renderApp(<App />, { route: '/registers/procurement?layout=wide' });
+    await screen.findByTestId(`wide-row-${ENTRY}`);
+    await u.click(await screen.findByTestId('batch-start'));
+    expect(screen.getByTestId('batch-count')).toHaveTextContent('0');
+    await u.click(screen.getByTestId(`wide-edit-${ENTRY}-f:po_wo_no`));
+    const input = screen.getByTestId(`wide-input-${ENTRY}-f:po_wo_no`);
+    await u.clear(input);
+    await u.type(input, 'WO-BATCH-1');
+    await u.click(screen.getByTestId(`wide-save-${ENTRY}-f:po_wo_no`));
+    expect(await screen.findByTestId(`wide-pending-${ENTRY}-po_wo_no`)).toHaveTextContent('WO-BATCH-1');
+    expect(screen.getByTestId('batch-count')).toHaveTextContent('1 changes');
+    expect(patches).toHaveLength(0);
+    await u.click(screen.getByTestId('batch-review'));
+    expect(screen.getByTestId('batch-review-list')).toHaveTextContent('WO-BATCH-1');
+    await u.click(screen.getByTestId('batch-save'));
+    await waitFor(() => expect(patches).toHaveLength(1));
+    await waitFor(() => expect(screen.getByTestId('batch-count')).toHaveTextContent('0 changes'));
+    server.events.removeListener('request:start', on);
   }, T);
 
   it('wide table: a refused save keeps the editor open and says why', async () => {
@@ -114,7 +152,7 @@ describe('W2 Procurement (records with a site): the view switcher of Site Master
     const u = userEvent.setup();
     renderApp(<App />, { route: '/registers/procurement' });
     await screen.findByTestId('register-list-card');
-    await u.click(screen.getByTestId('register-layout-board'));
+    await pickView(u, 'register', 'board');
     const board = await screen.findByTestId('register-board');
     expect(where()).toContain('layout=board');
     expect(board).toHaveAttribute('data-by', 'order_status');
@@ -143,7 +181,7 @@ describe('W2 Procurement (records with a site): the view switcher of Site Master
     const u = userEvent.setup();
     renderApp(<App />, { route: '/registers/procurement' });
     await screen.findByTestId('register-list-card');
-    await u.click(screen.getByTestId('register-layout-map'));
+    await pickView(u, 'register', 'map');
     expect(where()).toContain('layout=map');
     const wrap = await screen.findByTestId('register-map-wrap');
     await screen.findByTestId('register-map');
@@ -164,7 +202,7 @@ describe('W2 Procurement (records with a site): the view switcher of Site Master
     await u.type(screen.getByTestId('views-name'), 'W2 board by region');
     await u.click(screen.getByTestId('views-name-ok'));
     await waitFor(() => expect(within(screen.getByTestId('views-select')).getAllByRole('option').map((o) => o.textContent)).toContain('W2 board by region'));
-    await u.click(screen.getByTestId('register-layout-board')); // back to the list
+    await pickView(u, 'register', 'list'); // back to the list
     await screen.findByTestId('register-list-card');
     expect(where()).not.toContain('layout=');
     const opt = within(screen.getByTestId('views-select')).getAllByRole('option').find((o) => o.textContent === 'W2 board by region') as HTMLOptionElement;
@@ -181,9 +219,10 @@ describe('W2 Meetings (global rows, no site coordinates): no Map, the board fall
     await signIn('pm');
     renderApp(<App />, { route: '/registers/meetings?layout=map' });
     await screen.findByTestId('register-list-card');
-    expect(screen.queryByTestId('register-layout-map')).toBeNull();
-    expect(screen.getByTestId('register-layout-board')).toBeTruthy();
+    await userEvent.click(screen.getByTestId('register-view'));
+    expect(await screen.findByTestId('register-layout-board')).toBeTruthy();
     expect(screen.getByTestId('register-layout-wide')).toBeTruthy();
+    expect(screen.queryByTestId('register-layout-map')).toBeNull();
     expect(screen.queryByTestId('register-map')).toBeNull();
   }, T);
 
@@ -192,7 +231,7 @@ describe('W2 Meetings (global rows, no site coordinates): no Map, the board fall
     const u = userEvent.setup();
     renderApp(<App />, { route: '/registers/meetings' });
     await screen.findByTestId('register-list-card');
-    await u.click(screen.getByTestId('register-layout-wide'));
+    await pickView(u, 'register', 'wide');
     await screen.findByTestId('register-wide-table');
     expect(screen.getByTestId('wide-col-site')).toHaveTextContent('Record');
     expect(screen.getByTestId('wide-col-f:title')).toBeTruthy();
@@ -213,5 +252,31 @@ describe('W2 Meetings (global rows, no site coordinates): no Map, the board fall
     expect(screen.getByTestId(`board-record-${recId(15)}`)).toBeTruthy();
     // no record type on Meetings: the swimlanes are none and region
     expect(within(screen.getByTestId('register-board-lane')).getAllByRole('option').map((o) => (o as HTMLOptionElement).value)).toEqual(['none', 'region']);
+  }, T);
+
+  it('remembers the picked view per user on the server and opens it next time; a link with a layout wins', async () => {
+    const saved: Record<string, unknown>[] = [];
+    let stored: { version: number; payload: Record<string, unknown> } | null = null;
+    server.use(
+      http.get(`${API_BASE}/me/drafts/:key`, ({ params }) => String(params.key) === 'form.viewpref.register-procurement' && stored
+        ? Response.json({ key: String(params.key), version: stored.version, saved_at: new Date().toISOString(), created_at: new Date().toISOString(), expires_at: new Date(Date.now() + 864e5).toISOString(), payload: stored.payload })
+        : Response.json({ code: 'not_found', status: 404, title: 'none' }, { status: 404 })),
+      http.put(`${API_BASE}/me/drafts/:key`, async ({ params, request }) => {
+        const b = await request.json() as { payload: Record<string, unknown> };
+        saved.push({ key: String(params.key), ...b.payload });
+        stored = { version: (stored?.version ?? 0) + 1, payload: b.payload };
+        return Response.json({ key: String(params.key), version: stored.version, saved_at: new Date().toISOString(), created_at: new Date().toISOString(), expires_at: new Date(Date.now() + 864e5).toISOString() });
+      }),
+    );
+    await signIn('pm');
+    const u = userEvent.setup();
+    const first = renderApp(<App />, { route: '/registers/procurement' });
+    await screen.findByTestId('register-list-card');
+    await pickView(u, 'register', 'board');
+    await waitFor(() => expect(saved).toEqual([{ key: 'form.viewpref.register-procurement', layout: 'board' }]));
+    first.unmount();
+    renderApp(<App />, { route: '/registers/procurement' });
+    await screen.findByTestId('register-board');
+    expect(where()).toContain('layout=board');
   }, T);
 });

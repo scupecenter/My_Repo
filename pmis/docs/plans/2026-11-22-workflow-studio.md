@@ -6,7 +6,7 @@ Owner request: one screen in Settings to see the whole workflow and edit it dire
 - Approved the design ("مناسب جدا"); the design must look professional.
 - One "+ Add new" button opens a menu: Task, Milestone, Gate, Site Master column. Each opens the add screen with its place and all its properties. A shortcut "+ Add task in <milestone>" in the tree opens it with the place filled.
 - Editing applies to what exists now and to anything added later, with the same tools.
-- SITE 360 sidebar: one "Site Master" entry (all sites) with 7 sub-menus (done in #170).
+- Site Master sidebar: one "Site Master" entry (all sites) with 7 sub-menus (done in #170).
 
 ## Rules that stay (CLAUDE.md, unchanged)
 - Structural changes (add, remove, reorder or move a milestone, gate or task) are a new workflow version: new sites use it, open sites migrate only by the admin's choice with a preview.
@@ -42,5 +42,5 @@ Owner request: one screen in Settings to see the whole workflow and edit it dire
 - 2026-11-22: S1 committed, PR #175. vitest 1185/1185. Open: SLA-to-open-tasks option disabled (not in publish body), no optimistic undo yet (S4), closing-task action only in classic editor.
 - 2026-11-22: main merged #172 and #173 (migration 0132, CHANGELOG 174/175). S2 renumbered to migration 0133 and CHANGELOG 177, S1 to CHANGELOG 176; both branches merged main.
 - 2026-11-22: S1 merged (#175). S3 (CHANGELOG 179), S4 (CHANGELOG 180) and the db-security cases for the S2 doors (branch claude/site360-columns-dbsec) started in parallel; Site Master navigation and dashboard tab names on branch claude/site-master-nav (CHANGELOG 178).
-- 2026-11-22: S2 merged (#174) with the owner decision "one right" for every column change. db-security cases PR #176. S3 PR #179 and S4 PR #180 committed from interrupted agent sessions (CI decides the fixes). Site Master navigation PR #177 (CHANGELOG 179, migration 0135 for the register page names). Re-import of the reviewed SITE 360 Excel dropped by the owner.
+- 2026-11-22: S2 merged (#174) with the owner decision "one right" for every column change. db-security cases PR #176. S3 PR #179 and S4 PR #180 committed from interrupted agent sessions (CI decides the fixes). Site Master navigation PR #177 (CHANGELOG 179, migration 0135 for the register page names). Re-import of the reviewed Site Master Excel dropped by the owner.
 - 2026-11-22: all phases done. Merged: S1 #175, S2 #174, db-security #176, S3 #179, S4 #180, Site Master navigation #177 (Dismantle under Registers & Logs, six sub-menus with their own columns, no Grid button, register and dashboard tab renames, migration 0135). This plan merges last.

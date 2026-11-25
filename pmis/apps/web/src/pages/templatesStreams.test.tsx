@@ -11,7 +11,7 @@ import { RegisterBatch } from './RegisterBatch';
 import { RegisterPage } from './Register';
 import { TemplatesPage } from './Templates';
 
-/** Contract 0.11.5: the SITE 360 stream templates and TPL-MASTER on the Templates page, the upload dialog and the review of a batch of task rows. */
+/** Contract 0.11.5: the Site Master stream templates and TPL-MASTER on the Templates page, the upload dialog and the review of a batch of task rows. */
 const Routed = () => (
   <Routes>
     <Route path="/templates" element={<TemplatesPage />} />
@@ -37,20 +37,20 @@ describe('Templates page: Site Register templates', () => {
     }));
     renderApp(<Routed />, { route: '/templates' });
     const u = userEvent.setup();
-    for (const id of ['TPL-MASTER', 'TPL-SITE-DA', 'TPL-SITE-CW', 'TPL-SITE-TE', 'TPL-SITE-CL', 'TPL-PO', 'TPL-GECOL']) expect(await screen.findByTestId(`tpl-row-${id}`)).toBeInTheDocument();
-    expect(screen.getByTestId('tpl-row-TPL-SITE-CW')).toHaveAttribute('data-kind', 'stream');
-    expect(screen.getByTestId('tpl-row-TPL-SITE-CW')).toHaveAttribute('data-stream', 'CW');
-    expect(screen.getByTestId('tpl-kind-TPL-SITE-CW')).toHaveTextContent('Site Master stream');
+    for (const id of ['TPL-MASTER', 'TPL-DESIGN-ACQ', 'TPL-CIVIL', 'TPL-INSTALL', 'TPL-CLOSURE', 'TPL-PROCUREMENT', 'TPL-GECOL']) expect(await screen.findByTestId(`tpl-row-${id}`)).toBeInTheDocument();
+    expect(screen.getByTestId('tpl-row-TPL-CIVIL')).toHaveAttribute('data-kind', 'stream');
+    expect(screen.getByTestId('tpl-row-TPL-CIVIL')).toHaveAttribute('data-stream', 'CW');
+    expect(screen.getByTestId('tpl-kind-TPL-CIVIL')).toHaveTextContent('Site Master stream');
     expect(screen.getByTestId('tpl-kind-TPL-MASTER')).toHaveTextContent('Whole Master');
     expect(screen.queryByTestId('tpl-kind-TPL-GECOL')).not.toBeInTheDocument();
-    expect(screen.getByTestId('tpl-version-TPL-SITE-CW')).toHaveTextContent('v1');
+    expect(screen.getByTestId('tpl-version-TPL-CIVIL')).toHaveTextContent('v1');
     const order = within(screen.getByTestId('tpl-table')).getAllByTestId(/^tpl-row-/).map((r) => r.getAttribute('data-testid'));
-    expect(order.indexOf('tpl-row-TPL-SITE-TE')).toBeLessThan(order.indexOf('tpl-row-TPL-PO'));
+    expect(order.indexOf('tpl-row-TPL-INSTALL')).toBeLessThan(order.indexOf('tpl-row-TPL-PROCUREMENT'));
     expect(screen.getByTestId('tpl-streams-note')).toHaveTextContent(/never read/);
-    await u.click(screen.getByTestId('tpl-prefill-TPL-SITE-CW'));
-    await waitFor(() => expect(asked).toEqual(['TPL-SITE-CW?prefill=true']));
+    await u.click(screen.getByTestId('tpl-prefill-TPL-CIVIL'));
+    await waitFor(() => expect(asked).toEqual(['TPL-CIVIL?prefill=true']));
     await u.click(screen.getByTestId('tpl-download-TPL-MASTER'));
-    await waitFor(() => expect(asked).toEqual(['TPL-SITE-CW?prefill=true', 'TPL-MASTER?']));
+    await waitFor(() => expect(asked).toEqual(['TPL-CIVIL?prefill=true', 'TPL-MASTER?']));
   });
 
   it('shows no Site Register template to somebody who has no Templates page (permission)', async () => {
@@ -58,7 +58,7 @@ describe('Templates page: Site Register templates', () => {
     renderApp(<Routed />, { route: '/templates' });
     expect(await screen.findByTestId('tpl-empty')).toBeInTheDocument();
     const res = await api.get<{ items: { template_id: string }[] }>('/templates');
-    const site = ['TPL-MASTER', 'TPL-SITE-DA', 'TPL-SITE-CW', 'TPL-SITE-TE', 'TPL-SITE-CL'];
+    const site = ['TPL-MASTER', 'TPL-DESIGN-ACQ', 'TPL-CIVIL', 'TPL-INSTALL', 'TPL-CLOSURE'];
     expect(res.items.some((i) => site.includes(i.template_id))).toBe(false);
   });
 
@@ -66,8 +66,8 @@ describe('Templates page: Site Register templates', () => {
     await signIn('pm');
     renderApp(<Routed />, { route: '/templates' });
     const u = userEvent.setup();
-    expect(await screen.findByTestId('tpl-row-TPL-SITE-CW')).toBeInTheDocument();
-    await u.click(await screen.findByTestId('tpl-upload-TPL-SITE-CW'));
+    expect(await screen.findByTestId('tpl-row-TPL-CIVIL')).toBeInTheDocument();
+    await u.click(await screen.findByTestId('tpl-upload-TPL-CIVIL'));
     expect(await screen.findByTestId('template-upload-rule-tasks')).toHaveTextContent('submitted');
     expect(screen.queryByTestId('template-upload-rule-master')).not.toBeInTheDocument();
     await u.upload(await screen.findByTestId('template-upload-file'), new File(['x'], 'cw.xlsx'));
@@ -97,7 +97,7 @@ describe('Templates page: Site Register templates', () => {
     // it is on the Templates page too, under its stream
     const list = await api.get<{ items: ImportBatch[] }>('/import-batches', { query: { stream: 'CW' } });
     expect(list.items).toHaveLength(1);
-    expect(list.items[0]).toMatchObject({ template_id: 'TPL-SITE-CW', stream: 'CW', register_key: null });
+    expect(list.items[0]).toMatchObject({ template_id: 'TPL-CIVIL', stream: 'CW', register_key: null });
   });
 
   it('sends the batch, L2 approves one task row, returns another with a note and approves what is left; a held row is listed and left alone', async () => {
@@ -105,7 +105,7 @@ describe('Templates page: Site Register templates', () => {
     await api.post('/__mock/step-up');
     renderApp(<Routed />, { route: '/templates' });
     const u = userEvent.setup();
-    await upload(u, 'TPL-SITE-DA');
+    await upload(u, 'TPL-DESIGN-ACQ');
     await screen.findByTestId('page-register-batch');
     await waitFor(() => expect(screen.getByTestId('batch-count-valid')).toHaveTextContent('3 valid'));
     expect(screen.queryByTestId('batch-row-approve-2-A2')).not.toBeInTheDocument();       // nothing is in the flow before the send
@@ -133,7 +133,7 @@ describe('Templates page: Site Register templates', () => {
     await api.post('/__mock/step-up');
     renderApp(<Routed />, { route: '/templates' });
     const u = userEvent.setup();
-    await upload(u, 'TPL-SITE-TE');
+    await upload(u, 'TPL-INSTALL');
     await screen.findByTestId('page-register-batch');
     await u.click(await screen.findByTestId('batch-submit'));
     await waitFor(() => expect(screen.getByTestId('batch-status')).toHaveTextContent('In approval'));
@@ -183,7 +183,7 @@ describe('TPL-MASTER upload', () => {
     await signIn('pm');
     renderApp(<Routed />, { route: '/templates' });
     const u = userEvent.setup();
-    await u.click(await screen.findByTestId('tpl-upload-TPL-SITE-CW'));
+    await u.click(await screen.findByTestId('tpl-upload-TPL-CIVIL'));
     await u.upload(await screen.findByTestId('template-upload-file'), new File(['otherstream'], 'te.xlsx'));
     await u.click(screen.getByTestId('template-upload-submit'));
     const err = await screen.findByTestId('template-upload-error');
@@ -205,13 +205,13 @@ describe('Arabic', () => {
     renderApp(<Routed />, { route: '/templates', locale: 'ar' });
     const u = userEvent.setup();
     expect(document.documentElement.dir).toBe('rtl');
-    expect(await screen.findByTestId('tpl-row-TPL-SITE-CW')).toHaveTextContent('الموقع 360: الأعمال المدنية');
+    expect(await screen.findByTestId('tpl-row-TPL-CIVIL')).toHaveTextContent('Site Master: الأعمال المدنية');
     expect(screen.getByTestId('tpl-kind-TPL-MASTER')).toHaveTextContent('الماستر كاملًا');
     expect(screen.getByTestId('tpl-streams-note')).toHaveTextContent('الأعمدة الرمادية');
     await u.click(screen.getByTestId('tpl-upload-TPL-MASTER'));
     expect(await screen.findByTestId('template-upload-rule-master')).toHaveTextContent('دفعة لكل مسار');
     await u.keyboard('{Escape}');
-    await u.click(await screen.findByTestId('tpl-upload-TPL-SITE-CW'));
+    await u.click(await screen.findByTestId('tpl-upload-TPL-CIVIL'));
     await u.upload(await screen.findByTestId('template-upload-file'), new File(['x'], 'cw.xlsx'));
     await u.click(screen.getByTestId('template-upload-submit'));
     await screen.findByTestId('page-register-batch');
@@ -229,7 +229,7 @@ describe('Batch of task rows with the shapes of the real API', () => {
   it('reads the answer of imp_stage_stream_batch: several rows per file row, warnings, held reasons and the source of a Master row', async () => {
     await signIn('pm');
     const batch = {
-      id: '0b3c9f3e-0000-4000-8000-000000000042', template_id: 'TPL-SITE-CW', template_version: 2, source: 'master_template', file_name: 'master.xlsx', status: 'in_approval', current_level: 2, levels_required: 2,
+      id: '0b3c9f3e-0000-4000-8000-000000000042', template_id: 'TPL-CIVIL', template_version: 2, source: 'master_template', file_name: 'master.xlsx', status: 'in_approval', current_level: 2, levels_required: 2,
       register_key: null, stream: 'CW', group_id: '0b3c9f3e-0000-4000-8000-000000000099', part_sheet: 'Master', note: null,
       counts: { create: 0, update: 2, unchanged: 0, error: 0, pending: 1, approved: 0, rejected: 0, held: 1 }, job_id: null, task_id: null, site_id: null,
       uploaded_by: { id: '1', display_name: 'Entry User', employee_id: '4001' }, uploaded_at: '2026-11-02T08:00:00.000Z', version: 3,

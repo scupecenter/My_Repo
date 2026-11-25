@@ -25,6 +25,15 @@ export function useQuarantineExit() {
     onSuccess: () => { void qc.invalidateQueries({ queryKey: ['wh-stock'] }); void qc.invalidateQueries({ queryKey: ['wh-movements'] }); },
   });
 }
+/** A reversal of a posted DN or RN: a new document of the counterpart type with the same lines, through the existing POST /warehouse/movements; it waits for the normal approval. */
+export type ReversalBody = { record_type: 'te_dn' | 'cw_dn' | 'te_rn' | 'cw_rn'; site_id: string; reason: string; remark: string; lines: { item_id: string; qty: number }[] };
+export function useReverseMovement() {
+  const qc = useQueryClient();
+  return useMutation<StockMovement, ApiError, ReversalBody>({
+    mutationFn: (body) => api.post<StockMovement>('/warehouse/movements', { body }),
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ['wh-stock'] }); void qc.invalidateQueries({ queryKey: ['wh-movements'] }); },
+  });
+}
 export const useConfigGaps = () => useQuery({ queryKey: ['wh-gaps'], queryFn: () => api.get<WarehouseConfigGaps>('/warehouse/config-gaps') });
 export const useAsBuiltItems = (f: { section: string; include_inactive: boolean }) =>
   useQuery({ queryKey: ['asbuilt-items', f], queryFn: () => api.get<List<AsBuiltItem>>('/as-built/items', { query: f }) });

@@ -16,15 +16,16 @@ describe('Site Master wide table', () => {
   it('the toggle sets layout=wide, keeps the other params and the default stays the list', async () => {
     await signIn('pm');
     renderApp(<App />, { route: '/sites?region_id=1' });
-    const btn = await screen.findByTestId('sites-layout-wide');
-    expect(btn).toHaveAttribute('aria-pressed', 'false');
+    const menu = await screen.findByTestId('sites-view');
+    await userEvent.click(menu);
+    expect(await screen.findByTestId('sites-layout-wide')).toHaveAttribute('aria-checked', 'false');
     expect(await screen.findByTestId('sites-list')).toBeTruthy();
     expect(screen.queryByTestId('sites-wide')).toBeNull();
-    await userEvent.click(btn);
+    await userEvent.click(screen.getByTestId('sites-layout-wide'));
     expect(await screen.findByTestId('sites-wide-table')).toBeTruthy();
     expect(screen.getByTestId('where').textContent).toContain('layout=wide');
     expect(screen.getByTestId('where').textContent).toContain('region_id=1');
-    expect(screen.getByTestId('sites-layout-wide')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('sites-view')).toHaveAttribute('aria-label', expect.stringContaining('Wide table'));
   });
 
   it('Site Master: #, Site ID, Site Information, the last stage, all in Master order, LTR, two frozen columns, empty cells say Not entered', async () => {
@@ -73,14 +74,14 @@ describe('Site Master wide table', () => {
     await screen.findByTestId('wide-row-S360-001');
     const row = screen.getByTestId('wide-row-S360-001');
     expect(within(row).getAllByText(/غير مُدخل/).length).toBeGreaterThan(0);
-    expect(screen.getByTestId('sites-layout-wide')).toHaveTextContent(/[؀-ۿ]/);
+    expect(screen.getByTestId('sites-view').getAttribute('aria-label')).toMatch(/[؀-ۿ]/);
     expect(screen.getByTestId('sites-wide-table')).toHaveAttribute('dir', 'ltr');
   });
 
   it('keeps the filters visible and sends the same URL filters as the sub-menu list to the rows endpoint', async () => {
     await signIn('pm');
     const urls: URL[] = [];
-    server.use(http.get(`${API_BASE}/site360/:menu/rows`, ({ request }) => { urls.push(new URL(request.url)); return HttpResponse.json({ total: 0, filtered: 0, offset: 0, limit: 200, rows: [] }); }));
+    server.use(http.get(`${API_BASE}/site-master/:menu/rows`, ({ request }) => { urls.push(new URL(request.url)); return HttpResponse.json({ total: 0, filtered: 0, offset: 0, limit: 200, rows: [] }); }));
     renderApp(<App />, { route: '/sites?section=te&layout=wide&region_id=1&scenario=expansion&overall_status=in_progress&q=abc' });
     await screen.findByTestId('sites-wide-table');
     // the unified filter (+ Filter) on the menu's screen, with the URL filters as chips
@@ -88,12 +89,12 @@ describe('Site Master wide table', () => {
     for (const k of ['q', 'region_id', 'scenario', 'overall_status']) expect(screen.getByTestId(`filter-chip-x-${k}`)).toBeTruthy();
     await waitFor(() => expect(urls.length).toBeGreaterThan(0));
     const p = urls[0]!.searchParams;
-    expect(urls[0]!.pathname).toContain('/site360/te/rows');
+    expect(urls[0]!.pathname).toContain('/site-master/te/rows');
     expect([p.get('region_id'), p.get('scenario'), p.get('status')]).toEqual(['1', 'expansion', 'in_progress']);
   });
 
   describe('editing', () => {
-    const rowsWithTargets = () => server.use(http.get(`${API_BASE}/site360/:menu/rows`, ({ request }) => {
+    const rowsWithTargets = () => server.use(http.get(`${API_BASE}/site-master/:menu/rows`, ({ request }) => {
       const values = { '4': 'Name', '5': 'Tripoli', '78': '2026-03-10', '33': 'outsourced' };
       return HttpResponse.json({ total: 2, filtered: 2, offset: 0, limit: 50, rows: [
         { site_id: 'a0000000-0000-4000-8000-000000000001', site_code: 'S360-001', row_no: 1, values, cells: { '78': { task_id: 'task-1', version: 3, editable: true, field: 'actual_date' }, '33': { task_id: 'task-1', version: 3, editable: false } } },
@@ -120,6 +121,28 @@ describe('Site Master wide table', () => {
       expect(screen.queryByTestId('wide-input-S360-001-78')).toBeNull();
     });
 
+    it('batch mode: edits of two sites wait with a Pending chip, nothing is sent until Save all, then each cell is saved with its own version', async () => {
+      patched.length = 0;
+      await signIn('pm'); rowsWithTargets(); ok();
+      renderApp(<App />, { route: '/sites?section=te&layout=wide' });
+      await userEvent.click(await screen.findByTestId('batch-start'));
+      for (const [code, d] of [['S360-001', '2026-05-01'], ['S360-002', '2026-05-02']] as const) {
+        await userEvent.click(await screen.findByTestId(`wide-edit-${code}-78`));
+        const input = screen.getByTestId(`wide-input-${code}-78`);
+        await userEvent.clear(input);
+        await userEvent.type(input, `${d}{Enter}`);
+      }
+      expect(await screen.findByTestId('sites-pending-S360-001-78')).toBeInTheDocument();
+      expect(screen.getByTestId('sites-pending-S360-002-78')).toBeInTheDocument();
+      expect(screen.getByTestId('batch-count')).toHaveTextContent('2');
+      expect(patched).toHaveLength(0);
+      await userEvent.click(screen.getByTestId('batch-save'));
+      await waitFor(() => expect(patched).toHaveLength(2));
+      expect(patched.map((x) => x.url.match(/tasks\/([^?]+)/)![1]).sort()).toEqual(['task-1', 'task-2']);
+      expect(patched.find((x) => x.url.includes('task-2'))!.ifMatch).toContain('7');
+      expect(patched.find((x) => x.url.includes('task-2'))!.body).toEqual({ actual_date: '2026-05-02' });
+    });
+
     it('Esc cancels without saving; a locked or computed cell has no editor and says why', async () => {
       patched.length = 0;
       await signIn('pm'); rowsWithTargets(); ok();
@@ -144,7 +167,7 @@ describe('Site Master wide table', () => {
       expect(screen.getByTestId('wide-input-S360-001-78')).toBeTruthy(); // the editor stays open with the draft
     });
 
-    const typed = () => server.use(http.get(`${API_BASE}/site360/:menu/rows`, () => HttpResponse.json({ total: 1, filtered: 1, offset: 0, limit: 50, rows: [
+    const typed = () => server.use(http.get(`${API_BASE}/site-master/:menu/rows`, () => HttpResponse.json({ total: 1, filtered: 1, offset: 0, limit: 50, rows: [
       { site_id: 'a0000000-0000-4000-8000-000000000001', site_code: 'S360-001', row_no: 1, values: { '4': 'Name', '24': '12', '33': 'B', '157': 'true' }, cells: {
         '24': { task_id: 'task-1', version: 3, editable: true, values: 'height', input_type: 'number' },
         '33': { task_id: 'task-1', version: 3, editable: true, values: 'grade', input_type: 'list', options: [{ value: 'A', label_en: 'Grade A', label_ar: 'الدرجة أ' }, { value: 'B', label_en: 'Grade B', label_ar: null }] },

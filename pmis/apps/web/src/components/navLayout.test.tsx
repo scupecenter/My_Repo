@@ -16,17 +16,18 @@ const app = (locale: 'en' | 'ar' = 'en') =>
   renderApp(<Routes><Route element={<Shell />}><Route path="*" element={<div />} /></Route></Routes>, { route: '/my-work', locale });
 const store = (layout: unknown) => { db().cfg.navLayout = { layout, version: 7, updated_at: null, updated_by: null }; save(); };
 const keysIn = (testid: string) => [...screen.getByTestId(testid).querySelectorAll(':scope > a, :scope > div > a, :scope > div > div > a')]
-  .map((a) => a.getAttribute('data-testid')).filter((x) => x && !x.startsWith('nav-sites-'));
+  .map((a) => a.getAttribute('data-testid')).filter((x) => x && !x.startsWith('nav-sites-') && !x.startsWith('nav-group-open-'));
 const editItems = (id: string) => [...screen.getByTestId(`nav-edit-heading-${id}`).querySelectorAll(':scope > ul > li[data-testid^="nav-edit-item-"]')].map((li) => li.getAttribute('data-testid')!.slice('nav-edit-item-'.length));
 const key = (ref: string, k: string) => fireEvent.keyDown(screen.getByTestId(`nav-edit-handle-${ref}`), { key: k });
 const live = () => screen.getByTestId('nav-edit-live').textContent ?? '';
 
 describe('the layout model (lib/navLayout)', () => {
-  it('the default is the six groups of the code with their screens in NAV order', () => {
+  it('the default is the seven groups of the code with their screens in NAV order', () => {
     const d = defaultLayout();
-    expect(d.headings.map((h) => h.id)).toEqual(['work', 'site_register', 'registers', 'data', 'library', 'admin', 'logs']);
-    expect(d.headings[1]).toMatchObject({ name_en: 'Site Master', name_ar: 'ماستر المواقع', children: ['sites'] });
-    expect(d.headings[0]!.children).toEqual(['my_work', 'daily_plan', 'inbox', 'approvals', 'workload', 'status_updates', 'dashboard', 'messages', 'absence']);
+    expect(d.headings.map((h) => h.id)).toEqual(['home', 'work', 'site_register', 'registers', 'data', 'library', 'admin', 'logs']);
+    expect(d.headings[0]!.children).toEqual(['dashboard']); // Dashboard is the first main entry on its own (owner, 2026-11-25)
+    expect(d.headings[2]).toMatchObject({ name_en: 'Site Master', name_ar: 'ماستر المواقع', children: ['sites'] });
+    expect(d.headings[1]!.children).toEqual(['my_work', 'daily_plan', 'inbox', 'approvals', 'workload', 'status_updates', 'messages', 'absence']);
     expect(resolveLayout(null)).toEqual(d);
   });
 
@@ -68,42 +69,42 @@ describe('the layout model (lib/navLayout)', () => {
 
   it('moves with the keyboard: into and out of a sub-heading, across main headings, and stops at the ends', () => {
     let l: Layout = addSub(defaultLayout(), 'work', { name_en: 'Talk', name_ar: 'تواصل', icon: null });
-    const sub = (l.headings[0]!.children.at(-1) as { id: string }).id;
+    const sub = (l.headings[1]!.children.at(-1) as { id: string }).id;
     l = keyMove(l, itemRef('absence'), 1)!; // the last item steps into the sub-heading below it
-    expect(l.headings[0]!.children.at(-1)).toMatchObject({ id: sub, children: ['absence'] });
+    expect(l.headings[1]!.children.at(-1)).toMatchObject({ id: sub, children: ['absence'] });
     l = keyMove(l, itemRef('absence'), 1)!; // out of the sub-heading, after it
-    expect(l.headings[0]!.children.at(-1)).toBe('absence');
+    expect(l.headings[1]!.children.at(-1)).toBe('absence');
     l = keyMove(l, itemRef('absence'), 1)!; // into the next main heading, first
-    expect(l.headings[1]!.children[0]).toBe('absence');
-    expect(keyMove(l, headRef('work'), -1)).toBeNull();
+    expect(l.headings[2]!.children[0]).toBe('absence');
+    expect(keyMove(l, headRef('home'), -1)).toBeNull();
     expect(keyMove(l, headRef('logs'), 1)).toBeNull();
     expect(keyMove(l, headRef('logs'), -1)!.headings.map((h) => h.id).slice(-2)).toEqual(['logs', 'admin']);
     const s2 = keyMove(l, headRef(sub), 1)!; // a sub-heading moves to the next main heading
-    expect(s2.headings[1]!.children[0]).toMatchObject({ id: sub });
+    expect(s2.headings[2]!.children[0]).toMatchObject({ id: sub });
   });
 
   it('drops with the pointer: reorders, moves into another heading or sub-heading, moves a sub-heading under another main heading, never into itself', () => {
     let l = addSub(defaultLayout(), 'registers', { name_en: 'Power', name_ar: 'الطاقة', icon: 'power' });
-    const sub = (l.headings[2]!.children.at(-1) as { id: string }).id;
+    const sub = (l.headings[3]!.children.at(-1) as { id: string }).id;
     l = dropOn(l, itemRef('gecol'), `end:${sub}`)!;
-    expect(l.headings[2]!.children).not.toContain('gecol');
-    expect(l.headings[2]!.children.at(-1)).toMatchObject({ children: ['gecol'] });
+    expect(l.headings[3]!.children).not.toContain('gecol');
+    expect(l.headings[3]!.children.at(-1)).toMatchObject({ children: ['gecol'] });
     l = dropOn(l, itemRef('my_work'), itemRef('approvals'))!; // the same list: takes the place of the target
-    expect(l.headings[0]!.children.slice(0, 4)).toEqual(['daily_plan', 'inbox', 'approvals', 'my_work']);
+    expect(l.headings[1]!.children.slice(0, 4)).toEqual(['daily_plan', 'inbox', 'approvals', 'my_work']);
     l = dropOn(l, itemRef('templates'), itemRef('sites'))!; // another list: before the target
-    expect(l.headings[1]!.children).toEqual(['templates', 'sites']);
+    expect(l.headings[2]!.children).toEqual(['templates', 'sites']);
     l = dropOn(l, headRef(sub), headRef('logs'))!;
-    expect(l.headings[6]!.children.at(-1)).toMatchObject({ id: sub });
+    expect(l.headings[7]!.children.at(-1)).toMatchObject({ id: sub });
     expect(dropOn(l, headRef(sub), itemRef('gecol'))).toBeNull();
     expect(dropOn(l, headRef('work'), headRef('logs'))!.headings.map((h) => h.id).at(-1)).toBe('work');
   });
 
   it('deleting a heading never deletes a screen: a sub-heading gives its screens to its main heading, a main heading to Other', () => {
     let l = addSub(defaultLayout(), 'admin', { name_en: 'People', name_ar: 'الأشخاص', icon: null });
-    const sub = (l.headings[5]!.children.at(-1) as { id: string }).id;
+    const sub = (l.headings[6]!.children.at(-1) as { id: string }).id;
     l = dropOn(l, itemRef('admin.users'), `end:${sub}`)!;
     l = removeHeading(l, sub)!;
-    expect(l.headings[5]!.children).toEqual(['admin.settings', 'announcements', 'admin.users']);
+    expect(l.headings[6]!.children).toEqual(['admin.settings', 'announcements', 'admin.users']);
     l = removeHeading(l, 'admin')!;
     expect(l.headings.at(-1)).toMatchObject({ id: OTHER_ID, children: ['admin.settings', 'announcements', 'admin.users'] });
     expect(removeHeading(l, OTHER_ID)).toBeNull(); // Other with screens stays
@@ -126,7 +127,7 @@ describe('the side menu with a shared layout', () => {
       headings: d.headings.map((h) => (h.id === 'site_register' ? { ...h, name_en: 'SITE 360', children: ['sites', 'dismantle'] } : h.id === 'registers' ? { ...h, children: h.children.filter((k) => k !== 'dismantle').reverse() } : h)),
     };
     const r = resolveLayout(saved);
-    expect(r.headings.find((h) => h.id === 'site_register')).toMatchObject({ name_en: 'SITE 360', children: ['sites'] });
+    expect(r.headings.find((h) => h.id === 'site_register')).toMatchObject({ name_en: 'Site Master', name_ar: 'ماستر المواقع', children: ['sites'] }); // a layout saved under the old name shows the current one
     const regs = r.headings.find((h) => h.id === 'registers')!;
     expect(regs.children.at(-1)).toBe('dismantle');
     expect(regs.children.filter((k) => k === 'dismantle')).toHaveLength(1);
@@ -150,7 +151,7 @@ describe('the side menu with a shared layout', () => {
     expect(r3.headings[0]!.children).toEqual(['dismantle']);
   });
 
-  it('a saved SITE 360 heading holding sites and dismantle renders as the one Site Master row, with six sub-menus and Dismantle under Registers & Logs', async () => {
+  it('a saved Site Master heading holding sites and dismantle renders as the one Site Master row, with six sub-menus and Dismantle under Registers & Logs', async () => {
     const d = defaultLayout();
     store({ headings: d.headings.map((h) => (h.id === 'site_register' ? { ...h, name_en: 'SITE 360', name_ar: 'سايت 360', children: ['sites', 'dismantle'] } : h.id === 'registers' ? { ...h, children: h.children.filter((k) => k !== 'dismantle') } : h)) });
     await signIn('pm');
@@ -159,8 +160,8 @@ describe('the side menu with a shared layout', () => {
     expect(screen.queryByTestId('nav-group-toggle-site_register')).not.toBeInTheDocument();
     expect(screen.queryByText('SITE 360')).not.toBeInTheDocument();
     expect(screen.getByTestId('nav-sites')).toHaveTextContent(/^Site Master$/);
-    expect(screen.getByTestId('nav-site360-menus').querySelectorAll('a')).toHaveLength(6);
-    expect(screen.queryByTestId('nav-site360-dismantle')).not.toBeInTheDocument();
+    expect(screen.getByTestId('nav-site-master-menus').querySelectorAll('a')).toHaveLength(6);
+    expect(screen.queryByTestId('nav-site-master-dismantle')).not.toBeInTheDocument();
     expect(screen.getByTestId('nav-group-registers')).toContainElement(screen.getByTestId('nav-dismantle'));
     expect(screen.getByTestId('nav-group-site_register')).not.toContainElement(screen.getByTestId('nav-dismantle'));
   });
@@ -205,13 +206,13 @@ describe('the side menu with a shared layout', () => {
     expect(screen.getByTestId('nav-editor')).toBeInTheDocument();
     expect(editItems('work').slice(0, 4)).toEqual(['my_work', 'daily_plan', 'inbox', 'approvals']);
     key('i:approvals', ' ');
-    expect(live()).toMatch(/Approvals picked up: position 4 of 9 in Work/);
+    expect(live()).toMatch(/Approvals picked up: position 4 of 8 in Work/);
     key('i:approvals', 'ArrowUp');
     key('i:approvals', 'ArrowUp');
     key('i:approvals', 'ArrowUp');
-    expect(live()).toMatch(/Approvals: position 1 of 9 in Work/);
+    expect(live()).toMatch(/Approvals: position 1 of 8 in Work/);
     key('i:approvals', ' ');
-    expect(live()).toMatch(/Approvals dropped at position 1 of 9 in Work/);
+    expect(live()).toMatch(/Approvals dropped at position 1 of 8 in Work/);
     expect(editItems('work').slice(0, 4)).toEqual(['approvals', 'my_work', 'daily_plan', 'inbox']);
     expect(screen.getByTestId('nav-edit-handle-i:approvals')).toHaveFocus();
     // Escape puts a move back
@@ -225,7 +226,7 @@ describe('the side menu with a shared layout', () => {
     key('h:logs', 'ArrowUp');
     key('h:logs', 'Enter');
     expect([...screen.getByTestId('nav-edit-tree').children].map((li) => li.getAttribute('data-testid'))).toEqual(
-      ['work', 'site_register', 'registers', 'data', 'library', 'logs', 'admin'].map((id) => `nav-edit-heading-${id}`));
+      ['home', 'work', 'site_register', 'registers', 'data', 'library', 'logs', 'admin'].map((id) => `nav-edit-heading-${id}`));
 
     await u.click(screen.getByTestId('nav-edit-save'));
     const dlg = await screen.findByTestId('nav-edit-confirm');
@@ -235,7 +236,7 @@ describe('the side menu with a shared layout', () => {
     await u.click(within(dlg).getByTestId('nav-edit-confirm-submit'));
     await waitFor(() => expect(screen.queryByTestId('nav-editor')).not.toBeInTheDocument());
     expect(keysIn('nav-group-work').slice(0, 4)).toEqual(['nav-approvals', 'nav-my_work', 'nav-daily_plan', 'nav-inbox']);
-    expect((db().cfg.navLayout.layout as Layout).headings[0]!.children.slice(0, 2)).toEqual(['approvals', 'my_work']);
+    expect((db().cfg.navLayout.layout as Layout).headings[1]!.children.slice(0, 2)).toEqual(['approvals', 'my_work']);
     expect(db().cfg.navLayout.version).toBe(2);
   }, 30_000);
 
@@ -253,14 +254,14 @@ describe('the side menu with a shared layout', () => {
     await u.selectOptions(within(dlg).getByTestId('nav-heading-icon'), 'site');
     await u.click(within(dlg).getByTestId('nav-heading-dialog-submit'));
     await waitFor(() => expect(screen.queryByTestId('nav-heading-dialog')).not.toBeInTheDocument());
-    expect(screen.getByTestId('nav-edit-name-h8')).toHaveTextContent('Field work');
+    expect(screen.getByTestId('nav-edit-name-h9')).toHaveTextContent('Field work');
 
-    await u.click(screen.getByTestId('nav-edit-add-sub-h8'));
+    await u.click(screen.getByTestId('nav-edit-add-sub-h9'));
     dlg = await screen.findByTestId('nav-heading-dialog');
     await u.type(within(dlg).getByTestId('nav-heading-en'), 'Power');
     await u.type(within(dlg).getByTestId('nav-heading-ar'), 'الطاقة');
     await u.click(within(dlg).getByTestId('nav-heading-dialog-submit'));
-    await waitFor(() => expect(screen.getByTestId('nav-edit-heading-h9')).toHaveAttribute('data-depth', '2'));
+    await waitFor(() => expect(screen.getByTestId('nav-edit-heading-h10')).toHaveAttribute('data-depth', '2'));
 
     // move "Mail delivery" (last of Logs) down: into the next main heading (Field work), then into its sub-heading Power
     key('i:logs.mail', ' ');
@@ -269,12 +270,12 @@ describe('the side menu with a shared layout', () => {
     key('i:logs.mail', 'ArrowDown');
     expect(live()).toMatch(/in Power/);
     key('i:logs.mail', ' ');
-    expect(screen.getByTestId('nav-edit-heading-h9')).toContainElement(screen.getByTestId('nav-edit-item-logs.mail'));
+    expect(screen.getByTestId('nav-edit-heading-h10')).toContainElement(screen.getByTestId('nav-edit-item-logs.mail'));
 
     // deleting the sub-heading moves its screen to the main heading; deleting the main heading moves it to Other
+    await u.click(screen.getByTestId('nav-edit-delete-h10'));
+    expect(editItems('h9')).toEqual(['logs.mail']);
     await u.click(screen.getByTestId('nav-edit-delete-h9'));
-    expect(editItems('h8')).toEqual(['logs.mail']);
-    await u.click(screen.getByTestId('nav-edit-delete-h8'));
     expect(editItems(OTHER_ID)).toEqual(['logs.mail']);
     expect(live()).toMatch(/moved to Other/);
     expect(screen.getByTestId('nav-edit-delete-other')).toBeDisabled();

@@ -6,7 +6,7 @@ import { useNavLayout } from '@/api/settings';
 import { ICONS, ICON_PROPS } from '@/lib/icons';
 import { loadPref, savePref } from '@/lib/localPref';
 import { headingIcon, headingName, keysOf, resolveLayout, type NavHead, type NavSub } from '@/lib/navLayout';
-import { SITE360_SUBMENUS } from '@/lib/site360Menus';
+import { SITE_MASTER_SUBMENUS } from '@/lib/siteMasterMenus';
 import { NavLayoutEditor } from './NavLayoutEditor';
 import type { NavItem } from './navItems';
 
@@ -26,7 +26,7 @@ export function siteSelection(pathname: string, search: string): { stream: strin
   return { stream: p.get('stream') ?? '', view: p.get('view') ?? '', section: p.get('section') ?? '' };
 }
 
-/** The six SITE 360 sub-menus under "Site Master" (owner decision 2026-11-15, F15; the Master parent is the entry itself). Each opens `/sites?section=`. */
+/** The six Site Master sub-menus under "Site Master" (owner decision 2026-11-15, F15; the Master parent is the entry itself). Each opens `/sites?section=`. */
 function SiteSubmenus({ onNavigate }: { onNavigate?: () => void }) {
   const { t, i18n } = useTranslation();
   const loc = useLocation();
@@ -36,14 +36,41 @@ function SiteSubmenus({ onNavigate }: { onNavigate?: () => void }) {
       className={`block rounded-md px-2 py-1.5 text-sm ${on ? 'bg-sideOn font-semibold text-accentText' : 'text-mute hover:bg-hover'}`}>{text}</Link>
   );
   return (
-    <div className="ms-6 border-s border-line ps-1" role="group" aria-label={t('site360.menus')} data-testid="nav-site360-menus">
-      {SITE360_SUBMENUS.map((m) => item(`nav-site360-${m.key}`, `/sites?section=${m.key}`, sel.section === m.key, i18n.language === 'ar' ? m.ar : m.en))}
+    <div className="ms-6 border-s border-line ps-1" role="group" aria-label={t('siteMaster.menus')} data-testid="nav-site-master-menus">
+      {SITE_MASTER_SUBMENUS.map((m) => item(`nav-site-master-${m.key}`, `/sites?section=${m.key}`, sel.section === m.key, i18n.language === 'ar' ? m.ar : m.en))}
+    </div>
+  );
+}
+
+/**
+ * Hover (and keyboard focus) on a parent row opens its sub-menus beside it, in the icon rail and when the arrow has them closed. The arrow, the click and
+ * touch keep working as before: this is only a faster way to the same links (SiteSubmenus), it adds no second menu.
+ */
+function SubmenuFlyout({ enabled, onNavigate, children, panel, testid = 'nav-flyout-sites' }: { enabled: boolean; onNavigate?: () => void; children: ReactNode; panel?: (close: () => void) => ReactNode; testid?: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left?: number; right?: number } | null>(null);
+  const show = () => {
+    const r = ref.current?.getBoundingClientRect();
+    if (!enabled || !r) return;
+    const rtl = document.documentElement.dir === 'rtl';
+    setPos(rtl ? { top: r.top, right: window.innerWidth - r.left } : { top: r.top, left: r.right });
+  };
+  return (
+    <div ref={ref} onMouseEnter={show} onMouseLeave={() => setPos(null)} onFocus={show}
+      onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setPos(null); }}
+      onKeyDown={(e) => { if (e.key === 'Escape') setPos(null); }}>
+      {children}
+      {enabled && pos && (
+        <div className="fixed z-50 min-w-48 rounded-md border border-line bg-card p-1 shadow-lg" style={pos} data-testid={testid}>
+          {panel ? panel(() => { setPos(null); onNavigate?.(); }) : <SiteSubmenus onNavigate={() => { setPos(null); onNavigate?.(); }} />}
+        </div>
+      )}
     </div>
   );
 }
 
 /** Collapsible tree, favourites, recent items, filter, icon-only mode. Nav items arrive already filtered by the server's permission list. */
-export function SidebarBody({ items, compact, unread, alerts = 0, activeKey, onNavigate }: { items: NavItem[]; compact: boolean; unread: number; alerts?: number; activeKey: string | undefined; onNavigate?: () => void }) {
+export function SidebarBody({ items, compact, unread, alerts = 0, counts = {}, activeKey, onNavigate }: { items: NavItem[]; compact: boolean; unread: number; alerts?: number; /** waiting counts the API already gives (Approvals, My Work), by nav key */ counts?: Record<string, number>; activeKey: string | undefined; onNavigate?: () => void }) {
   const { t, i18n } = useTranslation();
   const loc = useLocation();
   // The shared layout of the menu (contract 0.15.1): the default of the code until a System Admin saves one, or when it cannot be read.
@@ -59,7 +86,7 @@ export function SidebarBody({ items, compact, unread, alerts = 0, activeKey, onN
   const label = (n: NavItem) => t(n.key === 'sites' ? 'nav.sites_all' : `nav.${n.key}`);
   const byKey = (k: string) => items.find((i) => i.key === k);
   const sel = siteSelection(loc.pathname, loc.search);
-  const subOn = SITE360_SUBMENUS.some((m) => m.key === sel.section);
+  const subOn = SITE_MASTER_SUBMENUS.some((m) => m.key === sel.section);
 
   // Recent items: adjust state while rendering when the active page changes (no effect needed).
   const [seen, setSeen] = useState<string | undefined>();
@@ -86,6 +113,9 @@ export function SidebarBody({ items, compact, unread, alerts = 0, activeKey, onN
         {badge && n.key === 'messages' && unread > 0 && (compact
           ? <span data-testid="messages-badge" aria-label={t('messages.unread_count', { count: unread })} className="h-2 w-2 rounded-full bg-accent" />
           : <span data-testid="messages-badge" aria-label={t('messages.unread_count', { count: unread })} className="grid h-5 min-w-5 place-items-center rounded-full bg-accent px-1 text-xs text-accentInk">{unread}</span>)}
+        {badge && (counts[n.key] ?? 0) > 0 && (compact
+          ? <span data-testid={`${n.key}-badge`} aria-label={t('nav.waiting_count', { count: counts[n.key] })} className="h-2 w-2 rounded-full bg-accent" />
+          : <span data-testid={`${n.key}-badge`} aria-label={t('nav.waiting_count', { count: counts[n.key] })} className="grid h-5 min-w-5 place-items-center rounded-full bg-accent px-1 text-xs text-accentInk">{(counts[n.key] ?? 0) > 99 ? '99+' : counts[n.key]}</span>)}
         {n.key === 'logs.alerts' && alerts > 0 && (compact
           ? <span data-testid="alerts-badge" aria-label={t('logs.open_alerts', { count: alerts })} className="h-2 w-2 rounded-full bg-late" />
           : <span data-testid="alerts-badge" aria-label={t('logs.open_alerts', { count: alerts })} className="grid h-5 min-w-5 place-items-center rounded-full bg-late px-1 text-xs text-white">{alerts}</span>)}
@@ -115,14 +145,15 @@ export function SidebarBody({ items, compact, unread, alerts = 0, activeKey, onN
   const favItems = favs.map(byKey).filter((x): x is NavItem => !!x);
   const recentItems = recent.filter((k) => k !== activeKey).map(byKey).filter((x): x is NavItem => !!x);
 
-  /** A screen of a heading. The Site Register entry "Site Master" carries the six SITE 360 sub-menus (no Dismantle); every other screen, Dismantle included, is a plain row (under Registers & Logs). */
+  /** A screen of a heading. The Site Register entry "Site Master" carries the six Site Master sub-menus (no Dismantle); every other screen, Dismantle included, is a plain row (under Registers & Logs). */
   const itemNode = (k: string) => {
     const n = byKey(k);
     if (!n) return null;
+    if (n.key === 'sites' && compact) return <SubmenuFlyout key={n.key} enabled onNavigate={onNavigate}>{row(n, { testid: `nav-${n.key}`, extra: pin(n) })}</SubmenuFlyout>;
     if (n.key !== 'sites' || compact) return row(n, { testid: `nav-${n.key}`, extra: pin(n) });
     return (
       <div key={n.key}>
-        {row(n, {
+        <SubmenuFlyout enabled={!sitesOpen} onNavigate={onNavigate}>{row(n, {
           testid: `nav-${n.key}`,
           active: loc.pathname.startsWith('/sites') && !subOn, plain: true,
           extra: (
@@ -133,7 +164,7 @@ export function SidebarBody({ items, compact, unread, alerts = 0, activeKey, onN
               {pin(n)}
             </>
           ),
-        })}
+        })}</SubmenuFlyout>
         {sitesOpen && <SiteSubmenus onNavigate={onNavigate} />}
       </div>
     );
@@ -143,7 +174,7 @@ export function SidebarBody({ items, compact, unread, alerts = 0, activeKey, onN
     const visible = keysOf(h).filter((k) => byKey(k));
     if (!visible.length) return null;
     // A heading whose only screen is the Site Register entry is not drawn twice: that entry is the one "Site Master" row (owner request 2026-11-22).
-    const solo = !sub && h.children.length === 1 && h.children[0] === 'sites';
+    const solo = !sub && h.children.length === 1 && (h.children[0] === 'sites' || h.id === 'home');
     const open = compact || solo || !collapsed.includes(h.id);
     const hasActive = visible.some((k) => k === activeKey) || (visible.includes('sites') && loc.pathname.startsWith('/sites'));
     const concept = headingIcon(h);
@@ -153,12 +184,27 @@ export function SidebarBody({ items, compact, unread, alerts = 0, activeKey, onN
         {compact
           ? (!sub && <div className="mx-2 my-1 border-t border-line" aria-hidden />)
           : solo ? null : (
-            <button type="button" data-testid={`nav-group-toggle-${h.id}`} aria-expanded={open} onClick={() => toggleGroup(h.id)}
-              className={`flex w-full items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold hover:bg-hover ${hasActive ? 'text-accentText' : 'text-mute'}`}>
-              <ChevronRight size={14} aria-hidden className={`transition-transform motion-reduce:transition-none ${open ? 'rotate-90 rtl:-rotate-90' : 'rtl:rotate-180'}`} />
-              {Icon && <Icon {...ICON_PROPS} size={14} className="shrink-0" />}
-              {headingName(h, i18n.language)}
-            </button>
+            <SubmenuFlyout enabled={!open} onNavigate={onNavigate} testid={`nav-flyout-${h.id}`}
+              panel={(close) => (
+                <div role="group" aria-label={headingName(h, i18n.language)} className="min-w-48">
+                  {visible.map((k) => { const n = byKey(k)!; const Icon = ICONS[n.icon]; return (
+                    <Link key={k} to={n.to} onClick={close} data-testid={`nav-flyout-${h.id}-${k}`} aria-current={k === activeKey ? 'page' : undefined}
+                      className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-sm ${k === activeKey ? 'bg-sideOn font-semibold text-accentText' : 'text-mute hover:bg-hover'}`}><Icon {...ICON_PROPS} size={16} className="shrink-0" />{label(n)}</Link>
+                  ); })}
+                </div>
+              )}>
+            <div className={`flex w-full items-center gap-1 rounded-md px-1 text-xs font-semibold hover:bg-hover ${hasActive ? 'text-accentText' : 'text-mute'}`}>
+              {/* the arrow opens and closes the list; the name opens the group's own page (like the Site Master row) */}
+              <button type="button" data-testid={`nav-group-toggle-${h.id}`} aria-expanded={open} aria-label={`${t(open ? 'nav.collapse' : 'nav.expand')}: ${headingName(h, i18n.language)}`} onClick={() => toggleGroup(h.id)} className="rounded-md p-1">
+                <span className="sr-only">{headingName(h, i18n.language)}</span>
+                <ChevronRight size={14} aria-hidden className={`transition-transform motion-reduce:transition-none ${open ? 'rotate-90 rtl:-rotate-90' : 'rtl:rotate-180'}`} />
+              </button>
+              <Link to={`/menu/${h.id}`} onClick={onNavigate} data-testid={`nav-group-open-${h.id}`} aria-current={loc.pathname === `/menu/${h.id}` ? 'page' : undefined} className="flex min-w-0 flex-1 items-center gap-1 py-1">
+                {Icon && <Icon {...ICON_PROPS} size={14} className="shrink-0" />}
+                <span className="truncate">{headingName(h, i18n.language)}</span>
+              </Link>
+            </div>
+            </SubmenuFlyout>
           )}
         {open && h.children.map((c) => (typeof c === 'string' ? itemNode(c) : renderHeading(c, true)))}
       </div>

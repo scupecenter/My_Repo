@@ -23,7 +23,7 @@ SELECT count(*) FROM import_uploads;
 -- @region *
 -- @expect error 42501 permission denied
 INSERT INTO import_uploads (actor_id, kind, template_id, template_version, file_name, file_sha256, mode, units, units_total, file_rows, unit_rows_total)
-VALUES ('{{ALICE}}', 'single', 'TPL-SITE-CW', 1, 'forged.xlsx', repeat('d', 64), 'submit', '[]'::jsonb, 1, 1, 1);
+VALUES ('{{ALICE}}', 'single', 'TPL-CIVIL', 1, 'forged.xlsx', repeat('d', 64), 'submit', '[]'::jsonb, 1, 1, 1);
 -- @end
 
 -- @case AU-03
@@ -69,7 +69,7 @@ SELECT imp_stream_close('{"version_id": "00000000-0000-4000-8000-0000000c0001", 
 -- @actor ALICE
 -- @region 1
 -- @expect error 42501 permission denied
-SELECT imp_insert_task_batch('00000000-0000-4000-8000-0000000c0001', 'TPL-SITE-CW', 'CW', 'f.xlsx', repeat('e', 64), NULL, 'Data', '[]'::jsonb, NULL, NULL, 'template');
+SELECT imp_insert_task_batch('00000000-0000-4000-8000-0000000c0001', 'TPL-CIVIL', 'CW', 'f.xlsx', repeat('e', 64), NULL, 'Data', '[]'::jsonb, NULL, NULL, 'template');
 -- @end
 
 -- @case AU-08
@@ -96,7 +96,7 @@ SELECT imp_upload_close('00000000-0000-4000-8000-0000000c0002', 'done', NULL, NU
 -- @actor ALICE
 -- @region 1
 -- @expect error 42501 permission denied
-SELECT imp_batch_post('00000000-0000-4000-8000-0000000c0003', 'TPL-SITE-CW', '{"file_v": 1, "version": 2}'::jsonb);
+SELECT imp_batch_post('00000000-0000-4000-8000-0000000c0003', 'TPL-CIVIL', '{"file_v": 1, "version": 2}'::jsonb);
 -- @end
 
 -- @case AU-11
@@ -135,7 +135,7 @@ SELECT mi_stage_open('f.xlsx', repeat('e', 64), 1, NULL, '["Master"]'::jsonb, '[
 -- @expect error 42501 no signed-in actor
 SET app.user_id = '{{ADMIN}}';
 SET app.region_ids = '*';
-SELECT imp_upload_start('TPL-SITE-CW', 1, NULL, 'single', 'f.xlsx', repeat('a', 64), NULL, 'submit', NULL, '[]'::jsonb, '[]'::jsonb, 60, NULL);
+SELECT imp_upload_start('TPL-CIVIL', 1, NULL, 'single', 'f.xlsx', repeat('a', 64), NULL, 'submit', NULL, '[]'::jsonb, '[]'::jsonb, 60, NULL);
 -- @end
 
 -- @case AU-21
@@ -171,9 +171,9 @@ SELECT imp_uploads_running_json()::text || '|' || coalesce((SELECT mi_run_stagin
 -- @actor ADMIN
 -- @region *
 -- @expect output running|1|1
-SELECT imp_upload_start('TPL-SITE-CW', v.version, v.header_checksum, 'single', 'sec-up.xlsx', repeat('a', 64), NULL, 'submit', NULL,
+SELECT imp_upload_start('TPL-CIVIL', v.version, v.header_checksum, 'single', 'sec-up.xlsx', repeat('a', 64), NULL, 'submit', NULL,
   '[{"row_no": 2, "sheet": "Data", "site_code": "NO-SUCH-SITE", "cells": {}, "pre_errors": []}]'::jsonb, '[]'::jsonb, 1, NULL) ->> 'upload_id' AS uid
-FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-SITE-CW' AND v.is_current \gset
+FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-CIVIL' AND v.is_current \gset
 SELECT (imp_upload_json(:'uid'::uuid) ->> 'state') || '|' || jsonb_array_length(imp_uploads_running_json()) || '|' || (SELECT count(*) FROM imp_upload_pending(0) WHERE upload_id = :'uid'::uuid);
 -- @end
 
@@ -183,9 +183,9 @@ SELECT (imp_upload_json(:'uid'::uuid) ->> 'state') || '|' || jsonb_array_length(
 -- @actor ADMIN
 -- @region *
 -- @expect output none|0
-SELECT imp_upload_start('TPL-SITE-CW', v.version, v.header_checksum, 'single', 'sec-up.xlsx', repeat('a', 64), NULL, 'submit', NULL,
+SELECT imp_upload_start('TPL-CIVIL', v.version, v.header_checksum, 'single', 'sec-up.xlsx', repeat('a', 64), NULL, 'submit', NULL,
   '[{"row_no": 2, "sheet": "Data", "site_code": "NO-SUCH-SITE", "cells": {}, "pre_errors": []}]'::jsonb, '[]'::jsonb, 1, NULL) ->> 'upload_id' AS uid
-FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-SITE-CW' AND v.is_current \gset
+FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-CIVIL' AND v.is_current \gset
 \ctx ALICE
 SELECT coalesce(imp_upload_json(:'uid'::uuid)::text, 'none') || '|' || jsonb_array_length(imp_uploads_running_json());
 -- @end
@@ -196,9 +196,9 @@ SELECT coalesce(imp_upload_json(:'uid'::uuid)::text, 'none') || '|' || jsonb_arr
 -- @actor ADMIN
 -- @region *
 -- @expect error 42501 only the person who uploaded the file
-SELECT imp_upload_start('TPL-SITE-CW', v.version, v.header_checksum, 'single', 'sec-up.xlsx', repeat('a', 64), NULL, 'submit', NULL,
+SELECT imp_upload_start('TPL-CIVIL', v.version, v.header_checksum, 'single', 'sec-up.xlsx', repeat('a', 64), NULL, 'submit', NULL,
   '[{"row_no": 2, "sheet": "Data", "site_code": "NO-SUCH-SITE", "cells": {}, "pre_errors": []}]'::jsonb, '[]'::jsonb, 1, NULL) ->> 'upload_id' AS uid
-FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-SITE-CW' AND v.is_current \gset
+FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-CIVIL' AND v.is_current \gset
 \ctx ALICE
 SELECT imp_upload_step(:'uid'::uuid, 100);
 -- @end
@@ -209,9 +209,9 @@ SELECT imp_upload_step(:'uid'::uuid, 100);
 -- @actor ADMIN
 -- @region *
 -- @expect error 42501 only the person who uploaded the file
-SELECT imp_upload_start('TPL-SITE-CW', v.version, v.header_checksum, 'single', 'sec-up.xlsx', repeat('a', 64), NULL, 'submit', NULL,
+SELECT imp_upload_start('TPL-CIVIL', v.version, v.header_checksum, 'single', 'sec-up.xlsx', repeat('a', 64), NULL, 'submit', NULL,
   '[{"row_no": 2, "sheet": "Data", "site_code": "NO-SUCH-SITE", "cells": {}, "pre_errors": []}]'::jsonb, '[]'::jsonb, 1, NULL) ->> 'upload_id' AS uid
-FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-SITE-CW' AND v.is_current \gset
+FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-CIVIL' AND v.is_current \gset
 \ctx ALICE
 SELECT imp_upload_abandon(:'uid'::uuid, 'not mine');
 -- @end
@@ -222,12 +222,12 @@ SELECT imp_upload_abandon(:'uid'::uuid, 'not mine');
 -- @actor ADMIN
 -- @region *
 -- @expect error P0001 upload_processing
-SELECT imp_upload_start('TPL-SITE-CW', v.version, v.header_checksum, 'single', 'sec-up.xlsx', repeat('a', 64), NULL, 'submit', NULL,
+SELECT imp_upload_start('TPL-CIVIL', v.version, v.header_checksum, 'single', 'sec-up.xlsx', repeat('a', 64), NULL, 'submit', NULL,
   '[{"row_no": 2, "sheet": "Data", "site_code": "NO-SUCH-SITE", "cells": {}, "pre_errors": []}]'::jsonb, '[]'::jsonb, 1, NULL)
-FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-SITE-CW' AND v.is_current;
-SELECT imp_upload_start('TPL-SITE-CW', v.version, v.header_checksum, 'single', 'sec-up.xlsx', repeat('a', 64), NULL, 'submit', NULL,
+FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-CIVIL' AND v.is_current;
+SELECT imp_upload_start('TPL-CIVIL', v.version, v.header_checksum, 'single', 'sec-up.xlsx', repeat('a', 64), NULL, 'submit', NULL,
   '[{"row_no": 2, "sheet": "Data", "site_code": "NO-SUCH-SITE", "cells": {}, "pre_errors": []}]'::jsonb, '[]'::jsonb, 1, NULL)
-FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-SITE-CW' AND v.is_current;
+FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-CIVIL' AND v.is_current;
 -- @end
 
 -- @case AU-35
@@ -236,9 +236,9 @@ FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id
 -- @actor ADMIN
 -- @region *
 -- @expect output done|1|1|true
-SELECT imp_upload_start('TPL-SITE-CW', v.version, v.header_checksum, 'single', 'sec-up.xlsx', repeat('a', 64), NULL, 'submit', NULL,
+SELECT imp_upload_start('TPL-CIVIL', v.version, v.header_checksum, 'single', 'sec-up.xlsx', repeat('a', 64), NULL, 'submit', NULL,
   '[{"row_no": 2, "sheet": "Data", "site_code": "NO-SUCH-SITE", "cells": {}, "pre_errors": []}]'::jsonb, '[]'::jsonb, 1, NULL) ->> 'upload_id' AS uid
-FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-SITE-CW' AND v.is_current \gset
+FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-CIVIL' AND v.is_current \gset
 SELECT imp_upload_step(:'uid'::uuid, 100) ->> 'state' AS st \gset
 SELECT :'st' || '|' || jsonb_array_length(imp_upload_json(:'uid'::uuid) -> 'batches') || '|'
   || (SELECT count(*) FROM import_batch_rows r WHERE r.batch_id = (imp_upload_json(:'uid'::uuid) -> 'batches' -> 0 ->> 'id')::uuid AND r.action = 'error') || '|'
@@ -251,9 +251,9 @@ SELECT :'st' || '|' || jsonb_array_length(imp_upload_json(:'uid'::uuid) -> 'batc
 -- @actor BOB
 -- @region 1
 -- @expect error P0001 template_rejected|action_forbidden|not_found
-SELECT imp_upload_start('TPL-SITE-CW', v.version, v.header_checksum, 'single', 'sec-up.xlsx', repeat('b', 64), NULL, 'submit', NULL,
+SELECT imp_upload_start('TPL-CIVIL', v.version, v.header_checksum, 'single', 'sec-up.xlsx', repeat('b', 64), NULL, 'submit', NULL,
   '[{"row_no": 2, "sheet": "Data", "site_code": "NO-SUCH-SITE", "cells": {}, "pre_errors": []}]'::jsonb, '[]'::jsonb, 1, NULL)
-FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-SITE-CW' AND v.is_current;
+FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-CIVIL' AND v.is_current;
 -- @end
 
 -- @case AU-37
@@ -262,9 +262,9 @@ FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id
 -- @actor ALICE
 -- @region 1
 -- @expect error P0001 action_forbidden|template_rejected
-SELECT imp_upload_start('TPL-SITE-CW', v.version, v.header_checksum, 'single', 'sec-up.xlsx', repeat('c', 64), NULL, 'submit', 'forged historical load',
+SELECT imp_upload_start('TPL-CIVIL', v.version, v.header_checksum, 'single', 'sec-up.xlsx', repeat('c', 64), NULL, 'submit', 'forged historical load',
   '[{"row_no": 2, "sheet": "Data", "site_code": "NO-SUCH-SITE", "cells": {}, "pre_errors": []}]'::jsonb, '[]'::jsonb, 1, NULL)
-FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-SITE-CW' AND v.is_current;
+FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-CIVIL' AND v.is_current;
 -- @end
 
 -- @case AU-38

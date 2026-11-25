@@ -182,9 +182,9 @@ describe('upload: split into one batch per part', () => {
     expect(body.group_id).toMatch(/^[0-9a-f-]{36}$/);
     expect(body.parts).toHaveLength(3);
     const part = (k: string): Record<string, any> => body.parts.find((p: Record<string, any>) => (p.stream ?? p.register_key) === k);
-    expect(part('CW')).toMatchObject({ template_id: 'TPL-SITE-CW', source: 'master_template', part_sheet: 'Master', group_id: body.group_id, status: 'validated' });
-    expect(part('TE')).toMatchObject({ template_id: 'TPL-SITE-TE', source: 'master_template', part_sheet: 'Master' });
-    expect(part('as_built')).toMatchObject({ template_id: 'TPL-ASB', source: 'master_template', part_sheet: 'As-Built', register_key: 'as_built' });
+    expect(part('CW')).toMatchObject({ template_id: 'TPL-CIVIL', source: 'master_template', part_sheet: 'Master', group_id: body.group_id, status: 'validated' });
+    expect(part('TE')).toMatchObject({ template_id: 'TPL-INSTALL', source: 'master_template', part_sheet: 'Master' });
+    expect(part('as_built')).toMatchObject({ template_id: 'TPL-AS-BUILT', source: 'master_template', part_sheet: 'As-Built', register_key: 'as_built' });
     expect(body.id).toBe(body.parts[0].id);
     const codes = body.warnings.map((w: { code: string }) => w.code).sort();
     expect(codes).toEqual(['column_not_owned', 'extra_column', 'unknown_sheet']);

@@ -241,7 +241,7 @@ describe('0126: N/A "historical load: no source" where the site moved past the t
       await makeTask(db, s, 'MS1', 'locked');
       await makeTask(db, s, 'B1', 'approved', { actualDate: '2026-02-01' });
     }
-    const tv = (await q<{ id: string }>(db, `SELECT v.id::text AS id FROM template_versions v JOIN template_definitions dd ON dd.id = v.template_def_id WHERE dd.template_id = 'TPL-ACQ' AND v.is_current`))[0]!.id;
+    const tv = (await q<{ id: string }>(db, `SELECT v.id::text AS id FROM template_versions v JOIN template_definitions dd ON dd.id = v.template_def_id WHERE dd.template_id = 'TPL-ACQUISITION' AND v.is_current`))[0]!.id;
     // as an earlier load left them (fixture rows, triggers off): B1 of the historical site approved directly by a historical batch
     await db.query('SET session_replication_role = replica');
     try {

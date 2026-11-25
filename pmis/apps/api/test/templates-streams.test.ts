@@ -11,7 +11,7 @@ import { SOUT, SR, SITE_ENTRY_GRANTS, filled, moreSite, streamTeam, taskRow } fr
 import { actor, addAssignment, makeSite, makeTask, plainAdmin, setCell } from './wf-helpers';
 
 /**
- * Migration 0051: the Site Register stream templates (TPL-SITE-DA, -CW, -TE, -CL). The tasks A2, A5, B4 ... of workflow v1 in region 7, where no other suite sets
+ * Migration 0051: the Site Register stream templates (TPL-DESIGN-ACQ, -CW, -TE, -CL). The tasks A2, A5, B4 ... of workflow v1 in region 7, where no other suite sets
  * matrix cells. Dates are fixed past dates; nothing depends on the weekday or the collation. The suite has its own database (TEST_DATABASE_URL_TPLST): it changes
  * the tasks of workflow v1 and the template versions, which the other suites of the main database would otherwise see in the middle of a test.
  */
@@ -69,12 +69,12 @@ describe('catalogue and download', () => {
     const list = await t.entry.api.call('get', '/templates');
     expect(list.status).toBe(200);
     const ids: string[] = list.body.items.map((i: { template_id: string }) => i.template_id);
-    expect(ids).toEqual(expect.arrayContaining(['TPL-MASTER', 'TPL-SITE-DA', 'TPL-SITE-CW', 'TPL-SITE-TE', 'TPL-SITE-CL']));
-    const cw = list.body.items.find((i: { template_id: string }) => i.template_id === 'TPL-SITE-CW');
+    expect(ids).toEqual(expect.arrayContaining(['TPL-MASTER', 'TPL-DESIGN-ACQ', 'TPL-CIVIL', 'TPL-INSTALL', 'TPL-CLOSURE']));
+    const cw = list.body.items.find((i: { template_id: string }) => i.template_id === 'TPL-CIVIL');
     expect(cw).toMatchObject({ kind: 'data_import', template_kind: 'stream', stream: 'CW', register_key: null, module_key: 'sites', is_active: true });
     expect(cw.current_version).toBeGreaterThanOrEqual(1);
     expect(list.body.items.find((i: { template_id: string }) => i.template_id === 'TPL-MASTER')).toMatchObject({ template_kind: 'master', stream: null });
-    expect(ids.indexOf('TPL-MASTER')).toBeLessThan(ids.indexOf('TPL-SITE-DA'));
+    expect(ids.indexOf('TPL-MASTER')).toBeLessThan(ids.indexOf('TPL-DESIGN-ACQ'));
 
     const regOnly = await actor(app, db, { grants: [...G('gecol', 'view'), ...G('templates', 'view')], regions: [SR], modules: null });
     const mine: string[] = (await regOnly.api.call('get', '/templates')).body.items.map((i: { template_id: string }) => i.template_id);
@@ -84,13 +84,13 @@ describe('catalogue and download', () => {
 
   it('issues a file with the _tpl sheet, the headers in Master order with the Master names, grey locked columns and a Columns sheet; every download is audited', async () => {
     const t = await streamTeam(app, db, { B4: 'open' });
-    const dl = await downloadTemplate(t.entry.api, 'TPL-SITE-CW');
+    const dl = await downloadTemplate(t.entry.api, 'TPL-CIVIL');
     expect(dl.status).toBe(200);
-    expect(dl.headers['content-disposition']).toMatch(/^attachment; filename="TPL-SITE-CW_v\d+_\d{4}-\d{2}-\d{2}\.xlsx"$/);
+    expect(dl.headers['content-disposition']).toMatch(/^attachment; filename="TPL-CIVIL_v\d+_\d{4}-\d{2}-\d{2}\.xlsx"$/);
     const wb = await load(dl.buffer);
     const kv = kvOf(wb);
-    const version = (await q<{ v: number }>(db, `SELECT current_version AS v FROM template_definitions WHERE template_id = 'TPL-SITE-CW'`))[0]!.v;
-    expect(kv.get('template_id')).toBe('TPL-SITE-CW');
+    const version = (await q<{ v: number }>(db, `SELECT current_version AS v FROM template_definitions WHERE template_id = 'TPL-CIVIL'`))[0]!.v;
+    expect(kv.get('template_id')).toBe('TPL-CIVIL');
     expect(Number(kv.get('version'))).toBe(version);
     expect(kv.get('kind')).toBe('stream');
     expect(kv.get('stream')).toBe('CW');
@@ -135,7 +135,7 @@ describe('catalogue and download', () => {
     expect(vals).toEqual(['STA', 'ST', 'N/A']);
     // audited
     const au = await q<{ after: { version: number; prefill: boolean; kind: string; stream: string } }>(db,
-      `SELECT after FROM audit_log WHERE action = 'template_download' AND entity_id = 'TPL-SITE-CW' AND actor_id = $1`, [t.entry.user.id]);
+      `SELECT after FROM audit_log WHERE action = 'template_download' AND entity_id = 'TPL-CIVIL' AND actor_id = $1`, [t.entry.user.id]);
     expect(au).toHaveLength(1);
     expect(au[0]!.after).toMatchObject({ version, prefill: false, kind: 'stream', stream: 'CW' });
   });
@@ -151,7 +151,7 @@ describe('catalogue and download', () => {
     const cancelled = await makeSite(db, SR, { prefix: 'CAN', status: 'cancelled' });
     await makeTask(db, cancelled, 'B4', 'open');
 
-    const dl = await downloadTemplate(t.entry.api, 'TPL-SITE-CW', '?prefill=true');
+    const dl = await downloadTemplate(t.entry.api, 'TPL-CIVIL', '?prefill=true');
     expect(dl.status).toBe(200);
     const wb = await load(dl.buffer);
     expect(kvOf(wb).get('prefilled')).toBe('yes');
@@ -181,15 +181,15 @@ describe('catalogue and download', () => {
     expect(ws.getRow(row).getCell(h.indexOf('MS2 PRE-CW Completion (milestone)') + 1).protection?.locked).not.toBe(false);   // locked is the default
 
     // for one task: its site only; a task of another stream is refused (wrong_template)
-    const one = await downloadTemplate(t.entry.api, 'TPL-SITE-CW', `?task_id=${t.tasks.B4}`);
+    const one = await downloadTemplate(t.entry.api, 'TPL-CIVIL', `?task_id=${t.tasks.B4}`);
     expect(one.status).toBe(200);
     const teTask = await makeTask(db, t.site, 'D5', 'locked');
-    const wrong = await downloadTemplate(t.entry.api, 'TPL-SITE-CW', `?task_id=${teTask}`);
+    const wrong = await downloadTemplate(t.entry.api, 'TPL-CIVIL', `?task_id=${teTask}`);
     expect(wrong.status).toBe(422);
     expect(wrong.body).toMatchObject({ code: 'template_rejected', reason: 'wrong_template' });
-    expect((await downloadTemplate(t.entry.api, 'TPL-SITE-CW', `?task_id=${'0'.repeat(8)}-0000-4000-8000-000000000000`)).status).toBe(404);
+    expect((await downloadTemplate(t.entry.api, 'TPL-CIVIL', `?task_id=${'0'.repeat(8)}-0000-4000-8000-000000000000`)).status).toBe(404);
     // the audit row of the pre-filled download counts the rows
-    const au = await q<{ after: { rows: number; prefill: boolean } }>(db, `SELECT after FROM audit_log WHERE action = 'template_download' AND entity_id = 'TPL-SITE-CW' AND actor_id = $1 ORDER BY id`, [t.entry.user.id]);
+    const au = await q<{ after: { rows: number; prefill: boolean } }>(db, `SELECT after FROM audit_log WHERE action = 'template_download' AND entity_id = 'TPL-CIVIL' AND actor_id = $1 ORDER BY id`, [t.entry.user.id]);
     expect(au[0]!.after.prefill).toBe(true);
     expect(au[0]!.after.rows).toBeGreaterThanOrEqual(1);
     expect(au.length).toBe(2);
@@ -201,7 +201,7 @@ describe('catalogue and download', () => {
       `INSERT INTO register_records (entity_id, version_no, register_key, site_id, region_id, state, is_current, data, approved_at, current_level)
        VALUES (gen_random_uuid(), 1, 'as_built', $1, $2, 'approved', true, '{"cw_as_built_submitted": "Yes"}'::jsonb, now(), 3)`, [t.site.id, SR]);
     const valueFor = async (api: Api): Promise<ExcelJS.CellValue> => {
-      const dl = await downloadTemplate(api, 'TPL-SITE-CW', '?prefill=true');
+      const dl = await downloadTemplate(api, 'TPL-CIVIL', '?prefill=true');
       expect(dl.status).toBe(200);
       const ws = (await load(dl.buffer)).getWorksheet('Data')!;
       const h = headersOf(ws);
@@ -217,11 +217,11 @@ describe('catalogue and download', () => {
 
   it('refuses a caller without the right to download, or without the Site Register, and an unknown template (permission denied)', async () => {
     const noRight = await actor(app, db, { grants: [...G('sites', 'view'), ...G('templates', 'view')], regions: [SR], modules: null });
-    const denied = await downloadTemplate(noRight.api, 'TPL-SITE-CW');
+    const denied = await downloadTemplate(noRight.api, 'TPL-CIVIL');
     expect(denied.status).toBe(403);
     expect((await downloadTemplate(noRight.api, 'TPL-MASTER')).status).toBe(403);
     const noModule = await actor(app, db, { grants: G('templates', 'view', 'download_documents'), regions: [SR], modules: null });
-    const nm = await downloadTemplate(noModule.api, 'TPL-SITE-TE');
+    const nm = await downloadTemplate(noModule.api, 'TPL-INSTALL');
     expect(nm.status).toBe(403);
     expect(nm.body).toMatchObject({ code: 'module_forbidden' });
     expect((await downloadTemplate(noRight.api, 'TPL-SITE-XX')).status).toBe(404);
@@ -233,7 +233,7 @@ describe('upload: match and validate', () => {
     const t = await streamTeam(app, db, { B4: 'open', B8: 'open', B13: 'open' });
     await db.query(`UPDATE task_instances SET planned_date = '2026-02-01', actual_date = '2026-02-02' WHERE id = $1`, [t.tasks.B4]);
     await db.query(`UPDATE task_instances SET planned_date = '2026-03-01' WHERE id = $1`, [t.tasks.B8]);
-    const buf = await filled(t.entry.api, 'TPL-SITE-CW', [{
+    const buf = await filled(t.entry.api, 'TPL-CIVIL', [{
       'Site ID': t.site.code,
       'B4 CW Survey Planned': day('2026-02-10'),             // changed; its actual date stays (the cell is not typed)
       'B4 AAT SE Name': 'Eng Two',
@@ -242,7 +242,7 @@ describe('upload: match and validate', () => {
       'B13 CW Snags Found': 'yes',                           // a list value, case-insensitive
     }]);
     const batch = await upload(t.entry.api, buf);
-    expect(batch).toMatchObject({ template_id: 'TPL-SITE-CW', status: 'validated', stream: 'CW', register_key: null, current_level: 1, levels_required: 2 });
+    expect(batch).toMatchObject({ template_id: 'TPL-CIVIL', status: 'validated', stream: 'CW', register_key: null, current_level: 1, levels_required: 2 });
     expect(batch.counts).toMatchObject({ update: 2, unchanged: 1, error: 0, create: 0 });
     const rows = await rowsOf(t.entry.api, batch.id);
     expect(rows.map((r) => r.task_code)).toEqual(['B4', 'B8', 'B13']);          // the column (Master) order of the file
@@ -261,7 +261,7 @@ describe('upload: match and validate', () => {
 
   it('reports the cell errors of a row by header: a bad date, a value outside the list, an out-of-range date, a future actual date, a formula', async () => {
     const t = await streamTeam(app, db, { B4: 'open', B5: 'open' });
-    const buf = await filled(t.entry.api, 'TPL-SITE-CW', [
+    const buf = await filled(t.entry.api, 'TPL-CIVIL', [
       { 'Site ID': t.site.code, 'B4 CW Survey Planned': day('2019-01-01'), 'B4 CW Survey Actual': day('2035-12-30'), 'B5 Analysis Type': 'XYZ', 'B5 Actual Date': 'not a date',
         'B4 AAT SE Name': { formula: '1+1', result: 2 } as unknown as ExcelJS.CellValue },
     ]);
@@ -280,7 +280,7 @@ describe('upload: match and validate', () => {
       expect.objectContaining({ column: 'B5 Actual Date', code: 'invalid_date' }),
     ]));
     // a future actual date is refused by the same rule as the task screen (wf_save_entry), on its own
-    const buf2 = await filled(t.entry.api, 'TPL-SITE-CW', [{ 'Site ID': t.site.code, 'B4 CW Survey Actual': day('2035-12-30') }]);
+    const buf2 = await filled(t.entry.api, 'TPL-CIVIL', [{ 'Site ID': t.site.code, 'B4 CW Survey Actual': day('2035-12-30') }]);
     const rows2 = await rowsOf(t.entry.api, (await upload(t.entry.api, buf2)).id);
     expect(byTask(rows2, 'B4')).toMatchObject({ action: 'error' });
     expect(byTask(rows2, 'B4').errors[0]).toMatchObject({ column: 'B4 CW Survey Actual', code: 'future_date' });
@@ -294,7 +294,7 @@ describe('upload: match and validate', () => {
     const site2 = await makeSite(db, SR, { prefix: 'SRT' });
     const foreign = await makeTask(db, site2, 'B4', 'open');
     await setCell(db, 'B4', SR, 'entry', { user: [other.user.id] });         // the entry cell of B4 now names somebody else
-    const buf = await filled(t.entry.api, 'TPL-SITE-CW', [
+    const buf = await filled(t.entry.api, 'TPL-CIVIL', [
       { 'Site ID': 'NO-SUCH-SITE', 'B4 CW Survey Actual': day('2026-01-10') },
       { 'Site ID': far.code, 'B4 CW Survey Actual': day('2026-01-10') },
       { 'Site ID': site2.code, 'B4 CW Survey Actual': day('2026-01-10') },
@@ -313,7 +313,7 @@ describe('upload: match and validate', () => {
 
     // the same task twice in one file: the second row is an error
     await setCell(db, 'B4', SR, 'entry', { user: [t.entry.user.id] });
-    const dup = await filled(t.entry.api, 'TPL-SITE-CW', [
+    const dup = await filled(t.entry.api, 'TPL-CIVIL', [
       { 'Site ID': t.site.code, 'B4 CW Survey Actual': day('2026-01-10') },
       { 'Site ID': t.site.code, 'B4 CW Survey Actual': day('2026-01-11') },
     ]);
@@ -330,7 +330,7 @@ describe('upload: match and validate', () => {
     await setCell(db, 'B8', SR, 'entry', { user: [t.entry.user.id] });
     await db.query(`UPDATE task_instances SET lock_reason = 'gate_closed:G3' WHERE id = $1`, [t.tasks.B8]);
     await db.query(`UPDATE task_instances SET is_na = true, na_reason = 'not applicable' WHERE id = $1`, [t.tasks.B10]);
-    const buf = await filled(t.entry.api, 'TPL-SITE-CW', [{
+    const buf = await filled(t.entry.api, 'TPL-CIVIL', [{
       'Site ID': t.site.code,
       'B4 CW Survey Planned': day('2026-02-01'),               // no actual date, none on the task
       'B5 Actual Date': day('2026-02-05'),
@@ -368,7 +368,7 @@ describe('upload: match and validate', () => {
     const t2 = await moreSite(db, t, { B4: 'open' });
     await db.query(`UPDATE task_instances SET sla_start_date = '2026-03-01', due_date = '2026-03-10' WHERE id = ANY($1::uuid[])`, [[t.tasks.B4, t2.tasks.B4]]);
     await makeTask(db, t.site, 'B7', 'approved');
-    const buf = await filled(t.entry.api, 'TPL-SITE-CW', [
+    const buf = await filled(t.entry.api, 'TPL-CIVIL', [
       { 'Site ID': t.site.code, 'B4 CW Survey Actual': day('2026-03-20'), 'B7 CW DN Submitted': day('2026-03-05') },
       { 'Site ID': t2.site.code, 'B4 CW Survey Actual': day('2026-02-20') },
     ]);
@@ -389,11 +389,11 @@ describe('upload: match and validate', () => {
 
   it('refuses a file of another stream, an upload from a task of another stream, a retired file and a file without _tpl, with the reason in the System Log', async () => {
     const t = await streamTeam(app, db, { B4: 'open' });
-    const cw = await downloadTemplate(t.entry.api, 'TPL-SITE-CW');
-    const res = await uploadFile(t.entry.api, cw.buffer, 'x.xlsx', { template_id: 'TPL-SITE-TE' });
+    const cw = await downloadTemplate(t.entry.api, 'TPL-CIVIL');
+    const res = await uploadFile(t.entry.api, cw.buffer, 'x.xlsx', { template_id: 'TPL-INSTALL' });
     expect(res.status).toBe(422);
     expect(res.body).toMatchObject({ code: 'template_rejected', reason: 'wrong_template' });
-    expect((await logRows('wrong_template'))[0]!.context).toMatchObject({ template_id: 'TPL-SITE-CW', selected: 'TPL-SITE-TE' });
+    expect((await logRows('wrong_template'))[0]!.context).toMatchObject({ template_id: 'TPL-CIVIL', selected: 'TPL-INSTALL' });
     // the file of the CW stream, sent from a TE task
     const te = await makeTask(db, t.site, 'D5', 'locked');
     const fromTask = await uploadFile(t.entry.api, await fillTemplate(cw.buffer, [{ 'Site ID': t.site.code, 'B4 CW Survey Actual': day('2026-01-10') }]), 'x.xlsx', { task_id: te });
@@ -427,7 +427,7 @@ describe('upload: the xlsx guard of every template', () => {
   it('rejects macros, other formats, oversize and too many rows of a stream file, and a stream file with formulas keeps the rest of the rows', async () => {
     const t = await streamTeam(app, db, { B4: 'open' });
     const t2 = await moreSite(db, t, { B4: 'open' });
-    const dl = await downloadTemplate(t.entry.api, 'TPL-SITE-CW');
+    const dl = await downloadTemplate(t.entry.api, 'TPL-CIVIL');
     expect((await uploadFile(t.entry.api, dl.buffer, 'filled.xlsm')).body).toMatchObject({ code: 'template_rejected', reason: 'macros_not_allowed' });
     expect((await uploadFile(t.entry.api, dl.buffer, 'filled.csv')).body).toMatchObject({ reason: 'not_xlsx' });
     expect((await uploadFile(t.entry.api, Buffer.from('PK not really a zip'), 'filled.xlsx')).body).toMatchObject({ reason: 'not_xlsx' });
@@ -464,7 +464,7 @@ describe('upload: the xlsx guard of every template', () => {
 describe('submit into the flow, and L2 decisions', () => {
   it('starts, saves and submits each task as the uploader; L2 approves all at once with step-up; the successor opens; the history and the audit say via batch', async () => {
     const t = await streamTeam(app, db, { A2: 'open', A5: 'locked' });
-    const buf = await filled(t.entry.api, 'TPL-SITE-DA', [{ 'Site ID': t.site.code, 'A2 Planned Date': day('2026-01-05'), 'A2 Actual Date': day('2026-01-10') }]);
+    const buf = await filled(t.entry.api, 'TPL-DESIGN-ACQ', [{ 'Site ID': t.site.code, 'A2 Planned Date': day('2026-01-05'), 'A2 Actual Date': day('2026-01-10') }]);
     const batch = await upload(t.entry.api, buf);
     expect(batch.counts).toMatchObject({ update: 1, error: 0 });
     // before the send: nothing happens, and L2 cannot decide a batch that was not sent
@@ -514,7 +514,7 @@ describe('submit into the flow, and L2 decisions', () => {
   it('approves row by row, returns a row with a note to L1, and a return without a note is refused', async () => {
     const t = await streamTeam(app, db, { A2: 'open' });
     const t2 = await moreSite(db, t, { A2: 'open' });
-    const buf = await filled(t.entry.api, 'TPL-SITE-DA', [
+    const buf = await filled(t.entry.api, 'TPL-DESIGN-ACQ', [
       { 'Site ID': t.site.code, 'A2 Actual Date': day('2026-01-10') },
       { 'Site ID': t2.site.code, 'A2 Actual Date': day('2026-01-11') },
     ]);
@@ -548,7 +548,7 @@ describe('submit into the flow, and L2 decisions', () => {
 
   it('holds a row until its predecessor is approved: approve-all lists it and leaves it, and a second send releases it', async () => {
     const t = await streamTeam(app, db, { A2: 'open', A5: 'locked' });
-    const buf = await filled(t.entry.api, 'TPL-SITE-DA', [{ 'Site ID': t.site.code, 'A2 Actual Date': day('2026-01-10'), 'A5 Actual Date': day('2026-01-12') }]);
+    const buf = await filled(t.entry.api, 'TPL-DESIGN-ACQ', [{ 'Site ID': t.site.code, 'A2 Actual Date': day('2026-01-10'), 'A5 Actual Date': day('2026-01-12') }]);
     const batch = await upload(t.entry.api, buf);
     const rows = await rowsOf(t.entry.api, batch.id);
     expect(byTask(rows, 'A5')).toMatchObject({ decision: 'pending_previous_approval', hold_reason: 'predecessor_open' });
@@ -576,10 +576,10 @@ describe('submit into the flow, and L2 decisions', () => {
 
   it('holds a row for a task that is already in review, and a discard closes an unsent batch', async () => {
     const t = await streamTeam(app, db, { A2: 'open' });
-    const first = await upload(t.entry.api, await filled(t.entry.api, 'TPL-SITE-DA', [{ 'Site ID': t.site.code, 'A2 Actual Date': day('2026-01-10') }]));
+    const first = await upload(t.entry.api, await filled(t.entry.api, 'TPL-DESIGN-ACQ', [{ 'Site ID': t.site.code, 'A2 Actual Date': day('2026-01-10') }]));
     const sent = await submit(t.entry.api, first.id, first.version);
     expect(sent.outcome.submitted).toBe(1);
-    const second = await upload(t.entry.api, await filled(t.entry.api, 'TPL-SITE-DA', [{ 'Site ID': t.site.code, 'A2 Actual Date': day('2026-01-11') }]));
+    const second = await upload(t.entry.api, await filled(t.entry.api, 'TPL-DESIGN-ACQ', [{ 'Site ID': t.site.code, 'A2 Actual Date': day('2026-01-11') }]));
     expect(byTask(await rowsOf(t.entry.api, second.id), 'A2')).toMatchObject({ decision: 'pending_previous_approval', hold_reason: 'open_submission' });
     expect((await decide(t.approve.api, second.id, second.version, { action: 'discard', scope: 'all' })).status).toBe(403);   // only the uploader or an admin
     const d = await decide(t.entry.api, second.id, second.version, { action: 'discard', scope: 'all', note: 'wrong file' });
@@ -591,7 +591,7 @@ describe('submit into the flow, and L2 decisions', () => {
 
   it('a self-approval needs a step-up: without it nothing is created, with it the task is approved at once and flagged', async () => {
     const t = await streamTeam(app, db, { A2: 'open' }, { sameUser: true, stepUp: false });
-    const batch = await upload(t.entry.api, await filled(t.entry.api, 'TPL-SITE-DA', [{ 'Site ID': t.site.code, 'A2 Actual Date': day('2026-01-10') }]));
+    const batch = await upload(t.entry.api, await filled(t.entry.api, 'TPL-DESIGN-ACQ', [{ 'Site ID': t.site.code, 'A2 Actual Date': day('2026-01-10') }]));
     const early = await t.entry.api.call('post', `/import-batches/${batch.id}/submit`, undefined, { 'If-Match': `"${batch.version}"` });
     expect(early.status).toBe(401);
     expect(early.body).toMatchObject({ code: 'step_up_required' });
@@ -609,7 +609,7 @@ describe('submit into the flow, and L2 decisions', () => {
 
   it('keeps the batch away from people without the Site Register, and a row the task refuses at the send becomes an error and keeps nothing', async () => {
     const t = await streamTeam(app, db, { B4: 'open' });
-    const batch = await upload(t.entry.api, await filled(t.entry.api, 'TPL-SITE-CW', [{ 'Site ID': t.site.code, 'B4 CW Survey Actual': day('2026-01-10') }]));
+    const batch = await upload(t.entry.api, await filled(t.entry.api, 'TPL-CIVIL', [{ 'Site ID': t.site.code, 'B4 CW Survey Actual': day('2026-01-10') }]));
     const stranger = await actor(app, db, { grants: G('templates', 'view'), regions: [SR], modules: null });
     expect((await stranger.api.call('get', `/import-batches/${batch.id}`)).status).toBe(404);
     expect((await stranger.api.call('get', `/import-batches/${batch.id}/rows`)).status).toBe(404);
@@ -641,61 +641,61 @@ describe('template versions', () => {
     const t = await streamTeam(app, db, { B4: 'open' });
     const admin = await plainAdmin(app, db);
     await db.query('SELECT tpl_sync_all()');   // settle the stored versions first: the first sync after the migrations re-issues TPL-MASTER (0095 changed tpl_columns)
-    const v0 = (await q<{ v: number }>(db, `SELECT current_version AS v FROM template_definitions WHERE template_id = 'TPL-SITE-CW'`))[0]!.v;
+    const v0 = (await q<{ v: number }>(db, `SELECT current_version AS v FROM template_definitions WHERE template_id = 'TPL-CIVIL'`))[0]!.v;
     const m0 = (await q<{ v: number }>(db, `SELECT current_version AS v FROM template_definitions WHERE template_id = 'TPL-MASTER'`))[0]!.v;
-    const te0 = (await q<{ v: number }>(db, `SELECT current_version AS v FROM template_definitions WHERE template_id = 'TPL-SITE-TE'`))[0]!.v;
-    const old = await downloadTemplate(t.entry.api, 'TPL-SITE-CW');
+    const te0 = (await q<{ v: number }>(db, `SELECT current_version AS v FROM template_definitions WHERE template_id = 'TPL-INSTALL'`))[0]!.v;
+    const old = await downloadTemplate(t.entry.api, 'TPL-CIVIL');
     const oldFile = await fillTemplate(old.buffer, [{ 'Site ID': t.site.code, 'B4 CW Survey Actual': day('2026-01-10') }]);
     await db.query(`UPDATE template_task_fields SET label = 'CW Survey Actual Date' WHERE task_code = 'B4' AND field_key = 'actual_date'`);
     try {
       const list = (await admin.api.call('get', '/templates')).body.items as { template_id: string; current_version: number; versions: { version: number }[] }[];
-      const cw = list.find((i) => i.template_id === 'TPL-SITE-CW')!;
+      const cw = list.find((i) => i.template_id === 'TPL-CIVIL')!;
       expect(cw.current_version).toBe(v0 + 1);
       expect(cw.versions.map((v) => v.version).slice(0, 2)).toEqual([v0 + 1, v0]);
       expect(list.find((i) => i.template_id === 'TPL-MASTER')!.current_version).toBe(m0);   // the Master header text comes from the Master, not from the label: same columns
-      expect(list.find((i) => i.template_id === 'TPL-SITE-TE')!.current_version).toBe(te0);   // another stream is not touched
+      expect(list.find((i) => i.template_id === 'TPL-INSTALL')!.current_version).toBe(te0);   // another stream is not touched
       const res = await uploadFile(t.entry.api, oldFile);
       expect(res.status).toBe(422);
       expect(res.body).toMatchObject({ code: 'template_rejected', reason: 'outdated_version' });
-      expect(res.body.detail).toContain(`version ${v0} of TPL-SITE-CW`);
+      expect(res.body.detail).toContain(`version ${v0} of TPL-CIVIL`);
       expect(res.body.detail).toContain(`current version is ${v0 + 1}`);
-      expect((await logRows('outdated_version'))[0]!.context).toMatchObject({ template_id: 'TPL-SITE-CW', version: v0, current_version: v0 + 1 });
-      const fresh = await downloadTemplate(t.entry.api, 'TPL-SITE-CW');
+      expect((await logRows('outdated_version'))[0]!.context).toMatchObject({ template_id: 'TPL-CIVIL', version: v0, current_version: v0 + 1 });
+      const fresh = await downloadTemplate(t.entry.api, 'TPL-CIVIL');
       const wb = await load(fresh.buffer);
       expect(kvOf(wb).get('version')).toBe(v0 + 1);
       expect(headersOf(wb.getWorksheet('Data')!)).toContain('B4 CW Survey Actual Date');
       expect(headersOf(wb.getWorksheet('Data')!)).not.toContain('B4 CW Survey Actual');
       const ok = await uploadFile(t.entry.api, await fillTemplate(fresh.buffer, [{ 'Site ID': t.site.code, 'B4 CW Survey Actual Date': day('2026-01-10') }]));
       expect(ok.status).toBe(202);
-      const states = await q<{ version: number; status: string }>(db, `SELECT version, status FROM templates WHERE template_id = 'TPL-SITE-CW' ORDER BY version DESC LIMIT 2`);
+      const states = await q<{ version: number; status: string }>(db, `SELECT version, status FROM templates WHERE template_id = 'TPL-CIVIL' ORDER BY version DESC LIMIT 2`);
       expect(states).toEqual([{ version: v0 + 1, status: 'active' }, { version: v0, status: 'retired' }]);
-      const au = await q(db, `SELECT 1 FROM audit_log WHERE action = 'template_version_issued' AND entity_id = 'TPL-SITE-CW' AND (after ->> 'version')::int = $1`, [v0 + 1]);
+      const au = await q(db, `SELECT 1 FROM audit_log WHERE action = 'template_version_issued' AND entity_id = 'TPL-CIVIL' AND (after ->> 'version')::int = $1`, [v0 + 1]);
       expect(au).toHaveLength(1);
       // an unchanged field set issues no new version
       await db.query('SELECT tpl_sync_all()');
-      expect((await q<{ n: string }>(db, `SELECT count(*)::text AS n FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-SITE-CW'`))[0]!.n).toBe(String(v0 + 1));
+      expect((await q<{ n: string }>(db, `SELECT count(*)::text AS n FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-CIVIL'`))[0]!.n).toBe(String(v0 + 1));
     } finally {
       await db.query(`UPDATE template_task_fields SET label = 'CW Survey Actual' WHERE task_code = 'B4' AND field_key = 'actual_date'`);
     }
-    expect((await q<{ v: number }>(db, `SELECT current_version AS v FROM template_definitions WHERE template_id = 'TPL-SITE-CW'`))[0]!.v).toBe(v0 + 2);
+    expect((await q<{ v: number }>(db, `SELECT current_version AS v FROM template_definitions WHERE template_id = 'TPL-CIVIL'`))[0]!.v).toBe(v0 + 2);
   });
 
   it('issues a new version of the stream template and of TPL-MASTER when a task is added to a stage of the stream', async () => {
     const t = await streamTeam(app, db, {});
     expect(t.region).toBe(SR);
     await db.query('SELECT tpl_sync_all()');   // settle the stored versions first (see the first test of this describe)
-    const cw0 = (await q<{ v: number }>(db, `SELECT current_version AS v FROM template_definitions WHERE template_id = 'TPL-SITE-CW'`))[0]!.v;
+    const cw0 = (await q<{ v: number }>(db, `SELECT current_version AS v FROM template_definitions WHERE template_id = 'TPL-CIVIL'`))[0]!.v;
     const m0 = (await q<{ v: number }>(db, `SELECT current_version AS v FROM template_definitions WHERE template_id = 'TPL-MASTER'`))[0]!.v;
     const stage = await q<{ id: string; workflow_id: string }>(db, `SELECT sd.id::text AS id, sd.workflow_id::text AS workflow_id FROM stage_definitions sd JOIN workflow_definitions w ON w.id = sd.workflow_id AND w.version = 1 WHERE sd.code = 'MS3'`);
     const ins = await db.query(`INSERT INTO task_definitions (workflow_id, code, stage_id, sort_order, name_en) VALUES ($1, 'ZX1', $2, 35, 'Extra CW check') RETURNING id`, [stage[0]!.workflow_id, stage[0]!.id]);
     try {
-      expect((await q<{ v: number }>(db, `SELECT current_version AS v FROM template_definitions WHERE template_id = 'TPL-SITE-CW'`))[0]!.v).toBe(cw0 + 1);
+      expect((await q<{ v: number }>(db, `SELECT current_version AS v FROM template_definitions WHERE template_id = 'TPL-CIVIL'`))[0]!.v).toBe(cw0 + 1);
       expect((await q<{ v: number }>(db, `SELECT current_version AS v FROM template_definitions WHERE template_id = 'TPL-MASTER'`))[0]!.v).toBe(m0);   // the Master sheet is the Master: no new column
-      const dl = await downloadTemplate(t.entry.api, 'TPL-SITE-CW');
+      const dl = await downloadTemplate(t.entry.api, 'TPL-CIVIL');
       expect(headersOf((await load(dl.buffer)).getWorksheet('Data')!)).toEqual(expect.arrayContaining(['ZX1 Planned Date', 'ZX1 Actual Date']));
     } finally {
       await db.query('DELETE FROM task_definitions WHERE id = $1', [ins.rows[0].id]);
     }
-    expect((await q<{ v: number }>(db, `SELECT current_version AS v FROM template_definitions WHERE template_id = 'TPL-SITE-CW'`))[0]!.v).toBe(cw0 + 2);
+    expect((await q<{ v: number }>(db, `SELECT current_version AS v FROM template_definitions WHERE template_id = 'TPL-CIVIL'`))[0]!.v).toBe(cw0 + 2);
   });
 });

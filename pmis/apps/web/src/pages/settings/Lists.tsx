@@ -1,4 +1,4 @@
-import { Download, Pencil, Plus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Download, GripVertical, Pencil, Plus, Trash2, Type } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -58,6 +58,18 @@ export function Lists() {
   const [filter, setFilter] = useState("");
   const [sel, setSel] = useState<string | null>(null);
   const [dlg, setDlg] = useState<Dlg | null>(null);
+  const [drag, setDrag] = useState<string | null>(null);
+  const reorderValue = useUpdateListValue();
+  /** Quick edit in the row: rename and show/hide without opening the panel. Same reason rule and same PATCH as the full edit. */
+  const [rowEd, setRowEd] = useState<{ id: string; label_en: string; label_ar: string; is_active: boolean; reason: string } | null>(null);
+  const saveRow = async (v: ListCatalogue["values"][number]) => {
+    if (!cur || !rowEd) return;
+    try {
+      await reorderValue.mutateAsync({ code: cur.code, id: v.id, version: v.version, body: { label_en: rowEd.label_en.trim(), label_ar: rowEd.label_ar.trim() || null, is_active: rowEd.is_active, reason: rowEd.reason.trim() } });
+      setRowEd(null);
+      toast(t("settings.audited"));
+    } catch (e) { toast(errText(e, t), "err"); }
+  };
   const all = q.data ?? [];
   const items = all.filter(
     (c) =>
@@ -67,6 +79,22 @@ export function Lists() {
         .includes(filter.trim().toLowerCase()),
   );
   const cur = all.find((c) => c.code === sel) ?? null;
+  /** Moves a value to the place of another (drag and drop) or one step (the arrows). Only the values whose position changes are written, each with its own version and reason, so the audit shows every change. */
+  const placeValue = async (id: string, targetIndex: number) => {
+    if (!cur) return;
+    const arr = [...cur.values];
+    const from = arr.findIndex((v) => v.id === id);
+    if (from < 0 || targetIndex < 0 || targetIndex >= arr.length || from === targetIndex) return;
+    const [moved] = arr.splice(from, 1);
+    arr.splice(targetIndex, 0, moved!);
+    try {
+      for (const [i, v] of arr.entries()) {
+        const want = (i + 1) * 10;
+        if (v.sort_order !== want) await reorderValue.mutateAsync({ code: cur.code, id: v.id, version: v.version, body: { sort_order: want, reason: t("lists.reorder_reason") } });
+      }
+      toast(t("settings.audited"));
+    } catch (e) { toast(errText(e, t), "err"); }
+  };
   const parentOf = (c: ListCatalogue) =>
     c.parent_catalogue
       ? (all.find((x) => x.code === c.parent_catalogue) ?? null)
@@ -265,10 +293,16 @@ export function Lists() {
               {cur.values.map((v) => (
                 <tr
                   key={v.id}
-                  className={`border-t border-line ${v.is_active ? "" : "opacity-60"}`}
+                  className={`border-t border-line ${v.is_active ? "" : "opacity-60"} ${drag === v.id ? "bg-hover" : ""}`}
                   data-testid={`lists-value-${v.code}`}
+                  draggable={!mirrored(cur)}
+                  onDragStart={() => setDrag(v.id)}
+                  onDragOver={(e) => { if (drag) e.preventDefault(); }}
+                  onDrop={() => { const d = drag; setDrag(null); if (d) void placeValue(d, cur.values.findIndex((x) => x.id === v.id)); }}
+                  onDragEnd={() => setDrag(null)}
                 >
                   <td className="p-2 mono">
+                    {!mirrored(cur) && <GripVertical size={14} className="me-1 inline cursor-grab text-mute" aria-hidden />}
                     {v.code}
                     {!v.is_active && (
                       <span className="chip ms-1 bg-lockBg text-lockInk">
@@ -284,10 +318,23 @@ export function Lists() {
                       </span>
                     )}
                   </td>
-                  <td className="p-2">{v.label_en}</td>
-                  <td className="p-2" dir="rtl">
-                    {v.label_ar ?? "-"}
-                  </td>
+                  {rowEd?.id === v.id ? (
+                    <>
+                      <td className="p-2">
+                        <input className="input w-full" data-testid={`lists-row-en-${v.code}`} aria-label={t("lists.label_en")} value={rowEd.label_en} onChange={(e) => setRowEd({ ...rowEd, label_en: e.target.value })} />
+                      </td>
+                      <td className="p-2" dir="rtl">
+                        <input className="input w-full" data-testid={`lists-row-ar-${v.code}`} aria-label={t("lists.label_ar")} value={rowEd.label_ar} onChange={(e) => setRowEd({ ...rowEd, label_ar: e.target.value })} />
+                      </td>
+                    </>
+                  ) : (
+                    <>
+                      <td className="p-2">{v.label_en}</td>
+                      <td className="p-2" dir="rtl">
+                        {v.label_ar ?? "-"}
+                      </td>
+                    </>
+                  )}
                   <td className="p-2 text-mute">
                     {v.aliases.join(", ") || "-"}
                   </td>
@@ -312,8 +359,19 @@ export function Lists() {
                     {v.parent_code ?? "-"}
                   </td>
                   <td className="p-2 text-end whitespace-nowrap">
-                    {!mirrored(cur) && (
+                    {!mirrored(cur) && rowEd?.id === v.id && (
+                      <span className="inline-flex flex-wrap items-center gap-1">
+                        <label className="text-xs"><input type="checkbox" data-testid={`lists-row-active-${v.code}`} checked={rowEd.is_active} onChange={(e) => setRowEd({ ...rowEd, is_active: e.target.checked })} /> {t("lists.active")}</label>
+                        <input className="input w-40" data-testid={`lists-row-reason-${v.code}`} aria-label={t("common.reason")} placeholder={t("common.reason")} value={rowEd.reason} onChange={(e) => setRowEd({ ...rowEd, reason: e.target.value })} />
+                        <button type="button" className="btn btn-primary p-1" data-testid={`lists-row-save-${v.code}`} disabled={!rowEd.label_en.trim() || rowEd.reason.trim().length < 3} onClick={() => void saveRow(v)}>{t("common.save")}</button>
+                        <button type="button" className="btn btn-ghost p-1" data-testid={`lists-row-cancel-${v.code}`} onClick={() => setRowEd(null)}>{t("common.cancel")}</button>
+                      </span>
+                    )}
+                    {!mirrored(cur) && rowEd?.id !== v.id && (
                       <>
+                        <button type="button" className="btn btn-ghost p-1" data-testid={`lists-value-quick-${v.code}`} aria-label={t("lists.quick_edit", { code: v.code })} onClick={() => setRowEd({ id: v.id, label_en: v.label_en, label_ar: v.label_ar ?? "", is_active: v.is_active, reason: "" })}><Type size={14} /></button>
+                        <button type="button" className="btn btn-ghost p-1" data-testid={`lists-value-up-${v.code}`} aria-label={t("lists.move_up", { code: v.code })} disabled={cur.values[0]?.id === v.id} onClick={() => void placeValue(v.id, cur.values.findIndex((x) => x.id === v.id) - 1)}><ArrowUp size={14} /></button>
+                        <button type="button" className="btn btn-ghost p-1" data-testid={`lists-value-down-${v.code}`} aria-label={t("lists.move_down", { code: v.code })} disabled={cur.values[cur.values.length - 1]?.id === v.id} onClick={() => void placeValue(v.id, cur.values.findIndex((x) => x.id === v.id) + 1)}><ArrowDown size={14} /></button>
                         <button
                           type="button"
                           className="btn btn-ghost p-1"
@@ -663,7 +721,7 @@ function ListDialog({
     </label>
   );
   return (
-    <FormDialog
+    <FormDialog inline
       open
       testid="lists-dialog"
       title={title}

@@ -252,7 +252,7 @@ describe("dropdown lists (migration 0102)", () => {
   it("the values import accepts only the issued list values template; a bad file is refused and nothing is applied", async () => {
     const L = code("Imported");
     await createList(L);
-    const wrong = await workbook("TPL-SITE-NEW", 1, [["Gamma", "Gamma", "", "", "", "", ""]]);
+    const wrong = await workbook("TPL-NEW-SITES", 1, [["Gamma", "Gamma", "", "", "", "", ""]]);
     const refused = await admin.api
       .call("post", `/list-catalogues/${L}/values/import`, undefined)
       .attach("file", wrong, "wrong.xlsx")

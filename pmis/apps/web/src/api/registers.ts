@@ -154,11 +154,12 @@ export function useNewVersion(key: string) {
 // ---- template entry (contract 0.7.0: /templates, /import-batches)
 export const useTemplates = () => useQuery({ queryKey: ['templates'], staleTime: 60_000, queryFn: () => api.get<{ items: Template[] }>('/templates').then((r) => r.items) });
 
-export type TemplateDownload = { prefill?: boolean; taskId?: string; siteIds?: string[]; regionId?: string };
+export type TemplateDownload = { prefill?: boolean; taskId?: string; siteIds?: string[]; regionId?: string; filters?: Record<string, unknown> };
 /** `GET /templates/{id}/download`: a blank copy, or a pre-filled one (the records in force inside the caller's regions). Returns the file name. */
 export const downloadTemplate = (templateId: string, o: TemplateDownload = {}): Promise<string> =>
   downloadFile(`/templates/${templateId}/download`, {
     ...(o.prefill ? { prefill: 'true' } : {}), ...(o.taskId ? { task_id: o.taskId } : {}), ...(o.siteIds?.length ? { site_ids: o.siteIds.join(',') } : {}), ...(o.regionId ? { region_id: o.regionId } : {}),
+    ...(o.filters && Object.keys(o.filters).length ? { filters: JSON.stringify(o.filters) } : {}),
   });
 
 /** How often the batch page polls (ms). A test may lower them. */

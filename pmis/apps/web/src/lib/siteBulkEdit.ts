@@ -1,6 +1,6 @@
 import { ApiError } from '@/api/client';
-import type { Site360CellSave } from '@/api/site360';
-import type { Site360CellTarget } from '@/components/Site360Grid';
+import type { SiteMasterCellSave } from '@/api/siteMaster';
+import type { SiteMasterCellTarget } from '@/components/SiteMasterGrid';
 
 /**
  * Bulk edit of one Site Master column for the selected sites (owner request 2026-11-22, contract 0.15.50). No new right and no new endpoint: every eligible
@@ -12,7 +12,7 @@ export type BulkInput = 'date' | 'number' | 'list' | 'text' | 'boolean';
 export type BulkValue = string | number | boolean;
 export type BulkOption = { value: string; label_en: string; label_ar: string | null; parent?: string | null };
 
-export interface BulkRow { site_id: string; site_code: string; values: Record<string, string | null>; cells?: Record<string, Site360CellTarget> }
+export interface BulkRow { site_id: string; site_code: string; values: Record<string, string | null>; cells?: Record<string, SiteMasterCellTarget> }
 
 /** Why a site is skipped before anything is sent. A missing right is only known to the server, so it shows later as a failure. */
 export type SkipReason = 'not_editable' | 'locked' | 'unchanged' | 'not_allowed' | 'already_empty';
@@ -21,7 +21,7 @@ export const SKIP_REASONS: SkipReason[] = ['not_editable', 'locked', 'unchanged'
 const isTrue = (x: string) => /^(true|yes|1)$/i.test(x);
 
 /** The editor of a cell: the API's `input_type`, else a date for a date key or a date-shaped value, else text (an older answer without it). */
-export function inputKind(target: Site360CellTarget, stored: string): BulkInput {
+export function inputKind(target: SiteMasterCellTarget, stored: string): BulkInput {
   if (target.input_type) return target.input_type;
   return target.field || /^\d{4}-\d{2}-\d{2}$/.test(stored) ? 'date' : 'text';
 }
@@ -30,7 +30,7 @@ export function inputKind(target: Site360CellTarget, stored: string): BulkInput 
  * The options of a list cell for one site. A list of a dependent catalogue (`parent_ord`) offers only the children of the parent value held by the same row;
  * with no parent value yet it offers none. A list without a parent column in the menu offers every option.
  */
-export function optionsOf(target: Site360CellTarget, values: Record<string, string | null>): BulkOption[] {
+export function optionsOf(target: SiteMasterCellTarget, values: Record<string, string | null>): BulkOption[] {
   const all = target.options ?? [];
   if (target.parent_ord === undefined || target.parent_ord === null) return all;
   const parent = values[String(target.parent_ord)] ?? '';
@@ -78,7 +78,7 @@ const same = (kind: BulkInput, stored: string, value: BulkValue): boolean => {
   return stored === value;
 };
 
-export interface BulkChange { row: BulkRow; target: Site360CellTarget }
+export interface BulkChange { row: BulkRow; target: SiteMasterCellTarget }
 export interface BulkPlan { change: BulkChange[]; skipped: { row: BulkRow; reason: SkipReason }[] }
 
 /**
@@ -109,7 +109,7 @@ export type BulkOutcome = { code: string; status: 'saved' } | { code: string; st
  * others. `save` is the single-cell save path; `onProgress` gets the number of finished cells.
  */
 export async function runBulk(
-  changes: BulkChange[], value: BulkValue | null, save: (v: Site360CellSave) => Promise<unknown>,
+  changes: BulkChange[], value: BulkValue | null, save: (v: SiteMasterCellSave) => Promise<unknown>,
   { concurrency = 4, onProgress }: { concurrency?: number; onProgress?: (done: number) => void } = {},
 ): Promise<BulkOutcome[]> {
   const out: BulkOutcome[] = new Array(changes.length);

@@ -7,8 +7,8 @@ import { actor, makeSite, makeTask, Site } from "./wf-helpers";
 import type { Actor } from "./wf-helpers";
 
 /**
- * The unified filter (contract 0.15.45): value lists of the enum fields, the screens `site360-<menu>` and `dashboard`, the Master columns `m:<ord>`, the `filter`
- * of GET /site360/{menu}/rows and of the dashboard endpoints. Everything runs in the shared test database: every site has a code with this file's tag, every
+ * The unified filter (contract 0.15.45): value lists of the enum fields, the screens `site-master-<menu>` and `dashboard`, the Master columns `m:<ord>`, the `filter`
+ * of GET /site-master/{menu}/rows and of the dashboard endpoints. Everything runs in the shared test database: every site has a code with this file's tag, every
  * tree starts with a condition on that tag (so other files' sites never count), and the values written here carry the tag too.
  */
 const TAG = randomBytes(3).toString("hex").toUpperCase();
@@ -61,7 +61,7 @@ const rowCodes = async (
 ): Promise<string[]> => {
   const res = await a.api.call(
     "get",
-    `/site360/${menu}/rows?limit=200&${q(tree)}`,
+    `/site-master/${menu}/rows?limit=200&${q(tree)}`,
   );
   expect(res.status, JSON.stringify(res.body)).toBe(200);
   return (res.body.rows as { site_code: string }[])
@@ -112,7 +112,7 @@ beforeAll(async () => {
       AND EXISTS (SELECT 1 FROM task_definitions td JOIN workflow_definitions w ON w.id = td.workflow_id AND w.version = 1 WHERE td.code = tf.task_code)
     ORDER BY mc.ord`);
   const admin = await actor(app, db, { regions: null, grants: SITES_VIEW });
-  const cat = await catalogue(admin, "site360-master");
+  const cat = await catalogue(admin, "site-master-master");
   for (const r of e.rows as {
     task_code: string;
     field_key: string;
@@ -170,7 +170,7 @@ describe("enum value lists on GET /saved-views/filter-fields", () => {
 
   it("limits the values to the regions of the caller: a Tripoli reader never sees a Benghazi value", async () => {
     const tripoli = await actor(app, db, { regions: [1], grants: SITES_VIEW });
-    for (const screen of ["sites", "site360-master", "site360-cw"]) {
+    for (const screen of ["sites", "site-master-master", "site-master-cw"]) {
       const cat = await catalogue(tripoli, screen);
       const values = cat
         .get("sub_region")!
@@ -227,9 +227,9 @@ describe("enum value lists on GET /saved-views/filter-fields", () => {
 });
 
 describe("screens site360-<menu> and dashboard", () => {
-  it("site360-master offers the sites fields and the Master columns as m:<ord>, typed like the grid, with the phase band as group", async () => {
+  it("site-master-master offers the sites fields and the Master columns as m:<ord>, typed like the grid, with the phase band as group", async () => {
     const a = await actor(app, db, { regions: null, grants: SITES_VIEW });
-    const cat = await catalogue(a, "site360-master");
+    const cat = await catalogue(a, "site-master-master");
     const sitesCat = await catalogue(a, "sites");
     for (const k of sitesCat.keys()) expect(cat.has(k), k).toBe(true);
     const date = cat.get(`m:${dateCol.ord}`)!;
@@ -255,8 +255,8 @@ describe("screens site360-<menu> and dashboard", () => {
 
   it("a menu offers its own Master columns only: a column of another menu is not in site360-design_acq", async () => {
     const a = await actor(app, db, { regions: null, grants: SITES_VIEW });
-    const master = await catalogue(a, "site360-master");
-    const design = await catalogue(a, "site360-design_acq");
+    const master = await catalogue(a, "site-master-master");
+    const design = await catalogue(a, "site-master-design_acq");
     const m = (c: Map<string, Field>): string[] =>
       [...c.keys()].filter((k) => k.startsWith("m:"));
     expect(m(design).length).toBeGreaterThan(0);
@@ -266,7 +266,7 @@ describe("screens site360-<menu> and dashboard", () => {
     // the rows of that menu refuse it like an unknown field
     const res = await a.api.call(
       "get",
-      `/site360/design_acq/rows?${q(mine(cond(outside, "not_empty")))}`,
+      `/site-master/design_acq/rows?${q(mine(cond(outside, "not_empty")))}`,
     );
     expect(res.status).toBe(422);
     expect(res.body.errors[0]).toMatchObject({ code: "unknown_field" });
@@ -274,7 +274,7 @@ describe("screens site360-<menu> and dashboard", () => {
       (
         await a.api.call(
           "get",
-          `/site360/master/rows?${q(mine(cond(outside, "not_empty")))}`,
+          `/site-master/master/rows?${q(mine(cond(outside, "not_empty")))}`,
         )
       ).status,
     ).toBe(200);
@@ -289,7 +289,7 @@ describe("screens site360-<menu> and dashboard", () => {
     expect(dash.get("sub_region")!.options!.map((o) => o.value)).toContain(
       `SRA-${TAG}`,
     );
-    for (const bad of ["site360-nope", "site360-", "audit-log"]) {
+    for (const bad of ["site-master-nope", "site-master-", "audit-log"]) {
       const res = await a.api.call(
         "get",
         `/saved-views/filter-fields?screen_key=${bad}`,
@@ -317,7 +317,7 @@ describe("a hidden field stays hidden", () => {
       [code, `gold${TAG}`, tri1.id],
     );
     const tree = mine(cond(`c:${code}`, "is", `gold${TAG}`));
-    for (const screen of ["sites", "site360-master", "dashboard"]) {
+    for (const screen of ["sites", "site-master-master", "dashboard"]) {
       expect(
         (await catalogue(lead, screen)).has(`c:${code}`),
         `lead ${screen}`,
@@ -332,7 +332,7 @@ describe("a hidden field stays hidden", () => {
     expect(await rowCodes(lead, "master", tree)).toEqual([tri1.code]);
     const refused = await reader.api.call(
       "get",
-      `/site360/master/rows?${q(tree)}`,
+      `/site-master/master/rows?${q(tree)}`,
     );
     expect(refused.status).toBe(422);
     expect(refused.body.errors[0]).toMatchObject({ code: "unknown_field" });
@@ -373,17 +373,17 @@ describe("a hidden field stays hidden", () => {
       regions: null,
       grants: [...SITES_VIEW, [mod, "view"]],
     });
-    expect((await catalogue(without, "site360-master")).has("m:36")).toBe(
+    expect((await catalogue(without, "site-master-master")).has("m:36")).toBe(
       false,
     );
-    expect((await catalogue(withReg, "site360-master")).has("m:36")).toBe(true);
+    expect((await catalogue(withReg, "site-master-master")).has("m:36")).toBe(true);
     const tree: Tree = {
       op: "and",
       items: [cond("site_code", "is", s.code), cond("m:36", "is", name)],
     };
     const refused = await without.api.call(
       "get",
-      `/site360/master/rows?${q(tree)}`,
+      `/site-master/master/rows?${q(tree)}`,
     );
     expect(refused.status).toBe(422);
     expect(refused.body.errors[0]).toMatchObject({ code: "unknown_field" });
@@ -391,7 +391,7 @@ describe("a hidden field stays hidden", () => {
   });
 });
 
-describe("GET /site360/{menu}/rows with a filter on Master columns", () => {
+describe("GET /site-master/{menu}/rows with a filter on Master columns", () => {
   it("filters by a date column: is, before, after, between and empty, and reads the value the grid shows", async () => {
     const a = await actor(app, db, { regions: null, grants: SITES_VIEW });
     const early = await makeSite(db, 1, { prefix: `UX${EXTRA}F` });
@@ -440,7 +440,7 @@ describe("GET /site360/{menu}/rows with a filter on Master columns", () => {
     // a date is a date: a number operator is refused, a bad date is 422
     const op = await a.api.call(
       "get",
-      `/site360/master/rows?${q(only(cond(key, "gt", 5)))}`,
+      `/site-master/master/rows?${q(only(cond(key, "gt", 5)))}`,
     );
     expect(op.status).toBe(422);
     expect(op.body.errors[0]).toMatchObject({ code: "invalid_operator" });
@@ -448,14 +448,14 @@ describe("GET /site360/{menu}/rows with a filter on Master columns", () => {
       (
         await a.api.call(
           "get",
-          `/site360/master/rows?${q(only(cond(key, "is", "soon")))}`,
+          `/site-master/master/rows?${q(only(cond(key, "is", "soon")))}`,
         )
       ).status,
     ).toBe(422);
     // the filtered counts follow, the grid value is the one filtered on
     const res = await a.api.call(
       "get",
-      `/site360/master/rows?limit=50&${q(only(cond(key, "after", "2026-04-01")))}`,
+      `/site-master/master/rows?limit=50&${q(only(cond(key, "after", "2026-04-01")))}`,
     );
     expect(res.body.filtered).toBe(1);
     expect(res.body.total).toBeGreaterThanOrEqual(3);
@@ -547,7 +547,7 @@ describe("GET /site360/{menu}/rows with a filter on Master columns", () => {
     const a = await actor(app, db, { regions: null, grants: SITES_VIEW });
     for (const field of ["nope", "m:9999", `m:${dateCol.ord}`]) {
       const path =
-        field === `m:${dateCol.ord}` ? "/sites" : "/site360/master/rows";
+        field === `m:${dateCol.ord}` ? "/sites" : "/site-master/master/rows";
       const res = await a.api.call(
         "get",
         `${path}?${q(mine(cond(field, "not_empty")))}`,
@@ -699,7 +699,7 @@ describe("permission denied", () => {
       ],
     });
     const noDash = await actor(app, db, { regions: null, grants: SITES_VIEW });
-    for (const screen of ["site360-master", "site360-cw", "dashboard"]) {
+    for (const screen of ["site-master-master", "site-master-cw", "dashboard"]) {
       const res = await noSites.api.call(
         "get",
         `/saved-views/filter-fields?screen_key=${screen}`,
@@ -733,11 +733,11 @@ describe("permission denied", () => {
       regions: null,
       grants: [["issues", "view"]],
     });
-    const plain = await noSites.api.call("get", "/site360/master/rows");
+    const plain = await noSites.api.call("get", "/site-master/master/rows");
     expect(plain.status).toBe(403);
     const filtered = await noSites.api.call(
       "get",
-      `/site360/master/rows?${q(mine(cond("sub_region", "is", `SRA-${TAG}`)))}`,
+      `/site-master/master/rows?${q(mine(cond("sub_region", "is", `SRA-${TAG}`)))}`,
     );
     expect(filtered.status).toBe(403);
     expect(filtered.body.code).toBe("module_forbidden");

@@ -112,10 +112,10 @@ SELECT imp_async_start('00000000-0000-4000-8000-0000000b0002', NULL, 'submit', N
 -- @actor ADMIN
 -- @region *
 -- @expect error P0001 not_found|not_eligible_holder
-SELECT imp_stage_batch('TPL-MTG', v.version, v.header_checksum, 'sec-async-reg.xlsx', repeat('d', 64), NULL::uuid,
+SELECT imp_stage_batch('TPL-MEETINGS', v.version, v.header_checksum, 'sec-async-reg.xlsx', repeat('d', 64), NULL::uuid,
   (SELECT jsonb_agg(jsonb_build_object('row_no', i + 1, 'sheet', 'Data', 'data', jsonb_build_object('meeting_date', '2026-02-03', 'title', 'SECAR21 meeting ' || i),
      'custom', '{}'::jsonb, 'pre_errors', '[]'::jsonb)) FROM generate_series(1, 60) i), 'submit')::text AS bid
-FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-MTG' AND v.is_current \gset
+FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-MEETINGS' AND v.is_current \gset
 SELECT version AS ver FROM import_batches WHERE id = :'bid' \gset
 \ctx ALICE stepup=300
 SELECT imp_async_start(:'bid'::uuid, :ver, 'submit', NULL, NULL, NULL, NULL, now() + interval '1 hour');
@@ -127,10 +127,10 @@ SELECT imp_async_start(:'bid'::uuid, :ver, 'submit', NULL, NULL, NULL, NULL, now
 -- @actor ADMIN
 -- @region *
 -- @expect output true|processing|register|60
-SELECT imp_stage_batch('TPL-MTG', v.version, v.header_checksum, 'sec-async-reg.xlsx', repeat('d', 64), NULL::uuid,
+SELECT imp_stage_batch('TPL-MEETINGS', v.version, v.header_checksum, 'sec-async-reg.xlsx', repeat('d', 64), NULL::uuid,
   (SELECT jsonb_agg(jsonb_build_object('row_no', i + 1, 'sheet', 'Data', 'data', jsonb_build_object('meeting_date', '2026-02-03', 'title', 'SECAR22 meeting ' || i),
      'custom', '{}'::jsonb, 'pre_errors', '[]'::jsonb)) FROM generate_series(1, 60) i), 'submit')::text AS bid
-FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-MTG' AND v.is_current \gset
+FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-MEETINGS' AND v.is_current \gset
 \ctx ADMIN stepup=300
 SELECT imp_async_start(:'bid'::uuid, (SELECT version FROM import_batches WHERE id = :'bid'), 'submit', NULL, NULL, NULL, NULL, now() + interval '5 minutes') ->> 'queued' AS q \gset
 SELECT :'q' || '|' || imp_status_of(:'bid'::uuid) || '|' || (imp_batch_job_json(:'bid'::uuid) ->> 'batch_kind') || '|' || (imp_batch_job_json(:'bid'::uuid) ->> 'rows_total');
@@ -142,10 +142,10 @@ SELECT :'q' || '|' || imp_status_of(:'bid'::uuid) || '|' || (imp_batch_job_json(
 -- @actor ADMIN
 -- @region *
 -- @expect error 42501 only the person who asked
-SELECT imp_stage_batch('TPL-MTG', v.version, v.header_checksum, 'sec-async-reg.xlsx', repeat('d', 64), NULL::uuid,
+SELECT imp_stage_batch('TPL-MEETINGS', v.version, v.header_checksum, 'sec-async-reg.xlsx', repeat('d', 64), NULL::uuid,
   (SELECT jsonb_agg(jsonb_build_object('row_no', i + 1, 'sheet', 'Data', 'data', jsonb_build_object('meeting_date', '2026-02-03', 'title', 'SECAR23 meeting ' || i),
      'custom', '{}'::jsonb, 'pre_errors', '[]'::jsonb)) FROM generate_series(1, 60) i), 'submit')::text AS bid
-FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-MTG' AND v.is_current \gset
+FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-MEETINGS' AND v.is_current \gset
 \ctx ADMIN stepup=300
 SELECT imp_async_start(:'bid'::uuid, (SELECT version FROM import_batches WHERE id = :'bid'), 'submit', NULL, NULL, NULL, NULL, now() + interval '5 minutes') -> 'job' ->> 'job_id' AS jid \gset
 \ctx ALICE stepup=300
@@ -158,10 +158,10 @@ SELECT imp_async_step(:'jid'::uuid, NULL);
 -- @actor ADMIN
 -- @region *
 -- @expect error 42501 only the person who asked
-SELECT imp_stage_batch('TPL-MTG', v.version, v.header_checksum, 'sec-async-reg.xlsx', repeat('d', 64), NULL::uuid,
+SELECT imp_stage_batch('TPL-MEETINGS', v.version, v.header_checksum, 'sec-async-reg.xlsx', repeat('d', 64), NULL::uuid,
   (SELECT jsonb_agg(jsonb_build_object('row_no', i + 1, 'sheet', 'Data', 'data', jsonb_build_object('meeting_date', '2026-02-03', 'title', 'SECAR24 meeting ' || i),
      'custom', '{}'::jsonb, 'pre_errors', '[]'::jsonb)) FROM generate_series(1, 60) i), 'submit')::text AS bid
-FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-MTG' AND v.is_current \gset
+FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-MEETINGS' AND v.is_current \gset
 \ctx ADMIN stepup=300
 SELECT imp_async_start(:'bid'::uuid, (SELECT version FROM import_batches WHERE id = :'bid'), 'submit', NULL, NULL, NULL, NULL, now() + interval '5 minutes') -> 'job' ->> 'job_id' AS jid \gset
 SELECT set_config('app.ctx', '', true), set_config('app.ctx_mac', '', true);
@@ -175,10 +175,10 @@ SELECT imp_async_abandon(:'jid'::uuid, 'forged');
 -- @actor ADMIN
 -- @region *
 -- @expect error 42501 no signed-in actor
-SELECT imp_stage_batch('TPL-MTG', v.version, v.header_checksum, 'sec-async-reg.xlsx', repeat('d', 64), NULL::uuid,
+SELECT imp_stage_batch('TPL-MEETINGS', v.version, v.header_checksum, 'sec-async-reg.xlsx', repeat('d', 64), NULL::uuid,
   (SELECT jsonb_agg(jsonb_build_object('row_no', i + 1, 'sheet', 'Data', 'data', jsonb_build_object('meeting_date', '2026-02-03', 'title', 'SECAR25 meeting ' || i),
      'custom', '{}'::jsonb, 'pre_errors', '[]'::jsonb)) FROM generate_series(1, 60) i), 'submit')::text AS bid
-FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-MTG' AND v.is_current \gset
+FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-MEETINGS' AND v.is_current \gset
 \ctx ADMIN stepup=300
 SELECT imp_async_start(:'bid'::uuid, (SELECT version FROM import_batches WHERE id = :'bid'), 'submit', NULL, NULL, NULL, NULL, now() + interval '5 minutes') -> 'job' ->> 'job_id' AS jid \gset
 SELECT set_config('app.ctx', '', true), set_config('app.ctx_mac', '', true);
@@ -192,10 +192,10 @@ SELECT count(*) FROM imp_async_chunk_tasks(:'jid'::uuid, NULL);
 -- @actor ADMIN
 -- @region *
 -- @expect error P0001 batch_processing
-SELECT imp_stage_batch('TPL-MTG', v.version, v.header_checksum, 'sec-async-reg.xlsx', repeat('d', 64), NULL::uuid,
+SELECT imp_stage_batch('TPL-MEETINGS', v.version, v.header_checksum, 'sec-async-reg.xlsx', repeat('d', 64), NULL::uuid,
   (SELECT jsonb_agg(jsonb_build_object('row_no', i + 1, 'sheet', 'Data', 'data', jsonb_build_object('meeting_date', '2026-02-03', 'title', 'SECAR26 meeting ' || i),
      'custom', '{}'::jsonb, 'pre_errors', '[]'::jsonb)) FROM generate_series(1, 60) i), 'submit')::text AS bid
-FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-MTG' AND v.is_current \gset
+FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-MEETINGS' AND v.is_current \gset
 \ctx ADMIN stepup=300
 SELECT imp_async_start(:'bid'::uuid, (SELECT version FROM import_batches WHERE id = :'bid'), 'submit', NULL, NULL, NULL, NULL, now() + interval '5 minutes');
 SELECT imp_decide_batch(:'bid'::uuid, (SELECT version FROM import_batches WHERE id = :'bid'), 'discard', 'all', NULL, 'gone', false);
@@ -207,10 +207,10 @@ SELECT imp_decide_batch(:'bid'::uuid, (SELECT version FROM import_batches WHERE 
 -- @actor ADMIN
 -- @region *
 -- @expect output running|50|60
-SELECT imp_stage_batch('TPL-MTG', v.version, v.header_checksum, 'sec-async-reg.xlsx', repeat('d', 64), NULL::uuid,
+SELECT imp_stage_batch('TPL-MEETINGS', v.version, v.header_checksum, 'sec-async-reg.xlsx', repeat('d', 64), NULL::uuid,
   (SELECT jsonb_agg(jsonb_build_object('row_no', i + 1, 'sheet', 'Data', 'data', jsonb_build_object('meeting_date', '2026-02-03', 'title', 'SECAR27 meeting ' || i),
      'custom', '{}'::jsonb, 'pre_errors', '[]'::jsonb)) FROM generate_series(1, 60) i), 'submit')::text AS bid
-FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-MTG' AND v.is_current \gset
+FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-MEETINGS' AND v.is_current \gset
 \ctx ADMIN stepup=300
 SELECT imp_async_start(:'bid'::uuid, (SELECT version FROM import_batches WHERE id = :'bid'), 'submit', NULL, NULL, NULL, NULL, now() + interval '5 minutes') -> 'job' ->> 'job_id' AS jid \gset
 \ctx ADMIN
@@ -224,10 +224,10 @@ SELECT (:'p'::jsonb ->> 'state') || '|' || (:'p'::jsonb ->> 'rows_done') || '|' 
 -- @actor ADMIN
 -- @region *
 -- @expect output 0
-SELECT imp_stage_batch('TPL-MTG', v.version, v.header_checksum, 'sec-async-reg.xlsx', repeat('d', 64), NULL::uuid,
+SELECT imp_stage_batch('TPL-MEETINGS', v.version, v.header_checksum, 'sec-async-reg.xlsx', repeat('d', 64), NULL::uuid,
   (SELECT jsonb_agg(jsonb_build_object('row_no', i + 1, 'sheet', 'Data', 'data', jsonb_build_object('meeting_date', '2026-02-03', 'title', 'SECAR28 meeting ' || i),
      'custom', '{}'::jsonb, 'pre_errors', '[]'::jsonb)) FROM generate_series(1, 60) i), 'submit')::text AS bid
-FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-MTG' AND v.is_current \gset
+FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-MEETINGS' AND v.is_current \gset
 \ctx ADMIN stepup=300
 SELECT imp_async_start(:'bid'::uuid, (SELECT version FROM import_batches WHERE id = :'bid'), 'submit', NULL, NULL, NULL, NULL, now() + interval '5 minutes') -> 'job' ->> 'job_id' AS jid \gset
 \ctx ALICE

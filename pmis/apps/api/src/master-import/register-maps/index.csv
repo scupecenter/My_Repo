@@ -4,10 +4,10 @@
 # site_scoped = no: the key column is not a Site ID (Risk Register), so it is not checked against the Master sheet.
 register,template_id,master_sheet,header_row,first_data_row,site_header,key_headers,key_any_of,site_scoped,needs_headers
 rf_design,TPL-RF,RF & Design,1,3,Site ID,Site ID,,yes,
-acquisition,TPL-ACQ,Acquisition,1,3,Site ID,Site ID|Candidate,,yes,
-permits_hse,TPL-PRM,Permission Log,1,3,Site ID,Site ID|Type|Valid From,,yes,
-procurement,TPL-PO,PR-PO,1,3,Site ID,Site ID|Scope|PR No.|PO / WO No.,PR No.|PO / WO No.,yes,Delivery|Team
+acquisition,TPL-ACQUISITION,Acquisition,1,3,Site ID,Site ID|Candidate,,yes,
+permits_hse,TPL-PERMITS,Permission Log,1,3,Site ID,Site ID|Type|Valid From,,yes,
+procurement,TPL-PROCUREMENT,PR-PO,1,3,Site ID,Site ID|Scope|PR No.|PO / WO No.,PR No.|PO / WO No.,yes,Delivery|Team
 gecol,TPL-GECOL,GECOL,1,3,Site ID,Site ID,,yes,
 hlc,TPL-HLC,HLC,1,3,Site ID,Site ID,,yes,
-as_built,TPL-ASB,As-Built,3,5,Site ID,Site ID|Record Type,,yes,
-risks,TPL-RSK,Risk Register,1,2,Risk ID,Risk ID,,no,
+as_built,TPL-AS-BUILT,As-Built,3,5,Site ID,Site ID|Record Type,,yes,
+risks,TPL-RISKS,Risk Register,1,2,Risk ID,Risk ID,,no,

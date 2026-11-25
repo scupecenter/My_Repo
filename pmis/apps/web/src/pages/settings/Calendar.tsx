@@ -1,9 +1,10 @@
 import { AlertTriangle, CalendarCheck, CheckCircle2, Pencil, Plus, Trash2, Upload } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { Fragment, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCalendar, useCalendarConfirmation, useCreateHoliday, useDeleteHoliday, useHolidayChange, useHolidays, useImportHolidays, useSetCalendarConfirmation, useSetWeekend } from '@/api/settings';
 import type { Holiday } from '@/api/types';
 import { errText, FormDialog } from '@/components/FormDialog';
+import { InlinePanel } from '@/components/InlinePanel';
 import { useToast } from '@/components/Toast';
 import { fieldErrors } from '@/lib/fields';
 
@@ -22,7 +23,7 @@ function HolidayDialog({ h, onClose }: { h: Holiday | null; onClose: () => void 
   const errs = fieldErrors(m.error);
   const done = { onSuccess: () => { toast(t('settings.audited')); onClose(); } };
   return (
-    <FormDialog open onClose={onClose} testid="holiday-dialog" title={t(h ? 'cal.edit' : 'cal.add')} busy={m.isPending} error={m.isError && !Object.keys(errs).length ? errText(m.error, t) : null}
+    <InlinePanel onClose={onClose} testid="holiday-dialog" title={t(h ? 'cal.edit' : 'cal.add')} busy={m.isPending} error={m.isError && !Object.keys(errs).length ? errText(m.error, t) : null}
       onSubmit={(reason) => {
         const body = { date: f.date, name_en: f.name_en, ...(f.name_ar ? { name_ar: f.name_ar } : {}), kind: f.kind, reason };
         if (h) change.mutate({ h, patch: body }, done); else create.mutate({ ...body, tentative: f.tentative }, done);
@@ -37,7 +38,7 @@ function HolidayDialog({ h, onClose }: { h: Holiday | null; onClose: () => void 
           <option value="national">{t('cal.kind_national')}</option><option value="religious">{t('cal.kind_religious')}</option></select></label>
       {!h && <label className="flex items-center gap-2 text-sm"><input type="checkbox" data-testid="holiday-tentative" checked={f.tentative} onChange={(e) => setF({ ...f, tentative: e.target.checked })} />{t('cal.tentative')}</label>}
       <p className="text-xs text-mute">{t('cal.recalc_note')}</p>
-    </FormDialog>
+    </InlinePanel>
   );
 }
 
@@ -96,6 +97,22 @@ export function Calendar() {
   const sum = list.data?.summary;
   const wk = days ?? cal.data?.weekend_days ?? [5, 6];
   const bad = !wk.length || wk.length > 6;
+  // Settings, edit in place: the form of a holiday (add, edit, confirm, delete) opens in the table, at its row (the add form above the table)
+  const dlgPanel = (
+    <>
+      {dlg?.kind === 'edit' && <HolidayDialog h={dlg.h} onClose={() => setDlg(null)} />}
+      {dlg?.kind === 'delete' && (
+        <InlinePanel onClose={() => setDlg(null)} testid="holiday-delete-dialog" title={t('cal.delete_title', { date: dlg.h.date })} busy={del.isPending} error={del.isError ? errText(del.error, t) : null}
+          onSubmit={(reason) => del.mutate({ h: dlg.h, reason }, { onSuccess: () => { toast(t('settings.audited')); setDlg(null); } })}><p className="text-sm text-mute">{t('cal.recalc_note')}</p></InlinePanel>
+      )}
+      {dlg?.kind === 'confirm' && (
+        <InlinePanel onClose={() => setDlg(null)} testid="holiday-confirm-dialog" title={t('cal.confirm_title', { date: dlg.h.date })} busy={change.isPending} error={change.isError ? errText(change.error, t) : null}
+          onSubmit={(reason) => change.mutate({ h: dlg.h, patch: { reason, confirm: true, ...(confirmDate ? { date: confirmDate } : {}) } }, { onSuccess: () => { toast(t('settings.audited')); setDlg(null); } })}>
+          <label className="block text-sm font-semibold">{t('cal.announced_date')}<input type="date" className="input mt-1 font-normal" data-testid="holiday-confirm-date" value={confirmDate} onChange={(e) => setConfirmDate(e.target.value)} /><span className="text-xs font-normal text-mute">{t('cal.announced_hint')}</span></label>
+        </InlinePanel>
+      )}
+    </>
+  );
   return (
     <div data-testid="page-calendar" className="space-y-4">
       {sum?.tentative_reminder_due && <div role="status" className="flex gap-2 rounded-md bg-waitBg p-3 text-sm text-waitInk" data-testid="cal-banner-tentative"><AlertTriangle size={16} />{t('cal.banner_tentative', { date: sum.next_tentative_date })}</div>}
@@ -120,11 +137,13 @@ export function Calendar() {
           <button className="btn" data-testid="cal-import" onClick={() => file.current?.click()}><Upload size={14} />{t('cal.import')}</button>
           <button className="btn btn-accent" data-testid="cal-add" onClick={() => setDlg({ kind: 'edit', h: null })}><Plus size={14} />{t('cal.add')}</button>
         </div>
+        {dlg?.kind === 'edit' && !dlg.h && <div className="mb-3">{dlgPanel}</div>}
         <div className="overflow-x-auto"><table className="w-full text-sm">
           <thead className="text-mute"><tr><th className="p-2 text-start">{t('cal.date')}</th><th className="p-2 text-start">{t('cal.name')}</th><th className="p-2 text-start">{t('cal.kind')}</th><th className="p-2 text-start">{t('users.status')}</th><th className="p-2" /></tr></thead>
           <tbody data-testid="cal-list">
             {(list.data?.items ?? []).map((h) => (
-              <tr key={h.id} className="border-t border-line" data-testid={`holiday-${h.date}`}>
+              <Fragment key={h.id}>
+              <tr className="border-t border-line" data-testid={`holiday-${h.date}`}>
                 <td className="mono p-2">{h.date}</td><td className="p-2">{(ar && h.name_ar) || h.name_en}</td><td className="p-2">{t(`cal.kind_${h.kind}`)}</td>
                 <td className="p-2">{h.tentative ? <span className="chip bg-waitBg text-waitInk" data-testid={`holiday-tentative-${h.date}`}>{t('cal.tentative')}</span> : <span className="chip bg-doneBg text-doneInk">{t('cal.confirmed')}</span>}</td>
                 <td className="p-2 text-end"><span className="inline-flex gap-1">
@@ -132,6 +151,8 @@ export function Calendar() {
                   <button className="btn" aria-label={t('common.edit')} data-testid={`holiday-edit-${h.date}`} onClick={() => setDlg({ kind: 'edit', h })}><Pencil size={14} /></button>
                   <button className="btn" aria-label={t('common.remove')} data-testid={`holiday-delete-${h.date}`} onClick={() => setDlg({ kind: 'delete', h })}><Trash2 size={14} /></button></span></td>
               </tr>
+              {dlg && dlg.kind !== 'weekend' && dlg.h?.id === h.id && <tr data-testid={`holiday-inline-${h.date}`}><td colSpan={5} className="p-2">{dlgPanel}</td></tr>}
+              </Fragment>
             ))}
             {list.isSuccess && !list.data.items.length && <tr><td colSpan={5} className="p-6 text-center text-mute" data-testid="cal-empty">{t('cal.empty')}</td></tr>}
           </tbody>
@@ -142,17 +163,6 @@ export function Calendar() {
           onSubmit={(reason) => imp.mutate({ file: importFile, reason }, { onSuccess: () => { toast(`${t('cal.imported')} ${t('settings.audited')}`); setImportFile(null); } })}>
           <p className="mono text-sm" dir="ltr" data-testid="holiday-import-name">{importFile.name}</p>
           <p className="text-xs text-mute">{t('cal.recalc_note')}</p>
-        </FormDialog>
-      )}
-      {dlg?.kind === 'edit' && <HolidayDialog h={dlg.h} onClose={() => setDlg(null)} />}
-      {dlg?.kind === 'delete' && (
-        <FormDialog open onClose={() => setDlg(null)} testid="holiday-delete-dialog" title={t('cal.delete_title', { date: dlg.h.date })} busy={del.isPending} error={del.isError ? errText(del.error, t) : null}
-          onSubmit={(reason) => del.mutate({ h: dlg.h, reason }, { onSuccess: () => { toast(t('settings.audited')); setDlg(null); } })}><p className="text-sm text-mute">{t('cal.recalc_note')}</p></FormDialog>
-      )}
-      {dlg?.kind === 'confirm' && (
-        <FormDialog open onClose={() => setDlg(null)} testid="holiday-confirm-dialog" title={t('cal.confirm_title', { date: dlg.h.date })} busy={change.isPending} error={change.isError ? errText(change.error, t) : null}
-          onSubmit={(reason) => change.mutate({ h: dlg.h, patch: { reason, confirm: true, ...(confirmDate ? { date: confirmDate } : {}) } }, { onSuccess: () => { toast(t('settings.audited')); setDlg(null); } })}>
-          <label className="block text-sm font-semibold">{t('cal.announced_date')}<input type="date" className="input mt-1 font-normal" data-testid="holiday-confirm-date" value={confirmDate} onChange={(e) => setConfirmDate(e.target.value)} /><span className="text-xs font-normal text-mute">{t('cal.announced_hint')}</span></label>
         </FormDialog>
       )}
       {dlg?.kind === 'weekend' && (

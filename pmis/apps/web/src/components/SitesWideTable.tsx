@@ -1,8 +1,8 @@
 import { ExternalLink } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import type { Site360MenuItem } from '@/api/site360';
-import type { Site360CellTarget } from '@/components/Site360Grid';
+import type { SiteMasterMenuItem } from '@/api/siteMaster';
+import type { SiteMasterCellTarget } from '@/components/SiteMasterGrid';
 import { bareHeader } from '@/components/TableStandard';
 import { WideTable, type WideCell, type WideColumn, type WideInput } from '@/components/WideTable';
 import type { Display } from '@/lib/tablePrefs';
@@ -10,16 +10,16 @@ import { optionsOf } from '@/lib/siteBulkEdit';
 import { fmtDate } from '@/lib/time';
 
 export type { WideInput } from '@/components/WideTable';
-export interface WideRow { site_id: string; site_code: string; row_no?: number | null; values: Record<string, string | null>; cells?: Record<string, Site360CellTarget> }
+export interface WideRow { site_id: string; site_code: string; row_no?: number | null; values: Record<string, string | null>; cells?: Record<string, SiteMasterCellTarget> }
 
 /**
  * One typed edit of one cell of one site: the same target and value the grid sends to the same save path (PATCH /tasks/{task_id}, If-Match the version).
  * The value has the type of the editor: a date or text as a string, a number as a number, a yes or no as a boolean; an empty string clears the value.
  */
-export interface WideEdit { row: WideRow; ord: number; target: Site360CellTarget; value: string | number | boolean }
+export interface WideEdit { row: WideRow; ord: number; target: SiteMasterCellTarget; value: string | number | boolean }
 
 /** The editor of a cell: the API's `input_type`; an older answer without it falls back to a date for a date key or a date-shaped value, else text. */
-export function inputOf(target: Site360CellTarget, raw: string): WideInput {
+export function inputOf(target: SiteMasterCellTarget, raw: string): WideInput {
   if (target.input_type) return target.input_type;
   return target.field || /^\d{4}-\d{2}-\d{2}$/.test(raw) ? 'date' : 'text';
 }
@@ -33,10 +33,12 @@ type Row = WideRow & { id: string; code: string; rowNo?: number | null };
  * Editing (owner decision 2026-11-22): a task-backed cell the API marks editable opens a typed inline editor; one edit changes only that site's cell,
  * through the same save path as the grid (the same rights, locks, gate rules and errors). Other cells stay plain, with the reason in a tooltip.
  */
-export function SitesWideTable({ display, menu, rows, hasMore, loadingMore, onMore, loaded, filtered, onClear, sel, onEdit, busy, height, picked, onPick, onPickAll }: {
+export function SitesWideTable({ pending, display, menu, rows, hasMore, loadingMore, onMore, loaded, filtered, onClear, sel, onEdit, busy, height, picked, onPick, onPickAll }: {
+  /** Batch edit: the value waiting in the draft, by task id and column order; shown in the cell with a Pending chip. */
+  pending?: Record<string, Record<string, { to: unknown }>>;
   /** W8 item 4: the Display options of the screen (text size, alignment, density, wrap, zebra) */
   display?: Display;
-  menu: Site360MenuItem; rows: WideRow[]; hasMore: boolean; loadingMore: boolean; onMore: () => void; loaded: boolean; filtered: boolean; onClear: () => void;
+  menu: SiteMasterMenuItem; rows: WideRow[]; hasMore: boolean; loadingMore: boolean; onMore: () => void; loaded: boolean; filtered: boolean; onClear: () => void;
   sel: string; onEdit: (e: WideEdit) => Promise<unknown>; busy?: boolean; height: number;
   /** the selected sites (Site IDs) for the bulk bar: a checkbox in the frozen # cell of each row and a select-all in its header */
   picked: Set<string>; onPick: (code: string) => void; onPickAll: () => void;
@@ -57,8 +59,9 @@ export function SitesWideTable({ display, menu, rows, hasMore, loadingMore, onMo
   const cell = (r: Row, c: WideColumn): WideCell => {
     const ord = Number(c.key);
     const target = r.cells?.[c.key];
-    const x = r.values[c.key] ?? '';
-    let shown = text(ord, r);
+    const wait = r.cells?.[c.key]?.task_id ? pending?.[r.cells[c.key]!.task_id]?.[c.key] : undefined;
+    const x = wait ? String(wait.to ?? '') : (r.values[c.key] ?? '');
+    let shown = wait ? x : text(ord, r);
     if (target && x) {
       const kind = inputOf(target, x);
       if (kind === 'list') { const o = target.options?.find((e) => e.value === x); if (o) shown = label(o); }
@@ -72,6 +75,7 @@ export function SitesWideTable({ display, menu, rows, hasMore, loadingMore, onMo
     const noParent = kind === 'list' && target.parent_ord !== undefined && !opts.length;
     return {
       text: shown, target: true,
+      ...(wait ? { node: <span data-testid={`sites-pending-${r.site_code}-${c.key}`}>{shown}<span className="chip ms-1 bg-waitBg text-waitInk">{t('batchedit.pending_chip')}</span></span> } : {}),
       edit: { input: kind, initial: kind === 'boolean' ? (/^(true|yes|1)$/i.test(x) ? 'true' : 'false') : x, options: opts.map((o) => ({ value: o.value, label: label(o) })), hint: noParent ? t('sites.wide_pick_parent') : undefined },
     };
   };
@@ -83,7 +87,7 @@ export function SitesWideTable({ display, menu, rows, hasMore, loadingMore, onMo
       idCell={(r) => <Link to={`/sites/${r.site_id}`} className="rounded p-0.5 text-link hover:bg-hover" aria-label={t('sites.wide_open', { code: r.site_code })} title={t('sites.wide_open', { code: r.site_code })} data-testid={`site-row-${r.site_code}`}><ExternalLink size={14} /></Link>}
       columns={cols} rows={wide} cell={cell} display={display} busy={busy} height={height} sel={sel}
       onSave={(r, c, value) => onEdit({ row: r, ord: Number(c.key), target: r.cells![c.key]!, value })}
-      picked={picked} onPick={onPick} onPickAll={onPickAll} hasMore={hasMore} loadingMore={loadingMore} onMore={onMore} moreTestid="site360-more"
+      picked={picked} onPick={onPick} onPickAll={onPickAll} hasMore={hasMore} loadingMore={loadingMore} onMore={onMore} moreTestid="site-master-more"
       loaded={loaded} filtered={filtered} onClear={onClear} emptyTestid="sites-empty" emptyTitle={t('sites.empty')} />
   );
 }

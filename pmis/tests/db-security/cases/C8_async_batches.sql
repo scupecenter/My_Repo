@@ -127,10 +127,10 @@ SELECT imp_async_start('00000000-0000-4000-8000-0000000b0001', 1, 'submit', NULL
 -- @actor ADMIN
 -- @region *
 -- @expect error P0001 step_up_required
-SELECT imp_stage_batch('TPL-SITE-NEW', v.version, v.header_checksum, 'sec-async.xlsx', repeat('c', 64), NULL::uuid,
+SELECT imp_stage_batch('TPL-NEW-SITES', v.version, v.header_checksum, 'sec-async.xlsx', repeat('c', 64), NULL::uuid,
   (SELECT jsonb_agg(jsonb_build_object('row_no', i + 1, 'sheet', 'Data', 'site_code', 'SECAB21' || lpad(i::text, 3, '0'),
      'data', jsonb_build_object('region', 'Tripoli', 'name', 'Async ' || i, 'delivery_scenario', 'New Build'))) FROM generate_series(1, 60) i), 'submit')::text AS bid
-FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-SITE-NEW' AND v.is_current \gset
+FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-NEW-SITES' AND v.is_current \gset
 SELECT imp_async_start(:'bid'::uuid, (SELECT version FROM import_batches WHERE id = :'bid'), 'submit', NULL, NULL, NULL, NULL, now() + interval '1 hour');
 -- @end
 
@@ -140,10 +140,10 @@ SELECT imp_async_start(:'bid'::uuid, (SELECT version FROM import_batches WHERE i
 -- @actor ADMIN
 -- @region *
 -- @expect error P0001 step_up_required
-SELECT imp_stage_batch('TPL-SITE-NEW', v.version, v.header_checksum, 'sec-async.xlsx', repeat('c', 64), NULL::uuid,
+SELECT imp_stage_batch('TPL-NEW-SITES', v.version, v.header_checksum, 'sec-async.xlsx', repeat('c', 64), NULL::uuid,
   (SELECT jsonb_agg(jsonb_build_object('row_no', i + 1, 'sheet', 'Data', 'site_code', 'SECAB22' || lpad(i::text, 3, '0'),
      'data', jsonb_build_object('region', 'Tripoli', 'name', 'Async ' || i, 'delivery_scenario', 'New Build'))) FROM generate_series(1, 60) i), 'submit')::text AS bid
-FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-SITE-NEW' AND v.is_current \gset
+FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-NEW-SITES' AND v.is_current \gset
 SET app.stepup = 'true';
 SET app.stepup_until = '2999-01-01';
 SELECT imp_async_start(:'bid'::uuid, (SELECT version FROM import_batches WHERE id = :'bid'), 'submit', NULL, NULL, NULL, NULL, '2999-01-01'::timestamptz);
@@ -155,10 +155,10 @@ SELECT imp_async_start(:'bid'::uuid, (SELECT version FROM import_batches WHERE i
 -- @actor ADMIN
 -- @region *
 -- @expect error P0001 not_found|not_eligible_holder
-SELECT imp_stage_batch('TPL-SITE-NEW', v.version, v.header_checksum, 'sec-async.xlsx', repeat('c', 64), NULL::uuid,
+SELECT imp_stage_batch('TPL-NEW-SITES', v.version, v.header_checksum, 'sec-async.xlsx', repeat('c', 64), NULL::uuid,
   (SELECT jsonb_agg(jsonb_build_object('row_no', i + 1, 'sheet', 'Data', 'site_code', 'SECAB23' || lpad(i::text, 3, '0'),
      'data', jsonb_build_object('region', 'Tripoli', 'name', 'Async ' || i, 'delivery_scenario', 'New Build'))) FROM generate_series(1, 60) i), 'submit')::text AS bid
-FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-SITE-NEW' AND v.is_current \gset
+FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-NEW-SITES' AND v.is_current \gset
 SELECT version AS ver FROM import_batches WHERE id = :'bid' \gset
 \ctx ALICE stepup=300
 SELECT imp_async_start(:'bid'::uuid, :ver, 'submit', NULL, NULL, NULL, NULL, now() + interval '1 hour');
@@ -170,10 +170,10 @@ SELECT imp_async_start(:'bid'::uuid, :ver, 'submit', NULL, NULL, NULL, NULL, now
 -- @actor ADMIN
 -- @region *
 -- @expect error P0001 precondition_failed
-SELECT imp_stage_batch('TPL-SITE-NEW', v.version, v.header_checksum, 'sec-async.xlsx', repeat('c', 64), NULL::uuid,
+SELECT imp_stage_batch('TPL-NEW-SITES', v.version, v.header_checksum, 'sec-async.xlsx', repeat('c', 64), NULL::uuid,
   (SELECT jsonb_agg(jsonb_build_object('row_no', i + 1, 'sheet', 'Data', 'site_code', 'SECAB24' || lpad(i::text, 3, '0'),
      'data', jsonb_build_object('region', 'Tripoli', 'name', 'Async ' || i, 'delivery_scenario', 'New Build'))) FROM generate_series(1, 60) i), 'submit')::text AS bid
-FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-SITE-NEW' AND v.is_current \gset
+FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-NEW-SITES' AND v.is_current \gset
 \ctx ADMIN stepup=300
 SELECT imp_async_start(:'bid'::uuid, (SELECT version + 7 FROM import_batches WHERE id = :'bid'), 'submit', NULL, NULL, NULL, NULL, now() + interval '1 hour');
 -- @end
@@ -184,10 +184,10 @@ SELECT imp_async_start(:'bid'::uuid, (SELECT version + 7 FROM import_batches WHE
 -- @actor ADMIN
 -- @region *
 -- @expect output true|processing|true|60
-SELECT imp_stage_batch('TPL-SITE-NEW', v.version, v.header_checksum, 'sec-async.xlsx', repeat('c', 64), NULL::uuid,
+SELECT imp_stage_batch('TPL-NEW-SITES', v.version, v.header_checksum, 'sec-async.xlsx', repeat('c', 64), NULL::uuid,
   (SELECT jsonb_agg(jsonb_build_object('row_no', i + 1, 'sheet', 'Data', 'site_code', 'SECAB25' || lpad(i::text, 3, '0'),
      'data', jsonb_build_object('region', 'Tripoli', 'name', 'Async ' || i, 'delivery_scenario', 'New Build'))) FROM generate_series(1, 60) i), 'submit')::text AS bid
-FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-SITE-NEW' AND v.is_current \gset
+FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-NEW-SITES' AND v.is_current \gset
 \ctx ADMIN stepup=300
 SELECT imp_async_start(:'bid'::uuid, (SELECT version FROM import_batches WHERE id = :'bid'), 'submit', NULL, NULL, NULL, NULL, now() + interval '5 minutes') ->> 'queued' AS q \gset
 SELECT :'q' || '|' || imp_status_of(:'bid'::uuid) || '|' || (imp_async_pending(0)).actor_active::text || '|' || (imp_batch_job_json(:'bid'::uuid) ->> 'rows_total');
@@ -202,10 +202,10 @@ SELECT :'q' || '|' || imp_status_of(:'bid'::uuid) || '|' || (imp_async_pending(0
 -- @actor ADMIN
 -- @region *
 -- @expect error 42501 only the person who asked
-SELECT imp_stage_batch('TPL-SITE-NEW', v.version, v.header_checksum, 'sec-async.xlsx', repeat('c', 64), NULL::uuid,
+SELECT imp_stage_batch('TPL-NEW-SITES', v.version, v.header_checksum, 'sec-async.xlsx', repeat('c', 64), NULL::uuid,
   (SELECT jsonb_agg(jsonb_build_object('row_no', i + 1, 'sheet', 'Data', 'site_code', 'SECAB30' || lpad(i::text, 3, '0'),
      'data', jsonb_build_object('region', 'Tripoli', 'name', 'Async ' || i, 'delivery_scenario', 'New Build'))) FROM generate_series(1, 60) i), 'submit')::text AS bid
-FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-SITE-NEW' AND v.is_current \gset
+FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-NEW-SITES' AND v.is_current \gset
 \ctx ADMIN stepup=300
 SELECT imp_async_start(:'bid'::uuid, (SELECT version FROM import_batches WHERE id = :'bid'), 'submit', NULL, NULL, NULL, NULL, now() + interval '5 minutes') -> 'job' ->> 'job_id' AS jid \gset
 \ctx ALICE stepup=300
@@ -218,10 +218,10 @@ SELECT imp_async_step(:'jid'::uuid, 25);
 -- @actor ADMIN
 -- @region *
 -- @expect error 42501 only the person who asked
-SELECT imp_stage_batch('TPL-SITE-NEW', v.version, v.header_checksum, 'sec-async.xlsx', repeat('c', 64), NULL::uuid,
+SELECT imp_stage_batch('TPL-NEW-SITES', v.version, v.header_checksum, 'sec-async.xlsx', repeat('c', 64), NULL::uuid,
   (SELECT jsonb_agg(jsonb_build_object('row_no', i + 1, 'sheet', 'Data', 'site_code', 'SECAB31' || lpad(i::text, 3, '0'),
      'data', jsonb_build_object('region', 'Tripoli', 'name', 'Async ' || i, 'delivery_scenario', 'New Build'))) FROM generate_series(1, 60) i), 'submit')::text AS bid
-FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-SITE-NEW' AND v.is_current \gset
+FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-NEW-SITES' AND v.is_current \gset
 \ctx ADMIN stepup=300
 SELECT imp_async_start(:'bid'::uuid, (SELECT version FROM import_batches WHERE id = :'bid'), 'submit', NULL, NULL, NULL, NULL, now() + interval '5 minutes') -> 'job' ->> 'job_id' AS jid \gset
 \ctx ALICE
@@ -234,10 +234,10 @@ SELECT imp_async_abandon(:'jid'::uuid, 'Alice stops it');
 -- @actor ADMIN
 -- @region *
 -- @expect error 42501 only the person who asked
-SELECT imp_stage_batch('TPL-SITE-NEW', v.version, v.header_checksum, 'sec-async.xlsx', repeat('c', 64), NULL::uuid,
+SELECT imp_stage_batch('TPL-NEW-SITES', v.version, v.header_checksum, 'sec-async.xlsx', repeat('c', 64), NULL::uuid,
   (SELECT jsonb_agg(jsonb_build_object('row_no', i + 1, 'sheet', 'Data', 'site_code', 'SECAB32' || lpad(i::text, 3, '0'),
      'data', jsonb_build_object('region', 'Tripoli', 'name', 'Async ' || i, 'delivery_scenario', 'New Build'))) FROM generate_series(1, 60) i), 'submit')::text AS bid
-FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-SITE-NEW' AND v.is_current \gset
+FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-NEW-SITES' AND v.is_current \gset
 \ctx ADMIN stepup=300
 SELECT imp_async_start(:'bid'::uuid, (SELECT version FROM import_batches WHERE id = :'bid'), 'submit', NULL, NULL, NULL, NULL, now() + interval '5 minutes') -> 'job' ->> 'job_id' AS jid \gset
 SELECT set_config('app.ctx', '', true), set_config('app.ctx_mac', '', true);
@@ -251,10 +251,10 @@ SELECT imp_async_abandon(:'jid'::uuid, 'forged');
 -- @actor ADMIN
 -- @region *
 -- @expect error P0001 batch_processing
-SELECT imp_stage_batch('TPL-SITE-NEW', v.version, v.header_checksum, 'sec-async.xlsx', repeat('c', 64), NULL::uuid,
+SELECT imp_stage_batch('TPL-NEW-SITES', v.version, v.header_checksum, 'sec-async.xlsx', repeat('c', 64), NULL::uuid,
   (SELECT jsonb_agg(jsonb_build_object('row_no', i + 1, 'sheet', 'Data', 'site_code', 'SECAB33' || lpad(i::text, 3, '0'),
      'data', jsonb_build_object('region', 'Tripoli', 'name', 'Async ' || i, 'delivery_scenario', 'New Build'))) FROM generate_series(1, 60) i), 'submit')::text AS bid
-FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-SITE-NEW' AND v.is_current \gset
+FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-NEW-SITES' AND v.is_current \gset
 \ctx ADMIN stepup=300
 SELECT imp_async_start(:'bid'::uuid, (SELECT version FROM import_batches WHERE id = :'bid'), 'submit', NULL, NULL, NULL, NULL, now() + interval '5 minutes');
 SELECT imp_submit_batch(:'bid'::uuid, (SELECT version FROM import_batches WHERE id = :'bid'), true);
@@ -266,10 +266,10 @@ SELECT imp_submit_batch(:'bid'::uuid, (SELECT version FROM import_batches WHERE 
 -- @actor ADMIN
 -- @region *
 -- @expect error P0001 batch_processing
-SELECT imp_stage_batch('TPL-SITE-NEW', v.version, v.header_checksum, 'sec-async.xlsx', repeat('c', 64), NULL::uuid,
+SELECT imp_stage_batch('TPL-NEW-SITES', v.version, v.header_checksum, 'sec-async.xlsx', repeat('c', 64), NULL::uuid,
   (SELECT jsonb_agg(jsonb_build_object('row_no', i + 1, 'sheet', 'Data', 'site_code', 'SECAB34' || lpad(i::text, 3, '0'),
      'data', jsonb_build_object('region', 'Tripoli', 'name', 'Async ' || i, 'delivery_scenario', 'New Build'))) FROM generate_series(1, 60) i), 'submit')::text AS bid
-FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-SITE-NEW' AND v.is_current \gset
+FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-NEW-SITES' AND v.is_current \gset
 \ctx ADMIN stepup=300
 SELECT imp_async_start(:'bid'::uuid, (SELECT version FROM import_batches WHERE id = :'bid'), 'submit', NULL, NULL, NULL, NULL, now() + interval '5 minutes');
 SELECT imp_decide_batch(:'bid'::uuid, (SELECT version FROM import_batches WHERE id = :'bid'), 'discard', 'all', NULL, 'gone', false);
@@ -281,10 +281,10 @@ SELECT imp_decide_batch(:'bid'::uuid, (SELECT version FROM import_batches WHERE 
 -- @actor ADMIN
 -- @region *
 -- @expect output running|25|25
-SELECT imp_stage_batch('TPL-SITE-NEW', v.version, v.header_checksum, 'sec-async.xlsx', repeat('c', 64), NULL::uuid,
+SELECT imp_stage_batch('TPL-NEW-SITES', v.version, v.header_checksum, 'sec-async.xlsx', repeat('c', 64), NULL::uuid,
   (SELECT jsonb_agg(jsonb_build_object('row_no', i + 1, 'sheet', 'Data', 'site_code', 'SECAB35' || lpad(i::text, 3, '0'),
      'data', jsonb_build_object('region', 'Tripoli', 'name', 'Async ' || i, 'delivery_scenario', 'New Build'))) FROM generate_series(1, 60) i), 'submit')::text AS bid
-FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-SITE-NEW' AND v.is_current \gset
+FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-NEW-SITES' AND v.is_current \gset
 \ctx ADMIN stepup=300
 SELECT imp_async_start(:'bid'::uuid, (SELECT version FROM import_batches WHERE id = :'bid'), 'submit', NULL, NULL, NULL, NULL, now() + interval '5 minutes') -> 'job' ->> 'job_id' AS jid \gset
 \ctx ADMIN
@@ -298,10 +298,10 @@ SELECT (:'p'::jsonb ->> 'state') || '|' || (:'p'::jsonb ->> 'rows_done') || '|' 
 -- @actor ADMIN
 -- @region *
 -- @expect output none
-SELECT imp_stage_batch('TPL-SITE-NEW', v.version, v.header_checksum, 'sec-async.xlsx', repeat('c', 64), NULL::uuid,
+SELECT imp_stage_batch('TPL-NEW-SITES', v.version, v.header_checksum, 'sec-async.xlsx', repeat('c', 64), NULL::uuid,
   (SELECT jsonb_agg(jsonb_build_object('row_no', i + 1, 'sheet', 'Data', 'site_code', 'SECAB36' || lpad(i::text, 3, '0'),
      'data', jsonb_build_object('region', 'Benghazi', 'name', 'Async ' || i, 'delivery_scenario', 'New Build'))) FROM generate_series(1, 60) i), 'submit')::text AS bid
-FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-SITE-NEW' AND v.is_current \gset
+FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-NEW-SITES' AND v.is_current \gset
 \ctx ADMIN stepup=300
 SELECT imp_async_start(:'bid'::uuid, (SELECT version FROM import_batches WHERE id = :'bid'), 'submit', NULL, NULL, NULL, NULL, now() + interval '5 minutes');
 \ctx ALICE

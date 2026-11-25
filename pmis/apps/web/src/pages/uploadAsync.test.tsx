@@ -59,7 +59,7 @@ describe('a big TPL-MASTER upload (0.15.3)', () => {
     const ID = '0b3c9f3e-0000-4000-8000-0000000000ab';
     let state: 'running' | 'failed' = 'running';
     const dto = (): ImportBatch => ({
-      id: ID, upload_id: ID, template_id: 'TPL-SITE-CW', template_version: 3, source: 'template', file_name: 'cw.xlsx', status: state === 'running' ? 'parsing' : 'failed', current_level: 1,
+      id: ID, upload_id: ID, template_id: 'TPL-CIVIL', template_version: 3, source: 'template', file_name: 'cw.xlsx', status: state === 'running' ? 'parsing' : 'failed', current_level: 1,
       levels_required: 2, counts: {}, register_key: null, entity: null, stream: 'CW', group_id: null, version: 0, job_id: null,
       progress: { kind: 'upload', state, rows_total: 469, rows_done: 200, percent: 42, parts_total: 1, parts_done: 0 },
       upload: { id: ID, kind: 'single', state, batch_ids: [], error: state === 'failed' ? { code: 'stopped', reason: null, detail: 'Stopped by the uploader.' } : null },

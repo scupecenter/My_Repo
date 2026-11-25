@@ -102,7 +102,7 @@ describe('W8 pasted-list search', () => {
   it('a single token keeps the contains search, and a menu list sends the search to the rows endpoint', async () => {
     await signIn('pm');
     const seen: string[] = [];
-    server.events.on('request:start', ({ request }) => { const u = new URL(request.url); if (u.pathname.includes('/site360/') && u.searchParams.get('q')) seen.push(u.searchParams.get('q')!); });
+    server.events.on('request:start', ({ request }) => { const u = new URL(request.url); if (u.pathname.includes('/site-master/') && u.searchParams.get('q')) seen.push(u.searchParams.get('q')!); });
     renderApp(<Sites />, { route: `/sites?section=cw&q=${encodeURIComponent('s360-001 S360-003 nope')}` });
     expect(await screen.findByTestId('site-row-S360-001')).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByTestId('site-row-S360-002')).toBeNull());
