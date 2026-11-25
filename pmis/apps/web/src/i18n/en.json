@@ -3046,7 +3046,10 @@
         "stale_tasks": "Stale tasks (idle for N working days)",
         "on_air_vs_target": "On-Air against the monthly target"
       }
-    }
+    },
+    "copy_link": "Copy link",
+    "link_copied": "Copied",
+    "copy_link_hint": "Copy the address of this view with its filters. Whoever opens it signs in first and sees only what their own role allows."
   },
   "docs": {
     "err": {

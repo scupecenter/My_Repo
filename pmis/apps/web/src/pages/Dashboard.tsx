@@ -1,4 +1,4 @@
-import { Download, PencilLine, Printer, RotateCcw } from "lucide-react";
+import { Check, Download, Link2, PencilLine, Printer, RotateCcw } from "lucide-react";
 import { useMemo, useState, type ReactNode, Fragment } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
@@ -651,6 +651,7 @@ export function Dashboard() {
   const d = dash.data;
   const extras = useDashboardExtras(q, !!d);
   const [exporting, setExporting] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
   const [format, setFormat] = useState<ExportFormat>("xlsx");
   // Q116: a local preview of the other pipeline style; the style in force is the setting (meta.pipeline_variant)
   const [preview, setPreview] = useState<"A" | "B" | null>(null);
@@ -1209,6 +1210,21 @@ export function Dashboard() {
               {t("dash.reset")}
             </button>
           )}
+          <button
+            className="btn"
+            data-testid="dash-copy-link"
+            title={t("dash.copy_link_hint")}
+            onClick={() => {
+              // the address already carries the tab and every filter; it opens after the normal sign-in and the reader's own permissions apply
+              void navigator.clipboard?.writeText(window.location.href).then(() => {
+                setLinkCopied(true);
+                window.setTimeout(() => setLinkCopied(false), 2000);
+              });
+            }}
+          >
+            {linkCopied ? <Check size={16} /> : <Link2 size={16} />}
+            {linkCopied ? t("dash.link_copied") : t("dash.copy_link")}
+          </button>
           <Link
             className="btn"
             to="/dashboard/manual-items"
