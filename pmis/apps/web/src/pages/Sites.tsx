@@ -33,7 +33,7 @@ import type { ColDef } from '@/lib/tablePrefs';
 import { EmptyState, NoResults } from '@/components/States';
 import { MiniRail } from '@/components/Pipeline';
 import { SiteMap } from '@/components/SiteMap';
-import { SitesWideTable } from '@/components/SitesWideTable';
+import { SitesWideBatch } from '@/components/SitesWideBatch';
 import { SitesBoard, SWIMLANES, type Swimlane } from '@/components/SitesBoard';
 import { useVirtual } from '@/components/useVirtual';
 import { SITE_MASTER_MASTER, SITE_MASTER_NAV } from '@/lib/siteMasterMenus';
@@ -403,8 +403,8 @@ export function Sites() {
         </div>
       ) : asWide && menu ? (
         <div className="space-y-2">
-          <SitesWideTable display={tbl.display} menu={menu} rows={mRows} sel={sel} height={viewport + 120} loaded={gridRowsQ.isSuccess} filtered={activeFilters > 0} onClear={clearAll} busy={saveCell.isPending}
-            onEdit={(e) => saveCell.mutateAsync({ task_id: e.target.task_id, version: e.target.version, field: e.target.field, values: e.target.values, value: e.value })}
+          <SitesWideBatch key={menu.key} menu={menu} rows={mRows} display={tbl.display} sel={sel} height={viewport + 120} loaded={gridRowsQ.isSuccess} filtered={activeFilters > 0} onClear={clearAll} busy={saveCell.isPending}
+            onSave={(a) => saveCell.mutateAsync(a as never)} errorText={(e) => errText(e, t)} columnLabel={(ord) => { const c = menu.columns.find((x) => String(x.ord) === ord); return c ? bareHeader(c) : ord; }}
             picked={picked} onPick={flip} onPickAll={() => setPicked(allPicked ? new Set() : new Set(allCodes))}
             hasMore={!!gridRowsQ.hasNextPage} loadingMore={gridRowsQ.isFetchingNextPage} onMore={() => void gridRowsQ.fetchNextPage()} />
           <ShownFooter shown={mRows.length} filtered={gridFiltered} />

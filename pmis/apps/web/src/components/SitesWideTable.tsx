@@ -33,7 +33,9 @@ type Row = WideRow & { id: string; code: string; rowNo?: number | null };
  * Editing (owner decision 2026-11-22): a task-backed cell the API marks editable opens a typed inline editor; one edit changes only that site's cell,
  * through the same save path as the grid (the same rights, locks, gate rules and errors). Other cells stay plain, with the reason in a tooltip.
  */
-export function SitesWideTable({ display, menu, rows, hasMore, loadingMore, onMore, loaded, filtered, onClear, sel, onEdit, busy, height, picked, onPick, onPickAll }: {
+export function SitesWideTable({ pending, display, menu, rows, hasMore, loadingMore, onMore, loaded, filtered, onClear, sel, onEdit, busy, height, picked, onPick, onPickAll }: {
+  /** Batch edit: the value waiting in the draft, by task id and column order; shown in the cell with a Pending chip. */
+  pending?: Record<string, Record<string, { to: unknown }>>;
   /** W8 item 4: the Display options of the screen (text size, alignment, density, wrap, zebra) */
   display?: Display;
   menu: SiteMasterMenuItem; rows: WideRow[]; hasMore: boolean; loadingMore: boolean; onMore: () => void; loaded: boolean; filtered: boolean; onClear: () => void;
@@ -57,8 +59,9 @@ export function SitesWideTable({ display, menu, rows, hasMore, loadingMore, onMo
   const cell = (r: Row, c: WideColumn): WideCell => {
     const ord = Number(c.key);
     const target = r.cells?.[c.key];
-    const x = r.values[c.key] ?? '';
-    let shown = text(ord, r);
+    const wait = r.cells?.[c.key]?.task_id ? pending?.[r.cells[c.key]!.task_id]?.[c.key] : undefined;
+    const x = wait ? String(wait.to ?? '') : (r.values[c.key] ?? '');
+    let shown = wait ? x : text(ord, r);
     if (target && x) {
       const kind = inputOf(target, x);
       if (kind === 'list') { const o = target.options?.find((e) => e.value === x); if (o) shown = label(o); }
@@ -72,6 +75,7 @@ export function SitesWideTable({ display, menu, rows, hasMore, loadingMore, onMo
     const noParent = kind === 'list' && target.parent_ord !== undefined && !opts.length;
     return {
       text: shown, target: true,
+      ...(wait ? { node: <span data-testid={`sites-pending-${r.site_code}-${c.key}`}>{shown}<span className="chip ms-1 bg-waitBg text-waitInk">{t('batchedit.pending_chip')}</span></span> } : {}),
       edit: { input: kind, initial: kind === 'boolean' ? (/^(true|yes|1)$/i.test(x) ? 'true' : 'false') : x, options: opts.map((o) => ({ value: o.value, label: label(o) })), hint: noParent ? t('sites.wide_pick_parent') : undefined },
     };
   };

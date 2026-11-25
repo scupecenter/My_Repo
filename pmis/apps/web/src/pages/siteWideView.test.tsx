@@ -121,6 +121,28 @@ describe('Site Master wide table', () => {
       expect(screen.queryByTestId('wide-input-S360-001-78')).toBeNull();
     });
 
+    it('batch mode: edits of two sites wait with a Pending chip, nothing is sent until Save all, then each cell is saved with its own version', async () => {
+      patched.length = 0;
+      await signIn('pm'); rowsWithTargets(); ok();
+      renderApp(<App />, { route: '/sites?section=te&layout=wide' });
+      await userEvent.click(await screen.findByTestId('batch-start'));
+      for (const [code, d] of [['S360-001', '2026-05-01'], ['S360-002', '2026-05-02']] as const) {
+        await userEvent.click(await screen.findByTestId(`wide-edit-${code}-78`));
+        const input = screen.getByTestId(`wide-input-${code}-78`);
+        await userEvent.clear(input);
+        await userEvent.type(input, `${d}{Enter}`);
+      }
+      expect(await screen.findByTestId('sites-pending-S360-001-78')).toBeInTheDocument();
+      expect(screen.getByTestId('sites-pending-S360-002-78')).toBeInTheDocument();
+      expect(screen.getByTestId('batch-count')).toHaveTextContent('2');
+      expect(patched).toHaveLength(0);
+      await userEvent.click(screen.getByTestId('batch-save'));
+      await waitFor(() => expect(patched).toHaveLength(2));
+      expect(patched.map((x) => x.url.match(/tasks\/([^?]+)/)![1]).sort()).toEqual(['task-1', 'task-2']);
+      expect(patched.find((x) => x.url.includes('task-2'))!.ifMatch).toContain('7');
+      expect(patched.find((x) => x.url.includes('task-2'))!.body).toEqual({ actual_date: '2026-05-02' });
+    });
+
     it('Esc cancels without saving; a locked or computed cell has no editor and says why', async () => {
       patched.length = 0;
       await signIn('pm'); rowsWithTargets(); ok();
