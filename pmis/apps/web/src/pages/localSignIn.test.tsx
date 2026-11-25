@@ -234,7 +234,7 @@ describe('reset password', () => {
 describe('hybrid mode list', () => {
   it('passes exactly the agreed method + path patterns through, and nothing without the switch', () => {
     expect(REAL_API_AUTH_USERS.map(([m, p]) => `${m.toUpperCase()} ${p}`)).toEqual([
-      'POST /auth/local/login', 'POST /auth/local/password', 'POST /auth/local/step-up',
+      'POST /auth/local/login', 'POST /auth/local/password', 'POST /auth/local/password-reset/request', 'POST /auth/local/password-reset/confirm', 'POST /auth/local/step-up',
       // contract 0.5.0: two-factor
       'POST /auth/local/2fa', 'POST /auth/local/2fa/enrol/start', 'POST /auth/local/2fa/enrol/confirm', 'POST /auth/local/2fa/recovery-codes',
       'GET /auth/session', 'POST /auth/logout', 'GET /me',

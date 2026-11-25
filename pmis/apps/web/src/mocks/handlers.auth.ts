@@ -348,3 +348,45 @@ export const authHandlers = [
     return HttpResponse.json({ two_factor: 'pending_enrolment', ...codeBody(c!.tf!) });
   }),
 ];
+
+/** "Forgot password" by email (contract 0.15.79). Links live in memory only; a test reads the last one from `resetLinks`. */
+export const resetLinks = new Map<string, { key: string; until: number }>();
+export const lastReset = { token: '' };
+const RESET_MS = 30 * 60_000;
+const RESET_RATE_PER_HOUR = 10;
+const resetHits: number[] = [];
+const badLink = () => problem(422, 'invalid_code', 'This link is not valid or has expired. Ask for a new one.', { errors: [{ path: '/token', code: 'invalid' }] });
+
+export const passwordResetHandlers = [
+  http.post(`${B}/auth/local/password-reset/request`, async ({ request }) => {
+    const now = Date.now();
+    while (resetHits.length && now - resetHits[0] > 3_600_000) resetHits.shift();
+    if (resetHits.length >= RESET_RATE_PER_HOUR) return problem(429, 'rate_limited', 'Too many attempts', {});
+    resetHits.push(now);
+    const b = (await request.json().catch(() => ({}))) as { identifier?: string };
+    if (typeof b.identifier !== 'string' || !b.identifier.trim()) return problem(400, 'validation_failed', 'Identifier is required');
+    const key = findAccount(b.identifier), c = key ? cred(key) : null;
+    const u = key ? db().admin.users.find((x) => accountKeyOf(x) === key) : null;
+    // Same answer for everyone. Only local-password accounts that are active and not System Admins get a link.
+    if (key && c?.enabled && u && u.status === 'active' && key !== 'pm') {
+      const token = Array.from({ length: 43 }, (_, i) => 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_'[(i * 7 + now) % 64]).join('');
+      resetLinks.set(token, { key, until: now + RESET_MS });
+      lastReset.token = token;
+    }
+    return HttpResponse.json({ accepted: true }, { status: 202 });
+  }),
+  http.post(`${B}/auth/local/password-reset/confirm`, async ({ request }) => {
+    const b = (await request.json().catch(() => ({}))) as { token?: string; new_password?: string };
+    const link = typeof b.token === 'string' ? resetLinks.get(b.token) : undefined;
+    if (!link || link.until < Date.now() || typeof b.new_password !== 'string') return badLink();
+    const c = cred(link.key), u = db().admin.users.find((x) => accountKeyOf(x) === link.key);
+    if (!c || !u) return badLink();
+    const s = u.local ?? STAFF.find((x) => x.employee_id === u.employee_id);
+    const rules = passwordRules(b.new_password, c.password, { email: s?.email, employee_id: u.employee_id, phone: s?.phone });
+    if (rules.length) return weak('/new_password', rules);
+    c.password = b.new_password; c.must_change = false;
+    resetLinks.delete(b.token as string);
+    save();
+    return new HttpResponse(null, { status: 204 });
+  }),
+];

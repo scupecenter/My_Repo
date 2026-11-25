@@ -210,13 +210,19 @@
     "label": "Email, employee ID or phone",
     "placeholder": "name@company.com · 1234 · +218…",
     "button": "Sign in",
-    "note": "Forgot your password? Ask a System Admin for a new temporary password.",
+    "note": "Forgot your password? Use the link above. System Admin and Microsoft 365 accounts: ask a System Admin for a new temporary password.",
     "error": "We could not sign you in. Try again.",
     "password": "Password",
     "invalid": "The ID or password is not correct, or the account cannot sign in. Check them and try again.",
     "rate": "Too many attempts. Wait a minute and try again.",
     "or": "or",
-    "m365": "Sign in with Microsoft 365"
+    "m365": "Sign in with Microsoft 365",
+    "remember": "Remember my ID on this device",
+    "remember_hint": "Saves only the ID or email you typed, for 30 days. Never the password.",
+    "forgot": "Forgot password?",
+    "busy": "Please wait…",
+    "need_access": "Need access? Ask your Project Manager or a System Admin to create your account.",
+    "session_ended": "You were signed out. Sign in again to continue."
   },
   "mock": {
     "title": "Microsoft 365 (mock)",
@@ -6069,5 +6075,47 @@
       "region": "Region",
       "cluster": "Cluster"
     }
+  },
+  "auth": {
+    "switch_lang": "Switch language",
+    "switch_theme": "Switch light or dark theme",
+    "light": "Light",
+    "dark": "Dark",
+    "show_password": "Show password",
+    "hide_password": "Hide password",
+    "caps_lock": "Caps Lock is on.",
+    "footer": "GSDN Workspace · For support, contact a System Admin.",
+    "brand": {
+      "title": "One workspace for every site, from survey to handover.",
+      "p1": "Live map and progress of every site",
+      "p2": "Approvals, documents and follow-up in one place",
+      "p3": "Built for civil work and telecom installation teams",
+      "secure": "Protected sign-in with audit and optional two-factor"
+    }
+  },
+  "forgot": {
+    "title": "Reset your password",
+    "subtitle": "Enter your 4-digit employee ID, company email or registered phone. If the account can use this, we send a link to its registered email.",
+    "button": "Send reset link",
+    "sent_title": "Check your email",
+    "sent_body": "If an account matches and can reset its password this way, a link was sent to its registered email. It works once and expires in 30 minutes. If nothing arrives, ask a System Admin.",
+    "back": "Back to sign in",
+    "admin_note": "System Admin and Microsoft 365 accounts cannot use this. Ask a System Admin."
+  },
+  "reset": {
+    "title": "Choose a new password",
+    "subtitle": "Use at least 12 characters. It cannot be a common password or contain your email, ID or phone.",
+    "new_password": "New password",
+    "confirm_password": "Repeat the new password",
+    "rules": "After the change, every open session ends and you sign in again (with your authenticator code if it is on).",
+    "mismatch": "The two passwords are not the same.",
+    "weak": "This password does not meet the rules. Use at least 12 characters, not a common password, not your email, ID or phone, and not your current password.",
+    "button": "Change password",
+    "done_title": "Password changed",
+    "done_body": "Sign in with your new password.",
+    "to_login": "Go to sign in",
+    "bad_title": "This link cannot be used",
+    "bad_body": "It is not valid, was already used or has expired. Ask for a new link.",
+    "new_link": "Ask for a new link"
   }
 }

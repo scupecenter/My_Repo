@@ -19,6 +19,8 @@ import { ChangePassword } from '@/pages/ChangePassword';
 import { InviteAccept } from '@/pages/InviteAccept';
 import { EmployeeId } from '@/pages/EmployeeId';
 import { Login, USE_MOCKS } from '@/pages/Login';
+import { ForgotPassword } from '@/pages/ForgotPassword';
+import { ResetPassword } from '@/pages/ResetPassword';
 import { MockM365, MockStepUp, StepUpDone } from '@/pages/MockM365';
 import { MatrixPage } from '@/pages/Matrix';
 import { MyWork } from '@/pages/MyWork';
@@ -156,6 +158,8 @@ export function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/invite/:token" element={<InviteAccept />} />
       <Route path="/step-up-done" element={<StepUpDone />} />
       {USE_MOCKS && <Route path="/mock-m365" element={<MockM365 />} />}
