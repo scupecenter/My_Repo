@@ -480,8 +480,8 @@ export class MasterImportService {
     const ws = wb.addWorksheet('Differences');
     ws.columns = [
       { header: 'Site ID', key: 'site', width: 14 }, { header: 'Region', key: 'region', width: 12 }, { header: 'Source (Sheet!row)', key: 'src', width: 16 },
-      { header: 'Master column', key: 'col', width: 10 }, { header: 'Field', key: 'field', width: 40 }, { header: 'PMIS field', key: 'pfield', width: 24 },
-      { header: 'Master value', key: 'mv', width: 22 }, { header: 'PMIS value', key: 'pv', width: 22 }, { header: 'Kind', key: 'kind', width: 16 },
+      { header: 'Master column', key: 'col', width: 10 }, { header: 'Field', key: 'field', width: 40 }, { header: 'Workspace field', key: 'pfield', width: 24 },
+      { header: 'Master value', key: 'mv', width: 22 }, { header: 'Workspace value', key: 'pv', width: 22 }, { header: 'Kind', key: 'kind', width: 16 },
       { header: 'Reason', key: 'reason', width: 20 }, { header: 'Applicable', key: 'appl', width: 10 }, { header: 'Resolution', key: 'res', width: 16 },
       { header: 'Resolution note', key: 'note', width: 30 }, { header: 'Resolved by', key: 'by', width: 20 }, { header: 'Resolved at', key: 'at', width: 20 },
     ];

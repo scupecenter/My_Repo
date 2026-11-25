@@ -110,7 +110,7 @@
 - **أول دخول:** يُنشأ الحساب «بانتظار الإسناد» ولا يرى شيئاً حتى يسند المدير الدور والفريق (CW/TE/كلاهما) ومستوى الصلاحية والمناطق والوحدات. الرقم الوظيفي يُدخل مرة واحدة. (CLAUDE.md، ADR 0002)
 - **الدخول المحلي** (رقم وظيفي أو هاتف + كلمة مرور) **مؤجل لمرحلة لاحقة**؛ التصميم المقترح محفوظ في ADR 0002 §10 وسجل الموظفين يُستخدم الآن كي لا يلزم إعادة عمل. (CLAUDE.md)
 - **التحقق الثنائي (MFA):** يُفرض عبر Conditional Access في Entra. وتتحقق الواجهة الخلفية من `amr` عبر مفتاح يديره المدير، **مُطفأ حتى تفعّله IT**. التحقق الإضافي (step-up) مطلوب للاعتماد النهائي وتغيير الأدوار والمصفوفة والمجموعات والتفويض والحذف وتجاوزات المدير. حساب طوارئ محلي واحد (break-glass) بـTOTP من الشبكة الداخلية فقط، وكل استخدام يُسجَّل ويُرسل بالبريد. (CLAUDE.md)
-- **إعفاء مستخدم من MFA (طلب المالك 2026-10-25):** يزيل مدير النظام (أو مفوَّض) شرط MFA داخل PMIS عن مستخدم مسجَّل، إلى أن يُلغى أو إلى تاريخ نهاية، بسبب وstep-up للمدير نفسه؛ لا أحد يعفي نفسه، ويُدقَّق، ويصله بريد، وتظهر شارة «معفى من MFA». **لا يغيّر MFA المفروض من Entra** (تغييره عند IT). (CLAUDE.md)
+- **إعفاء مستخدم من MFA (طلب المالك 2026-10-25):** يزيل مدير النظام (أو مفوَّض) شرط MFA داخل Workspace عن مستخدم مسجَّل، إلى أن يُلغى أو إلى تاريخ نهاية، بسبب وstep-up للمدير نفسه؛ لا أحد يعفي نفسه، ويُدقَّق، ويصله بريد، وتظهر شارة «معفى من MFA». **لا يغيّر MFA المفروض من Entra** (تغييره عند IT). (CLAUDE.md)
 - اللغة: إنجليزية افتراضياً مع العربية (RTL) بتبديل فوري؛ وضعان فاتح وداكن؛ خط Cairo؛ ألوان ERPNext (frappe-ui) دون شعار ERPNext ولا اسمه. الهوية النهائية لـAljeel **تُؤكَّد لاحقاً**. (CLAUDE.md)
 
 ![شاشة الدخول](../../design/screens/latest/01-login.png)
@@ -164,7 +164,7 @@
 
 (CLAUDE.md)
 1. **تجربة في منطقة واحدة (طرابلس) لأسبوعين.**
-2. **تشغيل موازٍ شهراً:** يصدّر PMIS ملفاً بصيغة Master ويقارنه تلقائياً بالـMaster الحي. **يُتقاعد الـMaster بعد شهر بلا فروقات جوهرية.**
+2. **تشغيل موازٍ شهراً:** يصدّر Workspace ملفاً بصيغة Master ويقارنه تلقائياً بالـMaster الحي. **يُتقاعد الـMaster بعد شهر بلا فروقات جوهرية.**
 3. **التدريب لكل دور:** فيديوهات عربية قصيرة، ودليل داخل التطبيق عند أول استخدام، وجلسة حية لكل مجموعة أدوار، وبطل دعم من Project Support.
 4. **معايير القبول:** نجاح اختبارات المسار الحرج الشاملة (E2E)، ومطابقة 100% لتواريخ المراحل في استيراد الـMaster الحقيقي، ولا أعطال حرجة مفتوحة، وتحقيق أهداف الأداء.
 5. البيانات الحقيقية تُرفع عبر النظام بعد اكتمالها؛ حتى ذلك الحين بيانات اصطناعية فقط.
@@ -282,7 +282,7 @@ Separate modules, each with its own menu: **Procurement (PR/PO/WO), Contractors,
 
 - **One box (owner decision 2026-10-25):** the employee types their email, employee ID or registered phone. GSDN Workspace looks it up in the staff registry and sends the browser to Microsoft 365 with that person's email as `login_hint`; **Microsoft performs the actual sign-in** (password, MFA, Conditional Access). **GSDN Workspace never stores passwords.** The screen behaves the same whether or not a match is found, so it does not reveal who is registered. After the callback, the token's account must match the registry row. (CLAUDE.md, ADR 0002 §9b)
 - **First sign-in:** the account is created as "Pending assignment" and sees nothing until an admin assigns the role, team (CW/TE/both), permission level, regions and modules. The employee ID is entered once. (CLAUDE.md, ADR 0002)
-- **Local sign-in** (employee ID or phone + PMIS password) is **deferred to a later phase**; the proposed design is kept in ADR 0002 §10, and the staff registry is used now so no rework is needed. (CLAUDE.md)
+- **Local sign-in** (employee ID or phone + Workspace password) is **deferred to a later phase**; the proposed design is kept in ADR 0002 §10, and the staff registry is used now so no rework is needed. (CLAUDE.md)
 - **MFA:** enforced through Entra Conditional Access. The API checks the token's `amr` claim behind an admin toggle that is **off until IT enables MFA**. Step-up re-authentication is required for final approval, role/matrix/group changes, delegation, deletes and admin overrides. One break-glass local admin account (TOTP, internal network only) exists; every use is logged and emailed. (CLAUDE.md)
 - **Per-user MFA exemption (owner request 2026-10-25):** a System Admin (or delegate) can remove GSDN Workspace MFA requirement for a registered user, until revoked or until an end date, with a reason and the admin's own step-up. Nobody exempts themselves; it is audited, the user is emailed, and an "MFA exempt" badge shows. **It does not change MFA enforced by Entra**, which IT changes in Entra. (CLAUDE.md)
 - UI language: English by default, Arabic (RTL) as an instant switch; light and dark themes; Cairo font; ERPNext (frappe-ui) colours without the ERPNext logo or name. The final Aljeel brand is **to be confirmed**. (CLAUDE.md)

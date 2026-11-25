@@ -69,7 +69,7 @@ const NEED_STATUSES = [
 
 /**
  * Migration 0053 (work package P7: Q105, Q106, Q107, D6): the numbering service (`/number-sequences`), the TE dispatch view of each site (the Q65 date and
- * the need-based PMIS status, side by side), the region WL vendors (Setting tblRegionVendor, D58) and the list of the owner data still missing.
+ * the need-based Workspace status, side by side), the region WL vendors (Setting tblRegionVendor, D58) and the list of the owner data still missing.
  */
 @Injectable()
 export class WarehouseConfigService {

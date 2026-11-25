@@ -176,7 +176,7 @@ describe('legacy Master import: identification, preview and the comparison repor
     const wb = await load(x.buffer);
     const ws = wb.getWorksheet('Differences')!;
     const head = (ws.getRow(1).values as unknown[]).slice(1);
-    expect(head).toEqual(['Site ID', 'Region', 'Source (Sheet!row)', 'Master column', 'Field', 'PMIS field', 'Master value', 'PMIS value', 'Kind', 'Reason', 'Applicable',
+    expect(head).toEqual(['Site ID', 'Region', 'Source (Sheet!row)', 'Master column', 'Field', 'Workspace field', 'Master value', 'Workspace value', 'Kind', 'Reason', 'Applicable',
       'Resolution', 'Resolution note', 'Resolved by', 'Resolved at']);
     const txt = (v: unknown): string => (v && typeof v === 'object' && 'richText' in (v as object) ? (v as { richText: { text: string }[] }).richText.map((t) => t.text).join('') : String(v ?? ''));
     let found = false;
