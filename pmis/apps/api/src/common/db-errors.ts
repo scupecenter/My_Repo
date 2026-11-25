@@ -67,6 +67,9 @@ export function mapWfError(message: string): ProblemException | null {
       return new ProblemException(403, 'not_eligible_holder', { detail: detail ?? 'You are not a holder of the level the task is at.' });
     case 'already_claimed':
       return new ProblemException(409, 'already_claimed', { detail: 'Another holder has claimed this level.', extra: { claimed_by: { id: extra.claimed_by } } });
+    case 'item_in_use':
+      // 0160: a warehouse item with data (movements, serials, site quantities, As-Built link) can only be deactivated
+      return new ProblemException(409, 'item_in_use', { detail: detail ?? 'This item has data: it can only be deactivated.' });
     case 'invalid_transition':
       return new ProblemException(409, 'invalid_transition', {
         detail: detail ?? 'This is not possible in the current state.',
