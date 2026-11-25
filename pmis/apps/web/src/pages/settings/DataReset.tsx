@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '@/api/client';
 import {
-  closureOf, RUNNING, useApproveDataReset, useCancelDataReset, useDataReset, useDataResetPlan, useDataResetRequest, useRequestDataReset, useRetryDataResetFiles,
+  closureOf, requiresBackup, RUNNING, useApproveDataReset, useCancelDataReset, useDataReset, useDataResetPlan, useDataResetRequest, useRequestDataReset, useRetryDataResetFiles,
   useRunDataReset, useSetDataResetSettings, type DataResetPart, type DataResetPlanTable, type DataResetRequest,
 } from '@/api/dataReset';
 import { errText, FormDialog } from '@/components/FormDialog';
@@ -18,7 +18,9 @@ type Dialog = 'approve' | 'cancel' | 'run' | 'retry' | 'settings' | null;
  * successful database backup of the last hours is recorded. The plan (what is deleted and what is kept, with counts) is the same list as the operator script.
  * The server decides every right; this screen only offers what the state allows. Contract 0.15.71 (migration 0152): the requester chooses the scope (the parts),
  * the parts that depend on a chosen part are added with a visible note (the server computes the same closure and stores it with its hash), and the approver
- * sees that scope read-only with its counts and approves exactly it.
+ * sees that scope read-only with its counts and approves exactly it. Contract 0.15.72 (migration 0154): the requester chooses whether the run needs a recent
+ * backup (default) or runs without one (the typed phrase NO BACKUP); the choice is bound into the scope hash, shown with a red warning to the approver and
+ * the runner, and only the backup check is skipped.
  */
 export function DataReset() {
   const { t, i18n } = useTranslation();
@@ -41,6 +43,8 @@ export function DataReset() {
   const [cfg, setCfgForm] = useState<{ expiry: string; hours: string } | null>(null);
   const [mode, setMode] = useState<'everything' | 'custom'>('everything');
   const [chosen, setChosen] = useState<string[]>([]);
+  const [requireBackup, setRequireBackup] = useState(true);
+  const [noBackupTyped, setNoBackupTyped] = useState('');
   const requested = mode === 'custom' ? [...chosen].sort() : null;
   const dry = useDataResetPlan(requested, mode === 'custom' && !!s && !open);
   const when = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleString(i18n.language === 'ar' ? 'ar' : 'en-GB', { dateStyle: 'medium', timeStyle: 'short' }) : '—');
@@ -61,6 +65,9 @@ export function DataReset() {
   const scopeOk = mode === 'everything' || chosen.length > 0;
   const reasonOk = reason.trim().length >= 10;
   const phraseOk = typed === s.confirmation_phrase;
+  const noBackupPhrase = s.no_backup_phrase ?? 'NO BACKUP';
+  const noBackupOk = requireBackup || noBackupTyped === noBackupPhrase;
+  const needBackup = requiresBackup(req);
   const last = s.last_request;
 
   return (
@@ -71,6 +78,7 @@ export function DataReset() {
         <ul className="mt-2 list-disc space-y-1 ps-5 text-sm">
           <li>{t('dr.rule_two_admins')}</li>
           <li>{t('dr.rule_backup', { hours: s.settings.backup_max_age_hours })}</li>
+          <li>{t('dr.rule_backup_choice')}</li>
           <li>{t('dr.rule_sessions')}</li>
           <li>{t('dr.rule_files')}</li>
           <li>{t('dr.rule_expiry', { minutes: s.settings.request_expiry_minutes })}</li>
@@ -113,6 +121,7 @@ export function DataReset() {
           <h3 className="flex items-center gap-2 font-bold"><ShieldCheck size={18} aria-hidden />{t('dr.request')}</h3>
           <p className="font-semibold" data-testid="dr-request-status">{t(`dr.status_${req.status}`)}</p>
           <ScopeView r={req} catalogue={catalogue} />
+          <BackupView r={req} hours={s.settings.backup_max_age_hours} />
           <dl className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 text-sm">
             <dt>{t('dr.requested_by')}</dt><dd data-testid="dr-requested-by">{req.requested_by.display_name} · {when(req.requested_at)}</dd>
             <dt>{t('common.reason')}</dt><dd>{req.request_reason}</dd>
@@ -125,17 +134,21 @@ export function DataReset() {
           {req.stalled && <p className="text-sm text-lateInk" data-testid="dr-stalled">{t('dr.stalled')}</p>}
           <div className="flex flex-wrap gap-2">
             {s.can.approve && <button className="btn btn-danger" data-testid="dr-approve" onClick={() => { approve.reset(); setDialog('approve'); }}>{t('dr.approve')}</button>}
-            {s.can.start && <button className="btn btn-danger" data-testid="dr-run" disabled={!s.backup.ok || !s.storage.supported} onClick={() => { run.reset(); setRunTyped(''); setDialog('run'); }}>{t('dr.run')}</button>}
+            {s.can.start && <button className="btn btn-danger" data-testid="dr-run" disabled={(needBackup && !s.backup.ok) || !s.storage.supported} onClick={() => { run.reset(); setRunTyped(''); setDialog('run'); }}>{t('dr.run')}</button>}
             {s.can.cancel && <button className="btn" data-testid="dr-cancel" onClick={() => { cancel.reset(); setDialog('cancel'); }}>{t('dr.cancel')}</button>}
             {req.status === 'files_pending' && s.can.retry_files && <button className="btn" data-testid="dr-retry-files" onClick={() => { retry.reset(); setDialog('retry'); }}>{t('dr.retry_files')}</button>}
           </div>
-          {s.can.start && !s.backup.ok && <p className="text-sm text-lateInk" data-testid="dr-run-blocked">{t('dr.backup_missing', { hours: s.backup.max_age_hours })}</p>}
+          {s.can.start && needBackup && !s.backup.ok && (
+            <p className="text-sm text-lateInk" data-testid="dr-run-blocked">{t('dr.backup_missing', { hours: s.backup.max_age_hours })} {t('dr.backup_missing_new_request')}</p>
+          )}
         </section>
       ) : (
         <section className="card space-y-3 p-4" data-testid="dr-form">
           <h3 className="font-bold">{t('dr.new_request')}</h3>
           <ScopePicker catalogue={catalogue} mode={mode} setMode={setMode} chosen={chosen} setChosen={setChosen} disabled={!s.can.request}
             closure={mode === 'everything' ? (s.everything ?? []) : (dry.data?.scope.parts ?? closureOf(chosen, catalogue))} />
+          <BackupChoice requireBackup={requireBackup} setRequireBackup={(v) => { setRequireBackup(v); setNoBackupTyped(''); }} typed={noBackupTyped} setTyped={setNoBackupTyped}
+            phrase={noBackupPhrase} hours={s.settings.backup_max_age_hours} disabled={!s.can.request} />
           <label className="block text-sm font-semibold">{t('dr.reason_label')}
             <textarea className="input mt-1 min-h-16 font-normal" data-testid="dr-reason" value={reason} onChange={(e) => setReason(e.target.value)} disabled={!s.can.request} />
           </label>
@@ -143,9 +156,10 @@ export function DataReset() {
             <input className="input mt-1 font-normal" dir="ltr" data-testid="dr-phrase" value={typed} onChange={(e) => setTyped(e.target.value)} disabled={!s.can.request} autoComplete="off" />
           </label>
           {ask.isError && <p role="alert" className="text-sm text-lateInk" data-testid="dr-form-error">{errText(ask.error, t)}</p>}
-          <button className="btn btn-danger" data-testid="dr-submit" disabled={!s.can.request || !reasonOk || !phraseOk || !scopeOk || ask.isPending}
-            onClick={() => ask.mutate({ reason: reason.trim(), confirm_text: typed, ...(requested ? { parts: requested } : {}) },
-              { onSuccess: () => { toast(t('dr.requested_toast')); setReason(''); setTyped(''); setMode('everything'); setChosen([]); } })}>
+          <button className="btn btn-danger" data-testid="dr-submit" disabled={!s.can.request || !reasonOk || !phraseOk || !scopeOk || !noBackupOk || ask.isPending}
+            onClick={() => ask.mutate({ reason: reason.trim(), confirm_text: typed, ...(requested ? { parts: requested } : {}),
+              ...(requireBackup ? {} : { require_backup: false, no_backup_confirm: noBackupTyped }) },
+              { onSuccess: () => { toast(t('dr.requested_toast')); setReason(''); setTyped(''); setMode('everything'); setChosen([]); setRequireBackup(true); setNoBackupTyped(''); } })}>
             {t('dr.submit')}
           </button>
         </section>
@@ -167,6 +181,7 @@ export function DataReset() {
         <ReasonDialog testid="dr-approve-dialog" title={t('dr.approve_title')} hint={`${t('dr.approve_hint')} ${t('dr.approve_scope')}`} min={10} busy={approve.isPending} error={approve.isError ? errText(approve.error, t) : null} onClose={close}
           onSubmit={(r) => approve.mutate({ id: req.id, version: req.version, reason: r, scope_hash: req.scope_hash }, { onSuccess: () => { toast(t('dr.approved_toast')); close(); } })}>
           <ScopeView r={req} catalogue={catalogue} />
+          <BackupView r={req} hours={s.settings.backup_max_age_hours} testid="dr-approve-backup" />
         </ReasonDialog>
       )}
       {dialog === 'cancel' && req && (
@@ -182,6 +197,7 @@ export function DataReset() {
           disabled={runTyped !== s.confirmation_phrase} error={run.isError ? errText(run.error, t) : null}
           onSubmit={() => run.mutate({ id: req.id, version: req.version, confirm_text: runTyped }, { onSuccess: () => { toast(t('dr.started_toast')); close(); } })}>
           <p className="text-sm text-lateInk">{t('dr.run_hint', { db: s.database })}</p>
+          <BackupView r={req} hours={s.settings.backup_max_age_hours} testid="dr-run-backup" />
           <label className="block text-sm font-semibold">{t('dr.type_phrase', { phrase: s.confirmation_phrase })}
             <input className="input mt-1 font-normal" dir="ltr" data-testid="dr-run-phrase" value={runTyped} onChange={(e) => setRunTyped(e.target.value)} autoComplete="off" />
           </label>
@@ -229,6 +245,7 @@ function Result({ r, when }: { r: DataResetRequest; when: (s: string | null | un
         <li data-testid="dr-result-files">{t('dr.result_files', { moved: r.files.moved, missing: r.files.missing, refused: r.files.refused, pending: r.files.pending, total: r.files.total })}</li>
         <li>{t('dr.result_quarantine')} <span className="mono text-xs" dir="ltr" data-testid="dr-result-quarantine">{qd}</span></li>
       </ul>
+      {!requiresBackup(r) && <p role="alert" className="rounded-md border border-lateInk bg-lateBg p-2 text-sm font-semibold text-lateInk" data-testid="dr-result-no-backup">{t('dr.result_no_backup')}</p>}
       <h4 className="pt-2 text-sm font-semibold">{t('dr.restore')}</h4>
       <p className="text-sm text-mute">{t('dr.restore_note')}</p>
       <pre className="overflow-x-auto rounded-md bg-card2 p-3 text-xs" dir="ltr" data-testid="dr-restore">{[
@@ -358,5 +375,53 @@ function ScopeView({ r, catalogue }: { r: DataResetRequest; catalogue: DataReset
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * The backup choice of a new request (contract 0.15.72): "Require a recent backup (recommended)", the default, or "Run without a backup", which shows the
+ * red warning and asks for the typed phrase NO BACKUP. The reason of the request is the reason of the choice.
+ */
+function BackupChoice({ requireBackup, setRequireBackup, typed, setTyped, phrase, hours, disabled }: {
+  requireBackup: boolean; setRequireBackup: (v: boolean) => void; typed: string; setTyped: (v: string) => void; phrase: string; hours: number; disabled: boolean;
+}) {
+  const { t } = useTranslation();
+  return (
+    <fieldset className="space-y-2 rounded-md border border-line p-3" data-testid="dr-backup-choice" data-require={requireBackup ? 'true' : 'false'} disabled={disabled}>
+      <legend className="px-1 text-sm font-semibold">{t('dr.backup_choice')}</legend>
+      <label className="flex items-start gap-2 text-sm">
+        <input type="radio" name="dr-backup-choice" className="mt-1" data-testid="dr-backup-require" checked={requireBackup} onChange={() => setRequireBackup(true)} />
+        <span><span className="font-semibold">{t('dr.require_backup')}</span><span className="block text-mute">{t('dr.require_backup_hint', { hours })}</span></span>
+      </label>
+      <label className="flex items-start gap-2 text-sm">
+        <input type="radio" name="dr-backup-choice" className="mt-1" data-testid="dr-backup-none-option" checked={!requireBackup} onChange={() => setRequireBackup(false)} />
+        <span><span className="font-semibold text-lateInk">{t('dr.no_backup')}</span><span className="block text-mute">{t('dr.no_backup_hint')}</span></span>
+      </label>
+      {!requireBackup && (
+        <div className="space-y-2 ps-6">
+          <p role="alert" className="flex items-start gap-2 rounded-md border border-lateInk bg-lateBg p-2 text-sm font-semibold text-lateInk" data-testid="dr-no-backup-warning">
+            <AlertOctagon size={16} className="mt-0.5 shrink-0" aria-hidden />{t('dr.no_backup_warning')}
+          </p>
+          <label className="block text-sm font-semibold">{t('dr.no_backup_type', { phrase })}
+            <input className="input mt-1 font-normal" dir="ltr" data-testid="dr-no-backup-phrase" value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" />
+          </label>
+          <p className="text-xs text-mute">{t('dr.no_backup_reason_note')}</p>
+        </div>
+      )}
+    </fieldset>
+  );
+}
+
+/** The backup choice of a request, read-only (requester, approver, runner); a request without a backup carries the red warning. */
+function BackupView({ r, hours, testid = 'dr-request-backup' }: { r: DataResetRequest; hours: number; testid?: string }) {
+  const { t } = useTranslation();
+  const need = requiresBackup(r);
+  return need ? (
+    <p className="text-sm" data-testid={testid} data-require="true"><span className="font-semibold">{t('dr.backup_requirement')}:</span> {t('dr.backup_required_value')} ({t('dr.require_backup_hint', { hours })})</p>
+  ) : (
+    <p role="alert" className="flex items-start gap-2 rounded-md border border-lateInk bg-lateBg p-2 text-sm font-bold text-lateInk" data-testid={testid} data-require="false">
+      <AlertOctagon size={16} className="mt-0.5 shrink-0" aria-hidden />
+      <span><span>{t('dr.backup_requirement')}: {t('dr.backup_not_required_value')}.</span> <span>{t('dr.no_backup_warning')}</span></span>
+    </p>
   );
 }

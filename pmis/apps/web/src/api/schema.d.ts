@@ -5359,6 +5359,7 @@ export interface paths {
          *     `RESET <database>` (`confirmation_phrase` of the state; 422 `confirmation_mismatch`). Refused with 409 `single_admin` while fewer than two System Admins are active, 409
          *     `invalid_transition` while another request is open, 409 `reset_running` while the operator script runs. The request expires after `settings.request_expiry_minutes`
          *     (default 30). Every other active System Admin is told in-app. Audited (`data_reset_request`) and written to the security log (`project_data_reset`, step `request`).
+         *     0.15.72: the requester chooses whether the run needs a recent backup (`require_backup`, default true); without it, the typed phrase `NO BACKUP` is required too.
          */
         post: operations["requestDataReset"];
         delete?: never;
@@ -5402,7 +5403,7 @@ export interface paths {
         put?: never;
         /**
          * Approve the request (a second, different System Admin)
-         * @description 0.15.62; scope 0.15.71 (the approval binds to the request's `scope_hash`; 409 `scope_changed` when the approver saw another scope or the closure of the requested parts changed). A System Admin acting without delegation who is not the requester and not in the requester's session (403 `self_approval_forbidden`), a reason of at least 10 characters, a step-up and If-Match. The request must be `requested` (409 `invalid_transition`) and not expired (409 `request_expired`). Approval does not run anything. Audited (`data_reset_approve`) and in the security log.
+         * @description 0.15.62; scope 0.15.71 (the approval binds to the request's `scope_hash`; 409 `scope_changed` when the approver saw another scope or the closure of the requested parts changed; since 0.15.72 the hash also binds the backup choice `require_backup`, so an approval of the other choice is 409 `scope_changed`). A System Admin acting without delegation who is not the requester and not in the requester's session (403 `self_approval_forbidden`), a reason of at least 10 characters, a step-up and If-Match. The request must be `requested` (409 `invalid_transition`) and not expired (409 `request_expired`). Approval does not run anything. Audited (`data_reset_approve`) and in the security log.
          */
         post: operations["approveDataReset"];
         delete?: never;
@@ -5448,7 +5449,8 @@ export interface paths {
          * Start the approved reset (the requester or the approver)
          * @description 0.15.62. The System Admin who made the request or the one who approved it (403 `action_forbidden` for anyone else), acting without delegation, a step-up, the typed
          *     phrase again (422 `confirmation_mismatch`) and If-Match, while the request is `approved` and not expired. Refused with 409 `backup_missing` unless the System Log
-         *     records a successful database backup within `backup_max_age_hours`, 409 `storage_not_supported` when the documents are in S3/MinIO, 409 `quarantine_unavailable`
+         *     records a successful database backup within `backup_max_age_hours` (0.15.72: only when the request has `require_backup` true; a request made without a backup
+         *     skips this check only), 409 `storage_not_supported` when the documents are in S3/MinIO, 409 `quarantine_unavailable`
          *     when the quarantine directory cannot be made in the store, 409 `plan_incomplete` when a table has no decision, 409 `reset_running` while a reset runs.
          *     Answers 202 with the request in `running` and runs in the background: one database transaction (`admin_data_reset_execute`, `data_reset_core`) that deletes the
          *     project data with the guards of the operator script and ends every session except the runner's; while it runs every other route answers 503 `maintenance`. After the
@@ -14499,11 +14501,16 @@ export interface components {
                 [key: string]: unknown;
             } | null;
             scope?: components["schemas"]["DataResetScope"];
-            /** @description 0.15.71. SHA-256 of the normalised closure; null for a request made before 0.15.71 (everything). */
+            /** @description 0.15.71. SHA-256 of the normalised closure; null for a request made before 0.15.71 (everything). 0.15.72: it also binds the backup choice: equal to `scope.hash` when `require_backup` is true, a different SHA-256 when it is false. The approver sends this value. */
             scope_hash?: string | null;
+            /**
+             * @description 0.15.72. True: the run needs a recent successful backup. False: the request was made "without a backup" (typed `NO BACKUP`); the run skips only the backup check and the deleted data cannot be restored from a backup. Never changes; absent (older server) means true.
+             * @default true
+             */
+            require_backup: boolean;
             /** @description 0.15.71. The hash the approval bound to (always equal to `scope_hash`). */
             approved_scope_hash?: string | null;
-            /** @description `audit_id` (the `project_data_reset` row on the Audit Log chain), `sessions_ended`, `deleted` (rows per table). */
+            /** @description `audit_id` (the `project_data_reset` row on the Audit Log chain), `sessions_ended`, `deleted` (rows per table), and since 0.15.72 `require_backup`. */
             result?: {
                 [key: string]: unknown;
             } | null;
@@ -14516,6 +14523,8 @@ export interface components {
             database: string;
             /** @description `RESET <database>`: typed to request and again to run. */
             confirmation_phrase: string;
+            /** @description 0.15.72. `NO BACKUP`: typed to request a reset that runs without a backup. */
+            no_backup_phrase?: string;
             settings: components["schemas"]["DataResetSettings"];
             system_admins_active: number;
             /** @description Fewer than two active System Admins: no request; the operator script on the server is the way. */
@@ -28478,6 +28487,13 @@ export interface operations {
                     confirm_text: components["schemas"]["ConfirmText"];
                     /** @description 0.15.71. The parts to reset (codes of `DataResetState.plan.parts`). Absent: everything as before (every project part, no identity part). The database adds the dependent parts; unknown codes are 422 `validation_failed` (`/parts`, `unknown_part`). */
                     parts?: components["schemas"]["DataResetPartCode"][];
+                    /**
+                     * @description 0.15.72. True (the default, as before): the run needs a successful database backup within `backup_max_age_hours`. False: the run skips only that check; the deleted data cannot be restored from a backup. Bound into `scope_hash`; never changes after the request.
+                     * @default true
+                     */
+                    require_backup?: boolean;
+                    /** @description 0.15.72. Required when `require_backup` is false: the typed phrase `NO BACKUP` (`DataResetState.no_backup_phrase`; 422 `confirmation_mismatch` at `/no_backup_confirm` otherwise). Ignored when a backup is required. */
+                    no_backup_confirm?: string;
                 };
             };
         };
@@ -28541,7 +28557,7 @@ export interface operations {
             content: {
                 "application/json": {
                     reason: string;
-                    /** @description 0.15.71. The `scope_hash` of the request the approver read. When sent and different, 409 `scope_changed`. The approval binds to the request's hash either way. */
+                    /** @description 0.15.71. The `scope_hash` of the request the approver read. When sent and different, 409 `scope_changed`. The approval binds to the request's hash either way (since 0.15.72 the hash covers the scope and the backup choice). */
                     scope_hash?: string;
                 };
             };

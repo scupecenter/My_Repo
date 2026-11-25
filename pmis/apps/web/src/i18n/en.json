@@ -5677,7 +5677,21 @@
     "scope_hash": "Scope fingerprint",
     "approve_scope": "You approve exactly this scope. If it changed, the approval is refused and a new request is needed.",
     "plan_scope_note": "Counted for the chosen scope.",
-    "accounts_note": "{{count}} accounts would be deactivated."
+    "accounts_note": "{{count}} accounts would be deactivated.",
+    "backup_choice": "Backup before the run",
+    "require_backup": "Require a recent backup (recommended)",
+    "require_backup_hint": "The run is refused until the System Log records a successful database backup within the last {{hours}} hours.",
+    "no_backup": "Run without a backup",
+    "no_backup_hint": "Only the backup check is skipped. Two System Admins, the step-up, the typed phrases and every other check still apply.",
+    "no_backup_warning": "This reset runs WITHOUT a backup: the deleted data cannot be restored.",
+    "no_backup_type": "Type {{phrase}} to confirm that no backup is needed",
+    "no_backup_reason_note": "The reason of the request is recorded as the reason for running without a backup.",
+    "backup_requirement": "Backup",
+    "backup_required_value": "A recent backup is required before the run",
+    "backup_not_required_value": "Without a backup",
+    "rule_backup_choice": "The requester may instead choose to run without a backup (typed NO BACKUP); the approver sees and approves that choice.",
+    "backup_missing_new_request": "Or cancel this request and make a new one without the backup requirement.",
+    "result_no_backup": "This reset ran without a backup: no backup restores the database to the moment before it. Only the files in the quarantine can be put back."
   },
   "dailyPlan": {
     "title": "Daily Plan",

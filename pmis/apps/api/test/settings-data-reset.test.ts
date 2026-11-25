@@ -556,6 +556,102 @@ describe('a scoped run of the identity parts (0.15.71)', () => {
   });
 });
 
+describe('the backup choice of a request (0.15.72)', () => {
+  let a1: Api;
+  let a2: Api;
+  const reqBody = (extra: Record<string, unknown> = {}) => ({ reason: 'Owner decision: clean the test data, no backup', confirm_text: phrase, parts: ['issues'], ...extra });
+  const call = (who: Api, path: string, body: unknown, ifMatch?: string) =>
+    who.call('post', `/settings/data-reset${path}`, body, ifMatch === undefined ? {} : { 'If-Match': ifMatch });
+
+  beforeAll(async () => {
+    // the run of the block before finishes in the background (the database part, then the file move): a new request is refused with 409
+    // while that request is still open, so wait until none is (at most 60 s)
+    for (let i = 0; i < 240; i++) {
+      if ((await q(db, `SELECT 1 FROM data_reset_requests WHERE status IN ('requested', 'approved', 'running', 'files_pending')`)).length === 0) break;
+      await new Promise((r) => setTimeout(r, 250));
+    }
+    expect(await q(db, `SELECT status FROM data_reset_requests WHERE status IN ('requested', 'approved', 'running', 'files_pending')`)).toEqual([]);
+    // the earlier runs ended every session but their runner's: both admins sign in again
+    a1 = await loggedIn(app, admin1.user);
+    expect((await a1.stepUp(admin1.user.password)).status).toBe(200);
+    a2 = await loggedIn(app, admin2.user);
+    expect((await a2.stepUp(admin2.user.password)).status).toBe(200);
+    // no backup within the window any more (the System Log is append-only: the rows are aged with the triggers off, test only)
+    await db.query(`SET session_replication_role = replica; UPDATE system_log SET at = at - interval '200 hours' WHERE source = 'backup';
+      SET session_replication_role = origin;`);
+    expect((await a1.call('get', '/settings/data-reset')).body).toMatchObject({ backup: { ok: false }, no_backup_phrase: 'NO BACKUP' });
+  });
+
+  it('a default request (no field) still requires a backup: approved, its run is refused with backup_missing', async () => {
+    const res = await call(a1, '/requests', { reason: 'Owner decision: clean the test data', confirm_text: phrase, parts: ['issues'] });
+    expect(res.status).toBe(201);
+    expect(res.body).toMatchObject({ require_backup: true });
+    const dry = await a1.call('get', '/settings/data-reset/plan?parts=issues');
+    expect(res.body.scope_hash).toBe(dry.body.scope.hash);                 // a backup required: the hash of 0.15.71, unchanged
+    const ok = await call(a2, `/requests/${res.body.id}/approve`, { reason: 'Second admin agrees with it', scope_hash: res.body.scope_hash }, etag(res));
+    expect(ok.status).toBe(200);
+    const run = await call(a1, `/requests/${res.body.id}/run`, { confirm_text: phrase }, etag(ok));
+    expect(run.status).toBe(409);
+    expect(run.body.code).toBe('backup_missing');
+    expect(run.body.detail).toMatch(/without the backup requirement/);
+    // a client cannot switch the check off at the run
+    expect((await call(a1, `/requests/${res.body.id}/run`, { confirm_text: phrase, require_backup: false }, etag(ok))).status).toBe(422);
+    expect((await call(a1, `/requests/${res.body.id}/cancel`, { reason: 'Backup test only' }, etag(ok))).status).toBe(200);
+  });
+
+  it('"without a backup" needs the typed phrase NO BACKUP and a boolean', async () => {
+    const none = await call(a1, '/requests', reqBody({ require_backup: false }));
+    expect(none.status).toBe(422);
+    expect(none.body).toMatchObject({ code: 'confirmation_mismatch' });
+    expect(none.body.errors[0]).toMatchObject({ path: '/no_backup_confirm' });
+    const wrong = await call(a1, '/requests', reqBody({ require_backup: false, no_backup_confirm: 'no backup' }));
+    expect(wrong.status).toBe(422);
+    expect((await call(a1, '/requests', reqBody({ require_backup: 'no' }))).status).toBe(422);
+    expect(await q(db, `SELECT 1 FROM data_reset_requests WHERE status = 'requested'`)).toHaveLength(0);
+  });
+
+  it('the choice is bound into the approval and never changes; the run without a backup completes with no backup row', async () => {
+    const res = await call(a1, '/requests', reqBody({ require_backup: false, no_backup_confirm: 'NO BACKUP' }));
+    expect(res.status).toBe(201);
+    expect(res.body).toMatchObject({ require_backup: false, scope: { parts: ['issues'] } });
+    const id = res.body.id as string;
+    const dry = await a1.call('get', '/settings/data-reset/plan?parts=issues');
+    expect(res.body.scope_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(res.body.scope_hash).not.toBe(dry.body.scope.hash);              // the hash binds the choice too
+    expect(res.body.scope.hash).toBe(dry.body.scope.hash);
+    expect(await q(db, `SELECT 1 FROM audit_log WHERE action = 'data_reset_request' AND entity_id = $1 AND (after ->> 'require_backup')::boolean = false`, [id])).toHaveLength(1);
+    expect(await q(db, `SELECT 1 FROM notifications WHERE kind = 'data_reset_request' AND user_id = $1 AND body LIKE '%WITHOUT a backup%'`, [admin2.user.id])).toHaveLength(1);
+    // the choice never changes, not even for the superuser
+    await expect(db.query('UPDATE data_reset_requests SET require_backup = true WHERE id = $1', [id])).rejects.toThrow(/never changes/);
+    // an approval of the scope with a backup (the hash of the other choice) is refused
+    const other = await call(a2, `/requests/${id}/approve`, { reason: 'Second admin agrees with it', scope_hash: dry.body.scope.hash }, etag(res));
+    expect(other.status).toBe(409);
+    expect(other.body.code).toBe('scope_changed');
+    const ok = await call(a2, `/requests/${id}/approve`, { reason: 'Second admin agrees with it', scope_hash: res.body.scope_hash }, etag(res));
+    expect(ok.status).toBe(200);
+    expect(ok.body).toMatchObject({ status: 'approved', require_backup: false, approved_scope_hash: res.body.scope_hash });
+    expect(await q(db, `SELECT 1 FROM audit_log WHERE action = 'data_reset_approve' AND entity_id = $1 AND (after ->> 'require_backup')::boolean = false`, [id])).toHaveLength(1);
+    // every other check stays: the phrase, the runner
+    expect((await call(a1, `/requests/${id}/run`, { confirm_text: 'RESET' }, etag(ok))).status).toBe(422);
+    const third = await loggedIn(app, { ...admin3.user, email: 'reset.admin@example.test' }); // the e-mail of the seed's admin (beforeAll)
+    expect((await third.stepUp(admin3.user.password)).status).toBe(200);
+    expect((await call(third, `/requests/${id}/run`, { confirm_text: phrase }, etag(ok))).status).toBe(403);
+    expect((await a1.call('get', '/settings/data-reset')).body.backup.ok).toBe(false);
+    const run = await call(a1, `/requests/${id}/run`, { confirm_text: phrase }, etag(ok));
+    expect(run.status).toBe(202);
+    expect(run.body).toMatchObject({ status: 'running', require_backup: false, backup: null });
+    await settle();
+    const got = await a1.call('get', `/settings/data-reset/requests/${id}`);
+    expect(got.body).toMatchObject({ status: 'completed', require_backup: false, backup: null, result: { require_backup: false } });
+    expect(await q(db, `SELECT 1 FROM audit_log WHERE action = 'data_reset_start' AND entity_id = $1 AND (after ->> 'require_backup')::boolean = false
+      AND (after ->> 'backup_ok')::boolean = false`, [id])).toHaveLength(1);
+    const audit = await q<{ after: any }>(db, `SELECT after FROM audit_log WHERE action = 'project_data_reset' ORDER BY id DESC LIMIT 1`);
+    expect(audit[0]!.after).toMatchObject({ via: 'settings', request_id: id, require_backup: false, backup: null });
+    expect(await q(db, `SELECT 1 FROM security_log WHERE event = 'project_data_reset' AND detail ->> 'step' = 'completed' AND detail ->> 'request_id' = $1
+      AND (detail ->> 'require_backup')::boolean = false`, [id])).toHaveLength(1);
+  });
+});
+
 describe('one System Admin', () => {
   it('refuses the request (409 single_admin): the operator script is the way', async () => {
     const solo = await startApp({ databaseUrl: process.env.TEST_DATABASE_URL_SOLO as string });

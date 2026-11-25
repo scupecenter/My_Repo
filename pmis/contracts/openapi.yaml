@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.71
+  version: 0.15.72
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -31,6 +31,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.72 (2026-11-25): the backup precondition of the project data reset becomes a choice of each request (owner decision 2026-11-25; migration 0154, mirror `db/sql/153_data_reset_no_backup.sql`; CHANGELOG 209). Additive and backward compatible: a request without `require_backup` requires a recent backup as before. `POST /settings/data-reset/requests` takes optional `require_backup` (default true) and, when it is false, `no_backup_confirm` with the typed phrase `NO BACKUP` (`DataResetState.no_backup_phrase`; otherwise 422 `confirmation_mismatch` at `/no_backup_confirm`); the request's reason is the reason of the choice. The choice is stored on the request (`DataResetRequest.require_backup`), never changes, and is bound into `scope_hash` (equal to `scope.hash` when a backup is required, a different hash when not), so an approval sent with the hash of the other choice is 409 `scope_changed`. `POST .../run` skips only the backup check (409 `backup_missing`) for a request made without a backup; every other check stays. The choice is written into the audit rows of the request, the approval, the start and the reset, and into `result.require_backup`.
     - 0.15.71 (2026-11-24): the project data reset becomes selectable (owner decision 2026-11-24; migration 0152, mirror `db/sql/151_data_reset_scope.sql`; CHANGELOG 207). Additive and backward compatible: a request without `parts` is everything as before. New path `GET /settings/data-reset/plan?parts=...` (`data_reset_dry_run`): the counts of a chosen scope per part and per table, the closure and its hash. `POST /settings/data-reset/requests` takes optional `parts` (codes of the catalogue `DataResetPart`); the database adds every dependent part (`depends_on`) and stores the normalised closure and its SHA-256 on the request (`DataResetRequest.scope`, `scope_hash`). `POST .../approve` takes optional `scope_hash` (the scope the approver saw): a different hash, or a request whose closure would be different today, is 409 `scope_changed`; the approval stores `approved_scope_hash`, and start and execute check it again. `DataResetState.plan` is a `DataResetPlan` (now with `parts`, the catalogue with labels EN/AR, `depends_on`, `dependents` and rows, `scope`, `accounts_to_deactivate`) and `everything` (the parts of "everything"). Three optional identity parts, never in everything: `users` (deactivate every account but the System Admins, the break-glass account, the requester, the approver and the runner), `roles` (assignments, groups but the System Admins group, delegations), `staff` (staff registry, absences). `DataResetPlanTable` gains `part` and the action `optional`. New `ErrorCode` `scope_changed`.
     - 0.15.70 (2026-11-24): W5 of plan `docs/plans/2026-11-23-next-ui-cleanup.md`, the Library menu with Forms and Archive (migration 0151, mirror `db/sql/150_library.sql`; CHANGELOG 205; 0.15.69 is reserved for W2). Additive. (1) Library > Forms: `GET /library/forms` (the approved forms and the uploaded blank forms), `POST /library/forms/{template_id}/preview` (auto-filled, no number) and `POST /library/forms/{template_id}/generate` (numbered by the existing numbering service, kept, audited; the copy is "generated" in the Archive), `GET /library/generated/{doc_id}/download` (`purpose` download, print or view; audited) and `POST /library/generated/{doc_id}/void` (step-up). Who generates: the L1 holder of the task the document belongs to, or a holder of "Documents: generate" (grant `library.forms` `create`) for the region, while that task is open; the L2 holder approves the signed upload with the task, as before. (2) Library > Archive: `GET /library/archive` (one card per Document Library type with a file or a generated document, grouped by stream, counts approved, waiting review and missing), `GET /library/archive/rows` (the list: lifecycle `LibraryDocStatus`, the W8 search, the filter tree of the screen `library-archive`, server counts) and `POST /library/archive/zip` (bulk zip of the filtered files through the existing zip export, limit from the setting). Previews and version history reuse `GET /files/{file_id}/download` and `GET /documents?file_group_id=`. (3) Settings > Documents > Form templates: `GET`/`POST /library/form-templates`, `GET .../{template_id}/html`, `POST .../{template_id}/approve` and `.../retire` (System Admin or an all-regions delegate of `document_types` edit, reason, step-up for approve and retire, audited). (4) Settings > Documents > Archive: `GET`/`PUT /settings/library-archive` (guarded key `library.archive`). (5) Saved views and the filter builder accept the screen `library-archive` (module `sites.documents`). The CW warehouse forms of `/generated-forms` and `/form-templates` (DN, RN, PAC, FAC, snag list with warehouse lines) stay as specified and are not served yet.
     - 0.15.69 (2026-11-24): W2 of plan `docs/plans/2026-11-23-next-ui-cleanup.md` (CHANGELOG 204; 0.15.62 to 0.15.68 are used by the work merged before it). Documentation only, no path, schema or rule changes. A saved view of a register screen (`register-<register key>`) keeps the layout of the screen's view switcher as quick parameters of `filters`, as `site360-<menu>` does since 0.15.49: `layout` = empty (the list), `wide`, `board` or `map`; `board_by` = the code of the register field the board's columns follow, or `state` (the approval state); `lane` = empty, `region` or `type`. They are stored as given, like any other quick parameter; the filter tree in `filters.advanced` keeps its validation. `RegisterDefinition.site_scoped` also decides whether the screen offers the map. Inline edits of the wide table use `PATCH /registers/{register_key}/records/{record_id}` with `If-Match`, the same route, rights, field rules and locks as the record form.
@@ -8489,6 +8490,7 @@ paths:
         `RESET <database>` (`confirmation_phrase` of the state; 422 `confirmation_mismatch`). Refused with 409 `single_admin` while fewer than two System Admins are active, 409
         `invalid_transition` while another request is open, 409 `reset_running` while the operator script runs. The request expires after `settings.request_expiry_minutes`
         (default 30). Every other active System Admin is told in-app. Audited (`data_reset_request`) and written to the security log (`project_data_reset`, step `request`).
+        0.15.72: the requester chooses whether the run needs a recent backup (`require_backup`, default true); without it, the typed phrase `NO BACKUP` is required too.
       x-step-up: true
       x-db-path: admin_data_reset_request
       requestBody:
@@ -8508,6 +8510,8 @@ paths:
                   maxItems: 64
                   items: {$ref: '#/components/schemas/DataResetPartCode'}
                   description: '0.15.71. The parts to reset (codes of `DataResetState.plan.parts`). Absent: everything as before (every project part, no identity part). The database adds the dependent parts; unknown codes are 422 `validation_failed` (`/parts`, `unknown_part`).'
+                require_backup: {type: boolean, default: true, description: '0.15.72. True (the default, as before): the run needs a successful database backup within `backup_max_age_hours`. False: the run skips only that check; the deleted data cannot be restored from a backup. Bound into `scope_hash`; never changes after the request.'}
+                no_backup_confirm: {type: string, maxLength: 200, description: '0.15.72. Required when `require_backup` is false: the typed phrase `NO BACKUP` (`DataResetState.no_backup_phrase`; 422 `confirmation_mismatch` at `/no_backup_confirm` otherwise). Ignored when a backup is required.'}
       responses:
         '201':
           description: Requested.
@@ -8548,7 +8552,7 @@ paths:
       tags: [settings]
       operationId: approveDataReset
       summary: Approve the request (a second, different System Admin)
-      description: 0.15.62; scope 0.15.71 (the approval binds to the request's `scope_hash`; 409 `scope_changed` when the approver saw another scope or the closure of the requested parts changed). A System Admin acting without delegation who is not the requester and not in the requester's session (403 `self_approval_forbidden`), a reason of at least 10 characters, a step-up and If-Match. The request must be `requested` (409 `invalid_transition`) and not expired (409 `request_expired`). Approval does not run anything. Audited (`data_reset_approve`) and in the security log.
+      description: 0.15.62; scope 0.15.71 (the approval binds to the request's `scope_hash`; 409 `scope_changed` when the approver saw another scope or the closure of the requested parts changed; since 0.15.72 the hash also binds the backup choice `require_backup`, so an approval of the other choice is 409 `scope_changed`). A System Admin acting without delegation who is not the requester and not in the requester's session (403 `self_approval_forbidden`), a reason of at least 10 characters, a step-up and If-Match. The request must be `requested` (409 `invalid_transition`) and not expired (409 `request_expired`). Approval does not run anything. Audited (`data_reset_approve`) and in the security log.
       x-step-up: true
       x-db-path: admin_data_reset_approve
       parameters:
@@ -8563,7 +8567,7 @@ paths:
               required: [reason]
               properties:
                 reason: {type: string, minLength: 10, maxLength: 2000}
-                scope_hash: {type: string, pattern: '^[0-9a-f]{64}$', description: '0.15.71. The `scope_hash` of the request the approver read. When sent and different, 409 `scope_changed`. The approval binds to the request''s hash either way.'}
+                scope_hash: {type: string, pattern: '^[0-9a-f]{64}$', description: '0.15.71. The `scope_hash` of the request the approver read. When sent and different, 409 `scope_changed`. The approval binds to the request''s hash either way (since 0.15.72 the hash covers the scope and the backup choice).'}
       responses:
         '200':
           description: Approved.
@@ -8623,7 +8627,8 @@ paths:
       description: |
         0.15.62. The System Admin who made the request or the one who approved it (403 `action_forbidden` for anyone else), acting without delegation, a step-up, the typed
         phrase again (422 `confirmation_mismatch`) and If-Match, while the request is `approved` and not expired. Refused with 409 `backup_missing` unless the System Log
-        records a successful database backup within `backup_max_age_hours`, 409 `storage_not_supported` when the documents are in S3/MinIO, 409 `quarantine_unavailable`
+        records a successful database backup within `backup_max_age_hours` (0.15.72: only when the request has `require_backup` true; a request made without a backup
+        skips this check only), 409 `storage_not_supported` when the documents are in S3/MinIO, 409 `quarantine_unavailable`
         when the quarantine directory cannot be made in the store, 409 `plan_incomplete` when a table has no decision, 409 `reset_running` while a reset runs.
         Answers 202 with the request in `running` and runs in the background: one database transaction (`admin_data_reset_execute`, `data_reset_core`) that deletes the
         project data with the guards of the operator script and ends every session except the runner's; while it runs every other route answers 503 `maintenance`. After the
@@ -20024,9 +20029,10 @@ components:
         backup: {type: [object, 'null'], additionalProperties: true, description: 'The backup the run relied on (`DataResetBackup.last_success`).'}
         plan_at_request: {type: [object, 'null'], additionalProperties: true, description: '`delete_rows`, `files`, `sites`, and since 0.15.71 `accounts_to_deactivate` and `parts` (rows per selected part) when the request was made.'}
         scope: {$ref: '#/components/schemas/DataResetScope'}
-        scope_hash: {type: [string, 'null'], description: '0.15.71. SHA-256 of the normalised closure; null for a request made before 0.15.71 (everything).'}
+        scope_hash: {type: [string, 'null'], description: '0.15.71. SHA-256 of the normalised closure; null for a request made before 0.15.71 (everything). 0.15.72: it also binds the backup choice: equal to `scope.hash` when `require_backup` is true, a different SHA-256 when it is false. The approver sends this value.'}
+        require_backup: {type: boolean, default: true, description: '0.15.72. True: the run needs a recent successful backup. False: the request was made "without a backup" (typed `NO BACKUP`); the run skips only the backup check and the deleted data cannot be restored from a backup. Never changes; absent (older server) means true.'}
         approved_scope_hash: {type: [string, 'null'], description: '0.15.71. The hash the approval bound to (always equal to `scope_hash`).'}
-        result: {type: [object, 'null'], additionalProperties: true, description: '`audit_id` (the `project_data_reset` row on the Audit Log chain), `sessions_ended`, `deleted` (rows per table).'}
+        result: {type: [object, 'null'], additionalProperties: true, description: '`audit_id` (the `project_data_reset` row on the Audit Log chain), `sessions_ended`, `deleted` (rows per table), and since 0.15.72 `require_backup`.'}
         quarantine_dir: {type: [string, 'null'], description: 'Where the files of the deleted rows were moved (inside the store, `<STORAGE_DIR>/.pre-reset-<timestamp>`).'}
         error: {type: [string, 'null']}
         files: {$ref: '#/components/schemas/DataResetFiles'}
@@ -20036,6 +20042,7 @@ components:
       properties:
         database: {type: string}
         confirmation_phrase: {type: string, description: '`RESET <database>`: typed to request and again to run.'}
+        no_backup_phrase: {type: string, description: '0.15.72. `NO BACKUP`: typed to request a reset that runs without a backup.'}
         settings: {$ref: '#/components/schemas/DataResetSettings'}
         system_admins_active: {type: integer}
         single_admin: {type: boolean, description: 'Fewer than two active System Admins: no request; the operator script on the server is the way.'}

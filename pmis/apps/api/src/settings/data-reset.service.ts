@@ -19,7 +19,11 @@ type Json = Record<string, unknown>;
 const confirm = z.string().max(200);
 /** A part code of the catalogue (`data_reset_parts`); the database decides which exist and adds the dependent parts. */
 const partCode = z.string().regex(/^[a-z_]{2,40}$/);
-const requestBody = z.object({ reason: z.string().max(2000), confirm_text: confirm, parts: z.array(partCode).max(64).optional() }).strict();
+/** Contract 0.15.72: `require_backup` (absent = true, as before) and, when false, the typed phrase `NO BACKUP` in `no_backup_confirm` (the database checks it). */
+const requestBody = z.object({
+  reason: z.string().max(2000), confirm_text: confirm, parts: z.array(partCode).max(64).optional(),
+  require_backup: z.boolean().optional(), no_backup_confirm: confirm.optional(),
+}).strict();
 const reasonBody = z.object({ reason: z.string().max(2000) }).strict();
 const approveBody = z.object({ reason: z.string().max(2000), scope_hash: z.string().regex(/^[0-9a-f]{64}$/).optional() }).strict();
 const partsQuery = z.string().regex(/^[a-z_]{2,40}(,[a-z_]{2,40}){0,63}$/).optional();
@@ -31,7 +35,8 @@ const RUN_TIMEOUT_MS = 60 * 60 * 1000;
 
 /**
  * The project data reset in Settings (owner decisions 2026-11-24, migration 0146, contract 0.15.62). Every rule is decided by the database doors
- * (`admin_data_reset_*`): a System Admin acting without delegation, step-up, reason, the typed phrase, four eyes, the expiry, the backup precondition.
+ * (`admin_data_reset_*`): a System Admin acting without delegation, step-up, reason, the typed phrase, four eyes, the expiry, the backup precondition
+ * (since 0.15.72 a choice of each request, bound into its scope hash).
  * The API adds what only it can do: the document store (local disk only; the quarantine directory is made before the start), the run in a transaction of
  * its own (after the start has committed, as the runner in the runner's session), the maintenance mode, and the file move after the
  * commit, recorded on the request.
@@ -90,7 +95,10 @@ export class DataResetService {
     await this.stepUp.require(auth);
     // no parts = everything (as before 0.15.71); the database computes the closure, the client's list is only the choice
     const parts = b.parts ?? null;
-    return this.one(Prisma.sql`SELECT admin_data_reset_request(${b.reason}::text, ${b.confirm_text}::text, ${parts}::text[]) AS r`);
+    // no require_backup = a recent backup is required (as before 0.15.72); the choice is bound into the request's scope hash by the database
+    const requireBackup = b.require_backup ?? true;
+    return this.one(Prisma.sql`SELECT admin_data_reset_request(${b.reason}::text, ${b.confirm_text}::text, ${parts}::text[], ${requireBackup}::boolean,
+      ${b.no_backup_confirm ?? null}::text) AS r`);
   }
 
   async approve(auth: AuthContext, rawId: string, ifMatch: string | undefined, raw: unknown): Promise<Json> {
@@ -118,7 +126,7 @@ export class DataResetService {
   }
 
   /**
-   * Start: the checks of the database door (who, step-up, phrase, approved, not expired, backup, no reset running, the plan), the store (local disk, the
+   * Start: the checks of the database door (who, step-up, phrase, approved, not expired, backup unless the request was made without it, no reset running, the plan), the store (local disk, the
    * quarantine directory made now so a store that cannot take it refuses before anything changes). The run starts once this request has committed.
    */
   async run(auth: AuthContext, rawId: string, ifMatch: string | undefined, raw: unknown): Promise<Json> {

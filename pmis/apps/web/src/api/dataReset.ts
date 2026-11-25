@@ -55,7 +55,10 @@ function useAct<B>(fn: (b: B) => Promise<unknown>) {
 }
 
 export const useRequestDataReset = () =>
-  useAct((b: { reason: string; confirm_text: string; parts?: string[] }) => api.post('/settings/data-reset/requests', { body: b }));
+  useAct((b: { reason: string; confirm_text: string; parts?: string[]; require_backup?: boolean; no_backup_confirm?: string }) =>
+    api.post('/settings/data-reset/requests', { body: b }));
+/** Contract 0.15.72: a request made without a backup (`require_backup` false); a missing field (an older server) means a backup is required. */
+export const requiresBackup = (r: Pick<DataResetRequest, 'require_backup'> | null | undefined) => r?.require_backup !== false;
 /** The approver sends the scope hash they saw (0.15.71): a request whose scope is not that one is refused (409 scope_changed). */
 export const useApproveDataReset = () =>
   useAct((b: { id: string; version: number; reason: string; scope_hash?: string | null }) =>
