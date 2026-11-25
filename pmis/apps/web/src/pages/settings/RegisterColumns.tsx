@@ -8,6 +8,7 @@ import type { RegisterColumn, RegisterSection } from '@/api/types';
 import { ColumnDialog } from '@/components/ColumnDialog';
 import { errText, FormDialog } from '@/components/FormDialog';
 import { useToast } from '@/components/Toast';
+import { isStreamKey, STREAM_MENUS, STREAM_PREFIX, StreamColumns, type StreamMenu } from './StreamColumns';
 
 type Dlg =
   | { k: 'add' } | { k: 'edit'; c: RegisterColumn } | { k: 'delete'; c: RegisterColumn } | { k: 'react'; c: RegisterColumn }
@@ -15,10 +16,46 @@ type Dlg =
 
 /** Settings, register columns (contract 0.15.13): the admin adds, edits, orders, hides and removes the columns, sections and name of a register. */
 export function RegisterColumns() {
+  const [sp] = useSearchParams();
+  const k = sp.get('register') || 'gecol';
+  return isStreamKey(k) ? <StreamPage menu={k.slice(STREAM_PREFIX.length) as StreamMenu} /> : <RegisterColumnsOf />;
+}
+
+/** The one dropdown of the Columns page: the Site Master streams, then every register and log. */
+function ColumnsPicker({ value, onChange }: { value: string; onChange: (k: string) => void }) {
+  const { t, i18n } = useTranslation();
+  const defs = useRegisterDefs();
+  const lang = i18n.language;
+  return (
+    <select className="input w-auto" aria-label={t('regcols.register')} data-testid="regcols-register" value={value} onChange={(e) => onChange(e.target.value)}>
+      <optgroup label={t('regcols.group_streams')}>
+        {STREAM_MENUS.map((m) => <option key={m} value={STREAM_PREFIX + m}>{t(`studio.columns.menu_${m}`)}</option>)}
+      </optgroup>
+      <optgroup label={t('regcols.group_registers')}>
+        {(defs.data ?? []).map((d) => <option key={d.register_key} value={d.register_key}>{(lang === 'ar' && d.name_ar) || d.name_en}</option>)}
+      </optgroup>
+    </select>
+  );
+}
+
+function StreamPage({ menu }: { menu: StreamMenu }) {
+  const { t } = useTranslation();
+  const [, setSp] = useSearchParams();
+  return (
+    <section className="space-y-3" data-testid="page-register-columns">
+      <div className="card space-y-3 p-4">
+        <h2 className="font-bold">{t('regcols.title')}</h2>
+        <ColumnsPicker value={STREAM_PREFIX + menu} onChange={(k) => setSp({ register: k }, { replace: true })} />
+        <StreamColumns menu={menu} />
+      </div>
+    </section>
+  );
+}
+
+function RegisterColumnsOf() {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
   const toast = useToast();
-  const defs = useRegisterDefs();
   const [sp, setSp] = useSearchParams();
   const key = sp.get('register') || 'gecol';
   const setKey = (k: string) => setSp({ register: k }, { replace: true });
@@ -46,9 +83,7 @@ export function RegisterColumns() {
         <h2 className="font-bold">{t('regcols.title')}</h2>
         <p className="text-sm text-mute">{t('regcols.note')}</p>
         <div className="flex flex-wrap items-center gap-2">
-          <select className="input w-auto" aria-label={t('regcols.register')} data-testid="regcols-register" value={key} onChange={(e) => setKey(e.target.value)}>
-            {(defs.data ?? []).map((d) => <option key={d.register_key} value={d.register_key}>{(lang === 'ar' && d.name_ar) || d.name_en}</option>)}
-          </select>
+          <ColumnsPicker value={key} onChange={setKey} />
           <button type="button" className="btn" data-testid="regcols-rename" onClick={() => { setName({ en: scr.data?.register.name_en ?? '', ar: scr.data?.register.name_ar ?? '' }); setDlg({ k: 'rename' }); }}><Pencil size={14} />{t('regcols.rename_register')}</button>
           <button type="button" className="btn" data-testid="regcols-section-new" onClick={() => { setSec({ en: '', ar: '' }); setDlg({ k: 'section' }); }}><Plus size={14} />{t('regcols.add_section')}</button>
           <button type="button" className="btn btn-accent ms-auto" data-testid="regcols-add" onClick={() => setDlg({ k: 'add' })}><Plus size={14} />{t('regcols.add')}</button>

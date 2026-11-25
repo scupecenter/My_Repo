@@ -9,7 +9,7 @@ import { useListCatalogues } from '@/api/lists';
 import { FormDialog } from '@/components/FormDialog';
 import { useToast } from '@/components/Toast';
 import { colCb, useColErr } from './colErr';
-import type { Ctx } from './studioCtx';
+import type { ColCtx, Ctx } from './studioCtx';
 import { StudioCard } from './StudioForms';
 
 const lbl = 'block text-sm font-semibold';
@@ -19,13 +19,13 @@ export const COLUMN_TYPE_LIST: ColumnType[] = ['text', 'number', 'date', 'list',
 /** The column as people name it: the letter and the name of the language in use. */
 export const colName = (c: Pick<ColumnAdmin, 'name_en' | 'name_ar' | 'header'>, ar: boolean) => (ar && c.name_ar ? c.name_ar : c.name_en ?? c.header);
 
-function Dialogs({ c, dlg, onClose }: { c: Ctx; dlg: Dlg; onClose: () => void }) {
+export function Dialogs({ c, dlg, onClose }: { c: ColCtx; dlg: Dlg; onClose: () => void }) {
   if (!dlg) return null;
   if (dlg.kind === 'rename') return <RenameDialog c={c} col={dlg.col} onClose={onClose} />;
   if (dlg.kind === 'menus') return <MenusDialog c={c} col={dlg.col} onClose={onClose} />;
   return <TypeDialog c={c} col={dlg.col} mode={dlg.kind} onClose={onClose} />;
 }
-type Dlg = null | { kind: 'rename' | 'type' | 'list' | 'menus'; col: ColumnAdmin };
+export type Dlg = null | { kind: 'rename' | 'type' | 'list' | 'menus'; col: ColumnAdmin };
 
 /** The card of a task form: the Site Master columns whose source is this task, with the row actions of the Studio. */
 export function TaskColumnsCard({ c, code }: { c: Ctx; code: string }) {
@@ -98,7 +98,7 @@ const Item = ({ ord, id, label, why, onClick }: { ord: number; id: string; label
 );
 
 /** The actions of one column. A protected column keeps only the rename and the menus; the others are disabled with the reason. Delete shows only when the API allows it. */
-function RowActions({ c, col, del, onDialog }: { c: Ctx; col: ColumnAdmin; del: boolean; onDialog: (k: 'rename' | 'type' | 'list' | 'menus') => void }) {
+export function RowActions({ c, col, del, onDialog }: { c: ColCtx; col: ColumnAdmin; del: boolean; onDialog: (k: 'rename' | 'type' | 'list' | 'menus') => void }) {
   const { t } = useTranslation();
   const fmt = useColErr();
   const [open, setOpen] = useState(false);
@@ -139,7 +139,7 @@ function RowActions({ c, col, del, onDialog }: { c: Ctx; col: ColumnAdmin; del: 
   );
 }
 
-function RenameDialog({ c, col, onClose }: { c: Ctx; col: ColumnAdmin; onClose: () => void }) {
+function RenameDialog({ c, col, onClose }: { c: ColCtx; col: ColumnAdmin; onClose: () => void }) {
   const { t } = useTranslation();
   const toast = useToast();
   const err = useColErr();
@@ -156,7 +156,7 @@ function RenameDialog({ c, col, onClose }: { c: Ctx; col: ColumnAdmin; onClose: 
   );
 }
 
-function MenusDialog({ c, col, onClose }: { c: Ctx; col: ColumnAdmin; onClose: () => void }) {
+function MenusDialog({ c, col, onClose }: { c: ColCtx; col: ColumnAdmin; onClose: () => void }) {
   const { t } = useTranslation();
   const toast = useToast();
   const err = useColErr();
@@ -191,7 +191,7 @@ export function MenuPicker({ value, onChange, prefix }: { value: MenuKey[]; onCh
  * Change the type or the dropdown list of a column. The stored values are never rewritten, so before the change the Studio asks the API how many of them would
  * not fit (type-preview) and shows the count; with unconvertible values the admin must accept that they stay as they are (`confirm_unconvertible`).
  */
-function TypeDialog({ c, col, mode, onClose }: { c: Ctx; col: ColumnAdmin; mode: 'type' | 'list'; onClose: () => void }) {
+function TypeDialog({ c, col, mode, onClose }: { c: ColCtx; col: ColumnAdmin; mode: 'type' | 'list'; onClose: () => void }) {
   const { t, i18n } = useTranslation();
   const toast = useToast();
   const err = useColErr();

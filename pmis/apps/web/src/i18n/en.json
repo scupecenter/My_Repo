@@ -3874,7 +3874,11 @@
     "type_child_list": "Child list",
     "code_generated": "Technical ID (made for you: {{code}})",
     "code_hint": "Made from the English name. Only change it if you must; it cannot be changed later.",
-    "code_fixed": "It never changes. To change what people see, change the name instead. That is free."
+    "code_fixed": "It never changes. To change what people see, change the name instead. That is free.",
+    "group_streams": "Site Master streams",
+    "group_registers": "Registers and logs",
+    "stream_note": "Columns of the {{stream}} stream, in Master order. Same rules as the Workflow Studio: reason, approval and audit.",
+    "stream_add": "Add a column (Workflow Studio)"
   },
   "lists": {
     "colour": "Colour",

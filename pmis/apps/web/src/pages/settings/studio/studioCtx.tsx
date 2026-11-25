@@ -23,6 +23,8 @@ export function useWrites(version: number, etag: number) {
   };
 }
 export type Writes = ReturnType<typeof useWrites>;
+/** What the Site Master column rows need: the column writes and the reason question. The Studio and Settings > Registers > Columns both provide it. */
+export type ColCtx = { W: Pick<Writes, 'colCreate' | 'colUpdate' | 'colDeactivate' | 'colReactivate' | 'colDelete' | 'colSections'>; askReason: (a: Ask) => void; canCols: boolean };
 export type Ask = { title: string; hint?: string; run: (reason: string, cb: { onSuccess: () => void; onError: (e: unknown) => void }) => void; children?: React.ReactNode; disabled?: boolean };
 
 /** The one question every write asks (the reason, then the step-up the client opens by itself): the same rule as the classic editor. */
