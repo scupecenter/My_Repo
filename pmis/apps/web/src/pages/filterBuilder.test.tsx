@@ -117,7 +117,7 @@ describe('unified filter', () => {
 
   it('a Site Master sub-menu uses its own screen key and sends the tree to its rows', async () => {
     await signIn('pm');
-    const seen = watch('/site360/:menu/rows');
+    const seen = watch('/site-master/:menu/rows');
     const screens: string[] = [];
     server.use(http.get(`${API_BASE}/saved-views/filter-fields`, ({ request }) => { screens.push(new URL(request.url).searchParams.get('screen_key') ?? ''); }));
     const u = userEvent.setup();
@@ -201,7 +201,7 @@ describe('advanced (AND / OR) beside the unified filter', () => {
 
   it('Site Master sub-menu', async () => {
     await signIn('pm');
-    const seen = watch('/site360/:menu/rows');
+    const seen = watch('/site-master/:menu/rows');
     const u = userEvent.setup();
     renderApp(<Sites />, { route: '/sites?section=te' });
     await advancedGroup(u, 'overall_status');

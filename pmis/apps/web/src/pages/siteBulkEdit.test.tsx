@@ -91,7 +91,7 @@ describe('Site Master wide table: bulk edit', () => {
 
   it('with no editable cell in the menu the dialog says so and cannot confirm', async () => {
     await signIn('pm');
-    server.use(http.get(`${API_BASE}/site360/:menu/rows`, () => HttpResponse.json({ total: 1, filtered: 1, offset: 0, limit: 50, rows: [{ site_id: 'a0000000-0000-4000-8000-000000000001', site_code: 'S360-001', row_no: 1, values: { '4': 'Name' }, cells: {} }] })));
+    server.use(http.get(`${API_BASE}/site-master/:menu/rows`, () => HttpResponse.json({ total: 1, filtered: 1, offset: 0, limit: 50, rows: [{ site_id: 'a0000000-0000-4000-8000-000000000001', site_code: 'S360-001', row_no: 1, values: { '4': 'Name' }, cells: {} }] })));
     renderApp(<App />, { route: '/sites?section=sow&layout=wide' });
     await userEvent.click(await screen.findByTestId('wide-select-S360-001'));
     await userEvent.click(screen.getByTestId('sites-bulk-edit'));
@@ -101,7 +101,7 @@ describe('Site Master wide table: bulk edit', () => {
 });
 
 describe('Site Master wide table: dependent lists', () => {
-  const rows = () => server.use(http.get(`${API_BASE}/site360/:menu/rows`, () => HttpResponse.json({ total: 3, filtered: 3, offset: 0, limit: 50, rows: [
+  const rows = () => server.use(http.get(`${API_BASE}/site-master/:menu/rows`, () => HttpResponse.json({ total: 3, filtered: 3, offset: 0, limit: 50, rows: [
     ['S360-001', 'WEST'], ['S360-002', 'EAST'], ['S360-003', null],
   ].map(([code, parent], i) => ({ site_id: `a0000000-0000-4000-8000-00000000000${i + 1}`, site_code: code, row_no: i + 1, values: { '4': 'Name', '24': parent, '33': null }, cells: {
     '24': { task_id: `p${i}`, version: 1, editable: true, values: 'region', input_type: 'list', options: [{ value: 'WEST', label_en: 'West', label_ar: null }, { value: 'EAST', label_en: 'East', label_ar: null }] },
@@ -144,7 +144,7 @@ describe('Site Master wide table: the list filters', () => {
   it('sends the stage, mine or late, locks and gaps filters of the page to the rows endpoint with the same names as GET /sites', async () => {
     await signIn('pm');
     const urls: URL[] = [];
-    server.use(http.get(`${API_BASE}/site360/:menu/rows`, ({ request }) => { urls.push(new URL(request.url)); return HttpResponse.json({ total: 0, filtered: 0, offset: 0, limit: 200, rows: [] }); }));
+    server.use(http.get(`${API_BASE}/site-master/:menu/rows`, ({ request }) => { urls.push(new URL(request.url)); return HttpResponse.json({ total: 0, filtered: 0, offset: 0, limit: 200, rows: [] }); }));
     renderApp(<App />, { route: '/sites?section=cw&layout=wide&stage_code=MS2&bucket=late&workflow_locks=open&data_gaps=with&scenario=expansion' });
     await screen.findByTestId('sites-wide-table');
     await waitFor(() => expect(urls.length).toBeGreaterThan(0));
@@ -155,7 +155,7 @@ describe('Site Master wide table: the list filters', () => {
   it('the sub-menu list sends the same filters (bucket=mine, stage and locks)', async () => {
     await signIn('pm');
     const urls: URL[] = [];
-    server.use(http.get(`${API_BASE}/site360/:menu/rows`, ({ request }) => { urls.push(new URL(request.url)); return HttpResponse.json({ total: 0, filtered: 0, offset: 0, limit: 200, rows: [] }); }));
+    server.use(http.get(`${API_BASE}/site-master/:menu/rows`, ({ request }) => { urls.push(new URL(request.url)); return HttpResponse.json({ total: 0, filtered: 0, offset: 0, limit: 200, rows: [] }); }));
     renderApp(<App />, { route: '/sites?section=te&bucket=mine&stage_code=MS2&workflow_locks=locked' });
     await waitFor(() => expect(urls.some((u) => u.searchParams.get('bucket') === 'mine' && u.searchParams.get('stage_code') === 'MS2' && u.searchParams.get('workflow_locks') === 'locked')).toBe(true));
   });

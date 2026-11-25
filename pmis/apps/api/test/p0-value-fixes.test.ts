@@ -7,7 +7,7 @@ import { actor, makeSite, Site } from './wf-helpers';
 
 /**
  * Migration 0119 (contract 0.15.33): the P0 value fixes of the read-only audit of 2026-11-17. Synthetic sites only.
- *   - SITE 360 BW (GECOL Status), AJ / AK (contractor of the first CW, Tower Erection or Site Adaption order, rejected ones left out), R (As-Built configuration)
+ *   - Site Master BW (GECOL Status), AJ / AK (contractor of the first CW, Tower Erection or Site Adaption order, rejected ones left out), R (As-Built configuration)
  *   - the grid status filter is `status`
  *   - GET /sites dashboard_status, milestone_reached and ref_date: the list a dashboard card opens has the card's count
  */
@@ -27,12 +27,12 @@ afterAll(async () => {
 const site = (region = 1, over: { status?: string; cluster?: string; scenario?: string } = {}): Promise<Site> => makeSite(db, region, { prefix: TAG, ...over });
 const moduleOf = async (key: string): Promise<string> => (await db.query(`SELECT module_key FROM register_definitions WHERE register_key = $1`, [key])).rows[0].module_key as string;
 const rowValues = async (api: Awaited<ReturnType<typeof actor>>['api'], codes: string[]): Promise<Map<string, Record<string, string | null>>> => {
-  const res = await api.call('get', `/site360/master/rows?site_code=${codes.join(',')}&limit=200`);
+  const res = await api.call('get', `/site-master/master/rows?site_code=${codes.join(',')}&limit=200`);
   expect(res.status).toBe(200);
   return new Map(res.body.rows.map((r: { site_code: string; values: Record<string, string | null> }) => [r.site_code, r.values]));
 };
 
-describe('SITE 360 BW GECOL Status: the workbook formula over the GECOL scope and the approved GECOL record', () => {
+describe('Site Master BW GECOL Status: the workbook formula over the GECOL scope and the approved GECOL record', () => {
   it('shows N/A for a site whose GECOL scope is N/A, Done with a power-on date, Pending without one or without a record, and ignores the old status column', async () => {
     const na = await site();
     await db.query(`UPDATE sites SET scope_gecol_power = 'na' WHERE id = $1`, [na.id]);
@@ -60,7 +60,7 @@ describe('SITE 360 BW GECOL Status: the workbook formula over the GECOL scope an
   });
 });
 
-describe('SITE 360 AJ / AK: the contractor of the first CW, Tower Erection or Site Adaption order that is not cancelled or rejected', () => {
+describe('Site Master AJ / AK: the contractor of the first CW, Tower Erection or Site Adaption order that is not cancelled or rejected', () => {
   const party = async (name: string): Promise<string> => (await db.query(`INSERT INTO external_parties (name, type, is_active) VALUES ($1, 'cw_contractor', true) RETURNING id`, [name])).rows[0].id as string;
 
   it('reads a Tower Erection order and a Site Adaption order, leaves out a rejected one and the scopes the workbook excludes', async () => {
@@ -85,9 +85,9 @@ describe('SITE 360 AJ / AK: the contractor of the first CW, Tower Erection or Si
     expect(v.get(te.code)!['37']).toBe(`${name}-TE team`);
     expect(v.get(sa.code)!['36']).toBe(`${name}-SA`);
     // the contractor filter reads the same column
-    const hit = await a.api.call('get', `/site360/master/rows?site_code=${te.code},${sa.code}&contractor=${encodeURIComponent(`${name}-TE`)}`);
+    const hit = await a.api.call('get', `/site-master/master/rows?site_code=${te.code},${sa.code}&contractor=${encodeURIComponent(`${name}-TE`)}`);
     expect(hit.body.filtered).toBe(1);
-    const miss = await a.api.call('get', `/site360/master/rows?site_code=${te.code},${sa.code}&contractor=${encodeURIComponent(`${name}-REJ`)}`);
+    const miss = await a.api.call('get', `/site-master/master/rows?site_code=${te.code},${sa.code}&contractor=${encodeURIComponent(`${name}-REJ`)}`);
     expect(miss.body.filtered).toBe(0);
   });
 
@@ -99,7 +99,7 @@ describe('SITE 360 AJ / AK: the contractor of the first CW, Tower Erection or Si
   });
 });
 
-describe('SITE 360 R Configuration: the configuration of the approved As-Built TE part', () => {
+describe('Site Master R Configuration: the configuration of the approved As-Built TE part', () => {
   it('reads it from the approved TE part in force, not from sites.config_summary, and stays empty without one', async () => {
     const s = await site();
     const empty = await site();
@@ -120,12 +120,12 @@ describe('SITE 360 R Configuration: the configuration of the approved As-Built T
   });
 });
 
-describe('SITE 360 grid status filter', () => {
+describe('Site Master grid status filter', () => {
   it('filters on `status` (the name the web grid now sends)', async () => {
     const hold = await site(1, { status: 'on_hold' });
     const prog = await site(1, { status: 'in_progress' });
     const a = await actor(app, db, { regions: [1] });
-    const res = await a.api.call('get', `/site360/master/rows?site_code=${hold.code},${prog.code}&status=on_hold`);
+    const res = await a.api.call('get', `/site-master/master/rows?site_code=${hold.code},${prog.code}&status=on_hold`);
     expect(res.status).toBe(200);
     expect(res.body.filtered).toBe(1);
     expect(res.body.rows.map((r: { site_code: string }) => r.site_code)).toEqual([hold.code]);

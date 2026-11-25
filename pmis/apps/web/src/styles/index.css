@@ -77,6 +77,10 @@
 [data-tsize='sm'] [role='listitem'],[data-tsize='sm'] [role='row'],[data-tsize='sm'] td{font-size:.75rem}
 [data-tsize='lg'] [role='listitem'],[data-tsize='lg'] [role='row'],[data-tsize='lg'] td{font-size:1rem}
 [data-talign='center'] [data-col]:not([data-col='rowno']),[data-talign='center'] td[data-col]{text-align:center}
+/* the header rows follow the same option: a column header is a cell too (text, the label inside it and the group bands above it) */
+[data-talign='center'] [role='columnheader']:not([data-col='rowno']),[data-talign='center'] .gx-head [data-col]:not([data-col='rowno']){text-align:center}
+[data-talign='center'] [role='columnheader']:not([data-col='rowno'])>.truncate,[data-talign='center'] [role='columnheader']:not([data-col='rowno'])>span.block{text-align:center}
+[data-talign='center'] .gx-head [data-col]:not([data-col='rowno']){padding-inline:.5rem}
 [data-talign='center'] [data-col]:not([data-col='rowno'])>.flex,[data-talign='center'] [data-col]:not([data-col='rowno'])>span.flex{justify-content:center}
 [data-twrap='1'] [data-col] .truncate{white-space:normal;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow-wrap:anywhere}
 [data-twrap='1'] td[data-col]{white-space:normal}

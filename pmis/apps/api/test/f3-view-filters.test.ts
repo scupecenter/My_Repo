@@ -60,9 +60,9 @@ describe('compile and results', () => {
     expect(codes(r.body)).toEqual([tri1.code, zaw.code].sort());
   });
 
-  it('the same filter on GET /site360/{menu}/rows, on a register and on the task list of a site', async () => {
+  it('the same filter on GET /site-master/{menu}/rows, on a register and on the task list of a site', async () => {
     const a = await actor(app, db, { grants: [['sites', 'view'], ['issues', 'view']] });
-    const r = await a.api.call('get', `/site360/master/rows?limit=50&${q(mine({ op: 'or', items: [{ field: 'region_id', operator: 'is', value: '4' }, { field: 'delivery_scenario', operator: 'is', value: 'hot_swap' }] }))}`);
+    const r = await a.api.call('get', `/site-master/master/rows?limit=50&${q(mine({ op: 'or', items: [{ field: 'region_id', operator: 'is', value: '4' }, { field: 'delivery_scenario', operator: 'is', value: 'hot_swap' }] }))}`);
     expect(r.status).toBe(200);
     expect(r.body.rows.map((x: { site_code: string }) => x.site_code).sort()).toEqual([zaw.code, ben.code].sort());
 

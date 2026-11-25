@@ -196,7 +196,7 @@ export function WideTable<R extends WideTableRow>({
         </table>
         {loaded && !rows.length && (filtered ? <NoResults testid={emptyTestid} onClear={onClear} /> : <EmptyState testid={emptyTestid} title={emptyTitle} />)}
       </div>
-      {hasMore && <button type="button" className="btn m-2" data-testid={moreTestid} disabled={loadingMore} onClick={onMore}>{t('site360.more')}</button>}
+      {hasMore && <button type="button" className="btn m-2" data-testid={moreTestid} disabled={loadingMore} onClick={onMore}>{t('siteMaster.more')}</button>}
     </div>
   );
 }

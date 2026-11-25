@@ -256,7 +256,7 @@ export class MasterExportService {
     const today = (await this.db.tx.$queryRaw<{ d: string }[]>(Prisma.sql`SELECT cal_today()::text AS d`))[0]?.d ?? new Date().toISOString().slice(0, 10);
     if (body.as_of && body.as_of > today) throw problems.validation([{ path: '/as_of', code: 'future_date', message: 'The date is in the future.' }]);
     if (body.as_of && body.as_of < today) {
-      // the Master values are the live read model (site360_master_values); there is no history to rebuild an earlier day from (contract 0.15.34)
+      // the Master values are the live read model (site_master_values); there is no history to rebuild an earlier day from (contract 0.15.34)
       throw problems.validation([{ path: '/as_of', code: 'as_of_unsupported', message: 'Only today can be exported: past values are not kept.' }]);
     }
     const asked = [...(body.parts ?? []), ...(body.view ? [body.view.source] : [])];
@@ -489,10 +489,10 @@ export class MasterExportService {
   }
 
   // ------------------------------------------------------------------ the Master sheet
-  /** The values of the Master columns of some sites, from the read model of SITE 360 (site360_master_values); register-owned values need the register's view grant in the site's region. */
+  /** The values of the Master columns of some sites, from the read model of Site Master (site_master_values); register-owned values need the register's view grant in the site's region. */
   private async masterValues(auth: AuthContext, ids: string[], ords: number[], siteRegion: Map<string, number>): Promise<Map<string, Map<number, string | null>>> {
     const vals = await this.db.tx.$queryRaw<{ site_id: string; ord: number; value: string | null; register_key: string | null; kind: string | null }[]>(Prisma.sql`
-      SELECT v.site_id::text AS site_id, v.ord, v.value, v.register_key, v.src_kind AS kind FROM site360_master_values v
+      SELECT v.site_id::text AS site_id, v.ord, v.value, v.register_key, v.src_kind AS kind FROM site_master_values v
       WHERE v.site_id = ANY(${ids}::uuid[]) AND v.ord = ANY(${ords}::int[])`);
     // a not-tracked column filled by a site custom field follows that field's rule for the caller (hidden = left empty)
     const hiddenOrds = vals.some((v) => v.kind === 'custom_field')
@@ -577,7 +577,7 @@ export class MasterExportService {
     }
   }
 
-  /** "Export current view" of the Sites list or SITE 360: the rows of GET /sites with the same query, the chosen columns in screen order, Master header rows. */
+  /** "Export current view" of the Sites list or Site Master: the rows of GET /sites with the same query, the chosen columns in screen order, Master header rows. */
   private async masterViewSheet(
     wb: ReturnType<typeof workbookWriter>, auth: AuthContext, v: View, regs: number[] | null, regionsOf: Map<PartKey, number[] | null>,
   ): Promise<SheetCount> {

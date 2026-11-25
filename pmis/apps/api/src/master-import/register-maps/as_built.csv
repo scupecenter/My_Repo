@@ -1,4 +1,4 @@
-# Only the TE configuration columns the plan (section 2.2) lists for TPL-ASB. The CW quantity columns (q_*) are empty in the owner file and carry
+# Only the TE configuration columns the plan (section 2.2) lists for TPL-AS-BUILT. The CW quantity columns (q_*) are empty in the owner file and carry
 # item-specific headers issued by GSDN Workspace: add rows here when they are filled. Patch Cord 1 and 2 are missing in the owner file.
 template_header,master_header,master_column,transform,personal,notes
 Site ID,Site ID,B,site_id,,key

@@ -1,5 +1,5 @@
 import { AlertTriangle } from 'lucide-react';
-import type { ReactNode } from 'react';
+import type { DragEvent, ReactNode } from 'react';
 
 /** A column of a board: its key, its name, the number of cards in it (all of them, not only the cards drawn) and an optional WIP limit. */
 export interface BoardColumn { key: string; name: string; count: number; wip?: { limit: number; over: boolean; text: string } | null }
@@ -14,7 +14,9 @@ export interface BoardCell<C> { cards: C[]; more?: ReactNode }
  * record (a site, a register record), so a card moves only through the record's own actions. The screen gives the columns, the lanes, the
  * cells and how a card is drawn.
  */
-export function BoardGrid<C>({ columns, lanes, showLanes, cell, card, cardKey, testid, empty, emptyTestid, label, total: totalIn }: {
+export function BoardGrid<C>({ columns, lanes, showLanes, cell, card, cardKey, testid, empty, emptyTestid, label, total: totalIn, onDropTo }: {
+  /** Optional: a card dropped on a cell (the column key, the lane key). Without it nothing can be dropped, as before. */
+  onDropTo?: (column: string, lane: string, e: DragEvent) => void;
   columns: BoardColumn[];
   /** every card of the board (default: the sum of the column counts) */
   total?: number;
@@ -53,7 +55,8 @@ export function BoardGrid<C>({ columns, lanes, showLanes, cell, card, cardKey, t
             {columns.map((c) => {
               const x = cell(c.key, l.key);
               return (
-                <div key={c.key} className="min-h-12 rounded-md bg-card2/40 p-1" data-testid={`board-cell-${c.key}-${l.key}`}>
+                <div key={c.key} className="min-h-12 rounded-md bg-card2/40 p-1" data-testid={`board-cell-${c.key}-${l.key}`}
+                  {...(onDropTo ? { onDragOver: (e: DragEvent) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }, onDrop: (e: DragEvent) => { e.preventDefault(); onDropTo(c.key, l.key, e); } } : {})}>
                   <ul className="space-y-1" aria-label={label(c, l)}>
                     {x?.cards.map((k) => <li key={cardKey(k)}>{card(k)}</li>)}
                   </ul>

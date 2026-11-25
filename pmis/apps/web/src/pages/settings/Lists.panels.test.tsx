@@ -2,6 +2,9 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Route, Routes } from "react-router-dom";
 import { describe, expect, it } from "vitest";
+import { http, HttpResponse } from "msw";
+import { API_BASE } from "@/api/client";
+import { server } from "@/mocks/server";
 import { renderApp, signIn } from "@/test/utils";
 import { SettingsRoutes } from "./Settings";
 
@@ -68,5 +71,55 @@ describe("Settings, lists: import and bind panels (F17)", () => {
     expect(await screen.findByTestId("lists-mirrored")).toBeInTheDocument();
     expect(screen.queryByTestId("lists-import")).toBeNull();
     expect(screen.queryByTestId("lists-bind")).toBeNull();
+  });
+});
+
+describe("Settings, lists: reorder the values in place", () => {
+  it("moves a value one step with the arrow: only the values whose position changes are saved, each with a reason", async () => {
+    await signIn("pm");
+    const sent: { id: string; body: { sort_order?: number; reason?: string } }[] = [];
+    server.use(http.patch(`${API_BASE}/list-catalogues/:code/values/:id`, async ({ params, request }) => {
+      sent.push({ id: String(params.id), body: (await request.json()) as never });
+      return HttpResponse.json({ ok: true });
+    }));
+    const u = userEvent.setup();
+    settings();
+    const rows = await screen.findAllByTestId(/^lists-row-/);
+    await u.click(rows[0]!);
+    const down = (await screen.findAllByTestId(/^lists-value-down-/))[0]!;
+    await u.click(down);
+    await waitFor(() => expect(sent.length).toBeGreaterThan(0));
+    expect(sent.every((x) => typeof x.body.sort_order === "number" && (x.body.reason ?? "").length >= 3)).toBe(true);
+  });
+});
+
+describe("Settings, lists: quick rename and hide in the row", () => {
+  it("renames and hides a value in the row; Save needs a reason of 3 characters and sends the same PATCH as the full edit", async () => {
+    await signIn("pm");
+    const sent: { body: { label_en?: string; is_active?: boolean; reason?: string } }[] = [];
+    server.use(http.patch(`${API_BASE}/list-catalogues/:code/values/:id`, async ({ request }) => {
+      sent.push({ body: (await request.json()) as never });
+      return HttpResponse.json({ ok: true });
+    }));
+    const u = userEvent.setup();
+    settings();
+    const rows = await screen.findAllByTestId(/^lists-row-/);
+    await u.click(rows[0]!);
+    const quick = (await screen.findAllByTestId(/^lists-value-quick-/))[0]!;
+    await u.click(quick);
+    const code = quick.getAttribute("data-testid")!.replace("lists-value-quick-", "");
+    const en = screen.getByTestId(`lists-row-en-${code}`);
+    await u.clear(en);
+    await u.type(en, "Renamed here");
+    await u.click(screen.getByTestId(`lists-row-active-${code}`));
+    const save = screen.getByTestId(`lists-row-save-${code}`);
+    expect(save).toBeDisabled();
+    await u.type(screen.getByTestId(`lists-row-reason-${code}`), "ab");
+    expect(save).toBeDisabled();
+    await u.type(screen.getByTestId(`lists-row-reason-${code}`), "c");
+    await u.click(save);
+    await waitFor(() => expect(sent.length).toBe(1));
+    expect(sent[0]!.body).toMatchObject({ label_en: "Renamed here", reason: "abc" });
+    expect(typeof sent[0]!.body.is_active).toBe("boolean");
   });
 });

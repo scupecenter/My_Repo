@@ -6,7 +6,7 @@ import { startApp, superDb } from './helpers';
 import { actor, makeSite, makeTask, Site } from './wf-helpers';
 
 /**
- * Migration 0121 (contract 0.15.35, CHANGELOG 160): P1 Master. The source of each Master cell (GET /site360/sites/{site_id}/sources), the kind of
+ * Migration 0121 (contract 0.15.35, CHANGELOG 160): P1 Master. The source of each Master cell (GET /site-master/sites/{site_id}/sources), the kind of
  * source of each column in the menus, and a source for the columns that were always blank. Synthetic sites and records only.
  */
 const TAG = `MS${randomBytes(3).toString('hex').toUpperCase()}`;
@@ -33,12 +33,12 @@ const moduleOf = async (key: string): Promise<string> => (await db.query(`SELECT
 const REGS = ['permits_hse', 'procurement', 'as_built', 'change_control', 'readiness_handover', 'dismantle'];
 const fullReader = async (regions = [1]) => actor(app, db, { regions, grants: [['sites', 'view'], ...(await Promise.all(REGS.map(async (k) => [await moduleOf(k), 'view'] as [string, string])))] });
 const rowValues = async (api: Api, codes: string[], menu = 'master'): Promise<Map<string, Record<string, string | null>>> => {
-  const res = await api.call('get', `/site360/${menu}/rows?site_code=${codes.join(',')}&limit=200`);
+  const res = await api.call('get', `/site-master/${menu}/rows?site_code=${codes.join(',')}&limit=200`);
   expect(res.status).toBe(200);
   return new Map(res.body.rows.map((r: { site_code: string; values: Record<string, string | null> }) => [r.site_code, r.values]));
 };
 const sources = async (api: Api, s: Site, menu?: string): Promise<Map<string, Cell>> => {
-  const res = await api.call('get', `/site360/sites/${s.id}/sources${menu ? `?menu=${menu}` : ''}`);
+  const res = await api.call('get', `/site-master/sites/${s.id}/sources${menu ? `?menu=${menu}` : ''}`);
   expect(res.status).toBe(200);
   expect(res.body.site_code).toBe(s.code);
   return new Map((res.body.cells as Cell[]).map((c) => [c.letter, c]));
@@ -56,7 +56,7 @@ const setTask = async (id: string, set: string, args: unknown[] = []): Promise<v
 describe('the kind of source of each Master column', () => {
   it('flags the Dismantle planned and RN dates as not tracked in the menus, and the newly sourced columns with their kind', async () => {
     const a = await fullReader();
-    const res = await a.api.call('get', '/site360/sections');
+    const res = await a.api.call('get', '/site-master/sections');
     expect(res.status).toBe(200);
     const master = res.body.items.find((m: { key: string }) => m.key === 'master');
     const kind = new Map(master.columns.map((c: { letter: string; source_kind: string }) => [c.letter, c.source_kind]));
@@ -69,7 +69,7 @@ describe('the kind of source of each Master column', () => {
     expect(kind.get('B')).toBe('site');
     // no column is left without a kind
     expect([...kind.values()].every((k) => typeof k === 'string')).toBe(true);
-    const rows = await a.api.call('get', '/site360/dismantle/rows?limit=1');
+    const rows = await a.api.call('get', '/site-master/dismantle/rows?limit=1');
     expect(rows.body.menu.columns.find((c: { letter: string }) => c.letter === 'FP').source_kind).toBe('not_tracked');
   });
 });
@@ -216,10 +216,10 @@ describe('access: the source obeys the region and the register view of the value
     const s = await site(1);
     const cwPart = await record(s, 'dismantle', 'cw', { rfd_date: '2026-07-01' });
     const other = await fullReader([2]);
-    const res = await other.api.call('get', `/site360/sites/${s.id}/sources`);
+    const res = await other.api.call('get', `/site-master/sites/${s.id}/sources`);
     expect(res.status).toBe(404);
     expect(JSON.stringify(res.body)).not.toContain(cwPart);
-    const bad = await other.api.call('get', `/site360/sites/not-a-uuid/sources`);
+    const bad = await other.api.call('get', `/site-master/sites/not-a-uuid/sources`);
     expect(bad.status).toBe(404);
 
     const blind = await actor(app, db, { regions: [1], grants: [['sites', 'view']] });
@@ -234,7 +234,7 @@ describe('access: the source obeys the region and the register view of the value
 
     const full = await fullReader([1]);
     expect((await sources(full.api, s)).get('FN')).toMatchObject({ record_id: cwPart, hidden: false });
-    const menu = await full.api.call('get', `/site360/sites/${s.id}/sources?menu=nope`);
+    const menu = await full.api.call('get', `/site-master/sites/${s.id}/sources?menu=nope`);
     expect(menu.status).toBe(422);
   });
 });
@@ -258,7 +258,7 @@ describe('a not-tracked column filled by a hidden site custom field', () => {
       expect(hid).toMatchObject({ kind: 'custom_field', hidden: true, value: null });
 
       const order = async (api: Api, dir: string): Promise<string[]> => {
-        const res = await api.call('get', `/site360/master/rows?site_code=${a.code},${b.code}&sort=ord:${ord}&dir=${dir}&limit=200`);
+        const res = await api.call('get', `/site-master/master/rows?site_code=${a.code},${b.code}&sort=ord:${ord}&dir=${dir}&limit=200`);
         expect(res.status).toBe(200);
         return res.body.rows.map((r: { site_code: string }) => r.site_code);
       };

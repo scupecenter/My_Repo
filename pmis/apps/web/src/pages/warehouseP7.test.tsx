@@ -1,7 +1,10 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
+import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
+import { API_BASE } from '@/api/client';
+import { server } from '@/mocks/server';
 import { applyTheme } from '@/i18n';
 import { siteIdOf, siteMeta } from '@/mocks/sites';
 import { renderApp, signIn } from '@/test/utils';
@@ -84,6 +87,54 @@ describe('P7 in the Warehouse screen', () => {
     await waitFor(() => expect(screen.queryByTestId('wh-dialog')).not.toBeInTheDocument());
     await waitFor(() => expect(screen.queryByTestId('wh-need-pending-ANT-900')).not.toBeInTheDocument());
   }, 15_000);
+
+  it('edits a pending document in place through the register record; a posted one shows its lock and the reversal rule', async () => {
+    await signIn('pm');
+    let patched: unknown = null;
+    server.use(
+      http.get(`${API_BASE}/registers/warehouse/records/:id`, ({ params }) => HttpResponse.json({ id: params.id, register_key: 'warehouse', state: 'entry', version: 3, data: { doc_no: 'DN-2026-0101', doc_date: '2026-10-20' } })),
+      http.patch(`${API_BASE}/registers/warehouse/records/:id`, async ({ request, params }) => { patched = { ifMatch: request.headers.get('if-match'), body: await request.json() }; return HttpResponse.json({ id: params.id, register_key: 'warehouse', state: 'entry', version: 4, data: {} }); }),
+    );
+    show('/warehouse');
+    const u = userEvent.setup();
+    await u.click(await screen.findByTestId('wh-tab-movements'));
+    expect(await screen.findByTestId('wh-mv-lock-DN-2026-0099')).toHaveTextContent(/reversal/i);
+    expect(screen.queryByTestId('wh-mv-edit-open-DN-2026-0099')).not.toBeInTheDocument();
+    await u.click(await screen.findByTestId('wh-mv-edit-open-DN-2026-0101'));
+    const panel = await screen.findByTestId('wh-mv-edit');
+    expect(panel.closest('tr')).not.toBeNull();   // in the table, not a modal
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('wh-mv-edit-reason')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId('wh-mv-edit-submit')).toBeDisabled());
+    await u.type(screen.getByTestId('wh-mv-edit-remark'), 'checked at the gate');
+    await waitFor(() => expect(screen.getByTestId('wh-mv-edit-submit')).toBeEnabled());
+    await u.click(screen.getByTestId('wh-mv-edit-submit'));
+    await waitFor(() => expect(screen.queryByTestId('wh-mv-edit')).not.toBeInTheDocument());
+    expect(patched).toMatchObject({ body: { data: { remark: 'checked at the gate' } } });
+  });
+
+  it('reverses a posted delivery note with a counterpart return note through POST /warehouse/movements', async () => {
+    await signIn('pm');
+    let posted: { body: { record_type: string; reason: string; lines: unknown[] } } | null = null;
+    const l = { item_id: '11111111-1111-4111-8111-111111111111', item_code: 'ANT-900', qty: 4 };
+    const dn = { id: 'c1', doc_no: 'DN-2026-0500', record_type: 'te_dn', kind: 'issue', status: 'posted', site_id: '22222222-2222-4222-8222-222222222222', site_code: 'TRP-001', register_record_id: 'e1', lines: [l], version: 1, doc_no_locked: true, reserved: false, created_at: '2026-10-20T08:00:00Z' };
+    server.use(
+      http.get(`${API_BASE}/warehouse/movements`, () => HttpResponse.json({ items: [dn], next_cursor: null })),
+      http.post(`${API_BASE}/warehouse/movements`, async ({ request }) => { posted = { body: (await request.json()) as never }; return HttpResponse.json({ ...dn, id: 'c2', doc_no: 'RN-2026-0501', record_type: 'te_rn', status: 'pending' }); }),
+    );
+    show('/warehouse');
+    const u = userEvent.setup();
+    await u.click(await screen.findByTestId('wh-tab-movements'));
+    await u.click(await screen.findByTestId('wh-mv-reverse-open-DN-2026-0500'));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByTestId('wh-mv-reverse-lines')).toHaveTextContent('ANT-900');
+    await u.click(screen.getByTestId('wh-mv-reverse-submit'));
+    expect(await screen.findByTestId('wh-mv-reverse-reason-error')).toBeInTheDocument();
+    await u.type(screen.getByTestId('wh-mv-reverse-reason'), 'Wrong site');
+    await u.click(screen.getByTestId('wh-mv-reverse-submit'));
+    await waitFor(() => expect(screen.queryByTestId('wh-mv-reverse')).not.toBeInTheDocument());
+    expect(posted).toMatchObject({ body: { record_type: 'te_rn', reason: 'Wrong site', lines: [{ qty: 4 }] } });
+  });
 
   it('shows the lock of a posted Doc No. (Q106)', async () => {
     await signIn('pm');

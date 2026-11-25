@@ -120,7 +120,7 @@ function Edit({ id, onClose }: { id: string | null; onClose: () => void }) {
     else save.mutate({ id, version: item.data!.etag, patch: { ...r.body, reason } as never }, { onSuccess: () => { toast(t('settings.audited')); onClose(); } });
   };
   return (
-    <FormDialog open onClose={onClose} testid="doc-dialog" title={id ? t('docs.lib.edit', { code: cur.code }) : t('docs.lib.new')} wide busy={save.isPending || create.isPending}
+    <FormDialog inline open onClose={onClose} testid="doc-dialog" title={id ? t('docs.lib.edit', { code: cur.code }) : t('docs.lib.new')} wide busy={save.isPending || create.isPending}
       error={err ? errText(err, t) : null} disabled={!cur.name_en.trim() || (!id && !cur.code)} onSubmit={submit}>
       <p className="text-sm text-mute">{t('docs.lib.draft_note')}</p>
       <DocForm d={cur} setD={setD} create={!id} errs={errs} />
@@ -146,7 +146,7 @@ function Publish({ id, onClose }: { id: string; onClose: () => void }) {
   if (!item.data) return null;
   const d = item.data.doc;
   return (
-    <FormDialog open onClose={onClose} testid="doc-publish-dialog" title={t('docs.lib.publish_title', { code: d.code })} busy={pub.isPending} error={pub.isError ? errText(pub.error, t) : null}
+    <FormDialog inline open onClose={onClose} testid="doc-publish-dialog" title={t('docs.lib.publish_title', { code: d.code })} busy={pub.isPending} error={pub.isError ? errText(pub.error, t) : null}
       submitLabel={t('docs.lib.publish')} onSubmit={(reason) => pub.mutate({ id, version: item.data!.etag, reason, effective_from: from, apply_to: apply }, { onSuccess: (r) => { toast(t('docs.lib.published', { version: r.published_version, count: r.affected_open_tasks })); onClose(); } })}>
       <p className="text-sm text-mute">{t('docs.lib.publish_help')}</p>
       <fieldset className="space-y-1 text-sm">
@@ -162,7 +162,7 @@ function Versions({ id, onClose }: { id: string; onClose: () => void }) {
   const { t } = useTranslation();
   const v = useLibraryVersions(id);
   return (
-    <FormDialog open onClose={onClose} testid="doc-versions-dialog" title={t('docs.lib.versions')} withReason={false} submitLabel={t('common.close')} onSubmit={onClose}>
+    <FormDialog inline open onClose={onClose} testid="doc-versions-dialog" title={t('docs.lib.versions')} withReason={false} submitLabel={t('common.close')} onSubmit={onClose}>
       <ol className="space-y-2 text-sm" data-testid="doc-versions">
         {v.data?.map((x) => (
           <li key={x.version_no} className="rounded-md border border-line p-2">

@@ -7,7 +7,7 @@ import { actor, makeSite, Site } from './wf-helpers';
 
 /**
  * W8 (contract 0.15.68): the search box reads a pasted list of Site IDs on the server (items 5) and the lists answer the total and the filtered
- * counts (item 6), on GET /sites and GET /site360/{menu}/rows. Region scope: a site of another region is never counted, never returned and is
+ * counts (item 6), on GET /sites and GET /site-master/{menu}/rows. Region scope: a site of another region is never counted, never returned and is
  * reported as not found.
  */
 const PREFIX = `W8S${randomBytes(3).toString('hex').toUpperCase()}`;
@@ -73,21 +73,21 @@ describe('W8: pasted-list search and counts', () => {
     const bad = await me.api.call('get', `/sites?q=${encodeURIComponent(codes(1001))}`);
     expect(bad.status).toBe(422);
     expect(bad.body.errors[0]).toMatchObject({ path: '/q', code: 'too_many_codes' });
-    const bad2 = await me.api.call('get', `/site360/master/rows?q=${encodeURIComponent(codes(1001))}`);
+    const bad2 = await me.api.call('get', `/site-master/master/rows?q=${encodeURIComponent(codes(1001))}`);
     expect(bad2.status).toBe(422);
     const ok = await me.api.call('get', `/sites?q=${encodeURIComponent(codes(1000))}`);
     expect(ok.status).toBe(200);
     expect(ok.body.search.pasted).toBe(1000);
   });
 
-  it('GET /site360/{menu}/rows: the same pasted list, counts and not-found list, region scope kept', async () => {
+  it('GET /site-master/{menu}/rows: the same pasted list, counts and not-found list, region scope kept', async () => {
     const a1 = await site();
     const a2 = await site();
     const away = await site(OTHER);
     const me = await actor(app, db, { regions: [REGION] });
     const q = encodeURIComponent(`${a1.code} ${a2.code.toLowerCase()} ${away.code}`);
     for (const menu of ['master', 'cw']) {
-      const res = await me.api.call('get', `/site360/${menu}/rows?limit=200&q=${q}`);
+      const res = await me.api.call('get', `/site-master/${menu}/rows?limit=200&q=${q}`);
       expect(res.status, menu).toBe(200);
       expect(rowCodes(res.body)).toEqual([a1.code, a2.code].sort());
       expect(res.body.filtered).toBe(2);
@@ -95,12 +95,12 @@ describe('W8: pasted-list search and counts', () => {
       expect(res.body.rows.map((r: { row_no: number }) => r.row_no)).toEqual([1, 2]);
     }
     // one token: contains on the code and the name
-    const one = await me.api.call('get', `/site360/master/rows?limit=200&q=${encodeURIComponent(a1.code.toLowerCase())}`);
+    const one = await me.api.call('get', `/site-master/master/rows?limit=200&q=${encodeURIComponent(a1.code.toLowerCase())}`);
     expect(rowCodes(one.body)).toEqual([a1.code]);
     expect(one.body.search).toBeUndefined();
     // a caller of the other region sees only that site
     const other = await actor(app, db, { regions: [OTHER] });
-    const res = await other.api.call('get', `/site360/master/rows?limit=200&q=${q}`);
+    const res = await other.api.call('get', `/site-master/master/rows?limit=200&q=${q}`);
     expect(rowCodes(res.body)).toEqual([away.code]);
     expect(res.body.search.not_found.sort()).toEqual([a1.code, a2.code].sort());
   });

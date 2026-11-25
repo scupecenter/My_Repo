@@ -66,7 +66,7 @@ describe('Site Register: New site, Download template, Upload', () => {
     renderApp(<Routed />, { route: '/sites?layout=list' });
     const u = userEvent.setup();
     await u.click(await screen.findByTestId('sites-template-download'));
-    await waitFor(() => expect(screen.getAllByTestId('toast').at(-1)).toHaveTextContent('TPL-SITE-NEW'));
+    await waitFor(() => expect(screen.getAllByTestId('toast').at(-1)).toHaveTextContent('TPL-NEW-SITES'));
   });
 });
 
@@ -169,7 +169,7 @@ describe('New sites: the template and the L2 review of the batch', () => {
     await u.click(screen.getByTestId('batch-submit'));
     await waitFor(() => expect(screen.getByTestId('batch-status')).toHaveTextContent('In approval'));
     const id = (await api.get<Page<ImportBatch>>('/import-batches', { query: { status: 'in_approval' } })).items[0]!.id;
-    expect((await api.get<Page<ImportBatch>>('/import-batches')).items.find((b) => b.id === id)).toMatchObject({ entity: 'site', template_id: 'TPL-SITE-NEW' });
+    expect((await api.get<Page<ImportBatch>>('/import-batches')).items.find((b) => b.id === id)).toMatchObject({ entity: 'site', template_id: 'TPL-NEW-SITES' });
 
     await signIn('pm');
     view.unmount();
@@ -217,7 +217,7 @@ describe('New sites: the template and the L2 review of the batch', () => {
     await signIn('pm');
     const { TemplatesPage } = await import('./Templates');
     renderApp(<TemplatesPage />, { route: '/templates' });
-    expect(await screen.findByTestId('tpl-row-TPL-SITE-NEW')).toBeInTheDocument();
-    expect(screen.getByTestId('tpl-kind-TPL-SITE-NEW')).toHaveTextContent('New sites');
+    expect(await screen.findByTestId('tpl-row-TPL-NEW-SITES')).toBeInTheDocument();
+    expect(screen.getByTestId('tpl-kind-TPL-NEW-SITES')).toHaveTextContent('New sites');
   });
 });

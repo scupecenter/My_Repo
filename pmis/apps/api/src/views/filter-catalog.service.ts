@@ -3,8 +3,8 @@ import { Prisma } from '@prisma/client';
 import { AccessService } from '../access/access.service';
 import { problems } from '../common/problem';
 import { DbService } from '../db/db.service';
-import { COLUMNS_SQL } from '../site360/site360-columns-sql';
-import { buildMenu, SITE360_MENUS, type Site360ColumnRow, type Site360Menu } from '../site360/site360-sections';
+import { COLUMNS_SQL } from '../site-master/site-master-columns-sql';
+import { buildMenu, SITE_MASTER_MENUS, type SiteMasterColumnRow, type SiteMasterMenu } from '../site-master/site-master-sections';
 import {
   compileFilter,
   FilterCatalog,
@@ -24,10 +24,10 @@ import {
  * F3 (contract 0.15.31): the whitelist of filter fields of each list screen, and the one entry point the lists use to compile a filter tree.
  *
  * Built-in fields are constants of this file with fixed SQL over the aliases of each list query:
- *   - sites, sites-stream: `s` = sites (GET /sites, GET /site360/{menu}/rows);
+ *   - sites, sites-stream: `s` = sites (GET /sites, GET /site-master/{menu}/rows);
  *   - dashboard (0.15.45): the same fields as `sites`; the dashboard endpoints narrow their site set with it;
- *   - site360-<menu> (0.15.45): the `sites` fields plus the Master columns of the menu (`m:<ord>`, the value of site360_master_values; one derived table per
- *     column used, joined by GET /site360/{menu}/rows);
+ *   - site-master-<menu> (0.15.45): the `sites` fields plus the Master columns of the menu (`m:<ord>`, the value of site_master_values; one derived table per
+ *     column used, joined by GET /site-master/{menu}/rows);
  *   - site-tasks, tasks-board: `t` = task_instances, `td` = task_definitions, `st` = stage_definitions, `s` = sites (GET /sites/{id}/tasks; F5 GET /boards/tasks);
  *   - register-<key>: `r` = register_records, `s` = sites (GET /registers/{key}/records).
  * Data-defined fields come from the configuration: `f:<code>` the active fields of a register (its own and its custom fields), `c:<code>` the
@@ -118,7 +118,7 @@ type OptionWant =
 
 /** Master columns whose value is already a field of `sites` (same value, same label): the sites field is offered, not a second copy. */
 const MASTER_ORD_IS_SITE_FIELD = new Set([2, 4, 5, 6, 7, 10, 11, 13, 14, 15, 16, 17, 19, 20, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 180, 181, 182]);
-/** Master columns whose value is read from a register through a branch of site360_master_values that has no row in task_field_sources (migration 0133). */
+/** Master columns whose value is read from a register through a branch of site_master_values that has no row in task_field_sources (migration 0133). */
 const VIEW_REGISTER_ORDS: Record<number, string> = {
   18: 'as_built',
   104: 'as_built',
@@ -144,13 +144,13 @@ const VIEW_REGISTER_ORDS: Record<number, string> = {
   186: 'issues',
   187: 'issues',
 };
-const SITE360_MENU_KEYS: readonly string[] = SITE360_MENUS.map((m) => m.key);
-/** The menu of a `site360-<menu>` screen, or null. */
-const site360Menu = (screen: string): Site360Menu | null => {
-  const m = /^site360-([a-z_]{2,20})$/.exec(screen)?.[1];
-  return m && SITE360_MENU_KEYS.includes(m) ? (m as Site360Menu) : null;
+const SITE_MASTER_MENU_KEYS: readonly string[] = SITE_MASTER_MENUS.map((m) => m.key);
+/** The menu of a `site-master-<menu>` screen, or null. */
+const siteMasterMenu = (screen: string): SiteMasterMenu | null => {
+  const m = /^site-master-([a-z_]{2,20})$/.exec(screen)?.[1];
+  return m && SITE_MASTER_MENU_KEYS.includes(m) ? (m as SiteMasterMenu) : null;
 };
-const isSitesLike = (screen: string): boolean => screen === 'sites' || screen === 'sites-stream' || screen === 'dashboard' || site360Menu(screen) !== null;
+const isSitesLike = (screen: string): boolean => screen === 'sites' || screen === 'sites-stream' || screen === 'dashboard' || siteMasterMenu(screen) !== null;
 
 /** A register or custom field type, as the builder offers it. */
 function typeOf(t: string | null): FilterFieldType | null {
@@ -190,7 +190,7 @@ function typed(text: Prisma.Sql, t: FilterFieldType): Prisma.Sql {
   return text;
 }
 
-export type FilterScreen = 'sites' | 'dashboard' | 'site-tasks' | 'tasks-board' | 'library-archive' | `register-${string}` | `site360-${string}`;
+export type FilterScreen = 'sites' | 'dashboard' | 'site-tasks' | 'tasks-board' | 'library-archive' | `register-${string}` | `site-master-${string}`;
 
 @Injectable()
 export class FilterCatalogService {
@@ -210,7 +210,7 @@ export class FilterCatalogService {
    */
   static modulesOf(screen: string): string[] | null {
     if (screen === 'dashboard') return ['dashboard', 'sites'];
-    return site360Menu(screen) ? ['sites'] : null;
+    return siteMasterMenu(screen) ? ['sites'] : null;
   }
 
   private async regionOptions() {
@@ -317,15 +317,15 @@ export class FilterCatalogService {
   }
 
   /**
-   * The fields of a site360-<menu> screen: the `sites` fields and the Master columns of the menu (the same columns, the same order and the same type
+   * The fields of a site-master-<menu> screen: the `sites` fields and the Master columns of the menu (the same columns, the same order and the same type
    * as the grid; a column the caller cannot see is left out). A Master column that is already a `sites` field is not offered twice.
    */
-  private async site360(menu: Site360Menu): Promise<Built> {
+  private async siteMasterFields(menu: SiteMasterMenu): Promise<Built> {
     const built = await this.sites();
-    const rows = await this.db.tx.$queryRaw<Site360ColumnRow[]>(Prisma.sql`${COLUMNS_SQL} WHERE mc.is_active ORDER BY mc.display_order`);
+    const rows = await this.db.tx.$queryRaw<SiteMasterColumnRow[]>(Prisma.sql`${COLUMNS_SQL} WHERE mc.is_active ORDER BY mc.display_order`);
     const cols = buildMenu(menu, rows).columns.filter((c) => c.ord > 1 && !MASTER_ORD_IS_SITE_FIELD.has(c.ord) && c.source_kind !== 'not_tracked' && Number.isInteger(c.ord));
     if (!cols.length) return built;
-    const vis = await this.site360Visibility();
+    const vis = await this.siteMasterVisibility();
     const visibleKeys = [...vis.visible];
     const listOrds = cols.filter((c) => c.value_type === 'list').map((c) => c.ord);
     const fixed = new Map<number, string[]>();
@@ -343,7 +343,7 @@ export class FilterCatalogService {
       if (type === 'list' && !c.list_catalogue && !fixed.get(c.ord)) type = 'text'; // a list column with no list defined yet has no values to offer
       const alias = Prisma.raw(`fmv${c.ord}`);
       const key = `m:${c.ord}`;
-      const join = Prisma.sql`LEFT JOIN (SELECT v.site_id, min(v.value) AS value FROM site360_master_values v
+      const join = Prisma.sql`LEFT JOIN (SELECT v.site_id, min(v.value) AS value FROM site_master_values v
         WHERE v.ord = ${c.ord}::int AND (v.register_key IS NULL OR v.register_key = ANY(${visibleKeys}::text[])) GROUP BY v.site_id) ${alias} ON ${alias}.site_id = s.id`;
       const raw = Prisma.sql`${alias}.value`;
       const group = groupOf(c.group_top, G.fields);
@@ -371,7 +371,7 @@ export class FilterCatalogService {
   }
 
   /** The registers the caller may view, the Master columns filled by a site custom field the caller may not see, and the register of each register-owned column. */
-  private async site360Visibility(): Promise<{
+  private async siteMasterVisibility(): Promise<{
     visible: Set<string>;
     hiddenOrds: Set<number>;
     registerOf: Map<number, string>;
@@ -666,9 +666,9 @@ export class FilterCatalogService {
         },
       ]);
     }
-    const menu = site360Menu(screen);
+    const menu = siteMasterMenu(screen);
     const built = menu
-      ? await this.site360(menu)
+      ? await this.siteMasterFields(menu)
       : isSitesLike(screen)
         ? await this.sites()
         : screen === 'site-tasks' || screen === 'tasks-board'
@@ -796,7 +796,7 @@ export class FilterCatalogService {
     return (await this.compile(screen, q)).where;
   }
 
-  /** Like fromQuery, with the JOINs the compiled condition needs (site360-<menu>: one derived table per Master column used); the list adds them to its FROM clause. */
+  /** Like fromQuery, with the JOINs the compiled condition needs (site-master-<menu>: one derived table per Master column used); the list adds them to its FROM clause. */
   async compile(screen: FilterScreen, q: Record<string, unknown>): Promise<{ where: Prisma.Sql | null; joins: Prisma.Sql }> {
     const tree: FilterGroup | null = parseFilterParam(q.filter);
     if (!tree || tree.items.length === 0) return { where: null, joins: Prisma.empty };
@@ -832,7 +832,7 @@ interface Built {
 }
 
 /** The filter type of a Master column (0.15.45): the effective type of the column; a column with no type of its own that holds dates is a date. */
-function masterType(c: Site360ColumnRow & { group_top: string | null }): FilterFieldType | 'list' {
+function masterType(c: SiteMasterColumnRow & { group_top: string | null }): FilterFieldType | 'list' {
   switch (c.value_type) {
     case 'date':
       return 'date';

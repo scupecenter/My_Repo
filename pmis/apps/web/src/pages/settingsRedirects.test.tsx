@@ -16,29 +16,38 @@ describe('F19: Settings tabs and old routes', () => {
   beforeEach(async () => { await signIn('pm'); });
 
   it('has the 11 one-word tabs of the plan plus the F20 dashboard tab', () => {
-    expect(SETTINGS_TABS.map((t) => t.key)).toEqual(['calendar', 'workflow', 'sla', 'weights', 'registers', 'ddl', 'documents', 'data', 'alerts', 'security', 'dashboard', 'display', 'identity', 'my-work']); // 0148 (W8): Display; 0149 (W7): Settings > My Work > Daily Plan
+    expect(SETTINGS_TABS.map((t) => t.key)).toEqual(['sla', 'workflow', 'registers', 'documents', 'data', 'alerts', 'security', 'screens', 'identity']); // Settings merge 2026-11-25: 14 tabs became 9
   });
 
   it.each([
     ['freeze', '/admin/settings/workflow/freeze'],
     ['idle', '/admin/settings/workflow/idle'],
-    ['dlp', '/admin/settings/sla/dlp'],
-    ['notifications', '/admin/settings/alerts'],
+    ['dlp', '/admin/settings/security/dlp'],
+    ['notifications', '/admin/settings/alerts/policy'],
+    ['alerts', '/admin/settings/alerts/policy'],
+    ['ddl', '/admin/settings/registers/lists'],
+    ['weights', '/admin/settings/sla/weights'],
+    ['dashboard', '/admin/settings/screens/dashboard'],
+    ['display', '/admin/settings/screens/tables'],
+    ['my-work', '/admin/settings/screens/daily-plan'],
+    ['my-work/daily-plan', '/admin/settings/screens/daily-plan'],
+    ['sla/dlp', '/admin/settings/security/dlp'],
+    ['documents/mail', '/admin/settings/alerts/mail'],
     ['retention', '/admin/settings/security/retention'],
     ['staff-visibility', '/admin/settings/security/staff'],
     ['team-scope', '/admin/settings/registers/team-scope'],
     ['contractor-rules', '/admin/settings/registers/contractors'],
     ['gecol-order', '/admin/settings/registers/gecol'],
     ['register-columns', '/admin/settings/registers/columns'],
-    ['lists', '/admin/settings/ddl'],
-    ['mail-kinds', '/admin/settings/documents/mail'],
+    ['lists', '/admin/settings/registers/lists'],
+    ['mail-kinds', '/admin/settings/alerts/mail'],
     ['imports', '/admin/settings/data/imports'],
     ['historical-waiver', '/admin/settings/data/historical'],
     ['sla', '/admin/settings/sla/rules'],
     ['workflow', '/admin/settings/workflow/editor'],
     ['documents', '/admin/settings/documents/types'],
     ['documents/library', '/admin/settings/documents/types'],
-    ['calendar', '/admin/settings/calendar'],
+    ['calendar', '/admin/settings/sla/calendar'],
     ['site360', '/admin/settings/workflow/columns'],
     ['site360-columns', '/admin/settings/workflow/columns'],
   ])('old /admin/settings/%s opens %s', async (old, target) => {
@@ -68,13 +77,13 @@ describe('F19: Settings tabs and old routes', () => {
     expect(screen.getByTestId('settings-tab-registers')).toHaveClass('btn-accent');
   });
 
-  it('W3: no Site360 tab; the old Site360 routes open Workflow > Columns', async () => {
+  it('W3: no SiteMaster tab; the old SiteMaster routes open Workflow > Columns', async () => {
     at('/admin/settings/site360-columns');
-    expect(await screen.findByTestId('site360-columns')).toBeInTheDocument();
+    expect(await screen.findByTestId('site-master-columns')).toBeInTheDocument();
     expect(screen.queryByTestId('settings-tab-site360')).toBeNull();
     expect(screen.getByTestId('settings-tab-workflow')).toHaveClass('btn-accent');
     expect(screen.getByTestId('settings-section-workflow-columns')).toHaveClass('btn-accent');
-    expect(screen.getByTestId('page-settings')).not.toHaveTextContent(/Site360|SITE 360/);
+    expect(screen.getByTestId('page-settings')).not.toHaveTextContent(/SiteMaster|SITE 360|Site 360/);
   });
 
   it('the Workflow tab still opens the editor first', async () => {

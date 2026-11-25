@@ -5,7 +5,7 @@ import { OoxmlWorkbook, SheetCell } from './ooxml-reader';
 /**
  * Migration 0093 (owner decision 2026-11-12, "Everything from the one file"; CHANGELOG 135): the register sheets of the owner's Site Master (RF & Design,
  * Acquisition, Permission Log, PR-PO, GECOL, HLC, As-Built, Risk Register), read from the file stored with the import run and mapped onto the columns of the
- * register templates GSDN Workspace issues (TPL-RF ... TPL-RSK).
+ * register templates GSDN Workspace issues (TPL-RF ... TPL-RISKS).
  *
  * The mapping is data, one source of truth: `register-maps/` beside this file (index.csv and one CSV per register), the same files the offline helper
  * `tools/master-import/fill-templates.py` reads. The normalisation is the helper's, mechanical only: spaces, Site IDs trimmed and upper-cased, dates typed

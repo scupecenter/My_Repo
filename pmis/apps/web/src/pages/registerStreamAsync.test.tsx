@@ -34,7 +34,7 @@ afterEach(() => { Object.assign(BATCH_POLL, SAVED); Object.assign(RUN_POLL, SAVE
 const ID = '0b3c9f3e-0000-4000-8000-0000000000cc';
 const T0 = '2026-11-05T08:00:00.000Z';
 const batch = (over: Partial<ImportBatch> = {}): ImportBatch => ({
-  id: ID, template_id: 'TPL-ISS', template_version: 1, source: 'template', file_name: 'issues.xlsx', status: 'processing', current_level: 2, levels_required: 2, register_key: 'issues',
+  id: ID, template_id: 'TPL-ISSUES', template_version: 1, source: 'template', file_name: 'issues.xlsx', status: 'processing', current_level: 2, levels_required: 2, register_key: 'issues',
   note: null, counts: { create: 120, update: 0, unchanged: 0, error: 0, pending: 70, approved: 50, rejected: 0, held: 0 }, job_id: null, task_id: null, site_id: null,
   progress: { job_id: 'j2', kind: 'decide', action: 'approve', batch_kind: 'register', state: 'running', rows_total: 120, rows_done: 50, percent: 41, submitted: 0, approved: 50, decided: 50,
     rejected: 0, held: 0, saved: 0, failed: 0, started_at: T0, updated_at: T0, finished_at: null, error: null },
@@ -69,7 +69,7 @@ describe('a big register or stream batch in the background', () => {
 
   it('a stream send in Arabic: the tasks submitted, Western digits, right to left; a return of rows says the tasks decided', async () => {
     await signIn('pm');
-    const stream = (over: Partial<ImportBatch['progress']> = {}) => batch({ template_id: 'TPL-SITE-CW', register_key: null, stream: 'CW', file_name: 'cw.xlsx',
+    const stream = (over: Partial<ImportBatch['progress']> = {}) => batch({ template_id: 'TPL-CIVIL', register_key: null, stream: 'CW', file_name: 'cw.xlsx',
       counts: { create: 0, update: 60, unchanged: 0, error: 0, pending: 60, approved: 0, rejected: 0, held: 0 },
       progress: { ...batch().progress!, kind: 'submit', action: null, batch_kind: 'stream', rows_total: 60, rows_done: 25, percent: 41, submitted: 25, approved: 0, decided: 0, ...over } });
     let body = stream();

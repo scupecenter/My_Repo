@@ -132,7 +132,7 @@ export interface UploadWarning {
 
 const OWNER_TEXT: Record<string, string> = {
   calc: 'calculated by GSDN Workspace', identity: 'owned by the RF & Design register', scope: 'owned by the site scope (Change Control)', baseline: 'owned by the Baseline',
-  dismantle: 'owned by the Dismantle register (TPL-DIS)', issues: 'owned by the Issue Log (TPL-ISS)', row: 'a row number',
+  dismantle: 'owned by the Dismantle register (TPL-DISMANTLE)', issues: 'owned by the Issue Log (TPL-ISSUES)', row: 'a row number',
 };
 
 const sha256 = (b: Buffer | string): string => createHash('sha256').update(b).digest('hex');
@@ -215,6 +215,15 @@ export class ImportService {
 
     // 2. known and active template, current version
     const current = await this.templates.current(templateId);
+    if (!current) {
+      // 0156: a file made before the IDs followed the section names carries the old ID: it is an outdated version, and the answer names the new template
+      const renamed = await this.templates.byPreviousId(templateId);
+      if (renamed) {
+        return this.reject(auth, requestId, 'outdated_version',
+          `This file was made from the template ${templateId}, which is now ${renamed.template_id} (${renamed.name}). Download ${renamed.template_id} again and fill it.`,
+          { ...ctx, renamed_to: renamed.template_id, current_version: renamed.current_version });
+      }
+    }
     if (!current || !current.is_active) return this.reject(auth, requestId, 'template_unknown_or_inactive', `The template ${templateId} does not exist or is no longer in use.`, ctx);
     const issued = await this.templates.version(templateId, version);
     if (!issued) return this.reject(auth, requestId, 'tpl_invalid', `This file names version ${version} of ${templateId}, which was never issued.`, ctx);

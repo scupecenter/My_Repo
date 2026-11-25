@@ -280,7 +280,7 @@ describe('Q12 and Q111: Meetings with structured fields', () => {
   it('round-trips the new types through the approved template (multi values separated by ";")', async () => {
     const t = await meetingsTeam();
     const site = await makeSite(db, R, { prefix: 'P5T' });
-    const dl = await downloadTemplate(t.entry.api, 'TPL-MTG');
+    const dl = await downloadTemplate(t.entry.api, 'TPL-MEETINGS');
     expect(dl.status).toBe(200);
     const ws = (await load(dl.buffer)).getWorksheet('Data')!;
     const headers = ws.getRow(1).values as string[];
@@ -294,7 +294,7 @@ describe('Q12 and Q111: Meetings with structured fields', () => {
     const rec = await q<{ data: Record<string, unknown> }>(db, `SELECT data FROM register_records WHERE register_key = 'meetings' AND data ->> 'title' = $1`, [title]);
     expect(rec[0]!.data).toMatchObject({ attendee_users: [t.entry.user.id, t.approve.user.id], linked_site_ids: [site.id] });
     // the pre-filled copy shows the codes a person types
-    const pre = await downloadTemplate(t.entry.api, 'TPL-MTG', '?prefill=true');
+    const pre = await downloadTemplate(t.entry.api, 'TPL-MEETINGS', '?prefill=true');
     const pws = (await load(pre.buffer)).getWorksheet('Data')!;
     const head = pws.getRow(1).values as string[];
     let found = false;
@@ -333,7 +333,7 @@ describe('Q12 and Q111: Meetings with structured fields', () => {
     const viewer = await actor(app, db, { level: 'view', grants: G('meetings', 'view'), regions: [R], modules: null });
     expect((await viewer.api.call('post', recPath('meetings'), { data: { ...base, title: `P5V ${U}`, external_attendees: 'GECOL' } })).status).toBe(403);
     // the approved template has a column for it and reads it
-    const dl = await downloadTemplate(t.entry.api, 'TPL-MTG');
+    const dl = await downloadTemplate(t.entry.api, 'TPL-MEETINGS');
     expect((await load(dl.buffer)).getWorksheet('Data')!.getRow(1).values as string[]).toEqual(expect.arrayContaining(['Attendees', 'External attendees']));
     const title = `P5T ${U}`;
     const up = await uploadFile(t.entry.api, await fillTemplate(dl.buffer, [{ Date: day('2026-02-05'), Title: title, 'External attendees': 'HLC fiber lead; GECOL' }]));

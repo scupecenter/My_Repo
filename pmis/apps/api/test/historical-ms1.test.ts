@@ -291,7 +291,7 @@ describe('0124: A3 from the Acquisition sheet of the historical load (Master T)'
     const admin = await plainAdmin(app, db);
     const s = await stage1('HLK', { A2: ['approved', '2026-01-08'], A4: ['approved', '2026-01-12'], A5: ['approved', '2026-01-14'] });
     const d = await stage1('HLX', { A2: ['approved', '2026-01-08'], A4: ['approved', '2026-01-12'], A5: ['approved', '2026-01-14'] });
-    const tv = (await q<{ id: string }>(db, `SELECT v.id::text AS id FROM template_versions v JOIN template_definitions dd ON dd.id = v.template_def_id WHERE dd.template_id = 'TPL-ACQ' AND v.is_current`))[0]!.id;
+    const tv = (await q<{ id: string }>(db, `SELECT v.id::text AS id FROM template_versions v JOIN template_definitions dd ON dd.id = v.template_def_id WHERE dd.template_id = 'TPL-ACQUISITION' AND v.is_current`))[0]!.id;
     const batch = async (st: string, site: Site, date: string) => {
       const b = (await q<{ id: string }>(db, `INSERT INTO import_batches (template_version_id, source, file_name, file_sha256, status, uploaded_by, register_key, mode,
           historical_load, historical_cutoff, historical_reason, historical_marked_by, historical_marked_at, historical_direct_approve, closed_at)

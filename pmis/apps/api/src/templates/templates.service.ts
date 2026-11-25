@@ -7,6 +7,7 @@ import { ProblemException, problems } from '../common/problem';
 import { boolParam, oneParam } from '../common/query';
 import { uuidSchema } from '../common/zod';
 import { DbService } from '../db/db.service';
+import { SitesService } from '../sites/sites.service';
 
 /** One column of a template (the JSON that tpl_columns() stores with every version). */
 export interface TplColumn {
@@ -87,6 +88,8 @@ export const LISTS_SHEET = '_lists';
 /** Rows below the pre-filled ones that are formatted and validated for typing. */
 const BLANK_ROWS = 300;
 const MAX_PREFILL_ROWS = 5000;
+/** The most sites a filter-based pre-fill reads (one row per site in a stream template). */
+const MAX_PREFILL_SITES = 5000;
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 const isoToDate = (s: string): Date => new Date(`${s}T00:00:00.000Z`);
@@ -101,6 +104,7 @@ export class TemplatesService {
   constructor(
     private readonly db: DbService,
     private readonly access: AccessService,
+    private readonly sitesSvc: SitesService,
   ) {}
 
   /** The current version of a template (active ones only). */
@@ -110,6 +114,13 @@ export class TemplatesService {
         v.field_set_version, v.columns, v.header_checksum, v.field_set_hash, d.custom_entity
       FROM template_definitions d JOIN template_versions v ON v.template_def_id = d.id AND v.is_current
       WHERE d.template_id = ${templateId}`);
+    return rows[0] ?? null;
+  }
+
+  /** 0156: the template that an old ID (from before the rename) stands for, active ones only. */
+  async byPreviousId(oldId: string): Promise<{ template_id: string; name: string; current_version: number } | null> {
+    const rows = await this.db.tx.$queryRaw<{ template_id: string; name: string; current_version: number }[]>(Prisma.sql`
+      SELECT template_id, name, current_version FROM template_definitions WHERE ${oldId}::text = ANY(previous_ids) AND is_active`);
     return rows[0] ?? null;
   }
 
@@ -235,7 +246,7 @@ export class TemplatesService {
   }
 
   /**
-   * TPL-SITE-NEW (0.14.0, Q460): one row per new site, empty (a new site has nothing to pre-fill). The columns are the identity and scope of a site; there is no landlord,
+   * TPL-NEW-SITES (0.14.0, Q460): one row per new site, empty (a new site has nothing to pre-fill). The columns are the identity and scope of a site; there is no landlord,
    * contact, phone or e-mail column (Q469). The upload becomes a batch whose rows are site drafts for L2.
    */
   private async downloadNewSites(auth: AuthContext, t: TemplateRow): Promise<{ buffer: Buffer; fileName: string }> {
@@ -269,6 +280,27 @@ export class TemplatesService {
     await this.db.tx.$queryRaw(Prisma.sql`SELECT log_audit_write('template_download', 'template', ${t.template_id}::text, NULL,
         ${JSON.stringify({ version: t.current_version, prefill: false, rows: 0, kind: t.kind })}::jsonb, NULL)`);
     return { buffer, fileName: `${t.template_id}_v${t.current_version}_${issuedAt.toISOString().slice(0, 10)}.xlsx` };
+  }
+
+  /** The ids of the sites the Sites list shows for these filters (JSON object of the list's query), at most MAX_PREFILL_SITES. */
+  private async siteIdsFromFilters(auth: AuthContext, raw: string): Promise<string[]> {
+    let parsed: unknown;
+    try { parsed = JSON.parse(raw); } catch { throw problems.validation([{ path: '/filters', code: 'invalid', message: 'filters is a JSON object.' }]); }
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw problems.validation([{ path: '/filters', code: 'invalid', message: 'filters is a JSON object.' }]);
+    const base: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
+      if (['limit', 'cursor', 'offset'].includes(k) || v === null || v === undefined || v === '') continue;
+      base[k] = Array.isArray(v) ? v.map(String).join(',') : typeof v === 'object' ? JSON.stringify(v) : String(v);
+    }
+    const ids: string[] = [];
+    let cursor: string | null = null;
+    for (;;) {
+      const r = (await this.sitesSvc.list(auth, { ...base, limit: '200', ...(cursor ? { cursor } : {}) })) as { items: { id: string }[]; page: { next_cursor: string | null } };
+      for (const it of r.items) if (typeof it.id === 'string') ids.push(it.id);
+      cursor = r.page.next_cursor;
+      if (!cursor || ids.length >= MAX_PREFILL_SITES) break;
+    }
+    return ids.slice(0, MAX_PREFILL_SITES);
   }
 
   private siteIds(q: Record<string, unknown>): string[] {
@@ -348,7 +380,7 @@ export class TemplatesService {
 
   // ------------------------------------------------------------------ Site Register stream templates and TPL-MASTER
   /**
-   * TPL-SITE-DA, -CW, -TE, -CL (Q73) and TPL-MASTER: one row per site, the task fields of the stream (or of the whole Master) in Master column order.
+   * TPL-DESIGN-ACQ, -CW, -TE, -CL (Q73) and TPL-MASTER: one row per site, the task fields of the stream (or of the whole Master) in Master column order.
    * Calculated columns, the dates the workflow sets itself and the fields another register owns are grey and locked: they are shown, never read.
    * The download can be pre-filled for the caller's regions (the current values of the tasks and, read only, of the registers).
    */
@@ -360,6 +392,14 @@ export class TemplatesService {
     const regionParam = oneParam(q, 'region_id');
     let prefill = boolParam(q, 'prefill') === true || taskId !== undefined || siteIds.length > 0;
     let sites: string[] = siteIds;
+    // the filters of the screen (the Sites list query as JSON): the pre-fill covers every site the list would show, not only the first page.
+    // It goes through the list service, so the visibility, the F3 filter tree and the field rules are the list's own.
+    const filtersRaw = oneParam(q, 'filters');
+    if (filtersRaw !== undefined) {
+      sites = await this.siteIdsFromFilters(auth, filtersRaw);
+      prefill = true;
+      if (!sites.length) throw problems.validation([{ path: '/filters', code: 'no_sites', message: 'No site matches these filters, so there is nothing to pre-fill.' }]);
+    }
     if (taskId !== undefined) {
       if (!uuidSchema.safeParse(taskId).success) throw problems.validation([{ path: '/task_id', code: 'invalid', message: 'task_id is a uuid.' }]);
       const task = await this.db.tx.$queryRaw<{ site_id: string; stream_code: string | null }[]>(Prisma.sql`

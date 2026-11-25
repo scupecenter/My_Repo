@@ -266,7 +266,7 @@ export default async function setup(): Promise<() => Promise<void>> {
   process.env.TEST_DATABASE_URL_TPLST = tplstDb.appUrl;
   process.env.TEST_SUPER_URL_TPLST = tplstDb.superUrl;
   // The Site Master columns database (migration 0133, Workflow Studio S2): the suite adds, retypes, moves, deactivates and deletes Master columns, which changes the
-  // columns of every SITE 360 menu, of the Master export and of the stream templates.
+  // columns of every Site Master menu, of the Master export and of the stream templates.
   const scols = `${dbName}_scols`;
   const scolsDb = await buildDatabase(adminUrl, scols, appPassword);
   process.env.TEST_DATABASE_URL_SCOLS = scolsDb.appUrl;

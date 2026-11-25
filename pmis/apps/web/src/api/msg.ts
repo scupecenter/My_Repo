@@ -159,3 +159,15 @@ export function useSetOrg(userId: string) {
 }
 
 export type { MessageItem };
+
+/**
+ * The numbers beside Approvals and My Work in the menu: the totals the two lists already answer (`counts.total` of GET /approvals and of the do-now bucket of
+ * GET /me/tasks, one row asked). Read again every minute like the unread messages; no new endpoint.
+ */
+export function useMenuCounts(approvals: boolean, myWork: boolean): { approvals: number; my_work: number } {
+  const a = useQuery({ queryKey: ['menu-count', 'approvals'], enabled: approvals, refetchInterval: POLL_MS, refetchIntervalInBackground: false,
+    queryFn: () => api.get<{ counts?: { total?: number } }>('/approvals', { query: { tab: 'all', limit: 1 }, headers: LIVE }).then((r) => r.counts?.total ?? 0) });
+  const w = useQuery({ queryKey: ['menu-count', 'my_work'], enabled: myWork, refetchInterval: POLL_MS, refetchIntervalInBackground: false,
+    queryFn: () => api.get<{ counts?: { total?: number } }>('/me/tasks', { query: { bucket: 'do_now', limit: 1 }, headers: LIVE }).then((r) => r.counts?.total ?? 0) });
+  return { approvals: a.data ?? 0, my_work: w.data ?? 0 };
+}

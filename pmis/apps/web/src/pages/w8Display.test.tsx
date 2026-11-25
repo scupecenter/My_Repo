@@ -33,7 +33,7 @@ describe('W8 Display menu', () => {
     expect(card()).toHaveAttribute('data-twrap', '1');
     expect(card()).toHaveAttribute('data-tzebra', '0');
     // an admin sees the link to the defaults
-    expect(within(panel).getByTestId('display-settings-link')).toHaveAttribute('href', '/admin/settings/display');
+    expect(within(panel).getByTestId('display-settings-link')).toHaveAttribute('href', '/admin/settings/screens/tables');
     // remembered: a new render of the same screen keeps them (the browser store is per user and per screen)
     const saved = Object.keys(localStorage).find((k) => k.startsWith('pmis.table.sites.'));
     expect(JSON.parse(localStorage.getItem(saved!)!)).toMatchObject({ density: 'normal', display: { size: 'lg', align: 'center', wrap: true, zebra: false } });
@@ -98,7 +98,7 @@ describe('W8 Settings > Display', () => {
     server.events.on('request:start', async ({ request }) => { if (request.method === 'PUT' && request.url.endsWith('/settings/table-display')) puts.push({ body: await request.clone().json(), ifMatch: request.headers.get('If-Match') }); });
     renderApp(<Routes><Route path="/admin/settings/*" element={<SettingsRoutes />} /></Routes>, { route: '/admin/settings/display' });
     expect(await screen.findByTestId('page-display-settings')).toBeInTheDocument();
-    expect(screen.getByTestId('settings-tab-display')).toHaveClass('btn-accent');
+    expect(screen.getByTestId('settings-section-screens-tables')).toHaveClass('btn-accent');
     await u.click(screen.getByTestId('display-default-size-lg'));
     await u.click(screen.getByTestId('display-default-zebra'));
     expect(screen.getByTestId('display-preview')).toHaveAttribute('data-tsize', 'lg');

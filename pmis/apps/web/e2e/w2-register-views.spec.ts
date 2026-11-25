@@ -15,23 +15,26 @@ for (const c of CASES) {
     await expect(page.locator('html')).toHaveAttribute('dir', c.locale === 'ar' ? 'rtl' : 'ltr');
     await page.getByTestId('nav-procurement').click();
     await expect(page.getByTestId('register-list-card')).toBeVisible();
-    const sw = { map: page.getByTestId('register-layout-map'), board: page.getByTestId('register-layout-board'), wide: page.getByTestId('register-layout-wide') };
-    await expect(sw.map).toContainText(c.map);
-    await expect(sw.board).toContainText(c.board);
-    await expect(sw.wide).toContainText(c.wide);
+    // the View menu: one button, a menu of layouts
+    const item = (id: string) => page.getByTestId(`register-layout-${id}`);
+    const pick = async (id: string) => { await page.getByTestId('register-view').click(); await item(id).click(); };
+    await page.getByTestId('register-view').click();
+    await expect(item('map')).toContainText(c.map);
+    await expect(item('board')).toContainText(c.board);
+    await expect(item('wide')).toContainText(c.wide);
+    await page.keyboard.press('Escape');
 
     // wide table: LTR, # and Site ID frozen, an editable cell of a record in entry
-    await sw.wide.click();
+    await pick('wide');
     await expect(page).toHaveURL(/layout=wide/);
     await expect(page.getByTestId('register-wide-table')).toBeVisible();
     await expect(page.getByTestId('register-wide-table')).toHaveAttribute('dir', 'ltr');
     await expect(page.getByTestId('register-wide-scroll')).toHaveAttribute('dir', 'ltr');
-    await expect(sw.wide).toHaveAttribute('aria-pressed', 'true');
-    await expect(sw.wide).toContainText(c.table);
+    await expect(page.getByTestId('register-view')).toHaveAttribute('aria-label', new RegExp(c.wide));
     await expect(page.locator('[data-testid^="wide-edit-"]').first()).toBeVisible();
 
     // board: columns by Order Status, then by approval state
-    await sw.board.click();
+    await pick('board');
     await expect(page).toHaveURL(/layout=board/);
     await expect(page.getByTestId('register-board')).toHaveAttribute('data-by', 'order_status');
     await expect(page.getByTestId('board-col-Open')).toBeVisible();
@@ -43,18 +46,18 @@ for (const c of CASES) {
     await page.getByTestId('reg-close').click();
 
     // map: the Site Master map, narrowed to the sites of the records
-    await sw.map.click();
+    await pick('map');
     await expect(page).toHaveURL(/layout=map/);
     await expect(page.getByTestId('register-map')).toBeVisible();
     await expect(page.getByTestId('register-map-note')).toBeVisible();
 
     // a saved view keeps the layout
-    await sw.board.click();
+    await pick('board');
     await expect(page.getByTestId('register-board')).toBeVisible();
     await page.getByTestId('views-save').click();
     await page.getByTestId('views-name').fill(`W2 board ${c.locale}`);
     await page.getByTestId('views-name-ok').click();
-    await sw.board.click(); // back to the list
+    await pick('list'); // back to the list
     await expect(page.getByTestId('register-list-card')).toBeVisible();
     await page.getByTestId('views-select').selectOption({ label: `W2 board ${c.locale}` });
     await expect(page.getByTestId('register-board')).toBeVisible();

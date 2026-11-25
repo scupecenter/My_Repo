@@ -11,12 +11,12 @@ const Routed = () => (
   </Routes>
 );
 
-describe('Register views (F16, toggle removed 2026-11-22)', () => {
-  it('shows the row list by default and renders no view toggle', async () => {
+describe('Register views (F16; the layout buttons became one View dropdown)', () => {
+  it('shows the row list by default; the layouts are in one View dropdown, not buttons', async () => {
     await signIn('pm');
     renderApp(<Routed />, { route: '/registers/procurement' });
     expect(await screen.findByTestId(`reg-row-${recId(1)}`)).toBeInTheDocument();
-    expect(screen.queryByTestId('register-view')).toBeNull();
+    expect(screen.getByTestId('register-view')).toHaveAttribute('aria-haspopup');
     expect(screen.queryByTestId('register-view-vertical')).toBeNull();
     expect(screen.queryByTestId('register-view-grid')).toBeNull();
     expect(screen.queryByTestId('register-grid')).toBeNull();
@@ -27,7 +27,7 @@ describe('Register views (F16, toggle removed 2026-11-22)', () => {
     renderApp(<Routed />, { route: '/registers/procurement?view=grid' });
     expect(await screen.findByTestId('register-grid')).toBeInTheDocument();
     expect(screen.getByTestId('register-count')).toBeInTheDocument();
-    expect(screen.queryByTestId('register-view')).toBeNull();
+    expect(screen.getByTestId('register-view')).toBeInTheDocument();
     expect(screen.queryByTestId(`reg-row-${recId(1)}`)).toBeNull();
   });
 });

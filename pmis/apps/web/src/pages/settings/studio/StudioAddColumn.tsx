@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useListCatalogues } from '@/api/lists';
-import { COLUMN_TYPES, TASK_INPUT_KEYS, useColumnAdmin, useSiteCustomFields, type ColumnCreate, type ColumnType, type MenuKey } from '@/api/site360Columns';
+import { COLUMN_TYPES, TASK_INPUT_KEYS, useColumnAdmin, useSiteCustomFields, type ColumnCreate, type ColumnType, type MenuKey } from '@/api/siteMasterColumns';
 import { useToast } from '@/components/Toast';
 import type { Ctx } from './studioCtx';
 import { colCb, useColErr } from './colErr';

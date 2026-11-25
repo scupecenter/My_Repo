@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { ApiError } from '@/api/client';
 import { useHistoricalOffer } from '@/api/historicalWaiver';
-import { useUploadBatch } from '@/api/registers';
+import { downloadTemplate, useUploadBatch } from '@/api/registers';
 import type { ImportBatch, UploadedBatch } from '@/api/types';
 import { registerErrorMessage } from '@/lib/registerErrors';
 import { HistoricalLoadOption, historicalReady, NO_HISTORICAL, type HistoricalChoice } from './HistoricalLoadOption';
@@ -90,6 +90,9 @@ export function TemplateUploadDialog({ open, onClose, templateId, templateName, 
                   {error.uploadId
                     ? <Link className="mt-1 inline-block font-semibold underline" data-testid="template-upload-open-running" to={`/templates/batches/${error.uploadId}`} onClick={close}>{t('tpl.open_running')}</Link>
                     : <p className="mt-1 text-xs">{t('tpl.rejection_logged')}</p>}
+                  {error.reason === 'outdated_version' && (
+                    <button type="button" className="btn mt-2 px-2 py-1 text-xs" data-testid="template-upload-download-current" onClick={() => void downloadTemplate(templateId)}>{t('tpl.download_current')}</button>
+                  )}
                 </div>
               )}
               <div className="flex justify-end gap-2">

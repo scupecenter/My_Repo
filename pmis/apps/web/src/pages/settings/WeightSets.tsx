@@ -56,7 +56,7 @@ function Preview({ id, onClose }: { id: string; onClose: () => void }) {
   }, [run]);
   const p = prev.data;
   return (
-    <FormDialog
+    <FormDialog inline
       open
       onClose={onClose}
       testid="weights-preview-dialog"
@@ -128,7 +128,7 @@ function Publish({
   const list = problems(pub.error),
     errs = fieldErrors(pub.error);
   return (
-    <FormDialog
+    <FormDialog inline
       open
       onClose={onClose}
       testid="weights-publish-dialog"
@@ -511,7 +511,7 @@ function Editor({ id, pin }: { id: string; pin: () => void }) {
         })}
       </ul>
       {dlg === "save" && (
-        <FormDialog
+        <FormDialog inline
           open
           onClose={() => setDlg(null)}
           testid="weights-save-dialog"
@@ -680,7 +680,7 @@ export function WeightSets() {
         </table>
       </section>
       {open && (
-        <FormDialog
+        <FormDialog inline
           open
           onClose={() => setOpen(false)}
           testid="weights-create-dialog"

@@ -47,6 +47,6 @@ describe('W8 three-level headers', () => {
     expect(within(sec).getAllByTestId('list-bands-section-cell').map((c) => c.textContent)).toContain('PRE-CW');
     expect(within(grp).getAllByTestId('list-bands-group-cell').map((c) => c.textContent)).toContain('CW Procurement');
     // the tracks are the list's own: as many grid columns as the header row
-    expect(sec.style.gridTemplateColumns).toBe(screen.getByTestId('site360-list-head').querySelector('[role="row"]:last-child')!.getAttribute('style')!.match(/grid-template-columns: ([^;]+)/)![1]);
+    expect(sec.style.gridTemplateColumns).toBe(screen.getByTestId('site-master-list-head').querySelector('[role="row"]:last-child')!.getAttribute('style')!.match(/grid-template-columns: ([^;]+)/)![1]);
   });
 });

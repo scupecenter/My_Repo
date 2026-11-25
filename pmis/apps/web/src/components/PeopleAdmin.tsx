@@ -7,14 +7,15 @@ import { hasGrant } from '@/lib/perm';
 /**
  * The pages of the "Users & Roles" screen, in tab order. Each one opens only for holders of its module (effective.nav), or
  * of its grant when it has one (Online now: `manage_users`, as in the old sidebar). A page with `under` is a sub-tab of
- * that tab (Online now sits under Users, beside Deleted) and has no tab of its own.
+ * that tab and has no tab of its own (Online now sits under Users, beside Deleted; Assignments also sits under Users, and Permission profiles under
+ * Roles, shown as a small second row, merge of 2026-11-25: routes and rights unchanged).
  */
 export const PEOPLE_TABS: readonly { key: string; to: string; label: string; grant?: string; under?: string; navAny?: readonly string[] }[] = [
   { key: 'admin.users', to: '/admin/users', label: 'peopleAdmin.tab_users' },
   { key: 'admin.online', to: '/admin/online', label: 'nav.admin.online', grant: 'manage_users', under: 'admin.users' },
-  { key: 'admin.assignments', to: '/admin/assignments', label: 'peopleAdmin.tab_assignments', navAny: ['admin.users'] },
-  { key: 'admin.roles', to: '/admin/roles', label: 'nav.admin.roles' },
-  { key: 'admin.profiles', to: '/admin/profiles', label: 'peopleAdmin.tab_profiles', navAny: ['admin.roles'] },
+  { key: 'admin.assignments', to: '/admin/assignments', label: 'peopleAdmin.tab_assignments', navAny: ['admin.users'], under: 'admin.users' },
+  { key: 'admin.roles', to: '/admin/roles', label: 'peopleAdmin.tab_roles_profiles' },
+  { key: 'admin.profiles', to: '/admin/profiles', label: 'peopleAdmin.tab_profiles', navAny: ['admin.roles'], under: 'admin.roles' },
   { key: 'admin.groups', to: '/admin/groups', label: 'nav.admin.groups' },
   { key: 'admin.delegation', to: '/admin/delegation', label: 'nav.admin.delegation' },
   { key: 'admin.matrix', to: '/admin/matrix', label: 'nav.admin.matrix' },
@@ -49,6 +50,8 @@ export function PeopleAdminLayout() {
   const here = page?.under ? PEOPLE_TABS.find((p) => p.key === page.under) : page;
   // A tab the person may not open sends them to the first one they may (the page itself still enforces access).
   if (me.data && page && !peopleTabAllowed(me.data, page) && tabs[0]) return <Navigate to={tabs[0].to} replace />;
+  // The pages merged under this tab (not Online now: the Users page draws that one among its own sub-tabs), when the person may open at least one besides the tab's own.
+  const subs = here ? PEOPLE_TABS.filter((p) => !p.grant && (p.key === here.key || p.under === here.key)).filter((p) => peopleTabAllowed(me.data, p)) : [];
   return (
     <div data-testid="page-people-admin">
       <h1 className="text-2xl font-bold">{t('nav.admin.users')}</h1>
@@ -60,6 +63,15 @@ export function PeopleAdminLayout() {
           </NavLink>
         ))}
       </nav>
+      {subs.length > 1 && (
+        <nav role="tablist" aria-label={t(here?.label ?? 'nav.admin.users')} className="mb-3 flex flex-wrap gap-1" data-testid="people-subtabs">
+          {subs.map((p) => (
+            <NavLink key={p.key} to={p.to} role="tab" aria-selected={page?.key === p.key} data-testid={`people-sub-${p.key.slice(6)}`} className={() => `btn ${page?.key === p.key ? 'btn-accent' : ''}`}>
+              {t(p.key === here?.key && p.key === 'admin.roles' ? 'nav.admin.roles' : p.label)}
+            </NavLink>
+          ))}
+        </nav>
+      )}
       <Outlet />
     </div>
   );

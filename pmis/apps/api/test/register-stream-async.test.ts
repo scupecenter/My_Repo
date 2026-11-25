@@ -59,7 +59,7 @@ let issueSite: Site;
 /** An Issue Log file of `count` new issues on one site, uploaded by `who`. */
 async function issueBatch(who: Actor, rows: number): Promise<{ id: string; tag: string }> {
   issueSite ??= await makeSite(db, R, { prefix: 'ASY' });
-  const dl = await downloadTemplate(who.api, 'TPL-ISS');
+  const dl = await downloadTemplate(who.api, 'TPL-ISSUES');
   const file = await fillTemplate(dl.buffer, Array.from({ length: rows }, () => ({
     'Site ID': issueSite.code, 'Pending Issue': `Async issue ${TAG}-${++n}`, 'Issue Raised Date': day('2026-01-05'), 'Issue Status': 'Open', 'Issue Owner (Aljeel)': who.user.email,
   })));
@@ -219,7 +219,7 @@ describe('a big register batch: L1 sends, L2 decides in the background', () => {
   }, 240_000);
 });
 
-// ---------------------------------------------------------------------------------------------------------------------- streams (TPL-SITE-CW)
+// ---------------------------------------------------------------------------------------------------------------------- streams (TPL-CIVIL)
 /** `rows` sites of region 6 with the task `code` open. */
 async function sitesWith(code: string, rows: number): Promise<{ site: Site; task: string }[]> {
   const out: { site: Site; task: string }[] = [];
@@ -238,7 +238,7 @@ describe('a big stream batch in the background', () => {
     await setCell(db, 'B4', R, 'entry', { user: [both.user.id] });
     await setCell(db, 'B4', R, 'approve', { user: [both.user.id] });
     const sites = await sitesWith('B4', ROWS);
-    const up = await uploadFile(both.api, await filled(both.api, 'TPL-SITE-CW', sites.map((s) => ({ 'Site ID': s.site.code, 'B4 CW Survey Actual': day('2026-01-10') }))));
+    const up = await uploadFile(both.api, await filled(both.api, 'TPL-CIVIL', sites.map((s) => ({ 'Site ID': s.site.code, 'B4 CW Survey Actual': day('2026-01-10') }))));
     expect(up.status).toBe(202);
     expect(up.body.counts).toMatchObject({ update: ROWS, error: 0 });
     const docs = app.get(DocumentsService);
@@ -273,7 +273,7 @@ describe('a big stream batch in the background', () => {
     await setCell(db, 'B4', R, 'entry', { user: [l1.user.id] });
     await setCell(db, 'B4', R, 'approve', { user: [l2.user.id] });
     const sites = await sitesWith('B4', ROWS);
-    const up = await uploadFile(l1.api, await filled(l1.api, 'TPL-SITE-CW', sites.map((s) => ({ 'Site ID': s.site.code, 'B4 CW Survey Actual': day('2026-01-11') }))));
+    const up = await uploadFile(l1.api, await filled(l1.api, 'TPL-CIVIL', sites.map((s) => ({ 'Site ID': s.site.code, 'B4 CW Survey Actual': day('2026-01-11') }))));
     expect((await send(l1, up.body.id, etag(up))).status).toBe(202);
     await jobs.process(await runOf(up.body.id));
     const w = await get(l2, up.body.id);
@@ -297,7 +297,7 @@ describe('a big stream batch in the background', () => {
     const sites = await sitesWith('B6', ROWS);
     expect((await admin.api.call('put', '/settings/historical-waiver', { open: true, cutoff_date: '2026-01-31', reason: 'Open for the async load test' })).status).toBe(200);
     try {
-      const up = await uploadFile(admin.api, await filled(admin.api, 'TPL-SITE-CW', sites.map((s) => ({ 'Site ID': s.site.code, 'B6 Actual Date': day('2026-01-10') }))),
+      const up = await uploadFile(admin.api, await filled(admin.api, 'TPL-CIVIL', sites.map((s) => ({ 'Site ID': s.site.code, 'B6 Actual Date': day('2026-01-10') }))),
         'filled.xlsx', { historical_load_reason: 'One-time load of the historical tasks' });
       expect(up.status).toBe(202);
       expect(up.body.historical_load).toMatchObject({ cutoff_date: '2026-01-31' });

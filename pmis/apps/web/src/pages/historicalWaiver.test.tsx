@@ -25,7 +25,7 @@ const settings = (opts = {}) => renderApp(<Routes><Route path="/admin/settings/*
 const errCode = async (p: Promise<unknown>) => p.then(() => null, (e: ApiError) => `${e.status}:${e.code}`);
 const openIt = (cutoff = '2026-02-28') => api.put<HistoricalWaiver>('/settings/historical-waiver', { body: { open: true, cutoff_date: cutoff, reason: 'One-time load of the Master' } });
 const stream = (cb: (b: ImportBatch) => void = () => undefined) =>
-  renderApp(<TemplateUploadDialog open onClose={() => undefined} templateId="TPL-SITE-CW" templateName="CW" kind="stream" onDone={cb} />);
+  renderApp(<TemplateUploadDialog open onClose={() => undefined} templateId="TPL-CIVIL" templateName="CW" kind="stream" onDone={cb} />);
 
 describe('Settings, historical load', () => {
   it('is closed by default; a System Admin opens it with a cutoff date and a reason (step-up), sees the state, and closes it with a reason', async () => {
@@ -136,7 +136,7 @@ describe('the option "historical load: accept without documents" on the batch sc
     const seen: (string | null)[] = [];
     server.use(http.post(`${API_BASE}/import-batches`, async ({ request }) => {
       seen.push((await request.clone().formData()).get('historical_load_reason') as string | null);
-      return HttpResponse.json({ id: 'b-9', template_id: 'TPL-SITE-CW', template_version: 2, status: 'validated', counts: {}, version: 1,
+      return HttpResponse.json({ id: 'b-9', template_id: 'TPL-CIVIL', template_version: 2, status: 'validated', counts: {}, version: 1,
         historical_load: seen.at(-1) ? { cutoff_date: '2026-02-28', reason: seen.at(-1), marked_by: null, marked_at: '2026-11-05T09:00:00Z' } : null }, { status: 202 });
     }));
     let done: ImportBatch | null = null;
@@ -167,7 +167,7 @@ describe('the option "historical load: accept without documents" on the batch sc
     await signIn('pm'); await stepUpDone();
     const send = async (reason: string | null) => {
       const fd = new FormData();
-      fd.append('file', new File(['x'], 'cw.xlsx')); fd.append('template_id', 'TPL-SITE-CW');
+      fd.append('file', new File(['x'], 'cw.xlsx')); fd.append('template_id', 'TPL-CIVIL');
       if (reason !== null) fd.append('historical_load_reason', reason);
       return api.post<ImportBatch>('/import-batches', { body: fd });
     };
@@ -212,7 +212,7 @@ describe('the batch review', () => {
     await signIn('pm'); await stepUpDone();
     await openIt();
     const fd = new FormData();
-    fd.append('file', new File(['x'], 'cw.xlsx')); fd.append('template_id', 'TPL-SITE-CW'); fd.append('historical_load_reason', 'History of the Master');
+    fd.append('file', new File(['x'], 'cw.xlsx')); fd.append('template_id', 'TPL-CIVIL'); fd.append('historical_load_reason', 'History of the Master');
     const b = await api.post<ImportBatch>('/import-batches', { body: fd });
     renderApp(<Routes><Route path="/templates/batches/:batchId" element={<RegisterBatch />} /></Routes>, { route: `/templates/batches/${b.id}` });
     const chip = await screen.findByTestId('batch-historical');
@@ -224,7 +224,7 @@ describe('the batch review', () => {
   it('shows nothing of the kind on a batch that is not marked', async () => {
     await signIn('pm');
     const fd = new FormData();
-    fd.append('file', new File(['x'], 'cw.xlsx')); fd.append('template_id', 'TPL-SITE-CW');
+    fd.append('file', new File(['x'], 'cw.xlsx')); fd.append('template_id', 'TPL-CIVIL');
     const b = await api.post<ImportBatch>('/import-batches', { body: fd });
     renderApp(<Routes><Route path="/templates/batches/:batchId" element={<RegisterBatch />} /></Routes>, { route: `/templates/batches/${b.id}` });
     await screen.findByTestId('batch-counts');

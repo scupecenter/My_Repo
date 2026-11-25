@@ -362,7 +362,7 @@ describe('Financial Advances', () => {
     const own = await c.fin.entry.api.call('get', `${recPath('financial_advances')}?q=${AMOUNT}`);
     expect((own.body.items as unknown[]).length).toBeGreaterThan(0);
     const cells = async (api: Actor['api']): Promise<string[]> => {
-      const dl = await downloadTemplate(api, 'TPL-ADV', '?prefill=true');
+      const dl = await downloadTemplate(api, 'TPL-ADVANCES', '?prefill=true');
       expect(dl.status).toBe(200);
       const wb = await load(dl.buffer);
       const out: string[] = [];

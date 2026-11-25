@@ -94,7 +94,7 @@ describe('Template mapping and aliases (Q207, Q8, Q10)', () => {
     await u.type(screen.getByTestId('tmap-label'), 'Layout Ref');
     await u.type(screen.getByTestId('tmap-reason'), 'add the reference');
     await u.click(screen.getByTestId('tmap-test'));
-    expect(await screen.findByTestId('tmap-impact-TPL-SITE-CW')).toHaveTextContent('B6 Layout Ref');
+    expect(await screen.findByTestId('tmap-impact-TPL-CIVIL')).toHaveTextContent('B6 Layout Ref');
     await u.click(screen.getByRole('button', { name: 'Cancel' }));
 
     await u.click(screen.getByTestId('tmap-edit-B7-submitted_date'));
@@ -127,9 +127,9 @@ describe('upload mode (Q206)', () => {
     let mode: string | null = 'unset';
     server.use(http.post(`${API_BASE}/import-batches`, async ({ request }) => {
       mode = (await request.formData()).get('mode') as string | null;
-      return HttpResponse.json({ id: 'b-1', template_id: 'TPL-SITE-CW', template_version: 2, status: 'validated', counts: {}, version: 1, mode: 'draft' }, { status: 202 });
+      return HttpResponse.json({ id: 'b-1', template_id: 'TPL-CIVIL', template_version: 2, status: 'validated', counts: {}, version: 1, mode: 'draft' }, { status: 202 });
     }));
-    const { unmount } = renderApp(<TemplateUploadDialog open onClose={() => undefined} templateId="TPL-SITE-CW" templateName="CW" kind="stream" onDone={() => undefined} />);
+    const { unmount } = renderApp(<TemplateUploadDialog open onClose={() => undefined} templateId="TPL-CIVIL" templateName="CW" kind="stream" onDone={() => undefined} />);
     const u = userEvent.setup();
     expect(screen.getByTestId('template-upload-mode')).toHaveTextContent('Save Draft / Planning');
     await u.click(screen.getByTestId('template-upload-mode-draft'));

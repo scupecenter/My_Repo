@@ -1,12 +1,12 @@
 import * as Popover from '@radix-ui/react-popover';
 import { useQueryClient } from '@tanstack/react-query';
-import { Bell, Check, Download, Menu, Moon, PanelLeftClose, PanelLeftOpen, Search, Sun, LogOut, Lock, UserRound, X } from 'lucide-react';
+import { Bell, Check, Download, Menu, Moon, PanelLeftClose, PanelLeftOpen, Pin, PinOff, Search, Sun, LogOut, Lock, UserRound, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { api } from '@/api/client';
 import { useLogout, useMe, useNotifications, useSession } from '@/api/hooks';
-import { useUnreadTotal } from '@/api/msg';
+import { useMenuCounts, useUnreadTotal } from '@/api/msg';
 import { useOpenAlertCount } from '@/api/logs';
 import { canViewModule, hasGrant, isAdmin } from '@/lib/perm';
 import { notificationTarget } from '@/lib/x';
@@ -23,6 +23,8 @@ import { SIDEBAR_DEFAULT, SIDEBAR_MAX, SIDEBAR_MIN, SidebarBody, SidebarSplitter
 export { NAV };
 const WIDTH_KEY = 'pmis.nav.width';
 const ICONS_KEY = 'pmis.nav.icons';
+/** The menu hides by itself (a narrow rail that opens on hover) unless it is pinned; kept in the browser like the width and the icons-only choice. */
+const AUTO_KEY = 'pmis.nav.auto';
 
 export function Shell() {
   const { t } = useTranslation();
@@ -34,6 +36,8 @@ export function Shell() {
   const qc = useQueryClient();
   const logout = useLogout();
   const [compact, setCompact] = useState<boolean>(() => loadPref<boolean>(ICONS_KEY, false) === true);
+  const [auto, setAuto] = useState<boolean>(() => loadPref<boolean>(AUTO_KEY, false) === true);
+  const [hover, setHover] = useState(false);
   const [width, setWidth] = useState<number>(() => { const w = Number(loadPref(WIDTH_KEY, SIDEBAR_DEFAULT)); return Number.isFinite(w) ? Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, w)) : SIDEBAR_DEFAULT; });
   // The drawer is tied to the page it was opened on, so it closes by itself on navigation.
   const here = loc.pathname + loc.search;
@@ -66,6 +70,8 @@ export function Shell() {
   const allowed = new Set(me.data?.effective.nav ?? []);
   const unread = useUnreadTotal(allowed.has('messages')).data ?? 0;
   const items = NAV.filter((n) => (BY_GRANT[n.key] ? hasGrant(me.data, BY_GRANT[n.key]) : BY_MODULE_VIEW[n.key] ? canViewModule(me.data, BY_MODULE_VIEW[n.key]) : ANY_OF[n.key] ? ANY_OF[n.key]!.some((m) => allowed.has(m)) : ADMIN_ONLY.has(n.key) ? isAdmin(me.data) : allowed.has(n.key)));
+  const waiting = useMenuCounts(allowed.has('approvals'), allowed.has('my_work'));
+  const counts = { approvals: waiting.approvals, my_work: waiting.my_work };
   const alerts = useOpenAlertCount(isAdmin(me.data)).data ?? 0;
   // Users, Online now, Roles, Groups, Delegation and the Matrix are tabs of one screen: one sidebar entry, opening the first allowed tab.
   const peopleTo = firstPeopleTab(me.data);
@@ -84,6 +90,10 @@ export function Shell() {
   };
 
   const resize = (w: number) => { setWidth(w); storePref(WIDTH_KEY, w); };
+  const togglePin = () => { storePref(AUTO_KEY, !auto); setAuto(!auto); setHover(false); };
+  /** the rail shows icons only; it opens over the page (no push) while the pointer or the keyboard is in it */
+  const open = !auto || hover;
+  const rail = compact || !open;
   const toggleCompact = () => setCompact((c) => { storePref(ICONS_KEY, !c); return !c; });
   useEffect(() => {
     if (!drawer) return;
@@ -99,7 +109,8 @@ export function Shell() {
   const groupFirst = current ? sideItems.find((i) => i.group === current.group) : undefined;
   const brand = (
     <div className="flex items-center gap-2 px-4 py-4 font-bold">
-      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-accent text-accentInk">G</span>{!compact && t('app.name')}
+      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-accent text-accentInk">G</span>{!rail && t('app.name')}
+      {!rail && <button className="btn ms-auto hidden min-h-8 min-w-8 md:inline-flex" data-testid="sidebar-pin" aria-pressed={!auto} aria-label={t(auto ? 'nav.pin_menu' : 'nav.autohide_menu')} title={t(auto ? 'nav.pin_menu' : 'nav.autohide_menu')} onClick={togglePin}>{auto ? <PinOff size={16} aria-hidden /> : <Pin size={16} aria-hidden />}</button>}
     </div>
   );
 
@@ -108,13 +119,16 @@ export function Shell() {
 
   return (
     <div className="flex min-h-screen">
-      <aside ref={asideRef} data-testid="sidebar" aria-label={t('nav.sidebar_label')} style={{ width: compact ? 56 : width }}
-        className="side-scope sticky top-0 hidden h-screen shrink-0 flex-col border-e border-line bg-side md:flex">
+      {auto && <div className="hidden shrink-0 md:block" style={{ width: 56 }} aria-hidden />}
+      <aside ref={asideRef} data-testid="sidebar" data-auto={auto ? 'true' : 'false'} aria-label={t('nav.sidebar_label')} style={{ width: rail ? 56 : width }}
+        onMouseEnter={auto ? () => setHover(true) : undefined} onMouseLeave={auto ? () => setHover(false) : undefined}
+        onFocus={auto ? () => setHover(true) : undefined} onBlur={auto ? (e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setHover(false); } : undefined}
+        className={`side-scope ${auto ? 'fixed start-0 z-40' : 'sticky'} top-0 hidden h-screen shrink-0 flex-col border-e border-line bg-side md:flex`}>
         {brand}
-        <SidebarBody items={sideItems} compact={compact} unread={unread} alerts={alerts} activeKey={activeKey} />
+        <SidebarBody items={sideItems} compact={rail} unread={unread} alerts={alerts} counts={counts} activeKey={activeKey} />
         {/* the sample-data label only in the pure mock build (P0 of the 2026-11-17 audit: it also showed against the real server) */}
-        {!compact && import.meta.env.VITE_USE_MOCKS === 'true' && !HYBRID && <div className="border-t border-line px-4 py-3 text-xs text-faint">Synthetic data</div>}
-        {!compact && <SidebarSplitter width={width} onChange={resize} asideRef={asideRef} />}
+        {!rail && import.meta.env.VITE_USE_MOCKS === 'true' && !HYBRID && <div className="border-t border-line px-4 py-3 text-xs text-faint">Synthetic data</div>}
+        {!rail && <SidebarSplitter width={width} onChange={resize} asideRef={asideRef} />}
       </aside>
       {drawer && (
         <div className="fixed inset-0 z-50 md:hidden" data-testid="sidebar-drawer-root">
@@ -124,7 +138,7 @@ export function Shell() {
               <div className="flex items-center gap-2 px-4 py-4 font-bold"><span className="grid h-8 w-8 place-items-center rounded-md bg-accent text-accentInk">G</span>{t('app.name')}</div>
               <button ref={closeRef} className="btn min-h-11 min-w-11" data-testid="drawer-close" aria-label={t('nav.close_menu')} onClick={() => setDrawer(false)}><X size={16} aria-hidden /></button>
             </div>
-            <SidebarBody items={sideItems} compact={false} unread={unread} alerts={alerts} activeKey={activeKey} onNavigate={() => setDrawer(false)} />
+            <SidebarBody items={sideItems} compact={false} unread={unread} alerts={alerts} counts={counts} activeKey={activeKey} onNavigate={() => setDrawer(false)} />
           </div>
         </div>
       )}
@@ -169,7 +183,7 @@ export function Shell() {
           <button className="btn" data-testid="topbar-signout" aria-label={t('top.sign_out')} onClick={() => logout.mutate(undefined, { onSuccess: () => { void qc.invalidateQueries({ queryKey: ['session'] }); nav('/login'); } })}><LogOut size={16} /></button>
         </header>
         {HYBRID && <div role="status" data-testid="hybrid-banner" className="border-b border-line bg-waitBg px-4 py-1 text-xs text-waitInk">{t('hybrid.banner')}</div>}
-        <main className="p-6"><Outlet /></main>
+        <main className="p-6"><Outlet context={{ items: sideItems }} /></main>
       </div>
       <ExportDialog open={exp} onClose={() => setExp(false)} />
       <CommandPalette open={palette} onOpenChange={setPalette} items={items.map((i) => ({ key: i.key, to: i.to }))} />

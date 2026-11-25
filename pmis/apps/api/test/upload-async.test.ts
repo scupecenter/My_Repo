@@ -311,10 +311,10 @@ describe('a big one-template upload (a single batch) is staged in the background
     await setAsyncRows(10);
     const n = 45;
     const rows = Array.from({ length: n }, (_, i) => ({ 'Site ID': `NS${TAG}${String(i).padStart(3, '0')}`, Region: 'Sebha', 'Site Name (EN)': `Big ${i}`, 'Delivery Scenario': 'New Build' }));
-    const file = await fillTemplate((await downloadTemplate(admin.api, 'TPL-SITE-NEW')).buffer, rows);
+    const file = await fillTemplate((await downloadTemplate(admin.api, 'TPL-NEW-SITES')).buffer, rows);
     const up = await uploadFile(admin.api, file);
     expect(up.status).toBe(202);
-    expect(up.body).toMatchObject({ status: 'parsing', template_id: 'TPL-SITE-NEW' });
+    expect(up.body).toMatchObject({ status: 'parsing', template_id: 'TPL-NEW-SITES' });
     const id = up.body.id as string;
     expect(await jobs.resumeAll(0)).toBe(1);
     const done = await get(admin, id);

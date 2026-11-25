@@ -55,7 +55,7 @@ function PreviewDialog({ id, onClose }: { id: string; onClose: () => void }) {
   const p = prev.data,
     errs = fieldErrors(prev.error);
   return (
-    <FormDialog
+    <FormDialog inline
       open
       onClose={onClose}
       testid="sla-preview-dialog"
@@ -140,7 +140,7 @@ function PublishDialog({
   const errs = fieldErrors(pub.error);
   const others = Object.entries(errs).filter(([p]) => p !== "/effective_date");
   return (
-    <FormDialog
+    <FormDialog inline
       open
       onClose={onClose}
       testid="sla-publish-dialog"
@@ -629,7 +629,7 @@ function Editor({ id, pin }: { id: string; pin: () => void }) {
         </table>
       </div>
       {dlg === "save" && (
-        <FormDialog
+        <FormDialog inline
           open
           onClose={() => setDlg(null)}
           testid="sla-save-dialog"
@@ -773,7 +773,7 @@ export function SlaRules() {
         </table>
       </section>
       {open && (
-        <FormDialog
+        <FormDialog inline
           open
           onClose={() => setOpen(false)}
           testid="sla-create-dialog"

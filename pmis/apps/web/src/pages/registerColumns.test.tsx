@@ -83,3 +83,26 @@ describe('Settings > Register columns', () => {
     await waitFor(() => expect(screen.getByTestId('regcols-reactivate-request_date')).toBeInTheDocument());
   });
 });
+
+describe('register columns page: drag and drop, add before and after', () => {
+  it('drops a column on another to reorder, and opens the add dialog placed before a column', async () => {
+    await signIn('pm');
+    page();
+    const rows = async () => (await screen.findAllByTestId(/^regcols-row-/)).map((r) => r.getAttribute('data-testid')!.replace('regcols-row-', ''));
+    const before = await rows();
+    expect(before.length).toBeGreaterThan(2);
+    const [first, second] = before as [string, string];
+    const dt = { setData: () => undefined, getData: () => '' };
+    const { fireEvent } = await import('@testing-library/react');
+    fireEvent.dragStart(screen.getByTestId(`regcols-row-${first}`), { dataTransfer: dt });
+    fireEvent.dragOver(screen.getByTestId(`regcols-row-${second}`), { dataTransfer: dt });
+    fireEvent.drop(screen.getByTestId(`regcols-row-${second}`), { dataTransfer: dt });
+    await waitFor(async () => expect((await rows()).slice(0, 2)).toEqual([second, first]));
+    const u = userEvent.setup();
+    await u.click(screen.getByTestId(`regcols-before-${second}`));
+    expect(await screen.findByTestId('column-dialog')).toBeInTheDocument();
+    expect(within(screen.getByTestId('column-dialog')).getByTestId('col-code')).toBeInTheDocument();
+    expect(within(screen.getByTestId('column-dialog')).getByTestId('column-add-impact')).toHaveTextContent(/new version of the register template/i);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();   // in the page, not a modal
+  });
+});

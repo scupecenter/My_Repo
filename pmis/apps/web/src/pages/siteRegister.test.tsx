@@ -37,7 +37,7 @@ describe('Site Master: streams', () => {
       await waitFor(() => expect(document.querySelector(`[data-stream="${code}"]`)).not.toBeNull());
       cleanup();
     }
-  });
+  }, 30_000); // renders the page five times; the runner is slower than a laptop and the first render loads the lazy parts
 
   it('shows the agreed Arabic names in the title of each stream', async () => {
     await signIn('pm');
@@ -112,7 +112,7 @@ describe('Site Master: streams', () => {
   });
 });
 
-describe('SITE 360: views (contract 0.4.7)', () => {
+describe('Site Master: views (contract 0.4.7)', () => {
   it('titles the open view with the name from the API, in EN and AR, and shows no tab bars', async () => {
     await signIn('pm');
     for (const [view, en, ar] of [['CW', 'Civil Works', 'الأعمال المدنية'], ['TE', 'Installation (TE)', 'التركيبات'], ['OM', 'O&M', 'التشغيل والصيانة']]) {

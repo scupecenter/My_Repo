@@ -11,6 +11,7 @@ for (const locale of ['en', 'ar'] as const) {
     test('settings: calendar, notification policy rules, retention reduction', async ({ page }) => {
       await signIn(page, locale, 'pm');
       await page.getByTestId('nav-admin.settings').click();
+      await page.getByTestId('settings-section-sla-calendar').click(); // Calendar sits under SLA and time (Settings merge)
       await expect(page.getByTestId('cal-banner-tentative')).toBeVisible();
       await page.getByTestId('cal-add').click();
       await page.getByTestId('holiday-date').fill('2026-12-01');
@@ -80,7 +81,7 @@ for (const locale of ['en', 'ar'] as const) {
     test('weight sets: the 100% rule per level, then draft, save, publish', async ({ page }) => {
       await signIn(page, locale, 'pm');
       await page.getByTestId('nav-admin.settings').click();
-      await page.getByTestId('settings-tab-weights').click();
+      await page.getByTestId('settings-section-sla-weights').click();
       await page.getByTestId('weights-code').selectOption('health_index');
       await expect(page.getByTestId('weights-sum-activities')).toHaveAttribute('data-ok', 'false');
       await page.getByTestId('weights-publish-health_index').click();
@@ -114,6 +115,7 @@ for (const locale of ['en', 'ar'] as const) {
     test('holiday import asks for a reason', async ({ page }) => {
       await signIn(page, locale, 'pm');
       await page.getByTestId('nav-admin.settings').click();
+      await page.getByTestId('settings-section-sla-calendar').click();
       await page.getByTestId('cal-import-file').setInputFiles({ name: 'holidays.csv', mimeType: 'text/csv', buffer: Buffer.from('date,name_en\n2026-12-30,Test day\n') });
       await page.getByTestId('holiday-import-dialog-submit').click();
       await expect(page.getByTestId('holiday-import-dialog-reason-error')).toBeVisible();

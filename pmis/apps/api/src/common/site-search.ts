@@ -6,7 +6,7 @@ import { problems } from './problem';
 export const MAX_PASTED_CODES = 1000;
 
 /**
- * The search text of a site list (`q`), read the same way on every site-data list (GET /sites, GET /site360/{menu}/rows, the register records,
+ * The search text of a site list (`q`), read the same way on every site-data list (GET /sites, GET /site-master/{menu}/rows, the register records,
  * the approvals inbox and My Work):
  * - one token (no separator) keeps the "contains" search on code and name;
  * - two or more tokens, separated by spaces, new lines, tabs, commas or semicolons (cells copied from Excel), are a pasted list: each token

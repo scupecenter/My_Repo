@@ -21,7 +21,7 @@ for (const c of CASES) {
       await page.getByTestId('nav-procurement').click();
       await expect(page.getByTestId('page-register-procurement')).toBeVisible();
       await expect(page.getByRole('heading', { level: 1 })).toContainText(c.locale === 'ar' ? c.proc : 'Procurement');
-      await expect(page.getByTestId('register-export')).toBeVisible();
+      await expect(page.getByTestId('register-tools')).toBeVisible();
       await page.getByTestId('register-new').click();
       await page.getByTestId('reg-site-search').fill('TR101');
       await page.getByTestId('reg-site-opt-TR101').click();

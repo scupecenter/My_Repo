@@ -34,7 +34,7 @@ export function MigrationDialog({ version, versions, phrase, onClose }: { versio
   const pv = preview.data;
   const n = pv?.sites.length ?? 0;
   return (
-    <FormDialog open wide onClose={onClose} testid="wfe-migrate-dialog" title={t('wfe.migrate_title', { version })} busy={migrate.isPending} error={migrate.isError ? err(migrate.error) : preview.isError ? err(preview.error) : null}
+    <FormDialog inline open wide onClose={onClose} testid="wfe-migrate-dialog" title={t('wfe.migrate_title', { version })} busy={migrate.isPending} error={migrate.isError ? err(migrate.error) : preview.isError ? err(preview.error) : null}
       disabled={!pv || n === 0 || typed !== `v${version}` || (!!phrase && master !== phrase)} submitLabel={t('wfe.migrate')}
       onSubmit={(reason) => migrate.mutate({ preview_hash: pv!.preview_hash, selection, reason, ...(phrase ? { confirm_master_impact: master } : {}) }, { onSuccess: (r) => { toast(t('wfe.migrated', { count: r.sites_migrated })); onClose(); } })}>
       <p className="text-sm text-mute">{t('wfe.migrate_hint')}</p>
@@ -82,7 +82,7 @@ export function MigrationLog() {
             <td>{m.reverted_at ? t('wfe.reverted') : m.revertible && <button className="btn" data-testid={`wfe-revert-${m.id}`} onClick={() => { revert.reset(); setTarget(m.id); }}>{t('wfe.revert')}</button>}</td>
           </tr>))}</tbody>
       </table>
-      {target && <FormDialog open onClose={() => setTarget(null)} testid="wfe-revert-dialog" title={t('wfe.revert')} busy={revert.isPending} error={revert.isError ? err(revert.error) : null}
+      {target && <FormDialog inline open onClose={() => setTarget(null)} testid="wfe-revert-dialog" title={t('wfe.revert')} busy={revert.isPending} error={revert.isError ? err(revert.error) : null}
         onSubmit={(reason) => revert.mutate({ id: target, reason }, { onSuccess: () => { toast(t('wfe.reverted')); setTarget(null); } })}>
         <p className="text-sm text-mute">{t('wfe.revert_hint')}</p>
       </FormDialog>}

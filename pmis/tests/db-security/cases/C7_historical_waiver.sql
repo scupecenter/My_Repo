@@ -251,7 +251,7 @@ UPDATE import_batches SET historical_load = true, historical_cutoff = cal_today(
 -- @expect error 42501 permission denied
 INSERT INTO import_batches (template_version_id, file_name, file_sha256, uploaded_by, stream_code, historical_load, historical_cutoff, historical_reason, historical_marked_by, historical_marked_at)
 SELECT v.id, 'forged.xlsx', 'x', '{{ALICE}}', 'CW', true, cal_today() - 30, 'Forged', '{{ALICE}}', now()
-FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-SITE-CW' AND v.is_current;
+FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-CIVIL' AND v.is_current;
 -- @end
 
 -- ---------------------------------------------------------------------------------------------------------------------
@@ -264,7 +264,7 @@ FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id
 \ctx ADMIN stepup=300
 SELECT hw_waiver_set(true, cal_today() - 30, 'Control: open for the case') IS NOT NULL;
 \ctx ALICE
-SELECT imp_stage_batch('TPL-SITE-CW', (SELECT v.version FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-SITE-CW' AND v.is_current),
+SELECT imp_stage_batch('TPL-CIVIL', (SELECT v.version FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-CIVIL' AND v.is_current),
   NULL, 'forged.xlsx', 'x', NULL, '[]'::jsonb, 'submit', '{"reason": "Alice wants no documents"}'::jsonb);
 -- @end
 
@@ -275,7 +275,7 @@ SELECT imp_stage_batch('TPL-SITE-CW', (SELECT v.version FROM template_versions v
 \ctx ADMIN stepup=300
 SELECT hw_waiver_set(true, cal_today() - 30, 'Control: open for the case') IS NOT NULL;
 \ctx DEL_ALL
-SELECT imp_stage_batch('TPL-SITE-CW', (SELECT v.version FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-SITE-CW' AND v.is_current),
+SELECT imp_stage_batch('TPL-CIVIL', (SELECT v.version FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-CIVIL' AND v.is_current),
   NULL, 'forged.xlsx', 'x', NULL, '[]'::jsonb, 'submit', '{"reason": "A delegate wants no documents"}'::jsonb);
 -- @end
 
@@ -286,7 +286,7 @@ SELECT imp_stage_batch('TPL-SITE-CW', (SELECT v.version FROM template_versions v
 \ctx ADMIN stepup=300
 SELECT hw_waiver_set(true, cal_today() - 30, 'Control: open for the case') IS NOT NULL;
 \ctx ADMIN
-SELECT imp_stage_batch('TPL-SITE-CW', (SELECT v.version FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-SITE-CW' AND v.is_current),
+SELECT imp_stage_batch('TPL-CIVIL', (SELECT v.version FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-CIVIL' AND v.is_current),
   NULL, 'forged.xlsx', 'x', NULL, '[]'::jsonb, 'submit', '{"reason": "No step-up"}'::jsonb);
 -- @end
 
@@ -295,7 +295,7 @@ SELECT imp_stage_batch('TPL-SITE-CW', (SELECT v.version FROM template_versions v
 -- @category historical-waiver
 -- @expect error P0001 waiver is closed
 \ctx ADMIN stepup=300
-SELECT imp_stage_batch('TPL-SITE-CW', (SELECT v.version FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-SITE-CW' AND v.is_current),
+SELECT imp_stage_batch('TPL-CIVIL', (SELECT v.version FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-CIVIL' AND v.is_current),
   NULL, 'forged.xlsx', 'x', NULL, '[]'::jsonb, 'submit', '{"reason": "The waiver is closed"}'::jsonb);
 -- @end
 
@@ -305,7 +305,7 @@ SELECT imp_stage_batch('TPL-SITE-CW', (SELECT v.version FROM template_versions v
 -- @expect error P0001 draft has no document check
 \ctx ADMIN stepup=300
 SELECT hw_waiver_set(true, cal_today() - 30, 'Control: open for the case') IS NOT NULL;
-SELECT imp_stage_batch('TPL-SITE-CW', (SELECT v.version FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-SITE-CW' AND v.is_current),
+SELECT imp_stage_batch('TPL-CIVIL', (SELECT v.version FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-CIVIL' AND v.is_current),
   NULL, 'forged.xlsx', 'x', NULL, '[]'::jsonb, 'draft', '{"reason": "A draft"}'::jsonb);
 -- @end
 
