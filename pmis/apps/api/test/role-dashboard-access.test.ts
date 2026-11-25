@@ -34,7 +34,7 @@ describe('role dashboard access (0163)', () => {
   it('a role has all three tabs and shows Messages and Inbox by default', async () => {
     const api = await person(null);
     const me = await api.call('get', '/me');
-    expect(me.body.effective.dashboard_tabs).toEqual(['pmo', 'cw', 'te']);
+    expect(me.body.effective.dashboard_tabs).toEqual(['cw', 'pmo', 'te']);
     expect(me.body.effective.nav).toEqual(expect.arrayContaining(['messages', 'inbox']));
   });
 
@@ -55,7 +55,7 @@ describe('role dashboard access (0163)', () => {
   });
 
   it('hiding Messages and Inbox removes them from the menu only', async () => {
-    const api = await person(['pmo', 'cw', 'te'], true);
+    const api = await person(['cw', 'pmo', 'te'], true);
     const nav = (await api.call('get', '/me')).body.effective.nav as string[];
     expect(nav).not.toContain('messages');
     expect(nav).not.toContain('inbox');
@@ -65,7 +65,7 @@ describe('role dashboard access (0163)', () => {
   it('a System Admin is never limited', async () => {
     const { api } = await adminApi(app, db);
     const me = await api.call('get', '/me');
-    expect(me.body.effective.dashboard_tabs).toEqual(['pmo', 'cw', 'te']);
+    expect(me.body.effective.dashboard_tabs).toEqual(['cw', 'pmo', 'te']);
     expect((await api.call('get', '/dashboard?view=TE')).status).toBe(200);
   });
 
@@ -73,7 +73,7 @@ describe('role dashboard access (0163)', () => {
     const { api } = await adminApi(app, db);
     const created = await api.call('post', '/roles', { code: `DA_${Date.now()}`, name_en: 'Dash access', description_en: 'x', can_hold_matrix_levels: false, reason: 'new role', default_region_ids: [1], default_module_keys: ['dashboard'] });
     expect(created.status).toBe(201);
-    expect(created.body).toMatchObject({ dashboard_tabs: ['pmo', 'cw', 'te'], hide_messages_inbox: false });
+    expect(created.body).toMatchObject({ dashboard_tabs: ['cw', 'pmo', 'te'], hide_messages_inbox: false });
     const done = await api.call('patch', `/roles/${created.body.id}`, { dashboard_tabs: ['te', 'cw'], hide_messages_inbox: true, reason: 'management view' }, { 'If-Match': created.headers['etag']! });
     expect(done.status).toBe(200);
     expect(done.body).toMatchObject({ dashboard_tabs: ['cw', 'te'], hide_messages_inbox: true });
