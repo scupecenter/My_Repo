@@ -10,7 +10,7 @@ import { SettingsRoutes } from './Settings';
 
 /**
  * Settings > Workflow > Columns (W3; before: the SiteMaster tab). Contract 0.15.21, F15: every Master column with its Site Master menus, changed in one
- * dialog with a reason (`PATCH /site-master/columns/{ord}/sections`, the same right as before: site360_col_can_admin on the server).
+ * dialog with a reason (`PATCH /site-master/columns/{ord}/sections`, the same right as before: site_master_col_can_admin on the server).
  */
 function Probe() {
   const l = useLocation();

@@ -29,7 +29,7 @@ export interface SiteMasterColumnListDto {
 
 /**
  * Workflow Studio S2 (contract 0.15.43, migration 0133): the admin of the Site Master columns. Every rule (who may, the protected columns, the placement,
- * the type conversion, the ETag, the audit) is in the SECURITY DEFINER doors site360_column_*; this service checks the permission before the step-up (a plain
+ * the type conversion, the ETag, the audit) is in the SECURITY DEFINER doors site_master_column_*; this service checks the permission before the step-up (a plain
  * user gets 403, not 401), parses the request, adds the step-up and translates the database refusals.
  */
 @Injectable()
@@ -59,7 +59,7 @@ export class SiteMasterColumnsService {
   private async requireAdmin(): Promise<void> {
     const r = await this.db.tx.$queryRaw<
       { ok: boolean | null }[]
-    >`SELECT site360_col_can_admin() AS ok`;
+    >`SELECT site_master_col_can_admin() AS ok`;
     if (r[0]?.ok !== true)
       throw new ProblemException(403, 'action_forbidden', {
         detail:
@@ -93,7 +93,7 @@ export class SiteMasterColumnsService {
       ]);
     await this.requireAdmin();
     const items = await this.door<(ColumnAdminRow & Json)[]>(
-      Prisma.sql`SELECT site360_columns_list(${inc}::boolean) AS r`,
+      Prisma.sql`SELECT site_master_columns_list(${inc}::boolean) AS r`,
     );
     const list = Array.isArray(items) ? items : [];
     return {
@@ -107,7 +107,7 @@ export class SiteMasterColumnsService {
     const ord = this.ord(rawOrd);
     await this.requireAdmin();
     return this.door<Json>(
-      Prisma.sql`SELECT site360_column_get(${ord}::integer) AS r`,
+      Prisma.sql`SELECT site_master_column_get(${ord}::integer) AS r`,
     );
   }
 
@@ -116,7 +116,7 @@ export class SiteMasterColumnsService {
     const b = parse(previewBody, raw);
     await this.requireAdmin();
     return this.door<Json>(
-      Prisma.sql`SELECT site360_column_type_preview(${ord}::integer, ${b.value_type}::text, ${b.list_catalogue ?? null}::text) AS r`,
+      Prisma.sql`SELECT site_master_column_type_preview(${ord}::integer, ${b.value_type}::text, ${b.list_catalogue ?? null}::text) AS r`,
     );
   }
 
@@ -126,7 +126,7 @@ export class SiteMasterColumnsService {
     await this.stepUp.require(auth);
     const { reason, ...body } = b;
     return this.door<Json>(
-      Prisma.sql`SELECT site360_column_create(${JSON.stringify(body)}::jsonb, ${reason}::text) AS r`,
+      Prisma.sql`SELECT site_master_column_create(${JSON.stringify(body)}::jsonb, ${reason}::text) AS r`,
     );
   }
 
@@ -143,7 +143,7 @@ export class SiteMasterColumnsService {
     await this.stepUp.require(auth);
     const { reason, confirm_unconvertible: confirm, ...patch } = b;
     return this.door<Json>(
-      Prisma.sql`SELECT site360_column_update(${ord}::integer, ${version}::integer, ${JSON.stringify(patch)}::jsonb, ${confirm ?? false}::boolean, ${reason}::text) AS r`,
+      Prisma.sql`SELECT site_master_column_update(${ord}::integer, ${version}::integer, ${JSON.stringify(patch)}::jsonb, ${confirm ?? false}::boolean, ${reason}::text) AS r`,
     );
   }
 
@@ -160,7 +160,7 @@ export class SiteMasterColumnsService {
     const version = parseIfMatch(ifMatch);
     await this.stepUp.require(auth);
     return this.door<Json>(
-      Prisma.sql`SELECT site360_column_set_active(${ord}::integer, ${version}::integer, ${active}::boolean, ${b.reason}::text) AS r`,
+      Prisma.sql`SELECT site_master_column_set_active(${ord}::integer, ${version}::integer, ${active}::boolean, ${b.reason}::text) AS r`,
     );
   }
 
@@ -176,7 +176,7 @@ export class SiteMasterColumnsService {
     const version = parseIfMatch(ifMatch);
     await this.stepUp.require(auth);
     return this.door<Json>(
-      Prisma.sql`SELECT site360_column_delete(${ord}::integer, ${version}::integer, ${b.reason}::text) AS r`,
+      Prisma.sql`SELECT site_master_column_delete(${ord}::integer, ${version}::integer, ${b.reason}::text) AS r`,
     );
   }
 }

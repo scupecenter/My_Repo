@@ -7,7 +7,7 @@ import { actor, Actor, makeSite } from './wf-helpers';
 import type { Site } from './wf-helpers';
 
 /**
- * Contract 0.15.49 (migration 0138): saved views of the screens `site360-<menu>` and `dashboard`, and the server-side search of the value lists
+ * Contract 0.15.49 (migration 0138): saved views of the screens `site-master-<menu>` and `dashboard`, and the server-side search of the value lists
  * (GET /saved-views/filter-fields/{field}/values). Everything runs in the shared test database: every site and value written here carries this file's tag, and
  * every filter tree starts with a condition on the tag, so other files' data never counts.
  */
@@ -91,7 +91,7 @@ describe('saved views of a Site Master menu and of the dashboard', () => {
     const a = await actor(app, db, { regions: null, grants: SITES_VIEW });
     const tree = mine(cond('sub_region', 'is', `SVA-${TAG}`));
     const body = {
-      screen_key: 'site360-cw',
+      screen_key: 'site-master-cw',
       name: nm('CW Tripoli'),
       filters: {
         q: '',
@@ -113,7 +113,7 @@ describe('saved views of a Site Master menu and of the dashboard', () => {
     const res = await create(a, body);
     expect(res.status, JSON.stringify(res.body)).toBe(201);
     expect(res.body).toMatchObject({
-      screen_key: 'site360-cw',
+      screen_key: 'site-master-cw',
       is_owner: true,
       shared: false,
       version: 1,
@@ -184,7 +184,7 @@ describe('saved views of a Site Master menu and of the dashboard', () => {
       'om',
     ]) {
       const res = await create(a, {
-        screen_key: `site360-${menu}`,
+        screen_key: `site-master-${menu}`,
         name: nm(`Menu ${menu}`),
         filters: { advanced: mine() },
       });
@@ -193,13 +193,13 @@ describe('saved views of a Site Master menu and of the dashboard', () => {
     expect(
       (
         await create(a, {
-          screen_key: 'site360-nope',
+          screen_key: 'site-master-nope',
           name: nm('Unknown menu'),
         })
       ).status,
     ).toBe(422);
     const bad = await create(a, {
-      screen_key: 'site360-te',
+      screen_key: 'site-master-te',
       name: nm('Bad field'),
       filters: { advanced: mine(cond('no_such_field', 'is', 'x')) },
     });
@@ -207,14 +207,14 @@ describe('saved views of a Site Master menu and of the dashboard', () => {
     expect(bad.body.errors[0]).toMatchObject({ code: 'unknown_field' });
     // a Master column of another menu is not a field of this menu's catalogue (m:36 belongs to the procurement register: not viewable here)
     const hidden = await create(a, {
-      screen_key: 'site360-master',
+      screen_key: 'site-master-master',
       name: nm('Hidden column'),
       filters: { advanced: mine(cond('m:36', 'is', 'x')) },
     });
     expect(hidden.status).toBe(422);
     expect(hidden.body.errors[0]).toMatchObject({ code: 'unknown_field' });
     const op = await create(a, {
-      screen_key: 'site360-te',
+      screen_key: 'site-master-te',
       name: nm('Bad operator'),
       filters: { advanced: mine(cond('sub_region', 'contains', 'x')) },
     });
@@ -288,7 +288,7 @@ describe('saved views of a Site Master menu and of the dashboard', () => {
     expect(
       (
         await create(sitesOnly, {
-          screen_key: 'site360-master',
+          screen_key: 'site-master-master',
           name: nm('Menu with sites only'),
         })
       ).status,
@@ -302,7 +302,7 @@ describe('the same rights model as the other saved views', () => {
     const ben2 = await actor(app, db, { regions: null, grants: SITES_VIEW });
     const noSites = await actor(app, db, { grants: [['issues', 'view']] });
     const res = await create(ann, {
-      screen_key: 'site360-sow',
+      screen_key: 'site-master-sow',
       name: nm('Private'),
       filters: { layout: 'list' },
     });
@@ -326,14 +326,14 @@ describe('the same rights model as the other saved views', () => {
       ).status,
     ).toBe(404);
     expect(
-      (await create(noSites, { screen_key: 'site360-sow', name: nm('Nope') }))
+      (await create(noSites, { screen_key: 'site-master-sow', name: nm('Nope') }))
         .status,
     ).toBe(403);
     // sharing needs views.share
     expect(
       (
         await create(ann, {
-          screen_key: 'site360-sow',
+          screen_key: 'site-master-sow',
           name: nm('Shared by nobody'),
           audience: { user_ids: [ben2.user.id] },
         })
@@ -350,7 +350,7 @@ describe('the same rights model as the other saved views', () => {
     });
     const outsider = await actor(app, db, { regions: null, grants: DASH_VIEW });
     const menu = await create(lead, {
-      screen_key: 'site360-hoto',
+      screen_key: 'site-master-hoto',
       name: nm('HOTO late'),
       filters: { layout: 'wide', advanced: mine() },
       audience: { user_ids: [reader.user.id, sitesOnly.user.id] },
@@ -431,7 +431,7 @@ describe('the same rights model as the other saved views', () => {
   it('a region-limited lead may not share a view that pins another region, on a menu or on the dashboard, and may not share with everyone', async () => {
     const lead = await actor(app, db, { regions: [1], grants: LEAD });
     const other = await actor(app, db, { regions: null, grants: SITES_VIEW });
-    for (const screen of ['site360-cw', 'dashboard']) {
+    for (const screen of ['site-master-cw', 'dashboard']) {
       expect(
         (
           await create(lead, {
@@ -488,7 +488,7 @@ describe('the same rights model as the other saved views', () => {
       cond('sub_region', 'is', `SVA-${TAG}`),
     );
     const res = await create(lead, {
-      screen_key: 'site360-master',
+      screen_key: 'site-master-master',
       name: nm('With hidden'),
       filters: { advanced: tree },
       audience: { user_ids: [reader.user.id] },
@@ -520,8 +520,8 @@ describe('GET /saved-views/filter-fields/{field}/values', () => {
     const a = await actor(app, db, { regions: null, grants: DASH_VIEW });
     for (const screen of [
       'sites',
-      'site360-master',
-      'site360-cw',
+      'site-master-master',
+      'site-master-cw',
       'dashboard',
     ]) {
       const both = await values(
@@ -581,7 +581,7 @@ describe('GET /saved-views/filter-fields/{field}/values', () => {
     const tripoli = await actor(app, db, { regions: [1], grants: SITES_VIEW });
     const res = await values(
       tripoli,
-      'site360-master',
+      'site-master-master',
       'sub_region',
       `q=${TAG}`,
     );
@@ -614,7 +614,7 @@ describe('GET /saved-views/filter-fields/{field}/values', () => {
       `UPDATE field_list_values SET is_active = false WHERE field_id = $1 AND code = $2`,
       [f.rows[0].id, `GAMMA-${TAG}`],
     );
-    for (const screen of ['sites', 'site360-te', 'dashboard']) {
+    for (const screen of ['sites', 'site-master-te', 'dashboard']) {
       const key = `c:${code}`;
       const byLabel = await values(lead, screen, key, 'q=beta');
       expect(byLabel.status, `${screen} ${JSON.stringify(byLabel.body)}`).toBe(
@@ -647,7 +647,7 @@ describe('GET /saved-views/filter-fields/{field}/values', () => {
     expect(text.status).toBe(422);
     expect(text.body.errors[0]).toMatchObject({ code: 'not_enum' });
     // a Master column of another menu is unknown on this one
-    expect((await values(a, 'site360-cw', 'm:1', 'q=x')).status).toBe(422);
+    expect((await values(a, 'site-master-cw', 'm:1', 'q=x')).status).toBe(422);
     expect((await values(a, 'audit-log', 'sub_region', 'q=x')).status).toBe(
       422,
     );
@@ -667,7 +667,7 @@ describe('GET /saved-views/filter-fields/{field}/values', () => {
       200,
     );
     const none = await actor(app, db, { grants: [['issues', 'view']] });
-    for (const screen of ['sites', 'site360-master', 'dashboard'])
+    for (const screen of ['sites', 'site-master-master', 'dashboard'])
       expect(
         (await values(none, screen, 'sub_region', 'q=x')).status,
         screen,

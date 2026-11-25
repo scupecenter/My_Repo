@@ -32,7 +32,7 @@ New menu, each with Grid / Vertical toggle and the shared toolbar:
 | Dismantle | CW Dismantle and TE Dismantle as two bands (FN to FW) |
 | O&M | After HOTO to final closure: CW and TE DLP/FAC, final closure (FA to FM) |
 
-Column ranges are the default mapping; admins can move a column between menus (column metadata `site360_section`). STATUS columns (Current Milestone, Next Milestone, Overall Status, issues) appear in every menu.
+Column ranges are the default mapping; admins can move a column between menus (column metadata `site_master_section`). STATUS columns (Current Milestone, Next Milestone, Overall Status, issues) appear in every menu.
 
 The grid matches the Master sheet look: phase band row, group row, field row, Phase Gate columns highlighted, frozen identity columns (# to Site Name by default, user can change), a totals row of visible rows (count, sum for numbers), conditional colours.
 
@@ -98,7 +98,7 @@ Old routes redirect to the new tab and section. CHANGELOG 149, no contract chang
 
 ## F20 Dashboard follow-up (after #138)
 
-- The dashboard reads from the same sources as Site Master and the registers (site360_master_values view, task steps, register records); no own copy, so every edit anywhere shows on the dashboard.
+- The dashboard reads from the same sources as Site Master and the registers (site_master_master_values view, task steps, register records); no own copy, so every edit anywhere shows on the dashboard.
 - New edit options on the dashboard: admin-set targets (sites per batch, monthly On-Air target), KPI thresholds (green/amber/red), which cards each tab shows and their order, saved filter sets; global ones in Settings, per-user layout local.
 - New counters: SLA breaches and at-risk (warning %) per stage; weighted progress vs plan (from F14 weights); sites per Site Master menu stage; locked rows/sites count; data quality (empty mandatory cells per menu); advances open after work closed and vehicle-ready rate (Car Dispatcher, Financial Advances); dismantle CW/TE pending; As-Built submitted vs PAC; time-in-state median/P85 (F1); stale tasks (idle N days).
 - CHANGELOG 150, contract next free number at build time.

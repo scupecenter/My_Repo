@@ -14,6 +14,8 @@ export interface NavHead { id: string; name_en: string; name_ar: string; icon: s
 export interface Layout { headings: NavHead[] }
 
 /** The default headings, in order (the groups of navItems.ts). */
+/** The names the Site Register heading had before it was called Site Master (stored in layouts saved at the time). */
+const LEGACY_SITE_NAME = /^\s*(site\s?360|سايت\s?360|الموقع\s?360)\s*$/i;
 export const DEFAULT_GROUPS = ['work', 'site_register', 'registers', 'data', 'library', 'admin', 'logs'] as const;
 export const OTHER_ID = 'other';
 export const NAME_MAX = 60;
@@ -54,7 +56,13 @@ export function resolveLayout(saved: unknown, nav: readonly NavItem[] = NAV_SIDE
     const id = str(h.id);
     if (!id || ids.has(id)) return null;
     ids.add(id);
-    return { id, name_en: str(h.name_en) || id, name_ar: str(h.name_ar) || str(h.name_en) || id, icon: iconOrNull(h.icon) };
+    let name_en = str(h.name_en) || id, name_ar = str(h.name_ar) || str(h.name_en) || id;
+    // Site 360 was renamed Site Master: a layout saved while the heading still carried the old name shows the current default name.
+    if (id === 'site_register') {
+      if (LEGACY_SITE_NAME.test(name_en)) name_en = groupName(id, en);
+      if (LEGACY_SITE_NAME.test(name_ar)) name_ar = groupName(id, ar);
+    }
+    return { id, name_en, name_ar, icon: iconOrNull(h.icon) };
   };
   const out: NavHead[] = [];
   for (const raw of heads) {

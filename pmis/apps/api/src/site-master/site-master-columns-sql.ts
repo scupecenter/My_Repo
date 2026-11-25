@@ -2,7 +2,7 @@ import { Prisma } from '@prisma/client';
 
 /** The Master columns, with the effective kind of source (0.15.35): a not-tracked column takes the kind of a mapping an admin added later. */
 export const COLUMNS_SQL = Prisma.sql`
-  SELECT mc.ord, mc.letter, mc.group_top, mc.group_mid, mc.header, mc.site360_sections AS sections,
+  SELECT mc.ord, mc.letter, mc.group_top, mc.group_mid, mc.header, mc.site_master_sections AS sections,
     CASE
       WHEN mc.source_kind <> 'not_tracked' THEN mc.source_kind
       WHEN EXISTS (SELECT 1 FROM field_definitions fd WHERE fd.entity_type::text = 'site' AND fd.is_active AND fd.master_export_column = mc.letter) THEN 'custom_field'

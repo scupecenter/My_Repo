@@ -176,7 +176,7 @@ The Site Master name was removed from navigation in #177. Settings still has a t
 
 Do:
 1. List every function Site360Columns.tsx and its API (GET/POST /site360/columns...) still offer that Studio does not. Write the list here.
-2. Move each missing function into Settings > Workflow (a section, or inside Studio's Columns view), with the same rights (site360_col_can_admin).
+2. Move each missing function into Settings > Workflow (a section, or inside Studio's Columns view), with the same rights (site_master_col_can_admin).
 3. Remove the `site360` tab. Add a legacy redirect `site360` and `site360-columns` to the new Workflow section in LEGACY_SETTINGS_PATHS.
 4. Replace user-visible "Site360" / "Site Master" words in Settings and in i18n with "Site Master" (en) and its Arabic equivalent. Code identifiers and API paths stay.
 5. Tests: settingsRedirects and settingsScreens updated; the moved functions keep their tests.
@@ -188,7 +188,7 @@ Step 1 finding (2026-11-24). What the Site360 tab (Site360Columns.tsx) and its A
 | # | Function | Studio before W3 | Moved to |
 |---|----------|------------------|----------|
 | 1 | One list of every Master column in Master order (A to GE and the added columns), whatever feeds it | Studio lists only the columns whose source is a task, inside that task's form | Settings > Workflow > Columns (`workflow/columns`), the full list |
-| 2 | Change the menus of a column that no task feeds (site fields such as Site ID or Region, scope flags, register and formula columns) through `PATCH /site360/columns/{ord}/sections` with a reason | Not reachable: such a column is in no task form | Settings > Workflow > Columns, same dialog, same API, same right (`site360_col_can_admin` on the server) |
+| 2 | Change the menus of a column that no task feeds (site fields such as Site ID or Region, scope flags, register and formula columns) through `PATCH /site360/columns/{ord}/sections` with a reason | Not reachable: such a column is in no task form | Settings > Workflow > Columns, same dialog, same API, same right (`site_master_col_can_admin` on the server) |
 | 3 | The status columns (FX:GE) shown as "Status (every menu)", with no edit | Shown only for task columns | Settings > Workflow > Columns |
 | 4 | The list is read from `GET /site360/sections` (menu names from the server, readable by anyone who opens Settings); only the save needs the right | `GET /site360/columns` answers 403 to anyone without the right | Kept as it was: the moved screen still reads `GET /site360/sections` |
 

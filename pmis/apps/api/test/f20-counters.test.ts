@@ -261,7 +261,8 @@ describe("F20 counters: the seven former gaps and the Site Master counts (contra
 
   it("lists the sites per Site Master view, with integer counts", async () => {
     const body = (await admin.api.call("get", "/dashboard/extras")).body as J;
-    const menus = body.counters.site360_menus as J[];
+    const menus = body.counters.site_master_menus as J[];
+    expect(body.counters.site360_menus).toEqual(menus); // the deprecated name, one release
     expect(menus.map((m) => m.code)).toEqual(
       expect.arrayContaining(["CW", "TE", "OM"]),
     );

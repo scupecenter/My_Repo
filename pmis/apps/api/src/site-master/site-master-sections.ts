@@ -1,7 +1,7 @@
 /**
  * Site Master menus (F15, contract 0.15.21, migration 0101). Pure functions: the menus of a Master column and the 3-level
  * grid header (phase band, group, field). A column may belong to several menus (owner decision 2026-11-15): the database
- * holds the set (master_columns.site360_sections), the defaults below are the same ranges as the migration.
+ * holds the set (master_columns.site_master_sections), the defaults below are the same ranges as the migration.
  */
 
 export const SITE_MASTER_SECTIONS = ['design_acq', 'sow', 'cw', 'te', 'hoto', 'dismantle', 'om', 'status'] as const;

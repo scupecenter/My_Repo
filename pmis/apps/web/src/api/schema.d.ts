@@ -5931,7 +5931,7 @@ export interface paths {
          *     the bands `#`, `Phase Gate` and `STATUS` are reserved, code `reserved_band`).
          *     `value_type` is the type of the input when an existing input is linked (a different value is 422 `type_follows_source`); for a new input and for a site field
          *     it is the type of the column. A `list` type needs `list_catalogue` (an active list); another type takes none (422 `list_required` or `list_not_allowed`).
-         *     System Admin, or a delegate of `fields` edit for all regions; a reason and a step-up; audited `site360.column_created` with after. The new column has no value
+         *     System Admin, or a delegate of `fields` edit for all regions; a reason and a step-up; audited `site_master.column_created` with after. The new column has no value
          *     yet. 409 `duplicate` when the header exists, 409 `input_already_mapped` or `field_already_mapped` when the source already feeds a column, 422 `unknown_task`.
          */
         post: operations["createSiteMasterColumn"];
@@ -5967,7 +5967,7 @@ export interface paths {
          *     parameter. An original column is never deleted (409 `system_field`); a column that holds values is 409 `column_in_use` (`why`: `has_values`, `count`): deactivate
          *     it with `POST .../deactivate`. The letter and the Master order are free again only when it was the last added column; otherwise the export keeps an empty column
          *     at that position so the letters of the others stay true. `If-Match` is required. System Admin, or a delegate of `fields` edit for all regions; a step-up; audited
-         *     `site360.column_deleted` with before.
+         *     `site_master.column_deleted` with before.
          */
         delete: operations["deleteSiteMasterColumn"];
         options?: never;
@@ -5985,7 +5985,7 @@ export interface paths {
          *     A type or list change never rewrites a stored value. The values that would not convert are counted (see `POST .../type-preview`); when there are some and
          *     `confirm_unconvertible` is not true the answer is 409 `conversion_unconfirmed` with `conversion` (the preview). An `If-Match` with the column's `version` is
          *     required (428, 412). System Admin, or a delegate of `fields` edit for all regions; a reason and a step-up; one audit row with before and after
-         *     (`site360.column_updated`). Changing nothing is 409 `invalid_transition`.
+         *     (`site_master.column_updated`). Changing nothing is 409 `invalid_transition`.
          */
         patch: operations["updateSiteMasterColumn"];
         trace?: never;
@@ -6032,7 +6032,7 @@ export interface paths {
          * Deactivate a Site Master column (0.15.43, Workflow Studio S2)
          * @description 0.15.43 (migration 0133). The column leaves every menu, the grid and the Master-format export (which keeps its position empty so the letters of the others stay true); its values, its source and its letter stay, so it can be
          *     reactivated. A protected column cannot be deactivated (409 `system_field`); an inactive one is 409 `invalid_transition`. `If-Match` is required. System Admin,
-         *     or a delegate of `fields` edit for all regions; a reason and a step-up; audited `site360.column_deactivated`.
+         *     or a delegate of `fields` edit for all regions; a reason and a step-up; audited `site_master.column_deactivated`.
          */
         post: operations["deactivateSiteMasterColumn"];
         delete?: never;
@@ -6056,7 +6056,7 @@ export interface paths {
         /**
          * Reactivate a deactivated Site Master column (0.15.43, Workflow Studio S2)
          * @description 0.15.43. The column returns to its menus, the grid and the export at its place and with its letter. An active column is 409 `invalid_transition`. `If-Match`
-         *     is required. System Admin, or a delegate of `fields` edit for all regions; a reason and a step-up; audited `site360.column_reactivated`.
+         *     is required. System Admin, or a delegate of `fields` edit for all regions; a reason and a step-up; audited `site_master.column_reactivated`.
          */
         post: operations["reactivateSiteMasterColumn"];
         delete?: never;
@@ -18687,7 +18687,14 @@ export interface components {
             /** @description Active sites in scope (cancelled sites left out). */
             sites_total: number | null;
             /** @description 0.15.29: the sites per Site Master view (workflow views CW, TE, OM), in view order. A site counts once per view when it has a task of the view that is not n/a or skipped. Null without sites.view. */
-            site360_menus: {
+            site_master_menus: {
+                code: string;
+                name_en: string;
+                name_ar: string | null;
+                sites: number;
+            }[] | null;
+            /** @description Deprecated (0.15.75), the same list as `site_master_menus`, removed after one release. 0.15.29: the sites per Site Master view (workflow views CW, TE, OM), in view order. A site counts once per view when it has a task of the view that is not n/a or skipped. Null without sites.view. */
+            site360_menus?: {
                 code: string;
                 name_en: string;
                 name_ar: string | null;

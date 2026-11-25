@@ -126,7 +126,7 @@ describe('the side menu with a shared layout', () => {
       headings: d.headings.map((h) => (h.id === 'site_register' ? { ...h, name_en: 'SITE 360', children: ['sites', 'dismantle'] } : h.id === 'registers' ? { ...h, children: h.children.filter((k) => k !== 'dismantle').reverse() } : h)),
     };
     const r = resolveLayout(saved);
-    expect(r.headings.find((h) => h.id === 'site_register')).toMatchObject({ name_en: 'SITE 360', children: ['sites'] });
+    expect(r.headings.find((h) => h.id === 'site_register')).toMatchObject({ name_en: 'Site Master', name_ar: 'ماستر المواقع', children: ['sites'] }); // a layout saved under the old name shows the current one
     const regs = r.headings.find((h) => h.id === 'registers')!;
     expect(regs.children.at(-1)).toBe('dismantle');
     expect(regs.children.filter((k) => k === 'dismantle')).toHaveLength(1);

@@ -17,7 +17,9 @@ import { FilterCatalogService } from './filter-catalog.service';
  * that need the caller's region scope (a region filter of a shared view) and the read check of a draft's task or record.
  */
 
-const SCREEN = z.string().regex(/^[a-z][a-z0-9_-]{1,80}$/);
+/** Site 360 was renamed Site Master (0158): the old screen key `site-master-<menu>` is read as `site-master-<menu>` for one release. */
+export const normScreen = (s: string): string => s.replace(/^site-master-/, 'site-master-');
+const SCREEN = z.string().regex(/^[a-z][a-z0-9_-]{1,80}$/).transform(normScreen);
 const colId = z.string().max(100);
 const columnsSchema = z.object({
   order: z.array(colId).max(200).optional(),
@@ -127,12 +129,12 @@ export class SavedViewsService {
   }
 
   /**
-   * 0.15.49: a view of `site360-<menu>` may hold a condition on a Master column (`m:<ord>`) that the reader may not use (a register the reader may not view, a
+   * 0.15.49: a view of `site-master-<menu>` may hold a condition on a Master column (`m:<ord>`) that the reader may not use (a register the reader may not view, a
    * custom field a field rule hides): the condition is removed from what the reader gets and counted in `stripped_columns`, as hidden columns and fields are
    * on the other screens (the database strips `f:` and `c:` fields; the Master columns are decided by the catalogue of the reader).
    */
   private async scrub<T extends SavedViewDto>(dto: T): Promise<T> {
-    if (!dto || typeof dto.screen_key !== 'string' || !/^site360-/.test(dto.screen_key)) return dto;
+    if (!dto || typeof dto.screen_key !== 'string' || !/^site-master-/.test(dto.screen_key)) return dto;
     const adv = (dto.filters as { advanced?: unknown } | undefined)?.advanced;
     if (!treeHasMaster(adv)) return dto;
     const keys = new Set((await this.catalog.catalog(dto.screen_key)).keys());
@@ -144,7 +146,7 @@ export class SavedViewsService {
 
   // ------------------------------------------------------------------ views
   async list(_auth: AuthContext, q: Record<string, unknown>): Promise<{ items: SavedViewDto[]; can_share: string; can_manage: boolean }> {
-    const screen = typeof q.screen_key === 'string' && q.screen_key !== '' ? q.screen_key : null;
+    const screen = typeof q.screen_key === 'string' && q.screen_key !== '' ? normScreen(q.screen_key) : null;
     if (screen !== null && !SCREEN.safeParse(screen).success) throw problems.validation([{ path: '/screen_key', code: 'invalid' }]);
     const scope = typeof q.scope === 'string' && q.scope !== '' ? q.scope : 'all';
     const inactive = boolParam(q, 'include_inactive') === true;
@@ -224,11 +226,11 @@ export class SavedViewsService {
 
   /** The screen of a filter-fields request: it must have a filter builder and the caller must be able to open its module(s). */
   private async requireFilterScreen(q: Record<string, unknown>): Promise<string> {
-    const screen = typeof q.screen_key === 'string' ? q.screen_key : '';
+    const screen = typeof q.screen_key === 'string' ? normScreen(q.screen_key) : '';
     if (!SCREEN.safeParse(screen).success || !FilterCatalogService.supports(screen)) {
       throw problems.validation([{ path: '/screen_key', code: 'invalid', message: 'This list has no filter builder.' }]);
     }
-    const local = FilterCatalogService.modulesOf(screen); // dashboard and site360-<menu>: two rights for the dashboard, the Site Register for the menus
+    const local = FilterCatalogService.modulesOf(screen); // dashboard and site-master-<menu>: two rights for the dashboard, the Site Register for the menus
     if (local) {
       for (const m of local) await this.access.requireRegions(m, 'view');
       return screen;
