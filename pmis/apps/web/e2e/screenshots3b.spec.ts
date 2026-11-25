@@ -19,9 +19,9 @@ for (const [locale, theme] of [['en', 'light'], ['ar', 'dark']] as const) {
     await page.getByTestId('settings-tab-sla').click(); await page.getByTestId('sla-create-draft').click();
     await page.getByTestId('sla-create-dialog-reason').fill('Tighten A2'); await page.getByTestId('sla-create-dialog-submit').click();
     await page.getByTestId('sla-ovr-add-A2').click(); await page.getByTestId('sla-max-A2').fill('6'); await page.getByTestId('sla-A2').waitFor(); await shot('settings-sla');
-    await page.getByTestId('settings-tab-weights').click(); await page.getByTestId('weights-code').selectOption('health_index'); await page.getByTestId('weights-error-health_index').waitFor(); await shot('settings-weights');
+    await page.getByTestId('settings-section-sla-weights').click(); await page.getByTestId('weights-code').selectOption('health_index'); await page.getByTestId('weights-error-health_index').waitFor(); await shot('settings-weights');
     await page.getByTestId('settings-tab-workflow').click(); await page.getByTestId('settings-section-workflow-freeze').click(); await page.getByTestId('freeze-lift').waitFor(); await shot('settings-freeze');
-    await page.getByTestId('settings-tab-sla').click(); await page.getByTestId('settings-section-sla-dlp').click(); await page.getByTestId('dlp-version-2').waitFor(); await shot('settings-dlp');
+    await page.getByTestId('settings-tab-security').click(); await page.getByTestId('settings-section-security-dlp').click(); await page.getByTestId('dlp-version-2').waitFor(); await shot('settings-dlp');
     await page.getByTestId('settings-tab-workflow').click(); await page.getByTestId('settings-section-workflow-idle').click(); await page.getByTestId('idle-days').waitFor(); await shot('settings-idle');
     await page.getByTestId('settings-tab-alerts').click(); await page.getByTestId('np-row-no_holder').waitFor(); await shot('settings-notifications');
     await page.getByTestId('settings-tab-security').click(); await page.getByTestId('settings-section-security-retention').click(); await page.getByTestId('ret-audit').waitFor(); await shot('settings-retention');

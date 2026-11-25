@@ -159,7 +159,7 @@ describe('Settings > My Work > Daily Plan', () => {
     const u = userEvent.setup();
     renderApp(<App />, { route: '/admin/settings/my-work/daily-plan' });
     expect(await screen.findByTestId('page-daily-plan-settings')).toBeInTheDocument();
-    expect(screen.getByTestId('settings-tab-my-work')).toBeInTheDocument();
+    expect(screen.getByTestId('settings-tab-screens')).toBeInTheDocument();
     expect(screen.getByTestId('dps-toggle-progress-site_code')).toBeDisabled();
     await u.click(screen.getByTestId('dps-toggle-progress-remark'));
     await u.click(screen.getByTestId('dps-up-progress-remark'));

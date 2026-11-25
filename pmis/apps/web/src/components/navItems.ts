@@ -1,6 +1,6 @@
 import type { Concept } from '@/lib/icons';
 
-export const NAV: { key: string; to: string; icon: Concept; group: 'work' | 'site_register' | 'registers' | 'data' | 'library' | 'admin' | 'logs' }[] = [
+export const NAV: { key: string; to: string; icon: Concept; group: 'home' | 'work' | 'site_register' | 'registers' | 'data' | 'library' | 'admin' | 'logs' }[] = [
   { key: 'my_work', to: '/my-work', icon: 'home', group: 'work' },
   // 0149 (W7): My Work > Daily Plan
   { key: 'daily_plan', to: '/my-work/daily-plan', icon: 'dailyPlan', group: 'work' },
@@ -8,7 +8,7 @@ export const NAV: { key: string; to: string; icon: Concept; group: 'work' | 'sit
   { key: 'approvals', to: '/approvals', icon: 'approval', group: 'work' },
   { key: 'workload', to: '/workload', icon: 'workload', group: 'work' },
   { key: 'status_updates', to: '/status-updates', icon: 'weekly', group: 'work' },
-  { key: 'dashboard', to: '/dashboard', icon: 'dashboard', group: 'work' },
+  { key: 'dashboard', to: '/dashboard', icon: 'dashboard', group: 'home' },
   { key: 'messages', to: '/messages', icon: 'message', group: 'work' },
   { key: 'sites', to: '/sites', icon: 'site', group: 'site_register' },
   { key: 'dismantle', to: '/registers/dismantle', icon: 'dismantle', group: 'registers' },

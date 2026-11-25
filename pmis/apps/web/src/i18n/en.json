@@ -84,6 +84,7 @@
     }
   },
   "nav": {
+    "group_home": "Dashboard",
     "group_work": "Work",
     "group_data": "Data entry",
     "group_admin": "Administration",
@@ -139,6 +140,9 @@
     "move_down": "Move down",
     "resize": "Resize sidebar",
     "icons_only": "Icons only",
+    "pin_menu": "Pin the menu (always visible)",
+    "waiting_count": "{{count}} waiting",
+    "autohide_menu": "Hide the menu automatically",
     "full_menu": "Full menu",
     "sidebar_label": "Main menu",
     "close_menu": "Close menu",
@@ -1067,7 +1071,7 @@
   "settings": {
     "audited": "Saved and audited with your reason.",
     "tab_calendar": "Calendar",
-    "tab_sla": "SLA",
+    "tab_sla": "SLA and time",
     "tab_weights": "Weights",
     "tab_freeze": "Structural freeze",
     "tab_dlp": "DLP months",
@@ -1087,9 +1091,19 @@
     "tab_imports": "Imports",
     "tab_workflow": "Workflow",
     "tab_registers": "Registers",
+    "tab_screens": "Screens",
+    "section_sla_calendar": "Calendar",
+    "section_sla_weights": "Weights",
+    "section_registers_lists": "Lists",
+    "section_alerts_policy": "Notification policy",
+    "section_alerts_mail": "Mail kinds",
+    "section_security_dlp": "DLP months",
+    "section_screens_dashboard": "Dashboard",
+    "section_screens_tables": "Tables (Display)",
+    "section_screens_daily-plan": "My Work (Daily Plan)",
     "tab_ddl": "DDL",
     "tab_data": "Data",
-    "tab_alerts": "Alerts",
+    "tab_alerts": "Notifications",
     "tab_security": "Security",
     "section_workflow_editor": "Workflow editor",
     "section_workflow_columns": "Columns",
@@ -1632,6 +1646,7 @@
     "self_note": "You cannot change your own employee number. E-mail and phone change only through the verified request."
   },
   "peopleAdmin": {
+    "tab_roles_profiles": "Roles and profiles",
     "tab_users": "Users",
     "tab_assignments": "Assignments",
     "tab_profiles": "Permission profiles"

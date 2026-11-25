@@ -1,9 +1,10 @@
-import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
 import { Shell } from '@/components/Shell';
 import { ErrorState, NoResults } from '@/components/States';
 import { Sites } from '@/pages/Sites';
+import { MenuGroup } from '@/pages/MenuGroup';
 import { renderApp, signIn } from '@/test/utils';
 
 /** The six sub-menus under "Site Master" (owner request 2026-11-22): the Master section is the parent entry, not a sub-menu. */
@@ -30,6 +31,96 @@ describe('Sidebar tree (N1-N12)', () => {
     expect(screen.getByTestId('nav-group-toggle-registers')).toHaveAttribute('aria-expanded', 'false');
     await u.click(screen.getByTestId('nav-group-toggle-registers'));
     expect(await screen.findByTestId('nav-warehouse')).toBeInTheDocument();
+  });
+
+  it('hides the menu by itself: a rail that opens on hover, and a pin that keeps it, remembered after a reload', async () => {
+    const u = userEvent.setup();
+    app();
+    await screen.findByTestId('nav-my_work');
+    const side = screen.getByTestId('sidebar');
+    expect(side).toHaveAttribute('data-auto', 'false');
+    await u.click(screen.getByTestId('sidebar-pin'));
+    expect(side).toHaveAttribute('data-auto', 'true');
+    expect(side).toHaveStyle({ width: '56px' });
+    expect(screen.queryByTestId('sidebar-pin')).not.toBeInTheDocument();
+    expect(JSON.parse(localStorage.getItem('pmis.nav.auto') ?? 'false')).toBe(true);
+    await u.hover(side);
+    expect(await screen.findByTestId('sidebar-pin')).toHaveAttribute('aria-pressed', 'false');
+    expect(side).not.toHaveStyle({ width: '56px' });
+    await u.unhover(side);
+    expect(side).toHaveStyle({ width: '56px' });
+    cleanup();
+    app();
+    await screen.findByTestId('nav-my_work');
+    expect(screen.getByTestId('sidebar')).toHaveAttribute('data-auto', 'true');
+    await u.hover(screen.getByTestId('sidebar'));
+    fireEvent.click(await screen.findByTestId('sidebar-pin'));
+    await waitFor(() => expect(screen.getByTestId('sidebar')).toHaveAttribute('data-auto', 'false'));
+  });
+
+  it('opens the Site Master sub-menus on hover when the arrow has them closed, and in the icon rail', async () => {
+    const u = userEvent.setup();
+    app();
+    await screen.findByTestId('nav-sites');
+    await u.click(screen.getByTestId('nav-sites-toggle'));
+    expect(screen.queryByTestId('nav-site-master-te')).not.toBeInTheDocument();
+    await u.hover(screen.getByTestId('nav-sites'));
+    expect(await screen.findByTestId('nav-flyout-sites')).toBeInTheDocument();
+    expect(screen.getByTestId('nav-site-master-te')).toHaveAttribute('href', '/sites?section=te');
+    await u.unhover(screen.getByTestId('nav-sites'));
+    await waitFor(() => expect(screen.queryByTestId('nav-flyout-sites')).not.toBeInTheDocument());
+    // the arrow still opens them in place, and then there is no flyout
+    await u.click(screen.getByTestId('nav-sites-toggle'));
+    await u.hover(screen.getByTestId('nav-sites'));
+    expect(screen.queryByTestId('nav-flyout-sites')).not.toBeInTheDocument();
+    // the icon rail has no arrow: the hover is the way
+    await u.click(screen.getByTestId('topbar-collapse'));
+    await u.hover(screen.getByTestId('nav-sites'));
+    expect(await screen.findByTestId('nav-flyout-sites')).toBeInTheDocument();
+  });
+
+  it('opens a collapsed heading on hover with the same links, for every parent heading', async () => {
+    const u = userEvent.setup();
+    app();
+    await screen.findByTestId('nav-warehouse');
+    await u.click(screen.getByTestId('nav-group-toggle-registers'));
+    expect(screen.queryByTestId('nav-warehouse')).not.toBeInTheDocument();
+    await u.unhover(screen.getByTestId('nav-group-toggle-registers'));
+    await u.hover(screen.getByTestId('nav-group-toggle-registers'));
+    expect(await screen.findByTestId('nav-flyout-registers-warehouse')).toHaveAttribute('href', '/warehouse');
+    await u.unhover(screen.getByTestId('nav-group-toggle-registers'));
+    await waitFor(() => expect(screen.queryByTestId('nav-flyout-registers')).not.toBeInTheDocument());
+    // an open heading shows its items already: no flyout
+    await u.click(screen.getByTestId('nav-group-toggle-registers'));
+    await u.unhover(screen.getByTestId('nav-group-toggle-registers'));
+    await u.hover(screen.getByTestId('nav-group-toggle-registers'));
+    expect(screen.queryByTestId('nav-flyout-registers')).not.toBeInTheDocument();
+  });
+
+  it('puts Dashboard first, on its own, and shows the waiting counts the lists already give', async () => {
+    app();
+    const first = await screen.findByTestId('nav-dashboard');
+    expect(screen.getByTestId('nav-group-home')).toBeInTheDocument();
+    expect(screen.queryByTestId('nav-group-toggle-home')).not.toBeInTheDocument(); // one entry: no heading row
+    expect(screen.getByTestId('nav-group-work')).not.toContainElement(first);
+    const all = [...document.querySelectorAll('[data-testid^="nav-group-"][data-depth="1"], [data-testid="nav-dashboard"]')].map((e) => e.getAttribute('data-testid'));
+    expect(all.indexOf('nav-dashboard')).toBeGreaterThan(-1);
+    expect(screen.getByTestId('sidebar').querySelector('[data-testid^="nav-group-"]')).toHaveAttribute('data-testid', 'nav-group-home');
+    // the numbers come from the two lists' own totals (Approvals, My Work do-now)
+    await waitFor(() => expect(screen.getByTestId('nav-approvals')).toHaveTextContent(/\d/));
+  });
+
+  it('a parent heading opens its own page: Registers lists its screens as cards, the arrow still opens and closes the list', async () => {
+    const u = userEvent.setup();
+    renderApp(<Routes><Route element={<Shell />}><Route path="/menu/:id" element={<MenuGroup />} /><Route path="*" element={<div />} /></Route></Routes>, { route: '/my-work' });
+    await screen.findByTestId('nav-group-open-registers');
+    await u.click(screen.getByTestId('nav-group-open-registers'));
+    const page = await screen.findByTestId('page-menu-group');
+    expect(page).toHaveAttribute('data-group', 'registers');
+    expect(within(page).getByTestId('menu-card-warehouse')).toHaveAttribute('href', '/warehouse');
+    expect(within(page).getByTestId('menu-card-gecol')).toBeInTheDocument();
+    await u.click(screen.getByTestId('nav-group-toggle-logs'));
+    expect(screen.getByTestId('nav-group-toggle-logs')).toHaveAttribute('aria-expanded', 'false');
   });
 
   it('keeps working when localStorage is blocked', async () => {
@@ -104,7 +195,7 @@ describe('Sidebar tree (N1-N12)', () => {
     const sub = screen.getByTestId('nav-site-master-menus');
     expect([...sub.querySelectorAll('a')].map((a) => a.getAttribute('data-testid'))).toEqual(SUBMENU_TESTIDS);
     expect(screen.getByTestId('nav-group-site_register')).not.toContainElement(screen.getByTestId('nav-dismantle'));
-    const regs = [...screen.getByTestId('nav-group-registers').querySelectorAll('a')].map((a) => a.getAttribute('data-testid'));
+    const regs = [...screen.getByTestId('nav-group-registers').querySelectorAll('a')].filter((a) => !a.getAttribute('data-testid')?.startsWith('nav-group-open-')).map((a) => a.getAttribute('data-testid'));
     expect(regs).toEqual(['dismantle', 'procurement', 'gecol', 'hlc', 'permits_hse', 'warehouse', 'quality', 'issues', 'risks', 'change_control', 'readiness', 'as_built', 'meetings', 'rf_design', 'acquisition', 'contractors', 'car_dispatcher', 'financial_advances', 'contractor_reports'].map((k) => `nav-${k}`));
     expect(screen.getByTestId('nav-change_control')).toHaveTextContent('Change Control Log');
   });
