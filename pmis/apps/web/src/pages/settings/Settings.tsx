@@ -73,7 +73,7 @@ export const LEGACY_SETTINGS_PATHS: Readonly<Record<string, string>> = {
   'historical-waiver': 'data/historical',
   // W3 (2026-11-24): the SiteMaster tab is gone; its Master column menus live in Settings > Workflow > Columns, with the same rights.
   site360: 'workflow/columns',
-  'site-master-columns': 'workflow/columns',
+  'site360-columns': 'workflow/columns',
 };
 
 function Layout() {

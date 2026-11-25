@@ -40,7 +40,7 @@ describe('F19: Settings tabs and old routes', () => {
     ['documents/library', '/admin/settings/documents/types'],
     ['calendar', '/admin/settings/calendar'],
     ['site360', '/admin/settings/workflow/columns'],
-    ['site-master-columns', '/admin/settings/workflow/columns'],
+    ['site360-columns', '/admin/settings/workflow/columns'],
   ])('old /admin/settings/%s opens %s', async (old, target) => {
     at(`/admin/settings/${old}`);
     await waitFor(() => expect(probe()).toBe(target));
@@ -69,7 +69,7 @@ describe('F19: Settings tabs and old routes', () => {
   });
 
   it('W3: no SiteMaster tab; the old SiteMaster routes open Workflow > Columns', async () => {
-    at('/admin/settings/site-master-columns');
+    at('/admin/settings/site360-columns');
     expect(await screen.findByTestId('site-master-columns')).toBeInTheDocument();
     expect(screen.queryByTestId('settings-tab-site360')).toBeNull();
     expect(screen.getByTestId('settings-tab-workflow')).toHaveClass('btn-accent');

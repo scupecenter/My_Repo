@@ -32,8 +32,8 @@ const watchRows = (): string[] => {
   const seen: string[] = [];
   server.events.on('request:start', ({ request }) => {
     const u = new URL(request.url);
-    if (/\/site360\/[a-z_]+\/rows$/.test(u.pathname))
-      seen.push(`${u.pathname.match(/\/site360\/([a-z_]+)\/rows$/)![1]}?${u.searchParams.toString()}`); // the menu key, whatever the API base path
+    if (/\/site-master\/[a-z_]+\/rows$/.test(u.pathname))
+      seen.push(`${u.pathname.match(/\/site-master\/([a-z_]+)\/rows$/)![1]}?${u.searchParams.toString()}`); // the menu key, whatever the API base path
   });
   return seen;
 };

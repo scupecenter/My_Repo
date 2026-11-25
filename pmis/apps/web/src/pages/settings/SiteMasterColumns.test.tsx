@@ -60,7 +60,7 @@ describe('Settings > Workflow > Columns (Site Master columns)', () => {
     await waitFor(() => expect(screen.queryByTestId('siteMasterCols-dialog')).toBeNull());
   });
 
-  it.each(['/admin/settings/site-master', '/admin/settings/site-master-columns'])('the old link %s opens Workflow > Columns', async (old) => {
+  it.each(['/admin/settings/site360', '/admin/settings/site360-columns'])('the old link %s opens Workflow > Columns', async (old) => {
     await signIn('pm');
     screenAt(old);
     expect(await screen.findByTestId('site-master-columns')).toBeInTheDocument();
