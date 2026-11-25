@@ -564,6 +564,13 @@ describe('the backup choice of a request (0.15.72)', () => {
     who.call('post', `/settings/data-reset${path}`, body, ifMatch === undefined ? {} : { 'If-Match': ifMatch });
 
   beforeAll(async () => {
+    // the run of the block before finishes in the background (the database part, then the file move): a new request is refused with 409
+    // while that request is still open, so wait until none is (at most 60 s)
+    for (let i = 0; i < 240; i++) {
+      if ((await q(db, `SELECT 1 FROM data_reset_requests WHERE status IN ('requested', 'approved', 'running', 'files_pending')`)).length === 0) break;
+      await new Promise((r) => setTimeout(r, 250));
+    }
+    expect(await q(db, `SELECT status FROM data_reset_requests WHERE status IN ('requested', 'approved', 'running', 'files_pending')`)).toEqual([]);
     // the earlier runs ended every session but their runner's: both admins sign in again
     a1 = await loggedIn(app, admin1.user);
     expect((await a1.stepUp(admin1.user.password)).status).toBe(200);
