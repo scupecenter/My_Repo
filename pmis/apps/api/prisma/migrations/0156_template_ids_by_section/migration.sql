@@ -1,4 +1,4 @@
--- 0156_template_ids_by_section: template IDs follow the section and register names (owner decision 2026-11-25, GitHub PR #214).
+-- 0156_template_ids_by_section: template IDs follow the section and register names (approved in the PR discussion, GitHub PR #214).
 -- Mirror: db/sql/155_template_ids_by_section.sql (kept byte-identical).
 --
 --   1. The IDs. Every template ID that named a stream, the new-sites template or a register by an abbreviation gets a short readable name
