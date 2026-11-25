@@ -207,7 +207,8 @@ describe('SiteMap', () => {
     expect(await screen.findByTestId('filter-chip-x-coordinates')).toHaveTextContent('Coordinates: missing');
     const missing = Array.from({ length: SITE_COUNT }, (_, k) => k).filter((k) => !hasValidCoords(k)).length;
     await waitFor(() => expect(screen.getByTestId('sites-count')).toHaveTextContent(String(missing)));
-    fireEvent.click(screen.getByTestId('sites-layout'));
+    fireEvent.click(screen.getByTestId('sites-view'));
+    fireEvent.click(await screen.findByTestId('sites-layout'));
     expect(await screen.findByTestId('sites-map')).toBeInTheDocument();
     expect(await screen.findByTestId('map-legend-on_air')).toBeInTheDocument();
   }, T);

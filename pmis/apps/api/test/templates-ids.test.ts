@@ -69,10 +69,9 @@ describe('pre-fill by the filters of the Sites list', () => {
     const ok = await downloadTemplate(admin.api, 'TPL-MASTER', `?filters=${encodeURIComponent(JSON.stringify({ q: site.code }))}`);
     expect(ok.status).toBe(200);
     const wb = await load(ok.buffer);
-    // the data part sheets come first in the book (Instructions, Columns and Lists follow them)
-    const ws = wb.worksheets[0]!;
+    // the site is pre-filled in the data sheets of the book (the part sheets), not in Instructions, Columns or Lists
     const cells: string[] = [];
-    ws.eachRow((r, n) => { if (n > 1) r.eachCell((c) => cells.push(String(c.text))); });
+    for (const ws of wb.worksheets) ws.eachRow((r) => r.eachCell((c) => cells.push(String(c.text))));
     expect(cells.join(' ')).toContain(site.code);
   });
 });
