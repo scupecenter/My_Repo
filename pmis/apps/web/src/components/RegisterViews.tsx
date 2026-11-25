@@ -123,7 +123,7 @@ export function RegisterWide({ pending, def, records, admin, regionName, onOpen,
       : !input ? t('regviews.why_in_record') : undefined;
     if (reason || !input) return { text, reason, target: true };
     const initial = v === undefined || v === null ? '' : String(v);
-    return { text, ...(wait ? { node: <span data-testid={`wide-pending-${r.id}-${f.code}`}>{text}<span className="chip ms-1 bg-waitBg text-waitInk">{t('batch.pending_chip')}</span></span> } : {}), target: true, edit: { input, initial, options: (f.options ?? []).map((o) => ({ value: o.value, label: (lang === 'ar' && o.label_ar) || o.label_en })) } };
+    return { text, ...(wait ? { node: <span data-testid={`wide-pending-${r.id}-${f.code}`}>{text}<span className="chip ms-1 bg-waitBg text-waitInk">{t('batchedit.pending_chip')}</span></span> } : {}), target: true, edit: { input, initial, options: (f.options ?? []).map((o) => ({ value: o.value, label: (lang === 'ar' && o.label_ar) || o.label_en })) } };
   };
   const rows: WRow[] = records.map((r, i) => ({ id: r.id, key: r.id, code: r.site_code ?? '-', rowNo: i + 1, rec: r }));
   return (

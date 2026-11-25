@@ -212,7 +212,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
     ...(adv ? { filter: adv } : {}),
   });
   const save = useUpdateRecord(key);
-  const batch = useBatchEdit<RegisterRecord>(key, true, () => toast(t("batch.resumed")));
+  const batch = useBatchEdit<RegisterRecord>(key, true, () => toast(t("batchedit.resumed")));
   // 0.15.22: a System Admin edits a locked row or column (the database exempts admins too); everyone else sees it read-only.
   const me = useMe(true).data;
   const admin = !!me?.is_system_admin;
@@ -873,7 +873,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
           {layout === "wide" && (
             <div className="mb-2 space-y-2">
               {!batch.on ? (
-                <button type="button" className="btn" data-testid="batch-start" onClick={() => batch.setOn(true)}>{t("batch.start")}</button>
+                <button type="button" className="btn" data-testid="batch-start" onClick={() => batch.setOn(true)}>{t("batchedit.start")}</button>
               ) : (
                 <BatchEditBar
                   draft={batch.draft}
@@ -881,7 +881,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
                   busy={batch.busy}
                   fieldLabel={(c) => { const f = def.fields.find((x) => x.code === c); return f ? fieldLabel(f, i18n.language) : c; }}
                   valueText={(_c, v) => (v === null || v === undefined ? "" : String(v))}
-                  onSave={() => void batch.saveAll((id) => real.find((x) => x.id === id), (r, data) => save.mutateAsync({ record: r, patch: { data } }), (e) => registerErrorMessage(t, e)).then((out) => { const ok = out.filter((o) => o.status === "saved").length; if (ok) toast(t("batch.saved_n", { count: ok })); })}
+                  onSave={() => void batch.saveAll((id) => real.find((x) => x.id === id), (r, data) => save.mutateAsync({ record: r, patch: { data } }), (e) => registerErrorMessage(t, e)).then((out) => { const ok = out.filter((o) => o.status === "saved").length; if (ok) toast(t("batchedit.saved_n", { count: ok })); })}
                   onDiscard={batch.discard}
                   onExit={() => batch.setOn(false)}
                 />
