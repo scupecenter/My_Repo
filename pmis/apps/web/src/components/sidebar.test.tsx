@@ -78,6 +78,24 @@ describe('Sidebar tree (N1-N12)', () => {
     expect(await screen.findByTestId('nav-flyout-sites')).toBeInTheDocument();
   });
 
+  it('opens a collapsed heading on hover with the same links, for every parent heading', async () => {
+    const u = userEvent.setup();
+    app();
+    await screen.findByTestId('nav-warehouse');
+    await u.click(screen.getByTestId('nav-group-toggle-registers'));
+    expect(screen.queryByTestId('nav-warehouse')).not.toBeInTheDocument();
+    await u.unhover(screen.getByTestId('nav-group-toggle-registers'));
+    await u.hover(screen.getByTestId('nav-group-toggle-registers'));
+    expect(await screen.findByTestId('nav-flyout-registers-warehouse')).toHaveAttribute('href', '/warehouse');
+    await u.unhover(screen.getByTestId('nav-group-toggle-registers'));
+    await waitFor(() => expect(screen.queryByTestId('nav-flyout-registers')).not.toBeInTheDocument());
+    // an open heading shows its items already: no flyout
+    await u.click(screen.getByTestId('nav-group-toggle-registers'));
+    await u.unhover(screen.getByTestId('nav-group-toggle-registers'));
+    await u.hover(screen.getByTestId('nav-group-toggle-registers'));
+    expect(screen.queryByTestId('nav-flyout-registers')).not.toBeInTheDocument();
+  });
+
   it('keeps working when localStorage is blocked', async () => {
     const u = userEvent.setup();
     const real = { get: Storage.prototype.getItem, set: Storage.prototype.setItem };

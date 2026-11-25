@@ -46,7 +46,7 @@ function SiteSubmenus({ onNavigate }: { onNavigate?: () => void }) {
  * Hover (and keyboard focus) on a parent row opens its sub-menus beside it, in the icon rail and when the arrow has them closed. The arrow, the click and
  * touch keep working as before: this is only a faster way to the same links (SiteSubmenus), it adds no second menu.
  */
-function SubmenuFlyout({ enabled, onNavigate, children }: { enabled: boolean; onNavigate?: () => void; children: ReactNode }) {
+function SubmenuFlyout({ enabled, onNavigate, children, panel, testid = 'nav-flyout-sites' }: { enabled: boolean; onNavigate?: () => void; children: ReactNode; panel?: (close: () => void) => ReactNode; testid?: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ top: number; left?: number; right?: number } | null>(null);
   const show = () => {
@@ -61,8 +61,8 @@ function SubmenuFlyout({ enabled, onNavigate, children }: { enabled: boolean; on
       onKeyDown={(e) => { if (e.key === 'Escape') setPos(null); }}>
       {children}
       {enabled && pos && (
-        <div className="fixed z-50 min-w-48 rounded-md border border-line bg-card p-1 shadow-lg" style={pos} data-testid="nav-flyout-sites">
-          <SiteSubmenus onNavigate={() => { setPos(null); onNavigate?.(); }} />
+        <div className="fixed z-50 min-w-48 rounded-md border border-line bg-card p-1 shadow-lg" style={pos} data-testid={testid}>
+          {panel ? panel(() => { setPos(null); onNavigate?.(); }) : <SiteSubmenus onNavigate={() => { setPos(null); onNavigate?.(); }} />}
         </div>
       )}
     </div>
@@ -181,12 +181,22 @@ export function SidebarBody({ items, compact, unread, alerts = 0, activeKey, onN
         {compact
           ? (!sub && <div className="mx-2 my-1 border-t border-line" aria-hidden />)
           : solo ? null : (
+            <SubmenuFlyout enabled={!open} onNavigate={onNavigate} testid={`nav-flyout-${h.id}`}
+              panel={(close) => (
+                <div role="group" aria-label={headingName(h, i18n.language)} className="min-w-48">
+                  {visible.map((k) => { const n = byKey(k)!; const Icon = ICONS[n.icon]; return (
+                    <Link key={k} to={n.to} onClick={close} data-testid={`nav-flyout-${h.id}-${k}`} aria-current={k === activeKey ? 'page' : undefined}
+                      className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-sm ${k === activeKey ? 'bg-sideOn font-semibold text-accentText' : 'text-mute hover:bg-hover'}`}><Icon {...ICON_PROPS} size={16} className="shrink-0" />{label(n)}</Link>
+                  ); })}
+                </div>
+              )}>
             <button type="button" data-testid={`nav-group-toggle-${h.id}`} aria-expanded={open} onClick={() => toggleGroup(h.id)}
               className={`flex w-full items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold hover:bg-hover ${hasActive ? 'text-accentText' : 'text-mute'}`}>
               <ChevronRight size={14} aria-hidden className={`transition-transform motion-reduce:transition-none ${open ? 'rotate-90 rtl:-rotate-90' : 'rtl:rotate-180'}`} />
               {Icon && <Icon {...ICON_PROPS} size={14} className="shrink-0" />}
               {headingName(h, i18n.language)}
             </button>
+            </SubmenuFlyout>
           )}
         {open && h.children.map((c) => (typeof c === 'string' ? itemNode(c) : renderHeading(c, true)))}
       </div>
