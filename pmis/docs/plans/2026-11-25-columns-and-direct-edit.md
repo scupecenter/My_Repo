@@ -109,3 +109,4 @@ PRs: #214 templates; P2 Table basics; P3 Settings and columns; P4 Inline and bat
 - Done: registers wide table: inline edit existed; added Undo (8 s, same edit path); batch mode (draft in /me/drafts record.batch.<register>, bar, review, Save all with partial save and conflict by version, Discard all, leave warning, confirm above 50, 7-day expiry).
 - Left: batch for Sites and the 6 streams (Sites already has a one-column bulk edit), pending-changes chip for Change Control cells, coordinates editor, one-click new version of an approved record.
 - Done: Lists quick edit in the row (rename EN/AR and show/hide, reason of 3 characters, same PATCH).
+- Done: batch edit for the Site Master wide table (all menus/streams), same draft store (key record.batch.sites-<menu>), saved cell by cell through PATCH /tasks/{id} with the version.
