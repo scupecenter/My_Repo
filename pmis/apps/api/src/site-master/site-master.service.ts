@@ -53,7 +53,7 @@ export class SiteMasterService {
 
   /**
    * GET /site-master/{menu}/rows (contract 0.15.21, F15, migration 0104): one page of a menu's rows. Visibility (B3), the filters, the sort and the
-   * paging are in SQL; the values come from the set-based view site_master_master_values in one query for the page (no per-site path).
+   * paging are in SQL; the values come from the set-based view site_master_values in one query for the page (no per-site path).
    */
   async rows(auth: AuthContext, rawMenu: string, q: Record<string, unknown>): Promise<SiteMasterRowsDto> {
     if (!(SITE_MASTER_MENU_KEYS as readonly string[]).includes(rawMenu)) {
@@ -86,7 +86,7 @@ export class SiteMasterService {
       const vis = await this.registerVisibility(auth, allKeys);
       const visibleKeys = allKeys.filter((k) => vis.get(k) === true);
       const hiddenOrds = [...(await this.hiddenCustomFieldOrds(auth))];
-      sortJoin = Prisma.sql`LEFT JOIN LATERAL (SELECT v.value FROM site_master_master_values v WHERE v.site_id = s.id AND v.ord = ${Number(ordSort[1])}
+      sortJoin = Prisma.sql`LEFT JOIN LATERAL (SELECT v.value FROM site_master_values v WHERE v.site_id = s.id AND v.ord = ${Number(ordSort[1])}
         AND (v.register_key IS NULL OR v.register_key = ANY(${visibleKeys}::text[]))
         AND NOT (v.src_kind = 'custom_field' AND v.ord = ANY(${hiddenOrds}::int[]))) sv ON true`;
     }
@@ -124,7 +124,7 @@ export class SiteMasterService {
       const mod = await this.db.tx.$queryRaw<{ module_key: string }[]>(Prisma.sql`SELECT module_key FROM register_definitions WHERE register_key = 'procurement'`);
       const canSee = mod[0] ? await this.access.hasGrant(auth, mod[0].module_key, 'view') : false;
       filters.push(canSee
-        ? Prisma.sql`EXISTS (SELECT 1 FROM site_master_master_values cv WHERE cv.site_id = s.id AND cv.ord = 36 AND cv.value = ANY(${contractors}::text[]))`
+        ? Prisma.sql`EXISTS (SELECT 1 FROM site_master_values cv WHERE cv.site_id = s.id AND cv.ord = 36 AND cv.value = ANY(${contractors}::text[]))`
         : Prisma.sql`FALSE`);
     }
     const milestones = csvParam(q, 'milestone', 50);
@@ -156,7 +156,7 @@ export class SiteMasterService {
     if (page.length) {
       const ids = page.map((r) => r.id);
       const vals = await this.db.tx.$queryRaw<{ site_id: string; ord: number; value: string | null; kind: string; register_key: string | null }[]>(Prisma.sql`
-        SELECT v.site_id::text AS site_id, v.ord, v.value, v.kind, v.register_key FROM site_master_master_values v
+        SELECT v.site_id::text AS site_id, v.ord, v.value, v.kind, v.register_key FROM site_master_values v
         WHERE v.site_id = ANY(${ids}::uuid[]) AND v.ord = ANY(${menuOrds}::int[])`);
       // a register-owned value is shown only to a user who may view that register (its module, B3), as the Master export does;
       // a custom-field value (0.15.35) only to a user for whom the field is not hidden
@@ -256,7 +256,7 @@ export class SiteMasterService {
   /**
    * GET /site-master/sites/{site_id}/sources (contract 0.15.35, migration 0121): the value and the source of every Master column of one site (or of one
    * menu's columns). Per site, not per page, so a page of 1000 sites stays light: the grid asks for it when a cell is opened. The source comes from
-   * the same branch of site_master_master_values that computes the value, read with the caller's rights (row security): a site outside the caller's
+   * the same branch of site_master_values that computes the value, read with the caller's rights (row security): a site outside the caller's
    * regions answers 404, and a value hidden by the register's module view (B3) or by a field rule gives the source kind without value or id.
    */
   async sources(auth: AuthContext, siteId: string, q: Record<string, unknown>): Promise<SiteMasterSourcesDto> {
@@ -273,7 +273,7 @@ export class SiteMasterService {
     const ords = cols.map((c) => c.ord);
     const vals = await this.db.tx.$queryRaw<SourceRow[]>(Prisma.sql`
       SELECT v.ord, v.value, v.kind, v.register_key, v.src_kind, v.src_ref, v.src_id::text AS src_id, v.src_field
-      FROM site_master_master_values v WHERE v.site_id = ${siteId}::uuid AND v.ord = ANY(${ords}::int[])`);
+      FROM site_master_values v WHERE v.site_id = ${siteId}::uuid AND v.ord = ANY(${ords}::int[])`);
     const byOrd = new Map(vals.map((v) => [v.ord, v]));
     const visible = await this.registerVisibility(auth, vals.map((v) => v.register_key));
     const hiddenFieldOrds = vals.some((v) => v.kind === 'custom_field') ? await this.hiddenCustomFieldOrds(auth) : new Set<number>();

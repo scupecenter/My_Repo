@@ -11,7 +11,7 @@ import { masterHeaderRows } from '../src/exports/master-layout';
 
 /**
  * Master-format export (contract 0.2.2, 0.2.3, 0.15.34): parts by export grant and region (B3), a background job that writes the Site Master layout
- * (Master sheet header rows and the values of site_master_master_values), region limits, the current view with its filters, audit and ownership.
+ * (Master sheet header rows and the values of site_master_values), region limits, the current view with its filters, audit and ownership.
  * Sites of this file live in GM (6) and Sebha (7) and every export is limited to those regions.
  */
 const TAG = randomBytes(3).toString('hex').toUpperCase();
@@ -145,7 +145,7 @@ describe('POST /exports/master: checks', () => {
 });
 
 describe('the background job and the workbook', () => {
-  it('writes the Master sheet in the Master layout with the values of site_master_master_values, limited to the caller\'s regions; audited; owner-only download', async () => {
+  it('writes the Master sheet in the Master layout with the values of site_master_values, limited to the caller\'s regions; audited; owner-only download', async () => {
     const a = await actor(app, db, { regions: [7], grants: EXPORTER });
     const start = await a.api.call('post', '/exports/master', {}, { 'Idempotency-Key': `mx-full-${TAG}` });
     expect(start.status).toBe(202);
@@ -174,7 +174,7 @@ describe('the background job and the workbook', () => {
     expect(rows.has(sebha.code)).toBe(true);
     expect(rows.has(sebha2.code)).toBe(true);
     expect(rows.has(gm.code)).toBe(false); // GM is outside the caller's regions
-    const values = (await db.query(`SELECT ord, value FROM site_master_master_values WHERE site_id = $1 AND register_key IS NULL`, [sebha.id])).rows as { ord: number; value: string | null }[];
+    const values = (await db.query(`SELECT ord, value FROM site_master_values WHERE site_id = $1 AND register_key IS NULL`, [sebha.id])).rows as { ord: number; value: string | null }[];
     const got = rowValues(ws, rows.get(sebha.code)!, 187);
     for (const v of values) if (v.value !== null) expect([v.ord, got[v.ord - 1]]).toEqual([v.ord, v.value]);
     expect(got[dateMap.ord - 1]).toBe('2026-03-10');

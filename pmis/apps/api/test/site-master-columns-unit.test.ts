@@ -290,16 +290,16 @@ describe('migration 0133 and its mirror', () => {
       '..',
       'prisma',
       'migrations',
-      '0133_site_master_column_admin',
+      '0133_site360_column_admin',
       'migration.sql',
     ),
     'utf8',
   );
 
-  it('is byte-identical to db/sql/132_site_master_column_admin.sql', () => {
+  it('is byte-identical to db/sql/132_site360_column_admin.sql', () => {
     expect(
       readFileSync(
-        join(root, 'db', 'sql', '132_site_master_column_admin.sql'),
+        join(root, 'db', 'sql', '132_site360_column_admin.sql'),
         'utf8',
       ),
     ).toBe(mig);
@@ -307,14 +307,14 @@ describe('migration 0133 and its mirror', () => {
 
   it('defines every door as a SECURITY DEFINER function granted to pmis_app and uses no em dash', () => {
     for (const f of [
-      'site_master_columns_list',
-      'site_master_column_get',
-      'site_master_column_type_preview',
-      'site_master_column_create',
-      'site_master_column_update',
-      'site_master_column_set_active',
-      'site_master_column_delete',
-      'site_master_col_can_admin',
+      'site360_columns_list',
+      'site360_column_get',
+      'site360_column_type_preview',
+      'site360_column_create',
+      'site360_column_update',
+      'site360_column_set_active',
+      'site360_column_delete',
+      'site360_col_can_admin',
     ]) {
       expect(mig).toMatch(new RegExp(`CREATE OR REPLACE FUNCTION ${f}\\(`));
       expect(mig).toContain(`'${f}(`);

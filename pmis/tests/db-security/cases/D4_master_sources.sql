@@ -1,15 +1,15 @@
--- P1 Master sources (migration 0121, contract 0.15.35): the source of each Master cell is read from site_master_master_values with the caller's own
+-- P1 Master sources (migration 0121, contract 0.15.35): the source of each Master cell is read from site_master_values with the caller's own
 -- rights (security-invoker views, row security of every table), so a record of another region never yields its id; the column source kinds are
 -- configuration (master_columns stays read-only for pmis_app); site_master_date is a plain invoker helper (owner pmis_definer, PUBLIC revoked).
 -- No SECURITY DEFINER function is added. Alice: CW Team Lead in Tripoli (region 1). ADMIN: the System Admin. Each case is rolled back.
 
 -- @case MSRC-01
--- @title site_master_master_values and site_master_task_cells are security-invoker views; site_master_date is not SECURITY DEFINER, has a fixed search path, owner pmis_definer, PUBLIC revoked, EXECUTE for pmis_app
+-- @title site_master_values and site_master_task_cells are security-invoker views; site_master_date is not SECURITY DEFINER, has a fixed search path, owner pmis_definer, PUBLIC revoked, EXECUTE for pmis_app
 -- @category master-sources
 -- @expect output ok
 WITH v AS (
   SELECT c.relname, coalesce(c.reloptions::text, '') AS opts FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
-  WHERE n.nspname = 'public' AND c.relname IN ('site_master_master_values', 'site_master_task_cells')
+  WHERE n.nspname = 'public' AND c.relname IN ('site_master_values', 'site_master_task_cells')
 ), f AS (
   SELECT p.prosecdef, p.proconfig, pg_get_userbyid(p.proowner) AS owner, has_function_privilege('public', p.oid, 'EXECUTE') AS pub,
          has_function_privilege('pmis_app', p.oid, 'EXECUTE') AS app
@@ -51,7 +51,7 @@ UPDATE master_columns SET source_note = 'forged' WHERE letter = 'FA';
 -- @actor ALICE
 -- @region 1
 -- @expect output 0
-SELECT count(*) FROM site_master_master_values WHERE site_id = '{{SITE_BEN}}'::uuid;
+SELECT count(*) FROM site_master_values WHERE site_id = '{{SITE_BEN}}'::uuid;
 -- @end
 
 -- @case MSRC-05
@@ -69,7 +69,7 @@ SELECT count(*) FROM site_master_task_cells WHERE site_id = '{{SITE_BEN}}'::uuid
 -- @actor ALICE
 -- @region *
 -- @expect output 0
-SELECT count(*) FROM site_master_master_values WHERE site_id = '{{SITE_BEN}}'::uuid AND src_id IS NOT NULL;
+SELECT count(*) FROM site_master_values WHERE site_id = '{{SITE_BEN}}'::uuid AND src_id IS NOT NULL;
 -- @end
 
 -- @case MSRC-07
@@ -78,8 +78,8 @@ SELECT count(*) FROM site_master_master_values WHERE site_id = '{{SITE_BEN}}'::u
 -- @actor ALICE
 -- @region 1
 -- @expect output SEC-TRI-S1|site|site_code|derived
-SELECT (SELECT value || '|' || src_kind || '|' || src_field FROM site_master_master_values WHERE site_id = '{{SITE_TRI}}'::uuid AND ord = 2)
-  || '|' || (SELECT src_kind FROM site_master_master_values WHERE site_id = '{{SITE_TRI}}'::uuid AND ord = 113);
+SELECT (SELECT value || '|' || src_kind || '|' || src_field FROM site_master_values WHERE site_id = '{{SITE_TRI}}'::uuid AND ord = 2)
+  || '|' || (SELECT src_kind FROM site_master_values WHERE site_id = '{{SITE_TRI}}'::uuid AND ord = 113);
 -- @end
 
 -- @case MSRC-08

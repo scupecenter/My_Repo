@@ -71,7 +71,7 @@ describe('Site Master default sections', () => {
   });
 
   it('matches the ranges seeded by migration 0101', () => {
-    const sql = readFileSync(join(__dirname, '..', 'prisma', 'migrations', '0101_site_master_sections', 'migration.sql'), 'utf8');
+    const sql = readFileSync(join(__dirname, '..', 'prisma', 'migrations', '0101_site360_sections', 'migration.sql'), 'utf8');
     const seeded = [...sql.matchAll(/WHEN ord BETWEEN (\d+) AND (\d+) THEN '(\w+)'/g)].map((m) => [Number(m[1]), Number(m[2]), m[3]]);
     expect(seeded).toEqual(SITE_MASTER_DEFAULT_RANGES.map(([a, b, s]) => [a, b, s]));
   });

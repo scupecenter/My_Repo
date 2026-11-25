@@ -26,7 +26,7 @@ import {
  * Built-in fields are constants of this file with fixed SQL over the aliases of each list query:
  *   - sites, sites-stream: `s` = sites (GET /sites, GET /site-master/{menu}/rows);
  *   - dashboard (0.15.45): the same fields as `sites`; the dashboard endpoints narrow their site set with it;
- *   - site-master-<menu> (0.15.45): the `sites` fields plus the Master columns of the menu (`m:<ord>`, the value of site_master_master_values; one derived table per
+ *   - site-master-<menu> (0.15.45): the `sites` fields plus the Master columns of the menu (`m:<ord>`, the value of site_master_values; one derived table per
  *     column used, joined by GET /site-master/{menu}/rows);
  *   - site-tasks, tasks-board: `t` = task_instances, `td` = task_definitions, `st` = stage_definitions, `s` = sites (GET /sites/{id}/tasks; F5 GET /boards/tasks);
  *   - register-<key>: `r` = register_records, `s` = sites (GET /registers/{key}/records).
@@ -118,7 +118,7 @@ type OptionWant =
 
 /** Master columns whose value is already a field of `sites` (same value, same label): the sites field is offered, not a second copy. */
 const MASTER_ORD_IS_SITE_FIELD = new Set([2, 4, 5, 6, 7, 10, 11, 13, 14, 15, 16, 17, 19, 20, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 180, 181, 182]);
-/** Master columns whose value is read from a register through a branch of site_master_master_values that has no row in task_field_sources (migration 0133). */
+/** Master columns whose value is read from a register through a branch of site_master_values that has no row in task_field_sources (migration 0133). */
 const VIEW_REGISTER_ORDS: Record<number, string> = {
   18: 'as_built',
   104: 'as_built',
@@ -343,7 +343,7 @@ export class FilterCatalogService {
       if (type === 'list' && !c.list_catalogue && !fixed.get(c.ord)) type = 'text'; // a list column with no list defined yet has no values to offer
       const alias = Prisma.raw(`fmv${c.ord}`);
       const key = `m:${c.ord}`;
-      const join = Prisma.sql`LEFT JOIN (SELECT v.site_id, min(v.value) AS value FROM site_master_master_values v
+      const join = Prisma.sql`LEFT JOIN (SELECT v.site_id, min(v.value) AS value FROM site_master_values v
         WHERE v.ord = ${c.ord}::int AND (v.register_key IS NULL OR v.register_key = ANY(${visibleKeys}::text[])) GROUP BY v.site_id) ${alias} ON ${alias}.site_id = s.id`;
       const raw = Prisma.sql`${alias}.value`;
       const group = groupOf(c.group_top, G.fields);

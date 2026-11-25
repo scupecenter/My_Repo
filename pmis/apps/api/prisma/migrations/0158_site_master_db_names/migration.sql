@@ -12,6 +12,7 @@
 --   5. Saved views: saved_views.screen_key site360-<menu> becomes site-master-<menu>. The versions of a view (append-only snapshots)
 --      and the audit log keep what was said at the time and are not rewritten. The API still accepts the old screen key for one release
 --      and reads it as the new one.
+-- (site360_master_values becomes site_master_values, not site_master_master_values.)
 -- Nothing is kept under the old database names: they are called only by the API of the same release.
 ALTER TABLE master_columns RENAME COLUMN site360_sections TO site_master_sections;
 ALTER TABLE master_columns RENAME CONSTRAINT master_columns_site360_sections_chk TO master_columns_site_master_sections_chk;
@@ -30,7 +31,7 @@ BEGIN
             WHERE ns.nspname = 'public' AND p.prokind = 'f' AND (p.prosrc LIKE '%site360%' OR p.prosrc LIKE '%SITE 360%') ORDER BY p.oid
   LOOP
     def := pg_get_functiondef(r.oid);
-    nd := replace(replace(replace(replace(replace(def, 'site360_', 'site_master_'), 'site360-', 'site-master-'), 'site360.', 'site_master.'), 'SITE 360', 'Site Master'), 'site360', 'site_master');
+    nd := replace(replace(replace(replace(replace(replace(def, 'site360_master_values', 'site_master_values'), 'site360_', 'site_master_'), 'site360-', 'site-master-'), 'site360.', 'site_master.'), 'SITE 360', 'Site Master'), 'site360', 'site_master');
     IF nd <> def THEN EXECUTE nd; n := n + 1; END IF;
   END LOOP;
   RAISE NOTICE '0158: % functions rewritten', n;
