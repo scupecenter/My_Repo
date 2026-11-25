@@ -94,7 +94,7 @@ export function useTablePrefs(screen: string, defs: ColDef[]) {
     drop: (id: string, onto: string) => set((p) => dropCol(p, p.unpinned ? eff : defs, id, onto)),
     toggle: (id: string) => set((p) => toggleCol(p, p.unpinned ? eff : defs, id)),
     /** Display > Freeze the first columns */
-    setPinned: (on: boolean) => set((p) => { const { unpinned: _u, ...rest } = p; return on ? rest : { ...rest, unpinned: true }; }),
+    setPinned: (on: boolean) => set((p) => { const rest: Prefs = { ...p }; delete rest.unpinned; return on ? rest : { ...rest, unpinned: true }; }),
     resize: (id: string, px: number) => set((p) => resizeCol(p, defs, id, px)),
     setDensity: (d: Density) => set((p) => ({ ...p, density: d })),
     setDisplay: (d: Partial<DisplayOpts>) => set((p) => ({ ...p, display: { ...p.display, ...d } })),
