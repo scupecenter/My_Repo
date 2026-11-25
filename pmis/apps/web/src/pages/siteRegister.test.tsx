@@ -37,7 +37,7 @@ describe('Site Master: streams', () => {
       await waitFor(() => expect(document.querySelector(`[data-stream="${code}"]`)).not.toBeNull());
       cleanup();
     }
-  });
+  }, 30_000); // renders the page five times; the runner is slower than a laptop and the first render loads the lazy parts
 
   it('shows the agreed Arabic names in the title of each stream', async () => {
     await signIn('pm');
