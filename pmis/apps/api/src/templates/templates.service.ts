@@ -117,7 +117,7 @@ export class TemplatesService {
     return rows[0] ?? null;
   }
 
-  /** 0155: the template that an old ID (from before the rename) stands for, active ones only. */
+  /** 0156: the template that an old ID (from before the rename) stands for, active ones only. */
   async byPreviousId(oldId: string): Promise<{ template_id: string; name: string; current_version: number } | null> {
     const rows = await this.db.tx.$queryRaw<{ template_id: string; name: string; current_version: number }[]>(Prisma.sql`
       SELECT template_id, name, current_version FROM template_definitions WHERE ${oldId}::text = ANY(previous_ids) AND is_active`);

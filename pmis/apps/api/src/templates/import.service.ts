@@ -216,7 +216,7 @@ export class ImportService {
     // 2. known and active template, current version
     const current = await this.templates.current(templateId);
     if (!current) {
-      // 0155: a file made before the IDs followed the section names carries the old ID: it is an outdated version, and the answer names the new template
+      // 0156: a file made before the IDs followed the section names carries the old ID: it is an outdated version, and the answer names the new template
       const renamed = await this.templates.byPreviousId(templateId);
       if (renamed) {
         return this.reject(auth, requestId, 'outdated_version',
