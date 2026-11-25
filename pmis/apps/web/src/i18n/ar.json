@@ -3902,7 +3902,9 @@
     "group_streams": "مسارات Site Master",
     "group_registers": "السجلات واللوغات",
     "stream_note": "أعمدة مسار {{stream}} بترتيب Master. نفس قواعد Workflow Studio: السبب والموافقة والتدقيق.",
-    "stream_add": "إضافة عمود (Workflow Studio)"
+    "stream_add": "إضافة عمود (Workflow Studio)",
+    "add_before": "إضافة عمود قبل {{code}}",
+    "add_after": "إضافة عمود بعد {{code}}"
   },
   "lists": {
     "colour": "اللون",

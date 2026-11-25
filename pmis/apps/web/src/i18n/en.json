@@ -3878,7 +3878,9 @@
     "group_streams": "Site Master streams",
     "group_registers": "Registers and logs",
     "stream_note": "Columns of the {{stream}} stream, in Master order. Same rules as the Workflow Studio: reason, approval and audit.",
-    "stream_add": "Add a column (Workflow Studio)"
+    "stream_add": "Add a column (Workflow Studio)",
+    "add_before": "Add a column before {{code}}",
+    "add_after": "Add a column after {{code}}"
   },
   "lists": {
     "colour": "Colour",
