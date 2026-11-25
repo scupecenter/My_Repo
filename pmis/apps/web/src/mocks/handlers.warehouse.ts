@@ -20,7 +20,40 @@ const stale = (req: Request, v: number) => {
 type Body = Record<string, unknown> & { reason?: string };
 const bad = (b: Body) => String(b.reason ?? '').trim().length < 3 ? problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '/reason', code: 'required' }] }) : null;
 
+/** P6: the extra columns of the item master (mock of field_definitions of the warehouse item). */
+type MockCol = { code: string; label_en: string; label_ar: string | null; data_type: string; required: boolean; section: string | null; sort_order: number; in_templates: boolean; in_exports: boolean; in_list_filters: boolean; is_active: boolean; version: number; has_values: boolean };
+const itemCols: MockCol[] = [];
+
 export const warehouseHandlers = [
+  http.get(`${B}/warehouse/item-columns`, ({ request }) => {
+    const g = guard(); if (g) return g;
+    const all = new URL(request.url).searchParams.get('include_inactive') === 'true';
+    if (all && !admin()) return problem(403, 'forbidden', 'Not allowed');
+    return HttpResponse.json({ items: itemCols.filter((c) => all || c.is_active).sort((a, b) => a.sort_order - b.sort_order) });
+  }),
+  http.post(`${B}/warehouse/item-columns`, async ({ request }) => {
+    const g = guard(); if (g) return g;
+    if (!admin()) return problem(403, 'forbidden', 'Not allowed');
+    const b = (await request.json()) as Body & { code: string; label_en: string; data_type: string };
+    const e = bad(b); if (e) return e;
+    if (itemCols.some((c) => c.code === b.code)) return problem(409, 'duplicate', 'A column with this code exists already.');
+    const { reason: _r, ...rest } = b; void _r;
+    const row = { label_ar: null, required: false, section: null, in_templates: true, in_exports: true, in_list_filters: false, is_active: true, ...rest, sort_order: Math.max(0, ...itemCols.map((c) => c.sort_order)) + 10, version: 1, has_values: false } as MockCol;
+    itemCols.push(row);
+    return HttpResponse.json(row, { status: 201, ...tag(1) });
+  }),
+  http.patch(`${B}/warehouse/item-columns/:code`, async ({ params, request }) => {
+    const g = guard(); if (g) return g;
+    if (!admin()) return problem(403, 'forbidden', 'Not allowed');
+    const c = itemCols.find((x) => x.code === params.code);
+    if (!c) return problem(404, 'not_found', 'No column has this code.');
+    const s = stale(request, c.version); if (s) return s;
+    const b = (await request.json()) as Body;
+    const e = bad(b); if (e) return e;
+    const { reason: _r, ...rest } = b; void _r;
+    Object.assign(c, rest, { version: c.version + 1 });
+    return HttpResponse.json(c, tag(c.version));
+  }),
   http.get(`${B}/warehouse/items`, ({ request }) => {
     const g = guard(); if (g) return g;
     const u = new URL(request.url).searchParams, q = u.get('q') ?? '', cat = u.get('category');
@@ -49,8 +82,12 @@ export const warehouseHandlers = [
     const used = W().inUse.includes(it.code);
     if (used && (('uom' in b && b.uom !== it.uom) || ('serial_tracked' in b && b.serial_tracked !== it.serial_tracked))) return problem(422, 'item_in_use', 'Item is in use');
     if (used && b.is_active === false) return problem(422, 'item_in_use', 'Item has a pending movement');
-    const { reason: _r, ...rest } = b; void _r;
+    const { reason: _r, custom, ...rest } = b; void _r;
     Object.assign(it, rest, { version: it.version + 1 });
+    if (custom && typeof custom === 'object') {
+      const cur = ((it as { custom?: Record<string, unknown> }).custom ??= {});
+      Object.entries(custom as Record<string, unknown>).forEach(([k, v]) => { if (v === null) delete cur[k]; else cur[k] = v; });
+    }
     return HttpResponse.json(it, tag(it.version));
   }),
   http.get(`${B}/warehouse/stock`, ({ request }) => {

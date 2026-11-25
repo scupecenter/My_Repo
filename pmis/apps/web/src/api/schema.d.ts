@@ -8103,6 +8103,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/warehouse/item-columns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Extra columns of the item master (active ones for whoever reads the items; hidden ones too with `include_inactive` for the System Admin or the `fields` delegate) */
+        get: operations["listWarehouseItemColumns"];
+        put?: never;
+        /** Add an extra column to the item master */
+        post: operations["createWarehouseItemColumn"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/warehouse/item-columns/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Edit, order or hide an extra column (hiding keeps the values) */
+        patch: operations["updateWarehouseItemColumn"];
+        trace?: never;
+    };
     "/warehouse/items": {
         parameters: {
             query?: never;
@@ -15970,6 +16007,43 @@ export interface components {
              */
             code_source?: "master" | "internal_provisional";
             is_active?: boolean;
+            /** @description Values of the extra columns of the item master, by column code (P6). Send only the codes that change; null clears one. */
+            custom?: {
+                [key: string]: string | number | boolean | null;
+            };
+        };
+        WarehouseItemColumn: {
+            code: string;
+            label_en: string;
+            label_ar?: string | null;
+            /** @enum {string} */
+            data_type: "text" | "number" | "date" | "bool";
+            required: boolean;
+            section?: string | null;
+            sort_order: number;
+            in_templates: boolean;
+            in_exports: boolean;
+            in_list_filters: boolean;
+            is_active: boolean;
+            version: number;
+            has_values: boolean;
+        };
+        WarehouseItemColumnPatch: components["schemas"]["WithReason"] & {
+            label_en?: string;
+            label_ar?: string | null;
+            /** @enum {string} */
+            data_type?: "text" | "number" | "date" | "bool";
+            required?: boolean;
+            section?: string | null;
+            sort_order?: number;
+            in_templates?: boolean;
+            in_exports?: boolean;
+            in_list_filters?: boolean;
+            is_active?: boolean;
+            reason?: components["schemas"]["Reason"];
+        };
+        WarehouseItemColumnCreate: components["schemas"]["WarehouseItemColumnPatch"] & {
+            code: string;
         };
         WarehouseItem: components["schemas"]["WarehouseItemFields"] & {
             /** Format: uuid */
@@ -15977,6 +16051,10 @@ export interface components {
             code: string;
             /** @description The As-Built item linked to this item (Q74). */
             readonly as_built_item_code?: string | null;
+            /** @description Values of the extra columns (P6). */
+            custom?: {
+                [key: string]: unknown;
+            };
             version: number;
         };
         WarehouseItemInput: components["schemas"]["WarehouseItemFields"] & components["schemas"]["WithReason"] & {
@@ -33619,6 +33697,95 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    listWarehouseItemColumns: {
+        parameters: {
+            query?: {
+                include_inactive?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Columns, hidden ones included. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["WarehouseItemColumn"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    createWarehouseItemColumn: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WarehouseItemColumnCreate"];
+            };
+        };
+        responses: {
+            /** @description Created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WarehouseItemColumn"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    updateWarehouseItemColumn: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WarehouseItemColumnPatch"];
+            };
+        };
+        responses: {
+            /** @description Updated. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WarehouseItemColumn"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
             412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];

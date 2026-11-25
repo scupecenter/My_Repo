@@ -3789,6 +3789,28 @@
     "anchor_none": "No external anchor to compare yet.",
     "none": "No check has run yet."
   },
+  "itemcols": {
+    "title": "Warehouse items",
+    "note": "Extra columns of the item master (text, number, date, yes/no). Every change needs a reason and is audited. Hiding a column keeps its values. A column that holds values cannot change type.",
+    "code": "Code",
+    "name": "Name",
+    "type": "Type",
+    "state": "State",
+    "name_en": "English name",
+    "name_ar": "Arabic name",
+    "add": "Add column",
+    "move": "Move column",
+    "hide": "Hide",
+    "show": "Show",
+    "up": "Move up",
+    "down": "Move down",
+    "empty": "No extra columns yet.",
+    "type_text": "Text",
+    "type_number": "Number",
+    "type_date": "Date",
+    "type_bool": "Yes / no",
+    "group": "Warehouse"
+  },
   "regcols": {
     "title": "Register columns",
     "note": "Add, rename, reorder, hide and remove the columns and sections of a register, and rename the register. Every change needs a reason, is audited, and issues a new template version; an older template file is still read by its column codes. Protected columns (code depends on them) can only be renamed, moved and shown or hidden.",

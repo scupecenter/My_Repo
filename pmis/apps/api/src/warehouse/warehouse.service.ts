@@ -427,11 +427,13 @@ export class WarehouseService {
   }
 
   // ------------------------------------------------------------------ P6: custom columns of the item master (field_definitions of warehouse_item)
-  async itemColumns(auth: AuthContext): Promise<{ items: unknown[] }> {
-    await this.access.requireAdmin("fields", "edit");
+  async itemColumns(auth: AuthContext, q: Query): Promise<{ items: unknown[] }> {
+    const all = boolParam(q, "include_inactive");
+    if (all) await this.access.requireAdmin("fields", "edit");
+    else await this.access.requireModuleView(auth, "warehouse");
     const items = await this.call<unknown[]>(
       auth,
-      Prisma.sql`SELECT item_fields_json('warehouse_item', true) AS r`,
+      Prisma.sql`SELECT item_fields_json('warehouse_item', ${all}::boolean) AS r`,
     );
     return { items };
   }

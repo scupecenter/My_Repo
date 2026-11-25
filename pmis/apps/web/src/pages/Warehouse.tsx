@@ -7,6 +7,7 @@ import { useMe } from '@/api/hooks';
 import { useRegisterRecord, useUpdateRecord } from '@/api/registers';
 import { useRegions } from '@/api/sites';
 import type { StockLevel, StockMovement, WarehouseItem } from '@/api/types';
+import { useItemColumns, type ItemColumn } from '@/api/warehouseColumns';
 import { useConfigGaps, useDispatchList, useMovements, useQuarantineExit, useReverseMovement, useSaveItem, useStock, useWhItems, type QuarantineExitBody } from '@/api/warehouse';
 import { NEED_TONE } from '@/components/SiteDispatch';
 import { errText, FormDialog } from '@/components/FormDialog';
@@ -26,7 +27,7 @@ const TONE: Record<string, string> = { pending: 'bg-lateBg text-lateInk', posted
 const useName = () => { const { i18n } = useTranslation(); return (x: { name_en?: string; name_ar?: string | null }) => (i18n.language === 'ar' && x.name_ar) || x.name_en || ''; };
 
 function Items() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const toast = useToast();
   const name = useName();
   const admin = isAdmin(useMe(true).data);
@@ -36,14 +37,20 @@ function Items() {
   const save = useSaveItem<WarehouseItem>('/warehouse/items', 'wh-items');
   const [dlg, setDlg] = useState<Dlg>(null);
   const [f, setF] = useState<Form>(EMPTY);
+  const cols = useItemColumns().data ?? [];
+  /** P6: the values of the extra columns in the form, as text ('true'/'false' for yes/no); empty = no value. */
+  const [cv, setCv] = useState<Record<string, string>>({});
   const [fe, setFe] = useState<Record<string, string>>({});
   const [err, setErr] = useState<string | null>(null);
   const items = list.data?.items ?? [];
   const close = () => { setDlg(null); setFe({}); setErr(null); };
   const open = (d: Dlg) => {
     setF(d && d.mode === 'edit' ? { code: d.item.code, name_en: d.item.name_en ?? '', name_ar: d.item.name_ar ?? '', uom: d.item.uom ?? '', category: d.item.category ?? '', serial_tracked: !!d.item.serial_tracked, code_source: d.item.code_source ?? 'internal_provisional', rules: d.item.need_rules ?? [] } : EMPTY);
+    setCv(d && d.mode === 'edit' ? Object.fromEntries(Object.entries(d.item.custom ?? {}).map(([k, v]) => [k, v === null || v === undefined ? '' : String(v)])) : {});
     setFe({}); setErr(null); setDlg(d);
   };
+  const colLabel = (c: ItemColumn) => (i18n.language === 'ar' && c.label_ar) || c.label_en;
+  const showVal = (c: ItemColumn, v: unknown) => (v === null || v === undefined || v === '' ? '—' : c.data_type === 'bool' ? t(v ? 'wh.yes' : 'wh.no') : String(v));
   const set = (k: keyof Form) => (v: string | boolean) => setF((x) => ({ ...x, [k]: v }));
   const setRule = (i: number, patch: Partial<Rule>) => setF((x) => ({ ...x, rules: x.rules.map((r, j) => (j === i ? { ...r, ...patch } : r)) }));
 
@@ -58,6 +65,15 @@ function Items() {
       body = { ...(cur ? Object.fromEntries(Object.entries(all).filter(([k, v]) => v !== ((cur as Record<string, unknown>)[k] ?? null))) : { code: f.code.trim(), ...all }), reason };
       // need rules (Q107): sent only when the quantity or the status of one changed
       if (cur && JSON.stringify(f.rules.map(ruleBody)) !== JSON.stringify((cur.need_rules ?? []).map(ruleBody))) body.need_rules = f.rules.map(ruleBody);
+      // P6: only the extra columns whose value changed
+      const was = (cur?.custom ?? {}) as Record<string, unknown>;
+      const custom: Record<string, string | number | boolean | null> = {};
+      cols.forEach((c) => {
+        const v = (cv[c.code] ?? '').trim();
+        if (v === (was[c.code] === null || was[c.code] === undefined ? '' : String(was[c.code]))) return;
+        custom[c.code] = v === '' ? null : c.data_type === 'number' ? Number(v) : c.data_type === 'bool' ? v === 'true' : v;
+      });
+      if (Object.keys(custom).length) body.custom = custom;
       if (cur && Object.keys(body).length === 1) return close();
     }
     save.mutate({ item, body }, {
@@ -89,13 +105,14 @@ function Items() {
       </div>
       <div className="card overflow-x-auto">
         <table className="w-full text-sm">
-          <thead><tr className="border-b border-line bg-card2 text-start text-mute">{['code', 'name', 'uom', 'category', 'serial', 'status'].map((c) => <th key={c} className="px-3 py-2 text-start font-semibold">{t(`wh.${c}`)}</th>)}<th /></tr></thead>
+          <thead><tr className="border-b border-line bg-card2 text-start text-mute">{['code', 'name', 'uom', 'category', 'serial', 'status'].map((c) => <th key={c} className="px-3 py-2 text-start font-semibold">{t(`wh.${c}`)}</th>)}{cols.map((c) => <th key={c.code} className="px-3 py-2 text-start font-semibold" data-testid={`wh-colh-${c.code}`}>{colLabel(c)}</th>)}<th /></tr></thead>
           <tbody data-testid="wh-item-list">
             {items.map((x) => (
               <tr key={x.id} data-testid={`wh-item-${x.code}`} className="border-b border-line">
                 <td className="mono px-3 py-2 font-bold">{x.code}{x.code_source === 'internal_provisional' && <span className="chip ms-2 bg-waitBg font-normal text-waitInk" data-testid={`wh-provisional-${x.code}`} title={t('wh.code_source')}>{t('wh.cs_internal_provisional')}</span>}</td>
                 <td className="px-3 py-2">{name(x)}{(() => { const pend = (x.need_rules ?? []).filter((r) => r.status !== 'confirmed').length; return pend > 0 ? <span className="chip ms-2 bg-waitBg text-waitInk" data-testid={`wh-need-pending-${x.code}`}>{t('wh.need_pending_n', { count: pend })}</span> : null; })()}</td><td className="px-3 py-2">{x.uom}</td><td className="px-3 py-2">{x.category ?? '—'}</td>
                 <td className="px-3 py-2">{x.serial_tracked ? t('wh.yes') : t('wh.no')}</td>
+                {cols.map((c) => <td key={c.code} className="px-3 py-2" data-testid={`wh-cv-${x.code}-${c.code}`}>{showVal(c, (x.custom ?? {})[c.code])}</td>)}
                 <td className="px-3 py-2"><span className={`chip ${x.is_active ? 'bg-doneBg text-doneInk' : 'bg-lockBg text-lockInk'}`}>{t(x.is_active ? 'wh.active' : 'wh.inactive')}</span></td>
                 <td className="px-3 py-2 text-end">{admin && x.is_active && <>
                   <button className="btn" data-testid={`wh-edit-${x.code}`} onClick={() => open({ mode: 'edit', item: x })}>{t('wh.edit')}</button>{' '}
@@ -124,6 +141,17 @@ function Items() {
                 {['master', 'internal_provisional'].map((c) => <option key={c} value={c}>{t(`wh.cs_${c}`)}</option>)}
               </select>
             </label>
+            {cols.map((c) => (
+              <label key={c.code} className="block text-sm font-semibold">{colLabel(c)}
+                {c.data_type === 'bool' ? (
+                  <select className="input mt-1 font-normal" data-testid={`wh-f-cv-${c.code}`} value={cv[c.code] ?? ''} onChange={(e) => setCv((x) => ({ ...x, [c.code]: e.target.value }))}>
+                    <option value="" />{['true', 'false'].map((b) => <option key={b} value={b}>{t(b === 'true' ? 'wh.yes' : 'wh.no')}</option>)}
+                  </select>
+                ) : (
+                  <input className="input mt-1 font-normal" type={c.data_type === 'number' ? 'number' : c.data_type === 'date' ? 'date' : 'text'} step="any" data-testid={`wh-f-cv-${c.code}`} value={cv[c.code] ?? ''} onChange={(e) => setCv((x) => ({ ...x, [c.code]: e.target.value }))} />
+                )}
+              </label>
+            ))}
             {dlg.mode === 'edit' && f.rules.length > 0 && (
               <fieldset className="space-y-2" data-testid="wh-f-rules"><legend className="text-sm font-semibold">{t('wh.need')}</legend>
                 {f.rules.map((r, i) => (

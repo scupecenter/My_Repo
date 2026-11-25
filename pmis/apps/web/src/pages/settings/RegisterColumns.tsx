@@ -8,6 +8,7 @@ import type { RegisterColumn, RegisterSection } from '@/api/types';
 import { ColumnDialog, type Place } from '@/components/ColumnDialog';
 import { errText, FormDialog } from '@/components/FormDialog';
 import { useToast } from '@/components/Toast';
+import { ItemColumns } from './ItemColumns';
 import { isStreamKey, STREAM_MENUS, STREAM_PREFIX, StreamColumns, type StreamMenu } from './StreamColumns';
 
 type Dlg =
@@ -18,8 +19,11 @@ type Dlg =
 export function RegisterColumns() {
   const [sp] = useSearchParams();
   const k = sp.get('register') || 'gecol';
+  if (k === ITEMS_KEY) return <ItemsPage />;
   return isStreamKey(k) ? <StreamPage menu={k.slice(STREAM_PREFIX.length) as StreamMenu} /> : <RegisterColumnsOf />;
 }
+
+const ITEMS_KEY = 'wh:items';
 
 /** The one dropdown of the Columns page: the Site Master streams, then every register and log. */
 function ColumnsPicker({ value, onChange }: { value: string; onChange: (k: string) => void }) {
@@ -31,10 +35,27 @@ function ColumnsPicker({ value, onChange }: { value: string; onChange: (k: strin
       <optgroup label={t('regcols.group_streams')}>
         {STREAM_MENUS.map((m) => <option key={m} value={STREAM_PREFIX + m}>{t(`studio.columns.menu_${m}`)}</option>)}
       </optgroup>
+      <optgroup label={t('itemcols.group')}>
+        <option value={ITEMS_KEY}>{t('itemcols.title')}</option>
+      </optgroup>
       <optgroup label={t('regcols.group_registers')}>
         {(defs.data ?? []).map((d) => <option key={d.register_key} value={d.register_key}>{(lang === 'ar' && d.name_ar) || d.name_en}</option>)}
       </optgroup>
     </select>
+  );
+}
+
+function ItemsPage() {
+  const { t } = useTranslation();
+  const [, setSp] = useSearchParams();
+  return (
+    <section className="space-y-3" data-testid="page-register-columns">
+      <div className="card space-y-3 p-4">
+        <h2 className="font-bold">{t('regcols.title')}</h2>
+        <ColumnsPicker value={ITEMS_KEY} onChange={(k) => setSp({ register: k }, { replace: true })} />
+        <ItemColumns />
+      </div>
+    </section>
   );
 }
 

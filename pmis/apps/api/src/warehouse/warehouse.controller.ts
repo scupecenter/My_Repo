@@ -89,8 +89,8 @@ export class WarehouseController {
   }
 
   @Get("item-columns")
-  itemColumns(@Auth() auth: AuthContext) {
-    return this.wh.itemColumns(auth);
+  itemColumns(@Auth() auth: AuthContext, @Query() q: Record<string, unknown>) {
+    return this.wh.itemColumns(auth, q);
   }
 
   @Post("item-columns")

@@ -1,4 +1,5 @@
 -- 0159 (P6): custom columns for the Warehouse items catalogue, on the EXISTING engine (field_definitions + the `custom` JSONB of warehouse_items + the custom_validate trigger).
+-- Mirror: db/sql/158_item_custom_columns.sql (kept byte-identical).
 -- Nothing new is stored. What was missing is a writer:
 --   1. item_fields_json(entity)                      the columns (field_definitions rows) of an entity, active and hidden, with the number of items that hold a value.
 --   2. admin_item_field_save(entity, code, create, patch, reason, version)
@@ -27,13 +28,14 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $$
     'version', f.version, 'has_values', public.field_has_values(f.entity_type, f.code))
 $$;
 
-CREATE OR REPLACE FUNCTION item_fields_json(p_entity text, p_include_inactive boolean DEFAULT true) RETURNS jsonb
+CREATE OR REPLACE FUNCTION item_fields_json(p_entity text, p_include_inactive boolean DEFAULT false) RETURNS jsonb
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 DECLARE e "FieldEntityType" := public.item_field_entity(p_entity);
 BEGIN
-  PERFORM public.calc_require_admin('fields', true);
+  -- the active columns are read by whoever reads the item master (they draw the item form); the hidden ones only by the column admin
+  IF coalesce(p_include_inactive, false) THEN PERFORM public.calc_require_admin('fields', true); END IF;
   RETURN coalesce((SELECT jsonb_agg(public.item_field_json(f) ORDER BY f.sort_order, f.code COLLATE "C") FROM public.field_definitions f
-                   WHERE f.entity_type = e AND f.task_code IS NULL AND (f.is_active OR coalesce(p_include_inactive, true))), '[]'::jsonb);
+                   WHERE f.entity_type = e AND f.task_code IS NULL AND (f.is_active OR coalesce(p_include_inactive, false))), '[]'::jsonb);
 END $$;
 
 CREATE OR REPLACE FUNCTION admin_item_field_save(p_entity text, p_code text, p_create boolean, p_patch jsonb, p_reason text, p_version integer DEFAULT NULL) RETURNS jsonb
