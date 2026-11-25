@@ -111,3 +111,4 @@ PRs: #214 templates; P2 Table basics; P3 Settings and columns; P4 Inline and bat
 - Done: Lists quick edit in the row (rename EN/AR and show/hide, reason of 3 characters, same PATCH).
 - Done: batch edit for the Site Master wide table (all menus/streams), same draft store (key record.batch.sites-<menu>), saved cell by cell through PATCH /tasks/{id} with the version.
 - Done: Sites board drag to the next column and 'Open action' button; only opens the existing task action (allowed_actions), several tasks = pick list, no API change.
+- Done: pending Change Control drafts of a site on the site page (state, old/new value, L2 return note), read from the existing change_control register list (site_id filter). Not done: chip inside the Site Master wide cells, map preview (skipped).

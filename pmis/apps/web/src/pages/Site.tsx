@@ -9,6 +9,7 @@ import { SiteAdminEdit } from '@/components/SiteAdminEdit';
 import { SiteDocuments } from '@/components/SiteDocuments';
 import { SiteFields } from '@/components/SiteFields';
 import { SiteIdentity } from '@/components/SiteIdentity';
+import { SitePendingChanges } from '@/components/SitePendingChanges';
 import { SiteSnags } from '@/components/SiteSnags';
 import { SiteMasterSources } from '@/components/SiteMasterSource';
 import { SiteApplicability } from '@/components/SiteApplicability';
@@ -116,6 +117,7 @@ export function Site() {
             <span className={`chip ${TONE[s.overall_status]}`} data-testid="site-status">{t(`status.${s.overall_status}`)}</span>
           </div>
           <SiteIdentity site={s} />
+          <SitePendingChanges siteId={s.id} />
           <SiteAdminEdit site={s} />
           <SiteFields site={s} />
           {cp && <div className="my-3 flex items-center gap-2 rounded-lg bg-openBg p-3 text-openInk" data-testid="cluster-progress"><Layers size={16} />{t('site.cluster', { code: cp.cluster_code, at: cp.sites_at_te_pac, total: cp.sites_total })}</div>}

@@ -6005,5 +6005,19 @@
     "resumed": "Your unsaved batch changes were restored.",
     "saved_n": "{{count}} records saved",
     "pending_chip": "Pending"
+  },
+  "pendingChanges": {
+    "title": "Changes waiting for approval",
+    "draft": "Draft",
+    "waiting": "Waiting for L2",
+    "returned": "Returned",
+    "note": "Note: {{note}}",
+    "item": {
+      "name": "Name",
+      "name_ar": "Arabic name",
+      "coordinates": "Coordinates",
+      "region": "Region",
+      "cluster": "Cluster"
+    }
   }
 }
