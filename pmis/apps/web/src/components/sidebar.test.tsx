@@ -96,6 +96,19 @@ describe('Sidebar tree (N1-N12)', () => {
     expect(screen.queryByTestId('nav-flyout-registers')).not.toBeInTheDocument();
   });
 
+  it('puts Dashboard first, on its own, and shows the waiting counts the lists already give', async () => {
+    app();
+    const first = await screen.findByTestId('nav-dashboard');
+    expect(screen.getByTestId('nav-group-home')).toBeInTheDocument();
+    expect(screen.queryByTestId('nav-group-toggle-home')).not.toBeInTheDocument(); // one entry: no heading row
+    expect(screen.getByTestId('nav-group-work')).not.toContainElement(first);
+    const all = [...document.querySelectorAll('[data-testid^="nav-group-"][data-depth="1"], [data-testid="nav-dashboard"]')].map((e) => e.getAttribute('data-testid'));
+    expect(all.indexOf('nav-dashboard')).toBeGreaterThan(-1);
+    expect(screen.getByTestId('sidebar').querySelector('[data-testid^="nav-group-"]')).toHaveAttribute('data-testid', 'nav-group-home');
+    // the numbers come from the two lists' own totals (Approvals, My Work do-now)
+    await waitFor(() => expect(screen.getByTestId('nav-approvals')).toHaveTextContent(/\d/));
+  });
+
   it('keeps working when localStorage is blocked', async () => {
     const u = userEvent.setup();
     const real = { get: Storage.prototype.getItem, set: Storage.prototype.setItem };

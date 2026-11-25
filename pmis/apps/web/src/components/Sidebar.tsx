@@ -70,7 +70,7 @@ function SubmenuFlyout({ enabled, onNavigate, children, panel, testid = 'nav-fly
 }
 
 /** Collapsible tree, favourites, recent items, filter, icon-only mode. Nav items arrive already filtered by the server's permission list. */
-export function SidebarBody({ items, compact, unread, alerts = 0, activeKey, onNavigate }: { items: NavItem[]; compact: boolean; unread: number; alerts?: number; activeKey: string | undefined; onNavigate?: () => void }) {
+export function SidebarBody({ items, compact, unread, alerts = 0, counts = {}, activeKey, onNavigate }: { items: NavItem[]; compact: boolean; unread: number; alerts?: number; /** waiting counts the API already gives (Approvals, My Work), by nav key */ counts?: Record<string, number>; activeKey: string | undefined; onNavigate?: () => void }) {
   const { t, i18n } = useTranslation();
   const loc = useLocation();
   // The shared layout of the menu (contract 0.15.1): the default of the code until a System Admin saves one, or when it cannot be read.
@@ -113,6 +113,9 @@ export function SidebarBody({ items, compact, unread, alerts = 0, activeKey, onN
         {badge && n.key === 'messages' && unread > 0 && (compact
           ? <span data-testid="messages-badge" aria-label={t('messages.unread_count', { count: unread })} className="h-2 w-2 rounded-full bg-accent" />
           : <span data-testid="messages-badge" aria-label={t('messages.unread_count', { count: unread })} className="grid h-5 min-w-5 place-items-center rounded-full bg-accent px-1 text-xs text-accentInk">{unread}</span>)}
+        {badge && (counts[n.key] ?? 0) > 0 && (compact
+          ? <span data-testid={`${n.key}-badge`} aria-label={t('nav.waiting_count', { count: counts[n.key] })} className="h-2 w-2 rounded-full bg-accent" />
+          : <span data-testid={`${n.key}-badge`} aria-label={t('nav.waiting_count', { count: counts[n.key] })} className="grid h-5 min-w-5 place-items-center rounded-full bg-accent px-1 text-xs text-accentInk">{(counts[n.key] ?? 0) > 99 ? '99+' : counts[n.key]}</span>)}
         {n.key === 'logs.alerts' && alerts > 0 && (compact
           ? <span data-testid="alerts-badge" aria-label={t('logs.open_alerts', { count: alerts })} className="h-2 w-2 rounded-full bg-late" />
           : <span data-testid="alerts-badge" aria-label={t('logs.open_alerts', { count: alerts })} className="grid h-5 min-w-5 place-items-center rounded-full bg-late px-1 text-xs text-white">{alerts}</span>)}
@@ -171,7 +174,7 @@ export function SidebarBody({ items, compact, unread, alerts = 0, activeKey, onN
     const visible = keysOf(h).filter((k) => byKey(k));
     if (!visible.length) return null;
     // A heading whose only screen is the Site Register entry is not drawn twice: that entry is the one "Site Master" row (owner request 2026-11-22).
-    const solo = !sub && h.children.length === 1 && h.children[0] === 'sites';
+    const solo = !sub && h.children.length === 1 && (h.children[0] === 'sites' || h.id === 'home');
     const open = compact || solo || !collapsed.includes(h.id);
     const hasActive = visible.some((k) => k === activeKey) || (visible.includes('sites') && loc.pathname.startsWith('/sites'));
     const concept = headingIcon(h);

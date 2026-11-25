@@ -16,7 +16,7 @@ export interface Layout { headings: NavHead[] }
 /** The default headings, in order (the groups of navItems.ts). */
 /** The names the Site Register heading had before it was called Site Master (stored in layouts saved at the time). */
 const LEGACY_SITE_NAME = /^\s*(site\s?360|سايت\s?360|الموقع\s?360)\s*$/i;
-export const DEFAULT_GROUPS = ['work', 'site_register', 'registers', 'data', 'library', 'admin', 'logs'] as const;
+export const DEFAULT_GROUPS = ['home', 'work', 'site_register', 'registers', 'data', 'library', 'admin', 'logs'] as const;
 export const OTHER_ID = 'other';
 export const NAME_MAX = 60;
 export const MAX_MAIN = 30;

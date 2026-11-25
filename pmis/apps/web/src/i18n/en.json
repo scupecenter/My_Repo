@@ -84,6 +84,7 @@
     }
   },
   "nav": {
+    "group_home": "Dashboard",
     "group_work": "Work",
     "group_data": "Data entry",
     "group_admin": "Administration",
@@ -140,6 +141,7 @@
     "resize": "Resize sidebar",
     "icons_only": "Icons only",
     "pin_menu": "Pin the menu (always visible)",
+    "waiting_count": "{{count}} waiting",
     "autohide_menu": "Hide the menu automatically",
     "full_menu": "Full menu",
     "sidebar_label": "Main menu",

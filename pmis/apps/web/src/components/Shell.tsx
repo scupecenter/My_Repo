@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { api } from '@/api/client';
 import { useLogout, useMe, useNotifications, useSession } from '@/api/hooks';
-import { useUnreadTotal } from '@/api/msg';
+import { useMenuCounts, useUnreadTotal } from '@/api/msg';
 import { useOpenAlertCount } from '@/api/logs';
 import { canViewModule, hasGrant, isAdmin } from '@/lib/perm';
 import { notificationTarget } from '@/lib/x';
@@ -70,6 +70,8 @@ export function Shell() {
   const allowed = new Set(me.data?.effective.nav ?? []);
   const unread = useUnreadTotal(allowed.has('messages')).data ?? 0;
   const items = NAV.filter((n) => (BY_GRANT[n.key] ? hasGrant(me.data, BY_GRANT[n.key]) : BY_MODULE_VIEW[n.key] ? canViewModule(me.data, BY_MODULE_VIEW[n.key]) : ANY_OF[n.key] ? ANY_OF[n.key]!.some((m) => allowed.has(m)) : ADMIN_ONLY.has(n.key) ? isAdmin(me.data) : allowed.has(n.key)));
+  const waiting = useMenuCounts(allowed.has('approvals'), allowed.has('my_work'));
+  const counts = { approvals: waiting.approvals, my_work: waiting.my_work };
   const alerts = useOpenAlertCount(isAdmin(me.data)).data ?? 0;
   // Users, Online now, Roles, Groups, Delegation and the Matrix are tabs of one screen: one sidebar entry, opening the first allowed tab.
   const peopleTo = firstPeopleTab(me.data);
@@ -123,7 +125,7 @@ export function Shell() {
         onFocus={auto ? () => setHover(true) : undefined} onBlur={auto ? (e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setHover(false); } : undefined}
         className={`side-scope ${auto ? 'fixed start-0 z-40' : 'sticky'} top-0 hidden h-screen shrink-0 flex-col border-e border-line bg-side md:flex`}>
         {brand}
-        <SidebarBody items={sideItems} compact={rail} unread={unread} alerts={alerts} activeKey={activeKey} />
+        <SidebarBody items={sideItems} compact={rail} unread={unread} alerts={alerts} counts={counts} activeKey={activeKey} />
         {/* the sample-data label only in the pure mock build (P0 of the 2026-11-17 audit: it also showed against the real server) */}
         {!rail && import.meta.env.VITE_USE_MOCKS === 'true' && !HYBRID && <div className="border-t border-line px-4 py-3 text-xs text-faint">Synthetic data</div>}
         {!rail && <SidebarSplitter width={width} onChange={resize} asideRef={asideRef} />}
@@ -136,7 +138,7 @@ export function Shell() {
               <div className="flex items-center gap-2 px-4 py-4 font-bold"><span className="grid h-8 w-8 place-items-center rounded-md bg-accent text-accentInk">G</span>{t('app.name')}</div>
               <button ref={closeRef} className="btn min-h-11 min-w-11" data-testid="drawer-close" aria-label={t('nav.close_menu')} onClick={() => setDrawer(false)}><X size={16} aria-hidden /></button>
             </div>
-            <SidebarBody items={sideItems} compact={false} unread={unread} alerts={alerts} activeKey={activeKey} onNavigate={() => setDrawer(false)} />
+            <SidebarBody items={sideItems} compact={false} unread={unread} alerts={alerts} counts={counts} activeKey={activeKey} onNavigate={() => setDrawer(false)} />
           </div>
         </div>
       )}

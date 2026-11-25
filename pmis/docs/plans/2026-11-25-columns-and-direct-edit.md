@@ -116,3 +116,8 @@ PRs: #214 templates; P2 Table basics; P3 Settings and columns; P4 Inline and bat
 ## Sidebar: auto-hide and hover sub-menus (owner voice notes 22:27 and 22:28)
 - Auto-hide: `Shell` keeps the existing icon rail (56 px) and opens it over the page on hover or focus; a pin button keeps it open. Stored in the browser with the existing width and icons-only choices (`pmis.nav.auto`). Default: pinned, as before. Server-side storage (per user across devices) would need a contract change: not done, listed as left.
 - Hover sub-menus: `SubmenuFlyout` in `Sidebar.tsx` shows the same `SiteSubmenus` beside the Site Master row on hover or focus when the arrow has them closed and in the icon rail. Arrow, click and touch unchanged. The same `SubmenuFlyout` serves every collapsed parent heading (owner, 22:31), listing its screens as links.
+
+## Menu: Dashboard first, waiting counts (owner voice notes 22:33 to 22:36)
+- Dashboard is the new first main heading `home` (one entry, drawn without a heading row); the other My Work screens stay in `work`. Route `/dashboard` unchanged. A layout saved by a System Admin is not changed.
+- Counts beside Approvals and My Work come from the totals the two lists already answer (`useMenuCounts`, polled each minute like the unread messages). No new endpoint.
+- Already existed, not duplicated: favourites (star, order, per user in the browser), recent pages, menu filter and Ctrl+K, shared menu order editor (drag, arrows). Not built: per-user hide of menu items (needs server storage), skipped.
