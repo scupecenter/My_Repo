@@ -2,7 +2,9 @@
 // test signs in as; a second, synthetic System Admin ("Second Admin") exists so a request can be made. A test that needs the approver's view makes the
 // request with `POST /__mock/data-reset/request-by-other` (body `{parts}` for a scoped one). A run completes at once. Contract 0.15.71: the catalogue of
 // parts with a synthetic dependency map (the database's closure rule: a part is added when one of its depends_on is chosen), the dry run of a scope, the scope
-// and its hash on the request, and the approval bound to that hash (409 scope_changed otherwise).
+// and its hash on the request, and the approval bound to that hash (409 scope_changed otherwise). Contract 0.15.72: the backup choice of a request
+// (`require_backup`, `NO BACKUP` typed when false, bound into the hash; a run without a backup skips only the backup check). `request-by-other` takes
+// `{require_backup}` too.
 import { http, HttpResponse } from 'msw';
 import { API_BASE } from '@/api/client';
 import { closureOf, type DataResetPart, type DataResetPlan, type DataResetRequest, type DataResetScope, type DataResetState } from '@/api/dataReset';
@@ -13,6 +15,7 @@ import { isSystemAdmin } from './waiverData';
 
 const B = API_BASE;
 const PHRASE = 'RESET pmis';
+const NO_BACKUP = 'NO BACKUP';
 const OTHER = { id: uid('9002'), display_name: 'Second Admin (synthetic)', employee_id: '9002' };
 const me = () => ({ id: uid(viewer()?.employee_id ?? '1001'), display_name: viewer()?.name ?? 'Ahmed Salem', employee_id: viewer()?.employee_id ?? '1001' });
 const now = () => new Date().toISOString();
@@ -85,7 +88,7 @@ function planOf(requested: string[] | null): DataResetPlan {
 function view(): DataResetState {
   const s = st(), r = s.request, mine = r?.requested_by.id === me().id;
   return {
-    database: 'pmis', confirmation_phrase: PHRASE, settings: s.settings, system_admins_active: 2, single_admin: false, script_running: false, maintenance: false,
+    database: 'pmis', confirmation_phrase: PHRASE, no_backup_phrase: NO_BACKUP, settings: s.settings, system_admins_active: 2, single_admin: false, script_running: false, maintenance: false,
     backup: { ok: s.backupOk, max_age_hours: s.settings.backup_max_age_hours,
       last_success: { system_log_id: 1, at: new Date(Date.now() - (s.backupOk ? 3 : 30) * 3_600_000).toISOString(), type: 'full', mode: 'full', repository: '1', stanza: 'gsdn-pmis' }, last_problem: null },
     plan: r && r.status === 'completed' ? { ...planOf(null), tables: [] } : planOf(null), everything: EVERYTHING,
@@ -100,13 +103,15 @@ function admin() {
   if (!isSystemAdmin()) return problem(403, 'action_forbidden', 'Action not allowed', { detail: 'Only a System Admin may use the project data reset.' });
   return null;
 }
-const fresh = (by: DataResetRequest['requested_by'], reason: string, minutes: number, parts: string[] | null = null): DataResetRequest => ({
+/** The mock's binding hash: the scope's hash, or another one when the request runs without a backup (as the database does). */
+const bound = (parts: string[] | null, requireBackup: boolean) => (requireBackup ? scopeOf(parts).hash ?? null : hashOf([...(scopeOf(parts).parts ?? []), 'no-backup']));
+const fresh = (by: DataResetRequest['requested_by'], reason: string, minutes: number, parts: string[] | null = null, requireBackup = true): DataResetRequest => ({
   id: crypto.randomUUID(), status: 'requested', version: 1, database_name: 'pmis', requested_by: by, requested_at: now(), request_reason: reason,
   expires_at: new Date(Date.now() + minutes * 60_000).toISOString(), expired: false, approved_by: null, approved_at: null, approve_reason: null, cancelled_by: null,
   cancelled_at: null, cancel_reason: null, run_by: null, run_started_at: null, db_committed_at: null, finished_at: null, stalled: false, backup: null,
   plan_at_request: { delete_rows: planOf(parts).delete_rows, files: planOf(parts).files, sites: 12,
     parts: Object.fromEntries(CATALOGUE.filter((c) => (scopeOf(parts).parts ?? []).includes(c[0])).map((c) => [c[0], c[5]])) },
-  scope: scopeOf(parts), scope_hash: scopeOf(parts).hash ?? null, approved_scope_hash: null,
+  scope: scopeOf(parts), scope_hash: bound(parts, requireBackup), approved_scope_hash: null, require_backup: requireBackup,
   result: null, quarantine_dir: null, error: null,
   files: { total: 0, moved: 0, missing: 0, refused: 0, pending: 0, problems: [] },
 });
@@ -122,8 +127,8 @@ const reason = (b: { reason?: string }, min: number) =>
 
 export const dataResetHandlers = [
   http.post(`${B}/__mock/data-reset/request-by-other`, async ({ request }) => {
-    const b = (await request.json().catch(() => ({}))) as { parts?: string[] } | null;
-    st().request = fresh(OTHER, 'Owner decision: start the real data load', 30, b?.parts ?? null);
+    const b = (await request.json().catch(() => ({}))) as { parts?: string[]; require_backup?: boolean } | null;
+    st().request = fresh(OTHER, 'Owner decision: start the real data load', 30, b?.parts ?? null, b?.require_backup ?? true);
     return HttpResponse.json(st().request);
   }),
   http.get(`${B}/settings/data-reset/plan`, ({ request }) => {
@@ -143,15 +148,19 @@ export const dataResetHandlers = [
   http.post(`${B}/settings/data-reset/requests`, async ({ request }) => {
     const g = admin(); if (g) return g;
     if (!stepUpValid()) return stepUp();
-    const b = await request.json() as { reason?: string; confirm_text?: string; parts?: string[] };
+    const b = await request.json() as { reason?: string; confirm_text?: string; parts?: string[]; require_backup?: boolean; no_backup_confirm?: string };
     const bad = reason(b, 10); if (bad) return bad;
     if (b.parts && (b.parts.length === 0 || b.parts.some((p) => !CATALOGUE.some((c) => c[0] === p)))) {
       return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '/parts', code: b.parts.length ? 'unknown_part' : 'required' }] as never });
     }
     if (b.confirm_text !== PHRASE) return problem(422, 'confirmation_mismatch', 'The typed confirmation does not match', { detail: `Type ${PHRASE} to confirm.` });
+    const need = b.require_backup ?? true;
+    if (!need && b.no_backup_confirm !== NO_BACKUP) {
+      return problem(422, 'confirmation_mismatch', 'The typed confirmation does not match', { detail: `Type ${NO_BACKUP} to request the reset without a backup.`, errors: [{ path: '/no_backup_confirm', code: 'confirmation_mismatch' }] as never });
+    }
     const s = st();
     if (s.request) return problem(409, 'invalid_transition', 'Not possible now', { detail: 'Another data reset request is open.' });
-    s.request = fresh(me(), b.reason!.trim(), s.settings.request_expiry_minutes, b.parts ?? null);
+    s.request = fresh(me(), b.reason!.trim(), s.settings.request_expiry_minutes, b.parts ?? null, need);
     return json(s.request, 201);
   }),
   http.post(`${B}/settings/data-reset/requests/:id/approve`, async ({ params, request }) => {
@@ -188,10 +197,11 @@ export const dataResetHandlers = [
     const v = version(request, r); if (v) return v;
     if ((await request.json() as { confirm_text?: string }).confirm_text !== PHRASE) return problem(422, 'confirmation_mismatch', 'The typed confirmation does not match');
     if (r.status !== 'approved') return problem(409, 'invalid_transition', 'Not possible now');
-    if (!s.backupOk) return problem(409, 'backup_missing', 'No recent successful database backup', { detail: 'No successful database backup in the last 24 hours.' });
+    if ((r.require_backup ?? true) && !s.backupOk) return problem(409, 'backup_missing', 'No recent successful database backup', { detail: 'No successful database backup in the last 24 hours.' });
     const t0 = now();
     s.last = { ...r, status: 'completed', version: r.version + 3, run_by: me(), run_started_at: t0, db_committed_at: t0, finished_at: t0,
-      quarantine_dir: '/var/lib/gsdn-pmis/files/.pre-reset-20261124-101500', result: { audit_id: 9001, sessions_ended: 7, deleted: { sites: 12 } },
+      backup: s.backupOk ? { system_log_id: 1, type: 'full' } : null,
+      quarantine_dir: '/var/lib/gsdn-pmis/files/.pre-reset-20261124-101500', result: { audit_id: 9001, sessions_ended: 7, deleted: { sites: 12 }, require_backup: r.require_backup ?? true },
       files: { total: 31, moved: 30, missing: 1, refused: 0, pending: 0, problems: [{ storage_key: 'docs/2026/11/synthetic-missing', outcome: 'missing', detail: null }] } };
     s.request = null;
     return json({ ...r, status: 'running', version: r.version + 1, run_by: me(), run_started_at: t0 }, 202);

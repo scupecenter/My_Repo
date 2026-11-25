@@ -133,6 +133,65 @@ describe('Settings, data reset', () => {
     await waitFor(() => expect(screen.getByTestId('dr-request')).toHaveAttribute('data-status', 'approved'));
   });
 
+  it('the backup choice: require by default; "without a backup" shows the red warning and needs the typed phrase NO BACKUP (0.15.72)', async () => {
+    await signIn('pm'); await stepUpDone();
+    const u = userEvent.setup();
+    page();
+    const choice = await screen.findByTestId('dr-backup-choice');
+    expect(choice).toHaveAttribute('data-require', 'true');
+    expect(screen.getByTestId('dr-backup-require')).toBeChecked();
+    expect(screen.queryByTestId('dr-no-backup-warning')).not.toBeInTheDocument();
+    await u.type(screen.getByTestId('dr-reason'), 'Owner decision: clean test data, no backup');
+    await u.type(screen.getByTestId('dr-phrase'), 'RESET pmis');
+    expect(screen.getByTestId('dr-submit')).toBeEnabled();
+    await u.click(screen.getByTestId('dr-backup-none-option'));
+    expect(screen.getByTestId('dr-no-backup-warning')).toHaveTextContent(en.dr.no_backup_warning);
+    expect(screen.getByTestId('dr-submit')).toBeDisabled();                  // NO BACKUP not typed yet
+    await u.type(screen.getByTestId('dr-no-backup-phrase'), 'NO BACKU');
+    expect(screen.getByTestId('dr-submit')).toBeDisabled();
+    await u.type(screen.getByTestId('dr-no-backup-phrase'), 'P');
+    expect(screen.getByTestId('dr-submit')).toBeEnabled();
+    await u.click(screen.getByTestId('dr-submit'));
+    const view = await screen.findByTestId('dr-request-backup');
+    expect(view).toHaveAttribute('data-require', 'false');
+    expect(view).toHaveTextContent(en.dr.no_backup_warning);
+  });
+
+  it('a request without a backup: the approver sees the warning, the run is allowed although no recent backup exists, the result says so', async () => {
+    await signIn('pm'); await stepUpDone();
+    await api.post('/__mock/data-reset/backup', { body: { ok: false } });
+    await api.post('/__mock/data-reset/request-by-other', { body: { require_backup: false } });
+    const u = userEvent.setup();
+    page();
+    expect(await screen.findByTestId('dr-request-backup')).toHaveAttribute('data-require', 'false');
+    await u.click(screen.getByTestId('dr-approve'));
+    expect(screen.getByTestId('dr-approve-backup')).toHaveTextContent(en.dr.no_backup_warning);
+    await u.type(screen.getByTestId('dr-approve-dialog-reason'), 'Agreed with the owner today');
+    await u.click(screen.getByTestId('dr-approve-dialog-submit'));
+    await waitFor(() => expect(screen.getByTestId('dr-request')).toHaveAttribute('data-status', 'approved'));
+    expect(screen.getByTestId('dr-run')).toBeEnabled();
+    expect(screen.queryByTestId('dr-run-blocked')).not.toBeInTheDocument();
+    await u.click(screen.getByTestId('dr-run'));
+    expect(screen.getByTestId('dr-run-backup')).toHaveTextContent(en.dr.no_backup_warning);
+    await u.type(screen.getByTestId('dr-run-phrase'), 'RESET pmis');
+    await u.click(screen.getByTestId('dr-run-dialog-submit'));
+    expect(await screen.findByTestId('dr-result-no-backup')).toHaveTextContent(en.dr.result_no_backup);
+  });
+
+  it('a request that requires a backup and has none: the disabled run says a new request can be made without the requirement', async () => {
+    await signIn('pm'); await stepUpDone();
+    await api.post('/__mock/data-reset/backup', { body: { ok: false } });
+    await api.post('/__mock/data-reset/request-by-other');
+    const u = userEvent.setup();
+    page();
+    expect(await screen.findByTestId('dr-request-backup')).toHaveAttribute('data-require', 'true');
+    await u.click(screen.getByTestId('dr-approve'));
+    await u.type(screen.getByTestId('dr-approve-dialog-reason'), 'Agreed with the owner today');
+    await u.click(screen.getByTestId('dr-approve-dialog-submit'));
+    expect(await screen.findByTestId('dr-run')).toBeDisabled();
+    expect(screen.getByTestId('dr-run-blocked')).toHaveTextContent(en.dr.backup_missing_new_request);
+  });
+
   it('is in Arabic too', async () => {
     await signIn('pm');
     page({ locale: 'ar' });
@@ -143,6 +202,9 @@ describe('Settings, data reset', () => {
     await userEvent.setup().click(screen.getByTestId('dr-scope-custom'));
     expect(screen.getByTestId('dr-part-row-sites')).toHaveTextContent('المواقع ومهامها');
     expect(screen.getByTestId('dr-scope-group-identity')).toHaveTextContent(ar.dr.group_identity);
+    expect(screen.getByTestId('dr-backup-choice')).toHaveTextContent(ar.dr.require_backup);
+    await userEvent.setup().click(screen.getByTestId('dr-backup-none-option'));
+    expect(screen.getByTestId('dr-no-backup-warning')).toHaveTextContent(ar.dr.no_backup_warning);
   });
 
   it('is hidden from a user who is not a System Admin, and refused if opened directly', async () => {

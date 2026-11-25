@@ -264,3 +264,58 @@ SELECT concat_ws('|',
   (SELECT has_function_privilege('pmis_app', 'data_reset_dry_run(text[])', 'EXECUTE')),
   (SELECT count(*) FROM pg_constraint c WHERE c.conrelid = 'data_reset_requests'::regclass AND c.conname IN ('data_reset_scope_shape', 'data_reset_scope_bound', 'data_reset_scope_approved')));
 -- @end
+
+-- Migration 0154 (contract 0.15.72): the backup precondition is a choice of each request (require_backup), bound into the request's scope hash and never
+-- changed after the request. pmis_app cannot flip it, the start door has no way to skip the backup check, and a request without a backup needs NO BACKUP.
+
+-- @case DR-27
+-- @title The System Admin flips the backup choice of a request directly (a request made with a backup run without one)
+-- @category settings-data-reset
+-- @actor ADMIN
+-- @region *
+-- @expect error 42501 permission denied
+UPDATE data_reset_requests SET require_backup = false;
+-- @end
+
+-- @case DR-28
+-- @title A client asks the start door to skip the backup check (no such argument: the choice is the request's, never the runner's)
+-- @category settings-data-reset
+-- @actor ADMIN
+-- @region *
+-- @expect error 42883 does not exist
+SELECT admin_data_reset_start(gen_random_uuid(), 'RESET ' || current_database(), 1, '/tmp/x', false);
+-- @end
+
+-- @case DR-29
+-- @title A delegate of the System Admin (all regions) requests a reset without a backup, with the typed phrase
+-- @category settings-data-reset
+-- @actor DEL_ALL
+-- @region *
+-- @expect error P0001 wf:data_reset.*(action_forbidden|delegate_forbidden)
+SELECT admin_data_reset_request('A delegate asks for a reset without a backup', 'RESET ' || current_database(), ARRAY['issues'], false, 'NO BACKUP');
+-- @end
+
+-- @case DR-30
+-- @title The System Admin calls the binding hash of a request to forge the hash of the other backup choice
+-- @category settings-data-reset
+-- @actor ADMIN
+-- @region *
+-- @expect error 42501 permission denied for function
+SELECT data_reset_request_hash(ARRAY['issues'], false);
+-- @end
+
+-- @case DR-31
+-- @title Control: require_backup is NOT NULL with default true, the row guard covers it, the hash owner is the reset role, pmis_app executes the 5-argument request door only
+-- @category settings-data-reset
+-- @actor ALICE
+-- @region 1
+-- @expect output t|true|t|t|t|f
+SELECT concat_ws('|',
+  (SELECT a.attnotnull FROM pg_attribute a WHERE a.attrelid = 'data_reset_requests'::regclass AND a.attname = 'require_backup'),
+  (SELECT pg_get_expr(d.adbin, d.adrelid) FROM pg_attrdef d JOIN pg_attribute a ON a.attrelid = d.adrelid AND a.attnum = d.adnum
+     WHERE d.adrelid = 'data_reset_requests'::regclass AND a.attname = 'require_backup'),
+  (SELECT pg_get_functiondef(p.oid) LIKE '%NEW.require_backup IS DISTINCT FROM OLD.require_backup%' FROM pg_proc p WHERE p.proname = 'data_reset_rows_guard'),
+  (SELECT pg_get_userbyid(p.proowner) = 'pmis_reset_owner' AND NOT has_function_privilege('public', p.oid, 'EXECUTE') FROM pg_proc p WHERE p.proname = 'data_reset_request_hash'),
+  (SELECT has_function_privilege('pmis_app', 'admin_data_reset_request(text,text,text[],boolean,text)', 'EXECUTE')),
+  (SELECT EXISTS (SELECT 1 FROM pg_proc p WHERE p.proname = 'admin_data_reset_request' AND pg_get_function_identity_arguments(p.oid) = 'p_reason text, p_confirm text, p_parts text[]')));
+-- @end

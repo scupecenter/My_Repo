@@ -5,7 +5,10 @@ configuration, the staff registry and all logs; delete the project data (sites a
 notifications, snapshots). Owner decisions 2026-11-24: the same reset is also a function of Settings, run by two System Admins (four eyes), and only
 after a recent successful database backup. Owner decision 2026-11-24 (migration 0152, contract 0.15.71): the reset is **selectable**. The requesting
 System Admin chooses what is reset (the parts below); the two approving System Admins see and approve exactly that scope. "Everything (as today)" stays
-one click and is the default of the operator script; three optional identity parts (users, roles, staff) are never part of it.
+one click and is the default of the operator script; three optional identity parts (users, roles, staff) are never part of it. Owner decision
+2026-11-25 (migration 0154, contract 0.15.72): "I need an option to choose if I need to take a backup or not; if I do not need a backup I can clean and
+reset the data." The backup precondition of a Settings run is a **choice of each request** (see "The backup choice of a request"); requiring a recent
+backup stays the default.
 
 This page is the reviewable contract of the reset, both ways. Both say the same as this page, table for table, because both call one database function:
 
@@ -13,6 +16,7 @@ This page is the reviewable contract of the reset, both ways. Both say the same 
 |---|---|
 | `apps/api/prisma/migrations/0146_settings_data_reset/migration.sql` (mirror `db/sql/145_settings_data_reset.sql`) | The reset role, the request tables, the guards and the Settings doors `admin_data_reset_*`. |
 | `apps/api/prisma/migrations/0152_data_reset_scope/migration.sql` (mirror `db/sql/151_data_reset_scope.sql`) | The latest plan `data_reset_plan()` (every table with its decision, its part and the parts of its rows), the catalogue `data_reset_parts()` and the closure `data_reset_closure()`, the reset `data_reset_core()` (counts per table and per part, deletes, checks, session end, audit row), the identity writes `idm_data_reset_identity()`, the scope of a request and its hash. |
+| `apps/api/prisma/migrations/0154_data_reset_no_backup/migration.sql` (mirror `db/sql/153_data_reset_no_backup.sql`) | The backup choice of a request (`require_backup`), its binding hash `data_reset_request_hash()`, and the doors that read it (request, approve, start, execute, the row guard). |
 | `infra/scripts/reset-project-data.sh` | The operator way. Run as root on the server. Dry run by default; `--execute` backs up, stops the API, resets, quarantines the files. |
 | `infra/scripts/reset-project-data.sql` | The operator's database wrapper: one transaction around `data_reset_core`, printing the plan, the files and the result. |
 | Settings > Data > Data reset (`apps/web/src/pages/settings/DataReset.tsx`, `apps/api/src/settings/data-reset.*`) | The in-app way (contract 0.15.62, scope 0.15.71): choose the parts, request, approve, run, progress, result. |
@@ -77,6 +81,30 @@ exactly that: new gate states, calculated milestone steps and gate events of kep
   reset role may execute it. The staff registry guard (`people_staff_no_delete`) lets the reset role through inside the running reset, like the other
   delete guards since 0146.
 
+### The backup choice of a request
+
+Since migration 0154 (contract 0.15.72) the requesting System Admin chooses, on the request form, between:
+
+- **Require a recent backup (recommended)**: the default, and the behaviour before 0154. The run is refused (409 `backup_missing`) until the System Log
+  records a successful backup within `backup_max_age_hours` (see "Backup rule").
+- **Run without a backup**: the screen shows the red warning "This reset runs WITHOUT a backup: the deleted data cannot be restored" and asks for the
+  extra typed phrase `NO BACKUP` (`no_backup_confirm`; 422 `confirmation_mismatch` at `/no_backup_confirm` otherwise). Decision: the reason of the request
+  (10 characters or more) is the reason of the choice; there is no second reason field. Only the backup check of the start is skipped: two System
+  Admins, the step-ups, the typed phrase `RESET <database>`, the expiry, "no reset running", the scope hash, the maintenance mode, the storage and
+  quarantine checks and the coverage check of the plan all stay.
+
+The choice is stored on the request (`data_reset_requests.require_backup`, boolean, NOT NULL, default true; a request open when 0154 ran keeps true) and
+never changes (the row guard, also for the superuser; `pmis_app` has no right on the table). It is part of what the approver approves: the request's
+`scope_hash` is `data_reset_request_hash(closure, require_backup)`, equal to the 0152 hash of the closure (`scope.hash`) when a backup is required and a
+different, domain-separated SHA-256 when it is not. The approver sends the `scope_hash` they read; the hash of the other choice is 409 `scope_changed`, and
+`data_reset_check_scope` recomputes it from the stored parts and choice at approve, start and execute. A client that omits the field gets the old
+behaviour (a backup is required). The approver and the runner see the choice read-only on the request, with the red warning when it is "without".
+
+The choice is written into the audit rows `data_reset_request`, `data_reset_approve`, `data_reset_start` (with `backup_ok`, whether a backup within the
+window existed anyway) and `project_data_reset` (the reset's own row, in its detail), into the request's `result.require_backup` and into the security log
+row of the completion. A run without a backup records `backup` = null unless a backup within the window happened to exist. A new admin setting to turn
+the option off (`allow_no_backup`) was not added (owner: the option is available; keep it simple).
+
 ### The scope of a request
 
 The request stores the requested parts, the normalised closure (`scope`, jsonb) and its SHA-256 (`scope_hash`). The approver sees the scope read-only
@@ -99,7 +127,7 @@ Every step is a System Admin acting without delegation (a delegate gets 403 on e
 a live session of their own, with a step-up (`stepup_max_age_seconds`). Every write is audited with before and after and written to the security log
 (event `project_data_reset`, `detail.step` = `request`, `approve`, `cancel`, `start`, `completed`, `failed`, `files`).
 
-1. **Request** (`POST /settings/data-reset/requests`): the parts (none = everything; see "Parts"), a reason of at least 10 characters and the typed phrase `RESET <database>`. Refused while another
+1. **Request** (`POST /settings/data-reset/requests`): the parts (none = everything; see "Parts"), a reason of at least 10 characters, the typed phrase `RESET <database>` and the backup choice (`require_backup`, default true; false needs `no_backup_confirm` = `NO BACKUP`; see "The backup choice of a request"). Refused while another
    request is open (one open request at a time, a unique index), with fewer than two active System Admins, or while a reset runs. The request expires
    after `data_reset.settings.request_expiry_minutes` (default 30). The other active System Admins are told in-app.
 2. **Approve** (`POST .../approve`, If-Match, the `scope_hash` shown): a DIFFERENT System Admin (another user and another session, checked by the database and by a CHECK
@@ -107,7 +135,9 @@ a live session of their own, with a step-up (`stepup_max_age_seconds`). Every wr
 3. **Cancel** (`POST .../cancel`, If-Match): any System Admin, with a reason, while the request is requested or approved.
 4. **Run** (`POST .../run`, If-Match): the requester or the approver (decision: either of the two people who agreed, never a third admin), with the
    typed phrase again, while the request is approved and not expired. Refused (409, nothing changes) when:
-   - the System Log has no successful database backup within `data_reset.settings.backup_max_age_hours` (default 24; `backup_missing`, see "Backup rule");
+   - the request requires a backup (the default) and the System Log has no successful database backup within `data_reset.settings.backup_max_age_hours`
+     (default 24; `backup_missing`, see "Backup rule"; the message says a new request can be made without the backup requirement). A request made
+     without a backup skips this check only;
    - the documents are in S3/MinIO (`storage_not_supported`; see Open);
    - the quarantine directory cannot be made inside the document store (`quarantine_unavailable`);
    - a table has no decision in the plan (`plan_incomplete`), or a reset runs (`reset_running`).
@@ -151,7 +181,8 @@ last success (time, type, repository) and the latest backup-check error newer th
 **Settings.** `data_reset.settings` (guarded: only `admin_set_data_reset_settings`, a System Admin, reason, step-up, If-Match, never while a request is
 open): `request_expiry_minutes` 5 to 240 (default 30), `backup_max_age_hours` 1 to 72 (default 24).
 
-**Restore after a Settings reset** (the screen prints the paths): the database from the backup the run relied on, to the moment before the reset
+**Restore after a Settings reset** (the screen prints the paths; after a run without a backup there may be no backup to restore the database from, and
+the screen says so: only the files in the quarantine can be put back): the database from the backup the run relied on, to the moment before the reset
 (`run_started_at`): `db-restore.sh --pgdata <scratch> --port <scratch port> --target-time '<run_started_at>' --keep-running` (infra/RUNBOOK.md, section
 8), then stop the API, replace the live database with a dump of the restored one (`pg_dump -Fc` from the scratch port, `dropdb`, `createdb`,
 `pg_restore --exit-on-error`), start the API; the files with `sudo -u gsdn-pmis cp -a -n <quarantine>/. <STORAGE_DIR>/`. A restore loses the reset's
@@ -171,6 +202,7 @@ requester or approver: the System Admins and the break-glass account are the acc
 
 `--execute` on a terminal asks for the phrase `RESET <database>` (for example `RESET pmis`). Without a terminal it refuses, unless both
 `--yes-i-have-a-backup <dump>` (an existing `pg_dump -Fc` file that `pg_restore --list` reads) and `--confirm "RESET <database>"` are given.
+The backup choice of migration 0154 is a Settings choice only: the operator script is unchanged and always takes its own `pg_dump` before it resets.
 The database name and port come from `DATABASE_URL` in `/etc/gsdn-pmis/pmis.env` (written by the installer; port 5433 when the URL has none),
 the documents directory from `STORAGE_DIR` (default `/var/lib/gsdn-pmis/files`). The superuser is reached with `sudo -u postgres psql`.
 
@@ -515,6 +547,8 @@ Outside the `public` schema nothing is touched (`pmis_admin.migrations`, the ins
   writable quarantine root on the same filesystem.
 - **Settings while a reset runs.** A compromised `pmis_app` can take the advisory lock `353383097684` itself and keep every route at 503 (a denial of
   service, never a deletion); it can already do worse. Nothing in the API takes that lock outside `data_reset_core`.
+- **Run without a backup (0154).** The option has no admin switch (`allow_no_backup` was not added). If the owner wants to forbid it later, a guarded
+  setting read by `admin_data_reset_request` is the place. A run without a backup cannot be undone from a backup; the quarantined files stay.
 - **Backup rows.** A server needs the updated `db-backup.sh` (migration 0146 era) and one successful backup after it before a Settings run is
   possible. The operator script keeps its own pre-reset `pg_dump`.
 - **External party contracts** (`external_party_contracts`, contract records of the Contractors register) are kept as master data of the
