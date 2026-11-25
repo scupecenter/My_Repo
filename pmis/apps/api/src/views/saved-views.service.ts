@@ -17,8 +17,8 @@ import { FilterCatalogService } from './filter-catalog.service';
  * that need the caller's region scope (a region filter of a shared view) and the read check of a draft's task or record.
  */
 
-/** Site 360 was renamed Site Master (0158): the old screen key `site-master-<menu>` is read as `site-master-<menu>` for one release. */
-export const normScreen = (s: string): string => s.replace(/^site-master-/, 'site-master-');
+/** Site 360 was renamed Site Master (0158): the old screen key `site360-<menu>` is read as `site-master-<menu>` for one release. */
+export const normScreen = (s: string): string => s.replace(/^site360-/, 'site-master-');
 const SCREEN = z.string().regex(/^[a-z][a-z0-9_-]{1,80}$/).transform(normScreen);
 const colId = z.string().max(100);
 const columnsSchema = z.object({
