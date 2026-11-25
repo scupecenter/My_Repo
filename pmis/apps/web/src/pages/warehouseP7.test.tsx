@@ -1,7 +1,10 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
+import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
+import { API_BASE } from '@/api/client';
+import { server } from '@/mocks/server';
 import { applyTheme } from '@/i18n';
 import { siteIdOf, siteMeta } from '@/mocks/sites';
 import { renderApp, signIn } from '@/test/utils';
@@ -84,6 +87,31 @@ describe('P7 in the Warehouse screen', () => {
     await waitFor(() => expect(screen.queryByTestId('wh-dialog')).not.toBeInTheDocument());
     await waitFor(() => expect(screen.queryByTestId('wh-need-pending-ANT-900')).not.toBeInTheDocument());
   }, 15_000);
+
+  it('edits a pending document in place through the register record; a posted one shows its lock and the reversal rule', async () => {
+    await signIn('pm');
+    let patched: unknown = null;
+    server.use(
+      http.get(`${API_BASE}/registers/warehouse/records/:id`, ({ params }) => HttpResponse.json({ id: params.id, register_key: 'warehouse', state: 'entry', version: 3, data: { doc_no: 'DN-2026-0101', doc_date: '2026-10-20' } })),
+      http.patch(`${API_BASE}/registers/warehouse/records/:id`, async ({ request, params }) => { patched = { ifMatch: request.headers.get('if-match'), body: await request.json() }; return HttpResponse.json({ id: params.id, register_key: 'warehouse', state: 'entry', version: 4, data: {} }); }),
+    );
+    show('/warehouse');
+    const u = userEvent.setup();
+    await u.click(await screen.findByTestId('wh-tab-movements'));
+    expect(await screen.findByTestId('wh-mv-lock-DN-2026-0099')).toHaveTextContent(/reversal/i);
+    expect(screen.queryByTestId('wh-mv-edit-open-DN-2026-0099')).not.toBeInTheDocument();
+    await u.click(await screen.findByTestId('wh-mv-edit-open-DN-2026-0101'));
+    const panel = await screen.findByTestId('wh-mv-edit');
+    expect(panel.closest('tr')).not.toBeNull();   // in the table, not a modal
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('wh-mv-edit-reason')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId('wh-mv-edit-submit')).toBeDisabled());
+    await u.type(screen.getByTestId('wh-mv-edit-remark'), 'checked at the gate');
+    await waitFor(() => expect(screen.getByTestId('wh-mv-edit-submit')).toBeEnabled());
+    await u.click(screen.getByTestId('wh-mv-edit-submit'));
+    await waitFor(() => expect(screen.queryByTestId('wh-mv-edit')).not.toBeInTheDocument());
+    expect(patched).toMatchObject({ body: { data: { remark: 'checked at the gate' } } });
+  });
 
   it('shows the lock of a posted Doc No. (Q106)', async () => {
     await signIn('pm');

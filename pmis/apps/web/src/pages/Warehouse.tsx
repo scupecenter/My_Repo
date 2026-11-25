@@ -1,14 +1,16 @@
-import { Lock, Plus } from 'lucide-react';
-import { useState } from 'react';
+import { Lock, Pencil, Plus } from 'lucide-react';
+import { Fragment, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { ApiError } from '@/api/client';
 import { useMe } from '@/api/hooks';
+import { useRegisterRecord, useUpdateRecord } from '@/api/registers';
 import { useRegions } from '@/api/sites';
 import type { StockLevel, WarehouseItem } from '@/api/types';
 import { useConfigGaps, useDispatchList, useMovements, useQuarantineExit, useSaveItem, useStock, useWhItems, type QuarantineExitBody } from '@/api/warehouse';
 import { NEED_TONE } from '@/components/SiteDispatch';
 import { errText, FormDialog } from '@/components/FormDialog';
+import { InlinePanel } from '@/components/InlinePanel';
 import { useToast } from '@/components/Toast';
 import { hasGrant, isAdmin } from '@/lib/perm';
 import { registerErrorMessage } from '@/lib/registerErrors';
@@ -149,6 +151,7 @@ function Movements() {
   const { t } = useTranslation();
   const [status, setStatus] = useState('');
   const list = useMovements(status);
+  const [editing, setEditing] = useState<string | null>(null);
   // DN and RN, and the quarantine exits (Q270); the other documents (PL, OPEN, ADJ) have no site and are kept in the register.
   const items = (list.data?.items ?? []).filter((m) => m.kind === 'issue' || m.kind === 'return' || m.kind === 'quarantine_exit');
   return (
@@ -160,15 +163,21 @@ function Movements() {
       </div>
       <div className="card overflow-x-auto">
         <table className="w-full text-sm">
-          <thead><tr className="border-b border-line bg-card2 text-mute">{['doc_no', 'type', 'site', 'qty', 'status'].map((c) => <th key={c} className="px-3 py-2 text-start font-semibold">{t(`wh.${c}`)}</th>)}</tr></thead>
+          <thead><tr className="border-b border-line bg-card2 text-mute">{['doc_no', 'type', 'site', 'qty', 'status'].map((c) => <th key={c} className="px-3 py-2 text-start font-semibold">{t(`wh.${c}`)}</th>)}<th className="px-3 py-2" /></tr></thead>
           <tbody data-testid="wh-movement-list">
             {items.map((m) => (
-              <tr key={m.id} data-testid={`wh-mv-${m.doc_no ?? m.id}`} data-status={m.status} className="border-b border-line">
+              <Fragment key={m.id}>
+              <tr data-testid={`wh-mv-${m.doc_no ?? m.id}`} data-status={m.status} className="border-b border-line">
                 <td className="mono px-3 py-2 font-bold">{m.register_record_id ? <Link className="underline" to={`/registers/warehouse?record=${m.register_record_id}`}>{m.doc_no ?? '—'}</Link> : (m.doc_no ?? '—')}</td>
                 <td className="px-3 py-2">{(m.record_type ?? m.kind).toUpperCase()}{m.exit_kind && <span className="chip ms-2 bg-waitBg font-normal text-waitInk" data-testid={`wh-mv-exit-${m.doc_no ?? m.id}`} title={m.exit_reason ?? undefined}>{t(`wh.qx_${m.exit_kind}`)}</span>}{m.doc_no_locked && <Lock size={12} className="ms-1 inline text-mute" aria-label={t('wh.locked_hint')} data-testid={`wh-mv-locked-${m.doc_no ?? m.id}`} />}</td><td className="px-3 py-2">{m.site_code ?? '—'}</td>
                 <td className="px-3 py-2">{m.lines.reduce((a, l) => a + l.qty, 0)}</td>
                 <td className="px-3 py-2"><span className={`chip ${TONE[m.status]}`} data-testid={`wh-mv-status-${m.doc_no ?? m.id}`}>{t(`wh.st_${m.status}`)}</span></td>
+                <td className="px-3 py-2 text-end">{m.register_record_id && (m.status === 'pending'
+                  ? <button className="btn" data-testid={`wh-mv-edit-open-${m.doc_no ?? m.id}`} onClick={() => setEditing(m.id)}><Pencil size={14} />{t('wh.mv_edit')}</button>
+                  : <span className="inline-flex items-center gap-1 text-xs text-mute" data-testid={`wh-mv-lock-${m.doc_no ?? m.id}`} title={t(`wh.mv_locked_${m.status}`, { defaultValue: '' })}><Lock size={12} />{t(m.status === 'posted' ? 'wh.mv_locked_posted' : 'wh.mv_locked_cancelled')}</span>)}</td>
               </tr>
+              {editing === m.id && m.register_record_id && <tr><td colSpan={6} className="p-2"><MovementEdit recordId={m.register_record_id} doc={m.doc_no ?? ''} onClose={() => setEditing(null)} /></td></tr>}
+              </Fragment>
             ))}
           </tbody>
         </table>
@@ -176,6 +185,31 @@ function Movements() {
         {list.isError && <p role="alert" className="p-6 text-center text-lateInk">{t('errors.generic')}</p>}
       </div>
     </div>
+  );
+}
+
+/**
+ * Pending document: edit in place through the existing register record edit path (PATCH /registers/warehouse/records/:id, same permissions, If-Match
+ * version and audit, no new write path; the register edit has no reason field, so none is asked; the server decides who may edit and when). Lines are not edited: stock is computed from the movements only.
+ */
+function MovementEdit({ recordId, doc, onClose }: { recordId: string; doc: string; onClose: () => void }) {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const rec = useRegisterRecord('warehouse', recordId);
+  const upd = useUpdateRecord('warehouse');
+  const cur = rec.data;
+  const [f, setF] = useState<{ doc_date?: string; remark?: string }>({});
+  const val = (k: 'doc_date' | 'remark') => f[k] ?? (typeof cur?.data?.[k] === 'string' ? (cur.data[k] as string) : '');
+  return (
+    <InlinePanel onClose={onClose} testid="wh-mv-edit" title={t('wh.mv_edit_title', { doc })} busy={upd.isPending || !cur} disabled={!cur || !Object.keys(f).length}
+      error={upd.isError ? registerErrorMessage(t, upd.error) : null}
+      withReason={false} onSubmit={() => cur && upd.mutate({ record: cur, patch: { data: f } }, { onSuccess: () => { toast(t('wh.mv_saved'), 'ok'); onClose(); } })}>
+      <label className="block text-sm font-semibold">{t('wh.mv_doc_date')}
+        <input type="date" className="input mt-1 font-normal" data-testid="wh-mv-edit-date" value={val('doc_date')} onChange={(e) => setF({ ...f, doc_date: e.target.value })} /></label>
+      <label className="block text-sm font-semibold">{t('wh.mv_remark')}
+        <input className="input mt-1 font-normal" data-testid="wh-mv-edit-remark" value={val('remark')} onChange={(e) => setF({ ...f, remark: e.target.value })} /></label>
+      <p className="text-xs text-mute">{t('wh.mv_lines_note')}</p>
+    </InlinePanel>
   );
 }
 

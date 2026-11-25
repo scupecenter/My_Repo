@@ -2312,7 +2312,15 @@
     "qx_err_unknown_serial": "A serial is unknown for this item.",
     "qx_err_not_serial_tracked": "This item is not serial-tracked: leave the serial numbers empty.",
     "qx_err_whole_units": "Pieces and sets cannot have a fraction.",
-    "qx_exit": "Quarantine exit"
+    "qx_exit": "Quarantine exit",
+    "mv_edit": "Edit",
+    "mv_edit_title": "Edit document {{doc}}",
+    "mv_doc_date": "Document date",
+    "mv_remark": "Remark",
+    "mv_lines_note": "Quantities and items are not edited here: cancel this pending document and create a new one. Stock is computed from the movements only.",
+    "mv_locked_posted": "Locked: a posted document is not edited. Correct it with a reversal movement, which goes through the normal approval.",
+    "mv_locked_cancelled": "Locked: a cancelled document is not edited.",
+    "mv_saved": "Saved"
   },
   "asb": {
     "title": "As-Built items",
