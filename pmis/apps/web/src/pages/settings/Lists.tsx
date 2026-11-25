@@ -1,4 +1,4 @@
-import { Download, Pencil, Plus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Download, GripVertical, Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -58,6 +58,8 @@ export function Lists() {
   const [filter, setFilter] = useState("");
   const [sel, setSel] = useState<string | null>(null);
   const [dlg, setDlg] = useState<Dlg | null>(null);
+  const [drag, setDrag] = useState<string | null>(null);
+  const reorderValue = useUpdateListValue();
   const all = q.data ?? [];
   const items = all.filter(
     (c) =>
@@ -67,6 +69,22 @@ export function Lists() {
         .includes(filter.trim().toLowerCase()),
   );
   const cur = all.find((c) => c.code === sel) ?? null;
+  /** Moves a value to the place of another (drag and drop) or one step (the arrows). Only the values whose position changes are written, each with its own version and reason, so the audit shows every change. */
+  const placeValue = async (id: string, targetIndex: number) => {
+    if (!cur) return;
+    const arr = [...cur.values];
+    const from = arr.findIndex((v) => v.id === id);
+    if (from < 0 || targetIndex < 0 || targetIndex >= arr.length || from === targetIndex) return;
+    const [moved] = arr.splice(from, 1);
+    arr.splice(targetIndex, 0, moved!);
+    try {
+      for (const [i, v] of arr.entries()) {
+        const want = (i + 1) * 10;
+        if (v.sort_order !== want) await reorderValue.mutateAsync({ code: cur.code, id: v.id, version: v.version, body: { sort_order: want, reason: t("lists.reorder_reason") } });
+      }
+      toast(t("settings.audited"));
+    } catch (e) { toast(errText(e, t), "err"); }
+  };
   const parentOf = (c: ListCatalogue) =>
     c.parent_catalogue
       ? (all.find((x) => x.code === c.parent_catalogue) ?? null)
@@ -265,10 +283,16 @@ export function Lists() {
               {cur.values.map((v) => (
                 <tr
                   key={v.id}
-                  className={`border-t border-line ${v.is_active ? "" : "opacity-60"}`}
+                  className={`border-t border-line ${v.is_active ? "" : "opacity-60"} ${drag === v.id ? "bg-hover" : ""}`}
                   data-testid={`lists-value-${v.code}`}
+                  draggable={!mirrored(cur)}
+                  onDragStart={() => setDrag(v.id)}
+                  onDragOver={(e) => { if (drag) e.preventDefault(); }}
+                  onDrop={() => { const d = drag; setDrag(null); if (d) void placeValue(d, cur.values.findIndex((x) => x.id === v.id)); }}
+                  onDragEnd={() => setDrag(null)}
                 >
                   <td className="p-2 mono">
+                    {!mirrored(cur) && <GripVertical size={14} className="me-1 inline cursor-grab text-mute" aria-hidden />}
                     {v.code}
                     {!v.is_active && (
                       <span className="chip ms-1 bg-lockBg text-lockInk">
@@ -314,6 +338,8 @@ export function Lists() {
                   <td className="p-2 text-end whitespace-nowrap">
                     {!mirrored(cur) && (
                       <>
+                        <button type="button" className="btn btn-ghost p-1" data-testid={`lists-value-up-${v.code}`} aria-label={t("lists.move_up", { code: v.code })} disabled={cur.values[0]?.id === v.id} onClick={() => void placeValue(v.id, cur.values.findIndex((x) => x.id === v.id) - 1)}><ArrowUp size={14} /></button>
+                        <button type="button" className="btn btn-ghost p-1" data-testid={`lists-value-down-${v.code}`} aria-label={t("lists.move_down", { code: v.code })} disabled={cur.values[cur.values.length - 1]?.id === v.id} onClick={() => void placeValue(v.id, cur.values.findIndex((x) => x.id === v.id) + 1)}><ArrowDown size={14} /></button>
                         <button
                           type="button"
                           className="btn btn-ghost p-1"

@@ -32,13 +32,13 @@ PRs: #214 templates; P2 Table basics; P3 Settings and columns; P4 Inline and bat
 
 ### Settings and columns (P3)
 - [P3] Settings regrouped into 6 groups, old links redirect, search box, "where it shows" line
-- [P3] Columns page: dropdown with Site Master streams (Design & Acquisition, SOW, CW, TE, HOTO, O&M) and every register and log
+- [DONE, this PR] Columns page: dropdown with Site Master streams (Design & Acquisition, SOW, CW, TE, HOTO, O&M) and every register and log
 - [P3] Add column before/after; rename; full options; hide (deactivate) keeping old values, new data only; positions
-- [P3] Drag-and-drop reorder with up/down keyboard fallback
+- [DONE, this PR] Drag-and-drop reorder with up/down keyboard fallback (registers); add column before/after
 - [P3] Quick add (name, type cards with examples, paste list values) with impact line (new template version, users on old one, empty records)
 - [P3] Reason optional for add and rename; mandatory for delete, type change, hide in template
 - [P3] Tick matrix per column: Form, Table, Filter, Template, Export, Import
-- [P3] Lists library: shared lists with tree (parent and child), used-by warning, value editing, private copy, fixed lists (Region, Cluster) explained, site custom field lists linked
+- [PARTLY, this PR] Lists library: value reorder by drag/arrows done; used-by column and value editing already existed; tree, private copy and in-place rename still open
 - [P3] Notification to holders of old templates (if small; otherwise stated as left)
 - [ASK] Rename code flow
 - [ASK] Unified column engine (item 7) and merging register_fields and field_definitions
