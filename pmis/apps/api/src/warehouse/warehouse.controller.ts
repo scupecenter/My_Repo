@@ -88,6 +88,32 @@ export class WarehouseController {
     return r;
   }
 
+  @Get("item-columns")
+  itemColumns(@Auth() auth: AuthContext) {
+    return this.wh.itemColumns(auth);
+  }
+
+  @Post("item-columns")
+  async createItemColumn(@Auth() auth: AuthContext, @Body() body: unknown, @Res({ passthrough: true }) res: Response) {
+    const r = (await this.wh.createItemColumn(auth, body)) as { version?: number };
+    res.status(201);
+    if (r.version) res.setHeader("ETag", etagHeader(r.version));
+    return r;
+  }
+
+  @Patch("item-columns/:code")
+  async updateItemColumn(
+    @Auth() auth: AuthContext,
+    @Param("code") code: string,
+    @Headers("if-match") ifMatch: string | undefined,
+    @Body() body: unknown,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const r = (await this.wh.updateItemColumn(auth, code, ifMatch, body)) as { version?: number };
+    if (r.version) res.setHeader("ETag", etagHeader(r.version));
+    return r;
+  }
+
   @Patch("items/:id")
   async updateItem(
     @Auth() auth: AuthContext,
