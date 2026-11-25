@@ -1,9 +1,10 @@
-import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
 import { Shell } from '@/components/Shell';
 import { ErrorState, NoResults } from '@/components/States';
 import { Sites } from '@/pages/Sites';
+import { MenuGroup } from '@/pages/MenuGroup';
 import { renderApp, signIn } from '@/test/utils';
 
 /** The six sub-menus under "Site Master" (owner request 2026-11-22): the Master section is the parent entry, not a sub-menu. */
@@ -109,6 +110,19 @@ describe('Sidebar tree (N1-N12)', () => {
     await waitFor(() => expect(screen.getByTestId('nav-approvals')).toHaveTextContent(/\d/));
   });
 
+  it('a parent heading opens its own page: Registers lists its screens as cards, the arrow still opens and closes the list', async () => {
+    const u = userEvent.setup();
+    renderApp(<Routes><Route element={<Shell />}><Route path="/menu/:id" element={<MenuGroup />} /><Route path="*" element={<div />} /></Route></Routes>, { route: '/my-work' });
+    await screen.findByTestId('nav-group-open-registers');
+    await u.click(screen.getByTestId('nav-group-open-registers'));
+    const page = await screen.findByTestId('page-menu-group');
+    expect(page).toHaveAttribute('data-group', 'registers');
+    expect(within(page).getByTestId('menu-card-warehouse')).toHaveAttribute('href', '/warehouse');
+    expect(within(page).getByTestId('menu-card-gecol')).toBeInTheDocument();
+    await u.click(screen.getByTestId('nav-group-toggle-logs'));
+    expect(screen.getByTestId('nav-group-toggle-logs')).toHaveAttribute('aria-expanded', 'false');
+  });
+
   it('keeps working when localStorage is blocked', async () => {
     const u = userEvent.setup();
     const real = { get: Storage.prototype.getItem, set: Storage.prototype.setItem };
@@ -181,7 +195,7 @@ describe('Sidebar tree (N1-N12)', () => {
     const sub = screen.getByTestId('nav-site-master-menus');
     expect([...sub.querySelectorAll('a')].map((a) => a.getAttribute('data-testid'))).toEqual(SUBMENU_TESTIDS);
     expect(screen.getByTestId('nav-group-site_register')).not.toContainElement(screen.getByTestId('nav-dismantle'));
-    const regs = [...screen.getByTestId('nav-group-registers').querySelectorAll('a')].map((a) => a.getAttribute('data-testid'));
+    const regs = [...screen.getByTestId('nav-group-registers').querySelectorAll('a')].filter((a) => !a.getAttribute('data-testid')?.startsWith('nav-group-open-')).map((a) => a.getAttribute('data-testid'));
     expect(regs).toEqual(['dismantle', 'procurement', 'gecol', 'hlc', 'permits_hse', 'warehouse', 'quality', 'issues', 'risks', 'change_control', 'readiness', 'as_built', 'meetings', 'rf_design', 'acquisition', 'contractors', 'car_dispatcher', 'financial_advances', 'contractor_reports'].map((k) => `nav-${k}`));
     expect(screen.getByTestId('nav-change_control')).toHaveTextContent('Change Control Log');
   });

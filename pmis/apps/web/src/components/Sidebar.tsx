@@ -193,12 +193,17 @@ export function SidebarBody({ items, compact, unread, alerts = 0, counts = {}, a
                   ); })}
                 </div>
               )}>
-            <button type="button" data-testid={`nav-group-toggle-${h.id}`} aria-expanded={open} onClick={() => toggleGroup(h.id)}
-              className={`flex w-full items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold hover:bg-hover ${hasActive ? 'text-accentText' : 'text-mute'}`}>
-              <ChevronRight size={14} aria-hidden className={`transition-transform motion-reduce:transition-none ${open ? 'rotate-90 rtl:-rotate-90' : 'rtl:rotate-180'}`} />
-              {Icon && <Icon {...ICON_PROPS} size={14} className="shrink-0" />}
-              {headingName(h, i18n.language)}
-            </button>
+            <div className={`flex w-full items-center gap-1 rounded-md px-1 text-xs font-semibold hover:bg-hover ${hasActive ? 'text-accentText' : 'text-mute'}`}>
+              {/* the arrow opens and closes the list; the name opens the group's own page (like the Site Master row) */}
+              <button type="button" data-testid={`nav-group-toggle-${h.id}`} aria-expanded={open} aria-label={`${t(open ? 'nav.collapse' : 'nav.expand')}: ${headingName(h, i18n.language)}`} onClick={() => toggleGroup(h.id)} className="rounded-md p-1">
+                <span className="sr-only">{headingName(h, i18n.language)}</span>
+                <ChevronRight size={14} aria-hidden className={`transition-transform motion-reduce:transition-none ${open ? 'rotate-90 rtl:-rotate-90' : 'rtl:rotate-180'}`} />
+              </button>
+              <Link to={`/menu/${h.id}`} onClick={onNavigate} data-testid={`nav-group-open-${h.id}`} aria-current={loc.pathname === `/menu/${h.id}` ? 'page' : undefined} className="flex min-w-0 flex-1 items-center gap-1 py-1">
+                {Icon && <Icon {...ICON_PROPS} size={14} className="shrink-0" />}
+                <span className="truncate">{headingName(h, i18n.language)}</span>
+              </Link>
+            </div>
             </SubmenuFlyout>
           )}
         {open && h.children.map((c) => (typeof c === 'string' ? itemNode(c) : renderHeading(c, true)))}

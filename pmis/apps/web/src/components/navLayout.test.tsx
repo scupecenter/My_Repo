@@ -16,7 +16,7 @@ const app = (locale: 'en' | 'ar' = 'en') =>
   renderApp(<Routes><Route element={<Shell />}><Route path="*" element={<div />} /></Route></Routes>, { route: '/my-work', locale });
 const store = (layout: unknown) => { db().cfg.navLayout = { layout, version: 7, updated_at: null, updated_by: null }; save(); };
 const keysIn = (testid: string) => [...screen.getByTestId(testid).querySelectorAll(':scope > a, :scope > div > a, :scope > div > div > a')]
-  .map((a) => a.getAttribute('data-testid')).filter((x) => x && !x.startsWith('nav-sites-'));
+  .map((a) => a.getAttribute('data-testid')).filter((x) => x && !x.startsWith('nav-sites-') && !x.startsWith('nav-group-open-'));
 const editItems = (id: string) => [...screen.getByTestId(`nav-edit-heading-${id}`).querySelectorAll(':scope > ul > li[data-testid^="nav-edit-item-"]')].map((li) => li.getAttribute('data-testid')!.slice('nav-edit-item-'.length));
 const key = (ref: string, k: string) => fireEvent.keyDown(screen.getByTestId(`nav-edit-handle-${ref}`), { key: k });
 const live = () => screen.getByTestId('nav-edit-live').textContent ?? '';
