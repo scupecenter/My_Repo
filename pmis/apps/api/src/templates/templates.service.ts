@@ -7,6 +7,7 @@ import { ProblemException, problems } from '../common/problem';
 import { boolParam, oneParam } from '../common/query';
 import { uuidSchema } from '../common/zod';
 import { DbService } from '../db/db.service';
+import { SitesService } from '../sites/sites.service';
 
 /** One column of a template (the JSON that tpl_columns() stores with every version). */
 export interface TplColumn {
@@ -87,6 +88,8 @@ export const LISTS_SHEET = '_lists';
 /** Rows below the pre-filled ones that are formatted and validated for typing. */
 const BLANK_ROWS = 300;
 const MAX_PREFILL_ROWS = 5000;
+/** The most sites a filter-based pre-fill reads (one row per site in a stream template). */
+const MAX_PREFILL_SITES = 5000;
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 const isoToDate = (s: string): Date => new Date(`${s}T00:00:00.000Z`);
@@ -101,6 +104,7 @@ export class TemplatesService {
   constructor(
     private readonly db: DbService,
     private readonly access: AccessService,
+    private readonly sitesSvc: SitesService,
   ) {}
 
   /** The current version of a template (active ones only). */
@@ -271,6 +275,27 @@ export class TemplatesService {
     return { buffer, fileName: `${t.template_id}_v${t.current_version}_${issuedAt.toISOString().slice(0, 10)}.xlsx` };
   }
 
+  /** The ids of the sites the Sites list shows for these filters (JSON object of the list's query), at most MAX_PREFILL_SITES. */
+  private async siteIdsFromFilters(auth: AuthContext, raw: string): Promise<string[]> {
+    let parsed: unknown;
+    try { parsed = JSON.parse(raw); } catch { throw problems.validation([{ path: '/filters', code: 'invalid', message: 'filters is a JSON object.' }]); }
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw problems.validation([{ path: '/filters', code: 'invalid', message: 'filters is a JSON object.' }]);
+    const base: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
+      if (['limit', 'cursor', 'offset'].includes(k) || v === null || v === undefined || v === '') continue;
+      base[k] = Array.isArray(v) ? v.map(String).join(',') : typeof v === 'object' ? JSON.stringify(v) : String(v);
+    }
+    const ids: string[] = [];
+    let cursor: string | null = null;
+    for (;;) {
+      const r = (await this.sitesSvc.list(auth, { ...base, limit: '200', ...(cursor ? { cursor } : {}) })) as { items: { id: string }[]; page: { next_cursor: string | null } };
+      for (const it of r.items) if (typeof it.id === 'string') ids.push(it.id);
+      cursor = r.page.next_cursor;
+      if (!cursor || ids.length >= MAX_PREFILL_SITES) break;
+    }
+    return ids.slice(0, MAX_PREFILL_SITES);
+  }
+
   private siteIds(q: Record<string, unknown>): string[] {
     const v = q.site_ids ?? q['site_ids[]'];
     if (v === undefined) return [];
@@ -360,6 +385,14 @@ export class TemplatesService {
     const regionParam = oneParam(q, 'region_id');
     let prefill = boolParam(q, 'prefill') === true || taskId !== undefined || siteIds.length > 0;
     let sites: string[] = siteIds;
+    // the filters of the screen (the Sites list query as JSON): the pre-fill covers every site the list would show, not only the first page.
+    // It goes through the list service, so the visibility, the F3 filter tree and the field rules are the list's own.
+    const filtersRaw = oneParam(q, 'filters');
+    if (filtersRaw !== undefined) {
+      sites = await this.siteIdsFromFilters(auth, filtersRaw);
+      prefill = true;
+      if (!sites.length) throw problems.validation([{ path: '/filters', code: 'no_sites', message: 'No site matches these filters, so there is nothing to pre-fill.' }]);
+    }
     if (taskId !== undefined) {
       if (!uuidSchema.safeParse(taskId).success) throw problems.validation([{ path: '/task_id', code: 'invalid', message: 'task_id is a uuid.' }]);
       const task = await this.db.tx.$queryRaw<{ site_id: string; stream_code: string | null }[]>(Prisma.sql`
