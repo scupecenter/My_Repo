@@ -2521,6 +2521,7 @@
     "rule_flow": "Nothing is saved to the register until the rows go through the approval levels.",
     "file": "Filled template (.xlsx)",
     "upload": "Upload and check",
+    "download_current": "Download the current version",
     "rejection_logged": "This refusal was written to the System Log.",
     "kind_master": "Whole Master",
     "kind_stream": "Site Master stream",
