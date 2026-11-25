@@ -18,6 +18,8 @@ const regionId = z.number().int().min(1).max(7);
 const regionScope = z.union([z.literal('all'), z.array(regionId).max(7)]);
 const moduleScope = z.union([z.literal('all'), z.array(z.string().min(1).max(60)).max(100)]);
 
+export const DASHBOARD_TABS = ['pmo', 'cw', 'te'] as const;
+
 const inputSchema = z.object({
   code: z.string().regex(/^[A-Z][A-Z0-9_]{1,40}$/),
   name_en: z.string().trim().min(2).max(200),
@@ -45,6 +47,9 @@ const patchSchema = z.object({
   is_active: z.boolean().optional(),
   // 0.12.3 (Q165): managed capabilities; System Admin only, checked again in the database (idm_role_set_capabilities)
   capabilities: z.array(z.enum(ROLE_CAPABILITIES)).max(2).optional(),
+  // 0.15.80 (0163): what holders of the role see of the Dashboard; System Admin only, checked again in the database
+  dashboard_tabs: z.array(z.enum(DASHBOARD_TABS)).min(1).max(3).optional(),
+  hide_messages_inbox: z.boolean().optional(),
   reason,
 }).strict();
 
@@ -63,6 +68,8 @@ export interface RoleDto extends RoleRefDto {
   default_module_keys: 'all' | string[];
   can_hold_matrix_levels: boolean;
   capabilities: string[];
+  dashboard_tabs: string[];
+  hide_messages_inbox: boolean;
   is_active: boolean;
   active_assignment_count: number;
   version: number;
@@ -126,14 +133,21 @@ export class RolesService {
     const cur = await this.find(id);
     if (!cur) throw problems.notFound();
     checkIfMatch(ifMatch, cur.version);
-    const { capabilities, ...rest } = b;
+    const { capabilities, dashboard_tabs, hide_messages_inbox, ...rest } = b;
     if (capabilities !== undefined && !auth.state.isAdmin) {
       throw new ProblemException(403, 'delegate_forbidden', { detail: 'Only a System Admin sets the capabilities of a role (they decide who reads the Audit Log).' });
     }
+    if ((dashboard_tabs !== undefined || hide_messages_inbox !== undefined) && !auth.state.isAdmin) {
+      throw new ProblemException(403, 'delegate_forbidden', { detail: 'Only a System Admin sets what a role sees of the dashboard and the menu.' });
+    }
     if (capabilities !== undefined) {
       await this.db.tx.$queryRaw(Prisma.sql`SELECT idm_role_set_capabilities(${id}::uuid, ${capabilities}::text[], ${b.reason}::text)`);
-      if (Object.keys(rest).length < 2) return this.get(id);   // only the capabilities changed
     }
+    if (dashboard_tabs !== undefined || hide_messages_inbox !== undefined) {
+      await this.db.tx.$queryRaw(Prisma.sql`SELECT idm_role_set_dashboard_access(${id}::uuid, ${dashboard_tabs ?? cur.dashboard_tabs}::text[],
+        ${hide_messages_inbox ?? cur.hide_messages_inbox}::boolean, ${b.reason}::text)`);
+    }
+    if ((capabilities !== undefined || dashboard_tabs !== undefined || hide_messages_inbox !== undefined) && Object.keys(rest).length < 2) return this.get(id); // only these changed
 
     if (b.is_active === false && cur.is_active) {
       // current and scheduled assignments both count: a scheduled row would start under an inactive role
@@ -196,6 +210,8 @@ export class RolesService {
     const counts = await this.db.tx.$queryRaw<{ role_id: string; n: bigint }[]>(Prisma.sql`SELECT role_id::text AS role_id, count(*) AS n FROM user_role_assignments
       WHERE role_id = ANY(${rows.map((r) => r.id)}::uuid[]) AND valid_from <= now() AND (valid_to IS NULL OR valid_to > now()) GROUP BY role_id`);
     const count = new Map(counts.map((c) => [c.role_id, Number(c.n)]));
+    const access = new Map((await this.db.tx.$queryRaw<{ id: string; dashboard_tabs: string[]; hide_messages_inbox: boolean }[]>(Prisma.sql`
+      SELECT id::text AS id, dashboard_tabs, hide_messages_inbox FROM roles WHERE id = ANY(${rows.map((r) => r.id)}::uuid[])`)).map((c) => [c.id, c]));
     const caps = new Map((await this.db.tx.$queryRaw<{ id: string; capabilities: string[] }[]>(Prisma.sql`
       SELECT id::text AS id, capabilities FROM roles WHERE id = ANY(${rows.map((r) => r.id)}::uuid[])`)).map((c) => [c.id, [...c.capabilities].sort()]));
     return rows.map((r) => {
@@ -210,10 +226,12 @@ export class RolesService {
         default_module_keys: r.default_all_modules ? 'all' : modules,
         can_hold_matrix_levels: r.can_hold_matrix_levels,
         capabilities: caps.get(r.id) ?? [],
+        dashboard_tabs: [...(access.get(r.id)?.dashboard_tabs ?? ['cw', 'pmo', 'te'])].sort(),
+        hide_messages_inbox: access.get(r.id)?.hide_messages_inbox ?? false,
         is_active: r.is_active,
         active_assignment_count: count.get(r.id) ?? 0,
         version: contentVersion([r.code, r.name_en, r.name_ar, r.description_en, r.description_ar, r.team, r.default_profile_id,
-          r.default_all_regions, r.default_all_modules, r.can_hold_matrix_levels, r.sort, r.is_active, regions, modules, caps.get(r.id) ?? []]),
+          r.default_all_regions, r.default_all_modules, r.can_hold_matrix_levels, r.sort, r.is_active, regions, modules, caps.get(r.id) ?? [], access.get(r.id)?.dashboard_tabs ?? [], access.get(r.id)?.hide_messages_inbox ?? false]),
       };
     });
   }

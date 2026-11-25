@@ -7,6 +7,7 @@ import { useSession } from '@/api/hooks';
 import type { Session } from '@/api/types';
 import { AnnouncementPopup } from '@/components/AnnouncementPopup';
 import { Shell } from '@/components/Shell';
+import { Home } from '@/components/Home';
 import { PeopleAdminLayout } from '@/components/PeopleAdmin';
 import { Approvals } from '@/pages/Approvals';
 import { Inbox } from '@/pages/Inbox';
@@ -85,7 +86,7 @@ function gated(session: Session) {
   return (
     <Routes>
       <Route element={<Shell />}>
-        <Route index element={<Navigate to="/my-work" replace />} />
+        <Route index element={<Home />} />
         <Route path="change-password" element={<ChangePassword />} />
         <Route path="profile" element={<Profile />} />
         <Route path="my-work" element={<MyWork />} />

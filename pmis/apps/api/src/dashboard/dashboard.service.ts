@@ -119,6 +119,7 @@ export class DashboardService {
   async get(_auth: AuthContext, q: Query): Promise<Json> {
     const regions = await this.access.requireRegions('dashboard', 'view');
     const p = dashboardParams(q);
+    await this.access.requireDashboardTab(p.view);
     if (p.stream) await this.requireStream(p.stream);
     if (p.view) await this.requireView(p.view);
     const excl = await this.excludeOverrides(p);
@@ -272,6 +273,7 @@ export class DashboardService {
    */
   async export(auth: AuthContext, q: Query): Promise<{ filename: string; body: Buffer; contentType: string }> {
     await this.access.requireRegions('dashboard', 'view');
+    await this.access.requireDashboardTab(oneParam(q, 'view'));
     if (!(await this.access.hasGrant(auth, 'dashboard', 'export'))) {
       throw problems.forbidden('action_forbidden', 'You need the export right on the dashboard.');
     }

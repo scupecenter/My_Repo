@@ -10870,6 +10870,8 @@ export interface components {
             effective: components["schemas"]["EffectivePermissions"];
         };
         EffectivePermissions: {
+            /** @description 0.15.80 (0163). The Dashboard tabs the roles held now allow; all three for a System Admin or a user with no active role. */
+            dashboard_tabs?: ("pmo" | "cw" | "te")[];
             /** @description Union over active assignments (app_resolve_permissions), each with the regions where it applies. */
             grants: {
                 module_key: components["schemas"]["ModuleKey"];
@@ -10996,6 +10998,10 @@ export interface components {
             can_hold_matrix_levels: boolean;
             /** @description 0.12.3 (Q165). */
             capabilities?: components["schemas"]["RoleCapability"][];
+            /** @description 0.15.80 (0163). Default all three. */
+            dashboard_tabs?: ("pmo" | "cw" | "te")[];
+            /** @description 0.15.80 (0163). Hides the Messages and Inbox menu entries of the holders. Default false. */
+            hide_messages_inbox?: boolean;
             is_active: boolean;
             active_assignment_count?: number;
             version?: number;
@@ -11029,6 +11035,10 @@ export interface components {
             default_module_keys?: "all" | components["schemas"]["ModuleKey"][];
             can_hold_matrix_levels?: boolean;
             is_active?: boolean;
+            /** @description 0.15.80 (0163). System Admin only (403 `delegate_forbidden` for a delegate); with the reason and step-up of the patch; audited as `role_dashboard_access_set`. */
+            dashboard_tabs?: ("pmo" | "cw" | "te")[];
+            /** @description 0.15.80 (0163). System Admin only; same rules as dashboard_tabs. */
+            hide_messages_inbox?: boolean;
             /** @description 0.12.3 (Q165). System Admin only (403 `delegate_forbidden` for a delegate); with the reason and step-up of the patch; audited as `role_capabilities_set`. */
             capabilities?: components["schemas"]["RoleCapability"][];
         };

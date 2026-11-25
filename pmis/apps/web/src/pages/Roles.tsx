@@ -24,9 +24,12 @@ function RoleForm({ role, onClose }: { role?: Role; onClose: () => void }) {
   // Q165 (contract 0.12.3): who reads the whole Audit Log, and who reads it as a Team Lead. System Admin only.
   const admin = isAdmin(useMe(true).data);
   const [caps, setCaps] = useState<string[]>([...(role?.capabilities ?? [])].sort());
+  // 0163 (contract 0.15.80): what holders of the role see of the dashboard and the menu. System Admin only.
+  const [tabs, setTabs] = useState<string[]>(role?.dashboard_tabs ?? ['pmo', 'cw', 'te']);
+  const [hideMsg, setHideMsg] = useState(role?.hide_messages_inbox ?? false);
   const [reg, setReg] = useState<'all' | number[]>(role?.default_region_ids ?? 'all'), [mods, setMods] = useState<'all' | string[]>(role?.default_module_keys ?? 'all');
   const m = role ? patch : create;
-  const bad = en.trim().length < 2 || (!role && !/^[A-Z][A-Z0-9_]{1,40}$/.test(code));
+  const bad = tabs.length === 0 || en.trim().length < 2 || (!role && !/^[A-Z][A-Z0-9_]{1,40}$/.test(code));
   const done = () => { toast(t('roles.saved')); onClose(); };
   return (
     <FormDialog open onClose={onClose} testid="role-dialog" wide title={role ? t('roles.edit') : t('roles.new')} disabled={bad} busy={m.isPending} error={m.isError ? errText(m.error, t) : null}
@@ -38,6 +41,8 @@ function RoleForm({ role, onClose }: { role?: Role; onClose: () => void }) {
           if (!same(reg, role.default_region_ids ?? 'all')) p.default_region_ids = reg;
           if (!same(mods, role.default_module_keys ?? 'all')) p.default_module_keys = mods;
           if (admin && !same(caps, [...(role.capabilities ?? [])].sort())) (p as Record<string, unknown>).capabilities = caps;
+          if (admin && !same([...tabs].sort(), [...(role.dashboard_tabs ?? ['pmo', 'cw', 'te'])].sort())) (p as Record<string, unknown>).dashboard_tabs = ['pmo', 'cw', 'te'].filter((x) => tabs.includes(x));
+          if (admin && hideMsg !== (role.hide_messages_inbox ?? false)) (p as Record<string, unknown>).hide_messages_inbox = hideMsg;
           patch.mutate({ role, reason, patch: p as Partial<Role> }, { onSuccess: done });
         } else {
           const body: RoleInput = { code, name_en: en, name_ar: arName || undefined, description_en: desc || undefined, can_hold_matrix_levels: hold, default_profile_id: profile || null, default_region_ids: reg, default_module_keys: mods, reason };
@@ -66,6 +71,18 @@ function RoleForm({ role, onClose }: { role?: Role; onClose: () => void }) {
             <label key={c} className="flex items-center gap-2 text-sm"><input type="checkbox" data-testid={`role-cap-${c}`} checked={caps.includes(c)}
               onChange={(e) => setCaps((x) => (e.target.checked ? [...x, c].sort() : x.filter((y) => y !== c)))} />{t(`roles.cap_${c}`)}</label>))}
           <p className="text-xs text-mute">{t('roles.cap_hint')}</p>
+        </fieldset>
+      )}
+      {role && admin && (
+        <fieldset className="space-y-1 rounded-md border border-line p-2" data-testid="role-dashboard-access">
+          <legend className="px-1 text-sm font-semibold">{t('roles.dash_access')}</legend>
+          <p className="text-xs text-mute">{t('roles.dash_tabs')}</p>
+          {(['pmo', 'cw', 'te'] as const).map((k) => (
+            <label key={k} className="flex items-center gap-2 text-sm"><input type="checkbox" data-testid={`role-tab-${k}`} checked={tabs.includes(k)}
+              onChange={(e) => setTabs((x) => (e.target.checked ? [...x, k] : x.filter((y) => y !== k)))} />{t(`dash.tabs.${k}`)}</label>))}
+          {tabs.length === 0 && <p className="text-xs text-lateInk" data-testid="role-tabs-none">{t('roles.dash_tabs_none')}</p>}
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" data-testid="role-hide-msg" checked={hideMsg} onChange={(e) => setHideMsg(e.target.checked)} />{t('roles.hide_msg')}</label>
+          <p className="text-xs text-mute">{t('roles.dash_hint')}</p>
         </fieldset>
       )}
       {role && <label className="flex items-center gap-2 text-sm"><input type="checkbox" data-testid="role-active" checked={active} onChange={(e) => setActive(e.target.checked)} />{t('roles.active')}</label>}

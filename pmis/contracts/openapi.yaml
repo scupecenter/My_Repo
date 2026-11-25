@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.79
+  version: 0.15.80
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -31,6 +31,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.80 (2026-11-26): what a role sees of the Dashboard (migration 0163). `Role.dashboard_tabs` (any non-empty combination of `pmo`, `cw`, `te`; default all three) and `Role.hide_messages_inbox` (default false); `RolePatch` sets them (System Admin only, 403 `delegate_forbidden` for a delegate; reason, step-up; audited as `role_dashboard_access_set`). `EffectivePermissions.dashboard_tabs` is the union over the roles held now (a System Admin or a user with no active role: all three). `GET /dashboard`, `/dashboard/extras`, `/dashboard/export` and `/project-status*` answer 403 `action_forbidden` outside the caller's tabs (`pmo` includes the others; view CW needs `cw`, view TE needs `te`, any other view or none needs `pmo`). A role that hides Messages and Inbox removes only the two menu entries of its holders (`effective.nav`); the pages and the API are unchanged. No grant, role or default changes.
     - 0.15.79 (2026-11-26): "Forgot password" by email: `POST /auth/local/password-reset/request` (always the same 202) and `POST /auth/local/password-reset/confirm` (one-time link, 204). Local-password accounts only; System Admins and M365 or break-glass accounts are excluded. No existing endpoint changes.
     - 0.15.78 (2026-11-25): `PATCH /users/{user_id}` also takes `display_name`; `employee_id` is now edited by the admin (4 digits, unique, audited as `user_identity`, never your own row). E-mail and phone stay on the verified request flow. No new endpoint.
     - 0.15.77 (2026-11-25): Real delete of a warehouse item that has no data (owner decision 2026-11-25): `DELETE /warehouse/items/{item_id}?reason=` (System Admin or the `warehouse_items` delegate, reason, If-Match, audited). Allowed only when no movement line (any status), serial, site quantity or As-Built link points to the item; otherwise 409 `item_in_use` and the item can only be deactivated (PATCH `is_active: false`, unchanged). The item answer carries `deletable` (read-only). Migration 0160.
@@ -16830,6 +16831,11 @@ components:
       type: object
       required: [grants, nav]
       properties:
+        dashboard_tabs:
+          type: array
+          uniqueItems: true
+          items: { type: string, enum: [pmo, cw, te] }
+          description: '0.15.80 (0163). The Dashboard tabs the roles held now allow; all three for a System Admin or a user with no active role.'
         grants:
           type: array
           description: Union over active assignments (app_resolve_permissions), each with the regions where it applies.
@@ -16973,6 +16979,8 @@ components:
                   items: { $ref: '#/components/schemas/ModuleKey' }
             can_hold_matrix_levels: { type: boolean }
             capabilities: { type: array, items: { $ref: '#/components/schemas/RoleCapability' }, description: '0.12.3 (Q165).' }
+            dashboard_tabs: { type: array, uniqueItems: true, items: { type: string, enum: [pmo, cw, te] }, description: '0.15.80 (0163). Default all three.' }
+            hide_messages_inbox: { type: boolean, description: '0.15.80 (0163). Hides the Messages and Inbox menu entries of the holders. Default false.' }
             is_active: { type: boolean }
             active_assignment_count: { type: integer }
             version: { type: integer }
@@ -17024,6 +17032,8 @@ components:
               items: { $ref: '#/components/schemas/ModuleKey' }
         can_hold_matrix_levels: { type: boolean }
         is_active: { type: boolean }
+        dashboard_tabs: { type: array, minItems: 1, maxItems: 3, uniqueItems: true, items: { type: string, enum: [pmo, cw, te] }, description: '0.15.80 (0163). System Admin only (403 `delegate_forbidden` for a delegate); with the reason and step-up of the patch; audited as `role_dashboard_access_set`.' }
+        hide_messages_inbox: { type: boolean, description: '0.15.80 (0163). System Admin only; same rules as dashboard_tabs.' }
         capabilities: { type: array, maxItems: 2, uniqueItems: true, items: { $ref: '#/components/schemas/RoleCapability' }, description: '0.12.3 (Q165). System Admin only (403 `delegate_forbidden` for a delegate); with the reason and step-up of the patch; audited as `role_capabilities_set`.' }
     RoleCapability:
       type: string

@@ -27,6 +27,8 @@ type RegionSet = 'all' | number[];
 export interface EffectiveDto {
   grants: { module_key: string; action: string; region_ids: RegionSet }[];
   nav: string[];
+  /** 0163: the Dashboard tabs the roles held now allow (pmo, cw, te). */
+  dashboard_tabs: string[];
   matrix_levels: { module_key: string; level: string; region_ids: RegionSet }[];
 }
 
@@ -80,10 +82,11 @@ export class MeService {
       return {
         grants: ALL_ACTIONS.map((action) => ({ module_key: '*', action, region_ids: 'all' as const })),
         nav: [...NAV_KEYS],
+        dashboard_tabs: ['cw', 'pmo', 'te'],
         matrix_levels: [{ module_key: '*', level: 'admin', region_ids: 'all' }],
       };
     }
-    if (auth.state.pending || auth.user.status !== 'active') return { grants: [], nav: [], matrix_levels: [] };
+    if (auth.state.pending || auth.user.status !== 'active') return { grants: [], nav: [], dashboard_tabs: ['cw', 'pmo', 'te'], matrix_levels: [] };
 
     const active = assignments.filter((a) => a.is_active_now);
     const grants = new Map<string, { module_key: string; action: string; acc: RegionAcc }>();
@@ -153,6 +156,9 @@ export class MeService {
     if (nav.has('sites')) nav.add('daily_plan');
     if (nav.has('sites') && nav.has('reports')) nav.add('workload');
     if (await this.access.canSendAnnouncements()) nav.add('announcements');
-    return { grants: effGrants, nav: [...nav].sort(), matrix_levels: [...levels.values()] };
+    // 0163: a role can hide Messages and Inbox from the menu (menu only: the pages and the API are unchanged) and limit the Dashboard tabs.
+    const access = await this.db.tx.$queryRaw<{ tabs: string[]; hidden: boolean }[]>(Prisma.sql`SELECT app_dashboard_tabs(${auth.user.id}::uuid) AS tabs, app_nav_hidden(${auth.user.id}::uuid) AS hidden`);
+    if (access[0]?.hidden) { nav.delete('messages'); nav.delete('inbox'); }
+    return { grants: effGrants, nav: [...nav].sort(), dashboard_tabs: access[0]?.tabs ?? ['cw', 'pmo', 'te'], matrix_levels: [...levels.values()] };
   }
 }

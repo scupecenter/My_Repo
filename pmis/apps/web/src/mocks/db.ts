@@ -184,7 +184,7 @@ export function meBody(): Me {
     user: { id: uid(v.employee_id ?? '9999'), display_name: db().profiles?.[v.key]?.display_name ?? v.name, employee_id: v.employee_id, email: db().profiles?.[v.key]?.email ?? v.email, status: v.status, locale: db().profiles?.[v.key]?.locale ?? 'en', theme: db().profiles?.[v.key]?.theme ?? 'light',
       ui_brand: db().profiles?.[v.key]?.ui_brand ?? null, brand: effectiveBrand(db().profiles?.[v.key]?.ui_brand) },
     assignments: [], is_system_admin: v.key === 'pm',
-    effective: { grants: [...v.nav.map((m) => ({ module_key: m, action: 'view' as const, region_ids: 'all' as const })), ...(v.key === 'engineer' ? [{ module_key: 'sites', action: 'create' as const, region_ids: 'all' as const }] : []), ...(v.key === 'auditor' ? [{ module_key: 'admin.security_log', action: 'view_security_log' as const, region_ids: 'all' as const }, { module_key: 'audit', action: 'view_audit' as const, region_ids: 'all' as const }] : [])], nav: v.nav },
+    effective: { grants: [...v.nav.map((m) => ({ module_key: m, action: 'view' as const, region_ids: 'all' as const })), ...(v.key === 'engineer' ? [{ module_key: 'sites', action: 'create' as const, region_ids: 'all' as const }] : []), ...(v.key === 'auditor' ? [{ module_key: 'admin.security_log', action: 'view_security_log' as const, region_ids: 'all' as const }, { module_key: 'audit', action: 'view_audit' as const, region_ids: 'all' as const }] : [])], nav: v.nav, dashboard_tabs: ['pmo', 'cw', 'te'] },
   };
 }
 
