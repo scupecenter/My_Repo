@@ -97,6 +97,12 @@ describe('W2 Procurement (records with a site): the view switcher of Site Master
     const p = patches.find((x) => x.url.includes(`/registers/procurement/records/${ENTRY}`));
     expect(p).toBeDefined();
     expect(p!.ifMatch).toBeTruthy();
+    // undo (8 s): the same edit path puts the old value back
+    const undo = await screen.findByTestId('toast-action');
+    const before = patches.length;
+    await u.click(undo);
+    await waitFor(() => expect(patches.length).toBe(before + 1));
+    await waitFor(() => expect(screen.getByTestId(`wide-cell-${ENTRY}-f:po_wo_no`)).not.toHaveTextContent('WO-W2-7'));
     // a list field with values offers them in a select
     await u.click(screen.getByTestId(`wide-edit-${ENTRY}-f:scope`));
     expect(screen.getByTestId(`wide-input-${ENTRY}-f:scope`)).toHaveAttribute('data-input', 'list');

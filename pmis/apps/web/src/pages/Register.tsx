@@ -835,14 +835,31 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
                 field={fc}
                 value={r.data[fc.code]}
                 onClose={() => setEditing(null)}
-                onSave={(v) =>
+                onSave={(v) => {
+                  const before = r.data[fc.code];
                   save.mutate(
                     { record: r, patch: { data: { [fc.code]: v } } },
                     {
                       onError: (e) => toast(registerErrorMessage(t, e), "err"),
+                      // undo for 8 seconds: the same edit path puts the old value back (same permissions and rules; the server may refuse it)
+                      onSuccess: (saved) =>
+                        toast(t("registers.inline_saved"), "ok", {
+                          ms: 8000,
+                          action: {
+                            label: t("common.undo"),
+                            onClick: () =>
+                              save.mutate(
+                                { record: saved, patch: { data: { [fc.code]: before ?? null } } },
+                                {
+                                  onSuccess: () => toast(t("registers.inline_undone")),
+                                  onError: (e) => toast(registerErrorMessage(t, e), "err"),
+                                },
+                              ),
+                          },
+                        }),
                     },
-                  )
-                }
+                  );
+                }}
               />
             );
           }}
@@ -857,9 +874,26 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
               admin={admin}
               regionName={(id) => rname(id as number | null)}
               onOpen={setRecord}
-              onSave={(r, code, value) =>
-                save.mutateAsync({ record: r, patch: { data: { [code]: value } } })
-              }
+              onSave={async (r, code, value) => {
+                const before = r.data[code];
+                const saved = await save.mutateAsync({ record: r, patch: { data: { [code]: value } } });
+                // undo for 8 seconds: the same edit path puts the old value back (the server may refuse it)
+                toast(t("registers.inline_saved"), "ok", {
+                  ms: 8000,
+                  action: {
+                    label: t("common.undo"),
+                    onClick: () =>
+                      save.mutate(
+                        { record: saved, patch: { data: { [code]: before ?? null } } },
+                        {
+                          onSuccess: () => toast(t("registers.inline_undone")),
+                          onError: (e) => toast(registerErrorMessage(t, e), "err"),
+                        },
+                      ),
+                  },
+                });
+                return saved;
+              }}
               errorText={(e) => registerErrorMessage(t, e)}
               display={tbl.display}
               height={Math.max(320, (typeof window === "undefined" ? 800 : window.innerHeight) - 260)}

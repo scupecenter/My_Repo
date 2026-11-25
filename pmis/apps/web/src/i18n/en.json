@@ -397,7 +397,8 @@
     "clear": "Clear",
     "yes": "Yes",
     "no": "No",
-    "soon_chip": "Soon"
+    "soon_chip": "Soon",
+    "undo": "Undo"
   },
   "sites": {
     "title": "Site Master",
@@ -1954,7 +1955,9 @@
     "scope_hlc_only": "You may enter scope HLC only (HLC Fiber Team).",
     "transfer": "Transfer the draft",
     "transferred": "The draft was moved to a qualified holder.",
-    "transfer_note": "The person holding this draft no longer holds Data Entry (L1) of the permit's stream. Transfer it so a qualified holder can finish it; nothing in it is lost."
+    "transfer_note": "The person holding this draft no longer holds Data Entry (L1) of the permit's stream. Transfer it so a qualified holder can finish it; nothing in it is lost.",
+    "inline_saved": "Saved. You can undo for 8 seconds.",
+    "inline_undone": "Change undone."
   },
   "regErrors": {
     "register_locked": "This is locked: only a System Admin can change it until it is unlocked.",
