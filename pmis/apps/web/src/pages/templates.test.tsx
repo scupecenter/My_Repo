@@ -32,6 +32,8 @@ describe('Templates page', () => {
     const u = userEvent.setup();
     for (const id of ['TPL-PROCUREMENT', 'TPL-GECOL', 'TPL-HLC', 'TPL-PERMITS']) expect(await screen.findByTestId(`tpl-row-${id}`)).toBeInTheDocument();
     expect(screen.getByTestId('tpl-version-TPL-GECOL')).toHaveTextContent('v1');
+    expect(screen.getByTestId('tpl-group-registers')).toBeInTheDocument();
+    expect(screen.getByTestId('tpl-group-master')).toBeInTheDocument();
     expect(screen.getByTestId('tpl-streams-note')).toHaveTextContent(/stream templates/);
     await u.click(screen.getByTestId('tpl-download-TPL-GECOL'));
     await waitFor(() => expect(asked).toEqual(['TPL-GECOL?']));

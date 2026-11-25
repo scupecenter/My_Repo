@@ -2551,7 +2551,10 @@
     "kind_holidays": "Holidays (upload in Settings > Calendar)",
     "kind_list_values": "List values (upload in the list)",
     "rule_sites": "One row per new site. Each valid row becomes a site draft when you send the batch; no site exists until L2 approves it.",
-    "open_running": "This file is already being checked: open it"
+    "open_running": "This file is already being checked: open it",
+    "group_master": "Master and shared files",
+    "group_sections": "Sections",
+    "group_registers": "Registers and logs"
   },
   "follow": {
     "follow": "Follow",
@@ -5931,5 +5934,7 @@
     "reason": "Reason",
     "no_cards": "No document type has a file yet; cards appear here once they do."
   },
-  "tplmenu": { "title": "Templates & export" }
+  "tplmenu": {
+    "title": "Templates & export"
+  }
 }
