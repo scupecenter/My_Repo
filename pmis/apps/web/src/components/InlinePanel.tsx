@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 /**
@@ -13,9 +13,11 @@ export function InlinePanel({ onClose, title, testid, children, onSubmit, submit
   const { t } = useTranslation();
   const [reason, setReason] = useState('');
   const [touched, setTouched] = useState(false);
+  const ref = useRef<HTMLElement>(null);
+  useEffect(() => { ref.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' }); }, []);
   const short = withReason && reason.trim().length < 3;
   return (
-    <Tag data-testid={testid} role="group" aria-label={title} className="space-y-3 rounded-md border border-line bg-card2 p-4"
+    <Tag ref={ref as never} data-testid={testid} role="group" aria-label={title} className="space-y-3 rounded-md border border-line bg-card2 p-4"
       onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}>
       <h3 className="font-bold">{title}</h3>
       {children}

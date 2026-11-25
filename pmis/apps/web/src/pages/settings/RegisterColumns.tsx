@@ -145,26 +145,26 @@ function RegisterColumnsOf() {
 
       <ColumnDialog open={dlg?.k === 'add' || dlg?.k === 'edit'} onClose={close} registerKey={key} column={dlg?.k === 'edit' ? dlg.c : undefined} columns={fields} sections={sections} place={dlg?.k === 'add' ? dlg.place : null} />
 
-      <FormDialog open={dlg?.k === 'delete'} onClose={close} testid="column-delete" title={dlg?.k === 'delete' ? t('regcols.delete_title', { code: dlg.c.code }) : ''} error={err} busy={del.isPending}
+      <FormDialog inline open={dlg?.k === 'delete'} onClose={close} testid="column-delete" title={dlg?.k === 'delete' ? t('regcols.delete_title', { code: dlg.c.code }) : ''} error={err} busy={del.isPending}
         submitLabel={impact.data?.delete_mode === 'hard' ? t('regcols.delete') : t('regcols.deactivate')}
         onSubmit={(reason) => dlg?.k === 'delete' && void run(async () => { const r = await del.mutateAsync({ code: dlg.c.code, reason }); toast(r.mode === 'deleted' ? t('regcols.deleted') : t('regcols.deactivated')); }, '')}>
         {impact.isLoading && <p className="text-mute">{t('common.loading')}</p>}
         {impact.data && <p data-testid="column-delete-mode">{impact.data.delete_mode === 'hard' ? t('regcols.delete_hard') : t('regcols.delete_deactivate', { count: impact.data.usage.records_with_value ?? 0 })}</p>}
       </FormDialog>
 
-      <FormDialog open={dlg?.k === 'react'} onClose={close} testid="column-react" title={dlg?.k === 'react' ? t('regcols.reactivate', { code: dlg.c.code }) : ''} error={err} busy={upd.isPending}
+      <FormDialog inline open={dlg?.k === 'react'} onClose={close} testid="column-react" title={dlg?.k === 'react' ? t('regcols.reactivate', { code: dlg.c.code }) : ''} error={err} busy={upd.isPending}
         onSubmit={(reason) => dlg?.k === 'react' && void run(() => upd.mutateAsync({ code: dlg.c.code, version: dlg.c.version, patch: { is_active: true, reason } }), t('regcols.saved'))} />
 
-      <FormDialog open={dlg?.k === 'section'} onClose={close} testid="section-dialog" title={dlg?.k === 'section' && dlg.s ? t('regcols.rename_section', { name: dlg.s.name_en }) : t('regcols.add_section')} error={err} busy={saveSec.isPending} disabled={!sec.en.trim()}
+      <FormDialog inline open={dlg?.k === 'section'} onClose={close} testid="section-dialog" title={dlg?.k === 'section' && dlg.s ? t('regcols.rename_section', { name: dlg.s.name_en }) : t('regcols.add_section')} error={err} busy={saveSec.isPending} disabled={!sec.en.trim()}
         onSubmit={(reason) => dlg?.k === 'section' && void run(() => saveSec.mutateAsync({ id: dlg.s?.id, version: dlg.s?.version, name_en: sec.en.trim(), name_ar: sec.ar.trim() || null, reason }), t('regcols.saved'))}>
         <input className="input" data-testid="section-name-en" aria-label={t('regcols.label_en')} placeholder={t('regcols.label_en')} value={sec.en} onChange={(e) => setSec({ ...sec, en: e.target.value })} />
         <input className="input" dir="rtl" data-testid="section-name-ar" aria-label={t('regcols.label_ar')} placeholder={t('regcols.label_ar')} value={sec.ar} onChange={(e) => setSec({ ...sec, ar: e.target.value })} />
       </FormDialog>
 
-      <FormDialog open={dlg?.k === 'section-del'} onClose={close} testid="section-delete" title={dlg?.k === 'section-del' ? t('regcols.delete_section', { name: dlg.s.name_en }) : ''} error={err} busy={delSec.isPending}
+      <FormDialog inline open={dlg?.k === 'section-del'} onClose={close} testid="section-delete" title={dlg?.k === 'section-del' ? t('regcols.delete_section', { name: dlg.s.name_en }) : ''} error={err} busy={delSec.isPending}
         onSubmit={(reason) => dlg?.k === 'section-del' && void run(() => delSec.mutateAsync({ id: dlg.s.id, reason }), t('regcols.deleted'))} />
 
-      <FormDialog open={dlg?.k === 'rename'} onClose={close} testid="register-rename" title={t('regcols.rename_register')} error={err} busy={ren.isPending} disabled={!name.en.trim()}
+      <FormDialog inline open={dlg?.k === 'rename'} onClose={close} testid="register-rename" title={t('regcols.rename_register')} error={err} busy={ren.isPending} disabled={!name.en.trim()}
         onSubmit={(reason) => void run(() => ren.mutateAsync({ version: scr.data?.register.version, name_en: name.en.trim(), name_ar: name.ar.trim() || null, reason }), t('regcols.saved'))}>
         <input className="input" data-testid="register-name-en" aria-label={t('regcols.label_en')} value={name.en} onChange={(e) => setName({ ...name, en: e.target.value })} />
         <input className="input" dir="rtl" data-testid="register-name-ar" aria-label={t('regcols.label_ar')} value={name.ar} onChange={(e) => setName({ ...name, ar: e.target.value })} />

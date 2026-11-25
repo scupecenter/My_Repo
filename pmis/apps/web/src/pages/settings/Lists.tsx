@@ -689,7 +689,7 @@ function ListDialog({
     </label>
   );
   return (
-    <FormDialog
+    <FormDialog inline
       open
       testid="lists-dialog"
       title={title}

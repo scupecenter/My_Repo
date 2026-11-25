@@ -82,7 +82,7 @@ export function SiteMasterColumns() {
           </tbody>
         </table>
       </div>
-      <FormDialog
+      <FormDialog inline
         open={edit !== null}
         onClose={() => setEdit(null)}
         testid="siteMasterCols-dialog"

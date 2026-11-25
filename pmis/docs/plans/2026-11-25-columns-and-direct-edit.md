@@ -100,3 +100,7 @@ PRs: #214 templates; P2 Table basics; P3 Settings and columns; P4 Inline and bat
 - Same permissions, locks, Change Control (coordinates and names stay proposals needing L2), approvals, step-up and audit on every write path.
 - Hiding a column that holds data deactivates it: old values stay, new data only.
 - No new write path without the owner's approval.
+
+## Settings in place (status)
+- Done: `InlinePanel` (same reason rule and testids as FormDialog); `FormDialog inline` used by Calendar (row-level), Document types, Lists, SLA rules, Weight sets, Site Master columns, Register columns, Workflow structure. Data reset and Historical waiver keep their step-up flow.
+- Left: position of some panels is at the end of their section (scrolled into view), row-level placement only for Calendar so far.
