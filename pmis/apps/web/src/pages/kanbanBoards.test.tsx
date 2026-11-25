@@ -1,6 +1,6 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { http } from 'msw';
+import { http, HttpResponse } from 'msw';
 import { Route, Routes } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 import { API_BASE } from '@/api/client';
@@ -51,6 +51,19 @@ describe('sites board (Site Master)', () => {
     await u.selectOptions(screen.getByTestId('sites-board-swimlane'), 'region');
     await screen.findByTestId('board-lane-title-1');
     await waitFor(() => expect(seen.some((s) => s.includes('swimlane=region'))).toBe(true));
+  }, T);
+
+  it('Open action on a site card opens only the task action of its milestone (next column only) and writes nothing', async () => {
+    await signIn('pm');
+    const sent = writes();
+    const u = userEvent.setup();
+    renderApp(<Sites />, { route: '/sites?layout=board' });
+    const btn = (await screen.findAllByTestId(/^board-site-action-/))[0]!;
+    const column = btn.closest('[data-testid^="board-cell-"]')!.getAttribute('data-testid')!.replace('board-cell-', '').replace(/-[^-]+$/, '');
+    server.use(http.get(`${API_BASE}/sites/:id/tasks`, () => HttpResponse.json({ workflow_version: 1, stages: [{ code: column, name_en: column, tasks: [{ id: TASK_APPROVE, site_id: 's', name_en: 'Task', state: 'in_approval' }] }] })));
+    await u.click(btn);
+    expect(await screen.findByTestId('drawer-intent')).toBeInTheDocument();
+    expect(sent).toEqual([]);
   }, T);
 
   it('marks a column above its WIP limit with a warning and keeps every card (Arabic)', async () => {

@@ -5273,7 +5273,11 @@
     "wip_limit_label": "WIP limit",
     "wip_none": "No limit",
     "wip_range": "A whole number from {{min}} to {{max}}, or empty.",
-    "wip_confirm": "The new limits apply to the board at once. They only warn."
+    "wip_confirm": "The new limits apply to the board at once. They only warn.",
+    "sites_drop_note": "Dropping a site card on the next column only opens the task's own action; nothing changes until you confirm it.",
+    "site_next_only": "Only the next column: a site moves one milestone at a time.",
+    "site_drop_refused": "You cannot do that here: no action of yours moves a task of {{code}} on.",
+    "site_pick_title": "Which task of {{code}}?"
   },
   "brand": {
     "current": "Current (standard)",
