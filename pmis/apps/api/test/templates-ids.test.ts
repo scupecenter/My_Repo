@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { q } from './calc-helpers';
 import { startApp, superDb } from './helpers';
 import { downloadTemplate, fillTemplate, load, uploadFile } from './tpl-helpers';
-import { makeSite, plainAdmin } from './wf-helpers';
+import { makeSite, makeTask, plainAdmin } from './wf-helpers';
 
 /**
  * Migration 0156: template IDs follow the section and register names. An old ID is kept in previous_ids; a file that still carries it is refused as an
@@ -66,12 +66,13 @@ describe('pre-fill by the filters of the Sites list', () => {
     const none = await downloadTemplate(admin.api, 'TPL-MASTER', `?filters=${encodeURIComponent(JSON.stringify({ q: 'ZZ-NO-SUCH-SITE-0000' }))}`);
     expect(none.status).toBe(422);
     const site = await makeSite(db, 5);
+    await makeTask(db, site, 'B4', 'open'); // the pre-fill lists the sites that have a task of the template
     const ok = await downloadTemplate(admin.api, 'TPL-MASTER', `?filters=${encodeURIComponent(JSON.stringify({ q: site.code }))}`);
     expect(ok.status).toBe(200);
     const wb = await load(ok.buffer);
-    // the site is pre-filled in the data sheets of the book (the part sheets), not in Instructions, Columns or Lists
+    const ws = wb.getWorksheet('Master')!;
     const cells: string[] = [];
-    for (const ws of wb.worksheets) ws.eachRow((r) => r.eachCell((c) => cells.push(String(c.text))));
-    expect(cells.join(' ')).toContain(site.code);
+    ws.eachRow((r, n) => { if (n > 1) cells.push(String(r.getCell(2).text)); });
+    expect(cells).toContain(site.code);
   });
 });
