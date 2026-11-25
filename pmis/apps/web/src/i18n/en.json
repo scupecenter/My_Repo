@@ -1636,6 +1636,7 @@
     "self": "You cannot change your own System Admin rights."
   },
   "peopleAdmin": {
+    "tab_roles_profiles": "Roles and profiles",
     "tab_users": "Users",
     "tab_assignments": "Assignments",
     "tab_profiles": "Permission profiles"

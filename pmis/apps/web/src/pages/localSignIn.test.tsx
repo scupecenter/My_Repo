@@ -402,6 +402,8 @@ describe('Users & Roles tabs', () => {
     expect(firstPeopleTab(me(['sites', 'admin.matrix']))).toBe('/admin/matrix');
     expect(firstPeopleTab(me(['sites'], ['manage_users']))).toBe('/admin/online'); // Online now (a sub-tab of Users) is opened by its grant
     expect(PEOPLE_TABS.find((p) => p.key === 'admin.online')?.under).toBe('admin.users');
+    expect(PEOPLE_TABS.find((p) => p.key === 'admin.assignments')?.under).toBe('admin.users'); // merge 2026-11-25
+    expect(PEOPLE_TABS.find((p) => p.key === 'admin.profiles')?.under).toBe('admin.roles');
     expect(firstPeopleTab(me(['sites']))).toBeNull();
   });
 });

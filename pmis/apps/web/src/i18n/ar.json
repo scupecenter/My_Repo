@@ -1636,6 +1636,7 @@
     "self": "لا يمكنك تغيير صلاحيات مدير النظام لنفسك."
   },
   "peopleAdmin": {
+    "tab_roles_profiles": "الأدوار والملفات",
     "tab_users": "المستخدمون",
     "tab_assignments": "الإسنادات",
     "tab_profiles": "ملفات الصلاحيات"
