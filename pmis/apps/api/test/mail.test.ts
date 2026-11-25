@@ -335,7 +335,7 @@ describe('the admin endpoints and the health check', () => {
     const t = await api.call('post', '/admin/mail/test');
     expect(t.status).toBe(200);
     expect(t.body).toMatchObject({ outcome: 'sent', error: null, to: `${admin.email[0]}***@example.test` });
-    expect(fake.received.some((m) => m.to.includes(admin.email) && m.subject.startsWith('[PMIS] Test mail'))).toBe(true);
+    expect(fake.received.some((m) => m.to.includes(admin.email) && m.subject.startsWith('[Workspace] Test mail'))).toBe(true);
     st = await api.call('get', '/admin/mail/status');
     expect(st.body.verified_at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     expect((await db.query(`SELECT count(*) FROM audit_log WHERE action = 'mail_test_sent' AND actor_id = $1`, [admin.id])).rows[0].count).toBe('1');

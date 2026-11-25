@@ -188,7 +188,7 @@ export class MailService implements OnApplicationBootstrap, OnModuleDestroy {
   async test(auth: AuthContext) {
     if (!auth.state.isAdmin) throw new ProblemException(403, 'action_forbidden', { detail: 'Only a System Admin can send a test mail.' });
     if (!this.cfg.enabled) throw new ProblemException(422, 'mail_not_configured', { detail: 'SMTP is not configured on the server (SMTP_HOST and SMTP_FROM in the env file).' });
-    const subject = '[PMIS] Test mail / رسالة اختبار';
+    const subject = '[Workspace] Test mail / رسالة اختبار';
     const text = `This is a test mail of GSDN Workspace, sent by ${auth.user.displayName}.\nهذه رسالة اختبار من نظام GSDN Workspace.\n\nServer: ${this.cfg.host}:${this.cfg.port} (${this.cfg.tls})\nTime: ${new Date().toISOString()}`;
     const id = (await this.db.tx.$queryRaw<{ id: string }[]>(Prisma.sql`SELECT mail_test_enqueue(${this.fingerprint()}::text, ${subject}::text, ${text}::text)::text AS id`))[0]!.id;
     const claimed = await this.db.tx.$queryRaw<{ id: string; kind: string; to_address: string; subject: string; body_text: string; attempts: number }[]>(Prisma.sql`
