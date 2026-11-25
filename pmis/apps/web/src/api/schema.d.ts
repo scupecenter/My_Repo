@@ -200,6 +200,51 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/local/password-reset/request": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ask for a password-reset link by email (migration 0162)
+         * @description Always answers the same 202, whether or not the identifier matches an account that can use the flow: nothing tells who is registered.
+         *     Only accounts that sign in with a local password and are active can get a link; System Admins, M365 and break-glass accounts cannot (ask an admin).
+         *     The link is mailed to the account's registered address and works once for 30 minutes. One link per account every 2 minutes, at most 3 requests per
+         *     identifier and 10 per IP per hour (over the IP limit: 429 `rate_limited`). The token is only in the URL fragment of the mailed link.
+         */
+        post: operations["requestPasswordReset"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/local/password-reset/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set a new password with the link from the mail (migration 0162)
+         * @description A wrong, used or expired link answers 422 `invalid_code`. The new password follows the same policy as `POST /auth/local/password` and must differ from
+         *     the current one (422 `weak_password`). On success every session of the account ends, a notice mail is sent and nobody is signed in: two-factor still applies at
+         *     the next sign-in. A failed sign-in lockout is not cleared. Rate limited per IP (429).
+         */
+        post: operations["confirmPasswordReset"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/local/2fa": {
         parameters: {
             query?: never;
@@ -19418,6 +19463,67 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    requestPasswordReset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    identifier: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Accepted (the same for every identifier). */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        accepted: true;
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    confirmPasswordReset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    token: string;
+                    /** Format: password */
+                    new_password: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The password was changed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            422: components["responses"]["Unprocessable"];
             429: components["responses"]["TooManyRequests"];
         };
     };

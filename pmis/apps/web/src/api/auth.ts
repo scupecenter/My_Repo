@@ -24,6 +24,20 @@ export function useLocalLogin() {
   });
 }
 
+/** "Forgot password" (contract 0.15.79): always the same 202. */
+export function useRequestPasswordReset() {
+  return useMutation<{ accepted: true }, ApiError, { identifier: string }>({
+    mutationFn: (body) => api.post<{ accepted: true }>('/auth/local/password-reset/request', { body }),
+  });
+}
+
+/** The one-time link from the mail plus the new password (204). Nobody is signed in by it. */
+export function useConfirmPasswordReset() {
+  return useMutation<unknown, ApiError, { token: string; new_password: string }>({
+    mutationFn: (body) => api.post('/auth/local/password-reset/confirm', { body }),
+  });
+}
+
 /** Second step of sign-in: a TOTP code or one recovery code. The pending-sign-in cookie travels by itself. */
 export function useTwoFactorSignIn() {
   const adopt = useAdoptSession();

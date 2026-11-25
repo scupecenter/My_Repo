@@ -1,9 +1,12 @@
+import { AlertTriangle, Info, LifeBuoy, LogIn } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { isPending, useLocalLogin } from '@/api/auth';
 import { API_BASE, ApiError } from '@/api/client';
+import { AuthShell, PasswordField } from '@/components/AuthShell';
 import { CodeStep, EnrolFlow } from '@/components/TwoFactor';
+import { clearRememberedId, readRememberedId, writeRememberedId } from '@/lib/rememberId';
 
 export const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === 'true';
 /** Microsoft 365 sign-in stays in the code but is hidden until IT registers the app (ADR 0012). */
@@ -18,7 +21,9 @@ export function loginUrl(identifier: string, returnTo = '/my-work') {
 
 export function Login() {
   const { t } = useTranslation();
-  const [id, setId] = useState('');
+  const saved = readRememberedId();
+  const [id, setId] = useState(saved);
+  const [remember, setRemember] = useState(saved !== '');
   const [pw, setPw] = useState('');
   const [err, setErr] = useState<'' | 'invalid' | 'rate' | 'other' | 'expired'>('');
   // After a right password, two-factor adds a step: the code, or the first-time setup (contract 0.5.0).
@@ -26,12 +31,14 @@ export function Login() {
   const [params] = useSearchParams();
   const nav = useNavigate();
   const login = useLocalLogin();
+  const keepId = () => { if (remember) writeRememberedId(id); else clearRememberedId(); };
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (login.isPending) return;
     setErr('');
     login.mutate({ identifier: id.trim(), password: pw }, {
       onSuccess: (r) => {
+        keepId();
         if (isPending(r)) { setPw(''); setStep(r.next === 'enrol' ? 'enrol' : 'code'); return; }
         nav('/my-work', { replace: true });
       },
@@ -44,33 +51,43 @@ export function Login() {
   };
   const restart = (why: '' | 'expired') => { setStep('password'); setPw(''); setErr(why); };
   const finish = () => nav('/my-work', { replace: true });
-  if (step === 'code') return <div className="grid min-h-screen place-items-center p-4"><CodeStep onDone={finish} onBack={() => restart('')} onExpired={() => restart('expired')} /></div>;
-  if (step === 'enrol') return <div className="grid min-h-screen place-items-center p-4"><EnrolFlow onDone={finish} onExpired={() => restart('expired')} /></div>;
+  if (step === 'code') return <AuthShell><CodeStep onDone={finish} onBack={() => restart('')} onExpired={() => restart('expired')} /></AuthShell>;
+  if (step === 'enrol') return <AuthShell><EnrolFlow onDone={finish} onExpired={() => restart('expired')} /></AuthShell>;
   const msg = err === 'expired' ? t('twoFactor.expired') : err === 'invalid' ? t('login.invalid') : err === 'rate' ? t('login.rate') : err === 'other' ? t('login.error') : params.get('error') ? t('login.error') : '';
+  const notice = !msg && params.get('reason') === 'expired' ? t('login.session_ended') : '';
   return (
-    <div className="grid min-h-screen place-items-center p-4">
-      <form onSubmit={submit} className="card w-[min(440px,100%)] space-y-4 p-6" data-testid="login-form">
-        <div className="flex items-center gap-2 text-lg font-bold"><span className="grid h-8 w-8 place-items-center rounded-md bg-accent text-accentInk">G</span>{t('app.name')}</div>
-        <h1 className="text-2xl font-bold">{t('login.title')}</h1>
-        <p className="text-mute">{t('login.subtitle')}</p>
+    <AuthShell>
+      <form onSubmit={submit} className="card space-y-4 p-6 sm:p-8" data-testid="login-form" aria-busy={login.isPending}>
+        <div>
+          <h1 className="text-2xl font-bold">{t('login.title')}</h1>
+          <p className="mt-1 text-mute">{t('login.subtitle')}</p>
+        </div>
+        {notice && <p role="status" className="flex items-start gap-2 rounded-md bg-accentSoft p-3 text-sm text-accentText" data-testid="login-notice"><Info size={16} className="mt-0.5 shrink-0" aria-hidden />{notice}</p>}
         <div>
           <label className="block text-sm font-semibold" htmlFor="identifier">{t('login.label')}</label>
-          <input id="identifier" data-testid="login-identifier" className="input mt-1" dir="ltr" autoComplete="username" autoFocus placeholder={t('login.placeholder')} value={id} onChange={(e) => setId(e.target.value)} />
+          <input id="identifier" data-testid="login-identifier" className="input mt-1 w-full" dir="ltr" autoComplete="username" autoFocus placeholder={t('login.placeholder')} value={id} onChange={(e) => setId(e.target.value)} />
         </div>
-        <div>
-          <label className="block text-sm font-semibold" htmlFor="password">{t('login.password')}</label>
-          <input id="password" data-testid="login-password" type="password" className="input mt-1" dir="ltr" autoComplete="current-password" value={pw} onChange={(e) => setPw(e.target.value)} />
+        <PasswordField id="password" label={t('login.password')} testid="login-password" autoComplete="current-password" value={pw} onChange={setPw} />
+        <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+          <label className="flex cursor-pointer items-center gap-2" title={t('login.remember_hint')}>
+            <input type="checkbox" data-testid="login-remember" checked={remember} onChange={(e) => { setRemember(e.target.checked); if (!e.target.checked) clearRememberedId(); }} />
+            {t('login.remember')}
+          </label>
+          <Link to="/forgot-password" className="font-semibold text-link hover:underline" data-testid="login-forgot">{t('login.forgot')}</Link>
         </div>
-        {msg && <p role="alert" data-testid="login-error" className="text-lateInk">{msg}</p>}
-        <button className="btn btn-accent w-full" data-testid="login-submit" type="submit" disabled={login.isPending || !id.trim() || !pw}>{t('login.button')}</button>
+        {msg && <p role="alert" data-testid="login-error" className="flex items-start gap-2 text-lateInk"><AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden />{msg}</p>}
+        <button className="btn btn-accent w-full gap-2" data-testid="login-submit" type="submit" disabled={login.isPending || !id.trim() || !pw}>
+          <LogIn size={16} aria-hidden />{login.isPending ? t('login.busy') : t('login.button')}
+        </button>
         {M365_ENABLED && (
           <>
             <div className="flex items-center gap-2 text-xs text-faint"><span className="h-px flex-1 bg-line" />{t('login.or')}<span className="h-px flex-1 bg-line" /></div>
             <button className="btn w-full" data-testid="login-m365" type="button" onClick={() => window.location.assign(loginUrl(id))}>{t('login.m365')}</button>
           </>
         )}
-        <p className="text-xs text-faint">{t('login.note')}</p>
+        <p className="flex items-start gap-2 border-t border-line pt-3 text-xs text-faint" data-testid="login-help"><LifeBuoy size={14} className="mt-0.5 shrink-0" aria-hidden />{t('login.note')}</p>
+        <p className="text-xs text-faint">{t('login.need_access')}</p>
       </form>
-    </div>
+    </AuthShell>
   );
 }

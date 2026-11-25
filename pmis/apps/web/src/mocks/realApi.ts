@@ -10,6 +10,8 @@ import { HYBRID, isHybrid, isRealJob } from '@/lib/hybrid';
 export const REAL_API_AUTH_USERS = [
   ['post', '/auth/local/login'],
   ['post', '/auth/local/password'],
+  ['post', '/auth/local/password-reset/request'],
+  ['post', '/auth/local/password-reset/confirm'],
   ['post', '/auth/local/step-up'],
   // Contract 0.5.0 and 0.6.0: two-factor (TOTP) for local accounts and its one-time enrolment code (apps/api: auth, users; migrations 0033, 0034).
   ['post', '/auth/local/2fa'],

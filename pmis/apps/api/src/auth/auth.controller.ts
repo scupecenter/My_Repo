@@ -7,6 +7,7 @@ import { TwoFactorService } from './two-factor.service';
 import type { AuthContext } from './auth.types';
 import { AllowIncomplete, Auth, Public } from './decorators';
 import { SessionService } from './session.service';
+import { PasswordResetService } from './password-reset.service';
 
 @Controller('auth')
 export class AuthController {
@@ -14,7 +15,27 @@ export class AuthController {
     private readonly auth: AuthService,
     private readonly sessions: SessionService,
     private readonly twoFactor: TwoFactorService,
+    private readonly resets: PasswordResetService,
   ) {}
+
+  /** "Forgot password" (0162): the same answer whether or not the account exists. */
+  @Public()
+  @Post('local/password-reset/request')
+  @HttpCode(202)
+  async passwordResetRequest(@Req() req: Request, @Body() body: unknown): Promise<{ accepted: true }> {
+    this.needJson(req);
+    await this.resets.request(body, req.ip ?? null, req.header('user-agent'), req.id ?? '');
+    return { accepted: true };
+  }
+
+  /** The link from the mail plus the new password. Nothing is signed in: the person signs in afterwards (two-factor still applies). */
+  @Public()
+  @Post('local/password-reset/confirm')
+  @HttpCode(204)
+  async passwordResetConfirm(@Req() req: Request, @Body() body: unknown): Promise<void> {
+    this.needJson(req);
+    await this.resets.confirm(body, req.ip ?? null, req.header('user-agent'), req.id ?? '');
+  }
 
   @Public()
   @Post('local/login')
