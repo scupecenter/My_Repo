@@ -10,7 +10,7 @@ ALTER TABLE roles ADD COLUMN dashboard_tabs text[] NOT NULL DEFAULT ARRAY['pmo',
   CONSTRAINT roles_dashboard_tabs_check CHECK (dashboard_tabs <@ ARRAY['pmo', 'cw', 'te']::text[] AND cardinality(dashboard_tabs) >= 1);
 ALTER TABLE roles ADD COLUMN hide_messages_inbox boolean NOT NULL DEFAULT false;
 
-CREATE OR REPLACE FUNCTION idm_role_set_dashboard_access(p_role uuid, p_tabs text[], p_hide boolean, p_reason text) RETURNS void
+CREATE OR REPLACE FUNCTION idm_role_set_dashboard_access(p_role uuid, p_tabs text[], p_hide boolean, p_reason text) RETURNS text[]
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 DECLARE o public.roles%ROWTYPE; nt text[];
 BEGIN
@@ -28,11 +28,12 @@ BEGIN
   IF NOT public.log_actor_stepped_up() THEN PERFORM public.wf_err('step_up_required', '{}'::jsonb); END IF;
   SELECT * INTO o FROM public.roles WHERE id = p_role FOR UPDATE;
   IF NOT FOUND THEN PERFORM public.wf_err('not_found', jsonb_build_object('detail', 'The role does not exist.')); END IF;
-  IF o.dashboard_tabs = nt AND o.hide_messages_inbox = coalesce(p_hide, false) THEN RETURN; END IF;
+  IF o.dashboard_tabs = nt AND o.hide_messages_inbox = coalesce(p_hide, false) THEN RETURN nt; END IF;
   UPDATE public.roles SET dashboard_tabs = nt, hide_messages_inbox = coalesce(p_hide, false) WHERE id = p_role;
   PERFORM public.log_audit_write('role_dashboard_access_set', 'role', p_role::text,
     jsonb_build_object('code', o.code, 'dashboard_tabs', to_jsonb(o.dashboard_tabs), 'hide_messages_inbox', o.hide_messages_inbox),
     jsonb_build_object('code', o.code, 'dashboard_tabs', to_jsonb(nt), 'hide_messages_inbox', coalesce(p_hide, false)), p_reason);
+  RETURN nt;  -- not void: Prisma cannot read a void result of a raw query
 END $$;
 
 -- The tabs of a user now. A System Admin and a user who holds no active role (the rights come from delegations or nothing) keep all three.
