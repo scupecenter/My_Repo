@@ -403,11 +403,11 @@ WHERE p.pronamespace = 'public'::regnamespace
 -- @end
 
 -- @case RB-62
--- @title The Master import apply keeps its two signatures and their grants of 0060 / 0073 (no new door); 0093 adds the 7-argument door with the register sheets
+-- @title The Master import apply keeps its two signatures and their grants of 0060 / 0073 (no new door); 0093 adds the 7-argument door with the register sheets; 0155 the 8-argument door with the creation of the sites
 -- @category async-register-batches
 -- @actor ALICE
 -- @region 1
--- @expect output 5,6,7
+-- @expect output 5,6,7,8
 SELECT string_agg(p.pronargs::text, ',' ORDER BY p.pronargs) FROM pg_proc p
 WHERE p.pronamespace = 'public'::regnamespace AND p.proname = 'mi_apply_run' AND has_function_privilege('pmis_app', p.oid, 'EXECUTE');
 -- @end

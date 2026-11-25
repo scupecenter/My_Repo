@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.72
+  version: 0.15.73
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -31,6 +31,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.73 (2026-11-25): the Master import creates the sites of its file that are not in GSDN Workspace, then enters their task dates and register rows, in one apply (owner request 2026-11-25; open question Q350; migration 0155, mirror `db/sql/154_master_create_sites.sql`; CHANGELOG 210). Additive and backward compatible: without the new field the apply is exactly as before. (1) `MasterImportApplyRequest.create_sites` (default false): before anything is entered, each Site ID of the file that is not a site of GSDN Workspace becomes a row of one New sites batch (`ImportBatch` entity `site`, `source` `master_import`, its file the run's file) and is created by the path of an approved New sites row: the Master identity and scope columns are mapped onto the New sites fields (B Site ID, C Site Owner ID, D Site Name, E Region, F Sub Region, G Cluster ID, H Latitude, I Longitude, J Site Type, K Site Scenario, S RF Survey Date, X Project Phase, Y Delivery Batch, Z Delivery Scenario, AA:AF the scope flags, AG CW Delivery Model, FZ Overall Status only when Cancelled), validated as a New sites row (a missing or unknown region or delivery scenario refuses the row; nothing is defaulted), then the site is created on the workflow version in force with the scenario applicability and an audit row `site_create` naming the run (`master_run_id`). A Site ID that exists (also cancelled, voided or deleted) is never touched: its row is skipped with the reason. Then the task columns and (with `historical_load.registers`) the register sheets are entered as before, the created sites included. (2) Who: a System Admin (never a delegate; the creation is flagged `admin_override` unless the admin also holds both levels), or a person who holds both L1 and L2 of the Matrix row `site_creation` in the region of the row (a self-approval, B5); the apply's step-up is required. Anyone else: 403 `action_forbidden`; a row of a region where the person does not hold both levels is skipped with the reason. `MasterImportRun.create_sites_offer` (`{allowed, admin, regions, reason}`) says whether the caller may use the option and why not. (3) Big runs: the sites to create count toward `imports.async_rows`; above it the apply runs in the background (202, status `applying`): the sites are created 25 per transaction first, visible in `MasterImportApplyProgress` (`phase` `create_sites` then `apply`, `create_total`, `create_done`), then the run is applied. A run stopped meanwhile keeps the sites created so far. (4) `MasterImportOutcome.create_sites`: `batch_id`, `created[]` (row, Site ID, site, region, self-approval), `skipped[]` (row, Site ID, code, reason, column, errors), `created_count`, `skipped_count`. (5) The batch is processed by the apply only: a send, a decision or a discard of it answers 409 `batch_processing`. (6) The 422 of a file whose rows belong to no site of GSDN Workspace now says how many sites are missing and names the option (or, with it, the first reasons why none could be created).
     - 0.15.72 (2026-11-25): the backup precondition of the project data reset becomes a choice of each request (owner decision 2026-11-25; migration 0154, mirror `db/sql/153_data_reset_no_backup.sql`; CHANGELOG 209). Additive and backward compatible: a request without `require_backup` requires a recent backup as before. `POST /settings/data-reset/requests` takes optional `require_backup` (default true) and, when it is false, `no_backup_confirm` with the typed phrase `NO BACKUP` (`DataResetState.no_backup_phrase`; otherwise 422 `confirmation_mismatch` at `/no_backup_confirm`); the request's reason is the reason of the choice. The choice is stored on the request (`DataResetRequest.require_backup`), never changes, and is bound into `scope_hash` (equal to `scope.hash` when a backup is required, a different hash when not), so an approval sent with the hash of the other choice is 409 `scope_changed`. `POST .../run` skips only the backup check (409 `backup_missing`) for a request made without a backup; every other check stays. The choice is written into the audit rows of the request, the approval, the start and the reset, and into `result.require_backup`.
     - 0.15.71 (2026-11-24): the project data reset becomes selectable (owner decision 2026-11-24; migration 0152, mirror `db/sql/151_data_reset_scope.sql`; CHANGELOG 207). Additive and backward compatible: a request without `parts` is everything as before. New path `GET /settings/data-reset/plan?parts=...` (`data_reset_dry_run`): the counts of a chosen scope per part and per table, the closure and its hash. `POST /settings/data-reset/requests` takes optional `parts` (codes of the catalogue `DataResetPart`); the database adds every dependent part (`depends_on`) and stores the normalised closure and its SHA-256 on the request (`DataResetRequest.scope`, `scope_hash`). `POST .../approve` takes optional `scope_hash` (the scope the approver saw): a different hash, or a request whose closure would be different today, is 409 `scope_changed`; the approval stores `approved_scope_hash`, and start and execute check it again. `DataResetState.plan` is a `DataResetPlan` (now with `parts`, the catalogue with labels EN/AR, `depends_on`, `dependents` and rows, `scope`, `accounts_to_deactivate`) and `everything` (the parts of "everything"). Three optional identity parts, never in everything: `users` (deactivate every account but the System Admins, the break-glass account, the requester, the approver and the runner), `roles` (assignments, groups but the System Admins group, delegations), `staff` (staff registry, absences). `DataResetPlanTable` gains `part` and the action `optional`. New `ErrorCode` `scope_changed`.
     - 0.15.70 (2026-11-24): W5 of plan `docs/plans/2026-11-23-next-ui-cleanup.md`, the Library menu with Forms and Archive (migration 0151, mirror `db/sql/150_library.sql`; CHANGELOG 205; 0.15.69 is reserved for W2). Additive. (1) Library > Forms: `GET /library/forms` (the approved forms and the uploaded blank forms), `POST /library/forms/{template_id}/preview` (auto-filled, no number) and `POST /library/forms/{template_id}/generate` (numbered by the existing numbering service, kept, audited; the copy is "generated" in the Archive), `GET /library/generated/{doc_id}/download` (`purpose` download, print or view; audited) and `POST /library/generated/{doc_id}/void` (step-up). Who generates: the L1 holder of the task the document belongs to, or a holder of "Documents: generate" (grant `library.forms` `create`) for the region, while that task is open; the L2 holder approves the signed upload with the task, as before. (2) Library > Archive: `GET /library/archive` (one card per Document Library type with a file or a generated document, grouped by stream, counts approved, waiting review and missing), `GET /library/archive/rows` (the list: lifecycle `LibraryDocStatus`, the W8 search, the filter tree of the screen `library-archive`, server counts) and `POST /library/archive/zip` (bulk zip of the filtered files through the existing zip export, limit from the setting). Previews and version history reuse `GET /files/{file_id}/download` and `GET /documents?file_group_id=`. (3) Settings > Documents > Form templates: `GET`/`POST /library/form-templates`, `GET .../{template_id}/html`, `POST .../{template_id}/approve` and `.../retire` (System Admin or an all-regions delegate of `document_types` edit, reason, step-up for approve and retire, audited). (4) Settings > Documents > Archive: `GET`/`PUT /settings/library-archive` (guarded key `library.archive`). (5) Saved views and the filter builder accept the screen `library-archive` (module `sites.documents`). The CW warehouse forms of `/generated-forms` and `/form-templates` (DN, RN, PAC, FAC, snag list with warehouse lines) stay as specified and are not served yet.
@@ -11504,6 +11505,7 @@ paths:
         **0.15.11:** `historical_load.approve_directly` (owner decision 2026-11-12) approves every submitted task of the historical load at once as an admin override (no L2 step); the batches and their rows read approved; it applies the same way in the background and in a chunked send.
         **0.15.11:** `historical_load.registers` (owner decision 2026-11-12) also loads the register sheets of the run's stored file (RF & Design, Acquisition, Permission Log, PR-PO, GECOL, HLC, As-Built, Risk Register) as register batches of the same group, after the Master batches; with `approve_directly` their rows are approved at once too. Personal columns are never read. 409 `invalid_transition` when the original file is not stored or does not match the run.
         **0.15.36:** `historical_load.reapply` (owner decision 2026-11-17) applies again a file another run already applied, with `approve_directly` only: the open Master import batches of earlier historical loads and of the same file are discarded first (audited per batch, their unsent rows never applied), then the file is loaded and approved directly. Without it, the 409 of a file already applied carries `already_applied` and `applied_run_id`.
+        **0.15.73:** `create_sites` (owner request 2026-11-25) first creates the sites of the file that are not in GSDN Workspace, by the path of an approved New sites row (a System Admin, or the holder of both L1 and L2 of the Matrix row `site_creation`; 403 `action_forbidden` otherwise; see `MasterImportRun.create_sites_offer`), then enters their task columns and register sheets. Existing Site IDs are never touched. The result is in `outcome.create_sites`; in the background the creation is the first phase of `applying`.
       x-step-up: true
       x-db-path: mi_apply_run
       parameters:
@@ -19121,7 +19123,46 @@ components:
           - type: 'null'
         staging: { oneOf: [{ $ref: '#/components/schemas/MasterImportStagingProgress' }, { type: 'null' }], description: '0.15.3: the comparison of a big file in the background; null when the file was compared in the request.' }
         applying: { oneOf: [{ $ref: '#/components/schemas/MasterImportApplyProgress' }, { type: 'null' }], description: '0.15.5: the latest apply of the file in the background; null when it was never applied in the background.' }
+        create_sites_offer: { oneOf: [{ $ref: '#/components/schemas/MasterImportCreateSitesOffer' }, { type: 'null' }], description: '0.15.73: whether the caller may use `create_sites` (decided by the database).' }
         version: { type: integer }
+    MasterImportCreateSitesOffer:
+      type: object
+      description: '0.15.73: the offer of the option "Create the sites that are not in GSDN Workspace from the Master": a System Admin, or a person who holds both L1 and L2 of the Matrix row `site_creation` (then only in those regions).'
+      required: [allowed, admin, regions]
+      properties:
+        allowed: { type: boolean }
+        admin: { type: boolean, description: The caller is a System Admin (every region; an admin override unless the admin also holds both levels). }
+        regions: { type: array, items: { type: integer }, description: The regions where the caller may create a site without a second person. }
+        reason: { type: [string, 'null'], description: Why the option is not offered (null when it is). }
+    MasterImportCreateSites:
+      type: object
+      description: '0.15.73: the sites the apply created from the file (`create_sites`), and the rows it skipped with their reasons.'
+      required: [created, skipped, created_count, skipped_count]
+      properties:
+        batch_id: { type: [string, 'null'], format: uuid, description: 'The New sites batch of the run (`ImportBatch` entity `site`, source `master_import`); null when every Site ID of the file was a site already.' }
+        created:
+          type: array
+          items:
+            type: object
+            properties:
+              row_no: { type: integer, description: The row of the Master sheet. }
+              site_code: { type: string }
+              site_id: { type: string, format: uuid }
+              region_id: { type: integer }
+              self_approval: { type: boolean, description: 'Created by the holder of both levels (B5); false for a System Admin override.' }
+        skipped:
+          type: array
+          items:
+            type: object
+            properties:
+              row_no: { type: integer }
+              site_code: { type: [string, 'null'] }
+              code: { type: string, description: '`duplicate` (the Site ID exists already or waits for approval), `required`, `unknown_region`, `not_in_list`, `invalid`, `scope_scenario_conflict`, `not_eligible_holder`, `not_created` (the run stopped first), ...' }
+              reason: { type: [string, 'null'] }
+              column: { type: [string, 'null'], description: The New sites column of the first error. }
+              errors: { type: array, items: { type: object, additionalProperties: true } }
+        created_count: { type: integer }
+        skipped_count: { type: integer }
     MasterImportApplyProgress:
       type: object
       description: '0.15.5: the apply of a big legacy Master in the background, one transaction (all or nothing). `failed`: the run is `previewed` again and can be applied again.'
@@ -19135,6 +19176,10 @@ components:
         finished_at: { type: [string, 'null'], format: date-time }
         error_code: { type: [string, 'null'] }
         error: { type: [string, 'null'] }
+        create_sites: { type: boolean, description: '0.15.73: the apply creates the missing sites of the file first.' }
+        create_total: { type: [integer, 'null'], description: '0.15.73: the rows of the New sites batch to create (null before it is staged).' }
+        create_done: { type: integer, description: '0.15.73: the rows done so far (created or refused).' }
+        phase: { type: [string, 'null'], enum: [create_sites, apply, null], description: '0.15.73: while running, the creation of the sites first, then the apply.' }
     MasterImportStagingProgress:
       type: object
       description: '0.15.3: the comparison of a big legacy Master in the background, 100 rows per transaction.'
@@ -19230,6 +19275,7 @@ components:
               headers: { type: array, items: { type: string } }
         skipped: { type: array, items: { type: object, additionalProperties: true } }
         queued: { type: integer, description: '0.14.6: how many batches are sent in the background.' }
+        create_sites: { $ref: '#/components/schemas/MasterImportCreateSites' }
     MasterImportDiff:
       type: object
       required: [id, sheet, kind, reason, resolution]
@@ -19279,6 +19325,10 @@ components:
               type: boolean
               default: false
               description: '0.15.36 (owner decision 2026-11-17): apply again a file that another run already applied (same SHA-256). Only with `approve_directly` (422 otherwise). The open Master import batches of earlier historical loads and of this file are discarded first (status `discarded`, audited per batch, their unsent rows rejected and never applied); approved tasks stay approved and are never approved twice.'
+        create_sites:
+          type: boolean
+          default: false
+          description: '0.15.73 (owner request 2026-11-25): first create the sites of the file that are not in GSDN Workspace (the New sites validation, defaults, applicability, workflow version and audit), then enter their task columns and register sheets. A System Admin, or a person who holds both L1 and L2 of the Matrix row `site_creation` (403 `action_forbidden` otherwise); a step-up. Independent of `historical_load`. An existing Site ID is never touched (skipped with the reason).'
     MasterImportDiffResolve:
       type: object
       required: [resolution]
