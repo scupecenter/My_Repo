@@ -4103,7 +4103,21 @@
     "reapply_title": "Re-apply the file with direct approval",
     "reapply_note": "System Admin only. The open batches of the earlier Master loads are discarded first (audited, their rows are not applied), then the whole file (every stream and the register sheets) is loaded and approved at once as an admin override. Tasks already approved stay approved and are never approved twice.",
     "reapply_offer": "Re-apply it with direct approval",
-    "reapplied_toast": "Re-applied: {{count}} task(s) approved directly, {{discarded}} earlier batch(es) discarded."
+    "reapplied_toast": "Re-applied: {{count}} task(s) approved directly, {{discarded}} earlier batch(es) discarded.",
+    "create_sites": "Create the sites that are not in GSDN Workspace from the Master",
+    "create_sites_hint": "{{count}} Site ID(s) of this file are not in GSDN Workspace. They are created first, exactly as an approved New sites row (the same checks, the workflow version in force, the scenario applicability, an audit row naming this run), then their task dates and register rows are entered. An existing site is never changed.",
+    "create_sites_who_admin": "As a System Admin: a site of a region where you do not hold both L1 and L2 of Site creation is created as an admin override.",
+    "create_sites_who_holder": "You hold both L1 and L2 of Site creation in: {{regions}}. Your creation is a self-approval; rows of other regions are refused.",
+    "create_sites_disabled": "Not available: {{reason}}",
+    "create_sites_none": "Every Site ID of this file is already in GSDN Workspace.",
+    "applying_create_sites": "Creating the sites of the file: {{done}} of {{total}}…",
+    "applying_create_sites_staging": "Reading the sites to create from the file…",
+    "outcome_sites_title": "Sites created from the Master",
+    "outcome_sites_counts": "{{created}} created, {{skipped}} skipped.",
+    "outcome_sites_skipped": "Row {{row}} ({{site}}): {{reason}}",
+    "outcome_sites_batch": "Open the New sites batch",
+    "sites_created_toast": "{{count}} site(s) created from the Master, then the file was applied.",
+    "reason_site_not_in_pmis_hint": "Apply with \"Create the sites that are not in GSDN Workspace from the Master\" to create it first."
   },
   "tmap": {
     "title": "Template mapping",

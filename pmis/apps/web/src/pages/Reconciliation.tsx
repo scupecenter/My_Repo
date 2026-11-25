@@ -10,6 +10,7 @@ import {
   type DiffFilters, type MasterImportDiff, type MasterImportOutcome, type MasterImportRun, type MasterImportRunProgress,
 } from '@/api/masterImport';
 import { useHistoricalOffer } from '@/api/historicalWaiver';
+import { useRegions } from '@/api/sites';
 import { BatchProgress } from '@/components/BatchProgress';
 import { ImportSitesPanel } from '@/components/WorkflowLocks';
 import { HistoricalLoadOption, historicalReady, NO_HISTORICAL, type HistoricalChoice } from '@/components/HistoricalLoadOption';
@@ -174,12 +175,21 @@ function RunApplying({ r }: { r: MasterImportRun }) {
     return <p role="alert" className="card p-3 text-sm text-lateInk" data-testid="mi-applying-failed">{t('mi.applying_failed')}{p.error ? ` ${p.error}` : ''}</p>;
   }
   if (r.status !== 'applying') return null;
-  const label = t('mi.applying_running', { sites: p?.sites_total ?? 0 });
+  // 0.15.73: with create_sites, the sites of the file are created first (25 per transaction), then the file is applied
+  const creating = p?.phase === 'create_sites';
+  const total = p?.create_total ?? null;
+  const done = p?.create_done ?? 0;
+  const label = creating ? (total === null ? t('mi.applying_create_sites_staging') : t('mi.applying_create_sites', { done, total }))
+    : t('mi.applying_running', { sites: p?.sites_total ?? 0 });
+  const pct = creating && total ? Math.min(100, Math.round((100 * done) / total)) : null;
   return (
     <section className="card p-3" data-testid="mi-applying" aria-busy="true" aria-label={t('mi.applying_title')}>
       <p id="mi-applying-label" className="mb-1 text-sm font-semibold" data-testid="mi-applying-label">{label}</p>
-      <div role="progressbar" aria-labelledby="mi-applying-label" aria-valuetext={label} className="relative h-3 w-full overflow-hidden rounded-full bg-card2" data-testid="mi-applying-bar">
-        <span className="absolute inset-y-0 start-0 block w-1/3 animate-pulse rounded-full bg-open" />
+      <div role="progressbar" aria-labelledby="mi-applying-label" aria-valuetext={label} {...(pct !== null ? { 'aria-valuenow': pct, 'aria-valuemin': 0, 'aria-valuemax': 100 } : {})}
+        className="relative h-3 w-full overflow-hidden rounded-full bg-card2" data-testid="mi-applying-bar">
+        {pct !== null
+          ? <span className="absolute inset-y-0 start-0 block rounded-full bg-open" style={{ width: `${pct}%` }} />
+          : <span className="absolute inset-y-0 start-0 block w-1/3 animate-pulse rounded-full bg-open" />}
       </div>
       <p className="mt-2 text-xs text-mute" role="status">{t('mi.applying_note')}</p>
     </section>
@@ -261,7 +271,8 @@ function RunDetail({ id }: { id: string }) {
                 <td className="p-2">{d.master_value ?? '—'}</td>
                 <td className="p-2">{d.pmis_value ?? '—'}</td>
                 <td className="p-2"><span className={`chip ${KIND_TONE[d.kind] ?? ''}`}>{t(`mi.kind_${d.kind}`)}</span></td>
-                <td className="p-2 text-mute">{t(`mi.reason_${d.reason}`, { defaultValue: d.reason })}</td>
+                <td className="p-2 text-mute">{t(`mi.reason_${d.reason}`, { defaultValue: d.reason })}
+                  {d.reason === 'site_not_in_pmis' && <span className="block text-xs" data-testid="mi-diff-create-hint">{t('mi.reason_site_not_in_pmis_hint')}</span>}</td>
                 <td className="p-2">{t(`mi.res_${d.resolution}`)}{d.resolution_note && <span className="block text-xs text-mute">{d.resolution_note}</span>}</td>
                 <td className="p-2"><button className="btn px-2 py-1 text-xs" data-testid={`mi-resolve-${d.id}`} onClick={() => setResolving(d)}>{t('mi.resolve')}</button></td>
               </tr>
@@ -284,10 +295,23 @@ function RunOutcome({ o }: { o: MasterImportOutcome }) {
   const { t } = useTranslation();
   const batches = o.batches ?? [];
   const skipped = ((o.skipped ?? []) as { sheet?: string; ref?: string; reason?: string; detail?: string }[]).filter((s) => s.sheet !== 'Master');
-  if (!batches.length && !skipped.length) return null;
+  const cs = o.create_sites;
+  if (!batches.length && !skipped.length && !cs) return null;
   return (
     <section className="card p-3 text-sm" aria-labelledby="mi-outcome-title" data-testid="mi-outcome">
       <h3 id="mi-outcome-title" className="mb-2 font-semibold">{t('mi.outcome_title')}</h3>
+      {cs && (
+        <div className="mb-3 space-y-1" data-testid="mi-outcome-sites">
+          <h4 className="font-semibold">{t('mi.outcome_sites_title')}</h4>
+          <p data-testid="mi-outcome-sites-counts">{t('mi.outcome_sites_counts', { created: cs.created_count, skipped: cs.skipped_count })}
+            {cs.batch_id && <a className="ms-2 underline" href={`/templates/batches/${cs.batch_id}`} data-testid="mi-outcome-sites-batch">{t('mi.outcome_sites_batch')}</a>}</p>
+          {cs.skipped.length > 0 && (
+            <ul className="list-disc ps-5 text-mute" data-testid="mi-outcome-sites-skipped">
+              {cs.skipped.map((x, i) => <li key={i}>{t('mi.outcome_sites_skipped', { row: x.row_no ?? '', site: x.site_code ?? '', reason: x.reason ?? x.code ?? '' })}</li>)}
+            </ul>
+          )}
+        </div>
+      )}
       <table className="w-full text-sm">
         <thead className="text-mute"><tr>{['part', 'rows', 'approved', 'errors', 'skipped'].map((c) => <th key={c} className="p-1 text-start">{t(`mi.outcome_${c}`)}</th>)}</tr></thead>
         <tbody>
@@ -331,12 +355,21 @@ function ApplyDialog({ run, reapply = false, onClose }: { run: MasterImportRun; 
   // 0.15.11 (owner decision 2026-11-12, "Everything from the one file"): also load the register sheets of the same file; only with the historical option
   const [registersChoice, setRegisters] = useState(reapply);
   const registers = !!offer && hist.on && registersChoice;
+  // 0.15.73 (owner request 2026-11-25): create the sites of the file that are not in GSDN Workspace first; offered by the server to a System Admin or the holder
+  // of both L1 and L2 of the Matrix row site_creation (the database checks it again), disabled with the reason otherwise
+  const csOffer = run.create_sites_offer;
+  const missingSites = num(run.summary, 'missing_in_pmis');
+  const regions = useRegions();
+  const [createSites, setCreateSites] = useState(false);
+  const csAllowed = !!csOffer?.allowed && missingSites > 0;
+  const holderRegions = (csOffer?.regions ?? []).map((id) => regions.data?.find((x) => x.id === id)?.name_en ?? String(id)).join(', ');
   const [err, setErr] = useState<string | null>(null);
   const go = () => apply.mutate({ run, mode, reason, ...(offer && hist.on ? { historical_load: { reason: hist.reason.trim(), ...(direct ? { approve_directly: true } : {}), ...(registers ? { registers: true } : {}),
-    ...(reapplyMode && direct ? { reapply: true } : {}) } } : {}) }, {
+    ...(reapplyMode && direct ? { reapply: true } : {}) } } : {}), ...(createSites && csAllowed ? { create_sites: true } : {}) }, {
     onSuccess: (r) => {
       const approved = (r.outcome?.batches ?? []).reduce((n, b) => n + (b.approved ?? 0), 0);
       toast(r.status === 'applying' ? t('mi.applying_queued') : r.progress?.state === 'running' ? t('mi.applied_processing')
+        : r.outcome?.create_sites ? t('mi.sites_created_toast', { count: r.outcome.create_sites.created_count })
         : r.outcome?.reapply ? t('mi.reapplied_toast', { count: approved, discarded: r.outcome.discarded?.length ?? 0 })
           : r.outcome?.approve_directly ? t('mi.approved_directly_toast', { count: approved }) : t('mi.applied_toast', { count: r.outcome?.batches?.length ?? 0 }));
       onClose();
@@ -376,6 +409,23 @@ function ApplyDialog({ run, reapply = false, onClose }: { run: MasterImportRun; 
               {registersChoice && <p role="note" className="text-xs text-mute" data-testid="mi-load-registers-note">{t('mi.load_registers_note')}</p>}
             </div>
           )}
+          <div className="space-y-1 rounded-md border border-line p-3 text-sm" data-testid="mi-create-sites-option">
+            <label className="flex items-start gap-2">
+              <input type="checkbox" data-testid="mi-create-sites" checked={createSites && csAllowed} disabled={!csAllowed}
+                aria-describedby="mi-create-sites-note" onChange={(e) => setCreateSites(e.target.checked)} />
+              <span className="font-semibold">{t('mi.create_sites')}</span>
+            </label>
+            <p id="mi-create-sites-note" className="text-xs text-mute" data-testid="mi-create-sites-note">
+              {!csOffer?.allowed ? t('mi.create_sites_disabled', { reason: csOffer?.reason ?? '' })
+                : missingSites === 0 ? t('mi.create_sites_none')
+                  : t('mi.create_sites_hint', { count: missingSites })}
+            </p>
+            {csAllowed && createSites && (
+              <p role="note" className="text-xs text-waitInk" data-testid="mi-create-sites-who">
+                {csOffer?.admin ? t('mi.create_sites_who_admin') : t('mi.create_sites_who_holder', { regions: holderRegions })}
+              </p>
+            )}
+          </div>
           <div>
             <label htmlFor="mi-reason" className="text-sm font-semibold">{t('mi.reason')}</label>
             <textarea id="mi-reason" className="input mt-1 w-full" data-testid="mi-apply-reason" value={reason} onChange={(e) => setReason(e.target.value)} />

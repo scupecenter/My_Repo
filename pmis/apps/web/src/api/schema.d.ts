@@ -7289,6 +7289,7 @@ export interface paths {
          *     **0.15.11:** `historical_load.approve_directly` (owner decision 2026-11-12) approves every submitted task of the historical load at once as an admin override (no L2 step); the batches and their rows read approved; it applies the same way in the background and in a chunked send.
          *     **0.15.11:** `historical_load.registers` (owner decision 2026-11-12) also loads the register sheets of the run's stored file (RF & Design, Acquisition, Permission Log, PR-PO, GECOL, HLC, As-Built, Risk Register) as register batches of the same group, after the Master batches; with `approve_directly` their rows are approved at once too. Personal columns are never read. 409 `invalid_transition` when the original file is not stored or does not match the run.
          *     **0.15.36:** `historical_load.reapply` (owner decision 2026-11-17) applies again a file another run already applied, with `approve_directly` only: the open Master import batches of earlier historical loads and of the same file are discarded first (audited per batch, their unsent rows never applied), then the file is loaded and approved directly. Without it, the 409 of a file already applied carries `already_applied` and `applied_run_id`.
+         *     **0.15.73:** `create_sites` (owner request 2026-11-25) first creates the sites of the file that are not in GSDN Workspace, by the path of an approved New sites row (a System Admin, or the holder of both L1 and L2 of the Matrix row `site_creation`; 403 `action_forbidden` otherwise; see `MasterImportRun.create_sites_offer`), then enters their task columns and register sheets. Existing Site IDs are never touched. The result is in `outcome.create_sites`; in the background the creation is the first phase of `applying`.
          */
         post: operations["applyMasterImportRun"];
         delete?: never;
@@ -13523,7 +13524,51 @@ export interface components {
             staging?: components["schemas"]["MasterImportStagingProgress"] | null;
             /** @description 0.15.5: the latest apply of the file in the background; null when it was never applied in the background. */
             applying?: components["schemas"]["MasterImportApplyProgress"] | null;
+            /** @description 0.15.73: whether the caller may use `create_sites` (decided by the database). */
+            create_sites_offer?: components["schemas"]["MasterImportCreateSitesOffer"] | null;
             version: number;
+        };
+        /** @description 0.15.73: the offer of the option "Create the sites that are not in GSDN Workspace from the Master": a System Admin, or a person who holds both L1 and L2 of the Matrix row `site_creation` (then only in those regions). */
+        MasterImportCreateSitesOffer: {
+            allowed: boolean;
+            /** @description The caller is a System Admin (every region; an admin override unless the admin also holds both levels). */
+            admin: boolean;
+            /** @description The regions where the caller may create a site without a second person. */
+            regions: number[];
+            /** @description Why the option is not offered (null when it is). */
+            reason?: string | null;
+        };
+        /** @description 0.15.73: the sites the apply created from the file (`create_sites`), and the rows it skipped with their reasons. */
+        MasterImportCreateSites: {
+            /**
+             * Format: uuid
+             * @description The New sites batch of the run (`ImportBatch` entity `site`, source `master_import`); null when every Site ID of the file was a site already.
+             */
+            batch_id?: string | null;
+            created: {
+                /** @description The row of the Master sheet. */
+                row_no?: number;
+                site_code?: string;
+                /** Format: uuid */
+                site_id?: string;
+                region_id?: number;
+                /** @description Created by the holder of both levels (B5); false for a System Admin override. */
+                self_approval?: boolean;
+            }[];
+            skipped: {
+                row_no?: number;
+                site_code?: string | null;
+                /** @description `duplicate` (the Site ID exists already or waits for approval), `required`, `unknown_region`, `not_in_list`, `invalid`, `scope_scenario_conflict`, `not_eligible_holder`, `not_created` (the run stopped first), ... */
+                code?: string;
+                reason?: string | null;
+                /** @description The New sites column of the first error. */
+                column?: string | null;
+                errors?: {
+                    [key: string]: unknown;
+                }[];
+            }[];
+            created_count: number;
+            skipped_count: number;
         };
         /** @description 0.15.5: the apply of a big legacy Master in the background, one transaction (all or nothing). `failed`: the run is `previewed` again and can be applied again. */
         MasterImportApplyProgress: {
@@ -13541,6 +13586,17 @@ export interface components {
             finished_at?: string | null;
             error_code?: string | null;
             error?: string | null;
+            /** @description 0.15.73: the apply creates the missing sites of the file first. */
+            create_sites?: boolean;
+            /** @description 0.15.73: the rows of the New sites batch to create (null before it is staged). */
+            create_total?: number | null;
+            /** @description 0.15.73: the rows done so far (created or refused). */
+            create_done?: number;
+            /**
+             * @description 0.15.73: while running, the creation of the sites first, then the apply.
+             * @enum {string|null}
+             */
+            phase?: "create_sites" | "apply" | null;
         };
         /** @description 0.15.3: the comparison of a big legacy Master in the background, 100 rows per transaction. */
         MasterImportStagingProgress: {
@@ -13663,6 +13719,7 @@ export interface components {
             }[];
             /** @description 0.14.6: how many batches are sent in the background. */
             queued?: number;
+            create_sites?: components["schemas"]["MasterImportCreateSites"];
         };
         MasterImportDiff: {
             /** Format: uuid */
@@ -13719,6 +13776,11 @@ export interface components {
                  */
                 reapply: boolean;
             };
+            /**
+             * @description 0.15.73 (owner request 2026-11-25): first create the sites of the file that are not in GSDN Workspace (the New sites validation, defaults, applicability, workflow version and audit), then enter their task columns and register sheets. A System Admin, or a person who holds both L1 and L2 of the Matrix row `site_creation` (403 `action_forbidden` otherwise); a step-up. Independent of `historical_load`. An existing Site ID is never touched (skipped with the reason).
+             * @default false
+             */
+            create_sites: boolean;
         };
         MasterImportDiffResolve: {
             /** @enum {string} */

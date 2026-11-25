@@ -74,8 +74,10 @@ export function useUploadLegacyMaster() {
 /** Apply a previewed run (reason; the step-up dialog opens when the server asks). */
 export function useApplyRun() {
   const qc = useQueryClient();
-  return useMutation<MasterImportRun & { outcome?: MasterImportOutcome }, ApiError, { run: MasterImportRun; mode: 'submit' | 'draft'; reason: string; historical_load?: { reason: string; approve_directly?: boolean; registers?: boolean; reapply?: boolean } }>({
-    mutationFn: ({ run, mode, reason, historical_load }) => api.post(`/master-import/runs/${run.id}/apply`, { version: run.version, body: { mode, reason, ...(historical_load ? { historical_load } : {}) } }),
+  // 0.15.73 (owner request 2026-11-25): create_sites creates the sites of the file that are not in GSDN Workspace first
+  return useMutation<MasterImportRun & { outcome?: MasterImportOutcome }, ApiError, { run: MasterImportRun; mode: 'submit' | 'draft'; reason: string; historical_load?: { reason: string; approve_directly?: boolean; registers?: boolean; reapply?: boolean }; create_sites?: boolean }>({
+    mutationFn: ({ run, mode, reason, historical_load, create_sites }) => api.post(`/master-import/runs/${run.id}/apply`,
+      { version: run.version, body: { mode, reason, ...(historical_load ? { historical_load } : {}), ...(create_sites ? { create_sites: true } : {}) } }),
     onSuccess: (r) => { qc.setQueryData(['master-run', r.id], r); void qc.invalidateQueries({ queryKey: ['master-runs'] }); void qc.invalidateQueries({ queryKey: ['import-batches'] }); },
   });
 }
