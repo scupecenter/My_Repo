@@ -18,6 +18,12 @@
   "app": {
     "name": "GSDN Workspace"
   },
+  "hint": {
+    "docs_edit": "Edit this document type: its name, where it applies, mandatory or not, formats and limits. Saved as a draft until you publish.",
+    "docs_publish": "Publish the draft so new tasks use it. Choose whether open tasks get it too.",
+    "docs_publish_off": "Nothing to publish: there are no unpublished changes.",
+    "docs_versions": "Version history of this document type."
+  },
   "siteMaster": {
     "menus": "Site Master menus",
     "gate": "gate",

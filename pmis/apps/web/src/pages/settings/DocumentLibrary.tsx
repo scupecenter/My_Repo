@@ -5,6 +5,7 @@ import { ApiError } from '@/api/client';
 import {
   downloadDocument, useBlankForm, useCreateDoc, useLibrary, useLibraryItem, useLibraryVersions, usePublishDoc, useSaveDoc, type DocumentType, type DocumentTypeInput,
 } from '@/api/documents';
+import { Tip } from '@/components/Tip';
 import { errText, FormDialog } from '@/components/FormDialog';
 import { useToast } from '@/components/Toast';
 import { useRegisterDefs } from '@/api/registers';
@@ -241,9 +242,9 @@ export function DocumentLibrary() {
                   {!r.is_active && <span className="chip bg-lockBg text-lockInk">{t('docs.lib.inactive')}</span>}
                 </td>
                 <td className="whitespace-nowrap p-2 text-end">
-                  <button className="btn px-2 py-1 text-xs" data-testid={`lib-edit-${r.code}`} onClick={() => setDlg({ kind: 'edit', id: r.id })}><Pencil size={12} />{t('common.edit')}</button>{' '}
-                  <button className="btn px-2 py-1 text-xs" data-testid={`lib-publish-${r.code}`} disabled={!r.has_unpublished_changes} onClick={() => setDlg({ kind: 'publish', id: r.id })}>{t('docs.lib.publish')}</button>{' '}
-                  <button className="btn px-2 py-1 text-xs" aria-label={t('docs.lib.versions')} data-testid={`lib-versions-${r.code}`} onClick={() => setDlg({ kind: 'versions', id: r.id })}><History size={12} /></button>
+                  <Tip text={t('hint.docs_edit')}><button className="btn px-2 py-1 text-xs" data-testid={`lib-edit-${r.code}`} onClick={() => setDlg({ kind: 'edit', id: r.id })}><Pencil size={12} />{t('common.edit')}</button></Tip>{' '}
+                  <Tip text={t(r.has_unpublished_changes ? 'hint.docs_publish' : 'hint.docs_publish_off')}><span className="inline-block"><button className="btn px-2 py-1 text-xs" data-testid={`lib-publish-${r.code}`} disabled={!r.has_unpublished_changes} onClick={() => setDlg({ kind: 'publish', id: r.id })}>{t('docs.lib.publish')}</button></span></Tip>{' '}
+                  <Tip text={t('hint.docs_versions')}><button className="btn px-2 py-1 text-xs" aria-label={t('docs.lib.versions')} data-testid={`lib-versions-${r.code}`} onClick={() => setDlg({ kind: 'versions', id: r.id })}><History size={12} /></button></Tip>
                 </td>
               </tr>
             ))}
