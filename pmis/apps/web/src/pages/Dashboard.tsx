@@ -9,6 +9,7 @@ import {
   useDashboard,
   useDashboardExtras,
   useDashboardOps,
+  useProjectStatusSnapshots,
   type Dashboard as Dash,
   type DashboardExtras,
   type DashboardQuery,
@@ -35,6 +36,7 @@ import {
   signed,
 } from "./dashboardBits";
 import { OpsProcurementCard } from "./dashboardOps";
+import { OpsScurveCard } from "./dashboardScurve";
 import { useDashboardSettings } from "@/api/dashboardSettings";
 import { SavedViews } from "@/components/SavedViews";
 import { UnifiedFilter } from "@/components/UnifiedFilter";
@@ -562,6 +564,7 @@ export function Dashboard() {
   const d = dash.data;
   const extras = useDashboardExtras(q, !!d);
   const ops = useDashboardOps(q, !!d);
+  const snaps = useProjectStatusSnapshots(!!d);
   const [exporting, setExporting] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const [format, setFormat] = useState<ExportFormat>("xlsx");
@@ -1396,6 +1399,13 @@ export function Dashboard() {
                 <>
                   {/* 0.15.98 (owner approval 2026-11-26, item 1): open PR/PO aging, receive rate and shortage per contractor */}
                   <OpsProcurementCard ops={ops.data} />
+                </>
+              ),
+
+              ops_scurve: (
+                <>
+                  {/* owner approval 2026-11-26, item 2: planned vs actual of the saved weekly snapshots, weekly velocity and the 100% forecast */}
+                  <OpsScurveCard snaps={snaps.data} />
                 </>
               ),
 

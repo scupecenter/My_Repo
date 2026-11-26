@@ -3150,6 +3150,20 @@
       "unattributed": "Unattributed",
       "by_contractor": "Shortage per contractor",
       "contractor_row": "{{qty}} missing · {{lines}} lines · {{sites}} sites"
+    },
+    "scurve": {
+      "title": "Progress curve",
+      "hint": "Planned against actual of the saved weekly snapshots, the weekly velocity and the date the curve reaches 100% at that velocity. Read only.",
+      "open_project_status": "Open Project Status",
+      "actual": "Actual",
+      "planned": "Planned",
+      "spi": "Plan index",
+      "velocity": "Velocity",
+      "per_week": "%/week",
+      "forecast": "100% forecast",
+      "empty": "No saved snapshots yet: the curve appears after the first weekly snapshot.",
+      "chart_label": "Progress curve: {{list}}",
+      "basis": "{{n}} saved weekly snapshots, values frozen at their dates."
     }
   },
   "docs": {
