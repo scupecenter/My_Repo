@@ -1171,6 +1171,7 @@
     "section_documents_archive": "Archive",
     "section_documents_numbering": "Numbering",
     "section_data_counts": "GECOL / HLC counts",
+    "section_registers_recycle": "Recycle bin"
     "section_screens_motion": "Motion",
     "section_workflow_coverage": "Matrix coverage",
     "section_screens_login": "Login page"
@@ -6515,6 +6516,26 @@
     "cancel": "Cancel",
     "save": "Save"
   },
+  "recycleBin": {
+    "title": "Recycle bin",
+    "note": "Voided register records can be restored for {{days}} days after they were voided. A restored record returns as a draft and goes through the workflow again. Nothing is deleted.",
+    "register": "Register",
+    "all": "All",
+    "search": "Search record, site or reason",
+    "edit_retention": "Change retention",
+    "none": "No voided record inside the retention window.",
+    "record": "Record",
+    "voided": "Voided",
+    "reason": "Reason",
+    "until": "Restorable until",
+    "restore": "Restore",
+    "restore_title": "Restore {{label}}",
+    "restore_note": "The record returns as a draft (level 1). Its history and audit stay.",
+    "restored": "Record restored as a draft.",
+    "days": "Days of retention (30 to 730)",
+    "blocked_open_version_exists": "A newer open version exists",
+    "blocked_site_slot_taken": "The site already has another record",
+    "audit_link": "Every void and restore is in the audit log."
   "motion": {
     "title": "Motion",
     "note": "One motion system for the whole app: dialogs, messages, cards, progress bars, charts and the map. This choice is saved in this browser, like the theme and the language.",

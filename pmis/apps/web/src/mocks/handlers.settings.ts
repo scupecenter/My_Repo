@@ -390,6 +390,12 @@ const SLA_TASKS: MockSlaTask[] = [
 ];
 const slaCounts = () => ({ total: SLA_TASKS.length, set: SLA_TASKS.filter((x) => x.mode === 'set').length, none: SLA_TASKS.filter((x) => x.mode === 'none').length, undecided: SLA_TASKS.filter((x) => x.mode === 'undecided').length, in_draft: SLA_TASKS.filter((x) => x.in_draft).length });
 
+/** GET/PUT/POST /recycle-bin (contract 0.15.98): demo voided records. */
+const BIN = {
+  retention_days: 90, version: 1,
+  items: [
+    { id: '00000000-0000-4000-8000-0000000000a1', register_key: 'procurement', register_name_en: 'Procurement', register_name_ar: null, label: 'GN-0012 / Procurement v1', site_id: null, site_code: 'GN-0012', version: 4, version_no: 1, voided_at: '2026-11-20T09:00:00.000Z', voided_by: null, voided_by_name: 'Demo Admin', void_reason: 'Entered on the wrong site', restorable_until: '2027-02-18T09:00:00.000Z', blocked: null as string | null },
+    { id: '00000000-0000-4000-8000-0000000000a2', register_key: 'gecol', register_name_en: 'GECOL', register_name_ar: null, label: 'GN-0031 / GECOL v1', site_id: null, site_code: 'GN-0031', version: 3, version_no: 1, voided_at: '2026-11-22T09:00:00.000Z', voided_by: null, voided_by_name: 'Demo Admin', void_reason: 'Duplicate', restorable_until: '2027-02-20T09:00:00.000Z', blocked: 'site_slot_taken' },
 /** GET /matrix/coverage (contract 0.15.94): demo numbers only. */
 const MATRIX_COVERAGE = {
   workflow_version: 1,
@@ -407,6 +413,9 @@ const MATRIX_COVERAGE = {
 };
 
 export const settingsHandlers = [
+  http.get(`${B}/recycle-bin`, () => { const g = guard(); if (g) return g; return HttpResponse.json(BIN, tag(BIN.version)); }),
+  http.put(`${B}/recycle-bin/retention`, async ({ request }) => { const g = guard(); if (g) return g; const b = (await request.json()) as { retention_days: number }; BIN.retention_days = b.retention_days; BIN.version += 1; return HttpResponse.json({ retention_days: BIN.retention_days, version: BIN.version }, tag(BIN.version)); }),
+  http.post(`${B}/recycle-bin/:id/restore`, ({ params }) => { const g = guard(); if (g) return g; const i = BIN.items.findIndex((x) => x.id === params.id); if (i < 0) return HttpResponse.json({ code: 'not_found' }, { status: 404 }); const [r] = BIN.items.splice(i, 1); return HttpResponse.json({ id: r!.id, register_key: r!.register_key, state: 'entry', version: r!.version + 1 }); }),
   http.get(`${B}/matrix/coverage`, () => { const g = guard(); if (g) return g; return HttpResponse.json(MATRIX_COVERAGE); }),
   // ------------------------------------------------------------------ dashboard settings (F20, contract 0.15.24)
   http.get(`${B}/settings/dashboard`, () => { const g = guard(); if (g) return g; return HttpResponse.json(dashView(), tag(dashState.version)); }),
