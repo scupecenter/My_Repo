@@ -6157,5 +6157,15 @@
     "go_l": "Workload",
     "go_r": "Status updates",
     "note": "Shortcuts only open pages; your permissions still apply on each page."
+  },
+  "siteSummary": {
+    "title": "Site summary",
+    "progress": "{{done}} of {{total}} stages done",
+    "current": "Now",
+    "late": "{{n}} late stages",
+    "next": "Next planned",
+    "snags": "{{n}} open snags",
+    "issues": "{{n}} open issues",
+    "docs": "{{n}} documents missing"
   }
 }

@@ -1,3 +1,4 @@
+import { SiteSummaryStrip } from '@/components/SiteSummaryStrip';
 import type { TasksExportColumnCode } from '@/api/types';
 import { ArrowLeft, Layers } from 'lucide-react';
 import { useState } from 'react';
@@ -116,6 +117,7 @@ export function Site() {
             <FollowButton target={{ kind: 'site', id: s.id }} entityId={s.id} />
             <span className={`chip ${TONE[s.overall_status]}`} data-testid="site-status">{t(`status.${s.overall_status}`)}</span>
           </div>
+          <SiteSummaryStrip site={s} />
           <SiteIdentity site={s} />
           <SitePendingChanges siteId={s.id} />
           <SiteAdminEdit site={s} />
