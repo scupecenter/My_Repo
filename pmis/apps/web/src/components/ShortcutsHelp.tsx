@@ -37,6 +37,7 @@ export function ShortcutsHelp() {
               <li key={k} data-testid={`shortcut-${k}`}><kbd className="chip">g {k}</kbd> {t(`shortcuts.go_${k}`)} <span className="text-mute" dir="ltr">{to}</span></li>
             ))}
           </ul>
+          <button className="btn mt-3" data-testid="shortcuts-tour" onClick={() => { setOpen(false); window.dispatchEvent(new Event('gsdn:tour')); }}>{t('tour.start')}</button>
           <p className="mt-2 text-xs text-mute">{t('shortcuts.note')}</p>
         </Dialog.Content>
       </Dialog.Portal>

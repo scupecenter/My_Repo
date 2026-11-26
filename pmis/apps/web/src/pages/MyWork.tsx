@@ -6,6 +6,7 @@ import { downloadFile } from '@/api/client';
 import { useMe, useMyTasks } from '@/api/hooks';
 import type { TaskSummary } from '@/api/types';
 import { Holders } from '@/components/HolderChip';
+import { MyWorkCalendar } from '@/components/MyWorkCalendar';
 import { PersonTag } from '@/components/PersonTag';
 import { TaskDrawer } from '@/components/TaskDrawer';
 import { BallSince, ExternalParty, SlaOverrun, StaleBadge } from '@/components/TaskTiming';
@@ -111,6 +112,7 @@ export function MyWork() {
         <button type="button" className="btn ms-auto" data-testid="my-work-ics" onClick={() => { void downloadFile('/me/tasks.ics').catch(() => undefined); }}><CalendarDays size={16} />{t('myWork.ics')}</button>
         <Link to="/approvals" data-testid="my-work-go-approvals" className="btn btn-accent"><Inbox size={16} />{t('myWork.go_approvals')}<span className="chip bg-card text-ink">{doNow.data?.items.length ?? 0}</span></Link>
       </div>
+      <MyWorkCalendar late={late.data?.items ?? []} doNow={doNow.data?.items ?? []} onOpen={setOpen} />
       {board ? (
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-2" data-testid="tasks-board-toolbar">

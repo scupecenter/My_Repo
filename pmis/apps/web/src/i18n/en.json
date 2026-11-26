@@ -6181,5 +6181,29 @@
     "empty": "No activity recorded for this site.",
     "system": "System",
     "more": "Load more"
+  },
+  "myWorkCal": {
+    "title": "Calendar (my tasks by due date)",
+    "prev": "Previous month",
+    "next": "Next month",
+    "undated": "{{n}} tasks have no date"
+  },
+  "tour": {
+    "step": "Step {{i}} of {{n}}",
+    "skip": "Skip",
+    "back": "Back",
+    "next": "Next",
+    "done": "Done",
+    "start": "Take the tour",
+    "dashboard_t": "Dashboard",
+    "dashboard_b": "The map and the key numbers for the sites you may see. Use the filters, then open any card to reach the list behind it. TV mode shows it on a big screen.",
+    "sites_t": "Sites and Site Master",
+    "sites_b": "Open a site to see its stages, timeline, documents, snags and activity. Everything you see follows your role.",
+    "mywork_t": "My Work",
+    "mywork_b": "Your open tasks, late first. The calendar shows them by due date, and you can download them as a calendar file.",
+    "search_t": "Search",
+    "search_b": "Press Ctrl K to search and jump to any page you may open.",
+    "shortcuts_t": "Shortcuts",
+    "shortcuts_b": "Press ? to see the list. G then D opens the Dashboard, G then S the Sites, G then W My Work."
   }
 }
