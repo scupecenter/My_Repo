@@ -149,6 +149,17 @@ export class TasksController {
     return this.myWork.list(auth, q);
   }
 
+  /** My Work as an iCalendar file (contract 0.15.82). Needs the session like every other call: nothing public, no token link. */
+  @Get('me/tasks.ics')
+  async myTasksIcs(@Auth() auth: AuthContext, @Res({ passthrough: true }) res: Response): Promise<string> {
+    const body = await this.myWork.ics(auth);
+    res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="my-work.ics"');
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    return body;
+  }
+
   @Get('approvals')
   inbox(@Auth() auth: AuthContext, @Query() q: Record<string, unknown>) {
     return this.approvals.list(auth, q);

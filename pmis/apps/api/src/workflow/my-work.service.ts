@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { AccessService } from '../access/access.service';
 import type { AuthContext } from '../auth/auth.types';
+import { buildIcs } from './ics';
 import { decodeTypedCursor, encodeCursor, parseLimit } from '../common/cursor';
 import { problems } from '../common/problem';
 import { TS_TEXT, oneParam } from '../common/query';
@@ -30,6 +31,19 @@ export class MyWorkService {
     private readonly view: TaskViewService,
     private readonly filters: FilterCatalogService,
   ) {}
+
+  /** The caller's own open tasks as an iCalendar file (My Work, do now and late). Built from `list`, so the same rights and region scope apply; the date is the SLA due date, or the planned date. */
+  async ics(auth: AuthContext): Promise<string> {
+    const tasks: Parameters<typeof buildIcs>[0] = [];
+    let cursor: string | undefined;
+    for (let page = 0; page < 10; page++) {
+      const r = await this.list(auth, { limit: '200', ...(cursor ? { cursor } : {}) });
+      for (const t of r.items) tasks.push({ id: t.id, site_code: t.site_code, task_code: t.task_code, name_en: t.name_en, stage_code: t.stage_code, state: t.state, due: t.sla?.due_date ?? t.planned_date ?? null });
+      if (!r.page.next_cursor) break;
+      cursor = r.page.next_cursor;
+    }
+    return buildIcs(tasks, new Date());
+  }
 
   async list(auth: AuthContext, q: Record<string, unknown>): Promise<{ items: TaskSummaryDto[]; page: { limit: number; next_cursor: string | null }; counts: { total: number; filtered: number }; search?: PastedSearchDto }> {
     const regions = await this.access.requireRegions('sites', 'view');

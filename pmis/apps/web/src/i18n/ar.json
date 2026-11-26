@@ -273,7 +273,8 @@
     "nothing": "لا شيء هنا",
     "empty_title": "أنجزت كل شيء",
     "empty_body": "لا مهام مسندة إليك في مناطقك.",
-    "go_approvals": "الموافقات"
+    "go_approvals": "الموافقات",
+    "ics": "ملف تقويم (.ics)"
   },
   "approvals": {
     "title": "الموافقات",
