@@ -3939,6 +3939,8 @@
     "hide": "Hide {{code}} everywhere it is listed",
     "show": "Show {{code}} again",
     "hide_reason": "Column hidden from the Register columns screen",
+    "hide_btn": "Hide",
+    "show_btn": "Show",
     "show_reason": "Column shown again from the Register columns screen",
     "hidden": "Hidden",
     "hidden_done": "Hidden. The data is kept.",
