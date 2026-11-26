@@ -32,6 +32,16 @@ export function displayName(p: NameParts): string {
   return `${name}.${ext}`;
 }
 
+/**
+ * The Library Archive name of a downloaded file (zip): `DocType_SiteID_Number_vN.ext`. Number is the number of the generated document the slot belongs to;
+ * a file without one is `DocType_SiteID_vN.ext`. Only the name in the zip changes: the stored name and the other downloads keep ADR 0008.
+ */
+export function archiveName(p: { doc_code: string; site_code: string; doc_number: string | null; version: number; ext: string }): string {
+  const parts = [safePart(p.doc_code), safePart(p.site_code), p.doc_number ? safePart(p.doc_number) : null, `v${p.version}`].filter((x): x is string => x !== null);
+  const ext = p.ext.toLowerCase().replace(/[^a-z0-9]/g, '') || 'bin';
+  return `${parts.join('_')}.${ext}`;
+}
+
 /** A Content-Disposition value that is always an attachment with an ASCII-only name. */
 export function attachmentHeader(name: string): string {
   const ascii = name.replace(/[^A-Za-z0-9._-]/g, '_').replace(/\.{2,}/g, '.');
