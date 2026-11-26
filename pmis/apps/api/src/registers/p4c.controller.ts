@@ -24,6 +24,16 @@ export class P4cController {
     return this.p4c.dismantleOrderOptions(auth, q);
   }
 
+  @Get('warehouse/order-options')
+  warehouseOrderOptions(@Auth() auth: AuthContext, @Query() q: Record<string, unknown>) {
+    return this.p4c.warehouseOrderOptions(auth, q);
+  }
+
+  @Get('procurement/:entity_id/receipts')
+  orderReceipts(@Auth() auth: AuthContext, @Param('entity_id') entityId: string) {
+    return this.p4c.orderReceipts(auth, entityId);
+  }
+
   @Post('hlc/legacy-migration')
   @HttpCode(200)
   legacy(@Auth() auth: AuthContext, @Body() body: unknown) {

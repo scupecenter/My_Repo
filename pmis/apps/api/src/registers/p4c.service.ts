@@ -49,6 +49,24 @@ export class P4cService {
     return { items };
   }
 
+  /** GET /registers/warehouse/order-options?site_id= : the approved, active Procurement orders a PL / OPEN receipt may name (row-level security applies). */
+  async warehouseOrderOptions(auth: AuthContext, q: Record<string, unknown>): Promise<{ items: unknown[] }> {
+    await this.access.requireRegions('warehouse', 'view');
+    const site = oneParam(q, 'site_id');
+    if (site && !uuidSchema.safeParse(site).success) throw problems.validation([{ path: '/site_id', code: 'invalid', message: 'site_id is a uuid.' }]);
+    const items = await this.registers.call<unknown[]>(auth, Prisma.sql`SELECT wh_order_options(${site ?? null}::uuid) AS r`);
+    return { items };
+  }
+
+  /** GET /registers/procurement/{entity_id}/receipts : the warehouse receipts against an order. */
+  async orderReceipts(auth: AuthContext, entityId: string): Promise<{ items: unknown[] }> {
+    await this.access.requireRegions('procurement', 'view');
+    await this.access.requireRegions('warehouse', 'view');
+    if (!uuidSchema.safeParse(entityId).success) throw problems.validation([{ path: '/entity_id', code: 'invalid', message: 'entity_id is a uuid.' }]);
+    const items = await this.registers.call<unknown[]>(auth, Prisma.sql`SELECT proc_order_receipts(${entityId}::uuid) AS r`);
+    return { items };
+  }
+
   /** POST /registers/hlc/legacy-migration: the preview (dry_run) or the run (reason and step-up). */
   async legacyMigration(auth: AuthContext, raw: unknown): Promise<unknown> {
     const body = parse(legacySchema, raw);

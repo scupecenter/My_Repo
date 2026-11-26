@@ -5982,6 +5982,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/registers/warehouse/order-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The approved, active Procurement orders a warehouse receipt may name (0.15.90)
+         * @description 0.15.91. The approved Procurement versions in force, not cancelled, that the caller can see; of the site `site_id` when it is given (a PL / OPEN receipt may have no site).
+         *     Needs the Warehouse module; only the orders in regions where the caller also holds the Procurement view right (the responsibility matrix) are listed, and the same right is checked when a receipt is saved.
+         */
+        get: operations["listWarehouseOrderOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/registers/procurement/{entity_id}/receipts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The warehouse receipts against a Procurement order (0.15.91)
+         * @description 0.15.91. The current, not voided PL / OPEN receipts whose `procurement_order_id` is this order, with the number of lines and the total quantity. Needs the Procurement module
+         *     (view) and the Warehouse module; the receipts the caller cannot see are not listed.
+         */
+        get: operations["listProcurementOrderReceipts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/registers/car_dispatcher/records/{record_id}/extend": {
         parameters: {
             query?: never;
@@ -15784,6 +15826,42 @@ export interface components {
             order_status?: string;
             external_party?: components["schemas"]["ExternalPartyRef"];
         };
+        /** @description 0.15.91. An approved, active Procurement order a warehouse receipt may name. */
+        WarehouseOrderOption: {
+            /**
+             * Format: uuid
+             * @description The value of the warehouse field `procurement_order_id`.
+             */
+            entity_id: string;
+            /** Format: uuid */
+            record_id: string;
+            /** Format: uuid */
+            site_id?: string;
+            scope?: string;
+            pr_no?: string;
+            po_wo_no?: string;
+            /** Format: date */
+            po_wo_date?: string;
+            order_status?: string;
+            external_party?: components["schemas"]["ExternalPartyRef"];
+        };
+        /** @description 0.15.91. A warehouse receipt (PL or OPEN) against a Procurement order. */
+        ProcurementOrderReceipt: {
+            /** Format: uuid */
+            entity_id: string;
+            /** Format: uuid */
+            record_id: string;
+            /** @enum {string} */
+            record_type: "pl" | "open";
+            state: string;
+            doc_no?: string;
+            doc_date?: string;
+            txn_status?: string;
+            /** @enum {string} */
+            movement_status?: "pending" | "posted" | "cancelled";
+            lines: number;
+            qty: number;
+        };
         /** @description 0.15.32 (F5). The setting `kanban.wip_limits`: the WIP limit of each milestone column of the sites board, a warning only. */
         KanbanWip: {
             /** @description Stage code to limit; a column not named has no limit. */
@@ -16768,6 +16846,8 @@ export interface components {
             /** @description A return note needs a reason before it is submitted (Faulty or Damaged, Relocation, Cancellation, Other, Dismantle). */
             reason?: string;
             remark?: string;
+            /** @description 0.15.91. PL and OPEN only: the entity id of an approved, active Procurement order (see GET /registers/warehouse/order-options). PR No., PO / WO No. and the contractor are then derived from it. */
+            procurement_order_id?: string;
             lines: components["schemas"]["StockMovementLine"][];
         };
         AsBuiltItemFields: {
@@ -30079,6 +30159,60 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listWarehouseOrderOptions: {
+        parameters: {
+            query?: {
+                site_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The orders. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["WarehouseOrderOption"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listProcurementOrderReceipts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entity_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The receipts. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["ProcurementOrderReceipt"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             422: components["responses"]["Unprocessable"];
         };
     };

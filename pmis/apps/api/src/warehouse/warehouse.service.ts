@@ -167,6 +167,7 @@ const movementInput = z
     condition: z.enum(["Good", "Faulty", "Damaged"]).optional(),
     reason: z.string().trim().min(1).max(200).optional(),
     remark: z.string().trim().min(1).max(2000).optional(),
+    procurement_order_id: z.string().trim().min(1).max(64).optional(),
     lines: z.array(line).min(1).max(500),
   })
   .strict();
@@ -716,6 +717,7 @@ export class WarehouseService {
       "condition",
       "reason",
       "remark",
+      "procurement_order_id",
     ] as const)
       if (b[k] !== undefined) data[k] = b[k];
     const id = await this.call<string>(
