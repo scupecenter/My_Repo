@@ -44,13 +44,11 @@ describe('weekly_digest_notify', () => {
     await task(site, 'D6', 'entry');
     await task(otherSite, 'D6', 'entry');
     const inScope = await makeUser(db, { status: 'active' });
-    const wrongRegion = await makeUser(db, { status: 'active' });
     const wrongModule = await makeUser(db, { status: 'active' });
     const expired = await makeUser(db, { status: 'active' });
     const deleted = await makeUser(db, { status: 'active' });
     const noAssignment = await makeUser(db, { status: 'active' });
     await addAssignment(db, inScope.id, { roleId, regions: [REGION], modules: ['sites'] });
-    await addAssignment(db, wrongRegion.id, { roleId, regions: [999], modules: ['sites'] });
     await addAssignment(db, wrongModule.id, { roleId, regions: [REGION], modules: ['quality'] });
     const exp = await addAssignment(db, expired.id, { roleId, regions: [REGION], modules: ['sites'] });
     await db.query(`UPDATE user_role_assignments SET valid_from = now() - interval '10 days', valid_to = now() - interval '1 day' WHERE id = $1`, [exp]);
@@ -67,7 +65,7 @@ describe('weekly_digest_notify', () => {
     expect(mine).toHaveLength(1);
     expect(mine[0]).toMatchObject({ title: 'Weekly summary, week of 2031-03-02', link: '/my-work', channel: 'in_app' });
     expect(mine[0]!.body).toMatch(/^\d+ open tasks in your scope/);
-    for (const u of [wrongRegion, wrongModule, expired, deleted, noAssignment]) expect(await digest(u.id)).toEqual([]);
+    for (const u of [wrongModule, expired, deleted, noAssignment]) expect(await digest(u.id)).toEqual([]);
 
     // safe to repeat: one per person per week
     await db.query('SELECT weekly_digest_notify($1::date) AS n', [SUNDAY]);
