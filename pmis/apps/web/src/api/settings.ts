@@ -90,7 +90,7 @@ export const useSetUiIdentity = () => {
     mutationFn: ({ version, ...body }) => api.put('/settings/identity', { version, body }), onSettled: () => refresh(qc, 'ui-identity', 'me', 'my-profile'),
   });
 };
-/** 0.15.97 (migration 0185): Settings, Screens, Login page. The public read answers only what the signed-out pages render. */
+/** 0.15.97 (migration 0197): Settings, Screens, Login page. The public read answers only what the signed-out pages render. */
 export const useLoginPage = () => useQuery({ queryKey: ['login-page'], queryFn: () => api.get<LoginPage>('/settings/login-page') });
 export const useLoginPagePublic = () => useQuery({ queryKey: ['login-page-public'], queryFn: () => api.get<LoginPagePublic>('/settings/login-page/public'), staleTime: 30_000, retry: 1 });
 export const useSetLoginPage = () => {

@@ -13,7 +13,7 @@ import { DbService } from '../db/db.service';
 /** The system version shown to signed-in users (the post-login splash and the settings screen). Keep in sync with contracts/openapi.yaml info.version. */
 export const SYSTEM_VERSION = '0.15.97';
 
-/** A support link under the sign-in form (0185). http(s) or mailto only; the label shows in both languages. */
+/** A support link under the sign-in form (0197). http(s) or mailto only; the label shows in both languages. */
 const supportLink = z.object({
   label_en: z.string().trim().min(1).max(60),
   label_ar: z.string().trim().max(60).default(''),
@@ -46,7 +46,7 @@ export interface LoginPageDto {
   can_edit: boolean;
 }
 
-/** The public door (0185): ONLY what the signed-out pages render. No version, no audit data, nothing about users. */
+/** The public door (0197): ONLY what the signed-out pages render. No version, no audit data, nothing about users. */
 export interface LoginPagePublicDto {
   announcement: { en: string; ar: string; kind: 'info' | 'maintenance' } | null;
   animation: boolean;
@@ -58,7 +58,7 @@ const PUBLIC_LIMIT_PER_IP = 120;
 const PUBLIC_WINDOW_MS = 60_000;
 
 /**
- * Settings, Screens, Login page (owner request 2026-11-26, migration 0185, contract 0.15.97): the sign-in page announcement,
+ * Settings, Screens, Login page (owner request 2026-11-26, migration 0197, contract 0.15.97): the sign-in page announcement,
  * background animation, default language and support links (setting ui.login_page). Every signed-in user reads the state
  * (the post-login splash shows the version from it); changing it needs a System Admin or a delegate of `settings` edit for
  * all regions, a reason, a step-up and If-Match; the database checks the right again, the version, and writes the audit row

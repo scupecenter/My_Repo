@@ -1,5 +1,5 @@
--- 0185_login_page: the login page settings (Settings > Screens > Login page) and the public sign-in page config
--- (owner request 2026-11-26, contract 0.15.97). Mirror: db/sql/184_login_page.sql (kept identical).
+-- 0197_login_page: the login page settings (Settings > Screens > Login page) and the public sign-in page config
+-- (owner request 2026-11-26, contract 0.15.97). Mirror: db/sql/196_login_page.sql (kept identical).
 --
 -- WHY. The owner approved a polish of the sign-in pages (2026-11-26): a calm telecom-themed animated background, a short
 -- admin-controlled announcement (for example scheduled maintenance), a default language for the signed-out pages and
@@ -33,7 +33,7 @@ GRANT SELECT, INSERT, UPDATE ON settings TO pmis_definer;
 INSERT INTO settings (key, value, description, updated_at)
 VALUES ('ui.login_page',
         '{"announcement_en": "", "announcement_ar": "", "announcement_kind": "info", "animation": true, "default_locale": null, "support_links": []}'::jsonb,
-        'Owner request 2026-11-26 (0185): the sign-in page settings {announcement_en, announcement_ar, announcement_kind, animation, default_locale, support_links}. Changed only through admin_set_login_page.', now())
+        'Owner request 2026-11-26 (0197): the sign-in page settings {announcement_en, announcement_ar, announcement_kind, animation, default_locale, support_links}. Changed only through admin_set_login_page.', now())
 ON CONFLICT (key) DO NOTHING;
 
 DROP TRIGGER IF EXISTS b_settings_ui_login_page ON settings;
@@ -177,7 +177,7 @@ BEGIN
   INSERT INTO public.settings (key, value, description, updated_at)
   VALUES ('ui.login_page',
           '{"announcement_en": "", "announcement_ar": "", "announcement_kind": "info", "animation": true, "default_locale": null, "support_links": []}'::jsonb,
-          'Owner request 2026-11-26 (0185): the sign-in page settings {announcement_en, announcement_ar, announcement_kind, animation, default_locale, support_links}. Changed only through admin_set_login_page.', now())
+          'Owner request 2026-11-26 (0197): the sign-in page settings {announcement_en, announcement_ar, announcement_kind, animation, default_locale, support_links}. Changed only through admin_set_login_page.', now())
   ON CONFLICT (key) DO NOTHING;
   PERFORM 1 FROM public.settings WHERE key = 'ui.login_page' FOR UPDATE;
   cur := public.login_page_cfg();
@@ -216,4 +216,4 @@ INSERT INTO audit_log (action, entity_type, entity_id, after, reason)
 VALUES ('login_page_applied', 'workflow', NULL,
         jsonb_build_object('setting', 'ui.login_page', 'default', jsonb_build_object('announcement_en', '', 'announcement_ar', '', 'announcement_kind', 'info', 'animation', true, 'default_locale', 'null', 'support_links', '[]'::jsonb),
           'read', 'login_page_state', 'public', 'login_page_public', 'write', 'admin_set_login_page', 'audit', jsonb_build_array('login_page_update')),
-        'Owner request 2026-11-26: the sign-in page settings (announcement, animation, default language, support links), edited from Settings > Screens > Login page; the public read shows only what the page renders (migration 0185).');
+        'Owner request 2026-11-26: the sign-in page settings (announcement, animation, default language, support links), edited from Settings > Screens > Login page; the public read shows only what the page renders (migration 0197).');

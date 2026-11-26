@@ -25,7 +25,7 @@ const clean = (d: Draft): Draft => ({
 });
 
 /**
- * Settings > Screens > Login page (owner request 2026-11-26, migration 0185, contract 0.15.97): what the sign-in page shows —
+ * Settings > Screens > Login page (owner request 2026-11-26, migration 0197, contract 0.15.97): what the sign-in page shows —
  * the announcement, the background animation, the default language and the support links. Nothing here touches the sign-in
  * mechanism. A System Admin or a delegate of settings edit for all regions changes it with a reason and a step-up (audited).
  */

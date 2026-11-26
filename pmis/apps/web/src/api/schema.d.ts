@@ -16225,7 +16225,7 @@ export interface components {
             label_ar: string;
             url: string;
         };
-        /** @description 0.15.97. Settings, Screens, Login page (setting `ui.login_page`, migration 0185). */
+        /** @description 0.15.97. Settings, Screens, Login page (setting `ui.login_page`, migration 0197). */
         LoginPage: {
             /** @description Both texts empty: no banner. */
             announcement_en: string;

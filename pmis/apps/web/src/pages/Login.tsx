@@ -31,7 +31,7 @@ export function Login() {
   const [err, setErr] = useState<'' | 'invalid' | 'rate' | 'other' | 'expired'>('');
   // After a right password, two-factor adds a step: the code, or the first-time setup (contract 0.5.0).
   const [step, setStep] = useState<'password' | 'code' | 'enrol'>('password');
-  // After a successful sign-in (password, code or enrolment): the calm post-login transition, then the app (0185).
+  // After a successful sign-in (password, code or enrolment): the calm post-login transition, then the app (0197).
   const [entering, setEntering] = useState(false);
   const [params] = useSearchParams();
   const nav = useNavigate();

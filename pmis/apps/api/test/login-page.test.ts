@@ -7,7 +7,7 @@ import { G } from './reg-helpers';
 import { Actor, actor, plainAdmin } from './wf-helpers';
 
 /**
- * Settings, Screens, Login page (owner request 2026-11-26, migration 0185, contract 0.15.97): GET / PUT /settings/login-page
+ * Settings, Screens, Login page (owner request 2026-11-26, migration 0197, contract 0.15.97): GET / PUT /settings/login-page
  * (setting ui.login_page) and the public GET /settings/login-page/public, which answers ONLY what the signed-out pages render
  * (announcement, animation, default_locale, support_links): no version, no audit data, nothing about users. The suite puts the
  * setting back to the default at the end; no other suite reads it.

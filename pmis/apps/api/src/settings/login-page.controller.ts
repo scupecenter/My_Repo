@@ -6,7 +6,7 @@ import { etagHeader } from '../common/etag';
 import { LoginPageDto, LoginPagePublicDto, LoginPageService } from './login-page.service';
 
 /**
- * Contract `settings` (0.15.97, migration 0185): GET and PUT /settings/login-page, the sign-in page settings, and
+ * Contract `settings` (0.15.97, migration 0197): GET and PUT /settings/login-page, the sign-in page settings, and
  * GET /settings/login-page/public, the public read of only what the sign-in page shows. The public route is cached
  * for 30 seconds and rate limited per address; it carries no version, no audit data and nothing about users.
  */

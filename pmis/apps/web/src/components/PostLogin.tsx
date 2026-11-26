@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useLoginPage } from '@/api/settings';
 
 /**
- * The post-login transition (0185): a calm full-screen beat between a successful sign-in and the app, with the system
+ * The post-login transition (0197): a calm full-screen beat between a successful sign-in and the app, with the system
  * version (shown to signed-in users only). It never slows the way in: a click or any key skips it, the beat is 400 ms
  * and the app opens after 480 ms even when the version read is slow or fails. No motion for a visitor who prefers
  * reduced motion.

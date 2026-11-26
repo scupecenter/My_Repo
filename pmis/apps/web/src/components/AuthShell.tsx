@@ -47,7 +47,7 @@ function NetworkArt({ className = '' }: { className?: string }) {
   );
 }
 
-/** The calm animated backdrop of the signed-out pages (0185): two soft glows and the network art. No motion when the admin turned it off or the visitor prefers reduced motion. */
+/** The calm animated backdrop of the signed-out pages (0197): two soft glows and the network art. No motion when the admin turned it off or the visitor prefers reduced motion. */
 function AuthBackdrop() {
   return (
     <div className="auth-backdrop" aria-hidden>
@@ -77,7 +77,7 @@ function AuthAnnouncement() {
   );
 }
 
-/** Under the form: a generic availability dot (no backend detail) and the admin support links (0185). */
+/** Under the form: a generic availability dot (no backend detail) and the admin support links (0197). */
 function AuthFooter() {
   const { t, i18n } = useTranslation();
   const cfg = useLoginPagePublic();
@@ -109,7 +109,7 @@ export function AuthShell({ children, wide = false }: { children: ReactNode; wid
   const { t } = useTranslation();
   const cfg = useLoginPagePublic();
   const anim = cfg.data?.animation ?? true;
-  // The admin default language of the signed-out pages (0185) applies only until the visitor picks one.
+  // The admin default language of the signed-out pages (0197) applies only until the visitor picks one.
   useEffect(() => {
     const d = cfg.data?.default_locale;
     if (d && !localStorage.getItem('pmis.locale')) applyLocale(d);

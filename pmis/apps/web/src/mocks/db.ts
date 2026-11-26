@@ -106,7 +106,7 @@ const fresh = () => ({
   profiles: {} as Record<string, { display_name?: string; phone?: string | null; locale?: 'en' | 'ar'; theme?: 'light' | 'dark'; ui_brand?: Brand | null; email?: string; version: number }>,
   /** 0.15.41 (migration 0130): Settings, Identity & themes (setting ui.identity). */
   identity: initIdentity(),
-  /** 0.15.97 (migration 0185): Settings, Screens, Login page (setting ui.login_page). */
+  /** 0.15.97 (migration 0197): Settings, Screens, Login page (setting ui.login_page). */
   loginPage: initLoginPage(),
   emailChanges: [] as { id: string; account: string; old_email: string; new_email: string; status: 'pending' | 'approved' | 'rejected' | 'cancelled'; requested_at: string; decided_at: string | null; decision_reason: string | null; decided_by: string | null;
     /** 0.12.6 (Q158): the code "mailed" to the new address (the mock has no mail: it is always the demo code), and the check made. */
