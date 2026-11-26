@@ -6143,5 +6143,19 @@
     "bad_title": "This link cannot be used",
     "bad_body": "It is not valid, was already used or has expired. Ask for a new link.",
     "new_link": "Ask for a new link"
+  },
+  "shortcuts": {
+    "title": "Keyboard shortcuts",
+    "palette": "Search and go to a page",
+    "help": "Show this list",
+    "go_d": "Dashboard",
+    "go_s": "Sites",
+    "go_w": "My work",
+    "go_a": "Approvals",
+    "go_i": "Inbox",
+    "go_m": "Messages",
+    "go_l": "Workload",
+    "go_r": "Status updates",
+    "note": "Shortcuts only open pages; your permissions still apply on each page."
   }
 }
