@@ -3869,6 +3869,11 @@
     "type_bool": "Yes / no",
     "group": "Warehouse"
   },
+  "evidence": {
+    "red": "Documents: {{missing}} missing, {{rejected}} rejected, {{expired}} expired. Upload needed ({{approved}} of {{need}} approved).",
+    "yellow": "Documents uploaded, waiting for review or approval ({{approved}} of {{need}} approved).",
+    "green": "Documents approved ({{approved}} of {{need}})."
+  },
   "regcols": {
     "title": "Register columns",
     "note": "Add, rename, reorder, hide and remove the columns and sections of a register, and rename the register. Every change needs a reason, is audited, and issues a new template version; an older template file is still read by its column codes. Protected columns (code depends on them) can only be renamed, moved and shown or hidden.",
