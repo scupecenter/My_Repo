@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { api, ApiError, downloadFile, type RequestOptions } from './client';
 import type { IssueStoppedRowList, IssueTaskMapItem, IssueTaskMapList,
-  ActiveSession, ActOnBehalfRequest, Calendar, CalendarConfirmation, MailNotificationKinds, ImportsSettings, ContractorPerformanceReport, ContractorPerformanceThresholds, ContractorPerformanceSettings, NavLayoutSetting, UiIdentity, UiBrand, NavLayoutT, ContractorRules, ContractorRulesInput, GecolHlcCounts, ContractorsCompletenessReport, TeamScopeMismatchReport, DeletedUser, PurgedUser, DlpSettings, DlpVersion, DlpVersionInput, Holiday, HolidayChangeResult, HolidayInput, HolidayPatch, HolidaySummary, IdleTaskAlertSetting, Job, LogIntegrity, LogRetention, LogRetentionInput,
+  ActiveSession, ActOnBehalfRequest, Calendar, CalendarConfirmation, MailNotificationKinds, ImportsSettings, ContractorPerformanceReport, ContractorPerformanceThresholds, ContractorPerformanceSettings, NavLayoutSetting, UiIdentity, UiBrand, LoginPage, LoginPagePublic, SupportLink, NavLayoutT, ContractorRules, ContractorRulesInput, GecolHlcCounts, ContractorsCompletenessReport, TeamScopeMismatchReport, DeletedUser, PurgedUser, DlpSettings, DlpVersion, DlpVersionInput, Holiday, HolidayChangeResult, HolidayInput, HolidayPatch, HolidaySummary, IdleTaskAlertSetting, Job, LogIntegrity, LogRetention, LogRetentionInput,
   NotificationPolicy, NotificationPolicyInput, NotificationTypeDef, Page, ReassignmentAlert, SecurityLogEntry, SessionRevokeResult, SlaPublishPreview, SlaRuleSet, SlaRuleSetPublishResult, SlaRuleSetSummary, SlaTaskRule, StaffCard, StaffVisibility, StructuralFreeze,
   TaskDefinition, TeamScopeMatch, TeamScopeMatchInput, TransitionResultT, User, UserDetail, WeekendDaysResult, WeightSet, WeightSetCode, WeightSetInput, WeightSetPreview, WeightSetPublishResult, WorkflowVersion, WorkflowVersionSummary,
 } from './types';
@@ -88,6 +88,15 @@ export const useSetUiIdentity = () => {
   const qc = useQueryClient();
   return useMutation<UiIdentity, ApiError, { version: number; default_brand: UiBrand; allow_user_choice: boolean; reason: string }>({
     mutationFn: ({ version, ...body }) => api.put('/settings/identity', { version, body }), onSettled: () => refresh(qc, 'ui-identity', 'me', 'my-profile'),
+  });
+};
+/** 0.15.97 (migration 0185): Settings, Screens, Login page. The public read answers only what the signed-out pages render. */
+export const useLoginPage = () => useQuery({ queryKey: ['login-page'], queryFn: () => api.get<LoginPage>('/settings/login-page') });
+export const useLoginPagePublic = () => useQuery({ queryKey: ['login-page-public'], queryFn: () => api.get<LoginPagePublic>('/settings/login-page/public'), staleTime: 30_000, retry: 1 });
+export const useSetLoginPage = () => {
+  const qc = useQueryClient();
+  return useMutation<LoginPage, ApiError, { version: number; announcement_en: string; announcement_ar: string; announcement_kind: 'info' | 'maintenance'; animation: boolean; default_locale: 'en' | 'ar' | null; support_links: SupportLink[]; reason: string }>({
+    mutationFn: ({ version, ...body }) => api.put('/settings/login-page', { version, body }), onSettled: () => refresh(qc, 'login-page', 'login-page-public'),
   });
 };
 export const useImportsSettings = () => useQuery({ queryKey: ['imports-settings'], queryFn: () => api.get<ImportsSettings>('/settings/imports') });

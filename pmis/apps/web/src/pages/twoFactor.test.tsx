@@ -58,7 +58,8 @@ describe('sign-in with a code', () => {
     expect(screen.getByTestId('two-factor-code')).toHaveValue('');
     await u.type(screen.getByTestId('two-factor-code'), await codeAt(secret));
     await u.click(screen.getByTestId('two-factor-submit'));
-    expect(await screen.findByTestId('page-my-work')).toBeInTheDocument();
+    // the post-sign-in splash (0185) is a calm ~1 s beat before the app opens
+    expect(await screen.findByTestId('page-my-work', undefined, { timeout: 4000 })).toBeInTheDocument();
   });
 
   it('a recovery code works instead, once, and the count goes down', async () => {
@@ -71,7 +72,8 @@ describe('sign-in with a code', () => {
     await u.click(await screen.findByTestId('two-factor-toggle'));
     await u.type(screen.getByTestId('two-factor-recovery'), rc.toLowerCase());
     await u.click(screen.getByTestId('two-factor-submit'));
-    expect(await screen.findByTestId('page-my-work')).toBeInTheDocument();
+    // the post-sign-in splash (0185) is a calm ~1 s beat before the app opens
+    expect(await screen.findByTestId('page-my-work', undefined, { timeout: 4000 })).toBeInTheDocument();
     expect(cred('engineer')!.tf!.codes).toHaveLength(9);
     await api.post('/auth/logout');
     await api.post('/auth/local/login', { body: { identifier: '1204', password: DEMO_PASSWORDS.engineer } });

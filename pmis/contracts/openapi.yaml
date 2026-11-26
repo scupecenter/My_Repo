@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.96
+  version: 0.15.97
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -31,6 +31,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.97 (2026-11-27): the sign-in page settings (owner request 2026-11-26; migration 0188). Additive. New `GET/PUT /settings/login-page` (`getLoginPage`, `setLoginPage`; setting `ui.login_page`): the sign-in page announcement (English and Arabic, kind info or maintenance, both texts empty hides it), the background animation switch, the default language of the signed-out pages and up to five support links ({label_en, label_ar, url}; http(s) or mailto only). Every signed-in user reads the state (the post-login splash shows `server_version` from it); a System Admin or a delegate of `settings` edit for all regions changes it with a reason, a step-up and If-Match (audited `login_page_update`, before and after). New `GET /settings/login-page/public` (`getLoginPagePublic`, no session): ONLY what the sign-in page renders (announcement, animation, default_locale, support_links) - no version, no audit data, nothing about users; cached 30 seconds and rate limited per address. No permission, visibility or authentication change.
     - 0.15.96 (2026-11-27): responsibility-matrix coverage screen (CHANGELOG MatrixCoverage; no migration). Additive and read only. `GET /matrix/coverage` (`getMatrixCoverage`, System Admin or an all-region delegate of the matrix): for each active stage and enabled register row and each of the seven regions, whether the matrix cell has an actor, so empty cells show before a task or record stalls. Settings > Workflow > Coverage.
     - 0.15.95 (2026-11-27): Issue log and Quality record link to a Procurement order (migration 0195; CHANGELOG IssueQualityOrderLink). Additive. New optional field `procurement_order_id` on `issues` and `quality`; when set, the contractor (`external_party`) is taken from the order (a different typed `external_party_id` is refused, 422 `contractor_from_order`; `order_not_active`, `order_other_site`, `invalid`), so the contractor performance view sees the issue and the inspection. `GET /registers/issues/order-options` and `GET /registers/quality/order-options` list the orders (own module view plus Procurement view).
     - 0.15.92 (2026-11-27): order picker for the Car dispatcher and Financial advances (CHANGELOG OrderPickersDispatchAdvances). Additive, no migration. `GET /registers/car_dispatcher/order-options` and `GET /registers/financial_advances/order-options` list the approved, active Procurement orders for the field `procurement_record_id` (the same list as the warehouse picker); each needs its own module view, and only orders in regions where the caller also holds the Procurement view right are listed.
@@ -9202,6 +9203,71 @@ paths:
         '412': {$ref: '#/components/responses/PreconditionFailed'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /settings/login-page:
+    get:
+      tags: [settings]
+      operationId: getLoginPage
+      summary: The sign-in page settings (announcement, animation, default language, support links) (0.15.97)
+      description: Every signed-in user may read it; the settings screen and the post-login splash use it. `can_edit` is true for a System Admin or a delegate of `settings` edit for all regions. `server_version` is shown to signed-in users only.
+      x-db-path: login_page_state
+      responses:
+        '200':
+          description: The login page settings.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/LoginPage'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+    put:
+      tags: [settings]
+      operationId: setLoginPage
+      summary: Set the sign-in page settings (reason, step-up, If-Match, audited) (0.15.97)
+      description: |
+        A System Admin, or a delegate of `settings` edit for all regions (403 `action_forbidden` otherwise, also for a delegate limited to some regions). A reason
+        (3+ characters), a step-up (401 `step_up_required`) and `If-Match` (428 / 412) are required. Unknown keys and invalid values are 422; saving the values in
+        force is 409 `invalid_transition`. Audited `login_page_update` with the config before and after. Nothing about the sign-in mechanism changes: this is
+        presentation only (announcement, background animation, default language, support links).
+      x-step-up: true
+      x-db-path: admin_set_login_page
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/LoginPageInput'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/LoginPage'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /settings/login-page/public:
+    get:
+      tags: [settings]
+      operationId: getLoginPagePublic
+      summary: The public sign-in page config (no session) (0.15.97)
+      description: |
+        No session: what the signed-out pages render, and nothing else - the announcement, the background animation switch, the default language and the support
+        links. No version, no audit data, nothing about users. Cached 30 seconds (`Cache-Control: public, max-age=30`) and rate limited per address
+        (429 `rate_limited` with `Retry-After`).
+      x-db-path: login_page_public
+      responses:
+        '200':
+          description: The public sign-in page config.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/LoginPagePublic'}
+        '429': { $ref: '#/components/responses/TooManyRequests' }
   /settings/historical-waiver:
     get:
       tags: [settings]
@@ -21866,6 +21932,60 @@ components:
           properties:
             default_brand: { $ref: '#/components/schemas/UiBrand' }
             allow_user_choice: { type: boolean }
+    SupportLink:
+      type: object
+      description: '0.15.97. A support link under the sign-in form. http(s) or mailto only.'
+      additionalProperties: false
+      required: [label_en, label_ar, url]
+      properties:
+        label_en: { type: string, minLength: 1, maxLength: 60 }
+        label_ar: { type: string, maxLength: 60, description: 'Empty: the English label shows.' }
+        url: { type: string, minLength: 1, maxLength: 300, pattern: '^(https?://|mailto:)' }
+    LoginPage:
+      type: object
+      description: '0.15.97. Settings, Screens, Login page (setting `ui.login_page`, migration 0185).'
+      required: [announcement_en, announcement_ar, announcement_kind, animation, default_locale, support_links, server_version, version, can_edit]
+      properties:
+        announcement_en: { type: string, maxLength: 280, description: 'Both texts empty: no banner.' }
+        announcement_ar: { type: string, maxLength: 280 }
+        announcement_kind: { type: string, enum: [info, maintenance] }
+        animation: { type: boolean, description: 'The calm telecom background animation of the signed-out pages. A visitor who prefers reduced motion never sees it.' }
+        default_locale: { anyOf: [{ type: string, enum: [en, ar] }, { type: 'null' }], description: 'The language of the signed-out pages until the visitor chooses one; null: the browser default (English).' }
+        support_links: { type: array, maxItems: 5, items: { $ref: '#/components/schemas/SupportLink' } }
+        server_version: { type: string, description: 'The system version, shown to signed-in users only (the post-login splash and this screen).' }
+        updated_at: { type: [string, 'null'], format: date-time }
+        updated_by: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+        version: { type: integer, description: The ETag value. }
+        can_edit: { type: boolean, description: 'A System Admin or a delegate of `settings` edit for all regions.' }
+    LoginPageInput:
+      allOf:
+        - $ref: '#/components/schemas/WithReason'
+        - type: object
+          required: [announcement_en, announcement_ar, announcement_kind, animation, default_locale, support_links]
+          properties:
+            announcement_en: { type: string, maxLength: 280 }
+            announcement_ar: { type: string, maxLength: 280 }
+            announcement_kind: { type: string, enum: [info, maintenance] }
+            animation: { type: boolean }
+            default_locale: { anyOf: [{ type: string, enum: [en, ar] }, { type: 'null' }] }
+            support_links: { type: array, maxItems: 5, items: { $ref: '#/components/schemas/SupportLink' } }
+    LoginPagePublic:
+      type: object
+      description: '0.15.97. The public sign-in page config: ONLY what the signed-out pages render. No version, no audit data, nothing about users.'
+      required: [announcement, animation, default_locale, support_links]
+      properties:
+        announcement:
+          oneOf:
+            - type: object
+              required: [en, ar, kind]
+              properties:
+                en: { type: string, maxLength: 280 }
+                ar: { type: string, maxLength: 280 }
+                kind: { type: string, enum: [info, maintenance] }
+            - type: 'null'
+        animation: { type: boolean }
+        default_locale: { anyOf: [{ type: string, enum: [en, ar] }, { type: 'null' }] }
+        support_links: { type: array, maxItems: 5, items: { $ref: '#/components/schemas/SupportLink' } }
     NavLayout:
       type: object
       description: '0.15.1. The shared order of the side menu (setting `nav.layout`).'

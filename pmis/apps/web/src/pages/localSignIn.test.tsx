@@ -64,7 +64,8 @@ describe('login errors', () => {
     const u = userEvent.setup();
     renderApp(<App />, { route: '/login' });
     await fillLogin(u, '+218 91 200 1000', DEMO_PASSWORDS.pm);
-    expect(await screen.findByTestId('page-my-work')).toBeInTheDocument();
+    // the post-sign-in splash (0185) is a calm ~1 s beat before the app opens
+    expect(await screen.findByTestId('page-my-work', undefined, { timeout: 4000 })).toBeInTheDocument();
   });
 });
 
@@ -73,7 +74,8 @@ describe('must change password', () => {
     const u = userEvent.setup();
     renderApp(<App />, { route: '/login' });
     await fillLogin(u, 'new.employee@example.com', DEMO_PASSWORDS.newbie);
-    expect(await screen.findByTestId('change-password-forced')).toBeInTheDocument();
+    // the post-sign-in splash (0185) is a calm ~1 s beat before the app opens
+    expect(await screen.findByTestId('change-password-forced', undefined, { timeout: 4000 })).toBeInTheDocument();
     expect(screen.queryByTestId('sidebar')).toBeNull();
     // A weak password is refused by the server and shown on the field.
     await u.type(screen.getByTestId('cp-current'), DEMO_PASSWORDS.newbie);

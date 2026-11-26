@@ -5,6 +5,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { isPending, useLocalLogin } from '@/api/auth';
 import { API_BASE, ApiError } from '@/api/client';
 import { AuthShell, PasswordField } from '@/components/AuthShell';
+import { PostLogin } from '@/components/PostLogin';
 import { CodeStep, EnrolFlow } from '@/components/TwoFactor';
 import { clearRememberedId, readRememberedId, writeRememberedId } from '@/lib/rememberId';
 
@@ -30,6 +31,8 @@ export function Login() {
   const [err, setErr] = useState<'' | 'invalid' | 'rate' | 'other' | 'expired'>('');
   // After a right password, two-factor adds a step: the code, or the first-time setup (contract 0.5.0).
   const [step, setStep] = useState<'password' | 'code' | 'enrol'>('password');
+  // After a successful sign-in (password, code or enrolment): the calm post-login transition, then the app (0185).
+  const [entering, setEntering] = useState(false);
   const [params] = useSearchParams();
   const nav = useNavigate();
   const login = useLocalLogin();
@@ -42,7 +45,7 @@ export function Login() {
       onSuccess: (r) => {
         keepId();
         if (isPending(r)) { setPw(''); setStep(r.next === 'enrol' ? 'enrol' : 'code'); return; }
-        nav(safeNext(params.get('next')) ?? '/', { replace: true });
+        setEntering(true);
       },
       onError: (x) => {
         setPw('');
@@ -52,14 +55,15 @@ export function Login() {
     });
   };
   const restart = (why: '' | 'expired') => { setStep('password'); setPw(''); setErr(why); };
-  const finish = () => nav(safeNext(params.get('next')) ?? '/', { replace: true });
+  const finish = () => setEntering(true);
+  if (entering) return <PostLogin onDone={() => nav(safeNext(params.get('next')) ?? '/', { replace: true })} />;
   if (step === 'code') return <AuthShell><CodeStep onDone={finish} onBack={() => restart('')} onExpired={() => restart('expired')} /></AuthShell>;
   if (step === 'enrol') return <AuthShell><EnrolFlow onDone={finish} onExpired={() => restart('expired')} /></AuthShell>;
   const msg = err === 'expired' ? t('twoFactor.expired') : err === 'invalid' ? t('login.invalid') : err === 'rate' ? t('login.rate') : err === 'other' ? t('login.error') : params.get('error') ? t('login.error') : '';
   const notice = !msg && params.get('reason') === 'expired' ? t('login.session_ended') : '';
   return (
     <AuthShell>
-      <form onSubmit={submit} className="card space-y-4 p-6 sm:p-8" data-testid="login-form" aria-busy={login.isPending}>
+      <form onSubmit={submit} className="card auth-card auth-enter space-y-4 p-6 sm:p-8" data-testid="login-form" aria-busy={login.isPending}>
         <div>
           <h1 className="text-2xl font-bold">{t('login.title')}</h1>
           <p className="mt-1 text-mute">{t('login.subtitle')}</p>
