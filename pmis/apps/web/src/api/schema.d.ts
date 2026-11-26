@@ -10697,7 +10697,7 @@ export interface components {
             }[];
         };
         /** @enum {string} */
-        SearchType: "sites" | "registers" | "documents" | "meetings" | "people" | "contractors";
+        SearchType: "sites" | "registers" | "documents" | "meetings" | "people" | "contractors" | "tasks" | "warehouse_items";
         SearchHit: {
             id: string;
             /** @description Shown as is. `match_ranges` are offsets (UTF-16 code units, start inclusive, end exclusive) into this text. */
@@ -22953,7 +22953,7 @@ export interface operations {
             query: {
                 /** @description Text to find, 2 to 100 characters. */
                 q: string;
-                /** @description Groups to search (default: all six). */
+                /** @description Groups to search (default: all eight). */
                 types?: components["schemas"]["SearchType"][];
                 /** @description Items per group (1 to 10). */
                 limit?: number;
