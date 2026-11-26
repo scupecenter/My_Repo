@@ -3857,6 +3857,10 @@
     "none": "No check has run yet."
   },
   "itemcols": {
+    "inline_reason": "Reason for the changes made in the table (3+ characters)",
+    "inline_hint": "Click a name to edit it here. Up, down and Hide stay as buttons.",
+    "inline_need_reason": "Write the reason first (3+ characters).",
+    "inline_need_name": "The name cannot be empty.",
     "title": "Warehouse items",
     "note": "Extra columns of the item master (text, number, date, yes/no). Every change needs a reason and is audited. Hiding a column keeps its values. A column that holds values cannot change type.",
     "code": "Code",
