@@ -8,6 +8,8 @@ import { AuthShell, PasswordField } from '@/components/AuthShell';
 import { CodeStep, EnrolFlow } from '@/components/TwoFactor';
 import { clearRememberedId, readRememberedId, writeRememberedId } from '@/lib/rememberId';
 
+import { safeNext } from '@/lib/nextPath';
+
 export const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === 'true';
 /** Microsoft 365 sign-in stays in the code but is hidden until IT registers the app (ADR 0012). */
 export const M365_ENABLED = import.meta.env.VITE_M365_ENABLED === 'true';
@@ -40,7 +42,7 @@ export function Login() {
       onSuccess: (r) => {
         keepId();
         if (isPending(r)) { setPw(''); setStep(r.next === 'enrol' ? 'enrol' : 'code'); return; }
-        nav('/', { replace: true });
+        nav(safeNext(params.get('next')) ?? '/', { replace: true });
       },
       onError: (x) => {
         setPw('');
@@ -50,7 +52,7 @@ export function Login() {
     });
   };
   const restart = (why: '' | 'expired') => { setStep('password'); setPw(''); setErr(why); };
-  const finish = () => nav('/', { replace: true });
+  const finish = () => nav(safeNext(params.get('next')) ?? '/', { replace: true });
   if (step === 'code') return <AuthShell><CodeStep onDone={finish} onBack={() => restart('')} onExpired={() => restart('expired')} /></AuthShell>;
   if (step === 'enrol') return <AuthShell><EnrolFlow onDone={finish} onExpired={() => restart('expired')} /></AuthShell>;
   const msg = err === 'expired' ? t('twoFactor.expired') : err === 'invalid' ? t('login.invalid') : err === 'rate' ? t('login.rate') : err === 'other' ? t('login.error') : params.get('error') ? t('login.error') : '';

@@ -1,4 +1,4 @@
-import { Download, PencilLine, Printer, RotateCcw } from "lucide-react";
+import { Check, Download, Link2, MonitorPlay, PencilLine, Printer, RotateCcw } from "lucide-react";
 import { useMemo, useState, type ReactNode, Fragment } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
@@ -651,6 +651,7 @@ export function Dashboard() {
   const d = dash.data;
   const extras = useDashboardExtras(q, !!d);
   const [exporting, setExporting] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
   const [format, setFormat] = useState<ExportFormat>("xlsx");
   // Q116: a local preview of the other pipeline style; the style in force is the setting (meta.pipeline_variant)
   const [preview, setPreview] = useState<"A" | "B" | null>(null);
@@ -1188,7 +1189,7 @@ export function Dashboard() {
         >
           {t("dash.today")}
         </button>
-        <span className="ms-auto flex items-center gap-2">
+        <span className="ms-auto flex flex-wrap items-center gap-2">
           {activeFilters > 0 && (
             <button
               className="btn"
@@ -1209,6 +1210,25 @@ export function Dashboard() {
               {t("dash.reset")}
             </button>
           )}
+          <Link className="btn" data-testid="dash-tv" to={`/dashboard?${new URLSearchParams([...sp.entries(), ["tv", "1"]]).toString()}`}>
+            <MonitorPlay size={16} />
+            {t("dash.tv")}
+          </Link>
+          <button
+            className="btn"
+            data-testid="dash-copy-link"
+            title={t("dash.copy_link_hint")}
+            onClick={() => {
+              // the address already carries the tab and every filter; it opens after the normal sign-in and the reader's own permissions apply
+              void navigator.clipboard?.writeText(window.location.href).then(() => {
+                setLinkCopied(true);
+                window.setTimeout(() => setLinkCopied(false), 2000);
+              });
+            }}
+          >
+            {linkCopied ? <Check size={16} /> : <Link2 size={16} />}
+            {linkCopied ? t("dash.link_copied") : t("dash.copy_link")}
+          </button>
           <Link
             className="btn"
             to="/dashboard/manual-items"
@@ -1345,6 +1365,21 @@ export function Dashboard() {
 
               headline: (
                 <>
+                  {/* needs-attention strip: only counts the dashboard already returned, each linking to its list; nothing new is read */}
+                  {(() => {
+                    const lateN = d.sla?.totals?.open_late ?? 0;
+                    const issuesN = d.issues?.open_total ?? 0;
+                    const actNow = (extras.data?.decisions?.items ?? []).filter((x) => x.tag === "act_now").length;
+                    if (!lateN && !issuesN && !actNow) return null;
+                    return (
+                      <section className="mb-3 flex flex-wrap items-center gap-2 text-sm" data-testid="dash-attention" aria-label={t("dash.attention.title")}>
+                        <b>{t("dash.attention.title")}</b>
+                        {lateN > 0 && <Link className="chip bg-lateBg text-lateInk" data-testid="dash-attn-late" to={sites({ bucket: "late" })}>{t("dash.attention.late", { n: lateN })}</Link>}
+                        {issuesN > 0 && <Link className="chip bg-waitBg text-waitInk" data-testid="dash-attn-issues" to="/registers/issues">{t("dash.attention.issues", { n: issuesN })}</Link>}
+                        {actNow > 0 && <span className="chip bg-lateBg text-lateInk" data-testid="dash-attn-decisions">{t("dash.attention.decisions", { n: actNow })}</span>}
+                      </section>
+                    );
+                  })()}
                   {/* headline */}
                   <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                     <section

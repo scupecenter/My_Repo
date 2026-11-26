@@ -7,6 +7,7 @@ import { useSession } from '@/api/hooks';
 import type { Session } from '@/api/types';
 import { AnnouncementPopup } from '@/components/AnnouncementPopup';
 import { Shell } from '@/components/Shell';
+import { safeNext } from '@/lib/nextPath';
 import { Home } from '@/components/Home';
 import { PeopleAdminLayout } from '@/components/PeopleAdmin';
 import { Approvals } from '@/pages/Approvals';
@@ -69,11 +70,18 @@ function Soon() {
   return <p className="text-mute" data-testid="page-soon">{t('common.soon')}</p>;
 }
 
+/** /login, with the page asked for as ?next= when it is an internal path other than the landing page. */
+export function shareLoginTarget(loc: { pathname: string; search: string; hash: string }): string {
+  const want = safeNext(`${loc.pathname}${loc.search}${loc.hash}`);
+  return want && want !== '/' ? `/login?next=${encodeURIComponent(want)}` : '/login';
+}
+
 function Gate() {
   const s = useSession();
   if (s.isLoading) return null;
   const session = s.data;
-  if (!session?.authenticated) return <Navigate to="/login" replace />;
+  // an authenticated share link: after sign-in the person lands on the same page (their own role and permissions still apply)
+  if (!session?.authenticated) return <Navigate to={shareLoginTarget(window.location)} replace />;
   // The announcement pop-up (ADR 0013) shows for every signed-in person, also on the screens below that stand alone.
   return <><AnnouncementPopup />{gated(session)}</>;
 }

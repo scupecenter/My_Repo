@@ -1,6 +1,6 @@
 import * as Popover from '@radix-ui/react-popover';
 import { useQueryClient } from '@tanstack/react-query';
-import { Bell, Check, Download, Menu, Moon, PanelLeftClose, PanelLeftOpen, Pin, PinOff, Search, Sun, LogOut, Lock, UserRound, X } from 'lucide-react';
+import { Bell, Check, Download, Palette, Plus, Menu, Moon, PanelLeftClose, PanelLeftOpen, Pin, PinOff, Search, Sun, LogOut, Lock, UserRound, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
@@ -117,6 +117,24 @@ export function Shell() {
   const switchLang = () => { const l = lang === 'en' ? 'ar' : 'en'; applyLocale(l); savePref({ locale: l }); };
   const switchTheme = () => { const n = theme === 'light' ? 'dark' : 'light'; applyTheme(n); savePref({ theme: n }); };
 
+  // TV mode (/dashboard?tv=1): the Dashboard alone, larger, refreshed every minute, for a wall screen. Esc or the button leaves it. Same data and permissions as the normal page.
+  const tv = loc.pathname === '/dashboard' && new URLSearchParams(loc.search).get('tv') === '1';
+  useEffect(() => {
+    if (!tv) return;
+    const id = window.setInterval(() => { void qc.invalidateQueries(); }, 60_000);
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') nav('/dashboard'); };
+    window.addEventListener('keydown', esc);
+    return () => { window.clearInterval(id); window.removeEventListener('keydown', esc); };
+  }, [tv, qc, nav]);
+  if (tv) {
+    return (
+      <div className="min-h-screen bg-bg p-6" data-testid="tv-mode" style={{ zoom: 1.2 }}>
+        <button className="btn fixed end-4 top-4 z-50" data-testid="tv-exit" onClick={() => nav('/dashboard')}><X size={16} />{t('dash.tv_exit')}</button>
+        <Outlet context={{ items: sideItems }} />
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-screen">
       {auto && <div className="hidden shrink-0 md:block" style={{ width: 56 }} aria-hidden />}
@@ -163,6 +181,7 @@ export function Shell() {
           <button className="btn" data-testid="topbar-export" onClick={() => setExp(true)}><Download size={16} />{t('export.open')}</button>
           <button className="btn" data-testid="topbar-lang" aria-label={t('top.language')} onClick={switchLang}>{lang === 'en' ? 'ع' : 'EN'}</button>
           <button className="btn" data-testid="topbar-theme" aria-label={t('top.theme')} onClick={switchTheme}>{theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}</button>
+          <QuickCreate me={me.data} allowed={allowed} />
           <NotificationBell count={pending} />
           <Popover.Root>
             <Popover.Trigger asChild>
@@ -174,6 +193,7 @@ export function Shell() {
             <Popover.Portal>
               <Popover.Content align="end" sideOffset={6} data-testid="user-menu" className="card z-50 w-56 p-2">
                 <Popover.Close asChild><button className="btn w-full justify-start" data-testid="user-menu-profile" onClick={() => nav('/profile')}><UserRound size={14} />{t('top.my_profile')}</button></Popover.Close>
+                <Popover.Close asChild><button className="btn w-full justify-start" data-testid="user-menu-appearance" onClick={() => nav('/profile#pf-brand')}><Palette size={14} />{t('top.appearance')}</button></Popover.Close>
                 {session.data?.auth_method === 'local'
                   ? <Popover.Close asChild><button className="btn w-full justify-start" data-testid="user-menu-change-password" onClick={() => nav('/change-password')}><Lock size={14} />{t('top.change_password')}</button></Popover.Close>
                   : <p className="p-2 text-sm text-mute">{t('top.no_password')}</p>}
@@ -188,6 +208,32 @@ export function Shell() {
       <ExportDialog open={exp} onClose={() => setExp(false)} />
       <CommandPalette open={palette} onOpenChange={setPalette} items={items.map((i) => ({ key: i.key, to: i.to }))} />
     </div>
+  );
+}
+
+/** The "+" of the top bar: shortcuts to the things this person may start. Each one only opens its page; the page and the server still check the permission. */
+function QuickCreate({ me, allowed }: { me: ReturnType<typeof useMe>['data']; allowed: Set<string> }) {
+  const { t } = useTranslation();
+  const nav = useNavigate();
+  const canSite = isAdmin(me) || !!me?.effective.grants.some((g) => g.module_key === 'sites' && (g.action as string) === 'create');
+  const items = [
+    canSite ? { key: 'site', to: '/sites/new', label: t('top.qc_site') } : null,
+    allowed.has('status_updates') ? { key: 'status', to: '/status-updates', label: t('top.qc_status') } : null,
+    allowed.has('messages') ? { key: 'message', to: '/messages', label: t('top.qc_message') } : null,
+    allowed.has('absence') ? { key: 'absence', to: '/absence', label: t('top.qc_absence') } : null,
+  ].filter((x): x is { key: string; to: string; label: string } => x !== null);
+  if (items.length === 0) return null;
+  return (
+    <Popover.Root>
+      <Popover.Trigger asChild>
+        <button className="btn" data-testid="topbar-quick-create" aria-label={t('top.quick_create')} title={t('top.quick_create')}><Plus size={16} /></button>
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content align="end" sideOffset={6} data-testid="quick-create-menu" className="card z-50 w-56 p-2">
+          {items.map((i) => <Popover.Close asChild key={i.key}><button className="btn w-full justify-start" data-testid={`qc-${i.key}`} onClick={() => nav(i.to)}><Plus size={14} />{i.label}</button></Popover.Close>)}
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }
 
