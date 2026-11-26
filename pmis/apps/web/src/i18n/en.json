@@ -2012,7 +2012,10 @@
     "transferred": "The draft was moved to a qualified holder.",
     "transfer_note": "The person holding this draft no longer holds Data Entry (L1) of the permit's stream. Transfer it so a qualified holder can finish it; nothing in it is lost.",
     "inline_saved": "Saved. You can undo for 8 seconds.",
-    "inline_undone": "Change undone."
+    "inline_undone": "Change undone.",
+    "contractor": "Contractor",
+    "contractor_company": "Contractor company",
+    "contractor_hint": "Pick from the companies with an active contract. The contract is checked against the scope at submit."
   },
   "regErrors": {
     "register_locked": "This is locked: only a System Admin can change it until it is unlocked.",

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.87
+  version: 0.15.88
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -10254,6 +10254,21 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '422': { $ref: '#/components/responses/Unprocessable' }
+  /registers/contractor-companies:
+    get:
+      tags: [registers]
+      operationId: listContractorCompanies
+      summary: Companies a Procurement, GECOL or HLC record can name as its Contractor
+      description: |
+        0.15.88. Read only. Active companies with an active contract (not ended), each with the scopes of its active contracts (`scopes` null = the contract names no scope, so every scope). The pick is stored in the record column `external_party_id` (create and patch already accept it); the server checks that the company has an active contract covering the scope at submit (`no_active_contract`, `party_inactive`). Needs `view` on Procurement, GECOL or HLC.
+      responses:
+        '200':
+          description: The companies.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ContractorCompanyList'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
   /registers/{register_key}/records:
     parameters:
     - {$ref: '#/components/parameters/RegisterKeyPath'}
@@ -21681,6 +21696,20 @@ components:
         batch_row_id: { type: [string, 'null'], format: uuid, description: 'Set when the version came from a template batch.' }
         previous_path: { type: boolean, description: '0.12.2 (Q216): an act of the old 3-level path (level 2 or 3) recorded before the record was converted to two levels; shown as "previous path before conversion".' }
         created_at: { type: string, format: date-time }
+    ContractorCompanyList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            required: [id, name, type, scopes]
+            properties:
+              id: { type: string, format: uuid }
+              name: { type: string }
+              type: { type: string }
+              scopes: { type: [array, 'null'], items: { type: string } }
     RegisterRecordInput:
       type: object
       required: [data]

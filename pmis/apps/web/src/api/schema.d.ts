@@ -6541,6 +6541,26 @@ export interface paths {
         patch: operations["renameRegister"];
         trace?: never;
     };
+    "/registers/contractor-companies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Companies a Procurement, GECOL or HLC record can name as its Contractor
+         * @description 0.15.88. Read only. Active companies with an active contract (not ended), each with the scopes of its active contracts (`scopes` null = the contract names no scope, so every scope). The pick is stored in the record column `external_party_id` (create and patch already accept it); the server checks that the company has an active contract covering the scope at submit (`no_active_contract`, `party_inactive`). Needs `view` on Procurement, GECOL or HLC.
+         */
+        get: operations["listContractorCompanies"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/registers/{register_key}/records": {
         parameters: {
             query?: never;
@@ -15979,6 +15999,15 @@ export interface components {
             previous_path?: boolean;
             /** Format: date-time */
             created_at: string;
+        };
+        ContractorCompanyList: {
+            items: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                type: string;
+                scopes: string[] | null;
+            }[];
         };
         RegisterRecordInput: {
             /**
@@ -30956,6 +30985,28 @@ export interface operations {
             404: components["responses"]["NotFound"];
             412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["Unprocessable"];
+        };
+    };
+    listContractorCompanies: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The companies. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContractorCompanyList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     listRegisterRecords: {

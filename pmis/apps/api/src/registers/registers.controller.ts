@@ -20,6 +20,11 @@ export class RegistersController {
     return this.registers.list(auth);
   }
 
+  @Get('contractor-companies')
+  contractorCompanies(@Auth() auth: AuthContext) {
+    return this.registers.contractorCompanies(auth);
+  }
+
   @Get(':key/records')
   records(@Auth() auth: AuthContext, @Param('key') key: string, @Query() q: Record<string, unknown>) {
     return this.registers.listRecords(auth, key, q);

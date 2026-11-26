@@ -285,3 +285,8 @@ export function useColumnLock(key: string) {
     },
   });
 }
+
+/** 0.15.88: the companies a Procurement / GECOL / HLC record can name as its Contractor (record column external_party_id). */
+export type ContractorCompany = { id: string; name: string; type: string; scopes: string[] | null };
+export const useContractorCompanies = (enabled = true) =>
+  useQuery({ queryKey: ['contractor-companies'], enabled, staleTime: 60_000, queryFn: () => api.get<{ items: ContractorCompany[] }>('/registers/contractor-companies').then((r) => r.items) });

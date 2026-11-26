@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useSession } from '@/api/hooks';
-import { useCancelSnagRecord, useCreateRecord, useNewVersion, useRecordClaim, useRecordHistory, useRecordOp, useRecordTransfer, useRegisterRecord, useUpdateRecord, type RecordOp } from '@/api/registers';
+import { useCancelSnagRecord, useCreateRecord, useNewVersion, useRecordClaim, useRecordHistory, useRecordOp, useRecordTransfer, useRegisterRecord, useUpdateRecord, useContractorCompanies, type RecordOp } from '@/api/registers';
 import { useMatrix } from '@/api/sites';
 import { useAddRegisterComment, useRegisterComments } from '@/api/x';
 import type { RegisterDefinition, RegisterRecord } from '@/api/types';
@@ -97,6 +97,10 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
   const ctx = { refs: record?.refs, files: (recSlots.data?.items ?? []).flatMap((sl) => sl.files.filter((f) => !f.superseded_by).map((f) => ({ id: f.id, name: f.original_name }))) };
   const docsMissing = record?.state === 'entry' ? (recSlots.data?.missing_for_submit ?? []) : [];
   const [data, setData] = useState<Data>(record?.data ?? defaultsFor(rawDef.register_key, rawDef));
+  // 0.15.88: the Contractor company of a Procurement / GECOL / HLC record (record column external_party_id; Procurement picks it, GECOL and HLC show it read-only)
+  const hasContractor = ['procurement', 'gecol', 'hlc'].includes(rawDef.register_key);
+  const [party, setParty] = useState<string>(record?.external_party?.id ?? '');
+  const companies = useContractorCompanies(rawDef.register_key === 'procurement');
   const [site, setSite] = useState<SiteSel>(record?.site_id ? { id: record.site_id, code: record.site_code ?? '', region_id: record.region_id as number | undefined } : null);
   const [rtype, setRtype] = useState<string>(record?.record_type ?? '');
   const [dirty, setDirty] = useState(false);
@@ -150,10 +154,10 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
     if (!site && def.site_scoped) { setServer({ site_id: { code: 'site_required' } }); return; }
     if (typeMissing) { setServer({ record_type: { code: 'required' } }); return; }
     const body = visibleData(def, typed(data));
-    if (!record) create.mutate({ site_id: site?.id, site_code: site?.code, region_id: site?.region_id, ...(rtype ? { record_type: rtype } : {}), data: body }, {
+    if (!record) create.mutate({ site_id: site?.id, site_code: site?.code, region_id: site?.region_id, ...(rtype ? { record_type: rtype } : {}), ...(party ? { external_party_id: party } : {}), data: body }, {
       onSuccess: (r) => { dr.clear(); toast(t('registers.saved')); setDirty(false); onCreated(r.id); }, onError: fail,
     });
-    else update.mutate({ record, patch: { data: patchData(def, record.data, typed(data)) } }, { onSuccess: () => { dr.clear(); toast(t('registers.saved')); setDirty(false); }, onError: fail });
+    else update.mutate({ record, patch: { data: patchData(def, record.data, typed(data)), ...(party !== (record.external_party?.id ?? '') ? { external_party_id: party || null } : {}) } }, { onSuccess: () => { dr.clear(); toast(t('registers.saved')); setDirty(false); }, onError: fail });
   };
   const run = (o: RecordOp, r: RegisterRecord, note?: string) => op.mutate({ record: r, op: o, note }, {
     onSuccess: () => { toast(t(o === 'void' ? 'registers.voided' : 'approvals.done')); setRejecting(false); setVoiding(false); },
@@ -163,12 +167,12 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
     setTried(true);
     if (issueList.length) return;
     if (!record) {
-      create.mutate({ site_id: site?.id, site_code: site?.code, region_id: site?.region_id, ...(rtype ? { record_type: rtype } : {}), data: visibleData(def, typed(data)) }, {
+      create.mutate({ site_id: site?.id, site_code: site?.code, region_id: site?.region_id, ...(rtype ? { record_type: rtype } : {}), ...(party ? { external_party_id: party } : {}), data: visibleData(def, typed(data)) }, {
         // the drawer switches to the saved record only after the submit answered, so the buttons below keep their callbacks
         onSuccess: (r) => op.mutate({ record: r, op: 'submit' }, { onSuccess: () => { toast(t('approvals.done')); onCreated(r.id); }, onError: (e) => { fail(e); onCreated(r.id); } }),
         onError: fail,
       });
-    } else if (dirty) update.mutate({ record, patch: { data: patchData(def, record.data, typed(data)) } }, { onSuccess: (r) => { setDirty(false); run('submit', r); }, onError: fail });
+    } else if (dirty) update.mutate({ record, patch: { data: patchData(def, record.data, typed(data)), ...(party !== (record.external_party?.id ?? '') ? { external_party_id: party || null } : {}) } }, { onSuccess: (r) => { setDirty(false); run('submit', r); }, onError: fail });
     else run('submit', record);
   };
   const busy = create.isPending || update.isPending || op.isPending || cancelSnag.isPending || claim.isPending || newVersion.isPending || transfer.isPending;
@@ -252,7 +256,7 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
             <section key={s.id} aria-labelledby={`rs-${s.id}`} data-testid={`reg-section-${s.id}`} className="space-y-2">
               <h3 id={`rs-${s.id}`} className="font-semibold">{t(`regSections.${s.id}`, { defaultValue: s.title })}</h3>
               <div className="grid grid-cols-2 gap-3">
-                {s.fields.filter((f) => !(rk === 'procurement' && f.code === 'members') && !(rk === 'financial_advances' && f.code === 'balance')).map((f) => {
+                {s.fields.filter((f) => !(rk === 'gecol' && f.code === 'contractor') && !(rk === 'procurement' && f.code === 'members') && !(rk === 'financial_advances' && f.code === 'balance')).map((f) => {
                   const iss = issues[f.code];
                   const show = iss && (tried || server[f.code] || dirty);
                   return (
@@ -275,6 +279,21 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
               </div>
             </section>
           ))}
+          {hasContractor && (
+            <section aria-labelledby="rs-contractor" data-testid="reg-section-contractor" className="space-y-2">
+              <h3 id="rs-contractor" className="font-semibold">{t('registers.contractor')}</h3>
+              {editable && rk === 'procurement' ? (
+                <div><label htmlFor="reg-contractor" className="text-sm text-mute">{t('registers.contractor_company')}</label>
+                  <select id="reg-contractor" data-testid="reg-contractor" className="input" value={party} onChange={(e) => { setParty(e.target.value); setDirty(true); }}>
+                    <option value="">{t('registers.choose')}</option>
+                    {(companies.data ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}{c.scopes?.length ? ` (${c.scopes.join(', ')})` : ''}</option>)}
+                    {party && !(companies.data ?? []).some((c) => c.id === party) && record?.external_party && <option value={party}>{record.external_party.name}</option>}
+                  </select>
+                  <p className="text-xs text-mute">{t('registers.contractor_hint')}</p>
+                </div>
+              ) : <div className="font-semibold" data-testid="reg-view-contractor">{record?.external_party?.name ?? '—'}</div>}
+            </section>
+          )}
         </form>
         {rk === 'procurement' && (
           <section aria-labelledby="rs-assignment" data-testid="reg-section-assignment" className="space-y-2">

@@ -383,6 +383,7 @@ export const REAL_API_AUTH_USERS = [
   ['delete', '/matrix/cells/:id'],
   ['put', '/registers/hlc/records/:id/purchase-requests'],
   ['get', '/registers/dismantle/order-options'],
+  ['get', '/registers/contractor-companies'],
   ['post', '/registers/hlc/legacy-migration'],
   ['get', '/registers/:key/fields'],
   ['post', '/registers/:key/fields'],
