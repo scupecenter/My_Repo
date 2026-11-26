@@ -96,11 +96,12 @@ export function DismantleOrderSelect({ siteId, part, value, onChange, editable, 
 }
 
 /** 0181: the Procurement order of a warehouse receipt (optional); PR No., PO / WO No. and the contractor shown below it come from the order. */
-export function WarehouseOrderSelect({ siteId, value, onChange, editable, invalid }: {
+export function WarehouseOrderSelect({ siteId, value, onChange, editable, invalid, registerKey = 'warehouse', field = 'procurement_order_id' }: {
+  registerKey?: 'warehouse' | 'car_dispatcher' | 'financial_advances'; field?: string;
   siteId: string | null | undefined; value: unknown; onChange: (v: string | null) => void; editable: boolean; invalid?: boolean;
 }) {
   const { t } = useTranslation();
-  const q = useWarehouseOrders(siteId, editable);
+  const q = useWarehouseOrders(siteId, editable, registerKey);
   const items = q.data ?? [];
   const cur = typeof value === 'string' ? value : '';
   const chosen = items.find((i) => i.entity_id === cur);
@@ -109,14 +110,14 @@ export function WarehouseOrderSelect({ siteId, value, onChange, editable, invali
     <div data-testid="reg-warehouse-order">
       {editable
         ? (
-          <select id="reg-field-procurement_order_id" data-testid="reg-field-procurement_order_id" className="input" aria-invalid={invalid || undefined} value={cur}
+          <select id={`reg-field-${field}`} data-testid={`reg-field-${field}`} className="input" aria-invalid={invalid || undefined} value={cur}
             onChange={(e) => onChange(e.target.value || null)}>
             <option value="">{t('p4c.receipt_no_order')}</option>
             {items.map((i) => <option key={i.entity_id} value={i.entity_id}>{label(i)}</option>)}
             {cur && !chosen && <option value={cur}>{cur.slice(0, 8)}</option>}
           </select>
         )
-        : <div className="font-semibold" data-testid="reg-view-procurement_order_id">{chosen ? label(chosen) : cur ? cur.slice(0, 8) : '—'}</div>}
+        : <div className="font-semibold" data-testid={`reg-view-${field}`}>{chosen ? label(chosen) : cur ? cur.slice(0, 8) : '—'}</div>}
       <p className="text-sm text-mute">{t('p4c.receipt_order_hint')}</p>
     </div>
   );
