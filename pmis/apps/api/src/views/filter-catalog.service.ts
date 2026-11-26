@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { AccessService } from '../access/access.service';
-import { problems } from '../common/problem';
+import { ProblemException, problems } from '../common/problem';
 import { DbService } from '../db/db.service';
 import { COLUMNS_SQL } from '../site-master/site-master-columns-sql';
 import { buildMenu, SITE_MASTER_MENUS, type SiteMasterColumnRow, type SiteMasterMenu } from '../site-master/site-master-sections';
@@ -192,7 +192,7 @@ function typed(text: Prisma.Sql, t: FilterFieldType): Prisma.Sql {
   return text;
 }
 
-export type FilterScreen = 'sites' | 'dashboard' | 'site-tasks' | 'tasks-board' | 'library-archive' | 'users' | 'assignments' | `register-${string}` | `site-master-${string}`;
+export type FilterScreen = 'sites' | 'dashboard' | 'site-tasks' | 'tasks-board' | 'library-archive' | 'users' | 'assignments' | 'audit-log' | 'security-log' | `register-${string}` | `site-master-${string}`;
 
 @Injectable()
 export class FilterCatalogService {
@@ -203,7 +203,7 @@ export class FilterCatalogService {
 
   /** The screens with a filter builder. Other saved-view screens (the logs) keep their simple filters. */
   static supports(screen: string): boolean {
-    return isSitesLike(screen) || screen === 'site-tasks' || screen === 'tasks-board' || screen === 'library-archive' || ADMIN_SCREENS[screen] !== undefined || /^register-[a-z0-9_]{2,60}$/.test(screen);
+    return isSitesLike(screen) || screen === 'site-tasks' || screen === 'tasks-board' || screen === 'library-archive' || ADMIN_SCREENS[screen] !== undefined || screen === 'audit-log' || screen === 'security-log' || /^register-[a-z0-9_]{2,60}$/.test(screen);
   }
 
   /**
@@ -221,6 +221,18 @@ export class FilterCatalogService {
    */
   static adminModuleOf(screen: string): string | null {
     return ADMIN_SCREENS[screen] ?? null;
+  }
+
+  /**
+   * The Audit Log and the Security Log: the reader right their log function checks (audit: a reader scope; security: System Admin or view_security_log).
+   * The filter fields ask for the same right, so a caller who cannot read a log cannot even open its filter.
+   */
+  async requireLogReader(screen: string): Promise<void> {
+    const r =
+      screen === 'audit-log'
+        ? await this.db.tx.$queryRaw<{ ok: boolean }[]>`SELECT jsonb_array_length(log_audit_scope_json()) > 0 AS ok`
+        : await this.db.tx.$queryRaw<{ ok: boolean }[]>`SELECT sec_can_read() AS ok`;
+    if (!r[0]?.ok) throw new ProblemException(403, 'module_forbidden', { detail: 'You cannot read this log.' });
   }
 
   private async regionOptions() {
@@ -444,6 +456,48 @@ export class FilterCatalogService {
         field('valid_from', 'Valid from', 'ساري من', 'date', Prisma.sql`cal_local_date(a.valid_from)`, undefined, g),
         field('valid_to', 'Valid to', 'ساري حتى', 'date', Prisma.sql`cal_local_date(a.valid_to)`, undefined, g),
         field('active_now', 'Active now', 'ساري الآن', 'bool', Prisma.sql`(a.valid_from <= now() AND (a.valid_to IS NULL OR a.valid_to > now()))`, undefined, g),
+      ],
+    };
+  }
+
+  /**
+   * Admin > Audit Log (aliases `a` = a row of log_audit_read, `s` = sites, as in LogsService.auditSql). Only columns of what the log function already returns:
+   * the function applies the reader's scope, so the tree narrows and never widens.
+   */
+  private async auditLog(): Promise<Built> {
+    const g = { key: 'event', label_en: 'Event', label_ar: 'الحدث' };
+    const w = { key: 'where', label_en: 'Where', label_ar: 'المكان' };
+    const regions = await this.regionOptions();
+    return {
+      wants: new Map(),
+      fields: [
+        field('at', 'Date', 'التاريخ', 'date', Prisma.sql`cal_local_date(a.at)`, undefined, g),
+        field('action', 'Action', 'الإجراء', 'text', Prisma.sql`a.action`, undefined, g),
+        field('entity_type', 'Entity type', 'نوع الكيان', 'text', Prisma.sql`a.entity_type`, undefined, g),
+        field('entity_id', 'Entity ID', 'معرّف الكيان', 'text', Prisma.sql`a.entity_id`, undefined, g),
+        field('reason', 'Reason', 'السبب', 'text', Prisma.sql`a.reason`, undefined, g),
+        field('via', 'Via', 'القناة', 'text', Prisma.sql`a.via`, undefined, g),
+        field('is_admin_override', 'Admin override', 'تجاوز إداري', 'bool', Prisma.sql`a.is_admin_override`, undefined, g),
+        field('mfa', 'Second factor used', 'استُخدم عامل ثانٍ', 'bool', Prisma.sql`coalesce(a.mfa, false)`, undefined, g),
+        field('module_key', 'Module', 'الوحدة', 'text', Prisma.sql`a.module_key`, undefined, w),
+        field('region_id', 'Region', 'المنطقة', 'enum', Prisma.sql`a.region_id::text`, regions, w),
+        field('site_code', 'Site ID', 'رمز الموقع', 'text', Prisma.sql`s.site_code`, undefined, w),
+      ],
+    };
+  }
+
+  /** Admin > Security Log (alias `s` = a row of sec_log_read; its `ip` is already empty for a reader who is not a System Admin). */
+  private async securityLog(): Promise<Built> {
+    const g = { key: 'event', label_en: 'Event', label_ar: 'الحدث' };
+    return {
+      wants: new Map(),
+      fields: [
+        field('at', 'Date', 'التاريخ', 'date', Prisma.sql`cal_local_date(s.at)`, undefined, g),
+        field('event', 'Event', 'الحدث', 'text', Prisma.sql`s.event`, undefined, g),
+        field('outcome', 'Outcome', 'النتيجة', 'text', Prisma.sql`s.outcome`, undefined, g),
+        field('client_type', 'Client', 'العميل', 'text', Prisma.sql`s.client_type`, undefined, g),
+        field('ip', 'IP address', 'عنوان IP', 'text', Prisma.sql`s.ip`, undefined, g),
+        field('person', 'Person', 'الشخص', 'text', Prisma.sql`(SELECT u.display_name FROM users u WHERE u.id = s.user_id)`, undefined, g),
       ],
     };
   }
@@ -735,7 +789,11 @@ export class FilterCatalogService {
               ? await this.users()
               : screen === 'assignments'
                 ? await this.assignments()
-                : await this.register(screen.slice('register-'.length));
+                : screen === 'audit-log'
+                  ? await this.auditLog()
+                  : screen === 'security-log'
+                    ? await this.securityLog()
+                    : await this.register(screen.slice('register-'.length));
     const hidden = new Set(
       await this.hidden(
         screen,

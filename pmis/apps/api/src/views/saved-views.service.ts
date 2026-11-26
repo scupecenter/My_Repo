@@ -236,6 +236,10 @@ export class SavedViewsService {
       await this.access.requireModuleView(auth, admin);
       return screen;
     }
+    if (screen === 'audit-log' || screen === 'security-log') {
+      await this.catalog.requireLogReader(screen); // the reader right of the log function itself
+      return screen;
+    }
     const local = FilterCatalogService.modulesOf(screen); // dashboard and site-master-<menu>: two rights for the dashboard, the Site Register for the menus
     if (local) {
       for (const m of local) await this.access.requireRegions(m, 'view');
