@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, Param, Post, Put, Res } from '@nestjs/common';
+import { Body, Controller, Get, Headers, HttpCode, Param, Post, Put, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import type { AuthContext } from '../auth/auth.types';
 import { Auth } from '../auth/decorators';
@@ -25,6 +25,7 @@ export class RecycleBinController {
   }
 
   @Post(':id/restore')
+  @HttpCode(200)
   async restore(@Auth() auth: AuthContext, @Param('id') id: string, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response) {
     const r = await this.bin.restore(auth, id, ifMatch, body);
     res.setHeader('ETag', etagHeader(Number(r.version)));
