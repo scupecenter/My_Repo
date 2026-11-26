@@ -29,17 +29,25 @@ BEGIN
       JOIN public.regions rg ON a.all_regions OR EXISTS (SELECT 1 FROM public.user_role_assignment_regions x WHERE x.assignment_id = a.id AND x.region_id = rg.id)
       WHERE a.valid_from <= now() AND (a.valid_to IS NULL OR a.valid_to > now())
         AND (a.all_modules OR EXISTS (SELECT 1 FROM public.user_role_assignment_modules m WHERE m.assignment_id = a.id AND m.module_key = 'sites'))
-    ), tk AS (
-      SELECT t.region_id,
-             public.sla_colour(public.cal_workdays_between(t.sla_start_date, public.cal_today(), r.calendar_id), 0, r.max_working_days) AS colour
+    ), pairs AS (
+      -- the SLA colour depends only on (start date, calendar, maximum): work it out once per distinct triple, not once per task
+      SELECT DISTINCT t.sla_start_date AS sd, r.calendar_id AS cal, r.max_working_days AS mx
+      FROM public.task_instances t JOIN public.sla_rules r ON r.id = t.sla_rule_id
+      WHERE t.state::text IN ('open', 'entry', 'in_review', 'in_approval') AND t.sla_start_date IS NOT NULL
+    ), col AS (
+      SELECT sd, cal, mx, public.sla_colour(public.cal_workdays_between(sd, public.cal_today(), cal), 0, mx) AS colour FROM pairs
+    ), reg AS (
+      SELECT t.region_id, count(*)::int AS open_n,
+             count(*) FILTER (WHERE col.colour = 'red')::int AS red_n,
+             count(*) FILTER (WHERE col.colour = 'amber')::int AS amber_n
       FROM public.task_instances t
       LEFT JOIN public.sla_rules r ON r.id = t.sla_rule_id
+      LEFT JOIN col ON col.sd = t.sla_start_date AND col.cal IS NOT DISTINCT FROM r.calendar_id AND col.mx = r.max_working_days
       WHERE t.state::text IN ('open', 'entry', 'in_review', 'in_approval')
+      GROUP BY t.region_id
     )
-    SELECT reach.user_id, count(*)::int AS open_n,
-           count(*) FILTER (WHERE tk.colour = 'red')::int AS red_n,
-           count(*) FILTER (WHERE tk.colour = 'amber')::int AS amber_n
-    FROM reach JOIN tk ON tk.region_id = reach.region_id
+    SELECT reach.user_id, sum(reg.open_n)::int AS open_n, sum(reg.red_n)::int AS red_n, sum(reg.amber_n)::int AS amber_n
+    FROM reach JOIN reg ON reg.region_id = reach.region_id
     GROUP BY reach.user_id
   ) s
   WHERE NOT EXISTS (SELECT 1 FROM public.notifications nt WHERE nt.user_id = s.user_id AND nt.kind = 'weekly_digest' AND nt.title = 'Weekly summary, week of ' || to_char(wk, 'YYYY-MM-DD'));
