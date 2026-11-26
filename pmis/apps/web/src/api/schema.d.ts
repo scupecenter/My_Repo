@@ -5991,7 +5991,7 @@ export interface paths {
         };
         /**
          * The approved, active Procurement orders a warehouse receipt may name (0.15.90)
-         * @description 0.15.90. The approved Procurement versions in force, not cancelled, that the caller can see; of the site `site_id` when it is given (a PL / OPEN receipt may have no site).
+         * @description 0.15.91. The approved Procurement versions in force, not cancelled, that the caller can see; of the site `site_id` when it is given (a PL / OPEN receipt may have no site).
          *     Needs the Warehouse module; only the orders in regions where the caller also holds the Procurement view right (the responsibility matrix) are listed, and the same right is checked when a receipt is saved.
          */
         get: operations["listWarehouseOrderOptions"];
@@ -6011,8 +6011,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * The warehouse receipts against a Procurement order (0.15.90)
-         * @description 0.15.90. The current, not voided PL / OPEN receipts whose `procurement_order_id` is this order, with the number of lines and the total quantity. Needs the Procurement module
+         * The warehouse receipts against a Procurement order (0.15.91)
+         * @description 0.15.91. The current, not voided PL / OPEN receipts whose `procurement_order_id` is this order, with the number of lines and the total quantity. Needs the Procurement module
          *     (view) and the Warehouse module; the receipts the caller cannot see are not listed.
          */
         get: operations["listProcurementOrderReceipts"];
@@ -15826,7 +15826,7 @@ export interface components {
             order_status?: string;
             external_party?: components["schemas"]["ExternalPartyRef"];
         };
-        /** @description 0.15.90. An approved, active Procurement order a warehouse receipt may name. */
+        /** @description 0.15.91. An approved, active Procurement order a warehouse receipt may name. */
         WarehouseOrderOption: {
             /**
              * Format: uuid
@@ -15845,7 +15845,7 @@ export interface components {
             order_status?: string;
             external_party?: components["schemas"]["ExternalPartyRef"];
         };
-        /** @description 0.15.90. A warehouse receipt (PL or OPEN) against a Procurement order. */
+        /** @description 0.15.91. A warehouse receipt (PL or OPEN) against a Procurement order. */
         ProcurementOrderReceipt: {
             /** Format: uuid */
             entity_id: string;
@@ -16846,7 +16846,7 @@ export interface components {
             /** @description A return note needs a reason before it is submitted (Faulty or Damaged, Relocation, Cancellation, Other, Dismantle). */
             reason?: string;
             remark?: string;
-            /** @description 0.15.90. PL and OPEN only: the entity id of an approved, active Procurement order (see GET /registers/warehouse/order-options). PR No., PO / WO No. and the contractor are then derived from it. */
+            /** @description 0.15.91. PL and OPEN only: the entity id of an approved, active Procurement order (see GET /registers/warehouse/order-options). PR No., PO / WO No. and the contractor are then derived from it. */
             procurement_order_id?: string;
             lines: components["schemas"]["StockMovementLine"][];
         };

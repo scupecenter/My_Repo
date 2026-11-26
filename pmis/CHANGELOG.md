@@ -18,7 +18,7 @@
 
 **قاعدة البيانات.** الترحيل 0181 (مضاف فقط): أربعة حقول (واحد اختياري وثلاثة مشتقة)، مشغّل صفّي يتحقق من الأمر ويملأ المشتقات، ودالتا قراءة تخضعان لأمان الصفوف. لا جدول جديد ولا توسيع صلاحيات ولا حذف.
 
-**العقد 0.15.90.** `GET /registers/warehouse/order-options` و`GET /registers/procurement/{entity_id}/receipts`، ورموز جديدة `receipt_only` و`order_other_site`.
+**العقد 0.15.91.** `GET /registers/warehouse/order-options` و`GET /registers/procurement/{entity_id}/receipts`، ورموز جديدة `receipt_only` و`order_other_site`.
 
 **مفتوح.** سجلات سابقة على أوامر أُلغيت لاحقًا تحتفظ بقيمها المشتقة (تاريخ). ربط إيصالات DN/RN بالأمر غير مطلوب الآن.
 
