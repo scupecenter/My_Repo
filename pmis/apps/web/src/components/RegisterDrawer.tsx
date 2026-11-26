@@ -268,6 +268,8 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
                         ? <VehiclePicker value={data.vehicle_id} onChange={(v) => set('vehicle_id', v)} from={data.from_date as string} to={data.to_date as string} vehicleType={data.required_type as string} bookingId={record?.id} disabled={!editable} invalid={!!show} />
                         : key === 'dismantle' && f.code === 'procurement_order_id'
                         ? <DismantleOrderSelect siteId={site?.id} part={rtype} value={data[f.code]} onChange={(v) => set(f.code, v)} editable={editable} invalid={!!show} />
+                        : (key === 'car_dispatcher' || key === 'financial_advances') && f.code === 'procurement_record_id'
+                        ? <WarehouseOrderSelect registerKey={key} field="procurement_record_id" siteId={key === 'financial_advances' ? site?.id : null} value={data[f.code]} onChange={(v) => set(f.code, v)} editable={editable} invalid={!!show} />
                         : key === 'warehouse' && f.code === 'procurement_order_id'
                         ? <WarehouseOrderSelect siteId={site?.id} value={data[f.code]} onChange={(v) => set(f.code, v)} editable={editable} invalid={!!show} />
                         : editable ? <FieldInput field={f} value={data[f.code]} onChange={(v) => set(f.code, v)} invalid={!!show} ctx={ctx} />
