@@ -9,7 +9,7 @@ All paths below are relative to `pmis/` unless marked as repository root. The pr
 Read before any work:
 1. `docs/reference/GSDN_Workspace_Blueprint_v1.1.html`: the functional blueprint (sections 03, 06, 14, 17, 21).
 2. `docs/reference/GSDN_Rebuild_Decisions.md`: decisions D1–D88 that define the Master logic.
-3. `GSDN_Site_Master.xlsx` (repository root): the Master structure (23 sheets, 187 columns). It is the source for field names and calculations.
+3. The system itself is the reference for the Master structure (23 sheets, 187 columns): field names and calculations live in the database (`master_columns`, applied by the migrations), and a Master workbook in the legacy layout is generated on demand by the Master export (`POST /exports/master`). The `GSDN_Site_Master.xlsx` snapshot at the repository root is retired: it is no longer updated and nothing reads it.
 4. `docs/spec/` (written by domain-analyst) and `contracts/openapi.yaml` (owned by tech-lead).
 
 ## Domain facts (do not change without an ADR)

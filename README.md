@@ -7,6 +7,8 @@ Project management information system for the GSDN telecom site-delivery project
 | Path | Contents |
 |---|---|
 | `pmis/` | The system: spec, ADRs, API contract, database, design, forms |
-| `GSDN_Site_Master.xlsx` | The latest Site Master, the source for field names and calculations |
-| `build/` | The Python generator of the Site Master (`python3 build/main.py`) |
+| `build/` | The Python generator of the legacy Site Master workbook (`python3 build/main.py`) |
+
 | `.claude/agents/` | The AI agent team (see `pmis/ORCHESTRATION.md`) |
+
+The system itself is the reference for the Site Master structure: field names and calculations live in the database (`master_columns`, applied by the migrations), and a Master workbook in the legacy layout is generated on demand by the Master export (`POST /exports/master`). The `GSDN_Site_Master.xlsx` snapshot at the repository root is retired: it is no longer updated and nothing reads it.

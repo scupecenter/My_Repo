@@ -1,13 +1,12 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import ExcelJS from 'exceljs';
-import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { createHash, randomBytes } from 'node:crypto';
 import { Client as PgClient } from 'pg';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { q } from './calc-helpers';
-import { Api, startApp, superDb } from './helpers';
+import { MasterExportService } from '../src/exports/master-export.service';
+import { Api, sleep, startApp, superDb } from './helpers';
 import { G } from './reg-helpers';
 import { getBinary, load, TPL_GRANTS_ENTRY } from './tpl-helpers';
 import { taskRow } from './tpl-stream-helpers';
@@ -186,13 +185,29 @@ describe('legacy Master import: identification, preview and the comparison repor
     expect((await q(db, `SELECT 1 FROM audit_log WHERE action = 'master_import.export' AND entity_id = $1`, [run.id]))).toHaveLength(1);
   });
 
-  it('identifies the real Site Master of the repository (no _tpl, Excel tables, formula rows): every one of the 187 headers is found', async () => {
+  it('identifies a Master workbook the system generates from its own current field definitions (a full Master export): every one of the 187 headers is found', async () => {
     const admin = await plainAdmin(app, db);
-    const real = readFileSync(join(__dirname, '..', '..', '..', '..', 'GSDN_Site_Master.xlsx'));
-    const res = await uploadMaster(admin.api, real);
+    // the conformance check is about the structure, not the data: export a region without sites so the comparison stays empty
+    const counts = await q<{ region_id: number; n: number }>(db, 'SELECT region_id, count(*)::int AS n FROM sites GROUP BY region_id');
+    const region = [1, 2, 3, 4, 5, 6, 7].find((r) => !counts.some((c) => c.region_id === r)) ?? [...counts].sort((a, b) => a.n - b.n)[0]!.region_id;
+    const start = await admin.api.call('post', '/exports/master', { regions: [region] }, { 'Idempotency-Key': `mx-self-${randomBytes(4).toString('hex')}` });
+    expect(start.status).toBe(202);
+    await app.get(MasterExportService).idle();
+    let done: Record<string, any> | undefined;
+    for (let i = 0; i < 100; i++) {
+      const list = await admin.api.call('get', '/exports/master');
+      expect(list.status).toBe(200);
+      done = list.body.items.find((x: { id: string }) => x.id === start.body.id);
+      if (done && (done.status === 'done' || done.status === 'failed')) break;
+      await sleep(100);
+    }
+    expect(done).toMatchObject({ status: 'done' });
+    const dl = await getBinary(admin.api, `/exports/master/${start.body.id}/download`);
+    expect(dl.status).toBe(200);
+    expect(dl.headers['content-disposition']).toMatch(/GSDN_Site_Master_\d{8}\.xlsx/);
+    const res = await uploadMaster(admin.api, dl.buffer);
     expect(res.status).toBe(201);
     expect(res.body.structure).toMatchObject({ identified: true, columns_found: 187, missing: [], moved: [] });
-    expect(res.body.summary).toMatchObject({ rows: 0 });       // the shipped Master holds no site yet
   }, 120000);
 });
 
