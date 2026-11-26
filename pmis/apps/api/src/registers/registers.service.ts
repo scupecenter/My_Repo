@@ -532,6 +532,27 @@ export class RegistersService {
     const parties = partyIds.length
       ? await this.db.tx.$queryRaw<{ id: string; name: string; type: string }[]>(Prisma.sql`SELECT id::text AS id, name, type::text AS type FROM external_parties WHERE id = ANY(${partyIds}::uuid[])`)
       : [];
+    // 0.15.89: the Contractor shown on a GECOL / HLC record comes from Procurement by Site ID (read only, never written to the record):
+    // the Procurement record an HLC record links to, else the latest approved Procurement record of the site that names a company.
+    const procSites = [...new Set(rows.filter((r) => (r.register_key === 'gecol' || r.register_key === 'hlc') && r.site_id).map((r) => r.site_id as string))];
+    const procLinked = [...new Set(rows.filter((r) => r.register_key === 'hlc' && typeof r.data?.procurement_record_id === 'string').map((r) => r.data.procurement_record_id as string))].filter((x) => uuidSchema.safeParse(x).success);
+    const procBySite = new Map<string, { id: string; name: string; type: string }>();
+    const procById = new Map<string, { id: string; name: string; type: string }>();
+    if (procSites.length || procLinked.length) {
+      const pr = await this.db.tx.$queryRaw<{ rid: string; site_id: string | null; id: string; name: string; type: string; linked: boolean }[]>(Prisma.sql`
+        SELECT DISTINCT ON (r.id) r.id::text AS rid, r.site_id::text AS site_id, p.id::text AS id, p.name, p.type::text AS type, (r.id = ANY(${procLinked}::uuid[])) AS linked
+        FROM register_records r JOIN external_parties p ON p.id = r.external_party_id
+        WHERE r.register_key = 'procurement' AND r.is_current AND r.state = 'approved'
+          AND (r.site_id = ANY(${procSites}::uuid[]) OR r.id = ANY(${procLinked}::uuid[]))
+        ORDER BY r.id`);
+      const latest = await this.db.tx.$queryRaw<{ rid: string }[]>(Prisma.sql`
+        SELECT DISTINCT ON (r.site_id) r.id::text AS rid FROM register_records r
+        WHERE r.register_key = 'procurement' AND r.is_current AND r.state = 'approved' AND r.external_party_id IS NOT NULL AND r.site_id = ANY(${procSites}::uuid[])
+        ORDER BY r.site_id, r.approved_at DESC NULLS LAST, r.id`);
+      const by = new Map(pr.map((x) => [x.rid, x]));
+      for (const x of pr) procById.set(x.rid, { id: x.id, name: x.name, type: x.type });
+      for (const l of latest) { const x = by.get(l.rid); if (x?.site_id) procBySite.set(x.site_id, { id: x.id, name: x.name, type: x.type }); }
+    }
     const byCell = new Map<string, MatrixAssigneeDto[]>();
     for (const a of assignees) {
       const dto: MatrixAssigneeDto = { kind: a.kind as MatrixAssigneeDto['kind'], ref_id: a.ref_id, label: a.label, employee_id: a.kind === 'user' ? (a.employee_id?.trim() ?? null) : null };
@@ -618,6 +639,11 @@ export class RegistersService {
       // 0063 (Q150): the HLC purchase requests the record covers, and whether all are approved by HLC (C3)
       if (r.purchase_requests) dto.purchase_requests = r.purchase_requests;
       if (party) dto.external_party = party;
+      if (r.register_key === 'gecol' || r.register_key === 'hlc') {
+        const linked = typeof r.data?.procurement_record_id === 'string' ? procById.get(r.data.procurement_record_id) : undefined;
+        const pc = linked ?? (r.site_id ? procBySite.get(r.site_id) : undefined);
+        if (pc) dto.procurement_contractor = pc;
+      }
       if (r.created_by && refs.get(r.created_by)) dto.created_by = refs.get(r.created_by);
       if (r.approved_by && refs.get(r.approved_by)) dto.approved_by = refs.get(r.approved_by);
       if (r.kind) {

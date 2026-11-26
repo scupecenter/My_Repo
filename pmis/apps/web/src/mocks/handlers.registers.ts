@@ -157,6 +157,10 @@ export function toRecord(r: MockRecord): RegisterRecord {
     // 0063 (Q150, Q114): the HLC purchase requests of an HLC record; the contractor of a record (derived from the order for an outsourced Dismantle part)
     ...(r.register_key === 'hlc' && r.site_index !== null ? { purchase_requests: hlcPrView(r, R().records) } : {}),
     ...(r.external_party ? { external_party: r.external_party } : {}),
+    // 0.15.89: the Contractor of a GECOL / HLC record comes from the latest approved Procurement record of the site that names a company
+    ...((r.register_key === 'gecol' || r.register_key === 'hlc') && r.site_index !== null
+      ? (() => { const p = R().records.find((x) => x.register_key === 'procurement' && x.site_index === r.site_index && x.state === 'approved' && x.external_party && isCurrent(x)); return p?.external_party ? { procurement_contractor: p.external_party } : {}; })()
+      : {}),
   };
 }
 

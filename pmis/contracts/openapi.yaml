@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.89
+  version: 0.15.90
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -21254,6 +21254,7 @@ components:
       type: object
       required: [id, register_key, state, data, version]
       properties:
+        procurement_contractor: { $ref: '#/components/schemas/ExternalPartyRef', description: '0.15.90. GECOL and HLC records only: the Contractor company from Procurement by Site ID (read only, never stored on the record). HLC: the company of the Procurement record it links to; otherwise the company of the latest approved Procurement record of the site that names one. Absent when none. `external_party` of a GECOL or HLC record stays what the approval rules use (the party the record itself is approved for).' }
         docs:
           type: object
           additionalProperties: false

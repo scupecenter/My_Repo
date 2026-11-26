@@ -291,7 +291,7 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
                   </select>
                   <p className="text-xs text-mute">{t('registers.contractor_hint')}</p>
                 </div>
-              ) : <div className="font-semibold" data-testid="reg-view-contractor">{record?.external_party?.name ?? '—'}</div>}
+              ) : <div className="font-semibold" data-testid="reg-view-contractor">{(rk === 'procurement' ? record?.external_party?.name : record?.procurement_contractor?.name) ?? '—'}</div>}
             </section>
           )}
         </form>
