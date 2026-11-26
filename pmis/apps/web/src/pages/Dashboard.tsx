@@ -1189,7 +1189,7 @@ export function Dashboard() {
         >
           {t("dash.today")}
         </button>
-        <span className="ms-auto flex items-center gap-2">
+        <span className="ms-auto flex flex-wrap items-center gap-2">
           {activeFilters > 0 && (
             <button
               className="btn"
