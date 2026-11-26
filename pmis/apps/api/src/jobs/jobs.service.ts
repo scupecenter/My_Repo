@@ -19,6 +19,8 @@ export interface DailyJobResult {
   contractorAlerts?: number;
   /** Q245 (migration 0067): 1 when calendar.official_confirmed was reset because a new year began (job_runs row `calendar_year_reset`, audited) */
   calendarReset?: number;
+  /** 0165: SLA escalation notifications (notify only) written by this run */
+  slaEscalations?: number;
 }
 
 /** The wall-clock parts of an instant in a time zone, and the zone's offset from UTC at that instant (milliseconds). */
@@ -115,6 +117,8 @@ export class JobsService implements OnApplicationBootstrap, OnModuleDestroy {
         if (alerts > 0) result.contractorAlerts = alerts;
         const reset = await this.calendarYearReset();
         if (reset > 0) result.calendarReset = reset;
+        const escalated = await this.slaEscalations();
+        if (escalated > 0) result.slaEscalations = escalated;
       }
       this.lastRun = { at: new Date(), result };
       await this.runs.finish(run, result ? 'ok' : 'skipped', result ? result.slaApplied + result.reminders + (result.snapshots ?? 0) + (result.contractorAlerts ?? 0) + (result.calendarReset ?? 0) : null, null,
@@ -165,6 +169,24 @@ export class JobsService implements OnApplicationBootstrap, OnModuleDestroy {
       const message = e instanceof Error ? e.message.split('\n')[0] ?? 'failed' : 'failed';
       this.log.warn(`contractor alerts failed: ${message}`);
       await this.syslog.write('error', 'contractor alerts failed', { error: message });
+      return 0;
+    }
+  }
+
+  /** 0165: the SLA escalation ladder, notify only: one in-app notification per person and task for the escalation role of an overdue task's SLA rule. A failure is logged and leaves the other steps alone. */
+  private async slaEscalations(): Promise<number> {
+    try {
+      return await this.db.client.$transaction(async (tx) => {
+        const lock = await tx.$queryRaw<{ ok: boolean }[]>`SELECT pg_try_advisory_xact_lock(hashtext('pmis.sla_escalation')) AS ok`;
+        if (!lock[0]?.ok) return 0;
+        await this.runs.context(tx, 'sla_escalation');
+        const r = await tx.$queryRaw<{ n: number }[]>`SELECT sla_escalation_notify() AS n`;
+        return Number(r[0]?.n ?? 0);
+      }, { maxWait: 10_000, timeout: 60_000 });
+    } catch (e) {
+      const message = e instanceof Error ? e.message.split('\n')[0] ?? 'failed' : 'failed';
+      this.log.warn(`sla escalation failed: ${message}`);
+      await this.syslog.write('error', 'sla escalation failed', { error: message });
       return 0;
     }
   }
