@@ -47,6 +47,27 @@ async function slowest(a: Actor, path: string, runs = 5): Promise<{ ms: number; 
 }
 
 describe('1000 sites', () => {
+  // A/B in one job (same machine, same data): the dashboard with and without `ANALYZE _dtask` (0176), interleaved. Only logs; restores the function.
+  it('logs the dashboard time with and without ANALYZE _dtask (0176)', async () => {
+    const def = (await db.query("SELECT pg_get_functiondef('public.dash_build_tasks(date,text,boolean)'::regprocedure) AS d")).rows[0].d as string;
+    expect(def).toContain('ANALYZE _dtask');
+    const without = def.replace(/\n\s*ANALYZE _dtask;[^\n]*/, '');
+    expect(without).not.toContain('ANALYZE _dtask');
+    const res: Record<'with' | 'without', number[]> = { with: [], without: [] };
+    try {
+      for (let round = 0; round < 3; round++) {
+        for (const mode of ['with', 'without'] as const) {
+          await db.query(mode === 'with' ? def : without);
+          res[mode].push((await slowest(admin, '/dashboard', 5)).ms);
+        }
+      }
+    } finally {
+      await db.query(def);
+    }
+    const med = (a: number[]) => [...a].sort((x, y) => x - y)[Math.floor(a.length / 2)]!.toFixed(0);
+    console.log(`[perf-ab] /dashboard medians per round (ms) with ANALYZE ${res.with.map((x) => x.toFixed(0)).join(',')} | without ${res.without.map((x) => x.toFixed(0)).join(',')} | median of rounds: with ${med(res.with)}, without ${med(res.without)}`);
+  }, 180_000);
+
   it('the dashboard answers in under 2 seconds, for all regions and for two regions', async () => {
     const all = await slowest(admin, '/dashboard');
     expect(all.body.headline.sites_total).toBe(973); // 1000 sites, every 37th is cancelled
