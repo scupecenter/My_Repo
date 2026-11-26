@@ -506,6 +506,7 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/tasks/:id/overrides'],
   ['post', '/overrides/:override_id/revert'],
   ['get', '/me/tasks'],
+  ['get', '/me/tasks.ics'],
   // Contract 0.15.34 (P1 of the 2026-11-17 audit; apps/api: exports): the Master-format export (parts, start, the caller's exports, download).
   ['get', '/exports/parts'],
   ['post', '/exports/master'],
