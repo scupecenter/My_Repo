@@ -19,10 +19,10 @@ const EMPLOYEE_ID = /^[0-9]{4}$/;
 const assignee = z
   .object({
     kind: z.enum(['user', 'role', 'group']),
-    ref_id: z.string().uuid(),
+    ref_id: z.guid(),
     label: z.string().max(300).optional(),
     employee_id: z.string().max(10).nullable().optional(),
-    user_id: z.string().uuid().optional(),
+    user_id: z.guid().optional(),
     account_status: z.enum(['active', 'deactivated', 'deleted']).optional(),
     member_count: z.number().int().min(0).optional(),
   })

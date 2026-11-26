@@ -27,7 +27,7 @@ import {
 const CODE = /^(cf:)?[a-z][a-z0-9_]{1,60}$/;
 const viewSchema = z.object({
   source: z.enum(PART_KEYS),
-  filters: z.record(z.unknown()),
+  filters: z.record(z.string(), z.unknown()),
   columns: z.array(z.string().regex(CODE)).min(1).max(400),
   sort: z.string().max(100).optional(),
 }).strict();

@@ -18,11 +18,11 @@ type Cause = (typeof CAUSES)[number];
 const reassignSchema = z
   .object({
     scope: z.enum(['task', 'site', 'person']),
-    task_id: z.string().uuid().optional(),
-    site_id: z.string().uuid().optional(),
-    from_user_id: z.string().uuid().optional(),
+    task_id: z.guid().optional(),
+    site_id: z.guid().optional(),
+    from_user_id: z.guid().optional(),
     decision: z.enum(['reassign', 'act_on_behalf', 'keep']),
-    to_user_id: z.string().uuid().optional(),
+    to_user_id: z.guid().optional(),
     reason: z.string().trim().min(3).max(1000),
     dry_run: z.boolean().optional(),
   })

@@ -30,7 +30,7 @@ const visibility = { in_list: z.boolean().optional(), in_filter: z.boolean().opt
 const fieldBase = {
   label_en: label.optional(), label_ar: label.nullable().optional(), required: z.boolean().optional(), section: z.string().trim().min(1).max(120).nullable().optional(),
   sort_order: z.number().int().min(0).max(100000).optional(), list_catalogue: z.string().min(1).max(60).nullable().optional(), formula: formula.optional(), ...visibility,
-  columns: z.array(z.record(z.unknown())).min(1).max(30).optional(),
+  columns: z.array(z.record(z.string(), z.unknown())).min(1).max(30).optional(),
 };
 const createBody = z.object({ ...fieldBase, label_en: label, code, field_type: z.enum(COLUMN_TYPES), new_list: newList.optional(), reason }).strict();
 const patchBody = z.object({ field_type: z.enum(COLUMN_TYPES).optional(), is_active: z.boolean().optional(), new_list: newList.optional(), confirm_conversion: z.boolean().optional(), reason, ...fieldBase }).strict();

@@ -13,12 +13,12 @@ export const DELAY_PARTIES = ['gecol', 'hlc', 'client', 'contractor', 'external'
 const day = z.string().refine(isCalendarDate, 'Use YYYY-MM-DD.');
 const reason = z.string().trim().min(3).max(1000);
 const addSchema = z.object({
-  from_date: day, to_date: day, party: z.enum(DELAY_PARTIES), external_party_id: z.string().uuid().nullable().optional(), reason,
+  from_date: day, to_date: day, party: z.enum(DELAY_PARTIES), external_party_id: z.guid().nullable().optional(), reason,
   evidence: z.string().trim().max(2000).nullable().optional(),
 }).strict();
 const voidSchema = z.object({ reason }).strict();
 const decideSchema = z.object({
-  decision: z.enum(['approve', 'reject']), note: z.string().trim().max(1000).nullable().optional(), external_party_id: z.string().uuid().nullable().optional(),
+  decision: z.enum(['approve', 'reject']), note: z.string().trim().max(1000).nullable().optional(), external_party_id: z.guid().nullable().optional(),
 }).strict();
 
 interface Row {

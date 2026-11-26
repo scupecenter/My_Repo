@@ -18,7 +18,7 @@ const DRAFT_STATUSES = ['entry', 'in_approval', 'approved', 'rejected', 'discard
  * The body of POST /sites and PATCH /site-drafts/{id}: plain values only. Which fields are accepted, and every rule on them, is decided by the database
  * (site_new_clean): an unknown field (a landlord, a phone, an e-mail) is refused there with 422 `unknown_field`, because those data are not loaded (Q469).
  */
-const draftBody = z.record(z.union([z.string().max(2000), z.number(), z.boolean(), z.null()])).refine((v) => Object.keys(v).length <= 40, 'too many fields');
+const draftBody = z.record(z.string(), z.union([z.string().max(2000), z.number(), z.boolean(), z.null()])).refine((v) => Object.keys(v).length <= 40, 'too many fields');
 const decisionBody = z.object({ action: z.enum(['approve', 'reject']), note: z.string().trim().max(2000).optional() }).strict();
 
 interface DraftRow {

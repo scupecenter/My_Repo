@@ -28,25 +28,25 @@ const SCENARIOS = ['new_build', 'expansion', 'hot_swap', 'cold_swap', 'relocatio
 /** The ETag of a site: its last change to the millisecond (String(Date) would keep only the second, so two edits in one second shared an ETag). */
 const siteVersion = (v: unknown): number => contentVersion([v instanceof Date ? v.toISOString() : String(v)]);
 const STATUSES = ['not_started', 'in_progress', 'on_hold', 'completed', 'cancelled'];
-const patchSchema = z.object({ custom: z.record(z.unknown()).refine((v) => Object.keys(v).length > 0, 'send at least one field'), reason: z.string().trim().max(2000).optional() }).strict();
+const patchSchema = z.object({ custom: z.record(z.string(), z.unknown()).refine((v) => Object.keys(v).length > 0, 'send at least one field'), reason: z.string().trim().max(2000).optional() }).strict();
 /**
  * Q225 (migration 0062): a change to a site field that requires approval, proposed as Change Control drafts. Q473 (migration 0071): the identity of the site
  * (name, name_ar, latitude with longitude, region_id, cluster_code; site_code is refused by the database with the field error `immutable`) goes the same way.
  * The values are checked by the database, which answers the field errors; here only the shape is.
  */
 const proposalSchema = z.object({
-  custom: z.record(z.unknown()).refine((v) => Object.keys(v).length > 0, 'send at least one field').optional(),
-  identity: z.record(z.unknown()).refine((v) => Object.keys(v).length > 0, 'send at least one field').optional(),
+  custom: z.record(z.string(), z.unknown()).refine((v) => Object.keys(v).length > 0, 'send at least one field').optional(),
+  identity: z.record(z.string(), z.unknown()).refine((v) => Object.keys(v).length > 0, 'send at least one field').optional(),
   reason: z.string().trim().min(1).max(2000),
 }).strict().refine((b) => b.custom !== undefined || b.identity !== undefined, { message: 'send custom or identity', path: ['custom'] });
 
 /** Migration 0088 (owner decision 2026-11-12 (2)): the direct edit of a System Admin. The values are checked by the database, which answers the field errors; here only the shape is. */
 const adminEditSchema = z.object({
   reason: z.string().trim().min(3).max(2000),
-  identity: z.record(z.unknown()).optional(),
+  identity: z.record(z.string(), z.unknown()).optional(),
   scenario: z.string().optional(),
-  scope: z.record(z.unknown()).optional(),
-  custom: z.record(z.unknown()).optional(),
+  scope: z.record(z.string(), z.unknown()).optional(),
+  custom: z.record(z.string(), z.unknown()).optional(),
 }).strict().refine((b) => b.identity !== undefined || b.scenario !== undefined || b.scope !== undefined || b.custom !== undefined, { message: 'send at least one field', path: ['identity'] });
 
 interface SiteRow {
