@@ -24,6 +24,7 @@ import { streamName } from "@/lib/streams";
 import { tripoliToday } from "@/lib/today";
 import { orderedVisible, type TabLayout } from "./dashboardLayout";
 import { useDashboardSettings } from "@/api/dashboardSettings";
+import { GoalsPanel } from "@/components/GoalsPanel";
 import { SavedViews } from "@/components/SavedViews";
 import { UnifiedFilter } from "@/components/UnifiedFilter";
 import { decodeFilter, encodeFilter, type FilterTree } from "@/api/views";
@@ -2512,6 +2513,7 @@ export function Dashboard() {
               ),
 
               counters: <CountersPanel ex={extras.data} />,
+              goals: <GoalsPanel />,
               regions: (
                 <>
                   {/* regions */}

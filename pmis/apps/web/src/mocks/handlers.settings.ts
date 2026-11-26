@@ -359,6 +359,7 @@ const DASH_CATALOGUE = {
     { code: 'streams', label_en: 'Streams', label_ar: 'المسارات' },
     { code: 'sla', label_en: 'SLA per stage and top late tasks', label_ar: 'SLA لكل مرحلة' },
     { code: 'gates_issues_delay', label_en: 'Blocked gates, issues and delay attribution', label_ar: 'البوابات المعطلة والقضايا والتأخير' },
+    { code: 'goals', label_en: 'Goals', label_ar: 'الأهداف' },
     { code: 'regions', label_en: 'Regions', label_ar: 'المناطق' },
   ],
 };
@@ -372,6 +373,20 @@ let dashState = {
   updated_by: null as null | { id: string; display_name: string; employee_id: string | null },
 };
 const dashView = () => ({ ...dashState, catalogue: DASH_CATALOGUE });
+
+/** Goals (contract 0.15.99): the list in memory; the progress is a fixed demo count against each goal. */
+const GOALS_CATALOGUE = {
+  metrics: [{ code: 'MS1', label_en: 'Site acceptance', label_ar: 'قبول الموقع' }, { code: 'MS6', label_en: 'On-Air', label_ar: 'الربط On-Air' }],
+  regions: [{ id: 1, code: 'Tripoli', name_en: 'Tripoli', name_ar: 'طرابلس' }, { id: 5, code: 'Benghazi', name_en: 'Benghazi', name_ar: 'بنغازي' }],
+  periods: ['month', 'quarter', 'year'],
+};
+type MockGoal = { id: string; name_en: string; name_ar?: string | null; metric: string; region_id?: number | null; period: 'month' | 'quarter' | 'year'; target: number; active?: boolean };
+let goalsState = { version: 0, goals: [] as MockGoal[], updated_at: null as string | null, updated_by: null as null | { id: string; display_name: string } };
+const goalsView = () => ({ ...goalsState, catalogue: GOALS_CATALOGUE });
+const goalsProgress = () => goalsState.goals.filter((g) => g.active !== false).map((g) => {
+  const actual = Math.min(g.target, 3), percent = Math.round((1000 * actual) / g.target) / 10;
+  return { id: g.id, name_en: g.name_en, name_ar: g.name_ar ?? null, metric: g.metric, region_id: g.region_id ?? null, period: g.period, period_start: '2026-11-01', period_end: '2026-11-30', target: g.target, actual, percent, expected_percent: 90, status: (percent >= 100 ? 'achieved' : percent >= 90 ? 'on_track' : percent >= 75 ? 'at_risk' : 'behind') as 'achieved' | 'on_track' | 'at_risk' | 'behind' };
+});
 
 /** GET /settings/sla-tasks and PUT /settings/sla-tasks/:task/no-sla (contract 0.15.85): demo tasks, one per status, one in the open draft. */
 type MockSlaTask = { task_code: string; name_en: string; name_ar: string | null; stage_code: string; workflow_version: number; in_draft: boolean; mode: 'set' | 'none' | 'undecided'; none_reason: string | null; min_working_days: number | null; max_working_days: number | null; start_event: string | null; unit: string | null };
@@ -392,6 +407,15 @@ export const settingsHandlers = [
     dashState = { ...dashState, version: dashState.version + 1, targets: b.targets, thresholds: b.thresholds, tabs: b.tabs, updated_at: new Date().toISOString() };
     return HttpResponse.json(dashView(), tag(dashState.version));
   }),
+  // ------------------------------------------------------------------ goals (contract 0.15.99)
+  http.get(`${B}/settings/goals`, () => { const g = guard(); if (g) return g; return HttpResponse.json(goalsView(), tag(goalsState.version)); }),
+  http.put(`${B}/settings/goals`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    const b = (await request.json()) as { goals: MockGoal[] };
+    goalsState = { ...goalsState, version: goalsState.version + 1, goals: b.goals, updated_at: new Date().toISOString() };
+    return HttpResponse.json(goalsView(), tag(goalsState.version));
+  }),
+  http.get(`${B}/goals/progress`, () => { const g = guard(); if (g) return g; return HttpResponse.json({ goals: goalsProgress() }); }),
   // ------------------------------------------------------------------ calendar
   http.get(`${B}/settings/holidays`, ({ request }) => {
     const g = guard(); if (g) return g;

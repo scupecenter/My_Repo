@@ -403,7 +403,9 @@
     "storage_not_supported": "The documents are in S3/MinIO: the reset cannot move them from here.",
     "quarantine_unavailable": "The quarantine folder cannot be made in the document store. Nothing was changed.",
     "maintenance": "A project data reset is running. Try again in a few minutes.",
-    "scope_changed": "The scope is not the one you saw, or what it takes along changed. Read the request again or make a new one."
+    "scope_changed": "The scope is not the one you saw, or what it takes along changed. Read the request again or make a new one.",
+    "unknown_metric": "Not a milestone task.",
+    "unknown_region": "Not a region."
   },
   "common": {
     "search": "Search",
@@ -1156,7 +1158,8 @@
     "section_documents_types": "Document types",
     "section_documents_forms": "Form templates",
     "section_documents_archive": "Archive",
-    "section_data_counts": "GECOL / HLC counts"
+    "section_data_counts": "GECOL / HLC counts",
+    "section_screens_goals": "Goals"
   },
   "scopeMatch": {
     "title": "Team / scope match (Procurement)",
@@ -6409,5 +6412,33 @@
     "why": "Reason for the change",
     "cancel": "Cancel",
     "save": "Save"
+  },
+  "goals": {
+    "title": "Goals",
+    "manage": "Manage goals",
+    "none": "No goals yet.",
+    "open_sites": "Open sites",
+    "status_achieved": "Achieved",
+    "status_on_track": "On track",
+    "status_at_risk": "At risk",
+    "status_behind": "Behind",
+    "period_month": "This month",
+    "period_quarter": "This quarter",
+    "period_year": "This year",
+    "settings_title": "Goals",
+    "settings_note": "A goal counts the sites that reach a milestone task during the current month, quarter or year. The progress is counted from approved tasks, never typed. Each goal shows in the Goals card of the Dashboard.",
+    "link_dashboard_settings": "Dashboard cards and targets",
+    "link_dashboard": "Open the Dashboard",
+    "name_en": "Name (English)",
+    "name_ar": "Name (Arabic)",
+    "metric": "Milestone task",
+    "region": "Region",
+    "all_regions": "All regions",
+    "period": "Period",
+    "target": "Target (sites)",
+    "active": "Active",
+    "remove": "Remove goal",
+    "add": "Add goal",
+    "save_title": "Save the goals"
   }
 }

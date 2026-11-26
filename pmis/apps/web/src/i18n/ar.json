@@ -403,7 +403,9 @@
     "storage_not_supported": "المستندات في S3/MinIO: لا يمكن لإعادة التعيين نقلها من هنا.",
     "quarantine_unavailable": "تعذّر إنشاء مجلد الحجر في مخزن المستندات. لم يتغيّر شيء.",
     "maintenance": "إعادة تعيين بيانات المشروع قيد التنفيذ. حاول بعد دقائق.",
-    "scope_changed": "النطاق ليس الذي رأيته، أو تغيّر ما يأخذه معه. اقرأ الطلب مجددًا أو قدّم طلبًا جديدًا."
+    "scope_changed": "النطاق ليس الذي رأيته، أو تغيّر ما يأخذه معه. اقرأ الطلب مجددًا أو قدّم طلبًا جديدًا.",
+    "unknown_metric": "ليست مهمة معلم.",
+    "unknown_region": "ليست منطقة."
   },
   "common": {
     "search": "بحث",
@@ -1156,7 +1158,8 @@
     "section_documents_types": "أنواع المستندات",
     "section_documents_forms": "قوالب النماذج",
     "section_documents_archive": "الأرشيف",
-    "section_data_counts": "أعداد GECOL / HLC"
+    "section_data_counts": "أعداد GECOL / HLC",
+    "section_screens_goals": "الأهداف"
   },
   "scopeMatch": {
     "title": "مطابقة الفريق والنطاق (المشتريات)",
@@ -6477,5 +6480,33 @@
     "why": "سبب التغيير",
     "cancel": "إلغاء",
     "save": "حفظ"
+  },
+  "goals": {
+    "title": "الأهداف",
+    "manage": "إدارة الأهداف",
+    "none": "لا توجد أهداف بعد.",
+    "open_sites": "فتح المواقع",
+    "status_achieved": "تحقق",
+    "status_on_track": "على المسار",
+    "status_at_risk": "معرّض للخطر",
+    "status_behind": "متأخر",
+    "period_month": "هذا الشهر",
+    "period_quarter": "هذا الربع",
+    "period_year": "هذه السنة",
+    "settings_title": "الأهداف",
+    "settings_note": "يحتسب الهدف المواقع التي تبلغ مهمة معلم خلال الشهر أو الربع أو السنة الحالية. يُحسب التقدم تلقائيًا من المهام المعتمدة ولا يُدخل يدويًا. يظهر كل هدف في بطاقة الأهداف في لوحة المتابعة.",
+    "link_dashboard_settings": "بطاقات اللوحة والأهداف الثابتة",
+    "link_dashboard": "فتح لوحة المتابعة",
+    "name_en": "الاسم (الإنجليزية)",
+    "name_ar": "الاسم (العربية)",
+    "metric": "مهمة المعلم",
+    "region": "المنطقة",
+    "all_regions": "كل المناطق",
+    "period": "الفترة",
+    "target": "الهدف (مواقع)",
+    "active": "فعّال",
+    "remove": "حذف الهدف",
+    "add": "إضافة هدف",
+    "save_title": "حفظ الأهداف"
   }
 }
