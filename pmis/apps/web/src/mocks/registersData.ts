@@ -14,7 +14,8 @@ export const PERMIT_TYPES = ['City Council Permit', 'Civil Aviation Authority Pe
 const procurement: RegisterDefinition = {
   register_key: 'procurement', name_en: 'Procurement (PR / PO / WO)', name_ar: 'المشتريات (PR / PO / WO)', module_key: 'procurement', site_scoped: true, multiple_per_site: true, record_types: ['pr', 'po', 'wo'], approval_levels: 2,
   fields: [
-    F('scope', 'Scope', 'النطاق', 'list', 'Site and scope', { required: true, in_list: true, options: ['CW', 'Tower Erection', 'Site Adaption', 'TE Installation', 'CW Dismantle', 'TE Dismantle', 'STA', 'ST', 'HLC'] }),
+    // Migration 0173: the flat 16-value scope list (owner design 2026-11-26); labels come from the ProcScope list.
+    F('scope', 'Scope', 'النطاق', 'list', 'Site and scope', { required: true, in_list: true, options: ['CW', 'Tower Erection', 'Site Adaption', 'Grounding', 'CW Dismantle', 'TE Dismantle', 'TE Installation', 'STA', 'ST', 'GECOL', 'HLC', 'Survey', 'Acquisition Visit', 'Inspection', 'Maintenance', 'Emergency'] }),
     F('delivery', 'Delivery', 'طريقة التنفيذ', 'list', 'Site and scope', { in_list: true, options: ['Outsourced', 'In-House', 'TE Vendor'] }),
     F('pr_no', 'PR No.', 'رقم طلب الشراء', 'text', 'Request', { in_list: true }), F('pr_date', 'PR Date', 'تاريخ طلب الشراء', 'date', 'Request', { in_list: true }),
     // migration 0042: the HLC approval date of a scope-HLC request (the HLC purchase request lives here, entered by the HLC Fiber Team)
