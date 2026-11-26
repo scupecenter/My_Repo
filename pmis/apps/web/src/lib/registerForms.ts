@@ -59,6 +59,8 @@ export const MEETING_LEGACY = ['attendees', 'linked_sites', 'minutes_ref', 'acti
 
 export function isHidden(key: string, code: string, d: Data, def?: RegisterDefinition) {
   if (key === 'meetings' && MEETING_LEGACY.includes(code)) return d[code] === undefined || d[code] === null || d[code] === '';
+  // 0181: PR No., PO / WO No. and the contractor of a receipt come from its Procurement order; shown only when there is one
+  if (key === 'warehouse') return ['pr_no', 'po_wo_no', 'order_contractor'].includes(code) && (d[code] === undefined || d[code] === null || d[code] === '');
   if (key === 'procurement') return code === 'hlc_approval_date' && !isHlcScope(d);
   // 0063 (Q148): the reason of an emergency exception exists only with the exception
   if (key === 'hlc') return code === 'procurement_record_id' || (code === 'pr_exception_reason' && d.pr_exception !== true);

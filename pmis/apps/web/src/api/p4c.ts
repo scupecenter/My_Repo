@@ -31,6 +31,20 @@ export const useDismantleOrders = (siteId: string | null | undefined, part: stri
     queryFn: () => api.get<{ items: DismantleOrderOption[] }>('/registers/dismantle/order-options', { query: { site_id: siteId!, record_type: part! } }).then((r) => r.items),
   });
 
+/** GET /registers/warehouse/order-options: the approved, active orders a PL / OPEN receipt may name (of the site when it has one). */
+export const useWarehouseOrders = (siteId: string | null | undefined, enabled: boolean) =>
+  useQuery({
+    queryKey: ['warehouse-orders', siteId ?? null], enabled,
+    queryFn: () => api.get<{ items: S['WarehouseOrderOption'][] }>('/registers/warehouse/order-options', { query: siteId ? { site_id: siteId } : {} }).then((r) => r.items),
+  });
+
+/** GET /registers/procurement/{entity_id}/receipts: the warehouse receipts against an order. */
+export const useOrderReceipts = (entityId: string | null | undefined) =>
+  useQuery({
+    queryKey: ['order-receipts', entityId], enabled: !!entityId,
+    queryFn: () => api.get<{ items: S['ProcurementOrderReceipt'][] }>(`/registers/procurement/${entityId}/receipts`).then((r) => r.items),
+  });
+
 /** POST /registers/hlc/legacy-migration: the preview (dry_run) or the run (reason; the server asks for a step-up). */
 export function useHlcLegacyMigration() {
   const qc = useQueryClient();

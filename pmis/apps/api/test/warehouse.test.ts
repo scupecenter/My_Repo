@@ -1,5 +1,5 @@
 import type { NestExpressApplication } from "@nestjs/platform-express";
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import type { Client as PgClient } from "pg";
 import {
   afterAll,
@@ -747,6 +747,34 @@ describe("receipts, reservations, posting and returns", () => {
     });
     expect(open.status).toBe(201);
     expect(open.body).toMatchObject({ kind: "receipt", record_type: "open" });
+  });
+});
+
+describe("receipt to Procurement order link (0181)", () => {
+  it("a receipt without an order stays valid and carries no derived order fields", async () => {
+    const m = await move({ ...doc("pl"), lines: [{ item_id: tower.id, qty: 1 }] });
+    expect(m.status, JSON.stringify(m.body)).toBe(201);
+    const rec = await t.entry.api.call("get", recPath("warehouse", m.body.register_record_id));
+    expect(rec.body.data.procurement_order_id).toBeUndefined();
+    expect(rec.body.data.pr_no).toBeUndefined();
+  });
+  it("refuses an order that is not an approved, active Procurement order, and a typed derived value is not kept", async () => {
+    const bad = await move({
+      ...doc("pl"), procurement_order_id: randomUUID(), pr_no: "TYPED-PR",
+      lines: [{ item_id: tower.id, qty: 1 }],
+    });
+    expect(bad.status, JSON.stringify(bad.body)).toBe(422);
+    expect(JSON.stringify(bad.body)).toContain("order_not_active");
+    const junk = await move({ ...doc("pl"), procurement_order_id: "not-an-id", lines: [{ item_id: tower.id, qty: 1 }] });
+    expect(junk.status).toBe(422);
+    expect(JSON.stringify(junk.body)).toContain("invalid");
+  });
+  it("lists the order picker for a caller with the module, and refuses a bad site id", async () => {
+    const ok = await t.entry.api.call("get", "/registers/warehouse/order-options");
+    expect(ok.status, JSON.stringify(ok.body)).toBe(200);
+    expect(Array.isArray(ok.body.items)).toBe(true);
+    const bad = await t.entry.api.call("get", "/registers/warehouse/order-options?site_id=nope");
+    expect(bad.status).toBe(422);
   });
 });
 

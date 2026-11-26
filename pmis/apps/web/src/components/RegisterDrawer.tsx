@@ -19,7 +19,7 @@ import { DrawerFrame, DrawerTabs, panelProps, useReportDirty } from './DrawerFra
 import { DraftBar, useDraft } from './DraftBar';
 import { FollowButton } from './FollowButton';
 import { RecordDocuments } from './RecordDocuments';
-import { DismantleOrderSelect, HlcPurchaseRequests } from './P4cPanels';
+import { DismantleOrderSelect, HlcPurchaseRequests, OrderReceipts, WarehouseOrderSelect } from './P4cPanels';
 import { useRecordSlots } from '@/api/documents';
 import { Holders } from './HolderChip';
 import { Balance, ExtendBooking, MembersEditor, ReadinessBadge, reservedMessage, TopUp, VehiclePicker } from './AssignmentPanels';
@@ -256,7 +256,7 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
             <section key={s.id} aria-labelledby={`rs-${s.id}`} data-testid={`reg-section-${s.id}`} className="space-y-2">
               <h3 id={`rs-${s.id}`} className="font-semibold">{t(`regSections.${s.id}`, { defaultValue: s.title })}</h3>
               <div className="grid grid-cols-2 gap-3">
-                {s.fields.filter((f) => !(rk === 'gecol' && f.code === 'contractor') && !(rk === 'procurement' && f.code === 'members') && !(rk === 'financial_advances' && f.code === 'balance')).map((f) => {
+                {s.fields.filter((f) => !(rk === 'warehouse' && f.code === 'procurement_order_id' && rtype !== 'pl' && rtype !== 'open') && !(rk === 'gecol' && f.code === 'contractor') && !(rk === 'procurement' && f.code === 'members') && !(rk === 'financial_advances' && f.code === 'balance')).map((f) => {
                   const iss = issues[f.code];
                   const show = iss && (tried || server[f.code] || dirty);
                   return (
@@ -268,6 +268,8 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
                         ? <VehiclePicker value={data.vehicle_id} onChange={(v) => set('vehicle_id', v)} from={data.from_date as string} to={data.to_date as string} vehicleType={data.required_type as string} bookingId={record?.id} disabled={!editable} invalid={!!show} />
                         : key === 'dismantle' && f.code === 'procurement_order_id'
                         ? <DismantleOrderSelect siteId={site?.id} part={rtype} value={data[f.code]} onChange={(v) => set(f.code, v)} editable={editable} invalid={!!show} />
+                        : key === 'warehouse' && f.code === 'procurement_order_id'
+                        ? <WarehouseOrderSelect siteId={site?.id} value={data[f.code]} onChange={(v) => set(f.code, v)} editable={editable} invalid={!!show} />
                         : editable ? <FieldInput field={f} value={data[f.code]} onChange={(v) => set(f.code, v)} invalid={!!show} ctx={ctx} />
                         : f.type === 'child_list' ? <FieldInput field={f} value={data[f.code]} onChange={() => undefined} disabled ctx={ctx} />
                         : <div className="font-semibold whitespace-pre-line" data-testid={`reg-view-${f.code}`}>{showValue(f, data[f.code], lang, t, ctx)}</div>}
@@ -302,6 +304,7 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
             <MembersEditor value={data.members} onChange={(v) => set('members', v)} disabled={!editable} names={Object.fromEntries(Object.entries(record?.refs?.users ?? {}).map(([id, u]) => [id, (u as { display_name: string }).display_name]))} />
           </section>
         )}
+        {record && rk === 'procurement' && record.state === 'approved' && <OrderReceipts entityId={record.entity_id as string} />}
         {record && rk === 'financial_advances' && <Balance record={record} />}
         {record && rk === 'financial_advances' && record.record_type === 'advance' && record.state === 'approved' && <TopUp record={record} onDone={onCreated} />}
         {record && rk === 'car_dispatcher' && record.record_type === 'booking' && record.state === 'approved' && <ExtendBooking record={record} onDone={onCreated} />}

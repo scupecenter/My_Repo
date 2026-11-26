@@ -43,6 +43,24 @@ export const p4cHandlers = [
     return HttpResponse.json(toRecord(r), { headers: { ETag: `"${r.version}"` } });
   }),
 
+  // 0181: the picker of a warehouse receipt and the receipts against an order
+  http.get(`${B}/registers/warehouse/order-options`, ({ request }) => {
+    const g = guard(); if (g) return g;
+    const site = new URL(request.url).searchParams.get('site_id');
+    const si = site ? siteIndex(site) : null;
+    const items = R().records
+      .filter((o: MockRecord) => o.register_key === 'procurement' && o.state === 'approved' && !/^\s*cancel/i.test(String(o.data.order_status ?? '')) && (si === null || o.site_index === si))
+      .map((o: MockRecord) => ({ entity_id: o.entity_id, record_id: o.id, scope: o.data.scope, pr_no: o.data.pr_no, po_wo_no: o.data.po_wo_no, po_wo_date: o.data.po_wo_date, order_status: o.data.order_status, external_party: o.external_party ?? null }));
+    return HttpResponse.json({ items });
+  }),
+  http.get(`${B}/registers/procurement/:entity_id/receipts`, ({ params }) => {
+    const g = guard(); if (g) return g;
+    const items = R().records
+      .filter((o: MockRecord) => o.register_key === 'warehouse' && o.state !== 'voided' && o.data.procurement_order_id === params.entity_id)
+      .map((o: MockRecord) => ({ entity_id: o.entity_id, record_id: o.id, record_type: o.record_type, state: o.state, doc_no: o.data.doc_no, doc_date: o.data.doc_date, txn_status: o.data.txn_status, lines: 0, qty: 0 }));
+    return HttpResponse.json({ items });
+  }),
+
   http.get(`${B}/registers/dismantle/order-options`, ({ request }) => {
     const g = guard(); if (g) return g;
     const u = new URL(request.url).searchParams;

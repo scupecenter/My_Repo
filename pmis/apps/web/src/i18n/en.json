@@ -2114,6 +2114,8 @@
     "not_applicable": "{{field}} does not apply here.",
     "not_hlc_pr": "Not an HLC purchase request of this site.",
     "contractor_from_order": "The contractor comes from the Procurement order and cannot be typed.",
+    "receipt_only": "Only a receipt (PL or OPEN) names a Procurement order.",
+    "order_other_site": "The order belongs to another site than this receipt.",
     "order_choice_required": "The site has several active orders for this part: choose one.",
     "no_active_order": "The site has no approved, active Procurement order for this part.",
     "order_not_active": "This order is not approved and active for this part and site.",
@@ -4484,6 +4486,11 @@
     "billing_none": "No check (not set in the contract yet)"
   },
   "p4c": {
+    "receipt_no_order": "No order (stock without an order)",
+    "receipt_order_hint": "Optional. PR No., PO / WO No. and the contractor are read from the order.",
+    "receipts_title": "Warehouse receipts against this order",
+    "receipts_none": "No receipt names this order yet.",
+    "receipts_qty": "{{lines}} line(s), quantity {{qty}}",
     "prs_title": "HLC purchase requests of this work (C3)",
     "prs_complete": "All approved by HLC · {{date}}",
     "prs_incomplete": "{{n}} of {{total}} approved by HLC",
