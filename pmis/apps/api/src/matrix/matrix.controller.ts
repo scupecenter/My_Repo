@@ -3,7 +3,7 @@ import type { Response } from 'express';
 import type { AuthContext } from '../auth/auth.types';
 import { Auth } from '../auth/decorators';
 import { etagHeader } from '../common/etag';
-import { MatrixDto, MatrixService } from './matrix.service';
+import { MatrixCoverageDto, MatrixDto, MatrixService } from './matrix.service';
 
 /** Responsibility Matrix (contract tag `matrix`, P1-BE-12). */
 @Controller('matrix')
@@ -15,6 +15,12 @@ export class MatrixController {
     const m = await this.matrix.get(auth, q);
     res.setHeader('ETag', etagHeader(m.version));
     return m;
+  }
+
+  /** GET /matrix/coverage (0.15.94): the cells nobody can act on, per row, region and level. Read only. */
+  @Get('coverage')
+  coverage(@Auth() auth: AuthContext, @Query() q: Record<string, unknown>): Promise<MatrixCoverageDto> {
+    return this.matrix.coverage(auth, q);
   }
 
   @Patch()

@@ -1158,7 +1158,8 @@
     "section_documents_types": "Document types",
     "section_documents_forms": "Form templates",
     "section_documents_archive": "Archive",
-    "section_data_counts": "GECOL / HLC counts"
+    "section_data_counts": "GECOL / HLC counts",
+    "section_workflow_coverage": "Matrix coverage"
   },
   "scopeMatch": {
     "title": "Team / scope match (Procurement)",
@@ -6420,5 +6421,28 @@
     "why": "Reason for the change",
     "cancel": "Cancel",
     "save": "Save"
+  },
+  "matrixCoverage": {
+    "title": "Matrix coverage",
+    "note": "Read only. Shows the cells of the Responsibility Matrix that nobody can act on, per row, region and level. Nothing here changes the matrix.",
+    "as_of": "As of",
+    "version": "Workflow version",
+    "summary": "{{ok}} covered, {{empty}} empty, {{nobody}} named but nobody active, of {{cells}} cells",
+    "gaps_only": "Show gaps only",
+    "region": "Region",
+    "module": "Module",
+    "all": "All",
+    "row": "Row",
+    "kind_stage": "Stage",
+    "ok": "Covered",
+    "empty": "Empty",
+    "no_active_holder": "Nobody active",
+    "source_region": "region cell",
+    "source_default": "default cell",
+    "source_none": "no cell",
+    "assignees": "named",
+    "holders": "active",
+    "none": "No gaps in this view.",
+    "open_matrix": "Open the Responsibility Matrix"
   }
 }

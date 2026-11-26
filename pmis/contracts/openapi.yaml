@@ -4653,6 +4653,24 @@ paths:
         '422': { $ref: '#/components/responses/Unprocessable' }
 
   # ------------------------------------------------------------------ matrix
+  /matrix/coverage:
+    get:
+      tags: [matrix]
+      operationId: getMatrixCoverage
+      summary: Matrix cells with nobody to act (read only, admin)
+      description: |
+        0.15.94. Read only. For each active stage row and enabled register row, each of the seven regions and each level (L1, L2): the deciding cell (region cell before the default cell, as the approval engine finds it), the number of named assignees and the number of active people who can act (named users, role holders with a current assignment of enough level, region and module, group members). `empty` = no cell or no assignee; `no_active_holder` = named but nobody active can act. Needs `admin.matrix` view or edit (403 otherwise). Changes nothing.
+      parameters:
+        - { name: workflow_version, in: query, required: false, schema: { type: integer, minimum: 1 } }
+      responses:
+        '200':
+          description: The coverage.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MatrixCoverage'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
   /matrix:
     get:
       tags: [matrix]
@@ -18352,6 +18370,54 @@ components:
       type: string
       description: '0.4.6. Code of a matrix row that is not a stage: the register keys, plus `rf_design`, `acquisition` (Q44) and `deliverables` (Q71). 0.9.0: `procurement_hlc`, the row of the Procurement scope HLC (its L1 enters the HLC purchase requests). 0.11.4: `permits_hse_te`, the row of the TE stream of Permits & HSE (its L1 enters the TE permits; `permits_hse` covers CW). 0.12.2: `permits_hse_acq` (Acquisition / RF & Design stream) and `permits_hse_om` (O&M stream) of Permits & HSE (Q220). 0.12.4: `quality_te`, the row of the TE stream of QC snags (Q230; a TE snag uses its region cell, else the Quality region cell, else its global cell, else the Quality global cell).'
       enum: [procurement, procurement_hlc, contractors, rf_design, acquisition, gecol, hlc, permits_hse, permits_hse_te, permits_hse_acq, permits_hse_om, warehouse, quality, issues, risks, change_control, readiness_handover, as_built, meetings, deliverables, dismantle, quality_te, site_creation]
+    MatrixCoverage:
+      type: object
+      required: [workflow_version, as_of, regions, summary, rows]
+      properties:
+        workflow_version: { type: integer }
+        as_of: { type: string, format: date-time }
+        regions:
+          type: array
+          items:
+            type: object
+            required: [id, code, name_en, name_ar]
+            properties:
+              id: { type: integer }
+              code: { type: string }
+              name_en: { type: string }
+              name_ar: { type: [string, 'null'] }
+        summary:
+          type: object
+          required: [cells, ok, empty, no_active_holder]
+          properties:
+            cells: { type: integer }
+            ok: { type: integer }
+            empty: { type: integer }
+            no_active_holder: { type: integer }
+        rows:
+          type: array
+          items:
+            type: object
+            required: [kind, code, name_en, name_ar, module, gaps, cells]
+            properties:
+              kind: { type: string }
+              code: { type: string }
+              name_en: { type: string }
+              name_ar: { type: [string, 'null'] }
+              module: { type: string }
+              gaps: { type: integer }
+              cells:
+                type: array
+                items:
+                  type: object
+                  required: [region_id, level_code, source, assignees, holders, status]
+                  properties:
+                    region_id: { type: integer }
+                    level_code: { type: string, enum: [L1, L2] }
+                    source: { type: string, enum: [region, default, none] }
+                    assignees: { type: integer }
+                    holders: { type: integer }
+                    status: { type: string, enum: [ok, empty, no_active_holder] }
     Matrix:
       type: object
       required: [workflow_version, stages, version]
