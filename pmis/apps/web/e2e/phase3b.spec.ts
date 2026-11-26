@@ -171,7 +171,7 @@ for (const locale of ['en', 'ar'] as const) {
       await expect(list.getByRole('listitem').first()).toBeVisible();
       const before = Number(await page.getByTestId('alerts-count-absent').textContent());
       await list.getByRole('listitem').first().locator('[data-testid^="alert-act_on_behalf-"]').click();
-      await page.getByTestId('cover-dialog-reason').fill('Mona is on sick leave');
+      await page.getByTestId('cover-dialog-reason').fill('The holder is on sick leave');
       await page.getByTestId('cover-dialog-submit').click();
       await expect(page.getByTestId('alerts-count-absent')).toHaveText(String(before - 1));
     });

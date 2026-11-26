@@ -65,9 +65,9 @@ Sources:
   **And** violations go to a separate quality report (BP §17).
 - Acceptance: 100% of the milestone dates match the Master (CLAUDE.md "Rollout").
 
-## TI-07b Create the sites of the Master that are not in GSDN Workspace (owner request 2026-11-25, Q350; migration 0155, contract 0.15.73)
-- **Given** a Master import run whose rows name Site IDs that GSDN Workspace does not hold (for example after a project data reset; the comparison lists them as "Not in GSDN Workspace", reason `site_not_in_pmis`)
-  **When** a System Admin, or a person who holds both L1 and L2 of the Matrix row `site_creation`, applies the run with **"Create the sites that are not in GSDN Workspace from the Master"** (AR: «أنشئ المواقع غير الموجودة في النظام من الماستر»)
+## TI-07b Create the sites of the Master that are not in Workspace (owner request 2026-11-25, Q350; migration 0155, contract 0.15.73)
+- **Given** a Master import run whose rows name Site IDs that Workspace does not hold (for example after a project data reset; the comparison lists them as "Not in Workspace", reason `site_not_in_pmis`)
+  **When** a System Admin, or a person who holds both L1 and L2 of the Matrix row `site_creation`, applies the run with **"Create the sites that are not in Workspace from the Master"** (AR: «أنشئ المواقع غير الموجودة في النظام من الماستر»)
   **Then** before anything is entered, each such Site ID (its first row in the file) becomes a row of one New sites batch of the run and is created by the path of an approved New sites row: the same validation (`site_new_clean`), the workflow version in force with every task, the scenario applicability, the cluster created in its region when new, and one `site_create` audit row (before empty, after the site) that names the Master run.
   **And** then the task columns and, with the historical load "registers" option, the register sheets are entered as before, the created sites included.
   **And** a Site ID that exists (active, cancelled, voided or deleted, or waiting in a site draft) is never touched: the row is skipped with the reason "This Site ID exists already".
@@ -98,6 +98,6 @@ Not read at creation: L Site Uplink, M:Q tower data (Tower Owner, Existing or Ne
 
 ## TI-08 Master-format export for the parallel run
 - **Given** the parallel run
-  **When** GSDN Workspace exports a Master-format file
+  **When** Workspace exports a Master-format file
   **Then** it is compared automatically with the live Master.
   **And** the differences are listed per site and column.

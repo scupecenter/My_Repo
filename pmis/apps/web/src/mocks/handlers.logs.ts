@@ -13,8 +13,8 @@ const pageOf = <T,>(items: T[], limit = 50) => HttpResponse.json({ items: items.
 const lim = (u: URL) => Math.min(200, Math.max(1, Number(u.searchParams.get('limit') ?? 50) || 50));
 const VIAS = ['manual', 'template', 'bulk', 'api', 'job'] as const;
 
-const ACTOR = { id: '00000000-0000-4000-8000-000000001204', display_name: 'Sara Ben Ali (synthetic)', employee_id: '1204' };
-const LEAD = { id: '00000000-0000-4000-8000-000000002301', display_name: 'Omar Haddad (synthetic)', employee_id: '2301' };
+const ACTOR = { id: '00000000-0000-4000-8000-000000001204', display_name: 'Demo User 26 (synthetic)', employee_id: '1204' };
+const LEAD = { id: '00000000-0000-4000-8000-000000002301', display_name: 'Demo User 27 (synthetic)', employee_id: '2301' };
 const CHROME = { browser: 'Chrome', os: 'Windows', type: 'desktop' } as const;
 const PHONE = { browser: 'Safari', os: 'iOS', type: 'mobile' } as const;
 const RECORD = '7a000000-0000-4000-8000-000000000001';

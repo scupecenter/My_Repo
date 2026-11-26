@@ -48,7 +48,7 @@ for (const [locale, theme] of [['en', 'light'], ['ar', 'dark']] as const) {
       await page.getByTestId('comment-input').fill('please look @sa');
       await page.getByTestId('mention-opt-1204').click();
       await page.getByTestId('comment-send').click();
-      await expect(page.getByTestId('comment-mentions')).toContainText(`${locale === 'ar' ? 'وصلت إلى' : 'Reached'}: Sami Nuri`);
+      await expect(page.getByTestId('comment-mentions')).toContainText(`${locale === 'ar' ? 'وصلت إلى' : 'Reached'}: Demo User 06`);
       await page.getByRole('tab', { name: locale === 'ar' ? 'الزمن' : 'Time' }).click();
       await expect(page.getByTestId('tis-row-entry')).toBeVisible();
       await expect(page.getByTestId('tis-segments')).toBeVisible();

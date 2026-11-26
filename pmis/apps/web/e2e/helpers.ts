@@ -3,7 +3,7 @@ import { expect, type Page } from '@playwright/test';
 /** Synthetic demo accounts of the mock layer (README). Never real secrets. */
 export const DEMO = {
   pm: { id: '1001', password: 'Demo-Pm-2026-pass' },
-  /** Sami Nuri (1204): has one unanswered announcement in the seed, so the blocking pop-up shows right after sign-in. */
+  /** Demo User 06 (1204): has one unanswered announcement in the seed, so the blocking pop-up shows right after sign-in. */
   engineer: { id: '1204', password: 'Demo-Staff-2026-pass' },
   reviewer: { id: '1102', password: 'Demo-Lead-2026-pass' },
   auditor: { id: '1103', password: 'Demo-Audit-2026-pass' },
