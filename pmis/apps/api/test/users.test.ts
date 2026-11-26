@@ -362,7 +362,10 @@ describe('PATCH /users/{id} (status)', () => {
     // 0161: the admin edits the display name and the employee number (audited, unique, never your own)
     const other = await makeUser(db, { assigned: true });
     const otherDetail = (await api.call('get', `/users/${other.id}`)).body as { employee_id: string | null };
-    const free = String(1000 + (Math.floor(Math.random() * 8000)));
+    // 9000-9999 is never given by makeUser (1000-8999), so a parallel test file cannot hold the same number; the loop also checks the table.
+    let free = '';
+    do free = String(9000 + Math.floor(Math.random() * 1000));
+    while ((await db.query('SELECT 1 FROM users WHERE employee_id = $1', [free])).rowCount);
     const emp = await api.call('patch', `/users/${target.id}`, { employee_id: free, display_name: 'Renamed Person', reason: 'fix typo' }, { 'If-Match': etag });
     expect(emp.status).toBe(200);
     expect(emp.body).toMatchObject({ employee_id: free, display_name: 'Renamed Person' });
