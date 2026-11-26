@@ -28,7 +28,7 @@ describe('recycle bin', () => {
     const rec = await createRec(t, HLC);
     const admin = await plainAdmin(app, db);
     const v = await post(admin.api, 'hlc', rec.id, 'void', rec.version, { reason: 'wrong site' });
-    expect(v.status).toBe(200);
+    expect(v.status).toBe(201);
     expect((await t.entry.api.call('get', '/recycle-bin')).status).toBe(403);
     expect((await restore(t.entry.api, rec.id, v.body.version)).status).toBe(403);
     const bin = await admin.api.call('get', '/recycle-bin');
