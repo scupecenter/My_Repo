@@ -19,7 +19,7 @@ export function renderApp(ui: ReactElement, { route = '/', locale = 'en' as 'en'
   applyLocale(locale);
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return { qc, ...render(
-    <QueryClientProvider client={qc}><MemoryRouter initialEntries={[route]}><ToastProvider><StepUpProvider>{ui}</StepUpProvider></ToastProvider></MemoryRouter></QueryClientProvider>,
+    <QueryClientProvider client={qc}><MemoryRouter initialEntries={[route]} useTransitions={false}><ToastProvider><StepUpProvider>{ui}</StepUpProvider></ToastProvider></MemoryRouter></QueryClientProvider>,
   ) };
 }
 

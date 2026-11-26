@@ -26,7 +26,8 @@ async function boot() {
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
       <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
+        {/* react-router 7 navigates inside React.startTransition by default; false keeps the v6 behavior (the screens render each navigation at once) */}
+        <BrowserRouter useTransitions={false}>
           <ToastProvider>
             <StepUpProvider>
               <App />
