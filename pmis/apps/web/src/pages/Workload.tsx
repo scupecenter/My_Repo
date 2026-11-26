@@ -11,6 +11,7 @@ import { PageHeader, Toolbar } from '@/components/PageHeader';
 import { PersonTag } from '@/components/PersonTag';
 import { EmptyState, ErrorState, LoadingSkeleton, NoPermission } from '@/components/States';
 import { ApiError } from '@/api/client';
+import { heatLevel } from '@/lib/heat';
 import { canReassign, fmtDuration } from '@/lib/x';
 import { CoverDialog } from './Absence';
 
@@ -36,6 +37,7 @@ function WorkloadTable({ region, lead }: { region: string; lead: boolean }) {
   if (q.error instanceof ApiError && q.error.status === 403) return <NoPermission testid="workload-forbidden" />;
   if (q.isError || !q.data) return <ErrorState onRetry={() => void q.refetch()} testid="workload-error" />;
   const { items, no_holder } = q.data;
+  const maxOpen = Math.max(0, ...items.map((r) => r.open));
   return (
     <>
       {!items.length && !no_holder.open ? <EmptyState testid="workload-empty" title={t('workload.empty')} /> : (
@@ -46,7 +48,7 @@ function WorkloadTable({ region, lead }: { region: string; lead: boolean }) {
               <tr key={r.holder.id} data-testid={`workload-row-${r.holder.employee_id ?? r.holder.id}`} className="border-t border-line">
                 <td className="p-2"><PersonTag name={r.holder.display_name} employeeId={r.holder.employee_id} /></td>
                 <td><span className={`chip ${TEAM_TONE[r.team] ?? ''}`}>{t(`workload.team_${r.team}`)}</span></td>
-                <td className="mono" data-testid="workload-open">{r.open}</td>
+                <td className="mono" data-testid="workload-open" data-heat={heatLevel(r.open, maxOpen)}><span className="inline-flex min-w-10 items-center gap-2"><span aria-hidden className="inline-block h-2 rounded bg-accent" style={{ width: `${Math.round((r.open / Math.max(maxOpen, 1)) * 64)}px`, opacity: 0.25 + heatLevel(r.open, maxOpen) * 0.19 }} />{r.open}</span></td>
                 <td>{r.late > 0 ? <span className="chip bg-lateBg text-lateInk mono" data-testid="workload-late">{r.late}</span> : <span className="mono text-mute" data-testid="workload-late">0</span>}</td>
                 <td className="mono text-mute">{[['entry', 'L1'], ['review', 'L2'], ['approve', 'L2']].map(([k, l]) => ((r.by_level as Record<string, number | undefined>)[k as string] ? `${l}: ${(r.by_level as Record<string, number>)[k as string]}` : null)).filter(Boolean).join(' · ') || '—'}</td>
                 <td className="p-2 text-end">{lead && <button className="btn px-2 py-1 text-xs" data-testid={`workload-reassign-${r.holder.employee_id ?? r.holder.id}`} onClick={() => setAct(r.holder)}><UserRoundCog size={14} aria-hidden />{t('workload.reassign')}</button>}</td>
