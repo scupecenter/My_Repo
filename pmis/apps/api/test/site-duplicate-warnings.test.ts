@@ -55,7 +55,7 @@ describe('duplicate-site warnings', () => {
   });
 
   it('says only that a match exists when it is in another region (no Site ID, no name)', async () => {
-    const r = await db.query(`SELECT site_new_dup_warnings($1::jsonb, NULL) AS w`, [JSON.stringify({ site_code: `DW${TAG}Z`, region_id: 6, name: `Dup Name ${TAG}`, latitude: 32.8871, longitude: 13.191 })]);
+    const r = await db.query(`SELECT site_new_dup_warnings($1::jsonb, NULL) AS w`, [JSON.stringify({ site_code: `DW${TAG}Z`, region_id: 98, name: `Dup Name ${TAG}`, latitude: 32.8871, longitude: 13.191 })]);
     const w = r.rows[0].w as W[];
     const msgs = w.filter((x) => x.code === 'duplicate_name' || x.code === 'close_coordinates').map((x) => x.message);
     expect(msgs.length).toBeGreaterThanOrEqual(2);
