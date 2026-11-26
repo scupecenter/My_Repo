@@ -23,6 +23,13 @@ export function seedLists(): ListCatalogue[] {
       [...['Tower RT', 'Tower GF', 'Adaption'].map((c) => val(c, ++seq, { groups: ['CW'] })), val('TE', ++seq, { groups: ['TE'] }), ...vals(['Dismantle', 'GECOL', 'Fiber', 'Survey']), val('CW', ++seq, { groups: ['CW'], is_active: false })],
       [{ register_key: 'contractors', field_code: 'specialization' }]),
     cat('StaffStatus', 'Staff status', 'حالة الموظف', { critical: true, status: 'confirmed' }, vals(['Active', 'Inactive'])),
+    // Migration 0173: the flat 16-value Procurement scope list (owner design 2026-11-26), values editable in Settings.
+    cat('ProcScope', 'Delivery Scope', 'نطاق التسليم', { critical: true, status: 'confirmed' },
+      vals(['CW', 'Tower Erection', 'Site Adaption', 'Grounding', 'CW Dismantle', 'TE Dismantle', 'TE Installation', 'STA', 'ST', 'GECOL', 'HLC', 'Survey', 'Acquisition Visit', 'Inspection', 'Maintenance', 'Emergency'])
+        .map((v) => v.code === 'CW' ? { ...v, label_en: 'Full Civil Work', label_ar: 'الأعمال المدنية الكاملة' }
+          : v.code === 'GECOL' ? { ...v, label_en: 'Power (GECOL)', label_ar: 'الكهرباء (GECOL)' }
+          : v.code === 'HLC' ? { ...v, label_en: 'HLC Fiber', label_ar: 'ألياف HLC' } : v),
+      [{ register_key: 'procurement', field_code: 'scope' }]),
     cat('CompletionStatus', 'Execution status', 'حالة التنفيذ', { critical: true, status: 'confirmed' }, vals(['Done', 'Pending', 'N/A'])),
     // contract 0.13.2 (Q260): the list mirrors the snag severities (CRITICAL, MAJOR, MINOR); it is changed in Settings, QC snag severities, never directly
     cat('Severity', 'Severity', 'الخطورة', { critical: true },
