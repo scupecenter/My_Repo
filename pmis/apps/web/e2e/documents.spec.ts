@@ -76,7 +76,7 @@ for (const locale of ['en', 'ar'] as const) {
     await page.getByTestId('lib-new').click();
     await page.getByTestId('doc-code').fill('E2E_DOC');
     await page.getByTestId('doc-name-en').fill('E2E document');
-    await page.getByTestId('doc-placement-ref-0').fill('F1');
+    await page.getByTestId('doc-placement-ref-0').selectOption('F1');
     await page.getByTestId('doc-dialog-reason').fill('e2e test');
     await page.getByTestId('doc-dialog-submit').click();
     await expect(page.getByTestId('lib-row-E2E_DOC')).toBeVisible();
