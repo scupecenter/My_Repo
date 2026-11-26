@@ -17,6 +17,7 @@ import { applyBrand } from '@/lib/brands';
 import { ExportDialog } from './ExportDialog';
 import { CommandPalette } from './CommandPalette';
 import { ShortcutsHelp } from './ShortcutsHelp';
+import { QuickTour } from './QuickTour';
 import { firstPeopleTab, PEOPLE_KEYS, PEOPLE_TABS } from './PeopleAdmin';
 import { ADMIN_ONLY, ANY_OF, BY_GRANT, BY_MODULE_VIEW, NAV } from './navItems';
 import { SIDEBAR_DEFAULT, SIDEBAR_MAX, SIDEBAR_MIN, SidebarBody, SidebarSplitter } from './Sidebar';
@@ -208,6 +209,7 @@ export function Shell() {
       </div>
       <ExportDialog open={exp} onClose={() => setExp(false)} />
       <ShortcutsHelp />
+      {me.data?.user.id && <QuickTour userId={me.data.user.id} />}
       <CommandPalette open={palette} onOpenChange={setPalette} items={items.map((i) => ({ key: i.key, to: i.to }))} />
     </div>
   );
