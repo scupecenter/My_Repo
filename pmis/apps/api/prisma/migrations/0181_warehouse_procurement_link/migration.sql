@@ -5,7 +5,8 @@
 --   and the contractor are then READ from the order by the database and cannot be typed. A receipt without an order stays valid (stock that arrives with no order).
 --   Additive: three derived fields, one optional field, one row trigger, two readers. No new table, no permission widening, nothing deleted.
 --   Rules (blocking, on a version in entry): the order must be an approved, current, not cancelled Procurement record the caller may see; if the receipt has a site,
---   the order is on the same site; only a receipt (PL / OPEN) takes an order. A version in review or approved is history and is never rewritten.
+--   the caller holds the Procurement view right in the order's region (the responsibility matrix decides, so a warehouse user without it cannot read or
+--   pick an order); if the receipt has a site, the order is on the same site; only a receipt (PL / OPEN) takes an order. A version in review or approved is history and is never rewritten.
 
 SELECT set_config('app.region_ids', '*', true);
 
@@ -19,7 +20,7 @@ ON CONFLICT (register_key, code) DO NOTHING;
 CREATE OR REPLACE FUNCTION wh_order_rules() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 DECLARE
-  d jsonb := NEW.data; errs jsonb := '[]'::jsonb; ord uuid; o public.register_records%ROWTYPE; pname text;
+  regs int[]; d jsonb := NEW.data; errs jsonb := '[]'::jsonb; ord uuid; o public.register_records%ROWTYPE; pname text;
   live boolean := NEW.state = 'entry' OR (TG_OP = 'UPDATE' AND OLD.state = 'entry' AND NEW.state <> 'voided');
 BEGIN
   IF NOT live THEN RETURN NEW; END IF;
@@ -34,11 +35,12 @@ BEGIN
     errs := errs || public.reg_err_item('/data/procurement_order_id', 'invalid', 'A Procurement record id.');
   ELSE
     ord := (d ->> 'procurement_order_id')::uuid;
+    regs := public.wf_actor_regions('procurement', 'view');                 -- the matrix decides who may read Procurement: NULL = every region
     SELECT * INTO o FROM public.register_records x
       WHERE x.register_key = 'procurement' AND x.entity_id = ord AND x.is_current AND x.state = 'approved'
-        AND NOT public.proc_order_cancelled(x.data ->> 'order_status') AND public.app_region_read(x.is_global, x.region_id);
+        AND NOT public.proc_order_cancelled(x.data ->> 'order_status') AND public.app_region_read(x.is_global, x.region_id) AND (regs IS NULL OR x.region_id = ANY (regs));
     IF NOT FOUND THEN
-      errs := errs || public.reg_err_item('/data/procurement_order_id', 'order_not_active', 'Not an approved, active Procurement order that you can see.');
+      errs := errs || public.reg_err_item('/data/procurement_order_id', 'order_not_active', 'Not an approved, active Procurement order that you can see (it needs the Procurement view right).');
     ELSIF NEW.site_id IS NOT NULL AND o.site_id IS DISTINCT FROM NEW.site_id THEN
       errs := errs || public.reg_err_item('/data/procurement_order_id', 'order_other_site', 'The order belongs to another site than this receipt.');
     ELSE
@@ -62,7 +64,8 @@ LANGUAGE sql STABLE SECURITY INVOKER SET search_path = pg_catalog, public AS $$
              'external_party', CASE WHEN ep.id IS NOT NULL THEN jsonb_build_object('id', ep.id, 'name', ep.name, 'type', ep.type::text) END)) AS j,
            r.data ->> 'po_wo_date' AS sort_date, r.id AS sort_id
     FROM public.register_records r LEFT JOIN public.external_parties ep ON ep.id = r.external_party_id
-    WHERE r.register_key = 'procurement' AND r.is_current AND r.state = 'approved' AND NOT public.proc_order_cancelled(r.data ->> 'order_status')
+    CROSS JOIN (SELECT public.wf_actor_regions('procurement', 'view') AS regs) a
+    WHERE (a.regs IS NULL OR r.region_id = ANY (a.regs)) AND r.register_key = 'procurement' AND r.is_current AND r.state = 'approved' AND NOT public.proc_order_cancelled(r.data ->> 'order_status')
       AND (p_site IS NULL OR r.site_id = p_site)
     ORDER BY r.data ->> 'po_wo_date' DESC NULLS LAST, r.id LIMIT 500) x
 $$;

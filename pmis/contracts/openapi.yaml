@@ -9364,7 +9364,7 @@ paths:
       summary: The approved, active Procurement orders a warehouse receipt may name (0.15.90)
       description: |
         0.15.90. The approved Procurement versions in force, not cancelled, that the caller can see; of the site `site_id` when it is given (a PL / OPEN receipt may have no site).
-        Needs the Warehouse module.
+        Needs the Warehouse module; only the orders in regions where the caller also holds the Procurement view right (the responsibility matrix) are listed, and the same right is checked when a receipt is saved.
       parameters:
       - {name: site_id, in: query, required: false, schema: {type: string, format: uuid}}
       responses:
