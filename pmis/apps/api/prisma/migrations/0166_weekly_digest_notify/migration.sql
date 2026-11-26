@@ -21,28 +21,33 @@ BEGIN
          s.open_n::text || ' open tasks in your scope: ' || s.red_n::text || ' past their SLA maximum, ' || s.amber_n::text || ' close to it.',
          '/my-work', 'sites'
   FROM (
-    SELECT v.user_id, count(*)::int AS open_n,
-           count(*) FILTER (WHERE v.colour = 'red')::int AS red_n,
-           count(*) FILTER (WHERE v.colour = 'amber')::int AS amber_n
-    FROM (
-      SELECT DISTINCT a.user_id, t.id AS task_id,
+    -- the regions each eligible person reaches (one row per person and region), then the open tasks of those regions counted once per person
+    WITH reach AS (
+      SELECT DISTINCT a.user_id, rg.id AS region_id
+      FROM public.user_role_assignments a
+      JOIN public.users u ON u.id = a.user_id AND u.status = 'active' AND u.deleted_at IS NULL AND NOT u.is_break_glass
+      JOIN public.regions rg ON a.all_regions OR EXISTS (SELECT 1 FROM public.user_role_assignment_regions x WHERE x.assignment_id = a.id AND x.region_id = rg.id)
+      WHERE a.valid_from <= now() AND (a.valid_to IS NULL OR a.valid_to > now())
+        AND (a.all_modules OR EXISTS (SELECT 1 FROM public.user_role_assignment_modules m WHERE m.assignment_id = a.id AND m.module_key = 'sites'))
+    ), tk AS (
+      SELECT t.region_id,
              public.sla_colour(public.cal_workdays_between(t.sla_start_date, public.cal_today(), r.calendar_id), 0, r.max_working_days) AS colour
       FROM public.task_instances t
       LEFT JOIN public.sla_rules r ON r.id = t.sla_rule_id
-      JOIN public.user_role_assignments a ON a.valid_from <= now() AND (a.valid_to IS NULL OR a.valid_to > now())
-      JOIN public.users u ON u.id = a.user_id AND u.status = 'active' AND u.deleted_at IS NULL AND NOT u.is_break_glass
       WHERE t.state::text IN ('open', 'entry', 'in_review', 'in_approval')
-        AND (a.all_regions OR EXISTS (SELECT 1 FROM public.user_role_assignment_regions rg WHERE rg.assignment_id = a.id AND rg.region_id = t.region_id))
-        AND (a.all_modules OR EXISTS (SELECT 1 FROM public.user_role_assignment_modules m WHERE m.assignment_id = a.id AND m.module_key = 'sites'))
-    ) v
-    GROUP BY v.user_id
+    )
+    SELECT reach.user_id, count(*)::int AS open_n,
+           count(*) FILTER (WHERE tk.colour = 'red')::int AS red_n,
+           count(*) FILTER (WHERE tk.colour = 'amber')::int AS amber_n
+    FROM reach JOIN tk ON tk.region_id = reach.region_id
+    GROUP BY reach.user_id
   ) s
   WHERE NOT EXISTS (SELECT 1 FROM public.notifications nt WHERE nt.user_id = s.user_id AND nt.kind = 'weekly_digest' AND nt.title = 'Weekly summary, week of ' || to_char(wk, 'YYYY-MM-DD'));
   GET DIAGNOSTICS n = ROW_COUNT;
   RETURN n;
 END $$;
 
-GRANT SELECT ON task_instances, sla_rules, user_role_assignments, user_role_assignment_regions, user_role_assignment_modules, users, notifications TO pmis_definer;
+GRANT SELECT ON task_instances, sla_rules, regions, user_role_assignments, user_role_assignment_regions, user_role_assignment_modules, users, notifications TO pmis_definer;
 GRANT INSERT ON notifications TO pmis_definer;
 
 DO $$
