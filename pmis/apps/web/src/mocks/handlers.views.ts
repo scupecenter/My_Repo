@@ -149,7 +149,14 @@ const SECURITY_FILTER_FIELDS: FF[] = [
   { key: 'outcome', label_en: 'Outcome', label_ar: 'النتيجة', type: 'text' },
 ];
 
-const fieldsOf = (screen: string) => screen === 'audit-log' ? withGroup(AUDIT_FILTER_FIELDS, 'fields') : screen === 'security-log' ? withGroup(SECURITY_FILTER_FIELDS, 'fields') : screen === 'users' ? withGroup(USER_FIELDS, 'fields') : screen === 'assignments' ? withGroup(ASSIGNMENT_FIELDS, 'fields') : screen === 'library-archive' ? withGroup(ARCHIVE_FIELDS, 'fields') : screen === 'sites' || screen === 'sites-stream' ? withGroup(SITE_FIELDS, 'columns')
+const WH_MOVEMENT_FIELDS: FF[] = [
+  { key: 'doc_no', label_en: 'Document number', label_ar: 'رقم المستند', type: 'text' },
+  { key: 'status', label_en: 'Status', label_ar: 'الحالة', type: 'enum', options: en(['pending', 'posted', 'cancelled']) },
+  { key: 'doc_date', label_en: 'Document date', label_ar: 'تاريخ المستند', type: 'date' },
+  { key: 'site_code', label_en: 'Site ID', label_ar: 'رمز الموقع', type: 'text' },
+];
+
+const fieldsOf = (screen: string) => screen === 'warehouse-movements' ? withGroup(WH_MOVEMENT_FIELDS, 'fields') : screen === 'audit-log' ? withGroup(AUDIT_FILTER_FIELDS, 'fields') : screen === 'security-log' ? withGroup(SECURITY_FILTER_FIELDS, 'fields') : screen === 'users' ? withGroup(USER_FIELDS, 'fields') : screen === 'assignments' ? withGroup(ASSIGNMENT_FIELDS, 'fields') : screen === 'library-archive' ? withGroup(ARCHIVE_FIELDS, 'fields') : screen === 'sites' || screen === 'sites-stream' ? withGroup(SITE_FIELDS, 'columns')
   : screen === 'dashboard' ? withGroup(SITE_FIELDS.filter((f) => f.key !== 'workflow_locks'), 'columns')
   : /^site360-[a-z0-9_]+$/.test(screen) ? withGroup([...SITE_FIELDS, ...MENU_FIELDS], 'columns')
   : screen === 'site-tasks' || screen === 'tasks-board' ? withGroup(TASK_FIELDS, 'fields') : /^register-/.test(screen) ? withGroup(REGISTER_FIELDS, 'fields') : null;

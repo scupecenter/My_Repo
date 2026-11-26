@@ -192,7 +192,7 @@ function typed(text: Prisma.Sql, t: FilterFieldType): Prisma.Sql {
   return text;
 }
 
-export type FilterScreen = 'sites' | 'dashboard' | 'site-tasks' | 'tasks-board' | 'library-archive' | 'users' | 'assignments' | 'audit-log' | 'security-log' | `register-${string}` | `site-master-${string}`;
+export type FilterScreen = 'sites' | 'dashboard' | 'site-tasks' | 'tasks-board' | 'library-archive' | 'users' | 'assignments' | 'audit-log' | 'security-log' | 'warehouse-movements' | `register-${string}` | `site-master-${string}`;
 
 @Injectable()
 export class FilterCatalogService {
@@ -203,7 +203,7 @@ export class FilterCatalogService {
 
   /** The screens with a filter builder. Other saved-view screens (the logs) keep their simple filters. */
   static supports(screen: string): boolean {
-    return isSitesLike(screen) || screen === 'site-tasks' || screen === 'tasks-board' || screen === 'library-archive' || ADMIN_SCREENS[screen] !== undefined || screen === 'audit-log' || screen === 'security-log' || /^register-[a-z0-9_]{2,60}$/.test(screen);
+    return isSitesLike(screen) || screen === 'site-tasks' || screen === 'tasks-board' || screen === 'library-archive' || ADMIN_SCREENS[screen] !== undefined || screen === 'audit-log' || screen === 'security-log' || screen === 'warehouse-movements' || /^register-[a-z0-9_]{2,60}$/.test(screen);
   }
 
   /**
@@ -212,6 +212,7 @@ export class FilterCatalogService {
    */
   static modulesOf(screen: string): string[] | null {
     if (screen === 'dashboard') return ['dashboard', 'sites'];
+    if (screen === 'warehouse-movements') return ['warehouse']; // the region scope of the list itself applies beside the compiled tree
     return siteMasterMenu(screen) ? ['sites'] : null;
   }
 
@@ -498,6 +499,28 @@ export class FilterCatalogService {
         field('client_type', 'Client', 'العميل', 'text', Prisma.sql`s.client_type`, undefined, g),
         field('ip', 'IP address', 'عنوان IP', 'text', Prisma.sql`s.ip`, undefined, g),
         field('person', 'Person', 'الشخص', 'text', Prisma.sql`(SELECT u.display_name FROM users u WHERE u.id = s.user_id)`, undefined, g),
+      ],
+    };
+  }
+
+  /** Warehouse > Movements (aliases `m` = wh_movements and `s` = sites of WarehouseService MOVEMENT_SELECT; the list adds its region scope beside the tree). */
+  private async warehouseMovements(): Promise<Built> {
+    const g = { key: 'document', label_en: 'Document', label_ar: 'المستند' };
+    const w = { key: 'where', label_en: 'Where', label_ar: 'المكان' };
+    const regions = await this.regionOptions();
+    return {
+      wants: new Map(),
+      fields: [
+        field('doc_no', 'Document number', 'رقم المستند', 'text', Prisma.sql`m.doc_no`, undefined, g),
+        field('record_type', 'Type', 'النوع', 'enum', Prisma.sql`m.record_type`, opts(['te_dn', 'cw_dn', 'te_rn', 'cw_rn', 'pl', 'open', 'adj']), g),
+        field('kind', 'Kind', 'النوع الفرعي', 'enum', Prisma.sql`m.kind`, opts(['issue', 'return', 'receipt', 'adjustment', 'quarantine_exit']), g),
+        field('status', 'Status', 'الحالة', 'enum', Prisma.sql`m.status`, opts(['pending', 'posted', 'cancelled']), g),
+        field('doc_date', 'Document date', 'تاريخ المستند', 'date', Prisma.sql`m.doc_date`, undefined, g),
+        field('created_at', 'Created on', 'تاريخ الإنشاء', 'date', Prisma.sql`cal_local_date(m.created_at)`, undefined, g),
+        field('posted_at', 'Posted on', 'تاريخ الترحيل', 'date', Prisma.sql`cal_local_date(m.posted_at)`, undefined, g),
+        field('items', 'Items', 'الأصناف', 'text', Prisma.sql`(SELECT string_agg(wi.item_code || ' ' || wi.name, ', ') FROM wh_movement_lines l JOIN warehouse_items wi ON wi.id = l.item_id WHERE l.movement_id = m.id)`, undefined, g),
+        field('site_code', 'Site ID', 'رمز الموقع', 'text', Prisma.sql`s.site_code`, undefined, w),
+        field('region_id', 'Region', 'المنطقة', 'enum', Prisma.sql`m.region_id::text`, regions, w),
       ],
     };
   }
@@ -793,7 +816,9 @@ export class FilterCatalogService {
                   ? await this.auditLog()
                   : screen === 'security-log'
                     ? await this.securityLog()
-                    : await this.register(screen.slice('register-'.length));
+                    : screen === 'warehouse-movements'
+                      ? await this.warehouseMovements()
+                      : await this.register(screen.slice('register-'.length));
     const hidden = new Set(
       await this.hidden(
         screen,
