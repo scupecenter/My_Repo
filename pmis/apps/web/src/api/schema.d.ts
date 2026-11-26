@@ -15192,6 +15192,20 @@ export interface components {
         /** @enum {string} */
         RegisterRecordState: "entry" | "in_review" | "in_approval" | "approved" | "voided";
         RegisterRecord: {
+            /** @description 0.15.83. Read only. The evidence of the record: its mandatory document slots (the same rules as the Site Master cell `docs`). Absent when the record needs no document. */
+            docs?: {
+                /** @enum {string} */
+                state: "green" | "yellow" | "red";
+                /** @description Mandatory slots of the task that apply (not N/A). */
+                need: number;
+                /** @description Of them, approved. */
+                approved: number;
+                /** @description Of them, uploaded or in review. */
+                pending: number;
+                missing: number;
+                rejected: number;
+                expired: number;
+            };
             /** Format: uuid */
             id: string;
             register_key: components["schemas"]["RegisterKey"];

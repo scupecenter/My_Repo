@@ -3871,9 +3871,9 @@
     "group": "Warehouse"
   },
   "evidence": {
-    "red": "Documents: {{missing}} missing, {{rejected}} rejected, {{expired}} expired. Upload needed ({{approved}} of {{need}} approved).",
-    "yellow": "Documents uploaded, waiting for review or approval ({{approved}} of {{need}} approved).",
-    "green": "Documents approved ({{approved}} of {{need}})."
+    "red": "Needs upload. Documents: {{missing}} missing, {{rejected}} rejected, {{expired}} expired. Upload needed ({{approved}} of {{need}} approved).",
+    "yellow": "Pending approval. Documents uploaded, waiting for review or approval ({{approved}} of {{need}} approved).",
+    "green": "Approved. Documents approved ({{approved}} of {{need}})."
   },
   "regcols": {
     "title": "Register columns",

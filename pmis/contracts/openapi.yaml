@@ -31,7 +31,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
-    - 0.15.83 (2026-11-26): the evidence dot of the Site Master wide table (owner request 2026-11-26). Additive, read only, no migration. Each cell of `GET /site-master/{menu}/rows` may carry `docs` (`state` red when a document still has to be uploaded, yellow when all are uploaded but not all approved, green when all are approved; the counts `need`, `approved`, `pending`, `missing`, `rejected`, `expired`), computed from the mandatory document slots of the task behind the cell. Nothing is written and no permission changes.
+    - 0.15.83 (2026-11-26): the evidence dot of the Site Master wide table (owner request 2026-11-26). Additive, read only, no migration. Each cell of `GET /site-master/{menu}/rows` may carry `docs` (`state` red when a document still has to be uploaded, yellow when all are uploaded but not all approved, green when all are approved; the counts `need`, `approved`, `pending`, `missing`, `rejected`, `expired`), computed from the mandatory document slots of the task behind the cell. Nothing is written and no permission changes. Each register record (`RegisterRecord`) may carry the same `docs`, computed from the mandatory slots of its logical record (`register_entity_id`).
     - 0.15.82 (2026-11-26): `GET /me/tasks.ics` returns My Work (do now and late) as an iCalendar file. Needs the session like every call; same rights and region scope as `GET /me/tasks`; nothing public and no token link. No migration.
     - 0.15.81 (2026-11-26): two more UI designs, `obsidian` and `sahara` (migration 0164): `UiBrand` gains the two names (users.ui_brand, `ui.identity` default_brand, `PATCH /me/profile`). Visual only; the four existing designs, the light/dark theme and the storage are unchanged.
     - 0.15.80 (2026-11-26): what a role sees of the Dashboard (migration 0163). `Role.dashboard_tabs` (any non-empty combination of `pmo`, `cw`, `te`; default all three) and `Role.hide_messages_inbox` (default false); `RolePatch` sets them (System Admin only, 403 `delegate_forbidden` for a delegate; reason, step-up; audited as `role_dashboard_access_set`). `EffectivePermissions.dashboard_tabs` is the union over the roles held now (a System Admin or a user with no active role: all three). `GET /dashboard`, `/dashboard/extras`, `/dashboard/export` and `/project-status*` answer 403 `action_forbidden` outside the caller's tabs (`pmo` includes the others; view CW needs `cw`, view TE needs `te`, any other view or none needs `pmo`). A role that hides Messages and Inbox removes only the two menu entries of its holders (`effective.nav`); the pages and the API are unchanged. No grant, role or default changes.
@@ -20825,6 +20825,19 @@ components:
       type: object
       required: [id, register_key, state, data, version]
       properties:
+        docs:
+          type: object
+          additionalProperties: false
+          description: '0.15.83. Read only. The evidence of the record: its mandatory document slots (the same rules as the Site Master cell `docs`). Absent when the record needs no document.'
+          required: [state, need, approved, pending, missing, rejected, expired]
+          properties:
+            state: { type: string, enum: [green, yellow, red] }
+            need: { type: integer, minimum: 1, description: 'Mandatory slots of the task that apply (not N/A).' }
+            approved: { type: integer, minimum: 0, description: 'Of them, approved.' }
+            pending: { type: integer, minimum: 0, description: 'Of them, uploaded or in review.' }
+            missing: { type: integer, minimum: 0 }
+            rejected: { type: integer, minimum: 0 }
+            expired: { type: integer, minimum: 0 }
         id: { type: string, format: uuid }
         register_key: { $ref: '#/components/schemas/RegisterKey' }
         record_type: { type: [string, 'null'] }
