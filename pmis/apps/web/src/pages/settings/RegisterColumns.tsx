@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, GripVertical, Pencil, Plus, Trash2, Undo2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Eye, EyeOff, GripVertical, Pencil, Plus, Trash2, Undo2 } from 'lucide-react';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -100,6 +100,19 @@ function RegisterColumnsOf() {
     setDrag(null);
     order.mutate({ codes, reason: t('regcols.reorder_reason') }, { onError: (e) => toast(errText(e, t), 'err') });
   };
+  /** The four visibility switches (list, filters, template, export) together. A template natural key stays in the template (the database says so); the other three still go. Nothing is deleted. */
+  const isHidden = (c: RegisterColumn) => !c.in_list && !c.in_filter && !c.in_export;
+  const setHidden = async (c: RegisterColumn, hide: boolean) => {
+    const on = !hide;
+    const base = { in_list: on, in_filter: on, in_export: on, reason: t(hide ? 'regcols.hide_reason' : 'regcols.show_reason') };
+    try {
+      await upd.mutateAsync({ code: c.code, version: c.version, patch: { ...base, in_template: on } });
+      toast(t(hide ? 'regcols.hidden_done' : 'regcols.shown_done'));
+    } catch (e) {
+      if (!hide) { toast(errText(e, t), 'err'); return; }
+      try { await upd.mutateAsync({ code: c.code, version: c.version, patch: base }); toast(t('regcols.hidden_kept_template')); } catch (e2) { toast(errText(e2, t), 'err'); }
+    }
+  };
   const move = (c: RegisterColumn, d: -1 | 1) => {
     const codes = fields.map((f) => f.code), i = codes.indexOf(c.code), j = i + d;
     if (j < 0 || j >= codes.length) return;
@@ -142,7 +155,7 @@ function RegisterColumnsOf() {
                 <tr key={c.code} className={`border-t border-line ${c.is_active ? '' : 'opacity-60'} ${drag === c.code ? 'bg-hover' : ''}`} data-testid={`regcols-row-${c.code}`}
                   onDragOver={(e) => { if (drag) e.preventDefault(); }} onDrop={() => dropOn(c.code)} onDragEnd={() => setDrag(null)}>
                   <td className="mono p-2"><span draggable className="me-1 inline-block cursor-grab text-mute" data-testid={`regcols-grip-${c.code}`} title={t('regcols.drag')} onDragStart={(e) => { setDrag(c.code); const tr = e.currentTarget.closest('tr'); if (tr) e.dataTransfer.setDragImage?.(tr, 0, 0); }}><GripVertical size={14} aria-hidden /></span>{c.code}</td>
-                  <td className="p-2">{(lang === 'ar' && c.label_ar) || c.label_en}{c.is_system && <span className="chip ms-2" data-testid={`regcols-protected-${c.code}`} title={c.system_reason ?? ''}>{t('regcols.protected')}</span>}</td>
+                  <td className="p-2">{(lang === 'ar' && c.label_ar) || c.label_en}{c.is_active && isHidden(c) && <span className="chip ms-2" data-testid={`regcols-hidden-${c.code}`}>{t('regcols.hidden')}</span>}{c.is_system && <span className="chip ms-2" data-testid={`regcols-protected-${c.code}`} title={c.system_reason ?? ''}>{t('regcols.protected')}</span>}</td>
                   <td className="p-2">{t(`regcols.type_${c.type}`)}</td>
                   <td className="p-2">{secName(c.section)}</td>
                   <td className="p-2">{c.usage?.records_with_value ?? 0}</td>
@@ -153,6 +166,7 @@ function RegisterColumnsOf() {
                     <button type="button" className="btn btn-ghost p-1" data-testid={`regcols-before-${c.code}`} aria-label={t('regcols.add_before', { code: c.code })} title={t('regcols.add_before', { code: c.code })} onClick={() => setDlg({ k: 'add', place: { code: c.code, side: 'before' } })}><Plus size={14} /><ArrowUp size={10} /></button>
                     <button type="button" className="btn btn-ghost p-1" data-testid={`regcols-after-${c.code}`} aria-label={t('regcols.add_after', { code: c.code })} title={t('regcols.add_after', { code: c.code })} onClick={() => setDlg({ k: 'add', place: { code: c.code, side: 'after' } })}><Plus size={14} /><ArrowDown size={10} /></button>
                     <button type="button" className="btn btn-ghost p-1" data-testid={`regcols-edit-${c.code}`} aria-label={t('regcols.edit_title', { code: c.code })} onClick={() => setDlg({ k: 'edit', c })}><Pencil size={14} /></button>
+                    {c.is_active && <button type="button" className="btn btn-ghost p-1" data-testid={`regcols-hide-${c.code}`} aria-pressed={isHidden(c)} aria-label={t(isHidden(c) ? 'regcols.show' : 'regcols.hide', { code: c.code })} title={t(isHidden(c) ? 'regcols.show' : 'regcols.hide', { code: c.code })} disabled={upd.isPending} onClick={() => void setHidden(c, !isHidden(c))}>{isHidden(c) ? <EyeOff size={14} /> : <Eye size={14} />}</button>}
                     {c.is_active
                       ? <button type="button" className="btn btn-ghost p-1" data-testid={`regcols-delete-${c.code}`} aria-label={t('regcols.delete_title', { code: c.code })} disabled={c.is_system} title={c.is_system ? t('regcols.protected_note', { reason: c.system_reason ?? '' }) : undefined} onClick={() => setDlg({ k: 'delete', c })}><Trash2 size={14} /></button>
                       : <button type="button" className="btn btn-ghost p-1" data-testid={`regcols-reactivate-${c.code}`} aria-label={t('regcols.reactivate', { code: c.code })} onClick={() => setDlg({ k: 'react', c })}><Undo2 size={14} /></button>}
