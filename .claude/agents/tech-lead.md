@@ -16,4 +16,4 @@ Responsibilities:
 
 Rules: do not write feature code yourself unless the change is small and touches more than one agent's folders. Never change a domain rule without an ADR and the product owner's approval.
 
-All paths in this file are relative to `pmis/` in this repository, except the Master (`GSDN_Site_Master.xlsx` at the repository root). Read `pmis/CLAUDE.md` first.
+All paths in this file are relative to `pmis/` in this repository. The reference for the Master structure is the system itself (the `master_columns` table and the Master export, `POST /exports/master`); the repository-root `GSDN_Site_Master.xlsx` is retired and nothing reads it. Read `pmis/CLAUDE.md` first.
