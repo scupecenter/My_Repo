@@ -181,7 +181,13 @@
     "change_password": "Change password",
     "no_password": "You sign in with Microsoft 365. The password is managed there.",
     "open_inbox": "Open the inbox",
-    "my_profile": "My profile"
+    "my_profile": "My profile",
+    "quick_create": "Quick create",
+    "qc_site": "New site",
+    "qc_status": "Status update",
+    "qc_message": "New message",
+    "qc_absence": "Absence or cover",
+    "appearance": "Appearance"
   },
   "palette": {
     "title": "Go to",
