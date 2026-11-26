@@ -123,7 +123,21 @@ const ARCHIVE_FIELDS: FF[] = [
   { key: 'uploaded_at', label_en: 'Upload date', label_ar: 'تاريخ الرفع', type: 'date' },
 ];
 
-const fieldsOf = (screen: string) => screen === 'library-archive' ? withGroup(ARCHIVE_FIELDS, 'fields') : screen === 'sites' || screen === 'sites-stream' ? withGroup(SITE_FIELDS, 'columns')
+/** Pilot admin lists (users, assignments): the builtin fields of the screens `users` and `assignments`. */
+const USER_FIELDS: FF[] = [
+  { key: 'display_name', label_en: 'Name', label_ar: 'الاسم', type: 'text' },
+  { key: 'email', label_en: 'Email', label_ar: 'البريد', type: 'text' },
+  { key: 'status', label_en: 'Status', label_ar: 'الحالة', type: 'enum', options: en(['pending_assignment', 'active', 'suspended', 'disabled']) },
+  { key: 'roles', label_en: 'Current roles', label_ar: 'الأدوار الحالية', type: 'text' },
+];
+const ASSIGNMENT_FIELDS: FF[] = [
+  { key: 'person', label_en: 'Person', label_ar: 'الشخص', type: 'text' },
+  { key: 'role_name', label_en: 'Role', label_ar: 'الدور', type: 'text' },
+  { key: 'permission_level', label_en: 'Level', label_ar: 'المستوى', type: 'enum', options: en(['view', 'entry', 'review', 'approve', 'admin']) },
+  { key: 'active_now', label_en: 'Active now', label_ar: 'ساري الآن', type: 'bool' },
+];
+
+const fieldsOf = (screen: string) => screen === 'users' ? withGroup(USER_FIELDS, 'fields') : screen === 'assignments' ? withGroup(ASSIGNMENT_FIELDS, 'fields') : screen === 'library-archive' ? withGroup(ARCHIVE_FIELDS, 'fields') : screen === 'sites' || screen === 'sites-stream' ? withGroup(SITE_FIELDS, 'columns')
   : screen === 'dashboard' ? withGroup(SITE_FIELDS.filter((f) => f.key !== 'workflow_locks'), 'columns')
   : /^site360-[a-z0-9_]+$/.test(screen) ? withGroup([...SITE_FIELDS, ...MENU_FIELDS], 'columns')
   : screen === 'site-tasks' || screen === 'tasks-board' ? withGroup(TASK_FIELDS, 'fields') : /^register-/.test(screen) ? withGroup(REGISTER_FIELDS, 'fields') : null;

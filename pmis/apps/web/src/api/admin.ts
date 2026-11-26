@@ -8,7 +8,7 @@ import type {
 const key = (k: string, ...r: unknown[]) => [k, ...r];
 const refresh = (qc: QueryClient, ...ks: string[]) => ks.forEach((k) => void qc.invalidateQueries({ queryKey: [k] }));
 
-export const useUsers = (f: { q: string; status: string; role_id: string }) =>
+export const useUsers = (f: { q: string; status: string; role_id: string; filter?: string }) =>
   useQuery({ queryKey: key('users', f), queryFn: () => api.get<Page<User>>('/users', { query: { ...f, limit: 200 } }) });
 export const useUser = (id: string) => useQuery({ queryKey: key('user', id), queryFn: () => api.get<UserDetail>(`/users/${id}`) });
 export const useRoles = () => useQuery({ queryKey: ['roles'], queryFn: () => api.get<{ items: Role[] }>('/roles', { query: { include_inactive: true } }).then((r) => r.items) });
@@ -16,10 +16,10 @@ export const useProfiles = (includeInactive = false) =>
   useQuery({ queryKey: ['profiles', includeInactive], staleTime: 60_000, queryFn: () => api.get<{ items: PermissionProfile[] }>('/permission-profiles', { query: { include_inactive: includeInactive } }).then((r) => r.items) });
 export const useCatalogue = () => useQuery({ queryKey: ['catalogue'], staleTime: Infinity, queryFn: () => api.get<PermissionCatalogue>('/permissions/catalogue') });
 /** The by-role view: `GET /assignments`, ordered by person name, cursor-paged. */
-export const useAssignments = (f: { role_id: string; include_ended: boolean }) =>
+export const useAssignments = (f: { role_id: string; include_ended: boolean; filter?: string }) =>
   useInfiniteQuery({
     queryKey: key('assignments', f), initialPageParam: '',
-    queryFn: ({ pageParam }) => api.get<Page<Assignment>>('/assignments', { query: { role_id: f.role_id, include_ended: f.include_ended, limit: 100, cursor: pageParam } }),
+    queryFn: ({ pageParam }) => api.get<Page<Assignment>>('/assignments', { query: { role_id: f.role_id, include_ended: f.include_ended, filter: f.filter, limit: 100, cursor: pageParam } }),
     getNextPageParam: (last) => last.page.next_cursor ?? undefined,
   });
 export const useGroups = () => useQuery({ queryKey: ['groups'], queryFn: () => api.get<Page<Group>>('/groups').then((r) => r.items) });

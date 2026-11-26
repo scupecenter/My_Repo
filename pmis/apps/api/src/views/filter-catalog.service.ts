@@ -150,6 +150,8 @@ const siteMasterMenu = (screen: string): SiteMasterMenu | null => {
   const m = /^site-master-([a-z_]{2,20})$/.exec(screen)?.[1];
   return m && SITE_MASTER_MENU_KEYS.includes(m) ? (m as SiteMasterMenu) : null;
 };
+/** Admin list screens with a filter builder (pilot) and the module grant of their list endpoint. */
+const ADMIN_SCREENS: Record<string, string> = { users: 'admin.users', assignments: 'admin.users' };
 const isSitesLike = (screen: string): boolean => screen === 'sites' || screen === 'sites-stream' || screen === 'dashboard' || siteMasterMenu(screen) !== null;
 
 /** A register or custom field type, as the builder offers it. */
@@ -190,7 +192,7 @@ function typed(text: Prisma.Sql, t: FilterFieldType): Prisma.Sql {
   return text;
 }
 
-export type FilterScreen = 'sites' | 'dashboard' | 'site-tasks' | 'tasks-board' | 'library-archive' | `register-${string}` | `site-master-${string}`;
+export type FilterScreen = 'sites' | 'dashboard' | 'site-tasks' | 'tasks-board' | 'library-archive' | 'users' | 'assignments' | `register-${string}` | `site-master-${string}`;
 
 @Injectable()
 export class FilterCatalogService {
@@ -201,7 +203,7 @@ export class FilterCatalogService {
 
   /** The screens with a filter builder. Other saved-view screens (the logs) keep their simple filters. */
   static supports(screen: string): boolean {
-    return isSitesLike(screen) || screen === 'site-tasks' || screen === 'tasks-board' || screen === 'library-archive' || /^register-[a-z0-9_]{2,60}$/.test(screen);
+    return isSitesLike(screen) || screen === 'site-tasks' || screen === 'tasks-board' || screen === 'library-archive' || ADMIN_SCREENS[screen] !== undefined || /^register-[a-z0-9_]{2,60}$/.test(screen);
   }
 
   /**
@@ -211,6 +213,14 @@ export class FilterCatalogService {
   static modulesOf(screen: string): string[] | null {
     if (screen === 'dashboard') return ['dashboard', 'sites'];
     return siteMasterMenu(screen) ? ['sites'] : null;
+  }
+
+  /**
+   * The module grant a pilot admin screen (users, assignments) needs, or null for the other screens. These lists have no saved views and no region scope: their
+   * own list endpoint asks for the module view grant, and the filter fields ask for the same one, so a filter never reaches a list the caller cannot open.
+   */
+  static adminModuleOf(screen: string): string | null {
+    return ADMIN_SCREENS[screen] ?? null;
   }
 
   private async regionOptions() {
@@ -389,6 +399,52 @@ export class FilterCatalogService {
       visible: new Set(keys.map((k) => k.register_key)),
       hiddenOrds: new Set(hidden.map((h) => h.ord)),
       registerOf,
+    };
+  }
+
+  /** Admin > Users (alias `u` of UsersRepo.list). Contact data here is what the list already shows to the holder of the module; nothing else is offered. */
+  private async users(): Promise<Built> {
+    const g = { key: 'user', label_en: 'User', label_ar: 'المستخدم' };
+    const acc = { key: 'access', label_en: 'Access', label_ar: 'الصلاحيات' };
+    return {
+      wants: new Map(),
+      fields: [
+        field('display_name', 'Name', 'الاسم', 'text', Prisma.sql`u.display_name`, undefined, g),
+        field('email', 'Email', 'البريد', 'text', Prisma.sql`u.email`, undefined, g),
+        field('employee_id', 'Employee ID', 'الرقم الوظيفي', 'text', Prisma.sql`trim(u.employee_id)`, undefined, g),
+        field('phone', 'Phone', 'الهاتف', 'text', Prisma.sql`u.phone`, undefined, g),
+        field('status', 'Status', 'الحالة', 'enum', Prisma.sql`u.status::text`, opts(['pending_assignment', 'active', 'suspended', 'disabled']), g),
+        field('created_at', 'Created on', 'تاريخ الإنشاء', 'date', Prisma.sql`cal_local_date(u.created_at)`, undefined, g),
+        field('last_login_at', 'Last sign-in', 'آخر دخول', 'date', Prisma.sql`cal_local_date(u.last_login_at)`, undefined, g),
+        field('department', 'Department', 'الإدارة', 'text', Prisma.sql`(SELECT d.name_en FROM departments d WHERE d.id = u.department_id)`, undefined, g),
+        // a person holds several roles and groups: one text of the current ones, searched with "contains"
+        field('roles', 'Current roles', 'الأدوار الحالية', 'text', Prisma.sql`(SELECT string_agg(r.code || ' ' || r.name_en, ', ') FROM user_role_assignments a JOIN roles r ON r.id = a.role_id
+          WHERE a.user_id = u.id AND a.valid_from <= now() AND (a.valid_to IS NULL OR a.valid_to > now()))`, undefined, acc),
+        field('groups', 'Groups', 'المجموعات', 'text', Prisma.sql`(SELECT string_agg(gr.name, ', ') FROM group_members gm JOIN groups gr ON gr.id = gm.group_id WHERE gm.user_id = u.id)`, undefined, acc),
+      ],
+    };
+  }
+
+  /** Admin > Assignments (aliases `a` assignment and `u` user of AssignmentsService.list). */
+  private async assignments(): Promise<Built> {
+    const g = { key: 'assignment', label_en: 'Assignment', label_ar: 'الإسناد' };
+    const p = { key: 'person', label_en: 'Person', label_ar: 'الشخص' };
+    return {
+      wants: new Map(),
+      fields: [
+        field('person', 'Person', 'الشخص', 'text', Prisma.sql`u.display_name`, undefined, p),
+        field('employee_id', 'Employee ID', 'الرقم الوظيفي', 'text', Prisma.sql`trim(u.employee_id)`, undefined, p),
+        field('role_code', 'Role code', 'رمز الدور', 'text', Prisma.sql`(SELECT r.code FROM roles r WHERE r.id = a.role_id)`, undefined, g),
+        field('role_name', 'Role', 'الدور', 'text', Prisma.sql`(SELECT r.name_en FROM roles r WHERE r.id = a.role_id)`, undefined, g),
+        field('permission_level', 'Level', 'المستوى', 'enum', Prisma.sql`a.permission_level::text`, opts(['view', 'entry', 'review', 'approve', 'admin']), g),
+        field('team', 'Team', 'الفريق', 'enum', Prisma.sql`a.team::text`, opts(['cw', 'te', 'both', 'none']), g),
+        field('all_regions', 'All regions', 'كل المناطق', 'bool', Prisma.sql`a.all_regions`, undefined, g),
+        field('all_modules', 'All modules', 'كل الوحدات', 'bool', Prisma.sql`a.all_modules`, undefined, g),
+        field('is_primary', 'Primary role', 'الدور الأساسي', 'bool', Prisma.sql`a.is_primary`, undefined, g),
+        field('valid_from', 'Valid from', 'ساري من', 'date', Prisma.sql`cal_local_date(a.valid_from)`, undefined, g),
+        field('valid_to', 'Valid to', 'ساري حتى', 'date', Prisma.sql`cal_local_date(a.valid_to)`, undefined, g),
+        field('active_now', 'Active now', 'ساري الآن', 'bool', Prisma.sql`(a.valid_from <= now() AND (a.valid_to IS NULL OR a.valid_to > now()))`, undefined, g),
+      ],
     };
   }
 
@@ -675,7 +731,11 @@ export class FilterCatalogService {
           ? await this.tasks()
           : screen === 'library-archive'
             ? await this.archive()
-          : await this.register(screen.slice('register-'.length));
+            : screen === 'users'
+              ? await this.users()
+              : screen === 'assignments'
+                ? await this.assignments()
+                : await this.register(screen.slice('register-'.length));
     const hidden = new Set(
       await this.hidden(
         screen,
