@@ -50,8 +50,8 @@ export class P4cService {
   }
 
   /** GET /registers/warehouse/order-options?site_id= : the approved, active Procurement orders a PL / OPEN receipt may name (row-level security applies). */
-  async warehouseOrderOptions(auth: AuthContext, q: Record<string, unknown>): Promise<{ items: unknown[] }> {
-    await this.access.requireRegions('warehouse', 'view');
+  async warehouseOrderOptions(auth: AuthContext, q: Record<string, unknown>, module = 'warehouse'): Promise<{ items: unknown[] }> {
+    await this.access.requireRegions(module, 'view');
     const site = oneParam(q, 'site_id');
     if (site && !uuidSchema.safeParse(site).success) throw problems.validation([{ path: '/site_id', code: 'invalid', message: 'site_id is a uuid.' }]);
     const items = await this.registers.call<unknown[]>(auth, Prisma.sql`SELECT wh_order_options(${site ?? null}::uuid) AS r`);
