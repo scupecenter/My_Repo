@@ -11,7 +11,7 @@ import { parse, uuidSchema } from '../common/zod';
 import { DbService } from '../db/db.service';
 import { RegistersService } from './registers.service';
 
-const linksSchema = z.object({ procurement_entity_ids: z.array(z.string().uuid()).max(20) }).strict();
+const linksSchema = z.object({ procurement_entity_ids: z.array(z.guid()).max(20) }).strict();
 const legacySchema = z.object({ dry_run: z.boolean(), reason: z.string().trim().min(3).max(2000).optional() }).strict();
 
 /**

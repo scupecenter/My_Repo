@@ -41,7 +41,7 @@ const rejectSchema = z
   .object({
     note: z.string().max(2000).optional(),
     via: viaSchema.optional(),
-    rejected_slots: z.array(z.object({ slot_id: z.string().uuid(), reason: z.string().trim().min(1).max(500) }).strict()).max(100).optional(),
+    rejected_slots: z.array(z.object({ slot_id: z.guid(), reason: z.string().trim().min(1).max(500) }).strict()).max(100).optional(),
   })
   .strict();
 const patchSchema = z
@@ -49,8 +49,8 @@ const patchSchema = z
     actual_start: dateSchema.nullable().optional(),
     actual_date: dateSchema.nullable().optional(),
     planned_date: dateSchema.nullable().optional(),
-    values: z.record(z.unknown()).optional(),
-    custom: z.record(z.unknown()).optional(),
+    values: z.record(z.string(), z.unknown()).optional(),
+    custom: z.record(z.string(), z.unknown()).optional(),
   })
   .strict()
   .refine((v) => Object.keys(v).length > 0, 'send at least one field');
@@ -64,7 +64,7 @@ const actOnBehalfSchema = z
   })
   .strict();
 const commentSchema = z
-  .object({ body: z.string().trim().min(1).max(4000), mention_user_ids: z.array(z.string().uuid()).max(20).optional() })
+  .object({ body: z.string().trim().min(1).max(4000), mention_user_ids: z.array(z.guid()).max(20).optional() })
   .strict();
 
 export interface CommentDto {

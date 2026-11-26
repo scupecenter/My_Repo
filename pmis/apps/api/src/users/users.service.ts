@@ -46,8 +46,8 @@ const restoreSchema = z.object({ reason }).strict();
 const purgeSchema = z.object({ reason: z.string().trim().min(3).max(500), confirm_text: z.string().trim().min(1).max(254) }).strict();
 
 const orgSchema = z.object({
-  manager_id: z.string().uuid().nullable(),
-  department_id: z.string().uuid().nullable(),
+  manager_id: z.guid().nullable(),
+  department_id: z.guid().nullable(),
   reason,
 }).strict();
 

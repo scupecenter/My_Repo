@@ -53,13 +53,13 @@ const typeCreate = z.object({ ...typeFields, code: z.string().regex(/^[A-Z][A-Z0
 const typePatch = z.object(typeFields).strict().refine((v) => Object.keys(v).length >= 2, 'send at least one field besides the reason');
 const snagInput = z
   .object({
-    snag_type_id: z.string().uuid(),
-    task_id: z.string().uuid().optional(),
+    snag_type_id: z.guid(),
+    task_id: z.guid().optional(),
     scope: z.enum(['CW', 'TE']).optional(),
     title: z.string().trim().min(3).max(200),
     description: z.string().max(2000).optional(),
     severity: z.string().trim().min(1).max(40),
-    found_by: z.string().uuid().optional(),
+    found_by: z.guid().optional(),
   })
   .strict();
 const snagPatch = z
@@ -70,7 +70,7 @@ const noteBody = z.object({ note: z.string().max(2000).optional() }).strict();
 const rejectBody = z
   .object({
     note: z.string().trim().min(1).max(2000),
-    rejected_photos: z.array(z.object({ photo_id: z.string().uuid(), reason: z.string().trim().min(1).max(500) }).strict()).max(100).optional(),
+    rejected_photos: z.array(z.object({ photo_id: z.guid(), reason: z.string().trim().min(1).max(500) }).strict()).max(100).optional(),
   })
   .strict();
 const evidenceBody = z.object({ decision: z.enum(['accept', 'reject']), note: z.string().trim().min(3).max(500) }).strict();

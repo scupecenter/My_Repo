@@ -21,7 +21,7 @@ const createSchema = z.object({
   reason: z.string().trim().min(3).max(2000),
   date_field: z.enum(['actual_start', 'actual_date', 'planned_date', 'baseline_date']).optional(),
   new_date: dateSchema.nullable().optional(),
-  reassign_to_user_id: z.string().uuid().optional(),
+  reassign_to_user_id: z.guid().optional(),
 }).strict();
 const revertSchema = z.object({ reason: z.string().trim().min(3).max(2000) }).strict();
 

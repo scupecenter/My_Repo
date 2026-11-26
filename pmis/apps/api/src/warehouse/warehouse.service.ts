@@ -44,7 +44,7 @@ const appliesWhen = z
   .strict();
 const needRule = z
   .object({
-    id: z.string().uuid().optional(),
+    id: z.guid().optional(),
     need_unit: z.string().trim().min(1).max(80),
     quantity: z.number().min(0).nullable().optional(),
     status: z.enum(["confirmed", "pending_configuration"]).optional(),
@@ -145,7 +145,7 @@ const MOVEMENT_TYPES = [
 ] as const;
 const line = z
   .object({
-    item_id: z.string().uuid(),
+    item_id: z.guid(),
     qty: z.number().refine((n) => n !== 0, "The quantity cannot be zero."),
     qty_approved: z.number().positive().nullable().optional(),
     condition: z.enum(["Good", "Faulty", "Damaged"]).nullable().optional(),
@@ -155,7 +155,7 @@ const line = z
 const movementInput = z
   .object({
     record_type: z.enum(MOVEMENT_TYPES),
-    site_id: z.string().uuid().optional(),
+    site_id: z.guid().optional(),
     doc_no: z.string().trim().min(1).max(80).optional(),
     doc_date: z
       .string()
@@ -176,7 +176,7 @@ const movementInput = z
 const EXIT_KINDS = ["repaired", "written_off", "returned_to_supplier"] as const;
 const exitLine = z
   .object({
-    item_id: z.string().uuid(),
+    item_id: z.guid(),
     qty: z.number().positive(),
     serials: z.array(z.string().trim().min(1).max(80)).max(5000).optional(),
   })

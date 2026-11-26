@@ -17,9 +17,9 @@ const regionId = z.number().int().min(1).max(7);
 const instant = z.string().datetime({ offset: true });
 
 const inputSchema = z.object({
-  to_user_id: z.string().uuid().optional(),
+  to_user_id: z.guid().optional(),
   target_kind: z.enum(['user', 'role', 'group']).optional(),
-  target_id: z.string().uuid().optional(),
+  target_id: z.guid().optional(),
   scope: z.enum(['full', 'partial']),
   rights: z.array(z.enum(DELEGABLE_RIGHTS as [string, ...string[]])).min(1).max(DELEGABLE_RIGHTS.length).optional(),
   region_codes: z.array(regionId).max(7).default([]),

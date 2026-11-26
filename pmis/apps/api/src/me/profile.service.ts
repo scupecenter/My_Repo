@@ -552,7 +552,7 @@ export class EmailChangesService {
   async decide(auth: AuthContext, id: string, raw: unknown): Promise<EmailChangeAdminDto> {
     const body = parse(emailDecideSchema, raw);
     await this.access.requireAdmin('users', 'edit');
-    if (!z.string().uuid().safeParse(id).success) throw problems.notFound();
+    if (!z.guid().safeParse(id).success) throw problems.notFound();
     // the database decides who may (idm_actor users.edit, global, not one's own, a delegate never for an admin); step-up first
     await this.stepUp.require(auth);
     const check = body.decision === 'approve' ? body.identity_check ?? null : null;
@@ -611,7 +611,7 @@ export class PhoneChangesService {
   async decide(auth: AuthContext, id: string, raw: unknown): Promise<PhoneChangeAdminDto> {
     const body = parse(decideSchema, raw);
     await this.access.requireAdmin('users', 'edit');
-    if (!z.string().uuid().safeParse(id).success) throw problems.notFound();
+    if (!z.guid().safeParse(id).success) throw problems.notFound();
     await this.stepUp.require(auth);
     await this.db.tx.$queryRaw`SELECT idm_decide_phone_change(${id}::uuid, ${body.decision === 'approve'}::boolean, ${body.reason}::text) AS s`;
     const r = (await this.rows(null)).find((x) => x.id === id);

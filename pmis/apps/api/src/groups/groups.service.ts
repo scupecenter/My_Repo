@@ -19,10 +19,10 @@ const reasonSchema = z.string().trim().min(3).max(1000);
 const createSchema = z.object({
   name: z.string().trim().min(2).max(120),
   description: z.string().max(500).optional(),
-  member_ids: z.array(z.string().uuid()).max(500).optional(),
+  member_ids: z.array(z.guid()).max(500).optional(),
   reason: reasonSchema,
 }).strict();
-const addSchema = z.object({ user_ids: z.array(z.string().uuid()).min(1).max(500), reason: reasonSchema }).strict();
+const addSchema = z.object({ user_ids: z.array(z.guid()).min(1).max(500), reason: reasonSchema }).strict();
 
 interface GroupRow {
   id: string;

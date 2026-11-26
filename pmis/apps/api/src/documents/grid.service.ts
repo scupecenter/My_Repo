@@ -26,7 +26,7 @@ interface FileAgg { files: number; in_range: number }
 const reasonSchema = z.string().trim().min(3).max(1000);
 const overrideBody = z.object({ doc_code: z.string().trim().min(1).max(31), reason: reasonSchema }).strict();
 const reasonBody = z.object({ reason: reasonSchema }).strict();
-const moveBody = z.object({ target_slot_id: z.string().uuid(), reason: reasonSchema }).strict();
+const moveBody = z.object({ target_slot_id: z.guid(), reason: reasonSchema }).strict();
 const viewBody = z.object({ columns: z.array(z.string().min(1).max(40)).max(300) }).strict();
 
 @Injectable()

@@ -10,7 +10,7 @@ import { parse, uuidSchema } from '../common/zod';
 import { DbService } from '../db/db.service';
 import type { DepartmentRef, UserRef } from '../users/users.repo';
 
-const ids = (max: number) => z.array(z.string().uuid()).max(max).default([]);
+const ids = (max: number) => z.array(z.guid()).max(max).default([]);
 const sendSchema = z.object({
   title: z.string().trim().min(1).max(200),
   body: z.string().trim().min(1).max(5000),

@@ -23,7 +23,7 @@ const patchSchema = z.object({
     level: z.number().int().min(1).max(3),
     region_id: z.number().int().min(1).max(99).nullish(),
     rule: z.enum(['any_one', 'all_members']),
-    assignees: z.array(z.object({ kind: z.enum(['user', 'role', 'group']), ref_id: z.string().uuid() }).strict()).max(100),
+    assignees: z.array(z.object({ kind: z.enum(['user', 'role', 'group']), ref_id: z.guid() }).strict()).max(100),
   }).strict()).max(300).optional(),
   reason,
 }).strict().refine((b) => (b.stage_levels?.length ?? 0) + (b.cells?.length ?? 0) > 0, { message: 'Change at least one cell or level count.', path: [] });
@@ -271,7 +271,7 @@ export class MatrixService {
     await this.stepUp.require(auth);
     const version = parseIfMatch(ifMatch);
     const why = parse(reason, oneParam(q, 'reason') ?? '');
-    const id = z.string().uuid().safeParse(rawId);
+    const id = z.guid().safeParse(rawId);
     if (!id.success) throw problems.notFound('No such matrix cell.');
     const wf = await this.workflowOf(undefined);
     if (!wf) throw problems.notFound('There is no published workflow version.');

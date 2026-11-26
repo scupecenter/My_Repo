@@ -30,7 +30,7 @@ const patchShape = {
   team: z.enum(TEAMS).optional(),
   region_ids: z.union([z.literal('all'), z.array(regionId).min(1).max(7)]).optional(),
   module_keys: z.union([z.literal('all'), z.array(z.string().min(1).max(60)).min(1).max(100)]).optional(),
-  profile_ids: z.array(z.string().uuid()).min(1).max(50).optional(),
+  profile_ids: z.array(z.guid()).min(1).max(50).optional(),
   valid_from: instant.optional(),
   valid_to: instant.nullable().optional(),
 };
@@ -38,14 +38,14 @@ const patchSchema = z.object(patchShape).strict();
 type Patch = z.infer<typeof patchSchema>;
 
 const bulkAssignSchema = z.object({
-  user_ids: z.array(z.string().uuid()).min(1).max(500),
-  role_ids: z.array(z.string().uuid()).min(1).max(50),
+  user_ids: z.array(z.guid()).min(1).max(500),
+  role_ids: z.array(z.guid()).min(1).max(50),
   defaults: z.object({ ...patchShape, permission_level: z.enum(LEVELS) }).strict(),
   reason,
   dry_run: z.boolean().default(false),
 }).strict();
 
-const versionedRef = z.object({ id: z.string().uuid(), version: z.number().int().min(1) }).strict();
+const versionedRef = z.object({ id: z.guid(), version: z.number().int().min(1) }).strict();
 const bulkUpdateSchema = z.object({
   items: z.array(versionedRef).min(1).max(500),
   patch: patchSchema.refine((p) => Object.keys(p).length > 0, { message: 'Send at least one field to change.' }),
@@ -59,8 +59,8 @@ const bulkEndSchema = z.object({
   dry_run: z.boolean().default(false),
 }).strict();
 const copySchema = z.object({
-  from_user_id: z.string().uuid(),
-  to_user_ids: z.array(z.string().uuid()).min(1).max(200),
+  from_user_id: z.guid(),
+  to_user_ids: z.array(z.guid()).min(1).max(200),
   mode: z.enum(['add', 'replace']),
   reason,
   dry_run: z.boolean().default(true),
