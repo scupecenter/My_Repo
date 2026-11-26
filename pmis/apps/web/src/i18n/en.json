@@ -6143,5 +6143,36 @@
     "bad_title": "This link cannot be used",
     "bad_body": "It is not valid, was already used or has expired. Ask for a new link.",
     "new_link": "Ask for a new link"
+  },
+  "shortcuts": {
+    "title": "Keyboard shortcuts",
+    "palette": "Search and go to a page",
+    "help": "Show this list",
+    "go_d": "Dashboard",
+    "go_s": "Sites",
+    "go_w": "My work",
+    "go_a": "Approvals",
+    "go_i": "Inbox",
+    "go_m": "Messages",
+    "go_l": "Workload",
+    "go_r": "Status updates",
+    "note": "Shortcuts only open pages; your permissions still apply on each page."
+  },
+  "siteSummary": {
+    "title": "Site summary",
+    "progress": "{{done}} of {{total}} stages done",
+    "current": "Now",
+    "late": "{{n}} late stages",
+    "next": "Next planned",
+    "snags": "{{n}} open snags",
+    "issues": "{{n}} open issues",
+    "docs": "{{n}} documents missing"
+  },
+  "gantt": {
+    "title": "Timeline (read only)",
+    "legend": "Hollow grey: baseline. Outlined: planned. Filled: actual. Dates change only through the normal change flow.",
+    "baseline": "Baseline",
+    "planned": "Planned",
+    "actual": "Actual"
   }
 }
