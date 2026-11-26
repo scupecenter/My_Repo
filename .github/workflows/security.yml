@@ -25,12 +25,16 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # the whole history, for the history scan below
       - name: Install gitleaks
         run: |
           curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.21.2/gitleaks_8.21.2_linux_x64.tar.gz \
             | tar -xz -C /usr/local/bin gitleaks
       - name: Scan the working tree
         run: gitleaks detect --source . --no-git --config .gitleaks.toml --redact --exit-code 1
+      - name: Scan the full git history
+        run: gitleaks detect --source . --config .gitleaks.toml --redact --exit-code 1
 
   sast:
     name: SAST (semgrep)
