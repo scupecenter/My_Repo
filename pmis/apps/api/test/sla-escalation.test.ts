@@ -74,7 +74,7 @@ describe('sla_escalation_notify', () => {
     const exp = await addAssignment(db, expired.id, { roleId, regions: [REGION], modules: ['sites'] });
     await db.query(`UPDATE user_role_assignments SET valid_from = now() - interval '10 days', valid_to = now() - interval '1 day' WHERE id = $1`, [exp]);
     await addAssignment(db, deleted.id, { roleId, regions: [REGION], modules: ['sites'] });
-    await db.query('UPDATE users SET deleted_at = now(), status = 'disabled' WHERE id = $1', [deleted.id]);
+    await db.query("UPDATE users SET deleted_at = now(), status = 'disabled' WHERE id = $1", [deleted.id]);
     await addAssignment(db, otherRoleUser.id, { roleId: otherRole, regions: [REGION], modules: ['sites'] });
 
     const before = (await db.query('SELECT state::text AS s, updated_at FROM task_instances WHERE id = $1', [overdue])).rows[0];
