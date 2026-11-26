@@ -94,7 +94,8 @@ describe('register columns page: drag and drop, add before and after', () => {
     const [first, second] = before as [string, string];
     const dt = { setData: () => undefined, getData: () => '' };
     const { fireEvent } = await import('@testing-library/react');
-    fireEvent.dragStart(screen.getByTestId(`regcols-row-${first}`), { dataTransfer: dt });
+    expect(screen.getByTestId(`regcols-row-${first}`)).not.toHaveAttribute('draggable');
+    fireEvent.dragStart(screen.getByTestId(`regcols-grip-${first}`), { dataTransfer: dt });
     fireEvent.dragOver(screen.getByTestId(`regcols-row-${second}`), { dataTransfer: dt });
     fireEvent.drop(screen.getByTestId(`regcols-row-${second}`), { dataTransfer: dt });
     await waitFor(async () => expect((await rows()).slice(0, 2)).toEqual([second, first]));

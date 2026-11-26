@@ -140,8 +140,8 @@ function RegisterColumnsOf() {
             <tbody>
               {fields.map((c, i) => (
                 <tr key={c.code} className={`border-t border-line ${c.is_active ? '' : 'opacity-60'} ${drag === c.code ? 'bg-hover' : ''}`} data-testid={`regcols-row-${c.code}`}
-                  draggable onDragStart={() => setDrag(c.code)} onDragOver={(e) => { if (drag) e.preventDefault(); }} onDrop={() => dropOn(c.code)} onDragEnd={() => setDrag(null)}>
-                  <td className="mono p-2"><GripVertical size={14} className="me-1 inline cursor-grab text-mute" aria-hidden />{c.code}</td>
+                  onDragOver={(e) => { if (drag) e.preventDefault(); }} onDrop={() => dropOn(c.code)} onDragEnd={() => setDrag(null)}>
+                  <td className="mono p-2"><span draggable className="me-1 inline-block cursor-grab text-mute" data-testid={`regcols-grip-${c.code}`} title={t('regcols.drag')} onDragStart={(e) => { setDrag(c.code); const tr = e.currentTarget.closest('tr'); if (tr) e.dataTransfer.setDragImage?.(tr, 0, 0); }}><GripVertical size={14} aria-hidden /></span>{c.code}</td>
                   <td className="p-2">{(lang === 'ar' && c.label_ar) || c.label_en}{c.is_system && <span className="chip ms-2" data-testid={`regcols-protected-${c.code}`} title={c.system_reason ?? ''}>{t('regcols.protected')}</span>}</td>
                   <td className="p-2">{t(`regcols.type_${c.type}`)}</td>
                   <td className="p-2">{secName(c.section)}</td>
