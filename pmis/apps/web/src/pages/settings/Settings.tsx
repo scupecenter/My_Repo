@@ -16,6 +16,7 @@ import { GecolOrderWarnings } from './GecolOrderWarnings';
 import { MailKinds } from './MailKinds';
 import { useMe } from '@/api/hooks';
 import { ContractorRules } from './ContractorRules';
+import { ContractorPerfThresholds } from './ContractorPerfThresholds';
 import { GecolHlcCounts } from './GecolHlcCounts';
 import { Lists } from './Lists';
 import { RegisterColumns } from './RegisterColumns';
@@ -156,7 +157,7 @@ export function SettingsRoutes() {
           <Route index element={<Navigate to="columns" replace />} />
           <Route path="columns" element={<RegisterColumns />} />
           <Route path="lists" element={<Lists />} />
-          <Route path="contractors" element={<ContractorRules />} />
+          <Route path="contractors" element={<><ContractorRules /><ContractorPerfThresholds /></>} />
           <Route path="gecol" element={<GecolOrderWarnings />} />
           <Route path="team-scope" element={<TeamScopeMatch />} />
           <Route path="issue-map" element={<IssueTaskMap />} />

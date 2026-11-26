@@ -5044,6 +5044,53 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/reports/contractor-performance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Contractor performance (computed, read only)
+         * @description 0.15.88. Needs `contractors` view; rows come from tables the caller's regions let it read. A measure with fewer records than `thresholds.min_sample` is `insufficient`
+         *     and never colours the contractor. Percent measures are amber at or above the amber threshold and red at or above the red one; the contract is amber when the days left
+         *     to the end of the nearest active contract are at or below the amber value and red at or below the red value. `level` is the worst of the known measures. Worst first.
+         */
+        get: operations["getContractorPerformance"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/contractor-performance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Thresholds of the contractor performance view
+         * @description 0.15.88. Needs `contractors` view. `can_edit` is true for a System Admin or an all-regions settings delegate.
+         */
+        get: operations["getContractorPerformanceThresholds"];
+        /**
+         * Save the thresholds (reason, If-Match, audited)
+         * @description 0.15.88. System Admin, or a delegate of `settings` edit for all regions. Field errors: `unknown_key`, `out_of_range`, `invalid`, `order` (red below amber for a
+         *     percentage, red above amber for the days left). Audited as `contractor_performance_thresholds_update` with before and after.
+         */
+        put: operations["setContractorPerformanceThresholds"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/contractor-rules": {
         parameters: {
             query?: never;
@@ -14394,6 +14441,69 @@ export interface components {
             /** Format: date-time */
             updated_at?: string;
             updated_by?: components["schemas"]["UserRef"] | null;
+        };
+        PerfPair: {
+            amber: number;
+            red: number;
+        };
+        ContractorPerformanceSettings: {
+            min_sample: number;
+            snag_overdue_pct: components["schemas"]["PerfPair"];
+            snag_return_pct: components["schemas"]["PerfPair"];
+            quality_fail_pct: components["schemas"]["PerfPair"];
+            contract_expiry_days: components["schemas"]["PerfPair"];
+        };
+        ContractorPerformanceThresholds: {
+            thresholds: components["schemas"]["ContractorPerformanceSettings"];
+            version: number;
+            can_edit: boolean;
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+        };
+        /** @enum {string} */
+        PerfLevel: "ok" | "amber" | "red" | "insufficient";
+        ContractorPerformanceRow: {
+            /** Format: uuid */
+            party_id: string;
+            name: string;
+            type: string;
+            delay_days: number;
+            issues_total: number;
+            issues_open: number;
+            snags: {
+                total: number;
+                open: number;
+                overdue: number;
+                overdue_pct: number | null;
+                overdue_level: components["schemas"]["PerfLevel"];
+                returned: number;
+                returned_pct: number | null;
+                returned_level: components["schemas"]["PerfLevel"];
+            };
+            quality: {
+                total: number;
+                failed: number;
+                fail_pct: number | null;
+                fail_level: components["schemas"]["PerfLevel"];
+            };
+            orders: {
+                total: number;
+                open: number;
+            };
+            contract: {
+                active: number;
+                end_date: string | null;
+                days_left: number | null;
+                level: components["schemas"]["PerfLevel"];
+            };
+            level: components["schemas"]["PerfLevel"];
+        };
+        ContractorPerformanceReport: {
+            /** Format: date-time */
+            as_of: string;
+            thresholds: components["schemas"]["ContractorPerformanceSettings"];
+            items: components["schemas"]["ContractorPerformanceRow"][];
         };
         ContractorProblem: {
             /** @enum {string} */
@@ -28357,6 +28467,87 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TeamScopeMatch"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getContractorPerformance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The report. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContractorPerformanceReport"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getContractorPerformanceThresholds: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The thresholds. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContractorPerformanceThresholds"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setContractorPerformanceThresholds: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: string;
+                    thresholds: components["schemas"]["ContractorPerformanceSettings"];
+                };
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContractorPerformanceThresholds"];
                 };
             };
             401: components["responses"]["Unauthorized"];

@@ -21,6 +21,20 @@ const TD = () => (C().tableDisplay ??= { defaults: { size: 'md', align: 'start',
 /** A mock store saved before 0.9.1 has no match table, one saved before 0.12.9 no catalogue: start it from the seed. */
 const SM = () => (C().scopeMatch?.catalogue ? C().scopeMatch : (C().scopeMatch = initCfg().scopeMatch));
 const CR = () => (C().contractorRules ??= initCfg().contractorRules);
+/** Contractor performance (contract 0.15.88): demo thresholds, kept in memory; the report is computed from them in the mock like the API does. */
+const PERF_DEFAULT = { min_sample: 3, snag_overdue_pct: { amber: 10, red: 25 }, snag_return_pct: { amber: 20, red: 40 }, quality_fail_pct: { amber: 10, red: 20 }, contract_expiry_days: { amber: 60, red: 15 } };
+let perf = { thresholds: structuredClone(PERF_DEFAULT), version: 1 };
+const PERF_ROWS = [
+  { party_id: '11111111-1111-4111-8111-111111111101', name: 'Delta Build', type: 'cw_contractor', delay_days: 42, issues_total: 5, issues_open: 2,
+    snags: { total: 10, open: 4, overdue: 3, overdue_pct: 30, overdue_level: 'red' as const, returned: 2, returned_pct: 20, returned_level: 'amber' as const },
+    quality: { total: 8, failed: 1, fail_pct: 12.5, fail_level: 'amber' as const }, orders: { total: 6, open: 3 },
+    contract: { active: 1, end_date: '2027-01-10', days_left: 45, level: 'amber' as const }, level: 'red' as const },
+  { party_id: '11111111-1111-4111-8111-111111111102', name: 'Omega Works', type: 'cw_contractor', delay_days: 0, issues_total: 1, issues_open: 0,
+    snags: { total: 2, open: 0, overdue: 0, overdue_pct: 0, overdue_level: 'insufficient' as const, returned: 0, returned_pct: 0, returned_level: 'insufficient' as const },
+    quality: { total: 0, failed: 0, fail_pct: null, fail_level: 'insufficient' as const }, orders: { total: 1, open: 0 },
+    contract: { active: 1, end_date: '2027-09-01', days_left: 279, level: 'ok' as const }, level: 'ok' as const },
+];
+
 /** GET /reports/gecol-hlc-counts (contract 0.15.84): demo numbers only. */
 const GECOL_HLC_COUNTS = {
   as_of: '2026-11-26T12:00:00.000Z',
@@ -849,6 +863,17 @@ export const settingsHandlers = [
     return HttpResponse.json({ task_code: row.task_code, is_none: !!b.no_sla });
   }),
   http.get(`${B}/reports/gecol-hlc-counts`, () => { const g = guard(); if (g) return g; return HttpResponse.json(GECOL_HLC_COUNTS); }),
+  http.get(`${B}/reports/contractor-performance`, () => { const g = guard(); if (g) return g; return HttpResponse.json({ as_of: '2026-11-26T12:00:00.000Z', thresholds: perf.thresholds, items: PERF_ROWS }); }),
+  http.get(`${B}/settings/contractor-performance`, () => { const g = guard(); if (g) return g; return HttpResponse.json({ thresholds: perf.thresholds, version: perf.version, can_edit: true, updated_at: null, updated_by: null }, tag(perf.version)); }),
+  http.put(`${B}/settings/contractor-performance`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'Send the ETag you last read in If-Match.');
+    const p = ver(request, perf.version); if (p) return p;
+    const b = await body<{ reason?: string; thresholds: typeof PERF_DEFAULT }>(request);
+    const r = reasonErr(b.reason); if (r) return r;
+    perf = { thresholds: b.thresholds, version: perf.version + 1 };
+    return HttpResponse.json({ thresholds: perf.thresholds, version: perf.version, can_edit: true, updated_at: new Date().toISOString(), updated_by: null }, tag(perf.version));
+  }),
   http.get(`${B}/reports/contractors-completeness`, () => { const g = guard(); if (g) return g; return HttpResponse.json(COMPLETENESS); }),
 
   // ------------------------------------------------------------------ notification policy

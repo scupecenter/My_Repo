@@ -201,6 +201,10 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/reports/contractors-completeness'],
   // Contract 0.15.84: the read-only GECOL / HLC counts (apps/api: contractors).
   ['get', '/reports/gecol-hlc-counts'],
+  // Contract 0.15.88: the contractor performance view and its thresholds (apps/api: contractors; migration 0180).
+  ['get', '/reports/contractor-performance'],
+  ['get', '/settings/contractor-performance'],
+  ['put', '/settings/contractor-performance'],
   // Contract 0.9.2: the self-service profile (apps/api: me, users; migration 0044). Details, email change request and its decision, password, two-factor self-service, enforced mark.
   ['get', '/me/profile'],
   ['patch', '/me/profile'],
