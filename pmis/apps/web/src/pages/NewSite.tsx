@@ -49,6 +49,8 @@ export function NewSite() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [returning, setReturning] = useState<SiteDraft | null>(null);
+  /** 0185: the duplicate warnings of the draft just saved (never blocking; the draft is saved) */
+  const [saved, setSaved] = useState<{ code: string; warnings: NonNullable<SiteDraft['warnings']> } | null>(null);
   const set = (k: string) => (v: string) => setF((p) => ({ ...p, [k]: v }));
   const rname = (id: number) => { const r = regions.data?.find((x) => x.id === id); return (i18n.language === 'ar' && r?.name_ar) || r?.name_en || String(id); };
 
@@ -70,8 +72,8 @@ export function NewSite() {
   const reset = () => { setF(EMPTY); setEditing(null); setErrors({}); setFormError(null); };
   const save = () => {
     setErrors({}); setFormError(null);
-    if (editing) update.mutate({ draft: editing, body: toInput(f) }, { onSuccess: () => { toast(t('newSite.saved')); reset(); }, onError: fail });
-    else create.mutate(toInput(f), { onSuccess: (d) => { toast(t('newSite.created', { code: d.site_code })); reset(); }, onError: fail });
+    if (editing) update.mutate({ draft: editing, body: toInput(f) }, { onSuccess: (d) => { toast(t('newSite.saved')); setSaved(d.warnings?.length ? { code: d.site_code, warnings: d.warnings } : null); reset(); }, onError: fail });
+    else create.mutate(toInput(f), { onSuccess: (d) => { toast(t('newSite.created', { code: d.site_code })); setSaved(d.warnings?.length ? { code: d.site_code, warnings: d.warnings } : null); reset(); }, onError: fail });
   };
   const act = (m: { mutate: (v: never, o: { onSuccess: () => void; onError: (e: unknown) => void }) => void }, v: unknown, done: string) => m.mutate(v as never, { onSuccess: () => toast(done), onError: fail });
   const field = (k: string, label: string, o: { dir?: 'rtl' | 'ltr'; type?: string; required?: boolean } = {}) => (
@@ -91,6 +93,11 @@ export function NewSite() {
       {errors[k] && <p role="alert" className="mt-1 text-sm text-lateInk" data-testid={`ns-error-${k}`}>{errors[k]}</p>}
     </div>
   );
+  const warnList = (ws: NonNullable<SiteDraft['warnings']>, tid: string) => (
+    <ul className="mt-1 space-y-1 text-sm" data-testid={tid}>
+      {ws.map((x, i) => <li key={`${x.code}-${i}`} data-code={x.code}><span className="font-semibold">{t(`newSite.warn.${x.code}`, { defaultValue: x.message })}</span> <span className="text-xs text-mute" dir="ltr">{x.message}</span></li>)}
+    </ul>
+  );
   const busy = create.isPending || update.isPending;
   const items = drafts.data?.items ?? [];
 
@@ -99,6 +106,7 @@ export function NewSite() {
       <PageHeader title={t('newSite.title')} subtitle={t('newSite.subtitle')} context={<Link className="btn ms-auto px-2 py-1 text-xs" to="/sites" data-testid="ns-back">{t('newSite.back')}</Link>} />
       <form className="card mb-6 space-y-4 p-4" data-testid="new-site-form" onSubmit={(e) => { e.preventDefault(); save(); }}>
         <h2 className="text-lg font-bold">{editing ? t('newSite.edit_title', { code: editing.site_code }) : t('newSite.form_title')}</h2>
+        {saved && <div role="status" className="rounded-md bg-waitBg p-3 text-sm text-waitInk" data-testid="ns-saved-warnings"><p className="font-semibold">{t('newSite.warn.saved_title', { code: saved.code })}</p>{warnList(saved.warnings, 'ns-saved-warning-list')}</div>}
         {formError && <p role="alert" className="rounded-md bg-lateBg p-3 text-sm text-lateInk" data-testid="ns-form-error">{formError}</p>}
         <fieldset className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <legend className="mb-1 font-semibold">{t('newSite.identity')}</legend>
@@ -151,7 +159,7 @@ export function NewSite() {
                     <td className="p-2"><div>{String(data.name ?? '')}</div>{!!data.name_ar && <div dir="rtl" lang="ar" className="text-mute" data-testid={`ns-draft-name-ar-${d.site_code}`}>{String(data.name_ar)}</div>}</td>
                     <td className="p-2">{rname(d.region_id)}</td>
                     <td className="p-2"><span className={`chip ${TONE[d.status]}`} data-testid={`ns-draft-status-${d.site_code}`}>{t(`newSite.status_${d.status}`)}</span>{d.self_approval && <span className="chip ms-1 bg-card2 text-mute">{t('newSite.self_approval')}</span>}</td>
-                    <td className="p-2 text-mute">{d.last_return_note && d.status === 'entry' ? <span data-testid={`ns-draft-note-${d.site_code}`}>{d.last_return_note}</span> : '—'}</td>
+                    <td className="p-2 text-mute">{d.last_return_note && d.status === 'entry' ? <span data-testid={`ns-draft-note-${d.site_code}`}>{d.last_return_note}</span> : '—'}{!!d.warnings?.length && <div className="text-waitInk">{warnList(d.warnings, `ns-draft-warnings-${d.site_code}`)}</div>}</td>
                     <td className="p-2">
                       <span className="flex flex-wrap gap-1">
                         {may('edit') && <button className="btn px-2 py-0.5 text-xs" data-testid={`ns-edit-${d.site_code}`} onClick={() => { setEditing(d); setF(toForm(d)); setErrors({}); }}><Pencil size={12} />{t('newSite.edit')}</button>}

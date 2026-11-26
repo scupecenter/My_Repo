@@ -4847,6 +4847,15 @@
       "longitude": "Longitude",
       "address": "Address",
       "rf_survey_date": "RF survey date"
+    },
+    "warn": {
+      "saved_title": "{{code}} is saved. Check these before it is sent:",
+      "similar_site_code": "Another Site ID is almost the same.",
+      "duplicate_name": "A site with this name exists.",
+      "close_coordinates": "These coordinates are within 100 metres of another site.",
+      "cluster_will_be_created": "This cluster does not exist yet: it is created in the region of the site when L2 approves.",
+      "outside_libya": "These coordinates are outside Libya. Check them.",
+      "list_other": "This value is not in the list; the list allows another value."
     }
   },
   "siteMap": {

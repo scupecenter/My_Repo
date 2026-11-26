@@ -49,6 +49,8 @@ afterAll(async () => {
 const input = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
   site_code: code(), region_id: R, name: 'Synthetic Site', name_ar: 'موقع تجريبي', delivery_scenario: 'new_build', ...over,
 });
+/** 0185: the duplicate warnings (name, coordinates, similar Site ID) come on top of the older ones; fixtures of this file reuse names, so those tests look at the older warnings only. */
+const withoutDup = (w: { code: string }[]): { code: string }[] => w.filter((x) => !['duplicate_name', 'close_coordinates', 'similar_site_code'].includes(x.code));
 const etag = (res: { headers: Record<string, unknown> }): string => String(res.headers.etag);
 const siteIn = async (siteCode: string): Promise<{ id: string; overall_status: string; region_id: number; name_ar: string | null; cluster_id: string | null; workflow_version_id: string } | undefined> =>
   (await q<{ id: string; overall_status: string; region_id: number; name_ar: string | null; cluster_id: string | null; workflow_version_id: string }>(
@@ -78,7 +80,7 @@ describe('manual entry: draft, L1 submit, L2 approve', () => {
     const c = await l1.api.call('post', '/sites', body);
     expect(c.status).toBe(201);
     expect(c.body).toMatchObject({ status: 'entry', site_code: body.site_code, region_id: R, allowed_actions: expect.arrayContaining(['edit', 'submit']) });
-    expect(c.body.warnings).toEqual([expect.objectContaining({ code: 'cluster_will_be_created' })]);
+    expect(withoutDup(c.body.warnings)).toEqual([expect.objectContaining({ code: 'cluster_will_be_created' })]);
     expect(c.body.data).toMatchObject({ delivery_scenario: 'new_build', scope_tower_erection: 'yes', scope_site_adaption: 'na', name_ar: 'موقع تجريبي' });
     expect(await siteIn(String(body.site_code))).toBeUndefined();   // a draft is not a site
 
@@ -264,7 +266,7 @@ describe('validation (field errors in the usual problem format)', () => {
     // the Site Type list allows another value (a warning, not an error), as the catalogue says
     const other = await l1.api.call('post', '/sites', input({ site_type: 'Castle' }));
     expect(other.status).toBe(201);
-    expect(other.body.warnings).toEqual([expect.objectContaining({ field: 'site_type', code: 'list_other' })]);
+    expect(withoutDup(other.body.warnings)).toEqual([expect.objectContaining({ field: 'site_type', code: 'list_other' })]);
     const pair = await l1.api.call('post', '/sites', input({ latitude: 32.5 }));
     expect(pair.body.errors).toEqual([expect.objectContaining({ path: '/longitude', code: 'pair_required' })]);
     const badDate = await l1.api.call('post', '/sites', input({ rf_survey_date: '2026-02-31' }));
@@ -422,7 +424,7 @@ describe('the bulk way: the approved template "New sites"', () => {
     const rows = (await l1.api.call('get', `/import-batches/${up.body.id}/rows?limit=50`)).body.items as Record<string, any>[];
     expect(rows.map((r) => r.action)).toEqual(['create', 'create', 'create', 'error', 'error', 'error']);
     expect(rows[0]).toMatchObject({ key: a, site_code: a, diff: { site_code: { old: null, new: a }, region_id: { old: null, new: R }, name_ar: { old: null, new: 'موقع أ' } } });
-    expect(rows[0]!.warnings).toEqual([expect.objectContaining({ code: 'cluster_will_be_created' })]);
+    expect(withoutDup(rows[0]!.warnings)).toEqual([expect.objectContaining({ code: 'cluster_will_be_created' })]);
     expect(rows[3]!.errors).toEqual([expect.objectContaining({ field: 'site_code', code: 'duplicate', column: 'Site ID' })]);
     expect(rows[4]!.errors).toEqual([expect.objectContaining({ field: 'region', code: 'unknown_region', column: 'Region' })]);
     expect(rows[5]!.errors).toEqual([expect.objectContaining({ field: 'site_code', code: 'duplicate_in_file' })]);
