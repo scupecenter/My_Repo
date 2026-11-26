@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { api, ApiError, downloadFile, type RequestOptions } from './client';
 import type {
-  ActiveSession, ActOnBehalfRequest, Calendar, CalendarConfirmation, MailNotificationKinds, ImportsSettings, NavLayoutSetting, UiIdentity, UiBrand, NavLayoutT, ContractorRules, ContractorRulesInput, ContractorsCompletenessReport, TeamScopeMismatchReport, DeletedUser, PurgedUser, DlpSettings, DlpVersion, DlpVersionInput, Holiday, HolidayChangeResult, HolidayInput, HolidayPatch, HolidaySummary, IdleTaskAlertSetting, Job, LogIntegrity, LogRetention, LogRetentionInput,
+  ActiveSession, ActOnBehalfRequest, Calendar, CalendarConfirmation, MailNotificationKinds, ImportsSettings, NavLayoutSetting, UiIdentity, UiBrand, NavLayoutT, ContractorRules, ContractorRulesInput, GecolHlcCounts, ContractorsCompletenessReport, TeamScopeMismatchReport, DeletedUser, PurgedUser, DlpSettings, DlpVersion, DlpVersionInput, Holiday, HolidayChangeResult, HolidayInput, HolidayPatch, HolidaySummary, IdleTaskAlertSetting, Job, LogIntegrity, LogRetention, LogRetentionInput,
   NotificationPolicy, NotificationPolicyInput, NotificationTypeDef, Page, ReassignmentAlert, SecurityLogEntry, SessionRevokeResult, SlaPublishPreview, SlaRuleSet, SlaRuleSetPublishResult, SlaRuleSetSummary, SlaTaskRule, StaffCard, StaffVisibility, StructuralFreeze,
   TaskDefinition, TeamScopeMatch, TeamScopeMatchInput, TransitionResultT, User, UserDetail, WeekendDaysResult, WeightSet, WeightSetCode, WeightSetInput, WeightSetPreview, WeightSetPublishResult, WorkflowVersion, WorkflowVersionSummary,
 } from './types';
@@ -148,6 +148,8 @@ export const useSetIdle = () => {
 
 // ---------------------------------------------------------------- team / scope match of Procurement (0.9.1, Q97)
 export const useTeamScopeMatch = () => useQuery({ queryKey: ['teamScopeMatch'], queryFn: () => api.get<TeamScopeMatch>('/settings/team-scope-match') });
+// 0.15.84: the read-only GECOL / HLC counts (Settings > Data > GECOL / HLC counts)
+export const useGecolHlcCounts = () => useQuery({ queryKey: ['gecolHlcCounts'], queryFn: () => api.get<GecolHlcCounts>('/reports/gecol-hlc-counts') });
 // 0.12.9 (P4b): the contractor rules and the two reports
 export const useContractorRules = () => useQuery({ queryKey: ['contractorRules'], queryFn: () => api.get<ContractorRules>('/settings/contractor-rules') });
 export const useSetContractorRules = () => {

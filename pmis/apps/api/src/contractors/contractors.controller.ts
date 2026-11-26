@@ -20,6 +20,11 @@ export class ContractorsController {
     return this.svc.completeness(auth);
   }
 
+  @Get('reports/gecol-hlc-counts')
+  gecolHlcCounts() {
+    return this.svc.gecolHlcCounts();
+  }
+
   @Get('settings/contractor-rules')
   async rules(@Auth() auth: AuthContext, @Res({ passthrough: true }) res: Response) {
     const r = await this.svc.rules(auth);

@@ -5011,6 +5011,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/reports/gecol-hlc-counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Counts of the GECOL, HLC and Procurement records (read only, admin)
+         * @description 0.15.84. Read only. Counts the latest version of every GECOL, HLC and Procurement register record by state (Procurement also by `scope`),
+         *     the GECOL records with a PR number or a request date, the HLC records linked or not linked to a Procurement request, and the sites with the
+         *     GECOL (`scope_gecol_power`) or HLC (`scope_hlc_fiber`) scope. Needs `admin.settings` view for all regions (403 otherwise). Changes nothing.
+         */
+        get: operations["getGecolHlcCounts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/notification-policy": {
         parameters: {
             query?: never;
@@ -14249,6 +14271,38 @@ export interface components {
             as_of: string;
             match_version: number;
             items: components["schemas"]["TeamScopeMismatchRow"][];
+        };
+        GecolHlcCounts: {
+            /** Format: date-time */
+            as_of: string;
+            gecol: {
+                total: number;
+                with_pr_no: number;
+                with_request_date: number;
+                by_state: components["schemas"]["GecolHlcCountState"][];
+            };
+            hlc: {
+                total: number;
+                linked_to_procurement: number;
+                not_linked: number;
+                by_state: components["schemas"]["GecolHlcCountState"][];
+            };
+            procurement: {
+                total: number;
+                by_scope_state: {
+                    scope: string | null;
+                    state: string;
+                    count: number;
+                }[];
+            };
+            sites: {
+                with_gecol_scope: number;
+                with_hlc_scope: number;
+            };
+        };
+        GecolHlcCountState: {
+            state: string;
+            count: number;
         };
         ContractorsCompletenessReport: {
             /** Format: date */
@@ -28051,6 +28105,28 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ContractorsCompletenessReport"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getGecolHlcCounts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The counts. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GecolHlcCounts"];
                 };
             };
             401: components["responses"]["Unauthorized"];

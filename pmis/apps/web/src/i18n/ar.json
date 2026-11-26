@@ -1153,7 +1153,8 @@
     "section_my-work_daily-plan": "الخطة اليومية",
     "section_documents_types": "أنواع المستندات",
     "section_documents_forms": "قوالب النماذج",
-    "section_documents_archive": "الأرشيف"
+    "section_documents_archive": "الأرشيف",
+    "section_data_counts": "أعداد GECOL / HLC"
   },
   "scopeMatch": {
     "title": "مطابقة الفريق والنطاق (المشتريات)",
@@ -6341,5 +6342,27 @@
     "search_b": "اضغط Ctrl K للبحث والانتقال لأي صفحة يُسمح لك بفتحها.",
     "shortcuts_t": "الاختصارات",
     "shortcuts_b": "اضغط ? لعرض القائمة. G ثم D لوحة القيادة، G ثم S المواقع، G ثم W أعمالي."
+  },
+  "gecolHlcCounts": {
+    "title": "أعداد GECOL / HLC",
+    "note": "للقراءة فقط. يعدّ آخر نسخة من كل سجل. لا يغيّر شيئاً؛ يبيّن ما في النظام قبل أي نقل لبيانات GECOL أو HLC.",
+    "as_of": "حتى",
+    "gecol": "سجل GECOL",
+    "hlc": "سجل HLC",
+    "procurement": "سجل المشتريات",
+    "total": "المجموع",
+    "by_state": "حسب الحالة",
+    "with_pr_no": "لها رقم PR",
+    "with_request_date": "لها تاريخ طلب",
+    "linked": "مرتبطة بطلب مشتريات",
+    "not_linked": "غير مرتبطة",
+    "scope": "النطاق",
+    "state": "الحالة",
+    "count": "العدد",
+    "no_scope": "(بدون نطاق)",
+    "sites": "المواقع",
+    "sites_gecol": "مواقع نطاق GECOL",
+    "sites_hlc": "مواقع نطاق HLC",
+    "empty": "لا سجلات"
   }
 }

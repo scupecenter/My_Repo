@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.83
+  version: 0.15.84
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -31,6 +31,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.84 (2026-11-26): the read-only GECOL / HLC counts screen (owner request 2026-11-26, a step before any move of GECOL or HLC data). Additive, no migration. `GET /reports/gecol-hlc-counts` (System Admin or a delegate holding `admin.settings` view for all regions) counts the GECOL, HLC and Procurement register records (the latest version of each record, by state and Procurement by scope), the GECOL records that already hold a PR number or a request date, the HLC records linked or not linked to a Procurement request, and the sites that have the GECOL or HLC scope. It reads only; nothing is changed.
     - 0.15.83 (2026-11-26): the evidence dot of the Site Master wide table (owner request 2026-11-26). Additive, read only, no migration. Each cell of `GET /site-master/{menu}/rows` may carry `docs` (`state` red when a document still has to be uploaded, yellow when all are uploaded but not all approved, green when all are approved; the counts `need`, `approved`, `pending`, `missing`, `rejected`, `expired`), computed from the mandatory document slots of the task behind the cell. Nothing is written and no permission changes. Each register record (`RegisterRecord`) may carry the same `docs`, computed from the mandatory slots of its logical record (`register_entity_id`).
     - 0.15.82 (2026-11-26): `GET /me/tasks.ics` returns My Work (do now and late) as an iCalendar file. Needs the session like every call; same rights and region scope as `GET /me/tasks`; nothing public and no token link. No migration.
     - 0.15.81 (2026-11-26): two more UI designs, `obsidian` and `sahara` (migration 0164): `UiBrand` gains the two names (users.ui_brand, `ui.identity` default_brand, `PATCH /me/profile`). Visual only; the four existing designs, the light/dark theme and the storage are unchanged.
@@ -7916,6 +7917,23 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/ContractorsCompletenessReport'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /reports/gecol-hlc-counts:
+    get:
+      tags: [registers]
+      operationId: getGecolHlcCounts
+      summary: Counts of the GECOL, HLC and Procurement records (read only, admin)
+      description: |
+        0.15.84. Read only. Counts the latest version of every GECOL, HLC and Procurement register record by state (Procurement also by `scope`),
+        the GECOL records with a PR number or a request date, the HLC records linked or not linked to a Procurement request, and the sites with the
+        GECOL (`scope_gecol_power`) or HLC (`scope_hlc_fiber`) scope. Needs `admin.settings` view for all regions (403 otherwise). Changes nothing.
+      responses:
+        '200':
+          description: The counts.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/GecolHlcCounts'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
   /settings/notification-policy:
@@ -19877,6 +19895,53 @@ components:
         as_of: { type: string, format: date }
         match_version: { type: integer }
         items: { type: array, items: { $ref: '#/components/schemas/TeamScopeMismatchRow' } }
+    GecolHlcCounts:
+      type: object
+      required: [as_of, gecol, hlc, procurement, sites]
+      properties:
+        as_of: { type: string, format: date-time }
+        gecol:
+          type: object
+          required: [total, with_pr_no, with_request_date, by_state]
+          properties:
+            total: { type: integer }
+            with_pr_no: { type: integer }
+            with_request_date: { type: integer }
+            by_state: { type: array, items: { $ref: '#/components/schemas/GecolHlcCountState' } }
+        hlc:
+          type: object
+          required: [total, linked_to_procurement, not_linked, by_state]
+          properties:
+            total: { type: integer }
+            linked_to_procurement: { type: integer }
+            not_linked: { type: integer }
+            by_state: { type: array, items: { $ref: '#/components/schemas/GecolHlcCountState' } }
+        procurement:
+          type: object
+          required: [total, by_scope_state]
+          properties:
+            total: { type: integer }
+            by_scope_state:
+              type: array
+              items:
+                type: object
+                required: [scope, state, count]
+                properties:
+                  scope: { type: string, nullable: true }
+                  state: { type: string }
+                  count: { type: integer }
+        sites:
+          type: object
+          required: [with_gecol_scope, with_hlc_scope]
+          properties:
+            with_gecol_scope: { type: integer }
+            with_hlc_scope: { type: integer }
+    GecolHlcCountState:
+      type: object
+      required: [state, count]
+      properties:
+        state: { type: string }
+        count: { type: integer }
     ContractorsCompletenessReport:
       type: object
       required: [as_of, teams, parties, contracts]
