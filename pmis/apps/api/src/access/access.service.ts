@@ -61,6 +61,23 @@ export class AccessService {
     return r;
   }
 
+  /**
+   * 0163: the Dashboard tabs of the caller (pmo, cw, te) from the roles held now. A call is allowed when the caller holds `pmo` (the whole project, which
+   * contains the other two), or the tab of the view asked: view CW needs cw, view TE needs te, no view or any other view needs pmo. The tab is not a grant:
+   * dashboard.view and its regions are checked as before.
+   */
+  async dashboardTabs(): Promise<string[]> {
+    const rows = await this.db.tx.$queryRaw<{ t: string[] | null }[]>`SELECT app_dashboard_tabs(app_actor()) AS t`;
+    return rows[0]?.t ?? ['cw', 'pmo', 'te'];
+  }
+
+  async requireDashboardTab(view?: string | null): Promise<void> {
+    const tabs = await this.dashboardTabs();
+    const need = view === 'CW' ? 'cw' : view === 'TE' ? 'te' : 'pmo';
+    if (tabs.includes('pmo') || tabs.includes(need)) return;
+    throw new ProblemException(403, 'action_forbidden', { detail: 'Your role does not include this part of the dashboard.' });
+  }
+
   /** The caller is an active member of the System Admins group (not merely a delegate). */
   async isSystemAdmin(): Promise<boolean> {
     const rows = await this.db.tx.$queryRaw<{ ok: boolean }[]>`SELECT app_actor_is_system_admin() AS ok`;

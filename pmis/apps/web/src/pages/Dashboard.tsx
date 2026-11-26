@@ -31,6 +31,8 @@ import {
   DASH_TABS,
   readRemembered,
   resolveTab,
+  allowedTabs,
+  clampTab,
   tabView,
   teamTabs,
   writeRemembered,
@@ -622,10 +624,15 @@ export function Dashboard() {
   const today = tripoliToday();
   const userId = me.data?.user?.id;
   // F6: the tab (PMO, CW, TE) is the view filter; an explicit ?tab= wins, then the team, then the last tab used
-  const tab: DashTab = resolveTab(
-    sp.get("tab"),
-    readRemembered(userId),
-    teamTabs((me.data?.assignments ?? []).map((a) => a.team)),
+  // 0163: the role limits the tabs (Settings > Roles); a tab outside them is not shown and cannot be reached by the URL either
+  const tabsAllowed = allowedTabs(me.data?.effective.dashboard_tabs);
+  const tab: DashTab = clampTab(
+    resolveTab(
+      sp.get("tab"),
+      readRemembered(userId),
+      teamTabs((me.data?.assignments ?? []).map((a) => a.team)),
+    ),
+    tabsAllowed,
   );
   const dashSettings = useDashboardSettings();
   const q: DashboardQuery = {
@@ -1060,7 +1067,7 @@ export function Dashboard() {
         className="flex flex-wrap gap-2 print:hidden"
         data-testid="dash-tabs"
       >
-        {DASH_TABS.map((k) => {
+        {DASH_TABS.filter((k) => tabsAllowed.includes(k)).map((k) => {
           const on = tab === k;
           const available =
             k === "pmo" ||

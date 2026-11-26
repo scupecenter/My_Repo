@@ -55,6 +55,7 @@ export class ProjectStatusService {
   // ------------------------------------------------------------------ GET /project-status
   async get(_auth: AuthContext, q: Query): Promise<Json> {
     await this.access.requireRegions('dashboard', 'view');
+    await this.access.requireDashboardTab(undefined);
     const regionRaw = oneParam(q, 'region_id');
     const siteRaw = oneParam(q, 'site_id');
     const group = oneParam(q, 'group_by') ?? 'none';
@@ -125,6 +126,7 @@ export class ProjectStatusService {
    */
   async manualItems(): Promise<Json> {
     await this.access.requireRegions('dashboard', 'view');
+    await this.access.requireDashboardTab(undefined);
     const items = await this.db.tx.$queryRaw<{ item_code: string; name_en: string; name_ar: string | null; weight: string; activity_code: string; activity_name_en: string; activity_name_ar: string | null }[]>`
       SELECT item_code, name_en, name_ar, weight::text AS weight, activity_code, activity_name_en, activity_name_ar FROM ps_central_items(cal_today()) ORDER BY sort`;
     const hist = await this.db.tx.$queryRaw<{ id: string; item_code: string; version: number; value_pct: string; effective_date: string; reason: string; created_at: Date;
@@ -177,6 +179,7 @@ export class ProjectStatusService {
   /** POST /project-status/manual-items/{item_code}/values: one new entry (value, effective date, reason). The database checks who may and audits it. */
   async addManualValue(_auth: AuthContext, rawItem: string, raw: unknown): Promise<Json> {
     await this.access.requireRegions('dashboard', 'view');
+    await this.access.requireDashboardTab(undefined);
     const item = /^[A-Za-z0-9._-]{1,20}$/.test(rawItem) ? rawItem : null;
     if (!item) throw problems.notFound('There is no such central item.');
     const b = parse(manualSchema, raw);
@@ -189,6 +192,7 @@ export class ProjectStatusService {
   /** POST /project-status/manual-items/{item_code}/plan (Q177): a new version of the item's plan. The database checks who may, the points and audits it. */
   async setManualPlan(_auth: AuthContext, rawItem: string, raw: unknown): Promise<Json> {
     await this.access.requireRegions('dashboard', 'view');
+    await this.access.requireDashboardTab(undefined);
     const item = /^[A-Za-z0-9._-]{1,20}$/.test(rawItem) ? rawItem : null;
     if (!item) throw problems.notFound('There is no such central item.');
     const b = parse(planSchema, raw);
@@ -202,6 +206,7 @@ export class ProjectStatusService {
   // ------------------------------------------------------------------ GET /project-status/snapshots
   async snapshots(_auth: AuthContext, q: Query): Promise<Json> {
     const regions = await this.access.requireRegions('dashboard', 'view');
+    await this.access.requireDashboardTab(undefined);
     const limit = parseLimit(oneParam(q, 'limit'));
     const cursor = decodeCursor(oneParam(q, 'cursor'), 2);
     const regionRaw = oneParam(q, 'region_id');

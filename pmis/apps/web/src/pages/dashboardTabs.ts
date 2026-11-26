@@ -62,3 +62,15 @@ export function writeRemembered(userId: string | null | undefined, tab: DashTab)
     /* storage blocked: the tab still works for this visit */
   }
 }
+
+/** 0163: the tabs a user may open (`effective.dashboard_tabs`). Missing = all three (an older server), and the order is always PMO, CW, TE. */
+export function allowedTabs(granted: readonly string[] | null | undefined): DashTab[] {
+  if (!granted) return [...DASH_TABS];
+  const out = DASH_TABS.filter((t) => granted.includes(t));
+  return out.length > 0 ? out : [...DASH_TABS];
+}
+
+/** The tab to show once the allowed tabs are known: the chosen one when allowed, else the first allowed (PMO, CW, TE). */
+export function clampTab(tab: DashTab, allowed: readonly DashTab[]): DashTab {
+  return allowed.includes(tab) ? tab : (allowed[0] ?? "pmo");
+}

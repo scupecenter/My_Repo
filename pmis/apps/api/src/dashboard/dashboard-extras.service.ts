@@ -91,6 +91,7 @@ export class DashboardExtrasService {
   async get(_auth: AuthContext, q: Query): Promise<Record<string, unknown>> {
     const dash = await this.access.requireRegions("dashboard", "view");
     const p = dashboardParams(q);
+    await this.access.requireDashboardTab(p.view);
     const sitesRegions = await this.access.regions("sites", "view");
     const risksRegions = await this.access.regions("risks", "view");
     const sitesScope = intersect(dash, sitesRegions);

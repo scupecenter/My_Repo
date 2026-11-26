@@ -911,7 +911,12 @@
     "capabilities": "Audit Log reading (System Admin only)",
     "cap_audit_full_reader": "Reads the whole Audit Log",
     "cap_team_lead": "Team Lead: reads the Audit Log of its modules and regions",
-    "cap_hint": "Neither gives the security log. Saving needs a reason and a fresh sign-in check."
+    "cap_hint": "Neither gives the security log. Saving needs a reason and a fresh sign-in check.",
+    "dash_access": "Dashboard and menu",
+    "dash_tabs": "Dashboard tabs holders of this role can open",
+    "dash_tabs_none": "Choose at least one tab.",
+    "hide_msg": "Hide Messages and Inbox from the menu",
+    "dash_hint": "Default: all tabs, nothing hidden. A user with several roles gets the tabs of all of them. This does not change any permission."
   },
   "groups": {
     "title": "Groups",
