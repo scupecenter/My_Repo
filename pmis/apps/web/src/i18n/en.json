@@ -3153,6 +3153,7 @@
       "placements": "Placement",
       "target": "Placed on",
       "ref": "Code or key",
+      "ref_pick": "Pick from the list or type to filter",
       "ref_hint": "Task code, snag type or register key",
       "target_task": "Task",
       "target_qc": "QC",
@@ -3868,6 +3869,11 @@
     "type_date": "Date",
     "type_bool": "Yes / no",
     "group": "Warehouse"
+  },
+  "evidence": {
+    "red": "Needs upload. Documents: {{missing}} missing, {{rejected}} rejected, {{expired}} expired. Upload needed ({{approved}} of {{need}} approved).",
+    "yellow": "Pending approval. Documents uploaded, waiting for review or approval ({{approved}} of {{need}} approved).",
+    "green": "Approved. Documents approved ({{approved}} of {{need}})."
   },
   "regcols": {
     "title": "Register columns",

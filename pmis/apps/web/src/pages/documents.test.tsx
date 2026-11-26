@@ -133,6 +133,7 @@ describe('Settings: Document Library', () => {
     const dlg = await screen.findByTestId('doc-dialog');
     await u.type(within(dlg).getByTestId('doc-code'), 'TEST_DOC');
     await u.type(within(dlg).getByTestId('doc-name-en'), 'Test document');
+    // the placement is picked from the existing list (task definitions), not typed
     await u.type(within(dlg).getByTestId('doc-placement-ref-0'), 'F1');
     fireEvent.change(within(dlg).getByTestId('doc-formats'), { target: { value: 'pdf, exe' } });
     await u.type(within(dlg).getByTestId('doc-dialog-reason'), 'new test document');

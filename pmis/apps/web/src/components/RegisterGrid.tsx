@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { RegisterRecord } from '@/api/types';
+import { EvidenceDot } from './EvidenceDot';
 
 export interface GridColumn { id: string; label: string }
 
@@ -39,7 +40,7 @@ export function RegisterGrid({ columns, rows, cell, onOpen, canEdit, editing, on
             <tr key={r.id} data-testid={`reg-grid-row-${r.id}`} data-state={r.state} tabIndex={0} className="cursor-pointer border-b border-line hover:bg-hover focus-visible:bg-hover"
               onClick={() => onOpen(r.id)}
               onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) { e.preventDefault(); onOpen(r.id); } }}>
-              <td data-testid="reg-grid-no" className="px-2 py-2 text-end tabular-nums text-mute">{idx + 1}</td>
+              <td data-testid="reg-grid-no" className="px-2 py-2 text-end tabular-nums text-mute">{idx + 1}<EvidenceDot docs={r.docs} testid={`${testid}-dot-${r.id}`} /></td>
               {columns.map((c, i) => {
                 const on = editing?.id === r.id && editing.col === c.id;
                 const editable = !!onStartEdit && !on && !!canEdit?.(c.id, r);

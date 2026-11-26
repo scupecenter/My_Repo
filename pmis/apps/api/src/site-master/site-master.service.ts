@@ -202,11 +202,26 @@ export class SiteMasterService {
           listValues.set(r.catalogue_code, [...(listValues.get(r.catalogue_code) ?? []), { value: r.code, label_en: r.label_en, label_ar: r.label_ar, ...(r.parent_catalogue ? { parent: r.parent_code } : {}) }]);
         }
       }
+      // the evidence of the tasks of this page: one grouped query over their mandatory document slots (read only)
+      const docRows = tasks.length ? await this.db.tx.$queryRaw<{ task_id: string; need: number; missing: number; rejected: number; pending: number; expired: number }[]>(Prisma.sql`
+        SELECT ds.task_id::text AS task_id,
+               count(*) FILTER (WHERE ds.status::text <> 'not_required')::int AS need,
+               count(*) FILTER (WHERE ds.status::text = 'missing')::int AS missing,
+               count(*) FILTER (WHERE ds.status::text = 'rejected')::int AS rejected,
+               count(*) FILTER (WHERE ds.status::text IN ('uploaded', 'in_review'))::int AS pending,
+               count(*) FILTER (WHERE ds.status::text NOT IN ('not_required', 'missing', 'rejected') AND ds.valid_to IS NOT NULL AND ds.valid_to < current_date)::int AS expired
+        FROM document_slots ds JOIN document_types dt ON dt.id = ds.doc_type_id
+        WHERE ds.task_id = ANY(${tasks.map((t) => t.task_id)}::uuid[]) AND dt.is_mandatory
+        GROUP BY ds.task_id`) : [];
+      const docsOf = new Map(docRows.map((d) => [d.task_id, d]));
       for (const t of tasks) {
         const editable = !t.locked && EDITABLE_STATES.has(t.state);
         const field = t.field_key.startsWith('v:') ? { values: t.field_key.slice(2) } : { field: t.field_key };
         const typed = cellInput(t.field_key, t.field_type, t.options, t.list_catalogue ? listValues.get(t.list_catalogue) : undefined);
         const cell: EditCell = { task_id: t.task_id, version: t.version, editable, ...field, ...typed };
+        const dc = docsOf.get(t.task_id);
+        const dot = dc ? evidenceDot(dc) : undefined;
+        if (dot) cell.docs = dot;
         const byOrd = cells.get(t.site_id) ?? {};
         byOrd[String(t.ord)] = cell;
         cells.set(t.site_id, byOrd);
@@ -373,6 +388,22 @@ interface EditCell {
   options?: CellOption[];
   /** 0.15.50: for a list of a dependent catalogue, the column (ord) of the cell of the same site that holds the parent value; each option's `parent` is compared with it. */
   parent_ord?: number;
+  /** The evidence of the task (read only): its mandatory document slots. See `evidenceDot`. Absent when the task needs no document. */
+  docs?: EvidenceDot;
+}
+
+/** The evidence dot beside a date: `need` mandatory slots, `approved` of them approved, `pending` uploaded or in review. */
+export interface EvidenceDot { state: 'green' | 'yellow' | 'red'; need: number; approved: number; pending: number; missing: number; rejected: number; expired: number }
+
+/**
+ * The colour of the evidence dot of a task-backed cell (owner decision 2026-11-26). No mandatory document: no dot. RED: a document still has to be uploaded
+ * (missing, rejected or expired). YELLOW: all are uploaded but some wait for review or approval. GREEN: all are approved.
+ */
+export function evidenceDot(c: { need: number; missing: number; rejected: number; expired: number; pending: number }): EvidenceDot | undefined {
+  if (c.need <= 0) return undefined;
+  const approved = Math.max(0, c.need - c.missing - c.rejected - c.pending);
+  const state = c.missing > 0 || c.rejected > 0 || c.expired > 0 ? 'red' : c.pending > 0 ? 'yellow' : 'green';
+  return { state, need: c.need, approved, pending: c.pending, missing: c.missing, rejected: c.rejected, expired: c.expired };
 }
 
 export type CellInputType = 'date' | 'number' | 'list' | 'text' | 'boolean';

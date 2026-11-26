@@ -10308,6 +10308,20 @@ export interface components {
                         }[];
                         /** @description 0.15.50. Only for a list whose catalogue has a parent list: the Master column (ord) of the cell of the same site that holds the parent value. Offer the options whose `parent` equals that value; absent when the parent list is not in the menu. */
                         parent_ord?: number;
+                        /** @description 0.15.83. Read only. The evidence of the task behind the cell: its mandatory document slots. Absent when the task needs no document. `red`: a document still has to be uploaded (missing, rejected or expired). `yellow`: all are uploaded but some wait for review or approval. `green`: all are approved. */
+                        docs?: {
+                            /** @enum {string} */
+                            state: "green" | "yellow" | "red";
+                            /** @description Mandatory slots of the task that apply (not N/A). */
+                            need: number;
+                            /** @description Of them, approved. */
+                            approved: number;
+                            /** @description Of them, uploaded or in review. */
+                            pending: number;
+                            missing: number;
+                            rejected: number;
+                            expired: number;
+                        };
                     };
                 };
             }[];
@@ -15178,6 +15192,20 @@ export interface components {
         /** @enum {string} */
         RegisterRecordState: "entry" | "in_review" | "in_approval" | "approved" | "voided";
         RegisterRecord: {
+            /** @description 0.15.83. Read only. The evidence of the record: its mandatory document slots (the same rules as the Site Master cell `docs`). Absent when the record needs no document. */
+            docs?: {
+                /** @enum {string} */
+                state: "green" | "yellow" | "red";
+                /** @description Mandatory slots of the task that apply (not N/A). */
+                need: number;
+                /** @description Of them, approved. */
+                approved: number;
+                /** @description Of them, uploaded or in review. */
+                pending: number;
+                missing: number;
+                rejected: number;
+                expired: number;
+            };
             /** Format: uuid */
             id: string;
             register_key: components["schemas"]["RegisterKey"];

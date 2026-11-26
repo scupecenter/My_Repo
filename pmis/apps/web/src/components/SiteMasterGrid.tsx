@@ -1,3 +1,4 @@
+import { EvidenceDot, type EvidenceDotData } from "./EvidenceDot";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { SiteMasterMenuItem } from "@/api/siteMaster";
@@ -26,6 +27,8 @@ export interface SiteMasterCellTarget {
   options?: { value: string; label_en: string; label_ar: string | null; parent?: string | null }[];
   /** 0.15.50: for a list of a dependent catalogue, the column of the cell of the same site that holds the parent value; an option is offered when its `parent` equals that value. */
   parent_ord?: number;
+  /** 0.15.83: the evidence of the task (read only), drawn as a tiny dot beside the value. */
+  docs?: EvidenceDotData;
 }
 
 /** A value typed into a cell: the target and the new value (an empty text clears the value). */
@@ -739,7 +742,10 @@ export function SiteMasterGrid({
                           }}
                         />
                       ) : (
-                        renderCell(ord, value(ord, index, row))
+                        <>
+                          {renderCell(ord, value(ord, index, row))}
+                          <EvidenceDot docs={target?.docs} testid={`${testid}-dot-${row.site_code}-${ord}`} />
+                        </>
                       )}
                     </td>
                   );

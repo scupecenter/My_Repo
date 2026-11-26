@@ -15,6 +15,7 @@ import { DbService } from '../db/db.service';
 import { FilterCatalogService } from '../views/filter-catalog.service';
 import { setVia, viaSchema } from '../common/via';
 import { resolveMentions } from '../common/mentions';
+import { evidenceDot } from '../site-master/site-master.service';
 import { DocumentsService } from '../documents/documents.service';
 import { WorkflowService } from '../workflow/workflow.service';
 import { MatrixAssigneeDto, TaskViewService, UserRefDto, accountStatus, levelCode } from '../workflow/task-view.service';
@@ -539,6 +540,19 @@ export class RegistersService {
           SELECT register_entity_id::text AS entity_id, id::text AS id, status::text AS status, scope FROM snags WHERE register_entity_id = ANY(${snagRecs}::uuid[])`)).map((x) => [x.entity_id, x])
       : []);
     const QC_STATE: Record<string, string> = { open: 'open', fix_uploaded: 'fix_submitted', in_review: 'in_review', closed: 'closed', cancelled: 'cancelled' };
+    // the evidence of the records of this page (read only): one grouped query over the mandatory document slots of their logical records
+    const entityIds = [...new Set(rows.map((r) => r.entity_id))];
+    const docRows = await this.db.tx.$queryRaw<{ entity_id: string; need: number; missing: number; rejected: number; pending: number; expired: number }[]>(Prisma.sql`
+      SELECT ds.register_entity_id::text AS entity_id,
+             count(*) FILTER (WHERE ds.status::text <> 'not_required')::int AS need,
+             count(*) FILTER (WHERE ds.status::text = 'missing')::int AS missing,
+             count(*) FILTER (WHERE ds.status::text = 'rejected')::int AS rejected,
+             count(*) FILTER (WHERE ds.status::text IN ('uploaded', 'in_review'))::int AS pending,
+             count(*) FILTER (WHERE ds.status::text NOT IN ('not_required', 'missing', 'rejected') AND ds.valid_to IS NOT NULL AND ds.valid_to < current_date)::int AS expired
+      FROM document_slots ds JOIN document_types dt ON dt.id = ds.doc_type_id
+      WHERE ds.register_entity_id = ANY(${entityIds}::uuid[]) AND dt.is_mandatory
+      GROUP BY ds.register_entity_id`);
+    const docsOf = new Map(docRows.map((d) => [d.entity_id, d]));
     const out: Record<string, unknown>[] = [];
     for (const r of rows) {
       if (!defs.has(r.register_key)) defs.set(r.register_key, await this.definition(r.register_key));
@@ -572,6 +586,9 @@ export class RegistersService {
         version: r.version,
         warnings: Array.isArray(r.warnings) ? r.warnings : [],
       };
+      const dc = docsOf.get(r.entity_id);
+      const dot = dc ? evidenceDot(dc) : undefined;
+      if (dot) dto.docs = dot;
       if (r.task_id && r.task_code) dto.task = { id: r.task_id, task_code: r.task_code };
       if (r.register_key === 'quality' && r.record_type === 'snag') {
         const qs = qcSnags.get(r.entity_id);

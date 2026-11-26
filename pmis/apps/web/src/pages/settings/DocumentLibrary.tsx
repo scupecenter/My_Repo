@@ -7,6 +7,9 @@ import {
 } from '@/api/documents';
 import { errText, FormDialog } from '@/components/FormDialog';
 import { useToast } from '@/components/Toast';
+import { useRegisterDefs } from '@/api/registers';
+import { useSnagTypes } from '@/api/qc';
+import { useStartEvents } from '@/api/settings';
 import { fieldErrors } from '@/lib/fields';
 import { tripoliToday } from '@/lib/today';
 
@@ -49,6 +52,31 @@ function toBody(d: Draft): { ok: true; body: Omit<DocumentTypeInput, 'reason' | 
   };
 }
 
+/** Evidence config (owner request 2026-11-26): where a required document applies is PICKED from the existing lists (workflow tasks, registers, snag types), not typed. The dot in Site Master and the registers reads exactly these placements and the mandatory flag. */
+function useRefOptions(target: 'task' | 'qc' | 'register'): { value: string; label: string }[] {
+  const { i18n } = useTranslation();
+  const ar = i18n.language.startsWith('ar');
+  const tasks = useStartEvents().data?.tasks;
+  const regs = useRegisterDefs().data;
+  const snags = useSnagTypes().data;
+  const nm = (en: string, a?: string | null) => (ar && a ? a : en);
+  if (target === 'task') return (tasks ?? []).map((x) => ({ value: x.code, label: `${x.code} · ${nm(x.name_en, x.name_ar)}` }));
+  if (target === 'register') return (regs ?? []).map((x) => ({ value: x.register_key, label: `${x.register_key} · ${nm(x.name_en, x.name_ar)}` }));
+  return (snags ?? []).map((x) => ({ value: x.code, label: `${x.code} · ${nm(x.name_en, x.name_ar)}` }));
+}
+
+function PlacementRef({ target, value, onChange, i }: { target: 'task' | 'qc' | 'register'; value: string; onChange: (v: string) => void; i: number }) {
+  const { t } = useTranslation();
+  const opts = useRefOptions(target);
+  const list = `doc-ref-list-${i}`;
+  return (
+    <>
+      <input className="input flex-1" list={list} aria-label={t('docs.lib.ref')} placeholder={t('docs.lib.ref_pick')} autoComplete="off" data-testid={`doc-placement-ref-${i}`} value={value} onChange={(e) => onChange(e.target.value)} />
+      <datalist id={list}>{opts.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</datalist>
+    </>
+  );
+}
+
 function DocForm({ d, setD, create, errs }: { d: Draft; setD: (x: Draft) => void; create: boolean; errs: Record<string, string> }) {
   const { t } = useTranslation();
   const err = (p: string) => (errs[p] ? <span role="alert" className="block text-xs text-lateInk" data-testid={`doc-err${p.replace(/\//g, '-')}`}>{t(`docs.lib.err.${errs[p]}`, { defaultValue: errs[p] })}</span> : null);
@@ -68,9 +96,9 @@ function DocForm({ d, setD, create, errs }: { d: Draft; setD: (x: Draft) => void
         <legend className="text-sm font-semibold">{t('docs.lib.placements')}</legend>
         {d.placements.map((p, i) => (
           <div key={i} className="mt-1 flex gap-2">
-            <select className="input w-32" aria-label={t('docs.lib.target')} data-testid={`doc-placement-target-${i}`} value={p.target} onChange={(e) => up('placements', d.placements.map((x, j) => (j === i ? { ...x, target: e.target.value as 'task' | 'qc' | 'register' } : x)))}>
+            <select className="input w-32" aria-label={t('docs.lib.target')} data-testid={`doc-placement-target-${i}`} value={p.target} onChange={(e) => up('placements', d.placements.map((x, j) => (j === i ? { ...x, target: e.target.value as 'task' | 'qc' | 'register', ref: '' } : x)))}>
               {(['task', 'qc', 'register'] as const).map((k) => <option key={k} value={k}>{t(`docs.lib.target_${k}`)}</option>)}</select>
-            <input className="input flex-1" aria-label={t('docs.lib.ref')} placeholder={t('docs.lib.ref_hint')} data-testid={`doc-placement-ref-${i}`} value={p.ref} onChange={(e) => up('placements', d.placements.map((x, j) => (j === i ? { ...x, ref: e.target.value } : x)))} />
+            <PlacementRef i={i} target={p.target} value={p.ref} onChange={(v) => up('placements', d.placements.map((x, j) => (j === i ? { ...x, ref: v } : x)))} />
             <button type="button" className="btn px-2" aria-label={t('common.remove')} disabled={d.placements.length === 1} onClick={() => up('placements', d.placements.filter((_, j) => j !== i))}>×</button>
           </div>
         ))}
