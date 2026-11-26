@@ -1,7 +1,7 @@
 -- 0190_dash_ops_procurement (contract 0.15.101): the dashboard follow-up card "Procurement and materials" (owner approval 2026-11-26,
 -- dashboard proposals item 1). Mirror: db/sql/189_dash_ops_procurement.sql (kept identical).
 --
--- Additive: one card code, ops_procurement, is added to the dashboard settings catalogue (migration 0108), so the card can be shown,
+-- Additive: one card code, ops_procurement, is added to the dashboard settings catalogue (migration 0108), keeping the ops_scurve card of 0189, so the card can be shown,
 -- hidden and ordered per tab in Settings > Dashboard like every other card. A card in the catalogue that no saved list names is shown
 -- at the end, so the card appears by default. No table, no data, no grant, no permission and no threshold changes.
 
@@ -31,6 +31,7 @@ LANGUAGE sql IMMUTABLE SECURITY DEFINER SET search_path = pg_catalog, public AS 
       {"code":"gates_issues_delay","label_en":"Blocked gates, issues and delay attribution","label_ar":"البوابات المعطلة والقضايا وتوزيع التأخير"},
       {"code":"counters","label_en":"Counters: SLA breaches and at risk, data quality, KPI colours","label_ar":"العدادات: خروقات SLA والمعرضة للخطر وجودة البيانات وألوان المؤشرات"},
       {"code":"regions","label_en":"Regions","label_ar":"المناطق"},
+      {"code":"ops_scurve","label_en":"Progress curve: planned vs actual, velocity and forecast","label_ar":"منحنى التقدم: المخطط مقابل الفعلي والسرعة والتوقع"},
       {"code":"ops_procurement","label_en":"Procurement and materials","label_ar":"المشتريات والمواد"}
     ]'::jsonb
   )
