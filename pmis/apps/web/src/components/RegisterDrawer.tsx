@@ -97,10 +97,10 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
   const ctx = { refs: record?.refs, files: (recSlots.data?.items ?? []).flatMap((sl) => sl.files.filter((f) => !f.superseded_by).map((f) => ({ id: f.id, name: f.original_name }))) };
   const docsMissing = record?.state === 'entry' ? (recSlots.data?.missing_for_submit ?? []) : [];
   const [data, setData] = useState<Data>(record?.data ?? defaultsFor(rawDef.register_key, rawDef));
-  // 0.15.88: the Contractor company of a Procurement / GECOL / HLC record (record column external_party_id; Procurement and GECOL pick it, HLC shows it)
+  // 0.15.88: the Contractor company of a Procurement / GECOL / HLC record (record column external_party_id; Procurement picks it, GECOL and HLC show it read-only)
   const hasContractor = ['procurement', 'gecol', 'hlc'].includes(rawDef.register_key);
   const [party, setParty] = useState<string>(record?.external_party?.id ?? '');
-  const companies = useContractorCompanies(hasContractor && rawDef.register_key !== 'hlc');
+  const companies = useContractorCompanies(rawDef.register_key === 'procurement');
   const [site, setSite] = useState<SiteSel>(record?.site_id ? { id: record.site_id, code: record.site_code ?? '', region_id: record.region_id as number | undefined } : null);
   const [rtype, setRtype] = useState<string>(record?.record_type ?? '');
   const [dirty, setDirty] = useState(false);
@@ -282,7 +282,7 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
           {hasContractor && (
             <section aria-labelledby="rs-contractor" data-testid="reg-section-contractor" className="space-y-2">
               <h3 id="rs-contractor" className="font-semibold">{t('registers.contractor')}</h3>
-              {editable && rk !== 'hlc' ? (
+              {editable && rk === 'procurement' ? (
                 <div><label htmlFor="reg-contractor" className="text-sm text-mute">{t('registers.contractor_company')}</label>
                   <select id="reg-contractor" data-testid="reg-contractor" className="input" value={party} onChange={(e) => { setParty(e.target.value); setDirty(true); }}>
                     <option value="">{t('registers.choose')}</option>
