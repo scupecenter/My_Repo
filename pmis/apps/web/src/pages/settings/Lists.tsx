@@ -295,14 +295,12 @@ export function Lists() {
                   key={v.id}
                   className={`border-t border-line ${v.is_active ? "" : "opacity-60"} ${drag === v.id ? "bg-hover" : ""}`}
                   data-testid={`lists-value-${v.code}`}
-                  draggable={!mirrored(cur)}
-                  onDragStart={() => setDrag(v.id)}
                   onDragOver={(e) => { if (drag) e.preventDefault(); }}
                   onDrop={() => { const d = drag; setDrag(null); if (d) void placeValue(d, cur.values.findIndex((x) => x.id === v.id)); }}
                   onDragEnd={() => setDrag(null)}
                 >
                   <td className="p-2 mono">
-                    {!mirrored(cur) && <GripVertical size={14} className="me-1 inline cursor-grab text-mute" aria-hidden />}
+                    {!mirrored(cur) && <span draggable className="me-1 inline-block cursor-grab text-mute" data-testid={`lists-grip-${v.code}`} onDragStart={(e) => { setDrag(v.id); const tr = e.currentTarget.closest("tr"); if (tr) e.dataTransfer.setDragImage?.(tr, 0, 0); }}><GripVertical size={14} aria-hidden /></span>}
                     {v.code}
                     {!v.is_active && (
                       <span className="chip ms-1 bg-lockBg text-lockInk">
