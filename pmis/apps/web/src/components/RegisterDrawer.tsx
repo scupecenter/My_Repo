@@ -259,7 +259,7 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
                     <div key={f.code} className={(f.type === 'text' && f.code === 'remark') || ['child_list', 'multi_user', 'multi_site'].includes(f.type) ? 'col-span-2' : ''}>
                       <div className="flex items-center gap-1"><label htmlFor={`reg-field-${f.code}`} className="text-sm text-mute">{fieldLabel(f, lang)}{f.required ? ' *' : ''}</label>
                         {f.list?.status === 'pending' && <span className="chip bg-waitBg text-[10px] text-waitInk" data-testid={`reg-list-pending-${f.code}`} title={t('lists.pending_hint')}>{t('lists.pending')}</span>}
-                        {record && <FieldHistory entityType="register_record" entityId={record.entity_id} field={f.code} label={fieldLabel(f, lang)} />}</div>
+                        {record && <FieldHistory entityType="register_record" entityId={record.entity_id} field={f.code} label={fieldLabel(f, lang)} onRestore={editable && ['text', 'number', 'date', 'yes_no'].includes(f.type) ? (v) => set(f.code, v) : undefined} />}</div>
                       {rk === 'car_dispatcher' && f.code === 'vehicle_id'
                         ? <VehiclePicker value={data.vehicle_id} onChange={(v) => set('vehicle_id', v)} from={data.from_date as string} to={data.to_date as string} vehicleType={data.required_type as string} bookingId={record?.id} disabled={!editable} invalid={!!show} />
                         : key === 'dismantle' && f.code === 'procurement_order_id'

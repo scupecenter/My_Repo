@@ -3508,7 +3508,8 @@
     "r_sensitive": "التغييرات الحساسة",
     "r_none": "لا تغييرات حساسة هذا الشهر.",
     "r_xlsx": "مصنف Excel",
-    "sev_info": "معلومة"
+    "sev_info": "معلومة",
+    "fh_restore": "استرجاع"
   },
   "siteIdentity": {
     "title": "هوية الموقع",
