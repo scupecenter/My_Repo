@@ -6174,5 +6174,11 @@
     "baseline": "Baseline",
     "planned": "Planned",
     "actual": "Actual"
+  },
+  "siteActivity": {
+    "tab": "Activity",
+    "empty": "No activity recorded for this site.",
+    "system": "System",
+    "more": "Load more"
   }
 }
