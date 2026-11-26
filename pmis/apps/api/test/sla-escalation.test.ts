@@ -74,7 +74,7 @@ describe('sla_escalation_notify', () => {
     const exp = await addAssignment(db, expired.id, { roleId, regions: [REGION], modules: ['sites'] });
     await db.query(`UPDATE user_role_assignments SET valid_from = now() - interval '10 days', valid_to = now() - interval '1 day' WHERE id = $1`, [exp]);
     await addAssignment(db, deleted.id, { roleId, regions: [REGION], modules: ['sites'] });
-    await db.query('UPDATE users SET deleted_at = now() WHERE id = $1', [deleted.id]);
+    await db.query('UPDATE users SET deleted_at = now(), status = 'disabled' WHERE id = $1', [deleted.id]);
     await addAssignment(db, otherRoleUser.id, { roleId: otherRole, regions: [REGION], modules: ['sites'] });
 
     const before = (await db.query('SELECT state::text AS s, updated_at FROM task_instances WHERE id = $1', [overdue])).rows[0];
@@ -95,16 +95,15 @@ describe('sla_escalation_notify', () => {
   it('does nothing for a task inside its SLA, an approved task, a rule without an escalation role, or a role name that matches nobody', async () => {
     const roleId = await newRole(db);
     const roleCode = (await db.query('SELECT code FROM roles WHERE id = $1', [roleId])).rows[0].code as string;
-    const site = await makeSite(db, REGION, { prefix: PREFIX });
     const u = await makeUser(db, { status: 'active' });
     await addAssignment(db, u.id, { roleId, regions: [REGION], modules: ['sites'] });
     const withRole = await ruleWith('D6', roleCode);
     const noRole = await ruleWith('D6', null);
     const ghost = await ruleWith('D6', `NO_SUCH_ROLE_${randomBytes(3).toString('hex')}`);
-    const inside = await task(site, 'D6', 'entry', withRole, 1);
-    const approved = await task(site, 'D6', 'approved', withRole, 10);
-    const noEsc = await task(site, 'D6', 'entry', noRole, 10);
-    const nobody = await task(site, 'D6', 'entry', ghost, 10);
+    const inside = await task(await makeSite(db, REGION, { prefix: PREFIX }), 'D6', 'entry', withRole, 1);
+    const approved = await task(await makeSite(db, REGION, { prefix: PREFIX }), 'D6', 'approved', withRole, 10);
+    const noEsc = await task(await makeSite(db, REGION, { prefix: PREFIX }), 'D6', 'entry', noRole, 10);
+    const nobody = await task(await makeSite(db, REGION, { prefix: PREFIX }), 'D6', 'entry', ghost, 10);
     await db.query('SELECT sla_escalation_notify()');
     for (const t of [inside, approved, noEsc, nobody]) expect(await notified(t)).toEqual([]);
   });
@@ -124,7 +123,7 @@ describe('sla_escalation_notify', () => {
     await addAssignment(db, u2.id, { roleId: roleOff, regions: [REGION], modules: ['sites'] });
     await db.query('UPDATE roles SET is_active = false WHERE id = $1', [roleOff]);
     const code2 = (await db.query('SELECT code FROM roles WHERE id = $1', [roleOff])).rows[0].code as string;
-    const t2 = await task(site, 'D6', 'entry', await ruleWith('D6', code2), 10);
+    const t2 = await task(await makeSite(db, REGION, { prefix: PREFIX }), 'D6', 'entry', await ruleWith('D6', code2), 10);
     await db.query('SELECT sla_escalation_notify()');
     expect(await notified(t2)).toEqual([]);
   });
