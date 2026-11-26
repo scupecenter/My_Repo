@@ -107,3 +107,18 @@ describe('register columns page: drag and drop, add before and after', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();   // in the page, not a modal
   });
 });
+
+describe('register columns page: the Hide button', () => {
+  it('hides a column from every place it is listed with one click and shows it again; the column stays active', async () => {
+    await signIn('pm');
+    page();
+    const rows = await screen.findAllByTestId(/^regcols-row-/);
+    const code = rows[0]!.getAttribute('data-testid')!.replace('regcols-row-', '');
+    const u = userEvent.setup();
+    await u.click(screen.getByTestId(`regcols-hide-${code}`));
+    expect(await screen.findByTestId(`regcols-hidden-${code}`)).toBeInTheDocument();
+    expect(screen.getByTestId(`regcols-delete-${code}`)).toBeInTheDocument();          // still active: nothing was deleted or deactivated
+    await u.click(screen.getByTestId(`regcols-hide-${code}`));
+    await waitFor(() => expect(screen.queryByTestId(`regcols-hidden-${code}`)).not.toBeInTheDocument());
+  });
+});
