@@ -114,6 +114,17 @@ export function buildDashboard(q: URLSearchParams, scope: number[] | null = null
       { owner_key: 'party:1', owner_kind: 'party' as const, owner_name: 'A&T Global', count: sc(6, f), sites: sc(5, f), oldest_age_wd: 21, avg_age_wd: 11 },
       { owner_key: 'user:2', owner_kind: 'user' as const, owner_name: 'Lina Haddad', count: sc(4, f), sites: sc(4, f), oldest_age_wd: 12, avg_age_wd: 8 },
     ],
+    by_category: [
+      { code: 'Fiber', label_en: 'Fiber', label_ar: 'الألياف', count: sc(7, f), sites: sc(6, f) },
+      { code: 'Power', label_en: 'Power / GECOL', label_ar: 'الكهرباء / GECOL', count: sc(5, f), sites: sc(4, f) },
+      { code: 'Civil', label_en: 'Civil works / Tower', label_ar: 'الأعمال المدنية / البرج', count: sc(3, f), sites: sc(3, f) },
+      { code: null, label_en: null, label_ar: null, count: sc(2, f), sites: sc(2, f) },
+    ],
+    by_reason: [
+      { code: 'Uplink Site Not Ready', label_en: 'Uplink Site Not Ready', label_ar: 'موقع الـ Uplink غير جاهز', count: sc(6, f), sites: sc(5, f) },
+      { code: 'Waiting GECOL', label_en: 'Waiting for GECOL (power)', label_ar: 'بانتظار GECOL (الكهرباء)', count: sc(4, f), sites: sc(4, f) },
+      { code: 'Material Not Delivered', label_en: 'Material or equipment not delivered', label_ar: 'مواد أو معدات لم تصل', count: sc(3, f), sites: sc(3, f) },
+    ],
     age_buckets: [{ key: '0_7' as const, count: 8 }, { key: '8_15' as const, count: 6 }, { key: '16_30' as const, count: 6 }, { key: 'over_30' as const, count: 3 }],
   };
   return {

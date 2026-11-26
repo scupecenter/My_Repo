@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.84
+  version: 0.15.85
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -31,7 +31,9 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.85 (2026-11-26): the dashboard issues section gains two read-only breakdowns (migration 0172; issue work package 3). `DashboardIssues` gains `by_category` and `by_reason`: the open issues of the section grouped by the stored IssueCategory / BlockerReason list code, each row with the code (null when the field is empty), the list labels, the count of issues and the count of distinct sites (the same two measures as `by_owner`, Q36). The labels follow Settings > Lists; a hidden or renamed value keeps counting under its new label, a code no longer in the list counts under the code itself. Nothing existing changes and no permission or visibility changes.
     - 0.15.84 (2026-11-26): the read-only GECOL / HLC counts screen (owner request 2026-11-26, a step before any move of GECOL or HLC data). Additive, no migration. `GET /reports/gecol-hlc-counts` (System Admin or a delegate holding `admin.settings` view for all regions) counts the GECOL, HLC and Procurement register records (the latest version of each record, by state and Procurement by scope), the GECOL records that already hold a PR number or a request date, the HLC records linked or not linked to a Procurement request, and the sites that have the GECOL or HLC scope. It reads only; nothing is changed.
+
     - 0.15.83 (2026-11-26): the evidence dot of the Site Master wide table (owner request 2026-11-26). Additive, read only, no migration. Each cell of `GET /site-master/{menu}/rows` may carry `docs` (`state` red when a document still has to be uploaded, yellow when all are uploaded but not all approved, green when all are approved; the counts `need`, `approved`, `pending`, `missing`, `rejected`, `expired`), computed from the mandatory document slots of the task behind the cell. Nothing is written and no permission changes. Each register record (`RegisterRecord`) may carry the same `docs`, computed from the mandatory slots of its logical record (`register_entity_id`).
     - 0.15.82 (2026-11-26): `GET /me/tasks.ics` returns My Work (do now and late) as an iCalendar file. Needs the session like every call; same rights and region scope as `GET /me/tasks`; nothing public and no token link. No migration.
     - 0.15.81 (2026-11-26): two more UI designs, `obsidian` and `sahara` (migration 0164): `UiBrand` gains the two names (users.ui_brand, `ui.identity` default_brand, `PATCH /me/profile`). Visual only; the four existing designs, the light/dark theme and the storage are unchanged.
@@ -24148,7 +24150,7 @@ components:
     DashboardIssues:
       description: Counted by issue for the owner bars and the totals, by site for `sites_with_open_issue` (Q36). Age in working days from the raised date.
       type: object
-      required: [available, open_total, sites_with_open_issue, by_owner, age_buckets]
+      required: [available, open_total, sites_with_open_issue, by_owner, by_category, by_reason, age_buckets]
       properties:
         available: {type: boolean}
         open_total: {type: integer}
@@ -24169,6 +24171,30 @@ components:
               sites: {type: integer}
               oldest_age_wd: {type: [integer, 'null']}
               avg_age_wd: {type: [number, 'null']}
+        by_category:
+          type: array
+          description: '0.15.85 (0172). The open issues grouped by the IssueCategory code stored on the record; code null = no category set. Labels follow Settings > Lists.'
+          items:
+            type: object
+            required: [code, count, sites]
+            properties:
+              code: {type: [string, 'null']}
+              label_en: {type: [string, 'null']}
+              label_ar: {type: [string, 'null']}
+              count: {type: integer}
+              sites: {type: integer}
+        by_reason:
+          type: array
+          description: '0.15.85 (0172). The open issues grouped by the BlockerReason code stored on the record; code null = no reason set. Labels follow Settings > Lists.'
+          items:
+            type: object
+            required: [code, count, sites]
+            properties:
+              code: {type: [string, 'null']}
+              label_en: {type: [string, 'null']}
+              label_ar: {type: [string, 'null']}
+              count: {type: integer}
+              sites: {type: integer}
         age_buckets:
           type: array
           items:
