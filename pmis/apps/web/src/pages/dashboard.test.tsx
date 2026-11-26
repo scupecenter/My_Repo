@@ -71,6 +71,9 @@ describe('Dashboard', () => {
     expect(screen.getByTestId('dash-issues-open')).toBeInTheDocument();
     expect(screen.getByTestId('dash-issues-sites')).toBeInTheDocument();
     expect(screen.getByTestId('dash-issues-chart')).toHaveAccessibleName(/Sami Nuri 8/);
+    expect(screen.getByTestId('dash-issues-cat-chart')).toHaveAccessibleName(/Fiber: 7 issues, 6 sites/);
+    expect(screen.getByTestId('dash-issues-cat-chart')).toHaveAccessibleName(/No category: 2 issues, 2 sites/);
+    expect(screen.getByTestId('dash-issues-reason-chart')).toHaveAccessibleName(/Uplink Site Not Ready: 6 issues, 5 sites/);
     expect(screen.getByTestId('dash-delay')).toHaveTextContent('Delay attribution');
   });
 

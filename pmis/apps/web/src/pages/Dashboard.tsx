@@ -868,6 +868,108 @@ export function Dashboard() {
     [d, t],
   );
 
+  const catBars = useMemo(
+    () => (p: Palette, rtl: boolean) => {
+      const rows = d?.issues?.by_category.slice(0, 8) ?? [];
+      const label = (r: (typeof rows)[number]) =>
+        (ar && r.label_ar ? r.label_ar : r.label_en) ??
+        t("dash.issues.no_category");
+      return {
+        textStyle: { fontFamily: FONT },
+        tooltip: { trigger: "axis", axisPointer: { type: "shadow" } },
+        grid: { left: 16, right: 24, top: 8, bottom: 8, containLabel: true },
+        xAxis: {
+          type: "value",
+          inverse: rtl,
+          minInterval: 1,
+          axisLabel: { color: p.mute },
+          splitLine: { lineStyle: { color: p.line } },
+        },
+        yAxis: {
+          type: "category",
+          inverse: true,
+          position: rtl ? "right" : "left",
+          data: rows.map(label),
+          axisLabel: {
+            color: p.ink,
+            width: 100,
+            overflow: "truncate",
+            align: rtl ? "left" : "right",
+            margin: 10,
+          },
+        },
+        series: [
+          {
+            type: "bar",
+            itemStyle: { color: p.open },
+            data: rows.map((r) => r.count),
+            label: {
+              show: true,
+              position: rtl ? "left" : "right",
+              color: p.ink,
+              formatter: (pt: { dataIndex: number }) =>
+                `${rows[pt.dataIndex]?.count ?? 0} · ${
+                  rows[pt.dataIndex]?.sites ?? 0
+                }`,
+            },
+          },
+        ],
+      };
+    },
+    [d, t, ar],
+  );
+
+  const reasonBars = useMemo(
+    () => (p: Palette, rtl: boolean) => {
+      const rows = d?.issues?.by_reason.slice(0, 8) ?? [];
+      const label = (r: (typeof rows)[number]) =>
+        (ar && r.label_ar ? r.label_ar : r.label_en) ??
+        t("dash.issues.no_reason");
+      return {
+        textStyle: { fontFamily: FONT },
+        tooltip: { trigger: "axis", axisPointer: { type: "shadow" } },
+        grid: { left: 16, right: 24, top: 8, bottom: 8, containLabel: true },
+        xAxis: {
+          type: "value",
+          inverse: rtl,
+          minInterval: 1,
+          axisLabel: { color: p.mute },
+          splitLine: { lineStyle: { color: p.line } },
+        },
+        yAxis: {
+          type: "category",
+          inverse: true,
+          position: rtl ? "right" : "left",
+          data: rows.map(label),
+          axisLabel: {
+            color: p.ink,
+            width: 100,
+            overflow: "truncate",
+            align: rtl ? "left" : "right",
+            margin: 10,
+          },
+        },
+        series: [
+          {
+            type: "bar",
+            itemStyle: { color: p.open },
+            data: rows.map((r) => r.count),
+            label: {
+              show: true,
+              position: rtl ? "left" : "right",
+              color: p.ink,
+              formatter: (pt: { dataIndex: number }) =>
+                `${rows[pt.dataIndex]?.count ?? 0} · ${
+                  rows[pt.dataIndex]?.sites ?? 0
+                }`,
+            },
+          },
+        ],
+      };
+    },
+    [d, t, ar],
+  );
+
   const delayBars = useMemo(
     () => (p: Palette, rtl: boolean) => {
       const rows = d?.delay.items.slice(0, 8) ?? [];
@@ -2249,6 +2351,75 @@ export function Dashboard() {
                               })}
                               testid="dash-issues-chart"
                             />
+                          )}
+                          {d.issues.by_category.length > 0 && (
+                            <>
+                              <h3 className="mt-3 mb-1 text-sm font-semibold">
+                                {t("dash.issues.by_category")}
+                              </h3>
+                              <p className="mb-1 text-xs text-mute">
+                                {t("dash.issues.issues_sites")}
+                              </p>
+                              <EChart
+                                build={catBars}
+                                height={Math.max(
+                                  90,
+                                  Math.min(8, d.issues.by_category.length) *
+                                    28 +
+                                    16,
+                                )}
+                                label={t("dash.issues.cat_chart", {
+                                  list: d.issues.by_category
+                                    .map((r) =>
+                                      t("dash.issues.breakdown_row", {
+                                        label:
+                                          (ar && r.label_ar
+                                            ? r.label_ar
+                                            : r.label_en) ??
+                                          t("dash.issues.no_category"),
+                                        n: r.count,
+                                        s: r.sites,
+                                      }),
+                                    )
+                                    .join("; "),
+                                })}
+                                testid="dash-issues-cat-chart"
+                              />
+                            </>
+                          )}
+                          {d.issues.by_reason.length > 0 && (
+                            <>
+                              <h3 className="mt-3 mb-1 text-sm font-semibold">
+                                {t("dash.issues.by_reason")}
+                              </h3>
+                              <p className="mb-1 text-xs text-mute">
+                                {t("dash.issues.issues_sites")}
+                              </p>
+                              <EChart
+                                build={reasonBars}
+                                height={Math.max(
+                                  90,
+                                  Math.min(8, d.issues.by_reason.length) * 28 +
+                                    16,
+                                )}
+                                label={t("dash.issues.reason_chart", {
+                                  list: d.issues.by_reason
+                                    .map((r) =>
+                                      t("dash.issues.breakdown_row", {
+                                        label:
+                                          (ar && r.label_ar
+                                            ? r.label_ar
+                                            : r.label_en) ??
+                                          t("dash.issues.no_reason"),
+                                        n: r.count,
+                                        s: r.sites,
+                                      }),
+                                    )
+                                    .join("; "),
+                                })}
+                                testid="dash-issues-reason-chart"
+                              />
+                            </>
                           )}
                           <ul
                             className="mt-2 flex flex-wrap gap-2 text-xs"

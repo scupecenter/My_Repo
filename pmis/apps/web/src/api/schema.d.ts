@@ -18760,6 +18760,22 @@ export interface components {
                 oldest_age_wd?: number | null;
                 avg_age_wd?: number | null;
             }[];
+            /** @description 0.15.85 (0172). The open issues grouped by the IssueCategory code stored on the record; code null = no category set. Labels follow Settings > Lists. */
+            by_category: {
+                code: string | null;
+                label_en?: string | null;
+                label_ar?: string | null;
+                count: number;
+                sites: number;
+            }[];
+            /** @description 0.15.85 (0172). The open issues grouped by the BlockerReason code stored on the record; code null = no reason set. Labels follow Settings > Lists. */
+            by_reason: {
+                code: string | null;
+                label_en?: string | null;
+                label_ar?: string | null;
+                count: number;
+                sites: number;
+            }[];
             age_buckets: {
                 /** @enum {string} */
                 key: "0_7" | "8_15" | "16_30" | "over_30";
