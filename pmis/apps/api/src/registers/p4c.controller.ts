@@ -40,6 +40,17 @@ export class P4cController {
     return this.p4c.warehouseOrderOptions(auth, q, 'financial_advances');
   }
 
+  /** The same picker for the Issue log and Quality (`procurement_order_id`; the contractor comes from the order). */
+  @Get('issues/order-options')
+  issueOrderOptions(@Auth() auth: AuthContext, @Query() q: Record<string, unknown>) {
+    return this.p4c.warehouseOrderOptions(auth, q, 'issues');
+  }
+
+  @Get('quality/order-options')
+  qualityOrderOptions(@Auth() auth: AuthContext, @Query() q: Record<string, unknown>) {
+    return this.p4c.warehouseOrderOptions(auth, q, 'quality');
+  }
+
   @Get('procurement/:entity_id/receipts')
   orderReceipts(@Auth() auth: AuthContext, @Param('entity_id') entityId: string) {
     return this.p4c.orderReceipts(auth, entityId);
