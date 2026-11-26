@@ -4113,6 +4113,69 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/issues/stopped-rows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Derived "stopped at" issue rows (computed, never stored)
+         * @description 0.15.87. One row per stopped site: the site is not finished (not completed or cancelled, On-Air milestone MS6 not approved) and has an open task that is late
+         *     (SLA colour red) or blocked (rejected or suspended). The row shows the LATEST such task in workflow order. `category` and `blocker_reason` come from the map
+         *     `/settings/issue-task-map`; a task without a map row shows `Other` and `not_classified` true. Read only; the caller's regions of `issues` apply.
+         */
+        get: operations["listIssueStoppedRows"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/issue-task-map": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Task code to issue category and blocker reason (editable map)
+         * @description 0.15.87. One item per active task of the workflow version in force. Needs `view` on `admin.settings`.
+         */
+        get: operations["listIssueTaskMap"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/issue-task-map/{task_code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set the issue category and blocker reason of a task code
+         * @description 0.15.87. `category` must be a value of the list IssueCategory, `reason` a value of BlockerReason or null (Not classified). `is_active` false hides the row
+         *     (nothing is deleted). Needs `edit` on `settings` (System Admin or a delegation for all regions). Audited, a reason `why` is required.
+         */
+        put: operations["saveIssueTaskMap"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/sla-tasks": {
         parameters: {
             query?: never;
@@ -9829,6 +9892,50 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        IssueStoppedRow: {
+            site_code: string;
+            /** Format: uuid */
+            task_id?: string;
+            task_code: string;
+            task_name_en?: string;
+            task_name_ar?: string | null;
+            stage_code: string;
+            stage_name?: string;
+            state: string;
+            /** @enum {string} */
+            why: "late" | "rejected" | "suspended";
+            working_days_elapsed?: number | null;
+            category: string;
+            blocker_reason?: string | null;
+            not_classified: boolean;
+            open_blocking_tasks?: number;
+        };
+        IssueStoppedRowList: {
+            items: components["schemas"]["IssueStoppedRow"][];
+            counts: {
+                total: number;
+                not_classified: number;
+            };
+        };
+        IssueTaskMapItem: {
+            task_code: string;
+            name_en?: string;
+            name_ar?: string | null;
+            stage_code?: string;
+            stage_seq?: number;
+            category?: string | null;
+            reason?: string | null;
+            blocker_reason?: string | null;
+            is_active?: boolean;
+            not_classified?: boolean;
+        };
+        IssueTaskMapList: {
+            items: components["schemas"]["IssueTaskMapItem"][];
+            counts: {
+                total: number;
+                not_classified: number;
+            };
+        };
         /**
          * @description 0.15.70 (W5). The lifecycle of a site document: due (its task opened), generated (a filled copy was generated), signed_uploaded (the signed copy is uploaded), in_review (submitted with the task), approved, rejected (returned); superseded is an older file version.
          * @enum {string}
@@ -26427,6 +26534,84 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+        };
+    };
+    listIssueStoppedRows: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The rows. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssueStoppedRowList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    listIssueTaskMap: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The map. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssueTaskMapList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    saveIssueTaskMap: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    category: string;
+                    reason?: string | null;
+                    is_active?: boolean;
+                    why: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The row after the change. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssueTaskMapItem"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     listSlaTasks: {

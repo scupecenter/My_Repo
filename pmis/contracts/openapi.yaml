@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.86
+  version: 0.15.87
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -6420,6 +6420,69 @@ paths:
                     properties:
                       items: { type: array, items: { $ref: '#/components/schemas/SlaRule' } }
         '401': { $ref: '#/components/responses/Unauthorized' }
+  /issues/stopped-rows:
+    get:
+      tags: [registers]
+      operationId: listIssueStoppedRows
+      summary: Derived "stopped at" issue rows (computed, never stored)
+      description: |
+        0.15.87. One row per stopped site: the site is not finished (not completed or cancelled, On-Air milestone MS6 not approved) and has an open task that is late
+        (SLA colour red) or blocked (rejected or suspended). The row shows the LATEST such task in workflow order. `category` and `blocker_reason` come from the map
+        `/settings/issue-task-map`; a task without a map row shows `Other` and `not_classified` true. Read only; the caller's regions of `issues` apply.
+      responses:
+        '200':
+          description: The rows.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/IssueStoppedRowList'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /settings/issue-task-map:
+    get:
+      tags: [settings]
+      operationId: listIssueTaskMap
+      summary: Task code to issue category and blocker reason (editable map)
+      description: 0.15.87. One item per active task of the workflow version in force. Needs `view` on `admin.settings`.
+      responses:
+        '200':
+          description: The map.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/IssueTaskMapList'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /settings/issue-task-map/{task_code}:
+    put:
+      tags: [settings]
+      operationId: saveIssueTaskMap
+      summary: Set the issue category and blocker reason of a task code
+      description: |
+        0.15.87. `category` must be a value of the list IssueCategory, `reason` a value of BlockerReason or null (Not classified). `is_active` false hides the row
+        (nothing is deleted). Needs `edit` on `settings` (System Admin or a delegation for all regions). Audited, a reason `why` is required.
+      parameters:
+        - {name: task_code, in: path, required: true, schema: {type: string, maxLength: 40}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [category, why]
+              properties:
+                category: {type: string, maxLength: 80}
+                reason: {type: [string, 'null'], maxLength: 80}
+                is_active: {type: boolean}
+                why: {type: string, minLength: 3, maxLength: 500}
+      responses:
+        '200':
+          description: The row after the change.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/IssueTaskMapItem'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
   /settings/sla-tasks:
     get:
       tags: [settings]
@@ -15721,6 +15784,60 @@ components:
           schema: { $ref: '#/components/schemas/TransitionResult' }
 
   schemas:
+    IssueStoppedRow:
+      type: object
+      required: [site_code, task_code, stage_code, state, why, category, not_classified]
+      properties:
+        site_code: {type: string}
+        task_id: {type: string, format: uuid}
+        task_code: {type: string}
+        task_name_en: {type: string}
+        task_name_ar: {type: [string, 'null']}
+        stage_code: {type: string}
+        stage_name: {type: string}
+        state: {type: string}
+        why: {type: string, enum: [late, rejected, suspended]}
+        working_days_elapsed: {type: [integer, 'null']}
+        category: {type: string}
+        blocker_reason: {type: [string, 'null']}
+        not_classified: {type: boolean}
+        open_blocking_tasks: {type: integer}
+    IssueStoppedRowList:
+      type: object
+      required: [items, counts]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/IssueStoppedRow'}}
+        counts:
+          type: object
+          required: [total, not_classified]
+          properties:
+            total: {type: integer}
+            not_classified: {type: integer}
+    IssueTaskMapItem:
+      type: object
+      required: [task_code]
+      properties:
+        task_code: {type: string}
+        name_en: {type: string}
+        name_ar: {type: [string, 'null']}
+        stage_code: {type: string}
+        stage_seq: {type: integer}
+        category: {type: [string, 'null']}
+        reason: {type: [string, 'null']}
+        blocker_reason: {type: [string, 'null']}
+        is_active: {type: boolean}
+        not_classified: {type: boolean}
+    IssueTaskMapList:
+      type: object
+      required: [items, counts]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/IssueTaskMapItem'}}
+        counts:
+          type: object
+          required: [total, not_classified]
+          properties:
+            total: {type: integer}
+            not_classified: {type: integer}
     LibraryDocStatus:
       type: string
       enum: [due, generated, signed_uploaded, in_review, approved, rejected, superseded]

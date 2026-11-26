@@ -1139,6 +1139,7 @@
     "section_registers_columns": "أعمدة السجلات",
     "section_registers_contractors": "قواعد المقاولين",
     "section_registers_gecol": "تنبيهات ترتيب GECOL",
+    "section_registers_issue-map": "تصنيف المشكلة حسب المهمة",
     "section_registers_team-scope": "مطابقة الفريق والنطاق",
     "section_documents_library": "مكتبة المستندات",
     "section_documents_mail": "أنواع البريد",
@@ -6411,5 +6412,22 @@
     "save": "حفظ",
     "cancel": "إلغاء",
     "empty": "لا مهام."
+  },
+  "issueMap": {
+    "title": "تصنيف المشكلة حسب المهمة",
+    "note": "عندما يتوقف موقع، يتبع تصنيف صف المشكلة وسببه المهمة التي توقف عندها. القائمة مبنية من مجموعة المهمة، ويمكن تغيير كل سطر. القيم تأتي من قائمتي تصنيف المشكلة وسبب التعطيل.",
+    "banner_unclassified": "{{n}} مهمة غير مصنفة بعد. تظهر صفوف مشاكلها بتصنيف أخرى وغير مصنف.",
+    "banner_ok": "لكل مهمة تصنيف.",
+    "col_task": "المهمة",
+    "col_stage": "المرحلة",
+    "col_category": "التصنيف",
+    "col_reason": "السبب",
+    "col_actions": "إجراءات",
+    "not_classified": "غير مصنف",
+    "edit": "تعديل",
+    "active": "استخدام هذا السطر",
+    "why": "سبب التغيير",
+    "cancel": "إلغاء",
+    "save": "حفظ"
   }
 }

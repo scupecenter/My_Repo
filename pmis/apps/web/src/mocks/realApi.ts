@@ -425,6 +425,9 @@ export const REAL_API_AUTH_USERS = [
   // Contract 0.15.85: the SLA status of every task and the explicit "no SLA" choice.
   ['get', '/settings/sla-tasks'],
   ['put', '/settings/sla-tasks/:task_code/no-sla'],
+  ['get', '/issues/stopped-rows'],
+  ['get', '/settings/issue-task-map'],
+  ['put', '/settings/issue-task-map/:task_code'],
   ['get', '/settings/sla-rule-sets'],
   ['post', '/settings/sla-rule-sets'],
   ['get', '/settings/sla-rule-sets/:id'],

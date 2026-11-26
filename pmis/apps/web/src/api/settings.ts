@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { api, ApiError, downloadFile, type RequestOptions } from './client';
-import type {
+import type { IssueStoppedRowList, IssueTaskMapItem, IssueTaskMapList,
   ActiveSession, ActOnBehalfRequest, Calendar, CalendarConfirmation, MailNotificationKinds, ImportsSettings, NavLayoutSetting, UiIdentity, UiBrand, NavLayoutT, ContractorRules, ContractorRulesInput, GecolHlcCounts, ContractorsCompletenessReport, TeamScopeMismatchReport, DeletedUser, PurgedUser, DlpSettings, DlpVersion, DlpVersionInput, Holiday, HolidayChangeResult, HolidayInput, HolidayPatch, HolidaySummary, IdleTaskAlertSetting, Job, LogIntegrity, LogRetention, LogRetentionInput,
   NotificationPolicy, NotificationPolicyInput, NotificationTypeDef, Page, ReassignmentAlert, SecurityLogEntry, SessionRevokeResult, SlaPublishPreview, SlaRuleSet, SlaRuleSetPublishResult, SlaRuleSetSummary, SlaTaskRule, StaffCard, StaffVisibility, StructuralFreeze,
   TaskDefinition, TeamScopeMatch, TeamScopeMatchInput, TransitionResultT, User, UserDetail, WeekendDaysResult, WeightSet, WeightSetCode, WeightSetInput, WeightSetPreview, WeightSetPublishResult, WorkflowVersion, WorkflowVersionSummary,
@@ -409,3 +409,13 @@ export const useSetSlaNoSla = () => {
     onSettled: () => refresh(qc, 'slaTasks'),
   });
 };
+/** 0171 (contract 0.15.87): the editable map task code -> issue category and blocker reason, and the derived "stopped at" rows. */
+export const useIssueTaskMap = () => useQuery({ queryKey: ['issueTaskMap'], queryFn: () => api.get<IssueTaskMapList>('/settings/issue-task-map') });
+export const useSaveIssueTaskMap = () => {
+  const qc = useQueryClient();
+  return useMutation<IssueTaskMapItem, ApiError, { task: string; category: string; reason: string | null; is_active: boolean; why: string }>({
+    mutationFn: ({ task, ...body }) => api.put(`/settings/issue-task-map/${task}`, { body }),
+    onSettled: () => refresh(qc, 'issueTaskMap', 'issueStoppedRows'),
+  });
+};
+export const useIssueStoppedRows = () => useQuery({ queryKey: ['issueStoppedRows'], queryFn: () => api.get<IssueStoppedRowList>('/issues/stopped-rows') });

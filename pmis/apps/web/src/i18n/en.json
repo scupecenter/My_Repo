@@ -1139,6 +1139,7 @@
     "section_registers_columns": "Register columns",
     "section_registers_contractors": "Contractor rules",
     "section_registers_gecol": "GECOL order warnings",
+    "section_registers_issue-map": "Issue category by task",
     "section_registers_team-scope": "Team / scope match",
     "section_documents_library": "Document Library",
     "section_documents_mail": "Mail kinds",
@@ -6343,5 +6344,22 @@
     "save": "Save",
     "cancel": "Cancel",
     "empty": "No tasks."
+  },
+  "issueMap": {
+    "title": "Issue category by task",
+    "note": "When a site is stopped, the category and the reason of its issue row follow the task where it is stopped. The list is filled from the task group and every line can be changed. The values come from the lists Issue category and Blocker reason.",
+    "banner_unclassified": "{{n}} tasks are not classified yet. Their issue rows show Other and Not classified.",
+    "banner_ok": "Every task has a category.",
+    "col_task": "Task",
+    "col_stage": "Stage",
+    "col_category": "Category",
+    "col_reason": "Reason",
+    "col_actions": "Actions",
+    "not_classified": "Not classified",
+    "edit": "Edit",
+    "active": "Use this line",
+    "why": "Reason for the change",
+    "cancel": "Cancel",
+    "save": "Save"
   }
 }

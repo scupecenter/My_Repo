@@ -201,6 +201,9 @@ export type RegisterRecordPatch = S['RegisterRecordPatch'];
 // ---- 0.12.5 (P5): the list catalogue (Q104), the new field types, the Meetings conversion (Q111)
 export type ListRef = S['ListRef'];
 export type ListValue = S['ListValue'];
+export type IssueTaskMapItem = S['IssueTaskMapItem'];
+export type IssueTaskMapList = S['IssueTaskMapList'];
+export type IssueStoppedRowList = S['IssueStoppedRowList'];
 export type ListCatalogue = S['ListCatalogue'];
 export type ListCatalogueInput = S['ListCatalogueInput'];
 export type ListCataloguePatch = S['ListCataloguePatch'];
