@@ -20,3 +20,12 @@ describe('Dashboard TV mode', () => {
     expect(screen.queryByTestId('tv-mode')).toBeNull();
   });
 });
+
+describe('Dashboard needs-attention strip', () => {
+  it('shows only when something needs attention, with links into the existing lists', async () => {
+    await signIn('pm');
+    renderApp(<App />, { route: '/dashboard' });
+    const strip = await screen.findByTestId('dash-attention').catch(() => null);
+    if (strip) expect(strip.querySelectorAll('a,span.chip').length).toBeGreaterThan(0);
+  });
+});

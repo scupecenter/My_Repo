@@ -3057,7 +3057,13 @@
     "link_copied": "Copied",
     "copy_link_hint": "Copy the address of this view with its filters. Whoever opens it signs in first and sees only what their own role allows.",
     "tv": "TV mode",
-    "tv_exit": "Exit TV mode (Esc)"
+    "tv_exit": "Exit TV mode (Esc)",
+    "attention": {
+      "title": "Needs attention",
+      "late": "{{n}} late tasks",
+      "issues": "{{n}} open issues",
+      "decisions": "{{n}} decisions to act on now"
+    }
   },
   "docs": {
     "err": {

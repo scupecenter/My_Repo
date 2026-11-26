@@ -1365,6 +1365,21 @@ export function Dashboard() {
 
               headline: (
                 <>
+                  {/* needs-attention strip: only counts the dashboard already returned, each linking to its list; nothing new is read */}
+                  {(() => {
+                    const lateN = d.sla?.totals?.open_late ?? 0;
+                    const issuesN = d.issues?.open_total ?? 0;
+                    const actNow = (extras.data?.decisions?.items ?? []).filter((x) => x.tag === "act_now").length;
+                    if (!lateN && !issuesN && !actNow) return null;
+                    return (
+                      <section className="mb-3 flex flex-wrap items-center gap-2 text-sm" data-testid="dash-attention" aria-label={t("dash.attention.title")}>
+                        <b>{t("dash.attention.title")}</b>
+                        {lateN > 0 && <Link className="chip bg-lateBg text-lateInk" data-testid="dash-attn-late" to={sites({ bucket: "late" })}>{t("dash.attention.late", { n: lateN })}</Link>}
+                        {issuesN > 0 && <Link className="chip bg-waitBg text-waitInk" data-testid="dash-attn-issues" to="/registers/issues">{t("dash.attention.issues", { n: issuesN })}</Link>}
+                        {actNow > 0 && <span className="chip bg-lateBg text-lateInk" data-testid="dash-attn-decisions">{t("dash.attention.decisions", { n: actNow })}</span>}
+                      </section>
+                    );
+                  })()}
                   {/* headline */}
                   <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                     <section
