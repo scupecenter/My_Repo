@@ -2,7 +2,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { Client as PgClient } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { startApp, superDb } from './helpers';
-import { createRec, patch, team } from './reg-helpers';
+import { createRec, patch, recPath, team } from './reg-helpers';
 
 /** Migration 0168: the IssueCategory and BlockerReason lists, the three new Issues fields and the automatic issue number. */
 let app: NestExpressApplication;
@@ -42,11 +42,13 @@ describe('issue lists and fields (0168)', () => {
     expect(old.rows[0].required).toBe(true);
   });
 
-  it('a new issue gets ISS-nnnn, a new version keeps it, a typed number is overwritten', async () => {
+  it('a new issue gets ISS-nnnn, a new version keeps it, a typed number is refused (read-only)', async () => {
     const t = await team(app, db, 'issues', 'issues', 7);
-    const a = await createRec(t, { ...ISSUE, issue_no: 'ISS-9999' });
+    const typed = await t.entry.api.call('post', recPath('issues'), { site_id: t.site.id, data: { ...ISSUE, issue_no: 'ISS-9999' } });
+    expect(typed.status).toBe(422);
+    expect(typed.body.errors[0]).toMatchObject({ path: '/data/issue_no', code: 'field_read_only' });
+    const a = await createRec(t, ISSUE);
     expect(a.data.issue_no).toMatch(/^ISS-\d{4,}$/);
-    expect(a.data.issue_no).not.toBe('ISS-9999');
     const b = await createRec(t, ISSUE);
     expect(b.data.issue_no).toMatch(/^ISS-\d{4,}$/);
     expect(b.data.issue_no).not.toBe(a.data.issue_no);
