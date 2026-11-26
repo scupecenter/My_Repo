@@ -273,7 +273,8 @@
     "nothing": "Nothing here",
     "empty_title": "You are all caught up",
     "empty_body": "No task is assigned to you in your regions.",
-    "go_approvals": "Approvals"
+    "go_approvals": "Approvals",
+    "ics": "Calendar file (.ics)"
   },
   "approvals": {
     "title": "Approvals",
@@ -6174,5 +6175,11 @@
     "baseline": "Baseline",
     "planned": "Planned",
     "actual": "Actual"
+  },
+  "siteActivity": {
+    "tab": "Activity",
+    "empty": "No activity recorded for this site.",
+    "system": "System",
+    "more": "Load more"
   }
 }

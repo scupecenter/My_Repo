@@ -1,7 +1,8 @@
-import { AlertTriangle, Check, Clock, Columns3, Inbox, List, Pencil } from 'lucide-react';
+import { AlertTriangle, CalendarDays, Check, Clock, Columns3, Inbox, List, Pencil } from 'lucide-react';
 import { Fragment, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router-dom';
+import { downloadFile } from '@/api/client';
 import { useMe, useMyTasks } from '@/api/hooks';
 import type { TaskSummary } from '@/api/types';
 import { Holders } from '@/components/HolderChip';
@@ -107,7 +108,8 @@ export function MyWork() {
           <h1 className="text-2xl font-bold">{t('myWork.title')}</h1>
           <p className="text-mute">{t('myWork.hello', { name: me.data?.user.display_name.split(' ')[0] ?? '' })}</p>
         </div>
-        <Link to="/approvals" data-testid="my-work-go-approvals" className="btn btn-accent ms-auto"><Inbox size={16} />{t('myWork.go_approvals')}<span className="chip bg-card text-ink">{doNow.data?.items.length ?? 0}</span></Link>
+        <button type="button" className="btn ms-auto" data-testid="my-work-ics" onClick={() => { void downloadFile('/me/tasks.ics').catch(() => undefined); }}><CalendarDays size={16} />{t('myWork.ics')}</button>
+        <Link to="/approvals" data-testid="my-work-go-approvals" className="btn btn-accent"><Inbox size={16} />{t('myWork.go_approvals')}<span className="chip bg-card text-ink">{doNow.data?.items.length ?? 0}</span></Link>
       </div>
       {board ? (
         <div className="space-y-2">

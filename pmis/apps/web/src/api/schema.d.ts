@@ -971,6 +971,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me/tasks.ics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Work as an iCalendar file
+         * @description 0.15.82. The caller's open tasks that need action (do now and late) as all-day events on the SLA due date, or the planned date. Session required; the rights and region scope of `GET /me/tasks` apply. Tasks with no date are left out.
+         */
+        get: operations["myTasksIcs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me/tasks": {
         parameters: {
             query?: never;
@@ -20614,6 +20634,28 @@ export interface operations {
             409: components["responses"]["Conflict"];
             422: components["responses"]["Unprocessable"];
             429: components["responses"]["TooManyRequests"];
+        };
+    };
+    myTasksIcs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description An iCalendar (RFC 5545) file, sent as an attachment. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/calendar": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     listMyTasks: {
