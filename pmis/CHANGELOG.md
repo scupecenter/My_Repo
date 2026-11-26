@@ -19,6 +19,9 @@
 ## 2026-11-26 (I18nMissingKeys): مفاتيح ترجمة ناقصة وفحص CI لها
 
 **إصلاح.** ظهرت مفاتيح خام في الواجهة لأن ستة مفاتيح مستعملة في `t()` لا وجود لها في `en.json` و`ar.json`: `common.error`، `regcols.move_up`، `regcols.move_down`، `syslog.system`، والأصل `board.more` و`locks.gaps` (مع صيغ الجمع العربية الناقصة `zero/two/few/many`). أُضيفت كلها بالعربية والإنجليزية. أُضيف اختبار `src/i18n/missingKeys.test.ts` يفشل في CI إذا استُعمل في الشيفرة مفتاح `t('a.b')` حرفي بلا `defaultValue` وهو غير موجود في أحد الملفين. لا تغيير في العقد ولا في قاعدة البيانات.
+## 2026-11-26 (ReactRouter7): تحديث react-router-dom إلى 7.18.7 (ثغرتان متوسطتان)
+
+**أمان.** `react-router-dom` من 6.30.6 إلى 7.18.7 لسدّ ثغرتين متوسطتين: إعادة توجيه مفتوحة عبر الشرطة المائلة العكسية في `<Link>` و`useNavigate` (GHSA-wrjc-x8rr-h8h6)، وحقن بانٍ في `deserializeErrors()` عند الترطيب من جهة الخادم (GHSA-337j-9hxr-rhxg). التطبيق يستعمل `BrowserRouter` فقط والاستيراد من `react-router-dom` كما هو، وتعديل الشيفرة سطران فقط: `useTransitions={false}` على `BrowserRouter` (وعلى `MemoryRouter` في الاختبارات) لأن الإصدار 7 ينفّذ كل تنقّل داخل `React.startTransition` افتراضياً، وهذا أخّر عرض الشاشات في اختبارات e2e؛ مع `false` يبقى سلوك الإصدار 6. لا تغيير في العقد ولا قاعدة البيانات. (موافقة المالك 2026-11-26)
 
 ---
 
