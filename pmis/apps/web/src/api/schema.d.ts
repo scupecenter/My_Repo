@@ -15520,10 +15520,10 @@ export interface components {
             children: (string | components["schemas"]["NavSubHeading"])[];
         };
         /**
-         * @description 0.15.41. A UI design: `current` is the look of the system before 0.15.41 (the default); `aljeel` the company brand; `executive` a light sidebar; `field` high contrast with larger type for site teams. A design changes the sidebar, the accent, the page background, lines and type size only, never the status colours.
+         * @description 0.15.81 (0164): `obsidian` (near-black sidebar, gold accent) and `sahara` (sand page, emerald accent) added; visual only. 0.15.41. A UI design: `current` is the look of the system before 0.15.41 (the default); `aljeel` the company brand; `executive` a light sidebar; `field` high contrast with larger type for site teams. A design changes the sidebar, the accent, the page background, lines and type size only, never the status colours.
          * @enum {string}
          */
-        UiBrand: "current" | "aljeel" | "executive" | "field";
+        UiBrand: "current" | "aljeel" | "executive" | "field" | "obsidian" | "sahara";
         /** @description 0.15.41. Settings, Identity & themes (setting `ui.identity`, migration 0130). */
         UiIdentity: {
             default_brand: components["schemas"]["UiBrand"];

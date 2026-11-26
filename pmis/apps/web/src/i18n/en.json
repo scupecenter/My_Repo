@@ -5348,7 +5348,11 @@
     "current_desc": "The look of the system today. The default.",
     "aljeel_desc": "The company brand: a navy sidebar with an orange marker and a blue accent.",
     "executive_desc": "A white sidebar and a light page, for reading and reviews.",
-    "field_desc": "High contrast and larger type for site teams and bright light."
+    "field_desc": "High contrast and larger type for site teams and bright light.",
+    "obsidian": "Obsidian",
+    "sahara": "Sahara",
+    "obsidian_desc": "A near-black sidebar with a gold accent. A control-room look, best in the dark theme.",
+    "sahara_desc": "A warm sand page with an emerald accent and a deep green sidebar. Calm for long reading, best in the light theme."
   },
   "identity": {
     "title": "Identity & themes",

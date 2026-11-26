@@ -37,10 +37,10 @@ describe('applyBrand', () => {
 });
 
 describe('Settings > Identity & themes', () => {
-  it('shows the four designs with previews, the current default, the choice toggle and the locked status colours', async () => {
+  it('shows the six designs with previews, the current default, the choice toggle and the locked status colours', async () => {
     await signIn('pm');
     settings();
-    for (const b of ['current', 'aljeel', 'executive', 'field']) {
+    for (const b of ['current', 'aljeel', 'executive', 'field', 'obsidian', 'sahara']) {
       expect(await screen.findByTestId(`identity-card-${b}`)).toBeInTheDocument();
       expect(screen.getByTestId(`identity-preview-${b}`)).toBeInTheDocument();
     }
