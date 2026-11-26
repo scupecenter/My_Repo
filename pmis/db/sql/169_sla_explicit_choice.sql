@@ -96,6 +96,142 @@ BEGIN
   END LOOP;
 END $$;
 
+-- ---------------------------------------------------------------------------------------------------------------------
+-- Data reset coverage: every table needs a decision in data_reset_plan() (data_reset_core stops the reset on a table without one, and the
+-- Settings reset refuses). data_reset_plan() is redefined from its latest definition (0152) with task_sla_choices added as KEEP (configuration).
+-- ---------------------------------------------------------------------------------------------------------------------
+DROP FUNCTION IF EXISTS data_reset_plan();
+CREATE FUNCTION data_reset_plan() RETURNS TABLE (tbl text, action text, part text, parts_expr text)
+LANGUAGE sql IMMUTABLE SET search_path = pg_catalog, public, pg_temp AS $$
+  SELECT t, 'keep', NULL::text, '''{}''::text[]' FROM unnest(ARRAY[
+    -- identity and access (the optional identity tables are below)
+    'local_credentials', 'user_totp', 'user_recovery_codes', 'auth_pending', 'user_sessions', 'email_change_requests', 'phone_change_requests',
+    'user_invitations', 'roles', 'role_default_regions', 'role_default_modules', 'role_aliases', 'permission_profiles', 'permission_grants', 'field_permissions',
+    'departments', 'pmis_context_keys',
+    'staff_registry_visibility_state', 'staff_registry_visibility_fields', 'staff_registry_visibility_entries',
+    'user_mfa_exemptions', 'me_admin_requests',
+    -- configuration
+    'workflow_definitions', 'workflow_streams', 'workflow_views', 'workflow_view_members', 'stage_definitions', 'task_definitions', 'task_predecessors',
+    'phase_gate_rules', 'scenario_task_rules', 'scenario_rule_state', 'sla_rules', 'sla_rule_sets', 'sla_rule_set_items', 'sla_master_columns',
+    'work_calendars', 'holidays', 'dlp_versions', 'weight_sets', 'weight_activities', 'weight_items', 'list_catalogues', 'list_values', 'field_definitions',
+    'field_list_values', 'field_set_versions', 'document_types', 'document_type_versions', 'document_type_drafts', 'document_type_placements',
+    'document_blank_forms', 'library_form_templates', 'template_definitions', 'template_versions', 'template_parts', 'template_task_fields', 'template_task_rules',
+    'matrix_cells', 'matrix_cell_assignees', 'matrix_state', 'settings', 'nav_item_catalogue', 'master_columns', 'master_header_aliases', 'regions', 'region_aliases',
+    'register_definitions', 'register_fields', 'register_sections', 'register_task_sources', 'register_column_locks', 'task_field_sources',
+    'permit_types', 'snag_types', 'snag_severities', 'doc_sequences', 'doc_sequence_counters', 'doc_number_issues', 'warehouse_items',
+    'warehouse_item_need_rules', 'warehouse_region_vendors', 'as_built_items', 'as_built_type_sources', 'contractor_rules', 'external_party_type_map',
+    'team_specializations', 'team_scope_match', 'team_scope_match_groups', 'team_scope_match_meta', 'team_scope_match_scopes',
+    -- master data of companies and their contracts and teams
+    'external_parties', 'external_party_contracts', 'external_teams', 'external_team_specializations', 'contractor_alerts_sent',
+    'task_sla_choices',
+    -- between users, and personal preferences
+    'messages', 'message_threads', 'message_participants', 'announcements', 'announcement_targets', 'announcement_recipients',
+    'announcement_responses', 'saved_views', 'saved_view_versions', 'saved_view_targets', 'saved_view_region_targets', 'document_grid_views',
+    -- the reset itself (0146): the transaction marker (empty outside a running reset)
+    'data_reset_marker'
+  ]) t
+  UNION ALL
+  SELECT t, 'log', NULL::text, '''{}''::text[]' FROM unnest(ARRAY[
+    'audit_log', 'audit_log_chain', 'audit_field_changes', 'security_log', 'security_log_chain', 'log_chain_heads', 'log_integrity_runs', 'system_log',
+    'security_alerts', 'security_alert_state', 'job_runs', 'deployments', 'mail_outbox', 'status_transitions', 'status_updates',
+    'data_reset_requests', 'data_reset_request_files'
+  ]) t
+  UNION ALL
+  -- optional identity parts: KEEP unless chosen; users are deactivated (never deleted), the others deleted
+  SELECT * FROM (VALUES
+    ('users', 'optional', 'users',
+     'CASE WHEN public.data_reset_user_kept(t.id) OR t.id IN (SELECT k.id FROM pg_temp.reset_keep_users k) THEN ''{}''::text[] ELSE ARRAY[''users''] END'),
+    ('user_role_assignments',         'optional', 'roles', 'ARRAY[''roles'']'),
+    ('user_role_assignment_regions',  'optional', 'roles', 'ARRAY[''roles'']'),
+    ('user_role_assignment_modules',  'optional', 'roles', 'ARRAY[''roles'']'),
+    ('user_role_assignment_profiles', 'optional', 'roles', 'ARRAY[''roles'']'),
+    ('delegations',                   'optional', 'roles', 'ARRAY[''roles'']'),
+    ('delegation_grants',             'optional', 'roles', 'ARRAY[''roles'']'),
+    ('delegation_regions',            'optional', 'roles', 'ARRAY[''roles'']'),
+    ('groups',                        'optional', 'roles', 'CASE WHEN public.data_reset_group_kept(t.id) THEN ''{}''::text[] ELSE ARRAY[''roles''] END'),
+    ('group_members',                 'optional', 'roles',
+     'CASE WHEN EXISTS (SELECT 1 FROM public.groups g WHERE g.id = t.group_id AND g.is_system_admins) THEN ''{}''::text[] ELSE ARRAY[''roles''] END'),
+    ('staff_registry',                'optional', 'staff', 'ARRAY[''staff'']'),
+    ('absences',                      'optional', 'staff', 'ARRAY[''staff'']')
+  ) o(tbl, action, part, parts_expr)
+  UNION ALL
+  -- MIXED: rows of several parts, or kept master data (the Contractors register, the vehicles)
+  SELECT * FROM (VALUES
+    ('register_records',          'mixed', '*', '(SELECT r.parts FROM pg_temp.reset_rec r WHERE r.id = t.id)'),
+    ('register_steps',            'mixed', '*', '(SELECT r.parts FROM pg_temp.reset_rec r WHERE r.id = t.record_id)'),
+    ('register_level_actors',     'mixed', '*', '(SELECT r.parts FROM pg_temp.reset_rec r WHERE r.id = t.record_id)'),
+    ('register_level_voters',     'mixed', '*', '(SELECT r.parts FROM pg_temp.reset_rec r WHERE r.id = t.record_id)'),
+    ('register_record_locks',     'mixed', '*', '(SELECT r.parts FROM pg_temp.reset_rec r WHERE r.id = t.record_id)'),
+    ('team_scope_checks',         'mixed', '*', '(SELECT r.parts FROM pg_temp.reset_rec r WHERE r.id = t.record_id)'),
+    ('document_slots',            'mixed', '*', '(SELECT s.parts FROM pg_temp.reset_slot s WHERE s.id = t.id)'),
+    ('document_files',            'mixed', '*', '(SELECT s.parts FROM pg_temp.reset_slot s WHERE s.id = t.slot_id)'),
+    ('document_record_snapshots', 'mixed', '*',
+     'CASE WHEN EXISTS (SELECT 1 FROM pg_temp.reset_ent e WHERE e.entity_id = t.entity_id AND e.kept) THEN ''{}''::text[]'
+     ' ELSE coalesce((SELECT e.parts FROM pg_temp.reset_ent e WHERE e.entity_id = t.entity_id), ''{}''::text[]) || ARRAY[''documents''] END'),
+    ('comments',                  'mixed', '*', '(SELECT c.parts FROM pg_temp.reset_comment c WHERE c.id = t.id)'),
+    ('comment_mentions',          'mixed', '*', '(SELECT c.parts FROM pg_temp.reset_comment c WHERE c.id = t.comment_id)'),
+    ('levels_conversions',        'mixed', '*',
+     'CASE WHEN t.entity_type = ''register_record'' THEN coalesce((SELECT r.parts FROM pg_temp.reset_rec r WHERE r.id = t.entity_id),'
+     ' (SELECT e.parts FROM pg_temp.reset_ent e WHERE e.entity_id = t.entity_id), ARRAY[''sites'']) ELSE ARRAY[''sites''] END'),
+    ('import_batches',            'mixed', '*', '(SELECT b.parts FROM pg_temp.reset_batch b WHERE b.id = t.id)'),
+    ('import_batch_rows',         'mixed', '*', '(SELECT b.parts FROM pg_temp.reset_batch b WHERE b.id = t.batch_id)'),
+    ('user_drafts',               'mixed', '*',
+     'CASE WHEN t.draft_key LIKE ''task.%'' THEN ARRAY[''sites''] WHEN t.draft_key LIKE ''record.%'' THEN'
+     ' CASE WHEN t.draft_key = ''record.contractors.new'' OR substr(t.draft_key, length(split_part(t.draft_key, ''.'', 1) || split_part(t.draft_key, ''.'', 2)) + 3)'
+     ' IN (SELECT e.entity_id::text FROM pg_temp.reset_ent e WHERE e.kept UNION ALL SELECT r.id::text FROM pg_temp.reset_rec r WHERE r.parts = ''{}'')'
+     ' THEN ''{}''::text[] ELSE ARRAY[coalesce(public.data_reset_register_part(split_part(t.draft_key, ''.'', 2)), ''sites'')] END ELSE ''{}''::text[] END'),
+    ('stored_object_meta',        'mixed', '*', 'coalesce((SELECT f.parts FROM pg_temp.reset_files f WHERE f.storage_key = t.storage_key), ''{}''::text[])')
+  ) m(tbl, action, part, parts_expr)
+  UNION ALL
+  -- DELETE: every row of the table belongs to the parts named (a few tables to several)
+  SELECT * FROM (VALUES
+    ('sites', 'delete', 'sites', 'ARRAY[''sites'']'), ('clusters', 'delete', 'sites', 'ARRAY[''sites'']'),
+    ('task_instances', 'delete', 'sites', 'ARRAY[''sites'']'), ('task_cover_decisions', 'delete', 'sites', 'ARRAY[''sites'']'),
+    ('workflow_steps', 'delete', 'sites', 'ARRAY[''sites'']'), ('task_level_actors', 'delete', 'sites', 'ARRAY[''sites'']'),
+    ('task_level_voters', 'delete', 'sites', 'ARRAY[''sites'']'), ('task_delay_periods', 'delete', 'sites', 'ARRAY[''sites'']'),
+    ('admin_overrides', 'delete', 'sites', 'ARRAY[''sites'']'), ('site_gate_state', 'delete', 'sites', 'ARRAY[''sites'']'),
+    ('site_gate_events', 'delete', 'sites', 'ARRAY[''sites'']'), ('site_snapshots', 'delete', 'sites', 'ARRAY[''sites'']'),
+    ('site_workflow_migrations', 'delete', 'sites', 'ARRAY[''sites'']'), ('site_drafts', 'delete', 'sites', 'ARRAY[''sites'']'),
+    ('baseline_versions', 'delete', 'sites', 'ARRAY[''sites'']'), ('baseline_entries', 'delete', 'sites', 'ARRAY[''sites'']'),
+    ('watches', 'delete', '*', 'ARRAY[''notifications'', ''sites''] || CASE WHEN t.register_key IS NULL THEN ''{}''::text[]'
+                               ' ELSE ARRAY[coalesce(public.data_reset_register_part(t.register_key), ''sites'')] END'),
+    ('change_requests', 'delete', 'change_control', 'ARRAY[''change_control'']'), ('site_scope_exceptions', 'delete', 'change_control', 'ARRAY[''change_control'']'),
+    ('rf_design_records', 'delete', 'rf_design', 'ARRAY[''rf_design'']'), ('acquisition_candidates', 'delete', 'acquisition', 'ARRAY[''acquisition'']'),
+    ('procurement_records', 'delete', 'procurement', 'ARRAY[''procurement'']'), ('assignment_readiness', 'delete', 'procurement', 'ARRAY[''procurement'']'),
+    ('gecol_records', 'delete', 'gecol', 'ARRAY[''gecol'']'),
+    ('hlc_records', 'delete', 'hlc', 'ARRAY[''hlc'']'), ('hlc_legacy_migrations', 'delete', 'hlc', 'ARRAY[''hlc'']'),
+    ('hlc_pr_links', 'delete', '*', 'coalesce((SELECT r.parts FROM pg_temp.reset_rec r WHERE r.id = t.hlc_record_id), ARRAY[''hlc'']) || ARRAY[''procurement'']'),
+    ('permit_records', 'delete', 'permits', 'ARRAY[''permits'']'),
+    ('quality_inspections', 'delete', 'quality', 'ARRAY[''quality'']'), ('snags', 'delete', 'quality', 'ARRAY[''quality'']'),
+    ('snag_photos', 'delete', 'quality', 'ARRAY[''quality'']'), ('snag_level_voters', 'delete', 'quality', 'ARRAY[''quality'']'),
+    ('issues', 'delete', 'issues', 'ARRAY[''issues'']'), ('risks', 'delete', 'risks', 'ARRAY[''risks'']'),
+    ('readiness_handover', 'delete', 'readiness', 'ARRAY[''readiness'']'), ('as_built_records', 'delete', 'as_built', 'ARRAY[''as_built'']'),
+    ('meetings', 'delete', 'meetings', 'ARRAY[''meetings'']'), ('meeting_actions', 'delete', 'meetings', 'ARRAY[''meetings'']'),
+    ('warehouse_serials', 'delete', 'warehouse', 'ARRAY[''warehouse'']'), ('warehouse_site_qty', 'delete', 'warehouse', 'ARRAY[''warehouse'']'),
+    ('wh_movements', 'delete', 'warehouse', 'ARRAY[''warehouse'']'), ('wh_movement_lines', 'delete', 'warehouse', 'ARRAY[''warehouse'']'),
+    ('vehicle_reservations', 'delete', 'car_dispatcher', 'ARRAY[''car_dispatcher'']'),
+    ('document_site_overrides', 'delete', 'documents', 'ARRAY[''documents'']'), ('document_task_snapshots', 'delete', 'documents', 'ARRAY[''documents'']'),
+    ('library_generated_docs', 'delete', 'documents', 'ARRAY[''documents'']'),
+    ('document_export_jobs', 'delete', 'imports', 'ARRAY[''imports'']'),
+    ('import_batch_jobs', 'delete', 'imports', 'coalesce((SELECT b.parts FROM pg_temp.reset_batch b WHERE b.id = t.batch_id), ''{}''::text[]) || ARRAY[''imports'']'),
+    ('import_uploads', 'delete', 'imports', 'ARRAY[''imports'']'), ('master_reconciliation_runs', 'delete', 'imports', 'ARRAY[''imports'']'),
+    ('master_reconciliation_rows', 'delete', 'imports', 'ARRAY[''imports'']'), ('master_reconciliation_diffs', 'delete', 'imports', 'ARRAY[''imports'']'),
+    ('mi_apply_jobs', 'delete', 'imports', 'ARRAY[''imports'']'), ('hrf_stage_marks', 'delete', 'imports', 'ARRAY[''imports'']'),
+    ('hgd_marks', 'delete', 'imports', 'ARRAY[''imports'']'),
+    ('notifications', 'delete', 'notifications', 'ARRAY[''notifications'']'),
+    ('daily_plans', 'delete', 'daily_plan', 'ARRAY[''daily_plan'']'), ('daily_plan_rows', 'delete', 'daily_plan', 'ARRAY[''daily_plan'']'),
+    ('progress_snapshots', 'delete', 'kpi', 'ARRAY[''kpi'']'), ('dash_snapshot_runs', 'delete', 'kpi', 'ARRAY[''kpi'']'),
+    ('ps_manual_values', 'delete', 'kpi', 'ARRAY[''kpi'']'), ('ps_manual_plans', 'delete', 'kpi', 'ARRAY[''kpi'']')
+  ) d(tbl, action, part, parts_expr)
+$$;
+
+DO $$
+BEGIN
+  EXECUTE 'ALTER FUNCTION data_reset_plan() OWNER TO pmis_reset_owner';
+  EXECUTE 'REVOKE ALL ON FUNCTION data_reset_plan() FROM PUBLIC';
+  EXECUTE 'GRANT EXECUTE ON FUNCTION data_reset_plan() TO pmis_reset_owner, pmis_definer';
+END $$;
+
 INSERT INTO audit_log (action, entity_type, entity_id, after, reason)
 VALUES ('sla_explicit_choice_applied', 'workflow', NULL,
         jsonb_build_object('decision', 'owner 2026-11-26: the SLA of a task is an explicit choice (set or no SLA) and every task shows in Settings > SLA', 'functions', 'sla_task_overview, admin_task_sla_none'),
