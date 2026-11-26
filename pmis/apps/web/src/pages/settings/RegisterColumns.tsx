@@ -1,10 +1,11 @@
 import { ArrowDown, ArrowUp, Eye, EyeOff, GripVertical, Pencil, Plus, Trash2, Undo2 } from 'lucide-react';
+import { InlineCell } from '@/components/InlineCell';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useColumnImpact, useDeleteColumn, useDeleteSection, useRegisterColumns, useRenameRegister, useReorderColumns, useSaveSection, useUpdateColumn } from '@/api/registerColumns';
 import { useRegisterDefs } from '@/api/registers';
-import type { RegisterColumn, RegisterSection } from '@/api/types';
+import type { RegisterColumn, RegisterColumnPatch, RegisterColumnType, RegisterSection } from '@/api/types';
 import { ColumnDialog, type Place } from '@/components/ColumnDialog';
 import { errText, FormDialog } from '@/components/FormDialog';
 import { useToast } from '@/components/Toast';
@@ -92,6 +93,14 @@ function RegisterColumnsOf() {
   const run = async (fn: () => Promise<unknown>, ok: string) => { setErr(null); try { await fn(); toast(ok); close(); } catch (e) { setErr(errText(e, t)); } };
   const secName = (s: string | null | undefined) => { const x = sections.find((y) => y.name_en === s); return x ? (lang === 'ar' && x.name_ar) || x.name_en : s ?? '—'; };
   const [drag, setDrag] = useState<string | null>(null);
+  // Edit in place next to the pencil form: a cell saves ONE column through the same update call (audited, a new template version), with the reason typed above the table.
+  const [inReason, setInReason] = useState('');
+  const SIMPLE = ['text', 'long_text', 'number', 'currency', 'percentage', 'date', 'datetime', 'yes_no', 'email', 'phone', 'link'];
+  const saveCol = async (c: RegisterColumn, patch: Partial<RegisterColumnPatch>) => {
+    if (inReason.trim().length < 3) throw new Error(t('regcols.inline_need_reason'));
+    try { await upd.mutateAsync({ code: c.code, version: c.version, patch: { ...patch, reason: inReason.trim() } as RegisterColumnPatch }); toast(t('regcols.saved')); }
+    catch (e) { throw new Error(errText(e, t)); }
+  };
   /** Drag and drop: the dragged column takes the place of the one it is dropped on (the arrows are the keyboard way). */
   const dropOn = (onto: string) => {
     if (!drag || drag === onto) { setDrag(null); return; }
@@ -145,6 +154,10 @@ function RegisterColumnsOf() {
         </ul>}
 
         <div className="overflow-x-auto">
+          <div className="mb-2 flex flex-wrap items-end gap-2 text-sm" data-testid="regcols-inline-bar">
+            <label className="flex-1">{t('regcols.inline_reason')}<input className="input w-full" data-testid="regcols-inline-reason" value={inReason} onChange={(e) => setInReason(e.target.value)} /></label>
+            <p className="text-xs text-mute">{t('regcols.inline_hint')}</p>
+          </div>
           <table className="w-full text-sm" data-testid="regcols-table">
             <thead className="text-mute"><tr>
               <th className="p-2 text-start">{t('regcols.code')}</th><th className="p-2 text-start">{t('regcols.label_en')}</th><th className="p-2 text-start">{t('regcols.type')}</th>
@@ -155,9 +168,13 @@ function RegisterColumnsOf() {
                 <tr key={c.code} className={`border-t border-line ${c.is_active ? '' : 'opacity-60'} ${drag === c.code ? 'bg-hover' : ''}`} data-testid={`regcols-row-${c.code}`}
                   onDragOver={(e) => { if (drag) e.preventDefault(); }} onDrop={() => dropOn(c.code)} onDragEnd={() => setDrag(null)}>
                   <td className="mono p-2"><span draggable className="me-1 inline-block cursor-grab text-mute" data-testid={`regcols-grip-${c.code}`} title={t('regcols.drag')} onDragStart={(e) => { setDrag(c.code); const tr = e.currentTarget.closest('tr'); if (tr) e.dataTransfer.setDragImage?.(tr, 0, 0); }}><GripVertical size={14} aria-hidden /></span>{c.code}</td>
-                  <td className="p-2">{(lang === 'ar' && c.label_ar) || c.label_en}{c.is_active && isHidden(c) && <span className="chip ms-2" data-testid={`regcols-hidden-${c.code}`}>{t('regcols.hidden')}</span>}{c.is_system && <span className="chip ms-2" data-testid={`regcols-protected-${c.code}`} title={c.system_reason ?? ''}>{t('regcols.protected')}</span>}</td>
-                  <td className="p-2">{t(`regcols.type_${c.type}`)}</td>
-                  <td className="p-2">{secName(c.section)}</td>
+                  <td className="p-2"><span className="inline-block min-w-32">{lang === 'ar' && c.label_ar
+                    ? <InlineCell value={c.label_ar} dir="rtl" label={t('regcols.label_ar')} testid={`regcols-cell-name-${c.code}`} onCommit={(v) => saveCol(c, { label_ar: v.trim() || null })} />
+                    : <InlineCell value={c.label_en} label={t('regcols.label_en')} testid={`regcols-cell-name-${c.code}`} onCommit={(v) => v.trim() ? saveCol(c, { label_en: v.trim() }) : Promise.reject(new Error(t('regcols.inline_need_name')))} />}</span>{c.is_active && isHidden(c) && <span className="chip ms-2" data-testid={`regcols-hidden-${c.code}`}>{t('regcols.hidden')}</span>}{c.is_system && <span className="chip ms-2" data-testid={`regcols-protected-${c.code}`} title={c.system_reason ?? ''}>{t('regcols.protected')}</span>}</td>
+                  <td className="p-2">{!c.is_system && c.is_active && SIMPLE.includes(c.type) && (c.usage?.records_with_value ?? 0) === 0
+                    ? <InlineCell kind="select" value={c.type} display={t(`regcols.type_${c.type}`)} options={SIMPLE.map((x) => ({ value: x, label: t(`regcols.type_${x}`) }))} label={t('regcols.type')} testid={`regcols-cell-type-${c.code}`} onCommit={(v) => saveCol(c, { field_type: v as RegisterColumnType })} />
+                    : t(`regcols.type_${c.type}`)}</td>
+                  <td className="p-2"><InlineCell kind="select" value={c.section ?? ''} display={secName(c.section)} options={[{ value: '', label: '—' }, ...sections.map((x) => ({ value: x.name_en, label: (lang === 'ar' && x.name_ar) || x.name_en }))]} label={t('regcols.section')} testid={`regcols-cell-section-${c.code}`} onCommit={(v) => saveCol(c, { section: v || null })} /></td>
                   <td className="p-2">{c.usage?.records_with_value ?? 0}</td>
                   <td className="p-2">{c.is_active ? t('regcols.active') : t('regcols.inactive')}</td>
                   <td className="whitespace-nowrap p-2 text-end">

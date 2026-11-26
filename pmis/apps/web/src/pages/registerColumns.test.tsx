@@ -122,3 +122,23 @@ describe('register columns page: the Hide button', () => {
     await waitFor(() => expect(screen.queryByTestId(`regcols-hidden-${code}`)).not.toBeInTheDocument());
   });
 });
+
+describe('register columns: edit in place next to the pencil', () => {
+  it('asks for the reason, then saves a new name in the row and keeps the pencil', async () => {
+    await signIn('pm');
+    const u = userEvent.setup();
+    page();
+    const row = (await screen.findAllByTestId(/^regcols-row-/))[0]!;
+    const code = row.getAttribute('data-testid')!.replace('regcols-row-', '');
+    expect(screen.getByTestId(`regcols-edit-${code}`)).toBeInTheDocument();
+    await u.click(screen.getByTestId(`regcols-cell-name-${code}`));
+    const input = screen.getByTestId(`regcols-cell-name-${code}-input`);
+    await u.clear(input);
+    await u.type(input, 'Renamed inline{Enter}');
+    expect(await screen.findByTestId(`regcols-cell-name-${code}-err`)).toBeInTheDocument();
+    await u.type(screen.getByTestId('regcols-inline-reason'), 'Owner asked');
+    await u.click(screen.getByTestId(`regcols-cell-name-${code}-input`));
+    await u.keyboard('{Enter}');
+    expect(await screen.findByText('Renamed inline')).toBeInTheDocument();
+  });
+});
