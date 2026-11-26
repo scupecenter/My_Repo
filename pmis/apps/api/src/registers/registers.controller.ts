@@ -77,6 +77,16 @@ export class RegistersController {
     return this.act('reject', auth, key, id, ifMatch, body, res);
   }
 
+  /** 0188: one triage decision on a record of a triage-enabled register (Issue Log, Change Control). */
+  @Post(':key/records/:id/triage')
+  @HttpCode(200)
+  triage(
+    @Auth() auth: AuthContext, @Param('key') key: string, @Param('id') id: string, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    return this.registers.triage(auth, key, id, ifMatch, body).then((r) => this.tag(res, r));
+  }
+
   @Post(':key/records/:id/claim')
   @HttpCode(200)
   async claim(@Auth() auth: AuthContext, @Param('key') key: string, @Param('id') id: string, @Headers('if-match') ifMatch: string | undefined, @Res({ passthrough: true }) res: Response) {
