@@ -19927,7 +19927,7 @@ components:
                 type: object
                 required: [scope, state, count]
                 properties:
-                  scope: { type: string, nullable: true }
+                  scope: { type: [string, 'null'] }
                   state: { type: string }
                   count: { type: integer }
         sites:
