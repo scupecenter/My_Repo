@@ -3888,6 +3888,10 @@
     "green": "Approved. Documents approved ({{approved}} of {{need}})."
   },
   "regcols": {
+    "inline_reason": "Reason for the changes made in the table (3+ characters)",
+    "inline_hint": "Click a name, type or section to edit it here. The pencil still opens the full form. A column that already holds values changes type only in the form (it shows the conversion first).",
+    "inline_need_reason": "Write the reason first (3+ characters).",
+    "inline_need_name": "The name cannot be empty.",
     "title": "Register columns",
     "note": "Add, rename, reorder, hide and remove the columns and sections of a register, and rename the register. Every change needs a reason, is audited, and issues a new template version; an older template file is still read by its column codes. Protected columns (code depends on them) can only be renamed, moved and shown or hidden.",
     "register": "Register",
