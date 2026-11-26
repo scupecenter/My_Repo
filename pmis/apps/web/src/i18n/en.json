@@ -3153,7 +3153,7 @@
       "placements": "Placement",
       "target": "Placed on",
       "ref": "Code or key",
-      "ref_pick": "Pick from the list",
+      "ref_pick": "Pick from the list or type to filter",
       "ref_hint": "Task code, snag type or register key",
       "target_task": "Task",
       "target_qc": "QC",

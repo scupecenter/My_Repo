@@ -68,13 +68,12 @@ function useRefOptions(target: 'task' | 'qc' | 'register'): { value: string; lab
 function PlacementRef({ target, value, onChange, i }: { target: 'task' | 'qc' | 'register'; value: string; onChange: (v: string) => void; i: number }) {
   const { t } = useTranslation();
   const opts = useRefOptions(target);
-  const known = opts.some((o) => o.value === value);
+  const list = `doc-ref-list-${i}`;
   return (
-    <select className="input flex-1" aria-label={t('docs.lib.ref')} data-testid={`doc-placement-ref-${i}`} value={value} onChange={(e) => onChange(e.target.value)}>
-      <option value="">{t('docs.lib.ref_pick')}</option>
-      {value && !known && <option value={value}>{value}</option>}
-      {opts.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-    </select>
+    <>
+      <input className="input flex-1" list={list} aria-label={t('docs.lib.ref')} placeholder={t('docs.lib.ref_pick')} autoComplete="off" data-testid={`doc-placement-ref-${i}`} value={value} onChange={(e) => onChange(e.target.value)} />
+      <datalist id={list}>{opts.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</datalist>
+    </>
   );
 }
 
