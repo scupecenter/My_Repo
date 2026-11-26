@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, HttpCode, Param, Patch, Post, Query, Res } from '@nestjs/common';
+import { Body, Controller, Get, Headers, HttpCode, Param, Patch, Post, Put, Query, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import type { AuthContext } from '../auth/auth.types';
 import { Auth } from '../auth/decorators';
@@ -13,6 +13,17 @@ export class SlaController {
   @Get('sla-rules')
   rules(@Auth() auth: AuthContext, @Query() q: Record<string, unknown>) {
     return this.sla.rules(auth, q);
+  }
+
+  /** 0170: every task with its SLA status (set, no SLA by choice, not decided). */
+  @Get('sla-tasks')
+  tasks(@Auth() auth: AuthContext) {
+    return this.sla.tasks(auth);
+  }
+
+  @Put('sla-tasks/:task_code/no-sla')
+  setNoSla(@Auth() auth: AuthContext, @Param('task_code') taskCode: string, @Body() body: unknown) {
+    return this.sla.setNoSla(auth, taskCode, body);
   }
 
   @Get('sla-rule-sets')

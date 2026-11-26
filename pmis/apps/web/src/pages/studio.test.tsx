@@ -122,6 +122,12 @@ describe('Workflow Studio', () => {
     expect(await screen.findByTestId('studio-add-rewire-A2')).toHaveTextContent('A1 → NEW1 → A2');
     expect(screen.getByTestId('studio-add-matrix-link')).toHaveAttribute('href', '/admin/matrix');
     expect(screen.getByTestId('studio-add-inputs')).toHaveTextContent('Add the Site Master columns this task fills');
+    // 0.15.85: the SLA is an explicit choice. Without it the task cannot be added; "no SLA" needs a short reason.
+    expect(screen.getByTestId('studio-add-sla-required')).toBeInTheDocument();
+    expect(screen.getByTestId('studio-add-submit')).toBeDisabled();
+    await u.click(screen.getByTestId('studio-add-sla-none'));
+    expect(screen.getByTestId('studio-add-submit')).toBeDisabled();
+    await u.type(screen.getByTestId('studio-add-sla-none-reason'), 'Information step, no clock');
     await u.click(screen.getByTestId('studio-add-submit'));
     await reasonAndSave(u);
     expect(await screen.findByTestId('studio-task-NEW1')).toHaveTextContent('Site photos');

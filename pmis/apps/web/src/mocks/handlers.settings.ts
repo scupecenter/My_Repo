@@ -359,6 +359,16 @@ let dashState = {
 };
 const dashView = () => ({ ...dashState, catalogue: DASH_CATALOGUE });
 
+/** GET /settings/sla-tasks and PUT /settings/sla-tasks/:task/no-sla (contract 0.15.85): demo tasks, one per status, one in the open draft. */
+type MockSlaTask = { task_code: string; name_en: string; name_ar: string | null; stage_code: string; workflow_version: number; in_draft: boolean; mode: 'set' | 'none' | 'undecided'; none_reason: string | null; min_working_days: number | null; max_working_days: number | null; start_event: string | null; unit: string | null };
+const SLA_TASKS: MockSlaTask[] = [
+  { task_code: 'A1', name_en: 'Site survey', name_ar: null, stage_code: 'MS1', workflow_version: 1, in_draft: false, mode: 'set', none_reason: null, min_working_days: 2, max_working_days: 4, start_event: 'PRED', unit: 'working' },
+  { task_code: 'A2', name_en: 'TSSR approval', name_ar: null, stage_code: 'MS1', workflow_version: 1, in_draft: false, mode: 'undecided', none_reason: null, min_working_days: null, max_working_days: null, start_event: null, unit: null },
+  { task_code: 'B1', name_en: 'Information step', name_ar: null, stage_code: 'MS2', workflow_version: 1, in_draft: false, mode: 'none', none_reason: 'Information only', min_working_days: null, max_working_days: null, start_event: null, unit: null },
+  { task_code: 'NEW9', name_en: 'Draft task', name_ar: null, stage_code: 'MS2', workflow_version: 2, in_draft: true, mode: 'undecided', none_reason: null, min_working_days: null, max_working_days: null, start_event: null, unit: null },
+];
+const slaCounts = () => ({ total: SLA_TASKS.length, set: SLA_TASKS.filter((x) => x.mode === 'set').length, none: SLA_TASKS.filter((x) => x.mode === 'none').length, undecided: SLA_TASKS.filter((x) => x.mode === 'undecided').length, in_draft: SLA_TASKS.filter((x) => x.in_draft).length });
+
 export const settingsHandlers = [
   // ------------------------------------------------------------------ dashboard settings (F20, contract 0.15.24)
   http.get(`${B}/settings/dashboard`, () => { const g = guard(); if (g) return g; return HttpResponse.json(dashView(), tag(dashState.version)); }),
@@ -816,6 +826,17 @@ export const settingsHandlers = [
     return HttpResponse.json(C().contractorRules, tag(C().contractorRules.version));
   }),
   http.get(`${B}/reports/team-scope-mismatch`, () => { const g = guard(); if (g) return g; return HttpResponse.json(MISMATCH); }),
+  http.get(`${B}/settings/sla-tasks`, () => { const g = guard(); if (g) return g; return HttpResponse.json({ items: SLA_TASKS, counts: slaCounts() }); }),
+  http.put(`${B}/settings/sla-tasks/:task/no-sla`, async ({ params, request }) => {
+    const g = guard(); if (g) return g;
+    const b = (await request.json()) as { no_sla?: boolean; reason?: string };
+    const row = SLA_TASKS.find((x) => x.task_code === params.task);
+    if (!row) return problem(404, 'not_found', 'Not found');
+    if (row.mode === 'set') return problem(422, 'validation_failed', 'Validation failed');
+    if (!b.reason || b.reason.trim().length < 3) return problem(422, 'validation_failed', 'Validation failed');
+    row.mode = b.no_sla ? 'none' : 'undecided'; row.none_reason = b.no_sla ? b.reason.trim() : null;
+    return HttpResponse.json({ task_code: row.task_code, is_none: !!b.no_sla });
+  }),
   http.get(`${B}/reports/gecol-hlc-counts`, () => { const g = guard(); if (g) return g; return HttpResponse.json(GECOL_HLC_COUNTS); }),
   http.get(`${B}/reports/contractors-completeness`, () => { const g = guard(); if (g) return g; return HttpResponse.json(COMPLETENESS); }),
 

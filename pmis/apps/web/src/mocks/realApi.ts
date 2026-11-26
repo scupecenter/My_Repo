@@ -422,6 +422,9 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/sites/:id/admin-edits'],
   ['get', '/sites/:id/admin-edits'],
   ['get', '/settings/sla-rules'],
+  // Contract 0.15.85: the SLA status of every task and the explicit "no SLA" choice.
+  ['get', '/settings/sla-tasks'],
+  ['put', '/settings/sla-tasks/:task_code/no-sla'],
   ['get', '/settings/sla-rule-sets'],
   ['post', '/settings/sla-rule-sets'],
   ['get', '/settings/sla-rule-sets/:id'],

@@ -5690,7 +5690,13 @@
         "invalid_transition": "Nothing to change, or the column is already in that state."
       }
     },
-    "inputs_after": "Add the Site Master columns this task fills from its form, once the task is in the draft."
+    "inputs_after": "Add the Site Master columns this task fills from its form, once the task is in the draft.",
+    "sla_choice": "SLA (choose one)",
+    "sla_choice_set": "Set the SLA now",
+    "sla_choice_none": "This task has no SLA",
+    "sla_choice_required": "Choose one: set the SLA, or say that this task has no SLA. It is never left empty.",
+    "sla_none_reason": "Why has it no SLA? (short reason)",
+    "sla_undecided_warning": "These tasks have no SLA decision yet: {{codes}}. You can still publish; set an SLA or mark them as having none in Settings > SLA."
   },
   "tstd": {
     "count_all": "{{total}} {{noun}}",
@@ -6304,5 +6310,38 @@
     "sites_gecol": "Sites with the GECOL scope",
     "sites_hlc": "Sites with the HLC scope",
     "empty": "No records"
+  },
+  "slaTasks": {
+    "title": "Tasks and their SLA",
+    "note": "Every active task of the workflow in force and of the open draft is listed here. A task has an SLA, or it was explicitly marked as having none, or it is not decided yet. Nothing is decided for you.",
+    "banner_undecided": "{{n}} tasks are not decided yet: set an SLA for them or mark them as having no SLA.",
+    "banner_ok": "Every task has an SLA or an explicit \"no SLA\".",
+    "filter": "Show",
+    "f_all": "All tasks",
+    "f_undecided": "Not decided",
+    "f_set": "SLA set",
+    "f_none": "No SLA (by choice)",
+    "f_draft": "In draft",
+    "col_task": "Task",
+    "col_stage": "Milestone",
+    "col_where": "Version",
+    "col_status": "Status",
+    "col_sla": "SLA (working days)",
+    "col_actions": "Actions",
+    "live": "In force",
+    "draft": "In draft (v{{v}})",
+    "s_set": "SLA set",
+    "s_none": "No SLA",
+    "s_undecided": "Not decided",
+    "mark_none": "Mark: no SLA",
+    "clear_none": "Undo \"no SLA\"",
+    "edit_draft": "Edit in the workflow editor",
+    "set_below": "Set the SLA in the rule set below",
+    "reason": "Reason (short)",
+    "dialog_none": "This task has no SLA",
+    "dialog_clear": "Go back to \"Not decided\"",
+    "save": "Save",
+    "cancel": "Cancel",
+    "empty": "No tasks."
   }
 }
