@@ -1,4 +1,5 @@
 import type { Brand } from '@/lib/brands';
+import { APPEARANCE_OPTIONS } from '../lib/appearance';
 import type { ApprovalItem, BallInCourt, Comment, DocumentSlot, Matrix, Me, Session, SiteDraft, TaskDetail, TaskSummary, UserRef, WorkflowStep } from '@/api/types';
 import { initAdmin } from './adminData';
 import { initCfg } from './settingsData';
@@ -103,7 +104,7 @@ const fresh = () => ({
   /** Password right, code or enrolment still to do (the cookie pmis_2fa of the real server). */
   pending: null as null | { account: string; kind: 'two_factor' | 'enrol'; until: number },
   /** 0.9.2 self-service profile: the user's own edits (keyed by account) and the email change requests. */
-  profiles: {} as Record<string, { display_name?: string; phone?: string | null; locale?: 'en' | 'ar'; theme?: 'light' | 'dark'; ui_brand?: Brand | null; email?: string; version: number }>,
+  profiles: {} as Record<string, { display_name?: string; phone?: string | null; locale?: 'en' | 'ar'; theme?: 'light' | 'dark'; ui_brand?: Brand | null; ui_prefs?: Record<string, string>; email?: string; version: number }>,
   /** 0.15.41 (migration 0130): Settings, Identity & themes (setting ui.identity). */
   identity: initIdentity(),
   /** 0.15.97 (migration 0197): Settings, Screens, Login page (setting ui.login_page). */
@@ -173,7 +174,7 @@ export function sessionBody(): Session {
 }
 
 function initIdentity() {
-  return { default_brand: 'current' as Brand, allow_user_choice: true, version: 1, updated_at: null as string | null, updated_by: null as null | { id: string; display_name: string; employee_id: string | null } };
+  return { default_brand: 'current' as Brand, allow_user_choice: true, defaults: {} as Record<string, string>, pref_options: APPEARANCE_OPTIONS as unknown as Record<string, string[]>, version: 1, updated_at: null as string | null, updated_by: null as null | { id: string; display_name: string; employee_id: string | null } };
 }
 function initLoginPage() {
   return {
@@ -196,12 +197,16 @@ export const loginPagePublic = () => {
 export const identity = () => (db().identity ??= initIdentity());
 /** The design a user sees: their own while the admin allows a choice, else the organization default (ui_effective_brand). */
 export const effectiveBrand = (stored: Brand | null | undefined): Brand => (identity().allow_user_choice && stored ? stored : identity().default_brand);
+/** 0196: the appearance a user sees: their own choices while the admin allows a choice, over the organization defaults (ui_effective_prefs). */
+export const effectivePrefs = (stored: Record<string, string> | null | undefined): Record<string, string> =>
+  ({ ...identity().defaults, ...(identity().allow_user_choice ? stored ?? {} : {}) });
 
 export function meBody(): Me {
   const v = viewer()!;
   return {
     user: { id: uid(v.employee_id ?? '9999'), display_name: db().profiles?.[v.key]?.display_name ?? v.name, employee_id: v.employee_id, email: db().profiles?.[v.key]?.email ?? v.email, status: v.status, locale: db().profiles?.[v.key]?.locale ?? 'en', theme: db().profiles?.[v.key]?.theme ?? 'light',
-      ui_brand: db().profiles?.[v.key]?.ui_brand ?? null, brand: effectiveBrand(db().profiles?.[v.key]?.ui_brand) },
+      ui_brand: db().profiles?.[v.key]?.ui_brand ?? null, brand: effectiveBrand(db().profiles?.[v.key]?.ui_brand),
+      ui_prefs: db().profiles?.[v.key]?.ui_prefs ?? {}, appearance: effectivePrefs(db().profiles?.[v.key]?.ui_prefs) },
     assignments: [], is_system_admin: v.key === 'pm',
     effective: { grants: [...v.nav.map((m) => ({ module_key: m, action: 'view' as const, region_ids: 'all' as const })), ...(v.key === 'engineer' ? [{ module_key: 'sites', action: 'create' as const, region_ids: 'all' as const }] : []), ...(v.key === 'auditor' ? [{ module_key: 'admin.security_log', action: 'view_security_log' as const, region_ids: 'all' as const }, { module_key: 'audit', action: 'view_audit' as const, region_ids: 'all' as const }] : [])], nav: v.nav, dashboard_tabs: ['pmo', 'cw', 'te'] },
   };

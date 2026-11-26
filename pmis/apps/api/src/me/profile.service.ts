@@ -16,6 +16,7 @@ import { DbService } from '../db/db.service';
 import { MailMessage, MailPort } from '../mail/mail.port';
 import { sendQuietly } from '../mail/noop-mail';
 import { UI_BRANDS, UiBrand } from '../settings/ui-identity.service';
+import { uiPrefsSchema, UiPrefs } from '../settings/ui-prefs';
 import { DepartmentRef, UserRef, UsersRepo } from '../users/users.repo';
 
 /**
@@ -23,7 +24,7 @@ import { DepartmentRef, UserRef, UsersRepo } from '../users/users.repo';
  * list in 0058 (D156): it is a sign-in identifier and changes through a request an admin approves (POST /me/phone-change). 0130: `ui_brand`, the personal
  * UI design (null = the organization default), refused while the admin does not allow a personal choice.
  */
-export const SELF_EDITABLE = ['display_name', 'locale', 'theme', 'ui_brand'] as const;
+export const SELF_EDITABLE = ['display_name', 'locale', 'theme', 'ui_brand', 'ui_prefs'] as const;
 /**
  * Admin-owned fields a client might try to send: refused with 403 field_read_only (email has its own approval flow). Any other unknown
  * key is a plain 422.
@@ -38,6 +39,8 @@ const profilePatchSchema = z.object({
   locale: z.enum(['en', 'ar']).optional(),
   theme: z.enum(['light', 'dark']).optional(),
   ui_brand: z.enum(UI_BRANDS).nullable().optional(),
+  /** 0196: a subset of the appearance dimensions (owner approval 2026-11-27, proposal items 1-3); each with one of ui_pref_options(). */
+  ui_prefs: uiPrefsSchema.optional(),
 }).strict();
 
 /** PATCH /me/preferences (the language and theme buttons of the top bar): no If-Match, the last click wins. */
@@ -116,8 +119,12 @@ export interface ProfileDto {
   ui_brand: UiBrand | null;
   /** 0130: the design the user sees (their own while the admin allows a choice, else the default). */
   brand: UiBrand;
+  /** 0196: the stored personal appearance choices; {} = the organization defaults. */
+  ui_prefs: UiPrefs;
+  /** 0196: the appearance the user sees (ui_effective_prefs: own choices, else the organization defaults). */
+  appearance: UiPrefs;
   /** 0130: the organization default and whether a personal design is allowed (the profile shows the choice or a note). */
-  identity: { default_brand: UiBrand; allow_user_choice: boolean };
+  identity: { default_brand: UiBrand; allow_user_choice: boolean; defaults: UiPrefs; pref_options: Record<string, string[]> };
   status: string;
   auth_method: string;
   local_sign_in: boolean;
@@ -233,6 +240,8 @@ export class ProfileService {
       theme: user.theme,
       ui_brand: user.ui_brand,
       brand: user.brand,
+      ui_prefs: user.ui_prefs,
+      appearance: user.appearance,
       identity: await this.identity(),
       status: user.status,
       auth_method: auth.session.authMethod,
@@ -253,9 +262,9 @@ export class ProfileService {
   }
 
   /** 0130: the organization default design and whether users may choose (ui_identity_state, readable by every signed-in user). */
-  private async identity(): Promise<{ default_brand: UiBrand; allow_user_choice: boolean }> {
-    const r = await this.db.tx.$queryRaw<{ r: { default_brand: UiBrand; allow_user_choice: boolean } }[]>`SELECT ui_identity_state() AS r`;
-    return { default_brand: r[0]!.r.default_brand, allow_user_choice: r[0]!.r.allow_user_choice };
+  private async identity(): Promise<{ default_brand: UiBrand; allow_user_choice: boolean; defaults: UiPrefs; pref_options: Record<string, string[]> }> {
+    const r = await this.db.tx.$queryRaw<{ r: { default_brand: UiBrand; allow_user_choice: boolean; defaults: UiPrefs; pref_options: Record<string, string[]> } }[]>`SELECT ui_identity_state() AS r`;
+    return { default_brand: r[0]!.r.default_brand, allow_user_choice: r[0]!.r.allow_user_choice, defaults: r[0]!.r.defaults, pref_options: r[0]!.r.pref_options };
   }
 
   /** PATCH /me/profile: only the self-editable fields; If-Match on the profile version; audited with before and after in the database. */
@@ -282,6 +291,13 @@ export class ProfileService {
       throw new ProblemException(403, 'field_read_only', {
         detail: 'The administrator set one design for everyone, so you cannot choose your own.',
         errors: [{ path: '/ui_brand', code: 'brand_choice_locked', message: 'The administrator does not allow a personal design.' }],
+      });
+    }
+    // 0196: a personal appearance while the admin set one design for everyone (the database refuses it too)
+    if (body.ui_prefs != null && !(await this.identity()).allow_user_choice) {
+      throw new ProblemException(403, 'field_read_only', {
+        detail: 'The administrator set one design for everyone, so you cannot choose your own appearance.',
+        errors: [{ path: '/ui_prefs', code: 'appearance_choice_locked', message: 'The administrator does not allow a personal appearance.' }],
       });
     }
     await this.db.tx.$queryRaw`SELECT idm_update_own_profile(${JSON.stringify(body)}::jsonb) AS n`;

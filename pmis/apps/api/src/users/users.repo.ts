@@ -22,6 +22,10 @@ export interface UserDto extends UserRef {
   ui_brand: 'current' | 'aljeel' | 'executive' | 'field' | 'obsidian' | 'sahara' | null;
   /** 0130: the design the user sees (ui_effective_brand). */
   brand: 'current' | 'aljeel' | 'executive' | 'field' | 'obsidian' | 'sahara';
+  /** 0196: the stored personal appearance choices; {} = the organization defaults. */
+  ui_prefs: Record<string, string>;
+  /** 0196: the appearance the user sees (ui_effective_prefs: own choices, else the organization defaults). */
+  appearance: Record<string, string>;
   is_break_glass: boolean;
   phone: string | null;
   local_sign_in: boolean;
@@ -69,6 +73,8 @@ interface UserDbRow {
   theme: string;
   ui_brand: string | null;
   brand: string;
+  ui_prefs: Record<string, string>;
+  appearance: Record<string, string>;
   is_break_glass: boolean;
   last_login_at: Date | null;
   created_at: Date;
@@ -100,7 +106,9 @@ interface UserDbRow {
  * local_credentials). `version` is the microsecond epoch of users.updated_at: an integer that changes with every write to the row.
  */
 const USER_SELECT = Prisma.sql`u.id::text AS id, u.email, u.display_name, trim(u.employee_id) AS employee_id, u.phone, u.status::text AS status,
-  u.locale, u.theme, u.ui_brand, ui_effective_brand(u.ui_brand) AS brand, u.is_break_glass, u.last_login_at, u.created_at,
+  u.locale, u.theme, u.ui_brand, ui_effective_brand(u.ui_brand) AS brand,
+  u.ui_prefs, ui_effective_prefs(u.ui_prefs) AS appearance,
+  u.is_break_glass, u.last_login_at, u.created_at,
   (extract(epoch FROM u.updated_at) * 1000000)::bigint::text AS version,
   (l.user_id IS NOT NULL) AS local_sign_in, coalesce(l.must_change, false) AS must_change, tf.required AS tf_required, tf.enrolled AS tf_enrolled, auth_totp_enrol_code_state(u.id) AS tf_code_expires_at, auth_totp_enforced(u.id) AS tf_enforced,
   coalesce(mx.exempt, false) AS mfa_exempt, mx.until AS mfa_exempt_until,
@@ -123,6 +131,8 @@ export const toUserDto = (r: UserDbRow): UserDto => ({
   theme: r.theme,
   ui_brand: r.ui_brand as UserDto['ui_brand'],
   brand: r.brand as UserDto['brand'],
+  ui_prefs: r.ui_prefs ?? {},
+  appearance: r.appearance ?? {},
   is_break_glass: r.is_break_glass,
   phone: r.phone,
   local_sign_in: r.local_sign_in,
