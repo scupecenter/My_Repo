@@ -21,6 +21,8 @@ export interface DailyJobResult {
   calendarReset?: number;
   /** 0165: SLA escalation notifications (notify only) written by this run */
   slaEscalations?: number;
+  /** 0166: weekly digest notifications (in-app only) written by this run; only on the week's Sunday */
+  digests?: number;
 }
 
 /** The wall-clock parts of an instant in a time zone, and the zone's offset from UTC at that instant (milliseconds). */
@@ -119,6 +121,8 @@ export class JobsService implements OnApplicationBootstrap, OnModuleDestroy {
         if (reset > 0) result.calendarReset = reset;
         const escalated = await this.slaEscalations();
         if (escalated > 0) result.slaEscalations = escalated;
+        const digests = await this.weeklyDigest();
+        if (digests > 0) result.digests = digests;
       }
       this.lastRun = { at: new Date(), result };
       await this.runs.finish(run, result ? 'ok' : 'skipped', result ? result.slaApplied + result.reminders + (result.snapshots ?? 0) + (result.contractorAlerts ?? 0) + (result.calendarReset ?? 0) : null, null,
@@ -201,6 +205,17 @@ export class JobsService implements OnApplicationBootstrap, OnModuleDestroy {
     if (n === null) {
       this.log.warn('calendar year reset failed');
       await this.syslog.write('error', 'calendar year reset failed', {});
+      return 0;
+    }
+    return n;
+  }
+
+  /** 0166: the weekly digest, in-app only; the database function does nothing except on a Sunday and writes one notification per person per week. A failure is logged and leaves the other steps alone. */
+  private async weeklyDigest(): Promise<number> {
+    const n = await this.runs.run('weekly_digest', async (tx) => Number((await tx.$queryRaw<{ n: number }[]>`SELECT weekly_digest_notify() AS n`)[0]?.n ?? 0));
+    if (n === null) {
+      this.log.warn('weekly digest failed');
+      await this.syslog.write('error', 'weekly digest failed', {});
       return 0;
     }
     return n;
