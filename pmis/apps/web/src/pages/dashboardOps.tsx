@@ -9,7 +9,7 @@ type Aging = NonNullable<
 >;
 
 /**
- * The follow-up sections of the dashboard (contract 0.15.96; owner approval 2026-11-26, dashboard proposals).
+ * The follow-up sections of the dashboard (contract 0.15.101; owner approval 2026-11-26, dashboard proposals).
  * Read only; each figure links to the register it counts. Card primitives come from dashboardBits (the same design
  * system as the existing cards). Ordered and hidden per tab from Settings > Dashboard, like every other card.
  */

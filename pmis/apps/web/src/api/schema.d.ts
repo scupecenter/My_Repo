@@ -9539,11 +9539,11 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * The follow-up sections of the dashboard (0.15.96)
+         * The follow-up sections of the dashboard (0.15.101)
          * @description The sections that follow the operations beyond F13 (owner approval 2026-11-26, dashboard proposals). Read only; not audited (a read, like `GET /dashboard`).
          *     **Who sees what (B3).** Needs `dashboard.view` (403 `module_forbidden otherwise") and the tab rule of 0.15.80 applies as in `GET /dashboard/extras`.
          *     The caller's `dashboard.view` regions limit every section. A part whose module the caller may not see answers `available: false` with null figures.
-         *     **Section `procurement`** (item 1, migration 0184): the orders need `procurement.view`, the materials `warehouse.view`.
+         *     **Section `procurement`** (item 1, migration 0190): the orders need `procurement.view`, the materials `warehouse.view`.
          *     An **open order** is a Procurement record whose order status is not one of the closing statuses of the contractor rules (the same rule as
          *     `GET /reports/contractor-performance`, so the two screens never disagree). `pr_wait` ages the open orders that have a PR date and no PO/WO yet
          *     from the PR date; `po_wait` ages the open orders that have a PO/WO from the PO/WO date; both in calendar days, bucketed 0-7, 8-14, 15-30, over 30.
@@ -19342,7 +19342,7 @@ export interface components {
                 [key: string]: number;
             };
         };
-        /** @description 0.15.96: the follow-up sections of the dashboard (owner approval 2026-11-26). */
+        /** @description 0.15.101: the follow-up sections of the dashboard (owner approval 2026-11-26). */
         DashboardOps: {
             /** Format: date-time */
             as_of: string;
@@ -19350,7 +19350,7 @@ export interface components {
             scope_regions: components["schemas"]["RegionId"][] | null;
             procurement: components["schemas"]["DashboardOpsProcurement"];
         };
-        /** @description 0.15.96: procurement and materials (dashboard proposals item 1). */
+        /** @description 0.15.101: procurement and materials (dashboard proposals item 1). */
         DashboardOpsProcurement: {
             /** @description False when the caller may not see the Procurement register; the order figures are then null. */
             available: boolean;

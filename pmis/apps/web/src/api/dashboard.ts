@@ -60,7 +60,7 @@ export const useDashboardExtras = (q: DashboardQuery, enabled = true) => {
   });
 };
 
-// ---------------------------------------------------------------- 0.15.96: the follow-up sections (procurement and materials)
+// ---------------------------------------------------------------- 0.15.101: the follow-up sections (procurement and materials)
 export type DashboardOps = S['DashboardOps'];
 /** Read only. The same region filter and unified filter tree as the dashboard extras. */
 export const useDashboardOps = (q: DashboardQuery, enabled = true) => {

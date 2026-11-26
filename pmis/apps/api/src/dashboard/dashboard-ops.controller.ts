@@ -3,12 +3,12 @@ import type { AuthContext } from "../auth/auth.types";
 import { Auth } from "../auth/decorators";
 import { DashboardOpsService } from "./dashboard-ops.service";
 
-/** The follow-up sections of the dashboard (contract tag `dashboard`, 0.15.96). */
+/** The follow-up sections of the dashboard (contract tag `dashboard`, 0.15.101). */
 @Controller()
 export class DashboardOpsController {
   constructor(private readonly ops: DashboardOpsService) {}
 
-  /** 0.15.96: procurement and materials (open PR/PO aging, receive rate, shortage per contractor). */
+  /** 0.15.101: procurement and materials (open PR/PO aging, receive rate, shortage per contractor). */
   @Get("dashboard/ops")
   @Header("Cache-Control", "no-store")
   dashboardOps(@Auth() auth: AuthContext, @Query() q: Record<string, unknown>) {

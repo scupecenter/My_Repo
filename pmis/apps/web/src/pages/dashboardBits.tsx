@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 /**
- * The shared card primitives of the dashboard (extracted from Dashboard.tsx unchanged, 0.15.96), so the follow-up
+ * The shared card primitives of the dashboard (extracted from Dashboard.tsx unchanged, 0.15.101), so the follow-up
  * cards (dashboardOps.tsx) use the same design system: card, progress bar, KPI tile and the percentage format.
  */
 
