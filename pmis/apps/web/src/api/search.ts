@@ -2,7 +2,7 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { api } from './client';
 
 /** Global search (contract 0.15.19, plan F4). Read only; the server applies visibility per group. */
-export type SearchType = 'sites' | 'registers' | 'documents' | 'meetings' | 'people' | 'contractors';
+export type SearchType = 'sites' | 'registers' | 'documents' | 'meetings' | 'people' | 'contractors' | 'tasks' | 'warehouse_items';
 
 export interface SearchHit {
   id: string;
@@ -31,7 +31,7 @@ export interface SiteIdLookup {
   not_found: string[];
 }
 
-export const SEARCH_GROUP_ORDER: SearchType[] = ['sites', 'registers', 'documents', 'meetings', 'people', 'contractors'];
+export const SEARCH_GROUP_ORDER: SearchType[] = ['sites', 'registers', 'documents', 'meetings', 'people', 'contractors', 'tasks', 'warehouse_items'];
 
 /** The global search for one text (2 to 100 characters). */
 export const useGlobalSearch = (q: string) =>

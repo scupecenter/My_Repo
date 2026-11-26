@@ -9,7 +9,7 @@ import { parse } from '../common/zod';
 import { DbService } from '../db/db.service';
 import { matchRanges } from './search-text';
 
-export const SEARCH_TYPES = ['sites', 'registers', 'documents', 'meetings', 'people', 'contractors'] as const;
+export const SEARCH_TYPES = ['sites', 'registers', 'documents', 'meetings', 'people', 'contractors', 'tasks', 'warehouse_items'] as const;
 export type SearchType = (typeof SEARCH_TYPES)[number];
 
 export interface SearchHit {
@@ -181,6 +181,26 @@ export class SearchService {
           concat('/admin/users/', u.id::text) AS href, (COUNT(*) OVER())::int AS total
         FROM users u WHERE u.deleted_at IS NULL AND u.purged_at IS NULL AND search_user_text(u.display_name, u.email, u.employee_id) LIKE ${pattern}
         ORDER BY u.display_name LIMIT ${limit}`);
+    }
+    if (type === 'tasks') {
+      // Tasks of the sites the caller may view (the Site Register right and region, as the task grid); row-level security applies beneath.
+      const regions = await this.access.regions('sites', 'view');
+      if (regions !== null && regions.length === 0) return null;
+      const reach = regions === null ? Prisma.empty : Prisma.sql`AND s.region_id = ANY(${regions}::int[])`;
+      return tx.$queryRaw<Row[]>(Prisma.sql`SELECT t.id::text AS id, td.code || ' - ' || td.name_en AS title, s.site_code || ' - ' || s.name AS subtitle, s.region_id,
+          concat('/sites/', s.id::text, '?task=', t.id::text) AS href, (COUNT(*) OVER())::int AS total
+        FROM task_instances t JOIN task_definitions td ON td.id = t.task_def_id JOIN sites s ON s.id = t.site_id
+        WHERE s.is_active AND td.is_active AND search_norm(td.code || ' ' || td.name_en || ' ' || coalesce(td.name_ar, '') || ' ' || s.site_code) LIKE ${pattern} ${reach}
+        ORDER BY s.site_code, td.sort_order LIMIT ${limit}`);
+    }
+    if (type === 'warehouse_items') {
+      // Read only; the Warehouse module view is the same right as GET /warehouse/items. Items are global (no region).
+      if (!(await this.access.hasGrant(auth, 'warehouse', 'view'))) return null;
+      return tx.$queryRaw<Row[]>(Prisma.sql`SELECT i.id::text AS id, i.item_code || ' - ' || i.name AS title, i.item_group AS subtitle, NULL::int AS region_id,
+          '/warehouse' AS href, (COUNT(*) OVER())::int AS total
+        FROM warehouse_items i
+        WHERE i.is_active AND search_norm(i.item_code || ' ' || i.name || ' ' || coalesce(i.name_ar, '')) LIKE ${pattern}
+        ORDER BY i.item_code COLLATE "C" LIMIT ${limit}`);
     }
     // contractors
     if (!(await this.access.hasGrant(auth, 'contractors', 'view'))) return null;

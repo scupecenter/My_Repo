@@ -208,7 +208,9 @@
       "documents": "المستندات",
       "meetings": "الاجتماعات",
       "people": "الأشخاص",
-      "contractors": "المقاولون"
+      "contractors": "المقاولون",
+      "tasks": "المهام",
+      "warehouse_items": "أصناف المخزن"
     },
     "site_list": "أرقام المواقع في القائمة",
     "site_list_found": "عُثر على {{count}}",
