@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { matchRanges } from '../src/search/search-text';
 import { startApp, superDb } from './helpers';
 import { G } from './reg-helpers';
-import { Actor, actor, makeSite, plainAdmin } from './wf-helpers';
+import { Actor, actor, makeSite, makeTask, plainAdmin } from './wf-helpers';
 
 /**
  * Global search (plan F4, migration 0099, contract 0.15.19): Arabic-normalised matching, highlight offsets, the group visibility rules
@@ -91,6 +91,42 @@ describe('GET /search', () => {
     const site = await makeSite(db, OTHER, { prefix: 'OUT' });
     const res = await inRegion.api.call('get', `/search?q=${site.code}&types=sites`);
     expect(res.body.groups[0]?.items ?? []).toHaveLength(0);
+  });
+});
+
+describe('GET /search tasks and warehouse_items', () => {
+  it('finds a task by its code inside the caller regions only, and opens it from the site page', async () => {
+    const mine = await makeSite(db, R, { prefix: 'TSK' });
+    const far = await makeSite(db, OTHER, { prefix: 'TSK' });
+    const def = await db.query(
+      "SELECT td.code FROM task_definitions td JOIN workflow_definitions w ON w.id = td.workflow_id AND w.version = 1 WHERE td.is_active ORDER BY td.code LIMIT 1");
+    const code = def.rows[0].code as string;
+    const taskId = await makeTask(db, mine, code);
+    const farTask = await makeTask(db, far, code);
+    const res = await inRegion.api.call('get', `/search?q=${encodeURIComponent(`${code}`)}&types=tasks&limit=10`);
+    expect(res.status).toBe(200);
+    const items = (res.body.groups[0]?.items ?? []) as { id: string; href: string; region_id: number }[];
+    expect(items.every((i) => i.region_id === R)).toBe(true);
+    expect(items.find((i) => i.id === farTask)).toBeUndefined();
+    const bySite = await inRegion.api.call('get', `/search?q=${encodeURIComponent(mine.code)}&types=tasks&limit=10`);
+    const hit = (bySite.body.groups[0]?.items as { id: string; href: string }[]).find((i) => i.id === taskId);
+    expect(hit?.href).toBe(`/sites/${mine.id}?task=${taskId}`);
+  });
+
+  it('leaves the tasks group out for a caller who may read no site, and warehouse_items without the warehouse right', async () => {
+    const res = await nothing.api.call('get', '/search?q=item&types=tasks,warehouse_items');
+    expect(res.status).toBe(200);
+    expect(res.body.groups).toEqual([]);
+  });
+
+  it('finds a warehouse item by code or Arabic-normalised name for a warehouse viewer', async () => {
+    const code = `SRCH-${Date.now()}`;
+    await db.query("INSERT INTO warehouse_items (item_code, item_group, name, name_ar) VALUES ($1, 'WL', 'Search probe', 'كابل اختبار')", [code]);
+    const res = await admin.api.call('get', `/search?q=${encodeURIComponent('كابل اختبار')}&types=warehouse_items`);
+    expect(res.status).toBe(200);
+    const g = res.body.groups[0];
+    expect(g.type).toBe('warehouse_items');
+    expect((g.items as { title: string }[]).some((i) => i.title.startsWith(code))).toBe(true);
   });
 });
 
