@@ -39,10 +39,10 @@ function FlatTrack({ nodes, selected, onSelect, stats, label }: PipelineProps) {
             return (
               <li key={m.code} className="min-w-0 flex-1">
                 <button type="button" data-testid={`pipe-node-${m.code}`} data-state={m.state}
-                  className={`group block w-full rounded-md p-1 text-start transition-transform hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${selected === m.code ? 'bg-accentSoft' : ''}`}
+                  className={`group block w-full rounded-md p-1 text-start motion-lift focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${selected === m.code ? 'bg-accentSoft' : ''}`}
                   aria-pressed={selected === m.code} aria-label={label ? label(m) : `${name}: ${t(`pipe.${m.state}`)}`} onClick={() => onSelect?.(m.code)}>
                   <div className={`relative h-3 overflow-hidden bg-lockBg ${i === 0 ? 'rounded-s-full' : ''} ${i === ms.length - 1 ? 'rounded-e-full' : ''}`} aria-hidden="true">
-                    {m.state !== 'na' && <i className={`absolute inset-y-0 start-0 ${SEG_FILL[m.state] ?? 'bg-lock'}`} style={{ width: `${p * 100}%`, transition: 'width .6s ease' }} />}
+                    {m.state !== 'na' && <i className={`motion-fill absolute inset-y-0 start-0 ${SEG_FILL[m.state] ?? 'bg-lock'}`} style={{ width: `${p * 100}%` }} />}
                   </div>
                   <div className="mt-1 flex items-center gap-1 text-xs">
                     <span aria-hidden="true" className={m.state === 'late' ? 'font-bold text-lateInk' : m.state === 'done' ? 'text-doneInk' : 'text-mute'}>{SIGN[m.state] ?? '○'}</span>

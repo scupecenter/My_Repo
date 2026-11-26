@@ -26,7 +26,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
       <div role="status" aria-live="polite" className="fixed bottom-4 end-4 z-[60] flex flex-col gap-2">
         {items.map((i) => (
-          <div key={i.id} data-testid="toast" data-kind={i.kind} className={`card px-4 py-2 text-sm font-semibold ${i.kind === 'err' ? 'text-lateInk bg-lateBg' : 'text-doneInk bg-doneBg'}`}>{i.text}{i.action && <button type="button" className="btn ms-3" data-testid="toast-action" onClick={() => { i.action!.onClick(); setItems((x) => x.filter((y) => y.id !== i.id)); }}>{i.action.label}</button>}</div>
+          <div key={i.id} data-testid="toast" data-kind={i.kind} className={`motion-rise card px-4 py-2 text-sm font-semibold ${i.kind === 'err' ? 'text-lateInk bg-lateBg' : 'text-doneInk bg-doneBg'}`}>{i.text}{i.action && <button type="button" className="btn ms-3" data-testid="toast-action" onClick={() => { i.action!.onClick(); setItems((x) => x.filter((y) => y.id !== i.id)); }}>{i.action.label}</button>}</div>
         ))}
       </div>
     </Ctx.Provider>
