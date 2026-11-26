@@ -16846,6 +16846,8 @@ export interface components {
             /** @description A return note needs a reason before it is submitted (Faulty or Damaged, Relocation, Cancellation, Other, Dismantle). */
             reason?: string;
             remark?: string;
+            /** @description 0.15.90. PL and OPEN only: the entity id of an approved, active Procurement order (see GET /registers/warehouse/order-options). PR No., PO / WO No. and the contractor are then derived from it. */
+            procurement_order_id?: string;
             lines: components["schemas"]["StockMovementLine"][];
         };
         AsBuiltItemFields: {

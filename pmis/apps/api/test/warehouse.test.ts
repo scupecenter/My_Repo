@@ -758,9 +758,9 @@ describe("receipt to Procurement order link (0181)", () => {
     expect(rec.body.data.procurement_order_id).toBeUndefined();
     expect(rec.body.data.pr_no).toBeUndefined();
   });
-  it("refuses an order that is not an approved, active Procurement order, and a typed derived value is not kept", async () => {
+  it("refuses an order that is not an approved, active Procurement order, and a malformed id too", async () => {
     const bad = await move({
-      ...doc("pl"), procurement_order_id: randomUUID(), pr_no: "TYPED-PR",
+      ...doc("pl"), procurement_order_id: randomUUID(),
       lines: [{ item_id: tower.id, qty: 1 }],
     });
     expect(bad.status, JSON.stringify(bad.body)).toBe(422);

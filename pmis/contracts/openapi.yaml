@@ -22496,6 +22496,7 @@ components:
         condition: { type: string, enum: [Good, Faulty, Damaged] }
         reason: { type: string, description: 'A return note needs a reason before it is submitted (Faulty or Damaged, Relocation, Cancellation, Other, Dismantle).' }
         remark: { type: string }
+        procurement_order_id: { type: string, description: '0.15.90. PL and OPEN only: the entity id of an approved, active Procurement order (see GET /registers/warehouse/order-options). PR No., PO / WO No. and the contractor are then derived from it.' }
         lines: { type: array, minItems: 1, maxItems: 500, items: { $ref: '#/components/schemas/StockMovementLine' } }
     AsBuiltItemFields:
       type: object
