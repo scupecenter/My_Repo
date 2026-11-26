@@ -14,7 +14,7 @@ import { DbService } from '../db/db.service';
 import { applyContext } from '../logs/context';
 import { SyslogService } from '../auth/syslog.service';
 import { DocumentsService, SITE_DOCS } from './documents.service';
-import { attachmentHeader, displayName, safePart } from './naming';
+import { archiveName, attachmentHeader, displayName, safePart } from './naming';
 import { StorageService, newObjectKey } from './storage.service';
 
 const body = z
@@ -25,6 +25,8 @@ const body = z
     file_ids: z.array(z.string().uuid()).min(1).max(5000).optional(),
     slot_status: z.enum(['uploaded', 'in_review', 'approved', 'rejected']).optional(),
     include_superseded: z.boolean().optional(),
+    /** Library Archive zip: `DocType_SiteID_Number_vN.ext` in a folder per document type (set by the server route, never by the client). */
+    naming: z.enum(['archive']).optional(),
   })
   .strict();
 type Scope = z.infer<typeof body>;
@@ -175,10 +177,11 @@ export class ZipService implements OnApplicationBootstrap {
         const regions = admin ? null : await this.access.regions(SITE_DOCS, 'download_documents');
         const rows = await this.db.tx.$queryRaw<{
           id: string; original_name: string; storage_key: string; ext: string | null; version: number; is_current: boolean; sha256: string; size_bytes: bigint; uploaded_at: Date; approved_date: string | null;
-          site_code: string; task_code: string | null; doc_code: string; candidate_label: string | null; stage_code: string | null; slot_status: string;
+          site_code: string; task_code: string | null; doc_code: string; candidate_label: string | null; stage_code: string | null; slot_status: string; doc_number: string | null;
         }[]>(Prisma.sql`
           SELECT f.id::text AS id, f.original_name, f.storage_key, f.ext, f.version, f.is_current, f.sha256, f.size_bytes, f.uploaded_at, f.approved_date::text AS approved_date,
-            coalesce(si.site_code, 'GLOBAL') AS site_code, coalesce(td.code, upper(s.register_key)) AS task_code, dt.code AS doc_code, s.candidate_label, st.code AS stage_code, s.status::text AS slot_status
+            coalesce(si.site_code, 'GLOBAL') AS site_code, coalesce(td.code, upper(s.register_key)) AS task_code, dt.code AS doc_code, s.candidate_label, st.code AS stage_code, s.status::text AS slot_status,
+            (SELECT g.number FROM library_generated_docs g WHERE s.task_id IS NOT NULL AND g.task_id = s.task_id AND g.doc_type_id = s.doc_type_id AND g.status = 'generated' ORDER BY g.generated_at DESC LIMIT 1) AS doc_number
           ${DocumentsService.LIST_FROM}
           WHERE ${Prisma.join(this.matchFilter(job.scope, regions, await this.docs.registerScopeSql(admin)), ' AND ')} ORDER BY si.site_code, st.code, td.code, dt.code, f.uploaded_at, f.id`);
         if (rows.length === 0) throw new Error('no files');
@@ -204,9 +207,11 @@ export class ZipService implements OnApplicationBootstrap {
         const manifest = [['path', 'original_name', 'sha256', 'version', 'is_current', 'slot_status', 'approved_date', 'uploaded_at'].map(csvCell).join(',')];
         let i = 0;
         for (const r of included) {
-          const name = displayName({ site_code: r.site_code, task_code: r.task_code, doc_code: r.doc_code, candidate_label: r.candidate_label, approved_date: r.approved_date, uploaded_at: r.uploaded_at, ext: r.ext ?? 'bin', version: r.version, is_current: r.is_current });
-          let path = `${safePart(r.site_code)}/${safePart(r.stage_code ?? 'NA')}/${name}`;
-          for (let n = 2; used.has(path.toLowerCase()); n++) path = `${safePart(r.site_code)}/${safePart(r.stage_code ?? 'NA')}/${name.replace(/(\.[a-z0-9]+)$/, `_${n}$1`)}`;
+          const archive = job.scope.naming === 'archive';
+          const name = archive ? archiveName({ doc_code: r.doc_code, site_code: r.site_code, doc_number: r.doc_number, version: r.version, ext: r.ext ?? 'bin' }) : displayName({ site_code: r.site_code, task_code: r.task_code, doc_code: r.doc_code, candidate_label: r.candidate_label, approved_date: r.approved_date, uploaded_at: r.uploaded_at, ext: r.ext ?? 'bin', version: r.version, is_current: r.is_current });
+          const folder = archive ? safePart(r.doc_code) : `${safePart(r.site_code)}/${safePart(r.stage_code ?? 'NA')}`;
+          let path = `${folder}/${name}`;
+          for (let n = 2; used.has(path.toLowerCase()); n++) path = `${folder}/${name.replace(/(\.[a-z0-9]+)$/, `_${n}$1`)}`;
           used.add(path.toLowerCase());
           const entry = new ZipPassThrough(path);
           zip.add(entry);

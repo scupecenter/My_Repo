@@ -7,6 +7,7 @@ import { downloadFile, fetchBlob, type ApiError } from '@/api/client';
 import { useDocuments } from '@/api/documents';
 import { allArchiveRows, archiveZip, useArchive, useArchiveRows, useArchiveSetting, DOC_STATUSES, type ArchiveQuery, type LibraryArchiveRow, type LibraryDocStatus } from '@/api/library';
 import { decodeFilter, encodeFilter, type FilterTree } from '@/api/views';
+import { LibraryTabs } from './LibraryTabs';
 import { PageHeader } from '@/components/PageHeader';
 import { SavedViews } from '@/components/SavedViews';
 import { EmptyState, QueryFallback } from '@/components/States';
@@ -36,6 +37,7 @@ export function LibraryArchive() {
     <div data-testid="page-library-archive">
       <PageHeader title={t('lib.archive_title')} subtitle={t('lib.archive_sub')} context={q.data?.can_configure ? (
         <span className="ms-auto"><Link className="btn px-2 py-1 text-xs" to="/admin/settings/documents/archive" data-testid="lib-archive-settings">{t('lib.link_archive')}</Link></span>) : undefined} />
+      <LibraryTabs />
       {!q.data ? <QueryFallback queries={[q]} /> : !q.data.groups.length ? <EmptyState testid="lib-archive-empty" title={t('lib.no_cards')} /> : (
         <div className="space-y-5">
           {q.data.groups.map((g) => (

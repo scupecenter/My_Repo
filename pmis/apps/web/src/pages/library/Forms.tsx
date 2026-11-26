@@ -10,12 +10,13 @@ import { PageHeader } from '@/components/PageHeader';
 import { EmptyState, QueryFallback } from '@/components/States';
 import { SearchBox, TableCount } from '@/components/TableStandard';
 import { useToast } from '@/components/Toast';
+import { LibraryTabs } from './LibraryTabs';
 
 type SiteHit = { id: string; site_code: string; name: string | null };
 const errText = (e: ApiError | null | undefined) => (e ? (e.problem?.errors?.map((x) => x.message).join(' ') || e.problem?.detail || e.message) : '');
 
 /** A site of the caller's regions, picked by its Site ID (the list search of GET /sites). */
-function SitePicker({ value, onChange }: { value: SiteHit | null; onChange: (s: SiteHit | null) => void }) {
+export function SitePicker({ value, onChange }: { value: SiteHit | null; onChange: (s: SiteHit | null) => void }) {
   const { t } = useTranslation();
   const [q, setQ] = useState(value?.site_code ?? '');
   const hits = useQuery({
@@ -130,9 +131,10 @@ export function LibraryForms() {
     <div data-testid="page-library-forms">
       <PageHeader title={t('lib.forms_title')} subtitle={t('lib.forms_sub')} context={forms.data?.can_configure ? (
         <span className="ms-auto flex flex-wrap gap-1" data-testid="lib-settings-links">
-          <Link className="btn px-2 py-1 text-xs" to="/admin/settings/documents/forms">{t('lib.link_forms')}</Link>
+          <Link className="btn px-2 py-1 text-xs" to="/library/templates">{t('lib.link_forms')}</Link>
           <Link className="btn px-2 py-1 text-xs" to="/admin/settings/documents/types">{t('lib.link_types')}</Link>
         </span>) : undefined} />
+      <LibraryTabs />
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <SearchBox testid="lib-forms-search" value={q} onChange={(v) => setParam({ q: v })} placeholder={t('lib.search_forms')} />
         <span className="ms-auto"><TableCount testid="lib-forms-count" noun="items" total={all.length} filtered={items.length} active={!!needle} onClear={() => setParam({ q: '' })} /></span>

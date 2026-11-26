@@ -67,7 +67,7 @@ export class LibraryMenuController {
   @HttpCode(202)
   async startZip(@Auth() auth: AuthContext, @Body() body: unknown, @Headers('idempotency-key') key: string | undefined, @Res({ passthrough: true }) res: Response) {
     const ids = await this.lib.zipFileIds(body);
-    return this.zip.start(auth, { file_ids: ids, include_superseded: true }, key, (go) => {
+    return this.zip.start(auth, { file_ids: ids, include_superseded: true, naming: 'archive' }, key, (go) => {
       // after the response is sent the request transaction has committed: the worker can see the job
       res.once('finish', go);
     });

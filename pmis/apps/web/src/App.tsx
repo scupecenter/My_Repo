@@ -31,6 +31,7 @@ import { RegisterPage } from '@/pages/Register';
 import { RegisterBatch } from '@/pages/RegisterBatch';
 import { TemplatesPage } from '@/pages/Templates';
 import { LibraryForms } from '@/pages/library/Forms';
+import { LibraryTemplates } from '@/pages/library/Templates';
 import { ArchiveList, LibraryArchive } from '@/pages/library/Archive';
 import { ReconciliationPage } from '@/pages/Reconciliation';
 import { TemplateMappingPage } from '@/pages/TemplateMapping';
@@ -118,6 +119,7 @@ function gated(session: Session) {
         {/* W5: Library (Forms and Archive) */}
         <Route path="library" element={<Navigate to="/library/forms" replace />} />
         <Route path="library/forms" element={<LibraryForms />} />
+        <Route path="library/templates" element={<LibraryTemplates />} />
         <Route path="library/archive" element={<LibraryArchive />} />
         <Route path="library/archive/:docCode" element={<ArchiveList />} />
         <Route path="templates/batches/:batchId" element={<RegisterBatch />} />
