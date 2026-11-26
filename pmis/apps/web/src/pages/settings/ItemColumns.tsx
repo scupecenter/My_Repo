@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ApiError } from '@/api/client';
+import { InlineCell } from '@/components/InlineCell';
 import { type ItemColumn, useItemColumns, useSaveItemColumn } from '@/api/warehouseColumns';
 import { useAsk } from './studio/studioCtx';
 
@@ -15,6 +16,13 @@ export function ItemColumns() {
   const save = useSaveItemColumn();
   const { askReason, node } = useAsk();
   const [f, setF] = useState(EMPTY);
+  // Edit in place next to the buttons: a name cell saves that column (same call as the form, audited) with the reason typed above the table.
+  const [inReason, setInReason] = useState('');
+  const saveName = async (c: ItemColumn, body: Record<string, unknown>) => {
+    if (inReason.trim().length < 3) throw new Error(t('itemcols.inline_need_reason'));
+    try { await save.mutateAsync({ col: c, body: { ...body, reason: inReason.trim() } as never }); }
+    catch (e) { throw new Error(e instanceof Error ? e.message : t('errors.generic')); }
+  };
   const forbidden = q.error instanceof ApiError && q.error.status === 403;
   const cols = q.data ?? [];
   const run = (col: ItemColumn | undefined, body: Record<string, unknown>, title: string) =>
@@ -27,13 +35,19 @@ export function ItemColumns() {
       {q.isError && <p role="alert" className="text-lateInk">{forbidden ? t('studio.columns.no_access') : t('errors.generic')}</p>}
       {q.data && (
         <div className="overflow-x-auto">
+          <div className="mb-2 flex flex-wrap items-end gap-2 text-sm" data-testid="item-col-inline-bar">
+            <label className="flex-1">{t('itemcols.inline_reason')}<input className="input w-full" data-testid="item-col-inline-reason" value={inReason} onChange={(e) => setInReason(e.target.value)} /></label>
+            <p className="text-xs text-mute">{t('itemcols.inline_hint')}</p>
+          </div>
           <table className="w-full text-sm" data-testid="item-columns-table" aria-label={t('itemcols.title')}>
             <thead className="text-mute"><tr>{(['code', 'name', 'type', 'state'] as const).map((k) => <th key={k} scope="col" className="p-2 text-start">{t(`itemcols.${k}`)}</th>)}<th className="p-2" /></tr></thead>
             <tbody>
               {cols.map((c, i) => (
                 <tr key={c.code} className={`border-t border-line ${c.is_active ? '' : 'opacity-60'}`} data-testid={`item-col-${c.code}`}>
                   <td className="mono p-2" dir="ltr">{c.code}</td>
-                  <td className="p-2">{(ar && c.label_ar) || c.label_en}</td>
+                  <td className="p-2">{ar && c.label_ar
+                    ? <InlineCell value={c.label_ar} dir="rtl" label={t('itemcols.name_ar')} testid={`item-col-cell-name-${c.code}`} onCommit={(v) => saveName(c, { label_ar: v.trim() || null })} />
+                    : <InlineCell value={c.label_en} label={t('itemcols.name_en')} testid={`item-col-cell-name-${c.code}`} onCommit={(v) => v.trim() ? saveName(c, { label_en: v.trim() }) : Promise.reject(new Error(t('itemcols.inline_need_name')))} />}</td>
                   <td className="p-2">{t(`itemcols.type_${c.data_type}`)}</td>
                   <td className="p-2">{t(c.is_active ? 'regcols.active' : 'regcols.inactive')}</td>
                   <td className="p-2 text-end whitespace-nowrap">

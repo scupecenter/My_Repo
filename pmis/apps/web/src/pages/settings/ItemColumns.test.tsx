@@ -29,4 +29,24 @@ describe('item master extra columns', () => {
     await u.click(within(screen.getByTestId('wh-dialog')).getByRole('button', { name: /save|confirm|ok/i }));
     await waitFor(() => expect(screen.getByTestId('wh-cv-ANT-900-colour_p6')).toHaveTextContent('Grey'));
   });
+
+  it('edits a column name in the row after a reason is typed, and keeps the buttons', async () => {
+    await signIn('pm');
+    const u = userEvent.setup();
+    renderApp(<Routes><Route path="/admin/settings/registers/columns" element={<RegisterColumns />} /></Routes>, { route: '/admin/settings/registers/columns?register=wh:items' });
+    await u.type(await screen.findByTestId('item-col-f-code'), 'colour_in');
+    await u.type(screen.getByTestId('item-col-f-en'), 'Colour');
+    await u.click(screen.getByTestId('item-col-add-go'));
+    await u.type(await screen.findByTestId('studio-reason-dialog-reason'), 'Need the colour');
+    await u.click(within(screen.getByTestId('studio-reason-dialog')).getByRole('button', { name: /save|confirm|ok/i }));
+    await u.click(await screen.findByTestId('item-col-cell-name-colour_in'));
+    await u.clear(screen.getByTestId('item-col-cell-name-colour_in-input'));
+    await u.type(screen.getByTestId('item-col-cell-name-colour_in-input'), 'Shade{Enter}');
+    expect(await screen.findByTestId('item-col-cell-name-colour_in-err')).toBeInTheDocument();
+    await u.type(screen.getByTestId('item-col-inline-reason'), 'Better name');
+    await u.click(screen.getByTestId('item-col-cell-name-colour_in-input'));
+    await u.keyboard('{Enter}');
+    expect(await screen.findByText('Shade')).toBeInTheDocument();
+    expect(screen.getByTestId('item-col-toggle-colour_in')).toBeInTheDocument();
+  });
 });
