@@ -197,6 +197,13 @@ export class MasterExportService {
     return r[0]?.cols ?? [];
   }
 
+  /** 0167: the layout of a register sheet without the columns whose switch "In the export" is off (a switch that is off only removes a column; it never adds one). */
+  private async exportLayout(p: PartInfo): Promise<ReturnType<typeof registerLayout>> {
+    const layout = registerLayout(p.key, await this.tplColumns(p.register as string), p.map, p.site_scoped);
+    const off = new Set((await this.db.tx.$queryRaw<{ code: string }[]>(Prisma.sql`SELECT code FROM register_fields WHERE register_key = ${p.register as string} AND NOT in_export`)).map((r) => r.code));
+    return off.size === 0 ? layout : { ...layout, columns: layout.columns.filter((c) => !(c.source === 'field' && c.code && off.has(c.code))) };
+  }
+
   /** The stable column codes of a part (GET /exports/parts?include_columns=true and the check of ExportView.columns). */
   private async columnsOf(auth: AuthContext, p: PartInfo, cols?: MasterColumn[], ms?: Set<string>): Promise<ExportColumnDto[]> {
     if (p.key === 'tasks') return Object.entries(TASK_COLUMNS).map(([code, [en, ar]]) => ({ code, label_en: en, label_ar: ar, master_column: null, default_visible: true }));
@@ -221,7 +228,7 @@ export class MasterExportService {
       return out.filter((c) => CODE.test(c.code));
     }
     const out: ExportColumnDto[] = Object.entries(REG_FIXED).map(([code, [en, ar]]) => ({ code, label_en: en, label_ar: ar, master_column: null, default_visible: true }));
-    const layout = registerLayout(p.key, await this.tplColumns(p.register as string), p.map, p.site_scoped);
+    const layout = await this.exportLayout(p);
     for (const c of layout.columns) {
       if ((c.source !== 'field' && c.source !== 'custom') || !c.code || !CODE.test(c.code) || out.some((x) => x.code === c.code)) continue;
       out.push({ code: c.code, label_en: c.header, label_ar: c.header, master_column: null, custom: c.source === 'custom', default_visible: true });
@@ -689,7 +696,7 @@ export class MasterExportService {
     wb: ReturnType<typeof workbookWriter>, auth: AuthContext, p: PartInfo, regs: number[] | null, regionNames: Map<number, string>,
     view: { filters: Record<string, unknown>; columns: string[] } | null,
   ): Promise<SheetCount> {
-    const layout = registerLayout(p.key, await this.tplColumns(p.register as string), p.map, p.site_scoped);
+    const layout = await this.exportLayout(p);
     let columns: RegisterSheetColumn[] = layout.columns;
     if (view) {
       columns = view.columns.map((code): RegisterSheetColumn => {

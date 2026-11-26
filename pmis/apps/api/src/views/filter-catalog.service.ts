@@ -484,7 +484,7 @@ export class FilterCatalogService {
         section: string | null;
       }[]
     >`
-      SELECT code, label_en, label_ar, field_type, options, list_catalogue, section FROM register_fields WHERE register_key = ${key} AND is_active ORDER BY sort_order, code`;
+      SELECT code, label_en, label_ar, field_type, options, list_catalogue, section FROM register_fields WHERE register_key = ${key} AND is_active AND in_filter ORDER BY sort_order, code`;
     for (const f of own) {
       const t = typeOf(f.field_type);
       if (!t || !CODE.test(f.code)) continue;
