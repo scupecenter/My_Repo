@@ -1153,7 +1153,8 @@
     "section_my-work_daily-plan": "Daily Plan",
     "section_documents_types": "Document types",
     "section_documents_forms": "Form templates",
-    "section_documents_archive": "Archive"
+    "section_documents_archive": "Archive",
+    "section_data_counts": "GECOL / HLC counts"
   },
   "scopeMatch": {
     "title": "Team / scope match (Procurement)",
@@ -6273,5 +6274,27 @@
     "search_b": "Press Ctrl K to search and jump to any page you may open.",
     "shortcuts_t": "Shortcuts",
     "shortcuts_b": "Press ? to see the list. G then D opens the Dashboard, G then S the Sites, G then W My Work."
+  },
+  "gecolHlcCounts": {
+    "title": "GECOL / HLC counts",
+    "note": "Read only. Counts the latest version of each record. Nothing here changes any data; it shows what is in the system before any move of GECOL or HLC data.",
+    "as_of": "As of",
+    "gecol": "GECOL register",
+    "hlc": "HLC register",
+    "procurement": "Procurement register",
+    "total": "Total",
+    "by_state": "By state",
+    "with_pr_no": "With a PR number",
+    "with_request_date": "With a request date",
+    "linked": "Linked to a Procurement request",
+    "not_linked": "Not linked",
+    "scope": "Scope",
+    "state": "State",
+    "count": "Count",
+    "no_scope": "(no scope)",
+    "sites": "Sites",
+    "sites_gecol": "Sites with the GECOL scope",
+    "sites_hlc": "Sites with the HLC scope",
+    "empty": "No records"
   }
 }

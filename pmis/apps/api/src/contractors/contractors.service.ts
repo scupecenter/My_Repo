@@ -26,6 +26,7 @@ interface RulesJson {
  * P4b (migration 0061): the reports of the Contractors and Procurement data (Q142, Q145) and the contractor rules (Q147, D145b).
  *   GET /reports/team-scope-mismatch      running orders that no longer match; Procurement view, rows of the caller's Procurement regions (B3).
  *   GET /reports/contractors-completeness teams, parties and contracts that need data; Contractors view (the register is global, Q69).
+ *   GET /reports/gecol-hlc-counts         read only counts of the GECOL, HLC and Procurement records (0.15.84); admin.settings view for all regions.
  *   GET/PUT /settings/contractor-rules    the certificate lead days, the alert roles, the CW Delivery Model scopes, the internal team types and the
  *                                         order statuses that close an order; saving needs admin.settings edit for all regions, a reason, If-Match,
  *                                         and a step-up when a rule that decides eligibility changes (checked in the database).
@@ -54,6 +55,38 @@ export class ContractorsService {
       updated_by = { id: j.updated_by, display_name: u[0]?.display_name ?? '', employee_id: u[0]?.employee_id?.trim() ?? null };
     }
     return { ...j, updated_by };
+  }
+
+  /** 0.15.84: read-only counts, a step before any move of GECOL / HLC data. The latest version of every logical record; no write, no setting read. */
+  async gecolHlcCounts() {
+    await this.access.requireAdmin('admin.settings', 'view');
+    const latest = Prisma.sql`SELECT DISTINCT ON (entity_id) entity_id, register_key, state, data FROM register_records
+                              WHERE register_key IN ('gecol', 'hlc', 'procurement') ORDER BY entity_id, version_no DESC`;
+    // one statement per register, so the numbers of that register come from one snapshot (the totals are the sums of the states)
+    const reg = async (key: string) => {
+      const rows = await this.db.tx.$queryRaw<{ state: string; n: number; pr: number; rd: number; linked: number }[]>(Prisma.sql`
+        WITH l AS (${latest}) SELECT state, count(*)::int AS n,
+          (count(*) FILTER (WHERE btrim(coalesce(data ->> 'pr_no', '')) <> ''))::int AS pr,
+          (count(*) FILTER (WHERE btrim(coalesce(data ->> 'request_date', '')) <> ''))::int AS rd,
+          (count(*) FILTER (WHERE btrim(coalesce(data ->> 'procurement_record_id', '')) <> ''))::int AS linked
+        FROM l WHERE register_key = ${key} GROUP BY state ORDER BY state`);
+      const sum = (f: (r: (typeof rows)[number]) => number) => rows.reduce((a, r) => a + f(r), 0);
+      return { by_state: rows.map((r) => ({ state: r.state, count: r.n })), total: sum((r) => r.n), pr: sum((r) => r.pr), rd: sum((r) => r.rd), linked: sum((r) => r.linked) };
+    };
+    const g = await reg('gecol');
+    const h = await reg('hlc');
+    const p = await this.db.tx.$queryRaw<{ scope: string | null; state: string; n: number }[]>(Prisma.sql`
+      WITH l AS (${latest}) SELECT data ->> 'scope' AS scope, state, count(*)::int AS n FROM l WHERE register_key = 'procurement'
+      GROUP BY 1, 2 ORDER BY 1 NULLS LAST, 2`);
+    const s = await this.db.tx.$queryRaw<{ g: number; h: number }[]>`
+      SELECT (count(*) FILTER (WHERE scope_gecol_power = 'yes'))::int AS g, (count(*) FILTER (WHERE scope_hlc_fiber = 'yes'))::int AS h FROM sites`;
+    return {
+      as_of: new Date().toISOString(),
+      gecol: { total: g.total, with_pr_no: g.pr, with_request_date: g.rd, by_state: g.by_state },
+      hlc: { total: h.total, linked_to_procurement: h.linked, not_linked: h.total - h.linked, by_state: h.by_state },
+      procurement: { total: p.reduce((a, r) => a + r.n, 0), by_scope_state: p.map((r) => ({ scope: r.scope, state: r.state, count: r.n })) },
+      sites: { with_gecol_scope: s[0]!.g, with_hlc_scope: s[0]!.h },
+    };
   }
 
   async rules(auth: AuthContext) {

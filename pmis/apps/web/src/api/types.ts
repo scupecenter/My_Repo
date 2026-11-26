@@ -124,6 +124,7 @@ export type ContractorProblem = S['ContractorProblem'];
 export type TeamScopeMismatchReport = S['TeamScopeMismatchReport'];
 export type TeamScopeMismatchRow = S['TeamScopeMismatchRow'];
 export type ContractorsCompletenessReport = S['ContractorsCompletenessReport'];
+export type GecolHlcCounts = S['GecolHlcCounts'];
 export type NotificationPolicy = S['NotificationPolicy'];
 export type NotificationPolicyInput = S['NotificationPolicyInput'];
 export type NotificationPolicyRow = S['NotificationPolicyRow'];

@@ -21,6 +21,15 @@ const TD = () => (C().tableDisplay ??= { defaults: { size: 'md', align: 'start',
 /** A mock store saved before 0.9.1 has no match table, one saved before 0.12.9 no catalogue: start it from the seed. */
 const SM = () => (C().scopeMatch?.catalogue ? C().scopeMatch : (C().scopeMatch = initCfg().scopeMatch));
 const CR = () => (C().contractorRules ??= initCfg().contractorRules);
+/** GET /reports/gecol-hlc-counts (contract 0.15.84): demo numbers only. */
+const GECOL_HLC_COUNTS = {
+  as_of: '2026-11-26T12:00:00.000Z',
+  gecol: { total: 5, with_pr_no: 3, with_request_date: 4, by_state: [{ state: 'approved', count: 3 }, { state: 'entry', count: 2 }] },
+  hlc: { total: 4, linked_to_procurement: 2, not_linked: 2, by_state: [{ state: 'approved', count: 2 }, { state: 'entry', count: 2 }] },
+  procurement: { total: 6, by_scope_state: [{ scope: 'CW', state: 'approved', count: 3 }, { scope: 'HLC', state: 'approved', count: 2 }, { scope: null, state: 'entry', count: 1 }] },
+  sites: { with_gecol_scope: 5, with_hlc_scope: 4 },
+};
+
 /** The field rules of PUT /settings/contractor-rules (admin_save_contractor_rules of migration 0061). Exported for unit tests. */
 export function validateContractorRules(b: Record<string, unknown>) {
   const errs: { path: string; code: string }[] = [];
@@ -807,6 +816,7 @@ export const settingsHandlers = [
     return HttpResponse.json(C().contractorRules, tag(C().contractorRules.version));
   }),
   http.get(`${B}/reports/team-scope-mismatch`, () => { const g = guard(); if (g) return g; return HttpResponse.json(MISMATCH); }),
+  http.get(`${B}/reports/gecol-hlc-counts`, () => { const g = guard(); if (g) return g; return HttpResponse.json(GECOL_HLC_COUNTS); }),
   http.get(`${B}/reports/contractors-completeness`, () => { const g = guard(); if (g) return g; return HttpResponse.json(COMPLETENESS); }),
 
   // ------------------------------------------------------------------ notification policy
