@@ -35,18 +35,18 @@ const OPEN_STATES = ['entry', 'in_review', 'in_approval'];
 
 const createSchema = z
   .object({
-    site_id: z.string().uuid().optional(),
+    site_id: z.guid().optional(),
     record_type: z.string().min(1).max(40).optional(),
-    data: z.record(z.unknown()),
-    custom: z.record(z.unknown()).optional(),
-    external_party_id: z.string().uuid().nullable().optional(),
+    data: z.record(z.string(), z.unknown()),
+    custom: z.record(z.string(), z.unknown()).optional(),
+    external_party_id: z.guid().nullable().optional(),
   })
   .strict();
 const patchSchema = z
   .object({
-    data: z.record(z.unknown()).optional(),
-    custom: z.record(z.unknown()).optional(),
-    external_party_id: z.string().uuid().nullable().optional(),
+    data: z.record(z.string(), z.unknown()).optional(),
+    custom: z.record(z.string(), z.unknown()).optional(),
+    external_party_id: z.guid().nullable().optional(),
   })
   .strict()
   .refine((v) => Object.keys(v).length > 0, 'send at least one field');
@@ -55,19 +55,19 @@ const noteSchema = z
     note: z.string().max(2000).optional(),
     via: viaSchema.optional(),
     // Q131: a rejection may name document slots of the record, as for a task (RejectRequest.rejected_slots)
-    rejected_slots: z.array(z.object({ slot_id: z.string().uuid(), reason: z.string().trim().min(1).max(500) }).strict()).max(100).optional(),
+    rejected_slots: z.array(z.object({ slot_id: z.guid(), reason: z.string().trim().min(1).max(500) }).strict()).max(100).optional(),
   })
   .strict();
-const commentSchema = z.object({ body: z.string().trim().min(1).max(4000), mention_user_ids: z.array(z.string().uuid()).max(20).optional() }).strict();
+const commentSchema = z.object({ body: z.string().trim().min(1).max(4000), mention_user_ids: z.array(z.guid()).max(20).optional() }).strict();
 const transferSchema = z.object({ note: z.string().trim().max(2000).optional() }).strict();
 const convertSchema = z
   .object({
     values: z
       .object({
-        organiser: z.string().uuid().optional(),
-        attendee_users: z.array(z.string().uuid()).max(200).optional(),
-        linked_site_ids: z.array(z.string().uuid()).max(500).optional(),
-        action_items_list: z.array(z.record(z.unknown())).max(200).optional(),
+        organiser: z.guid().optional(),
+        attendee_users: z.array(z.guid()).max(200).optional(),
+        linked_site_ids: z.array(z.guid()).max(500).optional(),
+        action_items_list: z.array(z.record(z.string(), z.unknown())).max(200).optional(),
       })
       .strict(),
     reason: z.string().trim().min(3).max(1000),

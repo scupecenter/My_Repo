@@ -36,7 +36,7 @@ const f = {
   name_ar: z.string().trim().min(1).max(200).nullable(),
   placements: z.array(placement).min(1).max(100),
   mandatory: z.boolean(),
-  condition_rule: z.record(z.unknown()).nullable(),
+  condition_rule: z.record(z.string(), z.unknown()).nullable(),
   formats: z.array(z.string().regex(/^[a-z0-9]{2,5}$/)).min(1).max(20),
   max_size_mb: z.number().int().min(1).max(200),
   min_files: z.number().int().min(0).max(100),

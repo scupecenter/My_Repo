@@ -26,7 +26,7 @@ const itemSchema = z.object({
 const activitySchema = z.object({
   code, name_en: z.string().min(1).max(200), name_ar: z.string().max(200).nullable().optional(), weight, items: z.array(itemSchema).max(200).optional(),
 }).strict();
-const createSchema = z.object({ code: z.enum(CODES), base_set_id: z.string().uuid().optional(), reason }).strict();
+const createSchema = z.object({ code: z.enum(CODES), base_set_id: z.guid().optional(), reason }).strict();
 const putSchema = z.object({ reason, activities: z.array(activitySchema).min(1).max(50) }).strict();
 const publishSchema = z.object({ effective_date: isoDate, reason }).strict();
 

@@ -17,7 +17,7 @@ const CONTRACT_ACTIONS = ['view', 'create', 'edit', 'delete', 'approve', 'export
 const reason = z.string().trim().min(3).max(1000);
 const grantSchema = z.object({ module_key: z.string().min(1).max(80), action: z.enum(CONTRACT_ACTIONS) }).strict();
 const ruleSchema = z.object({
-  field_id: z.string().uuid(),
+  field_id: z.guid(),
   field_code: z.string().optional(),
   entity_type: z.string().optional(),
   access: z.enum(['hidden', 'read', 'edit']),

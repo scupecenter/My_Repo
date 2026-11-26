@@ -19,10 +19,10 @@ import { StorageService, newObjectKey } from './storage.service';
 
 const body = z
   .object({
-    site_id: z.string().uuid().optional(),
+    site_id: z.guid().optional(),
     stage_code: z.string().trim().min(1).max(20).optional(),
     doc_code: z.string().trim().min(1).max(40).optional(),
-    file_ids: z.array(z.string().uuid()).min(1).max(5000).optional(),
+    file_ids: z.array(z.guid()).min(1).max(5000).optional(),
     slot_status: z.enum(['uploaded', 'in_review', 'approved', 'rejected']).optional(),
     include_superseded: z.boolean().optional(),
     /** Library Archive zip: `DocType_SiteID_Number_vN.ext` in a folder per document type (set by the server route, never by the client). */

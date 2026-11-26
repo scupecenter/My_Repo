@@ -34,14 +34,14 @@ const isoDateTime = z.string().datetime({ offset: true });
 
 const assignmentSchema = z
   .object({
-    role_id: z.string().uuid(),
+    role_id: z.guid(),
     permission_level: z.enum(["view", "entry", "review", "approve", "admin"]),
     team: z.enum(["cw", "te", "both", "none"]).optional(),
     all_regions: z.boolean().optional(),
     region_ids: z.array(z.number().int().min(1).max(7)).max(7).optional(),
     all_modules: z.boolean().optional(),
     module_keys: z.array(z.string().min(1).max(100)).max(100).optional(),
-    profile_ids: z.array(z.string().uuid()).max(50).optional(),
+    profile_ids: z.array(z.guid()).max(50).optional(),
     valid_from: isoDateTime.nullish(),
     valid_to: isoDateTime.nullish(),
   })
@@ -60,9 +60,9 @@ const createSchema = z
       .regex(/^\+[1-9][0-9]{7,14}$/)
       .nullish(),
     assignments: z.array(assignmentSchema).max(20).default([]),
-    department_id: z.string().uuid().nullish(),
-    manager_id: z.string().uuid().nullish(),
-    group_ids: z.array(z.string().uuid()).max(50).default([]),
+    department_id: z.guid().nullish(),
+    manager_id: z.guid().nullish(),
+    group_ids: z.array(z.guid()).max(50).default([]),
     require_two_factor: z.boolean().default(false),
     reason,
   })

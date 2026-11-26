@@ -37,7 +37,7 @@ const taskInput = z
   })
   .strict();
 const siteField = z
-  .object({ kind: z.literal('site_field'), field_id: z.string().uuid() })
+  .object({ kind: z.literal('site_field'), field_id: z.guid() })
   .strict();
 
 export const createColumnBody = z
