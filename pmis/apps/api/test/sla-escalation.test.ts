@@ -14,7 +14,7 @@ const PREFIX = `SLE${randomBytes(3).toString('hex').toUpperCase()}`;
 let db: PgClient;
 let calendarId: string;
 let adminId: string;
-let ruleDay = Math.floor(Math.random() * 20000) + 30000;
+let ruleDay = Math.floor(Math.random() * 40000) + 60000;
 
 beforeAll(async () => {
   db = await superDb();
