@@ -421,7 +421,8 @@
     "yes": "Yes",
     "no": "No",
     "soon_chip": "Soon",
-    "undo": "Undo"
+    "undo": "Undo",
+    "error": "Something went wrong. Try again."
   },
   "sites": {
     "title": "Site Master",
@@ -4030,7 +4031,9 @@
     "add_before": "Add a column before {{code}}",
     "add_after": "Add a column after {{code}}",
     "add_impact_tpl": "Impact: a new version of the register template is issued with this column. Files made from the old template still upload; the new column stays empty in them. Existing records keep this column empty until filled.",
-    "add_impact": "Impact: existing records keep this column empty until filled. It is not in the template, so no new template version is issued."
+    "add_impact": "Impact: existing records keep this column empty until filled. It is not in the template, so no new template version is issued.",
+    "move_up": "Move {{code}} up",
+    "move_down": "Move {{code}} down"
   },
   "lists": {
     "colour": "Colour",
@@ -4932,7 +4935,8 @@
     "copy_failed": "Could not copy",
     "export": "Export CSV",
     "exported": "The current view was downloaded.",
-    "shown": "{{count}} shown"
+    "shown": "{{count}} shown",
+    "system": "System"
   },
   "upload": {
     "title": "Checking the uploaded file",
@@ -4987,7 +4991,8 @@
     "field_locked": "Locked (default)",
     "field_open_opt": "Open",
     "field_hint": "Open: the tasks of the new site are not held by predecessors or gates. Needs a System Admin or the delegated right to unlock when the site is approved.",
-    "historical_note": "The historical option also opens the workflow locks of every site of the file first (audited per site with this reason), so all historical data is accepted as it is. Missing values are warnings, not errors. Lock the sites again afterwards from the site page or Site Master."
+    "historical_note": "The historical option also opens the workflow locks of every site of the file first (audited per site with this reason), so all historical data is accepted as it is. Missing values are warnings, not errors. Lock the sites again afterwards from the site page or Site Master.",
+    "gaps": "{{count}} data gaps"
   },
   "wfe": {
     "activate": "Activate",
@@ -5441,7 +5446,8 @@
     "sites_drop_note": "Dropping a site card on the next column only opens the task's own action; nothing changes until you confirm it.",
     "site_next_only": "Only the next column: a site moves one milestone at a time.",
     "site_drop_refused": "You cannot do that here: no action of yours moves a task of {{code}} on.",
-    "site_pick_title": "Which task of {{code}}?"
+    "site_pick_title": "Which task of {{code}}?",
+    "more": "{{count}} more"
   },
   "brand": {
     "current": "Current (standard)",
