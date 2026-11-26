@@ -369,7 +369,7 @@ describe('0174: the HLC entry holders are told when a scope-HLC Procurement reco
     expect(ok.state).toBe('approved');
     const mine = await q<{ kind: string; link: string }>(db, `SELECT kind, link FROM notifications WHERE user_id = $1 AND kind = 'register_assigned' AND link LIKE $2`, [fiber.entry.user.id, `%${rec.id}`]);
     expect(mine.length).toBe(1);
-    expect(mine[0].link).toContain('/registers/procurement/records/');
+    expect(mine[0]?.link).toContain('/registers/procurement/records/');
     const approver = await q(db, `SELECT 1 FROM notifications WHERE user_id = $1 AND link LIKE $2 AND title LIKE 'Procurement approved%'`, [hlc.approve.user.id, `%${rec.id}`]);
     expect(approver.length).toBe(0);
   });
