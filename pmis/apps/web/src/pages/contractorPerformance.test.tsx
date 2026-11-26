@@ -5,7 +5,7 @@ import { renderApp, signIn } from '@/test/utils';
 import { ContractorsReports } from './ContractorsReports';
 import { SettingsRoutes } from './settings/Settings';
 
-/** Contract 0.15.88: the contractor performance view (read only) and its thresholds in Settings. */
+/** Contract 0.15.89: the contractor performance view (read only) and its thresholds in Settings. */
 describe('Contractor performance', () => {
   it('shows each contractor with its measures, computed and read only', async () => {
     await signIn('pm');

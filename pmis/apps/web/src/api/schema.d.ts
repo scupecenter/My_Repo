@@ -5053,7 +5053,7 @@ export interface paths {
         };
         /**
          * Contractor performance (computed, read only)
-         * @description 0.15.88. Needs `contractors` view; rows come from tables the caller's regions let it read. A measure with fewer records than `thresholds.min_sample` is `insufficient`
+         * @description 0.15.89. Needs `contractors` view; rows come from tables the caller's regions let it read. A measure with fewer records than `thresholds.min_sample` is `insufficient`
          *     and never colours the contractor. Percent measures are amber at or above the amber threshold and red at or above the red one; the contract is amber when the days left
          *     to the end of the nearest active contract are at or below the amber value and red at or below the red value. `level` is the worst of the known measures. Worst first.
          */
@@ -5075,12 +5075,12 @@ export interface paths {
         };
         /**
          * Thresholds of the contractor performance view
-         * @description 0.15.88. Needs `contractors` view. `can_edit` is true for a System Admin or an all-regions settings delegate.
+         * @description 0.15.89. Needs `contractors` view. `can_edit` is true for a System Admin or an all-regions settings delegate.
          */
         get: operations["getContractorPerformanceThresholds"];
         /**
          * Save the thresholds (reason, If-Match, audited)
-         * @description 0.15.88. System Admin, or a delegate of `settings` edit for all regions. Field errors: `unknown_key`, `out_of_range`, `invalid`, `order` (red below amber for a
+         * @description 0.15.89. System Admin, or a delegate of `settings` edit for all regions. Field errors: `unknown_key`, `out_of_range`, `invalid`, `order` (red below amber for a
          *     percentage, red above amber for the days left). Audited as `contractor_performance_thresholds_update` with before and after.
          */
         put: operations["setContractorPerformanceThresholds"];

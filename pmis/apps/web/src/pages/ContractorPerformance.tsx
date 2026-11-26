@@ -14,7 +14,7 @@ function Chip({ level, label, testid }: { level: Level; label: string; testid?: 
 
 const pctText = (p: number | null | undefined) => (p === null || p === undefined ? '—' : `${p}%`);
 
-/** Contractor performance, read only (contract 0.15.88): a section of the Contractors reports; a caller who may not read it sees nothing. */
+/** Contractor performance, read only (contract 0.15.89): a section of the Contractors reports; a caller who may not read it sees nothing. */
 export function ContractorPerformance() {
   const { t } = useTranslation();
   const q = useContractorPerformance();

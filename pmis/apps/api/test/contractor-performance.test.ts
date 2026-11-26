@@ -5,7 +5,7 @@ import { expiryLevel, overall, pctLevel } from '../src/contractors/contractor-pe
 import { loggedIn, makeAdmin, startApp, superDb } from './helpers';
 import { actor } from './wf-helpers';
 
-/** Contract 0.15.88: the contractor performance view is computed and read only; its thresholds are an audited setting. */
+/** Contract 0.15.89: the contractor performance view is computed and read only; its thresholds are an audited setting. */
 let app: NestExpressApplication;
 let db: PgClient;
 

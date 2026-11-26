@@ -21,7 +21,7 @@ const TD = () => (C().tableDisplay ??= { defaults: { size: 'md', align: 'start',
 /** A mock store saved before 0.9.1 has no match table, one saved before 0.12.9 no catalogue: start it from the seed. */
 const SM = () => (C().scopeMatch?.catalogue ? C().scopeMatch : (C().scopeMatch = initCfg().scopeMatch));
 const CR = () => (C().contractorRules ??= initCfg().contractorRules);
-/** Contractor performance (contract 0.15.88): demo thresholds, kept in memory; the report is computed from them in the mock like the API does. */
+/** Contractor performance (contract 0.15.89): demo thresholds, kept in memory; the report is computed from them in the mock like the API does. */
 const PERF_DEFAULT = { min_sample: 3, snag_overdue_pct: { amber: 10, red: 25 }, snag_return_pct: { amber: 20, red: 40 }, quality_fail_pct: { amber: 10, red: 20 }, contract_expiry_days: { amber: 60, red: 15 } };
 let perf = { thresholds: structuredClone(PERF_DEFAULT), version: 1 };
 const PERF_ROWS = [

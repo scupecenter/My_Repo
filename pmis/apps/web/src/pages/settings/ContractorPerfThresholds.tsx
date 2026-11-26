@@ -17,7 +17,7 @@ const toForm = (s: ContractorPerformanceSettings): Form => ({
 }) as Form;
 const whole = (v: string, max: number) => v.trim() !== '' && Number.isInteger(Number(v)) && Number(v) >= 0 && Number(v) <= max;
 
-/** Settings, Registers, Contractors: the thresholds of the contractor performance view (contract 0.15.88); read only unless the caller can edit. */
+/** Settings, Registers, Contractors: the thresholds of the contractor performance view (contract 0.15.89); read only unless the caller can edit. */
 export function ContractorPerfThresholds() {
   const { t } = useTranslation();
   const toast = useToast();

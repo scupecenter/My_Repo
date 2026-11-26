@@ -201,7 +201,7 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/reports/contractors-completeness'],
   // Contract 0.15.84: the read-only GECOL / HLC counts (apps/api: contractors).
   ['get', '/reports/gecol-hlc-counts'],
-  // Contract 0.15.88: the contractor performance view and its thresholds (apps/api: contractors; migration 0180).
+  // Contract 0.15.89: the contractor performance view and its thresholds (apps/api: contractors; migration 0180).
   ['get', '/reports/contractor-performance'],
   ['get', '/settings/contractor-performance'],
   ['put', '/settings/contractor-performance'],
