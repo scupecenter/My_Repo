@@ -1,4 +1,5 @@
 import * as Popover from '@radix-ui/react-popover';
+import { AutoHints } from './AutoHints';
 import { useQueryClient } from '@tanstack/react-query';
 import { Bell, Check, Download, Palette, Plus, Menu, Moon, PanelLeftClose, PanelLeftOpen, Pin, PinOff, Search, Sun, LogOut, Lock, UserRound, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -205,6 +206,7 @@ export function Shell() {
           <button className="btn" data-testid="topbar-signout" aria-label={t('top.sign_out')} onClick={() => logout.mutate(undefined, { onSuccess: () => { void qc.invalidateQueries({ queryKey: ['session'] }); nav('/login'); } })}><LogOut size={16} /></button>
         </header>
         {HYBRID && <div role="status" data-testid="hybrid-banner" className="border-b border-line bg-waitBg px-4 py-1 text-xs text-waitInk">{t('hybrid.banner')}</div>}
+        <AutoHints />
         <main className="p-6"><Outlet context={{ items: sideItems }} /></main>
       </div>
       <ExportDialog open={exp} onClose={() => setExp(false)} />
