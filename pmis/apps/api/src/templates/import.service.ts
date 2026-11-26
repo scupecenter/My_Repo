@@ -31,7 +31,7 @@ export const UPLOAD_ASYNC_FACTOR = 4;
 const BATCH_STATUSES = ['parsing', 'validated', 'in_review', 'in_approval', 'partially_approved', 'approved', 'rejected', 'applied', 'undone', 'failed', 'discarded', 'processing'];
 
 const uploadBody = z.object({
-  template_id: z.string().max(60).optional(), task_id: z.string().uuid().optional(), mode: z.enum(['submit', 'draft']).optional(),
+  template_id: z.string().max(60).optional(), task_id: z.guid().optional(), mode: z.enum(['submit', 'draft']).optional(),
   // Q462 (0073): "historical load: accept without documents", a System Admin under the open waiver
   historical_load_reason: z.string().trim().min(3).max(2000).optional(),
 }).passthrough();
@@ -39,7 +39,7 @@ const decisionBody = z
   .object({
     action: z.enum(['review', 'approve', 'reject', 'discard', 'admin_approve']),
     scope: z.enum(['all', 'rows']),
-    rows: z.array(z.object({ row_id: z.string().uuid(), decision: z.enum(['approved', 'rejected']), note: z.string().max(1000).optional() }).strict()).max(2000).optional(),
+    rows: z.array(z.object({ row_id: z.guid(), decision: z.enum(['approved', 'rejected']), note: z.string().max(1000).optional() }).strict()).max(2000).optional(),
     note: z.string().max(2000).optional(),
   })
   .strict();

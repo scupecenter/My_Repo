@@ -32,12 +32,12 @@ const createDraftBody = z.object({ parent_version: z.number().int().min(1), reas
 const publishBody = z.object({ reason, confirm_text: z.string().max(200), confirm_master_impact: confirmImpact }).strict();
 const milestoneBody = z.object({
   name_en: nameEn.optional(), name_ar: nameAr.optional(), counts_in_project_status: z.boolean().optional(),
-  custom: z.record(z.unknown()).optional(), reason, confirm_master_impact: confirmImpact,
+  custom: z.record(z.string(), z.unknown()).optional(), reason, confirm_master_impact: confirmImpact,
 }).strict().refine((b) => Object.keys(b).some((k) => !['reason', 'confirm_master_impact'].includes(k)), { message: 'send at least one field to change', path: ['name_en'] });
 const gateBody = z.object({
   name_en: nameEn.optional(), name_ar: nameAr.optional(), conditions: z.array(condition).max(30).optional(),
   sla_min_wd: z.number().int().min(0).optional(), sla_max_wd: z.number().int().min(0).optional(),
-  custom: z.record(z.unknown()).optional(), reason, confirm_master_impact: confirmImpact,
+  custom: z.record(z.string(), z.unknown()).optional(), reason, confirm_master_impact: confirmImpact,
 }).strict().refine((b) => Object.keys(b).some((k) => !['reason', 'confirm_master_impact'].includes(k)), { message: 'send at least one field to change', path: ['name_en'] });
 const taskCreateBody = z.object({
   stage_code: code, code: z.string().trim().max(40), name_en: z.string().trim().max(400), name_ar: z.string().trim().max(400).nullable().optional(),

@@ -20,7 +20,7 @@ import { WorkflowService } from './workflow.service';
 const bulkSchema = z
   .object({
     action: z.enum(['pass', 'approve']),
-    items: z.array(z.object({ id: z.string().uuid(), version: z.number().int().min(1) }).strict()).min(1).max(200),
+    items: z.array(z.object({ id: z.guid(), version: z.number().int().min(1) }).strict()).min(1).max(200),
     note: z.string().max(2000).optional(),
     via: viaSchema.optional(), // DD6: 'bulk' unless a board drag of several cards says 'drag'
   })

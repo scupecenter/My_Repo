@@ -10,7 +10,7 @@ import { DbService } from '../db/db.service';
 import type { UserRef } from '../users/users.repo';
 
 const startSchema = z.object({
-  to_user_id: z.string().uuid(),
+  to_user_id: z.guid(),
   subject: z.string().trim().min(1).max(200),
   body: z.string().trim().min(1).max(5000),
 }).strict();

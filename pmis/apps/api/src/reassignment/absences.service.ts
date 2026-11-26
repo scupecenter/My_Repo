@@ -15,7 +15,7 @@ const KINDS = ['annual', 'sick', 'emergency', 'other'] as const;
 const dateSchema = z.string().refine(isCalendarDate, 'not a calendar date');
 const inputSchema = z
   .object({
-    user_id: z.string().uuid().optional(),
+    user_id: z.guid().optional(),
     kind: z.enum(KINDS),
     from_date: dateSchema,
     to_date: dateSchema,
