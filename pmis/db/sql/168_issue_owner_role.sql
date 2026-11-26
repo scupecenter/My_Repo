@@ -6,7 +6,7 @@
 --      the list is a copy, it does not follow Roles & Responsibilities, and it grants nothing.
 --   2. Field owner_role on the Issues register (list_code, optional, in the list and the filters), section Issue, next to the person owner.
 --   3. The submit rule of an issue (Q70) says "an Aljeel person or an external party". It now says "a person, a role or an external party". Nothing else in the
---      validation changes. The function is patched in place from its stored definition (one condition and its message), so it keeps its owner and settings.
+--      validation changes. The function is patched in place from its stored definition (reg_validate_catalog_base, one condition and its message), so it keeps its owner and settings.
 -- A role owner sends no notification and gives nobody access or approval rights: it is a label for PMO. Existing issues are not changed.
 -- Not here (separate packages): the dashboard grouping by owner or category, the derived "stopped at" rows.
 
@@ -26,10 +26,10 @@ ON CONFLICT (register_key, code) DO NOTHING;
 DO $$
 DECLARE def text; patched text;
 BEGIN
-  def := pg_get_functiondef('public.reg_validate_catalog(uuid)'::regprocedure);
+  def := pg_get_functiondef('public.reg_validate_catalog_base(uuid)'::regprocedure);
   patched := replace(def,
     $a$IF NOT (d ? 'owner_user') AND r.external_party_id IS NULL THEN errs := errs || public.reg_err_item('/data/owner_user', 'required', 'The issue needs an owner: an Aljeel person or an external party (Q70).'); END IF;$a$,
     $b$IF NOT (d ? 'owner_user') AND NOT (d ? 'owner_role') AND r.external_party_id IS NULL THEN errs := errs || public.reg_err_item('/data/owner_user', 'required', 'The issue needs an owner: an Aljeel person, a role or an external party (Q70).'); END IF;$b$);
-  IF patched = def THEN RAISE EXCEPTION '0169: the issue owner rule was not found in reg_validate_catalog'; END IF;
+  IF patched = def THEN RAISE EXCEPTION '0169: the issue owner rule was not found in reg_validate_catalog_base'; END IF;
   EXECUTE patched;
 END $$;
