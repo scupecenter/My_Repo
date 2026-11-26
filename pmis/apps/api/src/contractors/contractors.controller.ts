@@ -3,12 +3,13 @@ import type { Response } from 'express';
 import type { AuthContext } from '../auth/auth.types';
 import { Auth } from '../auth/decorators';
 import { etagHeader } from '../common/etag';
+import { ContractorPerformanceService } from './contractor-performance.service';
 import { ContractorsService } from './contractors.service';
 
 /** P4b (contract 0.12.9, migration 0061): Contractors and Procurement reports (Q142, Q145) and the contractor rules (Q147, D145b). */
 @Controller()
 export class ContractorsController {
-  constructor(private readonly svc: ContractorsService) {}
+  constructor(private readonly svc: ContractorsService, private readonly perf: ContractorPerformanceService) {}
 
   @Get('reports/team-scope-mismatch')
   mismatch(@Auth() auth: AuthContext) {
@@ -18,6 +19,25 @@ export class ContractorsController {
   @Get('reports/contractors-completeness')
   completeness(@Auth() auth: AuthContext) {
     return this.svc.completeness(auth);
+  }
+
+  @Get('reports/contractor-performance')
+  performance(@Auth() auth: AuthContext) {
+    return this.perf.report(auth);
+  }
+
+  @Get('settings/contractor-performance')
+  async perfThresholds(@Auth() auth: AuthContext, @Res({ passthrough: true }) res: Response) {
+    const r = await this.perf.getThresholds(auth);
+    res.setHeader('ETag', etagHeader(r.version));
+    return r;
+  }
+
+  @Put('settings/contractor-performance')
+  async setPerfThresholds(@Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response) {
+    const r = await this.perf.putThresholds(ifMatch, body);
+    res.setHeader('ETag', etagHeader(r.version));
+    return r;
   }
 
   @Get('reports/gecol-hlc-counts')

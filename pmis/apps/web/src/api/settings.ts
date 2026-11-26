@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { api, ApiError, downloadFile, type RequestOptions } from './client';
 import type { IssueStoppedRowList, IssueTaskMapItem, IssueTaskMapList,
-  ActiveSession, ActOnBehalfRequest, Calendar, CalendarConfirmation, MailNotificationKinds, ImportsSettings, NavLayoutSetting, UiIdentity, UiBrand, NavLayoutT, ContractorRules, ContractorRulesInput, GecolHlcCounts, ContractorsCompletenessReport, TeamScopeMismatchReport, DeletedUser, PurgedUser, DlpSettings, DlpVersion, DlpVersionInput, Holiday, HolidayChangeResult, HolidayInput, HolidayPatch, HolidaySummary, IdleTaskAlertSetting, Job, LogIntegrity, LogRetention, LogRetentionInput,
+  ActiveSession, ActOnBehalfRequest, Calendar, CalendarConfirmation, MailNotificationKinds, ImportsSettings, ContractorPerformanceReport, ContractorPerformanceThresholds, ContractorPerformanceSettings, NavLayoutSetting, UiIdentity, UiBrand, NavLayoutT, ContractorRules, ContractorRulesInput, GecolHlcCounts, ContractorsCompletenessReport, TeamScopeMismatchReport, DeletedUser, PurgedUser, DlpSettings, DlpVersion, DlpVersionInput, Holiday, HolidayChangeResult, HolidayInput, HolidayPatch, HolidaySummary, IdleTaskAlertSetting, Job, LogIntegrity, LogRetention, LogRetentionInput,
   NotificationPolicy, NotificationPolicyInput, NotificationTypeDef, Page, ReassignmentAlert, SecurityLogEntry, SessionRevokeResult, SlaPublishPreview, SlaRuleSet, SlaRuleSetPublishResult, SlaRuleSetSummary, SlaTaskRule, StaffCard, StaffVisibility, StructuralFreeze,
   TaskDefinition, TeamScopeMatch, TeamScopeMatchInput, TransitionResultT, User, UserDetail, WeekendDaysResult, WeightSet, WeightSetCode, WeightSetInput, WeightSetPreview, WeightSetPublishResult, WorkflowVersion, WorkflowVersionSummary,
 } from './types';
@@ -156,6 +156,16 @@ export const useSetContractorRules = () => {
   const qc = useQueryClient();
   return useMutation<ContractorRules, ApiError, { version: number; body: ContractorRulesInput & { reason: string } }>({
     mutationFn: ({ version, body }) => api.put('/settings/contractor-rules', { version, body }), onSettled: () => refresh(qc, 'contractorRules'),
+  });
+};
+export const useContractorPerformance = (enabled = true) =>
+  useQuery({ queryKey: ['contractorPerformance'], enabled, retry: false, queryFn: () => api.get<ContractorPerformanceReport>('/reports/contractor-performance') });
+export const useContractorPerfThresholds = () => useQuery({ queryKey: ['contractorPerfThresholds'], queryFn: () => api.get<ContractorPerformanceThresholds>('/settings/contractor-performance') });
+export const useSetContractorPerfThresholds = () => {
+  const qc = useQueryClient();
+  return useMutation<ContractorPerformanceThresholds, ApiError, { version: number; body: { reason: string; thresholds: ContractorPerformanceSettings } }>({
+    mutationFn: ({ version, body }) => api.put('/settings/contractor-performance', { version, body }),
+    onSettled: () => { refresh(qc, 'contractorPerfThresholds'); void qc.invalidateQueries({ queryKey: ['contractorPerformance'] }); },
   });
 };
 export const useTeamScopeMismatch = (enabled = true) =>

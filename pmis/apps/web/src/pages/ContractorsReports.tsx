@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ApiError } from '@/api/client';
 import { useContractorsCompleteness, useTeamScopeMismatch } from '@/api/settings';
+import { ContractorPerformance } from './ContractorPerformance';
 import { TeamScopeMatch } from './settings/TeamScopeMatch';
 
 const forbidden = (e: unknown) => e instanceof ApiError && e.status === 403;
@@ -16,6 +17,8 @@ export function ContractorsReports() {
   return (
     <div className="space-y-4" data-testid="page-contractors-reports">
       <h1 className="text-2xl font-bold">{t('contractorReports.title')}</h1>
+
+      <ContractorPerformance />
 
       {!forbidden(mm.error) && (
         <section className="card space-y-2 p-4" data-testid="cr-mismatch">

@@ -167,6 +167,7 @@ import { MasterImportController, TemplateMappingController } from './master-impo
 import { MasterImportService } from './master-import/master-import.service';
 import { ContractorsController } from './contractors/contractors.controller';
 import { ContractorsService } from './contractors/contractors.service';
+import { ContractorPerformanceService } from './contractors/contractor-performance.service';
 import { ExportsController } from './exports/exports.controller';
 import { MasterExportService } from './exports/master-export.service';
 import { AbsencesController, ReassignmentController } from './reassignment/reassignment.controller';
@@ -215,6 +216,7 @@ export function appModuleFor(config: AppConfig) {
       { provide: MailPort, useClass: OutboxMail },
       MasterImportService, MappingService,
       ContractorsService,
+      ContractorPerformanceService,
       SavedViewsService, FilterCatalogService,
       SearchService, // 0.15.17 (F4)
       MasterExportService, // 0.15.34
