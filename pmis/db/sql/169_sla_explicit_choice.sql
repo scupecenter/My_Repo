@@ -231,6 +231,8 @@ BEGIN
   EXECUTE 'REVOKE ALL ON FUNCTION data_reset_plan() FROM PUBLIC';
   EXECUTE 'GRANT EXECUTE ON FUNCTION data_reset_plan() TO pmis_reset_owner, pmis_definer';
 END $$;
+-- the reset role reads every table (counts) and takes the share lock of a KEEP table (UPDATE): the coverage check of data_reset_core refuses a table without these rights
+GRANT SELECT, UPDATE ON public.task_sla_choices TO pmis_reset_owner;
 
 INSERT INTO audit_log (action, entity_type, entity_id, after, reason)
 VALUES ('sla_explicit_choice_applied', 'workflow', NULL,
