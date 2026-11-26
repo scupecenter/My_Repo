@@ -2946,7 +2946,7 @@ export interface paths {
         };
         /**
          * Matrix cells with nobody to act (read only, admin)
-         * @description 0.15.94. Read only. For each active stage row and enabled register row, each of the seven regions and each level (L1, L2): the deciding cell (region cell before the default cell, as the approval engine finds it), the number of named assignees and the number of active people who can act (named users, role holders with a current assignment of enough level, region and module, group members). `empty` = no cell or no assignee; `no_active_holder` = named but nobody active can act. Needs `admin.matrix` view or edit (403 otherwise). Changes nothing.
+         * @description 0.15.95. Read only. For each active stage row and enabled register row, each of the seven regions and each level (L1, L2): the deciding cell (region cell before the default cell, as the approval engine finds it), the number of named assignees and the number of active people who can act (named users, role holders with a current assignment of enough level, region and module, group members). `empty` = no cell or no assignee; `no_active_holder` = named but nobody active can act. Needs `admin.matrix` view or edit (403 otherwise). Changes nothing.
          */
         get: operations["getMatrixCoverage"];
         put?: never;
