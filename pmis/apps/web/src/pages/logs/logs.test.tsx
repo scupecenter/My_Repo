@@ -212,6 +212,26 @@ describe('History of this field', () => {
     } finally { server.events.removeListener('request:start', on); }
   });
 
+  it('offers Restore only when the host passes onRestore, and gives back the old value without saving anything', async () => {
+    await signIn('pm');
+    const u = userEvent.setup();
+    const seen: unknown[] = [];
+    renderApp(<FieldHistory entityType="register_record" entityId={POWER_ON_RECORD} field="power_on_date" label="Power-On date" onRestore={(v) => seen.push(v)} />);
+    await u.click(await screen.findByTestId('field-history-power_on_date'));
+    const first = within(await screen.findByTestId('fh-list')).getAllByTestId(/^fh-item-/)[0] as HTMLElement;
+    await u.click(within(first).getByTestId(/^fh-restore-/));
+    expect(seen).toEqual(['2026-10-27']);
+  });
+
+  it('has no Restore button without onRestore', async () => {
+    await signIn('pm');
+    const u = userEvent.setup();
+    history();
+    await u.click(await screen.findByTestId('field-history-power_on_date'));
+    await screen.findByTestId('fh-list');
+    expect(screen.queryAllByTestId(/^fh-restore-/)).toHaveLength(0);
+  });
+
   it('shows nothing to a person who cannot read the Audit Log', async () => {
     await signIn('engineer');
     history();

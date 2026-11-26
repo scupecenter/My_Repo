@@ -16,7 +16,10 @@ export function useCanReadAudit() {
   return hasGrant(me.data, 'view_audit');
 }
 
-function Body({ entityType, entityId, field }: { entityType: string; entityId: string; field: string }) {
+/** A value the form can take back as is: a text, a number or a yes/no. Lists and objects are never offered for restore. */
+const restorable = (v: unknown): v is string | number | boolean => typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean';
+
+function Body({ entityType, entityId, field, onRestore }: { entityType: string; entityId: string; field: string; onRestore?: (value: unknown) => void }) {
   const { t, i18n } = useTranslation();
   const q = useFieldHistory(entityType, entityId, field, true);
   if (q.isLoading) return <p className="text-sm text-mute">{t('common.loading')}</p>;
@@ -36,6 +39,9 @@ function Body({ entityType, entityId, field }: { entityType: string; entityId: s
             <span dir="ltr">{fmtDateTime(c.at, i18n.language)}</span>
             <DeviceIcon device={c.device} testid={`fh-device-${c.id}`} />
             <ViaChip via={c.via} />
+            {onRestore && restorable(c.old_value) && (
+              <button type="button" className="btn ms-auto px-2 py-0.5 text-xs" data-testid={`fh-restore-${c.id}`} onClick={() => onRestore(c.old_value)}>{t('logs.fh_restore')}</button>
+            )}
           </div>
         </li>
       ))}
@@ -43,8 +49,11 @@ function Body({ entityType, entityId, field }: { entityType: string; entityId: s
   );
 }
 
-/** Small history icon beside a field value. Shown only to Audit Log readers; the list is fetched when the popover opens. */
-export function FieldHistory({ entityType, entityId, field, label }: { entityType: string; entityId: string | null | undefined; field: string; label?: string }) {
+/**
+ * Small history icon beside a field value. With `onRestore` (given only where the person may edit the field) each past value has a "Restore" button: it puts the old
+ * value back into the open form as a draft. Nothing is saved by it; the person still saves through the normal door, with its checks and rights.
+ */
+export function FieldHistory({ entityType, entityId, field, label, onRestore }: { entityType: string; entityId: string | null | undefined; field: string; label?: string; onRestore?: (value: unknown) => void }) {
   const { t } = useTranslation();
   const can = useCanReadAudit();
   const [open, setOpen] = useState(false);
@@ -60,7 +69,7 @@ export function FieldHistory({ entityType, entityId, field, label }: { entityTyp
       <Popover.Portal>
         <Popover.Content align="start" sideOffset={6} className="card z-[75] w-[min(24rem,92vw)] p-3 shadow-lg" data-testid="field-history-popover">
           <h4 className="mb-2 text-sm font-bold">{t('logs.fh_title', { field: label ?? field })}</h4>
-          {open && <Body entityType={entityType} entityId={entityId} field={field} />}
+          {open && <Body entityType={entityType} entityId={entityId} field={field} onRestore={onRestore ? (v) => { onRestore(v); setOpen(false); } : undefined} />}
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>

@@ -3484,7 +3484,8 @@
     "r_sensitive": "Sensitive changes",
     "r_none": "No sensitive changes this month.",
     "r_xlsx": "Excel workbook",
-    "sev_info": "Info"
+    "sev_info": "Info",
+    "fh_restore": "Restore"
   },
   "siteIdentity": {
     "title": "Site identity",
