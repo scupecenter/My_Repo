@@ -9,7 +9,7 @@ import { parse } from '../common/zod';
 import { DbService } from '../db/db.service';
 
 /** The UI designs (owner decision 2026-11-19, migration 0130). `current` is today's look and the default. */
-export const UI_BRANDS = ['current', 'aljeel', 'executive', 'field'] as const;
+export const UI_BRANDS = ['current', 'aljeel', 'executive', 'field', 'obsidian', 'sahara'] as const;
 export type UiBrand = (typeof UI_BRANDS)[number];
 
 const putBody = z.object({

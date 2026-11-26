@@ -19,9 +19,9 @@ export interface UserDto extends UserRef {
   locale: string;
   theme: string;
   /** 0130: the stored personal UI design; null = the organization default. */
-  ui_brand: 'current' | 'aljeel' | 'executive' | 'field' | null;
+  ui_brand: 'current' | 'aljeel' | 'executive' | 'field' | 'obsidian' | 'sahara' | null;
   /** 0130: the design the user sees (ui_effective_brand). */
-  brand: 'current' | 'aljeel' | 'executive' | 'field';
+  brand: 'current' | 'aljeel' | 'executive' | 'field' | 'obsidian' | 'sahara';
   is_break_glass: boolean;
   phone: string | null;
   local_sign_in: boolean;

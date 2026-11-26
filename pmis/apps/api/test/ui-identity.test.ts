@@ -52,7 +52,7 @@ describe('Settings, Identity & themes: GET and PUT /settings/identity', () => {
       const r = await read(who);
       expect(r.status).toBe(200);
       expect(etag(r)).toMatch(/^"\d{1,10}"$/);
-      expect(r.body).toMatchObject({ default_brand: 'current', allow_user_choice: true, brands: ['current', 'aljeel', 'executive', 'field'], updated_by: null, can_edit: can });
+      expect(r.body).toMatchObject({ default_brand: 'current', allow_user_choice: true, brands: ['current', 'aljeel', 'executive', 'field', 'obsidian', 'sahara'], updated_by: null, can_edit: can });
     }
     expect((await new Api(app).raw('get', '/settings/identity')).status).toBe(401);
     const tag = etag(await read(admin));
@@ -126,6 +126,18 @@ describe('the personal design: PATCH /me/profile ui_brand', () => {
     const bad = await patchBrand(api, 'neon');
     expect(bad.status).toBe(422);
     expect(bad.body.errors.some((e: { path: string }) => e.path === '/ui_brand')).toBe(true);
+  });
+
+  it('the two designs of 0164 (obsidian, sahara) can be chosen like the others, and an unknown name is still refused', async () => {
+    const u = await makeUser(db, { assigned: true });
+    const api = await loggedIn(app, u);
+    for (const b of ['obsidian', 'sahara']) {
+      const r = await patchBrand(api, b);
+      expect(r.status).toBe(200);
+      expect(r.body).toMatchObject({ ui_brand: b });
+    }
+    expect((await patchBrand(api, 'neon')).status).toBeGreaterThanOrEqual(400);
+    await patchBrand(api, null);
   });
 
   it('while the admin locks the design, a personal one is refused (403 field_read_only) and ignored; null stays allowed', async () => {

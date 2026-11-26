@@ -770,3 +770,83 @@
   --sideOnInk:#FFFFFF;
   --sideActive:#FFFFFF;
 }
+/* 0164: Obsidian (near-black sidebar, gold accent; reads best in the dark theme) and Sahara (sand page, emerald accent, deep green sidebar; reads best in the light theme).
+   Same rules as above: layer-2 tokens only, never a status token. In the dark theme each design changes the sidebar and the accent family (dark-safe values). */
+[data-brand=obsidian]:not([data-theme=dark]){
+  --bg:#F4F5F7;
+  --side:#0E1116;
+  --sideInk:#ECEFF4;
+  --sideMute:#A7B0BE;
+  --sideFaint:#A7B0BE;
+  --sideHover:#181C24;
+  --sideLine:#262C38;
+  --sideField:#151922;
+  --sideSel:#222833;
+  --sideOnInk:#FFFFFF;
+  --sideActive:#F2C14E;
+  --sideMark:#E0A82E;
+  --sideMarkW:3px;
+  --accent:#8A5A00;
+  --accentHover:#6E4700;
+  --accentInk:#FFFFFF;
+  --accentSoft:#FBF1DC;
+  --accentText:#6B4500;
+}
+[data-brand=sahara]:not([data-theme=dark]){
+  --bg:#FAF7F2;
+  --side:#123D2E;
+  --sideInk:#E3F0EA;
+  --sideMute:#A9C8BA;
+  --sideFaint:#A9C8BA;
+  --sideHover:#1B4D3B;
+  --sideLine:#2C6350;
+  --sideField:#174A38;
+  --sideSel:#216049;
+  --sideOnInk:#FFFFFF;
+  --sideActive:#FFFFFF;
+  --sideMark:#E8C26A;
+  --sideMarkW:3px;
+  --accent:#0B6B4F;
+  --accentHover:#08523C;
+  --accentInk:#FFFFFF;
+  --accentSoft:#E3F2EB;
+  --accentText:#0A4F3A;
+}
+[data-theme=dark][data-brand=obsidian]{
+  --side:#0E1116;
+  --sideInk:#ECEFF4;
+  --sideMute:#A7B0BE;
+  --sideFaint:#A7B0BE;
+  --sideHover:#181C24;
+  --sideLine:#262C38;
+  --sideField:#151922;
+  --sideSel:#222833;
+  --sideOnInk:#FFFFFF;
+  --sideActive:#F2C14E;
+  --sideMark:#E0A82E;
+  --sideMarkW:3px;
+  --accent:#E0A82E;
+  --accentHover:#F0BC4A;
+  --accentInk:#1A1300;
+  --accentSoft:#2B2412;
+  --accentText:#F2C96B;
+}
+[data-theme=dark][data-brand=sahara]{
+  --side:#0B1F18;
+  --sideInk:#E3F0EA;
+  --sideMute:#9DBBAE;
+  --sideFaint:#9DBBAE;
+  --sideHover:#133026;
+  --sideLine:#1F4536;
+  --sideField:#0F2A21;
+  --sideSel:#1A4535;
+  --sideOnInk:#FFFFFF;
+  --sideActive:#FFFFFF;
+  --sideMark:#E8C26A;
+  --sideMarkW:3px;
+  --accent:#34C38F;
+  --accentHover:#5AD6A8;
+  --accentInk:#04251A;
+  --accentSoft:#12332A;
+  --accentText:#7FE0BB;
+}

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.80
+  version: 0.15.81
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -31,6 +31,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.81 (2026-11-26): two more UI designs, `obsidian` and `sahara` (migration 0164): `UiBrand` gains the two names (users.ui_brand, `ui.identity` default_brand, `PATCH /me/profile`). Visual only; the four existing designs, the light/dark theme and the storage are unchanged.
     - 0.15.80 (2026-11-26): what a role sees of the Dashboard (migration 0163). `Role.dashboard_tabs` (any non-empty combination of `pmo`, `cw`, `te`; default all three) and `Role.hide_messages_inbox` (default false); `RolePatch` sets them (System Admin only, 403 `delegate_forbidden` for a delegate; reason, step-up; audited as `role_dashboard_access_set`). `EffectivePermissions.dashboard_tabs` is the union over the roles held now (a System Admin or a user with no active role: all three). `GET /dashboard`, `/dashboard/extras`, `/dashboard/export` and `/project-status*` answer 403 `action_forbidden` outside the caller's tabs (`pmo` includes the others; view CW needs `cw`, view TE needs `te`, any other view or none needs `pmo`). A role that hides Messages and Inbox removes only the two menu entries of its holders (`effective.nav`); the pages and the API are unchanged. No grant, role or default changes.
     - 0.15.79 (2026-11-26): "Forgot password" by email: `POST /auth/local/password-reset/request` (always the same 202) and `POST /auth/local/password-reset/confirm` (one-time link, 204). Local-password accounts only; System Admins and M365 or break-glass accounts are excluded. No existing endpoint changes.
     - 0.15.78 (2026-11-25): `PATCH /users/{user_id}` also takes `display_name`; `employee_id` is now edited by the admin (4 digits, unique, audited as `user_identity`, never your own row). E-mail and phone stay on the verified request flow. No new endpoint.
@@ -21132,8 +21133,8 @@ components:
               - $ref: '#/components/schemas/NavSubHeading'
     UiBrand:
       type: string
-      enum: [current, aljeel, executive, field]
-      description: '0.15.41. A UI design: `current` is the look of the system before 0.15.41 (the default); `aljeel` the company brand; `executive` a light sidebar; `field` high contrast with larger type for site teams. A design changes the sidebar, the accent, the page background, lines and type size only, never the status colours.'
+      enum: [current, aljeel, executive, field, obsidian, sahara]
+      description: '0.15.81 (0164): `obsidian` (near-black sidebar, gold accent) and `sahara` (sand page, emerald accent) added; visual only. 0.15.41. A UI design: `current` is the look of the system before 0.15.41 (the default); `aljeel` the company brand; `executive` a light sidebar; `field` high contrast with larger type for site teams. A design changes the sidebar, the accent, the page background, lines and type size only, never the status colours.'
     UiIdentity:
       type: object
       description: '0.15.41. Settings, Identity & themes (setting `ui.identity`, migration 0130).'
