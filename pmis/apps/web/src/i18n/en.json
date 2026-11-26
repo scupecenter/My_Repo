@@ -208,7 +208,9 @@
       "documents": "Documents",
       "meetings": "Meetings",
       "people": "People",
-      "contractors": "Contractors"
+      "contractors": "Contractors",
+      "tasks": "Tasks",
+      "warehouse_items": "Warehouse items"
     },
     "site_list": "Site ID in list",
     "site_list_found": "{{count}} found",
