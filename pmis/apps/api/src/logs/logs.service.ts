@@ -291,9 +291,9 @@ export class LogsService {
     const recIds = [...new Set(rows.filter((r) => r.entity_type === 'register_record' && r.record_id && UUID_RE.test(r.record_id)).map((r) => r.record_id as string))];
     const recs = recIds.length === 0 ? [] : await this.db.tx.$queryRaw<{ id: string; register_key: string; entity_id: string; amounts_ok: boolean }[]>(Prisma.sql`
       SELECT r.id::text AS id, r.register_key, r.entity_id::text AS entity_id,
-        CASE WHEN r.register_key = 'financial_advances' THEN fin_amounts_visible(l.id, l.record_type, l.data) ELSE true END AS amounts_ok
+        CASE WHEN r.register_key = 'financial_advances' THEN coalesce(reg_data_for(l.id, l.register_key, l.record_type, l.entity_id, l.data) ->> 'amounts_hidden', 'false') <> 'true' ELSE true END AS amounts_ok
       FROM register_records r
-      JOIN LATERAL (SELECT x.id, x.record_type, x.data FROM register_records x WHERE x.entity_id = r.entity_id ORDER BY x.version_no DESC LIMIT 1) l ON true
+      JOIN LATERAL (SELECT x.id, x.register_key, x.record_type, x.entity_id, x.data FROM register_records x WHERE x.entity_id = r.entity_id ORDER BY x.version_no DESC LIMIT 1) l ON true
       WHERE r.id = ANY(${recIds}::uuid[])`);
     const rec = new Map(recs.map((r) => [r.id, r]));
     const hidden = await this.db.tx.$queryRaw<{ entity_type: string; code: string }[]>(Prisma.sql`
