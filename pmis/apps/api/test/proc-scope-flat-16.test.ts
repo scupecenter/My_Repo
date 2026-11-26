@@ -42,7 +42,7 @@ describe('procurement scope flat list (0173)', () => {
   });
 
   it('a Procurement record with scope GECOL is still refused wrong_register (the refusal lifts with P1, not here)', async () => {
-    const t = await team(app, db, 'procurement', 'procurement', 8);
+    const t = await team(app, db, 'procurement', 'procurement', 7);
     const r = await t.entry.api.call('post', recPath('procurement'), {
       site_id: t.site.id,
       data: { scope: 'GECOL', order_status: 'Active' },
