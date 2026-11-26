@@ -78,12 +78,16 @@ describe("goals (contract 0.15.99)", () => {
     const audit = await db.query("SELECT reason FROM audit_log WHERE action = 'goals_update' ORDER BY id DESC LIMIT 1");
     expect(audit.rows[0]?.reason).toBe("goals test");
 
-    // progress: only active goals, counted by the system (nothing approved yet), with the period and a status
+    // progress: only active goals, counted by the system, with the period and a status
     const pr = await admin.api.call("get", "/goals/progress");
     expect(pr.status).toBe(200);
     expect(pr.body.goals).toHaveLength(1);
     const p = pr.body.goals[0];
-    expect(p).toMatchObject({ id: "on-air-month", metric: "MS6", period: "month", target: 10, actual: 0, percent: 0 });
+    expect(p).toMatchObject({ id: "on-air-month", metric: "MS6", period: "month", target: 10 });
+    // the count is the same as a direct count of sites with an approved MS6 task this month (other suites may have seeded some)
+    const direct = await db.query("SELECT count(DISTINCT s.id)::int AS n FROM task_instances ti JOIN task_definitions td ON td.id = ti.task_def_id JOIN sites s ON s.id = ti.site_id WHERE td.code = 'MS6' AND ti.state::text = 'approved' AND ti.actual_date >= date_trunc('month', cal_today())::date AND ti.actual_date <= cal_today() AND s.is_active AND s.overall_status <> 'cancelled'");
+    expect(p.actual).toBe(direct.rows[0].n);
+    expect(p.percent).toBe(Math.round((1000 * direct.rows[0].n) / 10) / 10);
     expect(p.period_start <= p.period_end).toBe(true);
     expect(["behind", "at_risk", "on_track"]).toContain(p.status);
   });
