@@ -29,6 +29,17 @@ export class P4cController {
     return this.p4c.warehouseOrderOptions(auth, q);
   }
 
+  /** 0.15.92: the same picker for the Car dispatcher and Financial advances (`procurement_record_id`); each needs its own module view, the SQL adds the Procurement view. */
+  @Get('car_dispatcher/order-options')
+  carOrderOptions(@Auth() auth: AuthContext, @Query() q: Record<string, unknown>) {
+    return this.p4c.warehouseOrderOptions(auth, q, 'car_dispatcher');
+  }
+
+  @Get('financial_advances/order-options')
+  advanceOrderOptions(@Auth() auth: AuthContext, @Query() q: Record<string, unknown>) {
+    return this.p4c.warehouseOrderOptions(auth, q, 'financial_advances');
+  }
+
   @Get('procurement/:entity_id/receipts')
   orderReceipts(@Auth() auth: AuthContext, @Param('entity_id') entityId: string) {
     return this.p4c.orderReceipts(auth, entityId);
