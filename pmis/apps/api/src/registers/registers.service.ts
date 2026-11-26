@@ -204,6 +204,26 @@ export class RegistersService {
     return d;
   }
 
+  /**
+   * 0.15.88: the companies a Procurement / GECOL / HLC record can name as its Contractor (record column external_party_id).
+   * Read only: active companies with the scopes of their active contracts (NULL scopes = every scope). Needs `view` on one of the three registers.
+   */
+  async contractorCompanies(auth: AuthContext): Promise<{ items: { id: string; name: string; type: string; scopes: string[] | null }[] }> {
+    const mods = await this.db.tx.$queryRaw<{ module_key: string }[]>(Prisma.sql`
+      SELECT module_key FROM register_definitions WHERE register_key IN ('procurement', 'gecol', 'hlc') AND is_active AND enabled`);
+    let ok = false;
+    for (const m of mods) if (await this.access.hasGrant(auth, m.module_key, 'view')) { ok = true; break; }
+    if (!ok) throw problems.forbidden('action_forbidden', 'You need view on Procurement, GECOL or HLC.');
+    const rows = await this.db.tx.$queryRaw<{ id: string; name: string; type: string; scopes: string[] | null }[]>(Prisma.sql`
+      SELECT p.id::text AS id, p.name, p.type::text AS type,
+        CASE WHEN bool_or(c.scopes IS NULL) THEN NULL ELSE array_agg(DISTINCT s ORDER BY s) FILTER (WHERE s IS NOT NULL) END AS scopes
+      FROM external_parties p
+      JOIN external_party_contracts c ON c.party_id = p.id AND c.status = 'active' AND (c.end_date IS NULL OR c.end_date >= current_date)
+      LEFT JOIN LATERAL unnest(c.scopes) AS s ON true
+      WHERE p.is_active GROUP BY p.id, p.name, p.type ORDER BY p.name`);
+    return { items: rows };
+  }
+
   async list(auth: AuthContext): Promise<{ items: unknown[] }> {
     const defs = await this.db.tx.$queryRaw<DefRow[]>(Prisma.sql`
       SELECT register_key, name_en, name_ar, module_key, site_scoped, multiple_per_site, record_types, approval_levels

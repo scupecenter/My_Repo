@@ -208,7 +208,15 @@ function uploadDto(u: MockUpload): ImportBatch {
   } as ImportBatch;
 }
 
+/** 0.15.88: the companies a record can name as its Contractor (GET /registers/contractor-companies). */
+export const MOCK_COMPANIES = [
+  { id: '5b0c1d4e-0000-4000-8000-000000000001', name: 'Al-Nahda Contracting', type: 'cw_contractor', scopes: ['Tower RT', 'Tower GF', 'Fiber'] },
+  { id: '5b0c1d4e-0000-4000-8000-000000000002', name: 'Libya Telecom Vendor', type: 'te_vendor', scopes: null as string[] | null },
+];
+const companyOf = (id: unknown) => { const c = MOCK_COMPANIES.find((x) => x.id === id); return c ? { id: c.id, name: c.name, type: c.type } : null; };
+
 export const registerHandlers = [
+  http.get(`${B}/registers/contractor-companies`, () => { const g = guard(); if (g) return g; return HttpResponse.json({ items: MOCK_COMPANIES }); }),
   http.get(`${B}/registers`, () => {
     const g = guard(); if (g) return g;
     const nav = viewer()!.nav;
@@ -246,7 +254,8 @@ export const registerHandlers = [
     const g = guard(); if (g) return g;
     const def = defOf(params.key as string);
     if (!def) return problem(404, 'not_found', 'Register not found');
-    const b = (await request.json()) as { site_id?: string; record_type?: string; data?: Record<string, unknown> };
+    const b = (await request.json()) as { site_id?: string; record_type?: string; data?: Record<string, unknown>; external_party_id?: string | null };
+    if (b.external_party_id && !companyOf(b.external_party_id)) return invalid([{ path: '/external_party_id', code: 'not_an_active_company' }]);
     const si = b.site_id ? siteIndex(b.site_id) : null;
     if (def.site_scoped && (si === null || si < 0 || si >= SITE_COUNT)) return invalid([{ path: '/site_id', code: b.site_id ? 'site_not_found' : 'site_required' }]);
     if (def.register_key === 'permits_hse') { const pe = permitIssues(b.data ?? {}); if (pe.length) return invalid(pe); }
@@ -267,6 +276,7 @@ export const registerHandlers = [
     const now = new Date().toISOString();
     const id = recId(++R().seq);
     const r: MockRecord = { id, entity_id: id, version_no: 1, register_key: def.register_key, record_type: b.record_type ?? null, site_index: si, state: 'entry', current_level: 1, levels_required: levelsOf(def.register_key), data, version: 1, return_count: 0, last_return_note: null, created_by: viewer()!.employee_id ?? '9999', created_at: now, updated_at: now, steps: [] };
+    if (b.external_party_id) r.external_party = companyOf(b.external_party_id) as never;
     step(r, 'create', 1);
     linkHlc(r);
     deriveDismantle(r, R().records);
@@ -285,7 +295,9 @@ export const registerHandlers = [
     const bad = noMatch(request, r); if (bad) return bad;
     if (r.state !== 'entry') return problem(409, 'invalid_transition', 'Only a record in entry can be edited');
     if (!actions(r)!.includes('edit')) return problem(403, 'not_eligible_holder', 'You do not hold this level');
-    const b = (await request.json()) as { data?: Record<string, unknown> };
+    const b = (await request.json()) as { data?: Record<string, unknown>; external_party_id?: string | null };
+    if (b.external_party_id && !companyOf(b.external_party_id)) return invalid([{ path: '/external_party_id', code: 'not_an_active_company' }]);
+    if (b.external_party_id !== undefined) r.external_party = companyOf(b.external_party_id) as never;
     // a key that is sent applies, an explicit null clears it (as the API does); read-only fields cannot be typed (Q45)
     const merged: Record<string, unknown> = { ...r.data };
     for (const [c, v] of Object.entries(b.data ?? {})) { if (v === null) delete merged[c]; else merged[c] = v; }
