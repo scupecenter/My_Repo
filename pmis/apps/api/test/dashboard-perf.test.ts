@@ -42,6 +42,7 @@ async function slowest(a: Actor, path: string, runs = 5): Promise<{ ms: number; 
     body = res.body;
   }
   times.sort((x, y) => x - y);
+  console.log(`[perf] ${path} median ${times[Math.floor(times.length / 2)]!.toFixed(0)} ms of ${runs} (min ${times[0]!.toFixed(0)}, max ${times[times.length - 1]!.toFixed(0)})`);
   return { ms: times[Math.floor(times.length / 2)]!, body };
 }
 
