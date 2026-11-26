@@ -1,3 +1,4 @@
+import { SiteGantt } from '@/components/SiteGantt';
 import { SiteSummaryStrip } from '@/components/SiteSummaryStrip';
 import type { TasksExportColumnCode } from '@/api/types';
 import { ArrowLeft, Layers } from 'lucide-react';
@@ -118,6 +119,7 @@ export function Site() {
             <span className={`chip ${TONE[s.overall_status]}`} data-testid="site-status">{t(`status.${s.overall_status}`)}</span>
           </div>
           <SiteSummaryStrip site={s} />
+          <SiteGantt site={s} />
           <SiteIdentity site={s} />
           <SitePendingChanges siteId={s.id} />
           <SiteAdminEdit site={s} />

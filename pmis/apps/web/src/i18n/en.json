@@ -6167,5 +6167,12 @@
     "snags": "{{n}} open snags",
     "issues": "{{n}} open issues",
     "docs": "{{n}} documents missing"
+  },
+  "gantt": {
+    "title": "Timeline (read only)",
+    "legend": "Hollow grey: baseline. Outlined: planned. Filled: actual. Dates change only through the normal change flow.",
+    "baseline": "Baseline",
+    "planned": "Planned",
+    "actual": "Actual"
   }
 }
