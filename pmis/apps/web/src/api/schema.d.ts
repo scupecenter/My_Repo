@@ -15551,6 +15551,8 @@ export interface components {
         /** @enum {string} */
         RegisterRecordState: "entry" | "in_review" | "in_approval" | "approved" | "voided";
         RegisterRecord: {
+            /** @description 0.15.89. GECOL and HLC records only: the Contractor company from Procurement by Site ID (read only, never stored on the record). HLC: the company of the Procurement record it links to; otherwise the company of the latest approved Procurement record of the site that names one. Absent when none. `external_party` of a GECOL or HLC record stays what the approval rules use (the party the record itself is approved for). */
+            procurement_contractor?: components["schemas"]["ExternalPartyRef"];
             /** @description 0.15.83. Read only. The evidence of the record: its mandatory document slots (the same rules as the Site Master cell `docs`). Absent when the record needs no document. */
             docs?: {
                 /** @enum {string} */
