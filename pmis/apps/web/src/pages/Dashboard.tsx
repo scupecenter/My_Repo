@@ -1,4 +1,4 @@
-import { Check, Download, Link2, PencilLine, Printer, RotateCcw } from "lucide-react";
+import { Check, Download, Link2, MonitorPlay, PencilLine, Printer, RotateCcw } from "lucide-react";
 import { useMemo, useState, type ReactNode, Fragment } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
@@ -1210,6 +1210,10 @@ export function Dashboard() {
               {t("dash.reset")}
             </button>
           )}
+          <Link className="btn" data-testid="dash-tv" to={`/dashboard?${new URLSearchParams([...sp.entries(), ["tv", "1"]]).toString()}`}>
+            <MonitorPlay size={16} />
+            {t("dash.tv")}
+          </Link>
           <button
             className="btn"
             data-testid="dash-copy-link"

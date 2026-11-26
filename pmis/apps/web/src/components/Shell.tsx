@@ -117,6 +117,24 @@ export function Shell() {
   const switchLang = () => { const l = lang === 'en' ? 'ar' : 'en'; applyLocale(l); savePref({ locale: l }); };
   const switchTheme = () => { const n = theme === 'light' ? 'dark' : 'light'; applyTheme(n); savePref({ theme: n }); };
 
+  // TV mode (/dashboard?tv=1): the Dashboard alone, larger, refreshed every minute, for a wall screen. Esc or the button leaves it. Same data and permissions as the normal page.
+  const tv = loc.pathname === '/dashboard' && new URLSearchParams(loc.search).get('tv') === '1';
+  useEffect(() => {
+    if (!tv) return;
+    const id = window.setInterval(() => { void qc.invalidateQueries(); }, 60_000);
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') nav('/dashboard'); };
+    window.addEventListener('keydown', esc);
+    return () => { window.clearInterval(id); window.removeEventListener('keydown', esc); };
+  }, [tv, qc, nav]);
+  if (tv) {
+    return (
+      <div className="min-h-screen bg-bg p-6" data-testid="tv-mode" style={{ zoom: 1.2 }}>
+        <button className="btn fixed end-4 top-4 z-50" data-testid="tv-exit" onClick={() => nav('/dashboard')}><X size={16} />{t('dash.tv_exit')}</button>
+        <Outlet context={{ items: sideItems }} />
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-screen">
       {auto && <div className="hidden shrink-0 md:block" style={{ width: 56 }} aria-hidden />}
