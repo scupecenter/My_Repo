@@ -75,6 +75,8 @@ function AddTask({ c, milestone, onClose, onAdded }: { c: Ctx; milestone?: strin
   const [code, setCode] = useState(''), [en, setEn] = useState(''), [ar, setAr] = useState('');
   const [counts, setCounts] = useState(true);
   const [mn, setMn] = useState(''), [mx, setMx] = useState(''), [from, setFrom] = useState('PRED');
+  // 0.15.85: the SLA is an explicit choice, never silently empty: set it, or say that this task has no SLA (with a short reason).
+  const [slaChoice, setSlaChoice] = useState<'' | 'set' | 'none'>(''), [noSlaWhy, setNoSlaWhy] = useState('');
   const [wOn, setWOn] = useState(false), [wVal, setWVal] = useState(''), [wGroup, setWGroup] = useState('');
   const [master, setMaster] = useState('');
   const preds = after ? [after] : [], succs = before ? [before] : [];
@@ -84,9 +86,10 @@ function AddTask({ c, milestone, onClose, onAdded }: { c: Ctx; milestone?: strin
   const pv = preds.length || succs.length ? preview.data ?? null : null;
   const cycle = pv?.errors?.find((e) => e.code === 'cycle');
   const phrase = pv?.master_confirmation_needed ? pv.confirmation_phrase ?? null : null;
-  const slaBad = (mn !== '' || mx !== '') && (mn === '' || mx === '' || Number(mn) > Number(mx));
+  const slaBad = slaChoice === 'set' && (mn === '' || mx === '' || Number(mn) > Number(mx));
+  const slaOk = slaChoice === 'set' ? !slaBad : slaChoice === 'none' && noSlaWhy.trim().length >= 3;
   const wBad = wOn && (!wGroup.trim() || wVal === '' || Number(wVal) < 0 || Number(wVal) > 100);
-  const valid = CODE.test(code) && !!en.trim() && !!stage && !cycle && (!pv || pv.valid) && !slaBad && !wBad && (!phrase || master === phrase) && !c.placements.some((p) => p.task_code === code);
+  const valid = CODE.test(code) && !!en.trim() && !!stage && !cycle && (!pv || pv.valid) && slaOk && !wBad && (!phrase || master === phrase) && !c.placements.some((p) => p.task_code === code);
   const pickStage = (s: string) => { setStage(s); const r = c.placements.filter((p) => p.stage_code === s && p.is_active !== false).sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)); setAfter(r.length ? r[r.length - 1]!.task_code : ''); setBefore(''); };
   const submit = () => c.askReason({
     title: `${t('studio.add_to_draft')}: ${code}`, hint: t('wfe.insert_hint'),
@@ -97,7 +100,8 @@ function AddTask({ c, milestone, onClose, onAdded }: { c: Ctx; milestone?: strin
         let etag = r.version?.version_etag ?? c.etag;
         const refresh = async () => { etag = (await api.get<WorkflowVersion>(`/workflow/versions/${c.v.version}`)).version_etag ?? etag; };
         try {
-          if (mn !== '' && mx !== '') { await api.put(`${path}/sla-rule`, { body: { min_working_days: Number(mn), max_working_days: Number(mx), start_event: from, unit: 'working', calendar_code: 'default', warning_pct: null, breach_owner_role: null, escalation_role: null, pause_on_client_wait: false, reason }, version: etag }); await refresh(); }
+          if (slaChoice === 'none') await api.put(`/settings/sla-tasks/${code}/no-sla`, { body: { no_sla: true, reason: noSlaWhy.trim() } });
+          if (slaChoice === 'set') { await api.put(`${path}/sla-rule`, { body: { min_working_days: Number(mn), max_working_days: Number(mx), start_event: from, unit: 'working', calendar_code: 'default', warning_pct: null, breach_owner_role: null, escalation_role: null, pause_on_client_wait: false, reason }, version: etag }); await refresh(); }
           if (wOn) await api.put(`${path}/weight`, { body: { counts_in_weight: true, weight_value: Number(wVal), weight_group: wGroup.trim().toUpperCase(), reason }, version: etag });
         } catch (e) { toast(err(e)); }
         cb.onSuccess();
@@ -128,11 +132,22 @@ function AddTask({ c, milestone, onClose, onAdded }: { c: Ctx; milestone?: strin
       <Step n={2} title={t('studio.step_what')} testid="studio-step-what">
         <NameFields code={code} setCode={setCode} en={en} setEn={setEn} ar={ar} setAr={setAr} prefix="studio-add" />
         <label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" className="h-5 w-5" data-testid="studio-add-counts" checked={counts} onChange={(e) => setCounts(e.target.checked)} />{t('studio.counts_toward')}</label>
-        <div className="grid gap-3 sm:grid-cols-3">
-          <label className={lbl}>{t('wfe.sla_section.min')}<input type="number" min={0} className={field} dir="ltr" data-testid="studio-add-sla-min" value={mn} onChange={(e) => setMn(e.target.value)} /></label>
-          <label className={lbl}>{t('wfe.sla_section.max')}<input type="number" min={0} className={field} dir="ltr" data-testid="studio-add-sla-max" value={mx} onChange={(e) => setMx(e.target.value)} /></label>
-          <label className={lbl}>{t('wfe.sla_section.start')}<select className={field} data-testid="studio-add-sla-from" value={from} onChange={(e) => setFrom(e.target.value)}><option value="PRED">{t('wfe.sla_section.start_pred')}</option><option value="OPEN">{t('wfe.sla_section.start_open')}</option></select></label>
-        </div>
+        <fieldset className="space-y-2" data-testid="studio-add-sla-choice">
+          <legend className="text-sm font-semibold">{t('studio.sla_choice')}</legend>
+          <label className="flex min-h-11 items-center gap-2 text-sm"><input type="radio" name="sla-choice" className="h-5 w-5" data-testid="studio-add-sla-set" checked={slaChoice === 'set'} onChange={() => setSlaChoice('set')} />{t('studio.sla_choice_set')}</label>
+          <label className="flex min-h-11 items-center gap-2 text-sm"><input type="radio" name="sla-choice" className="h-5 w-5" data-testid="studio-add-sla-none" checked={slaChoice === 'none'} onChange={() => setSlaChoice('none')} />{t('studio.sla_choice_none')}</label>
+          {slaChoice === '' && <p className="text-xs text-mute" data-testid="studio-add-sla-required">{t('studio.sla_choice_required')}</p>}
+        </fieldset>
+        {slaChoice === 'set' && (
+          <div className="grid gap-3 sm:grid-cols-3">
+            <label className={lbl}>{t('wfe.sla_section.min')}<input type="number" min={0} className={field} dir="ltr" data-testid="studio-add-sla-min" value={mn} onChange={(e) => setMn(e.target.value)} /></label>
+            <label className={lbl}>{t('wfe.sla_section.max')}<input type="number" min={0} className={field} dir="ltr" data-testid="studio-add-sla-max" value={mx} onChange={(e) => setMx(e.target.value)} /></label>
+            <label className={lbl}>{t('wfe.sla_section.start')}<select className={field} data-testid="studio-add-sla-from" value={from} onChange={(e) => setFrom(e.target.value)}><option value="PRED">{t('wfe.sla_section.start_pred')}</option><option value="OPEN">{t('wfe.sla_section.start_open')}</option></select></label>
+          </div>
+        )}
+        {slaChoice === 'none' && (
+          <label className={lbl}>{t('studio.sla_none_reason')}<input className={field} data-testid="studio-add-sla-none-reason" value={noSlaWhy} onChange={(e) => setNoSlaWhy(e.target.value)} /></label>
+        )}
         {slaBad && <p role="alert" className="text-sm text-lateInk" data-testid="studio-add-sla-bad">{t('studio.sla_bad')}</p>}
       </Step>
       <Step n={3} title={t('studio.step_inputs')} testid="studio-step-inputs">

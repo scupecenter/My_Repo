@@ -1,4 +1,5 @@
 import { Plus, Trash2 } from "lucide-react";
+import { SlaTasksPanel } from "./SlaTasksPanel";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiError } from "@/api/client";
@@ -682,6 +683,7 @@ export function SlaRules() {
   const id = sel ?? draft?.id ?? active?.id;
   return (
     <div className="space-y-4" data-testid="page-sla">
+      <SlaTasksPanel />
       <SlaBulkAdmin />
       <section className="card space-y-2 p-4">
         <div className="flex flex-wrap items-center gap-2">

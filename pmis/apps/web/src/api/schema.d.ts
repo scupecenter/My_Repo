@@ -4113,6 +4113,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/sla-tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Every task with its SLA status (set, no SLA by choice, not decided)
+         * @description 0.15.85. One item per active task of the workflow version in force and of the open draft version (`in_draft` true), each with `mode`:
+         *     `set` (it has an active base SLA rule today), `none` (somebody chose "this task has no SLA", with the reason) or `undecided` (neither, shown as "Not decided").
+         *     Gates are not listed. Read only. Needs `view` on `admin.settings`.
+         */
+        get: operations["listSlaTasks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/sla-tasks/{task_code}/no-sla": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Record or clear the explicit "this task has no SLA" choice
+         * @description 0.15.85. `no_sla` true records the choice (the task then shows as `none`), false clears it (the task shows as `undecided` again). Nothing is deleted: the record keeps who, when and why.
+         *     A task that has an active SLA rule answers 422 (remove the rule first). Needs `edit` on `sla_rules` (System Admin or a delegation for all regions). Audited.
+         */
+        put: operations["setSlaTaskNoSla"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/sla-rule-sets": {
         parameters: {
             query?: never;
@@ -14271,6 +14314,31 @@ export interface components {
             as_of: string;
             match_version: number;
             items: components["schemas"]["TeamScopeMismatchRow"][];
+        };
+        SlaTaskItem: {
+            task_code: string;
+            name_en: string;
+            name_ar?: string | null;
+            stage_code?: string;
+            workflow_version: number;
+            in_draft: boolean;
+            /** @enum {string} */
+            mode: "set" | "none" | "undecided";
+            none_reason?: string | null;
+            min_working_days?: number | null;
+            max_working_days?: number | null;
+            start_event?: string | null;
+            unit?: string | null;
+        };
+        SlaTaskList: {
+            items: components["schemas"]["SlaTaskItem"][];
+            counts: {
+                total: number;
+                set: number;
+                none: number;
+                undecided: number;
+                in_draft: number;
+            };
         };
         GecolHlcCounts: {
             /** Format: date-time */
@@ -26359,6 +26427,63 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+        };
+    };
+    listSlaTasks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The tasks and the counts per mode. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SlaTaskList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setSlaTaskNoSla: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    no_sla: boolean;
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The choice after the change. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        task_code: string;
+                        is_none: boolean;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     listSlaRuleSets: {

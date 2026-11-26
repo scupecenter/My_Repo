@@ -398,3 +398,14 @@ export function usePublishWeights(id: string) {
     onSettled: () => refresh(qc, 'weight-sets', 'weight-set'),
   });
 }
+
+// 0.15.85: every task with its SLA status (Settings > SLA, "Tasks and their SLA") and the explicit "no SLA" choice
+import type { SlaTaskList } from './types';
+export const useSlaTasks = () => useQuery({ queryKey: ['slaTasks'], queryFn: () => api.get<SlaTaskList>('/settings/sla-tasks') });
+export const useSetSlaNoSla = () => {
+  const qc = useQueryClient();
+  return useMutation<{ task_code: string; is_none: boolean }, ApiError, { task: string; no_sla: boolean; reason: string }>({
+    mutationFn: ({ task, no_sla, reason }) => api.put(`/settings/sla-tasks/${task}/no-sla`, { body: { no_sla, reason } }),
+    onSettled: () => refresh(qc, 'slaTasks'),
+  });
+};

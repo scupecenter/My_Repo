@@ -41,6 +41,8 @@ const ruleSchema = z.object({
 
 const draftSchema = z.object({ reason }).strict();
 const patchSchema = z.object({ reason, rules: z.array(ruleSchema).min(1).max(500) }).strict();
+const noSlaSchema = z.object({ no_sla: z.boolean(), reason }).strict();
+const taskCodeSchema = z.string().regex(/^[A-Za-z0-9_.-]{1,40}$/, 'Not a task code.');
 const previewSchema = z.object({ effective_date: isoDate }).strict();
 const publishSchema = z.object({ effective_date: isoDate, reason, apply_to_open_tasks: z.boolean().default(false) }).strict();
 
@@ -237,6 +239,26 @@ export class SlaService {
     const b = parse(patchSchema, raw);
     await this.db.tx.$queryRaw(Prisma.sql`SELECT admin_save_sla_rule_set(${cur.id}::uuid, ${b.reason}::text, ${JSON.stringify(b.rules)}::jsonb, ${version}::int)`);
     return this.full(cur.id);
+  }
+
+  // ------------------------------------------------------------------ GET /settings/sla-tasks (0170)
+  /** Every active task of the version in force and of the open draft, with its SLA status: set, none (explicit) or undecided. Read only. */
+  async tasks(auth: AuthContext): Promise<unknown> {
+    await this.access.requireModuleView(auth, 'admin.settings');
+    const r = await this.db.tx.$queryRaw<{ items: Array<{ mode: string; in_draft: boolean }> }[]>(Prisma.sql`SELECT sla_task_overview() AS items`);
+    const items = r[0]?.items ?? [];
+    const count = (m: string) => items.filter((i) => i.mode === m).length;
+    return { items, counts: { total: items.length, set: count('set'), none: count('none'), undecided: count('undecided'), in_draft: items.filter((i) => i.in_draft).length } };
+  }
+
+  /** PUT /settings/sla-tasks/{task_code}/no-sla (0170): records or clears the explicit "this task has no SLA" choice. */
+  async setNoSla(auth: AuthContext, taskCode: string, raw: unknown): Promise<unknown> {
+    void auth;
+    await this.access.requireAdmin('sla_rules', 'edit');
+    const b = parse(noSlaSchema, raw);
+    const code = parse(taskCodeSchema, taskCode);
+    const r = await this.db.tx.$queryRaw<{ r: unknown }[]>(Prisma.sql`SELECT admin_task_sla_none(${code}::text, ${b.no_sla}::boolean, ${b.reason}::text) AS r`);
+    return r[0]!.r;
   }
 
   /** POST /settings/sla-rule-sets/{id}/preview */

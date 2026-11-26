@@ -6420,6 +6420,58 @@ paths:
                     properties:
                       items: { type: array, items: { $ref: '#/components/schemas/SlaRule' } }
         '401': { $ref: '#/components/responses/Unauthorized' }
+  /settings/sla-tasks:
+    get:
+      tags: [settings]
+      operationId: listSlaTasks
+      summary: Every task with its SLA status (set, no SLA by choice, not decided)
+      description: |
+        0.15.85. One item per active task of the workflow version in force and of the open draft version (`in_draft` true), each with `mode`:
+        `set` (it has an active base SLA rule today), `none` (somebody chose "this task has no SLA", with the reason) or `undecided` (neither, shown as "Not decided").
+        Gates are not listed. Read only. Needs `view` on `admin.settings`.
+      responses:
+        '200':
+          description: The tasks and the counts per mode.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SlaTaskList'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /settings/sla-tasks/{task_code}/no-sla:
+    put:
+      tags: [settings]
+      operationId: setSlaTaskNoSla
+      summary: Record or clear the explicit "this task has no SLA" choice
+      description: |
+        0.15.85. `no_sla` true records the choice (the task then shows as `none`), false clears it (the task shows as `undecided` again). Nothing is deleted: the record keeps who, when and why.
+        A task that has an active SLA rule answers 422 (remove the rule first). Needs `edit` on `sla_rules` (System Admin or a delegation for all regions). Audited.
+      parameters:
+        - {name: task_code, in: path, required: true, schema: {type: string, maxLength: 40}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [no_sla, reason]
+              properties:
+                no_sla: {type: boolean}
+                reason: {type: string, minLength: 3, maxLength: 1000}
+      responses:
+        '200':
+          description: The choice after the change.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [task_code, is_none]
+                properties:
+                  task_code: {type: string}
+                  is_none: {type: boolean}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
   /settings/sla-rule-sets:
     get:
       tags: [settings]
@@ -19897,6 +19949,36 @@ components:
         as_of: { type: string, format: date }
         match_version: { type: integer }
         items: { type: array, items: { $ref: '#/components/schemas/TeamScopeMismatchRow' } }
+    SlaTaskItem:
+      type: object
+      required: [task_code, name_en, workflow_version, in_draft, mode]
+      properties:
+        task_code: {type: string}
+        name_en: {type: string}
+        name_ar: {type: [string, 'null']}
+        stage_code: {type: string}
+        workflow_version: {type: integer}
+        in_draft: {type: boolean}
+        mode: {type: string, enum: [set, none, undecided]}
+        none_reason: {type: [string, 'null']}
+        min_working_days: {type: [integer, 'null']}
+        max_working_days: {type: [integer, 'null']}
+        start_event: {type: [string, 'null']}
+        unit: {type: [string, 'null']}
+    SlaTaskList:
+      type: object
+      required: [items, counts]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/SlaTaskItem'}}
+        counts:
+          type: object
+          required: [total, set, none, undecided, in_draft]
+          properties:
+            total: {type: integer}
+            set: {type: integer}
+            none: {type: integer}
+            undecided: {type: integer}
+            in_draft: {type: integer}
     GecolHlcCounts:
       type: object
       required: [as_of, gecol, hlc, procurement, sites]
