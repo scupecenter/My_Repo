@@ -360,3 +360,17 @@ describe('Q91: an approved GECOL request closes C1 with the request date', () =>
     expect(s2.body.detail).toContain('C1');
   });
 });
+
+describe('0174: the HLC entry holders are told when a scope-HLC Procurement record is approved', () => {
+  it('notifies the holders of the HLC register row (register_assigned, linked to the record), not the approver, and nobody once the site has an HLC record', async () => {
+    const { hlc, fiber } = await hlcTeam();
+    const rec = await createRec(hlc, HLC_PR);
+    const ok = await pass('procurement', hlc.entry, hlc.approve, rec.id, rec.version);
+    expect(ok.state).toBe('approved');
+    const mine = await q<{ kind: string; link: string }>(db, `SELECT kind, link FROM notifications WHERE user_id = $1 AND kind = 'register_assigned' AND link LIKE $2`, [fiber.entry.user.id, `%${rec.id}`]);
+    expect(mine.length).toBe(1);
+    expect(mine[0]?.link).toContain('/registers/procurement/records/');
+    const approver = await q(db, `SELECT 1 FROM notifications WHERE user_id = $1 AND link LIKE $2 AND title LIKE 'Procurement approved%'`, [hlc.approve.user.id, `%${rec.id}`]);
+    expect(approver.length).toBe(0);
+  });
+});
