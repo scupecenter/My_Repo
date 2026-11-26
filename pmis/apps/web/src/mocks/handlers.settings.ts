@@ -574,6 +574,17 @@ export const settingsHandlers = [
     return HttpResponse.json({ version: 1, status: 'published', is_current: true, light_revision: 1, milestones: MILESTONES, gates: GATES, placements: TASK_DEFS.map((t) => ({ task_code: t.code, stage_code: t.stage_code, sort_order: t.sort_order })) });
   }),
   http.get(`${B}/settings/task-definitions`, () => { const g = guard(); if (g) return g; return HttpResponse.json({ items: TASK_DEFS }); }),
+  http.get(`${B}/issues/stopped-rows`, () => { const g = guard(); if (g) return g; return HttpResponse.json({ items: [], counts: { total: 0, not_classified: 0 } }); }),
+  http.get(`${B}/settings/issue-task-map`, () => {
+    const g = needAdmin(); if (g) return g;
+    const items = TASK_DEFS.map((t, i) => ({ task_code: t.code, name_en: t.name_en, name_ar: null, stage_code: 'MS1', stage_seq: 1 + Math.floor(i / 5), category: 'Other', blocker_reason: null, is_active: true, not_classified: false }));
+    return HttpResponse.json({ items, counts: { total: items.length, not_classified: 0 } });
+  }),
+  http.put(`${B}/settings/issue-task-map/:task_code`, async ({ request, params }) => {
+    const g = needAdmin(); if (g) return g;
+    const b = (await request.json()) as { category: string; reason?: string | null; is_active?: boolean };
+    return HttpResponse.json({ task_code: String(params.task_code), category: b.category, reason: b.reason ?? null, is_active: b.is_active ?? true });
+  }),
   http.get(`${B}/settings/sla-rule-sets`, ({ request }) => {
     const g = needAdmin(); if (g) return g;
     const st = new URL(request.url).searchParams.get('status');
