@@ -8,6 +8,7 @@ import {
   downloadDashboard,
   useDashboard,
   useDashboardExtras,
+  useDashboardOps,
   type Dashboard as Dash,
   type DashboardExtras,
   type DashboardQuery,
@@ -23,6 +24,8 @@ import { useToast } from "@/components/Toast";
 import { streamName } from "@/lib/streams";
 import { tripoliToday } from "@/lib/today";
 import { orderedVisible, type TabLayout } from "./dashboardLayout";
+import { Bar, Card, Kpi, pct, signed } from "./dashboardBits";
+import { OpsProcurementCard } from "./dashboardOps";
 import { useDashboardSettings } from "@/api/dashboardSettings";
 import { SavedViews } from "@/components/SavedViews";
 import { UnifiedFilter } from "@/components/UnifiedFilter";
@@ -61,108 +64,6 @@ const BAND_TONE: Record<string, string> = {
 };
 const FONT = "Cairo, system-ui, sans-serif";
 
-const pct = (n: number | null | undefined, digits = 1): string =>
-  n === null || n === undefined ? "–" : `${Number(n.toFixed(digits))}%`;
-const signed = (n: number): string => (n > 0 ? `+${n}` : String(n));
-
-function Card({
-  title,
-  testid,
-  children,
-  aside,
-  className = "",
-}: {
-  title: string;
-  testid: string;
-  children: ReactNode;
-  aside?: ReactNode;
-  className?: string;
-}) {
-  return (
-    <section
-      className={`card p-4 ${className}`}
-      data-testid={testid}
-      aria-label={title}
-    >
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="font-bold">{title}</h2>
-        {aside}
-      </div>
-      {children}
-    </section>
-  );
-}
-
-/** A progress bar with an optional tick for the plan. */
-function Bar({
-  value,
-  plan,
-  tone = "bg-accent",
-}: {
-  value: number;
-  plan?: number | null;
-  tone?: string;
-}) {
-  const v = Math.max(0, Math.min(100, value));
-  return (
-    <div
-      className="relative h-3 w-full rounded-full bg-lockBg"
-      role="progressbar"
-      aria-valuenow={Math.round(v)}
-      aria-valuemin={0}
-      aria-valuemax={100}
-    >
-      <i
-        className={`absolute inset-y-0 start-0 rounded-full ${tone}`}
-        style={{ width: `${v}%` }}
-      />
-      {plan !== null && plan !== undefined && (
-        <u
-          className="absolute -inset-y-1 border-s-2 border-dashed border-ink no-underline"
-          style={{ insetInlineStart: `${Math.max(0, Math.min(100, plan))}%` }}
-          aria-hidden
-        />
-      )}
-    </div>
-  );
-}
-
-function Kpi({
-  title,
-  value,
-  sub,
-  to,
-  testid,
-  tone,
-}: {
-  title: string;
-  value: ReactNode;
-  sub?: ReactNode;
-  to?: string;
-  testid: string;
-  tone?: string;
-}) {
-  const body = (
-    <>
-      <div className="text-sm text-mute">{title}</div>
-      <div className={`text-3xl font-bold tnum ${tone ?? ""}`}>{value}</div>
-      {sub && <div className="mt-1 text-sm text-mute">{sub}</div>}
-    </>
-  );
-  return to ? (
-    <Link
-      to={to}
-      className="card block p-4 transition-transform hover:-translate-y-0.5 hover:border-mute"
-      data-testid={testid}
-    >
-      {body}
-    </Link>
-  ) : (
-    <div className="card p-4" data-testid={testid}>
-      {body}
-    </div>
-  );
-}
 
 const BAND_CELL: Record<string, string> = {
   low: "bg-doneBg text-doneInk",
@@ -650,6 +551,7 @@ export function Dashboard() {
   const dash = useDashboard(q);
   const d = dash.data;
   const extras = useDashboardExtras(q, !!d);
+  const ops = useDashboardOps(q, !!d);
   const [exporting, setExporting] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const [format, setFormat] = useState<ExportFormat>("xlsx");
@@ -1462,6 +1364,13 @@ export function Dashboard() {
                 <>
                   {/* F13 (contract 0.15.16): risk matrix, data quality, swap and relocation, decisions; A4 landscape when printed */}
                   <F13Panel ex={extras.data} sitesLink={sites} />
+                </>
+              ),
+
+              ops_procurement: (
+                <>
+                  {/* 0.15.96 (owner approval 2026-11-26, item 1): open PR/PO aging, receive rate and shortage per contractor */}
+                  <OpsProcurementCard ops={ops.data} />
                 </>
               ),
 

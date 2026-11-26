@@ -3090,6 +3090,36 @@
       "late": "{{n}} late tasks",
       "issues": "{{n}} open issues",
       "decisions": "{{n}} decisions to act on now"
+    },
+    "ops": {
+      "procurement_title": "Procurement and materials",
+      "procurement_hint": "Open PR/PO aging and the materials position of the visible sites. Read only.",
+      "open_register": "Open the register",
+      "open_orders": "Open orders",
+      "pr_wait": "PRs waiting for a PO/WO",
+      "po_wait": "Open PO/WOs",
+      "aging_total": "{{n}} waiting",
+      "oldest": "oldest {{n}} days",
+      "bucket": {
+        "d0_7": "0-7 days",
+        "d8_14": "8-14 days",
+        "d15_30": "15-30 days",
+        "over_30": "over 30 days"
+      },
+      "materials_title": "Materials",
+      "unavailable_orders": "You cannot see the Procurement register, so these figures are not shown.",
+      "unavailable_materials": "You cannot see the Warehouse, so the materials position is not shown.",
+      "receive_rate": "receive rate",
+      "sites_short": "Sites short on materials",
+      "no_shortage": "No material shortage on the visible sites.",
+      "top_shortages": "The biggest missing lines",
+      "col_site": "Site",
+      "col_item": "Item",
+      "col_missing": "Missing",
+      "col_contractor": "Contractor",
+      "unattributed": "Unattributed",
+      "by_contractor": "Shortage per contractor",
+      "contractor_row": "{{qty}} missing · {{lines}} lines · {{sites}} sites"
     }
   },
   "docs": {
