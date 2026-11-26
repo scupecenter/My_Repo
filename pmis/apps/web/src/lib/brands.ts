@@ -2,7 +2,7 @@
  * Switchable UI designs (owner decision 2026-11-19, migration 0130, contract 0.15.41). The tokens live in styles/tokens.css (`[data-brand=...]` blocks);
  * `current` is today's look and the default. The design is independent of the light/dark theme (users.theme) and never changes the status colours.
  */
-export const BRANDS = ['current', 'aljeel', 'executive', 'field'] as const;
+export const BRANDS = ['current', 'aljeel', 'executive', 'field', 'obsidian', 'sahara'] as const;
 export type Brand = (typeof BRANDS)[number];
 
 export const isBrand = (b: unknown): b is Brand => typeof b === 'string' && (BRANDS as readonly string[]).includes(b);
@@ -45,5 +45,15 @@ export const BRAND_SWATCHES: Record<Brand, BrandSwatch> = {
     side: '#0B1220', sideInk: '#FFFFFF', sideMute: '#C3CCD9', sideSel: '#24324F', sideActive: '#FFFFFF', sideMark: '#FB923C',
     accent: '#C2410C', accentInk: '#FFFFFF', accentSoft: '#FDE7DA', accentText: '#7C2D12',
     bg: 'oklch(0.979 0 0)', card: 'oklch(1 0 0)', line: '#AEB8C2', ink: 'oklch(0.205 0 0)', mute: '#3A4651',
+  },
+  obsidian: {
+    side: '#0E1116', sideInk: '#ECEFF4', sideMute: '#A7B0BE', sideSel: '#222833', sideActive: '#F2C14E', sideMark: '#E0A82E',
+    accent: '#8A5A00', accentInk: '#FFFFFF', accentSoft: '#FBF1DC', accentText: '#6B4500',
+    bg: '#F4F5F7', card: 'oklch(1 0 0)', line: 'oklch(0.913 0 0)', ink: 'oklch(0.205 0 0)', mute: 'oklch(0.439 0 0)',
+  },
+  sahara: {
+    side: '#123D2E', sideInk: '#E3F0EA', sideMute: '#A9C8BA', sideSel: '#216049', sideActive: '#FFFFFF', sideMark: '#E8C26A',
+    accent: '#0B6B4F', accentInk: '#FFFFFF', accentSoft: '#E3F2EB', accentText: '#0A4F3A',
+    bg: '#FAF7F2', card: 'oklch(1 0 0)', line: 'oklch(0.913 0 0)', ink: 'oklch(0.205 0 0)', mute: 'oklch(0.439 0 0)',
   },
 };

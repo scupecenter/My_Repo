@@ -7,7 +7,8 @@ const raw = readFileSync(path(process.cwd(), 'src/styles/tokens.css'), 'utf8');
 
 // WCAG AA contrast over the token pairs screens use, in both themes (plan 2.11 item 4), and for every UI design (0130) in both themes.
 type Vars = Record<string, string>;
-const block = (sel: string) => { const i = raw.indexOf(`${sel}{`); return i < 0 ? '' : raw.slice(i + sel.length + 1, raw.indexOf('\n}', i)); };
+// A block starts at the beginning of a line: `[data-brand=x]{` must not match inside `[data-theme=dark][data-brand=x]{`.
+const block = (sel: string) => { const k = raw.startsWith(`${sel}{`) ? 0 : raw.indexOf(`\n${sel}{`) + 1; const i = k === 0 && !raw.startsWith(`${sel}{`) ? -1 : k; return i < 0 ? '' : raw.slice(i + sel.length + 1, raw.indexOf('\n}', i)); };
 const decls = (b: string): Vars => Object.fromEntries([...b.matchAll(/(--[\w-]+):([^;]+);/g)].map((m) => [m[1], m[2].trim()]));
 const light = decls(block(':root'));
 const dark = { ...light, ...decls(block('[data-theme=dark]')) };
