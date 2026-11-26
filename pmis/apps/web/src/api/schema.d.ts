@@ -4113,11 +4113,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-<<<<<<< HEAD
-    "/settings/sla-tasks": {
-=======
     "/issues/stopped-rows": {
->>>>>>> 9041206 (feat(issues): derived stopped-at rows and editable task->category map (0.15.86, 0171))
         parameters: {
             query?: never;
             header?: never;
@@ -4125,21 +4121,12 @@ export interface paths {
             cookie?: never;
         };
         /**
-<<<<<<< HEAD
-         * Every task with its SLA status (set, no SLA by choice, not decided)
-         * @description 0.15.85. One item per active task of the workflow version in force and of the open draft version (`in_draft` true), each with `mode`:
-         *     `set` (it has an active base SLA rule today), `none` (somebody chose "this task has no SLA", with the reason) or `undecided` (neither, shown as "Not decided").
-         *     Gates are not listed. Read only. Needs `view` on `admin.settings`.
-         */
-        get: operations["listSlaTasks"];
-=======
          * Derived "stopped at" issue rows (computed, never stored)
-         * @description 0.15.86. One row per stopped site: the site is not finished (not completed or cancelled, On-Air milestone MS6 not approved) and has an open task that is late
+         * @description 0.15.87. One row per stopped site: the site is not finished (not completed or cancelled, On-Air milestone MS6 not approved) and has an open task that is late
          *     (SLA colour red) or blocked (rejected or suspended). The row shows the LATEST such task in workflow order. `category` and `blocker_reason` come from the map
          *     `/settings/issue-task-map`; a task without a map row shows `Other` and `not_classified` true. Read only; the caller's regions of `issues` apply.
          */
         get: operations["listIssueStoppedRows"];
->>>>>>> 9041206 (feat(issues): derived stopped-at rows and editable task->category map (0.15.86, 0171))
         put?: never;
         post?: never;
         delete?: never;
@@ -4148,9 +4135,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-<<<<<<< HEAD
-    "/settings/sla-tasks/{task_code}/no-sla": {
-=======
     "/settings/issue-task-map": {
         parameters: {
             query?: never;
@@ -4160,7 +4144,7 @@ export interface paths {
         };
         /**
          * Task code to issue category and blocker reason (editable map)
-         * @description 0.15.86. One item per active task of the workflow version in force. Needs `view` on `admin.settings`.
+         * @description 0.15.87. One item per active task of the workflow version in force. Needs `view` on `admin.settings`.
          */
         get: operations["listIssueTaskMap"];
         put?: never;
@@ -4172,7 +4156,6 @@ export interface paths {
         trace?: never;
     };
     "/settings/issue-task-map/{task_code}": {
->>>>>>> 9041206 (feat(issues): derived stopped-at rows and editable task->category map (0.15.86, 0171))
         parameters: {
             query?: never;
             header?: never;
@@ -4181,19 +4164,54 @@ export interface paths {
         };
         get?: never;
         /**
-<<<<<<< HEAD
+         * Set the issue category and blocker reason of a task code
+         * @description 0.15.87. `category` must be a value of the list IssueCategory, `reason` a value of BlockerReason or null (Not classified). `is_active` false hides the row
+         *     (nothing is deleted). Needs `edit` on `settings` (System Admin or a delegation for all regions). Audited, a reason `why` is required.
+         */
+        put: operations["saveIssueTaskMap"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/sla-tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Every task with its SLA status (set, no SLA by choice, not decided)
+         * @description 0.15.85. One item per active task of the workflow version in force and of the open draft version (`in_draft` true), each with `mode`:
+         *     `set` (it has an active base SLA rule today), `none` (somebody chose "this task has no SLA", with the reason) or `undecided` (neither, shown as "Not decided").
+         *     Gates are not listed. Read only. Needs `view` on `admin.settings`.
+         */
+        get: operations["listSlaTasks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/sla-tasks/{task_code}/no-sla": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
          * Record or clear the explicit "this task has no SLA" choice
          * @description 0.15.85. `no_sla` true records the choice (the task then shows as `none`), false clears it (the task shows as `undecided` again). Nothing is deleted: the record keeps who, when and why.
          *     A task that has an active SLA rule answers 422 (remove the rule first). Needs `edit` on `sla_rules` (System Admin or a delegation for all regions). Audited.
          */
         put: operations["setSlaTaskNoSla"];
-=======
-         * Set the issue category and blocker reason of a task code
-         * @description 0.15.86. `category` must be a value of the list IssueCategory, `reason` a value of BlockerReason or null (Not classified). `is_active` false hides the row
-         *     (nothing is deleted). Needs `edit` on `settings` (System Admin or a delegation for all regions). Audited, a reason `why` is required.
-         */
-        put: operations["saveIssueTaskMap"];
->>>>>>> 9041206 (feat(issues): derived stopped-at rows and editable task->category map (0.15.86, 0171))
         post?: never;
         delete?: never;
         options?: never;
@@ -26518,11 +26536,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
         };
     };
-<<<<<<< HEAD
-    listSlaTasks: {
-=======
     listIssueStoppedRows: {
->>>>>>> 9041206 (feat(issues): derived stopped-at rows and editable task->category map (0.15.86, 0171))
         parameters: {
             query?: never;
             header?: never;
@@ -26531,30 +26545,19 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-<<<<<<< HEAD
-            /** @description The tasks and the counts per mode. */
-=======
             /** @description The rows. */
->>>>>>> 9041206 (feat(issues): derived stopped-at rows and editable task->category map (0.15.86, 0171))
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-<<<<<<< HEAD
-                    "application/json": components["schemas"]["SlaTaskList"];
-=======
                     "application/json": components["schemas"]["IssueStoppedRowList"];
->>>>>>> 9041206 (feat(issues): derived stopped-at rows and editable task->category map (0.15.86, 0171))
                 };
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
         };
     };
-<<<<<<< HEAD
-    setSlaTaskNoSla: {
-=======
     listIssueTaskMap: {
         parameters: {
             query?: never;
@@ -26578,7 +26581,6 @@ export interface operations {
         };
     };
     saveIssueTaskMap: {
->>>>>>> 9041206 (feat(issues): derived stopped-at rows and editable task->category map (0.15.86, 0171))
         parameters: {
             query?: never;
             header?: never;
@@ -26590,37 +26592,78 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-<<<<<<< HEAD
-                    no_sla: boolean;
-                    reason: string;
-=======
                     category: string;
                     reason?: string | null;
                     is_active?: boolean;
                     why: string;
->>>>>>> 9041206 (feat(issues): derived stopped-at rows and editable task->category map (0.15.86, 0171))
                 };
             };
         };
         responses: {
-<<<<<<< HEAD
-            /** @description The choice after the change. */
-=======
             /** @description The row after the change. */
->>>>>>> 9041206 (feat(issues): derived stopped-at rows and editable task->category map (0.15.86, 0171))
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-<<<<<<< HEAD
+                    "application/json": components["schemas"]["IssueTaskMapItem"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listSlaTasks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The tasks and the counts per mode. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SlaTaskList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setSlaTaskNoSla: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    no_sla: boolean;
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The choice after the change. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
                     "application/json": {
                         task_code: string;
                         is_none: boolean;
                     };
-=======
-                    "application/json": components["schemas"]["IssueTaskMapItem"];
->>>>>>> 9041206 (feat(issues): derived stopped-at rows and editable task->category map (0.15.86, 0171))
                 };
             };
             401: components["responses"]["Unauthorized"];

@@ -413,6 +413,7 @@ KEEP in "everything" and in every scope without the part; with the part, the act
 | external_team_specializations | KEEP | Team specializations. |
 | contractor_alerts_sent | KEEP | Dedup of contractor alerts (certificate expiry, order mismatch); harmless, see Open. |
 | task_sla_choices | KEEP | The explicit no-SLA choice per task code (configuration, 0170). |
+| issue_task_map | KEEP | The task to issue category and reason map (configuration, 0171). |
 | messages | KEEP | Messages between users (append-only). |
 | message_threads | KEEP | Message threads. |
 | message_participants | KEEP | Thread participants. |
