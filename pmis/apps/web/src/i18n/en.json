@@ -1216,6 +1216,10 @@
     "in_the_future": "The cutoff date cannot be in the future."
   },
   "cal": {
+    "inline_reason": "Reason for the changes made in the table (3+ characters)",
+    "inline_hint": "Click a date, name or kind to edit it. Each change is saved and audited with this reason.",
+    "inline_need_reason": "Write the reason first (3+ characters).",
+    "inline_need_name": "The name cannot be empty.",
     "banner_tentative": "A tentative holiday falls within 14 days ({{date}}). Confirm it on the official announcement.",
     "banner_empty": "The holiday table for {{year}} is empty. Add or import the dates.",
     "weekend": "Weekend days",
@@ -3751,6 +3755,10 @@
     "no_events": "No gate change recorded yet."
   },
   "sla_admin": {
+    "inline_reason": "Reason for the changes made in the table (3+ characters)",
+    "inline_hint": "Click a number or choice to edit it. Each change saves to the draft; nothing is live until Publish.",
+    "inline_need_reason": "Write the reason first (3+ characters).",
+    "inline_saved": "Saved to the draft: {{task}}",
     "title": "SLA rules",
     "filter_task": "Task code",
     "all": "All",

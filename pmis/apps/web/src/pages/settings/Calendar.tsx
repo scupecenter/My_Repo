@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useCalendar, useCalendarConfirmation, useCreateHoliday, useDeleteHoliday, useHolidayChange, useHolidays, useImportHolidays, useSetCalendarConfirmation, useSetWeekend } from '@/api/settings';
 import type { Holiday } from '@/api/types';
 import { errText, FormDialog } from '@/components/FormDialog';
+import { InlineCell } from '@/components/InlineCell';
 import { InlinePanel } from '@/components/InlinePanel';
 import { useToast } from '@/components/Toast';
 import { fieldErrors } from '@/lib/fields';
@@ -91,6 +92,16 @@ export function Calendar() {
   const [dlg, setDlg] = useState<null | { kind: 'edit'; h: Holiday | null } | { kind: 'delete' | 'confirm'; h: Holiday } | { kind: 'weekend' }>(null);
   const [days, setDays] = useState<number[] | null>(null);
   const [confirmDate, setConfirmDate] = useState('');
+  const [inlineReason, setInlineReason] = useState('');
+  // Edit in place: a cell of a holiday row saves that holiday (audited, with the reason typed above the table); the date, name and kind are sent together like the form does.
+  const saveHoliday = async (h: Holiday, p: Partial<{ date: string; name_en: string; name_ar: string; kind: string }>) => {
+    if (inlineReason.trim().length < 3) throw new Error(t('cal.inline_need_reason'));
+    const m = { date: h.date, name_en: h.name_en, name_ar: h.name_ar ?? '', kind: h.kind, ...p };
+    try {
+      await change.mutateAsync({ h, patch: { date: m.date, name_en: m.name_en, ...(m.name_ar ? { name_ar: m.name_ar } : {}), kind: m.kind as Holiday['kind'], reason: inlineReason.trim() } });
+      toast(t('settings.audited'));
+    } catch (e) { throw new Error(errText(e, t)); }
+  };
   const [importFile, setImportFile] = useState<File | null>(null);
   const file = useRef<HTMLInputElement>(null);
   const ar = i18n.language === 'ar';
@@ -138,13 +149,19 @@ export function Calendar() {
           <button className="btn btn-accent" data-testid="cal-add" onClick={() => setDlg({ kind: 'edit', h: null })}><Plus size={14} />{t('cal.add')}</button>
         </div>
         {dlg?.kind === 'edit' && !dlg.h && <div className="mb-3">{dlgPanel}</div>}
+        <label className="mb-2 block text-sm">{t('cal.inline_reason')}<input className="input mt-1 w-full font-normal" data-testid="cal-inline-reason" value={inlineReason} onChange={(e) => setInlineReason(e.target.value)} /></label>
+        <p className="mb-2 text-xs text-mute">{t('cal.inline_hint')}</p>
         <div className="overflow-x-auto"><table className="w-full text-sm">
           <thead className="text-mute"><tr><th className="p-2 text-start">{t('cal.date')}</th><th className="p-2 text-start">{t('cal.name')}</th><th className="p-2 text-start">{t('cal.kind')}</th><th className="p-2 text-start">{t('users.status')}</th><th className="p-2" /></tr></thead>
           <tbody data-testid="cal-list">
             {(list.data?.items ?? []).map((h) => (
               <Fragment key={h.id}>
               <tr className="border-t border-line" data-testid={`holiday-${h.date}`}>
-                <td className="mono p-2">{h.date}</td><td className="p-2">{(ar && h.name_ar) || h.name_en}</td><td className="p-2">{t(`cal.kind_${h.kind}`)}</td>
+                <td className="mono p-2"><InlineCell kind="date" value={h.date} label={t('cal.date')} testid={`holiday-cell-date-${h.date}`} onCommit={(v) => saveHoliday(h, { date: v })} /></td>
+                <td className="p-2">{ar && h.name_ar
+                  ? <InlineCell value={h.name_ar} dir="rtl" label={t('cal.name_ar')} testid={`holiday-cell-name-${h.date}`} onCommit={(v) => saveHoliday(h, { name_ar: v })} />
+                  : <InlineCell value={h.name_en} label={t('cal.name_en')} testid={`holiday-cell-name-${h.date}`} onCommit={(v) => v.trim() ? saveHoliday(h, { name_en: v }) : Promise.reject(new Error(t('cal.inline_need_name')))} />}</td>
+                <td className="p-2"><InlineCell kind="select" value={h.kind} display={t(`cal.kind_${h.kind}`)} options={['national', 'religious'].map((k) => ({ value: k, label: t(`cal.kind_${k}`) }))} label={t('cal.kind')} testid={`holiday-cell-kind-${h.date}`} onCommit={(v) => saveHoliday(h, { kind: v })} /></td>
                 <td className="p-2">{h.tentative ? <span className="chip bg-waitBg text-waitInk" data-testid={`holiday-tentative-${h.date}`}>{t('cal.tentative')}</span> : <span className="chip bg-doneBg text-doneInk">{t('cal.confirmed')}</span>}</td>
                 <td className="p-2 text-end"><span className="inline-flex gap-1">
                   {h.tentative && <button className="btn" data-testid={`holiday-confirm-${h.date}`} onClick={() => { setConfirmDate(''); setDlg({ kind: 'confirm', h }); }}><CalendarCheck size={14} />{t('cal.confirm')}</button>}

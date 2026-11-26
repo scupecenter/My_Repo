@@ -5,6 +5,7 @@ import { api } from "@/api/client";
 import { useWorkflowVersions } from "@/api/workflowEditor";
 import type { WorkflowVersion } from "@/api/types";
 import { errText } from "@/components/FormDialog";
+import { InlineCell } from "@/components/InlineCell";
 
 /** F14: bulk SLA admin, a section of the Settings > SLA rules tab (owner rule: no setting twice). Lists the SLA rules of the current rule set, filters them, and bulk-edits the selected tasks.
  *  Writes go to the DRAFT workflow version through the editor door (one PUT per task, each with the version ETag in If-Match). */
@@ -144,6 +145,37 @@ export function SlaBulkAdmin() {
     }
   };
 
+  // Edit in place: one cell saves one rule to the DRAFT version (same door as the bulk apply); nothing is live before Publish.
+  const saveCell = async (r: RuleRow, patch: Partial<RuleRow>) => {
+    if (!draft) throw new Error(t("sla_admin.no_draft"));
+    if (reason.trim().length < 3) throw new Error(t("sla_admin.inline_need_reason"));
+    const etag = (await api.get<WorkflowVersion>(`/workflow/versions/${draft.version}`)).version_etag ?? 0;
+    const m = { ...r, ...patch };
+    try {
+      await api.put<WorkflowVersion>(`/workflow/versions/${draft.version}/tasks/${r.task_code}/sla-rule`, {
+        version: etag,
+        body: {
+          min_working_days: m.min_working_days,
+          max_working_days: m.max_working_days,
+          start_event: m.start_event,
+          unit: m.unit ?? "working",
+          calendar_code: m.calendar_code,
+          warning_pct: m.warning_pct ?? null,
+          breach_owner_role: m.breach_owner_role ?? null,
+          escalation_role: m.escalation_role ?? null,
+          pause_on_client_wait: m.pause_on_client_wait ?? false,
+          reason: reason.trim(),
+        },
+      });
+    } catch (e) {
+      throw new Error(errText(e, t));
+    }
+    setMsg(t("sla_admin.inline_saved", { task: r.task_code }));
+    await qc.invalidateQueries({ queryKey: ["sla-admin-rules"] });
+    await qc.invalidateQueries({ queryKey: ["wf-version"] });
+  };
+  const num = (v: string) => Number(v);
+
   const canBulk =
     !!draft && picked.size > 0 && reason.trim().length >= 3 && !busy;
 
@@ -198,6 +230,13 @@ export function SlaBulkAdmin() {
           </select>
         </label>
       </div>
+      <div className="flex flex-wrap items-end gap-2 text-sm" data-testid="sla-inline-bar">
+        <label className="flex-1">
+          {t("sla_admin.inline_reason")}
+          <input className="input w-full" data-testid="sla-inline-reason" value={reason} onChange={(e) => setReason(e.target.value)} />
+        </label>
+        <p className="text-xs text-mute">{t(draft ? "sla_admin.inline_hint" : "sla_admin.no_draft")}</p>
+      </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm" data-testid="sla-admin-table">
           <thead>
@@ -240,19 +279,15 @@ export function SlaBulkAdmin() {
                   />
                 </td>
                 <td className="mono p-2 text-xs">{r.task_code}</td>
-                <td className="p-2">{r.min_working_days}</td>
-                <td className="p-2">{r.max_working_days}</td>
-                <td className="p-2">{r.unit ?? "working"}</td>
+                <td className="p-2"><InlineCell kind="number" min={0} max={365} value={r.min_working_days} label={t("sla_admin.col_min")} testid={`sla-cell-min-${r.task_code}`} disabled={!draft} onCommit={(v) => saveCell(r, { min_working_days: num(v) })} /></td>
+                <td className="p-2"><InlineCell kind="number" min={0} max={365} value={r.max_working_days} label={t("sla_admin.col_max")} testid={`sla-cell-max-${r.task_code}`} disabled={!draft} onCommit={(v) => saveCell(r, { max_working_days: num(v) })} /></td>
+                <td className="p-2"><InlineCell kind="select" value={r.unit ?? "working"} options={[{ value: "working", label: t("wfe.sla_section.unit_working") }, { value: "calendar", label: t("wfe.sla_section.unit_calendar") }]} label={t("sla_admin.col_unit")} testid={`sla-cell-unit-${r.task_code}`} disabled={!draft} onCommit={(v) => saveCell(r, { unit: v as "working" | "calendar" })} /></td>
                 <td className="mono p-2 text-xs">{r.start_event}</td>
                 <td className="p-2">{r.calendar_code}</td>
-                <td className="p-2">{r.warning_pct ?? "-"}</td>
+                <td className="p-2"><InlineCell kind="number" min={0} max={100} value={r.warning_pct} label={t("sla_admin.col_warning")} testid={`sla-cell-warn-${r.task_code}`} disabled={!draft} onCommit={(v) => saveCell(r, { warning_pct: v === "" ? null : num(v) })} /></td>
                 <td className="p-2">{r.breach_owner_role ?? "-"}</td>
                 <td className="p-2">{r.escalation_role ?? "-"}</td>
-                <td className="p-2">
-                  {(r.pause_on_client_wait ?? false)
-                    ? t("common.yes")
-                    : t("common.no")}
-                </td>
+                <td className="p-2"><InlineCell kind="select" value={(r.pause_on_client_wait ?? false) ? "yes" : "no"} options={[{ value: "no", label: t("common.no") }, { value: "yes", label: t("common.yes") }]} display={(r.pause_on_client_wait ?? false) ? t("common.yes") : t("common.no")} label={t("sla_admin.col_pause")} testid={`sla-cell-pause-${r.task_code}`} disabled={!draft} onCommit={(v) => saveCell(r, { pause_on_client_wait: v === "yes" })} /></td>
                 <td className="p-2">{r.open_task_count}</td>
               </tr>
             ))}
