@@ -7,10 +7,9 @@
 -- kinds whose targets the database finds, and hands the live KPI of the run day to alert_rule_notify for kpi_threshold (the dashboard computes the
 -- value). One in-app notification per recipient per rule per period and target; alert_rule_fires is the dedupe record, so a second run adds nothing.
 --
--- KINDS (closed catalogue, v1):
---   kpi_threshold          {kpi: a KPI code of dashboard_settings_catalogue(), band: 'amber' | 'red'} - fires while the live KPI of the run day is
---                          at or past the band. period: the run day, target: the KPI code. Evaluated by the daily job (the value comes from the
---                          dashboard), which calls alert_rule_notify once per rule and run day.
+-- KINDS (closed catalogue, v1). kpi_threshold is designed (params kpi + band of the dashboard catalogue) but NOT in v1: the KPI values are computed
+-- by the web dashboard under the caller's row security and the daily job has no actor, so a correct evaluation needs a definer-side KPI evaluator
+-- (a fast follow). v1 ships the two kinds whose targets the database finds directly:
 --   weekly_status_missing  {} - fires for every region without a Weekly status update of the current working week (complements item 12).
 --                          period: the week start, target: the region id. Link default /status-updates.
 --   record_idle            {register_key, state, days 1..3650} - fires for every current record of the register that has been in the state for at
@@ -20,13 +19,13 @@
 -- current role assignments cover the module (all regions, or the item's region, the weekly_digest_notify reach pattern).
 --
 -- TEMPLATES. title_en/title_ar up to 200 chars, body_en/body_ar up to 2000. The placeholders replaced at fire time: {{value}}, {{kpi}}, {{region}},
--- {{record}}, {{days}}, {{state}}, {{week}} (unknown placeholders stay as written). The recipient's users.locale picks the language, English fallback.
+-- {{record}}, {{days}}, {{state}}, {{week}} (unknown placeholders stay as written; {{value}} and {{kpi}} are reserved for the KPI kind). The recipient's users.locale picks the language, English fallback.
 -- IN-APP ONLY. This migration adds no mail rule; an admin who lists the kind alert_rule in mail.notification_kinds gets it mailed as well.
 
 CREATE TABLE public.alert_rules (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   code text NOT NULL UNIQUE CHECK (code ~ '^[a-z0-9][a-z0-9-]{1,60}$'),
-  kind text NOT NULL CHECK (kind IN ('kpi_threshold', 'weekly_status_missing', 'record_idle')),
+  kind text NOT NULL CHECK (kind IN ('weekly_status_missing', 'record_idle')),
   params jsonb NOT NULL DEFAULT '{}'::jsonb,
   audience jsonb NOT NULL,
   title_en text NOT NULL, title_ar text NOT NULL,
@@ -49,20 +48,12 @@ CREATE TABLE public.alert_rule_fires (
 -- The closed per-kind params check. Returns the field errors (an empty array when valid).
 CREATE OR REPLACE FUNCTION alert_rule_params_errs(p_kind text, p_params jsonb) RETURNS jsonb
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $$
-DECLARE errs jsonb := '[]'::jsonb; kpi_codes text[];
+DECLARE errs jsonb := '[]'::jsonb;
 BEGIN
   IF p_params IS NULL OR jsonb_typeof(p_params) <> 'object' THEN
     RETURN jsonb_build_array(jsonb_build_object('path', '/params', 'code', 'invalid', 'message', 'params is an object.'));
   END IF;
-  IF p_kind = 'kpi_threshold' THEN
-    SELECT array_agg(e ->> 'code') INTO kpi_codes FROM jsonb_array_elements(public.dashboard_settings_catalogue() -> 'kpis') e;
-    IF coalesce(p_params ->> 'kpi', '') = '' OR NOT ((p_params ->> 'kpi') = ANY (coalesce(kpi_codes, '{}'::text[]))) THEN
-      errs := errs || jsonb_build_object('path', '/params/kpi', 'code', 'invalid', 'message', 'A KPI code of the dashboard catalogue.');
-    END IF;
-    IF coalesce(p_params ->> 'band', '') NOT IN ('amber', 'red') THEN
-      errs := errs || jsonb_build_object('path', '/params/band', 'code', 'invalid', 'message', 'band is amber or red.');
-    END IF;
-  ELSIF p_kind = 'weekly_status_missing' THEN
+  IF p_kind = 'weekly_status_missing' THEN
     IF p_params <> '{}'::jsonb THEN
       errs := errs || jsonb_build_object('path', '/params', 'code', 'invalid', 'message', 'This kind takes no params.');
     END IF;
@@ -203,7 +194,7 @@ BEGIN
   RETURN n;
 END $$;
 
--- The daily evaluation of the kinds whose targets the database finds (kpi_threshold is handed in by the job with the live value). Safe to repeat:
+-- The daily evaluation of every kind of v1 (the daily job calls it; jobs.service, the weekly_digest_notify pattern). Safe to repeat:
 -- alert_rule_notify writes nothing twice. Returns the notifications written.
 CREATE OR REPLACE FUNCTION alert_rules_run(p_day date DEFAULT NULL) RETURNS integer
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, public AS $$
@@ -213,7 +204,7 @@ DECLARE
   r public.alert_rules; c record; n integer := 0;
   t_en text; t_ar text; b_en text; b_ar text; rec_label text; mod text;
 BEGIN
-  FOR r IN SELECT * FROM public.alert_rules x WHERE x.enabled AND x.kind <> 'kpi_threshold' ORDER BY x.code LOOP
+  FOR r IN SELECT * FROM public.alert_rules x WHERE x.enabled ORDER BY x.code LOOP
     IF r.kind = 'weekly_status_missing' THEN
       FOR c IN SELECT rg.id, rg.name_en, rg.name_ar FROM public.regions rg
                WHERE NOT EXISTS (SELECT 1 FROM public.status_updates s WHERE s.scope = 'region' AND s.region_id = rg.id AND s.week_start = wk)

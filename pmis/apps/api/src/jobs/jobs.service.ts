@@ -23,6 +23,8 @@ export interface DailyJobResult {
   slaEscalations?: number;
   /** 0166: weekly digest notifications (in-app only) written by this run; only on the week's Sunday */
   digests?: number;
+  /** 0202: alert rule notifications (in-app only) written by this run */
+  alertRules?: number;
 }
 
 /** The wall-clock parts of an instant in a time zone, and the zone's offset from UTC at that instant (milliseconds). */
@@ -123,6 +125,8 @@ export class JobsService implements OnApplicationBootstrap, OnModuleDestroy {
         if (escalated > 0) result.slaEscalations = escalated;
         const digests = await this.weeklyDigest();
         if (digests > 0) result.digests = digests;
+        const ruleNotes = await this.alertRules();
+        if (ruleNotes > 0) result.alertRules = ruleNotes;
       }
       this.lastRun = { at: new Date(), result };
       await this.runs.finish(run, result ? 'ok' : 'skipped', result ? result.slaApplied + result.reminders + (result.snapshots ?? 0) + (result.contractorAlerts ?? 0) + (result.calendarReset ?? 0) : null, null,
@@ -216,6 +220,18 @@ export class JobsService implements OnApplicationBootstrap, OnModuleDestroy {
     if (n === null) {
       this.log.warn('weekly digest failed');
       await this.syslog.write('error', 'weekly digest failed', {});
+      return 0;
+    }
+    return n;
+  }
+
+  /** 0202: the generic alert rules, in-app notifications only; alert_rules_run finds the targets of the day and writes one notification per
+   * recipient per rule per period and target (deduped), so a second run the same day adds nothing. A failure is logged and leaves the other steps alone. */
+  private async alertRules(): Promise<number> {
+    const n = await this.runs.run('alert_rules', async (tx) => Number((await tx.$queryRaw<{ n: number }[]>`SELECT alert_rules_run() AS n`)[0]?.n ?? 0));
+    if (n === null) {
+      this.log.warn('alert rules failed');
+      await this.syslog.write('error', 'alert rules failed', {});
       return 0;
     }
     return n;
