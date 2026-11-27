@@ -1192,6 +1192,7 @@
     "section_documents_archive": "Archive",
     "section_documents_numbering": "Numbering",
     "section_data_counts": "GECOL / HLC counts",
+    "section_registers_recycle": "Recycle bin",
     "section_screens_motion": "Motion",
     "section_workflow_coverage": "Matrix coverage",
     "section_screens_login": "Login page",
@@ -4869,6 +4870,15 @@
       "longitude": "Longitude",
       "address": "Address",
       "rf_survey_date": "RF survey date"
+    },
+    "warn": {
+      "saved_title": "{{code}} is saved. Check these before it is sent:",
+      "similar_site_code": "Another Site ID is almost the same.",
+      "duplicate_name": "A site with this name exists.",
+      "close_coordinates": "These coordinates are within 100 metres of another site.",
+      "cluster_will_be_created": "This cluster does not exist yet: it is created in the region of the site when L2 approves.",
+      "outside_libya": "These coordinates are outside Libya. Check them.",
+      "list_other": "This value is not in the list; the list allows another value."
     }
   },
   "siteMap": {
@@ -6566,6 +6576,27 @@
     "cancel": "Cancel",
     "save": "Save"
   },
+  "recycleBin": {
+    "title": "Recycle bin",
+    "note": "Voided register records can be restored for {{days}} days after they were voided. A restored record returns as a draft and goes through the workflow again. Nothing is deleted.",
+    "register": "Register",
+    "all": "All",
+    "search": "Search record, site or reason",
+    "edit_retention": "Change retention",
+    "none": "No voided record inside the retention window.",
+    "record": "Record",
+    "voided": "Voided",
+    "reason": "Reason",
+    "until": "Restorable until",
+    "restore": "Restore",
+    "restore_title": "Restore {{label}}",
+    "restore_note": "The record returns as a draft (level 1). Its history and audit stay.",
+    "restored": "Record restored as a draft.",
+    "days": "Days of retention (30 to 730)",
+    "blocked_open_version_exists": "A newer open version exists",
+    "blocked_site_slot_taken": "The site already has another record",
+    "audit_link": "Every void and restore is in the audit log."
+  },
   "motion": {
     "title": "Motion",
     "note": "One motion system for the whole app: dialogs, messages, cards, progress bars, charts and the map. This choice is saved in this browser, like the theme and the language.",
@@ -6616,6 +6647,20 @@
     "holders": "active",
     "none": "No gaps in this view.",
     "open_matrix": "Open the Responsibility Matrix"
+  },
+  "sd": {
+    "title": "Time in each state",
+    "entity": "Counted for",
+    "entity_task": "Tasks (per stage)",
+    "entity_register_record": "Register records (per register)",
+    "note": "Median and P85 working days of completed stays. Admin overrides are left out. Only the regions you can read are counted.",
+    "empty": "No completed stays yet.",
+    "col_group": "Stage / register",
+    "col_state": "State",
+    "col_region": "Region",
+    "col_count": "Stays",
+    "col_median": "Median (working days)",
+    "col_p85": "P85 (working days)"
   },
   "timeline": {
     "title": "Timeline",
