@@ -380,6 +380,22 @@ BEGIN
   END IF;
 END $$;
 
+-- Data reset coverage: data_reset_core stops (and the Settings reset refuses) on a table without a decision in data_reset_plan(). The four new tables are
+-- identity/access state, so KEEP. The stored function text is patched in place (idempotent), never rebuilt from an old base, so every table and part
+-- added by other migrations stays.
+DO $$
+DECLARE def text; marker text := '''auth_pending'','; add text := '''auth_known_device'', ''auth_device_challenge'', ''auth_device_pass'', ''auth_device_bypass'',';
+BEGIN
+  def := pg_get_functiondef('public.data_reset_plan()'::regprocedure);
+  IF position('auth_known_device' IN def) = 0 THEN
+    IF position(marker IN def) = 0 THEN RAISE EXCEPTION 'data_reset_plan() has no auth_pending row to patch'; END IF;
+    EXECUTE replace(def, marker, marker || ' ' || add);
+  END IF;
+END $$;
+
+-- the reset role reads every table and takes the share lock of a KEEP table (UPDATE)
+GRANT SELECT, UPDATE ON public.auth_known_device, public.auth_device_challenge, public.auth_device_pass, public.auth_device_bypass TO pmis_reset_owner;
+
 INSERT INTO audit_log (action, entity_type, entity_id, after, reason)
 VALUES ('new_device_code_applied', 'workflow', NULL,
         jsonb_build_object('setting', 'security.new_device_code', 'enabled', false, 'code_minutes', 10, 'include_admins', false,
