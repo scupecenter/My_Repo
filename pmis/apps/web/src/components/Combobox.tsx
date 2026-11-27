@@ -5,7 +5,7 @@ import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type R
 export type ComboOption = { id: string; label: string; hint?: string; icon?: ReactNode; badge?: ReactNode; disabled?: boolean; search?: string };
 
 /**
- * The shared combobox of the Data hub (owner decision 2026-11-27): type to filter, arrows to move, Enter to pick, Escape to close, Home and End, full ARIA
+ * The shared combobox of the Data hub: type to filter, arrows to move, Enter to pick, Escape to close, Home and End, full ARIA
  * (combobox, listbox, option, aria-activedescendant). It opens on focus-by-click or on ArrowDown, so a keyboard user can pick without the pointer. The list is
  * drawn in a popover, so it never grows the page. Every option may carry an icon, a hint line and a badge; the control has a visible label and a hover hint.
  */

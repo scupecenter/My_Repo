@@ -89,10 +89,37 @@
       }
     }
   },
+  "dhs": {
+    "title": "Data hub settings", "widgets_title": "Landing page widgets", "widgets_note": "Choose what the Data hub landing page shows. A hidden widget is only hidden; its page stays in the menu.",
+    "widget_quick_bar": "Quick template download bar", "widget_batches": "Batches needing action", "widget_template_changes": "Template changes", "widget_recent": "Recent uploads and exports", "widget_health": "Data health", "widget_admin": "Admin section (System Admin only)",
+    "badge": "Show the count badge on Uploads & batches",
+    "views_title": "Default view of each page", "views_note": "The first view people see. A person can pick another view on the page; it is kept on their device.",
+    "screen_templates": "Templates", "screen_uploads": "Uploads & batches", "screen_exports": "Exports", "screen_master_import": "Master import & comparison",
+    "view_cards": "Cards", "view_rows": "Rows", "view_table": "Table", "view_compact": "Compact list"
+  },
+  "dhub": {
+    "title": "Data hub", "subtitle": "Templates, uploads, exports and data health in one place",
+    "settings_hint": "Data hub settings (widgets and default views)", "all_hidden": "All widgets are hidden. Turn them on in Settings > Screens > Data hub.",
+    "quick_title": "Quick template download", "pick_template": "Template", "pick_template_ph": "Type to find a template", "pick_action": "Action", "pick_action_ph": "Choose an action", "pick_template_first": "Choose a template first", "none_found": "No template matches", "quick_go": "Go",
+    "act_blank": "Download blank copy", "act_blank_hint": "The approved empty template", "act_prefill": "Download pre-filled copy", "act_prefill_hint": "With the records in force in your regions", "act_upload": "Upload a filled file", "act_upload_hint": "Starts an import batch", "act_open": "Open Templates page", "act_open_hint": "All templates and batches",
+    "kind_master": "Master", "kind_stream": "Section", "kind_register": "Register", "kind_sites": "New sites", "kind_list_values": "List values", "kind_holidays": "Holidays",
+    "my_downloads": "Your last downloads", "prefilled": "pre-filled",
+    "w_batches": "Batches needing action", "batches_none": "Nothing waits for you.", "open_all": "Open", "open_templates": "Templates",
+    "act_send": "Send", "act_review_l2": "Review", "act_returned": "Returned", "act_checking": "Checking",
+    "w_changes": "Template changes", "changes_none": "No template changed recently.", "change_diff": "{{added}} added, {{removed}} removed, {{renamed}} renamed", "mine_old": "your copy is old",
+    "w_recent": "Recent uploads and exports", "recent_none": "No uploads or exports yet.", "export_row": "Export ({{kind}})",
+    "w_health": "Data health", "h_held": "Rows held", "h_diffs": "Open comparison runs", "h_integrity": "Last log integrity run",
+    "w_admin": "Admin", "admin_note": "These open the existing Settings screens."
+  },
   "nav": {
     "group_home": "Dashboard",
     "group_work": "Work",
-    "group_data": "Data entry",
+    "group_data": "Data hub",
+    "data_hub": "Data hub",
+    "master_import": "Master import and comparison",
+    "column_mapping": "Column mapping",
+    "data_reset": "Data reset",
+    "recycle_bin": "Recycle bin",
     "group_admin": "Administration",
     "my_work": "My Work",
     "approvals": "Approvals",
@@ -1203,6 +1230,7 @@
     "section_workflow_coverage": "Matrix coverage",
     "section_screens_login": "Login page",
     "section_screens_interface": "Interface",
+    "section_screens_data-hub": "Data hub",
     "section_screens_goals": "Goals",
     "section_security_newdevice": "New-device code",
     "section_workflow_coverage": "Matrix coverage",
