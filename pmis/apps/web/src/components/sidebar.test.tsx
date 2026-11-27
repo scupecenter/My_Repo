@@ -101,12 +101,12 @@ describe('Sidebar tree (N1-N12)', () => {
   it('puts Dashboard first, on its own, and shows the waiting counts the lists already give', async () => {
     app();
     const first = await screen.findByTestId('nav-dashboard');
-    expect(screen.getByTestId('nav-group-home')).toBeInTheDocument();
-    expect(screen.queryByTestId('nav-group-toggle-home')).not.toBeInTheDocument(); // one entry: no heading row
+    // Dashboard is its own first row (above Favourites, Recent and every group); the Home heading no longer draws it a second time
+    expect(screen.queryByTestId('nav-group-home')).not.toBeInTheDocument();
+    expect(screen.getByTestId('nav-first')).toContainElement(first);
     expect(screen.getByTestId('nav-group-work')).not.toContainElement(first);
-    const all = [...document.querySelectorAll('[data-testid^="nav-group-"][data-depth="1"], [data-testid="nav-dashboard"]')].map((e) => e.getAttribute('data-testid'));
-    expect(all.indexOf('nav-dashboard')).toBeGreaterThan(-1);
-    expect(screen.getByTestId('sidebar').querySelector('[data-testid^="nav-group-"]')).toHaveAttribute('data-testid', 'nav-group-home');
+    const nav = screen.getByTestId('sidebar').querySelector('nav')!;
+    expect(nav.querySelector('[data-testid]')).toHaveAttribute('data-testid', 'nav-first');
     // the numbers come from the two lists' own totals (Approvals, My Work do-now)
     await waitFor(() => expect(screen.getByTestId('nav-approvals')).toHaveTextContent(/\d/));
   });

@@ -20,14 +20,14 @@ import { ruleKey } from '@/lib/passwordRules';
 import { fmtDateTime } from '@/lib/time';
 import { BRANDS, type Brand } from '@/lib/brands';
 import { APPEARANCE_DEFAULTS, APPEARANCE_OPTIONS, APPEARANCE_PRESETS, sanitizeAppearance, type Appearance, type AppearanceKey, paint } from '@/lib/appearance';
-import { applySidebarOverlay, BADGE_STYLES, sanitizeUiNav, type UiNav } from '@/lib/sidebarPrefs';
+import { applySidebarOverlay, BADGE_STYLES, isHideable, PALETTE_HIDDEN_KEY, sanitizeUiNav, type UiNav } from '@/lib/sidebarPrefs';
 import { resolveLayout, type Layout } from '@/lib/navLayout';
 import { visibleNavItems } from '@/lib/visibleNav';
 import { useNavLayout } from '@/api/settings';
 import { useQueryClient } from '@tanstack/react-query';
 import type { Me } from '@/api/types';
 import { applyTheme, currentTheme } from '@/i18n';
-import { savePref as storePref } from '@/lib/localPref';
+import { loadPref, savePref as storePref } from '@/lib/localPref';
 
 const REGION_NAMES: Record<number, string> = { 1: 'Tripoli', 2: 'Middle', 3: 'WM', 4: 'Zawia', 5: 'Benghazi', 6: 'GM', 7: 'Sebha' };
 const E164 = /^\+[1-9][0-9]{7,14}$/;
@@ -310,6 +310,7 @@ function SidebarSection({ p }: { p: MyProfile }) {
   const flatKeys = (l: Layout): string[] => l.headings.flatMap((h) => h.children.flatMap((c) => (typeof c === 'string' ? [c] : c.children)));
   const visibleOrder = useMemo(() => flatKeys(grouped).filter((k) => byKey.has(k)), [grouped, byKey]);
   const hiddenSet = new Set(draft.hidden ?? []);
+  const [palAll, setPalAll] = useState<boolean>(() => loadPref<boolean>(PALETTE_HIDDEN_KEY, false) === true);
 
   const move = (groupKeys: string[], k: string, d: -1 | 1) => {
     const i = groupKeys.indexOf(k);
@@ -358,7 +359,7 @@ function SidebarSection({ p }: { p: MyProfile }) {
                         <span className={`flex-1 truncate ${off ? 'line-through' : ''}`}>{label(k)}</span>
                         <button type="button" data-testid={`pf-sb-up-${k}`} disabled={i === 0} aria-label={`${t('nav.move_up')}: ${label(k)}`} onClick={() => move(keys, k, -1)} className="rounded-md p-1 text-faint hover:bg-hover hover:text-ink disabled:opacity-30"><ChevronUp size={14} aria-hidden /></button>
                         <button type="button" data-testid={`pf-sb-down-${k}`} disabled={i === keys.length - 1} aria-label={`${t('nav.move_down')}: ${label(k)}`} onClick={() => move(keys, k, 1)} className="rounded-md p-1 text-faint hover:bg-hover hover:text-ink disabled:opacity-30"><ChevronDown size={14} aria-hidden /></button>
-                        <button type="button" data-testid={`pf-sb-hide-${k}`} aria-pressed={off} aria-label={`${t(off ? 'nav_side.show' : 'nav_side.hide')}: ${label(k)}`} title={t(off ? 'nav_side.show' : 'nav_side.hide')} onClick={() => toggleHide(k)} className="rounded-md p-1 text-faint hover:bg-hover hover:text-ink">
+                        <button type="button" data-testid={`pf-sb-hide-${k}`} aria-pressed={off} aria-label={`${t(off ? 'nav_side.show' : 'nav_side.hide')}: ${label(k)}`} title={t(off ? 'nav_side.show' : 'nav_side.hide')} disabled={!isHideable(k)} onClick={() => toggleHide(k)} className="rounded-md p-1 text-faint hover:bg-hover hover:text-ink">
                           {off ? <EyeOff size={14} aria-hidden /> : <Eye size={14} aria-hidden />}
                         </button>
                       </li>
@@ -369,6 +370,11 @@ function SidebarSection({ p }: { p: MyProfile }) {
             );
           })}
         </div>
+        <label className="flex items-center gap-2 text-sm" data-testid="pf-sb-palette-row">
+          <input type="checkbox" data-testid="pf-sb-palette-hidden" checked={palAll} onChange={(e) => { setPalAll(e.target.checked); storePref(PALETTE_HIDDEN_KEY, e.target.checked); }} />
+          {t('nav_side.palette_hidden')}
+        </label>
+        <p className="text-xs text-mute">{t('nav_side.fixed_first')}</p>
         <p className="text-xs text-mute" data-testid="pf-sb-preview-note">{t('nav_side.note')}</p>
         <Err id="pf-sb-error" msg={save.isError ? (save.error.status === 412 ? t('profile.err_stale') : errText(save.error, t)) : null} />
         <div className="flex justify-end gap-2">
