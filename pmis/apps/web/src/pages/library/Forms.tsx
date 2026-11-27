@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { useDownloadGate } from '@/lib/downloadGate';
 import * as Dialog from '@radix-ui/react-dialog';
 import { Download, Eye, FilePlus2, Printer, Upload, X } from 'lucide-react';
 import { useState } from 'react';
@@ -42,6 +43,7 @@ export function SitePicker({ value, onChange }: { value: SiteHit | null; onChang
 
 /** Generate a filled document: pick the site, see the filled form (a sandboxed frame: no script runs), generate, then print, download and upload the signed copy. */
 export function GenerateDialog({ form, initialSite, onClose }: { form: LibraryForm; initialSite?: SiteHit | null; onClose: () => void }) {
+  const gate = useDownloadGate();
   const { t, i18n } = useTranslation();
   const toast = useToast();
   const [site, setSite] = useState<SiteHit | null>(initialSite ?? null);
@@ -88,8 +90,8 @@ export function GenerateDialog({ form, initialSite, onClose }: { form: LibraryFo
               <FilePlus2 size={14} />{t('lib.generate')}</button>}
             {done && (<>
               <span className="chip bg-doneBg text-doneInk" data-testid="lib-generated-number">{t('lib.number')}: <b className="mono">{done.number}</b></span>
-              <button type="button" className="btn" data-testid="lib-print" onClick={() => void generatedHtml(done.id, 'print').then(printHtml, (e) => toast(errText(e as ApiError), 'err'))}><Printer size={14} />{t('lib.print')}</button>
-              <button type="button" className="btn" data-testid="lib-download" onClick={() => void downloadGenerated(done.id).catch((e) => toast(errText(e as ApiError), 'err'))}><Download size={14} />{t('lib.download')}</button>
+              <button type="button" className="btn" data-testid="lib-print" disabled={gate.generatedLocked} title={gate.note(gate.generatedLocked)} onClick={() => void generatedHtml(done.id, 'print').then(printHtml, (e) => toast(errText(e as ApiError), 'err'))}><Printer size={14} />{t('lib.print')}</button>
+              <button type="button" className="btn" data-testid="lib-download" disabled={gate.generatedLocked} title={gate.note(gate.generatedLocked)} onClick={() => void downloadGenerated(done.id).catch((e) => toast(errText(e as ApiError), 'err'))}><Download size={14} />{t('lib.download')}</button>
               {/* the upload needs the task's document slot: it stays disabled until the archive row of the generated copy is read, so a file chosen at once is never dropped */}
               <label className={`btn ${row?.task_id && !uploading ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`} data-testid="lib-upload-signed" aria-disabled={!row?.task_id || uploading}><Upload size={14} />{t('lib.upload_signed')}
                 <input type="file" className="sr-only" data-testid="lib-upload-input" accept=".pdf,.png,.jpg,.jpeg" disabled={uploading || !row?.task_id}
