@@ -79,7 +79,7 @@ const siteRows = (ws: ExcelJS.Worksheet, first: number): Map<string, number> => 
 };
 
 describe('GET /exports/parts', () => {
-  it('lists only the parts the caller may export (export grant), never Car Dispatcher or Financial Advances', async () => {
+  it('lists only the parts the caller may export (export grant); the five registers with no Master columns are parts too (0.15.310)', async () => {
     const a = await actor(app, db, { regions: [7], grants: EXPORTER });
     const res = await a.api.call('get', '/exports/parts');
     expect(res.status).toBe(200);
@@ -89,8 +89,10 @@ describe('GET /exports/parts', () => {
     const admin = await plainAdmin(app, db, false);
     const all = (await admin.api.call('get', '/exports/parts')).body.items.map((p: { key: string }) => p.key);
     expect(all).toEqual(expect.arrayContaining(['sites', 'gecol', 'procurement', 'risks', 'dismantle', 'project_status', 'rf_design']));
-    expect(all).not.toContain('car_dispatcher');
-    expect(all).not.toContain('financial_advances');
+    expect(all).toEqual(expect.arrayContaining(['car_dispatcher', 'financial_advances', 'incidents', 'lessons_learned', 'invoices']));
+    const fin = await actor(app, db, { regions: [7], grants: [['invoices', 'view'], ['invoices', 'export']] });
+    const own = (await fin.api.call('get', '/exports/parts')).body.items.map((p: { key: string; master_sheet: string }) => `${p.key}:${p.master_sheet}`);
+    expect(own).toEqual(['invoices:Invoices']);
   });
 
   it('serves the stable column codes with include_columns=true', async () => {
@@ -122,13 +124,16 @@ describe('GET /exports/parts: columns of another part', () => {
 });
 
 describe('POST /exports/master: checks', () => {
-  it('refuses parts without the export grant (403 lists them), parts outside the Master, parts and view together, foreign regions and past dates', async () => {
+  it('refuses parts without the export grant (403 lists them), parts and view together, foreign regions and past dates', async () => {
     const a = await actor(app, db, { regions: [7], grants: EXPORTER });
     let r = await a.api.call('post', '/exports/master', { parts: ['sites', 'gecol'] });
     expect(r.status).toBe(403);
     expect(r.body.errors).toEqual([expect.objectContaining({ path: '/parts/gecol', code: 'export_denied' })]);
-    r = await a.api.call('post', '/exports/master', { parts: ['car_dispatcher'] });
-    expect(r.status).toBe(422);
+    for (const k of ['car_dispatcher', 'financial_advances', 'incidents', 'lessons_learned', 'invoices']) {
+      r = await a.api.call('post', '/exports/master', { parts: [k] });
+      expect(r.status).toBe(403);
+      expect(r.body.errors).toEqual([expect.objectContaining({ path: `/parts/${k}`, code: 'export_denied' })]);
+    }
     r = await a.api.call('post', '/exports/master', { parts: ['sites'], view: { source: 'sites', filters: {}, columns: ['site_code'] } });
     expect(r.status).toBe(422);
     r = await a.api.call('post', '/exports/master', { parts: ['sites'], regions: [5] });
@@ -253,5 +258,52 @@ describe('the background job and the workbook', () => {
     ws2.eachRow((row, n) => { if (n >= 3) codes.push(String(row.getCell(2).value)); });
     expect(codes).not.toContain(t.site.code);
     expect(e2.status).toBe('done');
+  });
+});
+
+describe('the five registers with no Master columns (contract 0.15.310)', () => {
+  const FIVE = ['car_dispatcher', 'financial_advances', 'incidents', 'lessons_learned', 'invoices'];
+  const SHEETS: Record<string, string> = { car_dispatcher: 'Car Dispatcher', financial_advances: 'Financial Advances', incidents: 'Incidents', lessons_learned: 'Lessons Learned', invoices: 'Invoices' };
+
+  it('a System Admin export writes one sheet per register; the grant and the regions follow the register\'s own module', async () => {
+    const inv = await team(app, db, 'invoices', 'invoices', 7);
+    const rec = await createRec(inv, { invoice_no: `INV-${TAG}`, invoice_date: '2026-11-20', amount: 1500 });
+    expect(rec.state).toBeDefined();
+    const inc = await team(app, db, 'incidents', 'incidents', 7);
+    await createRec(inc, { incident_date: '2026-11-20', incident_type: 'Theft', severity: 'Major', description: `Cable theft ${TAG}`, injured_count: 0 });
+    const admin = await plainAdmin(app, db, false);
+    const start = await admin.api.call('post', '/exports/master', { parts: FIVE, regions: [7] });
+    expect(start.status).toBe(202);
+    const e = await finished(admin.api, start.body.id);
+    expect(e.status).toBe('done');
+    const book = (await fetchBook(admin.api, start.body.id)).book!;
+    for (const k of FIVE) expect(book.getWorksheet(SHEETS[k]!), k).toBeDefined();
+    const flat = (ws: ExcelJS.Worksheet): string => { const out: string[] = []; ws.eachRow((row) => out.push(JSON.stringify(row.values))); return out.join('\n'); };
+    expect(flat(book.getWorksheet('Invoices')!)).toContain(`INV-${TAG}`);
+    expect(flat(book.getWorksheet('Incidents')!)).toContain(`Cable theft ${TAG}`);
+
+    // an exporter of Invoices only: the other four are refused, the Invoices sheet holds only the export regions
+    const only = await actor(app, db, { regions: [7], grants: [['invoices', 'view'], ['invoices', 'export']] });
+    expect((await only.api.call('post', '/exports/master', { parts: ['incidents'] })).status).toBe(403);
+    const ok = await only.api.call('post', '/exports/master', { parts: ['invoices'] });
+    expect(ok.status).toBe(202);
+    await finished(only.api, ok.body.id);
+    const mine = (await fetchBook(only.api, ok.body.id)).book!;
+    expect(flat(mine.getWorksheet('Invoices')!)).toContain(`INV-${TAG}`);
+    const tri = await actor(app, db, { regions: [1], grants: [['invoices', 'view'], ['invoices', 'export']] });
+    const t2 = await tri.api.call('post', '/exports/master', { parts: ['invoices'] });
+    expect(t2.status).toBe(202);
+    await finished(tri.api, t2.body.id);
+    expect(flat((await fetchBook(tri.api, t2.body.id)).book!.getWorksheet('Invoices')!)).not.toContain(`INV-${TAG}`);
+  });
+
+  it('"export current view" of Invoices works with its own columns', async () => {
+    const inv = await team(app, db, 'invoices', 'invoices', 7);
+    await createRec(inv, { invoice_no: `INV-V${TAG}`, invoice_date: '2026-11-21', amount: 20 });
+    const a = await actor(app, db, { regions: [7], grants: [['invoices', 'view'], ['invoices', 'export']] });
+    const start = await a.api.call('post', '/exports/master', { view: { source: 'invoices', filters: { site_id: inv.site.id }, columns: ['site_code', 'invoice_no'] } });
+    expect(start.status).toBe(202);
+    const e = await finished(a.api, start.body.id);
+    expect(e).toMatchObject({ status: 'done', row_count: 1 });
   });
 });
