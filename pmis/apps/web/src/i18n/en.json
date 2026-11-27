@@ -6713,6 +6713,10 @@
   "tplmenu": {
     "title": "Templates & export"
   },
+  "layout": {
+    "title": "Layout",
+    "options": "Options of this view"
+  },
   "view": {
     "site_list_hint": "The tasks as a table you can edit",
     "site_timeline_hint": "The tasks as a row per stage, read only",
