@@ -72,7 +72,7 @@ for (const c of CASES) {
       await expect(page.getByTestId('matrix-rule-pre_cw-1')).toBeVisible();
       const cell = page.getByTestId('matrix-cell-pre_cw-1');
       await cell.getByTestId('matrix-add').click();
-      await page.getByTestId('matrix-picker-q').fill('Hana');
+      await page.getByTestId('matrix-picker-q').fill('Demo');
       await page.getByTestId('matrix-opt-user-1210').click();
       await expect(cell.getByTestId('person-id-1210')).toBeVisible();
       await expect(page.getByTestId('matrix-dirty')).toContainText('1');

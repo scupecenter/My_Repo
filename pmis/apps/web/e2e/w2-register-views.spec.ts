@@ -59,7 +59,7 @@ for (const c of CASES) {
     await page.getByTestId('views-name-ok').click();
     await pick('list'); // back to the list
     await expect(page.getByTestId('register-list-card')).toBeVisible();
-    await page.getByTestId('views-select').selectOption({ label: `W2 board ${c.locale}` });
+    await page.getByRole('tab', { name: `W2 board ${c.locale}` }).click();
     await expect(page.getByTestId('register-board')).toBeVisible();
     await expect(page).toHaveURL(/board_by=state/);
   });

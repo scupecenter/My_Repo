@@ -129,8 +129,8 @@ describe('GET /staff-registry/{employee_id}: the hover card', () => {
     expect(draftRows()).toHaveLength(25);
     const seeded = await db.query(`SELECT count(*)::int AS n FROM staff_registry WHERE employee_id < '2000' AND email LIKE '%@example.com'`);
     expect(seeded.rows[0].n).toBe(25);
-    expect((await card(plain, '1104')).body).toMatchObject({ name_en: 'Karim Zaroug', status: 'inactive', team: 'none', region: 'Benghazi' });
-    expect((await card(plain, '1203')).body).toMatchObject({ team: 'cw', name_ar: 'عمر خالد' });
+    expect((await card(plain, '1104')).body).toMatchObject({ name_en: 'Demo User 04', status: 'inactive', team: 'none', region: 'Benghazi' });
+    expect((await card(plain, '1203')).body).toMatchObject({ team: 'cw', name_ar: 'مستخدم تجريبي 05' });
   });
 });
 

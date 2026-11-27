@@ -49,8 +49,8 @@ function seed(): State {
         doc_name_en: d.en, doc_name_ar: d.ar, candidate_label: null, doc_number: null, generated_id: null, version: has ? 1 : null, task_id: taskIdOf(i, k), task_code: d.task,
         task_name_en: d.task_en, task_name_ar: d.task_ar, register_key: null, file_id: has ? `7c1f0000-0000-4000-8000-${pad(i * 10 + k + 1)}` : null,
         file_group_id: has ? `7c1e0000-0000-4000-8000-${pad(i * 10 + k + 1)}` : null, file_name: has ? `${m.code}_${d.code}.pdf` : null, mime_type: has ? 'application/pdf' : null,
-        file_count: has ? 1 : 0, uploaded_by: has ? { id: 'u-1102', display_name: 'Mona Fathi', employee_id: '1102' } : null, uploaded_at: has ? '2026-11-10T09:00:00.000Z' : null,
-        approved_by: status === 'approved' ? { id: 'u-1001', display_name: 'Ahmed Salem', employee_id: '1001' } : null, approved_at: status === 'approved' ? '2026-11-12' : null,
+        file_count: has ? 1 : 0, uploaded_by: has ? { id: 'u-1102', display_name: 'Demo User 02', employee_id: '1102' } : null, uploaded_at: has ? '2026-11-10T09:00:00.000Z' : null,
+        approved_by: status === 'approved' ? { id: 'u-1001', display_name: 'Demo User 01', employee_id: '1001' } : null, approved_at: status === 'approved' ? '2026-11-12' : null,
         generated_at: null, form_id: null, site_i: i,
       } as Row);
     });
@@ -59,8 +59,8 @@ function seed(): State {
     id: 'f0000000-0000-4000-8000-000000000001', code: 'SSR', version: 1, name_en: 'Site survey report', name_ar: 'تقرير مسح الموقع', doc_type_id: DOCS[1]!.id, doc_code: 'A2',
     doc_name_en: DOCS[1]!.en, doc_name_ar: DOCS[1]!.ar, trigger_task_code: 'A2', trigger_task_name_en: 'TSSR', trigger_task_name_ar: 'تقرير المسح الفني', numbering_pattern: 'SSR-{YYYY}-{SEQ:4}',
     numbering_reset: 'yearly', bindings: {}, placeholders: ['doc.date', 'doc.ref_no', 'generated_by.name', 'site.id', 'site.name', 'site.region_name'], status: 'approved', sha256: '0'.repeat(64),
-    size_bytes: SEED_HTML.length, created_by: { id: 'u-1001', display_name: 'Ahmed Salem', employee_id: '1001' }, created_at: '2026-11-20T08:00:00.000Z',
-    approved_by: { id: 'u-1001', display_name: 'Ahmed Salem', employee_id: '1001' }, approved_at: '2026-11-20T09:00:00.000Z', retired_at: null, updated_at: '2026-11-20T09:00:00.000Z',
+    size_bytes: SEED_HTML.length, created_by: { id: 'u-1001', display_name: 'Demo User 01', employee_id: '1001' }, created_at: '2026-11-20T08:00:00.000Z',
+    approved_by: { id: 'u-1001', display_name: 'Demo User 01', employee_id: '1001' }, approved_at: '2026-11-20T09:00:00.000Z', retired_at: null, updated_at: '2026-11-20T09:00:00.000Z',
   };
   for (const r of rows) if (r.doc_type_id === tpl.doc_type_id) r.form_id = tpl.id;
   return { rows, gen: [], tpls: [tpl], seq: {}, setting: { hidden: [], order: [], default_columns: [...ARCHIVE_COLUMNS], zip_limit: 500, version: 0 } };

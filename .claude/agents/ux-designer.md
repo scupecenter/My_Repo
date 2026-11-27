@@ -1,6 +1,6 @@
 ---
 name: ux-designer
-description: UX/UI designer for GSDN Workspace. Use for the design system, screen designs, the clickable HTML prototype, bilingual EN/AR RTL layouts and usability review of built screens.
+description: UX/UI designer for Workspace. Use for the design system, screen designs, the clickable HTML prototype, bilingual EN/AR RTL layouts and usability review of built screens.
 model: sonnet
 effort: medium
 tools: Read, Grep, Glob, Write, Edit, Bash

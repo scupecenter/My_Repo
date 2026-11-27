@@ -95,8 +95,8 @@ describe('a permit draft whose holder lost the row (Q221) and the old review act
     const sites = await api.get<{ items: { id: string }[] }>('/sites', { query: { limit: 1 } });
     const rec = await api.post<RegisterRecord>('/registers/permits_hse/records', { body: { site_id: sites.items[0]!.id, data: { permit_type: 'Access - CW', status: 'Applied' } } });
     const steps = [
-      { id: 'a0000000-0000-4000-8000-000000000001', level: 2, action: 'review', created_at: '2026-10-01T08:00:00Z', previous_path: true, acted_by: { id: 'x', display_name: 'Mona Fathi' } },
-      { id: 'a0000000-0000-4000-8000-000000000002', level: 1, action: 'transfer', created_at: '2026-11-04T08:00:00Z', previous_path: false, acted_by: { id: 'y', display_name: 'Ahmed Salem' } },
+      { id: 'a0000000-0000-4000-8000-000000000001', level: 2, action: 'review', created_at: '2026-10-01T08:00:00Z', previous_path: true, acted_by: { id: 'x', display_name: 'Demo User 02' } },
+      { id: 'a0000000-0000-4000-8000-000000000002', level: 1, action: 'transfer', created_at: '2026-11-04T08:00:00Z', previous_path: false, acted_by: { id: 'y', display_name: 'Demo User 01' } },
     ];
     let transferred = false;
     server.use(

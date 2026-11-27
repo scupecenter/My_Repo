@@ -13,8 +13,8 @@ const pageOf = <T,>(items: T[], limit = 50) => HttpResponse.json({ items: items.
 const lim = (u: URL) => Math.min(200, Math.max(1, Number(u.searchParams.get('limit') ?? 50) || 50));
 const VIAS = ['manual', 'template', 'bulk', 'api', 'job'] as const;
 
-const ACTOR = { id: '00000000-0000-4000-8000-000000001204', display_name: 'Sara Ben Ali (synthetic)', employee_id: '1204' };
-const LEAD = { id: '00000000-0000-4000-8000-000000002301', display_name: 'Omar Haddad (synthetic)', employee_id: '2301' };
+const ACTOR = { id: '00000000-0000-4000-8000-000000001204', display_name: 'Demo User 26 (synthetic)', employee_id: '1204' };
+const LEAD = { id: '00000000-0000-4000-8000-000000002301', display_name: 'Demo User 27 (synthetic)', employee_id: '2301' };
 const CHROME = { browser: 'Chrome', os: 'Windows', type: 'desktop' } as const;
 const PHONE = { browser: 'Safari', os: 'iOS', type: 'mobile' } as const;
 const RECORD = '7a000000-0000-4000-8000-000000000001';
@@ -61,7 +61,7 @@ let alerts: MockAlert[] = [
 ];
 const SEVS = ['info', 'low', 'medium', 'high', 'critical'];
 const DEFAULT_SEV: Record<string, string> = { failed_sign_ins: 'medium', failed_sign_ins_ip: 'medium', new_ip: 'low', large_export: 'medium', admin_set_changed: 'high',
-  alert_settings_weakened: 'high', malware_upload: 'high', break_glass_used: 'critical' };
+  alert_settings_weakened: 'high', malware_upload: 'high', break_glass_used: 'critical', backup_missing: 'high' };
 let thresholds = { failed_sign_ins: { count: 5, minutes: 15 }, failed_by_ip: { count: 20, minutes: 15 }, large_export_rows: 5000, new_ip: true,
   severity: { ...DEFAULT_SEV }, mandatory_severity: { retention_reduced: 'critical', audit_integrity_failure: 'critical' }, email_min_severity: 'low', trusted_networks: [] as string[], version: 1, updated_at: null as string | null, updated_by: null as unknown };
 let sessions = [

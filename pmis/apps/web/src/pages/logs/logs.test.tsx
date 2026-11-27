@@ -79,7 +79,7 @@ describe('Audit Log screen', () => {
     await u.click(screen.getByTestId('audit-drawer-close'));
     // entry 4 (index 4) was done on behalf of the Project Manager
     await u.click(screen.getByTestId('audit-table-row-1846'));
-    expect(await screen.findByTestId('ad-behalf')).toHaveTextContent('Ahmed Salem');
+    expect(await screen.findByTestId('ad-behalf')).toHaveTextContent('Demo User 01');
   });
 
   it('saves a view and applies it again', async () => {
@@ -172,7 +172,7 @@ describe('Field changes screen', () => {
     expect(screen.getByTestId('fc-old-fc-002')).toHaveTextContent('2026-10-27');
     expect(screen.getByTestId('fc-new-fc-002')).toHaveTextContent('2026-11-03');
     const top = screen.getByTestId('fc-table-row-fc-002');
-    expect(within(top).getByText('Ahmed Salem')).toBeInTheDocument();
+    expect(within(top).getByText('Demo User 01')).toBeInTheDocument();
     await u.click(top);
     expect(await screen.findByTestId('fc-device')).toHaveTextContent(/Chrome|Safari|Edge|Firefox/);
     expect(screen.getByTestId('fc-ip')).toHaveTextContent('10.20.');
@@ -190,9 +190,9 @@ describe('Field changes screen', () => {
     await u.selectOptions(screen.getByTestId('f-via'), 'template');
     await waitFor(() => expect(screen.getAllByTestId(/^fc-table-row-/)).toHaveLength(1));
     await u.click(screen.getByTestId('chips-clear'));
-    await u.type(screen.getByTestId('f-who-search'), 'Mona');
+    await u.type(screen.getByTestId('f-who-search'), 'Demo');
     await u.click(await screen.findByTestId('f-who-opt-1102'));
-    await waitFor(() => { const r = screen.getAllByTestId(/^fc-table-row-/); r.forEach((x) => expect(x).toHaveTextContent('Mona Fathi')); });
+    await waitFor(() => { const r = screen.getAllByTestId(/^fc-table-row-/); r.forEach((x) => expect(x).toHaveTextContent('Demo User 02')); });
   });
 });
 
@@ -216,7 +216,7 @@ describe('History of this field', () => {
       expect(items).toHaveLength(3);
       expect(items[0]).toHaveTextContent('2026-10-27');
       expect(items[0]).toHaveTextContent('2026-11-03');
-      expect(items[0]).toHaveTextContent('Ahmed Salem');
+      expect(items[0]).toHaveTextContent('Demo User 01');
       expect(within(items[0]).getByTestId('person-id-1001')).toBeInTheDocument();
       expect(within(items[0]).getByTestId('fh-device-fc-002')).toHaveAttribute('aria-label', expect.stringMatching(/·/));
       expect(items[1]).toHaveTextContent('Template');
@@ -329,7 +329,7 @@ describe('Security alerts', () => {
     await u.click(screen.getByTestId('alerts-filter-acknowledged'));
     await waitFor(() => expect(screen.getAllByTestId(/^alert-al-\d$/)).toHaveLength(3));
     expect(screen.getByTestId('alert-status-al-1')).toHaveTextContent('Acknowledged');
-    expect(screen.getByTestId('alert-al-1')).toHaveTextContent('Ahmed Salem');
+    expect(screen.getByTestId('alert-al-1')).toHaveTextContent('Demo User 01');
   });
 
   it('keeps the alert open when the acknowledgement fails', async () => {
@@ -386,7 +386,7 @@ describe('Monthly activity report', () => {
     await u.click(screen.getByTestId('report-csv'));
     const text = await (blob as unknown as Blob).text();
     expect(text).toContain('employee_id,name,actions');
-    expect(text).toContain('Ahmed Salem');
+    expect(text).toContain('Demo User 01');
   });
 
   it('neutralises spreadsheet formulas in the CSV', () => {
