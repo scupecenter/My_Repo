@@ -13,7 +13,7 @@ import { FieldErr } from './Calendar';
 
 const INBOX_KINDS = ['mention', 'followed_change', 'task_assigned', 'task_returned', 'task_rejected', 'task_approved', 'approval_due', 'reassigned', 'absence_alert', 'idle_task_alert', 'no_holder', 'system'] as const;
 
-const SAMPLE = ['Ahmed Omran', 'سالم المصراتي', 'Nadia Ben Ali', 'خالد الزاوي', 'Tripoli CW Team'];
+const SAMPLE = ['Demo Person A', 'سالم المصراتي', 'Demo Person B', 'خالد الزاوي', 'Demo CW Team'];
 
 /**
  * Administration > Settings > Screens > Interface (migration 0280): the interface features in one place. Now: generated avatars (style, shape, palette, in lists)
