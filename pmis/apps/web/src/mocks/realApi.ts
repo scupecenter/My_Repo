@@ -125,6 +125,7 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/registers/:key/records/:id/triage'],
   // Contract 0.7.0: approved-template entry for the registers (apps/api: templates; migration 0037). The Site Register stream templates and TPL-MASTER (migration 0051, contract 0.11.3) use the same paths: no endpoint was added.
   ['get', '/templates'],
+  ['get', '/templates/:id/changes'],
   ['get', '/templates/:id/download'],
   ['get', '/import-batches'],
   ['get', '/data-hub/summary'],
@@ -160,11 +161,17 @@ export const REAL_API_AUTH_USERS = [
   ['delete', '/registers/:key/records/:id/follow'],
   ['get', '/registers/:key/records/:id/comments'],
   ['post', '/registers/:key/records/:id/comments'],
+  // Contract 0.15.247 (0346): a reaction and a resolved flag on any comment.
+  ['put', '/comments/:id/reactions'],
+  ['delete', '/comments/:id/reactions'],
+  ['put', '/comments/:id/resolved'],
+  ['delete', '/comments/:id/resolved'],
   ['get', '/tasks/:id/time-in-state'],
   ['get', '/tasks/:id/blocked-by'],
   ['get', '/reports/time-in-state'],
   ['get', '/reports/workload'],
   ['get', '/status-updates'],
+  ['get', '/status-updates/region-health'], // 0.15.241, item 12
   ['post', '/status-updates'],
   ['patch', '/status-updates/:id'],
   // Contract 0.7.2: the main dashboard, Project Status and the weight sets (apps/api: dashboard; migration 0039).
@@ -228,6 +235,10 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/me/sessions/:id/revoke'],
   ['patch', '/me/profile'],
   ['get', '/admin/document-search-index'],
+  ['get', '/me/push'],
+  ['post', '/me/push/subscribe'],
+  ['post', '/me/push/unsubscribe'],
+  ['get', '/admin/web-push'],
   ['patch', '/me/preferences'],
   ['post', '/me/password'],
   ['post', '/me/email-change'],
@@ -273,6 +284,8 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/admin/log-integrity/runs'],
   ['get', '/admin/log-integrity/runs/:id'],
   ['get', '/health'],
+  // Contract 0.15.300 (no migration; apps/api: security): the browser's Content-Security-Policy violation report (SEC-3). The browser posts it, the screens never do.
+  ['post', '/csp-report'],
   // Contract 0.11.1: the documents follow-up of Q130 to Q132 (apps/api: sites, documents, qc; migration 0047). The site's custom fields (near_airport),
   // document slots on register records, QC snags and the photos of their fix.
   ['patch', '/sites/:id'],
@@ -352,6 +365,14 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/saved-views/:id/restore'],
   ['post', '/saved-views/:id/transfer'],
   ['get', '/saved-views/:id/versions'],
+  // Contract 0.15.246 (item 17, migration 0345): the soft "… is editing this record" notice.
+  ['post', '/presence/editing'],
+  ['post', '/presence/editing/stop'],
+  ['get', '/presence/editing'],
+  // Contract 0.15.245 (0344): pin a saved view as a personal card on the home dashboard.
+  ['get', '/me/home-pins'],
+  ['post', '/saved-views/:id/pin'],
+  ['post', '/saved-views/:id/unpin'],
   ['get', '/me/drafts'],
   ['get', '/me/drafts/:key'],
   ['put', '/me/drafts/:key'],
@@ -384,6 +405,11 @@ export const REAL_API_AUTH_USERS = [
   // Contract 0.14.6 (migration 0075; apps/api: settings): the background threshold of batches (imports.async_rows) in Settings, Imports.
   ['get', '/settings/imports'],
   ['put', '/settings/imports'],
+  // Contract 0.15.322 (migration 0492; apps/api: settings): the upload policy of the imports (D49 part 3).
+  ['get', '/settings/imports/upload-policy'],
+  ['put', '/settings/imports/upload-policy'],
+  ['get', '/settings/template-change-notice'],
+  ['put', '/settings/template-change-notice'],
   // Contract 0.15.1 (migration 0081; apps/api: settings): the shared layout of the side menu.
   ['get', '/settings/nav-layout'],
   ['put', '/settings/nav-layout'],
@@ -393,6 +419,9 @@ export const REAL_API_AUTH_USERS = [
   // Contract 0.15.97 (migration 0197; apps/api: settings): the sign-in page settings and its public read (Settings, Screens, Login page).
   ['get', '/settings/login-page'],
   ['put', '/settings/login-page'],
+  // Contract 0.15.312 (migration 0402; apps/api: settings): the operational limits (Settings, Security, Limits).
+  ['get', '/settings/ops-limits'],
+  ['put', '/settings/ops-limits'],
   ['get', '/settings/login-page/public'],
   // Contract 0.15.292: the media gallery (apps/api: media; migration 0396).
   ['get', '/media/settings'],
@@ -425,6 +454,12 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/me/passkeys/register/verify'],
   ['delete', '/me/passkeys/:id'],
   ['post', '/users/:id/passkeys/revoke'],
+  ['put', '/settings/identity/logo'],
+  ['patch', '/settings/identity/logo'],
+  ['patch', '/settings/identity/logo/display'],
+  ['get', '/ui/public/identity'],
+  ['get', '/ui/public/logo/:purpose'],
+  ['get', '/ui/assets/:key'],
   // Contract 0.15.4 (migration 0085; apps/api: sites, master-import, templates): the per-site workflow locks (one site, many sites) and the status of the sites of
   // an import (missing data per site). The new site fields ride on the paths above.
   ['post', '/sites/workflow-locks'],
@@ -451,6 +486,11 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/registers/issues/order-options'],
   ['get', '/registers/change_control/order-options'],
   ['get', '/registers/quality/order-options'],
+  ['get', '/registers/financial_advances/advance-options'],
+  ['get', '/registers/invoices/order-options'],
+  ['get', '/registers/invoices/supplier-options'],
+  ['get', '/settings/register-rules'],
+  ['put', '/settings/register-rules/:key'],
   ['get', '/settings/register-state'],
   ['put', '/settings/register-state/:key'],
   ['get', '/registers/issues/risk-options'],
@@ -665,6 +705,7 @@ export const REAL_API_AUTH_USERS = [
   ['put', '/settings/data-reset/settings'],
   ['post', '/settings/data-reset/requests'],
   ['get', '/settings/data-reset/plan'],
+  ['get', '/settings/data-reset/narrow-options'],
   ['get', '/settings/data-reset/requests/:id'],
   ['post', '/settings/data-reset/requests/:id/approve'],
   ['post', '/settings/data-reset/requests/:id/cancel'],

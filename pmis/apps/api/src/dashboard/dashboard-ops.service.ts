@@ -9,6 +9,12 @@ import { FilterCatalogService } from "../views/filter-catalog.service";
 import { dashboardParams } from "./dashboard.service";
 import {
   AgeBuckets,
+  ActionDueRow,
+  actionsSummary,
+  ApprovalWaitRow,
+  ChangeWaitRow,
+  changesSummary,
+  approvalsByRole,
   bucketAges,
   firstPassPct,
   meanDays,
@@ -60,6 +66,13 @@ interface ShortageRow {
  *   - quality (0.15.203, item 6): the open snags and NCRs of the in-scope sites, the average closure age of each and
  *     the first-time acceptance rate (Pass over Pass + Fail of the decided inspections; the data keeps no
  *     re-inspection marker). Needs quality view, else available false.
+ *   - approvals (0.15.204, item 7): the tasks waiting for review or approval (the same population as the Approvals
+ *     inbox), their ages in calendar days since the level opened (falling back to the last update, as the inbox
+ *     orders), split review against approve and grouped by the ball-in-court role. Needs the approvals and the sites
+ *     view, else available false.
+ *   - changes_meetings (0.15.205, item 8): the change requests still pending (aged since the request date, per kind)
+ *     and the approved ones not applied, and the meeting actions not closed with the overdue ones aged by days late.
+ *     Each part needs its own module view (change_control, meetings), else that part answers available false.
  */
 @Injectable()
 export class DashboardOpsService {
@@ -81,12 +94,24 @@ export class DashboardOpsService {
     const hlcRegions = await this.access.regions("hlc", "view");
     const contractorRegions = await this.access.regions("contractors", "view");
     const qualityRegions = await this.access.regions("quality", "view");
+    const approvalsRegions = await this.access.regions("approvals", "view");
+    const sitesRegions = await this.access.regions("sites", "view");
+    const changeRegions = await this.access.regions("change_control", "view");
+    const meetingRegions = await this.access.regions("meetings", "view");
+    const changeScope = intersect(dash, changeRegions);
+    const meetingScope = intersect(dash, meetingRegions);
+    const changesOk = changeRegions === null || changeRegions.length > 0;
+    const meetingsOk = meetingRegions === null || meetingRegions.length > 0;
     const procScope = intersect(dash, procRegions);
     const whScope = intersect(dash, whRegions);
     const permitScope = intersect(dash, permitRegions);
     const gecolScope = intersect(dash, gecolRegions);
     const hlcScope = intersect(dash, hlcRegions);
     const qualityScope = intersect(dash, qualityRegions);
+    const approvalsScope = intersect(
+      dash,
+      intersect(approvalsRegions, sitesRegions),
+    );
     const procOk = procRegions === null || procRegions.length > 0;
     const whOk = whRegions === null || whRegions.length > 0;
     const permitsOk = permitRegions === null || permitRegions.length > 0;
@@ -96,6 +121,9 @@ export class DashboardOpsService {
       contractorRegions === null || contractorRegions.length > 0;
     const qualityOk =
       qualityRegions === null || qualityRegions.length > 0;
+    const approvalsOk =
+      (approvalsRegions === null || approvalsRegions.length > 0) &&
+      (sitesRegions === null || sitesRegions.length > 0);
 
     const orders = procOk ? await this.ordersSection(procScope, p.region_id ?? null) : null;
     const adv = whOk ? await this.filters.fromQuery("dashboard", q) : null;
@@ -116,6 +144,15 @@ export class DashboardOpsService {
       : null;
     const quality = qualityOk
       ? await this.qualitySection(qualityScope, p.region_id ?? null)
+      : null;
+    const approvals = approvalsOk
+      ? await this.approvalsSection(approvalsScope, p.region_id ?? null)
+      : null;
+    const changes = changesOk
+      ? await this.changesSection(changeScope, p.region_id ?? null)
+      : null;
+    const actions = meetingsOk
+      ? await this.actionsSection(meetingScope, p.region_id ?? null)
       : null;
 
     return {
@@ -174,6 +211,32 @@ export class DashboardOpsService {
         snags: quality?.snags ?? null,
         ncrs: quality?.ncrs ?? null,
         first_pass_pct: quality?.first_pass_pct ?? null,
+      },
+      approvals: {
+        available: approvalsOk,
+        total: approvals?.total ?? null,
+        review: approvals?.review ?? null,
+        approve: approvals?.approve ?? null,
+        waiting: approvals?.waiting ?? null,
+        by_role: approvals?.by_role ?? null,
+        unassigned: approvals?.unassigned ?? null,
+      },
+      changes_meetings: {
+        available: changesOk || meetingsOk,
+        changes: {
+          available: changesOk,
+          pending: changes?.pending ?? null,
+          approved_not_applied: changes?.approved_not_applied ?? null,
+          by_kind: changes?.by_kind ?? null,
+          pending_aging: changes?.pending_aging ?? null,
+        },
+        actions: {
+          available: meetingsOk,
+          open: actions?.open ?? null,
+          overdue: actions?.overdue ?? null,
+          no_due_date: actions?.no_due_date ?? null,
+          overdue_aging: actions?.overdue_aging ?? null,
+        },
       },
       contractor_scorecard: {
         available: contractorsOk,
@@ -451,6 +514,55 @@ export class DashboardOpsService {
       },
       first_pass_pct: firstPassPct(dc.pass, dc.fail),
     };
+  }
+
+  /**
+   * The pending approvals bottleneck (0.15.204, item 7): the tasks of the active, not cancelled sites in scope whose
+   * state is in_review or in_approval (the population of the Approvals inbox), aged in calendar days from
+   * level_opened_at (falling back to updated_at, the same fallback the inbox orders by), and grouped by the
+   * ball-in-court role (approvalsByRole). A level a group holds, or nobody holds yet, has no role and counts as
+   * unassigned.
+   */
+  private async approvalsSection(
+    scope: number[] | null,
+    region: number | null,
+  ) {
+    const rows = await this.db.tx.$queryRaw<ApprovalWaitRow[]>(Prisma.sql`
+      SELECT t.ball_in_court_role_id::text AS role_id, r.name_en, r.name_ar,
+             (CURRENT_DATE - coalesce(t.level_opened_at::date, t.updated_at::date))::int AS days,
+             t.state::text AS state
+      FROM task_instances t
+      JOIN sites s ON s.id = t.site_id AND s.region_id = t.region_id
+      LEFT JOIN roles r ON r.id = t.ball_in_court_role_id
+      WHERE t.state::text IN ('in_review', 'in_approval') AND s.is_active AND s.overall_status <> 'cancelled'
+      ${scope === null ? Prisma.empty : Prisma.sql`AND t.region_id = ANY(${scope}::int[])`}
+      ${region ? Prisma.sql`AND t.region_id = ${region}` : Prisma.empty}`);
+    return approvalsByRole(rows);
+  }
+
+  /**
+   * The change requests (0.15.205, item 8): rows of change_requests in the regions in scope (a global row, with no
+   * region, is outside a regional scope like every other card), aged from request_date.
+   */
+  private async changesSection(scope: number[] | null, region: number | null) {
+    const rows = await this.db.tx.$queryRaw<ChangeWaitRow[]>(Prisma.sql`
+      SELECT c.kind::text AS kind, c.status::text AS status, (CURRENT_DATE - c.request_date)::int AS days
+      FROM change_requests c
+      WHERE c.status::text IN ('requested', 'approved')
+      ${scope === null ? Prisma.empty : Prisma.sql`AND c.region_id = ANY(${scope}::int[])`}
+      ${region ? Prisma.sql`AND c.region_id = ${region}` : Prisma.empty}`);
+    return changesSummary(rows);
+  }
+
+  /** The meeting actions not closed (0.15.205, item 8), by the region of their meeting; days overdue against the due date. */
+  private async actionsSection(scope: number[] | null, region: number | null) {
+    const rows = await this.db.tx.$queryRaw<ActionDueRow[]>(Prisma.sql`
+      SELECT a.status::text AS status, (CURRENT_DATE - a.due_date)::int AS days_overdue
+      FROM meeting_actions a JOIN meetings m ON m.id = a.meeting_id
+      WHERE a.status::text IN ('open', 'in_progress')
+      ${scope === null ? Prisma.empty : Prisma.sql`AND m.region_id = ANY(${scope}::int[])`}
+      ${region ? Prisma.sql`AND m.region_id = ${region}` : Prisma.empty}`);
+    return actionsSummary(rows);
   }
 
   private async ordersSection(

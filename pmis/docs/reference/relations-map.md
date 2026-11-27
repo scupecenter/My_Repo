@@ -48,10 +48,14 @@ A dotted arrow is an id column with no `REFERENCES` constraint (the id is checke
 | HLC record | Procurement records of the site | register link, many (`hlc_pr_links`, Q150) | `pr_no`, `hlc_approval_date`, `procurement_record_id` | derived |
 | Dismantle part (outsourced) | Procurement order | register link | `procurement_order_id`, contractor | contractor derived from the order |
 | Register records, task instances, task delay periods, contractor teams and contracts | Contractor company (`external_parties`) | foreign key | `external_party_id`, `party_id` | chosen |
-| Procurement, snags, quality inspections, issues | Contractor company | id column, no constraint | `party_id`, `responsible_party_id` | chosen |
-| Procurement | Contractor team (`external_teams`) | id column, no constraint | `team_id` | chosen |
-| Quality inspection | Snag | id column, no constraint | `quality_inspections.snag_id` | not checked in the catalogue |
+| Procurement, snags, quality inspections, issues | Contractor company | foreign key (0182, `_idfk`) | `party_id`, `responsible_party_id` | chosen |
+| Procurement | Contractor team (`external_teams`) | foreign key (0182, `_idfk`) | `team_id` | chosen |
+| Quality inspection | Snag | foreign key (0182, `_idfk`, ON DELETE SET NULL) | `quality_inspections.snag_id` | not checked in the catalogue |
 | Car dispatcher, Financial advances | Procurement order | register link | `procurement_record_id` | typed (text) |
+| Financial advances (expense, settlement) | Advance | register link | `advance_id` | checked in entry (approved advance of the same site, 0407); disbursed rule at submit; picker `advance-options` |
+| Invoices | Procurement record | register link | `procurement_record_id` | checked in entry (0407); PR No. and PO / WO No. read from the order (`order_pr_no`, `order_po_wo_no`, 0430); required when Settings > Register rules says so (`order_required`); picker `invoices/order-options`; listed in `record_related` |
+| Invoices | Contractor company | register link | `supplier_party_id` | optional, checked against active `external_parties` (0407); fills `supplier` when empty; required when Settings > Register rules says so (`supplier_required`, 0430); picker `invoices/supplier-options` |
+| HLC record | Procurement record | register link, listed in `record_related` (0407) | `procurement_record_id` (id of the Procurement version row) | derived |
 | Issues, snags, quality, orders, contract end | Contractor performance view (0180) | computed on read, no stored value | thresholds in setting `contractors.performance` | derived |
 | Warehouse DN / RN documents | Stock, per-site quantity, serials | posted by approved documents | `wh_movement_lines`, `warehouse_site_qty`, `warehouse_serials` | derived |
 | Register records (procurement, warehouse, dismantle, issues, quality, car dispatcher, financial advances, risks) | Related records panel (0324) | computed on read, no stored value | `record_related(register, entity)`; the link list is one VALUES list in the function | derived |
@@ -68,7 +72,7 @@ A dotted arrow is an id column with no `REFERENCES` constraint (the id is checke
 3. **Car dispatcher and Financial advances to Procurement.** `procurement_record_id` is a typed text field; a picker over the orders of the site would
    remove the typing.
 4. **Contract end.** *(done, migration 0212)* `external_party_contracts` is the single source of the contract dates; `external_parties.contract_start` / `contract_end` are a mirror the database rebuilds on every contract change (earliest start, latest end of the active contracts; an open-ended contract leaves the end empty). The performance view reads the contracts first.
-5. **Constraints.** The id columns without a `REFERENCES` constraint (dotted in section 2) rely on the writing function. Adding the constraints is additive but needs a data check first (orphan ids), so it is a proposal for a later migration, not part of this document.
+5. **Constraints.** *(done, migration 0182)* The six id columns that had no `REFERENCES` constraint got one after an orphan check (added NOT VALID, then validated when the column holds no orphan; `fk_orphan_report()` re-checks later). Still without a constraint: `team_scope_checks.team_id`, a snapshot of the team that matched when the check ran, kept as history.
 6. **Notifications.** Each module raises its own notice; no single function applies the policy (channel, digest, escalation).
 
 ## 5. Appendix: every foreign key (parent, then children)

@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from './client';
-import type { StateDurationsReport, BlockedBy, Comment, Follow, Notification, Page, StatusHealth, StatusUpdate, StatusUpdateInput, TaskTimeInState, TimeInStateReport, Workload } from './types';
+import type { BlockedBy, Comment, Follow, Notification, Page, RegionHealthBoard, StateDurationsReport, StatusHealth, StatusUpdate, StatusUpdateInput, TaskTimeInState, TimeInStateReport, Workload } from './types';
 
 /** Hooks of the phase 4b features X1 to X7 (contract 0.4.10 and 0.7.1). The server decides what a caller may see; nothing here widens it. */
 
@@ -49,6 +49,25 @@ export function useAddRegisterComment(key: string, id: string) {
   });
 }
 
+// ---------------------------------------------------------------------------------------------------------------- PM item 18 (0.15.247): reactions and resolved flag on any comment
+export function useCommentReaction(queryKey: unknown[]) {
+  const qc = useQueryClient();
+  return useMutation<void, ApiError, { commentId: string; emoji: string; on: boolean }>({
+    mutationFn: ({ commentId, emoji, on }) => {
+      const url = `/comments/${commentId}/reactions`;
+      return on ? api.put<void>(url, { body: { emoji } }) : api.del<void>(url, { body: { emoji } });
+    },
+    onSuccess: () => void qc.invalidateQueries({ queryKey }),
+  });
+}
+export function useCommentResolved(queryKey: unknown[]) {
+  const qc = useQueryClient();
+  return useMutation<void, ApiError, { commentId: string; resolved: boolean }>({
+    mutationFn: ({ commentId, resolved }) => (resolved ? api.put<void>(`/comments/${commentId}/resolved`) : api.del<void>(`/comments/${commentId}/resolved`)),
+    onSuccess: () => void qc.invalidateQueries({ queryKey }),
+  });
+}
+
 // ---------------------------------------------------------------------------------------------------------------- X4 to X6 insights
 export const useTimeInState = (taskId: string, enabled = true) => useQuery({ queryKey: ['time-in-state', taskId], enabled, queryFn: () => api.get<TaskTimeInState>(`/tasks/${taskId}/time-in-state`) });
 export const useBlockedBy = (taskId: string, enabled = true) => useQuery({ queryKey: ['blocked-by', taskId], enabled, queryFn: () => api.get<BlockedBy>(`/tasks/${taskId}/blocked-by`) });
@@ -62,6 +81,8 @@ export const useTimeReport = (f: InsightFilter & { group_by: 'holder' | 'team'; 
 
 // ---------------------------------------------------------------------------------------------------------------- X7 status updates
 export type StatusFilter = { scope: string; region_id: string; team: string };
+/** Region health (0.15.241, item 12): the current-week health of every visible region plus the missing-update flag. */
+export const useRegionHealth = () => useQuery({ queryKey: ['region-health'], queryFn: () => api.get<RegionHealthBoard>('/status-updates/region-health') });
 export const useStatusUpdates = (f: StatusFilter) =>
   useInfiniteQuery({
     queryKey: ['status-updates', f], initialPageParam: '' as string,

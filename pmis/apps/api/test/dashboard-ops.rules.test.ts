@@ -7,6 +7,9 @@ import {
   bucketAges,
   receivePct,
   scorecardSummary,
+  approvalsByRole,
+  changesSummary,
+  actionsSummary,
   firstPassPct,
   meanDays,
   ScorecardItem,
@@ -166,5 +169,87 @@ describe("item 6 rules: quality (0.15.203)", () => {
     expect(firstPassPct(9, 1)).toBe(90);
     expect(firstPassPct(1, 2)).toBe(33.3);
     expect(firstPassPct(3, 0)).toBe(100);
+  });
+});
+
+describe("item 7 rules: pending approvals by role (0.15.204)", () => {
+  const row = (role_id: string | null, days: number, state: string, name_en = "PM") => ({
+    role_id,
+    name_en: role_id ? name_en : null,
+    name_ar: null,
+    days,
+    state,
+  });
+
+  it("groups the waiting tasks by role, most waiting first, and counts the unassigned", () => {
+    const r = approvalsByRole([
+      row("r1", 3, "in_review", "PM"),
+      row("r1", 40, "in_approval", "PM"),
+      row("r2", 9, "in_review", "QC"),
+      row(null, 20, "in_review"),
+    ]);
+    expect(r.total).toBe(4);
+    expect(r.review).toBe(3);
+    expect(r.approve).toBe(1);
+    expect(r.unassigned).toBe(1);
+    expect(r.by_role.map((x) => x.role_id)).toEqual(["r1", "r2"]);
+    expect(r.by_role[0]?.count).toBe(2);
+    expect(r.by_role[0]?.oldest_days).toBe(40);
+    expect(r.by_role[0]?.buckets.find((b) => b.key === "over_30")?.count).toBe(1);
+    expect(r.waiting.total).toBe(4);
+    expect(r.waiting.oldest_days).toBe(40);
+  });
+
+  it("answers an empty shape when nothing waits", () => {
+    const r = approvalsByRole([]);
+    expect(r.total).toBe(0);
+    expect(r.review).toBe(0);
+    expect(r.approve).toBe(0);
+    expect(r.unassigned).toBe(0);
+    expect(r.by_role).toEqual([]);
+    expect(r.waiting.total).toBe(0);
+    expect(r.waiting.oldest_days).toBeNull();
+  });
+});
+
+describe("item 8 rules: change requests and meeting actions (0.15.205)", () => {
+  it("counts the pending change requests per kind with their ages and the approved ones not yet applied", () => {
+    const r = changesSummary([
+      { kind: "scope_change", status: "requested", days: 3 },
+      { kind: "scope_change", status: "requested", days: 40 },
+      { kind: "date_change", status: "requested", days: 10 },
+      { kind: "date_change", status: "approved", days: 90 },
+      { kind: "other", status: "rejected", days: 5 },
+      { kind: "other", status: "applied", days: 5 },
+    ]);
+    expect(r.pending).toBe(3);
+    expect(r.approved_not_applied).toBe(1);
+    expect(r.by_kind).toEqual([
+      { kind: "scope_change", count: 2 },
+      { kind: "date_change", count: 1 },
+    ]);
+    expect(r.pending_aging.oldest_days).toBe(40);
+    expect(r.pending_aging.buckets.find((b) => b.key === "over_30")?.count).toBe(1);
+  });
+
+  it("counts the open meeting actions, the overdue ones with their days late, and those without a due date", () => {
+    const r = actionsSummary([
+      { status: "open", days_overdue: 5 },
+      { status: "in_progress", days_overdue: 35 },
+      { status: "open", days_overdue: -3 },
+      { status: "open", days_overdue: null },
+      { status: "closed", days_overdue: 50 },
+      { status: "na", days_overdue: 50 },
+    ]);
+    expect(r.open).toBe(4);
+    expect(r.overdue).toBe(2);
+    expect(r.no_due_date).toBe(1);
+    expect(r.overdue_aging.oldest_days).toBe(35);
+  });
+
+  it("answers empty shapes when there is nothing", () => {
+    expect(changesSummary([]).pending).toBe(0);
+    expect(changesSummary([]).pending_aging.oldest_days).toBeNull();
+    expect(actionsSummary([]).overdue).toBe(0);
   });
 });

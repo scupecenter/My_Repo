@@ -1,6 +1,7 @@
-import { Check, Download, Link2, MonitorPlay, PencilLine, Printer, RotateCcw } from "lucide-react";
+import { Check, ChevronDown, Download, Link2, MonitorPlay, PencilLine, Printer, RotateCcw, Share2 } from "lucide-react";
+import { loadPref, savePref } from "@/lib/localPref";
 import { useDownloadGate } from '@/lib/downloadGate';
-import { useMemo, useState, type ReactNode, Fragment } from "react";
+import { useEffect, useMemo, useState, type ReactNode, Fragment } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -17,6 +18,8 @@ import {
   type ExportFormat,
 } from "@/api/dashboard";
 import type { PipelineNode } from "@/api/types";
+import { useRegions } from "@/api/sites";
+import { useRegionHealth } from "@/api/x";
 import { EChart, type Palette } from "@/components/EChart";
 import { errText } from "@/components/FormDialog";
 import { Pipeline } from "@/components/Pipeline";
@@ -38,11 +41,14 @@ import {
   signed,
 } from "./dashboardBits";
 import { OpsProcurementCard } from "./dashboardOps";
+import { PinnedViewsCard } from "./dashboardPins";
 import { OpsScurveCard } from "./dashboardScurve";
 import { OpsPermitsCard } from "./dashboardPermits";
 import { OpsReadinessCard } from "./dashboardReadiness";
 import { OpsScorecardCard } from "./dashboardScorecard";
 import { OpsQualityCard } from "./dashboardQuality";
+import { OpsApprovalsCard } from "./dashboardApprovals";
+import { OpsChangesCard } from "./dashboardChanges";
 import { useDashboardSettings } from "@/api/dashboardSettings";
 import { GoalsPanel } from "@/components/GoalsPanel";
 import { SavedViews } from "@/components/SavedViews";
@@ -576,7 +582,17 @@ export function Dashboard() {
   const snaps = useProjectStatusSnapshots(!!d);
   const [exporting, setExporting] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
-  const [format, setFormat] = useState<ExportFormat>("xlsx");
+  const [format, setFormat] = useState<ExportFormat>(() => (loadPref<string>("dash.exportFormat", "xlsx") === "csv" ? "csv" : "xlsx"));
+  const [shareOpen, setShareOpen] = useState(false);
+  // the Share / Export menu closes on Escape and on a click outside it
+  useEffect(() => {
+    if (!shareOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setShareOpen(false); };
+    const onDown = (e: MouseEvent) => { if (!(e.target as HTMLElement | null)?.closest?.('[data-testid="dash-share-wrap"]')) setShareOpen(false); };
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("mousedown", onDown);
+    return () => { document.removeEventListener("keydown", onKey); document.removeEventListener("mousedown", onDown); };
+  }, [shareOpen]);
   // Q116: a local preview of the other pipeline style; the style in force is the setting (meta.pipeline_variant)
   const [preview, setPreview] = useState<"A" | "B" | null>(null);
   const canExport =
@@ -1251,69 +1267,97 @@ export function Dashboard() {
               {t("dash.reset")}
             </button>
           )}
-          <Link className="btn" data-testid="dash-tv" to={`/dashboard?${new URLSearchParams([...sp.entries(), ["tv", "1"]]).toString()}`}>
-            <MonitorPlay size={16} />
-            {t("dash.tv")}
-          </Link>
-          <button
-            className="btn"
-            data-testid="dash-copy-link"
-            title={t("dash.copy_link_hint")}
-            onClick={() => {
-              // the address already carries the tab and every filter; it opens after the normal sign-in and the reader's own permissions apply
-              void navigator.clipboard?.writeText(window.location.href).then(() => {
-                setLinkCopied(true);
-                window.setTimeout(() => setLinkCopied(false), 2000);
-              });
-            }}
-          >
-            {linkCopied ? <Check size={16} /> : <Link2 size={16} />}
-            {linkCopied ? t("dash.link_copied") : t("dash.copy_link")}
-          </button>
-          <Link
-            className="btn"
-            to="/dashboard/manual-items"
-            data-testid="dash-manual-link"
-          >
-            <PencilLine size={16} />
-            {t("dash.manual_link")}
-          </Link>
-          {canExport && (
-            <span className="flex items-center gap-1">
-              <select
-                className="input w-auto"
-                aria-label={t("dash.export_format")}
-                data-testid="dash-export-format"
-                value={format}
-                onChange={(e) => setFormat(e.target.value as ExportFormat)}
-              >
-                {(["xlsx", "csv"] as const).map((f) => (
-                  <option key={f} value={f}>
-                    {t(`dash.format.${f}`)}
-                  </option>
-                ))}
-              </select>
+          {/* P2: the six output buttons live in one menu; the controls and their test ids are unchanged, only closed (hidden, not removed) */}
+          <span className="relative print:hidden" data-testid="dash-share-wrap">
+            <button
+              type="button"
+              className="btn"
+              data-testid="dash-share"
+              aria-haspopup="true"
+              aria-expanded={shareOpen}
+              onClick={() => setShareOpen((o) => !o)}
+            >
+              <Share2 size={16} />
+              {t("dash.share_menu")}
+              <ChevronDown size={14} aria-hidden />
+            </button>
+            <div
+              role="group"
+              aria-label={t("dash.share_menu")}
+              data-testid="dash-share-panel"
+              className={`${shareOpen ? "flex" : "hidden"} absolute end-0 top-full z-30 mt-1 min-w-56 flex-col gap-1 rounded-lg border border-line bg-surface p-2 shadow-lg`}
+            >
+              <Link className="btn justify-start" data-testid="dash-tv" to={`/dashboard?${new URLSearchParams([...sp.entries(), ["tv", "1"]]).toString()}`}>
+                <MonitorPlay size={16} />
+                {t("dash.tv")}
+              </Link>
               <button
-                className="btn print:hidden"
-                data-testid="dash-print"
-                disabled={gate.exportLocked}
-                title={gate.note(gate.exportLocked)}
-                onClick={() => window.print()}
+                className="btn justify-start"
+                data-testid="dash-copy-link"
+                title={t("dash.copy_link_hint")}
+                onClick={() => {
+                  // the address already carries the tab and every filter; it opens after the normal sign-in and the reader's own permissions apply
+                  void navigator.clipboard?.writeText(window.location.href).then(() => {
+                    setLinkCopied(true);
+                    window.setTimeout(() => setLinkCopied(false), 2000);
+                  });
+                }}
               >
-                <Printer size={16} />
-                {t("dash.print")}
+                {linkCopied ? <Check size={16} /> : <Link2 size={16} />}
+                {linkCopied ? t("dash.link_copied") : t("dash.copy_link")}
               </button>
-              <button
-                className="btn btn-primary"
-                data-testid="dash-export"
-                disabled={exporting || !d}
-                onClick={doExport}
+              <Link
+                className="btn justify-start"
+                to="/dashboard/manual-items"
+                data-testid="dash-manual-link"
               >
-                <Download size={16} />
-                {t("dash.export")}
-              </button>
-            </span>
-          )}
+                <PencilLine size={16} />
+                {t("dash.manual_link")}
+              </Link>
+              {canExport && (
+                <>
+                  <label className="flex items-center justify-between gap-2 px-1 text-sm text-mute">
+                    {t("dash.export_format")}
+                    <select
+                      className="input w-auto"
+                      aria-label={t("dash.export_format")}
+                      data-testid="dash-export-format"
+                      value={format}
+                      onChange={(e) => {
+                        setFormat(e.target.value as ExportFormat);
+                        savePref("dash.exportFormat", e.target.value);
+                      }}
+                    >
+                      {(["xlsx", "csv"] as const).map((f) => (
+                        <option key={f} value={f}>
+                          {t(`dash.format.${f}`)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <button
+                    className="btn justify-start print:hidden"
+                    data-testid="dash-print"
+                    disabled={gate.exportLocked}
+                    title={gate.note(gate.exportLocked)}
+                    onClick={() => window.print()}
+                  >
+                    <Printer size={16} />
+                    {t("dash.print")}
+                  </button>
+                  <button
+                    className="btn btn-primary justify-start"
+                    data-testid="dash-export"
+                    disabled={exporting || !d}
+                    onClick={doExport}
+                  >
+                    <Download size={16} />
+                    {t("dash.export")}
+                  </button>
+                </>
+              )}
+            </div>
+          </span>
         </span>
         {!!basis?.snapshot_dates?.length && (
           <div
@@ -1413,6 +1457,12 @@ export function Dashboard() {
                 </>
               ),
 
+              pinned_views: (
+                <>
+                  {/* 0.15.245 (owner request 2026-11-27, research item 16): the caller's pinned views with counters */}
+                  <PinnedViewsCard />
+                </>
+              ),
               ops_scurve: (
                 <>
                   {/* owner approval 2026-11-26, item 2: planned vs actual of the saved weekly snapshots, weekly velocity and the 100% forecast */}
@@ -1445,6 +1495,20 @@ export function Dashboard() {
                 <>
                   {/* 0.15.203 (owner approval 2026-11-26, item 6): open snags and NCR, average closure age, first-time acceptance */}
                   <OpsQualityCard ops={ops.data} />
+                </>
+              ),
+
+              ops_approvals: (
+                <>
+                  {/* 0.15.204 (owner approval 2026-11-26, item 7): tasks waiting review or approval, ages per ball-in-court role */}
+                  <OpsApprovalsCard ops={ops.data} />
+                </>
+              ),
+
+              ops_changes: (
+                <>
+                  {/* 0.15.205 (owner approval 2026-11-26, item 8): pending change requests and overdue meeting actions */}
+                  <OpsChangesCard ops={ops.data} />
                 </>
               ),
 
@@ -2602,11 +2666,62 @@ export function Dashboard() {
                   </Card>
                 </>
               ),
+
+              region_health: <RegionHealthCard />,
             },
           )}
         </>
       )}
     </div>
+  );
+}
+
+const REGION_HEALTH_TONE: Record<string, string> = { on_track: "bg-openBg text-openInk", at_risk: "bg-waitBg text-waitInk", off_track: "bg-lateBg text-lateInk" };
+
+/** Item 12 (0.15.241): the region health card — the current-week Weekly-status health of every visible region, with the missing-update flag. */
+function RegionHealthCard() {
+  const { t, i18n } = useTranslation();
+  const q = useRegionHealth();
+  const regions = useRegions();
+  const name = (id: number) => { const r = regions.data?.find((x) => x.id === id); return (i18n.language === "ar" && r?.name_ar) || r?.name_en || String(id); };
+  return (
+    <Card title={t("dash.region_health.title")} testid="dash-region-health">
+      {!q.data ? (
+        <p className="text-mute" role="status" data-testid="dash-region-health-loading">
+          {t("common.loading")}
+        </p>
+      ) : (
+        <>
+          <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {q.data.items.map((r) => (
+              <li
+                key={r.region_id}
+                className="flex items-center gap-2 rounded-lg border border-line px-2 py-1"
+                data-testid={`dash-region-health-${r.region_id}`}
+                data-health={r.health ?? "missing"}
+              >
+                <span className="font-semibold">{name(r.region_id)}</span>
+                {r.health ? (
+                  <span className={`chip ${REGION_HEALTH_TONE[r.health]}`} data-testid={`dash-region-health-chip-${r.region_id}`}>
+                    {t(`weekly.health_${r.health}`)}
+                  </span>
+                ) : (
+                  <span className="chip bg-waitBg text-waitInk" data-testid={`dash-region-health-chip-${r.region_id}`}>
+                    {t("weekly.missing_update")}
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-sm">
+            <Link className="hover:underline" to="/status-updates" data-testid="dash-region-health-link">
+              {t("dash.region_health.open")}
+            </Link>
+            <span className="text-mute"> · {t("dash.region_health.week", { date: q.data.week_start })}</span>
+          </p>
+        </>
+      )}
+    </Card>
   );
 }
 

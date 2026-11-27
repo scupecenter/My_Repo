@@ -4,6 +4,86 @@
  */
 
 export interface paths {
+    "/me/push": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Web Push status of the caller (own browsers)
+         * @description 0.15.156. `enabled` is false until the server has its VAPID keys. `this_browser` is true when the `endpoint` query matches one of the caller's subscriptions.
+         */
+        get: operations["getMyPush"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/push/subscribe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Turn on Web Push for the caller's browser
+         * @description 0.15.156. A browser that another person used is moved to the caller. 409 while push is not configured on the server.
+         */
+        post: operations["subscribeMyPush"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/push/unsubscribe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Turn off Web Push for the caller's browser
+         * @description 0.15.156. Own rows only; an endpoint that is not the caller's removes nothing.
+         */
+        post: operations["unsubscribeMyPush"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/web-push": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Web Push on or off, with counts (System Admin)
+         * @description 0.15.156. 403 for anyone but a System Admin.
+         */
+        get: operations["getAdminWebPush"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/document-search-index": {
         parameters: {
             query?: never;
@@ -237,6 +317,27 @@ export interface paths {
          *     identifier and 10 per IP per hour (over the IP limit: 429 `rate_limited`). The token is only in the URL fragment of the mailed link.
          */
         post: operations["requestPasswordReset"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/csp-report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Where browsers report Content-Security-Policy violations (SEC-3)
+         * @description Public, because a browser sends the report without the session. Accepts the legacy `application/csp-report` body and the Reporting API list
+         *     (`application/reports+json`). Logs a short sanitised line and counts per directive in memory; changes nothing. 413 above 16 KB, 429 above 30 per minute per address.
+         */
+        post: operations["reportCspViolation"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4343,6 +4444,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/register-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The editable rules of the registers and their values
+         * @description 0.15.331 (migration 0430). System Admin or a delegate of `fields.edit` for all regions. `catalogue` lists the keys that can be edited (register, key, type, default, labels), `items` the registers that have some with their current `rules`.
+         */
+        get: operations["listRegisterRules"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/register-rules/{register_key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A register key (see `GET /registers`). */
+                register_key: components["parameters"]["RegisterKeyAny"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Change rules of one register
+         * @description 0.15.331 (migration 0430). Only keys of the catalogue (422 `unknown_rule`), each with the right type (422 `invalid`). A reason is required, the ETag is checked and the change is audited with before and after.
+         */
+        put: operations["setRegisterRules"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/sla-rules": {
         parameters: {
             query?: never;
@@ -5926,6 +6070,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/data-reset/narrow-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What the reset picker offers for narrowing (System Admin only)
+         * @description 0.15.265 (migration 0370, `data_reset_narrow_options`). A System Admin acting without delegation. The regions and the 200 most recent import batches of the part (`part`), with their row counts, and the narrowable parts.
+         */
+        get: operations["getDataResetNarrowOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/data-reset/settings": {
         parameters: {
             query?: never;
@@ -6088,7 +6252,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/settings/imports": {
+    "/settings/template-change-notice": {
         parameters: {
             query?: never;
             header?: never;
@@ -6096,18 +6260,39 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * The background threshold of batches (imports.async_rows)
-         * @description 0.14.6. Every signed-in user may read it. A send or a decision of a batch (New sites, register, stream, and each staged batch of a Master import apply) with more
-         *     rows than `async_rows` runs in the background (202, status `processing`). `can_edit` is true for a System Admin or a delegate of `settings` edit for all regions.
+         * The notice of a new template version (templates.change_notice)
+         * @description 0.15.203 (P3). Every signed-in user may read it. `enabled`: the daily job writes an in-app notice to the entry holders of a register when its template gets a new version; `days`: how long after the version is issued a person is still told. `can_edit` is true for a System Admin or a delegate of `settings` edit for all regions.
          */
-        get: operations["getImportsSettings"];
+        get: operations["getTemplateChangeNotice"];
         /**
-         * Change the background threshold (reason, If-Match, audited)
-         * @description 0.14.6. A System Admin, or a delegate of `settings` edit for all regions (403 `action_forbidden` otherwise, also for a delegate limited to some regions). A whole number
-         *     from 10 to 500 (422 `validation_failed`, path `/async_rows`), a reason and If-Match; an unknown key is refused (422 `unknown_field`). Saving the value in force is
-         *     409 `invalid_transition`. Audited as `imports_async_rows_update` with the value, who and when before and after. The next send or decision reads the new value.
+         * Change the notice of a new template version (reason, If-Match, audited)
+         * @description 0.15.203. A System Admin, or a delegate of `settings` edit for all regions (403 `action_forbidden`). `days` 1 to 365 (422 `validation_failed`, path `/days`), a reason and If-Match. Saving the values in force is 409 `invalid_transition`. Audited as `template_change_notice_update` with the values before and after.
          */
-        put: operations["setImportsSettings"];
+        put: operations["setTemplateChangeNotice"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/imports/upload-policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The upload policy of the imports (imports.upload_policy)
+         * @description 0.15.322. Every signed-in user may read it. `enforce` (default) keeps the sequencing locks of the sites; `accept_incomplete` opens the sites of a Master import run before it is applied (see the apply).
+         */
+        get: operations["getImportsUploadPolicy"];
+        /**
+         * Change the upload policy (reason, If-Match, audited)
+         * @description 0.15.322. A System Admin, or a delegate of `settings` edit for all regions (403 `action_forbidden` otherwise). `policy` is `enforce` or `accept_incomplete` (422 `validation_failed`, path `/policy`; an unknown key 422 `unknown_field`), with a reason and If-Match. Saving the value in force is 409 `invalid_transition`. Audited as `imports_upload_policy_update` with before and after.
+         */
+        put: operations["setImportsUploadPolicy"];
         post?: never;
         delete?: never;
         options?: never;
@@ -6329,6 +6514,119 @@ export interface paths {
          * @description Made from the stored original on the first request (EXIF orientation applied, metadata removed) and kept beside it. 404 when the item is not visible to the caller; 415 `thumbnail_unsupported` for a file type without a thumbnail; 503 `thumbnails_unavailable` when thumbnails are off or the maker is not installed.
          */
         get: operations["getMediaThumbnail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/identity/logo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Upload the workspace logo (reason, step-up, If-Match, audited) (0.15.107)
+         * @description A System Admin, or a delegate of `settings` edit for all regions (403 `action_forbidden` otherwise, also for a delegate limited to some regions). A `reason`
+         *     (3+ characters), a step-up (401 `step_up_required`) and, once a logo exists, `If-Match` on the asset `version` (428 / 412) are required. The body is the
+         *     image: PNG, JPEG, SVG or WebP, 256 KiB at most (422 `errors[0]` `{path: /file}`). An upload always enables the logo and bumps the version. Audited
+         *     `ui_asset_update` with the metadata (never the bytes) before and after.
+         */
+        put: operations["putUiLogo"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Show or hide the workspace logo (reason, step-up, If-Match, audited) (0.15.107)
+         * @description Hiding keeps the row and its bytes (hide never delete): the sidebar falls back to the built-in badge until the logo is enabled again. The same rights,
+         *     reason, step-up and If-Match rules as the upload; a missing logo is 422 `errors[0]` `{path: /key, code: not_found}` and saving the state in force is 409
+         *     `invalid_transition`. Audited `ui_asset_update`.
+         */
+        patch: operations["setUiLogoEnabled"];
+        trace?: never;
+    };
+    "/settings/identity/logo/display": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Where the logo shows outside the app, the sign-in pages and the browser tab icon (reason, step-up, If-Match, audited) (0.15.232)
+         * @description Both switches are off until an admin turns one on, so nothing about the logo is public by default. A switch has an effect only while the logo is enabled.
+         *     Same rights, reason, step-up and If-Match rules as the upload; a missing logo is 422 `errors[0]` `{path: /key, code: not_found}`, saving the values in force is
+         *     409 `invalid_transition`. Audited `ui_asset_update` with before and after.
+         */
+        patch: operations["setUiLogoDisplay"];
+        trace?: never;
+    };
+    "/ui/public/identity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Which public pages show the logo (no session) (0.15.232)
+         * @description No session. Only whether the sign-in pages and the tab icon use the logo, with the version for cache busting; `null` for a purpose that is off (the default). Nothing
+         *     about users, no audit data. Cached 30 seconds and rate limited per address (429 `rate_limited`).
+         */
+        get: operations["getUiPublicIdentity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ui/public/logo/{purpose}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The logo image for the sign-in pages or the tab icon (no session) (0.15.232)
+         * @description No session. The bytes of the enabled logo, only while the admin switched this purpose on; otherwise 404. SVG is served with a sandboxing Content-Security-Policy and
+         *     `nosniff`. Cached 30 seconds and rate limited per address.
+         */
+        get: operations["getUiPublicLogo"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ui/assets/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The bytes of an enabled identity image (0.15.107)
+         * @description Every signed-in user may read it (the logo is the organization identity, not user data). 404 when the key is unknown or the asset is hidden. Cache with the `version` of `UiIdentity.logo` as the query `v`.
+         */
+        get: operations["getUiAsset"];
         put?: never;
         post?: never;
         delete?: never;
@@ -6701,6 +6999,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/ops-limits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The operational limits, with the value in force and the default of each (0.15.312)
+         * @description Every signed-in user may read it. `can_edit` is true for a System Admin only. A value that was never saved reads as its default.
+         */
+        get: operations["getOpsLimits"];
+        /**
+         * Change the operational limits (System Admin, reason, step-up, If-Match, audited) (0.15.312)
+         * @description System Admin only (403 `action_forbidden` otherwise, a delegate included). A reason (3+ characters), a step-up (401 `step_up_required`) and `If-Match` (428 / 412)
+         *     are required. `values` holds the limits that differ from their default; a key that is left out returns to its default. 422 for an unknown key, a value that is not a
+         *     whole number, a value outside its range, or an absolute session length shorter than the idle limit. Saving what is already in force is 409 `invalid_transition`.
+         *     Audited `ops_limits_update` with the stored values before and after.
+         */
+        put: operations["setOpsLimits"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/historical-waiver": {
         parameters: {
             query?: never;
@@ -6956,6 +7281,66 @@ export interface paths {
          * @description 0.15.225. The approved Procurement versions in force, not cancelled, that the caller can see; of the site `site_id` when it is given. Needs the Change Control module; only the orders in regions where the caller also holds the Procurement view right (the responsibility matrix) are listed, and the same right is checked when the record is saved.
          */
         get: operations["listChangeControlOrderOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/registers/financial_advances/advance-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The advances an expense or settlement may name (0.15.330)
+         * @description 0.15.330. The approved advances in the state disbursed or settlement in progress, of the site `site_id` when it is given, in the regions the caller may read. Needs the Financial Advances view right.
+         */
+        get: operations["listAdvanceOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/registers/invoices/order-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The approved, active Procurement orders an invoice may name (0.15.330)
+         * @description 0.15.330. Same list as the other order pickers; needs the Invoices module view; only the orders in regions where the caller also holds the Procurement view right.
+         */
+        get: operations["listInvoiceOrderOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/registers/invoices/supplier-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The companies an invoice may name as its supplier (0.15.330)
+         * @description 0.15.330. The active companies of the Contractors list (`id`, `name`, `type`). Needs the Invoices module view; no Procurement right is required, and nothing else about the companies is returned.
+         */
+        get: operations["listInvoiceSupplierOptions"];
         put?: never;
         post?: never;
         delete?: never;
@@ -8493,6 +8878,30 @@ export interface paths {
         };
         /** Approved templates the caller may download or use */
         get: operations["listTemplates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/templates/{template_id}/changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Template ID such as TPL-SITE. */
+                template_id: components["parameters"]["TemplateId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * What changed between two versions of a template (columns added, removed, renamed)
+         * @description P3 (0.15.203). Compares `template_versions.columns` by column code. `to` defaults to the current version, `from` to the version before it. Read only; a caller who may not see the template gets 404 as for `GET /templates`.
+         *     A version that was never issued (for example from > current) answers 404. The first version has nothing to compare: `from` is null and the lists are empty.
+         */
+        get: operations["getTemplateChanges"];
         put?: never;
         post?: never;
         delete?: never;
@@ -10536,6 +10945,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/status-updates/region-health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Region health of the current week (0.15.241, item 12)
+         * @description One row per region the caller may view on `sites` (all seven when unrestricted). `health`, `summary`, `author` and `updated_at` come from the region's Weekly status update of the current working week (it opens on Sunday); they are null and `missing_update` is true when the region has not posted this week. Read only.
+         */
+        get: operations["getRegionHealth"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/status-updates/{update_id}": {
         parameters: {
             query?: never;
@@ -11309,10 +11738,182 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/presence/editing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The other current editors of an entity (0.15.246)
+         * @description 0.15.246 (migration 0345). Advisory "… is editing" presence: the editors of the entity other than the caller whose heartbeat is fresh (2 minutes). The caller themself is never listed.
+         */
+        get: operations["listEditPresence"];
+        put?: never;
+        /**
+         * The caller is editing this entity (heartbeat, 0.15.246)
+         * @description 0.15.246 (migration 0345). Upserts the caller's row and sweeps stale rows. Send every 30 seconds while the editor is open.
+         */
+        post: operations["pingEditPresence"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/presence/editing/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The caller stopped editing this entity (0.15.246)
+         * @description 0.15.246 (migration 0345). Removes the caller's row at once instead of letting it fade out.
+         */
+        post: operations["stopEditPresence"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/comments/{comment_id}/reactions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Comment. */
+                comment_id: components["parameters"]["CommentId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * React to a comment (0.15.247, PM item 18)
+         * @description Adds the caller's reaction to any comment they can read, a task comment or a register-record comment (the same bar as commenting on it). The emoji travels in the body because the client path whitelist keeps non-ASCII out of URLs. 404 `not_found` for a comment the caller cannot read, so its existence is not revealed; 422 `validation_failed` for an unsupported emoji. Idempotent. Not audited.
+         */
+        put: operations["reactToComment"];
+        post?: never;
+        /**
+         * Remove the caller's reaction (0.15.247)
+         * @description Removes the caller's own reaction, named in the body like the PUT. 404 for a comment the caller cannot read. Idempotent.
+         */
+        delete: operations["unreactToComment"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/comments/{comment_id}/resolved": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Comment. */
+                comment_id: components["parameters"]["CommentId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Mark a comment resolved (0.15.247, PM item 18)
+         * @description Marks the point of the comment resolved and records who did it and when. Anyone who can read the thread may resolve, the same bar as commenting. 404 for a comment the caller cannot read. Not audited.
+         */
+        put: operations["resolveComment"];
+        post?: never;
+        /**
+         * Open a resolved comment again (0.15.247)
+         * @description Clears the resolved mark (`resolved_at` and `resolved_by` read as null again). 404 for a comment the caller cannot read.
+         */
+        delete: operations["unresolveComment"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/home-pins": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The caller's pinned home views (0.15.245)
+         * @description 0.15.245 (migration 0344). The views the caller pinned as cards on the home dashboard, in the pin order. A pin is personal; a view that was deactivated or became unreadable drops out of the list. The counter a card shows is computed by the screen's own list endpoint for the caller, so it always stays inside the caller's permissions.
+         */
+        get: operations["getHomePins"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/saved-views/{view_id}/pin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pin a saved view as a card on the home dashboard (0.15.245)
+         * @description 0.15.245 (migration 0344). Personal: the pin is the caller's own. A view the caller may not read answers 404, exactly like `GET /saved-views/{view_id}`. At most 12 pins per caller (422 `validation_failed`, `/view` `too_many`); pinning again is a no-op.
+         */
+        post: operations["pinSavedViewHome"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/saved-views/{view_id}/unpin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Unpin a saved view from the home dashboard (0.15.245)
+         * @description 0.15.245 (migration 0344). Removes the caller's pin; a missing pin is a no-op.
+         */
+        post: operations["unpinSavedViewHome"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        MyPush: {
+            enabled: boolean;
+            /** @description The VAPID public key (public by design); null while push is off. */
+            public_key: string | null;
+            count: number;
+            this_browser: boolean;
+        };
+        AdminWebPush: {
+            enabled: boolean;
+            subscriptions: number;
+            users: number;
+            /** Format: date-time */
+            last_pushed_at: string | null;
+        };
         ExportScheduleInput: {
             /** Format: uuid */
             id?: string;
@@ -12085,7 +12686,7 @@ export interface components {
             }[];
         };
         /** @enum {string} */
-        SearchType: "sites" | "registers" | "documents" | "meetings" | "people" | "contractors" | "tasks" | "warehouse_items";
+        SearchType: "sites" | "registers" | "documents" | "meetings" | "people" | "contractors" | "tasks" | "warehouse_items" | "snags";
         SearchHit: {
             id: string;
             /** @description Shown as is. `match_ranges` are offsets (UTF-16 code units, start inclusive, end exclusive) into this text. */
@@ -12859,6 +13460,8 @@ export interface components {
             reason: components["schemas"]["Reason"];
         };
         RolePatch: {
+            /** @description 0.15.500 (0500, D51). Changes the code; built-in codes are locked (422), a duplicate is 409. */
+            code?: string;
             name_en?: string;
             name_ar?: string;
             description_en?: string;
@@ -13199,6 +13802,8 @@ export interface components {
             errors: number;
             /** @description The missing required values of the site now. */
             data_gaps: number;
+            /** @description 0.15.322: what is missing, per site (the missing-data indicator of the upload preview); the gaps of an approved-as-is task are not listed here. */
+            data_gap_items: components["schemas"]["SiteDataGap"][];
         };
         SiteListItem: {
             /** Format: uuid */
@@ -13700,8 +14305,31 @@ export interface components {
             body: string;
             is_rejection_note?: boolean;
             mentions?: components["schemas"]["UserRef"][];
+            /** @description 0.15.247. One entry per emoji used on the comment, with the count and whether the caller reacted. */
+            reactions?: components["schemas"]["CommentReaction"][];
+            resolved?: components["schemas"]["CommentResolved"];
             /** Format: date-time */
             created_at: string;
+        };
+        CommentReactionInput: {
+            /**
+             * @description 0.15.247. Starts with 👍 only.
+             * @enum {string}
+             */
+            emoji: "👍";
+        };
+        CommentReaction: {
+            /** @description 0.15.247. Starts with 👍 only. */
+            emoji: string;
+            count: number;
+            /** @description The caller reacted with this emoji. */
+            mine: boolean;
+        };
+        /** @description 0.15.247. Set while the comment is marked resolved; absent (null) while open. */
+        CommentResolved: {
+            /** Format: date-time */
+            at: string;
+            by: components["schemas"]["UserRef"];
         };
         OverrideRequest: {
             /** @enum {string} */
@@ -15088,6 +15716,25 @@ export interface components {
                 phone?: components["schemas"]["StaffFieldVisibility"];
             };
         };
+        TemplateChanges: {
+            template_id: string;
+            from: number | null;
+            to: number;
+            /** Format: date-time */
+            issued_at: string | null;
+            reason: string | null;
+            added: components["schemas"]["TemplateColumnRef"][];
+            removed: components["schemas"]["TemplateColumnRef"][];
+            renamed: {
+                code: string;
+                from_label: string;
+                to_label: string;
+            }[];
+        };
+        TemplateColumnRef: {
+            code: string;
+            label: string;
+        };
         Template: {
             /**
              * @example TPL-SITE
@@ -16369,6 +17016,16 @@ export interface components {
             width: "narrow" | "medium" | "wide";
             show_tabs: boolean;
         };
+        /** @description 0.15.262. The unsaved-changes guard: the master switch and one switch per area. */
+        UiUnsavedGuard: {
+            enabled: boolean;
+            settings: boolean;
+            dialogs: boolean;
+            drawers: boolean;
+            inline: boolean;
+            composers: boolean;
+            navigation: boolean;
+        };
         /** @description 0.15.185. The sections of the interface features setting; every section is complete. */
         UiFeatures: {
             avatars: components["schemas"]["UiAvatars"];
@@ -16376,6 +17033,7 @@ export interface components {
             inbox: components["schemas"]["UiInbox"];
             data_hub: components["schemas"]["UiDataHub"];
             panel: components["schemas"]["UiPanel"];
+            unsaved_guard: components["schemas"]["UiUnsavedGuard"];
         };
         UiFeaturesPatch: {
             avatars?: components["schemas"]["UiAvatars"];
@@ -16383,6 +17041,7 @@ export interface components {
             inbox?: components["schemas"]["UiInbox"];
             data_hub?: components["schemas"]["UiDataHub"];
             panel?: components["schemas"]["UiPanel"];
+            unsaved_guard?: components["schemas"]["UiUnsavedGuard"];
         };
         UiFeaturesSetting: {
             sections: components["schemas"]["UiFeatures"];
@@ -16760,6 +17419,8 @@ export interface components {
             selected: boolean;
             /** @description In the closure only because a chosen part takes it along. */
             added: boolean;
+            /** @description 0.15.265. The part can be narrowed to regions, batches or a period (its data follows one register record). */
+            narrowable?: boolean;
         };
         DataResetScope: {
             /** @description 1; 0 for a request made before 0.15.71 (`legacy`: everything as it was then). */
@@ -16773,8 +17434,48 @@ export interface components {
             everything?: boolean;
             /** @description The identity parts of the closure. */
             identity?: components["schemas"]["DataResetPartCode"][];
-            /** @description SHA-256 of the closure. */
+            /** @description SHA-256 of the closure (with the narrowing when there is one). */
             hash?: string;
+            /** @description 0.15.265. The narrowing of the scope (normal form), null when the whole part goes. */
+            narrow?: components["schemas"]["DataResetNarrow"] | null;
+        };
+        /** @description 0.15.265. Narrows the chosen register parts to the entities that match every given key. */
+        DataResetNarrow: {
+            /** @description Region ids (any of). */
+            regions?: number[];
+            /** @description Import batch ids (any of): the record came from the batch directly or through a row. */
+            batches?: string[];
+            /**
+             * Format: date
+             * @description First-created day, inclusive (Africa/Tripoli).
+             */
+            from?: string;
+            /**
+             * Format: date
+             * @description First-created day, inclusive (Africa/Tripoli).
+             */
+            to?: string;
+            readonly version?: number;
+        };
+        DataResetNarrowOptions: {
+            narrowable: components["schemas"]["DataResetPartCode"][];
+            regions: {
+                id: number;
+                code: string;
+                name_en: string;
+                name_ar?: string | null;
+            }[];
+            batches: {
+                /** Format: uuid */
+                id: string;
+                file_name: string;
+                register_key?: string | null;
+                rows_total: number;
+                status: string;
+                /** Format: date-time */
+                created_at: string;
+                historical_load?: boolean;
+            }[];
         };
         DataResetPlan: {
             scope: components["schemas"]["DataResetScope"];
@@ -16789,6 +17490,8 @@ export interface components {
             error?: string | null;
             /** @description 0.15.71. The catalogue in screen order, with the rows of each part and whether the scope selects it. */
             parts: components["schemas"]["DataResetPart"][];
+            /** @description 0.15.265. The narrowing the counts are for. */
+            narrow?: components["schemas"]["DataResetNarrow"] | null;
         };
         DataResetFiles: {
             total: number;
@@ -17101,6 +17804,8 @@ export interface components {
             is_custom?: boolean;
             /** @description 0.4.6. The form section of a base field (for example `Request`, `Validity`, `PTW checks`), in English, in the order of the fields. Absent for custom fields. */
             section?: string | null;
+            /** @description 0.15.156. The Arabic name of the field section (register_sections.name_ar, migration 0422); the web falls back to `section`. Absent when the section has no Arabic name yet. */
+            section_ar?: string | null;
             options?: {
                 value: string;
                 label_en: string;
@@ -17817,6 +18522,45 @@ export interface components {
             version: number;
             can_edit: boolean;
         };
+        /** @description 0.15.322. The setting `imports.upload_policy`: what the Master import apply does with incomplete data. */
+        ImportsUploadPolicy: {
+            /** @enum {string} */
+            policy: "enforce" | "accept_incomplete";
+            /** @enum {string} */
+            default_policy: "enforce";
+            policies: ("enforce" | "accept_incomplete")[];
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+            /** @description The ETag value. */
+            version: number;
+            can_edit: boolean;
+        };
+        /** @description 0.15.203. The setting `templates.change_notice`. */
+        TemplateChangeNotice: {
+            enabled: boolean;
+            days: number;
+            /** @description 14 */
+            default_days: number;
+            min: number;
+            max: number;
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+            /** @description The ETag value. */
+            version: number;
+            can_edit: boolean;
+        };
+        ImportsUploadPolicyInput: {
+            /** @enum {string} */
+            policy: "enforce" | "accept_incomplete";
+            reason: string;
+        };
+        TemplateChangeNoticeInput: {
+            enabled: boolean;
+            days: number;
+            reason: string;
+        };
         /** @description 0.15.1. A sub-heading of the side menu (under a main heading): screen keys only, no deeper level. */
         NavSubHeading: {
             /** @description Unique among all headings. */
@@ -17857,6 +18601,11 @@ export interface components {
             menu_style?: "default" | "rail" | "autohide";
             /** @enum {string} */
             accent?: "default" | "teal" | "blue" | "violet" | "green" | "orange" | "red" | "amber";
+            /**
+             * @description 0.15.248 (0347): the high-contrast mode.
+             * @enum {string}
+             */
+            contrast?: "standard" | "high";
         };
         /** @description 0.15.231 (0242): the personal sidebar (proposal item 4). `hidden` the screens the menu does not show, `order` their order inside their heading (a screen the list does not name keeps the organization order, after the named ones), `badge_style` how the count badges draw (full = the number, dot = a dot, none = no badge), `pins` the pinned shortcuts on top (at most 20). A menu key is a short lowercase id (the entries of the side menu; an unknown key is ignored). */
         UiNav: {
@@ -17882,6 +18631,8 @@ export interface components {
                 [key: string]: string[];
             };
             brands: components["schemas"]["UiBrand"][];
+            /** @description 0.15.232 (0243): the workspace logo (ui_asset_state). null: none was uploaded; the sidebar shows the built-in badge. */
+            logo?: components["schemas"]["UiAsset"] | null;
             /** Format: date-time */
             updated_at?: string | null;
             updated_by?: components["schemas"]["UserRef"] | null;
@@ -17889,6 +18640,41 @@ export interface components {
             version: number;
             /** @description A System Admin or a delegate of `settings` edit for all regions. */
             can_edit: boolean;
+        };
+        /** @description 0.15.232 (0243). An identity image (migration 0243, table ui_assets). The bytes are served by `GET /ui/assets/{key}`; this is the metadata. */
+        UiAsset: {
+            /** @description 'logo' today. */
+            key: string;
+            /** @description Shown on the sign-in pages (public). false by default; an admin turns it on in Settings > Identity. */
+            show_on_login: boolean;
+            /** @description Used as the browser tab icon (public). false by default. */
+            use_as_favicon: boolean;
+            /** @enum {string} */
+            mime: "image/png" | "image/jpeg" | "image/svg+xml" | "image/webp";
+            /** @description false hides it (the row stays: hide never delete). */
+            enabled: boolean;
+            /** @description The asset ETag value (If-Match on the logo endpoints). */
+            version: number;
+            /** Format: date-time */
+            updated_at?: string;
+            updated_by?: components["schemas"]["UserRef"] | null;
+        };
+        UiAssetDisplayInput: {
+            show_on_login: boolean;
+            use_as_favicon: boolean;
+            reason: string;
+        };
+        UiPublicIdentity: {
+            login: components["schemas"]["UiPublicLogo"] | null;
+            favicon: components["schemas"]["UiPublicLogo"] | null;
+        };
+        UiPublicLogo: {
+            version: number;
+            /** @enum {string} */
+            mime: "image/png" | "image/jpeg" | "image/svg+xml" | "image/webp";
+        };
+        UiAssetEnabledInput: components["schemas"]["WithReason"] & {
+            enabled: boolean;
         };
         UiIdentityInput: components["schemas"]["WithReason"] & {
             default_brand: components["schemas"]["UiBrand"];
@@ -18163,6 +18949,39 @@ export interface components {
             user_id: string;
             minutes?: number;
         };
+        /** @description 0.15.312. One operational limit. */
+        OpsLimitItem: {
+            /** @enum {string} */
+            key: "session.idle_hours" | "session.absolute_hours" | "stepup.seconds" | "assignments.max_rows" | "import.max_rows" | "master_import.max_rows" | "register_import.max_rows" | "prefill.max_rows" | "prefill.max_sites" | "export.max_rows" | "idempotency.max_entries";
+            /** @enum {string} */
+            group: "sessions" | "rows" | "exports";
+            /** @enum {string} */
+            unit: "hours" | "seconds" | "rows" | "sites" | "entries";
+            default: number;
+            min: number;
+            max: number;
+            /** @description The value in force. */
+            value: number;
+            /** @description true when no value was saved for this key. */
+            is_default: boolean;
+        };
+        /** @description 0.15.312. The operational limits (setting `ops.limits`, migration 0402). */
+        OpsLimits: {
+            items: components["schemas"]["OpsLimitItem"][];
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+            /** @description The ETag value. */
+            version: number;
+            /** @description A System Admin only. */
+            can_edit: boolean;
+        };
+        OpsLimitsInput: components["schemas"]["WithReason"] & {
+            /** @description The limits that differ from their default, key to value. A key that is left out returns to its default. */
+            values: {
+                [key: string]: number;
+            };
+        };
         /** @description 0.15.1. The shared order of the side menu (setting `nav.layout`). */
         NavLayout: {
             headings: components["schemas"]["NavHeading"][];
@@ -18267,6 +19086,8 @@ export interface components {
             gecol_hlc: components["schemas"]["DashboardOpsGecolHlc"];
             contractor_scorecard: components["schemas"]["DashboardOpsScorecard"];
             quality: components["schemas"]["DashboardOpsQuality"];
+            approvals: components["schemas"]["DashboardOpsApprovals"];
+            changes_meetings: components["schemas"]["DashboardOpsChangesMeetings"];
         };
         /** @description 0.15.106: procurement and materials (dashboard proposals item 1). */
         DashboardOpsProcurement: {
@@ -18375,6 +19196,67 @@ export interface components {
             civil_ready_no_power: number | null;
             /** @description HLC only: installation_date set but not in service yet; null in the GECOL part. */
             installed_not_in_service: number | null;
+        };
+        /** @description 0.15.204 (item 7): the tasks waiting for review or approval, their ages since the level opened, and the bottleneck role. */
+        DashboardOpsApprovals: {
+            /** @description False when the caller lacks the approvals or the sites view; every figure is then null. */
+            available: boolean;
+            /** @description The waiting tasks (states in_review and in_approval, as the Approvals inbox). */
+            total: number | null;
+            /** @description The waiting tasks at a review level. */
+            review: number | null;
+            /** @description The waiting tasks at an approve level. */
+            approve: number | null;
+            waiting: components["schemas"]["DashboardOpsAging"] | null;
+            /** @description One entry per ball-in-court role, most waiting tasks first. */
+            by_role: {
+                /** Format: uuid */
+                role_id: string;
+                name_en: string;
+                name_ar: string | null;
+                /** @description The waiting tasks whose ball-in-court role is this one. */
+                count: number;
+                /** @description The age of the oldest waiting task of the role, calendar days. */
+                oldest_days: number | null;
+                buckets: {
+                    /** @enum {string} */
+                    key: "d0_7" | "d8_14" | "d15_30" | "over_30";
+                    count: number;
+                }[];
+            }[] | null;
+            /** @description The waiting tasks with no ball-in-court role (a group holds them, or nobody yet). */
+            unassigned: number | null;
+        };
+        /** @description 0.15.205 (item 8): the pending change requests and the overdue meeting actions. */
+        DashboardOpsChangesMeetings: {
+            /** @description False when the caller has neither the change control nor the meetings view. */
+            available: boolean;
+            changes: {
+                /** @description False without the change control view; every figure is then null. */
+                available: boolean;
+                /** @description Change requests with status requested. */
+                pending: number | null;
+                /** @description Change requests approved and not yet applied. */
+                approved_not_applied: number | null;
+                /** @description The pending change requests per kind, most first. */
+                by_kind: {
+                    /** @enum {string} */
+                    kind: "scope_change" | "date_change" | "suspension" | "resumption" | "other";
+                    count: number;
+                }[] | null;
+                pending_aging: components["schemas"]["DashboardOpsAging"] | null;
+            };
+            actions: {
+                /** @description False without the meetings view; every figure is then null. */
+                available: boolean;
+                /** @description Meeting actions open or in progress. */
+                open: number | null;
+                /** @description Open actions whose due date is before today. */
+                overdue: number | null;
+                /** @description Open actions with no due date. */
+                no_due_date: number | null;
+                overdue_aging: components["schemas"]["DashboardOpsAging"] | null;
+            };
         };
         /** @description 0.15.203 (item 6): the open snags and NCRs of the in-scope sites, the average closure age of each and the first-time acceptance rate. */
         DashboardOpsQuality: {
@@ -20628,6 +21510,40 @@ export interface components {
                 name_ar?: string | null;
             }[];
         };
+        EditPresencePing: {
+            /**
+             * @description register records and workflow tasks.
+             * @enum {string}
+             */
+            kind: "record" | "task";
+            /** Format: uuid */
+            entity_id: string;
+        };
+        /** @description 0.15.246: another current editor of the entity (migration 0345). */
+        EditPresenceEditor: {
+            /** Format: uuid */
+            id: string;
+            display_name: string;
+            employee_id: string | null;
+            /**
+             * Format: date-time
+             * @description When this editing spell began.
+             */
+            since: string;
+        };
+        /** @description 0.15.245: one pinned home view (migration 0344). The card's counter is computed by the screen's own list endpoint for the caller. */
+        HomeViewPin: {
+            /** Format: uuid */
+            view_id: string;
+            /** @description The view's current name. */
+            name: string;
+            screen_key: components["schemas"]["SavedViewScreenKey"];
+            /** @description The view's filters, scrubbed for the caller like a read of the view (hidden fields left out). */
+            filters: {
+                [key: string]: unknown;
+            };
+            position: number;
+        };
         SavedView: {
             /** Format: uuid */
             id: string;
@@ -20874,6 +21790,25 @@ export interface components {
             updated_at: string;
             /** @description true for the author until the end of the week. */
             editable: boolean;
+        };
+        RegionHealth: {
+            region_id: number;
+            /** @enum {string|null} */
+            health: "on_track" | "at_risk" | "off_track" | null;
+            summary: string | null;
+            author: components["schemas"]["UserRef"] | null;
+            /** Format: date-time */
+            updated_at: string | null;
+            /** @description true when the region has not posted its Weekly status update of the current working week. */
+            missing_update: boolean;
+        };
+        RegionHealthBoard: {
+            /**
+             * Format: date
+             * @description The Sunday that opens the current working week.
+             */
+            week_start: string;
+            items: components["schemas"]["RegionHealth"][];
         };
         NotificationPreference: {
             kind: components["schemas"]["NotificationKind"];
@@ -22177,6 +23112,8 @@ export interface components {
         RegisterKeyPath: components["schemas"]["RegisterKey"];
         /** @description Register record. */
         RegisterRecordId: string;
+        /** @description Comment. */
+        CommentId: string;
         /** @description Document Library definition. */
         DocTypeId: string;
         /** @description Template ID such as TPL-SITE. */
@@ -22217,6 +23154,122 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    getMyPush: {
+        parameters: {
+            query?: {
+                endpoint?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The status. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyPush"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    subscribeMyPush: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uri */
+                    endpoint: string;
+                    keys: {
+                        p256dh: string;
+                        auth: string;
+                    };
+                    user_agent?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Subscribed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        count: number;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    unsubscribeMyPush: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uri */
+                    endpoint: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Done. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        removed: number;
+                        count: number;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getAdminWebPush: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The status. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminWebPush"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
     getDocumentSearchIndex: {
         parameters: {
             query?: never;
@@ -22502,6 +23555,34 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    reportCspViolation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/csp-report": {
+                    [key: string]: unknown;
+                };
+                "application/reports+json": {
+                    [key: string]: unknown;
+                }[];
+            };
+        };
+        responses: {
+            /** @description Received. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             429: components["responses"]["TooManyRequests"];
         };
     };
@@ -29514,6 +30595,92 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
         };
     };
+    listRegisterRules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The rules. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        catalogue: {
+                            register_key: string;
+                            key: string;
+                            /** @enum {string} */
+                            type: "boolean" | "text";
+                            default?: unknown;
+                            label_en: string;
+                            label_ar?: string;
+                        }[];
+                        items: {
+                            register_key: string;
+                            name_en: string;
+                            name_ar?: string | null;
+                            rules: {
+                                [key: string]: unknown;
+                            };
+                            version: number;
+                        }[];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setRegisterRules: {
+        parameters: {
+            query?: never;
+            header?: {
+                "If-Match"?: string;
+            };
+            path: {
+                /** @description A register key (see `GET /registers`). */
+                register_key: components["parameters"]["RegisterKeyAny"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    rules: {
+                        [key: string]: boolean | string;
+                    };
+                    reason: components["schemas"]["Reason"];
+                };
+            };
+        };
+        responses: {
+            /** @description The new rules. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        register_key: string;
+                        rules: {
+                            [key: string]: unknown;
+                        };
+                        version: number;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
     listSlaRules: {
         parameters: {
             query?: {
@@ -32457,6 +33624,14 @@ export interface operations {
             query?: {
                 /** @description Comma-separated part codes (for example `issues,risks`). */
                 parts?: string;
+                /** @description 0.15.265. Narrow to these region ids (comma-separated). */
+                regions?: string;
+                /** @description 0.15.265. Narrow to the records that came from these import batches (comma-separated ids). */
+                batches?: string;
+                /** @description 0.15.265. Narrow to entities first created on or after this day. */
+                from?: string;
+                /** @description 0.15.265. Narrow to entities first created on or before this day. */
+                to?: string;
             };
             header?: never;
             path?: never;
@@ -32471,6 +33646,31 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DataResetPlan"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getDataResetNarrowOptions: {
+        parameters: {
+            query?: {
+                part?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The options. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataResetNarrowOptions"];
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -32534,6 +33734,7 @@ export interface operations {
                      * @default true
                      */
                     require_backup?: boolean;
+                    narrow?: components["schemas"]["DataResetNarrow"];
                     /** @description 0.15.72. Required when `require_backup` is false: the typed phrase `NO BACKUP` (`DataResetState.no_backup_phrase`; 422 `confirmation_mismatch` at `/no_backup_confirm` otherwise). Ignored when a backup is required. */
                     no_backup_confirm?: string;
                 };
@@ -32735,7 +33936,7 @@ export interface operations {
             503: components["responses"]["ServiceUnavailable"];
         };
     };
-    getImportsSettings: {
+    getTemplateChangeNotice: {
         parameters: {
             query?: never;
             header?: never;
@@ -32751,13 +33952,13 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ImportsSettings"];
+                    "application/json": components["schemas"]["TemplateChangeNotice"];
                 };
             };
             401: components["responses"]["Unauthorized"];
         };
     };
-    setImportsSettings: {
+    setTemplateChangeNotice: {
         parameters: {
             query?: never;
             header: {
@@ -32769,7 +33970,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ImportsSettingsInput"];
+                "application/json": components["schemas"]["TemplateChangeNoticeInput"];
             };
         };
         responses: {
@@ -32780,7 +33981,63 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ImportsSettings"];
+                    "application/json": components["schemas"]["TemplateChangeNotice"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getImportsUploadPolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The policy. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportsUploadPolicy"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setImportsUploadPolicy: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportsUploadPolicyInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportsUploadPolicy"];
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -33184,6 +34441,188 @@ export interface operations {
                 content: {
                     "image/webp": string;
                     "image/jpeg": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    putUiLogo: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /**
+                     * Format: binary
+                     * @description The logo image: PNG, JPEG, SVG or WebP, 256 KiB at most (422 `errors[0]` `{path: /file}`).
+                     */
+                    file: string;
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UiAsset"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    setUiLogoEnabled: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UiAssetEnabledInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UiAsset"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    setUiLogoDisplay: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UiAssetDisplayInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UiAsset"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getUiPublicIdentity: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The public identity. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UiPublicIdentity"];
+                };
+            };
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    getUiPublicLogo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                purpose: "login" | "favicon";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The image. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/png": string;
+                    "image/jpeg": string;
+                    "image/svg+xml": string;
+                    "image/webp": string;
+                };
+            };
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    getUiAsset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The image. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/png": string;
+                    "image/jpeg": string;
+                    "image/svg+xml": string;
+                    "image/webp": string;
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -33825,6 +35264,62 @@ export interface operations {
             429: components["responses"]["TooManyRequests"];
         };
     };
+    getOpsLimits: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The limits. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpsLimits"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setOpsLimits: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OpsLimitsInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpsLimits"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
     getHistoricalWaiver: {
         parameters: {
             query?: never;
@@ -34180,6 +35675,89 @@ export interface operations {
                 content: {
                     "application/json": {
                         items: components["schemas"]["WarehouseOrderOption"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listAdvanceOptions: {
+        parameters: {
+            query?: {
+                site_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The options. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            [key: string]: unknown;
+                        }[];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listInvoiceOrderOptions: {
+        parameters: {
+            query?: {
+                site_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The options. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["WarehouseOrderOption"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listInvoiceSupplierOptions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The options. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            [key: string]: unknown;
+                        }[];
                     };
                 };
             };
@@ -36995,12 +38573,42 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
         };
     };
+    getTemplateChanges: {
+        parameters: {
+            query?: {
+                from?: number;
+                to?: number;
+            };
+            header?: never;
+            path: {
+                /** @description Template ID such as TPL-SITE. */
+                template_id: components["parameters"]["TemplateId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The differences. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateChanges"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
     downloadTemplate: {
         parameters: {
             query?: {
                 task_id?: string;
                 /** @description Repeated, or a comma separated list. At most 500. */
                 site_ids?: string[];
+                /** @description 0.15.320. Only for `TPL-LISTVALUES`: the code of a dropdown list. The file holds the current active values of that list (at most 5000), ready to edit and upload again. */
+                list?: string;
                 /** @description Pre-fill with the current records of the register (at most 5000 rows). */
                 prefill?: boolean;
                 /** @description Limit a pre-filled copy to one region (inside the caller's regions). */
@@ -40845,6 +42453,28 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
         };
     };
+    getRegionHealth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Region health. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegionHealthBoard"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
     editStatusUpdate: {
         parameters: {
             query?: never;
@@ -42099,6 +43729,263 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    listEditPresence: {
+        parameters: {
+            query: {
+                kind: "record" | "task";
+                entity_id: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The other current editors, oldest heartbeat first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        editors: components["schemas"]["EditPresenceEditor"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    pingEditPresence: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EditPresencePing"];
+            };
+        };
+        responses: {
+            /** @description Noted. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    stopEditPresence: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EditPresencePing"];
+            };
+        };
+        responses: {
+            /** @description Removed (also when there was none). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    reactToComment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Comment. */
+                comment_id: components["parameters"]["CommentId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CommentReactionInput"];
+            };
+        };
+        responses: {
+            /** @description Reaction recorded (also when it was already there). */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    unreactToComment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Comment. */
+                comment_id: components["parameters"]["CommentId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CommentReactionInput"];
+            };
+        };
+        responses: {
+            /** @description Reaction removed (also when it was not there). */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    resolveComment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Comment. */
+                comment_id: components["parameters"]["CommentId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Resolved. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    unresolveComment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Comment. */
+                comment_id: components["parameters"]["CommentId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Open again. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getHomePins: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The caller's pinned views, in the pin order. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["HomeViewPin"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    pinSavedViewHome: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                view_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Pinned. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        view_id: string;
+                        /** @enum {boolean} */
+                        pinned_home: true;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    unpinSavedViewHome: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                view_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Unpinned. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        view_id: string;
+                        /** @enum {boolean} */
+                        pinned_home: false;
+                    };
+                };
             };
             401: components["responses"]["Unauthorized"];
         };

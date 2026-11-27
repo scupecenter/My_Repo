@@ -3,14 +3,17 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { RegisterDefinition, RegisterField, RegisterRecord } from '@/api/types';
 import { BoardGrid, type BoardColumn } from '@/components/Board';
+import { CalendarGrid } from '@/components/CalendarGrid';
 import { INLINE_TYPES } from '@/components/GridCellEditor';
 import { Holders } from '@/components/HolderChip';
 import { fieldLabel, showValue } from '@/components/RegisterFields';
 import { STATE_TONE } from '@/components/RegisterDrawer';
 import { SiteMap } from '@/components/SiteMap';
+import { ChartView, type ChartKind } from '@/components/ChartView';
 import { StatusChip } from '@/components/TableKit';
 import { WideTable, type WideCell, type WideColumn, type WideInput, type WideTableRow } from '@/components/WideTable';
 import { isHidden, sectionIdOf, typeHides } from '@/lib/registerForms';
+import { measureBreakdown } from '@/lib/viewAnalytics';
 import type { Display } from '@/lib/tablePrefs';
 
 /**
@@ -18,8 +21,8 @@ import type { Display } from '@/lib/tablePrefs';
  * the board and the map are the same shared components as Site Master (WideTable, BoardGrid, SiteMap), fed by the register's own list
  * (GET /registers/{key}/records with the same filters, so every layout shows the same records, with the caller's rights and field rules).
  */
-export type RegisterLayout = 'list' | 'wide' | 'board' | 'map';
-export const REGISTER_LAYOUTS: readonly RegisterLayout[] = ['list', 'wide', 'board', 'map'];
+export type RegisterLayout = 'list' | 'wide' | 'board' | 'map' | 'calendar' | 'chart';
+export const REGISTER_LAYOUTS: readonly RegisterLayout[] = ['list', 'wide', 'board', 'map', 'calendar', 'chart'];
 
 /** The board's grouping on the approval state of the records (entry, in review, in approval, approved, voided), which every register has. */
 export const BY_STATE = 'state';
@@ -44,8 +47,21 @@ export function defaultBoardBy(def: RegisterDefinition): string {
   return (s.find((f) => f.in_list) ?? s[0])?.code ?? BY_STATE;
 }
 
-/** The layouts a register offers: list, wide table and board on every register; the map only where the records carry a site (and its coordinates). */
-export const layoutsOf = (def: RegisterDefinition): RegisterLayout[] => (def.site_scoped ? ['list', 'wide', 'board', 'map'] : ['list', 'wide', 'board']);
+/** The chart's axes (decision V4): the approval state, plus every list or yes/no field the caller may see; the measure is a count or the sum of a number field. */
+export const axisFields = (def: RegisterDefinition): RegisterField[] => def.fields.filter((f) => f.type === 'list' || f.type === 'yes_no');
+export const numericFields = (def: RegisterDefinition): RegisterField[] => def.fields.filter((f) => f.type === 'number');
+
+/** The date fields a register has: a date-typed field of the definition. */
+export const dateFields = (def: RegisterDefinition): RegisterField[] => def.fields.filter((f) => f.type === 'date');
+
+/** The layouts a register offers: list, wide table, board and chart on every register; the map only where the records carry a site (and its coordinates);
+    the calendar (decision V2) where the definition has at least one date field. */
+export const layoutsOf = (def: RegisterDefinition): RegisterLayout[] => [
+  'list', 'wide', 'board',
+  ...(def.site_scoped ? (['map'] as const) : []),
+  ...(dateFields(def).length ? (['calendar'] as const) : []),
+  'chart',
+];
 
 /** A key that is safe in a test id and an id attribute, unique among the keys already given. */
 function keyOf(v: string, used: Set<string>): string {
@@ -90,7 +106,7 @@ export function RegisterWide({ pending, def, records, admin, regionName, onOpen,
   const lang = i18n.language;
   const key = def.register_key;
   const record = t('regviews.group_record'), flow = t('regviews.group_workflow');
-  const section = (f: RegisterField) => t(`regSections.${sectionIdOf(f.section)}`, { defaultValue: f.section ?? t('regSections.details') });
+  const section = (f: RegisterField) => t(`regSections.${sectionIdOf(f.section)}`, { defaultValue: (lang === 'ar' && f.section_ar) || f.section || t('regSections.details') });
   const fields = def.fields;
   const cols: WideColumn[] = [
     { key: 'region', header: t('sites.region'), top: record, minWidth: 120 },
@@ -241,5 +257,54 @@ export function RegisterMap({ records, regionId, partial }: { records: RegisterR
       </div>
       <SiteMap testid="register-map" height={560} outer={{ region_id: regionId || undefined, site_codes: codes }} />
     </div>
+  );
+}
+
+/**
+ * The chart of a register (decision V4): the rows the view already shows, sliced by an axis (the approval state or a list or yes/no field) and
+ * measured by a count or the sum of a number field, as bars or a ring. It reads the records the screen has already loaded (the same for the
+ * list, the wide table, the board and the map), so it adds no request and shows nothing the caller cannot already see; when the view has more
+ * rows than are loaded the note says how many it counted.
+ */
+export function RegisterChart({ def, records, axis, measure, kind, partial }: {
+  def: RegisterDefinition; records: RegisterRecord[]; axis: string; measure: string; kind: ChartKind; partial?: { shown: number; total: number } | null;
+}) {
+  const { t, i18n } = useTranslation();
+  const lang = i18n.language;
+  const af = axis === BY_STATE ? undefined : axisFields(def).find((f) => f.code === axis);
+  const mf = numericFields(def).find((f) => f.code === measure);
+  const slices = measureBreakdown(
+    records,
+    (r) => (af ? (r.data[af.code] === undefined || r.data[af.code] === null || r.data[af.code] === '' ? '' : showValue(af, r.data[af.code], lang, t)) : t(`regState.${r.state}`)),
+    (r) => (mf ? r.data[mf.code] : 1),
+    t('analytics.none'), t('analytics.other'),
+  );
+  const axisLabel = af ? fieldLabel(af, lang) : t('analytics.by_state');
+  const measureLabel = mf ? t('chartv.sum_of', { field: fieldLabel(mf, lang) }) : t('chartv.count');
+  return (
+    <section className="card p-3" data-testid="register-chart-card" aria-label={t('chartv.title')}>
+      <ChartView testid="register-chart" slices={slices} kind={kind} label={t('chartv.label', { axis: axisLabel, measure: measureLabel })}
+        head={partial ? <span className="chip bg-waitBg text-waitInk" role="note" data-testid="register-chart-partial">{t('regviews.partial', { shown: partial.shown, total: partial.total })}</span> : undefined} />
+    </section>
+  );
+}
+
+/** Decision V2: the register's records on a month calendar, read only, on the date field chosen in the Layout panel. */
+export function RegisterCalendar({ def, records, field, onOpen, partial }: {
+  def: RegisterDefinition; records: RegisterRecord[]; field: RegisterField | undefined; onOpen: (id: string) => void; partial?: { shown: number; total: number } | null;
+}) {
+  const { t, i18n } = useTranslation();
+  const lang = i18n.language;
+  if (!field) return <div className="card p-3 text-sm text-mute" data-testid="register-calendar-empty">{t('calview.no_columns')}</div>;
+  const items = records.map((r) => {
+    const titleField = def.fields.find((y) => y.in_list && y.code !== field.code && r.data[y.code] !== undefined && r.data[y.code] !== null && r.data[y.code] !== '');
+    const label = [r.site_code, titleField ? valueText(titleField, r.data[titleField.code], lang, t) : ''].filter(Boolean).join(' ') || r.id;
+    return { id: r.id, label, date: String(r.data[field.code] ?? '').slice(0, 10), late: false };
+  });
+  return (
+    <section className="card p-3" data-testid="register-calendar-card" aria-label={t('calview.title')}>
+      <CalendarGrid testid="register-calendar" items={items} onOpen={onOpen}
+        head={partial ? <span className="chip bg-waitBg text-waitInk" role="note" data-testid="register-calendar-partial">{t('regviews.partial', { shown: partial.shown, total: partial.total })}</span> : undefined} />
+    </section>
   );
 }

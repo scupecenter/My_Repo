@@ -6,7 +6,8 @@ import { Link } from 'react-router-dom';
 import { useSession } from '@/api/hooks';
 import { useCancelSnagRecord, useCreateRecord, useNewVersion, useRecordClaim, useRecordHistory, useRecordOp, useRecordTriage, useRecordTransfer, useRegisterRecord, useRegisterRecords, useUpdateRecord, useContractorCompanies, type RecordOp, type TriageOp } from '@/api/registers';
 import { useMatrix } from '@/api/sites';
-import { useAddRegisterComment, useRegisterComments } from '@/api/x';
+import { EditingNotice } from './EditingNotice';
+import { useAddRegisterComment, useCommentReaction, useCommentResolved, useRegisterComments } from '@/api/x';
 import type { RegisterDefinition, RegisterRecord } from '@/api/types';
 import { registerErrorMessage, serverFieldIssues } from '@/lib/registerErrors';
 import { cellLevel } from '@/lib/matrixLevels';
@@ -16,14 +17,14 @@ import { FieldHistory } from './logs/FieldHistory';
 import { ChangeDiff } from './logs/ChangeDiff';
 import { FieldInput, fieldLabel, issueText, showValue, SiteCodeField, SitePicker } from './RegisterFields';
 import { CommentsPanel } from './Comments';
-import { DrawerFrame, DrawerTabs, panelProps, useReportDirty } from './DrawerFrame';
+import { DrawerFrame, DrawerTabs, panelProps, useDrawerSettled, useReportDirty } from './DrawerFrame';
 import { DraftBar, useDraft } from './DraftBar';
 import { FollowButton } from './FollowButton';
 import { RecordDocuments } from './RecordDocuments';
 import { RelatedRecords } from './RelatedRecords';
 import { SiteTaskField } from './SiteTaskField';
 import { SiteGateField } from './SiteGateField';
-import { IssueRiskSelect, RiskIssues, DismantleOrderSelect, DismantleRnSelect, HlcPurchaseRequests, OrderReceipts, WarehouseOrderSelect } from './P4cPanels';
+import { IssueRiskSelect, RiskIssues, DismantleOrderSelect, DismantleRnSelect, HlcPurchaseRequests, OrderReceipts, WarehouseOrderSelect, AdvanceSelect, SupplierSelect } from './P4cPanels';
 import { useRecordSlots } from '@/api/documents';
 import { Holders } from './HolderChip';
 import { Balance, ExtendBooking, MembersEditor, ReadinessBadge, reservedMessage, TopUp, VehiclePicker } from './AssignmentPanels';
@@ -130,7 +131,8 @@ function TriageDialog({ open, op, registerKey, selfId, onClose, onSend }: { open
   );
 }
 
-function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; record: RegisterRecord | null; onCreated: (id: string) => void }) {
+/** The record form, tabs and actions of a register record: the body of the drawer, and (decision V5) the body of the full record page. */
+export function RegisterRecordBody({ def: rawDef, record, onCreated }: { def: RegisterDefinition; record: RegisterRecord | null; onCreated: (id: string) => void }) {
   const { t, i18n } = useTranslation();
   const toast = useToast();
   const key = rawDef.register_key;
@@ -142,6 +144,8 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
   const hist = useRecordHistory(key, record?.id ?? null);
   const comments = useRegisterComments(key, record?.id ?? '', !!record?.region_id);
   const addComment = useAddRegisterComment(key, record?.id ?? '');
+  const reactComment = useCommentReaction(['register-comments', key, record?.id ?? '']);
+  const resolveComment = useCommentResolved(['register-comments', key, record?.id ?? '']);
   // 0.12.5: a register with a file field reads the record's slots too (the slots of a record without a site come with Q228)
   const hasFile = rawDef.fields.some((f) => f.type === 'file');
   const recSlots = useRecordSlots(key, record && (record.site_id || hasFile) ? record.id : null);
@@ -165,6 +169,7 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
   const [cancelling, setCancelling] = useState(false);
   const [tab, setTab] = useState('data');
   useReportDirty(dirty);
+  const settle = useDrawerSettled();
 
   const act = (a: string) => !!record?.allowed_actions?.includes(a as never);
   const editable = !record || act('edit');
@@ -223,7 +228,7 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
     if (!record) {
       create.mutate({ site_id: site?.id, site_code: site?.code, region_id: site?.region_id, ...(rtype ? { record_type: rtype } : {}), ...(party ? { external_party_id: party } : {}), data: visibleData(def, typed(data)) }, {
         // the drawer switches to the saved record only after the submit answered, so the buttons below keep their callbacks
-        onSuccess: (r) => op.mutate({ record: r, op: 'submit' }, { onSuccess: () => { toast(t('approvals.done')); onCreated(r.id); }, onError: (e) => { fail(e); onCreated(r.id); } }),
+        onSuccess: (r) => op.mutate({ record: r, op: 'submit' }, { onSuccess: () => { toast(t('approvals.done')); settle(); onCreated(r.id); }, onError: (e) => { fail(e); settle(); onCreated(r.id); } }),
         onError: fail,
       });
     } else if (dirty) update.mutate({ record, patch: { data: patchData(def, record.data, typed(data)), ...(party !== (record.external_party?.id ?? '') ? { external_party_id: party || null } : {}) } }, { onSuccess: (r) => { setDirty(false); run('submit', r); }, onError: fail });
@@ -259,6 +264,7 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
       {record && <DrawerTabs value={tab} onChange={setTab} tabs={[{ id: 'data', label: t('drawer.tab_data') }, { id: 'documents', label: t('docs.tab') }, { id: 'comments', label: t('drawer.comments') }, { id: 'history', label: t('drawer.history') }]} />}
       <div className="flex-1 space-y-4 overflow-y-auto p-4">
         <div {...panelProps('data', tab)} className="space-y-4">
+        {record && <EditingNotice kind="record" id={record.id} editing={editable} testid="reg-editing-notice" />}
         {editable && <DraftBar draft={dr} onRestore={(v) => { if (v.data && typeof v.data === 'object') setData(v.data as Data); if (typeof v.record_type === 'string') setRtype(v.record_type); setDirty(true); }} />}
         {OWNER_NOTE[key] && <p className="rounded-md bg-card2 p-3 text-sm" data-testid="reg-owner-note">{t(OWNER_NOTE[key])}</p>}
         {src && record?.site_id && (
@@ -337,7 +343,7 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
           )}
           {sections.map((s) => (
             <section key={s.id} aria-labelledby={`rs-${s.id}`} data-testid={`reg-section-${s.id}`} className="space-y-2">
-              <h3 id={`rs-${s.id}`} className="font-semibold">{t(`regSections.${s.id}`, { defaultValue: s.title })}</h3>
+              <h3 id={`rs-${s.id}`} className="font-semibold">{t(`regSections.${s.id}`, { defaultValue: (lang === 'ar' && s.title_ar) || s.title })}</h3>
               <div className="grid grid-cols-2 gap-3">
                 {s.fields.filter((f) => !(rk === 'warehouse' && f.code === 'procurement_order_id' && (!rtype || rtype === 'adj')) && !(rk === 'gecol' && f.code === 'contractor') && !(rk === 'procurement' && f.code === 'members') && !(rk === 'financial_advances' && f.code === 'balance')).map((f) => {
                   const iss = issues[f.code];
@@ -366,6 +372,12 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
                         ? <WarehouseOrderSelect registerKey={key} field="procurement_order_id" siteId={site?.id} value={data[f.code]} onChange={(v) => set(f.code, v)} editable={editable} invalid={!!show} />
                         : (key === 'car_dispatcher' || key === 'financial_advances') && f.code === 'procurement_record_id'
                         ? <WarehouseOrderSelect registerKey={key} field="procurement_record_id" siteId={key === 'financial_advances' ? site?.id : null} value={data[f.code]} onChange={(v) => set(f.code, v)} editable={editable} invalid={!!show} />
+                        : key === 'invoices' && f.code === 'procurement_record_id'
+                        ? <WarehouseOrderSelect registerKey="invoices" field="procurement_record_id" siteId={site?.id} value={data[f.code]} onChange={(v) => set(f.code, v)} editable={editable} invalid={!!show} />
+                        : key === 'invoices' && f.code === 'supplier_party_id'
+                        ? <SupplierSelect value={data[f.code]} onChange={(v) => set(f.code, v)} editable={editable} invalid={!!show} />
+                        : key === 'financial_advances' && f.code === 'advance_id'
+                        ? <AdvanceSelect siteId={site?.id} value={data[f.code]} onChange={(v) => set(f.code, v)} editable={editable} invalid={!!show} />
                         : key === 'warehouse' && f.code === 'procurement_order_id'
                         ? <WarehouseOrderSelect siteId={site?.id} value={data[f.code]} onChange={(v) => set(f.code, v)} editable={editable} invalid={!!show} />
                         : editable && !(key === 'dismantle' && f.code === 'closing_rn_ref' && data.closing_rn_id) ? <FieldInput field={f} value={data[f.code]} onChange={(v) => set(f.code, v)} invalid={!!show} ctx={ctx} />
@@ -420,7 +432,9 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
             {/* a global record (no region) has no thread yet: the server answers 422, so the box is not offered */}
             {record.region_id ? (
               <CommentsPanel items={comments.data?.items} loaded={comments.isSuccess} pending={addComment.isPending} error={addComment.isError ? registerErrorMessage(t, addComment.error) : null}
-                onSend={(body, ids) => addComment.mutate({ body, ...(ids.length ? { mention_user_ids: ids } : {}) })} />
+                onSend={(body, ids) => addComment.mutate({ body, ...(ids.length ? { mention_user_ids: ids } : {}) })}
+                onReact={(commentId, emoji, on) => reactComment.mutate({ commentId, emoji, on })}
+                onToggleResolved={(commentId, resolved) => resolveComment.mutate({ commentId, resolved })} />
             ) : <p className="text-mute" data-testid="reg-comments-global">{t('registers.comments_global')}</p>}
           </div>
         )}
@@ -470,9 +484,10 @@ export function RegisterDrawer({ def, recordId, onClose, onOpen, nav }: { def: R
   const q = useRegisterRecord(def.register_key, isNew ? null : recordId);
   return (
     <DrawerFrame name="register" testid="register-drawer" wide={640} open={!!recordId} onClose={onClose} nav={nav && !isNew ? { ids: nav, current: recordId, onGo: onOpen } : undefined}>
-      {isNew ? <Body key="new" def={def} record={null} onCreated={onOpen} />
-        : q.data ? <Body key={`${q.data.id}`} def={def} record={q.data} onCreated={onOpen} />
+      {isNew ? <RegisterRecordBody key="new" def={def} record={null} onCreated={onOpen} />
+        : q.data ? <RegisterRecordBody key={`${q.data.id}`} def={def} record={q.data} onCreated={onOpen} />
           : <div className="p-4"><Dialog.Title className="font-bold">{q.isError ? t('regErrors.not_found') : t('common.loading')}</Dialog.Title></div>}
     </DrawerFrame>
   );
 }
+

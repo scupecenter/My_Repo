@@ -187,3 +187,146 @@ export function firstPassPct(pass: number, fail: number): number | null {
   if (!(decided > 0)) return null;
   return Math.round((pass * 1000) / decided) / 10;
 }
+
+// ---------------------------------------------------------------- item 7 (0.15.204): pending approvals bottleneck
+
+export interface ApprovalWaitRow {
+  role_id: string | null;
+  name_en: string | null;
+  name_ar: string | null;
+  days: number | null;
+  state: string;
+}
+
+export interface ApprovalsByRole {
+  total: number;
+  review: number;
+  approve: number;
+  waiting: AgeBuckets;
+  by_role: {
+    role_id: string;
+    name_en: string;
+    name_ar: string | null;
+    count: number;
+    oldest_days: number | null;
+    buckets: AgeBuckets["buckets"];
+  }[];
+  unassigned: number;
+}
+
+/**
+ * The waiting tasks (states in_review and in_approval) grouped by the ball-in-court role: the counts per level kind,
+ * the overall age buckets, and per role the count, the oldest age and the buckets. Rows with no role count as
+ * unassigned (a group holds the level, or nobody yet). Most waiting tasks first, then the English name.
+ */
+export function approvalsByRole(rows: ApprovalWaitRow[]): ApprovalsByRole {
+  const byRole = new Map<string, { name_en: string; name_ar: string | null; days: number[] }>();
+  let review = 0;
+  let approve = 0;
+  let unassigned = 0;
+  const allDays: number[] = [];
+  for (const r of rows) {
+    if (r.state === "in_review") review += 1;
+    else if (r.state === "in_approval") approve += 1;
+    if (r.days !== null) allDays.push(r.days);
+    if (r.role_id === null) {
+      unassigned += 1;
+      continue;
+    }
+    const entry = byRole.get(r.role_id) ?? { name_en: r.name_en ?? "", name_ar: r.name_ar, days: [] };
+    if (r.days !== null) entry.days.push(r.days);
+    else entry.days.push(0);
+    byRole.set(r.role_id, entry);
+  }
+  const by_role = [...byRole.entries()]
+    .map(([role_id, e]) => {
+      const b = bucketAges(e.days);
+      return {
+        role_id,
+        name_en: e.name_en,
+        name_ar: e.name_ar,
+        count: e.days.length,
+        oldest_days: b.oldest_days,
+        buckets: b.buckets,
+      };
+    })
+    .sort((a, b) => b.count - a.count || a.name_en.localeCompare(b.name_en));
+  return {
+    total: rows.length,
+    review,
+    approve,
+    waiting: bucketAges(allDays),
+    by_role,
+    unassigned,
+  };
+}
+
+// ---------------------------------------------------------------- item 8 (0.15.205): change requests and overdue meeting actions
+
+export interface ChangeWaitRow {
+  kind: string;
+  status: string;
+  days: number | null;
+}
+
+export interface ChangesSummary {
+  pending: number;
+  approved_not_applied: number;
+  by_kind: { kind: string; count: number }[];
+  pending_aging: AgeBuckets;
+}
+
+/**
+ * The change requests: the pending ones (status requested) aged in calendar days since the request date, per kind
+ * (most first, then the kind name), and the approved ones not yet applied. Rejected and applied ones are not counted.
+ */
+export function changesSummary(rows: ChangeWaitRow[]): ChangesSummary {
+  const kinds = new Map<string, number>();
+  const ages: number[] = [];
+  let pending = 0;
+  let approved = 0;
+  for (const r of rows) {
+    if (r.status === "approved") approved += 1;
+    if (r.status !== "requested") continue;
+    pending += 1;
+    kinds.set(r.kind, (kinds.get(r.kind) ?? 0) + 1);
+    ages.push(r.days !== null && r.days > 0 ? r.days : 0);
+  }
+  return {
+    pending,
+    approved_not_applied: approved,
+    by_kind: [...kinds.entries()]
+      .map(([kind, count]) => ({ kind, count }))
+      .sort((a, b) => b.count - a.count || a.kind.localeCompare(b.kind)),
+    pending_aging: bucketAges(ages),
+  };
+}
+
+export interface ActionDueRow {
+  status: string;
+  days_overdue: number | null;
+}
+
+export interface ActionsSummary {
+  open: number;
+  overdue: number;
+  no_due_date: number;
+  overdue_aging: AgeBuckets;
+}
+
+/**
+ * The meeting actions that are not closed (status open or in_progress): how many are open, how many are overdue (due date
+ * before today), how many have no due date, and the days overdue of the late ones in the usual buckets.
+ */
+export function actionsSummary(rows: ActionDueRow[]): ActionsSummary {
+  const late: number[] = [];
+  let open = 0;
+  let none = 0;
+  for (const r of rows) {
+    if (r.status !== "open" && r.status !== "in_progress") continue;
+    open += 1;
+    if (r.days_overdue === null) none += 1;
+    else if (r.days_overdue > 0) late.push(r.days_overdue);
+  }
+  return { open, overdue: late.length, no_due_date: none, overdue_aging: bucketAges(late) };
+}

@@ -1,4 +1,5 @@
 import { Lock } from 'lucide-react';
+import { UnsavedGuard } from '@/lib/unsavedGuard';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDownloadLocks, useSecurityLocks, useSetDownloadLocks, useSetSecurityLocks } from '@/api/settings';
@@ -56,6 +57,7 @@ export function SecurityLocks() {
       {ro
         ? <p className="text-sm text-mute" data-testid="locks-readonly">{t('seclocks.readonly')}</p>
         : <button className="btn btn-accent" data-testid="locks-save" disabled={!dirty} onClick={() => setOpen(true)}>{t('common.save')}</button>}
+      <UnsavedGuard scope="settings" dirty={dirty} needsReason label={t('ui.guard_settings')} onSave={(reason) => new Promise<boolean>((res) => set.mutate({ version: cur.version, block_public_sharing: v.sharing, disable_export: v.exporting, reason }, { onSuccess: () => res(true), onError: () => res(false) }))} />
       {open && (
         <FormDialog open onClose={() => setOpen(false)} testid="locks-dialog" title={t('seclocks.title')} busy={set.isPending} error={set.isError ? errText(set.error, t) : null}
           onSubmit={(reason) => set.mutate({ version: cur.version, block_public_sharing: v.sharing, disable_export: v.exporting, reason },
