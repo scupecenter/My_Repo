@@ -34,7 +34,7 @@ function Stat({ label, value, testid, tone }: { label: string; value: ReactNode;
 const fmtAmount = (n: number, lang: string) => new Intl.NumberFormat(lang === 'ar' ? 'ar-LY' : 'en-US', { maximumFractionDigits: 2 }).format(n);
 
 /**
- * The Finance hub landing page (owner decision D57, contract 0.15.312): read-only summary cards over the two separate registers Financial Advances and
+ * The Finance hub landing page (owner decision D57, contract 0.15.361): read-only summary cards over the two separate registers Financial Advances and
  * Invoices, quick links into them, and their templates. A card a caller cannot see (no module) is left out; advance amounts appear only where the
  * register's own amounts rule shows them. The cards can be hidden and the thresholds set in Settings > Screens > Finance hub.
  */

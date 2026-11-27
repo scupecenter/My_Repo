@@ -6,7 +6,7 @@ import { G } from './reg-helpers';
 import { Actor, actor, makeSite, plainAdmin } from './wf-helpers';
 
 /**
- * Migration 0406, contract 0.15.312: the Finance hub. The setting section finance_hub of ui.features is closed and complete; GET /finance-hub/summary
+ * Migration 0406, contract 0.15.361: the Finance hub. The setting section finance_hub of ui.features is closed and complete; GET /finance-hub/summary
  * answers every signed-in user; a register whose module the caller cannot view is null; the counted rows are the rows the register screen would show
  * (module, regions, latest version); advance amounts follow fin_amounts_visible (an admin sees them, a custodian-less viewer does not).
  */

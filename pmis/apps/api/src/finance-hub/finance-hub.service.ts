@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { AccessService } from '../access/access.service';
 import { DbService } from '../db/db.service';
 
-/** The Finance hub summary (contract 0.15.312, migration 0406): one card per register, null when the caller cannot view the register's module. */
+/** The Finance hub summary (contract 0.15.361, migration 0406): one card per register, null when the caller cannot view the register's module. */
 export interface FinanceHubAdvances {
   open_count: number;
   overdue_count: number;

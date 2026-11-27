@@ -100,7 +100,7 @@ ON CONFLICT (key) DO NOTHING;
 INSERT INTO audit_log (action, entity_type, entity_id, after, reason)
 VALUES ('finance_hub_applied', 'workflow', NULL,
         jsonb_build_object('ui_features', 'section finance_hub added to ui.features'),
-        'Finance hub setting section and menu key (migration 0406, contract 0.15.312).');
+        'Finance hub setting section and menu key (migration 0406, contract 0.15.361).');
 
 DO $$
 DECLARE f text;

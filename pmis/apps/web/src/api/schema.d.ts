@@ -4317,8 +4317,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * The Finance hub landing page, in one call (0.15.312)
-         * @description 0.15.312. Read-only summary cards over the two separate registers `financial_advances` and `invoices` - open advances (count, overdue count, and the open balance total where `fin_amounts_visible` shows the caller amounts - null otherwise), and open invoices (count by state, aging buckets over the received date, count past due). Each card is null when the caller cannot view that register's module, and every row counted is a row the register screen would show the caller (same module and region visibility, latest version only). The thresholds come from the `finance_hub` section of ui.features.
+         * The Finance hub landing page, in one call (0.15.361)
+         * @description 0.15.361. Read-only summary cards over the two separate registers `financial_advances` and `invoices` - open advances (count, overdue count, and the open balance total where `fin_amounts_visible` shows the caller amounts - null otherwise), and open invoices (count by state, aging buckets over the received date, count past due). Each card is null when the caller cannot view that register's module, and every row counted is a row the register screen would show the caller (same module and region visibility, latest version only). The thresholds come from the `finance_hub` section of ui.features.
          */
         get: operations["getFinanceHubSummary"];
         put?: never;
@@ -16934,7 +16934,7 @@ export interface components {
             /** Format: date-time */
             at: string;
         };
-        /** @description 0.15.312. The Finance hub: which widgets of the page show, after how many days a disbursed, unsettled advance warns, and the two aging bounds of the open-invoice buckets. */
+        /** @description 0.15.361. The Finance hub: which widgets of the page show, after how many days a disbursed, unsettled advance warns, and the two aging bounds of the open-invoice buckets. */
         UiFinanceHub: {
             widgets: {
                 advances: boolean;

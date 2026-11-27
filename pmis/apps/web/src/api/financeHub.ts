@@ -3,7 +3,7 @@ import { api } from './client';
 import type { components } from './schema';
 import { useUiFeatures } from './uiFeatures';
 
-/** Contract 0.15.312 (migration 0406): the Finance hub landing page. */
+/** Contract 0.15.361 (migration 0406): the Finance hub landing page. */
 export type FinanceHubSummary = components['schemas']['FinanceHubSummary'];
 export type UiFinanceHub = components['schemas']['UiFinanceHub'];
 export type FinanceWidget = keyof UiFinanceHub['widgets'];

@@ -256,7 +256,7 @@ export function appModuleFor(config: AppConfig) {
       DataResetController, // 0.15.62 (0146): project data reset in Settings, two System Admins
       LibraryMenuController, // 0.15.70 (0151, W5): Library > Forms and Archive
       DataHubController, // 0.15.311 (0400): Data hub landing page
-      FinanceHubController, // 0.15.312 (0406): Finance hub landing page
+      FinanceHubController, // 0.15.361 (0406): Finance hub landing page
     ],
     providers: [
       { provide: APP_CONFIG, useValue: config },
@@ -286,7 +286,7 @@ export function appModuleFor(config: AppConfig) {
       DataResetService, MaintenanceService, // 0.15.62 (0146)
       LibraryMenuService, // 0.15.70 (0151, W5)
       DataHubService, // 0.15.311 (0400)
-      FinanceHubService, // 0.15.312 (0406)
+      FinanceHubService, // 0.15.361 (0406)
       DashboardCacheService, // short cache of the /dashboard figures (30 s, scope-keyed)
       { provide: APP_GUARD, useClass: SessionGuard },
       { provide: APP_INTERCEPTOR, useClass: DashboardCacheInvalidator }, // before TxInterceptor: clears the dashboard cache after a configuration write has committed
