@@ -73,6 +73,7 @@ export class MasterImportController {
     return new StreamableFile(buffer);
   }
 
+  @ExportAction({ category: 'uploaded_files' })
   @Get('runs/:id/file')
   async file(@Auth() auth: AuthContext, @Param('id') id: string, @Res({ passthrough: true }) res: Response): Promise<StreamableFile> {
     const { file, name } = await this.mi.downloadFile(auth, id);
