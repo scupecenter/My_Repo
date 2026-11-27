@@ -1,9 +1,12 @@
 import { fireEvent, screen } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderApp, signIn } from '@/test/utils';
 import { Dashboard } from './Dashboard';
 import { DashboardSettings } from './settings/DashboardSettings';
+
+// the charts are not under test here; a canvas chart in jsdom has no 2d context
+vi.mock('@/components/EChart', () => ({ EChart: () => null }));
 
 /** Contract 0.15.208 (migration 0510): the server-wide dashboard view defaults in Settings, overridden by the user's own choice. */
 describe('Dashboard view defaults', () => {

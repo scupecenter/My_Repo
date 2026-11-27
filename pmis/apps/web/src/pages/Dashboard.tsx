@@ -48,6 +48,7 @@ import { OpsReadinessCard } from "./dashboardReadiness";
 import { OpsScorecardCard } from "./dashboardScorecard";
 import { OpsQualityCard } from "./dashboardQuality";
 import { OpsApprovalsCard } from "./dashboardApprovals";
+import { OpsChangesCard } from "./dashboardChanges";
 import { useDashboardSettings } from "@/api/dashboardSettings";
 import { GoalsPanel } from "@/components/GoalsPanel";
 import { SavedViews } from "@/components/SavedViews";
@@ -1526,6 +1527,13 @@ export function Dashboard() {
                 <>
                   {/* 0.15.204 (owner approval 2026-11-26, item 7): tasks waiting review or approval, ages per ball-in-court role */}
                   <OpsApprovalsCard ops={ops.data} />
+                </>
+              ),
+
+              ops_changes: (
+                <>
+                  {/* 0.15.205 (owner approval 2026-11-26, item 8): pending change requests and overdue meeting actions */}
+                  <OpsChangesCard ops={ops.data} />
                 </>
               ),
 

@@ -114,7 +114,7 @@ import { MailKindsController } from './settings/mail-kinds.controller';
 import { MailKindsService } from './settings/mail-kinds.service';
 import { StructuralFreezeController } from './settings/structural-freeze.controller';
 import { StructuralFreezeService } from './settings/structural-freeze.service';
-import { UiIdentityController } from './settings/ui-identity.controller';
+import { UiAssetsController, UiIdentityController, UiPublicController } from './settings/ui-identity.controller';
 import { SecurityLocksController } from './security/security-locks.controller';
 import { SecurityLocksService } from './security/security-locks.service';
 import { DownloadLocksController } from './security/download-locks.controller';
@@ -230,7 +230,7 @@ export function appModuleFor(config: AppConfig) {
       AnnouncementsController, MeAnnouncementsController, RegionsController, RolesController, PermissionsController, AssignmentsController,
       DocumentTextController, PushController, DelegationsController, SitesController, SiteDraftsController, TasksController, WorkflowEditorController, TaskDefinitionsController, CalendarController, SlaController, IssueStoppedController, RegistersController, RecycleBinController, RegisterColumnsController, MatrixController, WarehouseController, AsBuiltItemsController, NumberSequencesController, RegisterStateController,
       NotificationsController, FollowController, StatusUpdatesController, InsightsController, TemplatesController, ImportBatchesController, DocumentsController, DocumentsGridController, LibraryController, SnagsController,
-      DashboardController, DashboardSettingsController, GoalsController, PmSchedulesController, DashboardOpsController, DashboardViewDefaultsController, SupportAccessController, DownloadLocksController, SecurityLocksController, DelayPeriodsController, WeightsController, TeamScopeMatchController, GecolOrderWarningsController, DeriveRulesController, MailKindsController, MailPolicyController, ImportsSettingsController, KanbanController, NavLayoutController, HistoricalWaiverController, SiteMasterController, SiteMasterColumnsController, CustomFieldsController, StructuralFreezeController, UiIdentityController, LoginPageController, SettingsScreensController, AlertRulesController, P4cController, FleetController, AuditLogController, SecurityLogController, LogsAdminController, NewDeviceController,
+      DashboardController, DashboardSettingsController, GoalsController, PmSchedulesController, DashboardOpsController, DashboardViewDefaultsController, SupportAccessController, DownloadLocksController, UiPublicController, UiAssetsController, SecurityLocksController, DelayPeriodsController, WeightsController, TeamScopeMatchController, GecolOrderWarningsController, DeriveRulesController, MailKindsController, MailPolicyController, ImportsSettingsController, KanbanController, NavLayoutController, HistoricalWaiverController, SiteMasterController, SiteMasterColumnsController, CustomFieldsController, StructuralFreezeController, UiIdentityController, LoginPageController, SettingsScreensController, AlertRulesController, P4cController, FleetController, AuditLogController, SecurityLogController, LogsAdminController, NewDeviceController,
       MediaController, // 0.15.292 (own line: the long lines above conflict on every merge)
       PasskeySettingController, PasskeyController, // S4
       CspReportController, // SEC-3

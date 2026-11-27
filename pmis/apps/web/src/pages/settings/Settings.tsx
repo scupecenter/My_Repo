@@ -51,6 +51,7 @@ import { AlertRules } from './AlertRules';
 import { LoginPageSettings } from './LoginPage';
 import { DataHubSettings } from './DataHubSettings';
 import { InterfaceSettings } from './InterfaceSettings';
+import { OpenRecordSettings } from './OpenRecordSettings';
 
 export interface SettingsSection { key: string; adminOnly?: boolean }
 export interface SettingsTab { key: string; sections: SettingsSection[] }
@@ -69,8 +70,8 @@ export const SETTINGS_TABS: readonly SettingsTab[] = [
   { key: 'alerts', sections: [{ key: 'policy' }, { key: 'mail', adminOnly: true }, { key: 'rules', adminOnly: true }, { key: 'push', adminOnly: true }] },
   // DLP months is a data-protection rule, so it moved here from SLA
   { key: 'security', sections: [{ key: 'staff' }, { key: 'retention' }, { key: 'dlp' }, { key: 'locks' }, { key: 'support' }, { key: 'newdevice' }, { key: 'passkeys' }] },
-  // Screens: what users see by default (Dashboard, Display menu of the tables, My Work Daily Plan)
-  { key: 'screens', sections: [{ key: 'dashboard' }, { key: 'tables' }, { key: 'daily-plan' }, { key: 'goals' }, { key: 'pm-schedules' }, { key: 'motion' }, { key: 'login' }, { key: 'interface' }, { key: 'data-hub' }] },
+  // Screens: what users see by default (Dashboard, Display menu of the tables, My Work Daily Plan). Records (V5) is personal: each user sets their own
+  { key: 'screens', sections: [{ key: 'dashboard' }, { key: 'tables' }, { key: 'records' }, { key: 'daily-plan' }, { key: 'goals' }, { key: 'pm-schedules' }, { key: 'motion' }, { key: 'login' }, { key: 'interface' }, { key: 'data-hub' }] },
   { key: 'identity', sections: [] },
 ];
 
@@ -153,6 +154,7 @@ export function SettingsRoutes() {
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<DashboardSettings />} />
           <Route path="tables" element={<DisplaySettings />} />
+          <Route path="records" element={<OpenRecordSettings />} />
           <Route path="daily-plan" element={<DailyPlanSettings />} />
           <Route path="goals" element={<GoalsSettings />} />
           <Route path="pm-schedules" element={<PmSchedulesSettings />} />
