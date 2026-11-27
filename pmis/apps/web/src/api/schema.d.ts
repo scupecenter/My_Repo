@@ -7443,6 +7443,7 @@ export interface paths {
          *     `parent_booking_id` set; it goes through L1 / L2 like any booking and its approval writes its own reservation (409 `vehicle_already_reserved` when the vehicle
          *     is taken). The parent keeps its history. Only a `reserved` or `on_trip` approved booking can be extended (409 `invalid_transition`). Needs `create` on
          *     `car_dispatcher` and L1 of its Matrix row (403 otherwise).
+         *     Since 0.15.406: `If-Match` is the version of the booking (advance) being extended (topped up): 428 `precondition_required` without it, 412 `precondition_failed` when it changed since it was read. It also needs a recent step-up (401 `step_up_required`), like the other financial and destructive actions.
          */
         post: operations["extendCarBooking"];
         delete?: never;
@@ -7466,6 +7467,7 @@ export interface paths {
          *     and kind. `requested_amount` is the extra money (LYD); `period_to` extends the period (at least one of the two). Only a `disbursed` or
          *     `settlement_in_progress` advance can be topped up (409 `invalid_transition`). The original keeps its history; the child has its own L1 / L2 and disbursement.
          *     Needs `create` on `financial_advances` in the region and L1 of its Matrix row (403 otherwise). Amounts are hidden from users outside Finance (Q512).
+         *     Since 0.15.406: `If-Match` is the version of the booking (advance) being extended (topped up): 428 `precondition_required` without it, 412 `precondition_failed` when it changed since it was read. It also needs a recent step-up (401 `step_up_required`), like the other financial and destructive actions.
          */
         post: operations["topUpAdvance"];
         delete?: never;
@@ -35801,7 +35803,10 @@ export interface operations {
     extendCarBooking: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
             path: {
                 record_id: string;
             };
@@ -35829,13 +35834,18 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
         };
     };
     topUpAdvance: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
             path: {
                 record_id: string;
             };
@@ -35864,7 +35874,9 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
         };
     };
     listFleetAvailability: {

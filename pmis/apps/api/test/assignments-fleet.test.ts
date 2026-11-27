@@ -235,7 +235,15 @@ describe('the Car Dispatcher', () => {
     const done = await reserve(c, (await children(c.car, 'booking', a1))[0]!, veh);
     const denied = await c.viewerCar.api.call('post', `/registers/car_dispatcher/records/${done.id}/extend`, { to_date: '2026-11-15' });
     expect(denied.status).toBe(403);
-    const ok = await c.car.entry.api.call('post', `/registers/car_dispatcher/records/${done.id}/extend`, { to_date: '2026-11-15' });
+    // hardening layer 2 (0.15.406): If-Match and a recent step-up
+    const ext = `/registers/car_dispatcher/records/${done.id}/extend`;
+    expect((await c.car.entry.api.call('post', ext, { to_date: '2026-11-15' })).status).toBe(428);
+    expect((await c.car.entry.api.call('post', ext, { to_date: '2026-11-15' }, { 'If-Match': `"${done.version + 5}"` })).status).toBe(412);
+    const noStep = await actor(app, db, { level: 'entry', grants: G('car_dispatcher', 'view', 'create', 'edit'), regions: [R], modules: null, stepUp: false });
+    const stepRes = await noStep.api.call('post', ext, { to_date: '2026-11-15' }, { 'If-Match': `"${done.version}"` });
+    expect(stepRes.status).toBe(401);
+    expect(stepRes.body.code).toBe('step_up_required');
+    const ok = await c.car.entry.api.call('post', ext, { to_date: '2026-11-15' }, { 'If-Match': `"${done.version}"` });
     expect(ok.status).toBe(201);
     expect(ok.body.data).toMatchObject({ parent_booking_id: done.entity_id, from_date: '2026-11-13', to_date: '2026-11-15', vehicle_id: veh.entity_id });
     expect(ok.body.state).toBe('entry');
@@ -392,7 +400,14 @@ describe('Financial Advances', () => {
     const dis = await disburse(c, ap, AMOUNT);
     const denied = await c.viewerFin.api.call('post', `/registers/financial_advances/records/${dis.id}/top-up`, { requested_amount: 10 });
     expect(denied.status).toBe(403);
-    const top = await c.fin.entry.api.call('post', `/registers/financial_advances/records/${dis.id}/top-up`, { requested_amount: 10 });
+    const up = `/registers/financial_advances/records/${dis.id}/top-up`;
+    expect((await c.fin.entry.api.call('post', up, { requested_amount: 10 })).status).toBe(428);
+    expect((await c.fin.entry.api.call('post', up, { requested_amount: 10 }, { 'If-Match': `"${dis.version + 5}"` })).status).toBe(412);
+    const noStep = await actor(app, db, { level: 'entry', grants: G('financial_advances', 'view', 'create', 'edit'), regions: [R], modules: null, stepUp: false });
+    const stepRes = await noStep.api.call('post', up, { requested_amount: 10 }, { 'If-Match': `"${dis.version}"` });
+    expect(stepRes.status).toBe(401);
+    expect(stepRes.body.code).toBe('step_up_required');
+    const top = await c.fin.entry.api.call('post', up, { requested_amount: 10 }, { 'If-Match': `"${dis.version}"` });
     expect(top.status).toBe(201);
     expect(top.body.data).toMatchObject({ parent_advance_id: dis.entity_id, advance_state: 'requested' });
   });

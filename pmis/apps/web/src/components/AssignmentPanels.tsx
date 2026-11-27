@@ -96,7 +96,7 @@ export function ExtendBooking({ record, onDone }: { record: RegisterRecord; onDo
   const [to, setTo] = useState('');
   return (
     <ChildAction label={t('fleet.extend')} testid="reg-extend" busy={m.isPending || !to} error={m.isError ? reservedMessage(t, m.error) ?? registerErrorMessage(t, m.error) : null}
-      onGo={() => m.mutate({ to_date: to }, { onSuccess: (r) => { toast(t('fleet.extended')); onDone(r.id); } })}>
+      onGo={() => m.mutate({ to_date: to, version: record.version }, { onSuccess: (r) => { toast(t('fleet.extended')); onDone(r.id); } })}>
       <label className="text-sm text-mute">{t('fleet.extend_to')}<DateInput className="input mono" data-testid="reg-extend-to" value={to} onChange={(e) => setTo(e.target.value)} /></label>
     </ChildAction>
   );
@@ -110,7 +110,7 @@ export function TopUp({ record, onDone }: { record: RegisterRecord; onDone: (id:
   const [to, setTo] = useState('');
   return (
     <ChildAction label={t('fleet.top_up')} testid="reg-topup" busy={m.isPending || (!amount && !to)} error={m.isError ? registerErrorMessage(t, m.error) : null}
-      onGo={() => m.mutate({ ...(amount ? { requested_amount: Number(amount) } : {}), ...(to ? { period_to: to } : {}) }, { onSuccess: (r) => { toast(t('fleet.topped_up')); onDone(r.id); } })}>
+      onGo={() => m.mutate({ ...(amount ? { requested_amount: Number(amount) } : {}), ...(to ? { period_to: to } : {}), version: record.version }, { onSuccess: (r) => { toast(t('fleet.topped_up')); onDone(r.id); } })}>
       <label className="text-sm text-mute">{t('fleet.top_up_amount')}<input type="number" min={0} className="input mono" data-testid="reg-topup-amount" value={amount} onChange={(e) => setAmount(e.target.value)} /></label>
       <label className="text-sm text-mute">{t('fleet.period_to')}<DateInput className="input mono" data-testid="reg-topup-to" value={to} onChange={(e) => setTo(e.target.value)} /></label>
     </ChildAction>
