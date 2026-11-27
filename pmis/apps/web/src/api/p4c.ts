@@ -13,6 +13,8 @@ export type HlcLegacyMigration = S['HlcLegacyMigration'];
 export type DismantleOrderOption = S['DismantleOrderOption'];
 export type GecolOrderWarnings = S['GecolOrderWarnings'];
 export type GecolOrderWarningsInput = S['GecolOrderWarningsInput'];
+export type DeriveRules = S['DeriveRules'];
+export type DeriveRule = S['DeriveRule'];
 
 /** PUT /registers/hlc/records/{id}/purchase-requests (If-Match = record version). */
 export function useSetHlcPurchaseRequests() {
@@ -88,5 +90,15 @@ export function useSetGecolOrderWarnings() {
   return useMutation<GecolOrderWarnings, ApiError, { version: number; body: GecolOrderWarningsInput & { reason: string } }>({
     mutationFn: ({ version, body }) => api.put('/settings/gecol-order-warnings', { version, body }),
     onSettled: () => void qc.invalidateQueries({ queryKey: ['gecolOrderWarnings'] }),
+  });
+}
+
+/** 0.15.260: the cross-register derive rules (Settings, Registers). */
+export const useDeriveRules = () => useQuery({ queryKey: ['deriveRules'], queryFn: () => api.get<DeriveRules>('/settings/derive-rules') });
+export function useSetDeriveRules() {
+  const qc = useQueryClient();
+  return useMutation<DeriveRules, ApiError, { version: number; body: { rules: DeriveRule[]; reason: string } }>({
+    mutationFn: ({ version, body }) => api.put('/settings/derive-rules', { version, body }),
+    onSettled: () => { void qc.invalidateQueries({ queryKey: ['deriveRules'] }); void qc.invalidateQueries({ queryKey: ['register-records'] }); },
   });
 }

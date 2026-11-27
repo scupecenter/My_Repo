@@ -162,6 +162,9 @@ export const downloadTemplate = (templateId: string, o: TemplateDownload = {}): 
     ...(o.filters && Object.keys(o.filters).length ? { filters: JSON.stringify(o.filters) } : {}),
   });
 
+/** P4 (migration 0365): `GET /import-batches/{id}/error-report`: the refused rows as an .xlsx to correct and upload again. Returns the file name. */
+export const downloadErrorReport = (batchId: string): Promise<string> => downloadFile(`/import-batches/${batchId}/error-report`);
+
 /** How often the batch page polls (ms). A test may lower them. */
 export const BATCH_POLL = { parsing: 2000, job: 1500, pending: 4000, processing: 3000 };
 /** Rows are waiting for L2 (or for a predecessor): the page keeps the batch fresh so the bar moves as L2 decides. */
