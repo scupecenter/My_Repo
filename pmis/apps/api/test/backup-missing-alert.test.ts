@@ -2,7 +2,7 @@ import type { Client as PgClient } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { superDb } from './helpers';
 
-/** Migration 0184: the alert `backup_missing` (no successful backup in the last 24 hours). The System Log is shared with other suites, so the checks follow the state they read. */
+/** Migration 0196: the alert `backup_missing` (no successful backup in the last 24 hours). The System Log is shared with other suites, so the checks follow the state they read. */
 let db: PgClient;
 beforeAll(async () => { db = await superDb(); });
 afterAll(async () => { await db.end(); });

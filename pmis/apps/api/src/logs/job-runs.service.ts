@@ -6,7 +6,7 @@ import { DbService, Tx } from '../db/db.service';
 import { applyContext, jobContext } from './context';
 
 export const ALERT_EVERY_MS = 5 * 60_000;
-/** 0184: the backup check runs every 6 hours (it raises at most one alert a calendar day). */
+/** 0196: the backup check runs every 6 hours (it raises at most one alert a calendar day). */
 export const BACKUP_CHECK_EVERY_MS = 6 * 60 * 60_000;
 export const PURGE_EVERY_MS = 24 * 3600_000;
 
@@ -28,7 +28,7 @@ export class JobRunsService implements OnApplicationBootstrap, OnModuleDestroy {
     const w = setInterval(() => void this.expireHistoricalWaiver(), ALERT_EVERY_MS);
     // 0149 (W7): the automatic lock of the Daily Plan and the reminder of an empty next working day (dp_tick, idempotent)
     const dp = setInterval(() => void this.dailyPlanTick(), ALERT_EVERY_MS);
-    // 0184: the backup check (alert `backup_missing`, one alert a day; the dedup key makes every run after the first of the day a no-op)
+    // 0196: the backup check (alert `backup_missing`, one alert a day; the dedup key makes every run after the first of the day a no-op)
     const bk = setInterval(() => void this.backupMissingCheck(), BACKUP_CHECK_EVERY_MS);
     bk.unref();
     this.timers.push(bk);
@@ -102,7 +102,7 @@ export class JobRunsService implements OnApplicationBootstrap, OnModuleDestroy {
     return this.run('daily_plan', async (tx) => Number((await tx.$queryRaw<{ n: number }[]>`SELECT dp_tick() AS n`)[0]?.n ?? 0));
   }
 
-  /** 0184: raises the security alert `backup_missing` when no backup succeeded in the last 24 hours (once a calendar day). */
+  /** 0196: raises the security alert `backup_missing` when no backup succeeded in the last 24 hours (once a calendar day). */
   backupMissingCheck(): Promise<number | null> {
     return this.run('backup_check', async (tx) => Number((await tx.$queryRaw<{ n: number }[]>`SELECT backup_missing_check() AS n`)[0]?.n ?? 0));
   }

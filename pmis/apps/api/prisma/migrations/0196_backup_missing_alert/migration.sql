@@ -1,4 +1,4 @@
--- 0184_backup_missing_alert: an admin alert when no backup succeeded in the last 24 hours (owner request 2026-11-26, relayed by the main agent; item 4).
+-- 0196_backup_missing_alert: an admin alert when no backup succeeded in the last 24 hours (owner request 2026-11-26, relayed by the main agent; item 4).
 --
 -- Additive. The alert uses the existing security alert channel (security_alerts, sec_alert_raise_at: bell and mail to the System Admins as the alert
 -- settings say) and the System Log. It reads the same System Log rows the data reset reads (source backup, level info, script db-backup, event
