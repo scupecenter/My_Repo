@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 // is wired or listed, so the guard cannot silently miss a screen.
 const EXCLUDED: Record<string, string> = {
   // the edit state only selects the row whose edit dialog is open: the dialog is a FormDialog, which guards its own typed input
+  'components/AnnotatePhoto.tsx': 'arrows and circles drawn on a photo in a short in-memory step with explicit Use and Cancel buttons; nothing typed, redrawn in seconds (follow-up if wanted)',
   'pages/settings/SiteMasterColumns.tsx': 'row selector for a FormDialog',
   'pages/logs/AlertRules.tsx': 'row selector for a FormDialog',
   'pages/DailyPlan.tsx': 'row selector for a FormDialog',
