@@ -388,6 +388,9 @@ export const REAL_API_AUTH_USERS = [
   // Contract 0.15.190 (migration 0290; apps/api: settings): the admin lock keys (Settings, Security, Lock keys).
   ['get', '/settings/security-locks'],
   ['put', '/settings/security-locks'],
+  // Contract 0.15.193 (migration 0293; apps/api: security): the download lock categories (Settings, Security, Lock keys).
+  ['get', '/settings/download-locks'],
+  ['put', '/settings/download-locks'],
   // Contract 0.15.191 (migration 0291; apps/api: security): support access (Settings, Security, Support access).
   ['get', '/settings/support-access'],
   ['put', '/settings/support-access'],
@@ -453,6 +456,8 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/search/site-ids'],
   ['get', '/settings/gecol-order-warnings'],
   ['put', '/settings/gecol-order-warnings'],
+  ['get', '/settings/derive-rules'],
+  ['put', '/settings/derive-rules'],
   ['get', '/settings/structural-freeze'],
   ['put', '/settings/structural-freeze'],
   ['post', '/settings/structural-freeze/lift'],
