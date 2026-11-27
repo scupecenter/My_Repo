@@ -6470,5 +6470,16 @@
     "holders": "active",
     "none": "No gaps in this view.",
     "open_matrix": "Open the Responsibility Matrix"
+  },
+  "timeline": {
+    "title": "Timeline",
+    "view_hint": "Sites on a date axis, read only",
+    "hint": "Pick up to {{max}} date columns. Read only: dates change through their tasks.",
+    "columns": "Date columns",
+    "no_columns": "No date columns",
+    "empty": "No dates to draw",
+    "empty_hint": "Pick another date column or widen the filters.",
+    "today": "Today",
+    "note": "{{shown}} of {{total}} loaded sites have a date in the chosen columns ({{all}} match the filters; the first 100 are drawn)."
   }
 }
