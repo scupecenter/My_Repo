@@ -23,6 +23,8 @@ export interface DailyJobResult {
   slaEscalations?: number;
   /** 0166: weekly digest notifications (in-app only) written by this run; only on the week's Sunday */
   digests?: number;
+  /** 0360 (A3): expiry radar notices (in-app only) written by this run */
+  expiryNotices?: number;
 }
 
 /** The wall-clock parts of an instant in a time zone, and the zone's offset from UTC at that instant (milliseconds). */
@@ -123,6 +125,8 @@ export class JobsService implements OnApplicationBootstrap, OnModuleDestroy {
         if (escalated > 0) result.slaEscalations = escalated;
         const digests = await this.weeklyDigest();
         if (digests > 0) result.digests = digests;
+        const expiring = await this.expiryRadar();
+        if (expiring > 0) result.expiryNotices = expiring;
       }
       this.lastRun = { at: new Date(), result };
       await this.runs.finish(run, result ? 'ok' : 'skipped', result ? result.slaApplied + result.reminders + (result.snapshots ?? 0) + (result.contractorAlerts ?? 0) + (result.calendarReset ?? 0) : null, null,
@@ -216,6 +220,17 @@ export class JobsService implements OnApplicationBootstrap, OnModuleDestroy {
     if (n === null) {
       this.log.warn('weekly digest failed');
       await this.syslog.write('error', 'weekly digest failed', {});
+      return 0;
+    }
+    return n;
+  }
+
+  /** 0360 (A3): the expiry radar (permit valid to, lease expiry, billing conversion), in-app notices to the Matrix holders; lead times are the setting expiry.radar. */
+  private async expiryRadar(): Promise<number> {
+    const n = await this.runs.run('expiry_radar', async (tx) => Number((await tx.$queryRaw<{ n: number }[]>`SELECT expiry_radar_notify() AS n`)[0]?.n ?? 0));
+    if (n === null) {
+      this.log.warn('expiry radar failed');
+      await this.syslog.write('error', 'expiry radar failed', {});
       return 0;
     }
     return n;
