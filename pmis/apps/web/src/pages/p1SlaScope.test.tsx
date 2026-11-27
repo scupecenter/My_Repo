@@ -57,7 +57,7 @@ describe('Q15 and Q3: the Scope section of a site', () => {
     await u.click(await screen.findByTestId('scope-apply'));
     await u.type(screen.getByTestId('scope-apply-dlg-reason'), 'scope reviewed with the PM');
     await u.click(screen.getByTestId('scope-apply-dlg-submit'));
-    expect(await screen.findByText(/task\(s\) changed/)).toBeInTheDocument();
+    expect(await screen.findByText(/tasks? changed/)).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByTestId('scope-apply-dlg')).not.toBeInTheDocument());
   });
 

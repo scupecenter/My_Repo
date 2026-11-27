@@ -128,9 +128,15 @@ describe('Workflow Studio', () => {
     await u.click(screen.getByTestId('studio-add-sla-none'));
     expect(screen.getByTestId('studio-add-submit')).toBeDisabled();
     await u.type(screen.getByTestId('studio-add-sla-none-reason'), 'Information step, no clock');
+    // D53: the closing task is chosen at create time
+    await u.click(screen.getByTestId('studio-add-closing'));
     await u.click(screen.getByTestId('studio-add-submit'));
     await reasonAndSave(u);
     expect(await screen.findByTestId('studio-task-NEW1')).toHaveTextContent('Site photos');
+    await waitFor(async () => {
+      const v = await api.get<{ placements: { task_code: string; is_milestone_task?: boolean }[] }>('/workflow/versions/2');
+      expect(v.placements.find((p) => p.task_code === 'NEW1')?.is_milestone_task).toBe(true);
+    });
     expect(await screen.findByTestId('studio-task-form')).toHaveAttribute('data-code', 'NEW1');
     const v2 = await api.get<{ placements: { task_code: string; predecessors?: string[] }[] }>('/workflow/versions/2');
     expect(v2.placements.find((p) => p.task_code === 'A2')?.predecessors).toContain('NEW1');
