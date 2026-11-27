@@ -279,6 +279,8 @@ describe('hybrid mode list', () => {
       'PUT /comments/:id/reactions', 'DELETE /comments/:id/reactions', 'PUT /comments/:id/resolved', 'DELETE /comments/:id/resolved',
       'GET /tasks/:id/time-in-state', 'GET /tasks/:id/blocked-by',
       'GET /reports/time-in-state', 'GET /reports/workload', 'GET /status-updates', 'GET /status-updates/region-health', 'POST /status-updates', 'PATCH /status-updates/:id',
+      // contract 0.15.402 (0561): dashboard share links
+      'GET /dashboard/share-links', 'POST /dashboard/share-links', 'POST /dashboard/share-links/:id/revoke', 'GET /dashboard/shared/:token',
       // contract 0.7.2: the main dashboard, Project Status, weight sets
       'GET /dashboard', 'GET /dashboard/export', 'GET /project-status', 'GET /project-status/snapshots',
       'GET /settings/weight-sets', 'POST /settings/weight-sets', 'GET /settings/weight-sets/:id', 'PUT /settings/weight-sets/:id', 'POST /settings/weight-sets/:id/preview', 'POST /settings/weight-sets/:id/publish',
