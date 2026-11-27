@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { UnsavedGuard } from '@/lib/unsavedGuard';
 import { useTranslation } from 'react-i18next';
 import { useKanbanWip, useSetKanbanWip } from '@/api/boards';
 import { errText, FormDialog } from '@/components/FormDialog';
@@ -54,6 +55,7 @@ export function KanbanWip() {
       {cur.can_edit
         ? <button className="btn btn-accent" data-testid="wip-save" disabled={!dirty} onClick={() => setOpen(true)}>{t('common.save')}</button>
         : <p className="text-sm text-mute" data-testid="wip-readonly">{t('importsSettings.readonly')}</p>}
+      <UnsavedGuard scope="settings" dirty={dirty} needsReason label={t('ui.guard_settings')} onSave={(reason) => new Promise<boolean>((res) => set.mutate({ version: cur.version, limits: next, reason }, { onSuccess: () => res(true), onError: () => res(false) }))} />
       {open && (
         <FormDialog open onClose={() => setOpen(false)} testid="wip-dialog" title={t('board.wip_title')} busy={set.isPending} error={set.isError ? errText(set.error, t) : null}
           onSubmit={(reason) => set.mutate({ version: cur.version, limits: next, reason }, { onSuccess: () => { toast(t('settings.audited')); setOpen(false); setDraft(null); } })}>

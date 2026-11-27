@@ -32,7 +32,9 @@ for (const locale of ['en', 'ar'] as const) {
       await expect(page.getByTestId('np-save')).toBeEnabled();
       await expect(page.getByTestId('np-lock-audit_integrity_failure')).toBeVisible();
 
-      await page.getByTestId('settings-tab-security').click(); await page.getByTestId('settings-section-security-retention').click();
+      await page.getByTestId('settings-tab-security').click();
+      await page.getByTestId('unsaved-discard').click(); // Decision 11: the unsaved threshold edit asks before the tab changes
+      await page.getByTestId('settings-section-security-retention').click();
       await page.getByTestId('ret-security').fill('400');
       await expect(page.getByTestId('ret-warning')).toBeVisible();
       await page.getByTestId('ret-save').click();

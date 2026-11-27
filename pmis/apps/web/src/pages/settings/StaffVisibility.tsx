@@ -1,4 +1,5 @@
 import { X } from 'lucide-react';
+import { UnsavedGuard } from '@/lib/unsavedGuard';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGroups, useRoles } from '@/api/admin';
@@ -57,6 +58,7 @@ export function StaffVisibility() {
         <div className="flex gap-3 text-sm">{(['email', 'phone'] as const).map((f) => <label key={f} className="flex items-center gap-1"><input type="checkbox" data-testid={`sv-hide-${f}`} checked={hidden.includes(f)} onChange={(e) => setHidden(e.target.checked ? [...hidden, f] : hidden.filter((x) => x !== f))} />{t(`card.${f}`)}</label>)}</div>
         <button className="btn" data-testid="sv-hide-save" disabled={!/^\d{4}$/.test(emp)} onClick={() => setHOpen(true)}>{t('common.save')}</button>
       </section>
+      <UnsavedGuard scope="settings" dirty={!!draft} needsReason label={t('ui.guard_settings')} onSave={(reason) => new Promise<boolean>((res) => save.mutate({ version: q.data.version, fields: d, reason }, { onSuccess: () => res(true), onError: () => res(false) }))} />
       {open && (
         <FormDialog open onClose={() => setOpen(false)} testid="sv-dialog" title={t('sv.title')} busy={save.isPending} error={save.isError ? errText(save.error, t) : null}
           onSubmit={(reason) => save.mutate({ version: q.data.version, fields: d, reason }, { onSuccess: () => { toast(t('settings.audited')); setOpen(false); setDraft(null); } })} />

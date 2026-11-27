@@ -6276,6 +6276,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/imports/upload-policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The upload policy of the imports (imports.upload_policy)
+         * @description 0.15.322. Every signed-in user may read it. `enforce` (default) keeps the sequencing locks of the sites; `accept_incomplete` opens the sites of a Master import run before it is applied (see the apply).
+         */
+        get: operations["getImportsUploadPolicy"];
+        /**
+         * Change the upload policy (reason, If-Match, audited)
+         * @description 0.15.322. A System Admin, or a delegate of `settings` edit for all regions (403 `action_forbidden` otherwise). `policy` is `enforce` or `accept_incomplete` (422 `validation_failed`, path `/policy`; an unknown key 422 `unknown_field`), with a reason and If-Match. Saving the value in force is 409 `invalid_transition`. Audited as `imports_upload_policy_update` with before and after.
+         */
+        put: operations["setImportsUploadPolicy"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/pm-schedules": {
         parameters: {
             query?: never;
@@ -12662,7 +12686,7 @@ export interface components {
             }[];
         };
         /** @enum {string} */
-        SearchType: "sites" | "registers" | "documents" | "meetings" | "people" | "contractors" | "tasks" | "warehouse_items";
+        SearchType: "sites" | "registers" | "documents" | "meetings" | "people" | "contractors" | "tasks" | "warehouse_items" | "snags";
         SearchHit: {
             id: string;
             /** @description Shown as is. `match_ranges` are offsets (UTF-16 code units, start inclusive, end exclusive) into this text. */
@@ -13778,6 +13802,8 @@ export interface components {
             errors: number;
             /** @description The missing required values of the site now. */
             data_gaps: number;
+            /** @description 0.15.322: what is missing, per site (the missing-data indicator of the upload preview); the gaps of an approved-as-is task are not listed here. */
+            data_gap_items: components["schemas"]["SiteDataGap"][];
         };
         SiteListItem: {
             /** Format: uuid */
@@ -16990,6 +17016,16 @@ export interface components {
             width: "narrow" | "medium" | "wide";
             show_tabs: boolean;
         };
+        /** @description 0.15.262. The unsaved-changes guard: the master switch and one switch per area. */
+        UiUnsavedGuard: {
+            enabled: boolean;
+            settings: boolean;
+            dialogs: boolean;
+            drawers: boolean;
+            inline: boolean;
+            composers: boolean;
+            navigation: boolean;
+        };
         /** @description 0.15.185. The sections of the interface features setting; every section is complete. */
         UiFeatures: {
             avatars: components["schemas"]["UiAvatars"];
@@ -16997,6 +17033,7 @@ export interface components {
             inbox: components["schemas"]["UiInbox"];
             data_hub: components["schemas"]["UiDataHub"];
             panel: components["schemas"]["UiPanel"];
+            unsaved_guard: components["schemas"]["UiUnsavedGuard"];
         };
         UiFeaturesPatch: {
             avatars?: components["schemas"]["UiAvatars"];
@@ -17004,6 +17041,7 @@ export interface components {
             inbox?: components["schemas"]["UiInbox"];
             data_hub?: components["schemas"]["UiDataHub"];
             panel?: components["schemas"]["UiPanel"];
+            unsaved_guard?: components["schemas"]["UiUnsavedGuard"];
         };
         UiFeaturesSetting: {
             sections: components["schemas"]["UiFeatures"];
@@ -17017,7 +17055,8 @@ export interface components {
             id: string;
             code: string;
             /** @enum {string} */
-            kind: "weekly_status_missing" | "record_idle";
+            kind: "weekly_status_missing" | "record_idle" | "kpi_threshold";
+            /** @description Per kind: weekly_status_missing {}, record_idle {register_key, state, days}, kpi_threshold {kpi (a catalogue code), op (above|below), value (the own threshold, 0..100000, in the unit of the KPI)}. */
             params: {
                 [key: string]: unknown;
             };
@@ -17031,6 +17070,8 @@ export interface components {
             body_ar: string;
             link: string | null;
             enabled: boolean;
+            /** @description 0.15.249: while locked, a rule takes no edit and cannot be disabled; the only accepted save is the unlock itself (audited). A locked rule still fires. */
+            locked: boolean;
             /** @description The If-Match of PUT /settings/alert-rules/{id}. */
             version: number;
             /** Format: date-time */
@@ -17041,7 +17082,7 @@ export interface components {
         AlertRuleInput: {
             code: string;
             /** @enum {string} */
-            kind: "weekly_status_missing" | "record_idle";
+            kind: "weekly_status_missing" | "record_idle" | "kpi_threshold";
             params: {
                 [key: string]: unknown;
             };
@@ -17054,6 +17095,8 @@ export interface components {
             body_ar: string;
             link?: string | null;
             enabled?: boolean;
+            /** @description 0.15.249: lock a rule against edits (unlock with a save that changes nothing else). */
+            locked?: boolean;
         };
         AlertRuleSaved: {
             /** Format: uuid */
@@ -17066,6 +17109,15 @@ export interface components {
                 kinds: {
                     kind: string;
                     params: string[];
+                }[];
+                /** @description 0.15.249: the KPI catalogue kpi_threshold rules pick from (dashboard settings catalogue). */
+                kpis: {
+                    code: string;
+                    label_en: string;
+                    label_ar: string;
+                    unit: string;
+                    /** @enum {string} */
+                    direction: "higher" | "lower";
                 }[];
                 audiences: ("system_admin" | "module")[];
                 registers: {
@@ -17766,6 +17818,8 @@ export interface components {
             is_custom?: boolean;
             /** @description 0.4.6. The form section of a base field (for example `Request`, `Validity`, `PTW checks`), in English, in the order of the fields. Absent for custom fields. */
             section?: string | null;
+            /** @description 0.15.156. The Arabic name of the field section (register_sections.name_ar, migration 0422); the web falls back to `section`. Absent when the section has no Arabic name yet. */
+            section_ar?: string | null;
             options?: {
                 value: string;
                 label_en: string;
@@ -18482,6 +18536,20 @@ export interface components {
             version: number;
             can_edit: boolean;
         };
+        /** @description 0.15.322. The setting `imports.upload_policy`: what the Master import apply does with incomplete data. */
+        ImportsUploadPolicy: {
+            /** @enum {string} */
+            policy: "enforce" | "accept_incomplete";
+            /** @enum {string} */
+            default_policy: "enforce";
+            policies: ("enforce" | "accept_incomplete")[];
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+            /** @description The ETag value. */
+            version: number;
+            can_edit: boolean;
+        };
         /** @description 0.15.203. The setting `templates.change_notice`. */
         TemplateChangeNotice: {
             enabled: boolean;
@@ -18496,6 +18564,11 @@ export interface components {
             /** @description The ETag value. */
             version: number;
             can_edit: boolean;
+        };
+        ImportsUploadPolicyInput: {
+            /** @enum {string} */
+            policy: "enforce" | "accept_incomplete";
+            reason: string;
         };
         TemplateChangeNoticeInput: {
             enabled: boolean;
@@ -33923,6 +33996,62 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TemplateChangeNotice"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getImportsUploadPolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The policy. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportsUploadPolicy"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setImportsUploadPolicy: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportsUploadPolicyInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportsUploadPolicy"];
                 };
             };
             401: components["responses"]["Unauthorized"];
