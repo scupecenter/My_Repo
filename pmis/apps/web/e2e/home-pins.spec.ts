@@ -24,13 +24,13 @@ for (const c of [{ locale: 'en', theme: 'light', suffix: 'en' }, { locale: 'ar',
     await expect(page.getByTestId(`pin-row-${id}`)).toContainText('Late issues');
     await expect(page.getByTestId(`pin-count-${id}`)).toContainText(/[0-9]/);
     await card.scrollIntoViewIfNeeded();
-    await card.screenshot({ path: `/downloads/pins-1-card-${c.suffix}.png` });
+    await card.screenshot({ path: `test-results/pins-1-card-${c.suffix}.png` });
 
     // The pin link opens the register screen with the view applied (?view_id), and the pin toggle reflects the pinned state.
     await page.getByTestId(`pin-link-${id}`).click();
     await expect(page.getByTestId('saved-views')).toBeVisible();
     await expect(page.getByTestId(`views-tab-register-issues-${id}`)).toHaveAttribute('aria-selected', 'true');
     await expect(page.getByTestId('views-pin-home')).toHaveAttribute('aria-pressed', 'true');
-    await page.screenshot({ path: `/downloads/pins-2-toggle-${c.suffix}.png`, fullPage: false });
+    await page.screenshot({ path: `test-results/pins-2-toggle-${c.suffix}.png`, fullPage: false });
   });
 }
