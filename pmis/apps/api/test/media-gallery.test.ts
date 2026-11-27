@@ -9,7 +9,7 @@ import { G } from './reg-helpers';
 import { Actor, actor, makeSite, plainAdmin } from './wf-helpers';
 
 /**
- * The central Media gallery (owner decisions GAL-1 and LIB-1, 2026-11-27, migration 0396, contract 0.15.291): GET /media/items, /media/facets,
+ * The central Media gallery (owner decisions GAL-1 and LIB-1, 2026-11-27, migration 0396, contract 0.15.292): GET /media/items, /media/facets,
  * /media/items/{kind}/{id}/thumbnail and GET / PUT /media/settings (setting media.gallery). The suite writes rows straight into document_files and
  * snag_photos (the owning tables) with real stored images, then checks that the gallery shows exactly what the owning slot allows, that nothing is
  * copied, that a withdrawn item is hidden (never deleted) and that every setting changes what is listed. The setting is put back at the end.

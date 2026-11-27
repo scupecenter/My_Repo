@@ -15,7 +15,7 @@ import { StorageService } from '../documents/storage.service';
 import { isThumbSource, loadSharp, makeThumb, thumbKey, thumbMime, ThumbFormat } from './thumbs';
 
 /**
- * The central Media gallery (Library > Media, owner decision GAL-1 and LIB-1, 2026-11-27, migration 0396, contract 0.15.291).
+ * The central Media gallery (Library > Media, owner decision GAL-1 and LIB-1, 2026-11-27, migration 0396, contract 0.15.292).
  *
  * No storage and no table of its own: the items are read live from document_files (through document_slots) and snag_photos, so a withdrawal,
  * a replacement or a decision on evidence shows at once. Visibility is exactly the owning slot's: the Documents screen view in the region,

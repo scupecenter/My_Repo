@@ -5,7 +5,7 @@ import { Auth } from '../auth/decorators';
 import { etagHeader } from '../common/etag';
 import { MediaService, MediaSettingsDto } from './media.service';
 
-/** Contract `media` (0.15.291, migration 0396): the central Media gallery, its filters and its settings. */
+/** Contract `media` (0.15.292, migration 0396): the central Media gallery, its filters and its settings. */
 @Controller('media')
 export class MediaController {
   constructor(private readonly svc: MediaService) {}
