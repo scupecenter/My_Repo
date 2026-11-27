@@ -295,6 +295,41 @@ describe('the scope of a request (0.15.71)', () => {
     const c = await post(admin1, `/requests/${id}/cancel`, { reason: 'Scope test only' }, etag(ok));
     expect(c.status).toBe(200);
   });
+
+  it('narrowing (migration 0366): the dry run counts only the matching records, the filter is bound into the scope hash, and parts that cannot follow one record refuse it', async () => {
+    const count = async (q2: string) => {
+      const r = await admin1.api.call('get', `/settings/data-reset/plan?${q2}`);
+      expect(r.status).toBe(200);
+      return r;
+    };
+    const whole = await count('parts=procurement');
+    const tripoli = await count('parts=procurement&regions=1');
+    const nowhere = await count('parts=procurement&regions=999');
+    const rows = (r: { body: { plan?: unknown; tables?: { table: string; delete: number }[] } }, t: string) =>
+      (r.body.tables ?? []).find((x) => x.table === t)?.delete ?? 0;
+    expect(rows(whole, 'procurement_records')).toBe(1);
+    expect(rows(tripoli, 'procurement_records')).toBe(1);
+    expect(rows(nowhere, 'procurement_records')).toBe(0);
+    expect(rows(nowhere, 'register_records')).toBe(0);
+    expect(tripoli.body.scope.narrow).toMatchObject({ regions: [1] });
+    expect(tripoli.body.scope.hash).not.toBe(whole.body.scope.hash);
+    expect((await count('parts=procurement&from=2000-01-01&to=2100-01-01')).body.tables.find((x: { table: string }) => x.table === 'procurement_records').delete).toBe(1);
+    const sitesNarrow = await admin1.api.call('get', '/settings/data-reset/plan?parts=sites&regions=1');
+    expect(sitesNarrow.status).toBeGreaterThanOrEqual(400);
+    expect(sitesNarrow.status).toBeLessThan(500);
+    const opts = await admin1.api.call('get', '/settings/data-reset/narrow-options?part=procurement');
+    expect(opts.status).toBe(200);
+    expect(opts.body.regions.length).toBeGreaterThan(0);
+    expect((await plain.api.call('get', '/settings/data-reset/narrow-options')).status).toBe(403);
+    // the request stores the filter in its scope, bound into the hash the approver approves
+    const r = await post(admin1, '/requests', { reason: 'Narrow scope synthetic test', confirm_text: phrase, parts: ['procurement'], narrow: { regions: [1] } });
+    expect(r.status).toBe(201);
+    expect(r.body.scope.narrow).toMatchObject({ regions: [1] });
+    expect(r.body.scope_hash).toBe(tripoli.body.scope.hash);
+    await expect(db.query(`UPDATE data_reset_requests SET scope = jsonb_set(scope, '{narrow}', '{"regions":[2]}') WHERE id = $1`, [r.body.id])).rejects.toThrow();
+    const c = await post(admin1, `/requests/${r.body.id}/cancel`, { reason: 'Narrow scope test only' }, etag(r));
+    expect(c.status).toBe(200);
+  });
 });
 
 describe('the guarded settings', () => {
