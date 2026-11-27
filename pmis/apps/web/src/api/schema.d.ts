@@ -17054,6 +17054,7 @@ export interface components {
             /** @description The regions the figures cover (null = every region). */
             scope_regions: components["schemas"]["RegionId"][] | null;
             procurement: components["schemas"]["DashboardOpsProcurement"];
+            permits_hse: components["schemas"]["DashboardOpsPermitsHse"];
         };
         /** @description 0.15.106: procurement and materials (dashboard proposals item 1). */
         DashboardOpsProcurement: {
@@ -17105,6 +17106,40 @@ export interface components {
                 missing_lines: number;
                 missing_qty: number;
             }[] | null;
+        };
+        /** @description 0.15.200: permits and HSE (dashboard proposals item 3). */
+        DashboardOpsPermitsHse: {
+            /** @description False when the caller may not see the Permits and HSE register; the other fields are then null. */
+            available: boolean;
+            /** @description The permit records of the active, not cancelled sites. */
+            total: number | null;
+            /** @description The status mix, the most frequent first; (none) gathers the blank statuses. */
+            by_status: {
+                status: string;
+                count: number;
+            }[] | null;
+            /** @description Permits with status Applied. */
+            waiting: number | null;
+            /** @description The active, not cancelled sites with no permit record at all. */
+            sites_without_permit: number | null;
+            /** @description The approved dated permits whose validity ends within the next 30 calendar days. */
+            expiring_14: number | null;
+            /** @description The approved dated permits whose validity has passed. */
+            expired: number | null;
+            /** @description Stop-work orders not yet lifted. */
+            stop_work_active: number | null;
+            /** @description The safety checks of the open PTWs (permit type beginning PTW, status Applied or Approved). A check counts as covered only when it is Done or N/A. */
+            ptw: {
+                open: number;
+                /** @description The open PTWs missing at least one check. */
+                with_gaps: number;
+                /** @description The gaps per check, only the checks that are missing somewhere. */
+                gaps: {
+                    /** @enum {string} */
+                    key: "jsa_tra" | "toolbox_talk" | "work_at_height" | "lifting_plan" | "loto" | "rescue_plan";
+                    count: number;
+                }[];
+            } | null;
         };
         DashboardTabLayout: {
             /** @description Card codes in display order. */
