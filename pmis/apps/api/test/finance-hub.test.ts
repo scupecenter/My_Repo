@@ -48,6 +48,8 @@ describe('Finance hub', () => {
   it('summary: a caller without a finance module gets null cards; the admin gets real counts under the threshold', async () => {
     const set = await admin.api.call('put', '/settings/ui-features', { sections: { finance_hub: HUB }, reason: 'Set the hub thresholds' }, { 'If-Match': String((await admin.api.call('get', '/settings/ui-features')).headers.etag) });
     expect(set.status).toBe(200);
+    // the database is shared with other suites that also leave advances and invoices: compare with the figures before this test adds its own
+    const base = (await admin.api.call('get', '/finance-hub/summary')).body;
     const mk = await makeSite(db, 5);
     const site = (await db.query(`SELECT id, region_id FROM sites WHERE id = $1`, [mk.id])).rows[0] as { id: string; region_id: number };
     const mkRec = (key: string, type: string | null, data: object) =>
@@ -66,12 +68,12 @@ describe('Finance hub', () => {
 
     const full = await admin.api.call('get', '/finance-hub/summary');
     expect(full.status).toBe(200);
-    expect(full.body.advances.open_count).toBe(1);
+    expect(full.body.advances.open_count - base.advances.open_count).toBe(1);
     // 2026-10-01 is more than 45 days before today: the disbursed, unsettled advance warns
-    expect(full.body.advances.overdue_count).toBe(1);
-    expect(full.body.advances.open_amount).toBe(100);
-    expect(full.body.invoices.open_count).toBe(1);
-    expect(full.body.invoices.by_state.Received).toBe(1);
-    expect(full.body.invoices.overdue_count).toBe(1);
+    expect(full.body.advances.overdue_count - base.advances.overdue_count).toBe(1);
+    expect((full.body.advances.open_amount ?? 0) - (base.advances.open_amount ?? 0)).toBe(100);
+    expect(full.body.invoices.open_count - base.invoices.open_count).toBe(1);
+    expect(full.body.invoices.by_state.Received - base.invoices.by_state.Received).toBe(1);
+    expect(full.body.invoices.overdue_count - base.invoices.overdue_count).toBe(1);
   });
 });
