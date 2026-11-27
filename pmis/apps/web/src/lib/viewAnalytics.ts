@@ -1,5 +1,5 @@
 /**
- * Free analytics on any view (item 8 of the PM-platforms report): a count breakdown and number totals computed from the rows the view has
+ * Free analytics on any view (item 8 of the improvement report): a count breakdown and number totals computed from the rows the view has
  * already loaded, so it adds no request, no permission and no hidden field. Pure functions, tested in viewAnalytics.test.ts.
  */
 export type Slice = { key: string; label: string; count: number; share: number };

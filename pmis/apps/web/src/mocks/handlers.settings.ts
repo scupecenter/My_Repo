@@ -257,6 +257,7 @@ const progress = (s: Pick<WeightSet, 'activities'>) => Math.round(s.activities.r
 
 /** Q440: the confirmation state, with what stops a confirmation (the current and the next year need holidays, none tentative). A store saved before 0.14.2 starts from the seed. */
 const CC = () => (C().calConfirm ??= initCfg().calConfirm);
+const MP = () => (C().mailPolicy ??= initCfg().mailPolicy);
 const MK = () => (C().mailKinds ??= initCfg().mailKinds);
 /** 0.15.1: nav.layout (a store saved before 0.15.1 starts from the seed). */
 /** 0.15.190: the admin lock keys, kept in memory like the other small settings of the mock (both off by default). */
@@ -896,6 +897,30 @@ export const settingsHandlers = [
     Object.assign(MK(), { kinds: [...(b.kinds as string[])].sort(), unknown: [], version: MK().version + 1, updated_at: new Date().toISOString(), updated_by: viewer()!.employee_id! }); save();
     const m = MK();
     return HttpResponse.json({ kinds: m.kinds, unknown_kinds: [], catalogue: MAIL_KIND_CATALOGUE, version: m.version, updated_at: m.updated_at, updated_by: ref(m.updated_by!) }, tag(m.version));
+  }),
+
+  // ------------------------------------------------------------------ 0.15.261: the mail policy (System Admin only)
+  http.get(`${B}/settings/mail-policy`, () => {
+    const g = needAdmin(); if (g) return g;
+    const m = MP();
+    return HttpResponse.json({ ...m, catalogue: MAIL_KIND_CATALOGUE, block_public_sharing: false, updated_by: m.updated_by ? ref(m.updated_by) : null }, tag(m.version));
+  }),
+  http.put(`${B}/settings/mail-policy`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    if (!stepUpValid()) return stepUp();
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, MP().version); if (p) return p;
+    const b = await body<{ reason?: string; enabled?: boolean; mode?: string; internal_domains?: string[]; kinds?: Record<string, { enabled: boolean; mode: string }> }>(request);
+    const errs: { path: string; code: string }[] = [];
+    if ((b.reason ?? '').trim().length < 3) errs.push({ path: '/reason', code: 'required' });
+    if (typeof b.enabled !== 'boolean') errs.push({ path: '/enabled', code: 'required' });
+    if (b.mode !== 'internal_only' && b.mode !== 'internal_external') errs.push({ path: '/mode', code: 'invalid' });
+    (b.internal_domains ?? []).forEach((d, i) => { if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(d)) errs.push({ path: `/internal_domains/${i}`, code: 'invalid' }); });
+    Object.keys(b.kinds ?? {}).forEach((k) => { if (!MAIL_KIND_CATALOGUE.some((c) => c.kind === k)) errs.push({ path: `/kinds/${k}`, code: 'unknown_kind' }); });
+    if (errs.length) return fields(...errs);
+    Object.assign(MP(), { enabled: b.enabled!, mode: b.mode!, internal_domains: b.internal_domains ?? [], kinds: b.kinds ?? {}, version: MP().version + 1, updated_at: new Date().toISOString(), updated_by: viewer()!.employee_id! }); save();
+    const m = MP();
+    return HttpResponse.json({ ...m, catalogue: MAIL_KIND_CATALOGUE, block_public_sharing: false, updated_by: ref(m.updated_by!) }, tag(m.version));
   }),
 
   // ------------------------------------------------------------------ SLA rule sets (0.2.6)

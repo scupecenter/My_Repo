@@ -1,5 +1,5 @@
 /**
- * Appearance profiles (owner approval 2026-11-27, the PM-platforms proposal items 1-3; migration 0241, contract 0.15.230).
+ * Appearance profiles (owner approval 2026-11-27, the improvement proposal items 1-3; migration 0241, contract 0.15.230).
  * Seven dimensions, each changeable alone, applied at once on <html> as data-ui-* attributes; the token blocks live in styles/appearance.css.
  * The effective set comes from the server (GET /me user.appearance: own choices, else the organization defaults); the last seen set is cached
  * so a reload does not flash. Independent of the UI design (brand) and of the light/dark theme.
