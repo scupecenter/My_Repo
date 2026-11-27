@@ -204,6 +204,7 @@
     "library.archive": "Archive",
     "lessons_learned": "Lessons Learned",
     "invoices": "Invoices",
+    "deliverables": "Deliverables",
     "incidents": "Incidents & Security"
   },
   "top": {
@@ -2025,6 +2026,8 @@
     "follow_up": "Follow-up",
     "invoice": "Invoice",
     "payment": "Payment",
+    "deliverable": "Deliverable",
+    "links_section": "Links",
     "amount_section": "Amount",
     "incident": "Incident",
     "people_damage": "People and damage",
@@ -4405,6 +4408,27 @@
     "red": "Needs upload. Documents: {{missing}} missing, {{rejected}} rejected, {{expired}} expired. Upload needed ({{approved}} of {{need}} approved).",
     "yellow": "Pending approval. Documents uploaded, waiting for review or approval ({{approved}} of {{need}} approved).",
     "green": "Approved. Documents approved ({{approved}} of {{need}})."
+  },
+  "regstate": {
+    "title": "Register state",
+    "note": "Switch a whole register off (it is hidden everywhere; nothing is deleted and switching it on again restores everything) or lock it (readable, but no new record and no change, except by a System Admin). Every change needs a reason and is audited.",
+    "register": "Register",
+    "records": "Records",
+    "enabled": "Enabled",
+    "locked": "Locked",
+    "reason": "Last reason",
+    "hidden": "Hidden",
+    "saved": "Register state saved",
+    "enabled_aria": "Enable {{name}}",
+    "lock_aria": "Lock {{name}}",
+    "unlock_aria": "Unlock {{name}}",
+    "enable_title": "Enable {{name}}",
+    "disable_title": "Disable {{name}}",
+    "lock_title": "Lock {{name}}",
+    "unlock_title": "Unlock {{name}}",
+    "disable_note": "The register is hidden from menus, lists and the Matrix. No record, step, template or history is removed.",
+    "lock_note": "The register stays readable. New records and changes (screen, upload, workflow step) are refused until it is unlocked; System Admins are exempt.",
+    "restore_note": "The register is available again with all its records."
   },
   "regcols": {
     "inline_reason": "Reason for the changes made in the table (3+ characters)",

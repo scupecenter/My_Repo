@@ -61,7 +61,7 @@ let alerts: MockAlert[] = [
 ];
 const SEVS = ['info', 'low', 'medium', 'high', 'critical'];
 const DEFAULT_SEV: Record<string, string> = { failed_sign_ins: 'medium', failed_sign_ins_ip: 'medium', new_ip: 'low', large_export: 'medium', admin_set_changed: 'high',
-  alert_settings_weakened: 'high', malware_upload: 'high', break_glass_used: 'critical', backup_missing: 'high' };
+  alert_settings_weakened: 'high', malware_upload: 'high', break_glass_used: 'critical', backup_missing: 'high', backup_late: 'high', job_failed: 'medium' };
 let thresholds = { failed_sign_ins: { count: 5, minutes: 15 }, failed_by_ip: { count: 20, minutes: 15 }, large_export_rows: 5000, new_ip: true,
   severity: { ...DEFAULT_SEV }, mandatory_severity: { retention_reduced: 'critical', audit_integrity_failure: 'critical' }, email_min_severity: 'low', trusted_networks: [] as string[], version: 1, updated_at: null as string | null, updated_by: null as unknown };
 let sessions = [

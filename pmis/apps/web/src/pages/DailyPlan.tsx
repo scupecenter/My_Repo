@@ -8,7 +8,9 @@ import { errText, FormDialog } from '@/components/FormDialog';
 import { PageHeader } from '@/components/PageHeader';
 import { SavedViews } from '@/components/SavedViews';
 import { ErrorState, LoadingSkeleton } from '@/components/States';
-import { ColumnMenu, DensityToggle, useTablePrefs } from '@/components/TableKit';
+import { LayoutPanel } from '@/components/LayoutPanel';
+import { ColumnMenu, useTablePrefs } from '@/components/TableKit';
+import { displayAttrs } from '@/components/TableStandard';
 import { useToast } from '@/components/Toast';
 import { WeekCycle } from '@/components/WeekCycle';
 import { UnifiedFilter } from '@/components/UnifiedFilter';
@@ -145,7 +147,7 @@ export function DailyPlan() {
         <span className="ms-auto flex flex-wrap items-center gap-2">
           <span className="text-sm text-mute" data-testid="daily-plan-count">{t('dailyPlan.count', { count: rows.length })}</span>
           {plans.some((p) => p.can_edit) && <button type="button" className="btn btn-accent" data-testid="daily-plan-add" onClick={() => setAdding(true)}><Plus size={16} aria-hidden />{t('dailyPlan.add_site')}</button>}
-          <DensityToggle api={table} />
+          <LayoutPanel testid="daily-plan-layout" table={table} />
           <ColumnMenu api={table} label={(id) => t(`dailyPlan.col.${id}`)} />
           <button type="button" className="btn" data-testid="daily-plan-export" disabled={!progress.data} onClick={doExport}><Download size={16} aria-hidden />{t('dailyPlan.export')}</button>
           <button type="button" className="btn" data-testid="daily-plan-copy" disabled={!progress.data || !tomorrow.data} onClick={() => void copy()}><ClipboardCopy size={16} aria-hidden />{t('dailyPlan.copy')}</button>
@@ -169,7 +171,7 @@ export function DailyPlan() {
       )}
 
       {day.isLoading || (tab === 'tomorrow' && !next && progress.isLoading) ? <LoadingSkeleton /> : day.isError ? <ErrorState onRetry={() => void day.refetch()} message={errText(day.error, t)} /> : (
-        <div className="card overflow-x-auto" dir="ltr" data-testid="daily-plan-table-wrap">
+        <div className="card overflow-x-auto" dir="ltr" data-testid="daily-plan-table-wrap" {...displayAttrs(table.display)}>
           <table className={`w-full text-sm ${table.density === 'compact' ? 'leading-tight' : ''}`} data-testid="daily-plan-table" data-tab={tab}>
             <thead className="sticky top-0 bg-card text-mute">
               <tr>
