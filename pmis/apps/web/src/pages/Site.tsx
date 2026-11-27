@@ -1,5 +1,6 @@
 import { SiteActivity } from '@/components/SiteActivity';
 import { LayoutPanel } from '@/components/LayoutPanel';
+import { ScreenSettingsLink } from '@/components/ScreenSettingsLink';
 import { SiteGantt } from '@/components/SiteGantt';
 import { SiteSummaryStrip } from '@/components/SiteSummaryStrip';
 import type { TasksExportColumnCode } from '@/api/types';
@@ -115,7 +116,7 @@ export function Site() {
         <>
           <div className="flex flex-wrap items-start gap-3">
             <div className="flex-1">
-              <h1 className="text-2xl font-bold" data-testid="site-title"><span className="mono">{s.site_code}</span> {s.name}</h1>
+              <div className="flex items-center gap-2"><h1 className="text-2xl font-bold" data-testid="site-title"><span className="mono">{s.site_code}</span> {s.name}</h1><ScreenSettingsLink screen="site" /></div>
               {s.name_ar && <p dir="rtl" lang="ar" className="text-lg text-mute" data-testid="site-name-ar">{s.name_ar}</p>}
               <p className="text-mute" data-testid="site-meta">{(i18n.language === 'ar' && region?.name_ar) || region?.name_en} · {s.delivery_scenario ? t(`scenario.${s.delivery_scenario}`) : ''}{s.cluster_code ? ` · ${s.cluster_code}` : ''}</p>
             </div>

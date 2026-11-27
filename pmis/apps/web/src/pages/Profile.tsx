@@ -58,7 +58,7 @@ export function Profile() {
   const p = q.data;
   return (
     <div className="space-y-4" data-testid="page-profile">
-      <PageHeader title={t('profile.title')} subtitle={t('profile.subtitle')} />
+      <PageHeader title={t('profile.title')} subtitle={t('profile.subtitle')} settings="profile" />
       <div className="grid gap-4 lg:grid-cols-2">
         <Details key={p.version} p={p} />
         <AppearanceSection key={`ap-${p.version}`} p={p} />

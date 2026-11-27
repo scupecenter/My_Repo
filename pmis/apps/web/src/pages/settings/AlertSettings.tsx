@@ -18,7 +18,7 @@ export function weakens(cur: AlertSettings, sev: Record<string, Severity>, floor
  * Alert rules (owner answers Q167 and Q168, contract 0.12.3): the severity of each rule, the lowest severity that is mailed to the System Admins, and
  * the trusted networks that soften a new-address alert by one level. The thresholds of 0.10.0 are sent back unchanged.
  */
-export function AlertRules() {
+export function AlertSettingsPanel() {
   const { t } = useTranslation();
   const toast = useToast();
   const q = useAlertSettings(), set = useSetAlertSettings();

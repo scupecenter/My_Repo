@@ -26,6 +26,14 @@ export const SCREEN_SETTINGS = {
   library_templates: { tab: 'documents', section: 'types' },
   data_hub: { tab: 'screens', section: 'data-hub' },
   audit_log: { tab: 'security', section: 'retention' },
+  security_alerts: { tab: 'security', section: 'alerts' },
+  users: { tab: 'security', section: 'limits' },
+  assignments: { tab: 'security', section: 'limits' },
+  matrix: { tab: 'workflow', section: 'coverage', adminOnly: true },
+  warehouse: { tab: 'screens', section: 'tables' },
+  my_work: { tab: 'workflow', section: 'board' },
+  site: { tab: 'workflow', section: 'freeze' },
+  profile: { tab: 'security', section: 'newdevice' },
 } as const satisfies Record<string, ScreenSettingsTarget>;
 
 export type ScreenKey = keyof typeof SCREEN_SETTINGS;
