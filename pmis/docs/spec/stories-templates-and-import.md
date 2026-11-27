@@ -84,7 +84,7 @@ Sources:
 | E Region | `region` (name, code or a region alias) | **refused**: required, or unknown region |
 | F Sub Region | `sub_region` | left empty |
 | G Cluster ID | `cluster_code` (created in the site's region when new; one of another region refuses the row) | left empty |
-| H Latitude, I Longitude | `latitude`, `longitude` | both or none; out of range refuses the row; outside Libya is a warning |
+| H Latitude, I Longitude | `latitude`, `longitude` | both or none; out of range refuses the row; outside the country is a warning |
 | J Site Type | `site_type` (list SiteType) | left empty; a value outside the list refuses the row unless the list allows other values |
 | K Site Scenario | `site_scenario` (list SiteScenario) | as Site Type |
 | S RF Survey Date | `rf_survey_date` | left empty; an invalid or future date refuses the row |
