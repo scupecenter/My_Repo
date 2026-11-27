@@ -2729,7 +2729,10 @@
     "kind_gate_closed_again": "عودة إغلاق بوابة",
     "kind_sla_negative_duration": "تنبيه بيانات SLA",
     "kind_site_region_moved": "موقع انتقل إلى منطقتك",
-    "kind_system": "النظام"
+    "kind_system": "النظام",
+    "priority": "أولوية",
+    "priority_only": "الأولوية فقط",
+    "empty_priority": "لا شيء يحتاج إليك الآن"
   },
   "tis": {
     "tab": "الزمن",

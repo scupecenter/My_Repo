@@ -2721,7 +2721,10 @@
     "kind_gate_closed_again": "Gate closed again",
     "kind_sla_negative_duration": "SLA data alert",
     "kind_site_region_moved": "Site moved to your region",
-    "kind_system": "System"
+    "kind_system": "System",
+    "priority": "Priority",
+    "priority_only": "Priority only",
+    "empty_priority": "Nothing needs you right now"
   },
   "tis": {
     "tab": "Time",
