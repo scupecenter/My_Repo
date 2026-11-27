@@ -17778,6 +17778,8 @@ export interface components {
             is_custom?: boolean;
             /** @description 0.4.6. The form section of a base field (for example `Request`, `Validity`, `PTW checks`), in English, in the order of the fields. Absent for custom fields. */
             section?: string | null;
+            /** @description 0.15.156. The Arabic name of the field section (register_sections.name_ar, migration 0422); the web falls back to `section`. Absent when the section has no Arabic name yet. */
+            section_ar?: string | null;
             options?: {
                 value: string;
                 label_en: string;
