@@ -65,7 +65,7 @@ function row(date: string, s: SiteSeed, st: Stored | undefined): DailyPlanRow {
   const ac = 'actual_work' in ov ? lines(ov.actual_work) : s.actual.length;
   const below = date <= today() && ac < pc;
   return {
-    region_id: s.region, site_id: s.id, site_code: s.code, site_name: s.name, origin: st?.origin ?? 'auto', values, auto,
+    row_id: st ? `00000000-0000-4000-9000-${String(s.id).replace(/\D/g, '').padStart(12, '0').slice(-12)}` : null, region_id: s.region, site_id: s.id, site_code: s.code, site_name: s.name, origin: st?.origin ?? 'auto', values, auto,
     overridden: OVERRIDE_KEYS.filter((k) => k in ov), reason: st?.reason ?? null, remark: st?.remark ?? null,
     planned_items: s.planned.map((l) => ({ kind: 'task' as const, code: l.split(' ')[0]!, label: l })), actual_items: s.actual.map((l) => ({ kind: 'task' as const, code: l.split(' ')[0]!, label: l })),
     planned_count: pc, actual_count: ac, below_target: below, reason_missing: below && !(st?.reason ?? '').trim(), frozen: false,
@@ -83,7 +83,7 @@ function rowsOf(date: string, region: number): DailyPlanRow[] {
 function head(date: string, region: number, rows: DailyPlanRow[]): DailyPlanRegion {
   const p = planAt(date, region);
   return {
-    region_id: region, region_code: REGIONS[region]!.code, region_name_en: REGIONS[region]!.en, region_name_ar: REGIONS[region]!.ar, plan_date: date, version: p.version,
+    plan_id: `00000000-0000-4000-a000-${date.replace(/\D/g, '')}${String(region).padStart(4, '0')}`, entity_locked: false, region_id: region, region_code: REGIONS[region]!.code, region_name_en: REGIONS[region]!.en, region_name_ar: REGIONS[region]!.ar, plan_date: date, version: p.version,
     locked: p.locked, lock_kind: p.lock_kind, locked_at: p.locked ? `${date}T15:00:00Z` : null, locked_by: p.locked && p.lock_kind === 'manual' ? { id: 'mock', display_name: viewer()?.name ?? 'Lead', employee_id: null } : null,
     unlocked_at: null, unlocked_by: null, updated_at: null, updated_by: null, row_count: rows.length, reason_missing_count: rows.filter((r) => r.reason_missing).length,
     can_edit: !p.locked && canEdit(), can_lock: !p.locked && canEdit(), can_unlock: p.locked && isAdmin(),

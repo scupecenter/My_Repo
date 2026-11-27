@@ -17202,6 +17202,11 @@ export interface components {
             label_ar?: string;
         };
         DailyPlanRow: {
+            /**
+             * Format: uuid
+             * @description The stored row (null until the row is saved or added); the target of a row lock (0.15.409).
+             */
+            row_id?: string | null;
             region_id: number;
             /** Format: uuid */
             site_id: string;
@@ -17251,6 +17256,13 @@ export interface components {
             frozen: boolean;
         };
         DailyPlanRegion: {
+            /**
+             * Format: uuid
+             * @description The plan header (null until the first change); the target of a plan lock (0.15.409).
+             */
+            plan_id?: string | null;
+            /** @description The plan carries an open entity lock (0.15.409): a non-admin cannot edit it. */
+            entity_locked?: boolean;
             region_id: number;
             region_code?: string;
             region_name_en?: string;

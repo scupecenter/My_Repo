@@ -1,8 +1,11 @@
 import { ChevronLeft, ChevronRight, ClipboardCopy, Download, Lock, LockOpen, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useMe } from '@/api/hooks';
+import { isAdmin } from '@/lib/perm';
 import { Link, useSearchParams } from 'react-router-dom';
 import { exportDailyPlan, useDailyPlan, useDailyPlanOps, useDailyPlanSettings, type DailyPlanDay, type DailyPlanRegion, type DailyPlanRow } from '@/api/dailyPlan';
+import { EntityColumnLocks, EntityLockButton } from '@/components/EntityLocks';
 import { errText, FormDialog } from '@/components/FormDialog';
 import { MoreMenu, PageHeader } from '@/components/PageHeader';
 import { SavedViews } from '@/components/SavedViews';
@@ -32,6 +35,7 @@ const colDefs = (cols: DpColumn[]): ColDef[] => cols.map((id) => ({ id, w: id ==
 export function DailyPlan() {
   const { t, i18n } = useTranslation();
   const toast = useToast();
+  const admin = isAdmin(useMe(true).data);
   const [sp, setSp] = useSearchParams();
   const isWeek = sp.get('tab') === 'week';
   const tab: DailyPlanTab = sp.get('tab') === 'tomorrow' ? 'tomorrow' : 'progress';
@@ -118,6 +122,7 @@ export function DailyPlan() {
       </div>
       {isWeek ? <WeekCycle date={date} regions={scope(progress.data)} onDate={(d) => setParams({ date: d })} /> : <>
 
+      {admin && <EntityColumnLocks kind="daily_plan_row" testid="daily-plan-column-locks" options={[...OVERRIDE_KEYS, 'reason', 'remark'].map((k) => ({ code: k, label: t(`dailyPlan.col.${k}`) }))} />}
       <div role="toolbar" className="flex flex-wrap items-center gap-2" data-testid="daily-plan-toolbar">
         <SavedViews screen={SCREEN} value={filters} empty={{ ...EMPTY_FILTERS, region: defaultScope }} table={table}
           onApply={(v) => setParams({ region: v.region || 'all', contractor: v.contractor, aat_se: v.aat_se, sow: v.sow, q: v.q })} />
@@ -159,6 +164,7 @@ export function DailyPlan() {
                 : p.reason_missing_count > 0 && <span className="chip bg-lateBg text-lateInk">{t('dailyPlan.reasons_missing', { count: p.reason_missing_count })}</span>}
               {p.can_lock && <button type="button" className="btn px-2 py-1 text-xs" data-testid={`daily-plan-lock-${p.region_id}`} onClick={() => setLocking(p)}><Lock size={12} aria-hidden />{t('dailyPlan.lock')}</button>}
               {p.can_unlock && <button type="button" className="btn px-2 py-1 text-xs" data-testid={`daily-plan-unlock-${p.region_id}`} onClick={() => setUnlocking(p)}><LockOpen size={12} aria-hidden />{t('dailyPlan.unlock')}</button>}
+              {admin && p.plan_id && <EntityLockButton kind="daily_plan" id={p.plan_id} testid={`daily-plan-entity-lock-${p.region_id}`} />}
             </li>
           ))}
         </ul>
@@ -194,6 +200,7 @@ export function DailyPlan() {
                     <td className="whitespace-nowrap p-1 text-end">
                       {p?.can_edit && <>
                         <button type="button" className="btn px-1.5 py-1" aria-label={t('dailyPlan.edit_row', { site: r.site_code })} data-testid={`daily-plan-edit-${r.site_code}`} onClick={() => setEdit(r)}><Pencil size={14} aria-hidden /></button>
+                        {admin && r.row_id && <EntityLockButton kind="daily_plan_row" id={r.row_id} testid={`daily-plan-row-lock-${r.site_code}`} />}
                         <button type="button" className="btn px-1.5 py-1" aria-label={t('dailyPlan.remove_row', { site: r.site_code })} data-testid={`daily-plan-remove-${r.site_code}`}
                           onClick={() => ops.remove.mutate({ date: shownDate, region: r.region_id, site: r.site_id, version: p.version }, { onSuccess: () => toast(t('dailyPlan.removed')), onError: fail })}><Trash2 size={14} aria-hidden /></button>
                       </>}

@@ -243,6 +243,7 @@ info:
     - 0.1.0 (2026-10-25): first contract for P1. Breaking changes are recorded in `docs/adr/` (ADR 0001 §6).
     - 0.15.204 (2026-11-27): the dashboard follow-up sections, pending approvals bottleneck (owner approval 2026-11-26, dashboard proposals item 7; migration 0305). Additive and read only. `GET /dashboard/ops` gains the section `approvals` (`DashboardOpsApprovals`): the tasks waiting for review or approval (states in_review and in_approval, the same population as the Approvals inbox), their ages in calendar days since the level opened, split review against approve, and the same ages grouped by the ball-in-court role so the bottleneck role shows. The section needs the approvals view (and the sites view, like the inbox) and answers available false without them. The dashboard settings catalogue gains the card `ops_approvals`. No grant, role or permission change.
     - 0.15.408 (2026-11-27): hardening layer 1a, locks for the Warehouse (migration 0565). Additive. `GET /entity-locks` lists the open locks of a kind; `POST` and `DELETE` on `/entity-locks/{kind}/{id}` lock or unlock one Warehouse item or movement (the kinds `daily_plan` and `daily_plan_row` are used from the next migration), and `POST` and `DELETE` on `/entity-locks/columns/{kind}/{field}` lock or unlock a column for every record. Same model as the register locks: the administer right, a reason, step-up and an audit entry; a locked record or column answers 403 `register_locked` from the item and movement writers for everyone except a System Admin. `DELETE /warehouse/items/{id}` no longer deletes: it hides the item (`is_active` false, reason, audit); the response keeps `deleted` and adds `hidden`. No grant, role or permission change.
+    - 0.15.409 (2026-11-27): hardening layer 1b, locks for the Daily Plan (migration 0566, after 0565). Additive. The `entity-locks` routes of 0.15.408 take the kinds `daily_plan` (the plan of a region and day) and `daily_plan_row` (one stored row, and a column of the rows for every plan). A locked plan or row refuses the plan doors (a manual value, add, remove, and the template import) with 403 `register_locked` for everyone except a System Admin; a locked column refuses a body that names it. The plan head gains `plan_id` and `entity_locked`, a row gains `row_id` (null until stored), and `can_edit` is false on a locked plan for a non-admin. Same administer right, reason, step-up and audit as the register locks. The day lock of 0149 is unchanged.
     - 0.15.205 (2026-11-27): the dashboard follow-up sections, change requests and overdue meeting actions (owner approval 2026-11-26, dashboard proposals item 8; migration 0306). Additive and read only. `GET /dashboard/ops` gains the section `changes_meetings` (`DashboardOpsChangesMeetings`): the change requests still pending (status requested) with their ages since the request date and a count per kind, the approved ones not yet applied, and the meeting actions not closed with the overdue ones aged by days late. Each part needs its own module view (change control, meetings) and answers `available: false` with null figures without it. No amounts.
 
     ## Changes since 0.1
@@ -23791,6 +23792,7 @@ components:
       type: object
       required: [region_id, site_id, site_code, origin, values, auto, overridden, planned_count, actual_count, below_target, reason_missing, frozen]
       properties:
+        row_id: {type: [string, 'null'], format: uuid, description: 'The stored row (null until the row is saved or added); the target of a row lock (0.15.409).'}
         region_id: {type: integer}
         site_id: {type: string, format: uuid}
         site_code: {type: string}
@@ -23835,6 +23837,8 @@ components:
       type: object
       required: [region_id, plan_date, version, locked, row_count, reason_missing_count, can_edit, can_lock, can_unlock]
       properties:
+        plan_id: {type: [string, 'null'], format: uuid, description: 'The plan header (null until the first change); the target of a plan lock (0.15.409).'}
+        entity_locked: {type: boolean, description: 'The plan carries an open entity lock (0.15.409): a non-admin cannot edit it.'}
         region_id: {type: integer}
         region_code: {type: string}
         region_name_en: {type: string}
