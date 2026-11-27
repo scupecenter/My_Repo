@@ -53,7 +53,7 @@ describe('deliverables register', () => {
     expect(noDoc.status, JSON.stringify(noDoc.body)).toBe(422);
     expect(JSON.stringify(noDoc.body)).toContain('document_required');
     // the document is a file reference (uploaded through the files endpoint); set directly here
-    await db.query(`UPDATE register_records SET data = data || '{"deliverable_file": "doc-1"}'::jsonb WHERE id = $1`, [rec.id]);
+    await db.query(`UPDATE register_records SET data = data || '{"deliverable_file": "7d1c2a4e-5b6f-4c3d-8e9a-0b1c2d3e4f50"}'::jsonb WHERE id = $1`, [rec.id]);
     const cur = await t.entry.api.call('get', recPath('deliverables', rec.id));
     const done = await approveAll(t, rec.id, cur.body.version ?? rec.version);
     expect(done.state).toBe('approved');
