@@ -32,10 +32,22 @@ info:
 
     ## Versions
     - 0.15.240 (2026-11-27): intake triage for the Issue Log and the Change Control Log (owner request 2026-11-27; migration 0340, mirror `db/sql/339_register_triage.sql`; CHANGELOG RegisterTriage). Additive. (1) `RegisterDefinition.triage_enabled` (true for `issues` and `change_control`): a record of such a register enters an intake queue (`RegisterRecord.triage.state` `pending`) on every insert, a new version included (the old decision is cleared). (2) New `POST /registers/{register_key}/records/{record_id}/triage` (`triageRegisterRecord`): one decision of the register's Matrix L2 holders of the record's region (a System Admin only when the row has no holder, exactly like an approval): `accept` (the record proceeds to its normal flow), `defer` (stays in the queue, with a note), `reject` (note and step-up required; the record is `voided`) and `merge` (`duplicate_of`, note and step-up; the record is `voided`, links the surviving record `triage.duplicate_of`, and the decision is noted on the surviving record's comment thread). `If-Match` is the record's version; `allowed_actions` gains `triage` while a record is pending or deferred and the caller may decide. `GET /registers/{register_key}/records` takes `triage` (one of `TriageState`). (3) Audited as `register_record_triage` with before and after; `RegisterRecordStep.action` gains `triage_accept`, `triage_reject`, `triage_merge`, `triage_defer`; the creator is notified (`NotificationKind` gains `triage_decision`). No grant, role or default changes.
+    - 0.15.161 (2026-11-27): recurring preventive-maintenance schedules that create drafts only (migration 0261; CHANGELOG PmSchedules). Additive. `GET`/`PUT /settings/pm-schedules` (`getPmSchedules`, `setPmSchedules`) and `POST /pm-schedules/{schedule_id}/generate` (`generatePmScheduleDraft`). A schedule never creates anything by itself: a person presses Create draft on a due schedule and the draft is saved through the register's own create path as that person; no permission is widened.
+    - 0.15.221 (2026-11-27): additive (migration 0321; CHANGELOG DismantleClosingRnLink). A Dismantle part closes by naming its signed Warehouse RN: new optional field `closing_rn_id` (entity id of a received RN of the part, cw_rn / te_rn, same site; needs the Warehouse view right in the RN's region). When set, `closing_rn_ref` is read from the RN's Doc No. and cannot be typed; without a link the typed reference still works. Field errors `rn_not_available`, `rn_other_site`, `invalid`. `GET /registers/dismantle/rn-options` lists the RNs. Also corrects the descriptions of the Issue log and Quality order-options paths.
+    - 0.15.220 (2026-11-27): additive in shape, looser in rule (migration 0320; CHANGELOG WarehouseDocOrderLink). A warehouse delivery note (`cw_dn`, `te_dn`) and a return note (`cw_rn`, `te_rn`) can name a Procurement order with `procurement_order_id`, like a receipt (PL / OPEN); the same derived fields and rules apply. Only a stock adjustment (`adj`) still answers 422 `receipt_only`. `GET /registers/procurement/{entity_id}/receipts` lists the documents of every type except adjustments.
+    - 0.15.157 (2026-11-27): duplicate-site warnings at creation (owner approval relayed 2026-11-26). Additive, migration 0257. The exact Site ID was already refused (`duplicate`, 0.14.0); new warnings, never blocking, in `warnings` of `POST /sites`, `GET` and `PATCH /site-drafts/{id}` and now also in each open draft of `GET /site-drafts`: `similar_site_code` (same code ignoring case, spaces, dashes), `duplicate_name` (English or Arabic name, of a site or a waiting draft), `close_coordinates` (within 100 metres). A match in the same region names the site; a match in another region says only that one exists. `SiteDraftWarning.code` gains the three codes. No new path, no permission change.
+    - 0.15.111 (2026-11-27): duplicate-site warnings at creation (owner approval relayed 2026-11-26). Additive, migration 0202. The exact Site ID was already refused (`duplicate`, 0.14.0); new warnings, never blocking, in `warnings` of `POST /sites`, `GET` and `PATCH /site-drafts/{id}` and now also in each open draft of `GET /site-drafts`: `similar_site_code` (same code ignoring case, spaces, dashes), `duplicate_name` (English or Arabic name, of a site or a waiting draft), `close_coordinates` (within 100 metres). A match in the same region names the site; a match in another region says only that one exists. `SiteDraftWarning.code` gains the three codes. No new path, no permission change.
+    - 0.15.96 (2026-11-27): duplicate-site warnings at creation (owner approval relayed 2026-11-26). Additive, migration 0185. The exact Site ID was already refused (`duplicate`, 0.14.0); new warnings, never blocking, in `warnings` of `POST /sites`, `GET` and `PATCH /site-drafts/{id}` and now also in each open draft of `GET /site-drafts`: `similar_site_code` (same code ignoring case, spaces, dashes), `duplicate_name` (English or Arabic name, of a site or a waiting draft), `close_coordinates` (within 100 metres). A match in the same region names the site; a match in another region says only that one exists. `SiteDraftWarning.code` gains the three codes. No new path, no permission change.
+    - 0.15.130 (2026-11-27): the admin alert `backup_missing` (owner approval relayed 2026-11-26). Additive, migration 0240. When no backup succeeded in the last 24 hours (the System Log rows the data reset reads) a security alert `backup_missing` (default severity high, configurable like the other rules) is raised once per calendar day by the job `backup_check` (every 6 hours) and one System Log row (source `backup_check`) is written. `SecurityAlertRule` and `AlertSeverityMap` gain `backup_missing`. No new endpoint.
+    - 0.15.95 (2026-11-27): the admin alert `backup_missing` (owner approval relayed 2026-11-26). Additive, migration 0184. When no backup succeeded in the last 24 hours (the System Log rows the data reset reads) a security alert `backup_missing` (default severity high, configurable like the other rules) is raised once per calendar day by the job `backup_check` (every 6 hours) and one System Log row (source `backup_check`) is written. `SecurityAlertRule` and `AlertSeverityMap` gain `backup_missing`. No new endpoint.
+    - 0.15.98 (2026-11-27): the dashboard follow-up sections (owner approval 2026-11-26, dashboard proposals item 1; migration 0230). Additive and read only. New `GET /dashboard/ops` (`getDashboardOps`, `DashboardOps`): the sections that follow the operations beyond F13, each part `available: false` when the caller may not see its module. First section `procurement`: the open orders (order status not one of the closing statuses of the contractor rules, as in `GET /reports/contractor-performance`), the PRs waiting for a PO/WO and the open PO/WOs, each aged in calendar days and bucketed 0-7, 8-14, 15-30, over 30, and the materials position: the receive rate (dispatched against required of `warehouse_site_qty` over the active, not cancelled sites), the count of sites with a shortage line, the top shortage lines with their contractor (the party of the site's newest open order; unattributed when none) and the shortage per contractor. No price is returned (no price is stored on a Procurement record). The dashboard settings catalogue gains the card `ops_procurement`, so the card shows, hides and orders per tab in Settings > Dashboard like every other card. No grant, role or permission change.
+    - 0.15.97 (2026-11-27): the sign-in page settings (owner request 2026-11-26; migration 0197). Additive. New `GET/PUT /settings/login-page` (`getLoginPage`, `setLoginPage`; setting `ui.login_page`): the sign-in page announcement (English and Arabic, kind info or maintenance, both texts empty hides it), the background animation switch, the default language of the signed-out pages and up to five support links ({label_en, label_ar, url}; http(s) or mailto only). Every signed-in user reads the state (the post-login splash shows `server_version` from it); a System Admin or a delegate of `settings` edit for all regions changes it with a reason, a step-up and If-Match (audited `login_page_update`, before and after). New `GET /settings/login-page/public` (`getLoginPagePublic`, no session): ONLY what the sign-in page renders (announcement, animation, default_locale, support_links) - no version, no audit data, nothing about users; cached 30 seconds and rate limited per address. No permission, visibility or authentication change.
     - 0.15.96 (2026-11-27): responsibility-matrix coverage screen (CHANGELOG MatrixCoverage; no migration). Additive and read only. `GET /matrix/coverage` (`getMatrixCoverage`, System Admin or an all-region delegate of the matrix): for each active stage and enabled register row and each of the seven regions, whether the matrix cell has an actor, so empty cells show before a task or record stalls. Settings > Workflow > Coverage.
     - 0.15.95 (2026-11-27): Issue log and Quality record link to a Procurement order (migration 0195; CHANGELOG IssueQualityOrderLink). Additive. New optional field `procurement_order_id` on `issues` and `quality`; when set, the contractor (`external_party`) is taken from the order (a different typed `external_party_id` is refused, 422 `contractor_from_order`; `order_not_active`, `order_other_site`, `invalid`), so the contractor performance view sees the issue and the inspection. `GET /registers/issues/order-options` and `GET /registers/quality/order-options` list the orders (own module view plus Procurement view).
+    - 0.15.185 (2026-11-27): interface features setting (migration 0280, mirror `db/sql/279_ui_features.sql`; CHANGELOG UiFeatures). Additive. `GET`/`PUT /settings/ui-features`: one guarded setting with a closed object per feature section (`UiFeatures`: `avatars` and `new_badge` now; the inbox, menu, hub and mobile sections of items 6 to 15 are added by later migrations). Read by every signed-in user; written by a System Admin or an all-regions delegate of `admin.settings` with a reason and If-Match, audited.
     - 0.15.92 (2026-11-27): order picker for the Car dispatcher and Financial advances (CHANGELOG OrderPickersDispatchAdvances). Additive, no migration. `GET /registers/car_dispatcher/order-options` and `GET /registers/financial_advances/order-options` list the approved, active Procurement orders for the field `procurement_record_id` (the same list as the warehouse picker); each needs its own module view, and only orders in regions where the caller also holds the Procurement view right are listed.
     - 0.15.91 (2026-11-26): warehouse receipt to Procurement order link (migration 0181; CHANGELOG WarehouseProcurementLink). Additive. A warehouse receipt (PL or OPEN) may name the approved, active Procurement order it belongs to (`procurement_order_id`); `pr_no`, `po_wo_no` and `order_contractor` are then derived from the order (read only). New `GET /registers/warehouse/order-options` (the picker) and `GET /registers/procurement/{entity_id}/receipts` (the receipts against an order). New 422 codes `receipt_only`, `order_not_active`, `order_other_site`.
+    - 0.15.150 (2026-11-27): recycle bin for voided register records (migration 0250; CHANGELOG RecycleBin). Additive. (1) `GET /recycle-bin` (`getRecycleBin`): the voided records inside the retention window, with who voided, why, until when each can be restored and `blocked` when a restore is not possible. (2) `POST /recycle-bin/{id}/restore` (`restoreRegisterRecord`): returns the record to a draft (`entry`, level 1); needs If-Match, a reason and a step-up. (3) `PUT /recycle-bin/retention` (`setRecycleBinRetention`): 30 to 730 days, default 90. System Admin only; nothing is deleted.
     - 0.15.94 (2026-11-26): `GET /audit-log/field-history` takes `field` as optional (item 2 of the 2026-11-26 review; no migration). Additive. Without `field` it returns every field change of the record (a register record by its logical `entity_id`, a task by its task id), newest first, at most 200: the field diff of the History tab. Changes of a field the caller may not see are left out (a `hidden` field rule, and the amounts of Financial Advances for a caller who may not see amounts); the reader rules (decision B4) and the audit of the read are unchanged. `entity_type` and `entity_id` stay required (422).
     - 0.15.93 (2026-11-26): global search also reads tasks and warehouse items (owner approval 2026-11-26; no migration). Additive. `SearchType` gains `tasks` (the tasks of the sites the caller may view, same Site Register right and regions as the site list; the hit opens `/sites/{id}?task={task_id}`) and `warehouse_items` (needs `warehouse` view, as `GET /warehouse/items`; items are global). Read only, a group the caller may not read is left out as before.
     - 0.15.89 (2026-11-26): contractor performance view (migration 0180; CHANGELOG ContractorPerformance). Additive and read only. (1) `GET /reports/contractor-performance` (`getContractorPerformance`): one row per active contractor, computed on read from the delay days of its issues, its snags, its quality results, its Procurement orders and its contract end; nothing is typed or stored. (2) `GET/PUT /settings/contractor-performance` (`getContractorPerformanceThresholds`, `setContractorPerformanceThresholds`): the amber and red thresholds and the least sample, audited as `contractor_performance_thresholds_update`. No table, no permission change.
@@ -111,6 +123,7 @@ info:
     - 0.15.2 (2026-11-09): additive. The System Log screen under Logs & monitoring (owner request 2026-11-09; migration 0082; CHANGELOG 121). (1) `GET /system-log` is documented as built: readable by a System Admin or `view` on `admin.system_log` (403 `action_forbidden` otherwise); `q` searches the message text (case-insensitive) or matches a request ID exactly; `from` is inclusive and `to` exclusive; newest first. (2) `SystemLogEntry.source` is an open string: the enum listed sources the server never writes and missed those it does (`api`, `template-check`, `master-import`, `mail`, `storage`, `integrity`, `contractors`, `assignments`, `job`...); `details` is the stored context (for a refused template upload: `reason`, `detail`, `load_error`, `file_name`, `size`); it is data, never markup. (3) `SavedViewScreenKey` gains `system-log` (module `admin.system_log`, so a shared view reaches only people who may read the System Log). The side-menu catalogue gains `logs.system`.
     - 0.15.1 (2026-11-09): additive. The editable side menu (owner request 2026-11-09, technical decision "Decided 2026-11-09: editable side menu" in `docs/spec/technical-decisions-2026-11-04.md`; migration 0081; CHANGELOG 119). New `GET /settings/nav-layout` (every signed-in user: the shared layout of the side menu, null while the code's default applies, the catalogue of screen keys, who changed it and when, the ETag, `can_edit`) and `PUT /settings/nav-layout` (a System Admin or a delegate of `settings` edit for all regions, 403 `action_forbidden` otherwise; a reason and If-Match; `layout: null` returns to the default; 422 `validation_failed` with field errors for a bad tree; 409 `invalid_transition` for the layout in force). Schemas `NavLayoutSetting`, `NavLayout`, `NavHeading`, `NavSubHeading`, `NavLayoutInput`. Audited as `nav_layout_update` / `nav_layout_reset` with before and after. The permission and module filter of the menu is unchanged and applies after the layout.
     - 0.15.0 (2026-11-07): additive. Field assignments in Procurement, the Car Dispatcher and Financial Advances (owner decisions Q495 to Q516, plan `docs/plans/2026-11-07-assignments-fleet-advances.md`; migration 0076; CHANGELOG 111). (1) Procurement is the assignment: new `ProcScope` values `Survey`, `Acquisition Visit`, `Inspection`, `Maintenance`, `Emergency` (In-House, no PR) and, in the Assignment section of `RegisterRecord.data` (register `procurement`, no Master column, the PR-PO export is unchanged): `members` (rows `{user_id, member_role: supervisor|executor, is_lead}`), `planned_start`, `planned_end`, `actual_end`, `vehicle_required` + `vehicle_not_required_reason`, `advance_required` + `advance_not_required_reason` (a "not required" answer needs its reason: 422 `reason_required` at submit) and the derived read-only `readiness` (`not_ready` is never returned; `awaiting_vehicle`, `awaiting_advance`, `awaiting_both`, `ready_to_mobilize`), `ready_date`, `open_advances_after_close`. (2) Two registers with the generic `/registers/{register_key}/records` endpoints, two levels and their own Matrix rows (empty in the seed): `car_dispatcher` (record types `vehicle`, `booking`; not site-scoped; fields in `docs/spec/registers-and-streams.md` section 3.20; derived `bookable`, `out_of_region`) and `financial_advances` (record types `advance`, `expense`, `settlement`; site-scoped; section 3.21; derived `balance`, `currency` = LYD). Permission modules `car_dispatcher` and `financial_advances`. Neither is part of the Master-format export. (3) Link rule: the L2 approval of a Procurement record with field work opens, in the same transaction and once only, one draft `booking` (when `vehicle_required`) and one draft individual `advance` per member (when `advance_required`). (4) New endpoints: `POST /registers/car_dispatcher/records/{record_id}/extend` (child booking draft), `POST /registers/financial_advances/records/{record_id}/top-up` (child advance draft: top-up and/or extension), `GET /fleet/availability` (bookable vehicles free in a date range), `GET /registers/procurement/records/{record_id}/readiness`. (5) New `ErrorCode` `vehicle_already_reserved` (409): a vehicle is never reserved for overlapping dates (database EXCLUDE constraint). An expense or settlement is never approved by its custodian (403 `self_approval_forbidden`). The amounts of Financial Advances (`requested_amount`, `approved_amount`, `disbursed_amount`, `amount`, `returned_amount`, `balance`) are absent from `data` (with `amounts_hidden: true`) for anyone but Finance, the Project Manager, the custodian and the custodian's manager (Q512); the same projection applies to search, template downloads and document contexts. (6) The workflow tasks `MOB-1` (stage 1), `MOB-2` (stage 2, after B2) and `MOB-5` (stage 5) are added without changing any milestone, gate, weight or existing SLA (`counts_toward_milestone` false, no document; SLA 2 to 3 working days from the L2 approval of the Procurement record, start event `REC:procurement`).
+    - 0.15.190 (2026-11-27): admin lock keys, slice S1 of the security section (owner decision 2026-11-27 relayed by Main; migration 0290, mirror `db/sql/289_security_lock_keys.sql`). Additive; both locks are off by default, so nothing changes until a System Admin turns one on. New paths `GET` and `PUT /settings/security-locks` (`getSecurityLocks`, `setSecurityLocks`, schemas `SecurityLocks`, `SecurityLocksInput`). Every signed-in user reads the state; only a System Admin changes it (a `settings` delegate does not), with a reason, a step-up and `If-Match`, audited `security_locks_update`. While `disable_export` is on, every route that hands data out as a file (Master export start and download, document zip start and download, library archive zip, Master-import run report, announcement responses CSV, My Work calendar file, dashboard export, daily plan export, log exports and the activity workbook) answers 403 `action_forbidden` with `errors[0].code` `export_locked`. `block_public_sharing` is the lock a future public-link feature must check (`SecurityLocksService.assertSharingAllowed`, 403 `action_forbidden`, `errors[0].code` `sharing_locked`); there is no public link in the system today. Blank templates and uploaded documents are not exports and stay open.
     - 0.14.6 (2026-11-05): register and stream batches in the background, and the threshold in Settings (technical decision of 2026-11-05 (6), `docs/spec/technical-decisions-2026-11-04.md`; migration 0075; CHANGELOG 108). Additive. (1) `POST /import-batches/{batch_id}/submit` of a register batch (any approved register template) or of a stream batch (TPL-DESIGN-ACQ / -CW / -TE / -CL and the stream parts of a TPL-MASTER file) with more rows to send than `imports.async_rows`, and `POST /import-batches/{batch_id}/decisions` of such a batch with `approve`, `review` or `reject` (all rows or the rows listed) of more rows than the threshold, answer **202** with the batch `processing` and its `progress`, as New sites batches since 0.14.4. Every check of the request is made before the 202: the uploader, If-Match, the state, the notes of a return (422 `note_required`), the authority of the person on at least one of the rows (403 `not_eligible_holder`, nothing queued), the grid right (403), and the step-up when the send can be a self-approval (the sender holds L2 of the register row or of a task of the rows) or when the decision approves (401 `step_up_required`, nothing queued). The rows are then done in chunks (register rows 50, stream rows 25, New sites 25), each committed on its own under the same person, every row checked again by the same functions (holders, levels, documents, gates, snags, the historical-load mark and cutoff); a stream send synchronises the conditional documents of each chunk's tasks inside that chunk. A row that would need a step-up the run does not have is left as it was and counted in `progress.failed` (code `step_up_required`). At the end the batch has its usual status, its one audit row and its notices. A discard and a Save Draft batch's return stay at once (200). (2) `ImportBatchProgress` gains `action` (`approve`, `review`, `reject`; null for a send), `batch_kind` (`site`, `register`, `stream`), `decided`, `held` and `saved`. (3) `POST /master-import/runs/{run_id}/apply`: the staging stays in the request; each staged batch with more rows than the threshold is sent in the background by the same admin and the answer is **202** with the run `applied`, `outcome.batches[].queued` / `job_id` / `rows`, and the new `MasterImportRun.progress` (`MasterImportRunProgress`: the background sends of the run's batches, rows done of rows total); a smaller apply answers 200 as before (`progress` null). (4) `GET /settings/imports` and `PUT /settings/imports` (`ImportsSettings`, `ImportsSettingsInput`): the threshold `async_rows` (default 50, range 10 to 500), who changed it last and when; every signed-in user reads it; a System Admin or a delegate of `settings` edit for all regions changes it with a reason and If-Match (403 `action_forbidden` otherwise; 422 out of range or unknown key; 412 stale; 409 the same value), audited as `imports_async_rows_update` with before and after.
     - 0.14.5 (2026-11-05): the site map of the dashboard (OV-12, SC-10; gap G-D05; owner request 2026-11-05 and the technical decision "site map" in `docs/spec/technical-decisions-2026-11-04.md`; no migration; CHANGELOG 107). Additive. (1) `GET /dashboard/site-map` (`getDashboardSiteMap`): one compact row per visible active site (`SiteMapItem`: id, Site ID, names EN/AR, region, sub-region, cluster, latitude and longitude with `has_coordinates` (lat 18 to 34.5, lon 8 to 26, as OV-12), overall status, delivery scenario, tower owner, the current stream and milestone (the first milestone of the site's own workflow version that is neither reached nor N/A), the last milestone reached, `on_air_reached` (the On-Air milestone MS6 reached), `late_task_count`, `behind_baseline` and `late`, `task_progress_pct`), the stream and milestone names of the workflow versions in use, the regions of the list and `counts` (total, cancelled, with and without valid coordinates). The sites are those of the caller's `dashboard.view` regions that are also in the caller's `sites.view` regions (B3; the row-level filter as for `GET /sites`); a caller without `sites.view` anywhere is 403 `module_forbidden`. Cancelled sites are listed (the map hides them unless asked). No custom field, no landlord or contact data. Not audited (a read, like `GET /dashboard`). (2) `GET /sites` takes `coordinates=missing` (sites not cancelled without valid coordinates, the link of the map) and `coordinates=valid`. (3) `SiteDetail` adds `tower_owner`, `tower_type` and `tower_height_m` (the site card of the map).
     - 0.14.4 (2026-11-05): big New sites batches run in the background (technical decision of 2026-11-05, `docs/spec/technical-decisions-2026-11-04.md`; migration 0074; CHANGELOG 106). Additive. (1) `POST /import-batches/{batch_id}/submit` and `POST /import-batches/{batch_id}/decisions` (action `approve`) of a New sites batch (`entity` = `site`) with more rows to send or to approve than the setting `imports.async_rows` (default 50) answer **202** with the batch in the new status `processing` and its `progress` (`ImportBatchProgress`: rows done of rows total, percent, sites created); every check of the request is made before the 202 (uploader, If-Match, state, note, L1 / L2 of the Matrix row with the grid right, the step-up of a final approval or a self-approval: 401 `step_up_required`, nothing is queued). The rows are then done in chunks of 25, each committed on its own under the same person (the step-up verified at the request counts; nobody else can continue the run), so the counts and the rows move while the page polls; a row that fails gets its error and the others go on; at the end the batch has its usual status (`approved`, `partially_approved`, `in_approval`) and its usual audit row and notices. A run left behind by a restart is resumed by the API. While `processing`, a second send, a decision or a discard answers 409 `batch_processing` (new `ErrorCode`). Smaller batches, returns and the other templates answer 200 as before. (2) `ImportBatch.status` adds `processing`; `ImportBatch.progress` (null when the batch never ran in the background). (3) No request changes; a client that only reads 200 keeps working for small batches and sees 202 + `processing` for big ones.
@@ -7532,6 +7545,53 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '412': {$ref: '#/components/responses/PreconditionFailed'}
         '422': {$ref: '#/components/responses/Unprocessable'}
+  /settings/ui-features:
+    get:
+      tags: [settings]
+      operationId: getUiFeaturesSetting
+      summary: Interface features (avatars, New badge) (0.15.185)
+      description: '0.15.185 (migration 0280). Every signed-in user. Without a saved value each section takes its seed: avatars `gradient`, `circle`, `varied`, in lists; New badge on for 14 days.'
+      responses:
+        '200':
+          description: Setting.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/UiFeaturesSetting'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+    put:
+      tags: [settings]
+      operationId: setUiFeaturesSetting
+      summary: Set the interface features (Administration > Settings > Screens > Interface)
+      description: |
+        0.15.185 (migration 0280): System Admin or a delegate of `admin.settings` edit for all regions (403 `action_forbidden` otherwise), a reason of at least 3 characters and If-Match. Closed body: `sections` with any of the known sections, each one complete (`unknown_key` at its path, `invalid` or `out_of_range` for a value outside its list). A section not sent keeps its value. Audited (`ui_features_update`, before and after).
+      x-db-path: admin_set_ui_features
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - {$ref: '#/components/schemas/WithReason'}
+              - type: object
+                required: [sections]
+                properties:
+                  sections: {$ref: '#/components/schemas/UiFeaturesPatch'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/UiFeaturesSetting'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
   /settings/idle-task-alert:
     get:
       tags: [settings]
@@ -9052,6 +9112,87 @@ paths:
         '412': {$ref: '#/components/responses/PreconditionFailed'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /settings/pm-schedules:
+    get:
+      tags: [settings]
+      operationId: getPmSchedules
+      summary: The preventive-maintenance schedules the caller may see (0.15.161)
+      description: |
+        0.15.161. Schedules kept in the settings table as `pm.schedules`. A schedule says: every `every` weeks or months create a DRAFT record in register `register_key`
+        (for `site_id`, with the field values in `data`). `next_due` is the next date a draft is due; `today` is the calendar day of the system. A schedule never creates
+        anything by itself. A caller sees the schedules of the registers the caller may view; an administrator with `admin.settings` edit sees all of them.
+      responses:
+        '200':
+          description: The schedules.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PmSchedules'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+    put:
+      tags: [settings]
+      operationId: setPmSchedules
+      summary: Save the schedules (reason, If-Match, audited, versioned)
+      description: |
+        0.15.161. System Admin, or a delegation of `admin.settings` edit for all regions (403 `action_forbidden` otherwise). The body replaces the whole list; the run
+        history of a schedule (`last_generated_at`, `last_record_id`) is kept by the database. Field errors (422 `validation_failed`): `unknown_key`, `invalid`,
+        `duplicate`, `unknown_register`, `unknown_site`, `required` (a site is needed), `too_many`. One audit row per save.
+      x-db-path: admin_save_pm_schedules
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - {$ref: '#/components/schemas/WithReason'}
+              - {$ref: '#/components/schemas/PmSchedulesInput'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PmSchedules'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /pm-schedules/{schedule_id}/generate:
+    post:
+      tags: [registers]
+      operationId: generatePmScheduleDraft
+      summary: Create the draft of a due schedule, as the caller (0.15.161)
+      description: |
+        0.15.161. Saves ONE draft record (state `entry`) in the schedule's register through the register's own create path, as the caller: the register's rights, region
+        rules and field rules apply unchanged (no permission is widened). Then the next due date moves past today in steps of the schedule (never a backlog).
+        404 when the schedule does not exist or the caller may not view its register; 409 `invalid_transition` when the schedule is switched off or not due yet.
+        Errors of the register (403, 422) are returned as they are.
+      x-db-path: pm_schedule_mark_generated
+      parameters:
+      - {name: schedule_id, in: path, required: true, schema: {type: string}}
+      responses:
+        '201':
+          description: The draft was created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [record_id, register_key, next_due]
+                additionalProperties: false
+                properties:
+                  record_id: { type: string, format: uuid }
+                  register_key: { type: string }
+                  next_due: { type: [string, 'null'], format: date }
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
   /settings/kanban-wip:
     get:
       tags: [settings]
@@ -9197,6 +9338,118 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/UiIdentity'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /settings/login-page:
+    get:
+      tags: [settings]
+      operationId: getLoginPage
+      summary: The sign-in page settings (announcement, animation, default language, support links) (0.15.97)
+      description: Every signed-in user may read it; the settings screen and the post-login splash use it. `can_edit` is true for a System Admin or a delegate of `settings` edit for all regions. `server_version` is shown to signed-in users only.
+      x-db-path: login_page_state
+      responses:
+        '200':
+          description: The login page settings.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/LoginPage'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+    put:
+      tags: [settings]
+      operationId: setLoginPage
+      summary: Set the sign-in page settings (reason, step-up, If-Match, audited) (0.15.97)
+      description: |
+        A System Admin, or a delegate of `settings` edit for all regions (403 `action_forbidden` otherwise, also for a delegate limited to some regions). A reason
+        (3+ characters), a step-up (401 `step_up_required`) and `If-Match` (428 / 412) are required. Unknown keys and invalid values are 422; saving the values in
+        force is 409 `invalid_transition`. Audited `login_page_update` with the config before and after. Nothing about the sign-in mechanism changes: this is
+        presentation only (announcement, background animation, default language, support links).
+      x-step-up: true
+      x-db-path: admin_set_login_page
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/LoginPageInput'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/LoginPage'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /settings/login-page/public:
+    get:
+      tags: [settings]
+      operationId: getLoginPagePublic
+      summary: The public sign-in page config (no session) (0.15.97)
+      description: |
+        No session: what the signed-out pages render, and nothing else - the announcement, the background animation switch, the default language and the support
+        links. No version, no audit data, nothing about users. Cached 30 seconds (`Cache-Control: public, max-age=30`) and rate limited per address
+        (429 `rate_limited` with `Retry-After`).
+      x-db-path: login_page_public
+      responses:
+        '200':
+          description: The public sign-in page config.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/LoginPagePublic'}
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+  /settings/security-locks:
+    get:
+      tags: [settings]
+      operationId: getSecurityLocks
+      summary: The admin lock keys, block public sharing and disable export (0.15.190)
+      description: Every signed-in user may read it (the UI hides what is locked). `can_edit` is true for a System Admin only. Both keys are `false` until a System Admin turns one on.
+      x-db-path: security_locks_state
+      responses:
+        '200':
+          description: The lock keys.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SecurityLocks'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+    put:
+      tags: [settings]
+      operationId: setSecurityLocks
+      summary: Turn the lock keys on or off (System Admin, reason, step-up, If-Match, audited) (0.15.190)
+      description: |
+        System Admin only (403 `action_forbidden` otherwise, a delegate included). A reason (3+ characters), a step-up (401 `step_up_required`) and `If-Match` (428 / 412)
+        are required. Unknown keys and non-boolean values are 422. Saving the values already in force is 409 `invalid_transition`. Audited `security_locks_update` with both keys
+        before and after. Reading and changing the lock keys is never locked, so an admin can always turn a lock off again.
+      x-step-up: true
+      x-db-path: admin_set_security_locks
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SecurityLocksInput'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SecurityLocks'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '409': {$ref: '#/components/responses/Conflict'}
@@ -9356,6 +9609,29 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '422': {$ref: '#/components/responses/Unprocessable'}
+  /registers/dismantle/rn-options:
+    get:
+      tags: [registers]
+      operationId: listDismantleRnOptions
+      summary: The received Warehouse RNs that can close a Dismantle part (0.15.110)
+      description: |
+        0.15.110. Current, not voided, Received Warehouse RNs of the part (`record_type` cw gives cw_rn, te gives te_rn) on the site, in the regions where the caller holds the Warehouse view right (the responsibility matrix). Needs the Dismantle module.
+      parameters:
+      - {name: site_id, in: query, required: true, schema: {type: string, format: uuid}}
+      - {name: record_type, in: query, required: true, schema: {type: string, enum: [cw, te]}}
+      responses:
+        '200':
+          description: The RNs.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/DismantleRnOption' } }
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
   /registers/dismantle/order-options:
     get:
       tags: [registers]
@@ -9454,10 +9730,9 @@ paths:
     get:
       tags: [registers]
       operationId: listIssueOrderOptions
-      summary: The approved, active Procurement orders a warehouse receipt may name (0.15.90)
+      summary: The approved, active Procurement orders a Issue log record may name (0.15.95)
       description: |
-        0.15.95. The approved Procurement versions in force, not cancelled, that the caller can see; of the site `site_id` when it is given (a PL / OPEN receipt may have no site).
-        Needs the Issue log module; only the orders in regions where the caller also holds the Procurement view right (the responsibility matrix) are listed, and the same right is checked when a receipt is saved.
+        0.15.95. The approved Procurement versions in force, not cancelled, that the caller can see; of the site `site_id` when it is given. Needs the Issue log module; only the orders in regions where the caller also holds the Procurement view right (the responsibility matrix) are listed, and the same right is checked when the record is saved.
       parameters:
       - {name: site_id, in: query, required: false, schema: {type: string, format: uuid}}
       responses:
@@ -9477,10 +9752,9 @@ paths:
     get:
       tags: [registers]
       operationId: listQualityOrderOptions
-      summary: The approved, active Procurement orders a warehouse receipt may name (0.15.90)
+      summary: The approved, active Procurement orders a Quality record may name (0.15.95)
       description: |
-        0.15.95. The approved Procurement versions in force, not cancelled, that the caller can see; of the site `site_id` when it is given (a PL / OPEN receipt may have no site).
-        Needs the Quality module; only the orders in regions where the caller also holds the Procurement view right (the responsibility matrix) are listed, and the same right is checked when a receipt is saved.
+        0.15.95. The approved Procurement versions in force, not cancelled, that the caller can see; of the site `site_id` when it is given. Needs the Quality module; only the orders in regions where the caller also holds the Procurement view right (the responsibility matrix) are listed, and the same right is checked when the record is saved.
       parameters:
       - {name: site_id, in: query, required: false, schema: {type: string, format: uuid}}
       responses:
@@ -9502,7 +9776,7 @@ paths:
       operationId: listProcurementOrderReceipts
       summary: The warehouse receipts against a Procurement order (0.15.91)
       description: |
-        0.15.91. The current, not voided PL / OPEN receipts whose `procurement_order_id` is this order, with the number of lines and the total quantity. Needs the Procurement module
+        0.15.91 (0.15.111: every document type except an adjustment). The current, not voided warehouse documents whose `procurement_order_id` is this order, with the number of lines and the total quantity. Needs the Procurement module
         (view) and the Warehouse module; the receipts the caller cannot see are not listed.
       parameters:
       - {name: entity_id, in: path, required: true, schema: {type: string, format: uuid}}
@@ -10152,6 +10426,92 @@ paths:
         '412': {$ref: '#/components/responses/PreconditionFailed'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /recycle-bin:
+    get:
+      tags: [registers]
+      operationId: getRecycleBin
+      summary: Voided register records that can still be restored (System Admin)
+      description: 0.15.150. The records voided inside the retention window (newest first, at most 500). `blocked` is `open_version_exists` or `site_slot_taken` when a restore would break a rule. 403 for anyone but a System Admin.
+      responses:
+        '200':
+          description: The bin.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RecycleBin'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /recycle-bin/retention:
+    put:
+      tags: [registers]
+      operationId: setRecycleBinRetention
+      summary: Set the retention of the recycle bin (System Admin)
+      description: 0.15.150. Days a voided record can be restored, 30 to 730. Needs If-Match and a reason; audited as `recycle_bin_retention_update`.
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [retention_days, reason]
+              properties:
+                retention_days: { type: integer, minimum: 30, maximum: 730 }
+                reason: { type: string, minLength: 3, maxLength: 1000 }
+      responses:
+        '200':
+          description: The new retention.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [retention_days, version]
+                properties:
+                  retention_days: { type: integer }
+                  version: { type: integer }
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /recycle-bin/{id}/restore:
+    post:
+      tags: [registers]
+      operationId: restoreRegisterRecord
+      summary: Restore a voided register record to a draft (System Admin)
+      description: 0.15.150. Only a voided record inside the retention window; it returns as `entry`, level 1, and goes through the workflow again. Refused when a newer open version exists or the site already has another record in a one-per-site register. Needs If-Match (the record version), a reason and a step-up. Audited as `register_record_restore`.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [reason]
+              properties:
+                reason: { type: string, minLength: 3, maxLength: 1000 }
+      responses:
+        '200':
+          description: The restored record.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, register_key, state, version]
+                properties:
+                  id: { type: string, format: uuid }
+                  register_key: { type: string }
+                  state: { type: string, enum: [entry] }
+                  version: { type: integer }
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
   /registers:
     get:
       tags: [registers]
@@ -14766,6 +15126,39 @@ paths:
                       items: {$ref: '#/components/schemas/SystemLogEntry'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
+  /dashboard/ops:
+    get:
+      tags: [dashboard]
+      operationId: getDashboardOps
+      summary: The follow-up sections of the dashboard (0.15.106)
+      description: |
+        The sections that follow the operations beyond F13 (owner approval 2026-11-26, dashboard proposals). Read only; not audited (a read, like `GET /dashboard`).
+        **Who sees what (B3).** Needs `dashboard.view` (403 `module_forbidden otherwise") and the tab rule of 0.15.80 applies as in `GET /dashboard/extras`.
+        The caller's `dashboard.view` regions limit every section. A part whose module the caller may not see answers `available: false` with null figures.
+        **Section `procurement`** (item 1, migration 0190): the orders need `procurement.view`, the materials `warehouse.view`.
+        An **open order** is a Procurement record whose order status is not one of the closing statuses of the contractor rules (the same rule as
+        `GET /reports/contractor-performance`, so the two screens never disagree). `pr_wait` ages the open orders that have a PR date and no PO/WO yet
+        from the PR date; `po_wait` ages the open orders that have a PO/WO from the PO/WO date; both in calendar days, bucketed 0-7, 8-14, 15-30, over 30.
+        The **materials** position reads `warehouse_site_qty` over the active, not cancelled sites of the caller's regions (the unified `filter` narrows
+        them as in `GET /dashboard/extras`): `receive_pct` is dispatched against required (capped at 100%, null when nothing is required),
+        `sites_short` counts the sites with at least one shortage line (required over dispatched), `top_shortages` lists the ten biggest missing
+        lines with the contractor of the site, and `by_contractor` groups the shortage per contractor. The contractor of a line is the party of the
+        site's newest open order; a site with no open order is unattributed (empty name, null party). No price is returned: no price is stored on a
+        Procurement record (the financial summary is a separate, restricted card).
+      parameters:
+      - {$ref: '#/components/parameters/DashboardFilterTree'}
+      - name: region_id
+        in: query
+        schema: {$ref: '#/components/schemas/RegionId'}
+      responses:
+        '200':
+          description: The sections.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DashboardOps'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
   /dashboard/milestone-pipeline:
     get:
       tags: [dashboard]
@@ -16075,6 +16468,92 @@ components:
           schema: { $ref: '#/components/schemas/TransitionResult' }
 
   schemas:
+    PmScheduleInput:
+      type: object
+      required: [id, name_en, register_key, data, every, unit, next_due]
+      additionalProperties: false
+      properties:
+        id: { type: string, pattern: '^[a-z0-9-]{3,40}$' }
+        name_en: { type: string, minLength: 1, maxLength: 120 }
+        name_ar: { type: [string, 'null'], maxLength: 120 }
+        register_key: { type: string }
+        site_id: { type: [string, 'null'], format: uuid, description: 'Required when the register is site scoped.' }
+        record_type: { type: [string, 'null'], maxLength: 40 }
+        data: { type: object, additionalProperties: true, description: 'Field values of the draft, by field code (at most 4000 characters).' }
+        every: { type: integer, minimum: 1, maximum: 52 }
+        unit: { type: string, enum: [week, month] }
+        next_due: { type: string, format: date }
+        active: { type: boolean }
+    PmSchedulesInput:
+      type: object
+      required: [schedules]
+      additionalProperties: false
+      properties:
+        schedules:
+          type: array
+          maxItems: 100
+          items: {$ref: '#/components/schemas/PmScheduleInput'}
+    PmSchedule:
+      allOf:
+      - {$ref: '#/components/schemas/PmScheduleInput'}
+      - type: object
+        properties:
+          last_generated_at: { type: string, format: date-time }
+          last_record_id: { type: string, format: uuid }
+    PmSchedules:
+      type: object
+      required: [version, schedules, today, catalogue, updated_at, updated_by]
+      properties:
+        version: { type: integer }
+        schedules:
+          type: array
+          items: {$ref: '#/components/schemas/PmSchedule'}
+        today: { type: string, format: date }
+        catalogue:
+          type: object
+          required: [registers, units]
+          properties:
+            registers:
+              type: array
+              items:
+                type: object
+                required: [key, name_en, name_ar, site_scoped]
+                properties: { key: {type: string}, name_en: {type: string}, name_ar: {type: string}, site_scoped: {type: boolean} }
+            units:
+              type: array
+              items: {type: string}
+        updated_at: { type: [string, 'null'], format: date-time }
+        updated_by:
+          type: [object, 'null']
+          required: [id, display_name]
+          properties: { id: {type: string}, display_name: {type: string} }
+    RecycleBin:
+      type: object
+      required: [retention_days, version, items]
+      properties:
+        retention_days: { type: integer }
+        version: { type: integer }
+        items:
+          type: array
+          items:
+            type: object
+            required: [id, register_key, register_name_en, register_name_ar, label, site_id, site_code, version, version_no, voided_at, voided_by, voided_by_name, void_reason, restorable_until, blocked]
+            properties:
+              id: { type: string, format: uuid }
+              register_key: { type: string }
+              register_name_en: { type: string }
+              register_name_ar: { type: [string, 'null'] }
+              label: { type: string }
+              site_id: { type: [string, 'null'], format: uuid }
+              site_code: { type: [string, 'null'] }
+              version: { type: integer }
+              version_no: { type: integer }
+              voided_at: { type: string, format: date-time }
+              voided_by: { type: [string, 'null'], format: uuid }
+              voided_by_name: { type: [string, 'null'] }
+              void_reason: { type: [string, 'null'] }
+              restorable_until: { type: string, format: date-time }
+              blocked: { type: [string, 'null'], enum: [open_version_exists, site_slot_taken, null] }
     IssueStoppedRow:
       type: object
       required: [site_code, task_code, stage_code, state, why, category, not_classified]
@@ -20626,6 +21105,43 @@ components:
         version: { type: integer, minimum: 0 }
         updated_at: { type: string, format: date-time }
         updated_by: { $ref: '#/components/schemas/UserRef' }
+    UiAvatars:
+      type: object
+      additionalProperties: false
+      required: [style, shape, palette, in_lists]
+      properties:
+        style: { type: string, enum: [initials, gradient, geometric, none] }
+        shape: { type: string, enum: [circle, rounded] }
+        palette: { type: string, enum: [brand, varied] }
+        in_lists: { type: boolean }
+    UiNewBadge:
+      type: object
+      additionalProperties: false
+      required: [enabled, days]
+      properties:
+        enabled: { type: boolean }
+        days: { type: integer, minimum: 1, maximum: 90 }
+    UiFeatures:
+      type: object
+      description: '0.15.185. The sections of the interface features setting; every section is complete.'
+      required: [avatars, new_badge]
+      properties:
+        avatars: { $ref: '#/components/schemas/UiAvatars' }
+        new_badge: { $ref: '#/components/schemas/UiNewBadge' }
+    UiFeaturesPatch:
+      type: object
+      additionalProperties: false
+      properties:
+        avatars: { $ref: '#/components/schemas/UiAvatars' }
+        new_badge: { $ref: '#/components/schemas/UiNewBadge' }
+    UiFeaturesSetting:
+      type: object
+      required: [sections, version]
+      properties:
+        sections: { $ref: '#/components/schemas/UiFeatures' }
+        version: { type: integer, minimum: 0 }
+        updated_at: { type: string, format: date-time }
+        updated_by: { $ref: '#/components/schemas/UserRef' }
     IdleTaskAlertSetting:
       type: object
       required: [enabled, working_days, version]
@@ -21697,6 +22213,17 @@ components:
         advances:
           type: array
           items: {type: object, properties: {entity_id: {type: string, format: uuid}, custodian_user_id: {type: [string, 'null'], format: uuid}, advance_state: {type: [string, 'null']}}}
+    DismantleRnOption:
+      type: object
+      required: [entity_id, record_id]
+      properties:
+        entity_id: {type: string, format: uuid}
+        record_id: {type: string, format: uuid}
+        site_id: {type: string, format: uuid}
+        record_type: {type: string, enum: [cw_rn, te_rn]}
+        doc_no: {type: string}
+        doc_date: {type: string}
+        txn_status: {type: string}
     DismantleOrderOption:
       type: object
       description: '0.12.11 (Q114). An approved, active Procurement order of a Dismantle part.'
@@ -21732,7 +22259,7 @@ components:
       properties:
         entity_id: { type: string, format: uuid }
         record_id: { type: string, format: uuid }
-        record_type: { type: string, enum: [pl, open] }
+        record_type: { type: string, enum: [te_dn, cw_dn, te_rn, cw_rn, pl, open] }
         state: { type: string }
         doc_no: { type: string }
         doc_date: { type: string }
@@ -21925,6 +22452,79 @@ components:
           properties:
             default_brand: { $ref: '#/components/schemas/UiBrand' }
             allow_user_choice: { type: boolean }
+    SupportLink:
+      type: object
+      description: '0.15.97. A support link under the sign-in form. http(s) or mailto only.'
+      additionalProperties: false
+      required: [label_en, label_ar, url]
+      properties:
+        label_en: { type: string, minLength: 1, maxLength: 60 }
+        label_ar: { type: string, maxLength: 60, description: 'Empty: the English label shows.' }
+        url: { type: string, minLength: 1, maxLength: 300, pattern: '^(https?://|mailto:)' }
+    LoginPage:
+      type: object
+      description: '0.15.97. Settings, Screens, Login page (setting `ui.login_page`, migration 0197).'
+      required: [announcement_en, announcement_ar, announcement_kind, animation, default_locale, support_links, server_version, version, can_edit]
+      properties:
+        announcement_en: { type: string, maxLength: 280, description: 'Both texts empty: no banner.' }
+        announcement_ar: { type: string, maxLength: 280 }
+        announcement_kind: { type: string, enum: [info, maintenance] }
+        animation: { type: boolean, description: 'The calm telecom background animation of the signed-out pages. A visitor who prefers reduced motion never sees it.' }
+        default_locale: { anyOf: [{ type: string, enum: [en, ar] }, { type: 'null' }], description: 'The language of the signed-out pages until the visitor chooses one; null: the browser default (English).' }
+        support_links: { type: array, maxItems: 5, items: { $ref: '#/components/schemas/SupportLink' } }
+        server_version: { type: string, description: 'The system version, shown to signed-in users only (the post-login splash and this screen).' }
+        updated_at: { type: [string, 'null'], format: date-time }
+        updated_by: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+        version: { type: integer, description: The ETag value. }
+        can_edit: { type: boolean, description: 'A System Admin or a delegate of `settings` edit for all regions.' }
+    LoginPageInput:
+      allOf:
+        - $ref: '#/components/schemas/WithReason'
+        - type: object
+          required: [announcement_en, announcement_ar, announcement_kind, animation, default_locale, support_links]
+          properties:
+            announcement_en: { type: string, maxLength: 280 }
+            announcement_ar: { type: string, maxLength: 280 }
+            announcement_kind: { type: string, enum: [info, maintenance] }
+            animation: { type: boolean }
+            default_locale: { anyOf: [{ type: string, enum: [en, ar] }, { type: 'null' }] }
+            support_links: { type: array, maxItems: 5, items: { $ref: '#/components/schemas/SupportLink' } }
+    LoginPagePublic:
+      type: object
+      description: '0.15.97. The public sign-in page config: ONLY what the signed-out pages render. No version, no audit data, nothing about users.'
+      required: [announcement, animation, default_locale, support_links]
+      properties:
+        announcement:
+          oneOf:
+            - type: object
+              required: [en, ar, kind]
+              properties:
+                en: { type: string, maxLength: 280 }
+                ar: { type: string, maxLength: 280 }
+                kind: { type: string, enum: [info, maintenance] }
+            - type: 'null'
+        animation: { type: boolean }
+        default_locale: { anyOf: [{ type: string, enum: [en, ar] }, { type: 'null' }] }
+        support_links: { type: array, maxItems: 5, items: { $ref: '#/components/schemas/SupportLink' } }
+    SecurityLocks:
+      type: object
+      description: '0.15.190. The admin lock keys (setting `security.locks`, migration 0290).'
+      required: [block_public_sharing, disable_export, version, can_edit]
+      properties:
+        block_public_sharing: { type: boolean, description: 'true: no feature may create a public link (checked by `SecurityLocksService.assertSharingAllowed`).' }
+        disable_export: { type: boolean, description: 'true: every export route answers 403 `export_locked`.' }
+        updated_at: { type: [string, 'null'], format: date-time }
+        updated_by: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+        version: { type: integer, description: The ETag value. }
+        can_edit: { type: boolean, description: A System Admin only. }
+    SecurityLocksInput:
+      allOf:
+        - $ref: '#/components/schemas/WithReason'
+        - type: object
+          required: [block_public_sharing, disable_export]
+          properties:
+            block_public_sharing: { type: boolean }
+            disable_export: { type: boolean }
     NavLayout:
       type: object
       description: '0.15.1. The shared order of the side menu (setting `nav.layout`).'
@@ -22019,6 +22619,79 @@ components:
         version: { type: integer, minimum: 0 }
         updated_at: { type: [string, 'null'], format: date-time }
         updated_by: { anyOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+    DashboardOps:
+      type: object
+      description: '0.15.106: the follow-up sections of the dashboard (owner approval 2026-11-26).'
+      required: [as_of, scope_regions, procurement]
+      properties:
+        as_of: {type: string, format: date-time}
+        scope_regions:
+          type: [array, 'null']
+          items: {$ref: '#/components/schemas/RegionId'}
+          description: The regions the figures cover (null = every region).
+        procurement: {$ref: '#/components/schemas/DashboardOpsProcurement'}
+    DashboardOpsProcurement:
+      type: object
+      description: '0.15.106: procurement and materials (dashboard proposals item 1).'
+      required: [available, open_total, pr_wait, po_wait, materials]
+      properties:
+        available: {type: boolean, description: False when the caller may not see the Procurement register; the order figures are then null.}
+        open_total: {type: [integer, 'null'], description: Open orders (status not one of the closing statuses of the contractor rules).}
+        pr_wait: {$ref: '#/components/schemas/DashboardOpsAging'}
+        po_wait: {$ref: '#/components/schemas/DashboardOpsAging'}
+        materials: {$ref: '#/components/schemas/DashboardOpsMaterials'}
+    DashboardOpsAging:
+      type: object
+      required: [buckets, total, oldest_days]
+      properties:
+        buckets:
+          type: array
+          description: Every bucket once, in order d0_7, d8_14, d15_30, over_30 (calendar days).
+          items:
+            type: object
+            required: [key, count]
+            properties:
+              key: {type: string, enum: [d0_7, d8_14, d15_30, over_30]}
+              count: {type: integer}
+        total: {type: integer}
+        oldest_days: {type: [integer, 'null']}
+    DashboardOpsMaterials:
+      type: object
+      required: [available, receive_pct, required_total, dispatched_total, sites_short, top_shortages, by_contractor]
+      properties:
+        available: {type: boolean, description: False when the caller may not see the Warehouse; the other fields are then null.}
+        receive_pct: {type: [number, 'null'], description: 'Dispatched against required, capped at 100; null when nothing is required.'}
+        required_total: {type: [number, 'null']}
+        dispatched_total: {type: [number, 'null']}
+        sites_short: {type: [integer, 'null'], description: 'Active, not cancelled sites with at least one shortage line.'}
+        top_shortages:
+          type: [array, 'null']
+          maxItems: 10
+          items:
+            type: object
+            required: [site_id, site_code, item_code, item_name, missing, required, dispatched, contractor]
+            properties:
+              site_id: {type: string, format: uuid}
+              site_code: {type: string}
+              item_code: {type: string}
+              item_name: {type: string}
+              missing: {type: number}
+              required: {type: number}
+              dispatched: {type: number}
+              contractor: {type: [string, 'null'], description: The party of the site's newest open order; null when unattributed.}
+        by_contractor:
+          type: [array, 'null']
+          maxItems: 10
+          description: The shortage per contractor, the biggest first. The row with party_id null gathers the unattributed lines.
+          items:
+            type: object
+            required: [party_id, name, sites, missing_lines, missing_qty]
+            properties:
+              party_id: {type: [string, 'null'], format: uuid}
+              name: {type: string}
+              sites: {type: integer}
+              missing_lines: {type: integer}
+              missing_qty: {type: number}
     DashboardTabLayout:
       type: object
       required: [order, hidden]
@@ -23014,7 +23687,7 @@ components:
       required: [field, code, message]
       properties:
         field: { type: string }
-        code: { type: string, enum: [cluster_will_be_created, outside_libya, list_other] }
+        code: { type: string, enum: [cluster_will_be_created, outside_libya, list_other, similar_site_code, duplicate_name, close_coordinates] }
         message: { type: string }
     SiteDraftDecision:
       type: object
@@ -23541,7 +24214,7 @@ components:
         host: { type: [string, 'null'] }
     SecurityAlertRule:
       type: string
-      enum: [failed_sign_ins, failed_sign_ins_ip, new_ip, large_export, admin_set_changed, retention_reduced, alert_settings_weakened, audit_integrity_failure, malware_upload, break_glass_used]
+      enum: [failed_sign_ins, failed_sign_ins_ip, new_ip, large_export, admin_set_changed, retention_reduced, alert_settings_weakened, audit_integrity_failure, malware_upload, break_glass_used, backup_missing]
     AlertSeverity:
       type: string
       enum: [info, low, medium, high, critical]
@@ -23549,7 +24222,7 @@ components:
     AlertSeverityMap:
       type: object
       additionalProperties: false
-      description: 'Severity per configurable rule (0.12.3, Q168). Defaults: failed_sign_ins medium, failed_sign_ins_ip medium, new_ip low, large_export medium, admin_set_changed high, alert_settings_weakened high, malware_upload high, break_glass_used critical.'
+      description: 'Severity per configurable rule (0.12.3, Q168). Defaults: failed_sign_ins medium, failed_sign_ins_ip medium, new_ip low, large_export medium, admin_set_changed high, alert_settings_weakened high, malware_upload high, break_glass_used critical, backup_missing high (0.15.130).'
       properties:
         failed_sign_ins: { $ref: '#/components/schemas/AlertSeverity' }
         failed_sign_ins_ip: { $ref: '#/components/schemas/AlertSeverity' }
@@ -23559,6 +24232,7 @@ components:
         alert_settings_weakened: { $ref: '#/components/schemas/AlertSeverity' }
         malware_upload: { $ref: '#/components/schemas/AlertSeverity' }
         break_glass_used: { $ref: '#/components/schemas/AlertSeverity' }
+        backup_missing: { $ref: '#/components/schemas/AlertSeverity' }
     SecurityAlert:
       type: object
       required: [id, at, rule, severity, summary, status]

@@ -114,7 +114,7 @@ describe('legacy Master import: identification, preview and the comparison repor
       { A: 1, B: f.site.code, E: 'WM Area', AM: 'Eng Legacy', AO: day('2026-02-03'), V: { formula: 'MAX(U5)', result: day('2026-01-05') } },
       { A: 2, B: f.other.code, E: 'Nowhere Area' },
       { A: 3, B: 'NOT-A-SITE-XYZ', AO: day('2026-02-04') },
-    ], { staff: [['Ahmed Test', 'Team Lead (CW)', 'Tripoli Area'], ['Sara Test', 'Site Engineer', 'Mars Area']] });
+    ], { staff: [['Demo Test 1', 'Team Lead (CW)', 'Tripoli Area'], ['Demo Test 2', 'Site Engineer', 'Mars Area']] });
     const res = await uploadMaster(admin.api, buf);
     expect(res.status).toBe(201);
     const run = res.body;

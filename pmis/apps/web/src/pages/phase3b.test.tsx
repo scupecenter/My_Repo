@@ -330,7 +330,7 @@ describe('users: deactivate, delete, restore', () => {
   });
 
   it('the badge shows beside the holder in PersonTag and HolderChip', () => {
-    renderApp(<><PersonTag name="Karim Zaroug" employeeId="1104" status="deactivated" /><HolderChip a={{ kind: 'user', ref_id: 'r', label: 'Sara Idris', employee_id: '1205', account_status: 'deleted' }} /><PersonTag name="Active One" employeeId="1001" status="active" /></>);
+    renderApp(<><PersonTag name="Demo User 04" employeeId="1104" status="deactivated" /><HolderChip a={{ kind: 'user', ref_id: 'r', label: 'Demo Holder', employee_id: '1205', account_status: 'deleted' }} /><PersonTag name="Active One" employeeId="1001" status="active" /></>);
     expect(screen.getByTestId('holder-status-1104')).toHaveTextContent('deactivated');
     expect(screen.getByTestId('holder-status-1205')).toHaveTextContent('deleted');
     expect(screen.queryByTestId('holder-status-1001')).toBeNull();
@@ -393,10 +393,10 @@ describe('act on behalf', () => {
     expect(screen.getByTestId('cover-dialog-submit')).toBeDisabled(); // reject needs a note
     await u.type(screen.getByTestId('cover-note'), 'Date is before the permit');
     await stepUpDone();
-    await reasonAndSave(u, 'cover-dialog', 'Mona is on sick leave');
+    await reasonAndSave(u, 'cover-dialog', 'The holder is on sick leave');
     await waitFor(() => expect(screen.getByTestId('alerts-count-absent')).toHaveTextContent(String(before - 1)));
     expect(hit!.url).toMatch(/\/tasks\/[^/]+\/act-on-behalf$/);
-    expect(hit!.body).toMatchObject({ action: 'reject', reason: 'Mona is on sick leave', note: 'Date is before the permit' });
+    expect(hit!.body).toMatchObject({ action: 'reject', reason: 'The holder is on sick leave', note: 'Date is before the permit' });
     expect(hit!.ifMatch).toMatch(/^"\d+"$/);
   });
 

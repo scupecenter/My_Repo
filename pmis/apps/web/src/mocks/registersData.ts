@@ -269,7 +269,7 @@ export function initRegisters() {
     // migration 0042: the HLC purchase request of site 1, entered by the HLC Fiber Team in Procurement; it closed C3 on the HLC approval date
     rec('procurement', 'pr', 1, 'approved', { scope: 'HLC', delivery: 'Outsourced', pr_no: 'HPR-2026-044', pr_date: '2026-09-10', hlc_approval_date: '2026-09-14', order_status: 'Open' }, { task: { id: task(1, 14), task_code: 'C3' } }),
     // contract 0.12.5 (Q111): a meeting entered with the old free text, to convert after a review (recId(15))
-    rec('meetings', null, 0, 'entry', { meeting_date: '2026-10-01', title: 'Weekly progress', attendees: 'Ahmed Salem, Mona Fathi', linked_sites: 'TR101',
+    rec('meetings', null, 0, 'entry', { meeting_date: '2026-10-01', title: 'Weekly progress', attendees: 'Demo User 01, Demo User 02', linked_sites: 'TR101',
       minutes_ref: 'MoM-07 on the share', action_items: '- Send the LLD\n- Book the crane' }, { site_index: null }),
     // migration 0063 (Q114): (recId(16), after the P5 meeting) the approved TE Dismantle order of site 1, which the TE Dismantle part takes its contractor (FT) from
     rec('procurement', 'wo', 1, 'approved', { scope: 'TE Dismantle', delivery: 'Outsourced', pr_no: 'PR-2026-061', pr_date: '2026-09-25', po_wo_no: 'WO-2026-061', po_wo_date: '2026-09-28', order_status: 'Open' },

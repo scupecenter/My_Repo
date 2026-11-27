@@ -8,6 +8,7 @@ import { loadPref, savePref } from '@/lib/localPref';
 import { headingIcon, headingName, keysOf, resolveLayout, type NavHead, type NavSub } from '@/lib/navLayout';
 import { SITE_MASTER_SUBMENUS } from '@/lib/siteMasterMenus';
 import { NavLayoutEditor } from './NavLayoutEditor';
+import { SidebarRecords } from './SidebarRecords';
 import type { NavItem } from './navItems';
 
 export const SIDEBAR_MIN = 200;
@@ -249,6 +250,7 @@ export function SidebarBody({ items, compact, unread, alerts = 0, counts = {}, a
                 {recentItems.map((n) => row(n, { testid: `nav-recent-${n.key}`, active: false }))}
               </div>
             )}
+            {!compact && <SidebarRecords activePath={loc.pathname} onNavigate={onNavigate} />}
             {layout.headings.map((h) => renderHeading(h, false))}
           </>
         )}

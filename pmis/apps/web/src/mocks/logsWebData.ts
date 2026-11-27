@@ -77,7 +77,7 @@ export function buildAudit(): AuditRow[] {
       ...(i % 11 === 4 ? { on_behalf_of: ref('1001'), on_behalf_kind: 'delegate' as AuditRow['on_behalf_kind'] } : {}),
     });
   }
-  // the self-approval of the demo: Ahmed Salem approves his own submission (action task.approve, i = 2 above); make it unmistakable
+  // the self-approval of the demo: Demo User 01 approves his own submission (action task.approve, i = 2 above); make it unmistakable
   rows[2] = { ...rows[2], action: 'task.approve', entity_type: 'task', actor: ref('1001'), self_approval: true, before: { state: 'entry', submitted_by: '1001' }, after: { state: 'approved', approved_by: '1001' }, reason: 'Self-approval: L1 and L2 held by one person' };
   return rows;
 }
@@ -102,15 +102,15 @@ export function buildJobRuns(): JobRun[] {
 }
 
 export const buildDeployments = (): Deployment[] => Array.from({ length: 8 }, (_, i) => ({
-  id: `dep-${8 - i}`, at: new Date(BASE - i * 6 * 86400e3).toISOString(), version: `0.${12 - i}.0`, git_sha: (`e17364${i}`.padEnd(40, 'f')).slice(0, 40), migrations: i % 3 === 0 ? [`0${60 - i}_logs_field_changes.sql`, `0${61 - i}_sessions_device.sql`] : [], by: i % 2 ? 'Ali Barka' : 'Ahmed Salem',
+  id: `dep-${8 - i}`, at: new Date(BASE - i * 6 * 86400e3).toISOString(), version: `0.${12 - i}.0`, git_sha: (`e17364${i}`.padEnd(40, 'f')).slice(0, 40), migrations: i % 3 === 0 ? [`0${60 - i}_logs_field_changes.sql`, `0${61 - i}_sessions_device.sql`] : [], by: i % 2 ? 'Demo User 03' : 'Demo User 01',
 }));
 
 export const buildAlerts = (): SecurityAlert[] => [
   { id: 'al-1', at: new Date(BASE - 1 * 3600e3).toISOString(), rule: 'repeated_failed_sign_in', severity: 'high', summary: '9 failed sign-ins from 10.20.2.90 in 10 minutes', detail: 'Identifiers: ?***#3f9c01d2ab47 (x7), 1211 (x2)', status: 'open', ack_by: null, ack_at: null },
-  { id: 'al-2', at: new Date(BASE - 9 * 3600e3).toISOString(), rule: 'self_approval_burst', severity: 'medium', summary: 'Ahmed Salem self-approved 4 tasks today', detail: 'Tasks B2, B3, B4, B6 on TR108', status: 'open', ack_by: null, ack_at: null },
+  { id: 'al-2', at: new Date(BASE - 9 * 3600e3).toISOString(), rule: 'self_approval_burst', severity: 'medium', summary: 'Demo User 01 self-approved 4 tasks today', detail: 'Tasks B2, B3, B4, B6 on TR108', status: 'open', ack_by: null, ack_at: null },
   { id: 'al-3', at: new Date(BASE - 30 * 3600e3).toISOString(), rule: 'off_hours_admin_override', severity: 'medium', summary: 'Admin override at 02:14 local time', detail: null, status: 'open', ack_by: null, ack_at: null },
-  { id: 'al-4', at: new Date(BASE - 80 * 3600e3).toISOString(), rule: 'retention_reduced', severity: 'critical', summary: 'System log retention reduced from 365 to 120 days', detail: null, status: 'acknowledged', ack_by: 'Ali Barka', ack_at: new Date(BASE - 70 * 3600e3).toISOString() },
-  { id: 'al-5', at: new Date(BASE - 120 * 3600e3).toISOString(), rule: 'audit_integrity_failure', severity: 'critical', summary: 'Security log chain break at #17 (test)', detail: 'hash_mismatch', status: 'acknowledged', ack_by: 'Ahmed Salem', ack_at: new Date(BASE - 119 * 3600e3).toISOString() },
+  { id: 'al-4', at: new Date(BASE - 80 * 3600e3).toISOString(), rule: 'retention_reduced', severity: 'critical', summary: 'System log retention reduced from 365 to 120 days', detail: null, status: 'acknowledged', ack_by: 'Demo User 03', ack_at: new Date(BASE - 70 * 3600e3).toISOString() },
+  { id: 'al-5', at: new Date(BASE - 120 * 3600e3).toISOString(), rule: 'audit_integrity_failure', severity: 'critical', summary: 'Security log chain break at #17 (test)', detail: 'hash_mismatch', status: 'acknowledged', ack_by: 'Demo User 01', ack_at: new Date(BASE - 119 * 3600e3).toISOString() },
 ];
 
 export function buildReport(month: string): ActivityReport {
@@ -122,7 +122,7 @@ export function buildReport(month: string): ActivityReport {
     sensitive: [
       { at: at(3, 9), actor: ref('1001'), action: 'task.approve', entity_type: 'task', entity_label: 'TR108 · B3', summary: 'Self-approval (L1 and L2 held by one person)' },
       { at: at(7, 2), actor: ref('1001'), action: 'settings.update', entity_type: 'setting', entity_label: 'work.weekend', summary: 'Admin override: weekend days changed' },
-      { at: at(12, 14), actor: ref('1103'), action: 'session.end', entity_type: 'session', entity_label: 'Sami Nuri', summary: 'Session ended by an admin' },
+      { at: at(12, 14), actor: ref('1103'), action: 'session.end', entity_type: 'session', entity_label: 'Demo User 06', summary: 'Session ended by an admin' },
       { at: at(18, 11), actor: ref('1102'), action: 'export.create', entity_type: 'export', entity_label: 'Master export', summary: 'Full Master export' },
     ],
   };

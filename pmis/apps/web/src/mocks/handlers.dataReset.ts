@@ -17,7 +17,7 @@ const B = API_BASE;
 const PHRASE = 'RESET pmis';
 const NO_BACKUP = 'NO BACKUP';
 const OTHER = { id: uid('9002'), display_name: 'Second Admin (synthetic)', employee_id: '9002' };
-const me = () => ({ id: uid(viewer()?.employee_id ?? '1001'), display_name: viewer()?.name ?? 'Ahmed Salem', employee_id: viewer()?.employee_id ?? '1001' });
+const me = () => ({ id: uid(viewer()?.employee_id ?? '1001'), display_name: viewer()?.name ?? 'Demo User 01', employee_id: viewer()?.employee_id ?? '1001' });
 const now = () => new Date().toISOString();
 
 interface St { request: DataResetRequest | null; last: DataResetRequest | null; settings: { request_expiry_minutes: number; backup_max_age_hours: number; version: number }; backupOk: boolean }

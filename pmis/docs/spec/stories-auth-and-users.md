@@ -3,8 +3,8 @@
 Every story in this file comes from CLAUDE.md, under "Decisions agreed" and "Roles, groups and administration", unless another source is cited.
 
 ## AU-01 First sign-in with Microsoft 365
-As an Aljeel employee, I sign in with my company M365 account and link my 4-digit employee ID.
-- **Given** a user whose Entra ID token is valid and who has no PMIS account yet
+As an Company employee, I sign in with my company M365 account and link my 4-digit employee ID.
+- **Given** a user whose Entra ID token is valid and who has no Workspace account yet
   **When** they sign in
   **Then** the system asks for a 4-digit employee ID and creates the account with status "Pending assignment".
 - **Given** an employee ID that is not exactly 4 digits, or that is already linked to another account
@@ -14,8 +14,8 @@ As an Aljeel employee, I sign in with my company M365 account and link my 4-digi
   **When** the user opens any page or API call other than the pending page
   **Then** they see a "waiting for assignment" page and get no data back (HTTP 403 on the API).
 
-## AU-02 Only Aljeel employees can sign in
-- **Given** a token from a tenant other than the Aljeel Entra tenant
+## AU-02 Only Company employees can sign in
+- **Given** a token from a tenant other than the Company Entra tenant
   **When** it reaches the API
   **Then** it is refused and the refusal is written to the System Log.
 - **Given** an external party (vendor, contractor, GECOL, HLC or supplier)
