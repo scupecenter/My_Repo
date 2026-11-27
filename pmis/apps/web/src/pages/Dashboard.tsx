@@ -38,6 +38,7 @@ import {
 import { OpsProcurementCard } from "./dashboardOps";
 import { OpsScurveCard } from "./dashboardScurve";
 import { OpsPermitsCard } from "./dashboardPermits";
+import { OpsReadinessCard } from "./dashboardReadiness";
 import { useDashboardSettings } from "@/api/dashboardSettings";
 import { GoalsPanel } from "@/components/GoalsPanel";
 import { SavedViews } from "@/components/SavedViews";
@@ -1415,6 +1416,13 @@ export function Dashboard() {
                 <>
                   {/* 0.15.200 (owner approval 2026-11-26, item 3): permit status mix, validity pressure, stop-work and the PTW check gaps */}
                   <OpsPermitsCard ops={ops.data} />
+                </>
+              ),
+
+              ops_gecol_hlc: (
+                <>
+                  {/* 0.15.201 (owner approval 2026-11-26, item 4): GECOL/HLC readiness, the waiting sites by age, civilly ready but not electrified */}
+                  <OpsReadinessCard ops={ops.data} />
                 </>
               ),
 

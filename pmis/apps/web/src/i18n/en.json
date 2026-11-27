@@ -3212,7 +3212,23 @@
         "rescue_plan": "Rescue plan"
       },
       "expiring_14": "Expiring in 14 days",
-      "no_permit": "Sites with no permit"
+      "no_permit": "Sites with no permit",
+      "readiness_title": "Power and fiber readiness (GECOL / HLC)",
+      "readiness_hint": "The sites waiting on power or fiber, aged since the request. Read only.",
+      "gecol_title": "GECOL power",
+      "hlc_title": "HLC fiber",
+      "open_gecol": "GECOL register",
+      "open_hlc": "HLC register",
+      "in_scope": "Sites in scope",
+      "powered": "Powered",
+      "in_service": "In service",
+      "no_record": "No record",
+      "civil_ready_no_power": "Civilly ready, no power",
+      "installed_not_in_service": "Installed, not in service",
+      "waiting_power": "Waiting for power",
+      "waiting_fiber": "Waiting for fiber",
+      "unavailable_gecol": "You cannot see the GECOL register, so these figures are not shown.",
+      "unavailable_hlc": "You cannot see the HLC register, so these figures are not shown."
     },
     "scurve": {
       "title": "Progress curve",

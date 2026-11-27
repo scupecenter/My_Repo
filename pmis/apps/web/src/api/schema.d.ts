@@ -16972,6 +16972,7 @@ export interface components {
             scope_regions: components["schemas"]["RegionId"][] | null;
             procurement: components["schemas"]["DashboardOpsProcurement"];
             permits_hse: components["schemas"]["DashboardOpsPermitsHse"];
+            gecol_hlc: components["schemas"]["DashboardOpsGecolHlc"];
         };
         /** @description 0.15.106: procurement and materials (dashboard proposals item 1). */
         DashboardOpsProcurement: {
@@ -17057,6 +17058,29 @@ export interface components {
                     count: number;
                 }[];
             } | null;
+        };
+        /** @description 0.15.201: GECOL and HLC readiness (dashboard proposals item 4). */
+        DashboardOpsGecolHlc: {
+            gecol: components["schemas"]["DashboardOpsUtilityReadiness"];
+            hlc: components["schemas"]["DashboardOpsUtilityReadiness"];
+        };
+        /** @description 0.15.201: the readiness of one utility (GECOL power or HLC fiber) over its scoped sites. */
+        DashboardOpsUtilityReadiness: {
+            /** @description False when the caller may not see the register; the other fields are then null. */
+            available: boolean;
+            /** @description The active, not cancelled sites with the scope. */
+            in_scope: number | null;
+            /** @description GECOL only: power_on_date set; null in the HLC part. */
+            powered: number | null;
+            /** @description HLC only: in_service_date set; null in the GECOL part. */
+            in_service: number | null;
+            waiting: components["schemas"]["DashboardOpsAging"] | null;
+            /** @description In-scope sites with no record of the register at all. */
+            no_record: number | null;
+            /** @description GECOL only: the CW PAC (task B13) is approved but the power is not on; null in the HLC part. */
+            civil_ready_no_power: number | null;
+            /** @description HLC only: installation_date set but not in service yet; null in the GECOL part. */
+            installed_not_in_service: number | null;
         };
         DashboardTabLayout: {
             /** @description Card codes in display order. */
