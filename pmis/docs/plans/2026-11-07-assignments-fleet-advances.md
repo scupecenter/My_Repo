@@ -24,7 +24,7 @@ Status: **approved by the product owner on 2026-11-07** (decisions Q495 to Q516)
 | Q | Decision |
 |---|---|
 | Q495 | Assignments are entered and approved by Procurement, the Project Manager and the Team Leads, as L1 and/or L2 of the Procurement matrix row. |
-| Q496 | Several Aljeel engineers per assignment; each one supervisor or executor; all may be supervisors or all executors. |
+| Q496 | Several Company engineers per assignment; each one supervisor or executor; all may be supervisors or all executors. |
 | Q497 | Advance individual by default; a group advance is allowed with one named custodian who receives and settles it. |
 | Q498 | Usually one vehicle per assignment; several allowed. |
 | Q499 | "Vehicle not required" allowed, with a mandatory reason. |

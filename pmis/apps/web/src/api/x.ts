@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from './client';
-import type { BlockedBy, Comment, Follow, Notification, Page, RegionHealthBoard, StatusHealth, StatusUpdate, StatusUpdateInput, TaskTimeInState, TimeInStateReport, Workload } from './types';
+import type { BlockedBy, Comment, Follow, Notification, Page, RegionHealthBoard, StateDurationsReport, StatusHealth, StatusUpdate, StatusUpdateInput, TaskTimeInState, TimeInStateReport, Workload } from './types';
 
 /** Hooks of the phase 4b features X1 to X7 (contract 0.4.10 and 0.7.1). The server decides what a caller may see; nothing here widens it. */
 
@@ -54,6 +54,9 @@ export const useTimeInState = (taskId: string, enabled = true) => useQuery({ que
 export const useBlockedBy = (taskId: string, enabled = true) => useQuery({ queryKey: ['blocked-by', taskId], enabled, queryFn: () => api.get<BlockedBy>(`/tasks/${taskId}/blocked-by`) });
 export type InsightFilter = { region_id: string; stage_code: string };
 export const useWorkload = (f: InsightFilter) => useQuery({ queryKey: ['workload', f], queryFn: () => api.get<Workload>('/reports/workload', { query: { region_id: f.region_id || undefined, stage_code: f.stage_code || undefined } }) });
+/** F1 (0.15.17): median and P85 working days per state, per stage (tasks) or register (records), per region. Completed stays only. */
+export const useStateDurations = (entity_type: 'task' | 'register_record', region_id: string) =>
+  useQuery({ queryKey: ['state-durations', entity_type, region_id], queryFn: () => api.get<StateDurationsReport>('/reports/state-durations', { query: { entity_type, region_id: region_id || undefined } }) });
 export const useTimeReport = (f: InsightFilter & { group_by: 'holder' | 'team'; from: string; to: string }) =>
   useQuery({ queryKey: ['time-report', f], queryFn: () => api.get<TimeInStateReport>('/reports/time-in-state', { query: { group_by: f.group_by, region_id: f.region_id || undefined, stage_code: f.stage_code || undefined, from: f.from || undefined, to: f.to || undefined } }) });
 

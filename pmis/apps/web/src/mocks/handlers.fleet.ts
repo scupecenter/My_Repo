@@ -8,9 +8,9 @@ import { recId, type MockRecord } from './registersData';
 
 const B = API_BASE;
 const VEHICLES = [
-  { vehicle_id: 'veh-1', plate_no: 'TRP-1001', vehicle_type: 'Pickup', model: 'Hilux', home_region: 'Tripoli', driver_name: 'Salem' },
+  { vehicle_id: 'veh-1', plate_no: 'TRP-1001', vehicle_type: 'Pickup', model: 'Hilux', home_region: 'Tripoli', driver_name: 'Demo Driver' },
   { vehicle_id: 'veh-2', plate_no: 'BNG-2002', vehicle_type: 'Van', model: 'Hiace', home_region: 'Benghazi', driver_name: null },
-  { vehicle_id: 'veh-3', plate_no: 'TRP-3003', vehicle_type: 'Van', model: 'Hiace', home_region: 'Tripoli', driver_name: 'Omar' },
+  { vehicle_id: 'veh-3', plate_no: 'TRP-3003', vehicle_type: 'Van', model: 'Hiace', home_region: 'Tripoli', driver_name: 'Demo Driver' },
 ];
 const invalid = (path: string) => problem(422, 'validation_failed', 'Validation failed', { errors: [{ path, code: 'invalid' }] });
 const find = (key: string, id: unknown) => db().reg.records.find((x) => x.id === id && x.register_key === key);

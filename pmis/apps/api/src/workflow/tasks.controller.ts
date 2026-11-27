@@ -1,3 +1,4 @@
+import { ExportAction } from '../security/export-lock';
 import { Body, Controller, Get, Headers, HttpCode, Param, Patch, Post, Query, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import type { AuthContext } from '../auth/auth.types';
@@ -150,6 +151,7 @@ export class TasksController {
   }
 
   /** My Work as an iCalendar file (contract 0.15.82). Needs the session like every other call: nothing public, no token link. */
+  @ExportAction()
   @Get('me/tasks.ics')
   async myTasksIcs(@Auth() auth: AuthContext, @Res({ passthrough: true }) res: Response): Promise<string> {
     const body = await this.myWork.ics(auth);

@@ -14,6 +14,23 @@ import { Sites } from './Sites';
 /** P10 (contract 0.12.12, owner answers Q115 and Q117): saved views on the server for every list screen, sharing, and server-side drafts. */
 const options = () => within(screen.getByTestId('views-select')).getAllByRole('option').map((o) => o.textContent);
 
+describe('saved views as tabs', () => {
+  it('shows the default view and each saved view as a tab, and arrow keys move between them', async () => {
+    await signIn('pm');
+    const u = userEvent.setup();
+    renderApp(<Sites />, { route: '/sites?layout=list' });
+    await screen.findByTestId('sites-list');
+    const tabs = await screen.findByTestId('views-tabs');
+    const all = within(tabs).getAllByRole('tab');
+    expect(all[0]).toHaveAttribute('aria-selected', 'true');
+    if (all.length > 1) {
+      all[0]!.focus();
+      await u.keyboard('{ArrowRight}');
+      await waitFor(() => expect(within(tabs).getAllByRole('tab')[1]).toHaveAttribute('aria-selected', 'true'));
+    }
+  });
+});
+
 describe('saved views on the list screens', () => {
   it('saves the filters and the columns of the Site Register, and applies both again', async () => {
     await signIn('pm');
@@ -62,7 +79,7 @@ describe('saved views on the list screens', () => {
 
     await signIn('reviewer');
     renderApp(<AuditLog />);
-    await waitFor(() => expect(options()).toContain('For all · Ahmed Salem'));
+    await waitFor(() => expect(options()).toContain('For all · Demo User 01'));
     expect(options().some((o) => o?.includes('Only mine'))).toBe(false);
     await u.selectOptions(screen.getByTestId('views-select'), screen.getByRole('option', { name: /For all/ }));
     expect(screen.queryByTestId('views-update')).toBeNull();
@@ -99,11 +116,11 @@ describe('saved views on the list screens', () => {
     await signIn('pm');
     server.use(http.get(`${API_BASE}/saved-views`, () => HttpResponse.json({
       can_share: 'none', can_manage: false,
-      items: [{ id: '5a000000-0000-4000-8000-000000000001', screen_key: 'audit-log', name: 'Lead view', filters: {}, columns: {}, sort: [], stripped_columns: 2, owner: { id: '5a000000-0000-4000-8000-000000000002', display_name: 'Mona Fathi' }, owner_left: true, is_owner: false, shared: true, audience: null, can_edit: false, can_share: false, is_active: true, version: 3, imported: false, created_at: '2026-11-01T08:00:00Z', updated_at: '2026-11-01T08:00:00Z' }],
+      items: [{ id: '5a000000-0000-4000-8000-000000000001', screen_key: 'audit-log', name: 'Lead view', filters: {}, columns: {}, sort: [], stripped_columns: 2, owner: { id: '5a000000-0000-4000-8000-000000000002', display_name: 'Demo User 02' }, owner_left: true, is_owner: false, shared: true, audience: null, can_edit: false, can_share: false, is_active: true, version: 3, imported: false, created_at: '2026-11-01T08:00:00Z', updated_at: '2026-11-01T08:00:00Z' }],
     })));
     const u = userEvent.setup();
     renderApp(<AuditLog />);
-    await waitFor(() => expect(options()).toContain('Lead view · Mona Fathi'));
+    await waitFor(() => expect(options()).toContain('Lead view · Demo User 02'));
     await u.selectOptions(screen.getByTestId('views-select'), screen.getByRole('option', { name: /Lead view/ }));
     expect(screen.getByTestId('views-stripped')).toHaveTextContent('2 hidden columns left out');
     expect(screen.getByTestId('views-owner-left')).toBeInTheDocument();

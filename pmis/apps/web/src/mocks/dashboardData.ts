@@ -110,7 +110,7 @@ export function buildDashboard(q: URLSearchParams, scope: number[] | null = null
   const issues = scope !== null && scope.length === 0 ? null : {
     available: true, open_total: sc(23, f * (region ? 0.3 : 1)), sites_with_open_issue: sc(17, f * (region ? 0.3 : 1)), blocking_total: 3, oldest_age_wd: 38, avg_age_wd: 14.2,
     by_owner: [
-      { owner_key: 'user:1', owner_kind: 'user' as const, owner_name: 'Sami Nuri', count: sc(8, f), sites: sc(6, f), oldest_age_wd: 38, avg_age_wd: 15 },
+      { owner_key: 'user:1', owner_kind: 'user' as const, owner_name: 'Demo User 06', count: sc(8, f), sites: sc(6, f), oldest_age_wd: 38, avg_age_wd: 15 },
       { owner_key: 'party:1', owner_kind: 'party' as const, owner_name: 'A&T Global', count: sc(6, f), sites: sc(5, f), oldest_age_wd: 21, avg_age_wd: 11 },
       { owner_key: 'user:2', owner_kind: 'user' as const, owner_name: 'Lina Haddad', count: sc(4, f), sites: sc(4, f), oldest_age_wd: 12, avg_age_wd: 8 },
     ],

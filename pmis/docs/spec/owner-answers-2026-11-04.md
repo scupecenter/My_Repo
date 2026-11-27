@@ -1,4 +1,4 @@
-# GSDN Workspace — مراجعة الأسئلة والإجابات المقترحة
+# Workspace — مراجعة الأسئلة والإجابات المقترحة
 
 > **Status (2026-11-04): approved by the product owner as decisions.** The owner confirmed in the session that every answer below is an owner decision (the preface's "advisory" wording is superseded). Where an answer depends on data not yet provided, the current default stays until the data arrives. Implementation plan: `docs/plans/2026-11-04-owner-answers-gap.md`.
 
@@ -7,7 +7,7 @@
 
 ## نطاق هذه الإجابات وحالتها
 
-هذه إجابات استشارية مقترحة لتجهيز القرارات والتنفيذ، مبنية على الأسئلة المرفقة وسياق الاتفاقات السابقة لمشروع GSDN Workspace؛ ليست ادعاءً بأن المالك اعتمد كل اختيار جديد. أُبقي اسم GSDN الوارد في الملف، دون افتراض إعادة تسمية المشروع إلى GSDM.
+هذه إجابات استشارية مقترحة لتجهيز القرارات والتنفيذ، مبنية على الأسئلة المرفقة وسياق الاتفاقات السابقة لمشروع Workspace؛ ليست ادعاءً بأن المالك اعتمد كل اختيار جديد. أُبقي اسم Project الوارد في الملف، دون افتراض إعادة تسمية المشروع إلى GSDM.
 
 لم تُرفق هنا نسخ CLAUDE.md أو Blueprint أو rules.md أو Master أو المستودع؛ لذلك عوملت أوصاف التنفيذ وأرقام الترحيلات الواردة في الأسئلة كمعلومات من الملف، ولم يُتحقق من الكود أو الصيغ أو حالة البناء فعليًا. الإشارات إلى ملفات/أقسام أخرى محفوظة كما وردت وليست مصادر فُحصت في هذه المراجعة. الإجابة الخاصة بالسؤال تتقدم على Proposed default إذا عدّلته؛ وعبارات «مؤقت» و«تجريبي» لا تعني اعتماد قيمة تشغيلية نهائية.
 
@@ -23,9 +23,9 @@
 
 **The Master upload has no `_tpl` sheet.** CLAUDE.md rejects uploads without an embedded ID. The live Master file contains no `_tpl` sheet, but must be uploadable during migration and the 1-month parallel run.
 
-**Proposed default / question:** GSDN Workspace issues a "Master template" by adding `_tpl` (TPL-MASTER, version) to the user's copy once. Until then, an admin-only "legacy Master import" path accepts it, identified by sheet names and headers, and writes every use to the System Log.
+**Proposed default / question:** Workspace issues a "Master template" by adding `_tpl` (TPL-MASTER, version) to the user's copy once. Until then, an admin-only "legacy Master import" path accepts it, identified by sheet names and headers, and writes every use to the System Log.
 
-**Answer:** المقترح: الإبقاء على مسارين واضحين: استيراد Master قديم بصلاحية إدارية، وقوالب صادرة من PMIS تحمل `_tpl` ومعرّف القالب وإصداره. لا يُرفض الملف التشغيلي القديم لمجرد غياب الورقة، ولا تُضاف الورقة إلى الأصل دون نسخة محفوظة. يلزم فحص البنية ومعاينة الفروق قبل التطبيق، وتسجيل المصدر والبصمة ونتيجة كل استيراد؛ وجود `_tpl` وحده لا يثبت صحة المحتوى.
+**Answer:** المقترح: الإبقاء على مسارين واضحين: استيراد Master قديم بصلاحية إدارية، وقوالب صادرة من Workspace تحمل `_tpl` ومعرّف القالب وإصداره. لا يُرفض الملف التشغيلي القديم لمجرد غياب الورقة، ولا تُضاف الورقة إلى الأصل دون نسخة محفوظة. يلزم فحص البنية ومعاينة الفروق قبل التطبيق، وتسجيل المصدر والبصمة ونتيجة كل استيراد؛ وجود `_tpl` وحده لا يثبت صحة المحتوى.
 
 
 ### Q2
@@ -34,7 +34,7 @@
 
 **Proposed default / question:** D-1 starts from MS4. Where RFI is N/A, it starts from MS1 (the base date of gate CA). D-1 is not measured for Hot / Cold Swap. The Master SLA sheet (column Y, which starts from Site Release) needs the same fix for the parallel-run comparison.
 
-**Answer:** المقترح: يبدأ D-1 من MS4 عندما يكون RFI مطلوبًا، ومن MS1، باعتباره التاريخ الأساسي لـ CA، عندما يكون RFI غير منطبق. لا يُقاس D-1 لسيناريوهَي Hot Swap وCold Swap. تُوحَّد القاعدة في PMIS ونسخة Master المقارنة بتغيير موثّق؛ التاريخ المفقود يبقى نقص بيانات ولا يُستبدل بتاريخ اليوم. جميع المدد بأيام العمل، واليوم نفسه = 0.
+**Answer:** المقترح: يبدأ D-1 من MS4 عندما يكون RFI مطلوبًا، ومن MS1، باعتباره التاريخ الأساسي لـ CA، عندما يكون RFI غير منطبق. لا يُقاس D-1 لسيناريوهَي Hot Swap وCold Swap. تُوحَّد القاعدة في Workspace ونسخة Master المقارنة بتغيير موثّق؛ التاريخ المفقود يبقى نقص بيانات ولا يُستبدل بتاريخ اليوم. جميع المدد بأيام العمل، واليوم نفسه = 0.
 
 
 ### Q3
@@ -86,9 +86,9 @@
 
 **Role list mismatch.** Setting StaffRole (15 values, for example "Team Lead (GECOL)", "Team Lead (Fiber)", "CW Engineer") does not match the 6 main roles and 9 sub-roles in CLAUDE.md.
 
-**Proposed default / question:** GSDN Workspace uses the CLAUDE.md roles. Import maps the Master values (Team Lead (CW) → CW Team Lead, CW Engineer / Site Engineer → Site Engineers (CW), Team Lead (GECOL) → GECOL Power Team, and so on). The mapping table is editable and approved by the owner.
+**Proposed default / question:** Workspace uses the CLAUDE.md roles. Import maps the Master values (Team Lead (CW) → CW Team Lead, CW Engineer / Site Engineer → Site Engineers (CW), Team Lead (GECOL) → GECOL Power Team, and so on). The mapping table is editable and approved by the owner.
 
-**Answer:** المقترح: اعتماد أكواد أدوار PMIS المستقرة، مع جدول تحويل قابل للتحرير والمراجعة لقيم Master. لا تُمنح صلاحيات فعلية لمجرد تطابق المسمى الوظيفي المستورد؛ يراجع المسؤول الدور والمنطقة والنطاق. لا يُحوَّل Site Engineer العام إلى CW تلقائيًا إن لم يُعرف تخصصه؛ القيم الملتبسة تظهر كاستثناءات استيراد. تبقى وظائف GECOL وFiber ممثلة دون فقدها في التحويل.
+**Answer:** المقترح: اعتماد أكواد أدوار Workspace المستقرة، مع جدول تحويل قابل للتحرير والمراجعة لقيم Master. لا تُمنح صلاحيات فعلية لمجرد تطابق المسمى الوظيفي المستورد؛ يراجع المسؤول الدور والمنطقة والنطاق. لا يُحوَّل Site Engineer العام إلى CW تلقائيًا إن لم يُعرف تخصصه؛ القيم الملتبسة تظهر كاستثناءات استيراد. تبقى وظائف GECOL وFiber ممثلة دون فقدها في التحويل.
 
 
 ### Q9
@@ -111,11 +111,11 @@
 
 ### Q11
 
-**Several issues per site vs the Master.** The Master holds one issue per site (GA:GE). GSDN Workspace allows several. For the parallel-run export, which issue goes into GA:GE?
+**Several issues per site vs the Master.** The Master holds one issue per site (GA:GE). Workspace allows several. For the parallel-run export, which issue goes into GA:GE?
 
 **Proposed default / question:** Export the oldest open issue, or the latest closed one when none is open, and append "+N more" in Remark.
 
-**Answer:** المقترح: لأغراض توافق Master فقط، تُصدَّر أقدم مشكلة مفتوحة؛ وعند عدم وجود مفتوحة، أحدث مشكلة مغلقة. تُضاف عبارة +N more في Remark دون استبدال النص الأصلي، ويُرفق تصدير كامل مستقل للمشكلات. تعرض واجهة PMIS أيضًا المشكلات الحرجة أولًا، فلا تؤدي قاعدة التصدير إلى إخفاء الأهم تشغيليًا؛ تُوثَّق قاعدة كسر تعادل التواريخ بمعرّف السجل.
+**Answer:** المقترح: لأغراض توافق Master فقط، تُصدَّر أقدم مشكلة مفتوحة؛ وعند عدم وجود مفتوحة، أحدث مشكلة مغلقة. تُضاف عبارة +N more في Remark دون استبدال النص الأصلي، ويُرفق تصدير كامل مستقل للمشكلات. تعرض واجهة Workspace أيضًا المشكلات الحرجة أولًا، فلا تؤدي قاعدة التصدير إلى إخفاء الأهم تشغيليًا؛ تُوثَّق قاعدة كسر تعادل التواريخ بمعرّف السجل.
 
 
 ### Q12
@@ -133,7 +133,7 @@
 
 **Proposed default / question:** Keep the Master behaviour for the parallel run. Propose a separate Layout Submitted Date after the Master is retired.
 
-**Answer:** المقترح: حفظ سلوك AR → AR في مقياس توافق Master فقط مع وسم «قيمة موروثة لا تقيس دورة فعلية». يبدأ PMIS بحقل مستقل لـ Layout Submitted Date عند تفعيل القاعدة الجديدة، دون ملئه تخمينيًا من التاريخ الآخر. تعرض المقارنة الفرق، وتبقى مؤشرات الماضي بإصدار القاعدة الذي احتُسبت به؛ لا ينتظر إصلاح النموذج تقاعد Master بالكامل.
+**Answer:** المقترح: حفظ سلوك AR → AR في مقياس توافق Master فقط مع وسم «قيمة موروثة لا تقيس دورة فعلية». يبدأ Workspace بحقل مستقل لـ Layout Submitted Date عند تفعيل القاعدة الجديدة، دون ملئه تخمينيًا من التاريخ الآخر. تعرض المقارنة الفرق، وتبقى مؤشرات الماضي بإصدار القاعدة الذي احتُسبت به؛ لا ينتظر إصلاح النموذج تقاعد Master بالكامل.
 
 
 ### Q14
@@ -156,7 +156,7 @@
 
 ### Q16
 
-**Health index and Final Closure KPI formulas.** These are new PMIS features with no source formula (rules.md §6.1, §9).
+**Health index and Final Closure KPI formulas.** These are new Workspace features with no source formula (rules.md §6.1, §9).
 
 **Proposed default / question:** Equal weights across the 6 factors. The % closed base is HOTO-achieved sites. FAC age is counted from DLP End. The owner reviews all three before P1.
 
@@ -501,7 +501,7 @@
 
 ### Q157
 
-**Email change for an M365 account.** A request needs the password re-entered, which an M365 user does not have in GSDN Workspace; the API refuses it (403) and the page tells them to ask an admin. When M365 sign-in is built, should GSDN Workspace email follow Entra (and a request need an M365 step-up), and what happens on approval to a user with an Entra link, since the first-sign-in match uses the email?
+**Email change for an M365 account.** A request needs the password re-entered, which an M365 user does not have in Workspace; the API refuses it (403) and the page tells them to ask an admin. When M365 sign-in is built, should Workspace email follow Entra (and a request need an M365 step-up), and what happens on approval to a user with an Entra link, since the first-sign-in match uses the email?
 
 **Proposed default / question:** Keep admin-only for M365 accounts until ADR 0002 sign-in is built; then require an M365 step-up and block approval while `m365_object_id` is set unless the new address is the Entra one.
 
@@ -787,7 +787,7 @@
 
 ### Q205
 
-**Stream templates: which task a Master column writes (migration 0049).** The Master has one column where GSDN Workspace has two tasks, and the spec table (registers-and-streams §2.3) names both: CW MOS Planned/Actual (AY, AZ) are B8 or B9; CW Installation Planned/Actual Start and End (BK:BN) are B10 or B11; the item lists BA:BC and BD:BJ sit on B10 and B11; Report/Layout Submitted and Approved (AR, AS) are B5, B6 or B7. Snags Found/Cleared (BS, BT, EG, EH, FC, FD, FH, FI) are Yes/N/A lists in the spec but the QC snags are records.
+**Stream templates: which task a Master column writes (migration 0049).** The Master has one column where Workspace has two tasks, and the spec table (registers-and-streams §2.3) names both: CW MOS Planned/Actual (AY, AZ) are B8 or B9; CW Installation Planned/Actual Start and End (BK:BN) are B10 or B11; the item lists BA:BC and BD:BJ sit on B10 and B11; Report/Layout Submitted and Approved (AR, AS) are B5, B6 or B7. Snags Found/Cleared (BS, BT, EG, EH, FC, FD, FH, FI) are Yes/N/A lists in the spec but the QC snags are records.
 
 **Proposed default / question:** Seeded in `template_task_fields` (data, editable): AY/AZ on B8, BK:BN on B11, the snag lists as plain task values (the QC snags stay the QC module's), AR and AS not mapped (read only), AT/AU/CG/CH/DB/DC mapped to the submitted and approved dates the workflow sets (read only). A task with no Master column (A1 to A5, B1 to B3, B6, B9, B10, C1 to C4, D1, D4b, D12, D17 and so on) has its own Planned Date and Actual Date columns. Confirm the mapping, or say which task each Master column belongs to.
 
@@ -841,9 +841,9 @@
 
 ### Q211
 
-**TPL-MASTER and the parallel run.** A file is a PMIS-issued template (hidden `_tpl`); the real Master has none (Q1). Every row keeps its source (`Sheet!row`, file name and hash) and its diff against what GSDN Workspace holds; the comparison report is the list of those diffs per part.
+**TPL-MASTER and the parallel run.** A file is a Workspace-issued template (hidden `_tpl`); the real Master has none (Q1). Every row keeps its source (`Sheet!row`, file name and hash) and its diff against what Workspace holds; the comparison report is the list of those diffs per part.
 
-**Proposed default / question:** Confirm that the real Master reaches GSDN Workspace through the one-time import (`tools/master-import`), and that TPL-MASTER is the path for files GSDN Workspace issued. Say whether the comparison report needs its own screen or export.
+**Proposed default / question:** Confirm that the real Master reaches Workspace through the one-time import (`tools/master-import`), and that TPL-MASTER is the path for files Workspace issued. Say whether the comparison report needs its own screen or export.
 
 **Answer:** المقترح: استخدام مسار legacy import للـ Master الحقيقي، ومسار TPL-MASTER للقوالب الصادرة من النظام. خلال شهر التشغيل المتوازي نحتاج تشغيل مقارنة متكرر للنسخ القديمة كمعاينة reconciliation دون تكرار ترحيل البيانات أو الكتابة فوق معتمد. مطلوب شاشة فروق وتصدير XLSX يتضمن الموقع والحقل والقيمتين والمصدر والسبب والحل؛ تحفظ البصمة وSheet!row والوقت والمستخدم، مع موافقة واضحة قبل تطبيق أي فرق.
 

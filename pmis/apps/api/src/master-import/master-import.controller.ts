@@ -1,3 +1,4 @@
+import { ExportAction } from '../security/export-lock';
 import { Body, Controller, Get, Headers, HttpCode, Param, Patch, Post, Put, Query, Req, Res, StreamableFile, UploadedFile as Upload, UseInterceptors } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import type { AuthContext } from '../auth/auth.types';
@@ -61,6 +62,7 @@ export class MasterImportController {
     return dto;
   }
 
+  @ExportAction()
   @Get('runs/:id/export')
   async export(@Auth() auth: AuthContext, @Param('id') id: string, @Query() q: Record<string, unknown>, @Res({ passthrough: true }) res: Response): Promise<StreamableFile> {
     const { buffer, name } = await this.mi.exportReport(auth, id, q);

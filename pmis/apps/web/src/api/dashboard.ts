@@ -60,6 +60,32 @@ export const useDashboardExtras = (q: DashboardQuery, enabled = true) => {
   });
 };
 
+// ---------------------------------------------------------------- 0.15.98: the follow-up sections (procurement and materials)
+export type DashboardOps = S['DashboardOps'];
+/** Read only. The same region filter and unified filter tree as the dashboard extras. */
+export const useDashboardOps = (q: DashboardQuery, enabled = true) => {
+  const query = clean({ region_id: q.region_id, filter: q.filter });
+  return useQuery({
+    queryKey: ['dashboard-ops', query],
+    staleTime: 30_000,
+    enabled,
+    placeholderData: keepPreviousData,
+    queryFn: () => api.get<DashboardOps>('/dashboard/ops', { query }),
+  });
+};
+
+// ---------------------------------------------------------------- 0.7.2: the saved weekly Project Status snapshots (the S-curve card, dashboard proposals item 2)
+export type ProjectStatusSnapshot = S['ProjectStatusSnapshot'];
+type PageEnvelope = { page?: { limit: number; next_cursor: string | null; total?: number } };
+/** Read only. The frozen weekly values (actual %, planned %, plan index), never recomputed; needs `dashboard.view`. */
+export const useProjectStatusSnapshots = (enabled = true) =>
+  useQuery({
+    queryKey: ['project-status-snapshots'],
+    staleTime: 60_000,
+    enabled,
+    queryFn: () => api.get<PageEnvelope & { items?: ProjectStatusSnapshot[] }>('/project-status/snapshots'),
+  });
+
 // ---------------------------------------------------------------- 0.14.5: the site map (OV-12, SC-10)
 export type SiteMap = S['SiteMap'];
 export type SiteMapItem = S['SiteMapItem'];

@@ -324,9 +324,9 @@ describe('Matrix: self-approval and empty cell', () => {
     expect(screen.getByTestId('matrix-warn-self-final_closure')).toHaveTextContent('holds L1 and L2 of Final Closure'); // one person at L1 and L2: shown in advance
     expect(screen.queryByTestId('matrix-warn-self-site_release')).not.toBeInTheDocument();
     await u.click(within(screen.getByTestId('matrix-cell-site_release-3')).getByTestId('matrix-add'));
-    await u.type(await screen.findByTestId('matrix-picker-q'), 'Mona');
+    await u.type(await screen.findByTestId('matrix-picker-q'), 'Demo');
     await u.click(await screen.findByTestId('matrix-opt-user-1102'));
-    expect(await screen.findByTestId('matrix-warn-self-site_release')).toHaveTextContent('Mona Fathi holds L1 and L2 of Site Release');
+    expect(await screen.findByTestId('matrix-warn-self-site_release')).toHaveTextContent('Demo User 02 holds L1 and L2 of Site Release');
   });
 
   it('names the level that has no holder when the server answers empty_cell', async () => {

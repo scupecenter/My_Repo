@@ -4791,6 +4791,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/ui-features": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Interface features (avatars, New badge) (0.15.185)
+         * @description 0.15.185 (migration 0280). Every signed-in user. Without a saved value each section takes its seed: avatars `gradient`, `circle`, `varied`, in lists; New badge on for 14 days.
+         */
+        get: operations["getUiFeaturesSetting"];
+        /**
+         * Set the interface features (Administration > Settings > Screens > Interface)
+         * @description 0.15.185 (migration 0280): System Admin or a delegate of `admin.settings` edit for all regions (403 `action_forbidden` otherwise), a reason of at least 3 characters and If-Match. Closed body: `sections` with any of the known sections, each one complete (`unknown_key` at its path, `invalid` or `out_of_range` for a value outside its list). A section not sent keeps its value. Audited (`ui_features_update`, before and after).
+         */
+        put: operations["setUiFeaturesSetting"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/idle-task-alert": {
         parameters: {
             query?: never;
@@ -5774,6 +5798,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/pm-schedules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The preventive-maintenance schedules the caller may see (0.15.161)
+         * @description 0.15.161. Schedules kept in the settings table as `pm.schedules`. A schedule says: every `every` weeks or months create a DRAFT record in register `register_key`
+         *     (for `site_id`, with the field values in `data`). `next_due` is the next date a draft is due; `today` is the calendar day of the system. A schedule never creates
+         *     anything by itself. A caller sees the schedules of the registers the caller may view; an administrator with `admin.settings` edit sees all of them.
+         */
+        get: operations["getPmSchedules"];
+        /**
+         * Save the schedules (reason, If-Match, audited, versioned)
+         * @description 0.15.161. System Admin, or a delegation of `admin.settings` edit for all regions (403 `action_forbidden` otherwise). The body replaces the whole list; the run
+         *     history of a schedule (`last_generated_at`, `last_record_id`) is kept by the database. Field errors (422 `validation_failed`): `unknown_key`, `invalid`,
+         *     `duplicate`, `unknown_register`, `unknown_site`, `required` (a site is needed), `too_many`. One audit row per save.
+         */
+        put: operations["setPmSchedules"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pm-schedules/{schedule_id}/generate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create the draft of a due schedule, as the caller (0.15.161)
+         * @description 0.15.161. Saves ONE draft record (state `entry`) in the schedule's register through the register's own create path, as the caller: the register's rights, region
+         *     rules and field rules apply unchanged (no permission is widened). Then the next due date moves past today in steps of the schedule (never a backlog).
+         *     404 when the schedule does not exist or the caller may not view its register; 409 `invalid_transition` when the schedule is switched off or not due yet.
+         *     Errors of the register (403, 422) are returned as they are.
+         */
+        post: operations["generatePmScheduleDraft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/kanban-wip": {
         parameters: {
             query?: never;
@@ -5855,6 +5930,81 @@ export interface paths {
          *     choice off keeps each user's stored `ui_brand` but everyone sees `default_brand` until it is turned on again.
          */
         put: operations["setUiIdentity"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/login-page": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The sign-in page settings (announcement, animation, default language, support links) (0.15.97)
+         * @description Every signed-in user may read it; the settings screen and the post-login splash use it. `can_edit` is true for a System Admin or a delegate of `settings` edit for all regions. `server_version` is shown to signed-in users only.
+         */
+        get: operations["getLoginPage"];
+        /**
+         * Set the sign-in page settings (reason, step-up, If-Match, audited) (0.15.97)
+         * @description A System Admin, or a delegate of `settings` edit for all regions (403 `action_forbidden` otherwise, also for a delegate limited to some regions). A reason
+         *     (3+ characters), a step-up (401 `step_up_required`) and `If-Match` (428 / 412) are required. Unknown keys and invalid values are 422; saving the values in
+         *     force is 409 `invalid_transition`. Audited `login_page_update` with the config before and after. Nothing about the sign-in mechanism changes: this is
+         *     presentation only (announcement, background animation, default language, support links).
+         */
+        put: operations["setLoginPage"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/login-page/public": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The public sign-in page config (no session) (0.15.97)
+         * @description No session: what the signed-out pages render, and nothing else - the announcement, the background animation switch, the default language and the support
+         *     links. No version, no audit data, nothing about users. Cached 30 seconds (`Cache-Control: public, max-age=30`) and rate limited per address
+         *     (429 `rate_limited` with `Retry-After`).
+         */
+        get: operations["getLoginPagePublic"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/security-locks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The admin lock keys, block public sharing and disable export (0.15.190)
+         * @description Every signed-in user may read it (the UI hides what is locked). `can_edit` is true for a System Admin only. Both keys are `false` until a System Admin turns one on.
+         */
+        get: operations["getSecurityLocks"];
+        /**
+         * Turn the lock keys on or off (System Admin, reason, step-up, If-Match, audited) (0.15.190)
+         * @description System Admin only (403 `action_forbidden` otherwise, a delegate included). A reason (3+ characters), a step-up (401 `step_up_required`) and `If-Match` (428 / 412)
+         *     are required. Unknown keys and non-boolean values are 422. Saving the values already in force is 409 `invalid_transition`. Audited `security_locks_update` with both keys
+         *     before and after. Reading and changing the lock keys is never locked, so an admin can always turn a lock off again.
+         */
+        put: operations["setSecurityLocks"];
         post?: never;
         delete?: never;
         options?: never;
@@ -5981,6 +6131,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/registers/dismantle/rn-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The received Warehouse RNs that can close a Dismantle part (0.15.110)
+         * @description 0.15.110. Current, not voided, Received Warehouse RNs of the part (`record_type` cw gives cw_rn, te gives te_rn) on the site, in the regions where the caller holds the Warehouse view right (the responsibility matrix). Needs the Dismantle module.
+         */
+        get: operations["listDismantleRnOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/registers/dismantle/order-options": {
         parameters: {
             query?: never;
@@ -6073,9 +6243,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * The approved, active Procurement orders a warehouse receipt may name (0.15.90)
-         * @description 0.15.95. The approved Procurement versions in force, not cancelled, that the caller can see; of the site `site_id` when it is given (a PL / OPEN receipt may have no site).
-         *     Needs the Issue log module; only the orders in regions where the caller also holds the Procurement view right (the responsibility matrix) are listed, and the same right is checked when a receipt is saved.
+         * The approved, active Procurement orders a Issue log record may name (0.15.95)
+         * @description 0.15.95. The approved Procurement versions in force, not cancelled, that the caller can see; of the site `site_id` when it is given. Needs the Issue log module; only the orders in regions where the caller also holds the Procurement view right (the responsibility matrix) are listed, and the same right is checked when the record is saved.
          */
         get: operations["listIssueOrderOptions"];
         put?: never;
@@ -6094,9 +6263,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * The approved, active Procurement orders a warehouse receipt may name (0.15.90)
-         * @description 0.15.95. The approved Procurement versions in force, not cancelled, that the caller can see; of the site `site_id` when it is given (a PL / OPEN receipt may have no site).
-         *     Needs the Quality module; only the orders in regions where the caller also holds the Procurement view right (the responsibility matrix) are listed, and the same right is checked when a receipt is saved.
+         * The approved, active Procurement orders a Quality record may name (0.15.95)
+         * @description 0.15.95. The approved Procurement versions in force, not cancelled, that the caller can see; of the site `site_id` when it is given. Needs the Quality module; only the orders in regions where the caller also holds the Procurement view right (the responsibility matrix) are listed, and the same right is checked when the record is saved.
          */
         get: operations["listQualityOrderOptions"];
         put?: never;
@@ -6116,7 +6284,7 @@ export interface paths {
         };
         /**
          * The warehouse receipts against a Procurement order (0.15.91)
-         * @description 0.15.91. The current, not voided PL / OPEN receipts whose `procurement_order_id` is this order, with the number of lines and the total quantity. Needs the Procurement module
+         * @description 0.15.91 (0.15.111: every document type except an adjustment). The current, not voided warehouse documents whose `procurement_order_id` is this order, with the number of lines and the total quantity. Needs the Procurement module
          *     (view) and the Warehouse module; the receipts the caller cannot see are not listed.
          */
         get: operations["listProcurementOrderReceipts"];
@@ -6552,6 +6720,66 @@ export interface paths {
          */
         put: operations["setMailNotificationKinds"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/recycle-bin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Voided register records that can still be restored (System Admin)
+         * @description 0.15.150. The records voided inside the retention window (newest first, at most 500). `blocked` is `open_version_exists` or `site_slot_taken` when a restore would break a rule. 403 for anyone but a System Admin.
+         */
+        get: operations["getRecycleBin"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/recycle-bin/retention": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set the retention of the recycle bin (System Admin)
+         * @description 0.15.150. Days a voided record can be restored, 30 to 730. Needs If-Match and a reason; audited as `recycle_bin_retention_update`.
+         */
+        put: operations["setRecycleBinRetention"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/recycle-bin/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore a voided register record to a draft (System Admin)
+         * @description 0.15.150. Only a voided record inside the retention window; it returns as `entry`, level 1, and goes through the workflow again. Refused when a newer open version exists or the site already has another record in a one-per-site register. Needs If-Match (the record version), a reason and a step-up. Audited as `register_record_restore`.
+         */
+        post: operations["restoreRegisterRecord"];
         delete?: never;
         options?: never;
         head?: never;
@@ -9460,6 +9688,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/dashboard/ops": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The follow-up sections of the dashboard (0.15.106)
+         * @description The sections that follow the operations beyond F13 (owner approval 2026-11-26, dashboard proposals). Read only; not audited (a read, like `GET /dashboard`).
+         *     **Who sees what (B3).** Needs `dashboard.view` (403 `module_forbidden otherwise") and the tab rule of 0.15.80 applies as in `GET /dashboard/extras`.
+         *     The caller's `dashboard.view` regions limit every section. A part whose module the caller may not see answers `available: false` with null figures.
+         *     **Section `procurement`** (item 1, migration 0190): the orders need `procurement.view`, the materials `warehouse.view`.
+         *     An **open order** is a Procurement record whose order status is not one of the closing statuses of the contractor rules (the same rule as
+         *     `GET /reports/contractor-performance`, so the two screens never disagree). `pr_wait` ages the open orders that have a PR date and no PO/WO yet
+         *     from the PR date; `po_wait` ages the open orders that have a PO/WO from the PO/WO date; both in calendar days, bucketed 0-7, 8-14, 15-30, over 30.
+         *     The **materials** position reads `warehouse_site_qty` over the active, not cancelled sites of the caller's regions (the unified `filter` narrows
+         *     them as in `GET /dashboard/extras`): `receive_pct` is dispatched against required (capped at 100%, null when nothing is required),
+         *     `sites_short` counts the sites with at least one shortage line (required over dispatched), `top_shortages` lists the ten biggest missing
+         *     lines with the contractor of the site, and `by_contractor` groups the shortage per contractor. The contractor of a line is the party of the
+         *     site's newest open order; a site with no open order is unattributed (empty name, null party). No price is returned: no price is stored on a
+         *     Procurement record (the financial summary is a separate, restricted card).
+         */
+        get: operations["getDashboardOps"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/dashboard/milestone-pipeline": {
         parameters: {
             query?: never;
@@ -10125,6 +10385,85 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        PmScheduleInput: {
+            id: string;
+            name_en: string;
+            name_ar?: string | null;
+            register_key: string;
+            /**
+             * Format: uuid
+             * @description Required when the register is site scoped.
+             */
+            site_id?: string | null;
+            record_type?: string | null;
+            /** @description Field values of the draft, by field code (at most 4000 characters). */
+            data: {
+                [key: string]: unknown;
+            };
+            every: number;
+            /** @enum {string} */
+            unit: "week" | "month";
+            /** Format: date */
+            next_due: string;
+            active?: boolean;
+        };
+        PmSchedulesInput: {
+            schedules: components["schemas"]["PmScheduleInput"][];
+        };
+        PmSchedule: components["schemas"]["PmScheduleInput"] & {
+            /** Format: date-time */
+            last_generated_at?: string;
+            /** Format: uuid */
+            last_record_id?: string;
+        };
+        PmSchedules: {
+            version: number;
+            schedules: components["schemas"]["PmSchedule"][];
+            /** Format: date */
+            today: string;
+            catalogue: {
+                registers: {
+                    key: string;
+                    name_en: string;
+                    name_ar: string;
+                    site_scoped: boolean;
+                }[];
+                units: string[];
+            };
+            /** Format: date-time */
+            updated_at: string | null;
+            updated_by: {
+                id: string;
+                display_name: string;
+            } | null;
+        };
+        RecycleBin: {
+            retention_days: number;
+            version: number;
+            items: {
+                /** Format: uuid */
+                id: string;
+                register_key: string;
+                register_name_en: string;
+                register_name_ar: string | null;
+                label: string;
+                /** Format: uuid */
+                site_id: string | null;
+                site_code: string | null;
+                version: number;
+                version_no: number;
+                /** Format: date-time */
+                voided_at: string;
+                /** Format: uuid */
+                voided_by: string | null;
+                voided_by_name: string | null;
+                void_reason: string | null;
+                /** Format: date-time */
+                restorable_until: string;
+                /** @enum {string|null} */
+                blocked: "open_version_exists" | "site_slot_taken" | null;
+            }[];
+        };
         IssueStoppedRow: {
             site_code: string;
             /** Format: uuid */
@@ -14870,6 +15209,35 @@ export interface components {
             updated_at?: string;
             updated_by?: components["schemas"]["UserRef"];
         };
+        UiAvatars: {
+            /** @enum {string} */
+            style: "initials" | "gradient" | "geometric" | "none";
+            /** @enum {string} */
+            shape: "circle" | "rounded";
+            /** @enum {string} */
+            palette: "brand" | "varied";
+            in_lists: boolean;
+        };
+        UiNewBadge: {
+            enabled: boolean;
+            days: number;
+        };
+        /** @description 0.15.185. The sections of the interface features setting; every section is complete. */
+        UiFeatures: {
+            avatars: components["schemas"]["UiAvatars"];
+            new_badge: components["schemas"]["UiNewBadge"];
+        };
+        UiFeaturesPatch: {
+            avatars?: components["schemas"]["UiAvatars"];
+            new_badge?: components["schemas"]["UiNewBadge"];
+        };
+        UiFeaturesSetting: {
+            sections: components["schemas"]["UiFeatures"];
+            version: number;
+            /** Format: date-time */
+            updated_at?: string;
+            updated_by?: components["schemas"]["UserRef"];
+        };
         IdleTaskAlertSetting: {
             enabled: boolean;
             /** @description Default 2. */
@@ -15967,6 +16335,19 @@ export interface components {
                 advance_state?: string | null;
             }[];
         };
+        DismantleRnOption: {
+            /** Format: uuid */
+            entity_id: string;
+            /** Format: uuid */
+            record_id: string;
+            /** Format: uuid */
+            site_id?: string;
+            /** @enum {string} */
+            record_type?: "cw_rn" | "te_rn";
+            doc_no?: string;
+            doc_date?: string;
+            txn_status?: string;
+        };
         /** @description 0.12.11 (Q114). An approved, active Procurement order of a Dismantle part. */
         DismantleOrderOption: {
             /**
@@ -16012,7 +16393,7 @@ export interface components {
             /** Format: uuid */
             record_id: string;
             /** @enum {string} */
-            record_type: "pl" | "open";
+            record_type: "te_dn" | "cw_dn" | "te_rn" | "cw_rn" | "pl" | "open";
             state: string;
             doc_no?: string;
             doc_date?: string;
@@ -16189,6 +16570,74 @@ export interface components {
             default_brand: components["schemas"]["UiBrand"];
             allow_user_choice: boolean;
         };
+        /** @description 0.15.97. A support link under the sign-in form. http(s) or mailto only. */
+        SupportLink: {
+            label_en: string;
+            /** @description Empty: the English label shows. */
+            label_ar: string;
+            url: string;
+        };
+        /** @description 0.15.97. Settings, Screens, Login page (setting `ui.login_page`, migration 0197). */
+        LoginPage: {
+            /** @description Both texts empty: no banner. */
+            announcement_en: string;
+            announcement_ar: string;
+            /** @enum {string} */
+            announcement_kind: "info" | "maintenance";
+            /** @description The calm telecom background animation of the signed-out pages. A visitor who prefers reduced motion never sees it. */
+            animation: boolean;
+            /** @description The language of the signed-out pages until the visitor chooses one; null: the browser default (English). */
+            default_locale: ("en" | "ar") | null;
+            support_links: components["schemas"]["SupportLink"][];
+            /** @description The system version, shown to signed-in users only (the post-login splash and this screen). */
+            server_version: string;
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+            /** @description The ETag value. */
+            version: number;
+            /** @description A System Admin or a delegate of `settings` edit for all regions. */
+            can_edit: boolean;
+        };
+        LoginPageInput: components["schemas"]["WithReason"] & {
+            announcement_en: string;
+            announcement_ar: string;
+            /** @enum {string} */
+            announcement_kind: "info" | "maintenance";
+            animation: boolean;
+            default_locale: ("en" | "ar") | null;
+            support_links: components["schemas"]["SupportLink"][];
+        };
+        /** @description 0.15.97. The public sign-in page config: ONLY what the signed-out pages render. No version, no audit data, nothing about users. */
+        LoginPagePublic: {
+            announcement: {
+                en: string;
+                ar: string;
+                /** @enum {string} */
+                kind: "info" | "maintenance";
+            } | null;
+            animation: boolean;
+            default_locale: ("en" | "ar") | null;
+            support_links: components["schemas"]["SupportLink"][];
+        };
+        /** @description 0.15.190. The admin lock keys (setting `security.locks`, migration 0290). */
+        SecurityLocks: {
+            /** @description true: no feature may create a public link (checked by `SecurityLocksService.assertSharingAllowed`). */
+            block_public_sharing: boolean;
+            /** @description true: every export route answers 403 `export_locked`. */
+            disable_export: boolean;
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+            /** @description The ETag value. */
+            version: number;
+            /** @description A System Admin only. */
+            can_edit: boolean;
+        };
+        SecurityLocksInput: components["schemas"]["WithReason"] & {
+            block_public_sharing: boolean;
+            disable_export: boolean;
+        };
         /** @description 0.15.1. The shared order of the side menu (setting `nav.layout`). */
         NavLayout: {
             headings: components["schemas"]["NavHeading"][];
@@ -16255,6 +16704,65 @@ export interface components {
             /** Format: date-time */
             updated_at?: string | null;
             updated_by?: components["schemas"]["UserRef"] | null;
+        };
+        /** @description 0.15.106: the follow-up sections of the dashboard (owner approval 2026-11-26). */
+        DashboardOps: {
+            /** Format: date-time */
+            as_of: string;
+            /** @description The regions the figures cover (null = every region). */
+            scope_regions: components["schemas"]["RegionId"][] | null;
+            procurement: components["schemas"]["DashboardOpsProcurement"];
+        };
+        /** @description 0.15.106: procurement and materials (dashboard proposals item 1). */
+        DashboardOpsProcurement: {
+            /** @description False when the caller may not see the Procurement register; the order figures are then null. */
+            available: boolean;
+            /** @description Open orders (status not one of the closing statuses of the contractor rules). */
+            open_total: number | null;
+            pr_wait: components["schemas"]["DashboardOpsAging"];
+            po_wait: components["schemas"]["DashboardOpsAging"];
+            materials: components["schemas"]["DashboardOpsMaterials"];
+        };
+        DashboardOpsAging: {
+            /** @description Every bucket once, in order d0_7, d8_14, d15_30, over_30 (calendar days). */
+            buckets: {
+                /** @enum {string} */
+                key: "d0_7" | "d8_14" | "d15_30" | "over_30";
+                count: number;
+            }[];
+            total: number;
+            oldest_days: number | null;
+        };
+        DashboardOpsMaterials: {
+            /** @description False when the caller may not see the Warehouse; the other fields are then null. */
+            available: boolean;
+            /** @description Dispatched against required, capped at 100; null when nothing is required. */
+            receive_pct: number | null;
+            required_total: number | null;
+            dispatched_total: number | null;
+            /** @description Active, not cancelled sites with at least one shortage line. */
+            sites_short: number | null;
+            top_shortages: {
+                /** Format: uuid */
+                site_id: string;
+                site_code: string;
+                item_code: string;
+                item_name: string;
+                missing: number;
+                required: number;
+                dispatched: number;
+                /** @description The party of the site's newest open order; null when unattributed. */
+                contractor: string | null;
+            }[] | null;
+            /** @description The shortage per contractor, the biggest first. The row with party_id null gathers the unattributed lines. */
+            by_contractor: {
+                /** Format: uuid */
+                party_id: string | null;
+                name: string;
+                sites: number;
+                missing_lines: number;
+                missing_qty: number;
+            }[] | null;
         };
         DashboardTabLayout: {
             /** @description Card codes in display order. */
@@ -17344,7 +17852,7 @@ export interface components {
         SiteDraftWarning: {
             field: string;
             /** @enum {string} */
-            code: "cluster_will_be_created" | "outside_libya" | "list_other";
+            code: "cluster_will_be_created" | "outside_libya" | "list_other" | "similar_site_code" | "duplicate_name" | "close_coordinates";
             message: string;
         };
         SiteDraftDecision: {
@@ -17997,13 +18505,13 @@ export interface components {
             host?: string | null;
         };
         /** @enum {string} */
-        SecurityAlertRule: "failed_sign_ins" | "failed_sign_ins_ip" | "new_ip" | "large_export" | "admin_set_changed" | "retention_reduced" | "alert_settings_weakened" | "audit_integrity_failure" | "malware_upload" | "break_glass_used";
+        SecurityAlertRule: "failed_sign_ins" | "failed_sign_ins_ip" | "new_ip" | "large_export" | "admin_set_changed" | "retention_reduced" | "alert_settings_weakened" | "audit_integrity_failure" | "malware_upload" | "break_glass_used" | "backup_missing";
         /**
          * @description `info` (0.12.3): a new address inside a trusted network.
          * @enum {string}
          */
         AlertSeverity: "info" | "low" | "medium" | "high" | "critical";
-        /** @description Severity per configurable rule (0.12.3, Q168). Defaults: failed_sign_ins medium, failed_sign_ins_ip medium, new_ip low, large_export medium, admin_set_changed high, alert_settings_weakened high, malware_upload high, break_glass_used critical. */
+        /** @description Severity per configurable rule (0.12.3, Q168). Defaults: failed_sign_ins medium, failed_sign_ins_ip medium, new_ip low, large_export medium, admin_set_changed high, alert_settings_weakened high, malware_upload high, break_glass_used critical, backup_missing high (0.15.130). */
         AlertSeverityMap: {
             failed_sign_ins?: components["schemas"]["AlertSeverity"];
             failed_sign_ins_ip?: components["schemas"]["AlertSeverity"];
@@ -18013,6 +18521,7 @@ export interface components {
             alert_settings_weakened?: components["schemas"]["AlertSeverity"];
             malware_upload?: components["schemas"]["AlertSeverity"];
             break_glass_used?: components["schemas"]["AlertSeverity"];
+            backup_missing?: components["schemas"]["AlertSeverity"];
         };
         SecurityAlert: {
             /** Format: uuid */
@@ -28218,6 +28727,62 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
         };
     };
+    getUiFeaturesSetting: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Setting. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UiFeaturesSetting"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setUiFeaturesSetting: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"] & {
+                    sections: components["schemas"]["UiFeaturesPatch"];
+                };
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UiFeaturesSetting"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
     getIdleTaskAlertSetting: {
         parameters: {
             query?: never;
@@ -29998,6 +30563,94 @@ export interface operations {
             428: components["responses"]["PreconditionRequired"];
         };
     };
+    getPmSchedules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The schedules. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PmSchedules"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setPmSchedules: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"] & components["schemas"]["PmSchedulesInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PmSchedules"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    generatePmScheduleDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                schedule_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The draft was created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        record_id: string;
+                        register_key: string;
+                        /** Format: date */
+                        next_due: string | null;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
     getKanbanWip: {
         parameters: {
             query?: never;
@@ -30156,6 +30809,139 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UiIdentity"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getLoginPage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The login page settings. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoginPage"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setLoginPage: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginPageInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoginPage"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getLoginPagePublic: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The public sign-in page config. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoginPagePublic"];
+                };
+            };
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    getSecurityLocks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The lock keys. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SecurityLocks"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setSecurityLocks: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SecurityLocksInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SecurityLocks"];
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -30330,6 +31116,34 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HlcLegacyMigration"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listDismantleRnOptions: {
+        parameters: {
+            query: {
+                site_id: string;
+                record_type: "cw" | "te";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The RNs. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["DismantleRnOption"][];
+                    };
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -31226,6 +32040,109 @@ export interface operations {
             412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getRecycleBin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The bin. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecycleBin"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setRecycleBinRetention: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    retention_days: number;
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The new retention. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        retention_days: number;
+                        version: number;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    restoreRegisterRecord: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The restored record. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        register_key: string;
+                        /** @enum {string} */
+                        state: "entry";
+                        version: number;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     listRegisters: {
@@ -36814,6 +37731,33 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+        };
+    };
+    getDashboardOps: {
+        parameters: {
+            query?: {
+                /** @description 0.15.45: a `FilterTree` as one JSON string (at most 8000 characters), compiled against the screen `dashboard` of `GET /saved-views/filter-fields` (the `sites` fields) and evaluated on the sites the caller may see; it only narrows (the caller's `dashboard.view` regions and every other filter still apply). Needs `sites.view` (403 `module_forbidden`). 422 `validation_failed` with `unknown_field` (also for a field hidden from the caller), `invalid_operator`, `invalid_value`, `too_deep` or `too_many`. */
+                filter?: components["parameters"]["DashboardFilterTree"];
+                region_id?: components["schemas"]["RegionId"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The sections. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardOps"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     getMilestonePipeline: {
