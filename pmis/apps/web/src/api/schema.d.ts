@@ -4938,6 +4938,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/alert-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The alert rules and the closed catalogues of the form
+         * @description 0.15.242 (migration 0342): System Admin. `rules` are the saved rules (code, kind, params, audience, templates, enabled, version); `catalogue` lists the closed kinds with their params, the audiences, the active registers and the modules the form offers. The database owns the validation.
+         */
+        get: operations["getAlertRules"];
+        put?: never;
+        /**
+         * Create an alert rule
+         * @description 0.15.242 (migration 0342): System Admin, a reason. Closed body (`unknown_key`): `code` (lowercase letters, digits and dashes, fixed once the rule exists, unique), `kind` (closed), `params` (closed per kind, field errors at `/params/<key>`), `audience` (`{"type":"system_admin"}` or `{"type":"module","module":"<module key>"}`), `title_en`, `title_ar`, `body_en`, `body_ar`, optional `link`, `enabled` (default true). Audited (`alert_rule_create`). Notifications only: a rule never changes a record, a state or a holder.
+         */
+        post: operations["createAlertRule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/alert-rules/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Update an alert rule
+         * @description 0.15.242 (migration 0342): System Admin, a reason and If-Match (the rule's `version`). The whole rule is sent; the `code` does not change. Audited (`alert_rule_update`, before and after).
+         */
+        put: operations["updateAlertRule"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/ui-features": {
         parameters: {
             query?: never;
@@ -15742,6 +15786,74 @@ export interface components {
             updated_at?: string;
             updated_by?: components["schemas"]["UserRef"];
         };
+        AlertRule: {
+            /** Format: uuid */
+            id: string;
+            code: string;
+            /** @enum {string} */
+            kind: "weekly_status_missing" | "record_idle";
+            params: {
+                [key: string]: unknown;
+            };
+            /** @description {"type":"system_admin"} or {"type":"module","module":"<module key>"}. */
+            audience: {
+                [key: string]: unknown;
+            };
+            title_en: string;
+            title_ar: string;
+            body_en: string;
+            body_ar: string;
+            link: string | null;
+            enabled: boolean;
+            /** @description The If-Match of PUT /settings/alert-rules/{id}. */
+            version: number;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        AlertRuleInput: {
+            code: string;
+            /** @enum {string} */
+            kind: "weekly_status_missing" | "record_idle";
+            params: {
+                [key: string]: unknown;
+            };
+            audience: {
+                [key: string]: unknown;
+            };
+            title_en: string;
+            title_ar: string;
+            body_en: string;
+            body_ar: string;
+            link?: string | null;
+            enabled?: boolean;
+        };
+        AlertRuleSaved: {
+            /** Format: uuid */
+            id: string;
+            version: number;
+        };
+        AlertRulesResponse: {
+            rules: components["schemas"]["AlertRule"][];
+            catalogue: {
+                kinds: {
+                    kind: string;
+                    params: string[];
+                }[];
+                audiences: ("system_admin" | "module")[];
+                registers: {
+                    register_key: string;
+                    name_en: string;
+                    name_ar: string | null;
+                    module_key: string;
+                }[];
+                modules: {
+                    key: string;
+                    name_en: string;
+                }[];
+            };
+        };
         IdleTaskAlertSetting: {
             enabled: boolean;
             /** @description Default 2. */
@@ -17346,6 +17458,7 @@ export interface components {
             permits_hse: components["schemas"]["DashboardOpsPermitsHse"];
             gecol_hlc: components["schemas"]["DashboardOpsGecolHlc"];
             contractor_scorecard: components["schemas"]["DashboardOpsScorecard"];
+            quality: components["schemas"]["DashboardOpsQuality"];
         };
         /** @description 0.15.106: procurement and materials (dashboard proposals item 1). */
         DashboardOpsProcurement: {
@@ -17454,6 +17567,31 @@ export interface components {
             civil_ready_no_power: number | null;
             /** @description HLC only: installation_date set but not in service yet; null in the GECOL part. */
             installed_not_in_service: number | null;
+        };
+        /** @description 0.15.203 (item 6): the open snags and NCRs of the in-scope sites, the average closure age of each and the first-time acceptance rate. */
+        DashboardOpsQuality: {
+            /** @description False when the caller lacks the quality view; every figure is then null. */
+            available: boolean;
+            snags: {
+                /** @description Snags of the active, not cancelled sites whose status is open, fix_uploaded or in_review. */
+                open: number;
+                /** @description Snags of those sites whose status is closed. */
+                closed: number;
+                /** @description The mean days from raised_at to closed_at over the closed snags, one decimal; null when none closed. */
+                avg_close_days: number | null;
+                /** @description The open snags returned at least once (return_count over 0). */
+                returned_open: number;
+            } | null;
+            ncrs: {
+                /** @description Quality records of record type ncr with no closed_date. */
+                open: number;
+                /** @description Quality records of record type ncr with a closed_date. */
+                closed: number;
+                /** @description The mean days from raised_date to closed_date over the closed NCRs, one decimal; null when none closed. */
+                avg_close_days: number | null;
+            } | null;
+            /** @description The share of the decided inspections (result Pass or Fail) whose result is Pass, one decimal; null when no inspection is decided. The data keeps no re-inspection marker, so this is the acceptance rate of all decided inspections. */
+            first_pass_pct: number | null;
         };
         /** @description 0.15.202: the contractor and supplier scorecard (dashboard proposals item 5), the aggregate of the contractor performance report. No amounts. */
         DashboardOpsScorecard: {
@@ -19421,7 +19559,7 @@ export interface components {
             revoked_count: number;
         };
         /** @enum {string} */
-        NotificationKind: "task_assigned" | "task_returned" | "task_approved" | "approval_due" | "reassigned" | "absence_alert" | "idle_task_alert" | "no_holder" | "holiday_tentative" | "delegation" | "mfa_exemption" | "template_updated" | "import_batch" | "system" | "mention" | "followed_change" | "task_rejected" | "no_eligible_holder" | "register_assigned" | "register_rejected" | "gate_closed_again" | "sla_negative_duration" | "email_change_requested" | "email_change_decided" | "security_alert" | "snag_raised" | "snag_review" | "snag_rejected" | "snag_closed" | "levels_converted" | "permit_transferred" | "phone_change_requested" | "phone_change_decided" | "security_notice" | "site_region_moved" | "assignment_request" | "data_reset_request";
+        NotificationKind: "task_assigned" | "task_returned" | "task_approved" | "approval_due" | "reassigned" | "absence_alert" | "idle_task_alert" | "no_holder" | "holiday_tentative" | "delegation" | "mfa_exemption" | "template_updated" | "import_batch" | "system" | "mention" | "followed_change" | "task_rejected" | "no_eligible_holder" | "register_assigned" | "register_rejected" | "gate_closed_again" | "sla_negative_duration" | "email_change_requested" | "email_change_decided" | "security_alert" | "snag_raised" | "snag_review" | "snag_rejected" | "snag_closed" | "levels_converted" | "permit_transferred" | "phone_change_requested" | "phone_change_decided" | "security_notice" | "site_region_moved" | "assignment_request" | "data_reset_request" | "alert_rule";
         Notification: {
             /** Format: uuid */
             id: string;
@@ -29699,6 +29837,90 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["Unprocessable"];
+        };
+    };
+    getAlertRules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The rules and the catalogue. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertRulesResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    createAlertRule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AlertRuleInput"] & components["schemas"]["WithReason"];
+            };
+        };
+        responses: {
+            /** @description Created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertRuleSaved"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    updateAlertRule: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AlertRuleInput"] & components["schemas"]["WithReason"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertRuleSaved"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
         };
     };
     getUiFeaturesSetting: {
