@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { ApiError } from '@/api/client';
 import { EMPTY_FILTER, useAuditLog } from '@/api/logs';
+import { StandardTable, type StdCol } from '@/components/StandardTable';
 import { EmptyState, ErrorState, LoadingSkeleton, NoPermission } from '@/components/States';
 
 /**
@@ -14,19 +15,17 @@ export function SiteActivity({ siteId, siteCode }: { siteId: string; siteCode: s
   if (q.error instanceof ApiError && q.error.status === 403) return <NoPermission testid="site-activity-forbidden" />;
   if (q.isError) return <ErrorState onRetry={() => void q.refetch()} testid="site-activity-error" />;
   if (!q.items.length) return <EmptyState testid="site-activity-empty" title={t('siteActivity.empty')} />;
+  type Row = (typeof q.items)[number];
+  const cols: StdCol<Row>[] = [
+    { id: 'at', label: t('siteActivity.c_at'), w: 190, pinned: true, text: (r) => new Date(r.at).toLocaleString(), cell: (r) => <span className="tnum" dir="ltr">{new Date(r.at).toLocaleString()}</span> },
+    { id: 'actor', label: t('siteActivity.c_actor'), w: 200, text: (r) => r.actor?.display_name ?? t('siteActivity.system'), cell: (r) => <b>{r.actor?.display_name ?? t('siteActivity.system')}</b> },
+    { id: 'action', label: t('siteActivity.c_action'), w: 240, text: (r) => r.action, cell: (r) => <span className="chip border border-line">{r.action}</span> },
+    { id: 'entity', label: t('siteActivity.c_entity'), w: 180, text: (r) => r.entity_type, cell: (r) => <span className="text-mute">{r.entity_type}</span> },
+  ];
   return (
     <section data-testid="site-activity">
-      <ul className="card divide-y divide-line text-sm">
-        {q.items.map((r) => (
-          <li key={r.id} className="flex flex-wrap items-center gap-2 p-2" data-testid="site-activity-item">
-            <span className="tnum text-mute" dir="ltr">{new Date(r.at).toLocaleString()}</span>
-            <b>{r.actor?.display_name ?? t('siteActivity.system')}</b>
-            <span className="chip border border-line">{r.action}</span>
-            <span className="text-mute">{r.entity_type}</span>
-          </li>
-        ))}
-      </ul>
-      {q.hasNextPage && <button className="btn mt-2" data-testid="site-activity-more" disabled={q.isFetchingNextPage} onClick={() => void q.fetchNextPage()}>{t('siteActivity.more')}</button>}
+      <StandardTable screen="site-activity" testid="site-activity-table" cols={cols} rows={q.items} rowId={(r) => String(r.id)} rowTestId={() => 'site-activity-item'} exportName="site-activity"
+        hasMore={q.hasNextPage} onMore={() => void q.fetchNextPage()} loadingMore={q.isFetchingNextPage} noun="items" />
     </section>
   );
 }

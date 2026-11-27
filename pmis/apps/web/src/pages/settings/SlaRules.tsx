@@ -26,6 +26,7 @@ import { tripoliToday } from "@/lib/today";
 import { FieldErr } from "./Calendar";
 import { SlaBulkAdmin } from "./SlaRuleAdmin";
 import { QueryFallback } from "@/components/States";
+import { DateInput } from '@/components/DateInput';
 
 const SCENARIOS: DeliveryScenario[] = [
   "new_build",
@@ -68,8 +69,7 @@ function PreviewDialog({ id, onClose }: { id: string; onClose: () => void }) {
     >
       <label className="block text-sm font-semibold">
         {t("slaSet.effective_date")}
-        <input
-          type="date"
+        <DateInput
           min={tripoliToday()}
           className="input mt-1 font-normal"
           data-testid="sla-preview-date"
@@ -166,8 +166,7 @@ function PublishDialog({
     >
       <label className="block text-sm font-semibold">
         {t("slaSet.effective_date")}
-        <input
-          type="date"
+        <DateInput
           min={tripoliToday()}
           className="input mt-1 font-normal"
           data-testid="sla-publish-date"
