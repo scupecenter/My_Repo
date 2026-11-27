@@ -98,6 +98,7 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/matrix'],
   ['patch', '/matrix'],
   ['get', '/matrix/coverage'],
+  ['get', '/matrix/simulate'],
   // Contract 0.4.5: the register framework and its first four registers (apps/api: registers; migration 0019), every action the API implements.
   ['get', '/recycle-bin'],
   ['put', '/recycle-bin/retention'],

@@ -177,6 +177,24 @@ export const dashboardHandlers = [
           ],
         },
       },
+      permits_hse: {
+        available: true, total: 26,
+        by_status: [
+          { status: 'Approved', count: 15 },
+          { status: 'Applied', count: 7 },
+          { status: 'Rejected', count: 3 },
+          { status: 'N/A', count: 1 },
+        ],
+        waiting: 7, sites_without_permit: 5, expiring_14: 4, expired: 2, stop_work_active: 1,
+        ptw: {
+          open: 9, with_gaps: 4,
+          gaps: [
+            { key: 'loto', count: 3 },
+            { key: 'rescue_plan', count: 2 },
+            { key: 'toolbox_talk', count: 1 },
+          ],
+        },
+      },
     });
   }),
   http.get(`${B}/dashboard/site-map`, () => {
