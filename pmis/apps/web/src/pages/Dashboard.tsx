@@ -41,6 +41,7 @@ import {
   signed,
 } from "./dashboardBits";
 import { OpsProcurementCard } from "./dashboardOps";
+import { PinnedViewsCard } from "./dashboardPins";
 import { OpsScurveCard } from "./dashboardScurve";
 import { OpsPermitsCard } from "./dashboardPermits";
 import { OpsReadinessCard } from "./dashboardReadiness";
@@ -1456,6 +1457,12 @@ export function Dashboard() {
                 </>
               ),
 
+              pinned_views: (
+                <>
+                  {/* 0.15.245 (owner request 2026-11-27, research item 16): the caller's pinned views with counters */}
+                  <PinnedViewsCard />
+                </>
+              ),
               ops_scurve: (
                 <>
                   {/* owner approval 2026-11-26, item 2: planned vs actual of the saved weekly snapshots, weekly velocity and the 100% forecast */}
