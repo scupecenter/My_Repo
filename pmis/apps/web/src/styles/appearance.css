@@ -1,4 +1,4 @@
-/* Appearance profiles (owner approval 2026-11-27, the PM-platforms proposal items 1-3; migration 0196, contract 0.15.105).
+/* Appearance profiles (owner approval 2026-11-27, the improvement proposal items 1-3; migration 0196, contract 0.15.105).
    The data-ui-* attributes on <html> come from lib/appearance.ts (server set via GET /me user.appearance, cached for boot).
    A dimension at its standard carries no attribute, so without a choice everything renders exactly as before.
    These blocks change spacing, type size, corners, motion, icon weight, the menu and the accent only - never the status colours. */

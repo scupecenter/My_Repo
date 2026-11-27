@@ -604,7 +604,11 @@
     "override_revert": "Override reverted",
     "reopen": "Reopened",
     "migrate": "Migrated",
-    "transfer": "Transferred"
+    "transfer": "Transferred",
+    "triage_accept": "Accepted at intake",
+    "triage_reject": "Rejected at intake",
+    "triage_merge": "Merged as a duplicate",
+    "triage_defer": "Deferred at intake"
   },
   "level": {
     "entry": "Entry",
@@ -1936,6 +1940,13 @@
     "approved": "Approved",
     "voided": "Voided"
   },
+  "triageState": {
+    "pending": "Waiting for intake review",
+    "accepted": "Accepted at intake",
+    "deferred": "Deferred at intake",
+    "rejected": "Rejected at intake",
+    "merged": "Merged as a duplicate"
+  },
   "regSections": {
     "site": "Site",
     "site_scope": "Site and scope",
@@ -2079,6 +2090,23 @@
     "transfer": "Transfer the draft",
     "transferred": "The draft was moved to a qualified holder.",
     "transfer_note": "The person holding this draft no longer holds Data Entry (L1) of the permit's stream. Transfer it so a qualified holder can finish it; nothing in it is lost.",
+    "triage_title": "Intake review",
+    "triage_hint": "New records and new versions wait here for one decision of the reviewer (L2) before they move on.",
+    "triage_accept": "Accept",
+    "triage_defer": "Defer",
+    "triage_reject": "Reject",
+    "triage_merge": "Merge as duplicate",
+    "triage_done": "Intake decision recorded",
+    "triage_defer_title": "Defer the record",
+    "triage_reject_title": "Reject the record at intake",
+    "triage_merge_title": "Merge the record as a duplicate",
+    "triage_merge_pick": "The surviving record",
+    "triage_note_optional": "Note (optional)",
+    "triage_decision_line": "{{action}} · {{name}} · {{date}}",
+    "triage_duplicate_of": "The record this one was merged into",
+    "triage_filter": "Intake state",
+    "triage_all": "Every intake state",
+    "triage_send": "Decide",
     "inline_saved": "Saved. You can undo for 8 seconds.",
     "inline_undone": "Change undone.",
     "contractor": "Contractor",
@@ -4796,6 +4824,7 @@
       "site_region_moved": "A site moved to your region",
       "sla_negative_duration": "SLA data alert (negative duration)",
       "snag_closed": "A snag was closed",
+      "triage_decision": "An intake decision on a record you created",
       "snag_raised": "A snag was raised",
       "team_safety_cert": "A team safety certificate expires",
       "mfa_exemption": "Your MFA exemption was granted or revoked (always mailed)",
