@@ -39,6 +39,7 @@ info:
     - 0.15.310 (2026-11-27): every register is downloadable (owner decision D48, 2026-11-27; no migration; CHANGELOG ExportAllRegisters). Additive. `GET /exports/parts` now also offers `car_dispatcher`, `financial_advances`, `incidents`, `lessons_learned` and `invoices`, and `POST /exports/master` accepts them in `parts` and as `view.source`; the 422 `not_in_master` of 0.15.34 is gone. Each writes its own sheet (Car Dispatcher, Financial Advances, Incidents, Lessons Learned, Invoices) with the register's template columns, header in row 1, no Master column. The rules are the other registers' rules: the export grant of the register's own module (no grant is seeded, so only a System Admin holds them until the owner grants them; Financial Advances and Invoices stay behind the finance grant), the export regions of that grant, voided rows left out of a full export, the field-level `in_export` switch and the personal-column rule. Settings and configuration are never exported. No schema change: `ExportPartKey` already listed the five keys.
     - 0.15.243 (2026-11-27): field quick capture for QC snags (owner request 2026-11-27; migration 0343; CHANGELOG FieldQuickCapture). Additive. The snag type photo rules `formats` list also accepts WEBM, MP4 and MOV, so a System Admin (or a Document Library configuration delegate) can let a snag type take a short field video through the existing `POST /snags/{snag_id}/photos` path; nothing is allowed by default (every type still lists only its own formats). A video has no EXIF date and is accepted with `unknown_capture_date`, like any photo without EXIF. No permission, visibility or authentication change; the photo rules, the format check and the upload limits are unchanged.
     - 0.15.248 (2026-11-27): high-contrast mode as an appearance dimension (item 19 of the 2026-11-27 batch, owner approval 2026-11-27 relayed by Main; migration 0347, mirror `db/sql/346_user_contrast.sql`; CHANGELOG HighContrast). Additive. `UiPrefs` gains `contrast` (`standard` = today's look, `high`): a personal choice (`MyProfilePatch.ui_prefs`), an organization default (`UiIdentityInput.defaults`, Settings > Identity), locked like every dimension while `identity.allow_user_choice` is false (403 `field_read_only`, `errors[0]` `{path: /ui_prefs, code: appearance_choice_locked}`), audited per dimension in `profile_updated`, resolved by `ui_effective_prefs`. The web paints `data-ui-contrast="high"`: stronger ink and line tokens only, the status colours and the designs are unchanged; `prefers-contrast: more` applies the high tokens while no choice is saved. No new column, grant, role or default changes.
+    - 0.15.321 (2026-11-27): the sequence lock mode of a workflow version (owner decision D49, 2026-11-27; migration 0491, mirror `db/sql/490_workflow_lock_mode.sql`). Additive. (1) `PUT /workflow/versions/{version}/lock-mode` (workflow_versions.administer, step-up, If-Match, draft only, audited). (2) `WorkflowVersionSummary` gains `lock_mode` (`strict` default for every version). No site is changed by it; the per-site switch stays the override.
     - 0.15.246 (2026-11-27): a soft "… is editing this record" notice (owner request 2026-11-27, item 17 of the 2026-11-27 batch; migration 0345; CHANGELOG RecordEditPresence). Additive and advisory only: nothing is locked. `POST /presence/editing` (`{kind, entity_id}`) is the editor's heartbeat (30 s; a row is stale after 2 minutes), `POST /presence/editing/stop` removes it at once, and `GET /presence/editing` (`kind`, `entity_id`) lists the other current editors of the entity (id, display name, since). Covers register records (kind `record`) and workflow tasks (kind `task`). No grant, role, permission, visibility or audit change.
 
     - 0.15.240 (2026-11-27): intake triage for the Issue Log and the Change Control Log (owner request 2026-11-27; migration 0340, mirror `db/sql/339_register_triage.sql`; CHANGELOG RegisterTriage). Additive. (1) `RegisterDefinition.triage_enabled` (true for `issues` and `change_control`): a record of such a register enters an intake queue (`RegisterRecord.triage.state` `pending`) on every insert, a new version included (the old decision is cleared). (2) New `POST /registers/{register_key}/records/{record_id}/triage` (`triageRegisterRecord`): one decision of the register's Matrix L2 holders of the record's region (a System Admin only when the row has no holder, exactly like an approval): `accept` (the record proceeds to its normal flow), `defer` (stays in the queue, with a note), `reject` (note and step-up required; the record is `voided`) and `merge` (`duplicate_of`, note and step-up; the record is `voided`, links the surviving record `triage.duplicate_of`, and the decision is noted on the surviving record's comment thread). `If-Match` is the record's version; `allowed_actions` gains `triage` while a record is pending or deferred and the caller may decide. `GET /registers/{register_key}/records` takes `triage` (one of `TriageState`). (3) Audited as `register_record_triage` with before and after; `RegisterRecordStep.action` gains `triage_accept`, `triage_reject`, `triage_merge`, `triage_defer`; the creator is notified (`NotificationKind` gains `triage_decision`). No grant, role or default changes.
@@ -5749,6 +5750,36 @@ paths:
                 reason: { type: string, minLength: 3 }
       responses:
         '200': { description: 'The version and the weight totals' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /workflow/versions/{version}/lock-mode:
+    put:
+      operationId: putWorkflowLockMode
+      tags: [workflow]
+      summary: The sequence lock mode of a draft version (strict or open)
+      description: "Migration 0491 (admin_wf_lock_mode). Needs workflow_versions.administer (the publish right), a step-up and If-Match. A draft only (a published version answers 409 `invalid_transition`; so does setting the value it already has). It changes no site: the per-site switch (`POST /sites/workflow-locks`) stays the override and the only way to open or lock a site."
+      x-db-path: admin_wf_lock_mode (app_actor_is_admin('workflow_versions', 'administer'))
+      parameters:
+        - { name: version, in: path, required: true, schema: { type: integer, minimum: 1 } }
+        - { name: If-Match, in: header, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [lock_mode, reason]
+              properties:
+                lock_mode: { type: string, enum: [strict, open] }
+                reason: { type: string, minLength: 3 }
+      responses:
+        '200': { description: 'The version' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
@@ -20693,6 +20724,7 @@ components:
         reason: { type: [string, 'null'] }
         published_by: { $ref: '#/components/schemas/UserRef' }
         published_at: { type: [string, 'null'], format: date-time }
+        lock_mode: { type: string, enum: [strict, open], description: '0.15.321 (migration 0491). The default of the sequence locks for new sites of this version; the per-site switch overrides it. Strict (default) is the behaviour before this field existed.' }
     WorkflowMilestone:
       type: object
       required: [code, seq, name_en, formula_kind, counts_in_project_status]
