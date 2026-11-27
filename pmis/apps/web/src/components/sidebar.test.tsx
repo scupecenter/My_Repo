@@ -214,7 +214,7 @@ describe('Sidebar tree (N1-N12)', () => {
     app();
     await screen.findByTestId('nav-sites');
     expect(screen.getByTestId('nav-group-toggle-registers')).toHaveTextContent('Registers & Logs');
-    expect(screen.getByTestId('nav-sites')).toHaveTextContent('Site Master');
+    expect(screen.getByTestId('nav-sites')).toHaveTextContent('Site 360°');
     expect(screen.getByTestId('nav-group-work')).not.toContainElement(screen.getByTestId('nav-sites'));
     const sub = screen.getByTestId('nav-site-master-menus');
     expect([...sub.querySelectorAll('a')].map((a) => a.getAttribute('data-testid'))).toEqual(SUBMENU_TESTIDS);
@@ -227,10 +227,12 @@ describe('Sidebar tree (N1-N12)', () => {
   it('shows one "Site Master" entry with exactly the 6 sub-menus (no Dismantle), and no older stream or view links', async () => {
     app();
     const entry = await screen.findByTestId('nav-sites');
-    expect(entry).toHaveTextContent(/^Site Master$/);
-    // the group heading is not drawn a second time: the entry is the only row with this name
-    expect(screen.queryByTestId('nav-group-toggle-site_register')).not.toBeInTheDocument();
-    expect(screen.getAllByText('Site Master')).toHaveLength(1);
+    expect(entry).toHaveTextContent(/^Site 360°$/);
+    // Site Master is a top-level group with no page of its own (no link to /menu/site_register); its first child is Site 360°, then the six sub-menus
+    expect(screen.getByTestId('nav-group-name-site_register')).toHaveTextContent('Site Master');
+    expect(screen.queryByTestId('nav-group-open-site_register')).not.toBeInTheDocument();
+    expect(screen.getByTestId('nav-group-site_register')).toContainElement(entry);
+    expect(screen.getByTestId('nav-group-toggle-site_register')).toHaveAttribute('aria-expanded', 'true'); // expanded by default
     expect(screen.queryByTestId('nav-site-master-master')).not.toBeInTheDocument();
     const menus = screen.getByTestId('nav-site-master-menus');
     expect([...menus.querySelectorAll('a')].map((a) => a.getAttribute('data-testid'))).toEqual(SUBMENU_TESTIDS);
@@ -361,7 +363,7 @@ describe('Sidebar tree (N1-N12)', () => {
     expect(screen.getByTestId('nav-rf_design')).toHaveTextContent('الترددات والتصميم');
     expect(screen.getByTestId('nav-site-master-om')).toHaveTextContent('التشغيل والصيانة');
     expect(screen.getByTestId('nav-dismantle')).toHaveTextContent('الفك');
-    expect(screen.getByTestId('nav-sites')).toHaveTextContent('ماستر المواقع');
+    expect(screen.getByTestId('nav-sites')).toHaveTextContent('الموقع 360°');
     expect(screen.getByTestId('nav-group-toggle-registers')).toHaveTextContent('السجلات والقيود');
     expect(screen.getByTestId('nav-change_control')).toHaveTextContent('سجل التغييرات');
     expect(screen.getByTestId('nav-sites-toggle')).toHaveAttribute('aria-expanded', 'true');

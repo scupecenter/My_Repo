@@ -21,7 +21,7 @@ for (const c of CASES) {
     await expect(page.getByTestId('page-sites')).toBeVisible();
     await expect(page.locator('html')).toHaveAttribute('dir', c.locale === 'ar' ? 'rtl' : 'ltr');
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(c.title);
-    await expect(page.getByTestId('nav-group-toggle-site_register')).toHaveCount(0); // the one Site Master row is the entry itself
+    await expect(page.getByTestId('nav-group-toggle-site_register')).toHaveCount(1); // Site Master is a group (Site 360 then the six sub-menus), expanded by default
     await expect(page.getByTestId('nav-sites')).toHaveText(c.title);
 
     // the page has no tab bars; the sidebar shows the six Site Master sub-menus and no stream links
