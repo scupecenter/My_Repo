@@ -6,6 +6,8 @@ import { parseContextKey } from '../db/session-context';
 const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('production'),
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
+  // Database connections the API opens (Prisma connection_limit). Used only when DATABASE_URL has no connection_limit of its own. Keep it well under PostgreSQL max_connections.
+  DB_POOL_SIZE: z.coerce.number().int().min(2).max(100).default(10),
   PORT: z.coerce.number().int().min(1).max(65535).default(3000),
   HOST: z.string().min(1).default('127.0.0.1'),
   COOKIE_SECURE: z.enum(['true', 'false']).default('true').transform((v) => v === 'true'),
@@ -92,6 +94,8 @@ export interface MailConfig {
 export interface AppConfig {
   nodeEnv: 'development' | 'test' | 'production';
   databaseUrl: string;
+  /** Database connections the API opens when the URL names none (DB_POOL_SIZE, default 10). Unset in tests: Prisma's own default applies. */
+  dbPoolSize?: number;
   port: number;
   host: string;
   cookieSecure: boolean;
@@ -197,6 +201,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   return {
     nodeEnv: v.NODE_ENV,
     databaseUrl: v.DATABASE_URL,
+    dbPoolSize: v.DB_POOL_SIZE,
     port: v.PORT,
     host: v.HOST,
     cookieSecure: v.COOKIE_SECURE,

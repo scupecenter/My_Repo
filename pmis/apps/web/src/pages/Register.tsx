@@ -1,5 +1,6 @@
 import {
   ArrowRightLeft,
+  CalendarDays,
   Columns3,
   Download,
   Grid3x3,
@@ -60,8 +61,10 @@ import {
   ALL_CAP,
   BY_STATE,
   defaultBoardBy,
+  dateFields,
   layoutsOf,
   RegisterBoard,
+  RegisterCalendar,
   RegisterMap,
   RegisterWide,
   statusFields,
@@ -103,12 +106,13 @@ import { isLive, OWNER_NOTE } from "@/lib/registerForms";
 
 const RF_KEYS = ["q", "region_id", "state", "record_type", "triage"] as const;
 // W2: a saved view also keeps the layout (list, wide, board, map) and the board's grouping and swimlane, as #185 does for Site Master
-const LAYOUT_KEYS = ["layout", "board_by", "lane"] as const;
+const LAYOUT_KEYS = ["layout", "board_by", "lane", "calf"] as const;
 type RegisterView = RecordFilters & {
   advanced?: FilterTree;
   layout?: string;
   board_by?: string;
   lane?: string;
+  calf?: string;
 };
 const VIEW_EMPTY: RegisterView = {
   q: "",
@@ -118,6 +122,7 @@ const VIEW_EMPTY: RegisterView = {
   layout: "",
   board_by: "",
   lane: "",
+  calf: "",
 };
 // P10: the saved-views control (and its share dialog, people picker and role/group queries) loads on its own, after the records, so it never
 // delays the first paint of the list.
@@ -192,6 +197,10 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
     (sp.get("lane") === "type" && !!def.record_types?.length)
       ? (sp.get("lane") as RegisterLane)
       : "none";
+  // V2: the calendar's date field (`calf` in the URL and the saved views); the register's first date field is the default
+  const calDates = dateFields(def);
+  const calParam = sp.get("calf") ?? "";
+  const calField = calDates.find((x) => x.code === calParam) ?? calDates[0];
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const regions = useRegions();
   // F16: As-Built splits CW BOQ / TE BOQ and Dismantle splits CW / TE by record_type (the server filter); the first tab is the default.
@@ -299,6 +308,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
     { id: "grid", label: t("view.grid"), hint: t("view.grid_hint"), icon: <Grid3x3 size={14} />, testid: "register-layout-grid" },
     { id: "board", label: t("board.board"), hint: t("view.board_hint"), icon: <Columns3 size={14} />, testid: "register-layout-board" },
     ...(layouts.includes("map") ? [{ id: "map", label: t("sites.map"), hint: t("view.map_hint"), icon: <MapIcon size={14} />, testid: "register-layout-map" }] : []),
+    ...(layouts.includes("calendar") ? [{ id: "calendar", label: t("calview.title"), hint: t("view.calendar_hint"), icon: <CalendarDays size={14} />, testid: "register-layout-calendar" }] : []),
   ];
   const applyView = (id: string) => setParams({ view: id === "grid" ? "grid" : "", layout: id === "grid" || id === "list" ? "" : id });
   const remember = useRememberedView(
@@ -652,6 +662,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
                 layout: layout === "list" ? "" : layout,
                 board_by: layout === "board" ? (sp.get("board_by") ?? "") : "",
                 lane: layout === "board" ? (sp.get("lane") ?? "") : "",
+                calf: layout === "calendar" ? (sp.get("calf") ?? "") : "",
                 ...(advTree ? { advanced: advTree } : {}),
               }}
               empty={VIEW_EMPTY}
@@ -696,7 +707,13 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
           <LayoutPanel
             testid="register-view"
             views={{ value: view === "grid" ? "grid" : layout, options: viewOptions, onChange: pickView }}
-            options={view === "vertical" && layout === "board" ? (
+            options={view === "vertical" && layout === "calendar" ? (
+              <label className="flex items-center gap-2 text-sm"><span className="text-mute">{t("calview.field")}</span>
+                <select className="input w-auto py-1" data-testid="register-calendar-field" value={calField?.code ?? ""} onChange={(e) => setParams({ calf: e.target.value === calDates[0]?.code ? "" : e.target.value })}>
+                  {calDates.map((x) => <option key={x.code} value={x.code}>{fieldLabel(x, i18n.language)}</option>)}
+                </select>
+              </label>
+            ) : view === "vertical" && layout === "board" ? (
               <>
                 <label className="flex items-center gap-2 text-sm"><span className="text-mute">{t("regviews.board_by")}</span>
                   <select className="input w-auto py-1" data-testid="register-board-by" value={boardBy} onChange={(e) => setParams({ board_by: e.target.value === defaultBoardBy(def) ? "" : e.target.value })}>
@@ -987,6 +1004,9 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
           )}
           {layout === "map" && (
             <RegisterMap records={real} regionId={f.region_id} partial={partial} />
+          )}
+          {layout === "calendar" && (
+            <RegisterCalendar def={def} records={real} field={calField} onOpen={setRecord} partial={partial} />
           )}
           {layout === "list" && (
           <div className="card gx overflow-hidden" {...displayAttrs(tbl.display)} data-testid="register-list-card">
