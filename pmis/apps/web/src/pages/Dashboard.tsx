@@ -1,7 +1,7 @@
 import { Check, ChevronDown, Download, Link2, MonitorPlay, PencilLine, Printer, RotateCcw, Share2 } from "lucide-react";
 import { loadPref, savePref } from "@/lib/localPref";
 import { useDownloadGate } from '@/lib/downloadGate';
-import { useEffect, useMemo, useRef, useState, type ReactNode, Fragment } from "react";
+import { useEffect, useMemo, useState, type ReactNode, Fragment } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -582,10 +582,16 @@ export function Dashboard() {
   const [linkCopied, setLinkCopied] = useState(false);
   const [format, setFormat] = useState<ExportFormat>(() => (loadPref<string>("dash.exportFormat", "xlsx") === "csv" ? "csv" : "xlsx"));
   const [shareOpen, setShareOpen] = useState(false);
-  const shownBlocks = useRef<string[]>([]);
-  const [collapsed, setCollapsed] = useState<string[]>(() => loadPref<string[]>(collapsedKey(userId), []));
-  useEffect(() => { setCollapsed(loadPref<string[]>(collapsedKey(userId), [])); }, [userId]);
-  const setCollapsedSaved = (next: string[]) => { setCollapsed(next); savePref(collapsedKey(userId), next); };
+  // the collapsed blocks of this user ("*" = all blocks, "!code" = one block opened again after "collapse all")
+  const ckey = collapsedKey(userId);
+  const [ownCollapsed, setOwnCollapsed] = useState<{ key: string; list: string[] } | null>(null);
+  const collapsed: string[] = ownCollapsed && ownCollapsed.key === ckey ? ownCollapsed.list : loadPref<string[]>(ckey, []);
+  const setCollapsedSaved = (next: string[]) => { setOwnCollapsed({ key: ckey, list: next }); savePref(ckey, next); };
+  const isCollapsed = (code: string) => collapsed.includes(code) || (collapsed.includes("*") && !collapsed.includes(`!${code}`));
+  const toggleBlock = (code: string) => {
+    if (collapsed.includes("*")) setCollapsedSaved(collapsed.includes(`!${code}`) ? collapsed.filter((c) => c !== `!${code}`) : [...collapsed, `!${code}`]);
+    else setCollapsedSaved(collapsed.includes(code) ? collapsed.filter((c) => c !== code) : [...collapsed, code]);
+  };
   const blockLabel = (code: string) => {
     const c = dashSettings.data?.catalogue.cards.find((x) => x.code === code);
     return c ? (ar && c.label_ar) || c.label_en : code;
@@ -1433,7 +1439,7 @@ export function Dashboard() {
               type="button"
               className="btn px-2 py-1 text-xs"
               data-testid="dash-collapse-all"
-              onClick={() => setCollapsedSaved([...shownBlocks.current])}
+              onClick={() => setCollapsedSaved(["*"])}
             >
               {t("dash.collapse_all")}
             </button>
@@ -2681,8 +2687,7 @@ export function Dashboard() {
               region_health: <RegionHealthCard />,
             },
             (code, node) => {
-              const closed = collapsed.includes(code);
-              if (!shownBlocks.current.includes(code)) shownBlocks.current.push(code);
+              const closed = isCollapsed(code);
               return (
                 <section
                   data-testid={`dash-block-${code}`}
@@ -2694,7 +2699,7 @@ export function Dashboard() {
                       className="flex w-full items-center gap-2 rounded-lg border border-line bg-surface px-3 py-1.5 text-start text-sm font-semibold"
                       data-testid={`dash-block-toggle-${code}`}
                       aria-expanded={!closed}
-                      onClick={() => setCollapsedSaved(closed ? collapsed.filter((c) => c !== code) : [...collapsed, code])}
+                      onClick={() => toggleBlock(code)}
                     >
                       <ChevronDown size={16} aria-hidden className={closed ? "-rotate-90 rtl:rotate-90" : ""} />
                       {blockLabel(code)}
