@@ -1214,6 +1214,7 @@
   },
   "export": {
     "open": "Export",
+    "centre": "Exports centre",
     "title": "Export",
     "body": "Excel file in the Site Master layout, limited to your regions and modules.",
     "whole": "Whole project (full Master)",
