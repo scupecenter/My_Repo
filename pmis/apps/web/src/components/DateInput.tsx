@@ -7,7 +7,8 @@ import { useTranslation } from 'react-i18next';
  * English browser, even in the Arabic UI) while every date the system shows is ISO. This field is typed and shown as YYYY-MM-DD in both languages,
  * accepts Arabic-Indic digits and "/" or "." as separators, and has a calendar button (hover hint and accessible label) that opens the native
  * picker. It is a drop-in for `<input type="date">`: the value is always an ISO date or empty, and `onChange` fires only with a complete valid date or
- * an empty value, so a half-typed date never reaches a form.
+ * an empty value, so a half-typed date never reaches a form. The whole control stays LTR in the Arabic UI too (the text always is), so the calendar
+ * button keeps its place at the right of the field instead of landing on the text.
  */
 const ISO = /^(\d{4})-(\d{2})-(\d{2})$/;
 const AR_DIGITS = '٠١٢٣٤٥٦٧٨٩';
@@ -54,7 +55,7 @@ export function DateInput({ value, onChange, className = '', min, max, disabled,
     try { p.showPicker(); } catch { p.focus(); p.click(); }
   };
   return (
-    <span className={wrap}>
+    <span className={wrap} dir="ltr">
       <input
         {...rest}
         data-testid={testid}
