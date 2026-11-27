@@ -196,7 +196,7 @@ function RegisterColumnsOf() {
           <table className="w-full text-sm" data-testid="regcols-table">
             <thead className="text-mute"><tr>
               <th className="p-2 text-start">{t('regcols.code')}</th><th className="p-2 text-start">{t('regcols.label_en')}</th><th className="p-2 text-start">{t('regcols.type')}</th>
-              <th className="p-2 text-start">{t('regcols.section')}</th><th className="p-2 text-start">{t('regcols.default_value')}</th><th className="p-2 text-start">{t('regcols.usage')}</th><th className="p-2 text-start">{t('lists.status')}</th><th className="p-2" />
+              <th className="p-2 text-start">{t('regcols.section')}</th><th className="p-2 text-start">{t('regcols.import_aliases')}</th><th className="p-2 text-start">{t('regcols.default_value')}</th><th className="p-2 text-start">{t('regcols.usage')}</th><th className="p-2 text-start">{t('lists.status')}</th><th className="p-2" />
             </tr></thead>
             <tbody>
               {fields.map((c, i) => (
@@ -210,6 +210,10 @@ function RegisterColumnsOf() {
                     ? <InlineCell kind="select" value={c.type} display={t(`regcols.type_${c.type}`)} options={SIMPLE.map((x) => ({ value: x, label: t(`regcols.type_${x}`) }))} label={t('regcols.type')} testid={`regcols-cell-type-${c.code}`} onCommit={(v) => saveCol(c, { field_type: v as RegisterColumnType })} />
                     : t(`regcols.type_${c.type}`)}</td>
                   <td className="p-2"><InlineCell kind="select" value={c.section ?? ''} display={secName(c.section)} options={[{ value: '', label: '—' }, ...sections.map((x) => ({ value: x.name_en, label: (lang === 'ar' && x.name_ar) || x.name_en }))]} label={t('regcols.section')} testid={`regcols-cell-section-${c.code}`} onCommit={(v) => saveCol(c, { section: v || null })} /></td>
+                  <td className="p-2" data-testid={`regcols-aliases-${c.code}`}>
+                    <InlineCell value={((c as { import_aliases?: string[] }).import_aliases ?? []).join('; ')} display={((c as { import_aliases?: string[] }).import_aliases ?? []).join('; ') || '—'} label={t('regcols.import_aliases')} testid={`regcols-cell-aliases-${c.code}`}
+                      onCommit={(v) => saveCol(c, { import_aliases: v.split(/[;\u061B|]/).map((x) => x.trim()).filter((x) => x !== '') })} />
+                  </td>
                   <td className="p-2" data-testid={`regcols-default-${c.code}`}>
                     {(() => { const rf = regDefs.data?.find((d) => d.register_key === key)?.fields.find((x) => x.code === c.code);
                       const dv = (c as { default_value?: unknown }).default_value;
