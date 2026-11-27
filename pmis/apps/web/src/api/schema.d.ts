@@ -10232,6 +10232,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/presence/editing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The other current editors of an entity (0.15.246)
+         * @description 0.15.246 (migration 0345). Advisory "… is editing" presence: the editors of the entity other than the caller whose heartbeat is fresh (2 minutes). The caller themself is never listed.
+         */
+        get: operations["listEditPresence"];
+        put?: never;
+        /**
+         * The caller is editing this entity (heartbeat, 0.15.246)
+         * @description 0.15.246 (migration 0345). Upserts the caller's row and sweeps stale rows. Send every 30 seconds while the editor is open.
+         */
+        post: operations["pingEditPresence"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/presence/editing/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The caller stopped editing this entity (0.15.246)
+         * @description 0.15.246 (migration 0345). Removes the caller's row at once instead of letting it fade out.
+         */
+        post: operations["stopEditPresence"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -18594,6 +18638,27 @@ export interface components {
                 name_en: string;
                 name_ar?: string | null;
             }[];
+        };
+        EditPresencePing: {
+            /**
+             * @description V1: register records only.
+             * @enum {string}
+             */
+            kind: "record";
+            /** Format: uuid */
+            entity_id: string;
+        };
+        /** @description 0.15.246: another current editor of the entity (migration 0345). */
+        EditPresenceEditor: {
+            /** Format: uuid */
+            id: string;
+            display_name: string;
+            employee_id: string | null;
+            /**
+             * Format: date-time
+             * @description When this editing spell began.
+             */
+            since: string;
         };
         SavedView: {
             /** Format: uuid */
@@ -38341,6 +38406,81 @@ export interface operations {
                 content?: never;
             };
             401: components["responses"]["Unauthorized"];
+        };
+    };
+    listEditPresence: {
+        parameters: {
+            query: {
+                kind: "record";
+                entity_id: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The other current editors, oldest heartbeat first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        editors: components["schemas"]["EditPresenceEditor"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    pingEditPresence: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EditPresencePing"];
+            };
+        };
+        responses: {
+            /** @description Noted. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    stopEditPresence: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EditPresencePing"];
+            };
+        };
+        responses: {
+            /** @description Removed (also when there was none). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            422: components["responses"]["Unprocessable"];
         };
     };
 }

@@ -2034,7 +2034,10 @@
     "inline_undone": "Change undone.",
     "contractor": "Contractor",
     "contractor_company": "Contractor company",
-    "contractor_hint": "Pick from the companies with an active contract. The contract is checked against the scope at submit."
+    "contractor_hint": "Pick from the companies with an active contract. The contract is checked against the scope at submit.",
+    "editing_notice_one": "{{names}} is editing this record",
+    "editing_notice_other": "{{names}} are editing this record",
+    "editing_notice_join": ", "
   },
   "regErrors": {
     "register_locked": "This is locked: only a System Admin can change it until it is unlocked.",

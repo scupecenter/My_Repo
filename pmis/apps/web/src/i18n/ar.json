@@ -2034,7 +2034,10 @@
     "inline_undone": "تم التراجع عن التعديل.",
     "contractor": "المقاول",
     "contractor_company": "شركة المقاول",
-    "contractor_hint": "اختر من الشركات ذات العقد الفعّال. يُفحص العقد مقابل النطاق عند الإرسال."
+    "contractor_hint": "اختر من الشركات ذات العقد الفعّال. يُفحص العقد مقابل النطاق عند الإرسال.",
+    "editing_notice_one": "{{names}} يحرّر هذا السجل الآن",
+    "editing_notice_other": "{{names}} يحرّرون هذا السجل الآن",
+    "editing_notice_join": "، "
   },
   "regErrors": {
     "register_locked": "هذا مقفل: لا يغيّره إلا مدير النظام حتى يُفك قفله.",

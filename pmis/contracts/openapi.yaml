@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.185
+  version: 0.15.246
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -31,6 +31,8 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.246 (2026-11-27): a soft "… is editing this record" notice (owner request 2026-11-27, PM-platforms research item 17; migration 0345; CHANGELOG RecordEditPresence). Additive and advisory only: nothing is locked. `POST /presence/editing` (`{kind, entity_id}`) is the editor's heartbeat (30 s; a row is stale after 2 minutes), `POST /presence/editing/stop` removes it at once, and `GET /presence/editing` (`kind`, `entity_id`) lists the other current editors of the entity (id, display name, since). V1 covers register records (kind `record`). No grant, role, permission, visibility or audit change.
+
     - 0.15.130 (2026-11-27): the admin alert `backup_missing` (owner approval relayed 2026-11-26). Additive, migration 0240. When no backup succeeded in the last 24 hours (the System Log rows the data reset reads) a security alert `backup_missing` (default severity high, configurable like the other rules) is raised once per calendar day by the job `backup_check` (every 6 hours) and one System Log row (source `backup_check`) is written. `SecurityAlertRule` and `AlertSeverityMap` gain `backup_missing`. No new endpoint.
     - 0.15.95 (2026-11-27): the admin alert `backup_missing` (owner approval relayed 2026-11-26). Additive, migration 0184. When no backup succeeded in the last 24 hours (the System Log rows the data reset reads) a security alert `backup_missing` (default severity high, configurable like the other rules) is raised once per calendar day by the job `backup_check` (every 6 hours) and one System Log row (source `backup_check`) is written. `SecurityAlertRule` and `AlertSeverityMap` gain `backup_missing`. No new endpoint.
     - 0.15.98 (2026-11-27): the dashboard follow-up sections (owner approval 2026-11-26, dashboard proposals item 1; migration 0230). Additive and read only. New `GET /dashboard/ops` (`getDashboardOps`, `DashboardOps`): the sections that follow the operations beyond F13, each part `available: false` when the caller may not see its module. First section `procurement`: the open orders (order status not one of the closing statuses of the contractor rules, as in `GET /reports/contractor-performance`), the PRs waiting for a PO/WO and the open PO/WOs, each aged in calendar days and bucketed 0-7, 8-14, 15-30, over 30, and the materials position: the receive rate (dispatched against required of `warehouse_site_qty` over the active, not cancelled sites), the count of sites with a shortage line, the top shortage lines with their contractor (the party of the site's newest open order; unattributed when none) and the shortage per contractor. No price is returned (no price is stored on a Procurement record). The dashboard settings catalogue gains the card `ops_procurement`, so the card shows, hides and orders per tab in Settings > Dashboard like every other card. No grant, role or permission change.
@@ -15884,6 +15886,58 @@ paths:
       responses:
         '204': {description: Discarded (also when there was none).}
         '401': {$ref: '#/components/responses/Unauthorized'}
+  /presence/editing:
+    get:
+      tags: [presence]
+      operationId: listEditPresence
+      summary: The other current editors of an entity (0.15.246)
+      description: >-
+        0.15.246 (migration 0345). Advisory "… is editing" presence: the editors of the entity other than the caller whose heartbeat is fresh
+        (2 minutes). The caller themself is never listed.
+      parameters:
+        - {name: kind, in: query, required: true, schema: {type: string, enum: [record]}}
+        - {name: entity_id, in: query, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: The other current editors, oldest heartbeat first.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [editors]
+                properties:
+                  editors: {type: array, items: {$ref: '#/components/schemas/EditPresenceEditor'}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+    post:
+      tags: [presence]
+      operationId: pingEditPresence
+      summary: The caller is editing this entity (heartbeat, 0.15.246)
+      description: 0.15.246 (migration 0345). Upserts the caller's row and sweeps stale rows. Send every 30 seconds while the editor is open.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/EditPresencePing'}
+      responses:
+        '200': {description: Noted.}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /presence/editing/stop:
+    post:
+      tags: [presence]
+      operationId: stopEditPresence
+      summary: The caller stopped editing this entity (0.15.246)
+      description: 0.15.246 (migration 0345). Removes the caller's row at once instead of letting it fade out.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/EditPresencePing'}
+      responses:
+        '200': {description: Removed (also when there was none).}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
 components:
   securitySchemes:
     cookieAuth:
@@ -24180,6 +24234,23 @@ components:
         groups: {type: array, items: {type: object, required: [id, name], properties: {id: {type: string, format: uuid}, name: {type: string}}}}
         users: {type: array, items: {$ref: '#/components/schemas/UserRef'}}
         regions: {type: array, description: '0.15.31 (F3).', items: {type: object, required: [id, name_en], properties: {id: {type: integer}, name_en: {type: string}, name_ar: {type: [string, "null"]}}}}
+    EditPresencePing:
+      type: object
+      additionalProperties: false
+      required: [kind, entity_id]
+      properties:
+        kind: {type: string, enum: [record], description: 'V1: register records only.'}
+        entity_id: {type: string, format: uuid}
+    EditPresenceEditor:
+      type: object
+      description: '0.15.246: another current editor of the entity (migration 0345).'
+      required: [id, display_name, employee_id, since]
+      additionalProperties: false
+      properties:
+        id: {type: string, format: uuid}
+        display_name: {type: string}
+        employee_id: {type: [string, 'null']}
+        since: {type: string, format: date-time, description: When this editing spell began.}
     SavedView:
       type: object
       required: [id, screen_key, name, filters, columns, sort, stripped_columns, owner, owner_left, is_owner, shared, can_edit, can_share, is_active, version, imported, created_at, updated_at]

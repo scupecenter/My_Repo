@@ -1,11 +1,12 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import { AlertTriangle, ArrowRightLeft, Ban, Check, FilePlus2, HandMetal, Save, Undo2, UserMinus, X, Clock, Link2 } from 'lucide-react';
+import { AlertTriangle, ArrowRightLeft, Ban, Check, FilePlus2, HandMetal, Save, Undo2, UserMinus, Users, X, Clock, Link2 } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useSession } from '@/api/hooks';
 import { useCancelSnagRecord, useCreateRecord, useNewVersion, useRecordClaim, useRecordHistory, useRecordOp, useRecordTransfer, useRegisterRecord, useUpdateRecord, useContractorCompanies, type RecordOp } from '@/api/registers';
 import { useMatrix } from '@/api/sites';
+import { useEditPresence } from '@/api/presence';
 import { useAddRegisterComment, useRegisterComments } from '@/api/x';
 import type { RegisterDefinition, RegisterRecord } from '@/api/types';
 import { registerErrorMessage, serverFieldIssues } from '@/lib/registerErrors';
@@ -197,6 +198,7 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
       {record && <DrawerTabs value={tab} onChange={setTab} tabs={[{ id: 'data', label: t('drawer.tab_data') }, { id: 'documents', label: t('docs.tab') }, { id: 'comments', label: t('drawer.comments') }, { id: 'history', label: t('drawer.history') }]} />}
       <div className="flex-1 space-y-4 overflow-y-auto p-4">
         <div {...panelProps('data', tab)} className="space-y-4">
+        {record && <EditingNotice id={record.id} editing={editable} />}
         {editable && <DraftBar draft={dr} onRestore={(v) => { if (v.data && typeof v.data === 'object') setData(v.data as Data); if (typeof v.record_type === 'string') setRtype(v.record_type); setDirty(true); }} />}
         {OWNER_NOTE[key] && <p className="rounded-md bg-card2 p-3 text-sm" data-testid="reg-owner-note">{t(OWNER_NOTE[key])}</p>}
         {src && record?.site_id && (
@@ -378,5 +380,20 @@ export function RegisterDrawer({ def, recordId, onClose, onOpen, nav }: { def: R
         : q.data ? <Body key={`${q.data.id}`} def={def} record={q.data} onCreated={onOpen} />
           : <div className="p-4"><Dialog.Title className="font-bold">{q.isError ? t('regErrors.not_found') : t('common.loading')}</Dialog.Title></div>}
     </DrawerFrame>
+  );
+}
+
+/**
+ * The soft "… is editing this record" notice (0.15.246, item 17): shown while another user has the same record open for editing. Advisory only;
+ * the heartbeat of the caller starts here too, so other viewers of the record see this caller. Never blocks anything.
+ */
+function EditingNotice({ id, editing }: { id: string; editing: boolean }) {
+  const { t } = useTranslation();
+  const editors = useEditPresence('record', id, editing).data ?? [];
+  if (!editors.length) return null;
+  return (
+    <p className="flex items-center gap-2 rounded-md bg-waitBg p-3 text-sm text-waitInk" data-testid="reg-editing-notice" role="note">
+      <Users size={14} aria-hidden />{t('registers.editing_notice', { names: editors.map((e) => e.display_name).join(t('registers.editing_notice_join')), count: editors.length })}
+    </p>
   );
 }

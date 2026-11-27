@@ -333,6 +333,10 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/saved-views/:id/restore'],
   ['post', '/saved-views/:id/transfer'],
   ['get', '/saved-views/:id/versions'],
+  // Contract 0.15.246 (item 17, migration 0345): the soft "… is editing this record" notice.
+  ['post', '/presence/editing'],
+  ['post', '/presence/editing/stop'],
+  ['get', '/presence/editing'],
   ['get', '/me/drafts'],
   ['get', '/me/drafts/:key'],
   ['put', '/me/drafts/:key'],
