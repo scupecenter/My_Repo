@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { UnsavedGuard } from '@/lib/unsavedGuard';
 import { useTranslation } from 'react-i18next';
 import { useContractorRules, useSetContractorRules, useTeamScopeMatch } from '@/api/settings';
 import { errText, FormDialog } from '@/components/FormDialog';
@@ -57,6 +58,7 @@ export function ContractorRules() {
         <input className="input mt-1 font-normal" data-testid="cr-closed" value={v.closed} onChange={(e) => setF({ ...v, closed: e.target.value })} />{err('/closed_order_statuses')}</label>
       <p className="mono text-xs text-mute" data-testid="cr-version">{t('scopeMatch.version', { version: q.data?.version })}</p>
       <button className="btn btn-accent" data-testid="cr-save" disabled={bad || !q.data || !f} onClick={() => setOpen(true)}>{t('common.save')}</button>
+      <UnsavedGuard scope="settings" dirty={!!f} needsReason label={t('ui.guard_settings')} onSave={(reason) => new Promise<boolean>((res) => set.mutate({ version: q.data.version, body: { reason, safety_cert_lead_days: n, recipient_roles: list(v.roles), cw_delivery_scopes: v.scopes, internal_team_types: list(v.internal), closed_order_statuses: list(v.closed), } }, { onSuccess: () => res(true), onError: () => res(false) }))} />
       {open && q.data && (
         <FormDialog open onClose={() => setOpen(false)} testid="cr-dialog" title={t('contractorRules.title')} busy={set.isPending} error={set.isError && !Object.keys(errs).length ? errText(set.error, t) : null}
           onSubmit={(reason) => set.mutate({ version: q.data.version, body: {

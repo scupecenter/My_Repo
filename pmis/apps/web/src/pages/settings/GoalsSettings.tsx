@@ -1,4 +1,5 @@
 import { Plus, Trash2 } from "lucide-react";
+import { UnsavedGuard } from '@/lib/unsavedGuard';
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
@@ -147,6 +148,7 @@ export function GoalsSettings() {
         <button className="btn" data-testid="goal-add" disabled={rows.length >= 50} onClick={add}>
           <Plus size={16} aria-hidden="true" /> {t("goals.add")}
         </button>
+        <UnsavedGuard scope="settings" dirty={!!draft && !invalid} needsReason label={t('ui.guard_settings')} onSave={(reason) => new Promise<boolean>((res) => set.mutate({ version: s.version, body: { goals: rows.map((g) => ({ ...g, name_en: g.name_en.trim(), name_ar: g.name_ar?.trim() || null })), reason } }, { onSuccess: () => { setDraft(null); res(true); }, onError: () => res(false) }))} />
         <button className="btn btn-accent" data-testid="goals-save" disabled={!draft || invalid} onClick={() => setOpen(true)}>
           {t("common.save")}
         </button>
