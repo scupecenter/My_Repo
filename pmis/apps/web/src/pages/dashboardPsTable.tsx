@@ -60,23 +60,23 @@ export function PsDetailTable({ activities }: { activities: Activity[] | undefin
                   <tr className="border-t border-line font-semibold" data-testid={`dash-pst-row-${a.code}`}>
                     <td className="py-1 pe-2">
                       {items.length > 0 ? (
-                        <button type="button" className="inline-flex items-center gap-1 text-start" aria-expanded={isOpen}
+                        <button type="button" className="inline-flex items-start gap-1 text-start" aria-expanded={isOpen}
                           data-testid={`dash-pst-toggle-${a.code}`}
                           title={t(isOpen ? "dash.pst.close_row" : "dash.pst.open_row", { n: items.length })}
                           onClick={() => toggle(a.code)}>
                           <span aria-hidden="true" className={`inline-block transition-transform rtl:-scale-x-100 ${isOpen ? "rotate-90 rtl:-rotate-90" : ""}`}>▸</span>
-                          <span className="tnum text-mute">{a.code}</span> {name(a)}
-                          <span className="text-xs font-normal text-mute">({items.length})</span>
+                          <span><span className="tnum text-mute">{a.code}</span> {name(a)}{" "}
+                          <span className="text-xs font-normal text-mute">({items.length})</span></span>
                         </button>
                       ) : (
-                        <span className="ps-4"><span className="tnum text-mute">{a.code}</span> {name(a)}</span>
+                        <span className="inline-flex items-start gap-1"><span aria-hidden="true" className="invisible">▸</span><span><span className="tnum text-mute">{a.code}</span> {name(a)}</span></span>
                       )}
                     </td>
                     <td className="px-2 text-end tnum">
                       {a.measured ? pct(a.progress_pct) : <span className="text-xs font-normal text-mute">{t("dash.ps.no_data")}</span>}
                     </td>
                     <td className="px-2 text-end tnum">{a.weight}%</td>
-                    <td className="ps-2 text-end tnum">{items.length > 0 ? `${sum("done")} / ${sum("applicable")}` : "–"}</td>
+                    <td className="ps-2 text-end tnum">{items.length > 0 ? <bdi dir="ltr">{`${sum("done")} / ${sum("applicable")}`}</bdi> : "–"}</td>
                   </tr>
                   {isOpen &&
                     items.map((i) => (
@@ -85,7 +85,7 @@ export function PsDetailTable({ activities }: { activities: Activity[] | undefin
                         <td className="py-0.5 ps-5 pe-2"><span className="tnum">{i.code}</span> {name(i)}</td>
                         <td className="px-2 text-end tnum">{i.measured ? pct(i.progress_pct) : "–"}</td>
                         <td className="px-2 text-end tnum">{i.weight}%</td>
-                        <td className="ps-2 text-end tnum">{i.applicable !== undefined ? `${i.done ?? 0} / ${i.applicable}` : "–"}</td>
+                        <td className="ps-2 text-end tnum">{i.applicable !== undefined ? <bdi dir="ltr">{`${i.done ?? 0} / ${i.applicable}`}</bdi> : "–"}</td>
                       </tr>
                     ))}
                 </RowGroup>
