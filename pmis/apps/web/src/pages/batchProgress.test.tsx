@@ -56,7 +56,7 @@ describe('New sites batch of 469 rows (the mock pages the rows with next_cursor)
     expect(screen.getByTestId('batch-count-invalid')).toHaveTextContent('0 invalid');
     expect(screen.getByTestId('batch-count-diff')).toHaveTextContent('New 469');
     expect(screen.queryByTestId('batch-loading-rows')).not.toBeInTheDocument();
-    expect(screen.getByText(/^469 row\(s\) can go into the approval flow/)).toBeInTheDocument();
+    expect(screen.getByText(/^469 rows can go into the approval flow/)).toBeInTheDocument();
     // the table is windowed, the last row is reached by scrolling
     expect(screen.queryByTestId('batch-row-470')).not.toBeInTheDocument();
     scroller.scrollTop = 469 * 76;
@@ -185,7 +185,7 @@ describe('The import progress bar follows the batch status', () => {
     expect(screen.getByTestId('batch-progress-sent-legend-rejected')).toHaveTextContent('Returned 50 (11%)');
     expect(screen.getByTestId('batch-progress-sent-legend-held')).toHaveTextContent('Held 19 (4%)');
     expect(screen.getByTestId('batch-progress-sent-legend-pending')).toHaveTextContent('Waiting 300 (64%)');
-    expect(screen.getByTestId('batch-approve-hint')).toHaveTextContent('300 record(s) wait for L2');
+    expect(screen.getByTestId('batch-approve-hint')).toHaveTextContent('300 records wait for L2');
     expect(screen.getByTestId('batch-count-held')).toHaveTextContent('19 held');
   });
 

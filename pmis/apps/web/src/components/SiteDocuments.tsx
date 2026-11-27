@@ -5,6 +5,7 @@ import { ApiError } from '@/api/client';
 import { downloadDocument, useDocuments, zipDownload, type DocFilters, type DocumentListItem } from '@/api/documents';
 import type { PipelineNode } from '@/api/types';
 import { DocumentsGrid } from './DocumentsGrid';
+import { StandardTable, type StdCol } from './StandardTable';
 import { useToast } from './Toast';
 import { SiteLifecycle } from '@/pages/library/Archive';
 
@@ -40,6 +41,18 @@ export function SiteDocuments({ siteId, stages }: { siteId: string; stages: Pipe
   const name = (r: DocumentListItem) => (i18n.language === 'ar' && r.doc_name_ar) || r.doc_name_en;
   const stageOptions = stages.filter((n) => n.kind === 'milestone');
   const toggle = (id: string) => setPicked((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const cols: StdCol<DocumentListItem>[] = [
+    { id: 'pick', label: t('docs.pick'), w: 44, pinned: true, action: true, text: () => '', cell: (r) => <input type="checkbox" aria-label={t('docs.pick_file', { name: r.file.original_name })} data-testid={`doc-pick-${r.file.id}`} checked={picked.has(r.file.id)} onChange={() => toggle(r.file.id)} /> },
+    ...(f.all ? [{ id: 'site', label: t('docs.c_site'), w: 110, text: (r: DocumentListItem) => r.site_code ?? '', cell: (r: DocumentListItem) => <span className="mono">{r.site_code}</span> }] : []),
+    { id: 'stage', label: t('docs.c_stage'), w: 90, text: (r) => r.stage_code ?? '', cell: (r) => r.stage_code ?? '' },
+    { id: 'task', label: t('docs.c_task'), w: 90, text: (r) => r.task_code ?? '', cell: (r) => <span className="mono">{r.task_code ?? ''}</span> },
+    { id: 'doc', label: t('docs.c_doc'), w: 240, text: (r) => `${name(r)}${r.candidate_label ? ` (${r.candidate_label})` : ''}`, cell: (r) => <>{name(r)}{r.candidate_label ? ` (${r.candidate_label})` : ''}</> },
+    { id: 'file', label: t('docs.c_file'), w: 260, text: (r) => r.file.download_name ?? r.file.original_name, cell: (r) => <button type="button" className="mono text-link hover:underline" title={r.file.download_name} data-testid={`doc-dl-${r.file.id}`} onClick={() => void downloadDocument(r.file.id).catch(() => toast(t('errors.generic'), 'err'))}><Download size={12} className="me-1 inline" />{r.file.download_name}</button> },
+    { id: 'version', label: t('docs.c_version'), w: 150, text: (r) => `v${r.file.version}`, cell: (r) => <><span className="chip bg-card2">v{r.file.version}</span>{!r.file.is_current && <span className="ms-1 text-xs text-mute" data-testid={`doc-superseded-${r.file.id}`}>{t('docs.superseded')}</span>}</> },
+    { id: 'status', label: t('docs.c_status'), w: 140, text: (r) => t(`slotStatus.${r.slot_status}`), cell: (r) => <span className={`chip ${TONE[r.slot_status]}`}>{t(`slotStatus.${r.slot_status}`)}</span> },
+    { id: 'uploaded', label: t('docs.c_uploaded'), w: 230, text: (r) => `${r.file.uploaded_by?.display_name ?? ''} ${r.file.uploaded_at.slice(0, 10)}`, cell: (r) => <>{r.file.uploaded_by?.display_name} · {r.file.uploaded_at.slice(0, 10)}</> },
+    { id: 'approved', label: t('docs.c_approved'), w: 130, text: (r) => r.file.approved_date ?? '', cell: (r) => <span className="mono">{r.file.approved_date ?? ''}</span> },
+  ];
   const viewToggle = (
     <div className="mb-2 flex gap-1" role="group" aria-label={t('docsGrid.title')}>
       <button type="button" className={`btn ${view === 'list' ? 'btn-accent' : ''}`} data-testid="docs-view-list" aria-pressed={view === 'list'} onClick={() => setView('list')}>{t('docsGrid.toggle_list')}</button>
@@ -67,7 +80,6 @@ export function SiteDocuments({ siteId, stages }: { siteId: string; stages: Pipe
           <select className="input mt-1" data-testid="docs-filter-status" value={f.slot_status} onChange={(e) => set('slot_status', e.target.value)}>
             <option value="">{t('common.all')}</option>{STATUSES.map((k) => <option key={k} value={k}>{t(`slotStatus.${k}`)}</option>)}
           </select></label>
-        <label className="text-sm">{t('docs.f_search')}<input className="input mt-1 w-44" data-testid="docs-filter-q" value={f.q} onChange={(e) => set('q', e.target.value)} /></label>
         <label className="flex items-center gap-1 text-sm"><input type="checkbox" data-testid="docs-filter-history" checked={f.history} onChange={(e) => set('history', e.target.checked)} />{t('docs.f_history')}</label>
         <label className="flex items-center gap-1 text-sm"><input type="checkbox" data-testid="docs-filter-all-sites" checked={f.all} onChange={(e) => set('all', e.target.checked)} />{t('docs.f_all_sites')}</label>
         <div className="ms-auto flex flex-wrap gap-2">
@@ -77,35 +89,9 @@ export function SiteDocuments({ siteId, stages }: { siteId: string; stages: Pipe
       </div>
       {busy && <p role="status" className="mb-2 text-sm text-mute" data-testid="docs-zip-busy">{t('docs.zip_running')}</p>}
       {q.isError && <p role="alert" className="text-lateInk" data-testid="docs-error">{q.error instanceof ApiError && q.error.status === 403 ? t('errors.forbidden') : t('errors.generic')}</p>}
-      {q.isLoading ? <p className="text-mute">{t('common.loading')}</p> : (
-        <div className="card overflow-x-auto">
-          <table className="w-full text-sm" data-testid="docs-table">
-            <thead><tr className="text-start text-mute">
-              <th className="p-2" scope="col"><span className="sr-only">{t('docs.pick')}</span></th>
-              {f.all && <th className="p-2 text-start" scope="col">{t('docs.c_site')}</th>}
-              <th className="p-2 text-start" scope="col">{t('docs.c_stage')}</th><th className="p-2 text-start" scope="col">{t('docs.c_task')}</th><th className="p-2 text-start" scope="col">{t('docs.c_doc')}</th>
-              <th className="p-2 text-start" scope="col">{t('docs.c_file')}</th><th className="p-2 text-start" scope="col">{t('docs.c_version')}</th><th className="p-2 text-start" scope="col">{t('docs.c_status')}</th>
-              <th className="p-2 text-start" scope="col">{t('docs.c_uploaded')}</th><th className="p-2 text-start" scope="col">{t('docs.c_approved')}</th>
-            </tr></thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.file.id} className={`border-t border-line ${r.file.is_current ? '' : 'opacity-75'}`} data-testid={`doc-row-${r.file.id}`} data-current={r.file.is_current}>
-                  <td className="p-2"><input type="checkbox" aria-label={t('docs.pick_file', { name: r.file.original_name })} data-testid={`doc-pick-${r.file.id}`} checked={picked.has(r.file.id)} onChange={() => toggle(r.file.id)} /></td>
-                  {f.all && <td className="mono p-2">{r.site_code}</td>}
-                  <td className="p-2">{r.stage_code ?? ''}</td><td className="mono p-2">{r.task_code ?? ''}</td>
-                  <td className="p-2">{name(r)}{r.candidate_label ? ` (${r.candidate_label})` : ''}</td>
-                  <td className="p-2"><button type="button" className="mono text-link hover:underline" title={r.file.download_name} data-testid={`doc-dl-${r.file.id}`} onClick={() => void downloadDocument(r.file.id).catch(() => toast(t('errors.generic'), 'err'))}><Download size={12} className="me-1 inline" />{r.file.download_name}</button></td>
-                  <td className="p-2"><span className="chip bg-card2">v{r.file.version}</span>{!r.file.is_current && <span className="ms-1 text-xs text-mute" data-testid={`doc-superseded-${r.file.id}`}>{t('docs.superseded')}</span>}</td>
-                  <td className="p-2"><span className={`chip ${TONE[r.slot_status]}`}>{t(`slotStatus.${r.slot_status}`)}</span></td>
-                  <td className="p-2">{r.file.uploaded_by?.display_name} · {r.file.uploaded_at.slice(0, 10)}</td>
-                  <td className="mono p-2">{r.file.approved_date ?? ''}</td>
-                </tr>
-              ))}
-              {q.isSuccess && rows.length === 0 && <tr><td className="p-4 text-mute" colSpan={f.all ? 10 : 9} data-testid="docs-empty">{t('docs.empty')}</td></tr>}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <StandardTable screen={f.all ? 'site-documents-all' : 'site-documents'} testid="docs-table" cols={cols} rows={rows} rowId={(r) => r.file.id} rowTestId={(r) => `doc-row-${r.file.id}`}
+        rowAttrs={(r) => ({ 'data-current': String(r.file.is_current) })} loading={q.isLoading} query={f.q} onQuery={(v) => set('q', v)} searchTestId="docs-filter-q"
+        empty={t('docs.empty')} exportName="site-documents" noun="documents" />
     </section>
   );
 }
