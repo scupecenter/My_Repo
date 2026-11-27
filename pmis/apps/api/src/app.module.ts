@@ -193,6 +193,8 @@ import { AbsencesController, ReassignmentController } from './reassignment/reass
 import { AbsencesService } from './reassignment/absences.service';
 import { DailyPlanController, DailyPlanSettingsController } from './daily-plan/daily-plan.controller';
 import { DailyPlanService } from './daily-plan/daily-plan.service';
+import { DataHubController } from './data-hub/data-hub.controller';
+import { DataHubService } from './data-hub/data-hub.service';
 import { ReassignmentService } from './reassignment/reassignment.service';
 import { StaffRegistryController } from './staff-registry/staff-registry.controller';
 import { StaffRegistryService } from './staff-registry/staff-registry.service';
@@ -219,6 +221,7 @@ export function appModuleFor(config: AppConfig) {
       StaffRegistryController, // 0.15.56 (0142): staff registry card, visibility, edit
       DataResetController, // 0.15.62 (0146): project data reset in Settings, two System Admins
       LibraryMenuController, // 0.15.70 (0151, W5): Library > Forms and Archive
+      DataHubController, // 0.15.270 (0370): Data hub landing page
     ],
     providers: [
       { provide: APP_CONFIG, useValue: config },
@@ -244,6 +247,7 @@ export function appModuleFor(config: AppConfig) {
       StaffRegistryService, // 0.15.56 (0142)
       DataResetService, MaintenanceService, // 0.15.62 (0146)
       LibraryMenuService, // 0.15.70 (0151, W5)
+      DataHubService, // 0.15.270 (0370)
       { provide: APP_GUARD, useClass: SessionGuard },
       { provide: APP_INTERCEPTOR, useClass: TxInterceptor },
       { provide: APP_INTERCEPTOR, useClass: ExportLockInterceptor }, // 0.15.190 (0290): after TxInterceptor, so the lock is read inside the request transaction

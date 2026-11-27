@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.203
+  version: 0.15.270
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -55,6 +55,7 @@ info:
     - 0.15.97 (2026-11-27): the sign-in page settings (owner request 2026-11-26; migration 0197). Additive. New `GET/PUT /settings/login-page` (`getLoginPage`, `setLoginPage`; setting `ui.login_page`): the sign-in page announcement (English and Arabic, kind info or maintenance, both texts empty hides it), the background animation switch, the default language of the signed-out pages and up to five support links ({label_en, label_ar, url}; http(s) or mailto only). Every signed-in user reads the state (the post-login splash shows `server_version` from it); a System Admin or a delegate of `settings` edit for all regions changes it with a reason, a step-up and If-Match (audited `login_page_update`, before and after). New `GET /settings/login-page/public` (`getLoginPagePublic`, no session): ONLY what the sign-in page renders (announcement, animation, default_locale, support_links) - no version, no audit data, nothing about users; cached 30 seconds and rate limited per address. No permission, visibility or authentication change.
     - 0.15.96 (2026-11-27): responsibility-matrix coverage screen (CHANGELOG MatrixCoverage; no migration). Additive and read only. `GET /matrix/coverage` (`getMatrixCoverage`, System Admin or an all-region delegate of the matrix): for each active stage and enabled register row and each of the seven regions, whether the matrix cell has an actor, so empty cells show before a task or record stalls. Settings > Workflow > Coverage.
     - 0.15.95 (2026-11-27): Issue log and Quality record link to a Procurement order (migration 0195; CHANGELOG IssueQualityOrderLink). Additive. New optional field `procurement_order_id` on `issues` and `quality`; when set, the contractor (`external_party`) is taken from the order (a different typed `external_party_id` is refused, 422 `contractor_from_order`; `order_not_active`, `order_other_site`, `invalid`), so the contractor performance view sees the issue and the inspection. `GET /registers/issues/order-options` and `GET /registers/quality/order-options` list the orders (own module view plus Procurement view).
+    - 0.15.270 (2026-11-27): the Data hub (owner approval 2026-11-27; migration 0370, mirror `db/sql/369_data_hub.sql`; CHANGELOG DataHub). Additive: new `GET /data-hub/summary` (batches waiting for the caller, recent template changes, the caller's last template downloads; read only, same visibility as the batch list and the template catalogue); `UiFeatures` and `UiFeaturesPatch` gain `data_hub` (`UiDataHub`: widget switches, the Uploads & batches badge, the default view of each hub list). A stored value without the section takes the seed. No permission change.
     - 0.15.250 (2026-11-27): inbox tabs and priority join `ui.features` as the section `inbox` (migration 0281, mirror `db/sql/280_ui_inbox.sql`; CHANGELOG UiInbox). Additive: `UiFeatures` and `UiFeaturesPatch` gain `inbox` (`UiInbox`: `tabs_enabled`, `default_tab`, `priority_kinds`); a stored value without the section takes the seed. No new path.
     - 0.15.185 (2026-11-27): interface features setting (migration 0280, mirror `db/sql/279_ui_features.sql`; CHANGELOG UiFeatures). Additive. `GET`/`PUT /settings/ui-features`: one guarded setting with a closed object per feature section (`UiFeatures`: `avatars` and `new_badge` now; the inbox, menu, hub and mobile sections of items 6 to 15 are added by later migrations). Read by every signed-in user; written by a System Admin or an all-regions delegate of `admin.settings` with a reason and If-Match, audited.
     - 0.15.230 (2026-11-27): appearance profiles (owner approval 2026-11-27, the PM-platforms proposal items 1-3; migration 0241; CHANGELOG AppearanceProfiles). Additive. (1) `User` and `MyProfile` gain `ui_prefs` (the stored personal appearance choices; `{}` = the organization defaults) and `appearance` (what the user sees: own choices, else the organization defaults; `ui_effective_prefs`). `MyProfile.identity` gains `defaults` (the organization appearance defaults) and `pref_options` (the dimensions with their allowed values). (2) `MyProfilePatch` gains `ui_prefs` (`UiPrefs`, a subset of the dimensions; while `allow_user_choice` is false a value is 403 `field_read_only`, `errors[0]` `{path: /ui_prefs, code: appearance_choice_locked}`); audited per dimension in `profile_updated`. (3) `UiIdentity` gains `defaults` and `pref_options`; `UiIdentityInput` gains optional `defaults` (omitted keeps the current ones). The dimensions: `density`, `font_scale`, `radius`, `motion`, `icon_style`, `menu_style`, `accent` (`UiPrefs`).
@@ -6437,6 +6438,19 @@ paths:
         '422': { $ref: '#/components/responses/Unprocessable' }
 
   # ------------------------------------------------------------------ master export
+  /data-hub/summary:
+    get:
+      tags: [templates]
+      operationId: getDataHubSummary
+      summary: The Data hub landing page, in one call (0.15.270)
+      description: 0.15.270. Batches waiting for the caller (count and up to 5, with why each waits), templates whose current version was issued in the last 45 days with the column diff against the version before, and the caller's last download of each template (read from the template_download audit rows of the caller only). Read only. A caller without the templates module sees no batches. The other hub widgets use the endpoints of their own screens.
+      responses:
+        '200':
+          description: The summary.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DataHubSummary'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
   /exports/schedules:
     get:
       tags: [exports]
@@ -21757,14 +21771,97 @@ components:
           type: array
           maxItems: 12
           items: { type: string, enum: [mention, followed_change, task_assigned, task_returned, task_rejected, task_approved, approval_due, reassigned, absence_alert, idle_task_alert, no_holder, system] }
+    UiDataHub:
+      type: object
+      description: '0.15.270. The Data hub: which widgets of the landing page show, the badge on Uploads & batches, and the default view of each hub list screen.'
+      additionalProperties: false
+      required: [widgets, badge, default_view]
+      properties:
+        widgets:
+          type: object
+          additionalProperties: false
+          required: [quick_bar, batches, template_changes, recent, health, admin]
+          properties:
+            quick_bar: { type: boolean }
+            batches: { type: boolean }
+            template_changes: { type: boolean }
+            recent: { type: boolean }
+            health: { type: boolean }
+            admin: { type: boolean }
+        badge: { type: boolean }
+        default_view:
+          type: object
+          additionalProperties: false
+          required: [templates, uploads, exports, master_import]
+          properties:
+            templates: { type: string, enum: [cards, rows, table, compact] }
+            uploads: { type: string, enum: [cards, rows, table, compact] }
+            exports: { type: string, enum: [cards, rows, table, compact] }
+            master_import: { type: string, enum: [cards, rows, table, compact] }
+    DataHubBatch:
+      type: object
+      required: [id, file_name, action, status, template_id, template_version, counts]
+      properties:
+        id: { type: string, format: uuid }
+        file_name: { type: string }
+        action: { type: string, enum: [send, review_l2, returned, checking], description: 'send: the caller uploaded it and has not sent it; review_l2: the caller may approve it; returned: it came back to the caller; checking: still being staged (listed, not counted).' }
+        status: { type: string }
+        template_id: { type: string }
+        template_version: { type: integer }
+        register_key: { type: string, nullable: true }
+        stream: { type: string, nullable: true }
+        counts:
+          type: object
+          required: [valid, invalid]
+          properties:
+            valid: { type: integer }
+            invalid: { type: integer }
+        uploaded_at: { type: string, format: date-time, nullable: true }
+        progress_pct: { type: integer, nullable: true }
+    DataHubTemplateChange:
+      type: object
+      required: [template_id, name_en, version, issued_at, added, removed, renamed, mine_is_old]
+      properties:
+        template_id: { type: string }
+        name_en: { type: string }
+        name_ar: { type: string, nullable: true }
+        version: { type: integer }
+        issued_at: { type: string, format: date-time }
+        reason: { type: string, nullable: true }
+        added: { type: array, items: { type: string } }
+        removed: { type: array, items: { type: string } }
+        renamed: { type: array, items: { type: string } }
+        my_version: { type: integer, nullable: true, description: 'The version of the caller last download of this template (null when never downloaded).' }
+        mine_is_old: { type: boolean }
+    DataHubDownload:
+      type: object
+      required: [template_id, prefill, at]
+      properties:
+        template_id: { type: string }
+        version: { type: integer, nullable: true }
+        prefill: { type: boolean }
+        at: { type: string, format: date-time }
+    DataHubSummary:
+      type: object
+      required: [batches, template_changes, my_downloads]
+      properties:
+        batches:
+          type: object
+          required: [count, items]
+          properties:
+            count: { type: integer, minimum: 0 }
+            items: { type: array, maxItems: 5, items: { $ref: '#/components/schemas/DataHubBatch' } }
+        template_changes: { type: array, maxItems: 5, items: { $ref: '#/components/schemas/DataHubTemplateChange' } }
+        my_downloads: { type: array, items: { $ref: '#/components/schemas/DataHubDownload' } }
     UiFeatures:
       type: object
       description: '0.15.185. The sections of the interface features setting; every section is complete.'
-      required: [avatars, new_badge, inbox]
+      required: [avatars, new_badge, inbox, data_hub]
       properties:
         avatars: { $ref: '#/components/schemas/UiAvatars' }
         new_badge: { $ref: '#/components/schemas/UiNewBadge' }
         inbox: { $ref: '#/components/schemas/UiInbox' }
+        data_hub: { $ref: '#/components/schemas/UiDataHub' }
     UiFeaturesPatch:
       type: object
       additionalProperties: false
@@ -21772,6 +21869,7 @@ components:
         avatars: { $ref: '#/components/schemas/UiAvatars' }
         new_badge: { $ref: '#/components/schemas/UiNewBadge' }
         inbox: { $ref: '#/components/schemas/UiInbox' }
+        data_hub: { $ref: '#/components/schemas/UiDataHub' }
     UiFeaturesSetting:
       type: object
       required: [sections, version]
