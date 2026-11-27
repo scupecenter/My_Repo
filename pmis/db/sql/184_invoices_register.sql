@@ -8,7 +8,7 @@
 --   3. The permission module invoices (no grant is seeded: no permission widening). The nav catalogue key.
 --   4. The template TPL-INVOICES (match keys site + invoice number), issued by tpl_sync_all().
 --   5. The Settings data reset: one resettable part, patched in place into data_reset_parts()/data_reset_register_part() (idempotent, anchored on the lessons row).
---   (The relation entry in record_related() is migration 0367, because that function is created by 0324, after this number.)
+--   (The relation entry in record_related() is migration 0380, because that function is created by 0324, after this number.)
 --
 -- No new table and no new endpoint: the register framework runs the records, steps, levels and views. Existing registers and data are untouched.
 SELECT set_config('app.region_ids', '*', true);
