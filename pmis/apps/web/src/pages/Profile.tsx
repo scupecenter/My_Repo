@@ -13,6 +13,7 @@ import { errText } from '@/components/FormDialog';
 import { PageHeader } from '@/components/PageHeader';
 import { ErrorState, LoadingSkeleton } from '@/components/States';
 import { useToast } from '@/components/Toast';
+import { MyPasskeysSection } from '@/components/Passkeys';
 import { CodeField, codeComplete, codeErrorText, digitsOnly, QrCode, RecoveryCodesView, TwoFactorCard } from '@/components/TwoFactor';
 import { ruleKey } from '@/lib/passwordRules';
 import { fmtDateTime } from '@/lib/time';
@@ -602,6 +603,7 @@ function TwoFactorSection({ p }: { p: MyProfile }) {
             </div>}
       {tf.can_enable && mode === 'idle' && <p className="text-xs text-mute">{t('profile.tf_enable_note')}</p>}
       {tf.state === 'on' && local && mode === 'idle' && <TwoFactorCard session={session.data} />}
+      {tf.state === 'on' && local && mode === 'idle' && <MyPasskeysSection />}
     </Section>
   );
 }

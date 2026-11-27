@@ -7,6 +7,7 @@ import { useMarkRead, useMessageContacts, useMessageThreads, useReply, useStartT
 import type { MessageItem, MessageThread, MessageThreadSummary, UserPickerItem } from '@/api/types';
 import { errText, FormDialog } from '@/components/FormDialog';
 import { PeoplePicker } from '@/components/PeoplePicker';
+import { SavedViews } from '@/components/SavedViews';
 import { PersonTag } from '@/components/PersonTag';
 import { fmtDateTime } from '@/lib/time';
 
@@ -147,7 +148,8 @@ export function Messages() {
       </div>
       <div className="card grid min-h-[60vh] overflow-hidden md:grid-cols-[22rem_1fr]">
         <div className={`${threadId ? 'hidden md:block' : ''} border-e border-line`}>
-          <div className="flex items-center gap-2 border-b border-line p-3">
+          <div className="flex flex-wrap items-center gap-2 border-b border-line p-3">
+            <SavedViews<Record<string, unknown>> screen="messages" value={{ unread: unreadOnly }} empty={{ unread: false }} onApply={(v) => setUnreadOnly(v.unread === true)} />
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" data-testid="messages-unread-only" checked={unreadOnly} onChange={(e) => setUnreadOnly(e.target.checked)} />{t('messages.unread_only')}</label>
             <span className="ms-auto text-xs text-mute" data-testid="messages-unread-total">{t('messages.unread_count', { count: list.data?.unread_total ?? 0 })}</span>
           </div>

@@ -1,3 +1,4 @@
+import { LayoutPanel, type ViewOption } from '@/components/LayoutPanel';
 import { AlertTriangle, CalendarDays, Check, Clock, Columns3, Inbox, List, Pencil } from 'lucide-react';
 import { Fragment, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -6,7 +7,6 @@ import { downloadFile } from '@/api/client';
 import { useMe, useMyTasks } from '@/api/hooks';
 import type { TaskSummary } from '@/api/types';
 import { Holders } from '@/components/HolderChip';
-import { LayoutPanel } from '@/components/LayoutPanel';
 import { MyWorkCalendar } from '@/components/MyWorkCalendar';
 import { PersonTag } from '@/components/PersonTag';
 import { TaskDrawer } from '@/components/TaskDrawer';
@@ -96,12 +96,11 @@ export function MyWork() {
   const tbl = useTablePrefs('my-work', DEFS);
   const label = (id: string) => t(LABEL[id] ?? id);
   const clearAll = () => setParams({ q: '', adv: '' });
-  const switcher = (
-    <span className="inline-flex gap-1" role="group" aria-label={t('board.layout')} data-testid="my-work-layout">
-      <button type="button" aria-pressed={!board} data-testid="my-work-layout-list" onClick={() => setParams({ layout: '' })} className={`btn px-2 py-1 text-xs ${!board ? 'btn-primary' : ''}`}><List size={14} aria-hidden />{t('board.list')}</button>
-      <button type="button" aria-pressed={board} data-testid="my-work-layout-board" onClick={() => setParams({ layout: 'board' })} className={`btn px-2 py-1 text-xs ${board ? 'btn-primary' : ''}`}><Columns3 size={14} aria-hidden />{t('board.board')}</button>
-    </span>
-  );
+  const myViews: ViewOption[] = [
+    { id: 'list', label: t('board.list'), hint: t('view.mywork_list_hint'), icon: <List size={14} />, testid: 'my-work-layout-list' },
+    { id: 'board', label: t('board.board'), hint: t('view.mywork_board_hint'), icon: <Columns3 size={14} />, testid: 'my-work-layout-board' },
+  ];
+  const switcher = <LayoutPanel testid="my-work-view" views={{ value: board ? 'board' : 'list', options: myViews, onChange: (id) => setParams({ layout: id === 'board' ? 'board' : '' }) }} />;
   let n = 0;
   return (
     <div className="space-y-4" data-testid="page-my-work">
