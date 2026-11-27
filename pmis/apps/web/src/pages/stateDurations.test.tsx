@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
@@ -14,8 +14,8 @@ describe('F1 state durations report on the Workload page', () => {
     expect(within(table).getAllByTestId('sd-row')).toHaveLength(2);
     expect(within(table).getByText('5')).toBeInTheDocument();
     await u.click(screen.getByTestId('sd-entity-register_record'));
-    const rec = await screen.findByText('procurement');
-    expect(rec).toBeInTheDocument();
+    await waitFor(() => expect(within(screen.getByTestId('sd-table')).getAllByTestId('sd-row')).toHaveLength(1));
+    expect(within(screen.getByTestId('sd-table')).getByTestId('sd-row')).toHaveTextContent(/procurement/i);
     expect(within(screen.getByTestId('sd-table')).getAllByTestId('sd-row')).toHaveLength(1);
   });
 });
