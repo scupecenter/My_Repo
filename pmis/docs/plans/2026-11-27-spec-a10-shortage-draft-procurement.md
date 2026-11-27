@@ -1,5 +1,5 @@
 # Spec: A10 warehouse shortage (052) suggests draft procurement lines
-Status: not built (verified not merged 19:22).
+Status: built in this PR (frontend only, no migration). Reorder-limit quantity is not covered until the warehouse reorder limits are merged.
 ## Requirements
 - A shortage found in the warehouse view (052) suggests draft procurement lines. Suggestion only: nothing is created without a user action, and a created line is a draft.
 - Rights follow the matrix; reorder limits from #443 (warehouse_reorder_limits) may feed the suggested quantity once merged.
