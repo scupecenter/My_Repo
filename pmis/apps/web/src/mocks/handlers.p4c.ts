@@ -173,7 +173,7 @@ export const p4cHandlers = [
     const errs: { path: string; code: string }[] = [];
     for (const k of Object.keys(b)) if (!['reason', 'rules'].includes(k)) errs.push({ path: `/${k}`, code: 'unknown_key' });
     if ((b.reason ?? '').trim().length < 3) errs.push({ path: '/reason', code: 'required' });
-    const keys = REGISTER_DEFS.map((d) => d.register_key);
+    const keys: string[] = REGISTER_DEFS.map((d) => d.register_key);
     if (!Array.isArray(b.rules) || b.rules.length > 60) errs.push({ path: '/rules', code: 'invalid' });
     else b.rules.forEach((r, i) => {
       if (!keys.includes(String(r.target_register))) errs.push({ path: `/rules/${i}/target_register`, code: 'unknown_register' });
