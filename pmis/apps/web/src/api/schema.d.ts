@@ -17698,7 +17698,7 @@ export interface components {
         SiteDraftWarning: {
             field: string;
             /** @enum {string} */
-            code: "cluster_will_be_created" | "outside_libya" | "list_other";
+            code: "cluster_will_be_created" | "outside_libya" | "list_other" | "similar_site_code" | "duplicate_name" | "close_coordinates";
             message: string;
         };
         SiteDraftDecision: {
