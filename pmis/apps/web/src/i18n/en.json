@@ -204,6 +204,7 @@
     "library.archive": "Archive",
     "lessons_learned": "Lessons Learned",
     "invoices": "Invoices",
+    "deliverables": "Deliverables",
     "incidents": "Incidents & Security"
   },
   "top": {
@@ -2024,6 +2025,8 @@
     "follow_up": "Follow-up",
     "invoice": "Invoice",
     "payment": "Payment",
+    "deliverable": "Deliverable",
+    "links_section": "Links",
     "amount_section": "Amount",
     "incident": "Incident",
     "people_damage": "People and damage",
