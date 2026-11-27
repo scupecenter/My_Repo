@@ -214,7 +214,7 @@ describe('Q225: a site field that changes rules goes through Change Control', ()
   });
 });
 
-describe('Issue to Risk link (0214)', () => {
+describe('Issue to Risk link (0322)', () => {
   it('an issue names a risk the caller may see; a made-up or malformed id is refused; the pickers answer', async () => {
     const t = await team(app, db, 'issues', 'issues', R);
     const bad = await t.entry.api.call('post', recPath('issues'), { site_id: t.site.id, data: { pending_issue: `I-${U}`, risk_entity_id: '00000000-0000-4000-8000-000000000000' } });

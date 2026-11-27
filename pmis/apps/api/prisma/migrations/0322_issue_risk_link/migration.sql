@@ -1,5 +1,5 @@
--- 0214_issue_risk_link: an Issue can name the Risk it realises; the Risk shows the issues that came from it.
--- Mirror: db/sql/213_issue_risk_link.sql (kept identical to prisma/migrations/0214_issue_risk_link/migration.sql).
+-- 0322_issue_risk_link: an Issue can name the Risk it realises; the Risk shows the issues that came from it.
+-- Mirror: db/sql/321_issue_risk_link.sql (kept identical to prisma/migrations/0322_issue_risk_link/migration.sql).
 --
 --   Owner principle (2026-11-26): registers feed each other, a value is typed once. A risk that happens becomes an issue; the issue names the risk (optional, picked from a list)
 --   and the risk lists its realised issues with their status. Additive: one optional field, one row trigger, two readers. No new table, no permission widening, nothing deleted.

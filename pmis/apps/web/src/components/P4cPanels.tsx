@@ -150,7 +150,7 @@ export function OrderReceipts({ entityId }: { entityId: string }) {
   );
 }
 
-/** 0214: the risk an Issue realises (optional picker). */
+/** 0322: the risk an Issue realises (optional picker). */
 export function IssueRiskSelect({ value, onChange, editable, invalid }: { value: unknown; onChange: (v: string | null) => void; editable: boolean; invalid?: boolean }) {
   const { t } = useTranslation();
   const q = useIssueRisks(editable);
@@ -173,7 +173,7 @@ export function IssueRiskSelect({ value, onChange, editable, invalid }: { value:
   );
 }
 
-/** 0214: the issues that came from a risk, on the risk page. */
+/** 0322: the issues that came from a risk, on the risk page. */
 export function RiskIssues({ entityId }: { entityId: string }) {
   const { t } = useTranslation();
   const q = useRiskIssues(entityId);

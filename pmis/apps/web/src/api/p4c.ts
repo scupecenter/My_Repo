@@ -38,14 +38,14 @@ export const useWarehouseOrders = (siteId: string | null | undefined, enabled: b
     queryFn: () => api.get<{ items: S['WarehouseOrderOption'][] }>(`/registers/${key}/order-options`, { query: siteId ? { site_id: siteId } : {} }).then((r) => r.items),
   });
 
-/** GET /registers/issues/risk-options: the risks an Issue may name as realised (0214). */
+/** GET /registers/issues/risk-options: the risks an Issue may name as realised (0322). */
 export const useIssueRisks = (enabled: boolean) =>
   useQuery({
     queryKey: ['issue-risks'], enabled,
     queryFn: () => api.get<{ items: S['IssueRiskOption'][] }>('/registers/issues/risk-options').then((r) => r.items),
   });
 
-/** GET /registers/risks/{entity_id}/issues: the issues that realise a risk (0214). */
+/** GET /registers/risks/{entity_id}/issues: the issues that realise a risk (0322). */
 export const useRiskIssues = (entityId: string | null | undefined) =>
   useQuery({
     queryKey: ['risk-issues', entityId], enabled: !!entityId,
