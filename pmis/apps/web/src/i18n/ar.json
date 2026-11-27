@@ -878,6 +878,8 @@
     "ended": "تم إنهاء الإسنادات.",
     "tab_active": "المستخدمون",
     "tab_invitations": "الدعوات",
+    "count": "{{count}} مستخدم",
+    "tab_more": "المزيد",
     "tab_deleted": "المحذوفون",
     "deactivate": "تعطيل",
     "reactivate": "إعادة تفعيل",

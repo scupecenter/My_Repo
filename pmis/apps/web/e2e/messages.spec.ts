@@ -109,7 +109,7 @@ for (const locale of ['en', 'ar'] as const) {
       await expect(page.getByTestId('user-dept-1103')).toBeVisible();
       await page.getByTestId('users-tab-departments').click();
       await expect(page.getByTestId('dept-row-CIVIL')).toBeVisible();
-      await page.getByTestId('users-tab-active').click();
+      await page.getByTestId('people-tab-users').click();
       await page.getByTestId('user-open-1103').click();
       await expect(page.getByTestId('org-manager-value')).toContainText('1102');
       await page.getByTestId('org-edit').click();
