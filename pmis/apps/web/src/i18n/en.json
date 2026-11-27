@@ -3496,7 +3496,16 @@
       "quality_ncrs_open": "NCR open",
       "quality_ncrs_note": "{{closed}} closed",
       "quality_avg_close": "Avg closure",
-      "quality_first_pass": "First-time acceptance"
+      "quality_first_pass": "First-time acceptance",
+      "approvals_title": "Pending approvals bottleneck",
+      "approvals_hint": "The tasks waiting for review or approval of the sites in scope, aged since the level opened, per role. Read only.",
+      "open_approvals": "Approvals inbox",
+      "unavailable_approvals": "You do not have the approvals view right, so this section stays hidden.",
+      "approvals_total": "Waiting",
+      "approvals_review": "Review",
+      "approvals_approve": "Approve",
+      "approvals_unassigned": "No role",
+      "approvals_oldest": "oldest {{n}}d"
     },
     "scurve": {
       "title": "Progress curve",

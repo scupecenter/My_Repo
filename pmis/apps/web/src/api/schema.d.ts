@@ -18348,6 +18348,7 @@ export interface components {
             gecol_hlc: components["schemas"]["DashboardOpsGecolHlc"];
             contractor_scorecard: components["schemas"]["DashboardOpsScorecard"];
             quality: components["schemas"]["DashboardOpsQuality"];
+            approvals: components["schemas"]["DashboardOpsApprovals"];
         };
         /** @description 0.15.106: procurement and materials (dashboard proposals item 1). */
         DashboardOpsProcurement: {
@@ -18456,6 +18457,36 @@ export interface components {
             civil_ready_no_power: number | null;
             /** @description HLC only: installation_date set but not in service yet; null in the GECOL part. */
             installed_not_in_service: number | null;
+        };
+        /** @description 0.15.204 (item 7): the tasks waiting for review or approval, their ages since the level opened, and the bottleneck role. */
+        DashboardOpsApprovals: {
+            /** @description False when the caller lacks the approvals or the sites view; every figure is then null. */
+            available: boolean;
+            /** @description The waiting tasks (states in_review and in_approval, as the Approvals inbox). */
+            total: number | null;
+            /** @description The waiting tasks at a review level. */
+            review: number | null;
+            /** @description The waiting tasks at an approve level. */
+            approve: number | null;
+            waiting: components["schemas"]["DashboardOpsAging"] | null;
+            /** @description One entry per ball-in-court role, most waiting tasks first. */
+            by_role: {
+                /** Format: uuid */
+                role_id: string;
+                name_en: string;
+                name_ar: string | null;
+                /** @description The waiting tasks whose ball-in-court role is this one. */
+                count: number;
+                /** @description The age of the oldest waiting task of the role, calendar days. */
+                oldest_days: number | null;
+                buckets: {
+                    /** @enum {string} */
+                    key: "d0_7" | "d8_14" | "d15_30" | "over_30";
+                    count: number;
+                }[];
+            }[] | null;
+            /** @description The waiting tasks with no ball-in-court role (a group holds them, or nobody yet). */
+            unassigned: number | null;
         };
         /** @description 0.15.203 (item 6): the open snags and NCRs of the in-scope sites, the average closure age of each and the first-time acceptance rate. */
         DashboardOpsQuality: {
