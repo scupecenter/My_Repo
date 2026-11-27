@@ -90,6 +90,7 @@ export class DataResetArchiveService {
       const q = (s: string) => `"${s.replace(/"/g, '""')}"`;
       let bytesFiles = 0;
       for (const f of sel.files) {
+        // eslint-disable-next-line no-control-regex
         const base = (f.name || 'file').replace(/[\\/:*?"<>|\x00-\x1f]/g, '_').slice(0, 120);
         let path = `files/${base}`;
         for (let n = 2; used.has(path.toLowerCase()); n++) path = `files/${n}_${base}`;
