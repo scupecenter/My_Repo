@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { DateInput } from '@/components/DateInput';
 
 /**
  * A table cell that is edited in place: click (or Enter on the focused cell) turns the value into an input; Enter or leaving the field saves, Esc cancels.
@@ -64,7 +65,9 @@ export function InlineCell({ value, display, kind = 'text', options, min, max, d
           {(options ?? []).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
       ) : (
-        <input ref={ref} className="input w-full" type={kind} min={min} max={max} dir={dir} aria-label={label} data-testid={testid ? `${testid}-input` : undefined} value={v} disabled={busy} onChange={(e) => setV(e.target.value)} onKeyDown={onKey} onBlur={() => void commit()} />
+        kind === 'date'
+          ? <DateInput autoFocus picker={false} className="input w-full" min={min} max={max} aria-label={label} data-testid={testid ? `${testid}-input` : undefined} value={v} disabled={busy} onChange={(e) => setV(e.target.value)} onKeyDown={onKey} onBlur={() => void commit()} />
+          : <input ref={ref} className="input w-full" type={kind} min={min} max={max} dir={dir} aria-label={label} data-testid={testid ? `${testid}-input` : undefined} value={v} disabled={busy} onChange={(e) => setV(e.target.value)} onKeyDown={onKey} onBlur={() => void commit()} />
       )}
       {err && <span role="alert" className="mt-1 block text-xs text-lateInk" data-testid={testid ? `${testid}-err` : undefined}>{err}</span>}
     </span>
