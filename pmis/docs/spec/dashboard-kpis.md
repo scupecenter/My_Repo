@@ -393,4 +393,9 @@ Open points: Q175 to Q187 in `open-questions.md`.
 | D16 | `components[].draft` on every health factor not approved (all but D and I; setting `dashboard.health_approved_factors`). | `dash_core` |
 | Q116 | Previews of variant A (rings, default) and B (flat segmented track); setting `dashboard.pipeline_variant`. | `Pipeline.tsx`, `dash_set_pipeline_variant` |
 
+## 13. Short result cache (D62, performance)
+
+`GET /dashboard` reads `dash_overview` through a 30 second in-process cache keyed by the caller's regions, the filters, the view, the override flag and the site set; the
+figures can be up to 30 seconds old and `meta.as_of` says when they were read. Settings, goals, weights and the other configuration writes clear it at once. See `docs/ops/load-test.md`.
+
 Open points: Q340 to Q393 in `open-questions.md`.

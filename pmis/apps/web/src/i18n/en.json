@@ -1208,6 +1208,7 @@
     "section_sla_weights": "Weights",
     "section_registers_lists": "Lists",
     "section_alerts_policy": "Notification policy",
+    "section_alerts_push": "Web push",
     "section_alerts_mail": "Mail kinds",
     "section_security_locks": "Lock keys",
     "section_security_support": "Support access",
@@ -1339,6 +1340,14 @@
     "unknown_role": "Not a role code.",
     "unknown_field": "Not a field that can be used here.",
     "in_the_future": "The cutoff date cannot be in the future."
+  },
+  "calview": {
+    "title": "Calendar",
+    "prev": "Previous month",
+    "next": "Next month",
+    "undated": "{{n}} with no date",
+    "field": "Date field",
+    "no_columns": "No date field is defined for this screen."
   },
   "cal": {
     "inline_reason": "Reason for the changes made in the table (3+ characters)",
@@ -3086,7 +3095,10 @@
     "only_leads": "Only a lead of this region (the reassign right), or a System Admin, writes its update. An author edits only until the week ends.",
     "empty": "No status updates yet",
     "empty_lead": "Write the first update of the week.",
-    "empty_hint": "Leads publish one update per region or team each week."
+    "empty_hint": "Leads publish one update per region or team each week.",
+    "health_board": "Region health",
+    "missing_update": "Missing update",
+    "missing_hint": "No update posted for this week yet."
   },
   "dash": {
     "tabs": {
@@ -3499,7 +3511,16 @@
       "quality_ncrs_open": "NCR open",
       "quality_ncrs_note": "{{closed}} closed",
       "quality_avg_close": "Avg closure",
-      "quality_first_pass": "First-time acceptance"
+      "quality_first_pass": "First-time acceptance",
+      "approvals_title": "Pending approvals bottleneck",
+      "approvals_hint": "The tasks waiting for review or approval of the sites in scope, aged since the level opened, per role. Read only.",
+      "open_approvals": "Approvals inbox",
+      "unavailable_approvals": "You do not have the approvals view right, so this section stays hidden.",
+      "approvals_total": "Waiting",
+      "approvals_review": "Review",
+      "approvals_approve": "Approve",
+      "approvals_unassigned": "No role",
+      "approvals_oldest": "oldest {{n}}d"
     },
     "scurve": {
       "title": "Progress curve",
@@ -3514,6 +3535,11 @@
       "empty": "No saved snapshots yet: the curve appears after the first weekly snapshot.",
       "chart_label": "Progress curve: {{list}}",
       "basis": "{{n}} saved weekly snapshots, values frozen at their dates."
+    },
+    "region_health": {
+      "title": "Region health",
+      "open": "Open the Weekly status",
+      "week": "Week of {{date}}"
     }
   },
   "docs": {
@@ -3802,7 +3828,8 @@
       "motion": "Motion",
       "icon_style": "Icon weight",
       "menu_style": "Side menu",
-      "accent": "Accent colour"
+      "accent": "Accent colour",
+      "contrast": "Contrast"
     },
     "opt": {
       "density": {
@@ -3843,6 +3870,10 @@
         "orange": "Orange",
         "red": "Red",
         "amber": "Amber"
+      },
+      "contrast": {
+        "standard": "Standard",
+        "high": "High"
       }
     }
   },
@@ -5057,6 +5088,10 @@
   "p4c": {
     "receipt_no_order": "No order (stock without an order)",
     "receipt_order_hint": "Optional. PR No., PO / WO No. and the contractor are read from the order.",
+    "advance_none": "Choose the advance",
+    "advance_hint": "Only approved advances of this site that are disbursed or being settled are listed.",
+    "supplier_none": "No company (type the name below)",
+    "supplier_hint": "Optional. Picking a company links the invoice to the Contractors list and fills the supplier name when it is empty.",
     "receipts_title": "Warehouse receipts against this order",
     "receipts_none": "No receipt names this order yet.",
     "receipts_qty": "{{lines}} line(s), quantity {{qty}}",
@@ -6886,6 +6921,28 @@
     "last": "Last indexed: {{at}}",
     "never": "Nothing indexed yet."
   },
+  "push": {
+    "title": "Notifications on this device",
+    "note": "Get a short alert on this phone or computer when you have a new notification. The alert only says you have something new; open the inbox to read it. The bell and the e-mail stay as they are, and you can turn this off at any time.",
+    "server_off": "Device alerts are not turned on for this system yet. Ask your administrator.",
+    "unsupported": "This browser does not support device alerts.",
+    "on": "On for this device",
+    "off": "Off for this device",
+    "enable": "Turn on",
+    "disable": "Turn off",
+    "denied": "The browser blocked notifications. Allow them in the browser settings, then try again.",
+    "failed": "Could not change device alerts. Try again."
+  },
+  "wps": {
+    "title": "Web push (device alerts)",
+    "note": "Field engineers can turn on a short alert on their phone or computer (Profile > Notifications on this device). The alert carries no site or record text, only that something new is waiting in the inbox. The bell and the e-mail are unchanged.",
+    "on": "Web push is on. A person turns it on for their own browser in Profile.",
+    "off": "Web push is off because the server has no push keys. It stays off until the administrator sets VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY and VAPID_SUBJECT in the server environment. Nothing is sent and people see that device alerts are not available.",
+    "browsers": "Subscribed browsers",
+    "people": "People",
+    "last": "Last alert sent: {{at}}",
+    "never": "No alert sent yet."
+  },
   "as": {
     "title": "Archive",
     "note": "Which document cards Library > Archive shows and in what order, the default columns of its list and the most files a bulk zip may hold.",
@@ -6922,7 +6979,8 @@
     "board": "Board",
     "board_hint": "Cards by milestone or status",
     "map": "Map",
-    "map_hint": "Items on the map"
+    "map_hint": "Items on the map",
+    "calendar_hint": "On a month grid, by a date you choose"
   },
   "batchedit": {
     "title": "Batch edit",
@@ -7612,6 +7670,13 @@
     "bad_value": "Use a whole number from {{min}} to {{max}}.",
     "bad_session": "The longest session cannot be shorter than the idle sign-out.",
     "in_force": "Changed"
+  },
+  "presence": {
+    "editing_record_one": "{{names}} is editing this record",
+    "editing_record_other": "{{names}} are editing this record",
+    "editing_task_one": "{{names}} is editing this task",
+    "editing_task_other": "{{names}} are editing this task",
+    "editing_join": ", "
   },
   "capture": {
     "dictate": "Dictate",

@@ -425,12 +425,14 @@ const DASH_CATALOGUE = {
     { code: 'gates_issues_delay', label_en: 'Blocked gates, issues and delay attribution', label_ar: 'البوابات المعطلة والقضايا والتأخير' },
     { code: 'goals', label_en: 'Goals', label_ar: 'الأهداف' },
     { code: 'regions', label_en: 'Regions', label_ar: 'المناطق' },
+    { code: 'region_health', label_en: 'Region health', label_ar: 'صحة المناطق' },
     { code: 'ops_procurement', label_en: 'Procurement and materials', label_ar: 'المشتريات والمواد' },
     { code: 'ops_scurve', label_en: 'Progress curve: planned vs actual, velocity and forecast', label_ar: 'منحنى التقدم: المخطط مقابل الفعلي والسرعة والتوقع' },
     { code: 'ops_permits_hse', label_en: 'Permits and HSE: status, validity, stop-work and PTW checks', label_ar: 'التصاريح والسلامة: الحالة والصلاحية وإيقاف العمل وفحوصات تصاريح العمل' },
     { code: 'ops_gecol_hlc', label_en: 'Power and fiber readiness: GECOL and HLC waiting sites by age', label_ar: 'جاهزية الكهرباء والألياف: مواقع GECOL وHLC المنتظرة حسب العمر' },
     { code: 'ops_contractors', label_en: 'Contractor and supplier scorecard: levels, delay and quality', label_ar: 'بطاقة أداء المقاولين والموردين: المستويات والتأخير والجودة' },
     { code: 'ops_quality', label_en: 'Quality: open snags and NCR, closure age, first-time acceptance', label_ar: 'الجودة: الـSnag والـNCR المفتوحة وعمر الإغلاق والقبول من أول مرة' },
+    { code: 'ops_approvals', label_en: 'Pending approvals: waiting review or approval, ages per role', label_ar: 'الموافقات المعلقة: بانتظار المراجعة أو الاعتماد، الأعمار حسب الدور' },
   ],
 };
 const dashSeedThresholds = Object.fromEntries(DASH_CATALOGUE.kpis.map((k) => [k.code, { green: k.default_green, amber: k.default_amber }]));
