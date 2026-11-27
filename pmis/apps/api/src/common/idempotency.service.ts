@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import { problems } from './problem';
+import { limit } from '../ops/ops-limits';
 
 const TTL_MS = 24 * 60 * 60 * 1000;
-const MAX_ENTRIES = 5000;
 const KEY_PATTERN = /^[\x21-\x7e]{8,128}$/;
 
 interface Entry {
@@ -52,7 +52,7 @@ export class IdempotencyService {
   private sweep(): void {
     const now = Date.now();
     for (const [k, v] of this.entries) {
-      if (now - v.at > TTL_MS || this.entries.size > MAX_ENTRIES) this.entries.delete(k);
+      if (now - v.at > TTL_MS || this.entries.size > limit('idempotency.max_entries')) this.entries.delete(k);
     }
   }
 }
