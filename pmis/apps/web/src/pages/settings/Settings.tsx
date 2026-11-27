@@ -3,6 +3,7 @@ import { NavLink, Navigate, Outlet, Route, Routes, useLocation } from 'react-rou
 import { Calendar } from './Calendar';
 import { DocumentLibrary } from './DocumentLibrary';
 import { FormTemplates } from './FormTemplates';
+import { WebPushSettings } from './WebPushSettings';
 import { ArchiveSettings } from './ArchiveSettings';
 import { DocumentSearchIndex } from './DocumentSearchIndex';
 import { Notifications } from './Notifications';
@@ -66,7 +67,7 @@ export const SETTINGS_TABS: readonly SettingsTab[] = [
   { key: 'documents', sections: [{ key: 'types' }, { key: 'forms' }, { key: 'archive' }, { key: 'numbering' }, { key: 'search', adminOnly: true }] },
   { key: 'data', sections: [{ key: 'imports' }, { key: 'historical' }, { key: 'counts', adminOnly: true }, { key: 'export' }, { key: 'reset', adminOnly: true }] },
   // Notification policy + Mail kinds (admin only): both are what is sent to people
-  { key: 'alerts', sections: [{ key: 'policy' }, { key: 'mail', adminOnly: true }, { key: 'rules', adminOnly: true }] },
+  { key: 'alerts', sections: [{ key: 'policy' }, { key: 'mail', adminOnly: true }, { key: 'rules', adminOnly: true }, { key: 'push', adminOnly: true }] },
   // DLP months is a data-protection rule, so it moved here from SLA
   { key: 'security', sections: [{ key: 'staff' }, { key: 'retention' }, { key: 'dlp' }, { key: 'locks' }, { key: 'support' }, { key: 'newdevice' }, { key: 'passkeys' }] },
   // Screens: what users see by default (Dashboard, Display menu of the tables, My Work Daily Plan)
@@ -167,6 +168,7 @@ export function SettingsRoutes() {
           <Route path="policy" element={<Notifications />} />
           <Route path="mail" element={<><MailPolicy /><MailKinds /></>} />
           <Route path="rules" element={<AlertRules />} />
+          <Route path="push" element={<WebPushSettings />} />
         </Route>
         <Route path="workflow" element={<TabFrame tab="workflow" />}>
           <Route index element={<Navigate to="editor" replace />} />

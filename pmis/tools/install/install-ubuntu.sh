@@ -853,6 +853,7 @@ server {
     add_header X-Frame-Options DENY always;
     add_header Referrer-Policy same-origin always;
     add_header Strict-Transport-Security "max-age=31536000" always;
+    $CSP_DIRECTIVE
     try_files \$uri =404;
   }
   location = /manifest.webmanifest {
@@ -861,6 +862,7 @@ server {
     add_header X-Frame-Options DENY always;
     add_header Referrer-Policy same-origin always;
     add_header Strict-Transport-Security "max-age=31536000" always;
+    $CSP_DIRECTIVE
     try_files \$uri =404;
   }
   location = /mockServiceWorker.js {
