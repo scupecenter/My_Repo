@@ -6860,5 +6860,16 @@
     "remove": "Remove goal",
     "add": "Add goal",
     "save_title": "Save the goals"
+  },
+  "mySessions": {
+    "title": "My sessions",
+    "note": "The devices signed in as you. Sign out of any you do not recognise or no longer use. This device stays signed in; use Sign out for it.",
+    "this_device": "This device",
+    "unknown_device": "Unknown device",
+    "signed_in": "Signed in",
+    "last_active": "Last active",
+    "sign_out": "Sign out",
+    "sign_out_others": "Sign out of all other devices",
+    "ended": "Signed out."
   }
 }

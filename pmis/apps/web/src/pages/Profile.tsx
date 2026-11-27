@@ -6,7 +6,7 @@ import { ApiError } from '@/api/client';
 import { useSession } from '@/api/hooks';
 import type { TwoFactorEnrolment } from '@/api/types';
 import {
-  type MyProfile, useCancelEmailChange, useCancelPhoneChange, useChangeMyPassword, useMyProfile, useRequestEmailChange, useRequestPhoneChange,
+  type MyProfile, useCancelEmailChange, useCancelPhoneChange, useChangeMyPassword, useEndMyOtherSessions, useEndMySession, useMyProfile, useMySessions, useRequestEmailChange, useRequestPhoneChange,
   useResendEmailCode, useSelfDisableTwoFactor, useSelfEnrolConfirm, useSelfEnrolStart, useUpdateMyProfile, useVerifyEmailChange,
 } from '@/api/profile';
 import { errText } from '@/components/FormDialog';
@@ -54,8 +54,47 @@ export function Profile() {
         <PhoneSection p={p} />
         <PasswordSection p={p} />
         <TwoFactorSection p={p} />
+        <MySessionsSection />
       </div>
     </div>
+  );
+}
+
+/** 0.15.101: "My sessions": the devices signed in as me, and signing out of the others. Own rows only. */
+function MySessionsSection() {
+  const { t, i18n } = useTranslation();
+  const toast = useToast();
+  const q = useMySessions();
+  const end = useEndMySession();
+  const endOthers = useEndMyOtherSessions();
+  const items = q.data ?? [];
+  const others = items.filter((s) => !s.is_current).length;
+  return (
+    <Section id="sessions" icon={<ShieldCheck size={18} aria-hidden />} title={t('mySessions.title')}>
+      <p className="text-sm text-mute">{t('mySessions.note')}</p>
+      {q.isLoading ? <LoadingSkeleton /> : q.isError ? <ErrorState onRetry={() => void q.refetch()} /> : (
+        <ul className="space-y-2" data-testid="my-sessions">
+          {items.map((s) => (
+            <li key={s.session_id} className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-card2 p-3 text-sm" data-testid={`my-session-${s.session_id}`}>
+              <span>
+                <span className="font-semibold">{s.device ? `${s.device.browser} · ${s.device.os}` : t('mySessions.unknown_device')}</span>
+                {s.is_current ? <span className="ms-2 text-ok" data-testid="my-session-current">{t('mySessions.this_device')}</span> : null}
+                <span className="block text-xs text-mute">{t('mySessions.signed_in')}: {fmtDateTime(s.signed_in_at, i18n.language)} · {t('mySessions.last_active')}: {fmtDateTime(s.last_activity_at, i18n.language)}{s.ip ? ` · ${s.ip}` : ''}</span>
+              </span>
+              {s.is_current ? null : (
+                <button type="button" className="btn" data-testid={`my-session-end-${s.session_id}`} disabled={end.isPending}
+                  onClick={() => end.mutate(s.session_id, { onSuccess: () => toast(t('mySessions.ended')) })}>{t('mySessions.sign_out')}</button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      <Err id="my-sessions-error" msg={end.isError ? errText(end.error, t) : endOthers.isError ? errText(endOthers.error, t) : null} />
+      {others > 0 ? (
+        <div className="flex justify-end"><button type="button" className="btn" data-testid="my-sessions-end-others" disabled={endOthers.isPending}
+          onClick={() => endOthers.mutate(undefined, { onSuccess: () => toast(t('mySessions.ended')) })}>{t('mySessions.sign_out_others')}</button></div>
+      ) : null}
+    </Section>
   );
 }
 
