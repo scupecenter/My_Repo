@@ -214,7 +214,7 @@ function Editor({ id, pin }: { id: string; pin: () => void }) {
     (a) =>
       !okWeight(a.weight) ||
       !a.name_en.trim() ||
-      a.items.some((i) => !okWeight(i.weight) || !i.name_en.trim() || ruleErrors(i.measure_rule).some((e) => e !== 'unknown_task')),
+      a.items.some((i) => !okWeight(i.weight) || !i.name_en.trim() || ruleErrors(i.measure_rule).some((e) => e !== 'unknown_task' && e !== 'legacy')),
   );
   const setAct = (ai: number, patch: Partial<Act>) =>
     setActs(view.map((a, k) => (k === ai ? { ...a, ...patch } : a)));
