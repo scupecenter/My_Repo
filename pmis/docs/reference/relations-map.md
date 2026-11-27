@@ -64,8 +64,7 @@ A dotted arrow is an id column with no `REFERENCES` constraint (the id is checke
    read them from Procurement by Site ID. Owned by the build agent of the Procurement to GECOL / HLC flow.
 3. **Car dispatcher and Financial advances to Procurement.** `procurement_record_id` is a typed text field; a picker over the orders of the site would
    remove the typing.
-4. **Contract end.** `external_parties.contract_end` and `external_party_contracts.end_date` both exist; the performance view uses the active contract first,
-   the company date second. One should be derived from the other.
+4. **Contract end.** *(done, migration 0212)* `external_party_contracts` is the single source of the contract dates; `external_parties.contract_start` / `contract_end` are a mirror the database rebuilds on every contract change (earliest start, latest end of the active contracts; an open-ended contract leaves the end empty). The performance view reads the contracts first.
 5. **Constraints.** The id columns without a `REFERENCES` constraint (dotted in section 2) rely on the writing function. Adding the constraints is additive but needs a data check first (orphan ids), so it is a proposal for a later migration, not part of this document.
 6. **Notifications.** Each module raises its own notice; no single function applies the policy (channel, digest, escalation).
 

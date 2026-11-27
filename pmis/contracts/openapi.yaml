@@ -32,6 +32,7 @@ info:
 
     ## Versions
     - 0.15.160 (2026-11-27): goals with automatic progress (migration 0260; CHANGELOG Goals). Additive. `GET`/`PUT /settings/goals` (`getGoals`, `setGoals`) and `GET /goals/progress` (`getGoalsProgress`). Progress is counted from approved milestone tasks, as the On-Air counter does; no permission is widened.
+    - 0.15.98 (2026-11-27): the dashboard follow-up sections (owner approval 2026-11-26, dashboard proposals item 1; migration 0230). Additive and read only. New `GET /dashboard/ops` (`getDashboardOps`, `DashboardOps`): the sections that follow the operations beyond F13, each part `available: false` when the caller may not see its module. First section `procurement`: the open orders (order status not one of the closing statuses of the contractor rules, as in `GET /reports/contractor-performance`), the PRs waiting for a PO/WO and the open PO/WOs, each aged in calendar days and bucketed 0-7, 8-14, 15-30, over 30, and the materials position: the receive rate (dispatched against required of `warehouse_site_qty` over the active, not cancelled sites), the count of sites with a shortage line, the top shortage lines with their contractor (the party of the site's newest open order; unattributed when none) and the shortage per contractor. No price is returned (no price is stored on a Procurement record). The dashboard settings catalogue gains the card `ops_procurement`, so the card shows, hides and orders per tab in Settings > Dashboard like every other card. No grant, role or permission change.
     - 0.15.97 (2026-11-27): the sign-in page settings (owner request 2026-11-26; migration 0197). Additive. New `GET/PUT /settings/login-page` (`getLoginPage`, `setLoginPage`; setting `ui.login_page`): the sign-in page announcement (English and Arabic, kind info or maintenance, both texts empty hides it), the background animation switch, the default language of the signed-out pages and up to five support links ({label_en, label_ar, url}; http(s) or mailto only). Every signed-in user reads the state (the post-login splash shows `server_version` from it); a System Admin or a delegate of `settings` edit for all regions changes it with a reason, a step-up and If-Match (audited `login_page_update`, before and after). New `GET /settings/login-page/public` (`getLoginPagePublic`, no session): ONLY what the sign-in page renders (announcement, animation, default_locale, support_links) - no version, no audit data, nothing about users; cached 30 seconds and rate limited per address. No permission, visibility or authentication change.
     - 0.15.96 (2026-11-27): responsibility-matrix coverage screen (CHANGELOG MatrixCoverage; no migration). Additive and read only. `GET /matrix/coverage` (`getMatrixCoverage`, System Admin or an all-region delegate of the matrix): for each active stage and enabled register row and each of the seven regions, whether the matrix cell has an actor, so empty cells show before a task or record stalls. Settings > Workflow > Coverage.
     - 0.15.95 (2026-11-27): Issue log and Quality record link to a Procurement order (migration 0195; CHANGELOG IssueQualityOrderLink). Additive. New optional field `procurement_order_id` on `issues` and `quality`; when set, the contractor (`external_party`) is taken from the order (a different typed `external_party_id` is refused, 422 `contractor_from_order`; `order_not_active`, `order_other_site`, `invalid`), so the contractor performance view sees the issue and the inspection. `GET /registers/issues/order-options` and `GET /registers/quality/order-options` list the orders (own module view plus Procurement view).
@@ -14858,6 +14859,39 @@ paths:
                       items: {$ref: '#/components/schemas/SystemLogEntry'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
+  /dashboard/ops:
+    get:
+      tags: [dashboard]
+      operationId: getDashboardOps
+      summary: The follow-up sections of the dashboard (0.15.106)
+      description: |
+        The sections that follow the operations beyond F13 (owner approval 2026-11-26, dashboard proposals). Read only; not audited (a read, like `GET /dashboard`).
+        **Who sees what (B3).** Needs `dashboard.view` (403 `module_forbidden otherwise") and the tab rule of 0.15.80 applies as in `GET /dashboard/extras`.
+        The caller's `dashboard.view` regions limit every section. A part whose module the caller may not see answers `available: false` with null figures.
+        **Section `procurement`** (item 1, migration 0190): the orders need `procurement.view`, the materials `warehouse.view`.
+        An **open order** is a Procurement record whose order status is not one of the closing statuses of the contractor rules (the same rule as
+        `GET /reports/contractor-performance`, so the two screens never disagree). `pr_wait` ages the open orders that have a PR date and no PO/WO yet
+        from the PR date; `po_wait` ages the open orders that have a PO/WO from the PO/WO date; both in calendar days, bucketed 0-7, 8-14, 15-30, over 30.
+        The **materials** position reads `warehouse_site_qty` over the active, not cancelled sites of the caller's regions (the unified `filter` narrows
+        them as in `GET /dashboard/extras`): `receive_pct` is dispatched against required (capped at 100%, null when nothing is required),
+        `sites_short` counts the sites with at least one shortage line (required over dispatched), `top_shortages` lists the ten biggest missing
+        lines with the contractor of the site, and `by_contractor` groups the shortage per contractor. The contractor of a line is the party of the
+        site's newest open order; a site with no open order is unattributed (empty name, null party). No price is returned: no price is stored on a
+        Procurement record (the financial summary is a separate, restricted card).
+      parameters:
+      - {$ref: '#/components/parameters/DashboardFilterTree'}
+      - name: region_id
+        in: query
+        schema: {$ref: '#/components/schemas/RegionId'}
+      responses:
+        '200':
+          description: The sections.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DashboardOps'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
   /dashboard/milestone-pipeline:
     get:
       tags: [dashboard]
@@ -22153,6 +22187,79 @@ components:
         version: { type: integer, minimum: 0 }
         updated_at: { type: [string, 'null'], format: date-time }
         updated_by: { anyOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+    DashboardOps:
+      type: object
+      description: '0.15.106: the follow-up sections of the dashboard (owner approval 2026-11-26).'
+      required: [as_of, scope_regions, procurement]
+      properties:
+        as_of: {type: string, format: date-time}
+        scope_regions:
+          type: [array, 'null']
+          items: {$ref: '#/components/schemas/RegionId'}
+          description: The regions the figures cover (null = every region).
+        procurement: {$ref: '#/components/schemas/DashboardOpsProcurement'}
+    DashboardOpsProcurement:
+      type: object
+      description: '0.15.106: procurement and materials (dashboard proposals item 1).'
+      required: [available, open_total, pr_wait, po_wait, materials]
+      properties:
+        available: {type: boolean, description: False when the caller may not see the Procurement register; the order figures are then null.}
+        open_total: {type: [integer, 'null'], description: Open orders (status not one of the closing statuses of the contractor rules).}
+        pr_wait: {$ref: '#/components/schemas/DashboardOpsAging'}
+        po_wait: {$ref: '#/components/schemas/DashboardOpsAging'}
+        materials: {$ref: '#/components/schemas/DashboardOpsMaterials'}
+    DashboardOpsAging:
+      type: object
+      required: [buckets, total, oldest_days]
+      properties:
+        buckets:
+          type: array
+          description: Every bucket once, in order d0_7, d8_14, d15_30, over_30 (calendar days).
+          items:
+            type: object
+            required: [key, count]
+            properties:
+              key: {type: string, enum: [d0_7, d8_14, d15_30, over_30]}
+              count: {type: integer}
+        total: {type: integer}
+        oldest_days: {type: [integer, 'null']}
+    DashboardOpsMaterials:
+      type: object
+      required: [available, receive_pct, required_total, dispatched_total, sites_short, top_shortages, by_contractor]
+      properties:
+        available: {type: boolean, description: False when the caller may not see the Warehouse; the other fields are then null.}
+        receive_pct: {type: [number, 'null'], description: 'Dispatched against required, capped at 100; null when nothing is required.'}
+        required_total: {type: [number, 'null']}
+        dispatched_total: {type: [number, 'null']}
+        sites_short: {type: [integer, 'null'], description: 'Active, not cancelled sites with at least one shortage line.'}
+        top_shortages:
+          type: [array, 'null']
+          maxItems: 10
+          items:
+            type: object
+            required: [site_id, site_code, item_code, item_name, missing, required, dispatched, contractor]
+            properties:
+              site_id: {type: string, format: uuid}
+              site_code: {type: string}
+              item_code: {type: string}
+              item_name: {type: string}
+              missing: {type: number}
+              required: {type: number}
+              dispatched: {type: number}
+              contractor: {type: [string, 'null'], description: The party of the site's newest open order; null when unattributed.}
+        by_contractor:
+          type: [array, 'null']
+          maxItems: 10
+          description: The shortage per contractor, the biggest first. The row with party_id null gathers the unattributed lines.
+          items:
+            type: object
+            required: [party_id, name, sites, missing_lines, missing_qty]
+            properties:
+              party_id: {type: [string, 'null'], format: uuid}
+              name: {type: string}
+              sites: {type: integer}
+              missing_lines: {type: integer}
+              missing_qty: {type: number}
     DashboardTabLayout:
       type: object
       required: [order, hidden]
