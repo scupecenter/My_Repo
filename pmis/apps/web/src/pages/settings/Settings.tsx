@@ -40,6 +40,7 @@ import { Identity } from './Identity';
 import { SecurityLocks } from './SecurityLocks';
 import { SupportAccess } from './SupportAccess';
 import { NewDeviceCode } from './NewDeviceCode';
+import { Passkeys } from './Passkeys';
 import { DisplaySettings } from './DisplaySettings';
 import { PmSchedulesSettings } from './PmSchedulesSettings';
 import { DailyPlanSettings } from './DailyPlanSettings';
@@ -65,7 +66,7 @@ export const SETTINGS_TABS: readonly SettingsTab[] = [
   // Notification policy + Mail kinds (admin only): both are what is sent to people
   { key: 'alerts', sections: [{ key: 'policy' }, { key: 'mail', adminOnly: true }, { key: 'rules', adminOnly: true }] },
   // DLP months is a data-protection rule, so it moved here from SLA
-  { key: 'security', sections: [{ key: 'staff' }, { key: 'retention' }, { key: 'dlp' }, { key: 'locks' }, { key: 'support' }, { key: 'newdevice' }] },
+  { key: 'security', sections: [{ key: 'staff' }, { key: 'retention' }, { key: 'dlp' }, { key: 'locks' }, { key: 'support' }, { key: 'newdevice' }, { key: 'passkeys' }] },
   // Screens: what users see by default (Dashboard, Display menu of the tables, My Work Daily Plan)
   { key: 'screens', sections: [{ key: 'dashboard' }, { key: 'tables' }, { key: 'daily-plan' }, { key: 'goals' }, { key: 'pm-schedules' }, { key: 'motion' }, { key: 'login' }, { key: 'interface' }, { key: 'data-hub' }] },
   { key: 'identity', sections: [] },
@@ -215,6 +216,7 @@ export function SettingsRoutes() {
           <Route path="locks" element={<SecurityLocks />} />
           <Route path="support" element={<SupportAccess />} />
           <Route path="newdevice" element={<NewDeviceCode />} />
+          <Route path="passkeys" element={<Passkeys />} />
         </Route>
         {Object.entries(LEGACY_SETTINGS_PATHS).map(([old, to]) => <Route key={old} path={old} element={<LegacyRedirect to={to} />} />)}
       </Route>
