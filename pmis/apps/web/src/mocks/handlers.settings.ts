@@ -359,6 +359,12 @@ const importsView = () => {
   const c = IM();
   return { async_rows: c.async_rows, default_async_rows: 50, min: 10, max: 500, updated_at: c.updated_at, updated_by: c.updated_by ? ref(c.updated_by) : null, version: c.version, can_edit: isAdmin() };
 };
+/** D49 part 3 (0.15.322): imports.upload_policy. */
+const policyView = () => {
+  const c = IM();
+  return { policy: c.upload_policy ?? 'enforce', default_policy: 'enforce', policies: ['enforce', 'accept_incomplete'], updated_at: c.policy_updated_at ?? null,
+    updated_by: c.policy_updated_by ? ref(c.policy_updated_by) : null, version: c.policy_version ?? 1, can_edit: isAdmin() };
+};
 const confirmation = () => {
   const c = CC(), h = C().holidays, y = Number(TODAY.slice(0, 4));
   const blockers = [y, y + 1].flatMap((yr): { code: 'no_holidays' | 'tentative_remaining'; year: number; count: number }[] => {
@@ -668,6 +674,23 @@ export const settingsHandlers = [
     if (IM().async_rows === b.async_rows) return problem(409, 'invalid_transition', `The threshold is already ${String(b.async_rows)} rows.`);
     Object.assign(IM(), { async_rows: b.async_rows as number, version: IM().version + 1, updated_at: new Date().toISOString(), updated_by: viewer()!.employee_id! }); save();
     const j = importsView();
+    return HttpResponse.json(j, tag(j.version));
+  }),
+
+  // ------------------------------------------------------------------ 0.15.322: the upload policy of the imports (D49 part 3)
+  http.get(`${B}/settings/imports/upload-policy`, () => { const g = guard(); if (g) return g; const j = policyView(); return HttpResponse.json(j, tag(j.version)); }),
+  http.put(`${B}/settings/imports/upload-policy`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, policyView().version); if (p) return p;
+    const b = await body<{ policy?: unknown; reason?: string } & Record<string, unknown>>(request);
+    const errs: { path: string; code: string }[] = Object.keys(b).filter((k) => !['policy', 'reason'].includes(k)).map((k) => ({ path: `/${k}`, code: 'unknown_field' }));
+    if ((b.reason ?? '').trim().length < 3 || (b.reason ?? '').length > 1000) errs.push({ path: '/reason', code: 'required' });
+    if (b.policy !== 'enforce' && b.policy !== 'accept_incomplete') errs.push({ path: '/policy', code: 'invalid' });
+    if (errs.length) return fields(...errs);
+    if (policyView().policy === b.policy) return problem(409, 'invalid_transition', `The upload policy is already ${String(b.policy)}.`);
+    Object.assign(IM(), { upload_policy: b.policy as 'enforce' | 'accept_incomplete', policy_version: (IM().policy_version ?? 1) + 1, policy_updated_at: new Date().toISOString(), policy_updated_by: viewer()!.employee_id! }); save();
+    const j = policyView();
     return HttpResponse.json(j, tag(j.version));
   }),
 
