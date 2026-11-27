@@ -31,6 +31,9 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.240 (2026-11-27): intake triage for the Issue Log and the Change Control Log (owner request 2026-11-27; migration 0340, mirror `db/sql/339_register_triage.sql`; CHANGELOG RegisterTriage). Additive. (1) `RegisterDefinition.triage_enabled` (true for `issues` and `change_control`): a record of such a register enters an intake queue (`RegisterRecord.triage.state` `pending`) on every insert, a new version included (the old decision is cleared). (2) New `POST /registers/{register_key}/records/{record_id}/triage` (`triageRegisterRecord`): one decision of the register's Matrix L2 holders of the record's region (a System Admin only when the row has no holder, exactly like an approval): `accept` (the record proceeds to its normal flow), `defer` (stays in the queue, with a note), `reject` (note and step-up required; the record is `voided`) and `merge` (`duplicate_of`, note and step-up; the record is `voided`, links the surviving record `triage.duplicate_of`, and the decision is noted on the surviving record's comment thread). `If-Match` is the record's version; `allowed_actions` gains `triage` while a record is pending or deferred and the caller may decide. `GET /registers/{register_key}/records` takes `triage` (one of `TriageState`). (3) Audited as `register_record_triage` with before and after; `RegisterRecordStep.action` gains `triage_accept`, `triage_reject`, `triage_merge`, `triage_defer`; the creator is notified (`NotificationKind` gains `triage_decision`). No grant, role or default changes.
+    - 0.15.261 (2026-11-27): mail policy (migration 0364, mirror `db/sql/363_mail_policy.sql`). Additive. New `GET/PUT /settings/mail-policy` (the setting `mail.policy`: global switch, internal only or internal plus external recipients, internal domains, per kind switch and mode). `expiry_radar`, `approval_digest` and `weekly_digest` join the mail kind catalogue (still mailed only when listed in `mail.notification_kinds`). Defaults keep today's behaviour.
+    - 0.15.260 (2026-11-27): cross-register derive (migration 0363, mirror `db/sql/362_derive_rules.sql`; owner approval 2026-11-27). Additive. New `GET/PUT /settings/derive-rules` (the setting `derive.rules`: which value a register shows from another register; If-Match, reason, audited; field errors `unknown_key`, `unknown_register`, `same_register`, `unknown_field`, `duplicate`, `invalid`, `too_many`). `RegisterRecord.derived` carries the derived values of the record by output name; `procurement_contractor` of GECOL and HLC is now the seeded rule and keeps its shape. A derived value is computed on read from the configured source field of the matching source record only (never the record), needs no permission on the source register, is shown only for target records the caller may read, and each person's first read of a rule in 10 minutes is audited (`derive_disclosed`). No grant, role or permission change.
     - 0.15.225 (2026-11-27): Change Control names the order and the task it affects (migration 0325; CHANGELOG ChangeControlAffected). Additive. New optional fields `procurement_order_id` (an approved, active Procurement order of the same site that the caller may see; 422 `order_not_active`, `order_other_site`, `invalid`) and `affected_task_code` (a task code of the workflow; 422 `unknown_task`), checked on a version in entry only. New `GET /registers/change_control/order-options` (the order picker; Change Control view plus Procurement view). `GET /registers/{register_key}/{entity_id}/related` also lists the change requests that name an order, so the order shows a change-pending mark. No permission change.
     - 0.15.244 (2026-11-27): list-value colours reach the register fields (item 15 of the improvement research, owner request 2026-11-27; no migration; CHANGELOG ListCellDisplay). Additive. `RegisterField.options[]` (and the child-list column options) gain the optional `colour` of the list value as set in Settings, Lists (#RRGGBB; absent when none). Display only: no permission, visibility, validation or stored-data change; a value keeps storing its code.
     - 0.15.242 (2026-11-27): generic if/then alert rules, notifications only (migration 0342, mirror `db/sql/341_alert_rules.sql`; CHANGELOG AlertRules; item 13 of the 2026-11-27 improvement research). Additive. A System Admin manages the rules in Settings: `GET /settings/alert-rules` (the rules plus the closed catalogues the form offers), `POST /settings/alert-rules`, `PUT /settings/alert-rules/{id}` (If-Match, a reason, audited `alert_rule_create`/`alert_rule_update`). A rule is a closed condition kind with closed params (`weekly_status_missing`: the regions without a Weekly status update of the current working week; `record_idle` `{register_key, state, days}`: the current records of the register in the state for at least days), a closed audience (`system_admin`, or `module` with a module key: the users whose assignment reaches the module) and a title/body template in English and Arabic with placeholders. The daily job fires the enabled rules: one in-app notification per recipient, deduped by (rule, period, target), in the recipient's language; a rule never changes a record, a state or a holder. `NotificationKind` gains `alert_rule` (in-app only).
@@ -11132,6 +11135,55 @@ paths:
         '412': {$ref: '#/components/responses/PreconditionFailed'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /settings/derive-rules:
+    get:
+      tags: [settings]
+      operationId: getDeriveRules
+      summary: The cross-register derive rules (0.15.260)
+      description: |
+        0.15.260. Each rule says which value of a source register a target register shows (the source record's external party, or one field), found by a link field of the target
+        record, else by the same site. Reading needs the Settings screen. `registers` lists the registers and fields a rule may name.
+      responses:
+        '200':
+          description: The setting.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DeriveRules'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    put:
+      tags: [settings]
+      operationId: setDeriveRules
+      summary: Save the cross-register derive rules (reason, If-Match, audited)
+      description: |
+        0.15.260. System Admin, or a delegation of `admin.settings` edit for all regions. Field errors: `unknown_key`, `unknown_register`, `same_register`, `unknown_field`,
+        `duplicate`, `invalid`, `too_many`, `required`.
+      x-db-path: admin_save_derive_rules
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - {$ref: '#/components/schemas/WithReason'}
+              - {$ref: '#/components/schemas/DeriveRulesInput'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DeriveRules'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
   /settings/dashboard:
     get:
       tags: [settings]
@@ -11258,6 +11310,56 @@ paths:
                     items: {$ref: '#/components/schemas/GoalProgress'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
+  /settings/mail-policy:
+    get:
+      tags: [settings]
+      operationId: getMailPolicy
+      summary: The mail policy (0.15.261)
+      description: |
+        0.15.261. System Admin only (403 `action_forbidden` otherwise). `enabled` is the global switch, `mode` is `internal_only` or `internal_external` for every kind, `kinds` may
+        override it per kind. An address is external when its domain is not in `internal_domains` (empty list: every address is internal). External mail also needs the security
+        lock `block_public_sharing` to be off (`block_public_sharing` shows its state). Security alerts and mandatory mail are never stopped by the policy.
+      responses:
+        '200':
+          description: The setting.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MailPolicy'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    put:
+      tags: [settings]
+      operationId: setMailPolicy
+      summary: Save the mail policy (System Admin, step-up, reason, If-Match, audited)
+      description: |
+        0.15.261. Field errors (422 `validation_failed`): `/enabled`, `/mode`, `/internal_domains[/i]`, `/kinds[/kind]` (`unknown_kind`, `invalid`), `unknown_key`. Audited as `mail_policy_update`.
+      x-step-up: true
+      x-db-path: admin_save_mail_policy
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - {$ref: '#/components/schemas/WithReason'}
+              - {$ref: '#/components/schemas/MailPolicyInput'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MailPolicy'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
   /settings/mail-notification-kinds:
     get:
       tags: [settings]
@@ -11800,6 +11902,10 @@ paths:
       - name: record_type
         in: query
         schema: {type: string}
+      - name: triage
+        in: query
+        description: '0.15.240: only records whose intake triage is in this state (triage-enabled registers).'
+        schema: {$ref: '#/components/schemas/TriageState'}
       - name: entity_id
         in: query
         description: All versions of one logical record.
@@ -12267,6 +12373,48 @@ paths:
       responses:
         '200':
           description: Unlocked.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RegisterRecord'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /registers/{register_key}/records/{record_id}/triage:
+    parameters:
+    - {$ref: '#/components/parameters/RegisterKeyPath'}
+    - {$ref: '#/components/parameters/RegisterRecordId'}
+    post:
+      tags: [registers]
+      operationId: triageRegisterRecord
+      summary: One intake-triage decision on a record (Issue Log, Change Control) (0.15.240)
+      description: |
+        0.15.240. A record of a triage-enabled register enters the queue `pending` on every insert and waits for one decision of the register's
+        Matrix L2 holders of the record's region (a System Admin only when the row has no holder, exactly like an approval; 403
+        `action_forbidden` / `not_eligible_holder` otherwise). `If-Match` is the record's version. The decision (`TriageRequest`):
+        `accept` lets the record proceed to its normal flow, `defer` keeps it in the queue (a note may say why), `reject` and `merge` void
+        the record (409 `invalid_transition` when already decided, or when the record is already approved) and need a note and step-up
+        (401 `step_up_required`); `merge` also names the surviving record `duplicate_of` (422 `validation_failed`, `/duplicate_of`, when it
+        is missing, the record itself, or not another live record of the same register the caller can see), links it in
+        `triage.duplicate_of` and notes the merge on the surviving record's comment thread. A record of a register without triage answers
+        404. Audited as `register_record_triage` with before and after; the creator is notified (`triage_decision`).
+      x-step-up: true
+      x-db-path: reg_triage_act
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/TriageRequest'}
+      responses:
+        '200':
+          description: The decided record.
           headers:
             ETag: {$ref: '#/components/headers/ETag'}
           content:
@@ -12936,6 +13084,26 @@ paths:
                     items:
                       type: array
                       items: {$ref: '#/components/schemas/ImportRow'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /import-batches/{batch_id}/error-report:
+    parameters:
+    - {$ref: '#/components/parameters/BatchId'}
+    get:
+      tags: [templates]
+      operationId: downloadImportBatchErrorReport
+      summary: 'The refused rows of a batch as an .xlsx to correct and upload again (0365, P4)'
+      description: |
+        The error and duplicate rows written back in the layout of the approved template (hidden `_tpl` sheet, header row as issued) with the values the file had, so the
+        corrected file is uploaded as it is, plus the sheet `Errors` (row in the file, key, column, reason code, reason). The reasons are never an extra column of the Data
+        sheet (an upload with an extra column is refused). A New sites, stream or Master batch answers the `Errors` sheet alone. Audited as `import_batch.error_report`.
+      responses:
+        '200':
+          description: The workbook.
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: {type: string, format: binary}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
@@ -21227,6 +21395,7 @@ components:
             saved: { type: integer, description: 'Rows saved without submission (draft batch).' }
             admin_approved: { type: integer, description: '0087: rows approved by a System Admin as is (flagged `admin_override`).' }
             incomplete: { type: integer, description: '0087: of those, the rows approved with missing data (flagged `incomplete`).' }
+            duplicate: { type: integer, description: '0365 (P4): of the `error` rows, those refused because the same record is already in the file (`duplicate_in_file`). Counted inside `error`, shown as a category of its own.' }
         job_id: { type: [string, 'null'], description: 'Always null (a big upload reports its progress in `progress`, 0.15.3).' }
         upload_id: { type: string, format: uuid, description: '0.15.3: the upload staged in the background that produced this batch (or that this answer is, while `parsing`).' }
         upload: { $ref: '#/components/schemas/ImportUploadInfo' }
@@ -23086,6 +23255,7 @@ components:
         multiple_per_site: { type: boolean }
         record_types: { type: array, items: { type: string }, description: 'For example pr, po, wo for procurement.' }
         approval_levels: { type: integer, const: 2, description: 'Always 2 since 0.6.1 (L1 Data Entry, L2 Data Reviewer & Approver), from the register row of the Responsibility Matrix.' }
+        triage_enabled: { type: boolean, description: '0.15.240. Intake triage on the register (the Issue Log and the Change Control Log): new records and new versions enter the queue (`pending`) and wait for a triage decision.' }
         fields: { type: array, items: { $ref: '#/components/schemas/RegisterField' }, description: 'Base fields plus active custom fields visible to the caller.' }
         record_count: { type: integer }
         entry_scopes:
@@ -23111,6 +23281,7 @@ components:
       type: object
       required: [id, register_key, state, data, version]
       properties:
+        derived: { type: object, additionalProperties: true, description: '0.15.260. Values this record shows from another register by the rules of `derive.rules`, keyed by the rule output. Only the configured value, never the source record.' }
         procurement_contractor: { $ref: '#/components/schemas/ExternalPartyRef', description: '0.15.90. GECOL and HLC records only: the Contractor company from Procurement by Site ID (read only, never stored on the record). HLC: the company of the Procurement record it links to; otherwise the company of the latest approved Procurement record of the site that names one. Absent when none. `external_party` of a GECOL or HLC record stays what the approval rules use (the party the record itself is approved for).' }
         docs:
           type: object
@@ -23142,7 +23313,18 @@ components:
         external_party: { $ref: '#/components/schemas/ExternalPartyRef' }
         return_count: { type: integer }
         last_return_note: { type: [string, 'null'] }
-        allowed_actions: { type: array, items: { type: string, enum: [edit, submit, review, approve, reject, void, claim, release, new_version, transfer, cancel_snag] } }
+        allowed_actions: { type: array, items: { type: string, enum: [edit, submit, review, approve, reject, void, claim, release, new_version, transfer, cancel_snag, triage] } }
+        triage:
+          type: object
+          additionalProperties: false
+          description: '0.15.240. The intake triage of a record of a triage-enabled register (absent while the record was never queued).'
+          required: [state, note, at, duplicate_of]
+          properties:
+            state: { $ref: '#/components/schemas/TriageState' }
+            note: { type: [string, 'null'] }
+            by: { $ref: '#/components/schemas/UserRef' }
+            at: { type: [string, 'null'], format: date-time }
+            duplicate_of: { type: [string, 'null'], format: uuid, description: 'For a record merged as a duplicate: the surviving record.' }
         entity_id: { type: string, format: uuid, description: 'The logical record; every version of it shares this id. The approved values are projected into the register table with the same id.' }
         version_no: { type: integer, minimum: 1, description: 'Business version of the logical record (1, 2, 3 ...). Not the ETag.' }
         supersedes_id: { type: [string, 'null'], format: uuid }
@@ -23910,6 +24092,40 @@ components:
               uniqueItems: true
               items: { type: string, minLength: 2, maxLength: 60, pattern: '^[a-z][a-z0-9_]*$' }
               description: 'Notification kinds that are also mailed to the person. An empty list keeps every notification in-app.'
+    MailPolicyInput:
+      type: object
+      required: [enabled, mode, internal_domains, kinds]
+      properties:
+        enabled: { type: boolean }
+        mode: { type: string, enum: [internal_only, internal_external] }
+        internal_domains: { type: array, maxItems: 50, items: { type: string } }
+        kinds:
+          type: object
+          additionalProperties:
+            type: object
+            required: [enabled, mode]
+            properties:
+              enabled: { type: boolean }
+              mode: { type: string, enum: [inherit, internal_only, internal_external] }
+    MailPolicy:
+      description: '0.15.261. The setting `mail.policy`.'
+      allOf:
+      - {$ref: '#/components/schemas/MailPolicyInput'}
+      - type: object
+        required: [version, catalogue, block_public_sharing]
+        properties:
+          version: { type: integer, minimum: 0 }
+          block_public_sharing: { type: boolean, description: 'The security lock; while on, no external mail is sent.' }
+          catalogue:
+            type: array
+            items:
+              type: object
+              required: [kind, recommended]
+              properties:
+                kind: { type: string }
+                recommended: { type: boolean }
+          updated_at: { type: [string, 'null'], format: date-time }
+          updated_by: { anyOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
     MailNotificationKinds:
       type: object
       description: '0.14.2 (Q441). The setting `mail.notification_kinds` and the kinds it may name.'
@@ -24289,6 +24505,49 @@ components:
                     code: { type: string }
                     label_en: { type: string }
                     label_ar: { type: string }
+    DeriveRule:
+      type: object
+      required: [key, enabled, target_register, output, source_register, source, link_field]
+      properties:
+        key: { type: string, pattern: '^[a-z][a-z0-9_]{0,59}$' }
+        enabled: { type: boolean }
+        target_register: { type: string, description: 'The register that shows the value.' }
+        output: { type: string, pattern: '^[a-z][a-z0-9_]{0,40}$', description: 'The name of the value in `RegisterRecord.derived`.' }
+        source_register: { type: string, description: 'Another register.' }
+        source: { type: string, description: '`external_party` (the company of the source record) or a field code of the source register.' }
+        link_field: { type: [string, 'null'], description: 'A field of the target register that holds the record id or entity id of the source record; null = match by site only.' }
+        site_fallback: { type: boolean, description: 'With a link field: when the link is empty, fall back to the latest approved source record of the same site (default false; HLC keeps it).' }
+    DeriveRulesInput:
+      type: object
+      required: [rules]
+      properties:
+        rules: { type: array, maxItems: 60, items: { $ref: '#/components/schemas/DeriveRule' } }
+    DeriveRules:
+      description: '0.15.260. Seed: the GECOL and HLC contractor from Procurement (the rules that were hard-coded).'
+      allOf:
+      - {$ref: '#/components/schemas/DeriveRulesInput'}
+      - type: object
+        required: [version, registers]
+        properties:
+          version: { type: integer, minimum: 0 }
+          updated_at: { type: [string, 'null'], format: date-time }
+          updated_by: { anyOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+          registers:
+            type: array
+            items:
+              type: object
+              required: [register_key, fields]
+              properties:
+                register_key: { type: string }
+                fields:
+                  type: array
+                  items:
+                    type: object
+                    required: [code, label_en]
+                    properties:
+                      code: { type: string }
+                      label_en: { type: string }
+                      label_ar: { type: [string, 'null'] }
     GecolOrderWarningsInput:
       type: object
       required: [enabled, chains, billing_after]
@@ -24325,7 +24584,7 @@ components:
       properties:
         id: { type: string, format: uuid }
         level: { type: integer }
-        action: { type: string, enum: [create, edit, submit, review, approve, reject, auto_skip, claim, release, new_version, void, transfer] }
+        action: { type: string, enum: [create, edit, submit, review, approve, reject, auto_skip, claim, release, new_version, void, transfer, triage_accept, triage_reject, triage_merge, triage_defer] }
         acted_by: { $ref: '#/components/schemas/UserRef' }
         note: { type: [string, 'null'] }
         before_state: { $ref: '#/components/schemas/RegisterRecordState' }
@@ -24349,6 +24608,20 @@ components:
               name: { type: string }
               type: { type: string }
               scopes: { type: [array, 'null'], items: { type: string } }
+    TriageState:
+      type: string
+      enum: [pending, accepted, deferred, rejected, merged]
+      description: '0.15.240. Intake triage: waiting (`pending`, `deferred`) or decided (`accepted`, `rejected`, `merged`).'
+    TriageRequest:
+      type: object
+      additionalProperties: false
+      required: [action]
+      description: '0.15.240: one intake-triage decision. The note is required for `reject` and `merge`; `merge` also names the surviving record.'
+      properties:
+        action: { type: string, enum: [accept, reject, merge, defer] }
+        note: { type: string, maxLength: 2000 }
+        duplicate_of: { type: string, format: uuid, description: 'With `merge`: the surviving record of the same register.' }
+        via: { $ref: '#/components/schemas/WorkflowVia' }
     RegisterRecordInput:
       type: object
       required: [data]
@@ -25838,7 +26111,7 @@ components:
     # ---------------------------------------------------------- notifications and logs
     NotificationKind:
       type: string
-      enum: [task_assigned, task_returned, task_approved, approval_due, reassigned, absence_alert, idle_task_alert, no_holder, holiday_tentative, delegation, mfa_exemption, template_updated, import_batch, system, mention, followed_change, task_rejected, no_eligible_holder, register_assigned, register_rejected, gate_closed_again, sla_negative_duration, email_change_requested, email_change_decided, security_alert, snag_raised, snag_review, snag_rejected, snag_closed, levels_converted, permit_transferred, phone_change_requested, phone_change_decided, security_notice, site_region_moved, assignment_request, data_reset_request, alert_rule]
+      enum: [task_assigned, task_returned, task_approved, approval_due, reassigned, absence_alert, idle_task_alert, no_holder, holiday_tentative, delegation, mfa_exemption, template_updated, import_batch, system, mention, followed_change, task_rejected, no_eligible_holder, register_assigned, register_rejected, gate_closed_again, sla_negative_duration, email_change_requested, email_change_decided, security_alert, snag_raised, snag_review, snag_rejected, snag_closed, levels_converted, permit_transferred, phone_change_requested, phone_change_decided, security_notice, site_region_moved, assignment_request, data_reset_request, triage_decision, alert_rule]
     Notification:
       type: object
       required: [id, kind, title, created_at, read_at]
