@@ -23991,6 +23991,7 @@ components:
         default_value: { description: '0.15.154. Prefilled on a new record by the form (absent = none).' }
         is_custom: { type: boolean }
         section: { type: [string, 'null'], description: '0.4.6. The form section of a base field (for example `Request`, `Validity`, `PTW checks`), in English, in the order of the fields. Absent for custom fields.' }
+        section_ar: { type: [string, 'null'], description: '0.15.156. The Arabic name of the field section (register_sections.name_ar, migration 0422); the web falls back to `section`. Absent when the section has no Arabic name yet.' }
         options:
           type: array
           items:
