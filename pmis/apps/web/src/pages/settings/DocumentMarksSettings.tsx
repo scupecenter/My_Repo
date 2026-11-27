@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { UnsavedGuard } from '@/lib/unsavedGuard';
 import { useTranslation } from 'react-i18next';
 import type { ApiError } from '@/api/client';
 import { useDocMarks, useSaveDocMark } from '@/api/documents';
@@ -46,6 +47,8 @@ export function DocumentMarksSettings({ types }: { types: { code: string; name: 
         <label className="min-w-60 flex-1 text-sm font-semibold">{t('marks.reason')}<input className="input mt-1 w-full font-normal" data-testid="marks-reason" value={reason} onChange={(e) => setReason(e.target.value)} /></label>
         <button type="button" className="btn btn-primary" data-testid="marks-save" disabled={!changed.length || reason.trim().length < 3 || save.isPending} onClick={() => void run()}>{t('marks.save')}</button>
       </div>
+      <UnsavedGuard scope="settings" dirty={changed.length > 0} needsReason label={t('ui.guard_settings')}
+        onSave={async (why) => { for (const code of changed) { try { await save.mutateAsync({ code, signature: draft[code]!.signature, stamp: draft[code]!.stamp, reason: why }); } catch { return false; } } setDraft({}); setReason(''); return true; }} />
       {save.isError && <p className="mt-2 text-sm text-lateInk" role="alert" data-testid="marks-error">{errText(save.error)}</p>}
     </fieldset>
   );
