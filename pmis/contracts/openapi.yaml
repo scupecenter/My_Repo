@@ -234,6 +234,7 @@ info:
     - 0.1.0 (2026-10-25): first contract for P1. Breaking changes are recorded in `docs/adr/` (ADR 0001 §6).
     - 0.15.204 (2026-11-27): the dashboard follow-up sections, pending approvals bottleneck (owner approval 2026-11-26, dashboard proposals item 7; migration 0305). Additive and read only. `GET /dashboard/ops` gains the section `approvals` (`DashboardOpsApprovals`): the tasks waiting for review or approval (states in_review and in_approval, the same population as the Approvals inbox), their ages in calendar days since the level opened, split review against approve, and the same ages grouped by the ball-in-court role so the bottleneck role shows. The section needs the approvals view (and the sites view, like the inbox) and answers available false without them. The dashboard settings catalogue gains the card `ops_approvals`. No grant, role or permission change.
     - 0.15.205 (2026-11-27): the dashboard follow-up sections, change requests and overdue meeting actions (owner approval 2026-11-26, dashboard proposals item 8; migration 0306). Additive and read only. `GET /dashboard/ops` gains the section `changes_meetings` (`DashboardOpsChangesMeetings`): the change requests still pending (status requested) with their ages since the request date and a count per kind, the approved ones not yet applied, and the meeting actions not closed with the overdue ones aged by days late. Each part needs its own module view (change control, meetings) and answers `available: false` with null figures without it. No amounts.
+    - 0.15.206 (2026-11-27): the dashboard follow-up sections, restricted financial summary (owner approval 2026-11-26, dashboard proposals item 9; migration 0307). Additive. `GET /dashboard/ops` gains the section `finance` (`DashboardOpsFinance`): the advances (counts, amounts of the records whose amounts are not hidden, age of the open ones since disbursement) and the disbursed amount against the completion of the assignments the advances belong to. It is OFF by default and only a holder of a role listed by the new setting `dashboard.finance_readers` (default Project Manager and Finance Officer) who also has the financial advances view receives figures; everyone else gets `available: false` with null figures, and the card stays hidden. It is never part of a share link or an export. New `GET/PUT /settings/dashboard-finance-readers` (`getDashboardFinanceReaders`, `setDashboardFinanceReaders`) to switch it on and choose the roles (System Admin or an all-regions delegate of settings edit, reason, step-up, If-Match, audited). Invoice ages are not part of the summary: the system holds no invoice data yet.
 
     ## Changes since 0.1
     - **Auth**: `GET /auth/login` accepts `identifier` (email, 4-digit employee ID or E.164 phone) and answers 302 the same way whether or not it matches; rate limited (ADR 0002 §9b). Local password sign-in stays deferred and is not in the contract.
@@ -10739,6 +10740,53 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '429': {$ref: '#/components/responses/TooManyRequests'}
+  /settings/dashboard-finance-readers:
+    get:
+      tags: [settings]
+      operationId: getDashboardFinanceReaders
+      summary: Who sees the restricted financial summary card of the dashboard (0.15.206)
+      description: Every signed-in user may read it. `can_edit` is true for a System Admin or a delegate of `settings` edit for all regions.
+      x-db-path: dashboard_finance_readers_state
+      responses:
+        '200':
+          description: The readers setting.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DashboardFinanceReaders'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+    put:
+      tags: [settings]
+      operationId: setDashboardFinanceReaders
+      summary: Switch the financial summary on or off and choose its roles (reason, step-up, If-Match, audited) (0.15.206)
+      description: |
+        A System Admin, or a delegate of `settings` edit for all regions (403 `action_forbidden` otherwise). A reason (3+ characters), a step-up (401
+        `step_up_required`) and `If-Match` (428 / 412) are required. A role code that is not an active role is 422. Saving the values in force is 409
+        `invalid_transition`. Audited `dashboard_finance_readers_update` with `{enabled, role_codes}` before and after.
+      x-step-up: true
+      x-db-path: admin_set_dashboard_finance_readers
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/DashboardFinanceReadersInput'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DashboardFinanceReaders'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
   /settings/historical-waiver:
     get:
       tags: [settings]
@@ -25118,7 +25166,7 @@ components:
     DashboardOps:
       type: object
       description: '0.15.106: the follow-up sections of the dashboard (owner approval 2026-11-26).'
-      required: [as_of, scope_regions, procurement, permits_hse, gecol_hlc, contractor_scorecard, quality, approvals, changes_meetings]
+      required: [as_of, scope_regions, procurement, permits_hse, gecol_hlc, contractor_scorecard, quality, approvals, changes_meetings, finance]
       properties:
         as_of: {type: string, format: date-time}
         scope_regions:
@@ -25132,6 +25180,7 @@ components:
         quality: {$ref: '#/components/schemas/DashboardOpsQuality'}
         approvals: {$ref: '#/components/schemas/DashboardOpsApprovals'}
         changes_meetings: {$ref: '#/components/schemas/DashboardOpsChangesMeetings'}
+        finance: {$ref: '#/components/schemas/DashboardOpsFinance'}
     DashboardOpsProcurement:
       type: object
       description: '0.15.106: procurement and materials (dashboard proposals item 1).'
@@ -25323,6 +25372,69 @@ components:
               anyOf:
                 - $ref: '#/components/schemas/DashboardOpsAging'
                 - type: 'null'
+    DashboardOpsFinance:
+      type: object
+      description: "0.15.206 (item 9): the restricted financial summary. Only for a configured reader (setting dashboard.finance_readers); never in an export or a share link. Invoice ages are not included: no invoice data exists."
+      required: [available, advances, amounts, open_aging, achievement]
+      properties:
+        available: {type: boolean, description: "False unless the card is switched on, the caller holds a listed role and has the financial advances view; every figure is then null."}
+        advances:
+          type: [object, 'null']
+          required: [total, open, hidden_amounts]
+          properties:
+            total: {type: integer}
+            open: {type: integer, description: "States approved_for_disbursement, disbursed and settlement_in_progress."}
+            hidden_amounts: {type: integer, description: "Records whose amounts are hidden: counted, but no amount is added."}
+        amounts:
+          type: [object, 'null']
+          required: [approved, disbursed, returned, open_disbursed]
+          properties:
+            approved: {type: number, description: "LYD."}
+            disbursed: {type: number, description: "LYD."}
+            returned: {type: number, description: "LYD."}
+            open_disbursed: {type: number, description: "LYD disbursed on advances still open."}
+        open_aging:
+          anyOf:
+                - $ref: '#/components/schemas/DashboardOpsAging'
+                - type: 'null'
+        achievement:
+          type: [object, 'null']
+          required: [assignments, completed, completion_pct, disbursed_on_completed, disbursed_on_open_work]
+          properties:
+            assignments: {type: integer, description: "Assignments (procurement records) that have an advance."}
+            completed: {type: integer, description: "Of them, those with an actual end."}
+            completion_pct: {type: [number, 'null']}
+            disbursed_on_completed: {type: number, description: "LYD."}
+            disbursed_on_open_work: {type: number, description: "LYD."}
+    DashboardFinanceReaders:
+      type: object
+      description: '0.15.206. Who sees the restricted financial summary card (setting `dashboard.finance_readers`, migration 0307).'
+      required: [enabled, role_codes, roles, version, can_edit]
+      properties:
+        enabled: {type: boolean, description: "Off by default."}
+        role_codes: {type: array, items: {type: string}, description: "Active roles whose holders see the card; default PM and FIN_OFFICER."}
+        roles:
+          type: array
+          description: "Every active role, to choose from."
+          items:
+            type: object
+            required: [code, name_en, name_ar]
+            properties:
+              code: {type: string}
+              name_en: {type: string}
+              name_ar: {type: [string, 'null']}
+        updated_at: {type: [string, 'null'], format: date-time}
+        updated_by: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+        version: {type: integer, description: The ETag value.}
+        can_edit: {type: boolean, description: 'A System Admin or a delegate of `settings` edit for all regions.'}
+    DashboardFinanceReadersInput:
+      allOf:
+        - $ref: '#/components/schemas/WithReason'
+        - type: object
+          required: [enabled, role_codes]
+          properties:
+            enabled: {type: boolean}
+            role_codes: {type: array, items: {type: string}}
     DashboardOpsQuality:
       type: object
       description: "0.15.203 (item 6): the open snags and NCRs of the in-scope sites, the average closure age of each and the first-time acceptance rate."

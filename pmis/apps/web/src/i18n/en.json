@@ -3528,7 +3528,22 @@
       "kind_date_change": "Date",
       "kind_suspension": "Suspension",
       "kind_resumption": "Resumption",
-      "kind_other": "Other"
+      "kind_other": "Other",
+      "finance_title": "Restricted financial summary",
+      "finance_hint": "Advances and the amount disbursed against the completion of their assignments. Only the configured roles see this card; it is never in a share link or an export. Invoice ages are not shown: the system holds no invoice data yet.",
+      "finance_advances": "Advances",
+      "finance_open": "Open",
+      "finance_hidden": "Amounts hidden: {{n}}",
+      "finance_approved": "Approved (LYD)",
+      "finance_disbursed": "Disbursed (LYD)",
+      "finance_returned": "Returned (LYD)",
+      "finance_open_disbursed": "Disbursed, still open (LYD)",
+      "finance_open_age": "Open advances by age since disbursement",
+      "finance_achievement": "Disbursed against completion",
+      "finance_assignments": "Assignments with an advance",
+      "finance_completed": "Completed",
+      "finance_on_done": "Disbursed on completed work (LYD)",
+      "finance_on_open": "Disbursed on open work (LYD)"
     },
     "scurve": {
       "title": "Progress curve",
@@ -5043,6 +5058,14 @@
     }
   },
   "dashSettings": {
+    "fr_title": "Restricted financial summary",
+    "fr_note": "Off by default. When on, only holders of the chosen roles see the card on the dashboard; it never appears in a share link or an export.",
+    "fr_enabled": "Show the financial summary card",
+    "fr_roles": "Roles that may see it",
+    "fr_readonly": "Only a System Admin may change this.",
+    "fr_confirm_on": "Switch the financial summary on for the chosen roles?",
+    "fr_confirm_off": "Switch the financial summary off for everyone?",
+    "fr_save": "Save",
     "title": "Dashboard",
     "note": "Global settings of the dashboard: targets, KPI thresholds, and the cards each tab shows and their order. Every save needs a reason, is audited and is versioned. Each user's own layout and saved filters stay in the browser.",
     "targets": "Targets",

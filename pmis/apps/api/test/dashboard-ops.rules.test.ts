@@ -10,6 +10,7 @@ import {
   approvalsByRole,
   changesSummary,
   actionsSummary,
+  financeSummary,
   firstPassPct,
   meanDays,
   ScorecardItem,
@@ -251,5 +252,50 @@ describe("item 8 rules: change requests and meeting actions (0.15.205)", () => {
     expect(changesSummary([]).pending).toBe(0);
     expect(changesSummary([]).pending_aging.oldest_days).toBeNull();
     expect(actionsSummary([]).overdue).toBe(0);
+  });
+});
+
+describe("item 9 rules: restricted financial summary (0.15.206)", () => {
+  const adv = (over: Partial<Parameters<typeof financeSummary>[0][number]>) => ({
+    state: "disbursed",
+    approved: 1000,
+    disbursed: 800,
+    returned: 0,
+    days_since_disbursed: 10,
+    assignment_id: "a1",
+    assignment_done: false,
+    amounts_hidden: false,
+    ...over,
+  });
+
+  it("sums the amounts, ages the open advances and splits the disbursed amount by assignment completion", () => {
+    const r = financeSummary([
+      adv({}),
+      adv({ assignment_id: "a2", assignment_done: true, disbursed: 500, days_since_disbursed: 45 }),
+      adv({ state: "settled", assignment_id: "a2", assignment_done: true, disbursed: 200, returned: 50 }),
+    ]);
+    expect(r.advances).toEqual({ total: 3, open: 2, hidden_amounts: 0 });
+    expect(r.amounts).toEqual({ approved: 3000, disbursed: 1500, returned: 50, open_disbursed: 1300 });
+    expect(r.open_aging.total).toBe(2);
+    expect(r.open_aging.oldest_days).toBe(45);
+    expect(r.achievement.assignments).toBe(2);
+    expect(r.achievement.completed).toBe(1);
+    expect(r.achievement.completion_pct).toBe(50);
+    expect(r.achievement.disbursed_on_completed).toBe(700);
+    expect(r.achievement.disbursed_on_open_work).toBe(800);
+  });
+
+  it("counts a record with hidden amounts but adds no amount of it", () => {
+    const r = financeSummary([adv({ amounts_hidden: true, disbursed: 9999 }), adv({})]);
+    expect(r.advances.hidden_amounts).toBe(1);
+    expect(r.advances.total).toBe(2);
+    expect(r.amounts.disbursed).toBe(800);
+  });
+
+  it("answers an empty shape and no completion rate without assignments", () => {
+    const r = financeSummary([]);
+    expect(r.advances.total).toBe(0);
+    expect(r.amounts.disbursed).toBe(0);
+    expect(r.achievement.completion_pct).toBeNull();
   });
 });

@@ -6935,6 +6935,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/dashboard-finance-readers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Who sees the restricted financial summary card of the dashboard (0.15.206)
+         * @description Every signed-in user may read it. `can_edit` is true for a System Admin or a delegate of `settings` edit for all regions.
+         */
+        get: operations["getDashboardFinanceReaders"];
+        /**
+         * Switch the financial summary on or off and choose its roles (reason, step-up, If-Match, audited) (0.15.206)
+         * @description A System Admin, or a delegate of `settings` edit for all regions (403 `action_forbidden` otherwise). A reason (3+ characters), a step-up (401
+         *     `step_up_required`) and `If-Match` (428 / 412) are required. A role code that is not an active role is 422. Saving the values in force is 409
+         *     `invalid_transition`. Audited `dashboard_finance_readers_update` with `{enabled, role_codes}` before and after.
+         */
+        put: operations["setDashboardFinanceReaders"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/historical-waiver": {
         parameters: {
             query?: never;
@@ -18727,6 +18753,7 @@ export interface components {
             quality: components["schemas"]["DashboardOpsQuality"];
             approvals: components["schemas"]["DashboardOpsApprovals"];
             changes_meetings: components["schemas"]["DashboardOpsChangesMeetings"];
+            finance: components["schemas"]["DashboardOpsFinance"];
         };
         /** @description 0.15.106: procurement and materials (dashboard proposals item 1). */
         DashboardOpsProcurement: {
@@ -18896,6 +18923,64 @@ export interface components {
                 no_due_date: number | null;
                 overdue_aging: components["schemas"]["DashboardOpsAging"] | null;
             };
+        };
+        /** @description 0.15.206 (item 9): the restricted financial summary. Only for a configured reader (setting dashboard.finance_readers); never in an export or a share link. Invoice ages are not included: no invoice data exists. */
+        DashboardOpsFinance: {
+            /** @description False unless the card is switched on, the caller holds a listed role and has the financial advances view; every figure is then null. */
+            available: boolean;
+            advances: {
+                total: number;
+                /** @description States approved_for_disbursement, disbursed and settlement_in_progress. */
+                open: number;
+                /** @description Records whose amounts are hidden: counted, but no amount is added. */
+                hidden_amounts: number;
+            } | null;
+            amounts: {
+                /** @description LYD. */
+                approved: number;
+                /** @description LYD. */
+                disbursed: number;
+                /** @description LYD. */
+                returned: number;
+                /** @description LYD disbursed on advances still open. */
+                open_disbursed: number;
+            } | null;
+            open_aging: components["schemas"]["DashboardOpsAging"] | null;
+            achievement: {
+                /** @description Assignments (procurement records) that have an advance. */
+                assignments: number;
+                /** @description Of them, those with an actual end. */
+                completed: number;
+                completion_pct: number | null;
+                /** @description LYD. */
+                disbursed_on_completed: number;
+                /** @description LYD. */
+                disbursed_on_open_work: number;
+            } | null;
+        };
+        /** @description 0.15.206. Who sees the restricted financial summary card (setting `dashboard.finance_readers`, migration 0307). */
+        DashboardFinanceReaders: {
+            /** @description Off by default. */
+            enabled: boolean;
+            /** @description Active roles whose holders see the card; default PM and FIN_OFFICER. */
+            role_codes: string[];
+            /** @description Every active role, to choose from. */
+            roles: {
+                code: string;
+                name_en: string;
+                name_ar: string | null;
+            }[];
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+            /** @description The ETag value. */
+            version: number;
+            /** @description A System Admin or a delegate of `settings` edit for all regions. */
+            can_edit: boolean;
+        };
+        DashboardFinanceReadersInput: components["schemas"]["WithReason"] & {
+            enabled: boolean;
+            role_codes: string[];
         };
         /** @description 0.15.203 (item 6): the open snags and NCRs of the in-scope sites, the average closure age of each and the first-time acceptance rate. */
         DashboardOpsQuality: {
@@ -34744,6 +34829,62 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             422: components["responses"]["Unprocessable"];
             429: components["responses"]["TooManyRequests"];
+        };
+    };
+    getDashboardFinanceReaders: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The readers setting. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardFinanceReaders"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setDashboardFinanceReaders: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DashboardFinanceReadersInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardFinanceReaders"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
         };
     };
     getHistoricalWaiver: {

@@ -283,6 +283,14 @@ const supportDto = (g: SupportGrant) => ({
   id: g.id, from_user: g.from, to_user: g.to, target_kind: 'user', target: { kind: 'user', id: g.to.id, label: g.to.display_name }, scope: 'partial', rights: g.rights, region_codes: [], module_codes: [],
   allow_redelegate: false, valid_from: g.valid_from, valid_to: g.valid_to, state: g.revoked ? 'revoked' : new Date(g.valid_to) <= new Date() ? 'expired' : 'active', reason: g.reason, revoked_at: g.revoked_at,
 });
+const FIN_ROLES = [
+  { code: 'PM', name_en: 'Project Manager', name_ar: 'مدير المشروع' },
+  { code: 'FIN_OFFICER', name_en: 'Finance Officer', name_ar: 'مسؤول المالية' },
+  { code: 'MANAGEMENT', name_en: 'Management', name_ar: 'الإدارة' },
+];
+const finReaders: { enabled: boolean; role_codes: string[]; version: number; updated_at: string | null; updated_by: { id: string; display_name: string; employee_id: string | null } | null } =
+  { enabled: false, role_codes: ['FIN_OFFICER', 'PM'], version: 1, updated_at: null, updated_by: null };
+const financeReadersView = () => ({ ...finReaders, roles: FIN_ROLES, can_edit: isAdmin() });
 const identityView = () => ({ ...identity(), brands: [...BRANDS], can_edit: isAdmin() });
 /** 0.15.97: the login page settings with the system version (shown to signed-in users only). */
 const loginPageView = () => ({ ...loginPage(), server_version: '0.15.97', can_edit: isAdmin() });
@@ -414,6 +422,7 @@ const DASH_CATALOGUE = {
     { code: 'ops_quality', label_en: 'Quality: open snags and NCR, closure age, first-time acceptance', label_ar: 'الجودة: الـSnag والـNCR المفتوحة وعمر الإغلاق والقبول من أول مرة' },
     { code: 'ops_approvals', label_en: 'Pending approvals: waiting review or approval, ages per role', label_ar: 'الموافقات المعلقة: بانتظار المراجعة أو الاعتماد، الأعمار حسب الدور' },
     { code: 'ops_changes', label_en: 'Change requests and overdue meeting actions', label_ar: 'طلبات التغيير وبنود الاجتماعات المتأخرة' },
+    { code: 'ops_finance', label_en: 'Restricted financial summary: advances and disbursed against completion', label_ar: 'ملخص مالي مقيّد: السلف والمنصرف مقابل الإنجاز' },
   ],
 };
 const dashSeedThresholds = Object.fromEntries(DASH_CATALOGUE.kpis.map((k) => [k.code, { green: k.default_green, amber: k.default_amber }]));
@@ -645,6 +654,30 @@ export const settingsHandlers = [
     if (IM().async_rows === b.async_rows) return problem(409, 'invalid_transition', `The threshold is already ${String(b.async_rows)} rows.`);
     Object.assign(IM(), { async_rows: b.async_rows as number, version: IM().version + 1, updated_at: new Date().toISOString(), updated_by: viewer()!.employee_id! }); save();
     const j = importsView();
+    return HttpResponse.json(j, tag(j.version));
+  }),
+
+  // ------------------------------------------------------------------ 0.15.206: who sees the restricted financial summary of the dashboard
+  http.get(`${B}/settings/dashboard-finance-readers`, () => { const g = guard(); if (g) return g; const j = financeReadersView(); return HttpResponse.json(j, tag(j.version)); }),
+  http.put(`${B}/settings/dashboard-finance-readers`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    const b = await body<{ enabled?: unknown; role_codes?: unknown; reason?: string } & Record<string, unknown>>(request);
+    const errs: { path: string; code: string }[] = Object.keys(b).filter((k) => !['enabled', 'role_codes', 'reason'].includes(k)).map((k) => ({ path: `/${k}`, code: 'unknown_field' }));
+    if (typeof b.enabled !== 'boolean') errs.push({ path: '/enabled', code: 'required' });
+    const codes = Array.isArray(b.role_codes) ? (b.role_codes as unknown[]).map(String) : null;
+    if (!codes) errs.push({ path: '/role_codes', code: 'required' });
+    else if (codes.some((c) => !FIN_ROLES.some((r) => r.code === c))) errs.push({ path: '/role_codes', code: 'invalid' });
+    if ((b.reason ?? '').trim().length < 3 || (b.reason ?? '').length > 1000) errs.push({ path: '/reason', code: 'required' });
+    if (errs.length) return fields(...errs);
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, finReaders.version); if (p) return p;
+    if (!stepUpValid()) return stepUp();
+    const next = [...new Set(codes!)].sort();
+    if (finReaders.enabled === b.enabled && JSON.stringify(finReaders.role_codes) === JSON.stringify(next)) return problem(409, 'invalid_transition', 'These are already the readers of the financial summary.');
+    const v = viewer()!;
+    Object.assign(finReaders, { enabled: b.enabled as boolean, role_codes: next, version: finReaders.version + 1, updated_at: new Date().toISOString(),
+      updated_by: { id: uid(v.employee_id ?? '9999'), display_name: v.name, employee_id: v.employee_id } });
+    const j = financeReadersView();
     return HttpResponse.json(j, tag(j.version));
   }),
 

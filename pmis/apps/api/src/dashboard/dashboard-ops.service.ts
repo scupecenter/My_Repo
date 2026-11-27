@@ -10,6 +10,8 @@ import { dashboardParams } from "./dashboard.service";
 import {
   AgeBuckets,
   ActionDueRow,
+  AdvanceRow,
+  financeSummary,
   actionsSummary,
   ApprovalWaitRow,
   ChangeWaitRow,
@@ -73,6 +75,10 @@ interface ShortageRow {
  *   - changes_meetings (0.15.205, item 8): the change requests still pending (aged since the request date, per kind)
  *     and the approved ones not applied, and the meeting actions not closed with the overdue ones aged by days late.
  *     Each part needs its own module view (change_control, meetings), else that part answers available false.
+ *   - finance (0.15.206, item 9): the restricted financial summary (advances, disbursed against assignment completion).
+ *     Shown only to a holder of a role the setting dashboard.finance_readers lists (default Project Manager and Finance
+ *     Officer, switched off until an admin turns it on) who also has the financial_advances view; otherwise
+ *     available false with no figure. Never part of an export or a share link: it is read only here, per caller.
  */
 @Injectable()
 export class DashboardOpsService {
@@ -98,6 +104,10 @@ export class DashboardOpsService {
     const sitesRegions = await this.access.regions("sites", "view");
     const changeRegions = await this.access.regions("change_control", "view");
     const meetingRegions = await this.access.regions("meetings", "view");
+    const finRegions = await this.access.regions("financial_advances", "view");
+    const finReader = await this.financeReader();
+    const financeOk = finReader && (finRegions === null || finRegions.length > 0);
+    const finScope = intersect(dash, finRegions);
     const changeScope = intersect(dash, changeRegions);
     const meetingScope = intersect(dash, meetingRegions);
     const changesOk = changeRegions === null || changeRegions.length > 0;
@@ -150,6 +160,9 @@ export class DashboardOpsService {
       : null;
     const changes = changesOk
       ? await this.changesSection(changeScope, p.region_id ?? null)
+      : null;
+    const finance = financeOk
+      ? await this.financeSection(finScope, p.region_id ?? null)
       : null;
     const actions = meetingsOk
       ? await this.actionsSection(meetingScope, p.region_id ?? null)
@@ -220,6 +233,13 @@ export class DashboardOpsService {
         waiting: approvals?.waiting ?? null,
         by_role: approvals?.by_role ?? null,
         unassigned: approvals?.unassigned ?? null,
+      },
+      finance: {
+        available: financeOk,
+        advances: finance?.advances ?? null,
+        amounts: finance?.amounts ?? null,
+        open_aging: finance?.open_aging ?? null,
+        achievement: finance?.achievement ?? null,
       },
       changes_meetings: {
         available: changesOk || meetingsOk,
@@ -538,6 +558,43 @@ export class DashboardOpsService {
       ${scope === null ? Prisma.empty : Prisma.sql`AND t.region_id = ANY(${scope}::int[])`}
       ${region ? Prisma.sql`AND t.region_id = ${region}` : Prisma.empty}`);
     return approvalsByRole(rows);
+  }
+
+  /** Does the caller see the restricted financial summary (the setting dashboard.finance_readers, role based). */
+  private async financeReader(): Promise<boolean> {
+    const r = await this.db.tx.$queryRaw<{ ok: boolean }[]>`SELECT dashboard_finance_reader() AS ok`;
+    return r[0]?.ok === true;
+  }
+
+  /**
+   * The advances (0.15.206, item 9): the latest approved version of each advance record in the regions in scope, with
+   * the completion of the assignment (procurement record) it belongs to. Amounts of a record whose amounts are hidden
+   * are left out (financeSummary).
+   */
+  private async financeSection(scope: number[] | null, region: number | null) {
+    const rows = await this.db.tx.$queryRaw<AdvanceRow[]>(Prisma.sql`
+      WITH num AS (SELECT '^-?[0-9]+([.][0-9]+)?$'::text AS re),
+      adv AS (
+        SELECT a.* FROM (SELECT DISTINCT ON (r.entity_id) r.* FROM register_records r
+                         WHERE r.register_key = 'financial_advances' AND r.state = 'approved'
+                         ORDER BY r.entity_id, r.version_no DESC) a
+        WHERE a.record_type = 'advance'
+        ${scope === null ? Prisma.empty : Prisma.sql`AND a.region_id = ANY(${scope}::int[])`}
+        ${region ? Prisma.sql`AND a.region_id = ${region}` : Prisma.empty}),
+      proc AS (
+        SELECT l.entity_id::text AS id, nullif(l.data ->> 'actual_end', '') IS NOT NULL AS done
+        FROM (SELECT DISTINCT ON (r.entity_id) r.* FROM register_records r
+              WHERE r.register_key = 'procurement' AND r.state = 'approved'
+              ORDER BY r.entity_id, r.version_no DESC) l)
+      SELECT adv.data ->> 'advance_state' AS state,
+             CASE WHEN adv.data ->> 'approved_amount' ~ num.re THEN (adv.data ->> 'approved_amount')::numeric END::float8 AS approved,
+             CASE WHEN adv.data ->> 'disbursed_amount' ~ num.re THEN (adv.data ->> 'disbursed_amount')::numeric END::float8 AS disbursed,
+             CASE WHEN adv.data ->> 'returned_amount' ~ num.re THEN (adv.data ->> 'returned_amount')::numeric END::float8 AS returned,
+             CASE WHEN adv.data ->> 'disbursed_date' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN (CURRENT_DATE - (adv.data ->> 'disbursed_date')::date)::int END AS days_since_disbursed,
+             proc.id AS assignment_id, coalesce(proc.done, false) AS assignment_done,
+             coalesce(adv.data ->> 'amounts_hidden', 'false') = 'true' AS amounts_hidden
+      FROM adv CROSS JOIN num LEFT JOIN proc ON proc.id = adv.data ->> 'procurement_record_id'`);
+    return financeSummary(rows);
   }
 
   /**
