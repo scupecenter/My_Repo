@@ -105,7 +105,8 @@ LANGUAGE sql IMMUTABLE SET search_path = pg_catalog, public, pg_temp AS $$
     ('deliverables',       'registers', 'project', 250, 'Deliverables', 'المخرجات', '{sites}'::text[]),
     ('car_dispatcher',     'registers', 'project', 260, 'Car Dispatcher bookings (the vehicles stay)', 'حجوزات السيارات (تبقى المركبات)', '{sites,procurement}'::text[]),
     ('financial_advances', 'registers', 'project', 270, 'Financial Advances', 'العهد المالية', '{sites,procurement}'::text[]),
-    ('lessons_learned',    'registers', 'project', 280, 'Lessons Learned', 'الدروس المستفادة', '{sites}'::text[]),
+    ('incidents',          'registers', 'project', 280, 'Incidents & Security', 'الحوادث والأمن', '{sites}'::text[]),
+    ('lessons_learned',    'registers', 'project', 285, 'Lessons Learned', 'الدروس المستفادة', '{sites}'::text[]),
     ('users',              'identity',  'identity', 900, 'Users: deactivate every account except the System Admins', 'المستخدمون: تعطيل كل الحسابات عدا مديري النظام', '{}'::text[]),
     ('roles',              'identity',  'identity', 910, 'Roles, groups and delegations (role definitions and profiles stay)', 'الأدوار والمجموعات والتفويضات (تبقى تعريفات الأدوار والملفات)', '{}'::text[]),
     ('staff',              'identity',  'identity', 920, 'Staff registry and absences', 'سجل الموظفين والغيابات', '{}'::text[])
@@ -121,6 +122,6 @@ LANGUAGE sql IMMUTABLE SET search_path = pg_catalog, public, pg_temp AS $$
     WHEN p_key = 'readiness_handover' THEN 'readiness'
     WHEN p_key = 'site_creation' THEN 'sites'
     WHEN p_key IN ('gecol', 'hlc', 'warehouse', 'issues', 'risks', 'change_control', 'as_built', 'meetings', 'rf_design', 'acquisition', 'dismantle',
-                   'deliverables', 'car_dispatcher', 'financial_advances', 'daily_plan', 'lessons_learned') THEN p_key
+                   'deliverables', 'car_dispatcher', 'financial_advances', 'daily_plan', 'incidents', 'lessons_learned') THEN p_key
   END
 $$;
