@@ -1201,7 +1201,9 @@
     "section_workflow_coverage": "Matrix coverage",
     "section_screens_login": "Login page",
     "section_screens_interface": "Interface",
-    "section_screens_goals": "Goals"
+    "section_screens_goals": "Goals",
+    "section_workflow_coverage": "Matrix coverage",
+    "section_workflow_simulate": "Who approves?"
   },
   "scopeMatch": {
     "title": "Team / scope match (Procurement)",
@@ -2064,7 +2066,9 @@
     "inline_undone": "Change undone.",
     "contractor": "Contractor",
     "contractor_company": "Contractor company",
-    "contractor_hint": "Pick from the companies with an active contract. The contract is checked against the scope at submit."
+    "contractor_hint": "Pick from the companies with an active contract. The contract is checked against the scope at submit.",
+    "prefilled": "Prefilled",
+    "prefilled_hint": "Filled from the default set in Settings; change it if it does not apply."
   },
   "regErrors": {
     "register_locked": "This is locked: only a System Admin can change it until it is unlocked.",
@@ -3189,7 +3193,30 @@
       "col_contractor": "Contractor",
       "unattributed": "Unattributed",
       "by_contractor": "Shortage per contractor",
-      "contractor_row": "{{qty}} missing · {{lines}} lines · {{sites}} sites"
+      "contractor_row": "{{qty}} missing · {{lines}} lines · {{sites}} sites",
+      "permits_title": "Permits and HSE",
+      "permits_hint": "The permit position of the visible sites: status mix, validity pressure, open stop-work and the PTW safety checks. Read only.",
+      "unavailable_permits": "You cannot see the Permits and HSE register, so these figures are not shown.",
+      "waiting": "Waiting for approval",
+      "expired": "Expired",
+      "stop_work_active": "Stop-work active",
+      "by_status": "Permits by status",
+      "permits_empty": "No permit records on the visible sites.",
+      "ptw_title": "PTW safety checks",
+      "ptw_open": "Open PTWs",
+      "ptw_with_gaps": "With missing checks",
+      "ptw_none": "No open PTWs on the visible sites.",
+      "ptw_clear": "Every open PTW has its six checks covered.",
+      "ptw_check": {
+        "jsa_tra": "JSA / TRA",
+        "toolbox_talk": "Toolbox talk",
+        "work_at_height": "Work at height",
+        "lifting_plan": "Lifting plan",
+        "loto": "LOTO",
+        "rescue_plan": "Rescue plan"
+      },
+      "expiring_14": "Expiring in 14 days",
+      "no_permit": "Sites with no permit"
     },
     "scurve": {
       "title": "Progress curve",
@@ -3469,6 +3496,69 @@
     "appearance_default": "Use organization default ({{name}})",
     "appearance_note": "The design of the menus and buttons. Light or dark is the Theme above; status colours never change.",
     "appearance_locked": "Your administrator set one design for everyone ({{name}}), so you cannot choose your own."
+  },
+  "appearance": {
+    "title": "Appearance",
+    "subtitle": "Your own look of the whole app: density, type size, corners, motion, icons, the menu and the accent. Every change shows at once before you save it.",
+    "preset": "Ready-made profile",
+    "preset_classic": "Classic",
+    "preset_comfortable": "Comfortable",
+    "preset_night": "Night",
+    "preset_compact": "Compact",
+    "apply": "Apply",
+    "revert": "Revert",
+    "preview_note": "What you see now is a preview. Apply saves it to your account; Revert returns to the saved appearance.",
+    "org_default": "Organization default ({{name}})",
+    "dim": {
+      "density": "Density",
+      "font_scale": "Type size",
+      "radius": "Corners",
+      "motion": "Motion",
+      "icon_style": "Icon weight",
+      "menu_style": "Side menu",
+      "accent": "Accent colour"
+    },
+    "opt": {
+      "density": {
+        "comfortable": "Comfortable",
+        "standard": "Standard",
+        "compact": "Compact"
+      },
+      "font_scale": {
+        "small": "Small",
+        "standard": "Standard",
+        "large": "Large"
+      },
+      "radius": {
+        "sharp": "Sharp",
+        "standard": "Standard",
+        "rounded": "Rounded"
+      },
+      "motion": {
+        "full": "Full",
+        "reduced": "Reduced"
+      },
+      "icon_style": {
+        "light": "Light",
+        "regular": "Regular",
+        "bold": "Bold"
+      },
+      "menu_style": {
+        "default": "Default",
+        "rail": "Icons only",
+        "autohide": "Hide until the edge"
+      },
+      "accent": {
+        "default": "Of the design",
+        "teal": "Teal",
+        "blue": "Blue",
+        "violet": "Violet",
+        "green": "Green",
+        "orange": "Orange",
+        "red": "Red",
+        "amber": "Amber"
+      }
+    }
   },
   "emailChange": {
     "tab": "Email changes",
@@ -4153,7 +4243,12 @@
     "add_impact_tpl": "Impact: a new version of the register template is issued with this column. Files made from the old template still upload; the new column stays empty in them. Existing records keep this column empty until filled.",
     "add_impact": "Impact: existing records keep this column empty until filled. It is not in the template, so no new template version is issued.",
     "move_up": "Move {{code}} up",
-    "move_down": "Move {{code}} down"
+    "move_down": "Move {{code}} down",
+    "default_value": "Default",
+    "default_edit": "Default value of {{code}}",
+    "default_title": "Default value of {{code}}",
+    "default_note": "Prefilled on a new record and shown as prefilled; the person can change it. The server never fills it in by itself (imports and API calls are unchanged).",
+    "default_clear": "Clear the default"
   },
   "lists": {
     "colour": "Colour",
@@ -5677,7 +5772,10 @@
     "readonly": "Only a System Admin, or a person they delegated settings to for all regions, can change this.",
     "confirm": "Default design: {{name}}. {{choice}} The change is audited with your reason.",
     "choice_on": "Users may choose their own design.",
-    "choice_off": "Everyone sees this design."
+    "choice_off": "Everyone sees this design.",
+    "defaults_title": "Organization appearance defaults",
+    "defaults_note": "The appearance of everyone without a personal choice. An empty field keeps the built-in standard.",
+    "defaults_builtin": "Built-in standard ({{name}})"
   },
   "studioPanel": {
     "open": "Show the pending changes",
@@ -6874,5 +6972,24 @@
     "remove": "Remove goal",
     "add": "Add goal",
     "save_title": "Save the goals"
+  },
+  "matrixSimulate": {
+    "title": "Who approves?",
+    "note": "Read only. Pick a site and a stage task or a register to see who would hold L1 and L2 today: the matrix cell that decides, its rule, the people who would hold the level and how they reach it (named, role, group). Nothing is written and nobody is notified. A task cell decides before the stage cell, and a region cell before the default cell.",
+    "site_search": "Find a site",
+    "site": "Site",
+    "kind": "For",
+    "kind_task": "A stage task",
+    "kind_register": "A register",
+    "what": "Task or register",
+    "choose": "Choose",
+    "open_coverage": "Matrix coverage",
+    "source_region": "region cell",
+    "source_default": "default cell",
+    "source_none": "no cell",
+    "task_cell": "task cell",
+    "rule": "rule",
+    "nobody": "Nobody holds this level.",
+    "fallback": "Who could act through the admin path:"
   }
 }
