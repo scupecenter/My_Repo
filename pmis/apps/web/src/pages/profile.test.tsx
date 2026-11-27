@@ -49,6 +49,33 @@ describe('My profile: reach and sections', () => {
   });
 });
 
+describe('appearance form (0241)', () => {
+  it('every org-default option shows a translated label, never a raw i18n key (motion, icon, menu and accent have no literal standard)', async () => {
+    await signIn('pm');
+    renderApp(<Profile />);
+    await screen.findByTestId('profile-appearance-form');
+    const dims = ['density', 'font_scale', 'radius', 'motion', 'icon_style', 'menu_style', 'accent'];
+    for (const k of dims) {
+      const sel = screen.getByTestId(`pf-ap-${k}`);
+      const first = sel.querySelector('option');
+      expect(first?.textContent ?? '').not.toContain('appearance.opt.');
+      expect((first?.textContent ?? '').length).toBeGreaterThan(3);
+    }
+    // the built-in standard of a dimension is named, e.g. the motion default is Full
+    expect(screen.getByTestId('pf-ap-motion').querySelector('option')!.textContent).toContain('Full');
+  });
+
+  it('shows the translated labels in Arabic too', async () => {
+    await localSignIn();
+    renderApp(<Profile />, { locale: 'ar' });
+    await screen.findByTestId('profile-appearance-form');
+    for (const k of ['motion', 'icon_style', 'menu_style', 'accent']) {
+      const first = screen.getByTestId(`pf-ap-${k}`).querySelector('option');
+      expect(first?.textContent ?? '').not.toContain('appearance.opt.');
+    }
+  });
+});
+
 describe('details', () => {
   it('saves the name with the version; the phone is no longer edited here; admin-owned fields are refused', async () => {
     await localSignIn();
