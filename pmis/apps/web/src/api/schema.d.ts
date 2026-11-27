@@ -271,6 +271,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/local/2fa/device-code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Second step of a sign-in from a new browser - the 6-digit code mailed to the account (0.15.192)
+         * @description Needs the pending sign-in cookie `pmis_2fa` from `POST /auth/local/login` when it answered `next` = `device_code`. Only exists while an admin has turned the
+         *     new-device code on (it is off by default). The code works once and ends after `code_minutes`. A wrong code is 422 `invalid_code`; the fifth wrong code ends the
+         *     challenge (401 `unauthenticated`: sign in again). On success the browser is remembered for this account (a hash of the `pmis_dev` cookie), the session cookie
+         *     is set. Rate limited (429). Failures are written to the security log.
+         */
+        post: operations["localDeviceCode"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/local/2fa/enrol/start": {
         parameters: {
             query?: never;
@@ -739,6 +762,66 @@ export interface paths {
          *     page) and a mail; the request is audited (`admins_notified`). Not for the break-glass account or before a forced password change (403).
          */
         post: operations["notifyAdmins"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My own live sessions (devices)
+         * @description 0.15.153. Only the caller's own sessions, newest activity first (at most 50). `device` is parsed from the user agent (browser, OS, type). The current one has `is_current` true.
+         */
+        get: operations["listMySessions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/sessions/revoke-others": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign out of every other device
+         * @description 0.15.153. Ends all the caller's other sessions and keeps the current one. No body.
+         */
+        post: operations["revokeMyOtherSessions"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/sessions/{session_id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign out of one of my other devices
+         * @description 0.15.153. Own sessions only (404 for any other id); the current session is refused (422 `own_session`, use sign out).
+         */
+        post: operations["revokeMySession"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2937,6 +3020,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/matrix/simulate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Who would hold L1 and L2 for a site and a task or register (read only, admin)
+         * @description 0.15.152. Read only, nothing is written. The cell that decides is found as the engine finds it (task cell before stage cell, region cell before default cell). `holders` are the active people who would hold the level and `via` says how (`named`, `role: <name>`, `group: <name>`). When nobody holds the level, `fallback` lists who could act through the admin path (`system_admin`, or `delegate` when a delegation covers the module and the region of the site). Needs `admin.matrix` view or edit (403 otherwise).
+         */
+        get: operations["simulateMatrix"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/matrix/coverage": {
         parameters: {
             query?: never;
@@ -4020,6 +4123,50 @@ export interface paths {
          */
         post: operations["revokeUserSessions"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/exports/schedules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The caller's scheduled Master exports (0.15.151)
+         * @description 0.15.151. Own schedules only, with the next due instant (project time zone) and whether one is due now.
+         */
+        get: operations["listExportSchedules"];
+        /**
+         * Create or change a scheduled Master export (0.15.151)
+         * @description 0.15.151. Without `id` a schedule is created (at most 5 each); with `id` one of the caller's own is replaced. `weekday` (0 Sunday to 6) for weekly, `day_of_month` (1 to 28) for monthly. `spec.parts` empty or absent means the whole Master. Whether the caller may export the parts is checked when the export starts, not when it is saved.
+         */
+        put: operations["saveExportSchedule"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/exports/schedules/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete a scheduled Master export (0.15.151)
+         * @description 0.15.151. One of the caller's own schedules; the exports it already made stay.
+         */
+        delete: operations["deleteExportSchedule"];
         options?: never;
         head?: never;
         patch?: never;
@@ -6103,6 +6250,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/new-device-code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The new-device email code setting (System Admin only) (0.15.192)
+         * @description System Admin only (403 `action_forbidden` otherwise). `enabled` is `false` until a System Admin turns it on. `mail_ready` says whether the mail server is set up (the code is sent by email).
+         */
+        get: operations["getNewDeviceCode"];
+        /**
+         * Turn the new-device email code on or off (System Admin, reason, step-up, If-Match, audited) (0.15.192)
+         * @description System Admin only. A reason (3+ characters), a step-up (401 `step_up_required`) and `If-Match` (428 / 412) are required. Turning it on needs the mail server (409 `invalid_transition` otherwise).
+         *     `code_minutes` is 5 to 30. System Admins are outside the feature unless `include_admins` is true, so the person who can turn it off can always sign in. Saving the values already in force is 409.
+         *     Audited `new_device_code_update` with before and after. Sessions already open are not touched.
+         */
+        put: operations["setNewDeviceCode"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/new-device-code/bypass": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Let one account sign in once from any browser without the code (System Admin, reason, step-up, audited) (0.15.192)
+         * @description The recovery path. `minutes` is 1 to 60 (default 30). The bypass is used up by the account's next sign-in. Audited `new_device_bypass`. Rate limited.
+         */
+        post: operations["bypassNewDeviceCode"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/historical-waiver": {
         parameters: {
             query?: never;
@@ -7073,6 +7266,26 @@ export interface paths {
         /** The preview of a change or a delete (nothing is written) */
         get: operations["getRegisterColumnImpact"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/registers/{register_key}/fields/{code}/default": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set or clear the default value of a register column
+         * @description 0.15.154. System Admin or a delegate of `fields.edit` (403 otherwise). The default is prefilled on a NEW record by the register form and shown as prefilled; the server never applies it by itself. Only simple columns (text, long text, email, phone, link, number, currency, percentage, date, yes/no, list, multi-list); 422 `not_supported` for the others, 422 `unknown_value` for a value that is not an active value of the list, and the same value rules as a record. `value` null clears it. If-Match (the column version) is optional. Audited (`register_field_default`).
+         */
+        put: operations["setRegisterFieldDefault"];
         post?: never;
         delete?: never;
         options?: never;
@@ -10619,6 +10832,92 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        ExportScheduleInput: {
+            /** Format: uuid */
+            id?: string;
+            name: string;
+            /** @enum {string} */
+            cadence: "daily" | "weekly" | "monthly";
+            weekday?: number;
+            day_of_month?: number;
+            spec?: {
+                parts?: string[];
+                regions?: number[];
+            };
+            enabled?: boolean;
+        };
+        ExportSchedule: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** @enum {string} */
+            cadence: "daily" | "weekly" | "monthly";
+            weekday?: number;
+            day_of_month?: number;
+            spec: {
+                parts?: string[];
+                regions?: number[];
+            };
+            enabled: boolean;
+            created_at: string;
+            last_started_at?: string | null;
+            /** Format: uuid */
+            last_job_id?: string | null;
+            last_error?: string | null;
+            /** Format: date-time */
+            next_due_at: string;
+            due: boolean;
+        };
+        ExportScheduleList: {
+            items: components["schemas"]["ExportSchedule"][];
+        };
+        MySession: {
+            /** Format: uuid */
+            session_id: string;
+            /** Format: date-time */
+            signed_in_at: string;
+            /** Format: date-time */
+            last_activity_at: string;
+            ip: string | null;
+            device: components["schemas"]["Device"] | null;
+            auth_method: string;
+            is_current: boolean;
+        };
+        MySessionRevokeResult: {
+            revoked_count: number;
+        };
+        MatrixSimulation: {
+            site: {
+                /** Format: uuid */
+                id: string;
+                site_code: string;
+                name: string | null;
+                region_id: number;
+            };
+            /** @enum {string} */
+            kind: "task" | "register";
+            code: string;
+            name_en: string;
+            name_ar: string | null;
+            module: string;
+            levels: {
+                /** @enum {string} */
+                level_code: "L1" | "L2";
+                /** @enum {string} */
+                source: "region" | "default" | "none";
+                task_specific: boolean;
+                rule: string | null;
+                holders: components["schemas"]["MatrixSimulationPerson"][];
+                fallback: components["schemas"]["MatrixSimulationPerson"][];
+            }[];
+        };
+        MatrixSimulationPerson: {
+            /** Format: uuid */
+            user_id: string;
+            name: string;
+            email: string;
+            via: string | string[];
+        };
         PmScheduleInput: {
             id: string;
             name_en: string;
@@ -11515,7 +11814,7 @@ export interface components {
          * @description Part key. Every register key used by `/registers` (including `dismantle`), plus the four non-register parts.
          * @enum {string}
          */
-        ExportPartKey: "procurement" | "contractors" | "gecol" | "hlc" | "permits_hse" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "dismantle" | "car_dispatcher" | "financial_advances" | "incidents" | "sites" | "milestones" | "tasks" | "project_status" | "rf_design" | "acquisition";
+        ExportPartKey: "procurement" | "contractors" | "gecol" | "hlc" | "permits_hse" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "dismantle" | "car_dispatcher" | "financial_advances" | "incidents" | "lessons_learned" | "sites" | "milestones" | "tasks" | "project_status" | "rf_design" | "acquisition";
         ExportPart: {
             key: components["schemas"]["ExportPartKey"];
             label_en: string;
@@ -11693,10 +11992,10 @@ export interface components {
             /** @constant */
             authenticated: false;
             /**
-             * @description `two_factor`: call `POST /auth/local/2fa`. `enrol`: two-factor is on but no authenticator is set up; call the enrolment endpoints.
+             * @description `two_factor`: call `POST /auth/local/2fa`. `enrol`: two-factor is on but no authenticator is set up; call the enrolment endpoints. `device_code` (0.15.192, only when an admin turned the new-device code on): call `POST /auth/local/2fa/device-code` with the code mailed to the account.
              * @enum {string}
              */
-            next: "two_factor" | "enrol";
+            next: "two_factor" | "enrol" | "device_code";
             /** Format: date-time */
             expires_at: string;
         };
@@ -11825,6 +12124,8 @@ export interface components {
             theme?: "light" | "dark";
             /** @description 0.15.41. The personal UI design; null goes back to the organization default. While `identity.allow_user_choice` is false a non-null value is 403 `field_read_only` (`errors[0]` `{path: /ui_brand, code: brand_choice_locked}`); null stays allowed. Audited in `profile_updated`. */
             ui_brand?: components["schemas"]["UiBrand"] | null;
+            /** @description 0.15.230 (0241). The personal appearance choices; a subset of the dimensions. While `identity.allow_user_choice` is false a value is 403 `field_read_only` (`errors[0]` `{path: /ui_prefs, code: appearance_choice_locked}`). Audited per dimension in `profile_updated`. */
+            ui_prefs?: components["schemas"]["UiPrefs"];
         };
         /** @description 0.9.2. The "My profile" page. */
         MyProfile: {
@@ -11848,16 +12149,26 @@ export interface components {
             ui_brand: components["schemas"]["UiBrand"] | null;
             /** @description 0.15.41. The design the user sees. */
             brand: components["schemas"]["UiBrand"];
+            /** @description 0.15.230 (0241). The stored personal appearance choices; empty = the organization defaults. */
+            ui_prefs: components["schemas"]["UiPrefs"];
+            /** @description 0.15.230 (0241). The appearance the user sees (ui_effective_prefs): own choices, else the organization defaults. */
+            appearance: components["schemas"]["UiPrefs"];
             /** @description 0.15.41. The organization default and whether a personal design is allowed (drives the Appearance control). */
             identity: {
                 default_brand: components["schemas"]["UiBrand"];
                 allow_user_choice: boolean;
+                /** @description 0.15.230 (0241): the organization appearance defaults. */
+                defaults?: components["schemas"]["UiPrefs"];
+                /** @description 0.15.230 (0241): the dimensions with their allowed values (ui_pref_options). */
+                pref_options?: {
+                    [key: string]: string[];
+                };
             };
             status: components["schemas"]["UserStatus"];
             /** @enum {string} */
             auth_method: "local" | "m365" | "break_glass";
             local_sign_in: boolean;
-            editable_fields: ("display_name" | "locale" | "theme" | "ui_brand")[];
+            editable_fields: ("display_name" | "locale" | "theme" | "ui_brand" | "ui_prefs")[];
             admin_owned: {
                 roles: components["schemas"]["RoleRef"][];
                 teams: components["schemas"]["TeamKind"][];
@@ -11917,6 +12228,10 @@ export interface components {
             ui_brand?: components["schemas"]["UiBrand"] | null;
             /** @description 0.15.41. The design the user sees: `ui_brand` while the admin allows a personal choice and one is set, else the organization default. Independent of `theme`. */
             brand?: components["schemas"]["UiBrand"];
+            /** @description 0.15.230 (0241). The stored personal appearance choices; empty = the organization defaults. */
+            ui_prefs?: components["schemas"]["UiPrefs"];
+            /** @description 0.15.230 (0241). The appearance the user sees (ui_effective_prefs): own choices, else the organization defaults. */
+            appearance?: components["schemas"]["UiPrefs"];
             is_break_glass?: boolean;
             /** @description 0.3.0. E.164; a local sign-in identifier. */
             phone?: string | null;
@@ -16019,6 +16334,8 @@ export interface components {
             in_filter?: boolean;
             in_template?: boolean;
             in_export?: boolean;
+            /** @description 0.15.154. Prefilled on a new record (null or absent = none). */
+            default_value?: unknown;
             is_active: boolean;
             /** @description Protected: code or a derived rule depends on it. */
             is_system: boolean;
@@ -16123,7 +16440,7 @@ export interface components {
             required_missing?: number | null;
         };
         /** @enum {string} */
-        RegisterKey: "procurement" | "contractors" | "gecol" | "hlc" | "permits_hse" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "dismantle" | "car_dispatcher" | "financial_advances" | "incidents";
+        RegisterKey: "procurement" | "contractors" | "gecol" | "hlc" | "permits_hse" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "dismantle" | "car_dispatcher" | "financial_advances" | "incidents" | "lessons_learned";
         RegisterField: {
             code: string;
             label_en: string;
@@ -16139,6 +16456,8 @@ export interface components {
             /** @description 0.12.5. Only for `child_list`: the columns of a row, in order. */
             columns?: components["schemas"]["RegisterFieldColumn"][];
             in_list?: boolean;
+            /** @description 0.15.154. Prefilled on a new record by the form (absent = none). */
+            default_value?: unknown;
             is_custom?: boolean;
             /** @description 0.4.6. The form section of a base field (for example `Request`, `Validity`, `PTW checks`), in English, in the order of the fields. Absent for custom fields. */
             section?: string | null;
@@ -16861,11 +17180,34 @@ export interface components {
          * @enum {string}
          */
         UiBrand: "current" | "aljeel" | "executive" | "field" | "obsidian" | "sahara";
+        /** @description 0.15.230 (0241): the appearance dimensions and their allowed values (the database list `ui_pref_options()` is the source). A subset may be sent; each key holds one of its values. `accent` `default` = the accent of the design. */
+        UiPrefs: {
+            /** @enum {string} */
+            density?: "comfortable" | "standard" | "compact";
+            /** @enum {string} */
+            font_scale?: "small" | "standard" | "large";
+            /** @enum {string} */
+            radius?: "sharp" | "standard" | "rounded";
+            /** @enum {string} */
+            motion?: "full" | "reduced";
+            /** @enum {string} */
+            icon_style?: "light" | "regular" | "bold";
+            /** @enum {string} */
+            menu_style?: "default" | "rail" | "autohide";
+            /** @enum {string} */
+            accent?: "default" | "teal" | "blue" | "violet" | "green" | "orange" | "red" | "amber";
+        };
         /** @description 0.15.41. Settings, Identity & themes (setting `ui.identity`, migration 0130). */
         UiIdentity: {
             default_brand: components["schemas"]["UiBrand"];
             /** @description true: each user may choose their own design in My profile; false: everyone sees `default_brand`. */
             allow_user_choice: boolean;
+            /** @description 0.15.230 (0241): the organization appearance defaults. */
+            defaults?: components["schemas"]["UiPrefs"];
+            /** @description 0.15.230 (0241): the dimensions with their allowed values (ui_pref_options). */
+            pref_options?: {
+                [key: string]: string[];
+            };
             brands: components["schemas"]["UiBrand"][];
             /** Format: date-time */
             updated_at?: string | null;
@@ -16878,6 +17220,8 @@ export interface components {
         UiIdentityInput: components["schemas"]["WithReason"] & {
             default_brand: components["schemas"]["UiBrand"];
             allow_user_choice: boolean;
+            /** @description 0.15.230 (0241): the organization appearance defaults; omitted keeps the current ones. */
+            defaults?: components["schemas"]["UiPrefs"];
         };
         /** @description 0.15.97. A support link under the sign-in form. http(s) or mailto only. */
         SupportLink: {
@@ -16974,6 +17318,32 @@ export interface components {
             /** @description Omitted = default_hours. */
             hours?: number;
         };
+        /** @description 0.15.192. The new-device email code setting (`security.new_device_code`, migration 0292). */
+        NewDeviceCodeSetting: {
+            /** @description false until a System Admin turns it on. */
+            enabled: boolean;
+            code_minutes: number;
+            /** @description false: System Admins are outside the feature (the recovery path). */
+            include_admins: boolean;
+            /** @description Whether the mail server is set up. */
+            mail_ready: boolean;
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+            /** @description The ETag value. */
+            version: number;
+            can_edit: boolean;
+        };
+        NewDeviceCodeSettingInput: components["schemas"]["WithReason"] & {
+            enabled: boolean;
+            code_minutes: number;
+            include_admins: boolean;
+        };
+        NewDeviceBypassInput: components["schemas"]["WithReason"] & {
+            /** Format: uuid */
+            user_id: string;
+            minutes?: number;
+        };
         /** @description 0.15.1. The shared order of the side menu (setting `nav.layout`). */
         NavLayout: {
             headings: components["schemas"]["NavHeading"][];
@@ -17048,6 +17418,8 @@ export interface components {
             /** @description The regions the figures cover (null = every region). */
             scope_regions: components["schemas"]["RegionId"][] | null;
             procurement: components["schemas"]["DashboardOpsProcurement"];
+            permits_hse: components["schemas"]["DashboardOpsPermitsHse"];
+            gecol_hlc: components["schemas"]["DashboardOpsGecolHlc"];
         };
         /** @description 0.15.106: procurement and materials (dashboard proposals item 1). */
         DashboardOpsProcurement: {
@@ -17099,6 +17471,63 @@ export interface components {
                 missing_lines: number;
                 missing_qty: number;
             }[] | null;
+        };
+        /** @description 0.15.200: permits and HSE (dashboard proposals item 3). */
+        DashboardOpsPermitsHse: {
+            /** @description False when the caller may not see the Permits and HSE register; the other fields are then null. */
+            available: boolean;
+            /** @description The permit records of the active, not cancelled sites. */
+            total: number | null;
+            /** @description The status mix, the most frequent first; (none) gathers the blank statuses. */
+            by_status: {
+                status: string;
+                count: number;
+            }[] | null;
+            /** @description Permits with status Applied. */
+            waiting: number | null;
+            /** @description The active, not cancelled sites with no permit record at all. */
+            sites_without_permit: number | null;
+            /** @description The approved dated permits whose validity ends within the next 30 calendar days. */
+            expiring_14: number | null;
+            /** @description The approved dated permits whose validity has passed. */
+            expired: number | null;
+            /** @description Stop-work orders not yet lifted. */
+            stop_work_active: number | null;
+            /** @description The safety checks of the open PTWs (permit type beginning PTW, status Applied or Approved). A check counts as covered only when it is Done or N/A. */
+            ptw: {
+                open: number;
+                /** @description The open PTWs missing at least one check. */
+                with_gaps: number;
+                /** @description The gaps per check, only the checks that are missing somewhere. */
+                gaps: {
+                    /** @enum {string} */
+                    key: "jsa_tra" | "toolbox_talk" | "work_at_height" | "lifting_plan" | "loto" | "rescue_plan";
+                    count: number;
+                }[];
+            } | null;
+        };
+        /** @description 0.15.201: GECOL and HLC readiness (dashboard proposals item 4). */
+        DashboardOpsGecolHlc: {
+            gecol: components["schemas"]["DashboardOpsUtilityReadiness"];
+            hlc: components["schemas"]["DashboardOpsUtilityReadiness"];
+        };
+        /** @description 0.15.201: the readiness of one utility (GECOL power or HLC fiber) over its scoped sites. */
+        DashboardOpsUtilityReadiness: {
+            /** @description False when the caller may not see the register; the other fields are then null. */
+            available: boolean;
+            /** @description The active, not cancelled sites with the scope. */
+            in_scope: number | null;
+            /** @description GECOL only: power_on_date set; null in the HLC part. */
+            powered: number | null;
+            /** @description HLC only: in_service_date set; null in the GECOL part. */
+            in_service: number | null;
+            waiting: components["schemas"]["DashboardOpsAging"] | null;
+            /** @description In-scope sites with no record of the register at all. */
+            no_record: number | null;
+            /** @description GECOL only: the CW PAC (task B13) is approved but the power is not on; null in the HLC part. */
+            civil_ready_no_power: number | null;
+            /** @description HLC only: installation_date set but not in service yet; null in the GECOL part. */
+            installed_not_in_service: number | null;
         };
         DashboardTabLayout: {
             /** @description Card codes in display order. */
@@ -21145,6 +21574,36 @@ export interface operations {
             429: components["responses"]["TooManyRequests"];
         };
     };
+    localDeviceCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    code: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Signed in. */
+            200: {
+                headers: {
+                    "Set-Cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Session"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
     startTwoFactorEnrolment: {
         parameters: {
             query?: never;
@@ -21849,6 +22308,75 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             422: components["responses"]["Unprocessable"];
             429: components["responses"]["TooManyRequests"];
+        };
+    };
+    listMySessions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sessions. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["MySession"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    revokeMyOtherSessions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Done. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MySessionRevokeResult"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    revokeMySession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: components["parameters"]["SessionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Ended. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MySessionRevokeResult"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     getMyProfile: {
@@ -25698,6 +26226,35 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
         };
     };
+    simulateMatrix: {
+        parameters: {
+            query: {
+                site_id: string;
+                kind: "task" | "register";
+                /** @description The task code (kind task) or the register key (kind register). */
+                code: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The simulation. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatrixSimulation"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
     getMatrixCoverage: {
         parameters: {
             query?: {
@@ -27679,6 +28236,78 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             422: components["responses"]["Unprocessable"];
+        };
+    };
+    listExportSchedules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The schedules. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportScheduleList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    saveExportSchedule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExportScheduleInput"];
+            };
+        };
+        responses: {
+            /** @description The caller's schedules after the change. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportScheduleList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    deleteExportSchedule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The caller's schedules after the change. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportScheduleList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
         };
     };
     listMasterExports: {
@@ -31500,6 +32129,94 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
         };
     };
+    getNewDeviceCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The setting. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NewDeviceCodeSetting"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setNewDeviceCode: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewDeviceCodeSettingInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NewDeviceCodeSetting"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    bypassNewDeviceCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewDeviceBypassInput"];
+            };
+        };
+        responses: {
+            /** @description Allowed until. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: date-time */
+                        until: string;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
     getHistoricalWaiver: {
         parameters: {
             query?: never;
@@ -33046,6 +33763,48 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    setRegisterFieldDefault: {
+        parameters: {
+            query?: never;
+            header?: {
+                "If-Match"?: string;
+            };
+            path: {
+                register_key: string;
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description A string, number, boolean or list of strings; null clears. */
+                    value: unknown;
+                    reason: components["schemas"]["Reason"];
+                };
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        code: string;
+                        version: number;
+                        default_value?: unknown;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["Unprocessable"];
         };
     };

@@ -17,6 +17,7 @@ export const NAV: { key: string; to: string; icon: Concept; group: 'home' | 'wor
   { key: 'hlc', to: '/registers/hlc', icon: 'fiber', group: 'registers' },
   { key: 'permits_hse', to: '/registers/permits_hse', icon: 'permit', group: 'registers' },
   { key: 'incidents', to: '/registers/incidents', icon: 'issue', group: 'registers' },
+  { key: 'lessons_learned', to: '/registers/lessons_learned', icon: 'handover', group: 'registers' },
   { key: 'warehouse', to: '/warehouse', icon: 'warehouse', group: 'registers' },
   { key: 'quality', to: '/registers/quality', icon: 'quality', group: 'registers' },
   { key: 'issues', to: '/registers/issues', icon: 'issue', group: 'registers' },

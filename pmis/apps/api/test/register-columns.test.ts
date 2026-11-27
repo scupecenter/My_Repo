@@ -325,3 +325,29 @@ describe('templates regenerate and an older file is read by its column codes', (
     expect(c2.input_changes).toEqual([expect.objectContaining({ key: 't_new', change: 'type_changed' })]);
   });
 });
+
+describe('default value of a column (0254)', () => {
+  const dflt = (code: string, value: unknown, who: Actor = admin, headers: Record<string, string> = {}) => who.api.call('put', `${F}/${code}/default`, { value, reason: REASON }, headers);
+  it('sets, serves to the form, validates, clears and is admin only', async () => {
+    expect((await add({ code: 'c_dflt_text', label_en: 'Default text', field_type: 'text' })).status).toBe(201);
+    expect((await add({ code: 'c_dflt_num', label_en: 'Default number', field_type: 'number' })).status).toBe(201);
+    expect((await dflt('c_dflt_text', 'Tripoli', plain)).status).toBe(403);
+    const ok = await dflt('c_dflt_text', 'Tripoli');
+    expect(ok.status).toBe(200);
+    expect(ok.body.default_value).toBe('Tripoli');
+    expect((await field('c_dflt_text'))?.default_value).toBe('Tripoli');
+    const defs = await admin.api.call('get', '/registers');
+    expect(defs.status).toBe(200);
+    const gecol = (defs.body.items as { register_key: string; fields: { code: string; default_value?: unknown }[] }[]).find((d) => d.register_key === 'gecol');
+    expect(gecol?.fields.find((f) => f.code === 'c_dflt_text')?.default_value).toBe('Tripoli');
+    expect((await dflt('c_dflt_num', 'not a number')).status).toBe(422);
+    expect((await dflt('c_dflt_num', 12)).status).toBe(200);
+    expect((await dflt('c_dflt_text', 'x', admin, { 'If-Match': '"999"' })).status).toBe(412);
+    const clear2 = await dflt('c_dflt_text', null);
+    expect(clear2.status).toBe(200);
+    expect((await field('c_dflt_text'))?.default_value ?? null).toBeNull();
+    // a record saved without the column stays without it: the server never applies the default
+    const r = await rec({ pr_no: `GD-${Date.now()}`, request_date: '2026-01-05' });
+    expect((r.data as Record<string, unknown>).c_dflt_num).toBeUndefined();
+  });
+});

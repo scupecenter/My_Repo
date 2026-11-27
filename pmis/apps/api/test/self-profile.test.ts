@@ -41,7 +41,7 @@ describe('profile: self-editable and admin-owned fields', () => {
     expect(r.headers.etag).toBe(`"${r.body.version}"`);
     expect(r.body).toMatchObject({
       id: u.id, display_name: u.name, email: u.email, employee_id: u.employeeId, phone: u.phone, local_sign_in: true, auth_method: 'local',
-      editable_fields: ['display_name', 'locale', 'theme', 'ui_brand'],
+      editable_fields: ['display_name', 'locale', 'theme', 'ui_brand', 'ui_prefs'],
       two_factor: { state: 'off', enforced: false, can_enable: true, can_disable: false }, email_change: null, phone_change: null,
     });
     expect(r.body.admin_owned.roles.length).toBe(1);

@@ -6,6 +6,7 @@ import { App } from './App';
 import { StepUpProvider } from './components/StepUp';
 import { ToastProvider } from './components/Toast';
 import { applyLocale, applyTheme, currentLocale, currentTheme } from './i18n';
+import { applyAppearance, savedAppearance } from './lib/appearance';
 import { applyBrand, savedBrand } from './lib/brands';
 import { applyMotion, currentMotion } from './lib/motion';
 import './styles/index.css';
@@ -15,6 +16,7 @@ applyLocale(currentLocale());
 applyTheme(currentTheme());
 applyBrand(savedBrand());
 applyMotion(currentMotion());
+applyAppearance(savedAppearance());
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } } });
 
