@@ -1329,6 +1329,14 @@
     "unknown_field": "Not a field that can be used here.",
     "in_the_future": "The cutoff date cannot be in the future."
   },
+  "calview": {
+    "title": "Calendar",
+    "prev": "Previous month",
+    "next": "Next month",
+    "undated": "{{n}} with no date",
+    "field": "Date field",
+    "no_columns": "No date field is defined for this screen."
+  },
   "cal": {
     "inline_reason": "Reason for the changes made in the table (3+ characters)",
     "inline_hint": "Click a date, name or kind to edit it. Each change is saved and audited with this reason.",
@@ -4408,6 +4416,27 @@
     "yellow": "Pending approval. Documents uploaded, waiting for review or approval ({{approved}} of {{need}} approved).",
     "green": "Approved. Documents approved ({{approved}} of {{need}})."
   },
+  "regstate": {
+    "title": "Register state",
+    "note": "Switch a whole register off (it is hidden everywhere; nothing is deleted and switching it on again restores everything) or lock it (readable, but no new record and no change, except by a System Admin). Every change needs a reason and is audited.",
+    "register": "Register",
+    "records": "Records",
+    "enabled": "Enabled",
+    "locked": "Locked",
+    "reason": "Last reason",
+    "hidden": "Hidden",
+    "saved": "Register state saved",
+    "enabled_aria": "Enable {{name}}",
+    "lock_aria": "Lock {{name}}",
+    "unlock_aria": "Unlock {{name}}",
+    "enable_title": "Enable {{name}}",
+    "disable_title": "Disable {{name}}",
+    "lock_title": "Lock {{name}}",
+    "unlock_title": "Unlock {{name}}",
+    "disable_note": "The register is hidden from menus, lists and the Matrix. No record, step, template or history is removed.",
+    "lock_note": "The register stays readable. New records and changes (screen, upload, workflow step) are refused until it is unlocked; System Admins are exempt.",
+    "restore_note": "The register is available again with all its records."
+  },
   "regcols": {
     "inline_reason": "Reason for the changes made in the table (3+ characters)",
     "inline_hint": "Click a name, type or section to edit it here. The pencil still opens the full form. A column that already holds values changes type only in the form (it shows the conversion first).",
@@ -6903,7 +6932,8 @@
     "board_hint": "Cards by milestone or status",
     "map": "Map",
     "map_hint": "Items on the map",
-    "chart_hint": "The rows as bars or a ring, by a field you choose"
+    "chart_hint": "The rows as bars or a ring, by a field you choose",
+    "calendar_hint": "On a month grid, by a date you choose"
   },
   "batchedit": {
     "title": "Batch edit",

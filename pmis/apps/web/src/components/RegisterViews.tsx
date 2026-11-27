@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { RegisterDefinition, RegisterField, RegisterRecord } from '@/api/types';
 import { BoardGrid, type BoardColumn } from '@/components/Board';
+import { CalendarGrid } from '@/components/CalendarGrid';
 import { INLINE_TYPES } from '@/components/GridCellEditor';
 import { Holders } from '@/components/HolderChip';
 import { fieldLabel, showValue } from '@/components/RegisterFields';
@@ -20,8 +21,8 @@ import type { Display } from '@/lib/tablePrefs';
  * the board and the map are the same shared components as Site Master (WideTable, BoardGrid, SiteMap), fed by the register's own list
  * (GET /registers/{key}/records with the same filters, so every layout shows the same records, with the caller's rights and field rules).
  */
-export type RegisterLayout = 'list' | 'wide' | 'board' | 'map' | 'chart';
-export const REGISTER_LAYOUTS: readonly RegisterLayout[] = ['list', 'wide', 'board', 'map', 'chart'];
+export type RegisterLayout = 'list' | 'wide' | 'board' | 'map' | 'calendar' | 'chart';
+export const REGISTER_LAYOUTS: readonly RegisterLayout[] = ['list', 'wide', 'board', 'map', 'calendar', 'chart'];
 
 /** The board's grouping on the approval state of the records (entry, in review, in approval, approved, voided), which every register has. */
 export const BY_STATE = 'state';
@@ -50,8 +51,17 @@ export function defaultBoardBy(def: RegisterDefinition): string {
 export const axisFields = (def: RegisterDefinition): RegisterField[] => def.fields.filter((f) => f.type === 'list' || f.type === 'yes_no');
 export const numericFields = (def: RegisterDefinition): RegisterField[] => def.fields.filter((f) => f.type === 'number');
 
-/** The layouts a register offers: list, wide table, board and chart on every register; the map only where the records carry a site (and its coordinates). */
-export const layoutsOf = (def: RegisterDefinition): RegisterLayout[] => (def.site_scoped ? ['list', 'wide', 'board', 'map', 'chart'] : ['list', 'wide', 'board', 'chart']);
+/** The date fields a register has: a date-typed field of the definition. */
+export const dateFields = (def: RegisterDefinition): RegisterField[] => def.fields.filter((f) => f.type === 'date');
+
+/** The layouts a register offers: list, wide table, board and chart on every register; the map only where the records carry a site (and its coordinates);
+    the calendar (decision V2) where the definition has at least one date field. */
+export const layoutsOf = (def: RegisterDefinition): RegisterLayout[] => [
+  'list', 'wide', 'board',
+  ...(def.site_scoped ? (['map'] as const) : []),
+  ...(dateFields(def).length ? (['calendar'] as const) : []),
+  'chart',
+];
 
 /** A key that is safe in a test id and an id attribute, unique among the keys already given. */
 function keyOf(v: string, used: Set<string>): string {
@@ -275,6 +285,26 @@ export function RegisterChart({ def, records, axis, measure, kind, partial }: {
     <section className="card p-3" data-testid="register-chart-card" aria-label={t('chartv.title')}>
       <ChartView testid="register-chart" slices={slices} kind={kind} label={t('chartv.label', { axis: axisLabel, measure: measureLabel })}
         head={partial ? <span className="chip bg-waitBg text-waitInk" role="note" data-testid="register-chart-partial">{t('regviews.partial', { shown: partial.shown, total: partial.total })}</span> : undefined} />
+    </section>
+  );
+}
+
+/** Decision V2: the register's records on a month calendar, read only, on the date field chosen in the Layout panel. */
+export function RegisterCalendar({ def, records, field, onOpen, partial }: {
+  def: RegisterDefinition; records: RegisterRecord[]; field: RegisterField | undefined; onOpen: (id: string) => void; partial?: { shown: number; total: number } | null;
+}) {
+  const { t, i18n } = useTranslation();
+  const lang = i18n.language;
+  if (!field) return <div className="card p-3 text-sm text-mute" data-testid="register-calendar-empty">{t('calview.no_columns')}</div>;
+  const items = records.map((r) => {
+    const titleField = def.fields.find((y) => y.in_list && y.code !== field.code && r.data[y.code] !== undefined && r.data[y.code] !== null && r.data[y.code] !== '');
+    const label = [r.site_code, titleField ? valueText(titleField, r.data[titleField.code], lang, t) : ''].filter(Boolean).join(' ') || r.id;
+    return { id: r.id, label, date: String(r.data[field.code] ?? '').slice(0, 10), late: false };
+  });
+  return (
+    <section className="card p-3" data-testid="register-calendar-card" aria-label={t('calview.title')}>
+      <CalendarGrid testid="register-calendar" items={items} onOpen={onOpen}
+        head={partial ? <span className="chip bg-waitBg text-waitInk" role="note" data-testid="register-calendar-partial">{t('regviews.partial', { shown: partial.shown, total: partial.total })}</span> : undefined} />
     </section>
   );
 }

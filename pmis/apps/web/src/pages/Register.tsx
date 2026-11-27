@@ -1,6 +1,7 @@
 import {
   ArrowRightLeft,
   BarChart3,
+  CalendarDays,
   Columns3,
   Download,
   Grid3x3,
@@ -62,10 +63,12 @@ import {
   BY_STATE,
   axisFields,
   defaultBoardBy,
+  dateFields,
   layoutsOf,
   numericFields,
   RegisterChart,
   RegisterBoard,
+  RegisterCalendar,
   RegisterMap,
   RegisterWide,
   statusFields,
@@ -107,12 +110,13 @@ import { isLive, OWNER_NOTE } from "@/lib/registerForms";
 
 const RF_KEYS = ["q", "region_id", "state", "record_type", "triage"] as const;
 // W2: a saved view also keeps the layout (list, wide, board, map) and the board's grouping and swimlane, as #185 does for Site Master
-const LAYOUT_KEYS = ["layout", "board_by", "lane", "chx", "chm", "chk"] as const;
+const LAYOUT_KEYS = ["layout", "board_by", "lane", "calf", "chx", "chm", "chk"] as const;
 type RegisterView = RecordFilters & {
   advanced?: FilterTree;
   layout?: string;
   board_by?: string;
   lane?: string;
+  calf?: string;
   chx?: string;
   chm?: string;
   chk?: string;
@@ -125,6 +129,7 @@ const VIEW_EMPTY: RegisterView = {
   layout: "",
   board_by: "",
   lane: "",
+  calf: "",
   chx: "",
   chm: "",
   chk: "",
@@ -209,6 +214,10 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
   const chKind: ChartKind = sp.get("chk") === "pie" ? "pie" : "bar";
   const chAxisFields = axisFields(def);
   const chNumeric = numericFields(def);
+  // V2: the calendar's date field (`calf` in the URL and the saved views); the register's first date field is the default
+  const calDates = dateFields(def);
+  const calParam = sp.get("calf") ?? "";
+  const calField = calDates.find((x) => x.code === calParam) ?? calDates[0];
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const regions = useRegions();
   // F16: As-Built splits CW BOQ / TE BOQ and Dismantle splits CW / TE by record_type (the server filter); the first tab is the default.
@@ -317,6 +326,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
     { id: "board", label: t("board.board"), hint: t("view.board_hint"), icon: <Columns3 size={14} />, testid: "register-layout-board" },
     ...(layouts.includes("map") ? [{ id: "map", label: t("sites.map"), hint: t("view.map_hint"), icon: <MapIcon size={14} />, testid: "register-layout-map" }] : []),
     { id: "chart", label: t("chartv.title"), hint: t("view.chart_hint"), icon: <BarChart3 size={14} />, testid: "register-layout-chart" },
+    ...(layouts.includes("calendar") ? [{ id: "calendar", label: t("calview.title"), hint: t("view.calendar_hint"), icon: <CalendarDays size={14} />, testid: "register-layout-calendar" }] : []),
   ];
   const applyView = (id: string) => setParams({ view: id === "grid" ? "grid" : "", layout: id === "grid" || id === "list" ? "" : id });
   const remember = useRememberedView(
@@ -673,6 +683,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
                 chx: layout === "chart" ? (sp.get("chx") ?? "") : "",
                 chm: layout === "chart" ? (sp.get("chm") ?? "") : "",
                 chk: layout === "chart" ? (sp.get("chk") ?? "") : "",
+                calf: layout === "calendar" ? (sp.get("calf") ?? "") : "",
                 ...(advTree ? { advanced: advTree } : {}),
               }}
               empty={VIEW_EMPTY}
@@ -737,6 +748,12 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
                   </select>
                 </label>
               </>
+            ) : view === "vertical" && layout === "calendar" ? (
+              <label className="flex items-center gap-2 text-sm"><span className="text-mute">{t("calview.field")}</span>
+                <select className="input w-auto py-1" data-testid="register-calendar-field" value={calField?.code ?? ""} onChange={(e) => setParams({ calf: e.target.value === calDates[0]?.code ? "" : e.target.value })}>
+                  {calDates.map((x) => <option key={x.code} value={x.code}>{fieldLabel(x, i18n.language)}</option>)}
+                </select>
+              </label>
             ) : view === "vertical" && layout === "board" ? (
               <>
                 <label className="flex items-center gap-2 text-sm"><span className="text-mute">{t("regviews.board_by")}</span>
@@ -1031,6 +1048,9 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
           )}
           {layout === "chart" && (
             <RegisterChart def={def} records={real} axis={chAxis} measure={chMeasure} kind={chKind} partial={partial} />
+          )}
+          {layout === "calendar" && (
+            <RegisterCalendar def={def} records={real} field={calField} onOpen={setRecord} partial={partial} />
           )}
           {layout === "list" && (
           <div className="card gx overflow-hidden" {...displayAttrs(tbl.display)} data-testid="register-list-card">
