@@ -122,6 +122,8 @@ import { ExportLockInterceptor } from './security/export-lock';
 import { UiIdentityService } from './settings/ui-identity.service';
 import { LoginPageController } from './settings/login-page.controller';
 import { LoginPageService } from './settings/login-page.service';
+import { MediaController } from './media/media.controller';
+import { MediaService } from './media/media.service';
 import { SettingsScreensController } from './settings/settings-screens.controller';
 import { SettingsScreensService } from './settings/settings-screens.service';
 import { AlertRulesController } from './settings/alert-rules.controller';
@@ -222,6 +224,7 @@ export function appModuleFor(config: AppConfig) {
       DocumentTextController, DelegationsController, SitesController, SiteDraftsController, TasksController, WorkflowEditorController, TaskDefinitionsController, CalendarController, SlaController, IssueStoppedController, RegistersController, RecycleBinController, RegisterColumnsController, MatrixController, WarehouseController, AsBuiltItemsController, NumberSequencesController, RegisterStateController,
       NotificationsController, FollowController, StatusUpdatesController, InsightsController, TemplatesController, ImportBatchesController, DocumentsController, DocumentsGridController, LibraryController, SnagsController,
       DashboardController, DashboardSettingsController, GoalsController, PmSchedulesController, DashboardOpsController, SupportAccessController, DownloadLocksController, SecurityLocksController, DelayPeriodsController, WeightsController, TeamScopeMatchController, GecolOrderWarningsController, DeriveRulesController, MailKindsController, MailPolicyController, ImportsSettingsController, KanbanController, NavLayoutController, HistoricalWaiverController, SiteMasterController, SiteMasterColumnsController, CustomFieldsController, StructuralFreezeController, UiIdentityController, LoginPageController, SettingsScreensController, AlertRulesController, P4cController, FleetController, AuditLogController, SecurityLogController, LogsAdminController, NewDeviceController,
+      MediaController, // 0.15.292 (own line: the long lines above conflict on every merge)
       PasskeySettingController, PasskeyController, // S4
       ScenarioSettingsController, SiteApplicabilityController, // P1 (0052)
       MailController, HealthController,
@@ -247,6 +250,7 @@ export function appModuleFor(config: AppConfig) {
       AssignmentsService, DelegationsService, SitesService, SiteLocksService, SiteDraftsService, TaskViewService, TaskDetailService, WorkflowEditorService, WorkflowService, ApprovalsService, MyWorkService, OverridesService, CalendarService, SlaService, IssueStoppedService, JobsService, RegistersService, RecycleBinService, RegisterColumnsService, MatrixService, WarehouseService, WarehouseConfigService, AsBuiltItemsService,
       NotificationsService, DocumentTextService, FollowService, StatusUpdatesService, InsightsService, TemplatesService, ImportService, ImportJobsService, UploadInterceptor, StorageService, DocumentsService, DocsGridService, LibraryService, ZipService, StorageJobsService, SnagsService,
       DashboardService, DashboardSettingsService, GoalsService, PmSchedulesService, SiteMapService, ProjectStatusService, DelayPeriodsService, WeightsService, TeamScopeMatchService, GecolOrderWarningsService, DeriveRulesService, MailKindsService, MailPolicyService, ImportsSettingsService, KanbanService, NavLayoutService, HistoricalWaiverService, SiteMasterService, SiteMasterColumnsService, CustomFieldsService, StructuralFreezeService, UiIdentityService, LoginPageService, SettingsScreensService, AlertRulesService, P4cService, FleetService, LogsService, SecurityLogService, JobRunsService, MailService, IntegrityService, DashboardExtrasService, DashboardOpsService, SecurityLocksService, SupportAccessService, DownloadLocksService, NewDeviceService,
+      MediaService, // 0.15.292
       PasskeyService, // S4
       ScenarioService, // P1 (0052)
       ListCataloguesService,

@@ -351,6 +351,8 @@ describe('hybrid mode list', () => {
       'GET /settings/identity', 'PUT /settings/identity',
       // contract 0.15.97: Settings, Screens, Login page and its public read
       'GET /settings/login-page', 'PUT /settings/login-page', 'GET /settings/login-page/public',
+      // contract 0.15.292: the media gallery
+      'GET /media/settings', 'PUT /media/settings', 'GET /media/items', 'GET /media/facets', 'GET /media/items/:kind/:id/thumbnail',
       'GET /settings/security-locks', 'PUT /settings/security-locks', 'GET /settings/download-locks', 'PUT /settings/download-locks',
       'GET /settings/support-access', 'PUT /settings/support-access', 'GET /support-access', 'POST /support-access', 'POST /support-access/revoke-all', 'POST /support-access/:id/revoke', 'GET /settings/new-device-code', 'PUT /settings/new-device-code', 'POST /settings/new-device-code/bypass', 'GET /settings/passkeys', 'PUT /settings/passkeys', 'GET /me/passkeys', 'POST /me/passkeys/register/options', 'POST /me/passkeys/register/verify', 'DELETE /me/passkeys/:id', 'POST /users/:id/passkeys/revoke',
       // contract 0.15.4: the per-site workflow locks and the status of the sites of an import
