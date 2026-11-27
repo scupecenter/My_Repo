@@ -26,8 +26,8 @@ export function FormDialog({ open, onClose, title, testid, children, onSubmit, s
   return (
     <Dialog.Root open={open} onOpenChange={(o) => { if (!o) { setReason(''); setTouched(false); onClose(); } }}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-[70] bg-scrim/60" />
-        <Dialog.Content data-testid={testid} className={`card fixed inset-x-0 top-[6vh] z-[70] mx-auto max-h-[88vh] space-y-3 overflow-y-auto p-5 ${wide ? 'w-[min(720px,94vw)]' : 'w-[min(480px,94vw)]'}`}>
+        <Dialog.Overlay className="motion-overlay fixed inset-0 z-[70] bg-scrim/60" />
+        <Dialog.Content data-testid={testid} className={`motion-panel card fixed inset-x-0 top-[6vh] z-[70] mx-auto max-h-[88vh] space-y-3 overflow-y-auto p-5 ${wide ? 'w-[min(720px,94vw)]' : 'w-[min(480px,94vw)]'}`}>
           <Dialog.Title className="text-lg font-bold">{title}</Dialog.Title>
           <Dialog.Description className="sr-only">{title}</Dialog.Description>
           {children}

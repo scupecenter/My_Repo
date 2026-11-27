@@ -157,7 +157,7 @@ function RunStaging({ r }: { r: MasterImportRun }) {
       <p id="mi-staging-label" className="mb-1 text-sm font-semibold" data-testid="mi-staging-label">{label}</p>
       <div role="progressbar" aria-labelledby="mi-staging-label" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-valuetext={label}
         className="relative h-3 w-full overflow-hidden rounded-full bg-card2" data-testid="mi-staging-bar">
-        <span className="block h-full rounded-full bg-open transition-all" style={{ width: `${pct}%` }} />
+        <span className="block h-full rounded-full bg-open motion-fill" style={{ width: `${pct}%` }} />
       </div>
       <p className="mt-2 text-xs text-mute" role="status">{t('mi.staging_note')}</p>
     </section>

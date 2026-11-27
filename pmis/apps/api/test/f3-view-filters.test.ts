@@ -139,7 +139,7 @@ describe('the whitelist and the limits', () => {
     expect(r.body.limits).toMatchObject({ max_depth: 2, max_items_per_group: 20, max_conditions: 50 });
     const reg = await a.api.call('get', '/saved-views/filter-fields?screen_key=register-issues');
     expect(reg.body.items.find((f: { key: string }) => f.key === 'f:issue_status')).toMatchObject({ type: 'enum' });
-    expect((await a.api.call('get', '/saved-views/filter-fields?screen_key=audit-log')).status).toBe(422);
+    expect((await a.api.call('get', '/saved-views/filter-fields?screen_key=not-a-screen')).status).toBe(422);
     const none = await actor(app, db, { grants: [['issues', 'view']] });
     expect((await none.api.call('get', '/saved-views/filter-fields?screen_key=sites')).status).toBe(403);
   });

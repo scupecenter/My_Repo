@@ -45,7 +45,7 @@ export const p4cHandlers = [
 
   // 0181: the picker of a warehouse receipt and the receipts against an order
   http.get(`${B}/registers/:key/order-options`, ({ request, params }) => {
-    if (!['warehouse', 'car_dispatcher', 'financial_advances'].includes(String(params.key))) return undefined;
+    if (!['warehouse', 'car_dispatcher', 'financial_advances', 'issues', 'quality'].includes(String(params.key))) return undefined;
     const g = guard(); if (g) return g;
     const site = new URL(request.url).searchParams.get('site_id');
     const si = site ? siteIndex(site) : null;

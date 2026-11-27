@@ -17,6 +17,7 @@ import { TS_TEXT, boolParam, oneParam, Query } from "../common/query";
 import { parse, uuidSchema } from "../common/zod";
 import { DbService } from "../db/db.service";
 import { TaskViewService } from "../workflow/task-view.service";
+import { FilterCatalogService } from "../views/filter-catalog.service";
 
 const reason = z.string().trim().min(3).max(1000);
 // Q107 (migration 0053): a need rule is confirmed only when the owner gave its quantity; otherwise it is pending configuration and never counts.
@@ -281,6 +282,7 @@ export class WarehouseService {
     private readonly access: AccessService,
     private readonly stepUp: StepUpService,
     private readonly view: TaskViewService,
+    private readonly filters: FilterCatalogService,
   ) {}
 
   /** The database decides; a savepoint keeps the request transaction usable after a refusal. */
@@ -602,6 +604,8 @@ export class WarehouseService {
     const limit = parseLimit(oneParam(q, "limit"));
     const cursor = decodeCursor(oneParam(q, "cursor"), 2);
     const conds: Prisma.Sql[] = [this.visible(regs)];
+    const adv = await this.filters.fromQuery("warehouse-movements", q); // the + Filter tree; it narrows beside the region scope above
+    if (adv) conds.push(Prisma.sql`(${adv})`);
     const site = oneParam(q, "site_id");
     if (site !== undefined) {
       if (!uuidSchema.safeParse(site).success)

@@ -12,6 +12,8 @@ import { useConfigGaps, useDeleteItem, useDispatchList, useMovements, useQuarant
 import { NEED_TONE } from '@/components/SiteDispatch';
 import { errText, FormDialog } from '@/components/FormDialog';
 import { InlinePanel } from '@/components/InlinePanel';
+import { UnifiedFilter } from '@/components/UnifiedFilter';
+import { decodeFilter, encodeFilter } from '@/api/views';
 import { useToast } from '@/components/Toast';
 import { hasGrant, isAdmin } from '@/lib/perm';
 import { registerErrorMessage } from '@/lib/registerErrors';
@@ -183,7 +185,8 @@ function Items() {
 function Movements() {
   const { t } = useTranslation();
   const [status, setStatus] = useState('');
-  const list = useMovements(status);
+  const [adv, setAdv] = useState('');
+  const list = useMovements(status, adv);
   const [editing, setEditing] = useState<string | null>(null);
   const [reversing, setReversing] = useState<string | null>(null);
   // DN and RN, and the quarantine exits (Q270); the other documents (PL, OPEN, ADJ) have no site and are kept in the register.
@@ -194,6 +197,7 @@ function Movements() {
         <select className="input w-auto" aria-label={t('wh.status')} data-testid="wh-filter-status" value={status} onChange={(e) => setStatus(e.target.value)}>
           <option value="">{t('wh.all_statuses')}</option>{['pending', 'posted', 'cancelled'].map((s) => <option key={s} value={s}>{t(`wh.st_${s}`)}</option>)}
         </select>
+        <UnifiedFilter screen="warehouse-movements" value={decodeFilter(adv)} onChange={(tree) => setAdv(encodeFilter(tree))} onClearAll={() => setAdv('')} />
       </div>
       <div className="card overflow-x-auto">
         <table className="w-full text-sm">

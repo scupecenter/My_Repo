@@ -15,6 +15,7 @@ import { parse, uuidSchema } from '../common/zod';
 import { DbService } from '../db/db.service';
 import { StorageService, newObjectKey } from '../documents/storage.service';
 import { attachmentHeader } from '../documents/naming';
+import { FilterCatalogService } from '../views/filter-catalog.service';
 import { applyContext, jobContext, parseDevice } from './context';
 import { WorkbookInput, activityWorkbook } from './activity-workbook';
 
@@ -97,6 +98,8 @@ function filters(q: Record<string, unknown>, keys: string[]): Record<string, unk
   return out;
 }
 
+/** How many of the newest visible rows the advanced filter looks through for one page. */
+const LOG_FILTER_WINDOW = 20000;
 const AUDIT_FILTERS = ['from', 'to', 'actor_id', 'site_id', 'region_id', 'entity_type', 'entity_id', 'action', 'module_key', 'via', 'ip', 'session_id', 'batch_id', 'bulk_action_id', 'admin_override', 'privileged', 'q'];
 const FIELD_FILTERS = ['entity_type', 'entity_id', 'site_id', 'field', 'actor_id', 'from', 'to', 'ip', 'via'];
 const SEC_FILTERS = ['from', 'to', 'event', 'outcome', 'user_id', 'ip', 'q'];
@@ -165,6 +168,7 @@ export class LogsService {
     private readonly idem: IdempotencyService,
     private readonly storage: StorageService,
     private readonly syslog: SyslogService,
+    private readonly filters: FilterCatalogService,
   ) {}
 
   /** Waits for export jobs started by this process (tests, shutdown). */
@@ -213,7 +217,15 @@ export class LogsService {
     };
   }
 
-  private auditSql(f: Record<string, unknown>, limit: number): Prisma.Sql {
+  /** The + Filter tree reads the newest LOG_FILTER_WINDOW rows the reader may see (after the simple filters and the dates); the tree only narrows what the log function returns. */
+  private auditSql(f: Record<string, unknown>, limit: number, adv: Prisma.Sql | null = null): Prisma.Sql {
+    if (adv) {
+      return Prisma.sql`WITH w AS (SELECT * FROM log_audit_read(${JSON.stringify(f)}::jsonb, ${LOG_FILTER_WINDOW}::int))
+      SELECT a.*, log_ts_text(a.at) AS at_text, log_is_privileged(a.action, a.entity_type, a.is_admin_override) AS privileged,
+        s.site_code, log_audit_chain_seq(a.id) AS chain_seq, (SELECT count(*) FROM w) AS win_n
+      FROM w a LEFT JOIN sites s ON s.id = a.site_id
+      WHERE (${adv}) ORDER BY a.at DESC, a.id DESC LIMIT ${limit}::int`;
+    }
     return Prisma.sql`SELECT a.*, log_ts_text(a.at) AS at_text, log_is_privileged(a.action, a.entity_type, a.is_admin_override) AS privileged,
         s.site_code, log_audit_chain_seq(a.id) AS chain_seq
       FROM log_audit_read(${JSON.stringify(f)}::jsonb, ${limit}::int) a
@@ -224,9 +236,11 @@ export class LogsService {
   async auditList(q: Query) {
     const limit = parseLimit(q.limit);
     const f = { ...filters(q, AUDIT_FILTERS), ...this.cursorTs(q, 'bigint') };
-    const rows = await this.db.tx.$queryRaw<AuditRow[]>(this.auditSql(f, limit + 1));
+    const adv = await this.filters.fromQuery('audit-log', q);
+    const rows = await this.db.tx.$queryRaw<(AuditRow & { win_n?: bigint })[]>(this.auditSql(f, limit + 1, adv));
     const u = await this.users(rows.flatMap((r) => [r.actor_id, r.on_behalf_of]));
-    return this.page(rows.map((r) => this.auditDto(r, u)), limit, (l) => [l.at, String(l.id)]);
+    const out = this.page(rows.map((r) => this.auditDto(r, u)), limit, (l) => [l.at, String(l.id)]);
+    return adv ? { ...out, page: { ...out.page, filter_window: { rows: LOG_FILTER_WINDOW, full: Number(rows[0]?.win_n ?? 0) >= LOG_FILTER_WINDOW } } } : out;
   }
 
   // ------------------------------------------------------------------ field changes
@@ -341,8 +355,11 @@ export class LogsService {
   async securityList(q: Query) {
     const limit = parseLimit(q.limit);
     const f = { ...filters(q, SEC_FILTERS), ...this.cursorTs(q, 'bigint') };
+    const adv = await this.filters.fromQuery('security-log', q);
     const rows = await this.db.tx.$queryRaw<{ id: bigint; at_text: string; event: string; outcome: string; user_id: string | null; actor_id: string | null; identifier_hash: string | null;
-      client_type: string; ip: string | null; user_agent: string | null; device: unknown; session_id: string | null; request_id: string | null; detail: unknown }[]>(Prisma.sql`
+      client_type: string; ip: string | null; user_agent: string | null; device: unknown; session_id: string | null; request_id: string | null; detail: unknown; win_n?: bigint }[]>(adv ? Prisma.sql`
+      WITH w AS (SELECT * FROM sec_log_read(${JSON.stringify(f)}::jsonb, ${LOG_FILTER_WINDOW}::int))
+      SELECT s.*, log_ts_text(s.at) AS at_text, (SELECT count(*) FROM w) AS win_n FROM w s WHERE (${adv}) ORDER BY s.at DESC, s.id DESC LIMIT ${limit + 1}::int` : Prisma.sql`
       SELECT s.*, log_ts_text(s.at) AS at_text FROM sec_log_read(${JSON.stringify(f)}::jsonb, ${limit + 1}::int) s ORDER BY s.at DESC, s.id DESC`);
     const u = await this.users(rows.flatMap((r) => [r.user_id, r.actor_id]));
     const items = rows.map((r) => ({
@@ -350,7 +367,8 @@ export class LogsService {
       identifier_masked: r.user_id ? null : r.identifier_hash, client_type: r.client_type, ip: r.ip, user_agent: r.user_agent, device: r.device ?? parseDevice(r.user_agent),
       session_id: r.session_id, request_id: r.request_id, details: r.detail ?? null,
     }));
-    return this.page(items, limit, (l) => [l.at, String(l.id)]);
+    const out = this.page(items, limit, (l) => [l.at, String(l.id)]);
+    return adv ? { ...out, page: { ...out.page, filter_window: { rows: LOG_FILTER_WINDOW, full: Number(rows[0]?.win_n ?? 0) >= LOG_FILTER_WINDOW } } } : out;
   }
 
   // ------------------------------------------------------------------ System Log
