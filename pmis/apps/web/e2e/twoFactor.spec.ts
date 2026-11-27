@@ -1,6 +1,6 @@
 import { createHmac } from 'node:crypto';
 import { expect, test, type Page } from '@playwright/test';
-import { answerAnnouncements, DEMO, login, stepUp } from './helpers';
+import { answerAnnouncements, DEMO, login, stepUp, signOutViaMenu } from './helpers';
 
 // Two-factor (TOTP) for local accounts: an admin turns it on and gets a one-time enrolment code (shown once), the user enters that code at the
 // next sign-in before the QR code appears, enrols (QR code, recovery codes), then signs in with password and code. Both languages and both themes (Arabic runs right-to-left, dark theme).
@@ -23,7 +23,7 @@ function totp(secret: string, offset = 0): string {
   const o = h[h.length - 1] & 0x0f;
   return String((((h[o] & 0x7f) << 24) | (h[o + 1] << 16) | (h[o + 2] << 8) | h[o + 3]) % 1_000_000).padStart(6, '0');
 }
-const signOut = (page: Page) => page.getByTestId('topbar-signout').click();
+const signOut = (page: Page) => signOutViaMenu(page);
 
 for (const [locale, theme] of [['en', 'light'], ['ar', 'dark']] as const) {
   test(`admin turns two-factor on, the user enrols, then signs in with a code ${locale} ${theme}`, async ({ page }) => {
