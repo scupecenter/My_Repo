@@ -4,6 +4,7 @@ import { AllowIncomplete, Auth } from '../auth/decorators';
 import type { AuthContext } from '../auth/auth.types';
 import { contentVersion, etagHeader } from '../common/etag';
 import { MeDto, MeService } from './me.service';
+import { MySessionsService } from './my-sessions.service';
 import { NotifyAdminsService } from './notify-admins.service';
 import { EmailChangesService, PhoneChangesService, ProfileDto, ProfileService } from './profile.service';
 
@@ -13,6 +14,7 @@ export class MeController {
     private readonly me: MeService,
     private readonly profile: ProfileService,
     private readonly notify: NotifyAdminsService,
+    private readonly mySessions: MySessionsService,
   ) {}
 
   @AllowIncomplete()
@@ -29,6 +31,24 @@ export class MeController {
   @HttpCode(202)
   async notifyAdmins(@Auth() auth: AuthContext, @Body() body: unknown): Promise<void> {
     await this.notify.notify(auth, body);
+  }
+
+  /** 0.15.102: my own sessions (device list) and ending them. Own rows only; the current session is ended by sign out. */
+  @Get('sessions')
+  listSessions(@Auth() auth: AuthContext) {
+    return this.mySessions.list(auth);
+  }
+
+  @Post('sessions/revoke-others')
+  @HttpCode(200)
+  endOtherSessions(@Auth() auth: AuthContext) {
+    return this.mySessions.endOthers(auth);
+  }
+
+  @Post('sessions/:id/revoke')
+  @HttpCode(200)
+  endSession(@Auth() auth: AuthContext, @Param('id') id: string) {
+    return this.mySessions.end(auth, id);
   }
 
   // ------------------------------------------------------------------ self-service profile (contract 0.9.2, migration 0044)

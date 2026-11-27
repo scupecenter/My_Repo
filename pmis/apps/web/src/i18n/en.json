@@ -174,6 +174,7 @@
     "group_library": "Library",
     "library.forms": "Forms",
     "library.archive": "Archive",
+    "lessons_learned": "Lessons Learned",
     "incidents": "Incidents & Security"
   },
   "top": {
@@ -1201,11 +1202,15 @@
     "section_documents_numbering": "Numbering",
     "section_data_counts": "GECOL / HLC counts",
     "section_registers_recycle": "Recycle bin",
+    "section_data_export": "Scheduled export",
     "section_screens_motion": "Motion",
     "section_workflow_coverage": "Matrix coverage",
     "section_screens_login": "Login page",
     "section_screens_interface": "Interface",
-    "section_screens_goals": "Goals"
+    "section_screens_goals": "Goals",
+    "section_security_newdevice": "New-device code",
+    "section_workflow_coverage": "Matrix coverage",
+    "section_workflow_simulate": "Who approves?"
   },
   "scopeMatch": {
     "title": "Team / scope match (Procurement)",
@@ -1960,6 +1965,8 @@
     "purchase_request": "Purchase request",
     "in_service": "In service",
     "execution": "Execution",
+    "lesson": "Lesson",
+    "follow_up": "Follow-up",
     "incident": "Incident",
     "people_damage": "People and damage",
     "resolution": "Resolution"
@@ -2092,7 +2099,9 @@
     "inline_undone": "Change undone.",
     "contractor": "Contractor",
     "contractor_company": "Contractor company",
-    "contractor_hint": "Pick from the companies with an active contract. The contract is checked against the scope at submit."
+    "contractor_hint": "Pick from the companies with an active contract. The contract is checked against the scope at submit.",
+    "prefilled": "Prefilled",
+    "prefilled_hint": "Filled from the default set in Settings; change it if it does not apply."
   },
   "regErrors": {
     "register_locked": "This is locked: only a System Admin can change it until it is unlocked.",
@@ -3217,7 +3226,46 @@
       "col_contractor": "Contractor",
       "unattributed": "Unattributed",
       "by_contractor": "Shortage per contractor",
-      "contractor_row": "{{qty}} missing · {{lines}} lines · {{sites}} sites"
+      "contractor_row": "{{qty}} missing · {{lines}} lines · {{sites}} sites",
+      "permits_title": "Permits and HSE",
+      "permits_hint": "The permit position of the visible sites: status mix, validity pressure, open stop-work and the PTW safety checks. Read only.",
+      "unavailable_permits": "You cannot see the Permits and HSE register, so these figures are not shown.",
+      "waiting": "Waiting for approval",
+      "expired": "Expired",
+      "stop_work_active": "Stop-work active",
+      "by_status": "Permits by status",
+      "permits_empty": "No permit records on the visible sites.",
+      "ptw_title": "PTW safety checks",
+      "ptw_open": "Open PTWs",
+      "ptw_with_gaps": "With missing checks",
+      "ptw_none": "No open PTWs on the visible sites.",
+      "ptw_clear": "Every open PTW has its six checks covered.",
+      "ptw_check": {
+        "jsa_tra": "JSA / TRA",
+        "toolbox_talk": "Toolbox talk",
+        "work_at_height": "Work at height",
+        "lifting_plan": "Lifting plan",
+        "loto": "LOTO",
+        "rescue_plan": "Rescue plan"
+      },
+      "expiring_14": "Expiring in 14 days",
+      "no_permit": "Sites with no permit",
+      "readiness_title": "Power and fiber readiness (GECOL / HLC)",
+      "readiness_hint": "The sites waiting on power or fiber, aged since the request. Read only.",
+      "gecol_title": "GECOL power",
+      "hlc_title": "HLC fiber",
+      "open_gecol": "GECOL register",
+      "open_hlc": "HLC register",
+      "in_scope": "Sites in scope",
+      "powered": "Powered",
+      "in_service": "In service",
+      "no_record": "No record",
+      "civil_ready_no_power": "Civilly ready, no power",
+      "installed_not_in_service": "Installed, not in service",
+      "waiting_power": "Waiting for power",
+      "waiting_fiber": "Waiting for fiber",
+      "unavailable_gecol": "You cannot see the GECOL register, so these figures are not shown.",
+      "unavailable_hlc": "You cannot see the HLC register, so these figures are not shown."
     },
     "scurve": {
       "title": "Progress curve",
@@ -3497,6 +3545,69 @@
     "appearance_default": "Use organization default ({{name}})",
     "appearance_note": "The design of the menus and buttons. Light or dark is the Theme above; status colours never change.",
     "appearance_locked": "Your administrator set one design for everyone ({{name}}), so you cannot choose your own."
+  },
+  "appearance": {
+    "title": "Appearance",
+    "subtitle": "Your own look of the whole app: density, type size, corners, motion, icons, the menu and the accent. Every change shows at once before you save it.",
+    "preset": "Ready-made profile",
+    "preset_classic": "Classic",
+    "preset_comfortable": "Comfortable",
+    "preset_night": "Night",
+    "preset_compact": "Compact",
+    "apply": "Apply",
+    "revert": "Revert",
+    "preview_note": "What you see now is a preview. Apply saves it to your account; Revert returns to the saved appearance.",
+    "org_default": "Organization default ({{name}})",
+    "dim": {
+      "density": "Density",
+      "font_scale": "Type size",
+      "radius": "Corners",
+      "motion": "Motion",
+      "icon_style": "Icon weight",
+      "menu_style": "Side menu",
+      "accent": "Accent colour"
+    },
+    "opt": {
+      "density": {
+        "comfortable": "Comfortable",
+        "standard": "Standard",
+        "compact": "Compact"
+      },
+      "font_scale": {
+        "small": "Small",
+        "standard": "Standard",
+        "large": "Large"
+      },
+      "radius": {
+        "sharp": "Sharp",
+        "standard": "Standard",
+        "rounded": "Rounded"
+      },
+      "motion": {
+        "full": "Full",
+        "reduced": "Reduced"
+      },
+      "icon_style": {
+        "light": "Light",
+        "regular": "Regular",
+        "bold": "Bold"
+      },
+      "menu_style": {
+        "default": "Default",
+        "rail": "Icons only",
+        "autohide": "Hide until the edge"
+      },
+      "accent": {
+        "default": "Of the design",
+        "teal": "Teal",
+        "blue": "Blue",
+        "violet": "Violet",
+        "green": "Green",
+        "orange": "Orange",
+        "red": "Red",
+        "amber": "Amber"
+      }
+    }
   },
   "emailChange": {
     "tab": "Email changes",
@@ -4181,7 +4292,12 @@
     "add_impact_tpl": "Impact: a new version of the register template is issued with this column. Files made from the old template still upload; the new column stays empty in them. Existing records keep this column empty until filled.",
     "add_impact": "Impact: existing records keep this column empty until filled. It is not in the template, so no new template version is issued.",
     "move_up": "Move {{code}} up",
-    "move_down": "Move {{code}} down"
+    "move_down": "Move {{code}} down",
+    "default_value": "Default",
+    "default_edit": "Default value of {{code}}",
+    "default_title": "Default value of {{code}}",
+    "default_note": "Prefilled on a new record and shown as prefilled; the person can change it. The server never fills it in by itself (imports and API calls are unchanged).",
+    "default_clear": "Clear the default"
   },
   "lists": {
     "colour": "Colour",
@@ -5706,7 +5822,10 @@
     "readonly": "Only a System Admin, or a person they delegated settings to for all regions, can change this.",
     "confirm": "Default design: {{name}}. {{choice}} The change is audited with your reason.",
     "choice_on": "Users may choose their own design.",
-    "choice_off": "Everyone sees this design."
+    "choice_off": "Everyone sees this design.",
+    "defaults_title": "Organization appearance defaults",
+    "defaults_note": "The appearance of everyone without a personal choice. An empty field keeps the built-in standard.",
+    "defaults_builtin": "Built-in standard ({{name}})"
   },
   "studioPanel": {
     "open": "Show the pending changes",
@@ -6700,6 +6819,37 @@
     "blocked_site_slot_taken": "The site already has another record",
     "audit_link": "Every void and restore is in the audit log."
   },
+  "exportSchedules": {
+    "title": "Scheduled Master export",
+    "note": "A schedule does not run by itself in the background. When a schedule is due, the file is produced when you next open Exports (or the Exports list) in the app, with your own permissions at that moment. It then appears in your exports list. Only you see your schedules.",
+    "none": "No scheduled export yet.",
+    "add": "Add a scheduled export",
+    "name": "Name",
+    "when": "Repeats",
+    "content": "Content",
+    "next": "Next due",
+    "last": "Last run",
+    "due": "Due, starts when you open Exports",
+    "paused": "paused",
+    "whole": "The whole Master",
+    "parts_hint": "none ticked = the whole Master",
+    "enabled": "Active",
+    "saved": "Schedule saved.",
+    "deleted": "Schedule deleted.",
+    "daily": "Every day",
+    "weekly_on": "Every week on {{day}}",
+    "monthly_on": "Every month on day {{day}}",
+    "cad_daily": "Daily",
+    "cad_weekly": "Weekly",
+    "cad_monthly": "Monthly",
+    "weekday_0": "Sunday",
+    "weekday_1": "Monday",
+    "weekday_2": "Tuesday",
+    "weekday_3": "Wednesday",
+    "weekday_4": "Thursday",
+    "weekday_5": "Friday",
+    "weekday_6": "Saturday"
+  },
   "motion": {
     "title": "Motion",
     "note": "One motion system for the whole app: dialogs, messages, cards, progress bars, charts and the map. This choice is saved in this browser, like the theme and the language.",
@@ -6903,5 +7053,66 @@
     "remove": "Remove goal",
     "add": "Add goal",
     "save_title": "Save the goals"
+  },
+  "newdevice": {
+    "title": "New-device code",
+    "note": "When this is on, a password-only sign-in from a browser the account has not used before needs a 6-digit code sent to the account's own email. It is off until you turn it on. Nothing is deleted, sessions already open keep working, and you can turn it off at any time.",
+    "enable": "Ask for an email code on a new device",
+    "enable_note": "Not asked of people with two-step verification (their authenticator is stronger), of System Admins (unless you include them), or of accounts with no email. If the code email cannot be queued the sign-in goes through, so nobody is locked out.",
+    "no_mail": "The mail server is not set up, so this cannot be turned on yet.",
+    "minutes": "Code valid for (minutes)",
+    "include_admins": "Include System Admins",
+    "admins_note": "Leave this off so an admin can always sign in to turn the feature off or let someone in.",
+    "save": "Save settings",
+    "updated": "Last changed by {{name}} on {{when}}.",
+    "readonly": "Only a System Admin manages the new-device code.",
+    "bypass": "Let one person in without the code",
+    "bypass_note": "For someone who cannot reach their mailbox. It works for their next sign-in only, from any browser, for a few minutes.",
+    "who": "Person",
+    "who_ph": "Type 2 letters of a name",
+    "bypass_minutes": "Minutes",
+    "bypass_btn": "Allow one sign-in",
+    "bypass_until": "They can sign in once without the code until {{when}}.",
+    "confirm_set": "New-device code: {{enabled}}, valid {{minutes}} minutes. Your password is asked again and the change is written to the audit log.",
+    "confirm_bypass": "Let {{who}} sign in once without the code, for {{minutes}} minutes. It is written to the audit log.",
+    "on": "on",
+    "off_word": "off"
+  },
+  "devicecode": {
+    "title": "Check it is you",
+    "body": "This browser is new for your account. We sent a 6-digit code to your email. Enter it to finish signing in.",
+    "label": "Code from your email",
+    "hint": "6 digits. It works once and expires soon.",
+    "wrong": "The code is not correct. Check your email and try again."
+  },
+  "mySessions": {
+    "title": "My sessions",
+    "note": "The devices signed in as you. Sign out of any you do not recognise or no longer use. This device stays signed in; use Sign out for it.",
+    "this_device": "This device",
+    "unknown_device": "Unknown device",
+    "signed_in": "Signed in",
+    "last_active": "Last active",
+    "sign_out": "Sign out",
+    "sign_out_others": "Sign out of all other devices",
+    "ended": "Signed out."
+  },
+  "matrixSimulate": {
+    "title": "Who approves?",
+    "note": "Read only. Pick a site and a stage task or a register to see who would hold L1 and L2 today: the matrix cell that decides, its rule, the people who would hold the level and how they reach it (named, role, group). Nothing is written and nobody is notified. A task cell decides before the stage cell, and a region cell before the default cell.",
+    "site_search": "Find a site",
+    "site": "Site",
+    "kind": "For",
+    "kind_task": "A stage task",
+    "kind_register": "A register",
+    "what": "Task or register",
+    "choose": "Choose",
+    "open_coverage": "Matrix coverage",
+    "source_region": "region cell",
+    "source_default": "default cell",
+    "source_none": "no cell",
+    "task_cell": "task cell",
+    "rule": "rule",
+    "nobody": "Nobody holds this level.",
+    "fallback": "Who could act through the admin path:"
   }
 }

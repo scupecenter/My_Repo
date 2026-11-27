@@ -1,14 +1,15 @@
 import { ExportAction } from '../security/export-lock';
-import { Body, Controller, Get, Headers, HttpCode, Param, Post, Query, Res } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Headers, HttpCode, Param, Post, Put, Query, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import type { AuthContext } from '../auth/auth.types';
 import { Auth } from '../auth/decorators';
+import { ExportSchedulesService } from './export-schedules.service';
 import { MasterExportService } from './master-export.service';
 
 /** Master-format export (contract 0.2.2, 0.2.3, 0.15.34): parts, start (202 job), the caller's exports, download. */
 @Controller('exports')
 export class ExportsController {
-  constructor(private readonly exports: MasterExportService) {}
+  constructor(private readonly exports: MasterExportService, private readonly schedules: ExportSchedulesService) {}
 
   @Get('parts')
   parts(@Auth() auth: AuthContext, @Query() q: Record<string, unknown>) {
@@ -25,9 +26,27 @@ export class ExportsController {
     });
   }
 
+  /** GET /exports/master: the caller's exports. Opening the first page also starts the caller's due scheduled exports (0.15.99, in the caller's own request). */
   @Get('master')
-  list(@Auth() auth: AuthContext, @Query() q: Record<string, unknown>) {
+  async list(@Auth() auth: AuthContext, @Query() q: Record<string, unknown>, @Res({ passthrough: true }) res: Response) {
+    if (typeof q.cursor !== 'string') await this.schedules.runDue(auth, (go) => { res.once('finish', go); });
     return this.exports.list(auth, q);
+  }
+
+  /** Scheduled Master exports of the caller (0.15.99): list, save (create or change), delete. Own items only. */
+  @Get('schedules')
+  listSchedules() {
+    return this.schedules.list();
+  }
+
+  @Put('schedules')
+  saveSchedule(@Body() body: unknown) {
+    return this.schedules.save(body);
+  }
+
+  @Delete('schedules/:id')
+  removeSchedule(@Param('id') id: string) {
+    return this.schedules.remove(id);
   }
 
   @ExportAction()
