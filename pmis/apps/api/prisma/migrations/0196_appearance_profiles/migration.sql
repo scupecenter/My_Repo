@@ -215,7 +215,7 @@ BEGIN
     IF bad IS NOT NULL THEN RAISE EXCEPTION 'profile: ui_prefs: unknown appearance dimension: %', bad; END IF;
     FOR k IN SELECT jsonb_object_keys(p_changes -> 'ui_prefs') LOOP
       IF jsonb_typeof(p_changes -> 'ui_prefs' -> k) <> 'string'
-         OR NOT ((p_changes ->> 'ui_prefs' -> k) IN (SELECT jsonb_array_elements_text(public.ui_pref_options() -> k))) THEN
+         OR NOT ((p_changes -> 'ui_prefs' ->> k) IN (SELECT jsonb_array_elements_text(public.ui_pref_options() -> k))) THEN
         RAISE EXCEPTION 'profile: ui_prefs: % has a value outside the allowed list', k;
       END IF;
     END LOOP;

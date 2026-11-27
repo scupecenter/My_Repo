@@ -91,7 +91,9 @@ describe('Settings, Identity & themes: GET and PUT /settings/identity', () => {
     expect(ok.status).toBe(200);
     expect(ok.body).toMatchObject({ default_brand: 'aljeel', allow_user_choice: true, updated_by: { id: admin.user.id }, can_edit: true });
     expect(etag(ok)).not.toBe(etag(cur));
-    expect(await value()).toEqual({ default_brand: 'aljeel', allow_user_choice: true });
+    expect(await value()).toMatchObject({ default_brand: 'aljeel', allow_user_choice: true });
+    // 0196: the stored value carries the appearance defaults (the built-in standard while none are set)
+    expect((await value() as { defaults?: unknown }).defaults).toMatchObject({ density: 'standard', accent: 'default' });
     const a = await audits();
     expect(a).toHaveLength(1);
     expect(a[0]).toMatchObject({ actor_id: admin.user.id, reason: REASON, before: { default_brand: 'current', allow_user_choice: true }, after: { default_brand: 'aljeel', allow_user_choice: true } });
