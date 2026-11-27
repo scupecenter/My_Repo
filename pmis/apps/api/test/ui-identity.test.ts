@@ -92,7 +92,7 @@ describe('Settings, Identity & themes: GET and PUT /settings/identity', () => {
     expect(ok.body).toMatchObject({ default_brand: 'aljeel', allow_user_choice: true, updated_by: { id: admin.user.id }, can_edit: true });
     expect(etag(ok)).not.toBe(etag(cur));
     expect(await value()).toMatchObject({ default_brand: 'aljeel', allow_user_choice: true });
-    // 0196: the stored value carries the appearance defaults (the built-in standard while none are set)
+    // 0241: the stored value carries the appearance defaults (the built-in standard while none are set)
     expect((await value() as { defaults?: unknown }).defaults).toMatchObject({ density: 'standard', accent: 'default' });
     const a = await audits();
     expect(a).toHaveLength(1);
@@ -165,7 +165,7 @@ describe('the personal design: PATCH /me/profile ui_brand', () => {
   });
 });
 
-/** 0196 (owner approval 2026-11-27, the PM-platforms proposal items 1-3): the appearance profile `ui_prefs` and the organization appearance defaults. */
+/** 0241 (owner approval 2026-11-27, the PM-platforms proposal items 1-3): the appearance profile `ui_prefs` and the organization appearance defaults. */
 describe('the appearance profile: PATCH /me/profile ui_prefs and the identity defaults', () => {
   const patchPrefs = async (api: Api, ui_prefs: unknown) => api.call('patch', '/me/profile', { ui_prefs }, { 'If-Match': await profileTag(api) });
 

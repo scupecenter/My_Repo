@@ -1,6 +1,6 @@
--- 0196_appearance_profiles: full-appearance profile presets and the per-user appearance dimensions
--- Mirror: db/sql/195_appearance_profiles.sql (kept identical to prisma/migrations/0196_appearance_profiles/migration.sql).
--- (owner approval 2026-11-27: the PM-platforms research proposal, items 1-3; contract 0.15.105).
+-- 0241_appearance_profiles: full-appearance profile presets and the per-user appearance dimensions
+-- Mirror: db/sql/240_appearance_profiles.sql (kept identical to prisma/migrations/0241_appearance_profiles/migration.sql).
+-- (owner approval 2026-11-27: the PM-platforms research proposal, items 1-3; contract 0.15.132).
 --
 -- WHY. The owner approved the research proposal: an appearance "profile type" is one bundle — the colour scheme (the design of 0130
 -- and the light/dark theme), the accent, the icon style, the density, the corner and button shape, the motion level and the menu
@@ -34,7 +34,7 @@ SELECT set_config('app.region_ids', '*', true);
 -- ---------------------------------------------------------------------------------------------------------------------
 ALTER TABLE users ADD COLUMN ui_prefs jsonb NOT NULL DEFAULT '{}'::jsonb
   CONSTRAINT users_ui_prefs_check CHECK (jsonb_typeof(ui_prefs) = 'object');
-COMMENT ON COLUMN users.ui_prefs IS '0196: the personal appearance dimensions (density, font_scale, radius, motion, icon_style, menu_style, accent); {} = the organization defaults of ui.identity.defaults. Written only by idm_update_own_profile.';
+COMMENT ON COLUMN users.ui_prefs IS '0241: the personal appearance dimensions (density, font_scale, radius, motion, icon_style, menu_style, accent); {} = the organization defaults of ui.identity.defaults. Written only by idm_update_own_profile.';
 
 -- ---------------------------------------------------------------------------------------------------------------------
 -- 2. The dimensions: allowed values and built-in defaults
@@ -140,7 +140,7 @@ BEGIN
   END IF;
   INSERT INTO public.settings (key, value, description, updated_at)
   VALUES ('ui.identity', '{"default_brand": "current", "allow_user_choice": true}'::jsonb,
-          'Owner decision 2026-11-19 (0130): the organization default UI design {default_brand, allow_user_choice}; 0196 adds defaults (the organization default of every appearance dimension). Changed only through admin_set_ui_identity.', now())
+          'Owner decision 2026-11-19 (0130): the organization default UI design {default_brand, allow_user_choice}; 0241 adds defaults (the organization default of every appearance dimension). Changed only through admin_set_ui_identity.', now())
   ON CONFLICT (key) DO NOTHING;
   PERFORM 1 FROM public.settings WHERE key = 'ui.identity' FOR UPDATE;
   cur := public.ui_identity_state();
@@ -206,7 +206,7 @@ BEGIN
       END IF;
     END IF;
   END IF;
-  -- 0196: the personal appearance dimensions (any subset). An unknown dimension or a bad value is an error; while the admin does
+  -- 0241: the personal appearance dimensions (any subset). An unknown dimension or a bad value is an error; while the admin does
   -- not allow a personal choice a non-empty object is refused, an empty one (back to the defaults) stays allowed.
   IF p_changes ? 'ui_prefs' THEN
     IF jsonb_typeof(p_changes -> 'ui_prefs') <> 'object' THEN RAISE EXCEPTION 'profile: ui_prefs must be an object of appearance dimensions'; END IF;
@@ -274,4 +274,4 @@ VALUES ('ui_identity_applied', 'workflow', NULL,
         jsonb_build_object('setting', 'ui.identity (defaults)', 'column', 'users.ui_prefs', 'dimensions', ui_pref_options(), 'defaults', ui_pref_defaults(),
           'read', jsonb_build_array('ui_identity_state', 'ui_effective_prefs'), 'write', 'admin_set_ui_identity (defaults)', 'self', 'idm_update_own_profile (ui_prefs)',
           'audit', jsonb_build_array('ui_identity_update', 'profile_updated')),
-        'Owner approval 2026-11-27 (PM-platforms proposal, items 1-3): appearance dimensions with organization defaults and a personal choice; presets and the live preview are web-side (migration 0196).');
+        'Owner approval 2026-11-27 (PM-platforms proposal, items 1-3): appearance dimensions with organization defaults and a personal choice; presets and the live preview are web-side (migration 0241).');

@@ -2,7 +2,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { APPEARANCE_DEFAULTS, APPEARANCE_PRESETS, applyAppearance, paint, sanitizeAppearance, savedAppearance } from './appearance';
 
-describe('appearance profiles (0196)', () => {
+describe('appearance profiles (0241)', () => {
   beforeEach(() => {
     localStorage.clear();
     for (const a of ['data-ui-density', 'data-ui-font-scale', 'data-ui-radius', 'data-ui-motion', 'data-ui-icon-style', 'data-ui-menu-style', 'data-ui-accent']) document.documentElement.removeAttribute(a);

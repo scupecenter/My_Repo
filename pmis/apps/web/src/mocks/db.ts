@@ -197,7 +197,7 @@ export const loginPagePublic = () => {
 export const identity = () => (db().identity ??= initIdentity());
 /** The design a user sees: their own while the admin allows a choice, else the organization default (ui_effective_brand). */
 export const effectiveBrand = (stored: Brand | null | undefined): Brand => (identity().allow_user_choice && stored ? stored : identity().default_brand);
-/** 0196: the appearance a user sees: their own choices while the admin allows a choice, over the organization defaults (ui_effective_prefs). */
+/** 0241: the appearance a user sees: their own choices while the admin allows a choice, over the organization defaults (ui_effective_prefs). */
 export const effectivePrefs = (stored: Record<string, string> | null | undefined): Record<string, string> =>
   ({ ...identity().defaults, ...(identity().allow_user_choice ? stored ?? {} : {}) });
 

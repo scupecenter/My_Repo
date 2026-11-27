@@ -22,9 +22,9 @@ export interface UserDto extends UserRef {
   ui_brand: 'current' | 'aljeel' | 'executive' | 'field' | 'obsidian' | 'sahara' | null;
   /** 0130: the design the user sees (ui_effective_brand). */
   brand: 'current' | 'aljeel' | 'executive' | 'field' | 'obsidian' | 'sahara';
-  /** 0196: the stored personal appearance choices; {} = the organization defaults. */
+  /** 0241: the stored personal appearance choices; {} = the organization defaults. */
   ui_prefs: Record<string, string>;
-  /** 0196: the appearance the user sees (ui_effective_prefs: own choices, else the organization defaults). */
+  /** 0241: the appearance the user sees (ui_effective_prefs: own choices, else the organization defaults). */
   appearance: Record<string, string>;
   is_break_glass: boolean;
   phone: string | null;

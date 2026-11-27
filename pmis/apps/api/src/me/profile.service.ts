@@ -39,7 +39,7 @@ const profilePatchSchema = z.object({
   locale: z.enum(['en', 'ar']).optional(),
   theme: z.enum(['light', 'dark']).optional(),
   ui_brand: z.enum(UI_BRANDS).nullable().optional(),
-  /** 0196: a subset of the appearance dimensions (owner approval 2026-11-27, proposal items 1-3); each with one of ui_pref_options(). */
+  /** 0241: a subset of the appearance dimensions (owner approval 2026-11-27, proposal items 1-3); each with one of ui_pref_options(). */
   ui_prefs: uiPrefsSchema.optional(),
 }).strict();
 
@@ -119,9 +119,9 @@ export interface ProfileDto {
   ui_brand: UiBrand | null;
   /** 0130: the design the user sees (their own while the admin allows a choice, else the default). */
   brand: UiBrand;
-  /** 0196: the stored personal appearance choices; {} = the organization defaults. */
+  /** 0241: the stored personal appearance choices; {} = the organization defaults. */
   ui_prefs: UiPrefs;
-  /** 0196: the appearance the user sees (ui_effective_prefs: own choices, else the organization defaults). */
+  /** 0241: the appearance the user sees (ui_effective_prefs: own choices, else the organization defaults). */
   appearance: UiPrefs;
   /** 0130: the organization default and whether a personal design is allowed (the profile shows the choice or a note). */
   identity: { default_brand: UiBrand; allow_user_choice: boolean; defaults: UiPrefs; pref_options: Record<string, string[]> };
@@ -293,7 +293,7 @@ export class ProfileService {
         errors: [{ path: '/ui_brand', code: 'brand_choice_locked', message: 'The administrator does not allow a personal design.' }],
       });
     }
-    // 0196: a personal appearance while the admin set one design for everyone (the database refuses it too)
+    // 0241: a personal appearance while the admin set one design for everyone (the database refuses it too)
     if (body.ui_prefs != null && !(await this.identity()).allow_user_choice) {
       throw new ProblemException(403, 'field_read_only', {
         detail: 'The administrator set one design for everyone, so you cannot choose your own appearance.',

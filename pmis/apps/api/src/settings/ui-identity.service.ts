@@ -16,7 +16,7 @@ export type UiBrand = (typeof UI_BRANDS)[number];
 const putBody = z.object({
   default_brand: z.enum(UI_BRANDS),
   allow_user_choice: z.boolean(),
-  /** 0196: the organization appearance defaults; omitted keeps the current ones. */
+  /** 0241: the organization appearance defaults; omitted keeps the current ones. */
   defaults: uiPrefsSchema.optional(),
   reason: z.string().trim().min(3).max(1000),
 }).strict();
@@ -24,9 +24,9 @@ const putBody = z.object({
 export interface UiIdentityDto {
   default_brand: UiBrand;
   allow_user_choice: boolean;
-  /** 0196: the organization appearance defaults (users without a personal choice see these). */
+  /** 0241: the organization appearance defaults (users without a personal choice see these). */
   defaults: UiPrefs;
-  /** 0196: the dimensions and their allowed values (ui_pref_options), so the client builds the pickers from the database. */
+  /** 0241: the dimensions and their allowed values (ui_pref_options), so the client builds the pickers from the database. */
   pref_options: Record<string, string[]>;
   brands: UiBrand[];
   updated_at: string | null;

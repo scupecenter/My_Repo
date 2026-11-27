@@ -136,7 +136,7 @@ function Details({ p }: { p: MyProfile }) {
 }
 
 /**
- * 0196 (proposal items 1-3): the appearance profile. Every dimension changes alone and shows at once on the whole app (the live preview paints the
+ * 0241 (proposal items 1-3): the appearance profile. Every dimension changes alone and shows at once on the whole app (the live preview paints the
  * attributes without saving); Apply saves through PATCH /me/profile (audited per dimension), Revert returns to the saved set. A ready-made profile
  * (classic / comfortable / night / compact) fills every dimension at once; `night` also switches the theme. Locked when the admin set one design for everyone.
  */

@@ -41,7 +41,7 @@ export function Shell() {
   const loc = useLocation();
   const qc = useQueryClient();
   const logout = useLogout();
-  // 0196: the menu style of the appearance profile is the default while the user has not switched the rail/pin in this browser
+  // 0241: the menu style of the appearance profile is the default while the user has not switched the rail/pin in this browser
   const menuStyle = me.data?.user.appearance?.menu_style;
   const [compactOwn, setCompact] = useState<boolean | null>(null);
   const [autoOwn, setAuto] = useState<boolean | null>(null);
@@ -68,7 +68,7 @@ export function Shell() {
   // 0130: the UI design follows the signed-in user's effective design (independent of the light/dark theme)
   const userBrand = me.data?.user.brand;
   useEffect(() => { if (userBrand) applyBrand(userBrand); }, [userBrand]);
-  // 0196: the appearance profile follows the signed-in user (own choices, else the organization defaults)
+  // 0241: the appearance profile follows the signed-in user (own choices, else the organization defaults)
   const userAppearance = me.data?.user.appearance;
   useEffect(() => { if (userAppearance) applyAppearance(userAppearance); }, [userAppearance]);
 

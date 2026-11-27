@@ -235,7 +235,7 @@ export function mapDbError(e: unknown): ProblemException | null {
           errors: [{ path: '/ui_brand', code: 'brand_choice_locked', message: 'The administrator does not allow a personal design.' }],
         });
       }
-      // 0196: a personal appearance while the admin set one design for everyone
+      // 0241: a personal appearance while the admin set one design for everyone
       if (/ui_prefs_locked/.test(msg)) {
         return new ProblemException(403, 'field_read_only', {
           detail: 'The administrator set one design for everyone, so you cannot choose your own appearance.',
