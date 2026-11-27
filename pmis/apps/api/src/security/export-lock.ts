@@ -9,8 +9,16 @@ import { DbService } from '../db/db.service';
 export const EXPORT_ACTION_KEY = 'pmis:export_action';
 
 /** Only requests whose query has `name=value` count as an export (for a route that answers JSON by default and a file on request). */
+export type DownloadCategory = 'templates' | 'uploaded_files' | 'generated_documents';
+
 export interface ExportActionOptions {
   whenQuery?: { name: string; value: string };
+  /**
+   * A download that is not an export of data (S1b, migration 0293): gated by its own switch in Settings > Security > Lock keys (off by default), not by `disable_export`.
+   * `exceptQuery` lists query values that stay open (on-screen viewing).
+   */
+  category?: DownloadCategory;
+  exceptQuery?: { name: string; values: string[] };
 }
 
 /**
@@ -20,6 +28,9 @@ export interface ExportActionOptions {
  */
 export const ExportAction = (opts: ExportActionOptions = {}) => SetMetadata(EXPORT_ACTION_KEY, opts);
 
+export const DOWNLOAD_LOCKED_DETAIL = 'This download is switched off by a System Admin (Settings > Security > Lock keys).';
+export const downloadLocked = (): ProblemException =>
+  new ProblemException(403, 'action_forbidden', { detail: DOWNLOAD_LOCKED_DETAIL, errors: [{ path: '', code: 'download_locked', message: DOWNLOAD_LOCKED_DETAIL}] });
 export const EXPORT_LOCKED_DETAIL = 'Export is switched off by a System Admin (Settings > Security > Lock keys).';
 export const exportLocked = (): ProblemException =>
   new ProblemException(403, 'action_forbidden', { detail: EXPORT_LOCKED_DETAIL, errors: [{ path: '', code: 'export_locked', message: EXPORT_LOCKED_DETAIL }] });
@@ -37,7 +48,16 @@ export class ExportLockInterceptor implements NestInterceptor {
       const v = req.query?.[opts.whenQuery.name];
       if ((Array.isArray(v) ? v[0] : v) !== opts.whenQuery.value) return next.handle();
     }
-    return from(this.check()).pipe(switchMap(() => next.handle()));
+    if (opts.exceptQuery) {
+      const v = context.switchToHttp().getRequest<Request>().query?.[opts.exceptQuery.name];
+      if (opts.exceptQuery.values.includes(String(Array.isArray(v) ? v[0] : v))) return next.handle();
+    }
+    return from(opts.category ? this.checkCategory(opts.category) : this.check()).pipe(switchMap(() => next.handle()));
+  }
+
+  private async checkCategory(category: DownloadCategory): Promise<void> {
+    const rows = await this.db.tx.$queryRaw<{ on: boolean }[]>(Prisma.sql`SELECT download_lock_active(${category}::text) AS "on"`);
+    if (rows[0]?.on) throw downloadLocked();
   }
 
   private async check(): Promise<void> {
