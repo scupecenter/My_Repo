@@ -3603,6 +3603,11 @@
       "chart_label": "Progress curve: {{list}}",
       "basis": "{{n}} saved weekly snapshots, values frozen at their dates."
     },
+    "pins": {
+      "title": "Pinned views",
+      "hint": "Your pinned views; the counter is what you may see there.",
+      "empty": "No pinned views yet. Pin a view from its screen with the pin button."
+    },
     "region_health": {
       "title": "Region health",
       "open": "Open the Weekly status",
@@ -5344,7 +5349,11 @@
     "transfer": "Hand over",
     "transfer_title": "Hand over “{{name}}”",
     "transfer_hint": "The new owner must be active and hold the right to share views.",
-    "transferred": "View handed over"
+    "transferred": "View handed over",
+    "pin_home": "Pin to home",
+    "unpin_home": "Unpin from home",
+    "pinned_home": "Pinned to the home dashboard",
+    "unpinned_home": "Unpinned from the home dashboard"
   },
   "draft": {
     "found": "You have an unsaved draft from {{at}}.",

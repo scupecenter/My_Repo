@@ -369,6 +369,10 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/presence/editing'],
   ['post', '/presence/editing/stop'],
   ['get', '/presence/editing'],
+  // Contract 0.15.245 (0344): pin a saved view as a personal card on the home dashboard.
+  ['get', '/me/home-pins'],
+  ['post', '/saved-views/:id/pin'],
+  ['post', '/saved-views/:id/unpin'],
   ['get', '/me/drafts'],
   ['get', '/me/drafts/:key'],
   ['put', '/me/drafts/:key'],

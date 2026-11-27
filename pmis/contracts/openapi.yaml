@@ -45,6 +45,7 @@ info:
     - 0.15.331 (2026-11-27): register rules in Settings and the order's PR / PO on an invoice (migration 0430, mirror `db/sql/429_invoice_rules.sql`; decisions L1 and L2 of the relations review, on top of D58 / 0407). Additive. (1) `GET /settings/register-rules` (`listRegisterRules`) and `PUT /settings/register-rules/{register_key}` (`setRegisterRules`): the editable rules of a register (invoices: `currency`, `order_required`, `supplier_required`), System Admin or a `fields.edit` delegate, reason required, audited. (2) An invoice reads `order_pr_no` and `order_po_wo_no` from its Procurement order (derived, never typed). (3) Errors `order_required`, `supplier_required`, `unknown_rule`. The order and supplier links themselves are 0407's (`supplier_party_id`, `invoices/order-options`, `invoices/supplier-options`).
 
     - 0.15.247 (2026-11-27): reactions on comments and a resolved flag (owner approval 2026-11-27, item 18 of the 2026-11-27 batch; migration 0346, mirror `db/sql/345_comment_reactions_resolve.sql`). Additive. New paths: `PUT`/`DELETE /comments/{comment_id}/reactions` (the emoji in the body, `👍` only, 422 `validation_failed` otherwise; a reaction of the caller on any comment they can read, a task comment or a register-record comment; idempotent both ways, 404 for a comment the caller cannot read) and `PUT`/`DELETE /comments/{comment_id}/resolved` (marks the point resolved or opens it again; records `resolved_at`/`resolved_by`). `Comment` gains `reactions` (`emoji`, `count`, `mine`) and `resolved` (`at`, `by`). The bar to react or resolve is the same as to comment: reading the thread. Not audited. No existing field or behaviour changes.
+    - 0.15.245 (2026-11-27): pin a saved view as a personal card on the home dashboard (owner request 2026-11-27, item 16 of the 2026-11-27 batch; migration 0344; CHANGELOG HomeViewPins). Additive. `POST /saved-views/{view_id}/pin` and `POST /saved-views/{view_id}/unpin` manage the caller's pins (at most 12, position kept; a view the caller may not read answers 404, exactly like `GET /saved-views/{view_id}`) and `GET /me/home-pins` (`HomeViewPin`) lists them in order (inactive views drop out). The card shows each pin with a counter the screen's own list endpoint computes for the caller, so the counts stay inside the caller's permissions; the dashboard settings catalogue gains the card `pinned_views` (Settings > Dashboard, shown by default). Personal display preference: no grant, role, permission, visibility or audit change.
     - 0.15.240 (2026-11-27): intake triage for the Issue Log and the Change Control Log (owner request 2026-11-27; migration 0340, mirror `db/sql/339_register_triage.sql`; CHANGELOG RegisterTriage). Additive. (1) `RegisterDefinition.triage_enabled` (true for `issues` and `change_control`): a record of such a register enters an intake queue (`RegisterRecord.triage.state` `pending`) on every insert, a new version included (the old decision is cleared). (2) New `POST /registers/{register_key}/records/{record_id}/triage` (`triageRegisterRecord`): one decision of the register's Matrix L2 holders of the record's region (a System Admin only when the row has no holder, exactly like an approval): `accept` (the record proceeds to its normal flow), `defer` (stays in the queue, with a note), `reject` (note and step-up required; the record is `voided`) and `merge` (`duplicate_of`, note and step-up; the record is `voided`, links the surviving record `triage.duplicate_of`, and the decision is noted on the surviving record's comment thread). `If-Match` is the record's version; `allowed_actions` gains `triage` while a record is pending or deferred and the caller may decide. `GET /registers/{register_key}/records` takes `triage` (one of `TriageState`). (3) Audited as `register_record_triage` with before and after; `RegisterRecordStep.action` gains `triage_accept`, `triage_reject`, `triage_merge`, `triage_defer`; the creator is notified (`NotificationKind` gains `triage_decision`). No grant, role or default changes.
     - 0.15.265 (2026-11-27): the project data reset can be narrowed inside a register part (Data entry proposal P1, approved by the owner 2026-11-27; migration 0370, mirror `db/sql/369_data_reset_narrow.sql`). Additive and backward compatible: a request without `narrow` is the whole part as before. `POST /settings/data-reset/requests` takes optional `narrow` (`DataResetNarrow`: `regions`, `batches`, `from`, `to`; every given key must match): the register entities that match go, the others stay with everything that hangs off them (every version of a record, steps, documents and files, comments, drafts, links). The unit is the entity; `from`/`to` are the days the entity was first created (inclusive, Africa/Tripoli); `batches` are import batches the record came from. Only parts whose data follows one register record can be narrowed (`DataResetPart.narrowable`); a narrowing needs chosen parts (not everything) and any other part is 422. A part the chosen one takes along (procurement takes car_dispatcher and financial_advances) loses only the entities linked to the selected procurement records. The narrowing is stored in `DataResetScope.narrow` and bound into `scope_hash`/`approved_scope_hash`: an approver who saw another narrowing is 409 `scope_changed`. `GET /settings/data-reset/plan` takes `regions`, `batches`, `from`, `to` (the dry run of the narrowed scope, `DataResetPlan.narrow`). New `GET /settings/data-reset/narrow-options?part=` lists the regions and the recent import batches of the part for the picker. System Admin only, no delegation.
     - 0.15.312 (2026-11-27): operational limits in Settings (review item 5, owner decision 35; migration 0402, mirror `db/sql/401_ops_limits.sql`). Additive; every default is the number the code used before, so nothing changes until a System Admin changes a value. New paths `GET` and `PUT /settings/ops-limits` (`getOpsLimits`, `setOpsLimits`, schemas `OpsLimits`, `OpsLimitItem`, `OpsLimitsInput`). Every signed-in user reads the catalogue and the values in force; only a System Admin changes them (a `settings` delegate does not), with a reason, a step-up and `If-Match`, audited `ops_limits_update` with the stored values before and after. Eleven limits: session idle hours (8) and absolute hours (12), step-up seconds (300, it also honours the earlier setting `stepup_max_age_seconds` until a value is saved here), and the row or entry caps of the assignments request (2000), imports (2000), Master import (5000), register import (5000), template prefill rows and sites (5000), log export (100000) and the idempotency store (5000). A key that is left out of `values` returns to its default. 422 for an unknown key, a non-integer, a value outside its range or an absolute session shorter than the idle limit.
@@ -18069,6 +18070,70 @@ paths:
         '204': {description: Open again.}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '404': {$ref: '#/components/responses/NotFound'}
+  /me/home-pins:
+    get:
+      tags: [saved-views]
+      operationId: getHomePins
+      summary: The caller's pinned home views (0.15.245)
+      description: >-
+        0.15.245 (migration 0344). The views the caller pinned as cards on the home dashboard, in the pin order. A pin is personal; a view
+        that was deactivated or became unreadable drops out of the list. The counter a card shows is computed by the screen's own list
+        endpoint for the caller, so it always stays inside the caller's permissions.
+      responses:
+        '200':
+          description: The caller's pinned views, in the pin order.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: '#/components/schemas/HomeViewPin'}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+  /saved-views/{view_id}/pin:
+    post:
+      tags: [saved-views]
+      operationId: pinSavedViewHome
+      summary: Pin a saved view as a card on the home dashboard (0.15.245)
+      description: >-
+        0.15.245 (migration 0344). Personal: the pin is the caller's own. A view the caller may not read answers 404, exactly like
+        `GET /saved-views/{view_id}`. At most 12 pins per caller (422 `validation_failed`, `/view` `too_many`); pinning again is a no-op.
+      parameters:
+        - {name: view_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: Pinned.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [view_id, pinned_home]
+                properties:
+                  view_id: {type: string, format: uuid}
+                  pinned_home: {type: boolean, enum: [true]}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /saved-views/{view_id}/unpin:
+    post:
+      tags: [saved-views]
+      operationId: unpinSavedViewHome
+      summary: Unpin a saved view from the home dashboard (0.15.245)
+      description: 0.15.245 (migration 0344). Removes the caller's pin; a missing pin is a no-op.
+      parameters:
+        - {name: view_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: Unpinned.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [view_id, pinned_home]
+                properties:
+                  view_id: {type: string, format: uuid}
+                  pinned_home: {type: boolean, enum: [false]}
+        '401': {$ref: '#/components/responses/Unauthorized'}
 components:
   securitySchemes:
     cookieAuth:
@@ -27702,6 +27767,17 @@ components:
         display_name: {type: string}
         employee_id: {type: [string, 'null']}
         since: {type: string, format: date-time, description: When this editing spell began.}
+    HomeViewPin:
+      type: object
+      description: '0.15.245: one pinned home view (migration 0344). The card''s counter is computed by the screen''s own list endpoint for the caller.'
+      required: [view_id, name, screen_key, filters, position]
+      additionalProperties: false
+      properties:
+        view_id: {type: string, format: uuid}
+        name: {type: string, maxLength: 120, description: The view's current name.}
+        screen_key: {$ref: '#/components/schemas/SavedViewScreenKey'}
+        filters: {type: object, additionalProperties: true, description: 'The view''s filters, scrubbed for the caller like a read of the view (hidden fields left out).' }
+        position: {type: integer, minimum: 1}
     SavedView:
       type: object
       required: [id, screen_key, name, filters, columns, sort, stripped_columns, owner, owner_left, is_owner, shared, can_edit, can_share, is_active, version, imported, created_at, updated_at]

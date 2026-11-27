@@ -429,6 +429,7 @@ const DASH_CATALOGUE = {
     { code: 'regions', label_en: 'Regions', label_ar: 'المناطق' },
     { code: 'region_health', label_en: 'Region health', label_ar: 'صحة المناطق' },
     { code: 'ops_procurement', label_en: 'Procurement and materials', label_ar: 'المشتريات والمواد' },
+    { code: 'pinned_views', label_en: 'Pinned views', label_ar: 'العروض المثبتة' },
     { code: 'ops_scurve', label_en: 'Progress curve: planned vs actual, velocity and forecast', label_ar: 'منحنى التقدم: المخطط مقابل الفعلي والسرعة والتوقع' },
     { code: 'ops_permits_hse', label_en: 'Permits and HSE: status, validity, stop-work and PTW checks', label_ar: 'التصاريح والسلامة: الحالة والصلاحية وإيقاف العمل وفحوصات تصاريح العمل' },
     { code: 'ops_gecol_hlc', label_en: 'Power and fiber readiness: GECOL and HLC waiting sites by age', label_ar: 'جاهزية الكهرباء والألياف: مواقع GECOL وHLC المنتظرة حسب العمر' },
