@@ -9,6 +9,7 @@ import {
   useDashboard,
   useDashboardExtras,
   useDashboardOps,
+  useProjectStatusSnapshots,
   type Dashboard as Dash,
   type DashboardExtras,
   type DashboardQuery,
@@ -36,6 +37,7 @@ import {
 } from "./dashboardBits";
 import { OpsProcurementCard } from "./dashboardOps";
 import { PinnedViewsCard } from "./dashboardPins";
+import { OpsScurveCard } from "./dashboardScurve";
 import { useDashboardSettings } from "@/api/dashboardSettings";
 import { SavedViews } from "@/components/SavedViews";
 import { UnifiedFilter } from "@/components/UnifiedFilter";
@@ -563,6 +565,7 @@ export function Dashboard() {
   const d = dash.data;
   const extras = useDashboardExtras(q, !!d);
   const ops = useDashboardOps(q, !!d);
+  const snaps = useProjectStatusSnapshots(!!d);
   const [exporting, setExporting] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const [format, setFormat] = useState<ExportFormat>("xlsx");
@@ -1404,6 +1407,12 @@ export function Dashboard() {
                 <>
                   {/* 0.15.245 (owner request 2026-11-27, research item 16): the caller's pinned views with counters */}
                   <PinnedViewsCard />
+                </>
+              ),
+              ops_scurve: (
+                <>
+                  {/* owner approval 2026-11-26, item 2: planned vs actual of the saved weekly snapshots, weekly velocity and the 100% forecast */}
+                  <OpsScurveCard snaps={snaps.data} />
                 </>
               ),
 

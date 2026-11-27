@@ -1,0 +1,74 @@
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { http, HttpResponse } from 'msw';
+import { Route, Routes } from 'react-router-dom';
+import { describe, expect, it } from 'vitest';
+import { API_BASE } from '@/api/client';
+import { Avatar } from '@/components/Avatar';
+import { NewBadge } from '@/components/NewBadge';
+import { server } from '@/mocks/server';
+import { renderApp, signIn } from '@/test/utils';
+import { SettingsRoutes } from './settings/Settings';
+
+/** Settings > Screens > Interface (migration 0196): generated avatars and the New badge; the preview follows the unsaved choice. */
+const settings = () => renderApp(<Routes><Route path="/admin/settings/*" element={<SettingsRoutes />} /></Routes>, { route: '/admin/settings/screens/interface' });
+
+describe('Settings > Interface', () => {
+  it('an admin saves the avatar choice with a reason and If-Match; the preview follows the choice before saving', async () => {
+    await signIn('pm');
+    const u = userEvent.setup();
+    const puts: { body: unknown; ifMatch: string | null }[] = [];
+    server.events.on('request:start', async ({ request }) => { if (request.method === 'PUT' && request.url.endsWith('/settings/ui-features')) puts.push({ body: await request.clone().json(), ifMatch: request.headers.get('If-Match') }); });
+    settings();
+    expect(await screen.findByTestId('page-ui-settings')).toBeInTheDocument();
+    expect(screen.getByTestId('settings-section-screens-interface')).toHaveClass('btn-accent');
+    const preview = screen.getByTestId('ui-av-preview');
+    expect(within(preview).getAllByTestId('avatar')[0]).toHaveAttribute('data-style', 'gradient');
+    await u.click(screen.getByTestId('ui-av-style-geometric'));
+    await u.click(screen.getByTestId('ui-av-shape-rounded'));
+    expect(within(preview).getAllByTestId('avatar')[0]).toHaveAttribute('data-style', 'geometric');
+    expect(within(preview).getAllByTestId('avatar')[0]).toHaveAttribute('data-shape', 'rounded');
+    await u.click(screen.getByTestId('ui-new-enabled'));
+    expect(screen.getByTestId('ui-new-days')).toBeDisabled();
+    await u.click(screen.getByTestId('ui-save'));
+    const dlg = await screen.findByTestId('ui-dialog');
+    await u.type(within(dlg).getByRole('textbox'), 'Square avatars, no badge');
+    await u.click(within(dlg).getByRole('button', { name: /save|confirm|submit/i }));
+    await waitFor(() => expect(puts).toHaveLength(1));
+    expect(puts[0]!.body).toMatchObject({ reason: 'Square avatars, no badge', sections: { avatars: { style: 'geometric', shape: 'rounded', palette: 'varied', in_lists: true }, new_badge: { enabled: false, days: 14 } } });
+    expect(puts[0]!.ifMatch).toBe('"0"');
+  });
+
+  it('shows the field error of a bad number of days and a user without the right reads only', async () => {
+    await signIn('pm');
+    server.use(http.put(`${API_BASE}/settings/ui-features`, () => HttpResponse.json({ code: 'validation_failed', title: 'Invalid', status: 422, errors: [{ path: '/sections/new_badge/days', code: 'out_of_range' }] }, { status: 422 })));
+    const u = userEvent.setup();
+    settings();
+    await screen.findByTestId('page-ui-settings');
+    await u.clear(screen.getByTestId('ui-new-days'));
+    await u.type(screen.getByTestId('ui-new-days'), '400');
+    await u.click(screen.getByTestId('ui-save'));
+    const dlg = await screen.findByTestId('ui-dialog');
+    await u.type(within(dlg).getByRole('textbox'), 'Too many days');
+    await u.click(within(dlg).getByRole('button', { name: /save|confirm|submit/i }));
+    expect(await screen.findByTestId('err-sections-new_badge-days')).toBeInTheDocument();
+  });
+
+  it('a user without the right reads it only', async () => {
+    await signIn('engineer');
+    settings();
+    expect(await screen.findByTestId('ui-read-only')).toBeInTheDocument();
+    expect(screen.queryByTestId('ui-save')).toBeNull();
+  });
+});
+
+describe('Avatar component', () => {
+  it('draws initials and follows the avatar setting in lists', async () => {
+    await signIn('pm');
+    renderApp(<div><Avatar name="Ahmed Omran" /><Avatar name="Nadia Ben Ali" lists /><NewBadge feature="interface-settings" /></div>);
+    const av = await screen.findAllByTestId('avatar');
+    expect(av[0]).toHaveTextContent('AO');
+    expect(av.length).toBe(2);
+    // whether the badge shows depends on the real date; the window itself is tested in avatar.test.ts
+  });
+});

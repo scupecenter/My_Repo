@@ -375,7 +375,8 @@ describe('X5 workload and the time report', () => {
     expect(lates).toEqual([...lates].sort((a, b) => b - a));
     const first = rows[0]!;
     const emp = first.getAttribute('data-testid')!.replace('workload-row-', '');
-    await u.click(within(first).getByTestId(`workload-reassign-${emp}`));
+    // the table can render before useMe resolves; the reassign button only shows once the viewer's right is known
+    await u.click(await within(first).findByTestId(`workload-reassign-${emp}`));
     const dlg = await screen.findByTestId('cover-dialog');
     expect(within(dlg).getByTestId('cover-person-only')).toBeInTheDocument();
     expect(within(dlg).queryByTestId('cover-scope')).toBeNull(); // the Workload view decides about the person's open tasks only
