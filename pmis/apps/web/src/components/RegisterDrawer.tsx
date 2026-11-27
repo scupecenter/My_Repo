@@ -7,7 +7,7 @@ import { useSession } from '@/api/hooks';
 import { useCancelSnagRecord, useCreateRecord, useNewVersion, useRecordClaim, useRecordHistory, useRecordOp, useRecordTriage, useRecordTransfer, useRegisterRecord, useRegisterRecords, useUpdateRecord, useContractorCompanies, type RecordOp, type TriageOp } from '@/api/registers';
 import { useMatrix } from '@/api/sites';
 import { EditingNotice } from './EditingNotice';
-import { useAddRegisterComment, useRegisterComments } from '@/api/x';
+import { useAddRegisterComment, useCommentReaction, useCommentResolved, useRegisterComments } from '@/api/x';
 import type { RegisterDefinition, RegisterRecord } from '@/api/types';
 import { registerErrorMessage, serverFieldIssues } from '@/lib/registerErrors';
 import { cellLevel } from '@/lib/matrixLevels';
@@ -144,6 +144,8 @@ export function RegisterRecordBody({ def: rawDef, record, onCreated }: { def: Re
   const hist = useRecordHistory(key, record?.id ?? null);
   const comments = useRegisterComments(key, record?.id ?? '', !!record?.region_id);
   const addComment = useAddRegisterComment(key, record?.id ?? '');
+  const reactComment = useCommentReaction(['register-comments', key, record?.id ?? '']);
+  const resolveComment = useCommentResolved(['register-comments', key, record?.id ?? '']);
   // 0.12.5: a register with a file field reads the record's slots too (the slots of a record without a site come with Q228)
   const hasFile = rawDef.fields.some((f) => f.type === 'file');
   const recSlots = useRecordSlots(key, record && (record.site_id || hasFile) ? record.id : null);
@@ -429,7 +431,9 @@ export function RegisterRecordBody({ def: rawDef, record, onCreated }: { def: Re
             {/* a global record (no region) has no thread yet: the server answers 422, so the box is not offered */}
             {record.region_id ? (
               <CommentsPanel items={comments.data?.items} loaded={comments.isSuccess} pending={addComment.isPending} error={addComment.isError ? registerErrorMessage(t, addComment.error) : null}
-                onSend={(body, ids) => addComment.mutate({ body, ...(ids.length ? { mention_user_ids: ids } : {}) })} />
+                onSend={(body, ids) => addComment.mutate({ body, ...(ids.length ? { mention_user_ids: ids } : {}) })}
+                onReact={(commentId, emoji, on) => reactComment.mutate({ commentId, emoji, on })}
+                onToggleResolved={(commentId, resolved) => resolveComment.mutate({ commentId, resolved })} />
             ) : <p className="text-mute" data-testid="reg-comments-global">{t('registers.comments_global')}</p>}
           </div>
         )}

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { DEMO, login, stepUp } from './helpers';
+import { DEMO, login, stepUp, signOutViaMenu } from './helpers';
 
 for (const locale of ['en', 'ar'] as const) {
   test.describe(locale, () => {
@@ -63,7 +63,7 @@ for (const locale of ['en', 'ar'] as const) {
       await expect(page.getByTestId('temp-password-dialog')).toHaveCount(0);
       await expect(page.getByTestId('must-change-badge-4821')).toBeVisible();
       await expect(page.getByTestId('local-badge-4821')).toBeVisible();
-      await page.getByTestId('topbar-signout').click();
+      await signOutViaMenu(page);
 
       await page.getByTestId('login-identifier').fill('4821');
       await page.getByTestId('login-password').fill(temp);
