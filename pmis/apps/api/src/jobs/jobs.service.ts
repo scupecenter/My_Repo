@@ -33,6 +33,7 @@ export interface DailyJobResult {
   expiryNotices?: number;
   /** 0362 (A9): approval digest notices written by this run */
   approvalDigests?: number;
+  templateNotices?: number;
 }
 
 /** The wall-clock parts of an instant in a time zone, and the zone's offset from UTC at that instant (milliseconds). */
@@ -143,6 +144,8 @@ export class JobsService implements OnApplicationBootstrap, OnModuleDestroy {
         if (ruleNotes > 0) result.alertRules = ruleNotes;
         const expiring = await this.expiryRadar();
         if (expiring > 0) result.expiryNotices = expiring;
+        const changed = await this.templateChanges();
+        if (changed > 0) result.templateNotices = changed;
       }
       this.lastRun = { at: new Date(), result };
       await this.runs.finish(run, result ? 'ok' : 'skipped', result ? result.slaApplied + result.reminders + (result.snapshots ?? 0) + (result.contractorAlerts ?? 0) + (result.calendarReset ?? 0) : null, null,
@@ -298,6 +301,17 @@ export class JobsService implements OnApplicationBootstrap, OnModuleDestroy {
     if (n === null) {
       this.log.warn('expiry radar failed');
       await this.syslog.write('error', 'expiry radar failed', {});
+      return 0;
+    }
+    return n;
+  }
+
+  /** 0367 (P3): in-app notice to the entry holders when a register template gets a new version; the setting is templates.change_notice. */
+  private async templateChanges(): Promise<number> {
+    const n = await this.runs.run('template_change_notice', async (tx) => Number((await tx.$queryRaw<{ n: number }[]>`SELECT template_change_notify() AS n`)[0]?.n ?? 0));
+    if (n === null) {
+      this.log.warn('template change notice failed');
+      await this.syslog.write('error', 'template change notice failed', {});
       return 0;
     }
     return n;

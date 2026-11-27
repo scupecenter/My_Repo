@@ -333,6 +333,8 @@ export function cleanNavLayout(raw: unknown): { layout: unknown; errors: { path:
 }
 /** 0.14.6: imports.async_rows (a store saved before 0.14.6 starts from the seed). */
 const IM = () => (C().imports ??= initCfg().imports);
+const TN = { enabled: true, days: 14, version: 1, updated_at: null as string | null };
+const tplNoticeView = () => ({ enabled: TN.enabled, days: TN.days, default_days: 14, min: 1, max: 365, updated_at: TN.updated_at, updated_by: null, version: TN.version, can_edit: viewer()?.key === 'admin' || !!viewer()?.nav.includes('settings') });
 const importsView = () => {
   const c = IM();
   return { async_rows: c.async_rows, default_async_rows: 50, min: 10, max: 500, updated_at: c.updated_at, updated_by: c.updated_by ? ref(c.updated_by) : null, version: c.version, can_edit: isAdmin() };
@@ -413,6 +415,7 @@ const DASH_CATALOGUE = {
     { code: 'ops_contractors', label_en: 'Contractor and supplier scorecard: levels, delay and quality', label_ar: 'بطاقة أداء المقاولين والموردين: المستويات والتأخير والجودة' },
     { code: 'ops_quality', label_en: 'Quality: open snags and NCR, closure age, first-time acceptance', label_ar: 'الجودة: الـSnag والـNCR المفتوحة وعمر الإغلاق والقبول من أول مرة' },
     { code: 'ops_approvals', label_en: 'Pending approvals: waiting review or approval, ages per role', label_ar: 'الموافقات المعلقة: بانتظار المراجعة أو الاعتماد، الأعمار حسب الدور' },
+    { code: 'ops_changes', label_en: 'Change requests and overdue meeting actions', label_ar: 'طلبات التغيير وبنود الاجتماعات المتأخرة' },
   ],
 };
 const dashSeedThresholds = Object.fromEntries(DASH_CATALOGUE.kpis.map((k) => [k.code, { green: k.default_green, amber: k.default_amber }]));
@@ -645,6 +648,23 @@ export const settingsHandlers = [
     Object.assign(IM(), { async_rows: b.async_rows as number, version: IM().version + 1, updated_at: new Date().toISOString(), updated_by: viewer()!.employee_id! }); save();
     const j = importsView();
     return HttpResponse.json(j, tag(j.version));
+  }),
+
+  // ------------------------------------------------------------------ 0.15.203 (P3): the notice of a new template version (Settings, Imports)
+  http.get(`${B}/settings/template-change-notice`, () => { const g = guard(); if (g) return g; return HttpResponse.json(tplNoticeView(), tag(TN.version)); }),
+  http.put(`${B}/settings/template-change-notice`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, TN.version); if (p) return p;
+    const b = await body<{ enabled?: unknown; days?: unknown; reason?: string }>(request);
+    const errs: { path: string; code: string }[] = [];
+    if ((b.reason ?? '').trim().length < 3) errs.push({ path: '/reason', code: 'required' });
+    if (typeof b.days !== 'number' || !Number.isInteger(b.days) || b.days < 1 || b.days > 365) errs.push({ path: '/days', code: 'out_of_range' });
+    if (typeof b.enabled !== 'boolean') errs.push({ path: '/enabled', code: 'required' });
+    if (errs.length) return fields(...errs);
+    if (TN.enabled === b.enabled && TN.days === b.days) return problem(409, 'invalid_transition', 'These values are already set.');
+    Object.assign(TN, { enabled: b.enabled as boolean, days: b.days as number, version: TN.version + 1, updated_at: new Date().toISOString() });
+    return HttpResponse.json(tplNoticeView(), tag(TN.version));
   }),
 
   // ------------------------------------------------------------------ 0.15.41: Settings, Identity & themes (the organization default UI design)
