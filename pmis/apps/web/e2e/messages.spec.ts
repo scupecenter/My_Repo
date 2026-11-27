@@ -1,11 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
-import { answerAnnouncements, login, type DemoAccount } from './helpers';
+import { answerAnnouncements, login, type DemoAccount, signOutViaMenu } from './helpers';
 
 async function signIn(page: Page, locale: 'en' | 'ar', account: DemoAccount) {
   await page.addInitScript((l) => { if (!localStorage.getItem('pmis.locale')) localStorage.setItem('pmis.locale', l); }, locale);
   await login(page, account);
 }
-const signOut = (page: Page) => page.getByTestId('topbar-signout').click();
+const signOut = (page: Page) => signOutViaMenu(page);
 
 for (const locale of ['en', 'ar'] as const) {
   test.describe(locale, () => {
@@ -109,7 +109,7 @@ for (const locale of ['en', 'ar'] as const) {
       await expect(page.getByTestId('user-dept-1103')).toBeVisible();
       await page.getByTestId('users-tab-departments').click();
       await expect(page.getByTestId('dept-row-CIVIL')).toBeVisible();
-      await page.getByTestId('users-tab-active').click();
+      await page.getByTestId('people-tab-users').click();
       await page.getByTestId('user-open-1103').click();
       await expect(page.getByTestId('org-manager-value')).toContainText('1102');
       await page.getByTestId('org-edit').click();

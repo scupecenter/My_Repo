@@ -31,8 +31,8 @@ const CR = () => (C().contractorRules ??= initCfg().contractorRules);
 /** Contractor performance (contract 0.15.89): demo thresholds, kept in memory; the report is computed from them in the mock like the API does. */
 const PERF_DEFAULT = { min_sample: 3, snag_overdue_pct: { amber: 10, red: 25 }, snag_return_pct: { amber: 20, red: 40 }, quality_fail_pct: { amber: 10, red: 20 }, contract_expiry_days: { amber: 60, red: 15 } };
 interface AlertRuleRow {
-  id: string; code: string; kind: 'weekly_status_missing' | 'record_idle'; params: Record<string, unknown>; audience: Record<string, unknown>;
-  title_en: string; title_ar: string; body_en: string; body_ar: string; link: string | null; enabled: boolean; version: number;
+  id: string; code: string; kind: 'weekly_status_missing' | 'record_idle' | 'kpi_threshold'; params: Record<string, unknown>; audience: Record<string, unknown>;
+  title_en: string; title_ar: string; body_en: string; body_ar: string; link: string | null; enabled: boolean; locked: boolean; version: number;
   created_at: string; updated_at: string;
 }
 const ALERT_RULES: AlertRuleRow[] = [
@@ -40,7 +40,7 @@ const ALERT_RULES: AlertRuleRow[] = [
     id: '00000000-0000-4000-8000-000000000001', code: 'weekly-status-missing', kind: 'weekly_status_missing', params: {}, audience: { type: 'system_admin' },
     title_en: 'Weekly status missing: {{region}}', title_ar: 'تحديث أسبوعي مفقود: {{region}}',
     body_en: 'No Weekly status update was filed for {{region}} this working week.', body_ar: 'لم يُقدَّم تحديث الحالة الأسبوعي لمنطقة {{region}} هذا الأسبوع.',
-    link: '/project-status', enabled: true, version: 1, created_at: '2026-11-27T00:00:00.000Z', updated_at: '2026-11-27T00:00:00.000Z',
+    link: '/project-status', enabled: true, locked: false, version: 1, created_at: '2026-11-27T00:00:00.000Z', updated_at: '2026-11-27T00:00:00.000Z',
   },
 ];
 let perf = { thresholds: structuredClone(PERF_DEFAULT), version: 1 };
@@ -265,6 +265,26 @@ const MK = () => (C().mailKinds ??= initCfg().mailKinds);
 /** 0.15.190: the admin lock keys, kept in memory like the other small settings of the mock (both off by default). */
 const locks: { block_public_sharing: boolean; disable_export: boolean; version: number; updated_at: string | null; updated_by: { id: string; display_name: string; employee_id: string | null } | null } =
   { block_public_sharing: false, disable_export: false, version: 1, updated_at: null, updated_by: null };
+/** 0.15.312: the operational limits (catalogue and defaults as ops_limits_catalogue() in migration 0402); a limit that was never saved reads as its default. */
+const OPS_CATALOGUE: { key: string; group: string; unit: string; default: number; min: number; max: number }[] = [
+  { key: 'session.idle_hours', group: 'sessions', unit: 'hours', default: 8, min: 1, max: 24 },
+  { key: 'session.absolute_hours', group: 'sessions', unit: 'hours', default: 12, min: 1, max: 72 },
+  { key: 'stepup.seconds', group: 'sessions', unit: 'seconds', default: 300, min: 30, max: 3600 },
+  { key: 'assignments.max_rows', group: 'rows', unit: 'rows', default: 2000, min: 100, max: 50000 },
+  { key: 'import.max_rows', group: 'rows', unit: 'rows', default: 2000, min: 100, max: 50000 },
+  { key: 'master_import.max_rows', group: 'rows', unit: 'rows', default: 5000, min: 100, max: 50000 },
+  { key: 'register_import.max_rows', group: 'rows', unit: 'rows', default: 5000, min: 100, max: 50000 },
+  { key: 'prefill.max_rows', group: 'rows', unit: 'rows', default: 5000, min: 100, max: 50000 },
+  { key: 'prefill.max_sites', group: 'rows', unit: 'sites', default: 5000, min: 100, max: 50000 },
+  { key: 'export.max_rows', group: 'exports', unit: 'rows', default: 100000, min: 1000, max: 1000000 },
+  { key: 'idempotency.max_entries', group: 'exports', unit: 'entries', default: 5000, min: 500, max: 100000 },
+];
+const opsLimits: { stored: Record<string, number>; version: number; updated_at: string | null; updated_by: { id: string; display_name: string; employee_id: string | null } | null } =
+  { stored: {}, version: 1, updated_at: null, updated_by: null };
+const opsView = () => ({
+  items: OPS_CATALOGUE.map((c) => ({ ...c, value: opsLimits.stored[c.key] ?? c.default, is_default: !(c.key in opsLimits.stored) })),
+  updated_at: opsLimits.updated_at, updated_by: opsLimits.updated_by, version: opsLimits.version, can_edit: isAdmin(),
+});
 const locksView = () => ({ ...locks, can_edit: isAdmin() });
 /** 0.15.193: the download lock categories (templates, uploaded files, generated documents), in memory, all off by default. */
 export const dlocks: { templates: boolean; uploaded_files: boolean; generated_documents: boolean; version: number; updated_at: string | null; updated_by: { id: string; display_name: string; employee_id: string | null } | null } =
@@ -340,6 +360,12 @@ const importsView = () => {
   const c = IM();
   return { async_rows: c.async_rows, default_async_rows: 50, min: 10, max: 500, updated_at: c.updated_at, updated_by: c.updated_by ? ref(c.updated_by) : null, version: c.version, can_edit: isAdmin() };
 };
+/** D49 part 3 (0.15.322): imports.upload_policy. */
+const policyView = () => {
+  const c = IM();
+  return { policy: c.upload_policy ?? 'enforce', default_policy: 'enforce', policies: ['enforce', 'accept_incomplete'], updated_at: c.policy_updated_at ?? null,
+    updated_by: c.policy_updated_by ? ref(c.policy_updated_by) : null, version: c.policy_version ?? 1, can_edit: isAdmin() };
+};
 const confirmation = () => {
   const c = CC(), h = C().holidays, y = Number(TODAY.slice(0, 4));
   const blockers = [y, y + 1].flatMap((yr): { code: 'no_holidays' | 'tentative_remaining'; year: number; count: number }[] => {
@@ -410,6 +436,7 @@ const DASH_CATALOGUE = {
     { code: 'regions', label_en: 'Regions', label_ar: 'المناطق' },
     { code: 'region_health', label_en: 'Region health', label_ar: 'صحة المناطق' },
     { code: 'ops_procurement', label_en: 'Procurement and materials', label_ar: 'المشتريات والمواد' },
+    { code: 'pinned_views', label_en: 'Pinned views', label_ar: 'العروض المثبتة' },
     { code: 'ops_scurve', label_en: 'Progress curve: planned vs actual, velocity and forecast', label_ar: 'منحنى التقدم: المخطط مقابل الفعلي والسرعة والتوقع' },
     { code: 'ops_permits_hse', label_en: 'Permits and HSE: status, validity, stop-work and PTW checks', label_ar: 'التصاريح والسلامة: الحالة والصلاحية وإيقاف العمل وفحوصات تصاريح العمل' },
     { code: 'ops_gecol_hlc', label_en: 'Power and fiber readiness: GECOL and HLC waiting sites by age', label_ar: 'جاهزية الكهرباء والألياف: مواقع GECOL وHLC المنتظرة حسب العمر' },
@@ -648,6 +675,23 @@ export const settingsHandlers = [
     if (IM().async_rows === b.async_rows) return problem(409, 'invalid_transition', `The threshold is already ${String(b.async_rows)} rows.`);
     Object.assign(IM(), { async_rows: b.async_rows as number, version: IM().version + 1, updated_at: new Date().toISOString(), updated_by: viewer()!.employee_id! }); save();
     const j = importsView();
+    return HttpResponse.json(j, tag(j.version));
+  }),
+
+  // ------------------------------------------------------------------ 0.15.322: the upload policy of the imports (D49 part 3)
+  http.get(`${B}/settings/imports/upload-policy`, () => { const g = guard(); if (g) return g; const j = policyView(); return HttpResponse.json(j, tag(j.version)); }),
+  http.put(`${B}/settings/imports/upload-policy`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, policyView().version); if (p) return p;
+    const b = await body<{ policy?: unknown; reason?: string } & Record<string, unknown>>(request);
+    const errs: { path: string; code: string }[] = Object.keys(b).filter((k) => !['policy', 'reason'].includes(k)).map((k) => ({ path: `/${k}`, code: 'unknown_field' }));
+    if ((b.reason ?? '').trim().length < 3 || (b.reason ?? '').length > 1000) errs.push({ path: '/reason', code: 'required' });
+    if (b.policy !== 'enforce' && b.policy !== 'accept_incomplete') errs.push({ path: '/policy', code: 'invalid' });
+    if (errs.length) return fields(...errs);
+    if (policyView().policy === b.policy) return problem(409, 'invalid_transition', `The upload policy is already ${String(b.policy)}.`);
+    Object.assign(IM(), { upload_policy: b.policy as 'enforce' | 'accept_incomplete', policy_version: (IM().policy_version ?? 1) + 1, policy_updated_at: new Date().toISOString(), policy_updated_by: viewer()!.employee_id! }); save();
+    const j = policyView();
     return HttpResponse.json(j, tag(j.version));
   }),
 
@@ -1017,6 +1061,34 @@ export const settingsHandlers = [
     return new HttpResponse(a.bytes, { headers: { 'Content-Type': a.mime, ETag: `"${meta.version}"` } });
   }),
 
+  // ------------------------------------------------------------------ 0.15.312: operational limits
+  http.get(`${B}/settings/ops-limits`, () => { const g = guard(); if (g) return g; const j = opsView(); return HttpResponse.json(j, tag(j.version)); }),
+  http.put(`${B}/settings/ops-limits`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    const b = await body<{ values?: Record<string, unknown>; reason?: string } & Record<string, unknown>>(request);
+    const errs: { path: string; code: string }[] = Object.keys(b).filter((k) => !['values', 'reason'].includes(k)).map((k) => ({ path: `/${k}`, code: 'unknown_field' }));
+    if (!b.values || typeof b.values !== 'object') errs.push({ path: '/values', code: 'required' });
+    if ((b.reason ?? '').trim().length < 3 || (b.reason ?? '').length > 1000) errs.push({ path: '/reason', code: 'required' });
+    const clean: Record<string, number> = {};
+    for (const [k, v] of Object.entries(b.values ?? {})) {
+      const c = OPS_CATALOGUE.find((x) => x.key === k);
+      if (!c) errs.push({ path: `/values/${k}`, code: 'unknown' });
+      else if (typeof v !== 'number' || !Number.isInteger(v)) errs.push({ path: `/values/${k}`, code: 'invalid' });
+      else if (v < c.min || v > c.max) errs.push({ path: `/values/${k}`, code: 'out_of_range' });
+      else clean[k] = v;
+    }
+    if ((clean['session.absolute_hours'] ?? 12) < (clean['session.idle_hours'] ?? 8)) errs.push({ path: '/values/session.absolute_hours', code: 'invalid' });
+    if (errs.length) return fields(...errs);
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, opsLimits.version); if (p) return p;
+    if (!stepUpValid()) return stepUp();
+    if (JSON.stringify(Object.entries(clean).sort()) === JSON.stringify(Object.entries(opsLimits.stored).sort())) return problem(409, 'invalid_transition', 'These are already the limits in force.');
+    const v = viewer()!;
+    Object.assign(opsLimits, { stored: clean, version: opsLimits.version + 1, updated_at: new Date().toISOString(), updated_by: { id: uid(v.employee_id ?? '9999'), display_name: v.name, employee_id: v.employee_id } });
+    const j = opsView();
+    return HttpResponse.json(j, tag(j.version));
+  }),
+
   // ------------------------------------------------------------------ 0.15.1: the shared layout of the side menu
   http.get(`${B}/settings/nav-layout`, () => { const g = guard(); if (g) return g; const j = navView(); return HttpResponse.json(j, tag(j.version)); }),
   http.put(`${B}/settings/nav-layout`, async ({ request }) => {
@@ -1344,6 +1416,10 @@ export const settingsHandlers = [
         for (const k of Object.keys(o)) if (!['mode', 'width', 'show_tabs'].includes(k)) errs.push({ path: `${path}/${k}`, code: 'unknown_key' });
         oneOf(o, path, 'mode', ['popover', 'side_panel']); oneOf(o, path, 'width', ['narrow', 'medium', 'wide']);
         if (typeof o.show_tabs !== 'boolean') errs.push({ path: `${path}/show_tabs`, code: 'invalid' });
+      } else if (name === 'unsaved_guard') {
+        const keys = ['enabled', 'settings', 'dialogs', 'drawers', 'inline', 'composers', 'navigation'];
+        for (const k of Object.keys(o)) if (!keys.includes(k)) errs.push({ path: `${path}/${k}`, code: 'unknown_key' });
+        for (const k of keys) if (typeof o[k] !== 'boolean') errs.push({ path: `${path}/${k}`, code: o[k] === undefined ? 'required' : 'invalid' });
       } else if (name === 'data_hub') {
         for (const k of Object.keys(o)) if (!['widgets', 'badge', 'default_view'].includes(k)) errs.push({ path: `${path}/${k}`, code: 'unknown_key' });
         if (typeof o.badge !== 'boolean') errs.push({ path: `${path}/badge`, code: 'invalid' });
@@ -1458,7 +1534,8 @@ export const settingsHandlers = [
     return HttpResponse.json({
       rules: ALERT_RULES,
       catalogue: {
-        kinds: [{ kind: 'weekly_status_missing', params: [] }, { kind: 'record_idle', params: ['register_key', 'state', 'days'] }],
+        kinds: [{ kind: 'weekly_status_missing', params: [] }, { kind: 'record_idle', params: ['register_key', 'state', 'days'] }, { kind: 'kpi_threshold', params: ['kpi', 'op', 'value'] }],
+        kpis: [{ code: 'sla_breach', label_en: 'SLA breaches (open tasks past the maximum)', label_ar: 'تجاوزات SLA', unit: 'pct', direction: 'lower' }, { code: 'stale_tasks', label_en: 'Stale tasks (idle for N working days)', label_ar: 'مهام راكدة', unit: 'pct', direction: 'lower' }],
         audiences: ['system_admin', 'module'],
         registers: [{ register_key: 'issues', name_en: 'Issue Log', name_ar: 'سجل البلاغات', module_key: 'sites' }, { register_key: 'change_control', name_en: 'Change Control Log', name_ar: 'سجل التحكم بالتغيير', module_key: 'sites' }],
         modules: [{ key: 'sites', name_en: 'Sites' }, { key: 'procurement', name_en: 'Procurement' }],
@@ -1469,14 +1546,14 @@ export const settingsHandlers = [
     const g = needAdmin(); if (g) return g;
     const b = await body<Record<string, unknown>>(request);
     const r = reasonErr(b.reason as string | undefined); if (r) return r;
-    if (typeof b.kind !== 'string' || !['weekly_status_missing', 'record_idle'].includes(b.kind)) return fields({ path: '/kind', code: 'invalid' });
+    if (typeof b.kind !== 'string' || !['weekly_status_missing', 'record_idle', 'kpi_threshold'].includes(b.kind)) return fields({ path: '/kind', code: 'invalid' });
     if (ALERT_RULES.some((x) => x.code === b.code)) return fields({ path: '/code', code: 'conflict' });
     const row = {
       id: `00000000-0000-4000-8000-${String(ALERT_RULES.length + 1).padStart(12, '0')}`,
-      code: String(b.code), kind: b.kind as 'weekly_status_missing' | 'record_idle',
+      code: String(b.code), kind: b.kind as 'weekly_status_missing' | 'record_idle' | 'kpi_threshold',
       params: (b.params ?? {}) as Record<string, unknown>, audience: (b.audience ?? { type: 'system_admin' }) as Record<string, unknown>,
       title_en: String(b.title_en ?? ''), title_ar: String(b.title_ar ?? ''), body_en: String(b.body_en ?? ''), body_ar: String(b.body_ar ?? ''),
-      link: (b.link ?? null) as string | null, enabled: b.enabled !== false, version: 1,
+      link: (b.link ?? null) as string | null, enabled: b.enabled !== false, locked: b.locked === true, version: 1,
       created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
     };
     ALERT_RULES.push(row);
@@ -1490,10 +1567,11 @@ export const settingsHandlers = [
     const p = ver(request, row.version); if (p) return p;
     const b = await body<Record<string, unknown>>(request);
     const r = reasonErr(b.reason as string | undefined); if (r) return r;
+    if (row.locked && b.locked !== false) return fields({ path: '/locked', code: 'rule_locked' });
     Object.assign(row, {
       kind: b.kind ?? row.kind, params: b.params ?? row.params, audience: b.audience ?? row.audience,
       title_en: b.title_en ?? row.title_en, title_ar: b.title_ar ?? row.title_ar, body_en: b.body_en ?? row.body_en, body_ar: b.body_ar ?? row.body_ar,
-      link: b.link === undefined ? row.link : b.link, enabled: b.enabled ?? row.enabled, version: row.version + 1, updated_at: new Date().toISOString(),
+      link: b.link === undefined ? row.link : b.link, enabled: b.enabled ?? row.enabled, locked: b.locked ?? row.locked, version: row.version + 1, updated_at: new Date().toISOString(),
     });
     return HttpResponse.json({ id: row.id, version: row.version });
   }),

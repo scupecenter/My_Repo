@@ -13,6 +13,7 @@ import { useOpenAlertCount } from '@/api/logs';
 import { isAdmin } from '@/lib/perm';
 import { applyLocale, applyTheme, currentLocale, currentTheme } from '@/i18n';
 import { HYBRID } from '@/lib/hybrid';
+import { UnsavedGuardProvider } from '@/lib/unsavedGuard';
 import { loadPref, savePref as storePref } from '@/lib/localPref';
 import { applyAppearance } from '@/lib/appearance';
 import { API_BASE } from '@/api/client';
@@ -38,7 +39,12 @@ const ICONS_KEY = 'pmis.nav.icons';
 /** The menu hides by itself (a narrow rail that opens on hover) unless it is pinned; kept in the browser like the width and the icons-only choice. */
 const AUTO_KEY = 'pmis.nav.auto';
 
+/** The signed-in frame. The unsaved-changes guard (Decision 11) wraps everything inside it: links, the Back button and every screen's dirty state. */
 export function Shell() {
+  return <UnsavedGuardProvider><ShellFrame /></UnsavedGuardProvider>;
+}
+
+function ShellFrame() {
   const { t } = useTranslation();
   const me = useMe(true);
   const notes = useNotifications(true);
@@ -243,10 +249,10 @@ export function Shell() {
                 {session.data?.auth_method === 'local'
                   ? <Popover.Close asChild><button className="btn w-full justify-start" data-testid="user-menu-change-password" onClick={() => nav('/change-password')}><Lock size={14} />{t('top.change_password')}</button></Popover.Close>
                   : <p className="p-2 text-sm text-mute">{t('top.no_password')}</p>}
+                <Popover.Close asChild><button className="btn mt-1 w-full justify-start border-t border-line" data-testid="user-menu-signout" onClick={() => logout.mutate(undefined, { onSuccess: () => { void qc.invalidateQueries({ queryKey: ['session'] }); nav('/login'); } })}><LogOut size={14} aria-hidden />{t('top.sign_out')}</button></Popover.Close>
               </Popover.Content>
             </Popover.Portal>
           </Popover.Root>
-          <button className="btn" data-testid="topbar-signout" aria-label={t('top.sign_out')} onClick={() => logout.mutate(undefined, { onSuccess: () => { void qc.invalidateQueries({ queryKey: ['session'] }); nav('/login'); } })}><LogOut size={16} /></button>
         </header>
         {HYBRID && <div role="status" data-testid="hybrid-banner" className="border-b border-line bg-waitBg px-4 py-1 text-xs text-waitInk">{t('hybrid.banner')}</div>}
         <AutoHints />
