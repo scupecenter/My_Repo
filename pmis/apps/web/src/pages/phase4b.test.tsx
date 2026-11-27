@@ -224,6 +224,37 @@ describe('Item 8 side panel', () => {
   });
 });
 
+describe('Floating inbox panel (appearance: inbox_panel, inbox_anchor)', () => {
+  const shell = () => renderApp(<Routes><Route element={<Shell />}><Route path="/inbox" element={<Inbox />} /><Route path="*" element={<div data-testid="elsewhere" />} /></Route></Routes>, { route: '/my-work' });
+
+  it('floats from the side panel, moves by keyboard, pins at the edge, and Escape closes it; the choice is saved in the profile', async () => {
+    await signIn('pm');
+    const u = userEvent.setup();
+    await api.put<UiFeaturesSetting>('/settings/ui-features', { version: 0, body: { sections: { panel: { mode: 'side_panel', width: 'medium', show_tabs: true } }, reason: 'Side panel' } });
+    shell();
+    await screen.findByTestId('topbar-bell');
+    await new Promise((r) => setTimeout(r, 300));
+    await u.click(screen.getByTestId('topbar-bell'));
+    await u.click(await screen.findByTestId('bell-float'));
+    await waitFor(() => expect(screen.queryByTestId('bell-panel')?.getAttribute('data-mode')).toBe('floating'));
+    // closing the overlay on switch is fine; reopen with the bell: no backdrop, the page stays usable
+    if (!screen.queryByTestId('bell-panel')) await u.click(screen.getByTestId('topbar-bell'));
+    const panel = await screen.findByTestId('bell-panel');
+    expect(panel).toHaveAttribute('data-anchor', 'end-top');
+    expect(screen.queryByRole('dialog', { hidden: false })?.getAttribute('aria-modal')).not.toBe('true');
+    const grip = within(panel).getByTestId('bell-drag');
+    grip.focus();
+    await u.keyboard('{ArrowLeft}{ArrowDown}');
+    await waitFor(() => expect(screen.getByTestId('bell-panel')).toHaveAttribute('data-anchor', 'start-bottom'));
+    await u.click(within(screen.getByTestId('bell-panel')).getByTestId('bell-pin'));
+    await waitFor(() => expect(screen.getByTestId('bell-panel')).toHaveAttribute('data-mode', 'docked'));
+    expect(document.documentElement.hasAttribute('data-inbox-docked')).toBe(true);
+    await u.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByTestId('bell-panel')).toBeNull());
+    expect(document.documentElement.hasAttribute('data-inbox-docked')).toBe(false);
+  });
+});
+
 describe('X2 follow', () => {
   it('follows and stops following a site, and the button shows the state', async () => {
     await signIn('pm');

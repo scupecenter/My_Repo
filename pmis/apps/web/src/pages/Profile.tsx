@@ -225,7 +225,8 @@ function AppearanceSection({ p }: { p: MyProfile }) {
   const revert = () => { setDraft(sanitizeAppearance(p.ui_prefs)); setTheme(p.theme); };
   const preset = (name: keyof typeof APPEARANCE_PRESETS) => {
     const pr = APPEARANCE_PRESETS[name];
-    setDraft({ ...pr.prefs });
+    // a look does not move the notification panel: the personal inbox_* choices stay
+    setDraft({ ...pr.prefs, ...(draft.inbox_panel ? { inbox_panel: draft.inbox_panel } : {}), ...(draft.inbox_anchor ? { inbox_anchor: draft.inbox_anchor } : {}) });
     setTheme(pr.theme);
   };
   const dimLabel = (k: AppearanceKey) => t(`appearance.dim.${k}`);
