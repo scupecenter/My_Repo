@@ -769,6 +769,16 @@ describe("receipt to Procurement order link (0181)", () => {
     expect(junk.status).toBe(422);
     expect(JSON.stringify(junk.body)).toContain("invalid");
   });
+  it("a delivery note and a return note take the order field like a receipt (0320); an adjustment refuses it", async () => {
+    for (const type of ["cw_dn", "cw_rn"] as const) {
+      const bad = await move({ ...doc(type), site_id: site.id, procurement_order_id: randomUUID(), lines: [{ item_id: tower.id, qty: 1 }] });
+      expect(bad.status, JSON.stringify(bad.body)).toBe(422);
+      expect(JSON.stringify(bad.body), type).toContain("order_not_active");
+    }
+    const adj = await move({ ...doc("adj"), procurement_order_id: randomUUID(), lines: [{ item_id: tower.id, qty: 1 }] });
+    expect(adj.status, JSON.stringify(adj.body)).toBe(422);
+    expect(JSON.stringify(adj.body)).toContain("receipt_only");
+  });
   it("lists the order picker for a caller with the module, and refuses a bad site id", async () => {
     const ok = await t.entry.api.call("get", "/registers/warehouse/order-options");
     expect(ok.status, JSON.stringify(ok.body)).toBe(200);
@@ -786,6 +796,22 @@ describe("Issue log and Quality order picker (0195)", () => {
       const ok = await admin.api.call("get", `/registers/${k}/order-options`);
       expect([200, 403], JSON.stringify(ok.body)).toContain(ok.status);
     }
+  });
+});
+
+describe("related records of a record (0324)", () => {
+  it("answers an empty list for a record with no links, refuses a bad key or id, and needs the register view right", async () => {
+    const m = await move({ ...doc("pl"), lines: [{ item_id: tower.id, qty: 1 }] });
+    expect(m.status, JSON.stringify(m.body)).toBe(201);
+    const rec = await t.entry.api.call("get", recPath("warehouse", m.body.register_record_id));
+    const ok = await t.entry.api.call("get", `/registers/warehouse/${rec.body.entity_id}/related`);
+    expect(ok.status, JSON.stringify(ok.body)).toBe(200);
+    expect(ok.body.groups).toEqual([]);
+    expect((await t.entry.api.call("get", "/registers/warehouse/not-an-id/related")).status).toBe(422);
+    expect((await t.entry.api.call("get", `/registers/Bad-Key/${rec.body.entity_id}/related`)).status).toBe(422);
+    const none = await admin.api.call("get", `/registers/warehouse/${randomUUID()}/related`);
+    expect(none.status).toBe(200);
+    expect(none.body.groups).toEqual([]);
   });
 });
 
