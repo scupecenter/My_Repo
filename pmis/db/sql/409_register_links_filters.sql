@@ -120,7 +120,7 @@ BEGIN
   ALTER FUNCTION register_link_def(text, text) OWNER TO pmis_definer;
   ALTER FUNCTION register_link_rules() OWNER TO pmis_definer;
   REVOKE ALL ON FUNCTION register_link_def(text, text), register_link_rules(), register_link_filter_ok(jsonb, jsonb, jsonb), register_link_label(public.register_records, text[]), register_link_options(text, text, uuid, text) FROM PUBLIC;
-  GRANT EXECUTE ON FUNCTION register_link_def(text, text) TO pmis_definer;
+  GRANT EXECUTE ON FUNCTION register_link_def(text, text), register_link_filter_ok(jsonb, jsonb, jsonb), register_link_label(public.register_records, text[]) TO pmis_definer;
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'pmis_app') THEN
     GRANT EXECUTE ON FUNCTION register_link_def(text, text), register_link_filter_ok(jsonb, jsonb, jsonb), register_link_label(public.register_records, text[]), register_link_options(text, text, uuid, text) TO pmis_app;
   END IF;
