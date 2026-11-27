@@ -11,7 +11,7 @@ for (const locale of ['en', 'ar'] as const) {
     await page.getByTestId('site-row-TR101').click();
     await page.getByTestId('site-section-snags').click();
     await page.getByTestId('snag-raise').click();
-    await page.screenshot({ path: `/downloads/fc-1-raise-${locale}.png` });
+    await page.screenshot({ path: `test-results/fc-1-raise-${locale}.png` });
     await page.getByTestId('snag-raise-title').fill(locale === 'ar' ? 'شرخ في العمود' : 'Crack on column');
     await page.getByTestId('snag-raise-type').selectOption({ label: locale === 'ar' ? 'شرخ خرساني' : 'Concrete crack' });
     await page.getByTestId('snag-raise-severity').selectOption({ label: locale === 'ar' ? 'ثانوية' : 'Minor' });
@@ -20,6 +20,6 @@ for (const locale of ['en', 'ar'] as const) {
     await expect(card).toBeVisible();
     await expect(card.locator('[data-testid^="snag-video-"]')).toBeVisible();
     await expect(card.locator('[data-testid^="snag-annotate-open-"]')).toBeVisible();
-    await card.screenshot({ path: `/downloads/fc-2-card-${locale}.png` });
+    await card.screenshot({ path: `test-results/fc-2-card-${locale}.png` });
   });
 }
