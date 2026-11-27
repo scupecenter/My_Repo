@@ -17353,6 +17353,7 @@ export interface components {
             procurement: components["schemas"]["DashboardOpsProcurement"];
             permits_hse: components["schemas"]["DashboardOpsPermitsHse"];
             gecol_hlc: components["schemas"]["DashboardOpsGecolHlc"];
+            contractor_scorecard: components["schemas"]["DashboardOpsScorecard"];
         };
         /** @description 0.15.106: procurement and materials (dashboard proposals item 1). */
         DashboardOpsProcurement: {
@@ -17461,6 +17462,49 @@ export interface components {
             civil_ready_no_power: number | null;
             /** @description HLC only: installation_date set but not in service yet; null in the GECOL part. */
             installed_not_in_service: number | null;
+        };
+        /** @description 0.15.202: the contractor and supplier scorecard (dashboard proposals item 5), the aggregate of the contractor performance report. No amounts. */
+        DashboardOpsScorecard: {
+            /** @description False when the caller may not see the contractors register; the other fields are then null. */
+            available: boolean;
+            /** @description The active parties in scope. */
+            parties: number | null;
+            /** @description The parties per overall level of the performance report. */
+            by_level: {
+                ok: number;
+                amber: number;
+                red: number;
+                insufficient: number;
+            } | null;
+            /** @description The mean delay days over the parties that have any delay, one decimal; null when nobody is delayed. */
+            avg_delay_days: number | null;
+            /** @description The share of snags not overdue (the on-time rectification rate), one decimal; null when there are no snags. */
+            on_time_pct: number | null;
+            /** @description The share of failed quality inspections (the rejection / NCR rate), one decimal; null when there are no inspections. */
+            quality_fail_pct: number | null;
+            snags: {
+                total: number;
+                open: number;
+                overdue: number;
+                returned: number;
+            } | null;
+            quality: {
+                total: number;
+                failed: number;
+            } | null;
+            /** @description The five worst parties (worst first), no amounts. */
+            worst: components["schemas"]["DashboardOpsScorecardWorst"][] | null;
+        };
+        DashboardOpsScorecardWorst: {
+            /** Format: uuid */
+            party_id: string;
+            name: string;
+            type: string;
+            /** @enum {string} */
+            level: "ok" | "amber" | "red" | "insufficient";
+            delay_days: number;
+            snags_overdue: number;
+            quality_failed: number;
         };
         DashboardTabLayout: {
             /** @description Card codes in display order. */
