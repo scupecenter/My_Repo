@@ -175,6 +175,7 @@
     "library.forms": "Forms",
     "library.archive": "Archive",
     "lessons_learned": "Lessons Learned",
+    "invoices": "Invoices",
     "incidents": "Incidents & Security"
   },
   "top": {
@@ -1205,7 +1206,8 @@
     "section_screens_interface": "Interface",
     "section_screens_goals": "Goals",
     "section_security_newdevice": "New-device code",
-    "section_workflow_simulate": "Who approves?"
+    "section_workflow_simulate": "Who approves?",
+    "section_alerts_rules": "Alert rules"
   },
   "scopeMatch": {
     "title": "Team / scope match (Procurement)",
@@ -1955,6 +1957,9 @@
     "execution": "Execution",
     "lesson": "Lesson",
     "follow_up": "Follow-up",
+    "invoice": "Invoice",
+    "payment": "Payment",
+    "amount_section": "Amount",
     "incident": "Incident",
     "people_damage": "People and damage",
     "resolution": "Resolution"
@@ -3610,6 +3615,18 @@
         "amber": "Amber"
       }
     }
+  },
+  "nav_side": {
+    "title": "Sidebar",
+    "subtitle": "Choose what your menu shows, the order of its screens and the badge style. The pinned shortcuts are managed on the menu itself (the star).",
+    "badges": "Badges",
+    "badge_full": "Full count",
+    "badge_dot": "Dot only",
+    "badge_none": "No badge",
+    "show": "Show",
+    "hide": "Hide",
+    "reset": "Back to the organization menu",
+    "note": "Changes preview in the menu at once. Apply saves them to your profile, on every device."
   },
   "emailChange": {
     "tab": "Email changes",
@@ -7118,6 +7135,48 @@
     "rule": "rule",
     "nobody": "Nobody holds this level.",
     "fallback": "Who could act through the admin path:"
+  },
+  "alertRules": {
+    "title": "Alert rules",
+    "note": "General if/then rules, notifications only. The daily job checks each enabled rule and sends one in-app notification per recipient, in their language. A rule never changes a record, a state or a holder.",
+    "col_code": "Code",
+    "col_kind": "Condition",
+    "col_title": "Title",
+    "col_enabled": "Enabled",
+    "empty": "No alert rules yet.",
+    "new": "New rule",
+    "edit": "Edit rule",
+    "code": "Code",
+    "kind": "Condition",
+    "audience": "Audience",
+    "audience_system_admin": "System Admins",
+    "audience_module": "A module's users",
+    "module": "Module",
+    "register": "Register",
+    "state": "State",
+    "days": "Days in the state",
+    "title_en": "Title (English)",
+    "title_ar": "Title (Arabic)",
+    "body_en": "Body (English)",
+    "body_ar": "Body (Arabic)",
+    "link": "Link (optional)",
+    "enabled": "Enabled",
+    "kind_weekly_status_missing": "Weekly status missing",
+    "kind_record_idle": "Record idle in a state",
+    "kind_weekly_status_missing_help": "Fires for every region without a Weekly status update of the current working week. Placeholders: {{region}}.",
+    "kind_record_idle_help": "Fires for every current record of the register in the state for at least the days. Placeholders: {{record}}, {{state}}, {{days}}."
+  },
+  "rel": {
+    "today": "today",
+    "tomorrow": "tomorrow",
+    "yesterday": "yesterday",
+    "in_days": "in {{count}} days",
+    "in_days_one": "in {{count}} day",
+    "days_ago": "{{count}} days ago",
+    "days_ago_one": "{{count}} day ago"
+  },
+  "cells": {
+    "progress": "Progress"
   },
   "mailPolicy": {
     "title": "Mail policy",
