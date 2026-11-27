@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { api, ApiError, downloadFile, type RequestOptions } from './client';
 import type { IssueStoppedRowList, IssueTaskMapItem, IssueTaskMapList,
-  ActiveSession, ActOnBehalfRequest, Calendar, CalendarConfirmation, MailNotificationKinds, ImportsSettings, ContractorPerformanceReport, ContractorPerformanceThresholds, ContractorPerformanceSettings, NavLayoutSetting, UiIdentity, UiBrand, LoginPage, SecurityLocks, SupportAccessSetting, Delegation, LoginPagePublic, SupportLink, NavLayoutT, ContractorRules, ContractorRulesInput, GecolHlcCounts, ContractorsCompletenessReport, TeamScopeMismatchReport, DeletedUser, PurgedUser, DlpSettings, DlpVersion, DlpVersionInput, Holiday, HolidayChangeResult, HolidayInput, HolidayPatch, HolidaySummary, IdleTaskAlertSetting, Job, LogIntegrity, LogRetention, LogRetentionInput,
+  ActiveSession, ActOnBehalfRequest, Calendar, CalendarConfirmation, MailNotificationKinds, ImportsSettings, ContractorPerformanceReport, ContractorPerformanceThresholds, ContractorPerformanceSettings, NavLayoutSetting, UiIdentity, UiBrand, LoginPage, SecurityLocks, SupportAccessSetting, NewDeviceCodeSetting, Delegation, LoginPagePublic, SupportLink, NavLayoutT, ContractorRules, ContractorRulesInput, GecolHlcCounts, ContractorsCompletenessReport, TeamScopeMismatchReport, DeletedUser, PurgedUser, DlpSettings, DlpVersion, DlpVersionInput, Holiday, HolidayChangeResult, HolidayInput, HolidayPatch, HolidaySummary, IdleTaskAlertSetting, Job, LogIntegrity, LogRetention, LogRetentionInput,
   NotificationPolicy, NotificationPolicyInput, NotificationTypeDef, Page, ReassignmentAlert, SecurityLogEntry, SessionRevokeResult, SlaPublishPreview, SlaRuleSet, SlaRuleSetPublishResult, SlaRuleSetSummary, SlaTaskRule, StaffCard, StaffVisibility, StructuralFreeze,
   TaskDefinition, TeamScopeMatch, TeamScopeMatchInput, TransitionResultT, User, UserDetail, WeekendDaysResult, WeightSet, WeightSetCode, WeightSetInput, WeightSetPreview, WeightSetPublishResult, WorkflowVersion, WorkflowVersionSummary,
 } from './types';
@@ -134,6 +134,16 @@ export const useRevokeAllSupport = () => {
     mutationFn: (body) => api.post('/support-access/revoke-all', { body }), onSettled: () => refresh(qc, 'support-grants'),
   });
 };
+/** 0.15.192 (migration 0292): the new-device email code (setting security.new_device_code) and its recovery path. System Admin only. */
+export const useNewDeviceCode = () => useQuery({ queryKey: ['new-device-code-setting'], queryFn: () => api.get<NewDeviceCodeSetting>('/settings/new-device-code') });
+export const useSetNewDeviceCode = () => {
+  const qc = useQueryClient();
+  return useMutation<NewDeviceCodeSetting, ApiError, { version: number; enabled: boolean; code_minutes: number; include_admins: boolean; reason: string }>({
+    mutationFn: ({ version, ...body }) => api.put('/settings/new-device-code', { version, body }), onSettled: () => refresh(qc, 'new-device-code-setting'),
+  });
+};
+export const useBypassNewDevice = () =>
+  useMutation<{ until: string }, ApiError, { user_id: string; minutes?: number; reason: string }>({ mutationFn: (body) => api.post('/settings/new-device-code/bypass', { body }) });
 export const useImportsSettings = () => useQuery({ queryKey: ['imports-settings'], queryFn: () => api.get<ImportsSettings>('/settings/imports') });
 export const useSetImportsSettings = () => {
   const qc = useQueryClient();
