@@ -40,6 +40,7 @@ import type { ExtraField } from "@/components/UnifiedFilter";
 import type { RegisterDefinition, RegisterRecord } from "@/api/types";
 import { TemplateExportMenu } from "@/components/TemplateExportMenu";
 import { PmDuePanel } from "@/components/PmDuePanel";
+import { ViewAnalytics } from "@/components/ViewAnalytics";
 import { ViewMenu, type ViewOption } from "@/components/ViewMenu";
 import { useRememberedView } from "@/lib/viewPreference";
 import { GridCellEditor, INLINE_TYPES } from "@/components/GridCellEditor";
@@ -668,6 +669,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
           <span className="flex items-center gap-2">
             {activeFilters > 0 && <span className="chip bg-accentSoft text-accentText" data-testid="toolbar-active-filters">{t("states.filters")} {activeFilters}</span>}
             <TableCount testid="register-count" noun={noun} total={screenTotal} filtered={total} active={activeFilters > 0} selected={picked.size} onClear={clearAll} />
+            <ViewAnalytics def={def} records={real} total={total} />
           </span>
         }
         switcher={

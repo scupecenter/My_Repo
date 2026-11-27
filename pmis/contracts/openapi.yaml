@@ -115,6 +115,7 @@ info:
     - 0.15.2 (2026-11-09): additive. The System Log screen under Logs & monitoring (owner request 2026-11-09; migration 0082; CHANGELOG 121). (1) `GET /system-log` is documented as built: readable by a System Admin or `view` on `admin.system_log` (403 `action_forbidden` otherwise); `q` searches the message text (case-insensitive) or matches a request ID exactly; `from` is inclusive and `to` exclusive; newest first. (2) `SystemLogEntry.source` is an open string: the enum listed sources the server never writes and missed those it does (`api`, `template-check`, `master-import`, `mail`, `storage`, `integrity`, `contractors`, `assignments`, `job`...); `details` is the stored context (for a refused template upload: `reason`, `detail`, `load_error`, `file_name`, `size`); it is data, never markup. (3) `SavedViewScreenKey` gains `system-log` (module `admin.system_log`, so a shared view reaches only people who may read the System Log). The side-menu catalogue gains `logs.system`.
     - 0.15.1 (2026-11-09): additive. The editable side menu (owner request 2026-11-09, technical decision "Decided 2026-11-09: editable side menu" in `docs/spec/technical-decisions-2026-11-04.md`; migration 0081; CHANGELOG 119). New `GET /settings/nav-layout` (every signed-in user: the shared layout of the side menu, null while the code's default applies, the catalogue of screen keys, who changed it and when, the ETag, `can_edit`) and `PUT /settings/nav-layout` (a System Admin or a delegate of `settings` edit for all regions, 403 `action_forbidden` otherwise; a reason and If-Match; `layout: null` returns to the default; 422 `validation_failed` with field errors for a bad tree; 409 `invalid_transition` for the layout in force). Schemas `NavLayoutSetting`, `NavLayout`, `NavHeading`, `NavSubHeading`, `NavLayoutInput`. Audited as `nav_layout_update` / `nav_layout_reset` with before and after. The permission and module filter of the menu is unchanged and applies after the layout.
     - 0.15.0 (2026-11-07): additive. Field assignments in Procurement, the Car Dispatcher and Financial Advances (owner decisions Q495 to Q516, plan `docs/plans/2026-11-07-assignments-fleet-advances.md`; migration 0076; CHANGELOG 111). (1) Procurement is the assignment: new `ProcScope` values `Survey`, `Acquisition Visit`, `Inspection`, `Maintenance`, `Emergency` (In-House, no PR) and, in the Assignment section of `RegisterRecord.data` (register `procurement`, no Master column, the PR-PO export is unchanged): `members` (rows `{user_id, member_role: supervisor|executor, is_lead}`), `planned_start`, `planned_end`, `actual_end`, `vehicle_required` + `vehicle_not_required_reason`, `advance_required` + `advance_not_required_reason` (a "not required" answer needs its reason: 422 `reason_required` at submit) and the derived read-only `readiness` (`not_ready` is never returned; `awaiting_vehicle`, `awaiting_advance`, `awaiting_both`, `ready_to_mobilize`), `ready_date`, `open_advances_after_close`. (2) Two registers with the generic `/registers/{register_key}/records` endpoints, two levels and their own Matrix rows (empty in the seed): `car_dispatcher` (record types `vehicle`, `booking`; not site-scoped; fields in `docs/spec/registers-and-streams.md` section 3.20; derived `bookable`, `out_of_region`) and `financial_advances` (record types `advance`, `expense`, `settlement`; site-scoped; section 3.21; derived `balance`, `currency` = LYD). Permission modules `car_dispatcher` and `financial_advances`. Neither is part of the Master-format export. (3) Link rule: the L2 approval of a Procurement record with field work opens, in the same transaction and once only, one draft `booking` (when `vehicle_required`) and one draft individual `advance` per member (when `advance_required`). (4) New endpoints: `POST /registers/car_dispatcher/records/{record_id}/extend` (child booking draft), `POST /registers/financial_advances/records/{record_id}/top-up` (child advance draft: top-up and/or extension), `GET /fleet/availability` (bookable vehicles free in a date range), `GET /registers/procurement/records/{record_id}/readiness`. (5) New `ErrorCode` `vehicle_already_reserved` (409): a vehicle is never reserved for overlapping dates (database EXCLUDE constraint). An expense or settlement is never approved by its custodian (403 `self_approval_forbidden`). The amounts of Financial Advances (`requested_amount`, `approved_amount`, `disbursed_amount`, `amount`, `returned_amount`, `balance`) are absent from `data` (with `amounts_hidden: true`) for anyone but Finance, the Project Manager, the custodian and the custodian's manager (Q512); the same projection applies to search, template downloads and document contexts. (6) The workflow tasks `MOB-1` (stage 1), `MOB-2` (stage 2, after B2) and `MOB-5` (stage 5) are added without changing any milestone, gate, weight or existing SLA (`counts_toward_milestone` false, no document; SLA 2 to 3 working days from the L2 approval of the Procurement record, start event `REC:procurement`).
+    - 0.15.190 (2026-11-27): admin lock keys, slice S1 of the security section (owner decision 2026-11-27 relayed by Main; migration 0290, mirror `db/sql/289_security_lock_keys.sql`). Additive; both locks are off by default, so nothing changes until a System Admin turns one on. New paths `GET` and `PUT /settings/security-locks` (`getSecurityLocks`, `setSecurityLocks`, schemas `SecurityLocks`, `SecurityLocksInput`). Every signed-in user reads the state; only a System Admin changes it (a `settings` delegate does not), with a reason, a step-up and `If-Match`, audited `security_locks_update`. While `disable_export` is on, every route that hands data out as a file (Master export start and download, document zip start and download, library archive zip, Master-import run report, announcement responses CSV, My Work calendar file, dashboard export, daily plan export, log exports and the activity workbook) answers 403 `action_forbidden` with `errors[0].code` `export_locked`. `block_public_sharing` is the lock a future public-link feature must check (`SecurityLocksService.assertSharingAllowed`, 403 `action_forbidden`, `errors[0].code` `sharing_locked`); there is no public link in the system today. Blank templates and uploaded documents are not exports and stay open.
     - 0.14.6 (2026-11-05): register and stream batches in the background, and the threshold in Settings (technical decision of 2026-11-05 (6), `docs/spec/technical-decisions-2026-11-04.md`; migration 0075; CHANGELOG 108). Additive. (1) `POST /import-batches/{batch_id}/submit` of a register batch (any approved register template) or of a stream batch (TPL-DESIGN-ACQ / -CW / -TE / -CL and the stream parts of a TPL-MASTER file) with more rows to send than `imports.async_rows`, and `POST /import-batches/{batch_id}/decisions` of such a batch with `approve`, `review` or `reject` (all rows or the rows listed) of more rows than the threshold, answer **202** with the batch `processing` and its `progress`, as New sites batches since 0.14.4. Every check of the request is made before the 202: the uploader, If-Match, the state, the notes of a return (422 `note_required`), the authority of the person on at least one of the rows (403 `not_eligible_holder`, nothing queued), the grid right (403), and the step-up when the send can be a self-approval (the sender holds L2 of the register row or of a task of the rows) or when the decision approves (401 `step_up_required`, nothing queued). The rows are then done in chunks (register rows 50, stream rows 25, New sites 25), each committed on its own under the same person, every row checked again by the same functions (holders, levels, documents, gates, snags, the historical-load mark and cutoff); a stream send synchronises the conditional documents of each chunk's tasks inside that chunk. A row that would need a step-up the run does not have is left as it was and counted in `progress.failed` (code `step_up_required`). At the end the batch has its usual status, its one audit row and its notices. A discard and a Save Draft batch's return stay at once (200). (2) `ImportBatchProgress` gains `action` (`approve`, `review`, `reject`; null for a send), `batch_kind` (`site`, `register`, `stream`), `decided`, `held` and `saved`. (3) `POST /master-import/runs/{run_id}/apply`: the staging stays in the request; each staged batch with more rows than the threshold is sent in the background by the same admin and the answer is **202** with the run `applied`, `outcome.batches[].queued` / `job_id` / `rows`, and the new `MasterImportRun.progress` (`MasterImportRunProgress`: the background sends of the run's batches, rows done of rows total); a smaller apply answers 200 as before (`progress` null). (4) `GET /settings/imports` and `PUT /settings/imports` (`ImportsSettings`, `ImportsSettingsInput`): the threshold `async_rows` (default 50, range 10 to 500), who changed it last and when; every signed-in user reads it; a System Admin or a delegate of `settings` edit for all regions changes it with a reason and If-Match (403 `action_forbidden` otherwise; 422 out of range or unknown key; 412 stale; 409 the same value), audited as `imports_async_rows_update` with before and after.
     - 0.14.5 (2026-11-05): the site map of the dashboard (OV-12, SC-10; gap G-D05; owner request 2026-11-05 and the technical decision "site map" in `docs/spec/technical-decisions-2026-11-04.md`; no migration; CHANGELOG 107). Additive. (1) `GET /dashboard/site-map` (`getDashboardSiteMap`): one compact row per visible active site (`SiteMapItem`: id, Site ID, names EN/AR, region, sub-region, cluster, latitude and longitude with `has_coordinates` (lat 18 to 34.5, lon 8 to 26, as OV-12), overall status, delivery scenario, tower owner, the current stream and milestone (the first milestone of the site's own workflow version that is neither reached nor N/A), the last milestone reached, `on_air_reached` (the On-Air milestone MS6 reached), `late_task_count`, `behind_baseline` and `late`, `task_progress_pct`), the stream and milestone names of the workflow versions in use, the regions of the list and `counts` (total, cancelled, with and without valid coordinates). The sites are those of the caller's `dashboard.view` regions that are also in the caller's `sites.view` regions (B3; the row-level filter as for `GET /sites`); a caller without `sites.view` anywhere is 403 `module_forbidden`. Cancelled sites are listed (the map hides them unless asked). No custom field, no landlord or contact data. Not audited (a read, like `GET /dashboard`). (2) `GET /sites` takes `coordinates=missing` (sites not cancelled without valid coordinates, the link of the map) and `coordinates=valid`. (3) `SiteDetail` adds `tower_owner`, `tower_type` and `tower_height_m` (the site card of the map).
     - 0.14.4 (2026-11-05): big New sites batches run in the background (technical decision of 2026-11-05, `docs/spec/technical-decisions-2026-11-04.md`; migration 0074; CHANGELOG 106). Additive. (1) `POST /import-batches/{batch_id}/submit` and `POST /import-batches/{batch_id}/decisions` (action `approve`) of a New sites batch (`entity` = `site`) with more rows to send or to approve than the setting `imports.async_rows` (default 50) answer **202** with the batch in the new status `processing` and its `progress` (`ImportBatchProgress`: rows done of rows total, percent, sites created); every check of the request is made before the 202 (uploader, If-Match, state, note, L1 / L2 of the Matrix row with the grid right, the step-up of a final approval or a self-approval: 401 `step_up_required`, nothing is queued). The rows are then done in chunks of 25, each committed on its own under the same person (the step-up verified at the request counts; nobody else can continue the run), so the counts and the rows move while the page polls; a row that fails gets its error and the others go on; at the end the batch has its usual status (`approved`, `partially_approved`, `in_approval`) and its usual audit row and notices. A run left behind by a restart is resumed by the API. While `processing`, a second send, a decision or a discard answers 409 `batch_processing` (new `ErrorCode`). Smaller batches, returns and the other templates answer 200 as before. (2) `ImportBatch.status` adds `processing`; `ImportBatch.progress` (null when the batch never ran in the background). (3) No request changes; a client that only reads 200 keeps working for small batches and sees 202 + `processing` for big ones.
@@ -9353,6 +9354,53 @@ paths:
             application/json:
               schema: {$ref: '#/components/schemas/LoginPagePublic'}
         '429': { $ref: '#/components/responses/TooManyRequests' }
+  /settings/security-locks:
+    get:
+      tags: [settings]
+      operationId: getSecurityLocks
+      summary: The admin lock keys, block public sharing and disable export (0.15.190)
+      description: Every signed-in user may read it (the UI hides what is locked). `can_edit` is true for a System Admin only. Both keys are `false` until a System Admin turns one on.
+      x-db-path: security_locks_state
+      responses:
+        '200':
+          description: The lock keys.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SecurityLocks'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+    put:
+      tags: [settings]
+      operationId: setSecurityLocks
+      summary: Turn the lock keys on or off (System Admin, reason, step-up, If-Match, audited) (0.15.190)
+      description: |
+        System Admin only (403 `action_forbidden` otherwise, a delegate included). A reason (3+ characters), a step-up (401 `step_up_required`) and `If-Match` (428 / 412)
+        are required. Unknown keys and non-boolean values are 422. Saving the values already in force is 409 `invalid_transition`. Audited `security_locks_update` with both keys
+        before and after. Reading and changing the lock keys is never locked, so an admin can always turn a lock off again.
+      x-step-up: true
+      x-db-path: admin_set_security_locks
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SecurityLocksInput'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SecurityLocks'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
   /settings/historical-waiver:
     get:
       tags: [settings]
@@ -22163,6 +22211,25 @@ components:
         animation: { type: boolean }
         default_locale: { anyOf: [{ type: string, enum: [en, ar] }, { type: 'null' }] }
         support_links: { type: array, maxItems: 5, items: { $ref: '#/components/schemas/SupportLink' } }
+    SecurityLocks:
+      type: object
+      description: '0.15.190. The admin lock keys (setting `security.locks`, migration 0290).'
+      required: [block_public_sharing, disable_export, version, can_edit]
+      properties:
+        block_public_sharing: { type: boolean, description: 'true: no feature may create a public link (checked by `SecurityLocksService.assertSharingAllowed`).' }
+        disable_export: { type: boolean, description: 'true: every export route answers 403 `export_locked`.' }
+        updated_at: { type: [string, 'null'], format: date-time }
+        updated_by: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+        version: { type: integer, description: The ETag value. }
+        can_edit: { type: boolean, description: A System Admin only. }
+    SecurityLocksInput:
+      allOf:
+        - $ref: '#/components/schemas/WithReason'
+        - type: object
+          required: [block_public_sharing, disable_export]
+          properties:
+            block_public_sharing: { type: boolean }
+            disable_export: { type: boolean }
     NavLayout:
       type: object
       description: '0.15.1. The shared order of the side menu (setting `nav.layout`).'
