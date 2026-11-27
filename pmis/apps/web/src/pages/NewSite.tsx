@@ -49,7 +49,7 @@ export function NewSite() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [returning, setReturning] = useState<SiteDraft | null>(null);
-  /** 0202: the duplicate warnings of the draft just saved (never blocking; the draft is saved) */
+  /** 0260: the duplicate warnings of the draft just saved (never blocking; the draft is saved) */
   const [saved, setSaved] = useState<{ code: string; warnings: NonNullable<SiteDraft['warnings']> } | null>(null);
   const set = (k: string) => (v: string) => setF((p) => ({ ...p, [k]: v }));
   const rname = (id: number) => { const r = regions.data?.find((x) => x.id === id); return (i18n.language === 'ar' && r?.name_ar) || r?.name_en || String(id); };

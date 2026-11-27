@@ -146,7 +146,7 @@ export class SiteDraftsService {
     if (text) where.push(Prisma.sql`(d.site_code ILIKE ${likePattern(text)} OR d.data ->> 'name' ILIKE ${likePattern(text)})`);
     const rows = await this.db.tx.$queryRaw<DraftRow[]>(this.select(Prisma.join(where, ' AND '), Prisma.sql`ORDER BY d.created_at DESC, d.id DESC LIMIT ${limit + 1} OFFSET ${offset}`));
     const page = rows.slice(0, limit);
-    // 0202: the warnings of the drafts still open (the duplicate-site warnings show beside each draft, also to L2 who decides it); one round trip
+    // 0260: the warnings of the drafts still open (the duplicate-site warnings show beside each draft, also to L2 who decides it); one round trip
     const open = page.filter((r) => r.status === 'entry' || r.status === 'in_approval').map((r) => r.id);
     const warnings = new Map<string, unknown[]>();
     if (open.length) {
