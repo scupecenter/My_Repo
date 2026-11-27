@@ -29,6 +29,7 @@ import { MyWork } from '@/pages/MyWork';
 import { DailyPlan } from '@/pages/DailyPlan';
 import { RegisterPage } from '@/pages/Register';
 import { RegisterBatch } from '@/pages/RegisterBatch';
+import { DataHubPage } from '@/pages/DataHub';
 import { TemplatesPage } from '@/pages/Templates';
 import { LibraryForms } from '@/pages/library/Forms';
 import { LibraryTemplates } from '@/pages/library/Templates';
@@ -122,6 +123,7 @@ function gated(session: Session) {
         <Route path="warehouse" element={<Warehouse />} />
         <Route path="as-built/items" element={<AsBuiltItems />} />
         <Route path="registers/:key/batches/:batchId" element={<RegisterBatch />} />
+        <Route path="data-hub" element={<DataHubPage />} />
         <Route path="templates" element={<TemplatesPage />} />
         {/* W5: Library (Forms and Archive) */}
         <Route path="library" element={<Navigate to="/library/forms" replace />} />
