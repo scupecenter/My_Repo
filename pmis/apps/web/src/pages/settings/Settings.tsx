@@ -31,6 +31,7 @@ import { SiteMasterColumns } from './SiteMasterColumns';
 import { DashboardSettings } from './DashboardSettings';
 import { Identity } from './Identity';
 import { DisplaySettings } from './DisplaySettings';
+import { PmSchedulesSettings } from './PmSchedulesSettings';
 import { DailyPlanSettings } from './DailyPlanSettings';
 import { MotionSettings } from './MotionSettings';
 import { LoginPageSettings } from './LoginPage';
@@ -53,7 +54,7 @@ export const SETTINGS_TABS: readonly SettingsTab[] = [
   // DLP months is a data-protection rule, so it moved here from SLA
   { key: 'security', sections: [{ key: 'staff' }, { key: 'retention' }, { key: 'dlp' }] },
   // Screens: what users see by default (Dashboard, Display menu of the tables, My Work Daily Plan)
-  { key: 'screens', sections: [{ key: 'dashboard' }, { key: 'tables' }, { key: 'daily-plan' }, { key: 'motion' }, { key: 'login' }] },
+  { key: 'screens', sections: [{ key: 'dashboard' }, { key: 'tables' }, { key: 'daily-plan' }, { key: 'pm-schedules' }, { key: 'motion' }, { key: 'login' }] },
   { key: 'identity', sections: [] },
 ];
 
@@ -137,6 +138,7 @@ export function SettingsRoutes() {
           <Route path="dashboard" element={<DashboardSettings />} />
           <Route path="tables" element={<DisplaySettings />} />
           <Route path="daily-plan" element={<DailyPlanSettings />} />
+          <Route path="pm-schedules" element={<PmSchedulesSettings />} />
           <Route path="motion" element={<MotionSettings />} />
           <Route path="login" element={<LoginPageSettings />} />
         </Route>

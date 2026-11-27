@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.98
+  version: 0.15.161
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -31,6 +31,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.161 (2026-11-27): recurring preventive-maintenance schedules that create drafts only (migration 0261; CHANGELOG PmSchedules). Additive. `GET`/`PUT /settings/pm-schedules` (`getPmSchedules`, `setPmSchedules`) and `POST /pm-schedules/{schedule_id}/generate` (`generatePmScheduleDraft`). A schedule never creates anything by itself: a person presses Create draft on a due schedule and the draft is saved through the register's own create path as that person; no permission is widened.
     - 0.15.98 (2026-11-27): the dashboard follow-up sections (owner approval 2026-11-26, dashboard proposals item 1; migration 0230). Additive and read only. New `GET /dashboard/ops` (`getDashboardOps`, `DashboardOps`): the sections that follow the operations beyond F13, each part `available: false` when the caller may not see its module. First section `procurement`: the open orders (order status not one of the closing statuses of the contractor rules, as in `GET /reports/contractor-performance`), the PRs waiting for a PO/WO and the open PO/WOs, each aged in calendar days and bucketed 0-7, 8-14, 15-30, over 30, and the materials position: the receive rate (dispatched against required of `warehouse_site_qty` over the active, not cancelled sites), the count of sites with a shortage line, the top shortage lines with their contractor (the party of the site's newest open order; unattributed when none) and the shortage per contractor. No price is returned (no price is stored on a Procurement record). The dashboard settings catalogue gains the card `ops_procurement`, so the card shows, hides and orders per tab in Settings > Dashboard like every other card. No grant, role or permission change.
     - 0.15.97 (2026-11-27): the sign-in page settings (owner request 2026-11-26; migration 0197). Additive. New `GET/PUT /settings/login-page` (`getLoginPage`, `setLoginPage`; setting `ui.login_page`): the sign-in page announcement (English and Arabic, kind info or maintenance, both texts empty hides it), the background animation switch, the default language of the signed-out pages and up to five support links ({label_en, label_ar, url}; http(s) or mailto only). Every signed-in user reads the state (the post-login splash shows `server_version` from it); a System Admin or a delegate of `settings` edit for all regions changes it with a reason, a step-up and If-Match (audited `login_page_update`, before and after). New `GET /settings/login-page/public` (`getLoginPagePublic`, no session): ONLY what the sign-in page renders (announcement, animation, default_locale, support_links) - no version, no audit data, nothing about users; cached 30 seconds and rate limited per address. No permission, visibility or authentication change.
     - 0.15.96 (2026-11-27): responsibility-matrix coverage screen (CHANGELOG MatrixCoverage; no migration). Additive and read only. `GET /matrix/coverage` (`getMatrixCoverage`, System Admin or an all-region delegate of the matrix): for each active stage and enabled register row and each of the seven regions, whether the matrix cell has an actor, so empty cells show before a task or record stalls. Settings > Workflow > Coverage.
@@ -9053,6 +9054,87 @@ paths:
         '412': {$ref: '#/components/responses/PreconditionFailed'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /settings/pm-schedules:
+    get:
+      tags: [settings]
+      operationId: getPmSchedules
+      summary: The preventive-maintenance schedules the caller may see (0.15.161)
+      description: |
+        0.15.161. Schedules kept in the settings table as `pm.schedules`. A schedule says: every `every` weeks or months create a DRAFT record in register `register_key`
+        (for `site_id`, with the field values in `data`). `next_due` is the next date a draft is due; `today` is the calendar day of the system. A schedule never creates
+        anything by itself. A caller sees the schedules of the registers the caller may view; an administrator with `admin.settings` edit sees all of them.
+      responses:
+        '200':
+          description: The schedules.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PmSchedules'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+    put:
+      tags: [settings]
+      operationId: setPmSchedules
+      summary: Save the schedules (reason, If-Match, audited, versioned)
+      description: |
+        0.15.161. System Admin, or a delegation of `admin.settings` edit for all regions (403 `action_forbidden` otherwise). The body replaces the whole list; the run
+        history of a schedule (`last_generated_at`, `last_record_id`) is kept by the database. Field errors (422 `validation_failed`): `unknown_key`, `invalid`,
+        `duplicate`, `unknown_register`, `unknown_site`, `required` (a site is needed), `too_many`. One audit row per save.
+      x-db-path: admin_save_pm_schedules
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - {$ref: '#/components/schemas/WithReason'}
+              - {$ref: '#/components/schemas/PmSchedulesInput'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PmSchedules'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /pm-schedules/{schedule_id}/generate:
+    post:
+      tags: [registers]
+      operationId: generatePmScheduleDraft
+      summary: Create the draft of a due schedule, as the caller (0.15.161)
+      description: |
+        0.15.161. Saves ONE draft record (state `entry`) in the schedule's register through the register's own create path, as the caller: the register's rights, region
+        rules and field rules apply unchanged (no permission is widened). Then the next due date moves past today in steps of the schedule (never a backlog).
+        404 when the schedule does not exist or the caller may not view its register; 409 `invalid_transition` when the schedule is switched off or not due yet.
+        Errors of the register (403, 422) are returned as they are.
+      x-db-path: pm_schedule_mark_generated
+      parameters:
+      - {name: schedule_id, in: path, required: true, schema: {type: string}}
+      responses:
+        '201':
+          description: The draft was created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [record_id, register_key, next_due]
+                additionalProperties: false
+                properties:
+                  record_id: { type: string, format: uuid }
+                  register_key: { type: string }
+                  next_due: { type: [string, 'null'], format: date }
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
   /settings/kanban-wip:
     get:
       tags: [settings]
@@ -16128,6 +16210,65 @@ components:
           schema: { $ref: '#/components/schemas/TransitionResult' }
 
   schemas:
+    PmScheduleInput:
+      type: object
+      required: [id, name_en, register_key, data, every, unit, next_due]
+      additionalProperties: false
+      properties:
+        id: { type: string, pattern: '^[a-z0-9-]{3,40}$' }
+        name_en: { type: string, minLength: 1, maxLength: 120 }
+        name_ar: { type: [string, 'null'], maxLength: 120 }
+        register_key: { type: string }
+        site_id: { type: [string, 'null'], format: uuid, description: 'Required when the register is site scoped.' }
+        record_type: { type: [string, 'null'], maxLength: 40 }
+        data: { type: object, additionalProperties: true, description: 'Field values of the draft, by field code (at most 4000 characters).' }
+        every: { type: integer, minimum: 1, maximum: 52 }
+        unit: { type: string, enum: [week, month] }
+        next_due: { type: string, format: date }
+        active: { type: boolean }
+    PmSchedulesInput:
+      type: object
+      required: [schedules]
+      additionalProperties: false
+      properties:
+        schedules:
+          type: array
+          maxItems: 100
+          items: {$ref: '#/components/schemas/PmScheduleInput'}
+    PmSchedule:
+      allOf:
+      - {$ref: '#/components/schemas/PmScheduleInput'}
+      - type: object
+        properties:
+          last_generated_at: { type: string, format: date-time }
+          last_record_id: { type: string, format: uuid }
+    PmSchedules:
+      type: object
+      required: [version, schedules, today, catalogue, updated_at, updated_by]
+      properties:
+        version: { type: integer }
+        schedules:
+          type: array
+          items: {$ref: '#/components/schemas/PmSchedule'}
+        today: { type: string, format: date }
+        catalogue:
+          type: object
+          required: [registers, units]
+          properties:
+            registers:
+              type: array
+              items:
+                type: object
+                required: [key, name_en, name_ar, site_scoped]
+                properties: { key: {type: string}, name_en: {type: string}, name_ar: {type: string}, site_scoped: {type: boolean} }
+            units:
+              type: array
+              items: {type: string}
+        updated_at: { type: [string, 'null'], format: date-time }
+        updated_by:
+          type: [object, 'null']
+          required: [id, display_name]
+          properties: { id: {type: string}, display_name: {type: string} }
     IssueStoppedRow:
       type: object
       required: [site_code, task_code, stage_code, state, why, category, not_classified]
