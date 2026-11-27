@@ -38172,6 +38172,8 @@ export interface operations {
                 task_id?: string;
                 /** @description Repeated, or a comma separated list. At most 500. */
                 site_ids?: string[];
+                /** @description 0.15.320. Only for `TPL-LISTVALUES`: the code of a dropdown list. The file holds the current active values of that list (at most 5000), ready to edit and upload again. */
+                list?: string;
                 /** @description Pre-fill with the current records of the register (at most 5000 rows). */
                 prefill?: boolean;
                 /** @description Limit a pre-filled copy to one region (inside the caller's regions). */

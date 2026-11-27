@@ -4678,6 +4678,8 @@
     "import_file": "Excel file (.xlsx)",
     "reason_short": "Reason (at least 3 characters)",
     "import_submit": "Import",
+    "template_current": "Download the template with the current values",
+    "import_unchanged": "{{count}} unchanged",
     "import_done": "{{count}} values imported",
     "bind_title": "Bind this list to a register column",
     "bind_pick_register": "Choose a register",
