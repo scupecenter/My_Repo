@@ -6215,7 +6215,7 @@ export interface paths {
         };
         /**
          * The warehouse receipts against a Procurement order (0.15.91)
-         * @description 0.15.91. The current, not voided PL / OPEN receipts whose `procurement_order_id` is this order, with the number of lines and the total quantity. Needs the Procurement module
+         * @description 0.15.91 (0.15.111: every document type except an adjustment). The current, not voided warehouse documents whose `procurement_order_id` is this order, with the number of lines and the total quantity. Needs the Procurement module
          *     (view) and the Warehouse module; the receipts the caller cannot see are not listed.
          */
         get: operations["listProcurementOrderReceipts"];
@@ -16152,7 +16152,7 @@ export interface components {
             /** Format: uuid */
             record_id: string;
             /** @enum {string} */
-            record_type: "pl" | "open";
+            record_type: "te_dn" | "cw_dn" | "te_rn" | "cw_rn" | "pl" | "open";
             state: string;
             doc_no?: string;
             doc_date?: string;
