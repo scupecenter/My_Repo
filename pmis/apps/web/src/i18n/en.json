@@ -3421,6 +3421,9 @@
         "on_air_vs_target": "On-Air against the monthly target"
       }
     },
+    "collapse_all": "Collapse all",
+    "expand_all": "Expand all",
+    "share_menu": "Share / Export",
     "copy_link": "Copy link",
     "link_copied": "Copied",
     "copy_link_hint": "Copy the address of this view with its filters. Whoever opens it signs in first and sees only what their own role allows.",
@@ -5469,6 +5472,7 @@
     "filters": "Map filters",
     "search": "Site ID or name",
     "no_options": "No values",
+    "more_filters": "More filters",
     "late_only": "Late only",
     "outer_note": "The dashboard filters above (region, cluster, scenario, stream) also apply to the map.",
     "legend": "Legend",
