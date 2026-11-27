@@ -47,3 +47,6 @@ V2–V10 قرارات لاحقة بـ PRs مستقلة: التقويم، الر�
 ## الدفعة الثانية (PR2، نفس اليوم)
 
 اللوحة عمّت بقية الشاشات التي كانت على قائمة العرض أو مفتاح الكثافة: صفحة الموقع (مبدّل القائمة/الجدول الزمني دخل اللوحة في وضعي الجدول والجدول الزمني معًا، بنفس المعرّفات `site-layout-list`/`site-layout-timeline`)، الموافقات، عملي (مبدّل القائمة/اللوحة يبقى خارج اللوحة حتى V7)، الخطة اليومية (مفتاح الكثافة صار اللوحة وربح الجدول `displayAttrs` لتعمل خيارات الحجم والمحاذاة والالتفاف)، وأرشيف المكتبة. `DisplayMenu` و`DensityToggle` حُذفا نهائيًا: لا مرجع ثانيًا للوحة غير `LayoutPanel`.
+
+## P3: Approvals control rows (four to two)
+Inside the list card: row 1 holds the tabs, the quick filters (colours, stale) and the sort; Select all moved into the list header directly above the list (`approvals-list-header`). With the page toolbar that is two control rows in place of four. Behaviour, test ids and Tab order inside each group are unchanged; Select all now comes after the filters.
