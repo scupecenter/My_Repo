@@ -1,6 +1,8 @@
 import { ExternalLink, X } from 'lucide-react';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
+import { StandardTable, type StdCol } from '@/components/StandardTable';
 import { siteMasterSourceHref, useSiteMasterSiteSources, type SiteMasterCellSource } from '@/api/siteMaster';
 
 /** Chips and details of one cell's source (contract 0.15.35): kind, origin, the record or task, the rule, and a link that opens the source. */
@@ -61,37 +63,25 @@ export function SiteMasterSourcePanel({ siteId, siteCode, ord, onClose }: { site
   );
 }
 
-/** The Master tab of the site page: every Master column of the site with its value and its source, and a link to the source record. */
+/** The Master tab of the site page: every Master column of the site with its value and its source, and a link to the source record (the table standard). */
 export function SiteMasterSources({ siteId }: { siteId: string }) {
   const { t } = useTranslation();
   const q = useSiteMasterSiteSources(siteId);
-  if (q.isLoading) return <p className="text-mute">{t('siteMaster.src.loading')}</p>;
-  if (q.isError || !q.data) return <p className="text-lateInk" role="alert">{t('siteMaster.src.error')}</p>;
+  const cols: StdCol<SiteMasterCellSource>[] = useMemo(() => {
+    const val = (c: SiteMasterCellSource) => (c.kind === 'not_tracked' ? t('siteMaster.not_tracked') : c.hidden ? t('siteMaster.src.hidden') : c.value ?? '');
+    return [
+      { id: 'column', label: t('siteMaster.src.column'), w: 260, pinned: true, text: (c) => `${c.letter} ${c.header}`, cell: (c) => <><span className="mono me-1 text-mute">{c.letter}</span>{c.header}</> },
+      { id: 'value', label: t('siteMaster.src.value'), w: 220, text: (c) => String(val(c)), cell: (c) => c.kind === 'not_tracked'
+        ? <span className="italic text-mute" title={t('siteMaster.not_tracked_hint')} data-testid={`site-master-not-tracked-${c.letter}`}>{t('siteMaster.not_tracked')}</span>
+        : c.hidden ? <span className="text-mute">{t('siteMaster.src.hidden')}</span> : c.value ?? <span className="text-mute">-</span> },
+      { id: 'source', label: t('siteMaster.src.source'), w: 420, multi: true, text: (c) => `${t(`siteMaster.src.kind.${c.kind}`)}${c.origin ? ` ${t(`siteMaster.src.origin.${c.origin}`)}` : ''}${c.task_code ? ` ${c.task_code}` : ''}`,
+        cell: (c) => <SiteMasterSourceDetails siteId={siteId} cell={c} testid={`site-master-src-${c.letter}`} /> },
+    ];
+  }, [t, siteId]);
+  if (q.isError) return <p className="text-lateInk" role="alert">{t('siteMaster.src.error')}</p>;
+  const rows = (q.data?.cells ?? []).filter((c) => c.ord !== 1);
   return (
-    <div className="card overflow-auto" data-testid="site-master-sources">
-      <table className="w-full text-xs">
-        <thead>
-          <tr className="border-b border-line text-start">
-            <th className="px-2 py-1 text-start">{t('siteMaster.src.column')}</th>
-            <th className="px-2 py-1 text-start">{t('siteMaster.src.value')}</th>
-            <th className="px-2 py-1 text-start">{t('siteMaster.src.source')}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {q.data.cells.filter((c) => c.ord !== 1).map((c) => (
-            <tr key={c.ord} className="border-b border-line align-top" data-testid={`site-master-row-${c.letter}`}>
-              <td className="px-2 py-1"><span className="mono me-1 text-mute">{c.letter}</span>{c.header}</td>
-              <td className="px-2 py-1">
-                {c.kind === 'not_tracked'
-                  ? <span className="italic text-mute" title={t('siteMaster.not_tracked_hint')} data-testid={`site-master-not-tracked-${c.letter}`}>{t('siteMaster.not_tracked')}</span>
-                  : c.hidden ? <span className="text-mute">{t('siteMaster.src.hidden')}</span>
-                  : c.value ?? <span className="text-mute">-</span>}
-              </td>
-              <td className="px-2 py-1"><SiteMasterSourceDetails siteId={siteId} cell={c} testid={`site-master-src-${c.letter}`} /></td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <StandardTable screen="site-master-sources" testid="site-master-sources" cols={cols} rows={rows} rowId={(c) => String(c.ord)} rowTestId={(c) => `site-master-row-${c.letter}`}
+      loading={q.isLoading} exportName="site-master-sources" noun="items" />
   );
 }
