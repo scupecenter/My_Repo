@@ -99,7 +99,7 @@ END $$;
 CREATE OR REPLACE FUNCTION admin_alert_rule_save(p_rule jsonb, p_reason text, p_id uuid DEFAULT NULL, p_version integer DEFAULT NULL) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 DECLARE
-  errs jsonb := '[]'::jsonb; cur public.alert_rules; id uuid; before jsonb; after jsonb; a jsonb;
+  errs jsonb := '[]'::jsonb; cur public.alert_rules; rid uuid; before jsonb; after jsonb; a jsonb;
 BEGIN
   PERFORM public.calc_require_admin('admin.settings', true);
   PERFORM public.calc_require_reason(p_reason);
@@ -146,23 +146,23 @@ BEGIN
     VALUES (p_rule ->> 'code', p_rule ->> 'kind', coalesce(p_rule -> 'params', '{}'::jsonb), a,
             btrim(p_rule ->> 'title_en'), btrim(p_rule ->> 'title_ar'), btrim(p_rule ->> 'body_en'), btrim(p_rule ->> 'body_ar'),
             p_rule ->> 'link', coalesce((p_rule ->> 'enabled')::boolean, true), public.app_actor(), public.app_actor())
-    RETURNING alert_rules.id INTO id;
-    SELECT to_jsonb(x) - 'created_at' - 'updated_at' INTO after FROM public.alert_rules x WHERE x.id = id;
-    PERFORM public.log_audit_write('alert_rule_create', 'alert_rule', id::text, NULL, after, btrim(p_reason));
+    RETURNING alert_rules.id INTO rid;
+    SELECT to_jsonb(x) - 'created_at' - 'updated_at' INTO after FROM public.alert_rules x WHERE x.id = rid;
+    PERFORM public.log_audit_write('alert_rule_create', 'alert_rule', rid::text, NULL, after, btrim(p_reason));
   ELSE
-    id := p_id;
-    SELECT to_jsonb(x) - 'created_at' - 'updated_at' INTO before FROM public.alert_rules x WHERE x.id = id;
+    rid := p_id;
+    SELECT to_jsonb(x) - 'created_at' - 'updated_at' INTO before FROM public.alert_rules x WHERE x.id = rid;
     UPDATE public.alert_rules x SET
       kind = p_rule ->> 'kind', params = coalesce(p_rule -> 'params', '{}'::jsonb), audience = a,
       title_en = btrim(p_rule ->> 'title_en'), title_ar = btrim(p_rule ->> 'title_ar'),
       body_en = btrim(p_rule ->> 'body_en'), body_ar = btrim(p_rule ->> 'body_ar'),
       link = p_rule ->> 'link', enabled = coalesce((p_rule ->> 'enabled')::boolean, true),
       version = x.version + 1, updated_at = now(), updated_by = public.app_actor()
-    WHERE x.id = id;
-    SELECT to_jsonb(x) - 'created_at' - 'updated_at' INTO after FROM public.alert_rules x WHERE x.id = id;
-    PERFORM public.log_audit_write('alert_rule_update', 'alert_rule', id::text, before, after, btrim(p_reason));
+    WHERE x.id = rid;
+    SELECT to_jsonb(x) - 'created_at' - 'updated_at' INTO after FROM public.alert_rules x WHERE x.id = rid;
+    PERFORM public.log_audit_write('alert_rule_update', 'alert_rule', rid::text, before, after, btrim(p_reason));
   END IF;
-  RETURN (SELECT jsonb_build_object('id', x.id, 'version', x.version) FROM public.alert_rules x WHERE x.id = id);
+  RETURN (SELECT jsonb_build_object('id', x.id, 'version', x.version) FROM public.alert_rules x WHERE x.id = rid);
 END $$;
 
 -- One notification per recipient, deduped by (rule, period, target): the number of notifications written (0 when this fire is a repeat or the rule

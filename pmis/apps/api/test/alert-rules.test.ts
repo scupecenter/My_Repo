@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import type { Client as PgClient } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { beginAs, makeAdmin, makeUser, superDb } from './helpers';
-import { addAssignment, newRole } from './wf-helpers';
+import { addAssignment, makeSite, newRole } from './wf-helpers';
 
 /**
  * Migration 0202: the generic if/then alert rules, NOTIFICATIONS ONLY. admin_alert_rule_save manages a rule (admin.settings edit for all regions, a
@@ -10,7 +10,7 @@ import { addAssignment, newRole } from './wf-helpers';
  * recipient's language, deduped by alert_rule_fires. They change no record, state, owner or permission.
  */
 const REGION = 7;
-const PREFIX = `ALR${randomBytes(3).toString('hex').toUpperCase()}`;
+const PREFIX = `alr${randomBytes(3).toString('hex')}`;   // rule codes are lowercase
 let db: PgClient;
 let adminId: string;
 
@@ -36,13 +36,16 @@ const fires = async (code: string): Promise<number> =>
 
 describe('alert rules (0202)', () => {
   it('validates the closed kinds, params, audience and templates with field errors', async () => {
-    await db.query('BEGIN');
-    await beginAs(db, adminId);
-    await expect(save(rule(`${PREFIX}-bad-kind`, { kind: 'nope' }), 'try a bad kind')).rejects.toThrow(/validation_failed/);
-    await expect(save(rule(`${PREFIX}-bad-aud`, { audience: { type: 'everyone' } }), 'try a bad audience')).rejects.toThrow(/validation_failed/);
-    await expect(save(rule(`${PREFIX}-bad-idle`, { kind: 'record_idle', params: { register_key: 'issues', state: 'entry', days: 'soon' } }), 'try bad days')).rejects.toThrow(/days/);
-    await expect(save(rule(`${PREFIX}-short`, { title_en: '  ' }), 'try an empty title')).rejects.toThrow(/title_en/);
-    await expect(db.query('ROLLBACK'));
+    const fails = async (r: Record<string, unknown>, re: RegExp): Promise<void> => {
+      await db.query('BEGIN');
+      await beginAs(db, adminId);
+      await expect(save(r, 'try an invalid rule')).rejects.toThrow(re);
+      await db.query('ROLLBACK');
+    };
+    await fails(rule(`${PREFIX}-bad-kind`, { kind: 'nope' }), /validation_failed/);
+    await fails(rule(`${PREFIX}-bad-aud`, { audience: { type: 'everyone' } }), /audience/);
+    await fails(rule(`${PREFIX}-bad-idle`, { kind: 'record_idle', params: { register_key: 'issues', state: 'entry', days: 'soon' } }), /days/);
+    await fails(rule(`${PREFIX}-short`, { title_en: '  ' }), /title_en/);
   });
 
   it('creates and updates a rule with a reason and an audit row; the update needs the version', async () => {
@@ -52,7 +55,6 @@ describe('alert rules (0202)', () => {
     const made = await save(rule(code), 'add the rule');
     const id = made.rows[0].j.id as string;
     expect(made.rows[0].j.version).toBe(1);
-    await expect(save(rule(code, { title_en: 'changed' }), 'update without the version', id, null)).rejects.toThrow(/precondition_failed/);
     const upd = await save(rule(code, { title_en: 'changed', enabled: false }), 'rename it', id, 1);
     expect(upd.rows[0].j.version).toBe(2);
     const list = (await db.query('SELECT alert_rules_json() AS j')).rows[0].j as { code: string; enabled: boolean; version: number }[];
@@ -60,6 +62,8 @@ describe('alert rules (0202)', () => {
     expect(row).toMatchObject({ enabled: false, version: 2 });
     const audit = await db.query(`SELECT action, entity_type, entity_id FROM audit_log WHERE entity_id = $1 AND action LIKE 'alert_rule%' ORDER BY id`, [id]);
     expect(audit.rows.map((r) => r.action)).toEqual(['alert_rule_create', 'alert_rule_update']);
+    // the rejecting call comes last: the error aborts the transaction, which the ROLLBACK then ends
+    await expect(save(rule(code, { title_en: 'changed again' }), 'update without the version', id, null)).rejects.toThrow(/precondition_failed/);
     await db.query('ROLLBACK');
   });
 
@@ -110,15 +114,16 @@ describe('alert rules (0202)', () => {
     await addAssignment(db, holder.id, { roleId, regions: [REGION], modules: ['issues'] });
     await addAssignment(db, wrongModule.id, { roleId, regions: [REGION], modules: ['sites'] });
     // an idle current record (in the state for 20 days) and a fresh one
+    const site = await makeSite(db, REGION, { prefix: PREFIX.toUpperCase() });
     const idle = await db.query(
-      `INSERT INTO register_records (entity_id, register_key, region_id, is_global, state, current_level, levels_required, level_round, created_by, updated_at)
-       VALUES (gen_random_uuid(), 'issues', $1, false, 'entry', 1, 3, 0, $2, now() - interval '20 days') RETURNING id`,
-      [REGION, adminId],
+      `INSERT INTO register_records (entity_id, register_key, site_id, region_id, is_global, is_current, state, current_level, levels_required, level_round, created_by, updated_at)
+       VALUES (gen_random_uuid(), 'issues', $3, $1, false, true, 'entry', 1, 3, 0, $2, now() - interval '20 days') RETURNING id`,
+      [REGION, adminId, site.id],
     );
     await db.query(
-      `INSERT INTO register_records (entity_id, register_key, region_id, is_global, state, current_level, levels_required, level_round, created_by, updated_at)
-       VALUES (gen_random_uuid(), 'issues', $1, false, 'entry', 1, 3, 0, $2, now())`,
-      [REGION, adminId],
+      `INSERT INTO register_records (entity_id, register_key, site_id, region_id, is_global, is_current, state, current_level, levels_required, level_round, created_by, updated_at)
+       VALUES (gen_random_uuid(), 'issues', $3, $1, false, true, 'entry', 1, 3, 0, $2, now())`,
+      [REGION, adminId, site.id],
     );
     const n = (await db.query(`SELECT alert_rules_run('2031-03-07'::date) AS n`)).rows[0].n as number;
     expect(n).toBe(1);
@@ -134,10 +139,13 @@ describe('alert rules (0202)', () => {
   });
 
   it('a non-admin cannot read or save the rules (403-style privilege error)', async () => {
-    await db.query('BEGIN');
     const plain = await makeUser(db, { status: 'active' });
+    await db.query('BEGIN');
     await beginAs(db, plain.id);
     await expect(db.query('SELECT alert_rules_json()')).rejects.toThrow(/insufficient_privilege|admin path/);
+    await db.query('ROLLBACK');
+    await db.query('BEGIN');
+    await beginAs(db, plain.id);
     await expect(save(rule(`${PREFIX}-noauth`), 'try without rights')).rejects.toThrow(/insufficient_privilege|admin path/);
     await db.query('ROLLBACK');
   });
