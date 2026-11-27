@@ -6840,6 +6840,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/derive-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The cross-register derive rules (0.15.260)
+         * @description 0.15.260. Each rule says which value of a source register a target register shows (the source record's external party, or one field), found by a link field of the target
+         *     record, else by the same site. Reading needs the Settings screen. `registers` lists the registers and fields a rule may name.
+         */
+        get: operations["getDeriveRules"];
+        /**
+         * Save the cross-register derive rules (reason, If-Match, audited)
+         * @description 0.15.260. System Admin, or a delegation of `admin.settings` edit for all regions. Field errors: `unknown_key`, `unknown_register`, `same_register`, `unknown_field`,
+         *     `duplicate`, `invalid`, `too_many`, `required`.
+         */
+        put: operations["setDeriveRules"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/dashboard": {
         parameters: {
             query?: never;
@@ -16402,6 +16428,10 @@ export interface components {
         /** @enum {string} */
         RegisterRecordState: "entry" | "in_review" | "in_approval" | "approved" | "voided";
         RegisterRecord: {
+            /** @description 0.15.260. Values this record shows from another register by the rules of `derive.rules`, keyed by the rule output. Only the configured value, never the source record. */
+            derived?: {
+                [key: string]: unknown;
+            };
             /** @description 0.15.90. GECOL and HLC records only: the Contractor company from Procurement by Site ID (read only, never stored on the record). HLC: the company of the Procurement record it links to; otherwise the company of the latest approved Procurement record of the site that names one. Absent when none. `external_party` of a GECOL or HLC record stays what the approval rules use (the party the record itself is approved for). */
             procurement_contractor?: components["schemas"]["ExternalPartyRef"];
             /** @description 0.15.83. Read only. The evidence of the record: its mandatory document slots (the same rules as the Site Master cell `docs`). Absent when the record needs no document. */
@@ -17286,6 +17316,38 @@ export interface components {
                     label_ar: string;
                 }[];
             };
+        };
+        DeriveRule: {
+            key: string;
+            enabled: boolean;
+            /** @description The register that shows the value. */
+            target_register: string;
+            /** @description The name of the value in `RegisterRecord.derived`. */
+            output: string;
+            /** @description Another register. */
+            source_register: string;
+            /** @description `external_party` (the company of the source record) or a field code of the source register. */
+            source: string;
+            /** @description A field of the target register that holds the entity record id of the source record; null = match by site only. */
+            link_field: string | null;
+        };
+        DeriveRulesInput: {
+            rules: components["schemas"]["DeriveRule"][];
+        };
+        /** @description 0.15.260. Seed: the GECOL and HLC contractor from Procurement (the rules that were hard-coded). */
+        DeriveRules: components["schemas"]["DeriveRulesInput"] & {
+            version: number;
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+            registers: {
+                register_key: string;
+                fields: {
+                    code: string;
+                    label_en: string;
+                    label_ar?: string | null;
+                }[];
+            }[];
         };
         GecolOrderWarningsInput: {
             enabled: boolean;
@@ -32650,6 +32712,62 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GecolOrderWarnings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getDeriveRules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The setting. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeriveRules"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setDeriveRules: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"] & components["schemas"]["DeriveRulesInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeriveRules"];
                 };
             };
             401: components["responses"]["Unauthorized"];

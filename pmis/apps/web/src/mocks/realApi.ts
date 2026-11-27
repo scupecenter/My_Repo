@@ -438,6 +438,8 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/search/site-ids'],
   ['get', '/settings/gecol-order-warnings'],
   ['put', '/settings/gecol-order-warnings'],
+  ['get', '/settings/derive-rules'],
+  ['put', '/settings/derive-rules'],
   ['get', '/settings/structural-freeze'],
   ['put', '/settings/structural-freeze'],
   ['post', '/settings/structural-freeze/lift'],

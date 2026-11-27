@@ -31,6 +31,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.260 (2026-11-27): cross-register derive (migration 0363, mirror `db/sql/362_derive_rules.sql`; owner approval 2026-11-27). Additive. New `GET/PUT /settings/derive-rules` (the setting `derive.rules`: which value a register shows from another register; If-Match, reason, audited; field errors `unknown_key`, `unknown_register`, `same_register`, `unknown_field`, `duplicate`, `invalid`, `too_many`). `RegisterRecord.derived` carries the derived values of the record by output name; `procurement_contractor` of GECOL and HLC is now the seeded rule and keeps its shape. A derived value is computed on read from the configured source field of the matching source record only (never the record), needs no permission on the source register, is shown only for target records the caller may read, and each person's first read of a rule in 10 minutes is audited (`derive_disclosed`). No grant, role or permission change.
     - 0.15.154 (2026-11-27): default value per register column (migration 0254; CHANGELOG ColumnDefaults). Additive. `PUT /registers/{key}/fields/{code}/default` (`setRegisterFieldDefault`, System Admin or delegate of `fields.edit`, reason, optional If-Match; `value` null clears) validated like a record value; `RegisterColumn.default_value` and `RegisterField.default_value`. The register form prefills it on a new record and marks it as prefilled; the server never applies it by itself (imports and API calls are unchanged).
     - 0.15.134 (2026-11-27): the Incidents & Security register (owner approval 2026-11-26; migration 0183): one register for safety incidents, near-misses and security events at sites (theft, vandalism, damaged equipment), with a cause/reason dropdown that also records a day with no execution because of bad weather (owner 2026-11-27). Additive. Register key `incidents` in `/registers` and `/registers/{key}` records with its own fields and the standard two levels, the Dropdown lists IncidentType, IncidentSeverity and IncidentCause in Settings, the module `incidents` in the permissions grid (no grant seeded), the nav key in the catalogue, the template TPL-INCIDENTS and the master export part. Existing registers and data are untouched.
     - 0.15.200 (2026-11-27): the dashboard follow-up sections, permits and HSE (owner approval 2026-11-26, dashboard proposals item 3; migration 0301). Additive and read only. `GET /dashboard/ops` gains the section `permits_hse` (`DashboardOpsPermitsHse`), over the permit records of the active, not cancelled sites: the status mix, the permits waiting for approval (status Applied), the sites with no permit record, the approved dated permits expiring within the next 14 calendar days and the expired ones, the open stop-work orders (not yet lifted), and the safety checks of the open PTWs (permit type beginning PTW, status Applied or Approved). A check counts as covered only when it is Done or N/A; the section reports the open PTWs with at least one gap and the gaps per check. The incident side of item 3 lands with the Incidents register. The dashboard settings catalogue gains the card `ops_permits_hse`. No grant, role or permission change.
@@ -10561,6 +10562,55 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/GecolOrderWarnings'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /settings/derive-rules:
+    get:
+      tags: [settings]
+      operationId: getDeriveRules
+      summary: The cross-register derive rules (0.15.260)
+      description: |
+        0.15.260. Each rule says which value of a source register a target register shows (the source record's external party, or one field), found by a link field of the target
+        record, else by the same site. Reading needs the Settings screen. `registers` lists the registers and fields a rule may name.
+      responses:
+        '200':
+          description: The setting.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DeriveRules'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    put:
+      tags: [settings]
+      operationId: setDeriveRules
+      summary: Save the cross-register derive rules (reason, If-Match, audited)
+      description: |
+        0.15.260. System Admin, or a delegation of `admin.settings` edit for all regions. Field errors: `unknown_key`, `unknown_register`, `same_register`, `unknown_field`,
+        `duplicate`, `invalid`, `too_many`, `required`.
+      x-db-path: admin_save_derive_rules
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - {$ref: '#/components/schemas/WithReason'}
+              - {$ref: '#/components/schemas/DeriveRulesInput'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DeriveRules'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '412': {$ref: '#/components/responses/PreconditionFailed'}
@@ -22398,6 +22448,7 @@ components:
       type: object
       required: [id, register_key, state, data, version]
       properties:
+        derived: { type: object, additionalProperties: true, description: '0.15.260. Values this record shows from another register by the rules of `derive.rules`, keyed by the rule output. Only the configured value, never the source record.' }
         procurement_contractor: { $ref: '#/components/schemas/ExternalPartyRef', description: '0.15.90. GECOL and HLC records only: the Contractor company from Procurement by Site ID (read only, never stored on the record). HLC: the company of the Procurement record it links to; otherwise the company of the latest approved Procurement record of the site that names one. Absent when none. `external_party` of a GECOL or HLC record stays what the approval rules use (the party the record itself is approved for).' }
         docs:
           type: object
@@ -23327,6 +23378,48 @@ components:
                     code: { type: string }
                     label_en: { type: string }
                     label_ar: { type: string }
+    DeriveRule:
+      type: object
+      required: [key, enabled, target_register, output, source_register, source, link_field]
+      properties:
+        key: { type: string, pattern: '^[a-z][a-z0-9_]{0,59}$' }
+        enabled: { type: boolean }
+        target_register: { type: string, description: 'The register that shows the value.' }
+        output: { type: string, pattern: '^[a-z][a-z0-9_]{0,40}$', description: 'The name of the value in `RegisterRecord.derived`.' }
+        source_register: { type: string, description: 'Another register.' }
+        source: { type: string, description: '`external_party` (the company of the source record) or a field code of the source register.' }
+        link_field: { type: [string, 'null'], description: 'A field of the target register that holds the entity record id of the source record; null = match by site only.' }
+    DeriveRulesInput:
+      type: object
+      required: [rules]
+      properties:
+        rules: { type: array, maxItems: 60, items: { $ref: '#/components/schemas/DeriveRule' } }
+    DeriveRules:
+      description: '0.15.260. Seed: the GECOL and HLC contractor from Procurement (the rules that were hard-coded).'
+      allOf:
+      - {$ref: '#/components/schemas/DeriveRulesInput'}
+      - type: object
+        required: [version, registers]
+        properties:
+          version: { type: integer, minimum: 0 }
+          updated_at: { type: [string, 'null'], format: date-time }
+          updated_by: { anyOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+          registers:
+            type: array
+            items:
+              type: object
+              required: [register_key, fields]
+              properties:
+                register_key: { type: string }
+                fields:
+                  type: array
+                  items:
+                    type: object
+                    required: [code, label_en]
+                    properties:
+                      code: { type: string }
+                      label_en: { type: string }
+                      label_ar: { type: [string, 'null'] }
     GecolOrderWarningsInput:
       type: object
       required: [enabled, chains, billing_after]
