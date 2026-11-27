@@ -232,6 +232,15 @@ export const useSetImportsUploadPolicy = () => {
   });
 };
 
+/** 0.15.203 (P3): the notice of a new template version (templates.change_notice). Read by everyone; changed by a System Admin or an all-regions delegate of settings, with a reason. */
+export const useTemplateNoticeSettings = () => useQuery({ queryKey: ['template-notice-settings'], queryFn: () => api.get<TemplateChangeNotice>('/settings/template-change-notice') });
+export const useSetTemplateNoticeSettings = () => {
+  const qc = useQueryClient();
+  return useMutation<TemplateChangeNotice, ApiError, { version: number; enabled: boolean; days: number; reason: string }>({
+    mutationFn: ({ version, ...body }) => api.put('/settings/template-change-notice', { version, body }), onSettled: () => refresh(qc, 'template-notice-settings'),
+  });
+};
+
 /** 0.15.1: the shared layout of the side menu (nav.layout). Read by everyone; changed by a System Admin or an all-regions delegate of settings, with a reason. */
 export const useNavLayout = (enabled = true) =>
   useQuery({ queryKey: ['nav-layout'], queryFn: () => api.get<NavLayoutSetting>('/settings/nav-layout'), enabled, staleTime: 60_000 });
@@ -545,6 +554,7 @@ export function usePublishWeights(id: string) {
 
 // 0.15.85: every task with its SLA status (Settings > SLA, "Tasks and their SLA") and the explicit "no SLA" choice
 import type { SlaTaskList } from './types';
+import type { TemplateChangeNotice } from './types';
 export const useSlaTasks = () => useQuery({ queryKey: ['slaTasks'], queryFn: () => api.get<SlaTaskList>('/settings/sla-tasks') });
 export const useSetSlaNoSla = () => {
   const qc = useQueryClient();

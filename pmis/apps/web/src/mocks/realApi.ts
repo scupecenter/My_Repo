@@ -125,6 +125,7 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/registers/:key/records/:id/triage'],
   // Contract 0.7.0: approved-template entry for the registers (apps/api: templates; migration 0037). The Site Register stream templates and TPL-MASTER (migration 0051, contract 0.11.3) use the same paths: no endpoint was added.
   ['get', '/templates'],
+  ['get', '/templates/:id/changes'],
   ['get', '/templates/:id/download'],
   ['get', '/import-batches'],
   ['get', '/data-hub/summary'],
@@ -398,6 +399,8 @@ export const REAL_API_AUTH_USERS = [
   // Contract 0.15.322 (migration 0492; apps/api: settings): the upload policy of the imports (D49 part 3).
   ['get', '/settings/imports/upload-policy'],
   ['put', '/settings/imports/upload-policy'],
+  ['get', '/settings/template-change-notice'],
+  ['put', '/settings/template-change-notice'],
   // Contract 0.15.1 (migration 0081; apps/api: settings): the shared layout of the side menu.
   ['get', '/settings/nav-layout'],
   ['put', '/settings/nav-layout'],
