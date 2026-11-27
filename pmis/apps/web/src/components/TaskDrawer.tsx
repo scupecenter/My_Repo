@@ -20,6 +20,7 @@ import { OverrideBadge } from './OverrideBadge';
 import { TaskRegisterFields } from './TaskRegisterFields';
 import { BallSince, ExternalParty, SlaOverrun, StaleBadge } from './TaskTiming';
 import { FieldHistory } from './logs/FieldHistory';
+import { ChangeDiff } from './logs/ChangeDiff';
 import { RejectDialog } from './RejectDialog';
 import { useToast } from './Toast';
 
@@ -42,6 +43,7 @@ function History({ task }: { task: TaskDetail }) {
         {h.data?.items.map((x) => <li key={x.id} data-previous-path={x.previous_path ? 'true' : undefined}>{t(`step.${x.action}`)} · L{x.level} · {x.acted_by?.display_name}{x.self_approval ? ` · ${t('drawer.self_approval')}` : ''}{x.note ? ` — ${x.note}` : ''}{x.previous_path && <span className="chip ms-2 bg-lockBg text-lockInk" data-testid="history-previous-path">{t('drawer.previous_path')}</span>}</li>)}
         {h.isSuccess && !h.data.items.length && <li className="text-mute">{t('drawer.no_history')}</li>}
       </ol>
+      <ChangeDiff entityType="task" entityId={task.id} />
     </section>
   );
 }

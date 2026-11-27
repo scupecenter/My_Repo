@@ -122,9 +122,9 @@ export const logsHandlers = [
   http.get(`${B}/audit-log/field-history`, ({ request }) => {
     const g = guard(); if (g) return g;
     const u = new URL(request.url);
-    const missing = ['entity_type', 'entity_id', 'field'].filter((k) => !u.searchParams.get(k));
+    const missing = ['entity_type', 'entity_id'].filter((k) => !u.searchParams.get(k));
     if (missing.length) return problem(422, 'validation_failed', 'Validation failed', { errors: missing.map((k) => ({ path: `/${k}`, code: 'required' })) });
-    const items = changes.filter((c) => c.entity_type === u.searchParams.get('entity_type') && c.field === u.searchParams.get('field')
+    const items = changes.filter((c) => c.entity_type === u.searchParams.get('entity_type') && (!u.searchParams.get('field') || c.field === u.searchParams.get('field'))
       && (c.entity_id === u.searchParams.get('entity_id') || u.searchParams.get('entity_type') === 'task'));
     return HttpResponse.json({ items });
   }),
