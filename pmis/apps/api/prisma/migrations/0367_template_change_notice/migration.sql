@@ -23,9 +23,9 @@ BEGIN
   IF cfg IS NULL OR jsonb_typeof(cfg) <> 'object' OR coalesce((cfg ->> 'enabled')::boolean, true) IS NOT TRUE THEN RETURN 0; END IF;
   days := least(greatest(coalesce(nullif(cfg ->> 'days', '')::integer, 14), 1), 365);
   FOR v IN
-    SELECT d.id AS def, d.template_id, d.register_key, v.version, v.columns, v.published_at
-    FROM public.template_definitions d JOIN public.template_versions v ON v.template_def_id = d.id AND v.is_current
-    WHERE d.is_active AND d.kind = 'register' AND d.register_key IS NOT NULL AND v.version > 1 AND v.published_at >= now() - make_interval(days => days)
+    SELECT d.id AS def, d.template_id, d.register_key, tv.version, tv.columns, tv.published_at
+    FROM public.template_definitions d JOIN public.template_versions tv ON tv.template_def_id = d.id AND tv.is_current
+    WHERE d.is_active AND d.kind = 'register' AND d.register_key IS NOT NULL AND tv.version > 1 AND tv.published_at >= now() - make_interval(days => days)
   LOOP
     SELECT p.columns INTO prev FROM public.template_versions p WHERE p.template_def_id = v.def AND p.version = v.version - 1;
     prev := coalesce(prev, '[]'::jsonb);

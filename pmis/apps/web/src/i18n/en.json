@@ -2286,6 +2286,17 @@
     "current_ok": "Current version. It matches the live definition of the register.",
     "notice": "This template changed on {{date}}: {{added}} added, {{removed}} removed, {{renamed}} renamed. An old file is refused; download the current version and copy your rows into it."
   },
+  "tplNoticeSettings": {
+    "title": "Imports / Template change notice",
+    "note": "When the columns of a register template change, a new version is issued. People who hold the entry level of that register get a notice in the bell so an old file is no surprise. Nothing is deleted: old versions stay and the Templates page shows what changed.",
+    "enabled": "Tell the entry holders when a template changes",
+    "days": "Keep telling people for",
+    "unit": "days after the new version",
+    "hint": "A whole number from {{min}} to {{max}}. The default is {{def}}.",
+    "confirm": "Set the template change notice to {{state}}, for {{days}} days after a new version.",
+    "on": "on",
+    "off": "off"
+  },
   "batchReview": {
     "kpis": "Upload counts",
     "kpi_rows": "Rows checked",

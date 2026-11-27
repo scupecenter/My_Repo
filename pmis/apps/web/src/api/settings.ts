@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { api, ApiError, downloadFile, type RequestOptions } from './client';
 import type { IssueStoppedRowList, IssueTaskMapItem, IssueTaskMapList,
-  ActiveSession, ActOnBehalfRequest, Calendar, CalendarConfirmation, MailNotificationKinds, ImportsSettings, ContractorPerformanceReport, ContractorPerformanceThresholds, ContractorPerformanceSettings, NavLayoutSetting, UiIdentity, UiBrand, LoginPage, SecurityLocks, SupportAccessSetting, NewDeviceCodeSetting, Delegation, LoginPagePublic, SupportLink, NavLayoutT, ContractorRules, ContractorRulesInput, GecolHlcCounts, ContractorsCompletenessReport, TeamScopeMismatchReport, DeletedUser, PurgedUser, DlpSettings, DlpVersion, DlpVersionInput, Holiday, HolidayChangeResult, HolidayInput, HolidayPatch, HolidaySummary, IdleTaskAlertSetting, Job, LogIntegrity, LogRetention, LogRetentionInput,
+  ActiveSession, ActOnBehalfRequest, Calendar, CalendarConfirmation, MailNotificationKinds, ImportsSettings, TemplateChangeNotice, ContractorPerformanceReport, ContractorPerformanceThresholds, ContractorPerformanceSettings, NavLayoutSetting, UiIdentity, UiBrand, LoginPage, SecurityLocks, SupportAccessSetting, NewDeviceCodeSetting, Delegation, LoginPagePublic, SupportLink, NavLayoutT, ContractorRules, ContractorRulesInput, GecolHlcCounts, ContractorsCompletenessReport, TeamScopeMismatchReport, DeletedUser, PurgedUser, DlpSettings, DlpVersion, DlpVersionInput, Holiday, HolidayChangeResult, HolidayInput, HolidayPatch, HolidaySummary, IdleTaskAlertSetting, Job, LogIntegrity, LogRetention, LogRetentionInput,
   NotificationPolicy, NotificationPolicyInput, NotificationTypeDef, Page, ReassignmentAlert, SecurityLogEntry, SessionRevokeResult, SlaPublishPreview, SlaRuleSet, SlaRuleSetPublishResult, SlaRuleSetSummary, SlaTaskRule, StaffCard, StaffVisibility, StructuralFreeze,
   TaskDefinition, TeamScopeMatch, TeamScopeMatchInput, TransitionResultT, User, UserDetail, WeekendDaysResult, WeightSet, WeightSetCode, WeightSetInput, WeightSetPreview, WeightSetPublishResult, WorkflowVersion, WorkflowVersionSummary,
 } from './types';
@@ -149,6 +149,15 @@ export const useSetImportsSettings = () => {
   const qc = useQueryClient();
   return useMutation<ImportsSettings, ApiError, { version: number; async_rows: number; reason: string }>({
     mutationFn: ({ version, ...body }) => api.put('/settings/imports', { version, body }), onSettled: () => refresh(qc, 'imports-settings'),
+  });
+};
+
+/** 0.15.203 (P3): the notice of a new template version (templates.change_notice). Read by everyone; changed by a System Admin or an all-regions delegate of settings, with a reason. */
+export const useTemplateNoticeSettings = () => useQuery({ queryKey: ['template-notice-settings'], queryFn: () => api.get<TemplateChangeNotice>('/settings/template-change-notice') });
+export const useSetTemplateNoticeSettings = () => {
+  const qc = useQueryClient();
+  return useMutation<TemplateChangeNotice, ApiError, { version: number; enabled: boolean; days: number; reason: string }>({
+    mutationFn: ({ version, ...body }) => api.put('/settings/template-change-notice', { version, body }), onSettled: () => refresh(qc, 'template-notice-settings'),
   });
 };
 

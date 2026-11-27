@@ -101,6 +101,7 @@ export type HolidaySummary = S['HolidaySummary'];
 export type CalendarConfirmation = S['CalendarConfirmation'];
 export type MailNotificationKinds = S['MailNotificationKinds'];
 export type ImportsSettings = S['ImportsSettings'];
+export type TemplateChangeNotice = S['TemplateChangeNotice'];
 export type NavLayoutSetting = S['NavLayoutSetting'];
 export type SecurityLocks = S['SecurityLocks'];
 export type SupportAccessSetting = S['SupportAccessSetting'];
