@@ -267,7 +267,7 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
                         {record && <FieldHistory entityType="register_record" entityId={record.entity_id} field={f.code} label={fieldLabel(f, lang)} onRestore={editable && ['text', 'number', 'date', 'yes_no'].includes(f.type) ? (v) => set(f.code, v) : undefined} />}</div>
                       {rk === 'car_dispatcher' && f.code === 'vehicle_id'
                         ? <VehiclePicker value={data.vehicle_id} onChange={(v) => set('vehicle_id', v)} from={data.from_date as string} to={data.to_date as string} vehicleType={data.required_type as string} bookingId={record?.id} disabled={!editable} invalid={!!show} />
-                        : (rk === 'rf_design' && (f.code === 'mw_far_end_site' || f.code === 'backup_site')) || (rk === 'risks' && f.code === 'affected_site_ids')
+                        : ((rk as string) === 'rf_design' && (f.code === 'mw_far_end_site' || f.code === 'backup_site')) || (rk === 'risks' && f.code === 'affected_site_ids')
                         ? <SiteCodeField id={`reg-field-${f.code}`} value={data[f.code]} onChange={(v) => set(f.code, v)} multi={f.code === 'affected_site_ids'} naOption={f.code === 'mw_far_end_site'} selfCode={site?.code} disabled={!editable} invalid={!!show} />
                         : key === 'dismantle' && f.code === 'procurement_order_id'
                         ? <DismantleOrderSelect siteId={site?.id} part={rtype} value={data[f.code]} onChange={(v) => set(f.code, v)} editable={editable} invalid={!!show} />
