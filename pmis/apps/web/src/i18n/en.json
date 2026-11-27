@@ -3466,6 +3466,8 @@
     "fc_subtitle": "One row per changed field: who changed it, from what to what, when and from which device.",
     "shown": "{{count}} shown",
     "integrity": "Check integrity",
+    "integrity_start_job": "Start the check as a job",
+    "integrity_open_runs": "Open Integrity checks",
     "export": "Export",
     "exported": "Export downloaded.",
     "d_diff": "Before and after",
