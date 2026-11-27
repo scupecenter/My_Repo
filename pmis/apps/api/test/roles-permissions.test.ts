@@ -146,7 +146,7 @@ describe('roles', () => {
     expect((await api.call('patch', `/roles/${randomUUID()}`, { name_en: 'Ghost', reason: 'unknown' }, ifMatch('"1"'))).status).toBe(404);
   });
 
-  it('the code is editable (0440, D51): audited as role_code_changed, format and uniqueness checked, built-in codes locked', async () => {
+  it('the code is editable (0500, D51): audited as role_code_changed, format and uniqueness checked, built-in codes locked', async () => {
     const { api } = await adminApi(app, db);
     const a = await api.call('post', '/roles', { code: `CODE_${uid()}`, name_en: 'Code A', description_ar: 'وصف', can_hold_matrix_levels: true, reason: 'new role' });
     const b = await api.call('post', '/roles', { code: `CODE_${uid()}`, name_en: 'Code B', can_hold_matrix_levels: true, reason: 'new role' });

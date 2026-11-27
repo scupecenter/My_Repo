@@ -1,6 +1,6 @@
 /**
  * Role codes the platform names in its own rules (seeded roles and the ones registers refer to). The database locks them
- * (migration 0440, `role_code_protected`); this copy only tells the dialog which field to disable, the server decides.
+ * (migration 0500, `role_code_protected`); this copy only tells the dialog which field to disable, the server decides.
  */
 export const BUILT_IN_ROLE_CODES: readonly string[] = [
   'PM', 'RFD_ACQ_TL', 'CW_TL', 'TE_TL', 'INV_SUP', 'PROJ_SUPPORT', 'MANAGEMENT', 'RF_ENG', 'MW_ENG', 'ACQ_TEAM', 'POWER_ENG',

@@ -36,7 +36,7 @@ const inputSchema = z.object({
 }).strict();
 
 const patchSchema = z.object({
-  /** 0440 (D51): the code is editable; the database checks format, uniqueness and the built-in lock, and audits role_code_changed. */
+  /** 0500 (D51): the code is editable; the database checks format, uniqueness and the built-in lock, and audits role_code_changed. */
   code: z.string().trim().regex(/^[A-Z][A-Z0-9_]{1,40}$/).optional(),
   name_en: z.string().trim().min(2).max(200).optional(),
   name_ar: z.string().trim().max(200).optional(),

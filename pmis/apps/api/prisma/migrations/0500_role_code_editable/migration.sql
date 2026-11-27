@@ -1,4 +1,4 @@
--- 0440: the role code is editable (owner decision D51). Additive: the immutability check leaves roles_guard, the format and the
+-- 0500: the role code is editable (owner decision D51). Additive: the immutability check leaves roles_guard, the format and the
 -- built-in protection become functions, and idm_role_save (patched in place) writes the audit event role_code_changed.
 -- History, saved filters and exports that quote the old code are not rewritten (the dialog says so).
 
@@ -64,7 +64,7 @@ BEGIN
       RAISE EXCEPTION 'you cannot change the default profile of a role you hold' USING ERRCODE = 'insufficient_privilege';
     END IF;
     IF newcode IS NOT NULL AND newcode IS DISTINCT FROM o.code THEN
-      -- 0440: the code is editable (owner decision D51). The platform refers to a few codes by name, so those stay locked.
+      -- 0500: the code is editable (owner decision D51). The platform refers to a few codes by name, so those stay locked.
       IF NOT public.role_code_valid(newcode) THEN
         RAISE EXCEPTION 'role code must be 2 to 41 characters: A-Z, 0-9 and _, starting with a letter' USING ERRCODE = 'check_violation';
       END IF;
