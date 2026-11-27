@@ -1394,7 +1394,7 @@ export function Dashboard() {
 
               ops_procurement: (
                 <>
-                  {/* 0.15.106 (owner approval 2026-11-26, item 1): open PR/PO aging, receive rate and shortage per contractor */}
+                  {/* 0.15.98 (owner approval 2026-11-26, item 1): open PR/PO aging, receive rate and shortage per contractor */}
                   <OpsProcurementCard ops={ops.data} />
                 </>
               ),

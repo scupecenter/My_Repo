@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
 /**
- * The shared card primitives of the dashboard (extracted from Dashboard.tsx unchanged, 0.15.106), so the follow-up
+ * The shared card primitives of the dashboard (extracted from Dashboard.tsx unchanged, 0.15.98), so the follow-up
  * cards (dashboardOps.tsx) use the same design system: card, progress bar, KPI tile and the percentage format.
  */
 

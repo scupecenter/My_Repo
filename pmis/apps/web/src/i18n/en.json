@@ -605,6 +605,16 @@
     "stream_empty": "This site has no tasks in this stream.",
     "stream_na": "This phase does not apply to this site.",
     "dismantle_todo": "Dismantle has no stream in the API yet (owner decision Q41), so there are no tasks to show here.",
+    "dismantle_count": "{{count}} Dismantle records",
+    "dismantle_open": "Open in the Dismantle register",
+    "dismantle_denied": "You do not have access to the Dismantle register.",
+    "dismantle_failed": "The Dismantle records could not be loaded.",
+    "dismantle_empty": "No Dismantle records for this site yet.",
+    "dismantle_col_state": "State",
+    "dismantle_col_rfd": "RFD date",
+    "dismantle_col_start": "Work start",
+    "dismantle_col_end": "Work end",
+    "dismantle_col_engineer": "Supervising engineer",
     "phases": "Phases",
     "phase_empty": "No task of this phase applies to this site.",
     "sections": "Sections",
@@ -1158,9 +1168,11 @@
     "section_documents_types": "Document types",
     "section_documents_forms": "Form templates",
     "section_documents_archive": "Archive",
+    "section_documents_numbering": "Numbering",
     "section_data_counts": "GECOL / HLC counts",
     "section_screens_motion": "Motion",
-    "section_workflow_coverage": "Matrix coverage"
+    "section_workflow_coverage": "Matrix coverage",
+    "section_screens_login": "Login page"
   },
   "scopeMatch": {
     "title": "Team / scope match (Procurement)",
@@ -2362,6 +2374,9 @@
     "gaps_vendor": "Regions without a WL vendor",
     "gaps_sequence": "Regions without a numbering sequence",
     "gaps_none": "Nothing missing.",
+    "vendor_unset": "Not set",
+    "vendor_edit": "WL vendor of {{region}}",
+    "vendor_pick": "WL vendor",
     "site_tab": "Warehouse",
     "qx_action": "Take out of quarantine",
     "qx_title": "Take stock out of quarantine",
@@ -6294,7 +6309,12 @@
       "p2": "Approvals, documents and follow-up in one place",
       "p3": "Built for civil work and telecom installation teams",
       "secure": "Protected sign-in with audit and optional two-factor"
-    }
+    },
+    "announcement": "Announcement",
+    "support": "Support",
+    "status_available": "System available",
+    "status_checking": "Checking the system…",
+    "status_unavailable": "The system cannot be reached right now"
   },
   "forgot": {
     "title": "Reset your password",
@@ -6465,6 +6485,23 @@
     "replay": "Replay",
     "link_display": "Tables (Display) settings"
   },
+  "seq": {
+    "title": "Numbering sequences",
+    "note": "The next number of each document type and form. A change applies to the numbers issued from now on; issued numbers never change.",
+    "col_key": "Key",
+    "col_for": "Numbers",
+    "col_pattern": "Pattern",
+    "col_reset": "Reset",
+    "col_next": "Next value",
+    "col_preview": "Next number",
+    "col_active": "Active",
+    "reset_yearly": "Every year",
+    "reset_never": "Never",
+    "edit_title": "Sequence {{key}}",
+    "pattern_help": "Tokens {REGION}, {YYYY}, {YY} and {SEQ:n} (once). Characters A-Z 0-9 - / _ .",
+    "next_help": "A whole number from 1. The database refuses a value that would repeat a number already issued.",
+    "region_code": "Region code"
+  },
   "matrixCoverage": {
     "title": "Matrix coverage",
     "note": "Read only. Shows the cells of the Responsibility Matrix that nobody can act on, per row, region and level. Nothing here changes the matrix.",
@@ -6487,5 +6524,41 @@
     "holders": "active",
     "none": "No gaps in this view.",
     "open_matrix": "Open the Responsibility Matrix"
+  },
+  "postLogin": {
+    "title": "Signing you in…",
+    "note": "Preparing your workspace",
+    "version": "Version {{v}}"
+  },
+  "loginPage": {
+    "title": "Login page",
+    "note": "What the sign-in page shows: the announcement, the background animation, the default language and the support links. Nothing here changes the sign-in mechanism.",
+    "announcement": "Announcement",
+    "ann_en": "Text (English)",
+    "ann_ar": "Text (Arabic)",
+    "ann_kind": "Kind",
+    "ann_hide": "Both texts empty: no banner.",
+    "kind_info": "Information",
+    "kind_maintenance": "Maintenance",
+    "animation": "Background animation",
+    "animation_note": "A calm telecom network behind the sign-in pages. A visitor who prefers reduced motion never sees it.",
+    "locale": "Default language",
+    "locale_browser": "Browser (English)",
+    "locale_en": "English",
+    "locale_ar": "Arabic",
+    "locale_note": "Applies until the visitor picks a language once; their choice stays.",
+    "links": "Support links",
+    "links_note": "Up to 5 links under the sign-in form (http, https or mailto).",
+    "link_label_en": "Label (English)",
+    "link_label_ar": "Label (Arabic)",
+    "link_url": "https://… or mailto:…",
+    "link_add": "Add a link",
+    "link_remove": "Remove",
+    "version": "System version",
+    "version_note": "Shown to signed-in users only (the post-login screen). It is never on the public sign-in page.",
+    "updated": "Last changed by {{name}} on {{when}}",
+    "never": "Not changed since installation.",
+    "readonly": "Only a System Admin, or a person they delegated settings to for all regions, can change this.",
+    "confirm": "Save the login page settings? The change is audited with your reason and shows on the sign-in page at once."
   }
 }
