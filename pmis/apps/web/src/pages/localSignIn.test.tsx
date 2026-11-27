@@ -298,7 +298,7 @@ describe('hybrid mode list', () => {
       'GET /email-change-requests', 'POST /email-change-requests/:id/decide', 'PUT /users/:id/two-factor/enforced',
       // contract 0.10.0: the logs core
       'GET /audit-log', 'POST /audit-log/exports', 'GET /audit-log/exports/:id/download', 'GET /audit-log/field-changes', 'GET /audit-log/field-history', 'GET /audit-log/integrity', 'GET /security-log', 'POST /security-log/exports', 'GET /security-log/exports/:id/download', 'GET /security-log/integrity', 'GET /system-log', 'GET /sessions/active', 'POST /sessions/:id/revoke', 'POST /users/:id/sessions/revoke', 'GET /admin/sessions', 'POST /admin/sessions/:id/end', 'GET /admin/job-runs', 'GET /admin/deployments', 'GET /admin/security-alerts', 'POST /admin/security-alerts/:id/ack', 'GET /settings/log-retention', 'PUT /settings/log-retention', 'GET /settings/security-alerts', 'PUT /settings/security-alerts', 'GET /reports/activity',
-      'GET /admin/mail/status', 'POST /admin/mail/test', 'GET /admin/mail/outbox', 'POST /admin/mail/outbox/:id/retry', 'GET /admin/log-integrity/runs', 'POST /admin/log-integrity/runs', 'GET /admin/log-integrity/runs/:id', 'GET /health',
+      'GET /admin/mail/status', 'POST /admin/mail/test', 'GET /admin/mail/outbox', 'POST /admin/mail/outbox/:id/retry', 'GET /admin/log-integrity/runs', 'POST /admin/log-integrity/runs', 'GET /admin/log-integrity/runs/:id', 'GET /health', 'POST /csp-report',
       // contract 0.11.1: the documents follow-up (Q130 to Q132)
       'PATCH /sites/:id', 'GET /registers/:key/records/:id/slots', 'POST /registers/:key/records/:id/slots', 'POST /registers/:key/records/:id/slots/:slotId/files',
       'DELETE /registers/:key/records/:id/slots/:slotId/files/:fileId', 'GET /snag-types', 'POST /snag-types', 'PATCH /snag-types/:id', 'GET /sites/:id/snags', 'POST /sites/:id/snags',
@@ -351,6 +351,8 @@ describe('hybrid mode list', () => {
       'GET /settings/identity', 'PUT /settings/identity',
       // contract 0.15.97: Settings, Screens, Login page and its public read
       'GET /settings/login-page', 'PUT /settings/login-page', 'GET /settings/ops-limits', 'PUT /settings/ops-limits', 'GET /settings/login-page/public',
+      // contract 0.15.292: the media gallery
+      'GET /media/settings', 'PUT /media/settings', 'GET /media/items', 'GET /media/facets', 'GET /media/items/:kind/:id/thumbnail',
       'GET /settings/security-locks', 'PUT /settings/security-locks', 'GET /settings/download-locks', 'PUT /settings/download-locks',
       'GET /settings/support-access', 'PUT /settings/support-access', 'GET /support-access', 'POST /support-access', 'POST /support-access/revoke-all', 'POST /support-access/:id/revoke', 'GET /settings/new-device-code', 'PUT /settings/new-device-code', 'POST /settings/new-device-code/bypass', 'GET /settings/passkeys', 'PUT /settings/passkeys', 'GET /me/passkeys', 'POST /me/passkeys/register/options', 'POST /me/passkeys/register/verify', 'DELETE /me/passkeys/:id', 'POST /users/:id/passkeys/revoke',
       // contract 0.15.4: the per-site workflow locks and the status of the sites of an import
