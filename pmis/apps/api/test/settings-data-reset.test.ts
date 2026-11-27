@@ -335,8 +335,8 @@ describe('the scope of a request (0.15.71)', () => {
   });
 
   it('archive before delete (migration 0371): the run is refused until the archive is made and (mode download) downloaded once; the download is System Admin only and logged', async () => {
-    await backupRow();
-    const r = await post(admin1, '/requests', { reason: 'Archive synthetic test', confirm_text: phrase, parts: ['procurement'], archive: 'download' });
+    // no backup row is written here: a later test of this file relies on there being none (the request says it needs none)
+    const r = await post(admin1, '/requests', { reason: 'Archive synthetic test', confirm_text: phrase, parts: ['procurement'], archive: 'download', require_backup: false, no_backup_confirm: 'NO BACKUP' });
     expect(r.status).toBe(201);
     expect(r.body.archive).toMatchObject({ mode: 'download', archive: null });
     const id = r.body.id as string;
