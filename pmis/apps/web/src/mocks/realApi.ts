@@ -119,6 +119,7 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/registers/:key/records/:id/history'],
   ['get', '/registers/:key/records/:id/versions'],
   ['post', '/registers/:key/records/:id/versions'],
+  ['post', '/registers/:key/records/:id/triage'],
   // Contract 0.7.0: approved-template entry for the registers (apps/api: templates; migration 0037). The Site Register stream templates and TPL-MASTER (migration 0051, contract 0.11.3) use the same paths: no endpoint was added.
   ['get', '/templates'],
   ['get', '/templates/:id/download'],
@@ -126,6 +127,7 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/import-batches'],
   ['get', '/import-batches/:id'],
   ['get', '/import-batches/:id/rows'],
+  ['get', '/import-batches/:id/error-report'],
   ['post', '/import-batches/:id/submit'],
   ['post', '/import-batches/:id/decisions'],
   // Contract 0.12.8 (P3, migration 0060): the legacy Master import and its comparison report, the template mapping screen and the import aliases.
@@ -363,6 +365,8 @@ export const REAL_API_AUTH_USERS = [
   // Contract 0.14.2 (settings screens, migration 0072; apps/api: calendar, settings): the official calendar confirmation (Q440) and the mail notification kinds (Q441).
   ['get', '/settings/calendar-confirmation'],
   ['put', '/settings/calendar-confirmation'],
+  ['get', '/settings/mail-policy'],
+  ['put', '/settings/mail-policy'],
   ['get', '/settings/mail-notification-kinds'],
   ['put', '/settings/mail-notification-kinds'],
   // Contract 0.14.3 (Q462, migration 0073; apps/api: settings): the one-time historical-load document waiver. The "historical load" option of the batch screens uses the

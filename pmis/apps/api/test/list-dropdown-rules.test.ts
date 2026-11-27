@@ -286,7 +286,7 @@ describe("dropdown lists (migration 0102)", () => {
   });
 });
 
-// Contract 0.15.244 (item 15 of the PM-platforms research): the colour of a list value reaches the register fields, display only.
+// Contract 0.15.244 (item 15 of the improvement research): the colour of a list value reaches the register fields, display only.
 describe("list value colour in the register fields (0.15.244)", () => {
   it("a coloured value of the ProcScope list shows its colour in the procurement scope options", async () => {
     const cat = (await admin.api.call("get", "/list-catalogues/ProcScope")).body as { values: { id: string; code: string }[] };

@@ -7255,6 +7255,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/mail-policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The mail policy (0.15.261)
+         * @description 0.15.261. System Admin only (403 `action_forbidden` otherwise). `enabled` is the global switch, `mode` is `internal_only` or `internal_external` for every kind, `kinds` may
+         *     override it per kind. An address is external when its domain is not in `internal_domains` (empty list: every address is internal). External mail also needs the security
+         *     lock `block_public_sharing` to be off (`block_public_sharing` shows its state). Security alerts and mandatory mail are never stopped by the policy.
+         */
+        get: operations["getMailPolicy"];
+        /**
+         * Save the mail policy (System Admin, step-up, reason, If-Match, audited)
+         * @description 0.15.261. Field errors (422 `validation_failed`): `/enabled`, `/mode`, `/internal_domains[/i]`, `/kinds[/kind]` (`unknown_kind`, `invalid`), `unknown_key`. Audited as `mail_policy_update`.
+         */
+        put: operations["setMailPolicy"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/mail-notification-kinds": {
         parameters: {
             query?: never;
@@ -7870,6 +7896,39 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/registers/{register_key}/records/{record_id}/triage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * One intake-triage decision on a record (Issue Log, Change Control) (0.15.240)
+         * @description 0.15.240. A record of a triage-enabled register enters the queue `pending` on every insert and waits for one decision of the register's
+         *     Matrix L2 holders of the record's region (a System Admin only when the row has no holder, exactly like an approval; 403
+         *     `action_forbidden` / `not_eligible_holder` otherwise). `If-Match` is the record's version. The decision (`TriageRequest`):
+         *     `accept` lets the record proceed to its normal flow, `defer` keeps it in the queue (a note may say why), `reject` and `merge` void
+         *     the record (409 `invalid_transition` when already decided, or when the record is already approved) and need a note and step-up
+         *     (401 `step_up_required`); `merge` also names the surviving record `duplicate_of` (422 `validation_failed`, `/duplicate_of`, when it
+         *     is missing, the record itself, or not another live record of the same register the caller can see), links it in
+         *     `triage.duplicate_of` and notes the merge on the surviving record's comment thread. A record of a register without triage answers
+         *     404. Audited as `register_record_triage` with before and after; the creator is notified (`triage_decision`).
+         */
+        post: operations["triageRegisterRecord"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/registers/{register_key}/columns/{field_code}/lock": {
         parameters: {
             query?: never;
@@ -8265,6 +8324,31 @@ export interface paths {
         };
         /** Preview: rows with action, diff and errors */
         get: operations["listImportBatchRows"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/import-batches/{batch_id}/error-report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Import batch. */
+                batch_id: components["parameters"]["BatchId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The refused rows of a batch as an .xlsx to correct and upload again (0365, P4)
+         * @description The error and duplicate rows written back in the layout of the approved template (hidden `_tpl` sheet, header row as issued) with the values the file had, so the
+         *     corrected file is uploaded as it is, plus the sheet `Errors` (row in the file, key, column, reason code, reason). The reasons are never an extra column of the Data
+         *     sheet (an upload with an extra column is refused). A New sites, stream or Master batch answers the `Errors` sheet alone. Audited as `import_batch.error_report`.
+         */
+        get: operations["downloadImportBatchErrorReport"];
         put?: never;
         post?: never;
         delete?: never;
@@ -14959,6 +15043,8 @@ export interface components {
                 admin_approved?: number;
                 /** @description 0087: of those, the rows approved with missing data (flagged `incomplete`). */
                 incomplete?: number;
+                /** @description 0365 (P4): of the `error` rows, those refused because the same record is already in the file (`duplicate_in_file`). Counted inside `error`, shown as a category of its own. */
+                duplicate?: number;
             };
             /** @description Always null (a big upload reports its progress in `progress`, 0.15.3). */
             job_id?: string | null;
@@ -16863,6 +16949,8 @@ export interface components {
              * @constant
              */
             approval_levels: 2;
+            /** @description 0.15.240. Intake triage on the register (the Issue Log and the Change Control Log): new records and new versions enter the queue (`pending`) and wait for a triage decision. */
+            triage_enabled?: boolean;
             /** @description Base fields plus active custom fields visible to the caller. */
             fields: components["schemas"]["RegisterField"][];
             record_count?: number;
@@ -16930,7 +17018,20 @@ export interface components {
             external_party?: components["schemas"]["ExternalPartyRef"];
             return_count?: number;
             last_return_note?: string | null;
-            allowed_actions?: ("edit" | "submit" | "review" | "approve" | "reject" | "void" | "claim" | "release" | "new_version" | "transfer" | "cancel_snag")[];
+            allowed_actions?: ("edit" | "submit" | "review" | "approve" | "reject" | "void" | "claim" | "release" | "new_version" | "transfer" | "cancel_snag" | "triage")[];
+            /** @description 0.15.240. The intake triage of a record of a triage-enabled register (absent while the record was never queued). */
+            triage?: {
+                state: components["schemas"]["TriageState"];
+                note: string | null;
+                by?: components["schemas"]["UserRef"];
+                /** Format: date-time */
+                at: string | null;
+                /**
+                 * Format: uuid
+                 * @description For a record merged as a duplicate: the surviving record.
+                 */
+                duplicate_of: string | null;
+            };
             /**
              * Format: uuid
              * @description The logical record; every version of it shares this id. The approved values are projected into the register table with the same id.
@@ -17614,6 +17715,32 @@ export interface components {
             /** @description Notification kinds that are also mailed to the person. An empty list keeps every notification in-app. */
             kinds: string[];
         };
+        MailPolicyInput: {
+            enabled: boolean;
+            /** @enum {string} */
+            mode: "internal_only" | "internal_external";
+            internal_domains: string[];
+            kinds: {
+                [key: string]: {
+                    enabled: boolean;
+                    /** @enum {string} */
+                    mode: "inherit" | "internal_only" | "internal_external";
+                };
+            };
+        };
+        /** @description 0.15.261. The setting `mail.policy`. */
+        MailPolicy: components["schemas"]["MailPolicyInput"] & {
+            version: number;
+            /** @description The security lock; while on, no external mail is sent. */
+            block_public_sharing: boolean;
+            catalogue: {
+                kind: string;
+                recommended: boolean;
+            }[];
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+        };
         /** @description 0.14.2 (Q441). The setting `mail.notification_kinds` and the kinds it may name. */
         MailNotificationKinds: {
             kinds: string[];
@@ -17987,7 +18114,7 @@ export interface components {
             id: string;
             level: number;
             /** @enum {string} */
-            action: "create" | "edit" | "submit" | "review" | "approve" | "reject" | "auto_skip" | "claim" | "release" | "new_version" | "void" | "transfer";
+            action: "create" | "edit" | "submit" | "review" | "approve" | "reject" | "auto_skip" | "claim" | "release" | "new_version" | "void" | "transfer" | "triage_accept" | "triage_reject" | "triage_merge" | "triage_defer";
             acted_by?: components["schemas"]["UserRef"];
             note?: string | null;
             before_state?: components["schemas"]["RegisterRecordState"];
@@ -18012,6 +18139,23 @@ export interface components {
                 type: string;
                 scopes: string[] | null;
             }[];
+        };
+        /**
+         * @description 0.15.240. Intake triage: waiting (`pending`, `deferred`) or decided (`accepted`, `rejected`, `merged`).
+         * @enum {string}
+         */
+        TriageState: "pending" | "accepted" | "deferred" | "rejected" | "merged";
+        /** @description 0.15.240: one intake-triage decision. The note is required for `reject` and `merge`; `merge` also names the surviving record. */
+        TriageRequest: {
+            /** @enum {string} */
+            action: "accept" | "reject" | "merge" | "defer";
+            note?: string;
+            /**
+             * Format: uuid
+             * @description With `merge`: the surviving record of the same register.
+             */
+            duplicate_of?: string;
+            via?: components["schemas"]["WorkflowVia"];
         };
         RegisterRecordInput: {
             /**
@@ -19774,7 +19918,7 @@ export interface components {
             revoked_count: number;
         };
         /** @enum {string} */
-        NotificationKind: "task_assigned" | "task_returned" | "task_approved" | "approval_due" | "reassigned" | "absence_alert" | "idle_task_alert" | "no_holder" | "holiday_tentative" | "delegation" | "mfa_exemption" | "template_updated" | "import_batch" | "system" | "mention" | "followed_change" | "task_rejected" | "no_eligible_holder" | "register_assigned" | "register_rejected" | "gate_closed_again" | "sla_negative_duration" | "email_change_requested" | "email_change_decided" | "security_alert" | "snag_raised" | "snag_review" | "snag_rejected" | "snag_closed" | "levels_converted" | "permit_transferred" | "phone_change_requested" | "phone_change_decided" | "security_notice" | "site_region_moved" | "assignment_request" | "data_reset_request" | "alert_rule";
+        NotificationKind: "task_assigned" | "task_returned" | "task_approved" | "approval_due" | "reassigned" | "absence_alert" | "idle_task_alert" | "no_holder" | "holiday_tentative" | "delegation" | "mfa_exemption" | "template_updated" | "import_batch" | "system" | "mention" | "followed_change" | "task_rejected" | "no_eligible_holder" | "register_assigned" | "register_rejected" | "gate_closed_again" | "sla_negative_duration" | "email_change_requested" | "email_change_decided" | "security_alert" | "snag_raised" | "snag_review" | "snag_rejected" | "snag_closed" | "levels_converted" | "permit_transferred" | "phone_change_requested" | "phone_change_decided" | "security_notice" | "site_region_moved" | "assignment_request" | "data_reset_request" | "triage_decision" | "alert_rule";
         Notification: {
             /** Format: uuid */
             id: string;
@@ -34023,6 +34167,62 @@ export interface operations {
             403: components["responses"]["Forbidden"];
         };
     };
+    getMailPolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The setting. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MailPolicy"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setMailPolicy: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"] & components["schemas"]["MailPolicyInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MailPolicy"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
     getMailNotificationKinds: {
         parameters: {
             query?: never;
@@ -34653,6 +34853,8 @@ export interface operations {
                 region_id?: components["schemas"]["RegionId"];
                 state?: components["schemas"]["RegisterRecordState"];
                 record_type?: string;
+                /** @description 0.15.240: only records whose intake triage is in this state (triage-enabled registers). */
+                triage?: components["schemas"]["TriageState"];
                 /** @description All versions of one logical record. */
                 entity_id?: string;
                 /** @description Default false = the latest version of each logical record. */
@@ -35232,6 +35434,46 @@ export interface operations {
         };
         responses: {
             /** @description Unlocked. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegisterRecord"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    triageRegisterRecord: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TriageRequest"];
+            };
+        };
+        responses: {
+            /** @description The decided record. */
             200: {
                 headers: {
                     ETag: components["headers"]["ETag"];
@@ -36027,6 +36269,32 @@ export interface operations {
                     "application/json": components["schemas"]["PageEnvelope"] & {
                         items?: components["schemas"]["ImportRow"][];
                     };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    downloadImportBatchErrorReport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Import batch. */
+                batch_id: components["parameters"]["BatchId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The workbook. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
                 };
             };
             401: components["responses"]["Unauthorized"];
