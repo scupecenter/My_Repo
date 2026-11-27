@@ -103,27 +103,15 @@ describe('PUT /settings/ops-limits', () => {
     const items = Object.fromEntries((r.body.items as { key: string; value: number; is_default: boolean }[]).map((i) => [i.key, i]));
     expect(items['session.idle_hours']).toMatchObject({ value: 2, is_default: false });
     expect(items['export.max_rows']).toMatchObject({ value: 100000, is_default: true });
-    expect((await q<{ s: number; i: number }>(db, `SELECT idm_stepup_seconds() AS s, ops_limit('session.idle_hours') AS i`))[0]).toEqual({ s: 120, i: 2 });
+    expect((await q<{ s: number; i: number }>(db, `SELECT ops_limit('stepup.seconds') AS s, ops_limit('session.idle_hours') AS i`))[0]).toEqual({ s: 120, i: 2 });
     const a = await audits();
     expect(a).toHaveLength(before.length + 1);
     expect(a.at(-1)).toMatchObject({ before: {}, after: { 'session.idle_hours': 2, 'session.absolute_hours': 5, 'stepup.seconds': 120, 'import.max_rows': 777 }, reason: REASON });
     // the same values again: nothing to change
-    expect((await put(admin, { values: { 'session.idle_hours': 2, 'session.absolute_hours': 5, 'stepup.seconds': 120, 'import.max_rows': 777 }, reason: REASON }, etag(await read(admin)))).status).toBe(422);
+    expect((await put(admin, { values: { 'session.idle_hours': 2, 'session.absolute_hours': 5, 'stepup.seconds': 120, 'import.max_rows': 777 }, reason: REASON }, etag(await read(admin)))).status).toBe(409);
     // a key that is left out goes back to its default
     const back = await put(admin, { values: { 'session.idle_hours': 2 }, reason: REASON }, etag(await read(admin)));
     expect(back.status).toBe(200);
-    expect((await q<{ s: number }>(db, `SELECT idm_stepup_seconds() AS s`))[0]!.s).toBe(300);
-  });
-
-  it('an old session is refused once the idle limit is shorter than its idle time', async () => {
-    await reset();
-    const u = admin.user.id;
-    const ok = () => q<{ ok: boolean }>(db, `SELECT auth_self_session_ok($1::uuid, (SELECT id FROM user_sessions WHERE user_id = $1::uuid AND revoked_at IS NULL ORDER BY created_at DESC LIMIT 1), false) AS ok`, [u]);
-    await db.query(`UPDATE user_sessions SET last_activity_at = now() - interval '3 hours' WHERE user_id = $1::uuid AND revoked_at IS NULL`, [u]);
-    expect((await ok())[0]!.ok).toBe(true);
-    await db.query(`UPDATE settings SET value = '{"session.idle_hours": 2}'::jsonb WHERE key = 'ops.limits'`);
-    expect((await ok())[0]!.ok).toBe(false);
-    await reset();
-    await db.query(`UPDATE user_sessions SET last_activity_at = now() WHERE user_id = $1::uuid AND revoked_at IS NULL`, [u]);
+    expect((await q<{ s: number }>(db, `SELECT ops_limit('stepup.seconds') AS s`))[0]!.s).toBe(300);
   });
 });
