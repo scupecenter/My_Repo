@@ -356,7 +356,7 @@ describe('hybrid mode list', () => {
       // contract 0.15.41: Settings, Identity & themes
       'GET /settings/identity', 'PUT /settings/identity',
       // contract 0.15.97: Settings, Screens, Login page and its public read
-      'GET /settings/login-page', 'PUT /settings/login-page', 'GET /settings/login-page/public',
+      'GET /settings/login-page', 'PUT /settings/login-page', 'GET /settings/ops-limits', 'PUT /settings/ops-limits', 'GET /settings/login-page/public',
       // contract 0.15.292: the media gallery
       'GET /media/settings', 'PUT /media/settings', 'GET /media/items', 'GET /media/facets', 'GET /media/items/:kind/:id/thumbnail',
       'GET /settings/security-locks', 'PUT /settings/security-locks', 'GET /settings/download-locks', 'PUT /settings/download-locks',

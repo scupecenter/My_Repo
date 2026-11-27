@@ -23,6 +23,7 @@ import type { UploadedFile } from '../templates/upload.interceptor';
 import { guardXlsx, normalizeSpreadsheetPrefixes } from '../templates/xlsx-guard';
 import { OoxmlError, OoxmlWorkbook, SheetCell, masterHeaders } from './ooxml-reader';
 import { RegisterSheets, RegisterTemplate, loadRegisterMaps, readRegisterSheets, registerSheetNames } from './register-sheets';
+import { limit } from '../ops/ops-limits';
 
 /**
  * Q1 and Q211: the admin-only legacy import of the real Site Master (no `_tpl`) and the comparison report of the parallel run.
@@ -35,7 +36,6 @@ export type LegacyRejectReason = 'not_xlsx' | 'macros_not_allowed' | 'size_or_ro
 
 const DIFF_KINDS = ['diff', 'missing_in_pmis', 'missing_in_master', 'exception'];
 const RESOLUTIONS = ['open', 'pmis_correct', 'master_correct', 'fixed', 'ignored'];
-const MAX_ROWS = 5000;
 
 const applyBody = z.object({
   mode: z.enum(['submit', 'draft']), reason: z.string().trim().min(3).max(2000),
@@ -126,7 +126,7 @@ export class MasterImportService {
     if (wb.sheetNames.includes(TPL_SHEET)) {
       return this.reject(auth, requestId, 'is_pmis_template', 'This file is a template issued by GSDN Workspace (it has the _tpl sheet): upload it on the Templates page. The legacy path is for the real Master only.', ctx);
     }
-    const master = wb.sheet('Master', MAX_ROWS + 10);
+    const master = wb.sheet('Master', limit('master_import.max_rows') + 10);
     const headers = master ? masterHeaders(master) : [];
     const rows: { row_no: number; cells: Record<string, SheetCell> }[] = [];
     if (master) {
@@ -134,7 +134,7 @@ export class MasterImportService {
         if (n <= 3) continue;
         // a row holds data when one of its cells is typed (the formula rows of an empty Master are skipped)
         if (![...cells.values()].some((c) => !c.f && c.v !== null)) continue;
-        if (rows.length >= MAX_ROWS) return this.reject(auth, requestId, 'size_or_rows_exceeded', `The Master sheet has more than ${MAX_ROWS} rows.`, ctx);
+        if (rows.length >= limit('master_import.max_rows')) return this.reject(auth, requestId, 'size_or_rows_exceeded', `The Master sheet has more than ${limit('master_import.max_rows')} rows.`, ctx);
         const out: Record<string, SheetCell> = {};
         for (const [L, c] of cells) if (c.v !== null && c.v !== '' && !c.e) out[L] = c;
         rows.push({ row_no: n, cells: out });
@@ -438,7 +438,7 @@ export class MasterImportService {
       if (e instanceof OoxmlError) throw new ProblemException(422, 'template_rejected', { detail: 'The file could not be read as an Excel workbook.', extra: { reason: 'not_xlsx' } });
       throw e;
     }
-    return { file_sha256: sha, ...readRegisterSheets(wb, maps, new Map(tpl.map((t) => [t.template_id, t]))) };
+    return { file_sha256: sha, ...readRegisterSheets(wb, maps, new Map(tpl.map((t) => [t.template_id, t])), limit('register_import.max_rows')) };
   }
 
   async resolve(auth: AuthContext, id: string, raw: unknown): Promise<Record<string, unknown>> {
