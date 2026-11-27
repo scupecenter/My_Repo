@@ -34,11 +34,21 @@ export const useMediaItems = (f: MediaFilter) =>
     getNextPageParam: (last) => last.page.next_cursor ?? undefined,
   });
 
+/** A page asks for up to a page-size of thumbnails at once; each one holds a database transaction while it is made, so they go through a short queue (3 at a time) and never starve the list request. */
+const MAX_THUMBS = 3;
+let running = 0;
+const waiting: (() => void)[] = [];
+async function slot<T>(run: () => Promise<T>): Promise<T> {
+  if (running >= MAX_THUMBS) await new Promise<void>((r) => waiting.push(r));
+  running++;
+  try { return await run(); } finally { running--; waiting.shift()?.(); }
+}
+
 /** The thumbnail through the session cookie, as an object URL; null when the item has none or it cannot be made (the card then shows a type icon). */
 export const useMediaThumb = (it: MediaItem, size: 'small' | 'medium') =>
   useQuery({
     queryKey: ['media-thumb', it.kind, it.id, size], enabled: it.has_thumbnail, staleTime: 5 * 60_000, retry: false,
-    queryFn: async () => { try { return URL.createObjectURL(await fetchBlob(`/media/items/${it.kind}/${it.id}/thumbnail`, { size })); } catch { return null; } },
+    queryFn: () => slot(async () => { try { return URL.createObjectURL(await fetchBlob(`/media/items/${it.kind}/${it.id}/thumbnail`, { size })); } catch { return null; } }),
   });
 
 /** Where the owning record is shown. */
