@@ -1,5 +1,6 @@
 // Synthetic state for phase 3b: calendar, rules, freeze, DLP, notification policy, retention, sessions, security log.
 import type { TableDisplaySetting } from '@/api/display';
+import type { UiFeaturesSetting } from '@/api/uiFeatures';
 import type {
   ActiveSession, ContractorRules, ContractorsCompletenessReport, DlpSettings, IdleTaskAlertSetting, LogRetention, NotificationPolicy, NotificationTypeDef, SecurityLogEntry, SlaRuleSet, SlaTaskRule,
   StaffVisibility, TaskDefinition, TeamScopeMatch, TeamScopeMismatchReport, WeightSet, WorkflowGate, WorkflowMilestone,
@@ -99,6 +100,7 @@ export function initCfg() {
     idle: { enabled: true, working_days: 2, version: 1 } as IdleTaskAlertSetting,
     // 0.15.64 (W8): the defaults of the Display menu of the site-data tables (null until read, then the seed)
     tableDisplay: undefined as TableDisplaySetting | undefined,
+    uiFeatures: undefined as UiFeaturesSetting | undefined,
     // Q97 seed of migration 0043 as converted by 0061 (P4b, Q143, Q144): the 8 catalogue codes, the old column CW as the group CW, HLC takes a Fiber team.
     scopeMatch: {
       specializations: SPEC_SEED.map((s) => s.code),

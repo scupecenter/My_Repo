@@ -3,12 +3,14 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStaffCard } from '@/api/hooks';
 import type { UserAccountStatus } from '@/api/types';
+import { Avatar } from './Avatar';
 
 /** Name with the 4-digit employee ID beside it; hover or focus the ID for the registry card (visibility applied server-side). */
 export function PersonTag({ name, employeeId, status }: { name: string; employeeId?: string | null; status?: UserAccountStatus }) {
   if (!employeeId) return <span>{name}</span>;
   return (
     <span className="inline-flex items-baseline gap-1">
+      <Avatar name={name} size="xs" lists className="self-center" />
       <span>{name}</span>
       <IdBadge employeeId={employeeId} />
       <AccountBadge status={status} employeeId={employeeId} />

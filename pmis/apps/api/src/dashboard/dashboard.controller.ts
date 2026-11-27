@@ -1,3 +1,4 @@
+import { ExportAction } from '../security/export-lock';
 import { Body, Controller, Get, Header, HttpCode, Param, Post, Put, Query, Res, StreamableFile } from '@nestjs/common';
 import type { Response } from 'express';
 import type { AuthContext } from '../auth/auth.types';
@@ -36,6 +37,7 @@ export class DashboardController {
     return this.map.get(q);
   }
 
+  @ExportAction()
   @Get('dashboard/export')
   @Header('Cache-Control', 'no-store')
   async export(@Auth() auth: AuthContext, @Query() q: Record<string, unknown>, @Res({ passthrough: true }) res: Response): Promise<StreamableFile> {

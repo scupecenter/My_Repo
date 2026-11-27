@@ -21,6 +21,7 @@ import { useToast } from '@/components/Toast';
 import { hasGrant, isAdmin } from '@/lib/perm';
 import type { ColDef } from '@/lib/tablePrefs';
 import { IntegrityCard } from '../SecurityLog';
+import { IntegrityTooLarge, isTooLarge } from '@/components/logs/IntegrityTooLarge';
 
 const DEFS: ColDef[] = [
   { id: 'at', w: 160, min: 110, pinned: true }, { id: 'actor', w: 210, min: 120 }, { id: 'action', w: 150, min: 90 }, { id: 'entity', w: 130, min: 80 }, { id: 'site', w: 90, min: 60 }, { id: 'region', w: 100, min: 60 },
@@ -109,6 +110,7 @@ export function AuditLog() {
   const [sel, setSel] = useState<AuditRow | null>(null);
   const verify = useVerifyIntegrity();
   const [res, setRes] = useState<LogIntegrity | null>(null);
+  const [tooLarge, setTooLarge] = useState(false);
   const [exporting, setExporting] = useState(false);
   const admin = isAdmin(me.data), canExport = admin || hasGrant(me.data, 'export');
   const region = (id?: number | null) => { const r = regions.find((x) => x.id === id); return r ? ((i18n.language === 'ar' && r.name_ar) || r.name_en) : '—'; };
@@ -129,7 +131,7 @@ export function AuditLog() {
     }
   };
   const doExport = () => { setExporting(true); exportAuditLog(f).then(() => toast(t('logs.exported'))).catch((e) => toast(errText(e, t), 'err')).finally(() => setExporting(false)); };
-  const check = () => verify.mutate('audit', { onSuccess: setRes, onError: (e) => toast(errText(e, t), 'err') });
+  const check = () => { setTooLarge(false); verify.mutate('audit', { onSuccess: setRes, onError: (e) => (isTooLarge(e) ? setTooLarge(true) : toast(errText(e, t), 'err')) }); };
   return (
     <div data-testid="page-audit-log">
       <PageHeader title={t('nav.audit')} subtitle={t('logs.audit_subtitle')} />
@@ -141,6 +143,7 @@ export function AuditLog() {
           {admin && <button className="btn" data-testid="audit-integrity" disabled={verify.isPending} onClick={check}><ShieldCheck size={14} />{t('logs.integrity')}</button>}
           {canExport && <button className="btn" data-testid="audit-export" disabled={exporting} onClick={doExport}><Download size={14} />{t('logs.export')}</button>}
         </>} />
+      {tooLarge && <div className="mb-3"><IntegrityTooLarge log="audit" onClose={() => setTooLarge(false)} /></div>}
       {res && <div className="mb-3" data-testid="audit-integrity-result"><IntegrityCard r={res} /></div>}
       <LogFilters kind="audit" f={f} set={setF} />
       <div className="mb-3"><UnifiedFilter screen="audit-log" value={decodeFilter(adv)} onChange={(tree) => setAdv(encodeFilter(tree))} onClearAll={() => setAdv('')} />

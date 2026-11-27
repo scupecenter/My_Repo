@@ -1,3 +1,4 @@
+import { ExportAction } from '../security/export-lock';
 import { Body, Controller, Delete, Get, Headers, HttpCode, Param, Post, Query, Res, UploadedFile, UseInterceptors, Patch } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
@@ -87,6 +88,7 @@ export class DocumentsController {
     return r.file;
   }
 
+  @ExportAction()
   @Post('exports/zip')
   @HttpCode(202)
   startZip(@Auth() auth: AuthContext, @Body() body: unknown, @Headers('idempotency-key') key: string | undefined, @Res({ passthrough: true }) res: Response) {
@@ -96,6 +98,7 @@ export class DocumentsController {
     });
   }
 
+  @ExportAction()
   @Get('exports/zip/:id/download')
   async downloadZip(@Auth() auth: AuthContext, @Param('id') id: string, @Res({ passthrough: true }) res: Response) {
     const r = await this.zip.download(auth, id);
