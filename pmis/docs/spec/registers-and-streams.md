@@ -931,16 +931,16 @@ Gaps found while tracing (each one is a question):
   **Then** the site carries an On Hold overlay and its gates follow `rules.md` §2.3.
 
 **SR-05 Working inside a sub-section**
-- **Given** a CW Site Engineer in the Tripoli region
+- **Given** a CW Site Engineer in the Region A region
   **When** they open the CW sub-section
-  **Then** they can open and enter only the CW tasks of Tripoli sites that they hold in the Matrix.
+  **Then** they can open and enter only the CW tasks of Region A sites that they hold in the Matrix.
   **And** the Identity, Scope and other-stream fields are read-only (SR-R5; B3).
 - **Given** a bulk action (for example "set AY planned date") in the CW sub-section
   **When** it is applied to 20 selected sites
   **Then** each site's task gets its own entry and goes through its own approval (BP §07 bulk rules; WF-01).
 
 **SR-06 Stream KPIs**
-- **Given** the CW sub-section with Region = Zawia
+- **Given** the CW sub-section with Region = Region C
   **When** the KPI cards load
   **Then** PRE-CW, CW Completion, CW PAC, GECOL, HLC and Site RFI each show Scope, Done, Pending, Not Due and %, where Scope = Done + Pending + Not Due (D67).
   **And** Done counts approved values only.
@@ -992,9 +992,9 @@ Gaps found while tracing (each one is a question):
   **Then** all streams are processed in one batch with the same rules (TI-03).
 
 **SR-12 Visibility in streams**
-- **Given** a user limited to the CW module and the Benghazi region
+- **Given** a user limited to the CW module and the Region B region
   **When** they open the Site Master
-  **Then** only the CW stream filter value and the CW sub-section are offered, and only Benghazi sites are listed (B3).
+  **Then** only the CW stream filter value and the CW sub-section are offered, and only Region B sites are listed (B3).
 
 ### 5.2 Common register entry (RE)
 **RE-01 Manual create**
