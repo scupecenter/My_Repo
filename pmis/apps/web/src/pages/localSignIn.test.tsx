@@ -265,7 +265,7 @@ describe('hybrid mode list', () => {
       'GET /registers/:key/records/:id/history', 'GET /registers/:key/records/:id/versions', 'POST /registers/:key/records/:id/versions',
       'POST /registers/:key/records/:id/triage',
       // contract 0.7.0: approved-template entry (templates and import batches)
-      'GET /templates', 'GET /templates/:id/changes', 'GET /templates/:id/download', 'GET /import-batches', 'GET /data-hub/summary', 'POST /import-batches', 'GET /import-batches/:id', 'GET /import-batches/:id/rows', 'GET /import-batches/:id/error-report',
+      'GET /templates', 'GET /templates/:id/changes', 'GET /templates/:id/download', 'GET /import-batches', 'GET /data-hub/summary', 'GET /finance-hub/summary', 'POST /import-batches', 'GET /import-batches/:id', 'GET /import-batches/:id/rows', 'GET /import-batches/:id/error-report',
       'POST /import-batches/:id/submit', 'POST /import-batches/:id/decisions',
       // contract 0.12.8 (P3): the legacy Master import and its comparison report, the template mapping screen and the import aliases
       'GET /master-import/runs', 'POST /master-import/runs', 'GET /master-import/runs/:id', 'GET /master-import/runs/:id/diffs', 'GET /master-import/runs/:id/export',
@@ -337,6 +337,8 @@ describe('hybrid mode list', () => {
       'POST /saved-views/:id/restore', 'POST /saved-views/:id/transfer', 'GET /saved-views/:id/versions',
       // contract 0.15.246 (item 17, migration 0345): the soft "... is editing this record" notice
       'POST /presence/editing', 'POST /presence/editing/stop', 'GET /presence/editing',
+      // contract 0.15.245 (0344): pin a saved view as a personal home card
+      'GET /me/home-pins', 'POST /saved-views/:id/pin', 'POST /saved-views/:id/unpin',
       'GET /me/drafts', 'GET /me/drafts/:key', 'PUT /me/drafts/:key',
       'DELETE /me/drafts/:key',
       // contract 0.13.2: follow-up group C (Q267 cancel of a mistaken Quality snag record)
@@ -350,13 +352,13 @@ describe('hybrid mode list', () => {
       // contract 0.14.5: the site map of the dashboard (OV-12)
       'GET /dashboard/site-map',
       // contract 0.14.6: the background threshold of batches (Settings, Imports)
-      'GET /settings/imports', 'PUT /settings/imports', 'GET /settings/template-change-notice', 'PUT /settings/template-change-notice',
+      'GET /settings/imports', 'PUT /settings/imports', 'GET /settings/imports/upload-policy', 'PUT /settings/imports/upload-policy', 'GET /settings/template-change-notice', 'PUT /settings/template-change-notice',
       // contract 0.15.1: the shared layout of the side menu
       'GET /settings/nav-layout', 'PUT /settings/nav-layout',
       // contract 0.15.41: Settings, Identity & themes
       'GET /settings/identity', 'PUT /settings/identity',
       // contract 0.15.97: Settings, Screens, Login page and its public read
-      'GET /settings/login-page', 'PUT /settings/login-page', 'GET /settings/login-page/public',
+      'GET /settings/login-page', 'PUT /settings/login-page', 'GET /settings/ops-limits', 'PUT /settings/ops-limits', 'GET /settings/login-page/public',
       // contract 0.15.292: the media gallery
       'GET /media/settings', 'PUT /media/settings', 'GET /media/items', 'GET /media/facets', 'GET /media/items/:kind/:id/thumbnail',
       'GET /settings/security-locks', 'PUT /settings/security-locks', 'GET /settings/download-locks', 'PUT /settings/download-locks',

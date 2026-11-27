@@ -1,4 +1,5 @@
 import { ChevronDown, ChevronUp, Eye, EyeOff, KeyRound, Lock, Mail, Palette, PanelLeft, Phone, ShieldCheck, ShieldOff, UserRound } from 'lucide-react';
+import { UnsavedGuard } from '@/lib/unsavedGuard';
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { fieldErrors } from '@/api/auth';
@@ -137,6 +138,7 @@ function Details({ p }: { p: MyProfile }) {
   const regions = ro.region_ids === 'all' ? t('profile.all_regions') : ro.region_ids.length ? ro.region_ids.map((r) => REGION_NAMES[r] ?? String(r)).join(', ') : t('profile.none');
   return (
     <Section id="details" icon={<UserRound size={18} aria-hidden />} title={t('profile.details')}>
+      <UnsavedGuard scope="inline" dirty={dirty && !bad.name} label={t('profile.details')} onSave={() => new Promise<boolean>((res) => { if (!dirty || bad.name) { res(false); return; } save.mutate({ version: p.version, patch }, { onSuccess: () => { toast(t('profile.saved')); res(true); }, onError: () => res(false) }); })} />
       <form onSubmit={submit} className="space-y-3" noValidate data-testid="profile-details-form">
         <div>
           <label className="block text-sm font-semibold" htmlFor="pf-name">{t('profile.display_name')}</label>
@@ -225,7 +227,8 @@ function AppearanceSection({ p }: { p: MyProfile }) {
   const revert = () => { setDraft(sanitizeAppearance(p.ui_prefs)); setTheme(p.theme); };
   const preset = (name: keyof typeof APPEARANCE_PRESETS) => {
     const pr = APPEARANCE_PRESETS[name];
-    setDraft({ ...pr.prefs });
+    // a look does not move the notification panel: the personal inbox_* choices stay
+    setDraft({ ...pr.prefs, ...(draft.inbox_panel ? { inbox_panel: draft.inbox_panel } : {}), ...(draft.inbox_anchor ? { inbox_anchor: draft.inbox_anchor } : {}) });
     setTheme(pr.theme);
   };
   const dimLabel = (k: AppearanceKey) => t(`appearance.dim.${k}`);
@@ -233,6 +236,7 @@ function AppearanceSection({ p }: { p: MyProfile }) {
     <Section id="appearance" icon={<Palette size={18} aria-hidden />} title={t('appearance.title')}>
       <p className="text-sm text-mute">{t('appearance.subtitle')}</p>
       {!choice && <p className="rounded-md bg-card2 p-2 text-sm" data-testid="pf-appearance-locked">{t('profile.appearance_locked', { name: t(`brand.${p.identity.default_brand}`) })}</p>}
+      <UnsavedGuard scope="inline" dirty={dirty && choice} label={t('appearance.title')} onSave={() => new Promise<boolean>((res) => { if (!dirty || !choice) { res(false); return; } save.mutate({ version: p.version, patch }, { onSuccess: () => { if (patch.theme) applyTheme(patch.theme); toast(t('profile.saved')); res(true); }, onError: () => res(false) }); })} />
       <form onSubmit={submit} className="space-y-3" noValidate data-testid="profile-appearance-form">
         <div>
           <span className="block text-sm font-semibold">{t('appearance.preset')}</span>
@@ -338,6 +342,7 @@ function SidebarSection({ p }: { p: MyProfile }) {
   return (
     <Section id="sidebar" icon={<PanelLeft size={18} aria-hidden />} title={t('nav_side.title')}>
       <p className="text-sm text-mute">{t('nav_side.subtitle')}</p>
+      <UnsavedGuard scope="inline" dirty={dirty} label={t('nav_side.title')} onSave={() => new Promise<boolean>((res) => { if (!dirty) { res(false); return; } save.mutate({ version: p.version, patch: { ui_prefs: { sidebar: tidy(draft) } } }, { onSuccess: () => { toast(t('profile.saved')); res(true); }, onError: () => res(false) }); })} />
       <form onSubmit={submit} className="space-y-3" noValidate data-testid="profile-sidebar-form">
         <label className="block text-sm font-semibold">{t('nav_side.badges')}
           <select className="input mt-1 font-normal" data-testid="pf-sb-badge" value={draft.badge_style ?? 'full'} onChange={(e) => setDraft({ ...draft, badge_style: e.target.value === 'full' ? undefined : (e.target.value as UiNav['badge_style']) })}>

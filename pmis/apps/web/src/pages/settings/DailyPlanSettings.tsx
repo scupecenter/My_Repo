@@ -1,4 +1,5 @@
 import { ArrowDown, ArrowUp } from 'lucide-react';
+import { UnsavedGuard } from '@/lib/unsavedGuard';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDailyPlanSettings, useSetDailyPlanSettings, type DailyPlanColumn, type DailyPlanSettings as Cfg } from '@/api/dailyPlan';
@@ -94,6 +95,7 @@ export function DailyPlanSettings() {
         <button type="button" className="btn btn-accent" data-testid="dps-save" onClick={() => setOpen(true)}>{t('common.save')}</button>
         <button type="button" className="btn" data-testid="dps-defaults" onClick={() => setForm({ ...f, progress: [...q.data.default_columns.progress!], tomorrow: [...q.data.default_columns.tomorrow!] })}>{t('dailyPlanSettings.defaults')}</button>
       </div>
+      <UnsavedGuard scope="settings" dirty={!!form} needsReason label={t('ui.guard_settings')} onSave={(reason) => new Promise<boolean>((res) => set.mutate({ version: q.data.version, reason, columns: { progress: f.progress, tomorrow: f.tomorrow }, default_region_scope: f.scope, auto_lock_time: f.lock || null, reminder_hour: f.hour === '' ? null : Number(f.hour) }, { onSuccess: () => res(true), onError: () => res(false) }))} />
       {open && (
         <FormDialog open onClose={() => setOpen(false)} testid="dps-dialog" title={t('dailyPlanSettings.title')} busy={set.isPending} error={set.isError && !Object.keys(errs).length ? errText(set.error, t) : null}
           onSubmit={(reason) => set.mutate({ version: q.data.version, reason, columns: { progress: f.progress, tomorrow: f.tomorrow }, default_region_scope: f.scope,
