@@ -1,5 +1,5 @@
 import { CalendarDays } from 'lucide-react';
-import { useEffect, useRef, useState, type ChangeEvent, type InputHTMLAttributes } from 'react';
+import { useRef, useState, type ChangeEvent, type InputHTMLAttributes } from 'react';
 import { useTranslation } from 'react-i18next';
 
 /**
@@ -34,8 +34,9 @@ type Props = Omit<InputHTMLAttributes<HTMLInputElement>, 'type' | 'value' | 'def
 export function DateInput({ value, onChange, className = '', min, max, disabled, picker: withPicker = true, 'data-testid': testid, ...rest }: Props) {
   const { t } = useTranslation();
   const [text, setText] = useState(value ?? '');
+  const [seen, setSeen] = useState(value ?? '');
   const picker = useRef<HTMLInputElement>(null);
-  useEffect(() => { setText(value ?? ''); }, [value]);
+  if ((value ?? '') !== seen) { setSeen(value ?? ''); setText(value ?? ''); }
   const tokens = className.split(/\s+/).filter(Boolean);
   const wrap = ['relative', ...tokens.filter((c) => WRAP.test(c))].join(' ');
   const inner = tokens.filter((c) => !WRAP.test(c)).join(' ');
