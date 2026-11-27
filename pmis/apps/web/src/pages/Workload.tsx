@@ -5,7 +5,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useMe } from '@/api/hooks';
 import { useRegions } from '@/api/sites';
 import type { UserRef } from '@/api/types';
-import { useTimeReport, useWorkload } from '@/api/x';
+import { useStateDurations, useTimeReport, useWorkload } from '@/api/x';
 import { useDurationUnits } from '@/components/InsightPanels';
 import { PageHeader, Toolbar } from '@/components/PageHeader';
 import { PersonTag } from '@/components/PersonTag';
@@ -101,6 +101,44 @@ function TimeReport({ region }: { region: string }) {
   );
 }
 
+/** F1: how long tasks (per stage) or register records (per register) stay in each state: median and P85 working days, completed stays only. */
+function StateDurations({ region }: { region: string }) {
+  const { t, i18n } = useTranslation();
+  const regions = useRegions().data ?? [];
+  const [entity, setEntity] = useState<'task' | 'register_record'>('task');
+  const q = useStateDurations(entity, region);
+  const rn = (id: number | null) => { const r = regions.find((x) => x.id === id); return id == null ? '—' : (i18n.language === 'ar' && r?.name_ar) || r?.name_en || String(id); };
+  const gn = (g: string | null) => (g == null ? '—' : entity === 'task' ? t(`stage.${g}`, { defaultValue: g }) : g);
+  return (
+    <section aria-label={t('sd.title')} data-testid="state-durations">
+      <div className="mb-2 flex items-center gap-2">
+        <h2 className="font-bold">{t('sd.title')}</h2>
+        <div role="group" aria-label={t('sd.entity')} className="inline-flex overflow-hidden rounded-md border border-line">
+          {(['task', 'register_record'] as const).map((e) => <button key={e} type="button" aria-pressed={entity === e} data-testid={`sd-entity-${e}`} onClick={() => setEntity(e)} className={`px-3 py-1 text-sm ${entity === e ? 'bg-accentSoft text-accentText' : 'text-mute'}`}>{t(`sd.entity_${e}`)}</button>)}
+        </div>
+      </div>
+      <p className="mb-2 text-xs text-mute">{t('sd.note')}</p>
+      {q.isLoading ? <LoadingSkeleton rows={3} testid="sd-loading" /> : q.isError || !q.data ? <ErrorState onRetry={() => void q.refetch()} testid="sd-error" /> : !q.data.items.length ? <EmptyState testid="sd-empty" title={t('sd.empty')} /> : (
+        <table className="card w-full text-sm" data-testid="sd-table">
+          <thead><tr>{['group', 'state', 'region', 'count', 'median', 'p85'].map((c) => <th key={c} className="p-2 text-start font-semibold text-mute">{t(`sd.col_${c}`)}</th>)}</tr></thead>
+          <tbody>
+            {q.data.items.map((r, i) => (
+              <tr key={`${r.group_key}|${r.state}|${r.region_id}|${i}`} className="border-t border-line" data-testid="sd-row">
+                <td className="p-2">{gn(r.group_key)}</td>
+                <td className="p-2">{t(`regState.${r.state}`, { defaultValue: r.state })}</td>
+                <td className="p-2">{rn(r.region_id)}</td>
+                <td className="mono p-2">{r.count}</td>
+                <td className="mono p-2">{r.median_working_days}</td>
+                <td className="mono p-2">{r.p85_working_days}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </section>
+  );
+}
+
 export function Workload() {
   const { t } = useTranslation();
   const me = useMe(true);
@@ -113,6 +151,7 @@ export function Workload() {
       <Toolbar filters={<RegionSelect value={region} onChange={setRegion} />} />
       <WorkloadTable region={region} lead={canReassign(me.data)} />
       <TimeReport region={region} />
+      <StateDurations region={region} />
     </div>
   );
 }

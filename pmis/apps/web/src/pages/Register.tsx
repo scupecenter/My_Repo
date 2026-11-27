@@ -39,6 +39,7 @@ import { useRegions } from "@/api/sites";
 import type { ExtraField } from "@/components/UnifiedFilter";
 import type { RegisterDefinition, RegisterRecord } from "@/api/types";
 import { TemplateExportMenu } from "@/components/TemplateExportMenu";
+import { PmDuePanel } from "@/components/PmDuePanel";
 import { ViewAnalytics } from "@/components/ViewAnalytics";
 import { ViewMenu, type ViewOption } from "@/components/ViewMenu";
 import { useRememberedView } from "@/lib/viewPreference";
@@ -620,6 +621,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
           ))}
         </div>
       )}
+      <PmDuePanel registerKey={key} />
       {/* W8: the shared table toolbar of the site-data screens (registers that list sites) */}
       <TableToolbar
         testid="register-toolbar"

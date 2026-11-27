@@ -24,6 +24,11 @@ export class P4cController {
     return this.p4c.dismantleOrderOptions(auth, q);
   }
 
+  @Get('dismantle/rn-options')
+  rnOptions(@Auth() auth: AuthContext, @Query() q: Record<string, unknown>) {
+    return this.p4c.dismantleRnOptions(auth, q);
+  }
+
   @Get('warehouse/order-options')
   warehouseOrderOptions(@Auth() auth: AuthContext, @Query() q: Record<string, unknown>) {
     return this.p4c.warehouseOrderOptions(auth, q);

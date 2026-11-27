@@ -53,6 +53,7 @@ describe("enable and list", () => {
       "work_start_date",
       "work_end_date",
       "closing_rn_ref",
+      "closing_rn_id",
       "closed",
     ]);
     expect(
@@ -407,6 +408,17 @@ describe("rules enforced in the database", () => {
       { data: { supervising_engineer: randomUUID() } },
     );
     expect(stranger.body.errors[0].code).toBe("unknown_user");
+    // 0321: the closing RN link. A made-up RN, a malformed id and an RN that is not a received RN of the part are refused; the typed reference is not read from them.
+    const noSuchRn = await patch(t.entry.api, KEY, rec.body.id, rec.body.version, { data: { closed: true, closing_rn_id: randomUUID() } });
+    expect(noSuchRn.status, JSON.stringify(noSuchRn.body)).toBe(422);
+    expect(JSON.stringify(noSuchRn.body)).toContain("rn_not_available");
+    const junkRn = await patch(t.entry.api, KEY, rec.body.id, rec.body.version, { data: { closing_rn_id: "not-an-id" } });
+    expect(junkRn.status).toBe(422);
+    expect(JSON.stringify(junkRn.body)).toContain("invalid");
+    const opts = await t.entry.api.call("get", `/registers/dismantle/rn-options?site_id=${t.site.id}&record_type=te`);
+    expect(opts.status, JSON.stringify(opts.body)).toBe(200);
+    expect(Array.isArray(opts.body.items)).toBe(true);
+    expect((await t.entry.api.call("get", `/registers/dismantle/rn-options?site_id=${t.site.id}&record_type=xx`)).status).toBe(422);
     const withCustom = await patch(
       t.entry.api,
       KEY,
