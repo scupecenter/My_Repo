@@ -289,6 +289,10 @@ records of the Contractors register (companies, teams, contracts) and the vehicl
 | local_credentials | KEEP | Passwords: users sign in as before. |
 | user_totp | KEEP | Two-factor secrets and the enforced flag. |
 | user_recovery_codes | KEEP | Two-factor recovery codes. |
+| auth_known_device | KEEP | New-device email code (0292): devices a user has signed in from. |
+| auth_device_challenge | KEEP | New-device email code (0292): pending codes. |
+| auth_device_pass | KEEP | New-device email code (0292): one-time passes. |
+| auth_device_bypass | KEEP | New-device email code (0292): per-user bypass flags. |
 | auth_pending | KEEP | Pending sign-ins (5 minutes, single use); identity, expires by itself. |
 | user_sessions | KEEP | Rows stay; every open session is ended (revoked, reason `project_data_reset`). Safer: nobody keeps a page of deleted data open. |
 | record_edit_presence | KEEP | Transient "is editing this record" presence rows; they expire on their own (0345). |

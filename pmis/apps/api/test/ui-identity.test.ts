@@ -91,7 +91,9 @@ describe('Settings, Identity & themes: GET and PUT /settings/identity', () => {
     expect(ok.status).toBe(200);
     expect(ok.body).toMatchObject({ default_brand: 'aljeel', allow_user_choice: true, updated_by: { id: admin.user.id }, can_edit: true });
     expect(etag(ok)).not.toBe(etag(cur));
-    expect(await value()).toEqual({ default_brand: 'aljeel', allow_user_choice: true });
+    expect(await value()).toMatchObject({ default_brand: 'aljeel', allow_user_choice: true });
+    // 0241: the stored value carries the appearance defaults (the built-in standard while none are set)
+    expect((await value() as { defaults?: unknown }).defaults).toMatchObject({ density: 'standard', accent: 'default' });
     const a = await audits();
     expect(a).toHaveLength(1);
     expect(a[0]).toMatchObject({ actor_id: admin.user.id, reason: REASON, before: { default_brand: 'current', allow_user_choice: true }, after: { default_brand: 'aljeel', allow_user_choice: true } });
@@ -160,5 +162,67 @@ describe('the personal design: PATCH /me/profile ui_brand', () => {
     const unlock = await put(admin, { default_brand: 'current', allow_user_choice: true, reason: REASON }, etag(await read(admin)));
     expect(unlock.status).toBe(200);
     expect((await api.call('get', '/me')).body.user).toMatchObject({ ui_brand: null, brand: 'current' });
+  });
+});
+
+/** 0241 (owner approval 2026-11-27, the PM-platforms proposal items 1-3): the appearance profile `ui_prefs` and the organization appearance defaults. */
+describe('the appearance profile: PATCH /me/profile ui_prefs and the identity defaults', () => {
+  const patchPrefs = async (api: Api, ui_prefs: unknown) => api.call('patch', '/me/profile', { ui_prefs }, { 'If-Match': await profileTag(api) });
+
+  it('a user chooses dimensions one at a time; the effective appearance fills the rest from the defaults; audited per dimension; GET /me carries both', async () => {
+    const u = await makeUser(db, { assigned: true });
+    const api = await loggedIn(app, u);
+    const p = await api.call('get', '/me/profile');
+    expect(p.body).toMatchObject({ ui_prefs: {}, identity: { allow_user_choice: true } });
+    expect(p.body.identity.defaults).toMatchObject({ density: 'standard', accent: 'default' });
+    expect(p.body.identity.pref_options.density).toEqual(['comfortable', 'standard', 'compact']);
+    expect(p.body.editable_fields).toContain('ui_prefs');
+    const r = await patchPrefs(api, { density: 'compact' });
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({ ui_prefs: { density: 'compact' } });
+    expect(r.body.appearance).toMatchObject({ density: 'compact', font_scale: 'standard', accent: 'default' });
+    const r2 = await patchPrefs(api, { density: 'compact', accent: 'violet' });
+    expect(r2.status).toBe(200);
+    expect(r2.body.appearance).toMatchObject({ density: 'compact', accent: 'violet' });
+    expect((await api.call('get', '/me')).body.user).toMatchObject({ ui_prefs: { density: 'compact', accent: 'violet' } });
+    const a = (await db.query(`SELECT before, after FROM audit_log WHERE action = 'profile_updated' AND entity_id = $1 ORDER BY id`, [u.id])).rows;
+    expect(a).toHaveLength(2);
+    expect(a[0]).toMatchObject({ before: { ui_prefs: {} }, after: { ui_prefs: { density: 'compact' }, via: 'self_service' } });
+    expect(a[1].after.ui_prefs).toMatchObject({ accent: 'violet' });
+    // an unknown dimension or value is 422 on the field
+    expect((await patchPrefs(api, { density: 'tiny' })).status).toBe(422);
+    expect((await patchPrefs(api, { sparkle: 'lots' })).status).toBe(422);
+  });
+
+  it('the organization defaults come from PUT /settings/identity (omitted keeps them); everyone without a choice sees them', async () => {
+    const u = await makeUser(db, { assigned: true });
+    const api = await loggedIn(app, u);
+    const set = await put(admin, { default_brand: 'aljeel', allow_user_choice: true, defaults: { density: 'compact', accent: 'green' }, reason: REASON }, etag(await read(admin)));
+    expect(set.status).toBe(200);
+    expect(set.body.defaults).toMatchObject({ density: 'compact', accent: 'green' });
+    expect((await api.call('get', '/me')).body.user.appearance).toMatchObject({ density: 'compact', accent: 'green' });
+    // omitted keeps the current defaults
+    const again = await put(admin, { default_brand: 'current', allow_user_choice: true, reason: REASON }, etag(await read(admin)));
+    expect(again.status).toBe(200);
+    expect(again.body.defaults).toMatchObject({ density: 'compact', accent: 'green' });
+    expect((await put(admin, { default_brand: 'current', allow_user_choice: true, defaults: { density: 'airy' }, reason: REASON }, etag(await read(admin)))).status).toBe(422);
+    await put(admin, { default_brand: 'current', allow_user_choice: true, defaults: {}, reason: REASON }, etag(await read(admin)));
+  });
+
+  it('while the admin locks the design, a personal appearance is refused (403 field_read_only); the stored choice is kept but the locked defaults apply', async () => {
+    const u = await makeUser(db, { assigned: true });
+    const api = await loggedIn(app, u);
+    expect((await patchPrefs(api, { radius: 'rounded' })).status).toBe(200);
+    const lock = await put(admin, { default_brand: 'current', allow_user_choice: false, defaults: { radius: 'sharp' }, reason: REASON }, etag(await read(admin)));
+    expect(lock.status).toBe(200);
+    const blocked = await patchPrefs(api, { radius: 'rounded', motion: 'reduced' });
+    expect(blocked.status).toBe(403);
+    expect(blocked.body.code).toBe('field_read_only');
+    expect(blocked.body.errors[0]).toMatchObject({ path: '/ui_prefs', code: 'appearance_choice_locked' });
+    const stored = await q<{ ui_prefs: Record<string, string> }>(db, 'SELECT ui_prefs FROM users WHERE id = $1', [u.id]);
+    expect(stored[0]!.ui_prefs).toMatchObject({ radius: 'rounded' });
+    expect((await api.call('get', '/me')).body.user.appearance).toMatchObject({ radius: 'sharp' });
+    await put(admin, { default_brand: 'current', allow_user_choice: true, defaults: {}, reason: REASON }, etag(await read(admin)));
+    expect((await api.call('get', '/me')).body.user.appearance).toMatchObject({ radius: 'rounded' });
   });
 });
