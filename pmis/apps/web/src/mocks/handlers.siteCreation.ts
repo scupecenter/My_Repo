@@ -44,6 +44,10 @@ function clean(raw: Record<string, unknown>, self?: string): { data: Record<stri
   else data.region_id = rid;
   if (!String(raw.name ?? '').trim()) err('name', 'required', 'The English site name is required.'); else data.name = String(raw.name).trim();
   if (String(raw.name_ar ?? '').trim()) data.name_ar = String(raw.name_ar).trim();
+  // 0257: the same name as another site or waiting draft is a warning, never an error (same region: named; other region: only that one exists)
+  const nm = String(raw.name ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
+  const twin = nm ? drafts().find((d) => d.id !== self && ['entry', 'in_approval'].includes(d.status) && String((d.data as Record<string, unknown>).name ?? '').trim().replace(/\s+/g, ' ').toLowerCase() === nm) : undefined;
+  if (twin) warnings.push({ field: 'name', code: 'duplicate_name', message: Number(twin.region_id) === Number(raw.region_id) ? `A site with this name exists: ${twin.site_code}. Check it is a different site.` : 'A site with this name exists in another region. Check it is a different site.' });
   const ds = String(raw.delivery_scenario ?? '').trim().toLowerCase().replace(/ /g, '_');
   if (!ds) err('delivery_scenario', 'required', 'The delivery scenario is required.');
   else if (!SCENARIOS.includes(ds)) err('delivery_scenario', 'not_in_list', 'Not a delivery scenario.');

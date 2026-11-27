@@ -97,4 +97,4 @@ END $$;
 INSERT INTO audit_log (action, entity_type, entity_id, after, reason)
 VALUES ('ui_features_inbox_applied', 'workflow', NULL,
         jsonb_build_object('ui_features', 'section inbox added to ui.features'),
-        'Inbox tabs and priority setting (migration 0281, contract 0.15.186).');
+        'Inbox tabs and priority setting (migration 0281, contract 0.15.250).');

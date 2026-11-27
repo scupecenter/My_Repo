@@ -6,7 +6,7 @@ import { G } from './reg-helpers';
 import { Actor, actor, plainAdmin } from './wf-helpers';
 
 /**
- * Migrations 0280 and 0281, contracts 0.15.185 and 0.15.186: the interface features are one guarded setting (ui.features), read by every signed-in user, written by a System Admin
+ * Migrations 0280 and 0281, contracts 0.15.185 and 0.15.250: the interface features are one guarded setting (ui.features), read by every signed-in user, written by a System Admin
  * or an all-regions delegate of admin.settings with a reason and If-Match, closed per section, audited.
  */
 let app: NestExpressApplication;

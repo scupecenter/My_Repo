@@ -21,6 +21,7 @@ export type Notification = S['Notification'];
 export type Follow = S['Follow'];
 export type TaskTimeInState = S['TaskTimeInState'];
 export type TimeInStateReport = S['TimeInStateReport'];
+export type StateDurationsReport = S['StateDurationsReport'];
 export type Workload = S['Workload'];
 export type BlockedBy = S['BlockedBy'];
 export type StatusUpdate = S['StatusUpdate'];
