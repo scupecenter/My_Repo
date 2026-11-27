@@ -1,3 +1,4 @@
+import { ExportAction } from '../security/export-lock';
 import { Body, Controller, Get, Header, HttpCode, Param, Post, Query, Req, Res } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import type { AuthContext } from '../auth/auth.types';
@@ -31,6 +32,7 @@ export class AnnouncementsController {
     return this.announcements.responses(id, query);
   }
 
+  @ExportAction()
   @Get(':id/responses/export')
   @Header('Content-Type', 'text/csv; charset=utf-8')
   async export(@Auth() auth: AuthContext, @Param('id') id: string, @Req() req: Request, @Res({ passthrough: true }) res: Response) {

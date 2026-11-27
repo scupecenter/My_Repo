@@ -373,6 +373,9 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/settings/login-page'],
   ['put', '/settings/login-page'],
   ['get', '/settings/login-page/public'],
+  // Contract 0.15.190 (migration 0290; apps/api: settings): the admin lock keys (Settings, Security, Lock keys).
+  ['get', '/settings/security-locks'],
+  ['put', '/settings/security-locks'],
   // Contract 0.15.4 (migration 0085; apps/api: sites, master-import, templates): the per-site workflow locks (one site, many sites) and the status of the sites of
   // an import (missing data per site). The new site fields ride on the paths above.
   ['post', '/sites/workflow-locks'],
@@ -545,6 +548,9 @@ export const REAL_API_AUTH_USERS = [
   // Contract 0.15.64 (migration 0148, W8): the defaults of the Display menu of the site-data tables
   ['get', '/settings/table-display'],
   ['put', '/settings/table-display'],
+  // Contract 0.15.102 (migration 0196): the interface features setting
+  ['get', '/settings/ui-features'],
+  ['put', '/settings/ui-features'],
   ['get', '/settings/idle-task-alert'],
   ['put', '/settings/idle-task-alert'],
   ['get', '/settings/notification-policy/catalogue'],
