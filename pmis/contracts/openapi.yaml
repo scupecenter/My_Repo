@@ -31,6 +31,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.261 (2026-11-27): mail policy (migration 0364, mirror `db/sql/363_mail_policy.sql`). Additive. New `GET/PUT /settings/mail-policy` (the setting `mail.policy`: global switch, internal only or internal plus external recipients, internal domains, per kind switch and mode). `expiry_radar`, `approval_digest` and `weekly_digest` join the mail kind catalogue (still mailed only when listed in `mail.notification_kinds`). Defaults keep today's behaviour.
     - 0.15.202 (2026-11-27): the dashboard follow-up sections, contractor and supplier scorecard (owner approval 2026-11-26, dashboard proposals item 5; migration 0303). Additive and read only. `GET /dashboard/ops` gains the section `contractor_scorecard` (`DashboardOpsScorecard`): the aggregate of `GET /reports/contractor-performance`, so the card and the performance screen never disagree - the counts of parties per level, the on-time rectification rate of snags, the average delay days over the delayed parties, the rejection (quality fail) rate, the snag and quality totals, and the five worst parties with their worst figures. No amounts. The section needs the contractors view and answers available false without it. The dashboard settings catalogue gains the card `ops_contractors`. No grant, role or permission change.
     - 0.15.153 (2026-11-27): "My sessions" (no migration; CHANGELOG MySessions). Additive. `GET /me/sessions` (`listMySessions`): the caller's own live sessions (device, sign-in time, last activity, IP, `is_current`); `POST /me/sessions/{session_id}/revoke` (`revokeMySession`) ends one of the caller's own other sessions (404 for anyone else's, 422 `own_session` for the current one); `POST /me/sessions/revoke-others` (`revokeMyOtherSessions`) ends every other session of the caller. Own rows only, no permission and no step-up (it only narrows access); audited and in the security log.
     - 0.15.135 (2026-11-27): the Lessons Learned register (owner approval 2026-11-26, C3; migration 0184): one register for the lessons of the project, from an incident, a snag, a delay or any experience, with the recommendation and where it was applied. Additive. Register key `lessons_learned` in `/registers` and `/registers/{key}` records with its own fields and the standard two levels, the Dropdown list LessonCategory in Settings, the module `lessons_learned` in the permissions grid (no grant seeded), the nav key in the catalogue, the template TPL-LESSONS-LEARNED and the master export part. Existing registers and data are untouched.
@@ -10901,6 +10902,56 @@ paths:
                     items: {$ref: '#/components/schemas/GoalProgress'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
+  /settings/mail-policy:
+    get:
+      tags: [settings]
+      operationId: getMailPolicy
+      summary: The mail policy (0.15.261)
+      description: |
+        0.15.261. System Admin only (403 `action_forbidden` otherwise). `enabled` is the global switch, `mode` is `internal_only` or `internal_external` for every kind, `kinds` may
+        override it per kind. An address is external when its domain is not in `internal_domains` (empty list: every address is internal). External mail also needs the security
+        lock `block_public_sharing` to be off (`block_public_sharing` shows its state). Security alerts and mandatory mail are never stopped by the policy.
+      responses:
+        '200':
+          description: The setting.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MailPolicy'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    put:
+      tags: [settings]
+      operationId: setMailPolicy
+      summary: Save the mail policy (System Admin, step-up, reason, If-Match, audited)
+      description: |
+        0.15.261. Field errors (422 `validation_failed`): `/enabled`, `/mode`, `/internal_domains[/i]`, `/kinds[/kind]` (`unknown_kind`, `invalid`), `unknown_key`. Audited as `mail_policy_update`.
+      x-step-up: true
+      x-db-path: admin_save_mail_policy
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - {$ref: '#/components/schemas/WithReason'}
+              - {$ref: '#/components/schemas/MailPolicyInput'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MailPolicy'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
   /settings/mail-notification-kinds:
     get:
       tags: [settings]
@@ -23347,6 +23398,40 @@ components:
               uniqueItems: true
               items: { type: string, minLength: 2, maxLength: 60, pattern: '^[a-z][a-z0-9_]*$' }
               description: 'Notification kinds that are also mailed to the person. An empty list keeps every notification in-app.'
+    MailPolicyInput:
+      type: object
+      required: [enabled, mode, internal_domains, kinds]
+      properties:
+        enabled: { type: boolean }
+        mode: { type: string, enum: [internal_only, internal_external] }
+        internal_domains: { type: array, maxItems: 50, items: { type: string } }
+        kinds:
+          type: object
+          additionalProperties:
+            type: object
+            required: [enabled, mode]
+            properties:
+              enabled: { type: boolean }
+              mode: { type: string, enum: [inherit, internal_only, internal_external] }
+    MailPolicy:
+      description: '0.15.261. The setting `mail.policy`.'
+      allOf:
+      - {$ref: '#/components/schemas/MailPolicyInput'}
+      - type: object
+        required: [version, catalogue, block_public_sharing]
+        properties:
+          version: { type: integer, minimum: 0 }
+          block_public_sharing: { type: boolean, description: 'The security lock; while on, no external mail is sent.' }
+          catalogue:
+            type: array
+            items:
+              type: object
+              required: [kind, recommended]
+              properties:
+                kind: { type: string }
+                recommended: { type: boolean }
+          updated_at: { type: [string, 'null'], format: date-time }
+          updated_by: { anyOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
     MailNotificationKinds:
       type: object
       description: '0.14.2 (Q441). The setting `mail.notification_kinds` and the kinds it may name.'

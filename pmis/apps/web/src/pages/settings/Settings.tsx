@@ -14,6 +14,7 @@ import { StaffVisibility } from './StaffVisibility';
 import { TeamScopeMatch } from './TeamScopeMatch';
 import { GecolOrderWarnings } from './GecolOrderWarnings';
 import { MailKinds } from './MailKinds';
+import { MailPolicy } from './MailPolicy';
 import { useMe } from '@/api/hooks';
 import { NewBadge } from '@/components/NewBadge';
 import { ContractorRules } from './ContractorRules';
@@ -156,7 +157,7 @@ export function SettingsRoutes() {
         <Route path="alerts" element={<TabFrame tab="alerts" />}>
           <Route index element={<Navigate to="policy" replace />} />
           <Route path="policy" element={<Notifications />} />
-          <Route path="mail" element={<MailKinds />} />
+          <Route path="mail" element={<><MailPolicy /><MailKinds /></>} />
         </Route>
         <Route path="workflow" element={<TabFrame tab="workflow" />}>
           <Route index element={<Navigate to="editor" replace />} />

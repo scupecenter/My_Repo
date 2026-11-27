@@ -335,7 +335,7 @@ describe('hybrid mode list', () => {
       // contract 0.14.0: site creation (Q460): the draft and its life
       'POST /sites', 'GET /site-drafts', 'GET /site-drafts/:id', 'PATCH /site-drafts/:id', 'DELETE /site-drafts/:id', 'POST /site-drafts/:id/submit', 'POST /site-drafts/:id/decide',
       // contract 0.14.2: the official calendar confirmation (Q440) and the mail notification kinds (Q441)
-      'GET /settings/calendar-confirmation', 'PUT /settings/calendar-confirmation', 'GET /settings/mail-notification-kinds', 'PUT /settings/mail-notification-kinds',
+      'GET /settings/calendar-confirmation', 'PUT /settings/calendar-confirmation', 'GET /settings/mail-policy', 'PUT /settings/mail-policy', 'GET /settings/mail-notification-kinds', 'PUT /settings/mail-notification-kinds',
       // contract 0.14.3: the one-time historical-load document waiver (Q462)
       'GET /settings/historical-waiver', 'PUT /settings/historical-waiver',
       // contract 0.14.5: the site map of the dashboard (OV-12)
