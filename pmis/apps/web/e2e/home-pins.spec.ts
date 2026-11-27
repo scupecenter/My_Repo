@@ -7,18 +7,19 @@ for (const c of [{ locale: 'en', theme: 'light', suffix: 'en' }, { locale: 'ar',
     await page.addInitScript(([l, t]) => { localStorage.setItem('pmis.locale', l); localStorage.setItem('pmis.theme', t); }, [c.locale, c.theme]);
     await login(page, 'pm');
     await expect(page.getByTestId('nav-dashboard')).toBeVisible();
-    // Create a view and pin it through the mock API (in-browser fetch is intercepted by MSW); a full page load would reset the mock state,
-    // so the pin happens before the dashboard is opened and every navigation below is in-app.
+    // Create the view through the mock API (in-browser fetch is intercepted by MSW); a full page load would reset the mock state,
+    // so every navigation below is in-app. The PIN itself goes through the real toggle so the card's cached list is invalidated
+    // (a raw fetch would leave the dashboard's first, empty read cached for its stale window).
     const id = await page.evaluate(async () => {
-      const mk = async (path: string, body: unknown) => {
-        const r = await fetch(`/api/v1${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
-        if (!r.ok) throw new Error(`${path}: ${r.status}`);
-        return r.json();
-      };
-      const v = (await mk('/saved-views', { screen_key: 'register-issues', name: 'Late issues — pinned', filters: {} })) as { id: string };
-      await mk(`/saved-views/${v.id}/pin`, {});
-      return v.id;
+      const r = await fetch('/api/v1/saved-views', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ screen_key: 'register-issues', name: 'Late issues — pinned', filters: {} }) });
+      if (!r.ok) throw new Error(`/saved-views: ${r.status}`);
+      return ((await r.json()) as { id: string }).id;
     });
+    await page.getByTestId('nav-issues').click();
+    await page.getByTestId(`views-tab-register-issues-${id}`).click();
+    await expect(page.getByTestId('views-pin-home')).toBeVisible();
+    await page.getByTestId('views-pin-home').click();
+    await expect(page.getByTestId('views-pin-home')).toHaveAttribute('aria-pressed', 'true');
     await page.getByTestId('nav-dashboard').click();
     const card = page.getByTestId('dash-pinned-views');
     await expect(card).toBeVisible();
