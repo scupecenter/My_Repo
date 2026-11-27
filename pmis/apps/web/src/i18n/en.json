@@ -885,6 +885,8 @@
     "ended": "Assignments ended.",
     "tab_active": "Users",
     "tab_invitations": "Invitations",
+    "count": "{{count}} users",
+    "tab_more": "More",
     "tab_deleted": "Deleted",
     "deactivate": "Deactivate",
     "reactivate": "Reactivate",
