@@ -6,7 +6,7 @@ import { G } from './reg-helpers';
 import { Actor, actor, plainAdmin } from './wf-helpers';
 
 /**
- * Migration 0280, contract 0.15.185: the interface features are one guarded setting (ui.features), read by every signed-in user, written by a System Admin
+ * Migrations 0280 and 0281, contracts 0.15.185 and 0.15.250: the interface features are one guarded setting (ui.features), read by every signed-in user, written by a System Admin
  * or an all-regions delegate of admin.settings with a reason and If-Match, closed per section, audited.
  */
 let app: NestExpressApplication;
@@ -36,6 +36,8 @@ const codes = (res: { body: any }): string[] => (res.body.errors ?? []).map((e: 
 const put = (who: Actor, body: unknown, tag?: string) => who.api.call('put', '/settings/ui-features', body, tag === undefined ? {} : { 'If-Match': tag });
 const AV = { style: 'geometric', shape: 'rounded', palette: 'brand', in_lists: false };
 const NB = { enabled: false, days: 30 };
+const INBOX_SEED = { tabs_enabled: true, default_tab: 'all', priority_kinds: ['mention', 'approval_due', 'task_returned', 'task_rejected', 'idle_task_alert', 'no_holder', 'absence_alert'] };
+const INBOX = { tabs_enabled: true, default_tab: 'priority', priority_kinds: ['mention', 'system'] };
 
 describe('Settings > Screens > Interface (ui.features)', () => {
   it('every signed-in user reads the seed before any save, with an ETag', async () => {
@@ -44,6 +46,7 @@ describe('Settings > Screens > Interface (ui.features)', () => {
     expect(res.body.sections).toEqual({
       avatars: { style: 'gradient', shape: 'circle', palette: 'varied', in_lists: true },
       new_badge: { enabled: true, days: 14 },
+      inbox: INBOX_SEED,
     });
     expect(etag(res)).toBe(`"${res.body.version}"`);
   });
@@ -54,13 +57,13 @@ describe('Settings > Screens > Interface (ui.features)', () => {
     expect((await put(delegateReg, { sections: { avatars: AV }, reason: 'Try it' }, etag(cur))).status).toBe(403);
     expect((await put(admin, { sections: { avatars: AV } }, etag(cur))).status).toBe(422);
     const bad = await put(admin, {
-      sections: { avatars: { style: 'cartoon', shape: 'square', palette: 'x', in_lists: 'yes', size: 1 }, new_badge: { enabled: true, days: 400 }, inbox: {} },
+      sections: { avatars: { style: 'cartoon', shape: 'square', palette: 'x', in_lists: 'yes', size: 1 }, new_badge: { enabled: true, days: 400 }, not_a_section: {} },
       extra: 1, reason: 'Bad values',
     }, etag(cur));
     expect(bad.status).toBe(422);
     expect(codes(bad)).toEqual([
       '/extra:unknown_key', '/sections/avatars/in_lists:invalid', '/sections/avatars/palette:invalid', '/sections/avatars/shape:invalid',
-      '/sections/avatars/size:unknown_key', '/sections/avatars/style:invalid', '/sections/inbox:unknown_key', '/sections/new_badge/days:out_of_range',
+      '/sections/avatars/size:unknown_key', '/sections/avatars/style:invalid', '/sections/new_badge/days:out_of_range', '/sections/not_a_section:unknown_key',
     ]);
     const zero = await put(admin, { sections: { new_badge: { enabled: true, days: 0 } }, reason: 'Zero days' }, etag(cur));
     expect(codes(zero)).toEqual(['/sections/new_badge/days:out_of_range']);
@@ -81,14 +84,30 @@ describe('Settings > Screens > Interface (ui.features)', () => {
     expect((await put(admin, { sections: { new_badge: NB }, reason: 'Stale' }, etag(cur))).status).toBe(412);
     const both = await put(admin, { sections: { avatars: AV, new_badge: NB }, reason: 'Both sections' }, etag(res));
     expect(both.status).toBe(200);
-    expect(both.body.sections).toEqual({ avatars: AV, new_badge: NB });
+    expect(both.body.sections).toEqual({ avatars: AV, new_badge: NB, inbox: INBOX_SEED });
     const rows = await db.query("SELECT entity_id, before, after, reason FROM audit_log WHERE action = 'ui_features_update' ORDER BY id DESC LIMIT 1");
-    expect(rows.rows[0]).toMatchObject({ entity_id: 'ui.features', reason: 'Both sections', after: { avatars: AV, new_badge: NB } });
+    expect(rows.rows[0]).toMatchObject({ entity_id: 'ui.features', reason: 'Both sections', after: { avatars: AV, new_badge: NB, inbox: INBOX_SEED } });
     expect(rows.rows[0].before.avatars).toEqual(AV);
-    expect((await plain.api.call('get', '/settings/ui-features')).body.sections).toEqual({ avatars: AV, new_badge: NB });
+    expect((await plain.api.call('get', '/settings/ui-features')).body.sections).toEqual({ avatars: AV, new_badge: NB, inbox: INBOX_SEED });
     const back = await put(admin, {
       sections: { avatars: { style: 'gradient', shape: 'circle', palette: 'varied', in_lists: true }, new_badge: { enabled: true, days: 14 } }, reason: 'Back to the default',
     }, etag(both));
+    expect(back.status).toBe(200);
+  });
+
+  it('the inbox section (0281): saved on its own, closed, kinds checked, and the other sections keep their value', async () => {
+    const cur = await admin.api.call('get', '/settings/ui-features');
+    const bad = await put(admin, { sections: { inbox: { tabs_enabled: 'yes', default_tab: 'inbox', priority_kinds: ['mention', 'nope'], extra: 1 } }, reason: 'Bad inbox' }, etag(cur));
+    expect(bad.status).toBe(422);
+    expect(codes(bad)).toEqual(['/sections/inbox/default_tab:invalid', '/sections/inbox/extra:unknown_key', '/sections/inbox/priority_kinds:invalid', '/sections/inbox/tabs_enabled:invalid']);
+    const notList = await put(admin, { sections: { inbox: { ...INBOX, priority_kinds: 'mention' } }, reason: 'Not a list' }, etag(cur));
+    expect(codes(notList)).toEqual(['/sections/inbox/priority_kinds:invalid']);
+    const ok = await put(admin, { sections: { inbox: INBOX }, reason: 'Priority tab first' }, etag(cur));
+    expect(ok.status).toBe(200);
+    expect(ok.body.sections.inbox).toEqual(INBOX);
+    expect(ok.body.sections.avatars).toEqual(cur.body.sections.avatars);
+    expect((await plain.api.call('get', '/settings/ui-features')).body.sections.inbox).toEqual(INBOX);
+    const back = await put(admin, { sections: { inbox: INBOX_SEED }, reason: 'Back to the default' }, etag(ok));
     expect(back.status).toBe(200);
   });
 
