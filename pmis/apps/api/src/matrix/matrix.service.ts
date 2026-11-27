@@ -5,6 +5,7 @@ import { AccessService } from '../access/access.service';
 import type { AuthContext } from '../auth/auth.types';
 import { StepUpService } from '../auth/step-up.service';
 import { parseIfMatch } from '../common/etag';
+import { mapDbError } from '../common/db-errors';
 import { ProblemException, problems } from '../common/problem';
 import { oneParam, Query } from '../common/query';
 import { parse } from '../common/zod';
@@ -359,5 +360,31 @@ export class MatrixService {
       byRow.set(key, row);
     }
     return { workflow_version: wf.version, as_of: new Date().toISOString(), regions, summary, rows: [...byRow.values()] };
+  }
+
+  /**
+   * GET /matrix/simulate (0.15.100): "who approves?" for a site and a stage task or a register. Read only and admin only (`matrix_simulate`, migration 0252):
+   * for L1 and L2 the cell that decides, its rule, the active people who would hold the level and how they reach it, and, when nobody holds it, the people
+   * who could act through the admin path (System Admins and delegates that cover the module and the region). Changes nothing and writes nothing.
+   */
+  async simulate(q: Query): Promise<Record<string, unknown>> {
+    const site = oneParam(q, 'site_id'), kind = oneParam(q, 'kind'), code = oneParam(q, 'code');
+    const errs: { path: string; code: string; message: string }[] = [];
+    if (!site || !/^[0-9a-fA-F-]{36}$/.test(site)) errs.push({ path: '/site_id', code: 'invalid', message: 'A site id is required.' });
+    if (kind !== 'task' && kind !== 'register') errs.push({ path: '/kind', code: 'invalid', message: 'kind is task or register.' });
+    if (!code || code.length > 60) errs.push({ path: '/code', code: 'invalid', message: 'The task code or the register key is required.' });
+    if (errs.length) throw problems.validation(errs);
+    await this.db.tx.$executeRaw`SAVEPOINT matrix_sim`;
+    try {
+      const rows = await this.db.tx.$queryRaw<{ r: Record<string, unknown> }[]>(Prisma.sql`SELECT matrix_simulate(${site}::uuid, ${kind}::text, ${code}::text) AS r`);
+      await this.db.tx.$executeRaw`RELEASE SAVEPOINT matrix_sim`;
+      return (rows[0] as { r: Record<string, unknown> }).r;
+    } catch (e) {
+      if (e instanceof ProblemException) throw e;
+      const p = mapDbError(e);
+      if (!p) throw e;
+      await this.db.tx.$executeRaw`ROLLBACK TO SAVEPOINT matrix_sim`;
+      throw p;
+    }
   }
 }

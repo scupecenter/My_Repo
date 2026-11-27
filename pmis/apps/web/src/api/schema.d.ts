@@ -2997,6 +2997,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/matrix/simulate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Who would hold L1 and L2 for a site and a task or register (read only, admin)
+         * @description 0.15.152. Read only, nothing is written. The cell that decides is found as the engine finds it (task cell before stage cell, region cell before default cell). `holders` are the active people who would hold the level and `via` says how (`named`, `role: <name>`, `group: <name>`). When nobody holds the level, `fallback` lists who could act through the admin path (`system_admin`, or `delegate` when a delegation covers the module and the region of the site). Needs `admin.matrix` view or edit (403 otherwise).
+         */
+        get: operations["simulateMatrix"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/matrix/coverage": {
         parameters: {
             query?: never;
@@ -7140,6 +7160,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/registers/{register_key}/fields/{code}/default": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set or clear the default value of a register column
+         * @description 0.15.154. System Admin or a delegate of `fields.edit` (403 otherwise). The default is prefilled on a NEW record by the register form and shown as prefilled; the server never applies it by itself. Only simple columns (text, long text, email, phone, link, number, currency, percentage, date, yes/no, list, multi-list); 422 `not_supported` for the others, 422 `unknown_value` for a value that is not an active value of the list, and the same value rules as a record. `value` null clears it. If-Match (the column version) is optional. Audited (`register_field_default`).
+         */
+        put: operations["setRegisterFieldDefault"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/registers/{register_key}/fields-order": {
         parameters: {
             query?: never;
@@ -10640,6 +10680,38 @@ export interface components {
         MySessionRevokeResult: {
             revoked_count: number;
         };
+        MatrixSimulation: {
+            site: {
+                /** Format: uuid */
+                id: string;
+                site_code: string;
+                name: string | null;
+                region_id: number;
+            };
+            /** @enum {string} */
+            kind: "task" | "register";
+            code: string;
+            name_en: string;
+            name_ar: string | null;
+            module: string;
+            levels: {
+                /** @enum {string} */
+                level_code: "L1" | "L2";
+                /** @enum {string} */
+                source: "region" | "default" | "none";
+                task_specific: boolean;
+                rule: string | null;
+                holders: components["schemas"]["MatrixSimulationPerson"][];
+                fallback: components["schemas"]["MatrixSimulationPerson"][];
+            }[];
+        };
+        MatrixSimulationPerson: {
+            /** Format: uuid */
+            user_id: string;
+            name: string;
+            email: string;
+            via: string | string[];
+        };
         PmScheduleInput: {
             id: string;
             name_en: string;
@@ -11846,6 +11918,8 @@ export interface components {
             theme?: "light" | "dark";
             /** @description 0.15.41. The personal UI design; null goes back to the organization default. While `identity.allow_user_choice` is false a non-null value is 403 `field_read_only` (`errors[0]` `{path: /ui_brand, code: brand_choice_locked}`); null stays allowed. Audited in `profile_updated`. */
             ui_brand?: components["schemas"]["UiBrand"] | null;
+            /** @description 0.15.230 (0241). The personal appearance choices; a subset of the dimensions. While `identity.allow_user_choice` is false a value is 403 `field_read_only` (`errors[0]` `{path: /ui_prefs, code: appearance_choice_locked}`). Audited per dimension in `profile_updated`. */
+            ui_prefs?: components["schemas"]["UiPrefs"];
         };
         /** @description 0.9.2. The "My profile" page. */
         MyProfile: {
@@ -11869,16 +11943,26 @@ export interface components {
             ui_brand: components["schemas"]["UiBrand"] | null;
             /** @description 0.15.41. The design the user sees. */
             brand: components["schemas"]["UiBrand"];
+            /** @description 0.15.230 (0241). The stored personal appearance choices; empty = the organization defaults. */
+            ui_prefs: components["schemas"]["UiPrefs"];
+            /** @description 0.15.230 (0241). The appearance the user sees (ui_effective_prefs): own choices, else the organization defaults. */
+            appearance: components["schemas"]["UiPrefs"];
             /** @description 0.15.41. The organization default and whether a personal design is allowed (drives the Appearance control). */
             identity: {
                 default_brand: components["schemas"]["UiBrand"];
                 allow_user_choice: boolean;
+                /** @description 0.15.230 (0241): the organization appearance defaults. */
+                defaults?: components["schemas"]["UiPrefs"];
+                /** @description 0.15.230 (0241): the dimensions with their allowed values (ui_pref_options). */
+                pref_options?: {
+                    [key: string]: string[];
+                };
             };
             status: components["schemas"]["UserStatus"];
             /** @enum {string} */
             auth_method: "local" | "m365" | "break_glass";
             local_sign_in: boolean;
-            editable_fields: ("display_name" | "locale" | "theme" | "ui_brand")[];
+            editable_fields: ("display_name" | "locale" | "theme" | "ui_brand" | "ui_prefs")[];
             admin_owned: {
                 roles: components["schemas"]["RoleRef"][];
                 teams: components["schemas"]["TeamKind"][];
@@ -11938,6 +12022,10 @@ export interface components {
             ui_brand?: components["schemas"]["UiBrand"] | null;
             /** @description 0.15.41. The design the user sees: `ui_brand` while the admin allows a personal choice and one is set, else the organization default. Independent of `theme`. */
             brand?: components["schemas"]["UiBrand"];
+            /** @description 0.15.230 (0241). The stored personal appearance choices; empty = the organization defaults. */
+            ui_prefs?: components["schemas"]["UiPrefs"];
+            /** @description 0.15.230 (0241). The appearance the user sees (ui_effective_prefs): own choices, else the organization defaults. */
+            appearance?: components["schemas"]["UiPrefs"];
             is_break_glass?: boolean;
             /** @description 0.3.0. E.164; a local sign-in identifier. */
             phone?: string | null;
@@ -15477,14 +15565,23 @@ export interface components {
             enabled: boolean;
             days: number;
         };
+        /** @description 0.15.250. The inbox tabs and which notification kinds count as priority. */
+        UiInbox: {
+            tabs_enabled: boolean;
+            /** @enum {string} */
+            default_tab: "all" | "priority" | "mentions" | "tasks" | "approvals" | "system";
+            priority_kinds: ("mention" | "followed_change" | "task_assigned" | "task_returned" | "task_rejected" | "task_approved" | "approval_due" | "reassigned" | "absence_alert" | "idle_task_alert" | "no_holder" | "system")[];
+        };
         /** @description 0.15.185. The sections of the interface features setting; every section is complete. */
         UiFeatures: {
             avatars: components["schemas"]["UiAvatars"];
             new_badge: components["schemas"]["UiNewBadge"];
+            inbox: components["schemas"]["UiInbox"];
         };
         UiFeaturesPatch: {
             avatars?: components["schemas"]["UiAvatars"];
             new_badge?: components["schemas"]["UiNewBadge"];
+            inbox?: components["schemas"]["UiInbox"];
         };
         UiFeaturesSetting: {
             sections: components["schemas"]["UiFeatures"];
@@ -16008,6 +16105,8 @@ export interface components {
             in_filter?: boolean;
             in_template?: boolean;
             in_export?: boolean;
+            /** @description 0.15.154. Prefilled on a new record (null or absent = none). */
+            default_value?: unknown;
             is_active: boolean;
             /** @description Protected: code or a derived rule depends on it. */
             is_system: boolean;
@@ -16128,6 +16227,8 @@ export interface components {
             /** @description 0.12.5. Only for `child_list`: the columns of a row, in order. */
             columns?: components["schemas"]["RegisterFieldColumn"][];
             in_list?: boolean;
+            /** @description 0.15.154. Prefilled on a new record by the form (absent = none). */
+            default_value?: unknown;
             is_custom?: boolean;
             /** @description 0.4.6. The form section of a base field (for example `Request`, `Validity`, `PTW checks`), in English, in the order of the fields. Absent for custom fields. */
             section?: string | null;
@@ -16850,11 +16951,34 @@ export interface components {
          * @enum {string}
          */
         UiBrand: "current" | "aljeel" | "executive" | "field" | "obsidian" | "sahara";
+        /** @description 0.15.230 (0241): the appearance dimensions and their allowed values (the database list `ui_pref_options()` is the source). A subset may be sent; each key holds one of its values. `accent` `default` = the accent of the design. */
+        UiPrefs: {
+            /** @enum {string} */
+            density?: "comfortable" | "standard" | "compact";
+            /** @enum {string} */
+            font_scale?: "small" | "standard" | "large";
+            /** @enum {string} */
+            radius?: "sharp" | "standard" | "rounded";
+            /** @enum {string} */
+            motion?: "full" | "reduced";
+            /** @enum {string} */
+            icon_style?: "light" | "regular" | "bold";
+            /** @enum {string} */
+            menu_style?: "default" | "rail" | "autohide";
+            /** @enum {string} */
+            accent?: "default" | "teal" | "blue" | "violet" | "green" | "orange" | "red" | "amber";
+        };
         /** @description 0.15.41. Settings, Identity & themes (setting `ui.identity`, migration 0130). */
         UiIdentity: {
             default_brand: components["schemas"]["UiBrand"];
             /** @description true: each user may choose their own design in My profile; false: everyone sees `default_brand`. */
             allow_user_choice: boolean;
+            /** @description 0.15.230 (0241): the organization appearance defaults. */
+            defaults?: components["schemas"]["UiPrefs"];
+            /** @description 0.15.230 (0241): the dimensions with their allowed values (ui_pref_options). */
+            pref_options?: {
+                [key: string]: string[];
+            };
             brands: components["schemas"]["UiBrand"][];
             /** Format: date-time */
             updated_at?: string | null;
@@ -16867,6 +16991,8 @@ export interface components {
         UiIdentityInput: components["schemas"]["WithReason"] & {
             default_brand: components["schemas"]["UiBrand"];
             allow_user_choice: boolean;
+            /** @description 0.15.230 (0241): the organization appearance defaults; omitted keeps the current ones. */
+            defaults?: components["schemas"]["UiPrefs"];
         };
         /** @description 0.15.97. A support link under the sign-in form. http(s) or mailto only. */
         SupportLink: {
@@ -17037,6 +17163,7 @@ export interface components {
             /** @description The regions the figures cover (null = every region). */
             scope_regions: components["schemas"]["RegionId"][] | null;
             procurement: components["schemas"]["DashboardOpsProcurement"];
+            permits_hse: components["schemas"]["DashboardOpsPermitsHse"];
         };
         /** @description 0.15.106: procurement and materials (dashboard proposals item 1). */
         DashboardOpsProcurement: {
@@ -17088,6 +17215,40 @@ export interface components {
                 missing_lines: number;
                 missing_qty: number;
             }[] | null;
+        };
+        /** @description 0.15.200: permits and HSE (dashboard proposals item 3). */
+        DashboardOpsPermitsHse: {
+            /** @description False when the caller may not see the Permits and HSE register; the other fields are then null. */
+            available: boolean;
+            /** @description The permit records of the active, not cancelled sites. */
+            total: number | null;
+            /** @description The status mix, the most frequent first; (none) gathers the blank statuses. */
+            by_status: {
+                status: string;
+                count: number;
+            }[] | null;
+            /** @description Permits with status Applied. */
+            waiting: number | null;
+            /** @description The active, not cancelled sites with no permit record at all. */
+            sites_without_permit: number | null;
+            /** @description The approved dated permits whose validity ends within the next 30 calendar days. */
+            expiring_14: number | null;
+            /** @description The approved dated permits whose validity has passed. */
+            expired: number | null;
+            /** @description Stop-work orders not yet lifted. */
+            stop_work_active: number | null;
+            /** @description The safety checks of the open PTWs (permit type beginning PTW, status Applied or Approved). A check counts as covered only when it is Done or N/A. */
+            ptw: {
+                open: number;
+                /** @description The open PTWs missing at least one check. */
+                with_gaps: number;
+                /** @description The gaps per check, only the checks that are missing somewhere. */
+                gaps: {
+                    /** @enum {string} */
+                    key: "jsa_tra" | "toolbox_talk" | "work_at_height" | "lifting_plan" | "loto" | "rescue_plan";
+                    count: number;
+                }[];
+            } | null;
         };
         DashboardTabLayout: {
             /** @description Card codes in display order. */
@@ -25754,6 +25915,35 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
         };
     };
+    simulateMatrix: {
+        parameters: {
+            query: {
+                site_id: string;
+                kind: "task" | "register";
+                /** @description The task code (kind task) or the register key (kind register). */
+                code: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The simulation. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatrixSimulation"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
     getMatrixCoverage: {
         parameters: {
             query?: {
@@ -33102,6 +33292,48 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    setRegisterFieldDefault: {
+        parameters: {
+            query?: never;
+            header?: {
+                "If-Match"?: string;
+            };
+            path: {
+                register_key: string;
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description A string, number, boolean or list of strings; null clears. */
+                    value: unknown;
+                    reason: components["schemas"]["Reason"];
+                };
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        code: string;
+                        version: number;
+                        default_value?: unknown;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["Unprocessable"];
         };
     };

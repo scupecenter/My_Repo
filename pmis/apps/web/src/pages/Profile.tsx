@@ -1,5 +1,5 @@
-import { KeyRound, Lock, Mail, Phone, ShieldCheck, ShieldOff, UserRound } from 'lucide-react';
-import { useState, type FormEvent, type ReactNode } from 'react';
+import { KeyRound, Lock, Mail, Palette, Phone, ShieldCheck, ShieldOff, UserRound } from 'lucide-react';
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { fieldErrors } from '@/api/auth';
 import { ApiError } from '@/api/client';
@@ -17,6 +17,9 @@ import { CodeField, codeComplete, codeErrorText, digitsOnly, QrCode, RecoveryCod
 import { ruleKey } from '@/lib/passwordRules';
 import { fmtDateTime } from '@/lib/time';
 import { BRANDS, type Brand } from '@/lib/brands';
+import { APPEARANCE_OPTIONS, APPEARANCE_PRESETS, type Appearance, type AppearanceKey, paint } from '@/lib/appearance';
+import { applyTheme, currentTheme } from '@/i18n';
+import { savePref as storePref } from '@/lib/localPref';
 
 const REGION_NAMES: Record<number, string> = { 1: 'Tripoli', 2: 'Middle', 3: 'WM', 4: 'Zawia', 5: 'Benghazi', 6: 'GM', 7: 'Sebha' };
 const E164 = /^\+[1-9][0-9]{7,14}$/;
@@ -50,6 +53,7 @@ export function Profile() {
       <PageHeader title={t('profile.title')} subtitle={t('profile.subtitle')} />
       <div className="grid gap-4 lg:grid-cols-2">
         <Details key={p.version} p={p} />
+        <AppearanceSection key={`ap-${p.version}`} p={p} />
         <EmailSection p={p} />
         <PhoneSection p={p} />
         <PasswordSection p={p} />
@@ -166,6 +170,86 @@ function Details({ p }: { p: MyProfile }) {
         </dl>
         <p className="mt-2 text-xs text-mute">{t('profile.admin_owned_note')}</p>
       </div>
+    </Section>
+  );
+}
+
+/**
+ * 0241 (proposal items 1-3): the appearance profile. Every dimension changes alone and shows at once on the whole app (the live preview paints the
+ * attributes without saving); Apply saves through PATCH /me/profile (audited per dimension), Revert returns to the saved set. A ready-made profile
+ * (classic / comfortable / night / compact) fills every dimension at once; `night` also switches the theme. Locked when the admin set one design for everyone.
+ */
+function AppearanceSection({ p }: { p: MyProfile }) {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const save = useUpdateMyProfile();
+  const choice = p.identity.allow_user_choice;
+  const [draft, setDraft] = useState<Appearance>({ ...p.ui_prefs });
+  const [theme, setTheme] = useState<'light' | 'dark'>(p.theme);
+  // the live preview: paint the draft over the organization defaults; on leave without Apply the saved set comes back
+  const shown: Appearance = { ...(p.identity.defaults ?? {}), ...draft };
+  // the theme attribute only is painted for the preview; the saved choice (localStorage included) changes on Apply, like the top-bar button
+  const paintTheme = (v: 'light' | 'dark') => { if (v === 'dark') document.documentElement.setAttribute('data-theme', 'dark'); else document.documentElement.removeAttribute('data-theme'); };
+  useEffect(() => {
+    paint(shown);
+    paintTheme(theme);
+    return () => { paint(p.appearance); paintTheme(currentTheme()); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(shown), theme]);
+  const patch: { ui_prefs?: Appearance; theme?: 'light' | 'dark' } = {
+    ...(JSON.stringify(draft) !== JSON.stringify(p.ui_prefs) ? { ui_prefs: draft } : {}),
+    ...(theme !== p.theme ? { theme } : {}),
+  };
+  const dirty = Object.keys(patch).length > 0;
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    if (!dirty || !choice || save.isPending) return;
+    save.mutate({ version: p.version, patch }, { onSuccess: () => {
+      if (patch.theme) applyTheme(patch.theme);
+      // the menu style applies in this browser too (the side menu keeps its own switch afterwards)
+      const ms = patch.ui_prefs?.menu_style;
+      if (ms) { storePref('pmis.nav.icons', ms === 'rail'); storePref('pmis.nav.auto', ms === 'autohide'); }
+      toast(t('profile.saved'));
+    } });
+  };
+  const revert = () => { setDraft({ ...p.ui_prefs }); setTheme(p.theme); };
+  const preset = (name: keyof typeof APPEARANCE_PRESETS) => {
+    const pr = APPEARANCE_PRESETS[name];
+    setDraft({ ...pr.prefs });
+    setTheme(pr.theme);
+  };
+  const dimLabel = (k: AppearanceKey) => t(`appearance.dim.${k}`);
+  return (
+    <Section id="appearance" icon={<Palette size={18} aria-hidden />} title={t('appearance.title')}>
+      <p className="text-sm text-mute">{t('appearance.subtitle')}</p>
+      {!choice && <p className="rounded-md bg-card2 p-2 text-sm" data-testid="pf-appearance-locked">{t('profile.appearance_locked', { name: t(`brand.${p.identity.default_brand}`) })}</p>}
+      <form onSubmit={submit} className="space-y-3" noValidate data-testid="profile-appearance-form">
+        <div>
+          <span className="block text-sm font-semibold">{t('appearance.preset')}</span>
+          <div className="mt-1 flex flex-wrap gap-2" role="group" aria-label={t('appearance.preset')}>
+            {(Object.keys(APPEARANCE_PRESETS) as (keyof typeof APPEARANCE_PRESETS)[]).map((name) => (
+              <button key={name} type="button" className="btn" data-testid={`pf-preset-${name}`} disabled={!choice} onClick={() => preset(name)}>{t(`appearance.preset_${name}`)}</button>
+            ))}
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          {(Object.keys(APPEARANCE_OPTIONS) as AppearanceKey[]).map((k) => (
+            <label key={k} className="block text-sm font-semibold">{dimLabel(k)}
+              <select className="input mt-1 font-normal" data-testid={`pf-ap-${k}`} disabled={!choice}
+                value={draft[k] ?? ''} onChange={(e) => setDraft({ ...draft, [k]: e.target.value === '' ? undefined : e.target.value })}>
+                <option value="">{t('appearance.org_default', { name: t(`appearance.opt.${k}.${p.identity.defaults?.[k] ?? 'standard'}`) })}</option>
+                {APPEARANCE_OPTIONS[k].map((v) => <option key={v} value={v}>{t(`appearance.opt.${k}.${v}`)}</option>)}
+              </select>
+            </label>
+          ))}
+        </div>
+        <p className="text-xs text-mute" data-testid="pf-appearance-preview-note">{t('appearance.preview_note')}</p>
+        <Err id="pf-ap-error" msg={save.isError ? (save.error.status === 412 ? t('profile.err_stale') : errText(save.error, t)) : null} />
+        <div className="flex justify-end gap-2">
+          <button type="button" className="btn" data-testid="pf-ap-revert" disabled={!dirty || save.isPending} onClick={revert}>{t('appearance.revert')}</button>
+          <button type="submit" className="btn btn-accent" data-testid="pf-ap-apply" disabled={!dirty || !choice || save.isPending}>{t('appearance.apply')}</button>
+        </div>
+      </form>
     </Section>
   );
 }
