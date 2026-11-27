@@ -274,7 +274,10 @@ describe('hybrid mode list', () => {
       // contract 0.4.10 and 0.7.1: phase 4b (inbox, follow, register comments, time in state, workload, blocked-by, status updates)
       'GET /notifications', 'POST /notifications/read-all', 'POST /notifications/:id/read', 'POST /notifications/:id/unread', 'POST /notifications/:id/snooze',
       'GET /me/follows', 'PUT /sites/:id/follow', 'DELETE /sites/:id/follow', 'PUT /registers/:key/records/:id/follow', 'DELETE /registers/:key/records/:id/follow',
-      'GET /registers/:key/records/:id/comments', 'POST /registers/:key/records/:id/comments', 'GET /tasks/:id/time-in-state', 'GET /tasks/:id/blocked-by',
+      'GET /registers/:key/records/:id/comments', 'POST /registers/:key/records/:id/comments',
+      // contract 0.15.247: a reaction and a resolved flag on any comment
+      'PUT /comments/:id/reactions', 'DELETE /comments/:id/reactions', 'PUT /comments/:id/resolved', 'DELETE /comments/:id/resolved',
+      'GET /tasks/:id/time-in-state', 'GET /tasks/:id/blocked-by',
       'GET /reports/time-in-state', 'GET /reports/workload', 'GET /status-updates', 'GET /status-updates/region-health', 'POST /status-updates', 'PATCH /status-updates/:id',
       // contract 0.7.2: the main dashboard, Project Status, weight sets
       'GET /dashboard', 'GET /dashboard/export', 'GET /project-status', 'GET /project-status/snapshots',
@@ -334,9 +337,9 @@ describe('hybrid mode list', () => {
       'POST /saved-views/:id/restore', 'POST /saved-views/:id/transfer', 'GET /saved-views/:id/versions',
       // contract 0.15.246 (item 17, migration 0345): the soft "... is editing this record" notice
       'POST /presence/editing', 'POST /presence/editing/stop', 'GET /presence/editing',
-      'GET /me/drafts', 'GET /me/drafts/:key', 'PUT /me/drafts/:key',
       // contract 0.15.245 (0344): pin a saved view as a personal home card
       'GET /me/home-pins', 'POST /saved-views/:id/pin', 'POST /saved-views/:id/unpin',
+      'GET /me/drafts', 'GET /me/drafts/:key', 'PUT /me/drafts/:key',
       'DELETE /me/drafts/:key',
       // contract 0.13.2: follow-up group C (Q267 cancel of a mistaken Quality snag record)
       'POST /registers/quality/records/:id/cancel-snag',
