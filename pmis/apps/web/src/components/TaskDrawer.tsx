@@ -11,6 +11,7 @@ import type { TaskDetail, TaskRegisterField } from '@/api/types';
 import { DocSlots } from './DocSlots';
 import { DraftBar, useDraft } from './DraftBar';
 import { DrawerFrame, DrawerTabs, panelProps, useReportDirty, type DrawerNav } from './DrawerFrame';
+import { EditingNotice } from './EditingNotice';
 import { useCommentReaction, useCommentResolved } from '@/api/x';
 import { CommentsPanel } from './Comments';
 import { DelayPeriodsPanel } from './DelayPeriods';
@@ -114,6 +115,8 @@ function Body({ task, regFields, intent }: { task: TaskDetail; regFields: TaskRe
         {task.holder_absent && <div className="flex gap-2 rounded-md bg-waitBg p-3 text-sm text-waitInk" data-testid="drawer-absent"><UserX size={16} />{t('drawer.absent')}</div>}
 
         <div {...panelProps('data', tab)} className="space-y-4">
+        {/* item 17 widened: the same soft "… is editing" notice as the register record editor, on the task record */}
+        {edit && <EditingNotice kind="task" id={task.id} editing={edit} testid="task-editing-notice" />}
         <section aria-label={t('grid.ball')}>
           <div className="mb-1 text-sm text-mute">{t('grid.ball')}</div>
           <Holders holders={task.ball_in_court?.holders ?? []} />

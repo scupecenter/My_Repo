@@ -17,6 +17,8 @@ import {
   type ExportFormat,
 } from "@/api/dashboard";
 import type { PipelineNode } from "@/api/types";
+import { useRegions } from "@/api/sites";
+import { useRegionHealth } from "@/api/x";
 import { EChart, type Palette } from "@/components/EChart";
 import { errText } from "@/components/FormDialog";
 import { Pipeline } from "@/components/Pipeline";
@@ -43,6 +45,7 @@ import { OpsPermitsCard } from "./dashboardPermits";
 import { OpsReadinessCard } from "./dashboardReadiness";
 import { OpsScorecardCard } from "./dashboardScorecard";
 import { OpsQualityCard } from "./dashboardQuality";
+import { OpsApprovalsCard } from "./dashboardApprovals";
 import { useDashboardSettings } from "@/api/dashboardSettings";
 import { GoalsPanel } from "@/components/GoalsPanel";
 import { SavedViews } from "@/components/SavedViews";
@@ -1448,6 +1451,13 @@ export function Dashboard() {
                 </>
               ),
 
+              ops_approvals: (
+                <>
+                  {/* 0.15.204 (owner approval 2026-11-26, item 7): tasks waiting review or approval, ages per ball-in-court role */}
+                  <OpsApprovalsCard ops={ops.data} />
+                </>
+              ),
+
               headline: (
                 <>
                   {/* needs-attention strip: only counts the dashboard already returned, each linking to its list; nothing new is read */}
@@ -2602,11 +2612,62 @@ export function Dashboard() {
                   </Card>
                 </>
               ),
+
+              region_health: <RegionHealthCard />,
             },
           )}
         </>
       )}
     </div>
+  );
+}
+
+const REGION_HEALTH_TONE: Record<string, string> = { on_track: "bg-openBg text-openInk", at_risk: "bg-waitBg text-waitInk", off_track: "bg-lateBg text-lateInk" };
+
+/** Item 12 (0.15.241): the region health card — the current-week Weekly-status health of every visible region, with the missing-update flag. */
+function RegionHealthCard() {
+  const { t, i18n } = useTranslation();
+  const q = useRegionHealth();
+  const regions = useRegions();
+  const name = (id: number) => { const r = regions.data?.find((x) => x.id === id); return (i18n.language === "ar" && r?.name_ar) || r?.name_en || String(id); };
+  return (
+    <Card title={t("dash.region_health.title")} testid="dash-region-health">
+      {!q.data ? (
+        <p className="text-mute" role="status" data-testid="dash-region-health-loading">
+          {t("common.loading")}
+        </p>
+      ) : (
+        <>
+          <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {q.data.items.map((r) => (
+              <li
+                key={r.region_id}
+                className="flex items-center gap-2 rounded-lg border border-line px-2 py-1"
+                data-testid={`dash-region-health-${r.region_id}`}
+                data-health={r.health ?? "missing"}
+              >
+                <span className="font-semibold">{name(r.region_id)}</span>
+                {r.health ? (
+                  <span className={`chip ${REGION_HEALTH_TONE[r.health]}`} data-testid={`dash-region-health-chip-${r.region_id}`}>
+                    {t(`weekly.health_${r.health}`)}
+                  </span>
+                ) : (
+                  <span className="chip bg-waitBg text-waitInk" data-testid={`dash-region-health-chip-${r.region_id}`}>
+                    {t("weekly.missing_update")}
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-sm">
+            <Link className="hover:underline" to="/status-updates" data-testid="dash-region-health-link">
+              {t("dash.region_health.open")}
+            </Link>
+            <span className="text-mute"> · {t("dash.region_health.week", { date: q.data.week_start })}</span>
+          </p>
+        </>
+      )}
+    </Card>
   );
 }
 

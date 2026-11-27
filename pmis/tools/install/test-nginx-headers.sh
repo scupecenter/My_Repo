@@ -10,6 +10,7 @@ ms = [x for x in re.finditer(r'cat > "\$SITE" <<EOF\n(.*?)\nEOF\n', s, re.S) if 
 assert ms, 'site heredoc not found'
 site = ms[-1].group(1)
 need = ['X-Content-Type-Options', 'X-Frame-Options', 'Referrer-Policy', 'Strict-Transport-Security']
+csp = '$CSP_DIRECTIVE'  # SEC-3: the Content-Security-Policy line (empty when CSP_MODE=off)
 https = site.split('listen $HTTPS_PORT ssl;')[1]
 bad = []
 # server level: text before the first location
@@ -17,6 +18,8 @@ head = https.split('location', 1)[0]
 for h in need:
     if 'add_header ' + h not in head:
         bad.append(f'server: {h}')
+if csp not in head:
+    bad.append('server: CSP')
 for loc in re.finditer(r'location ([^{]+)\{(.*?)\n  \}|location ([^{]+)\{([^}]*)\}', https, re.S):
     name = (loc.group(1) or loc.group(3)).strip()
     body = loc.group(2) or loc.group(4) or ''
@@ -24,6 +27,8 @@ for loc in re.finditer(r'location ([^{]+)\{(.*?)\n  \}|location ([^{]+)\{([^}]*)
         for h in need:
             if 'add_header ' + h not in body:
                 bad.append(f'location {name}: {h}')
+        if csp not in body:
+            bad.append(f'location {name}: CSP')
 if bad:
     print('missing security headers:', *bad, sep='\n  ')
     sys.exit(1)

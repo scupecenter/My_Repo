@@ -243,6 +243,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/csp-report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Where browsers report Content-Security-Policy violations (SEC-3)
+         * @description Public, because a browser sends the report without the session. Accepts the legacy `application/csp-report` body and the Reporting API list
+         *     (`application/reports+json`). Logs a short sanitised line and counts per directive in memory; changes nothing. 413 above 16 KB, 429 above 30 per minute per address.
+         */
+        post: operations["reportCspViolation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/local/password-reset/confirm": {
         parameters: {
             query?: never;
@@ -6254,6 +6275,89 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/media/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The Media gallery settings (0.15.292)
+         * @description Every signed-in user may read them (the gallery screen uses them). `can_edit` is true for a System Admin or an all-regions delegate of `settings` edit. `thumbnails_available` is false when the server cannot make thumbnails (the gallery then shows type icons).
+         */
+        get: operations["getMediaSettings"];
+        /**
+         * Set the Media gallery settings (reason, step-up, If-Match, audited) (0.15.292)
+         * @description A System Admin, or a delegate of `settings` edit for all regions. A reason (3+ characters), a step-up and `If-Match` are required. Unknown keys and invalid values are 422; saving the values in force is 409 `invalid_transition`. Audited `media_gallery_update` with before and after.
+         */
+        put: operations["setMediaSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The images the caller may see, newest first (0.15.292)
+         * @description Reads `document_files` (through their slots) and `snag_photos` live; nothing is copied. Visibility is the owning slot's. The scope (kinds, registers, excluded codes,
+         *     images only) comes from the setting `media.gallery`. `status` is `current` (default), `withdrawn` (only when the setting allows it) or `pending_evidence`.
+         *     `has_thumbnail` says whether `.../thumbnail` can answer; `link` names the record the item belongs to.
+         */
+        get: operations["listMediaItems"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/facets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The filter values of the gallery for the caller (0.15.292) */
+        get: operations["getMediaFacets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/items/{kind}/{id}/thumbnail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A thumbnail of one gallery item (0.15.292)
+         * @description Made from the stored original on the first request (EXIF orientation applied, metadata removed) and kept beside it. 404 when the item is not visible to the caller; 415 `thumbnail_unsupported` for a file type without a thumbnail; 503 `thumbnails_unavailable` when thumbnails are off or the maker is not installed.
+         */
+        get: operations["getMediaThumbnail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/login-page": {
         parameters: {
             query?: never;
@@ -6873,6 +6977,66 @@ export interface paths {
          * @description 0.15.225. The approved Procurement versions in force, not cancelled, that the caller can see; of the site `site_id` when it is given. Needs the Change Control module; only the orders in regions where the caller also holds the Procurement view right (the responsibility matrix) are listed, and the same right is checked when the record is saved.
          */
         get: operations["listChangeControlOrderOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/registers/financial_advances/advance-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The advances an expense or settlement may name (0.15.330)
+         * @description 0.15.330. The approved advances in the state disbursed or settlement in progress, of the site `site_id` when it is given, in the regions the caller may read. Needs the Financial Advances view right.
+         */
+        get: operations["listAdvanceOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/registers/invoices/order-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The approved, active Procurement orders an invoice may name (0.15.330)
+         * @description 0.15.330. Same list as the other order pickers; needs the Invoices module view; only the orders in regions where the caller also holds the Procurement view right.
+         */
+        get: operations["listInvoiceOrderOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/registers/invoices/supplier-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The companies an invoice may name as its supplier (0.15.330)
+         * @description 0.15.330. The active companies of the Contractors list (`id`, `name`, `type`). Needs the Invoices module view; no Procurement right is required, and nothing else about the companies is returned.
+         */
+        get: operations["listInvoiceSupplierOptions"];
         put?: never;
         post?: never;
         delete?: never;
@@ -10453,6 +10617,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/status-updates/region-health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Region health of the current week (0.15.241, item 12)
+         * @description One row per region the caller may view on `sites` (all seven when unrestricted). `health`, `summary`, `author` and `updated_at` come from the region's Weekly status update of the current working week (it opens on Sunday); they are null and `missing_update` is true when the region has not posted this week. Read only.
+         */
+        get: operations["getRegionHealth"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/status-updates/{update_id}": {
         parameters: {
             query?: never;
@@ -11221,6 +11405,50 @@ export interface paths {
         post?: never;
         /** Discard a draft (after a save, or when the user chooses not to restore it) (0.12.12) */
         delete: operations["discardMyDraft"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/presence/editing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The other current editors of an entity (0.15.246)
+         * @description 0.15.246 (migration 0345). Advisory "… is editing" presence: the editors of the entity other than the caller whose heartbeat is fresh (2 minutes). The caller themself is never listed.
+         */
+        get: operations["listEditPresence"];
+        put?: never;
+        /**
+         * The caller is editing this entity (heartbeat, 0.15.246)
+         * @description 0.15.246 (migration 0345). Upserts the caller's row and sweeps stale rows. Send every 30 seconds while the editor is open.
+         */
+        post: operations["pingEditPresence"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/presence/editing/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The caller stopped editing this entity (0.15.246)
+         * @description 0.15.246 (migration 0345). Removes the caller's row at once instead of letting it fade out.
+         */
+        post: operations["stopEditPresence"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -12187,7 +12415,7 @@ export interface components {
             conflicts?: components["schemas"]["ScopeConflict"][];
         };
         /** @enum {string} */
-        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "plan_locked" | "insufficient_stock" | "item_in_use" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "invalid_code" | "invalid_enrol_code" | "enrol_code_expired" | "password_change_required" | "weak_password" | "internal_error" | "team_scope_mismatch" | "two_factor_enforced" | "scope_scenario_conflict" | "too_many_rows" | "integrity_too_large" | "mail_not_configured" | "self_approval_forbidden" | "document_rule_pending" | "file_pending_scan" | "list_not_configured" | "list_parent_mismatch" | "email_not_verified" | "batch_processing" | "vehicle_already_reserved" | "upload_processing" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "invitation_invalid" | "system_field" | "conversion_unconfirmed" | "column_in_use" | "input_already_mapped" | "field_already_mapped" | "single_admin" | "backup_missing" | "request_expired" | "reset_running" | "plan_incomplete" | "storage_not_supported" | "quarantine_unavailable" | "maintenance" | "scope_changed";
+        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "plan_locked" | "insufficient_stock" | "item_in_use" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "invalid_code" | "invalid_enrol_code" | "enrol_code_expired" | "password_change_required" | "weak_password" | "internal_error" | "team_scope_mismatch" | "two_factor_enforced" | "scope_scenario_conflict" | "too_many_rows" | "integrity_too_large" | "mail_not_configured" | "self_approval_forbidden" | "document_rule_pending" | "file_pending_scan" | "list_not_configured" | "list_parent_mismatch" | "email_not_verified" | "batch_processing" | "vehicle_already_reserved" | "upload_processing" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "invitation_invalid" | "system_field" | "conversion_unconfirmed" | "column_in_use" | "input_already_mapped" | "field_already_mapped" | "single_admin" | "backup_missing" | "request_expired" | "reset_running" | "plan_incomplete" | "storage_not_supported" | "quarantine_unavailable" | "maintenance" | "scope_changed" | "thumbnail_unsupported" | "thumbnails_unavailable";
         PageEnvelope: {
             items: unknown[];
             page: components["schemas"]["PageInfo"];
@@ -17851,6 +18079,11 @@ export interface components {
             menu_style?: "default" | "rail" | "autohide";
             /** @enum {string} */
             accent?: "default" | "teal" | "blue" | "violet" | "green" | "orange" | "red" | "amber";
+            /**
+             * @description 0.15.248 (0347): the high-contrast mode.
+             * @enum {string}
+             */
+            contrast?: "standard" | "high";
         };
         /** @description 0.15.231 (0242): the personal sidebar (proposal item 4). `hidden` the screens the menu does not show, `order` their order inside their heading (a screen the list does not name keeps the organization order, after the named ones), `badge_style` how the count badges draw (full = the number, dot = a dot, none = no badge), `pins` the pinned shortcuts on top (at most 20). A menu key is a short lowercase id (the entries of the side menu; an unknown key is ignored). */
         UiNav: {
@@ -17896,6 +18129,89 @@ export interface components {
             /** @description Empty: the English label shows. */
             label_ar: string;
             url: string;
+        };
+        MediaThumbnails: {
+            enabled: boolean;
+            small_px: number;
+            /** @description Larger than small_px. */
+            medium_px: number;
+            quality: number;
+            /** @enum {string} */
+            format: "webp" | "jpeg";
+            max_source_mb: number;
+        };
+        /** @description 0.15.292. Setting `media.gallery` (migration 0396). */
+        MediaSettings: {
+            enabled: boolean;
+            snag_photos: boolean;
+            document_kinds: ("photo" | "scanned_document" | "email" | "report" | "excel_template")[];
+            /** @description Empty: every register. */
+            register_keys: string[];
+            /** @description Task and site slots (no register). */
+            include_site_documents: boolean;
+            exclude_doc_codes: string[];
+            image_only: boolean;
+            /** @description Whether withdrawn and rejected items can be listed (they are never deleted). */
+            show_withdrawn: boolean;
+            page_size: number;
+            thumbnails: components["schemas"]["MediaThumbnails"];
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+            /** @description The ETag value. */
+            version: number;
+            can_edit: boolean;
+            thumbnails_available: boolean;
+        };
+        MediaSettingsInput: components["schemas"]["WithReason"] & {
+            enabled: boolean;
+            snag_photos: boolean;
+            document_kinds: string[];
+            register_keys: string[];
+            include_site_documents: boolean;
+            exclude_doc_codes: string[];
+            image_only: boolean;
+            show_withdrawn: boolean;
+            page_size: number;
+            thumbnails: components["schemas"]["MediaThumbnails"];
+        };
+        MediaItem: {
+            /** @enum {string} */
+            kind: "document_file" | "snag_photo";
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            uploaded_at: string;
+            /** Format: uuid */
+            uploaded_by?: string;
+            /** @enum {string} */
+            state: "current" | "superseded" | "withdrawn" | "rejected" | "pending_evidence";
+            version?: number | null;
+            slot_status?: string | null;
+            snag_status?: string | null;
+            mime_type: string;
+            name?: string | null;
+            size_bytes: number;
+            shot_type?: string | null;
+            type: {
+                code: string;
+                name_en: string;
+                name_ar?: string | null;
+                kind?: string | null;
+            };
+            site?: Record<string, never> | null;
+            /** @description The owning record: {kind: snag|register|task|site, ...ids}. */
+            link: Record<string, never>;
+            has_thumbnail: boolean;
+            download_url: string;
+        };
+        MediaItemPage: {
+            enabled: boolean;
+            items: components["schemas"]["MediaItem"][];
+            page: {
+                limit: number;
+                next_cursor: string | null;
+            };
         };
         /** @description 0.15.97. Settings, Screens, Login page (setting `ui.login_page`, migration 0197). */
         LoginPage: {
@@ -18178,6 +18494,7 @@ export interface components {
             gecol_hlc: components["schemas"]["DashboardOpsGecolHlc"];
             contractor_scorecard: components["schemas"]["DashboardOpsScorecard"];
             quality: components["schemas"]["DashboardOpsQuality"];
+            approvals: components["schemas"]["DashboardOpsApprovals"];
         };
         /** @description 0.15.106: procurement and materials (dashboard proposals item 1). */
         DashboardOpsProcurement: {
@@ -18286,6 +18603,36 @@ export interface components {
             civil_ready_no_power: number | null;
             /** @description HLC only: installation_date set but not in service yet; null in the GECOL part. */
             installed_not_in_service: number | null;
+        };
+        /** @description 0.15.204 (item 7): the tasks waiting for review or approval, their ages since the level opened, and the bottleneck role. */
+        DashboardOpsApprovals: {
+            /** @description False when the caller lacks the approvals or the sites view; every figure is then null. */
+            available: boolean;
+            /** @description The waiting tasks (states in_review and in_approval, as the Approvals inbox). */
+            total: number | null;
+            /** @description The waiting tasks at a review level. */
+            review: number | null;
+            /** @description The waiting tasks at an approve level. */
+            approve: number | null;
+            waiting: components["schemas"]["DashboardOpsAging"] | null;
+            /** @description One entry per ball-in-court role, most waiting tasks first. */
+            by_role: {
+                /** Format: uuid */
+                role_id: string;
+                name_en: string;
+                name_ar: string | null;
+                /** @description The waiting tasks whose ball-in-court role is this one. */
+                count: number;
+                /** @description The age of the oldest waiting task of the role, calendar days. */
+                oldest_days: number | null;
+                buckets: {
+                    /** @enum {string} */
+                    key: "d0_7" | "d8_14" | "d15_30" | "over_30";
+                    count: number;
+                }[];
+            }[] | null;
+            /** @description The waiting tasks with no ball-in-court role (a group holds them, or nobody yet). */
+            unassigned: number | null;
         };
         /** @description 0.15.203 (item 6): the open snags and NCRs of the in-scope sites, the average closure age of each and the first-time acceptance rate. */
         DashboardOpsQuality: {
@@ -20539,6 +20886,27 @@ export interface components {
                 name_ar?: string | null;
             }[];
         };
+        EditPresencePing: {
+            /**
+             * @description register records and workflow tasks.
+             * @enum {string}
+             */
+            kind: "record" | "task";
+            /** Format: uuid */
+            entity_id: string;
+        };
+        /** @description 0.15.246: another current editor of the entity (migration 0345). */
+        EditPresenceEditor: {
+            /** Format: uuid */
+            id: string;
+            display_name: string;
+            employee_id: string | null;
+            /**
+             * Format: date-time
+             * @description When this editing spell began.
+             */
+            since: string;
+        };
         SavedView: {
             /** Format: uuid */
             id: string;
@@ -20785,6 +21153,25 @@ export interface components {
             updated_at: string;
             /** @description true for the author until the end of the week. */
             editable: boolean;
+        };
+        RegionHealth: {
+            region_id: number;
+            /** @enum {string|null} */
+            health: "on_track" | "at_risk" | "off_track" | null;
+            summary: string | null;
+            author: components["schemas"]["UserRef"] | null;
+            /** Format: date-time */
+            updated_at: string | null;
+            /** @description true when the region has not posted its Weekly status update of the current working week. */
+            missing_update: boolean;
+        };
+        RegionHealthBoard: {
+            /**
+             * Format: date
+             * @description The Sunday that opens the current working week.
+             */
+            week_start: string;
+            items: components["schemas"]["RegionHealth"][];
         };
         NotificationPreference: {
             kind: components["schemas"]["NotificationKind"];
@@ -22415,6 +22802,34 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    reportCspViolation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/csp-report": {
+                    [key: string]: unknown;
+                };
+                "application/reports+json": {
+                    [key: string]: unknown;
+                }[];
+            };
+        };
+        responses: {
+            /** @description Received. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             429: components["responses"]["TooManyRequests"];
         };
     };
@@ -32960,6 +33375,149 @@ export interface operations {
             428: components["responses"]["PreconditionRequired"];
         };
     };
+    getMediaSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The settings. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaSettings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setMediaSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MediaSettingsInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaSettings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    listMediaItems: {
+        parameters: {
+            query?: {
+                source?: "documents" | "snags";
+                site_id?: string;
+                region_id?: number;
+                register_key?: string;
+                doc_code?: string;
+                snag_type?: string;
+                status?: "current" | "withdrawn" | "pending_evidence";
+                uploaded_by?: string;
+                uploaded_from?: string;
+                uploaded_to?: string;
+                q?: string;
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaItemPage"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getMediaFacets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Document types with images in scope, active snag types, register keys. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getMediaThumbnail: {
+        parameters: {
+            query?: {
+                size?: "small" | "medium";
+            };
+            header?: never;
+            path: {
+                kind: "document_file" | "snag_photo";
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The image (webp or jpeg, as configured). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/webp": string;
+                    "image/jpeg": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
     getLoginPage: {
         parameters: {
             query?: never;
@@ -33950,6 +34508,89 @@ export interface operations {
                 content: {
                     "application/json": {
                         items: components["schemas"]["WarehouseOrderOption"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listAdvanceOptions: {
+        parameters: {
+            query?: {
+                site_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The options. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            [key: string]: unknown;
+                        }[];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listInvoiceOrderOptions: {
+        parameters: {
+            query?: {
+                site_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The options. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["WarehouseOrderOption"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listInvoiceSupplierOptions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The options. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            [key: string]: unknown;
+                        }[];
                     };
                 };
             };
@@ -40615,6 +41256,28 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
         };
     };
+    getRegionHealth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Region health. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegionHealthBoard"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
     editStatusUpdate: {
         parameters: {
             query?: never;
@@ -41871,6 +42534,81 @@ export interface operations {
                 content?: never;
             };
             401: components["responses"]["Unauthorized"];
+        };
+    };
+    listEditPresence: {
+        parameters: {
+            query: {
+                kind: "record" | "task";
+                entity_id: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The other current editors, oldest heartbeat first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        editors: components["schemas"]["EditPresenceEditor"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    pingEditPresence: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EditPresencePing"];
+            };
+        };
+        responses: {
+            /** @description Noted. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    stopEditPresence: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EditPresencePing"];
+            };
+        };
+        responses: {
+            /** @description Removed (also when there was none). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     reactToComment: {
