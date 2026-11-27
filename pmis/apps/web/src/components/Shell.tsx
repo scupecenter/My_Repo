@@ -19,6 +19,7 @@ import { ExportDialog } from './ExportDialog';
 import { CommandPalette } from './CommandPalette';
 import { RowActions } from './RowActions';
 import { ShortcutsHelp } from './ShortcutsHelp';
+import { Avatar } from './Avatar';
 import { QuickTour } from './QuickTour';
 import { firstPeopleTab, PEOPLE_KEYS, PEOPLE_TABS } from './PeopleAdmin';
 import { ADMIN_ONLY, ANY_OF, BY_GRANT, BY_MODULE_VIEW, NAV } from './navItems';
@@ -190,7 +191,7 @@ export function Shell() {
           <Popover.Root>
             <Popover.Trigger asChild>
               <button className="flex items-center gap-2 rounded-full border border-line px-2 py-1 text-sm" data-testid="topbar-user" aria-label={t('top.account')}>
-                <span className="grid h-6 w-6 place-items-center rounded-full bg-accent text-xs font-bold text-accentInk">{(me.data?.user.display_name ?? '?').split(' ').map((w) => w[0]).join('').slice(0, 2)}</span>
+                <Avatar name={me.data?.user.display_name} size="sm" />
                 {me.data?.user.display_name}
               </button>
             </Popover.Trigger>
