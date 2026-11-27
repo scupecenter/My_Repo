@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { api, ApiError, downloadFile, type RequestOptions } from './client';
 import type { AlertRuleInput, AlertRuleSaved, AlertRulesResponse, IssueStoppedRowList, IssueTaskMapItem, IssueTaskMapList,
-  ActiveSession, ActOnBehalfRequest, Calendar, CalendarConfirmation, MailNotificationKinds, ImportsSettings, ContractorPerformanceReport, ContractorPerformanceThresholds, ContractorPerformanceSettings, NavLayoutSetting, UiIdentity, UiBrand, LoginPage, SecurityLocks, LoginPagePublic, SupportLink, NavLayoutT, ContractorRules, ContractorRulesInput, GecolHlcCounts, ContractorsCompletenessReport, TeamScopeMismatchReport, DeletedUser, PurgedUser, DlpSettings, DlpVersion, DlpVersionInput, Holiday, HolidayChangeResult, HolidayInput, HolidayPatch, HolidaySummary, IdleTaskAlertSetting, Job, LogIntegrity, LogRetention, LogRetentionInput,
+  ActiveSession, ActOnBehalfRequest, Calendar, CalendarConfirmation, MailNotificationKinds, ImportsSettings, ContractorPerformanceReport, ContractorPerformanceThresholds, ContractorPerformanceSettings, NavLayoutSetting, UiIdentity, UiBrand, LoginPage, SecurityLocks, SupportAccessSetting, Delegation, LoginPagePublic, SupportLink, NavLayoutT, ContractorRules, ContractorRulesInput, GecolHlcCounts, ContractorsCompletenessReport, TeamScopeMismatchReport, DeletedUser, PurgedUser, DlpSettings, DlpVersion, DlpVersionInput, Holiday, HolidayChangeResult, HolidayInput, HolidayPatch, HolidaySummary, IdleTaskAlertSetting, Job, LogIntegrity, LogRetention, LogRetentionInput,
   NotificationPolicy, NotificationPolicyInput, NotificationTypeDef, Page, ReassignmentAlert, SecurityLogEntry, SessionRevokeResult, SlaPublishPreview, SlaRuleSet, SlaRuleSetPublishResult, SlaRuleSetSummary, SlaTaskRule, StaffCard, StaffVisibility, StructuralFreeze,
   TaskDefinition, TeamScopeMatch, TeamScopeMatchInput, TransitionResultT, User, UserDetail, WeekendDaysResult, WeightSet, WeightSetCode, WeightSetInput, WeightSetPreview, WeightSetPublishResult, WorkflowVersion, WorkflowVersionSummary,
 } from './types';
@@ -105,6 +105,33 @@ export const useSetSecurityLocks = () => {
   const qc = useQueryClient();
   return useMutation<SecurityLocks, ApiError, { version: number; block_public_sharing: boolean; disable_export: boolean; reason: string }>({
     mutationFn: ({ version, ...body }) => api.put('/settings/security-locks', { version, body }), onSettled: () => refresh(qc, 'security-locks'),
+  });
+};
+/** 0.15.191 (migration 0291): support access (setting security.support_access) and the support grants. System Admin only; a grant is a time-limited delegation. */
+export const useSupportAccess = () => useQuery({ queryKey: ['support-access-setting'], queryFn: () => api.get<SupportAccessSetting>('/settings/support-access') });
+export const useSetSupportAccess = () => {
+  const qc = useQueryClient();
+  return useMutation<SupportAccessSetting, ApiError, { version: number; enabled: boolean; max_hours: number; default_hours: number; reason: string }>({
+    mutationFn: ({ version, ...body }) => api.put('/settings/support-access', { version, body }), onSettled: () => refresh(qc, 'support-access-setting'),
+  });
+};
+export const useSupportGrants = (enabled = true) => useQuery({ queryKey: ['support-grants'], enabled, queryFn: () => api.get<{ items: Delegation[] }>('/support-access').then((r) => r.items) });
+export const useGrantSupport = () => {
+  const qc = useQueryClient();
+  return useMutation<Delegation, ApiError, { to_user_id: string; rights: string[]; hours?: number; reason: string }>({
+    mutationFn: (body) => api.post('/support-access', { body }), onSettled: () => refresh(qc, 'support-grants'),
+  });
+};
+export const useRevokeSupport = () => {
+  const qc = useQueryClient();
+  return useMutation<Delegation, ApiError, { id: string; reason: string }>({
+    mutationFn: ({ id, reason }) => api.post(`/support-access/${id}/revoke`, { body: { reason } }), onSettled: () => refresh(qc, 'support-grants'),
+  });
+};
+export const useRevokeAllSupport = () => {
+  const qc = useQueryClient();
+  return useMutation<{ revoked: number }, ApiError, { reason: string }>({
+    mutationFn: (body) => api.post('/support-access/revoke-all', { body }), onSettled: () => refresh(qc, 'support-grants'),
   });
 };
 export const useImportsSettings = () => useQuery({ queryKey: ['imports-settings'], queryFn: () => api.get<ImportsSettings>('/settings/imports') });
