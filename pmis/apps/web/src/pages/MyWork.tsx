@@ -100,7 +100,8 @@ export function MyWork() {
     { id: 'list', label: t('board.list'), hint: t('view.mywork_list_hint'), icon: <List size={14} />, testid: 'my-work-layout-list' },
     { id: 'board', label: t('board.board'), hint: t('view.mywork_board_hint'), icon: <Columns3 size={14} />, testid: 'my-work-layout-board' },
   ];
-  const switcher = <LayoutPanel testid="my-work-view" views={{ value: board ? 'board' : 'list', options: myViews, onChange: (id) => setParams({ layout: id === 'board' ? 'board' : '' }) }} />;
+  // V7: one Layout panel for My Work, as on every screen — the list/board switcher and, while the list is on, the Display options
+  const switcher = <LayoutPanel testid="my-work-view" views={{ value: board ? 'board' : 'list', options: myViews, onChange: (id) => setParams({ layout: id === 'board' ? 'board' : '' }) }} table={board ? undefined : tbl} />;
   let n = 0;
   return (
     <div className="space-y-4" data-testid="page-my-work">
@@ -132,9 +133,8 @@ export function MyWork() {
         filter={<UnifiedFilter screen="tasks-board" value={advTree} onChange={(tree) => setParams({ adv: encodeFilter(tree) })} onClearAll={clearAll} />}
         extra={<PastedChip search={late.data?.search ?? doNow.data?.search ?? waiting.data?.search} />}
         count={<TableCount testid="my-work-count" noun="tasks" total={screenTotal} filtered={filtered} active={active} onClear={clearAll} />}
-        switcher={switcher}
         columns={<ColumnMenu api={tbl} label={label} />}
-        layout={<LayoutPanel testid="my-work-display" table={tbl} />}
+        layout={switcher}
         exporter={<ExportCsvButton testid="my-work-export" name="my-work" head={['#', t('approvals.bucket'), label('site'), t('grid.code'), label('task'), label('sla')]}
           rows={() => { let i = 0; return BUCKETS.flatMap(([k]) => (qs[k].data?.items ?? []).map((x) => [++i, t(`myWork.${k}`), x.site_code, x.task_code, (i18n.language === 'ar' && x.name_ar) || x.name_en, x.sla?.colour ?? ''])); }} />} />
       <div className="card gx overflow-auto" {...displayAttrs(tbl.display)} data-testid="my-work-table">
