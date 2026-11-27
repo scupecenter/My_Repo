@@ -148,11 +148,11 @@ END $$;
 
 -- The menu keys of the Data hub heading (a saved menu layout is refused for a key the catalogue does not list). Additive; an existing key is kept.
 INSERT INTO nav_item_catalogue (key, default_group, ord, added_in) VALUES
-  ('data_hub', 'data', 110, '0400'),
-  ('master_import', 'data', 111, '0400'),
-  ('column_mapping', 'data', 112, '0400'),
-  ('data_reset', 'data', 113, '0400'),
-  ('recycle_bin', 'data', 114, '0400')
+  ('data_hub', 'data', 90, '0400'),
+  ('master_import', 'data', 91, '0400'),
+  ('column_mapping', 'data', 92, '0400'),
+  ('data_reset', 'data', 93, '0400'),
+  ('recycle_bin', 'data', 94, '0400')
 ON CONFLICT (key) DO NOTHING;
 
 -- The caller's last download of each template: [{template_id, version, prefill, at}], newest first. Rows of other users are never read.
@@ -176,7 +176,7 @@ END $$;
 INSERT INTO audit_log (action, entity_type, entity_id, after, reason)
 VALUES ('data_hub_applied', 'workflow', NULL,
         jsonb_build_object('ui_features', 'section data_hub added to ui.features', 'door', 'data_hub_my_downloads()'),
-        'Data hub setting section and last-downloads reader (migration 0400, contract 0.15.270).');
+        'Data hub setting section and last-downloads reader (migration 0400, contract 0.15.311).');
 
 DO $$
 DECLARE f text;

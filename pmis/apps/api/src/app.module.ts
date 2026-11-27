@@ -229,7 +229,7 @@ export function appModuleFor(config: AppConfig) {
       StaffRegistryController, // 0.15.56 (0142): staff registry card, visibility, edit
       DataResetController, // 0.15.62 (0146): project data reset in Settings, two System Admins
       LibraryMenuController, // 0.15.70 (0151, W5): Library > Forms and Archive
-      DataHubController, // 0.15.270 (0400): Data hub landing page
+      DataHubController, // 0.15.311 (0400): Data hub landing page
     ],
     providers: [
       { provide: APP_CONFIG, useValue: config },
@@ -255,7 +255,7 @@ export function appModuleFor(config: AppConfig) {
       StaffRegistryService, // 0.15.56 (0142)
       DataResetService, MaintenanceService, // 0.15.62 (0146)
       LibraryMenuService, // 0.15.70 (0151, W5)
-      DataHubService, // 0.15.270 (0400)
+      DataHubService, // 0.15.311 (0400)
       { provide: APP_GUARD, useClass: SessionGuard },
       { provide: APP_INTERCEPTOR, useClass: TxInterceptor },
       { provide: APP_INTERCEPTOR, useClass: ExportLockInterceptor }, // 0.15.190 (0290): after TxInterceptor, so the lock is read inside the request transaction

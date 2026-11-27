@@ -3,7 +3,7 @@ import { api } from './client';
 import type { components } from './schema';
 import { useUiFeatures } from './uiFeatures';
 
-/** Contract 0.15.270 (migration 0400): the Data hub landing page. */
+/** Contract 0.15.311 (migration 0400): the Data hub landing page. */
 export type DataHubSummary = components['schemas']['DataHubSummary'];
 export type DataHubBatch = components['schemas']['DataHubBatch'];
 export type DataHubTemplateChange = components['schemas']['DataHubTemplateChange'];

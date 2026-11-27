@@ -4136,8 +4136,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * The Data hub landing page, in one call (0.15.270)
-         * @description 0.15.270. Batches waiting for the caller (count and up to 5, with why each waits), templates whose current version was issued in the last 45 days with the column diff against the version before, and the caller's last download of each template (read from the template_download audit rows of the caller only). Read only. A caller without the templates module sees no batches. The other hub widgets use the endpoints of their own screens.
+         * The Data hub landing page, in one call (0.15.311)
+         * @description 0.15.311. Batches waiting for the caller (count and up to 5, with why each waits), templates whose current version was issued in the last 45 days with the column diff against the version before, and the caller's last download of each template (read from the template_download audit rows of the caller only). Read only. A caller without the templates module sees no batches. The other hub widgets use the endpoints of their own screens.
          */
         get: operations["getDataHubSummary"];
         put?: never;
@@ -15948,7 +15948,7 @@ export interface components {
             default_tab: "all" | "priority" | "mentions" | "tasks" | "approvals" | "system";
             priority_kinds: ("mention" | "followed_change" | "task_assigned" | "task_returned" | "task_rejected" | "task_approved" | "approval_due" | "reassigned" | "absence_alert" | "idle_task_alert" | "no_holder" | "system")[];
         };
-        /** @description 0.15.270. The Data hub: which widgets of the landing page show, the badge on Uploads & batches, and the default view of each hub list screen. */
+        /** @description 0.15.311. The Data hub: which widgets of the landing page show, the badge on Uploads & batches, and the default view of each hub list screen. */
         UiDataHub: {
             widgets: {
                 quick_bar: boolean;
