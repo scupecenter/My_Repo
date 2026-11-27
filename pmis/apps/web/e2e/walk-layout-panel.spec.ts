@@ -102,3 +102,28 @@ test('layout panel walk: a register (procurement) keeps board by/lane in the pan
   await expect(page.getByTestId('register-view-display')).toHaveCount(0);
   await page.screenshot({ path: 'test-results/walk-layout-register-board-en.png' });
 });
+
+test('layout panel walk: a register (procurement) chart mode, EN and AR', async ({ page }) => {
+  await signIn(page);
+  await page.goto('/registers/procurement');
+  await expect(page.getByTestId('register-view')).toBeVisible({ timeout: 20000 });
+  await page.getByTestId('register-view').click();
+  await page.getByTestId('register-layout-chart').click();
+  await expect(page).toHaveURL(/layout=chart/);
+  await expect(page.getByTestId('register-chart-card')).toBeVisible({ timeout: 20000 });
+  // the axis, the measure and the drawing live in the Layout panel options
+  await page.getByTestId('register-view').click();
+  await expect(page.getByTestId('register-chart-axis')).toBeVisible();
+  await expect(page.getByTestId('register-chart-measure')).toBeVisible();
+  await expect(page.getByTestId('register-chart-kind')).toBeVisible();
+  await page.screenshot({ path: 'test-results/walk-chart-register-en.png' });
+  await page.keyboard.press('Escape');
+
+  // AR: the chart and its panel render right-to-left with Arabic labels.
+  await page.getByTestId('topbar-lang').click();
+  await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
+  await expect(page.getByTestId('register-chart-card')).toBeVisible({ timeout: 20000 });
+  await page.getByTestId('register-view').click();
+  await expect(page.getByTestId('register-chart-axis')).toBeVisible();
+  await page.screenshot({ path: 'test-results/walk-chart-register-ar.png' });
+});

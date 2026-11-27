@@ -6398,6 +6398,18 @@
     "add": "Add schedule",
     "save_title": "Save the schedules"
   },
+  "chartv": {
+    "title": "Chart",
+    "axis": "Axis",
+    "measure": "Measure",
+    "count": "Number of rows",
+    "sum_of": "Sum of {{field}}",
+    "kind": "Drawing",
+    "bar": "Bars",
+    "pie": "Ring",
+    "empty": "No rows in this view.",
+    "label": "Chart of {{measure}} by {{axis}}"
+  },
   "analytics": {
     "title": "Analytics of this view",
     "counted": "{{n}} rows counted",
@@ -6890,7 +6902,8 @@
     "board": "Board",
     "board_hint": "Cards by milestone or status",
     "map": "Map",
-    "map_hint": "Items on the map"
+    "map_hint": "Items on the map",
+    "chart_hint": "The rows as bars or a ring, by a field you choose"
   },
   "batchedit": {
     "title": "Batch edit",

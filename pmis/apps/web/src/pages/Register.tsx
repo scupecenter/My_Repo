@@ -1,5 +1,6 @@
 import {
   ArrowRightLeft,
+  BarChart3,
   Columns3,
   Download,
   Grid3x3,
@@ -40,8 +41,8 @@ import type { ExtraField } from "@/components/UnifiedFilter";
 import type { RegisterDefinition, RegisterRecord } from "@/api/types";
 import { TemplateExportMenu } from "@/components/TemplateExportMenu";
 import { PmDuePanel } from "@/components/PmDuePanel";
-import { ViewAnalytics } from "@/components/ViewAnalytics";
 import { LayoutPanel, type ViewOption } from "@/components/LayoutPanel";
+import type { ChartKind } from "@/components/ChartView";
 import { useRememberedView } from "@/lib/viewPreference";
 import { GridCellEditor, INLINE_TYPES } from "@/components/GridCellEditor";
 import { FieldValue } from "@/components/FieldValue";
@@ -59,8 +60,11 @@ import { RegisterDrawer, STATE_TONE, TRIAGE_TONE } from "@/components/RegisterDr
 import {
   ALL_CAP,
   BY_STATE,
+  axisFields,
   defaultBoardBy,
   layoutsOf,
+  numericFields,
+  RegisterChart,
   RegisterBoard,
   RegisterMap,
   RegisterWide,
@@ -103,12 +107,15 @@ import { isLive, OWNER_NOTE } from "@/lib/registerForms";
 
 const RF_KEYS = ["q", "region_id", "state", "record_type", "triage"] as const;
 // W2: a saved view also keeps the layout (list, wide, board, map) and the board's grouping and swimlane, as #185 does for Site Master
-const LAYOUT_KEYS = ["layout", "board_by", "lane"] as const;
+const LAYOUT_KEYS = ["layout", "board_by", "lane", "chx", "chm", "chk"] as const;
 type RegisterView = RecordFilters & {
   advanced?: FilterTree;
   layout?: string;
   board_by?: string;
   lane?: string;
+  chx?: string;
+  chm?: string;
+  chk?: string;
 };
 const VIEW_EMPTY: RegisterView = {
   q: "",
@@ -118,6 +125,9 @@ const VIEW_EMPTY: RegisterView = {
   layout: "",
   board_by: "",
   lane: "",
+  chx: "",
+  chm: "",
+  chk: "",
 };
 // P10: the saved-views control (and its share dialog, people picker and role/group queries) loads on its own, after the records, so it never
 // delays the first paint of the list.
@@ -192,6 +202,13 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
     (sp.get("lane") === "type" && !!def.record_types?.length)
       ? (sp.get("lane") as RegisterLane)
       : "none";
+  // V4: the chart's axis (`chx`: empty = the approval state, else a list or yes/no field), measure (`chm`: empty = a count, else a number
+  // field to sum) and kind (`chk`: bar by default, or pie), in the URL and the saved views
+  const chAxis = sp.get("chx") ?? "";
+  const chMeasure = sp.get("chm") ?? "";
+  const chKind: ChartKind = sp.get("chk") === "pie" ? "pie" : "bar";
+  const chAxisFields = axisFields(def);
+  const chNumeric = numericFields(def);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const regions = useRegions();
   // F16: As-Built splits CW BOQ / TE BOQ and Dismantle splits CW / TE by record_type (the server filter); the first tab is the default.
@@ -299,6 +316,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
     { id: "grid", label: t("view.grid"), hint: t("view.grid_hint"), icon: <Grid3x3 size={14} />, testid: "register-layout-grid" },
     { id: "board", label: t("board.board"), hint: t("view.board_hint"), icon: <Columns3 size={14} />, testid: "register-layout-board" },
     ...(layouts.includes("map") ? [{ id: "map", label: t("sites.map"), hint: t("view.map_hint"), icon: <MapIcon size={14} />, testid: "register-layout-map" }] : []),
+    { id: "chart", label: t("chartv.title"), hint: t("view.chart_hint"), icon: <BarChart3 size={14} />, testid: "register-layout-chart" },
   ];
   const applyView = (id: string) => setParams({ view: id === "grid" ? "grid" : "", layout: id === "grid" || id === "list" ? "" : id });
   const remember = useRememberedView(
@@ -652,6 +670,9 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
                 layout: layout === "list" ? "" : layout,
                 board_by: layout === "board" ? (sp.get("board_by") ?? "") : "",
                 lane: layout === "board" ? (sp.get("lane") ?? "") : "",
+                chx: layout === "chart" ? (sp.get("chx") ?? "") : "",
+                chm: layout === "chart" ? (sp.get("chm") ?? "") : "",
+                chk: layout === "chart" ? (sp.get("chk") ?? "") : "",
                 ...(advTree ? { advanced: advTree } : {}),
               }}
               empty={VIEW_EMPTY}
@@ -687,7 +708,6 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
           <span className="flex items-center gap-2">
             {activeFilters > 0 && <span className="chip bg-accentSoft text-accentText" data-testid="toolbar-active-filters">{t("states.filters")} {activeFilters}</span>}
             <TableCount testid="register-count" noun={noun} total={screenTotal} filtered={total} active={activeFilters > 0} selected={picked.size} onClear={clearAll} />
-            <ViewAnalytics def={def} records={real} total={total} />
           </span>
         }
         layout={
@@ -696,7 +716,28 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
           <LayoutPanel
             testid="register-view"
             views={{ value: view === "grid" ? "grid" : layout, options: viewOptions, onChange: pickView }}
-            options={view === "vertical" && layout === "board" ? (
+            options={view === "vertical" && layout === "chart" ? (
+              <>
+                <label className="flex items-center gap-2 text-sm"><span className="text-mute">{t("chartv.axis")}</span>
+                  <select className="input w-auto py-1" data-testid="register-chart-axis" value={chAxis} onChange={(e) => setParams({ chx: e.target.value })}>
+                    <option value="">{t("analytics.by_state")}</option>
+                    {chAxisFields.map((x) => <option key={x.code} value={x.code}>{fieldLabel(x, i18n.language)}</option>)}
+                  </select>
+                </label>
+                <label className="flex items-center gap-2 text-sm"><span className="text-mute">{t("chartv.measure")}</span>
+                  <select className="input w-auto py-1" data-testid="register-chart-measure" value={chMeasure} onChange={(e) => setParams({ chm: e.target.value })}>
+                    <option value="">{t("chartv.count")}</option>
+                    {chNumeric.map((x) => <option key={x.code} value={x.code}>{fieldLabel(x, i18n.language)}</option>)}
+                  </select>
+                </label>
+                <label className="flex items-center gap-2 text-sm"><span className="text-mute">{t("chartv.kind")}</span>
+                  <select className="input w-auto py-1" data-testid="register-chart-kind" value={chKind} onChange={(e) => setParams({ chk: e.target.value === "bar" ? "" : e.target.value })}>
+                    <option value="bar">{t("chartv.bar")}</option>
+                    <option value="pie">{t("chartv.pie")}</option>
+                  </select>
+                </label>
+              </>
+            ) : view === "vertical" && layout === "board" ? (
               <>
                 <label className="flex items-center gap-2 text-sm"><span className="text-mute">{t("regviews.board_by")}</span>
                   <select className="input w-auto py-1" data-testid="register-board-by" value={boardBy} onChange={(e) => setParams({ board_by: e.target.value === defaultBoardBy(def) ? "" : e.target.value })}>
@@ -987,6 +1028,9 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
           )}
           {layout === "map" && (
             <RegisterMap records={real} regionId={f.region_id} partial={partial} />
+          )}
+          {layout === "chart" && (
+            <RegisterChart def={def} records={real} axis={chAxis} measure={chMeasure} kind={chKind} partial={partial} />
           )}
           {layout === "list" && (
           <div className="card gx overflow-hidden" {...displayAttrs(tbl.display)} data-testid="register-list-card">
