@@ -49,6 +49,25 @@ export function useAddRegisterComment(key: string, id: string) {
   });
 }
 
+// ---------------------------------------------------------------------------------------------------------------- PM item 18 (0.15.247): reactions and resolved flag on any comment
+export function useCommentReaction(queryKey: unknown[]) {
+  const qc = useQueryClient();
+  return useMutation<void, ApiError, { commentId: string; emoji: string; on: boolean }>({
+    mutationFn: ({ commentId, emoji, on }) => {
+      const url = `/comments/${commentId}/reactions`;
+      return on ? api.put<void>(url, { body: { emoji } }) : api.del<void>(url, { body: { emoji } });
+    },
+    onSuccess: () => void qc.invalidateQueries({ queryKey }),
+  });
+}
+export function useCommentResolved(queryKey: unknown[]) {
+  const qc = useQueryClient();
+  return useMutation<void, ApiError, { commentId: string; resolved: boolean }>({
+    mutationFn: ({ commentId, resolved }) => (resolved ? api.put<void>(`/comments/${commentId}/resolved`) : api.del<void>(`/comments/${commentId}/resolved`)),
+    onSuccess: () => void qc.invalidateQueries({ queryKey }),
+  });
+}
+
 // ---------------------------------------------------------------------------------------------------------------- X4 to X6 insights
 export const useTimeInState = (taskId: string, enabled = true) => useQuery({ queryKey: ['time-in-state', taskId], enabled, queryFn: () => api.get<TaskTimeInState>(`/tasks/${taskId}/time-in-state`) });
 export const useBlockedBy = (taskId: string, enabled = true) => useQuery({ queryKey: ['blocked-by', taskId], enabled, queryFn: () => api.get<BlockedBy>(`/tasks/${taskId}/blocked-by`) });
