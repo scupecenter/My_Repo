@@ -1,5 +1,5 @@
--- 0211_site_code_references: the fields that name another site by its code are checked against the Site Register (RF & Design backup_site, Risks affected_site_ids).
--- Mirror: db/sql/210_site_code_references.sql (kept identical to prisma/migrations/0211_site_code_references/migration.sql).
+-- 0323_site_code_references: the fields that name another site by its code are checked against the Site Register (RF & Design backup_site, Risks affected_site_ids).
+-- Mirror: db/sql/322_site_code_references.sql (kept identical to prisma/migrations/0323_site_code_references/migration.sql).
 --
 --   The far-end site of a microwave link (mw_far_end_site) already has this rule (DQ04, 0025). The other two fields that hold site codes as typed text did not: a typo was kept.
 --   The web form now picks them from the Site Register; this trigger makes the database agree. The stored value does not change (a site code, or codes joined by ", "), so

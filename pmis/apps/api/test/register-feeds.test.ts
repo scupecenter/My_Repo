@@ -214,7 +214,7 @@ describe('Q225: a site field that changes rules goes through Change Control', ()
   });
 });
 
-describe('site code references (0211)', () => {
+describe('site code references (0323)', () => {
   it('RF & Design backup_site must be another existing site; a risk lists existing site codes; an unchanged old value is never blocked', async () => {
     const t = await team(app, db, 'rf_design', 'rf_design', R);
     const bad = await t.entry.api.call('post', recPath('rf_design'), { site_id: t.site.id, data: { backup_site: `NOPE-${U}` } });
