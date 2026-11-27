@@ -757,9 +757,13 @@ export class RegistersService {
       users: ids.users.size ? await this.view.userRefs([...ids.users]) : new Map<string, UserRefDto>(),
       sites: ids.sites.size ? await this.db.tx.$queryRaw<{ id: string; site_code: string }[]>(Prisma.sql`SELECT id::text AS id, site_code FROM sites WHERE id = ANY(${[...ids.sites]}::uuid[])`) : [],
       items: ids.items.size ? await this.db.tx.$queryRaw<{ id: string; item_code: string; name: string; is_active: boolean }[]>(Prisma.sql`SELECT id::text AS id, item_code, name, is_active FROM warehouse_items WHERE id = ANY(${[...ids.items]}::uuid[])`) : [],
-      // a file name is shown only for a file of a slot of the same logical record
-      files: ids.files.size ? await this.db.tx.$queryRaw<{ id: string; entity: string; name: string }[]>(Prisma.sql`
-        SELECT f.id::text AS id, s.register_entity_id::text AS entity, f.original_name AS name FROM document_files f JOIN document_slots s ON s.id = f.slot_id
+      // a file name is shown only for a file of a slot of the same logical record. LIB-1: a file field follows the latest version of its file (the
+      // newest version of the same file_group_id that is neither superseded nor withdrawn); `latest` is that version's id, `name` its name
+      files: ids.files.size ? await this.db.tx.$queryRaw<{ id: string; entity: string; name: string; latest: string }[]>(Prisma.sql`
+        SELECT f.id::text AS id, s.register_entity_id::text AS entity, coalesce(l.original_name, f.original_name) AS name, coalesce(l.id, f.id)::text AS latest
+        FROM document_files f JOIN document_slots s ON s.id = f.slot_id
+        LEFT JOIN LATERAL (SELECT x.id, x.original_name FROM document_files x WHERE x.file_group_id = f.file_group_id AND x.superseded_by IS NULL AND x.withdrawn_at IS NULL
+                           ORDER BY x.version DESC LIMIT 1) l ON true
         WHERE f.id = ANY(${[...ids.files]}::uuid[]) AND s.register_entity_id IS NOT NULL`) : [],
       tasks: ids.tasks.size ? await this.db.tx.$queryRaw<{ id: string; code: string }[]>(Prisma.sql`
         SELECT t.id::text AS id, td.code FROM task_instances t JOIN task_definitions td ON td.id = t.task_def_id WHERE t.id = ANY(${[...ids.tasks]}::uuid[])`) : [],
@@ -775,7 +779,11 @@ export class RegistersService {
       const items = refs.items.filter((x) => has(x.id));
       if (items.length) r.warehouse_items = Object.fromEntries(items.map((x) => [x.id, { item_code: x.item_code, name: x.name, is_active: x.is_active }]));
       const files = refs.files.filter((x) => has(x.id) && x.entity === d.entity_id);
-      if (files.length) r.files = Object.fromEntries(files.map((x) => [x.id, x.name]));
+      if (files.length) {
+        r.files = Object.fromEntries(files.map((x) => [x.id, x.name]));
+        const moved = files.filter((x) => x.latest !== x.id);
+        if (moved.length) r.files_latest = Object.fromEntries(moved.map((x) => [x.id, x.latest]));
+      }
       const tasks = refs.tasks.filter((x) => has(x.id));
       if (tasks.length) r.tasks = Object.fromEntries(tasks.map((x) => [x.id, x.code]));
       if (Object.keys(r).length) d.refs = r;
