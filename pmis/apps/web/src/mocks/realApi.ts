@@ -269,6 +269,8 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/admin/log-integrity/runs'],
   ['get', '/admin/log-integrity/runs/:id'],
   ['get', '/health'],
+  // Contract 0.15.300 (no migration; apps/api: security): the browser's Content-Security-Policy violation report (SEC-3). The browser posts it, the screens never do.
+  ['post', '/csp-report'],
   // Contract 0.11.1: the documents follow-up of Q130 to Q132 (apps/api: sites, documents, qc; migration 0047). The site's custom fields (near_airport),
   // document slots on register records, QC snags and the photos of their fix.
   ['patch', '/sites/:id'],
