@@ -1,4 +1,5 @@
 import { Plus, X } from 'lucide-react';
+import { UnsavedGuard } from '@/lib/unsavedGuard';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGecolOrderWarnings, useSetGecolOrderWarnings, type GecolOrderWarningsInput } from '@/api/p4c';
@@ -62,6 +63,7 @@ export function GecolOrderWarnings() {
         </select>
       </label>
       <button className="btn btn-accent" data-testid="gow-save" disabled={!draft || cur.chains.some((c) => c.length < 2)} onClick={() => setOpen(true)}>{t('scopeMatch.save')}</button>
+      <UnsavedGuard scope="settings" dirty={!!draft} needsReason label={t('ui.guard_settings')} onSave={(reason) => new Promise<boolean>((res) => set.mutate({ version: q.data!.version, body: { ...cur, reason } }, { onSuccess: () => res(true), onError: () => res(false) }))} />
       {open && (
         <FormDialog open onClose={() => setOpen(false)} testid="gow-dialog" title={t('gecolOrder.title')} busy={set.isPending} error={set.isError ? errText(set.error, t) : null}
           onSubmit={(reason) => set.mutate({ version: q.data!.version, body: { ...cur, reason } }, { onSuccess: () => { toast(t('settings.audited')); setOpen(false); setDraft(null); } })} />

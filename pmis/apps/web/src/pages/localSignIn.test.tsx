@@ -337,6 +337,8 @@ describe('hybrid mode list', () => {
       'POST /saved-views/:id/restore', 'POST /saved-views/:id/transfer', 'GET /saved-views/:id/versions',
       // contract 0.15.246 (item 17, migration 0345): the soft "... is editing this record" notice
       'POST /presence/editing', 'POST /presence/editing/stop', 'GET /presence/editing',
+      // contract 0.15.245 (0344): pin a saved view as a personal home card
+      'GET /me/home-pins', 'POST /saved-views/:id/pin', 'POST /saved-views/:id/unpin',
       'GET /me/drafts', 'GET /me/drafts/:key', 'PUT /me/drafts/:key',
       'DELETE /me/drafts/:key',
       // contract 0.13.2: follow-up group C (Q267 cancel of a mistaken Quality snag record)
@@ -350,7 +352,7 @@ describe('hybrid mode list', () => {
       // contract 0.14.5: the site map of the dashboard (OV-12)
       'GET /dashboard/site-map',
       // contract 0.14.6: the background threshold of batches (Settings, Imports)
-      'GET /settings/imports', 'PUT /settings/imports', 'GET /settings/template-change-notice', 'PUT /settings/template-change-notice',
+      'GET /settings/imports', 'PUT /settings/imports', 'GET /settings/imports/upload-policy', 'PUT /settings/imports/upload-policy', 'GET /settings/template-change-notice', 'PUT /settings/template-change-notice',
       // contract 0.15.1: the shared layout of the side menu
       'GET /settings/nav-layout', 'PUT /settings/nav-layout',
       // contract 0.15.41: Settings, Identity & themes
