@@ -168,6 +168,7 @@ export interface TaskRow {
   pinned_user: string | null;
   external_party_id: string | null;
   workflow_version: number;
+  is_milestone_task: boolean;
   kind: string | null;
   cell_id: string | null;
   rule: string | null;
@@ -241,7 +242,7 @@ const ACTIVE_STATES = ['open', 'entry', 'in_review', 'in_approval'];
 export function taskSelect(extraWhere: Prisma.Sql, tail: Prisma.Sql = Prisma.empty): Prisma.Sql {
   return Prisma.sql`
     SELECT t.id::text AS id, t.site_id::text AS site_id, s.site_code, t.region_id, t.task_def_id::text AS task_def_id,
-      td.code AS task_code, td.name_en, td.name_ar, st.code AS stage_code, st.stream_code,
+      td.code AS task_code, td.name_en, td.name_ar, st.code AS stage_code, st.stream_code, td.is_milestone_task,
       t.state::text AS state, t.current_level, lv.n AS n_levels, (t.path_frozen_at IS NOT NULL) AS frozen,
       t.planned_date::text AS planned_date, t.actual_date::text AS actual_date, t.due_date::text AS due_date,
       t.planned_start::text AS planned_start, t.actual_start::text AS actual_start, t.submitted_date::text AS submitted_date,

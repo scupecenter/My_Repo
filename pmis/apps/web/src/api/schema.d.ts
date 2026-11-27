@@ -13839,6 +13839,10 @@ export interface components {
             name_ar?: string | null;
             stage_code: string;
             stream_code?: string | null;
+            /** @description 0.15.269: the workflow version the site runs on. The milestone/gate date rule (automatic milestone dates; gates take the milestone date only) applies from version 2. */
+            workflow_version?: number;
+            /** @description 0.15.269: the task is the milestone task of its stage (its code is the stage code). On workflow version 2+ its actual date is the date of its last linked task, set automatically and never typed. */
+            is_milestone_task?: boolean;
             state: components["schemas"]["TaskState"];
             current_level?: number;
             levels_required?: number;

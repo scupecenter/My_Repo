@@ -786,6 +786,7 @@
     "level": "Level {{level}} of {{total}}",
     "absent": "The holder is absent. Nothing moves automatically: the Team Lead decides whether to keep, reassign or act on behalf. The SLA keeps running.",
     "will_skip": "will be skipped",
+    "ms_auto_date": "Set automatically: the date of the last linked task.",
     "dates": "Dates",
     "slots_missing": "Upload every mandatory document to submit.",
     "upload_failed": "The upload failed and was rolled back.",

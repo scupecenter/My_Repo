@@ -20519,6 +20519,8 @@ components:
         name_ar: { type: [string, 'null'] }
         stage_code: { type: string }
         stream_code: { type: [string, 'null'] }
+        workflow_version: { type: integer, description: '0.15.269: the workflow version the site runs on. The milestone/gate date rule (automatic milestone dates; gates take the milestone date only) applies from version 2.' }
+        is_milestone_task: { type: boolean, description: '0.15.269: the task is the milestone task of its stage (its code is the stage code). On workflow version 2+ its actual date is the date of its last linked task, set automatically and never typed.' }
         state: { $ref: '#/components/schemas/TaskState' }
         current_level: { type: integer }
         levels_required: { type: integer }
