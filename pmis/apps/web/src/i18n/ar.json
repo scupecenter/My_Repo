@@ -3276,7 +3276,16 @@
       "quality_ncrs_open": "NCR مفتوحة",
       "quality_ncrs_note": "{{closed}} مغلقة",
       "quality_avg_close": "متوسط الإغلاق",
-      "quality_first_pass": "القبول من أول مرة"
+      "quality_first_pass": "القبول من أول مرة",
+      "approvals_title": "الموافقات المعلقة وعنق الزجاجة",
+      "approvals_hint": "المهام بانتظار المراجعة أو الاعتماد في المواقع ضمن النطاق، بأعمارها منذ فتح المستوى، حسب الدور. قراءة فقط.",
+      "open_approvals": "صندوق الموافقات",
+      "unavailable_approvals": "لا تملك صلاحية عرض الموافقات، لذا يبقى هذا القسم مخفيًا.",
+      "approvals_total": "بانتظار",
+      "approvals_review": "مراجعة",
+      "approvals_approve": "اعتماد",
+      "approvals_unassigned": "بلا دور",
+      "approvals_oldest": "أقدمها {{n}} يوم"
     },
     "scurve": {
       "title": "منحنى التقدم",
