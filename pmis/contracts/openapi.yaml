@@ -22126,8 +22126,8 @@ components:
         status: { type: string }
         template_id: { type: string }
         template_version: { type: integer }
-        register_key: { type: string, nullable: true }
-        stream: { type: string, nullable: true }
+        register_key: { type: [string, 'null'] }
+        stream: { type: [string, 'null'] }
         counts:
           type: object
           required: [valid, invalid]
@@ -22135,28 +22135,28 @@ components:
             valid: { type: integer }
             invalid: { type: integer }
         uploaded_at: { type: string, format: date-time, nullable: true }
-        progress_pct: { type: integer, nullable: true }
+        progress_pct: { type: [integer, 'null'] }
     DataHubTemplateChange:
       type: object
       required: [template_id, name_en, version, issued_at, added, removed, renamed, mine_is_old]
       properties:
         template_id: { type: string }
         name_en: { type: string }
-        name_ar: { type: string, nullable: true }
+        name_ar: { type: [string, 'null'] }
         version: { type: integer }
         issued_at: { type: string, format: date-time }
-        reason: { type: string, nullable: true }
+        reason: { type: [string, 'null'] }
         added: { type: array, items: { type: string } }
         removed: { type: array, items: { type: string } }
         renamed: { type: array, items: { type: string } }
-        my_version: { type: integer, nullable: true, description: 'The version of the caller last download of this template (null when never downloaded).' }
+        my_version: { type: [integer, 'null'], description: 'The version of the caller last download of this template (null when never downloaded).' }
         mine_is_old: { type: boolean }
     DataHubDownload:
       type: object
       required: [template_id, prefill, at]
       properties:
         template_id: { type: string }
-        version: { type: integer, nullable: true }
+        version: { type: [integer, 'null'] }
         prefill: { type: boolean }
         at: { type: string, format: date-time }
     DataHubSummary:
