@@ -1168,6 +1168,7 @@
     "section_documents_types": "أنواع المستندات",
     "section_documents_forms": "قوالب النماذج",
     "section_documents_archive": "الأرشيف",
+    "section_documents_numbering": "الترقيم",
     "section_data_counts": "أعداد GECOL / HLC",
     "section_screens_motion": "الحركة",
     "section_workflow_coverage": "تغطية المصفوفة"
@@ -6515,6 +6516,23 @@
     "preview": "معاينة لفتح نافذة",
     "replay": "إعادة التشغيل",
     "link_display": "إعدادات الجداول (العرض)"
+  },
+  "seq": {
+    "title": "تسلسلات الترقيم",
+    "note": "الرقم التالي لكل نوع مستند ونموذج. التغيير يسري على الأرقام الصادرة من الآن، والأرقام الصادرة لا تتغير أبداً.",
+    "col_key": "المفتاح",
+    "col_for": "يرقّم",
+    "col_pattern": "النمط",
+    "col_reset": "إعادة التصفير",
+    "col_next": "القيمة التالية",
+    "col_preview": "الرقم التالي",
+    "col_active": "فعّال",
+    "reset_yearly": "كل سنة",
+    "reset_never": "أبداً",
+    "edit_title": "التسلسل {{key}}",
+    "pattern_help": "الرموز {REGION} و{YYYY} و{YY} و{SEQ:n} (مرة واحدة). الأحرف A-Z و0-9 و- و/ و_ و.",
+    "next_help": "عدد صحيح من 1. ترفض قاعدة البيانات قيمة تكرّر رقماً صدر.",
+    "region_code": "رمز المنطقة"
   },
   "matrixCoverage": {
     "title": "تغطية المصفوفة",
