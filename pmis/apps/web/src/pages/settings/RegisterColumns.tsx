@@ -12,6 +12,7 @@ import { errText, FormDialog } from '@/components/FormDialog';
 import { useToast } from '@/components/Toast';
 import { ItemColumns } from './ItemColumns';
 import { RegisterStatePanel } from './RegisterStatePanel';
+import { RegisterRulesPanel } from './RegisterRulesPanel';
 import { isStreamKey, STREAM_MENUS, STREAM_PREFIX, StreamColumns, type StreamMenu } from './StreamColumns';
 
 type Dlg =
@@ -57,6 +58,7 @@ function ItemsPage() {
   return (
     <section className="space-y-3" data-testid="page-register-columns">
       <RegisterStatePanel />
+      <RegisterRulesPanel />
       <div className="card space-y-3 p-4">
         <h2 className="font-bold">{t('regcols.title')}</h2>
         <ColumnsPicker value={ITEMS_KEY} onChange={(k) => setSp({ register: k }, { replace: true })} />

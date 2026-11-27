@@ -27,7 +27,7 @@ import { MockM365, MockStepUp, StepUpDone } from '@/pages/MockM365';
 import { MatrixPage } from '@/pages/Matrix';
 import { MyWork } from '@/pages/MyWork';
 import { DailyPlan } from '@/pages/DailyPlan';
-import { RegisterPage } from '@/pages/Register';
+import { RegisterPage, RegisterRecordPage } from '@/pages/Register';
 import { RegisterBatch } from '@/pages/RegisterBatch';
 import { DataHubPage } from '@/pages/DataHub';
 import { FinanceHubPage } from '@/pages/FinanceHub';
@@ -67,6 +67,7 @@ import { MailDelivery } from '@/pages/logs/MailDelivery';
 import { IntegrityRuns } from '@/pages/logs/IntegrityRuns';
 import { SystemLog } from '@/pages/logs/SystemLog';
 import { SettingsRoutes } from '@/pages/settings/Settings';
+import { FaviconSync } from '@/components/PublicLogo';
 
 function Soon() {
   const { t } = useTranslation();
@@ -114,6 +115,8 @@ function gated(session: Session) {
         <Route path="sites/:siteId" element={<Site />} />
         <Route path="menu/:id" element={<MenuGroup />} />
         <Route path="registers/:key" element={<RegisterPage />} />
+        {/* V5: a record on its own page (the person chose so in Settings > Screens > Records) */}
+        <Route path="registers/:key/records/:id" element={<RegisterRecordPage />} />
         <Route path="warehouse" element={<Warehouse />} />
         <Route path="as-built/items" element={<AsBuiltItems />} />
         <Route path="registers/:key/batches/:batchId" element={<RegisterBatch />} />
@@ -171,6 +174,8 @@ export function App() {
     return () => setPasswordChangeHandler(null);
   }, [qc]);
   return (
+    <>
+    <FaviconSync />
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -181,5 +186,6 @@ export function App() {
       {USE_MOCKS && <Route path="/mock-m365/step-up" element={<MockStepUp />} />}
       <Route path="/*" element={<Gate />} />
     </Routes>
+    </>
   );
 }

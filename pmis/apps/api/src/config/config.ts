@@ -39,6 +39,10 @@ const schema = z.object({
   CLAMD_PORT: z.coerce.number().int().min(1).max(65535).optional(),
   CLAMD_TIMEOUT_MS: z.coerce.number().int().min(1000).max(900000).optional(),
   SCAN_FAILURE: z.enum(['fail_closed', 'fail_open']).optional(),
+  // Web Push (item 13, contract 0.15.156). Off unless all three are set. The keys come only from the environment; the app never creates or stores them.
+  VAPID_PUBLIC_KEY: z.string().optional(),
+  VAPID_PRIVATE_KEY: z.string().optional(),
+  VAPID_SUBJECT: z.string().optional(),
   // Outbound mail (owner answer Q167, migration 0055). Off when SMTP_HOST is empty: the queue then records what it would have sent.
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().int().min(1).max(65535).optional(),
@@ -91,6 +95,13 @@ export interface MailConfig {
   heloName: string;
 }
 
+export interface WebPushConfig {
+  enabled: boolean;
+  publicKey: string;
+  privateKey: string;
+  subject: string;
+}
+
 export interface AppConfig {
   nodeEnv: 'development' | 'test' | 'production';
   databaseUrl: string;
@@ -106,6 +117,7 @@ export interface AppConfig {
   contextKey: string;
   /** Runs the daily job (SLA versions due, tentative-holiday reminder) at start-up and at 02:00 Africa/Tripoli. */
   jobsEnabled: boolean;
+  webPush: WebPushConfig;
   /** Where document files and zip exports are kept. */
   storage: StorageConfig;
   /** Master keys of the envelope encryption of stored files (FILE_ENC_KEY). */
@@ -133,6 +145,14 @@ export function parseFrom(v: string): { address: string; header: string } | null
     return { address, header: `${name} <${address}>` };
   }
   return ADDR_RE.test(t) ? { address: t, header: t } : null;
+}
+
+/** Web Push is on only when the public key, the private key and the contact subject (mailto: or https:) are all set. A half-set configuration stays off. */
+function webPushFrom(v: z.infer<typeof schema>): WebPushConfig {
+  const e = (x: string | undefined): string => (x ?? '').trim();
+  const publicKey = e(v.VAPID_PUBLIC_KEY), privateKey = e(v.VAPID_PRIVATE_KEY), subject = e(v.VAPID_SUBJECT);
+  const ok = publicKey !== '' && privateKey !== '' && /^(mailto:|https:\/\/)/.test(subject);
+  return ok ? { enabled: true, publicKey, privateKey, subject } : { enabled: false, publicKey: '', privateKey: '', subject: '' };
 }
 
 function mailFrom(v: z.infer<typeof schema>): MailConfig {
@@ -213,6 +233,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     fileEnc: fileEncFrom(v),
     scan: scanFrom(v),
     mail: mailFrom(v),
+    webPush: webPushFrom(v),
     appBaseUrl: (() => { const u = (v.APP_BASE_URL ?? '').trim() || (v.APP_URL ?? '').trim(); return u ? u.replace(/\/+$/, '') : undefined; })(),
     anchorDir: v.LOG_ANCHOR_DIR && v.LOG_ANCHOR_DIR.trim() !== '' ? v.LOG_ANCHOR_DIR.trim() : undefined,
   };

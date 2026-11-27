@@ -772,6 +772,13 @@
     "saved": "Saved in the register",
     "new_version_note": "Saving creates a new version"
   },
+  "comment": {
+    "react": "Acknowledge",
+    "react_ack": "Acknowledged",
+    "resolve": "Mark resolved",
+    "resolved": "Resolved",
+    "reopen": "Reopen"
+  },
   "drawer": {
     "mandatory": "Mandatory",
     "drop": "Drop a file or click to upload",
@@ -1258,12 +1265,14 @@
     "section_sla_weights": "Weights",
     "section_registers_lists": "Lists",
     "section_alerts_policy": "Notification policy",
+    "section_alerts_push": "Web push",
     "section_alerts_mail": "Mail kinds",
     "section_security_locks": "Lock keys",
     "section_security_support": "Support access",
     "section_security_dlp": "DLP months",
     "section_screens_dashboard": "Dashboard",
     "section_screens_tables": "Tables (Display)",
+    "section_screens_records": "Records",
     "section_screens_daily-plan": "My Work (Daily Plan)",
     "section_screens_pm-schedules": "Preventive maintenance",
     "tab_ddl": "DDL",
@@ -2323,6 +2332,9 @@
     "order_other_site": "The order belongs to another site than this receipt.",
     "order_choice_required": "The site has several active orders for this part: choose one.",
     "no_active_order": "The site has no approved, active Procurement order for this part.",
+    "order_required": "Settings require this invoice to name its Procurement order.",
+    "unknown_rule": "This register has no such rule.",
+    "supplier_required": "Settings require an invoice to name its supplier company.",
     "order_not_active": "This order is not approved and active for this part and site.",
     "in_house_no_order": "In-house work has no Procurement order.",
     "in_house_no_contractor": "In-house work names the internal team, not a contractor.",
@@ -2427,6 +2439,31 @@
     "open_site": "Open site",
     "processing_started": "The batch is being processed in the background. The bar shows the progress.",
     "processing_busy": "Processing…"
+  },
+  "tplChanges": {
+    "button": "What changed",
+    "button_hint": "Compare v{{version}} with the version before it",
+    "title": "What changed in {{id}}",
+    "between": "v{{from}} to v{{to}}, issued {{date}}",
+    "loading": "Loading",
+    "error": "Could not load the comparison.",
+    "none": "Same columns; only a setting inside the template changed.",
+    "added": "Columns added ({{count}})",
+    "removed": "Columns removed ({{count}})",
+    "renamed": "Columns renamed ({{count}})",
+    "current_ok": "Current version. It matches the live definition of the register.",
+    "notice": "This template changed on {{date}}: {{added}} added, {{removed}} removed, {{renamed}} renamed. An old file is refused; download the current version and copy your rows into it."
+  },
+  "tplNoticeSettings": {
+    "title": "Imports / Template change notice",
+    "note": "When the columns of a register template change, a new version is issued. People who hold the entry level of that register get a notice in the bell so an old file is no surprise. Nothing is deleted: old versions stay and the Templates page shows what changed.",
+    "enabled": "Tell the entry holders when a template changes",
+    "days": "Keep telling people for",
+    "unit": "days after the new version",
+    "hint": "A whole number from {{min}} to {{max}}. The default is {{def}}.",
+    "confirm": "Set the template change notice to {{state}}, for {{days}} days after a new version.",
+    "on": "on",
+    "off": "off"
   },
   "batchReview": {
     "kpis": "Upload counts",
@@ -3134,7 +3171,10 @@
     "only_leads": "Only a lead of this region (the reassign right), or a System Admin, writes its update. An author edits only until the week ends.",
     "empty": "No status updates yet",
     "empty_lead": "Write the first update of the week.",
-    "empty_hint": "Leads publish one update per region or team each week."
+    "empty_hint": "Leads publish one update per region or team each week.",
+    "health_board": "Region health",
+    "missing_update": "Missing update",
+    "missing_hint": "No update posted for this week yet."
   },
   "dash": {
     "tabs": {
@@ -3556,7 +3596,25 @@
       "approvals_review": "Review",
       "approvals_approve": "Approve",
       "approvals_unassigned": "No role",
-      "approvals_oldest": "oldest {{n}}d"
+      "approvals_oldest": "oldest {{n}}d",
+      "changes_title": "Change requests and overdue meeting actions",
+      "changes_hint": "Pending change requests aged since the request date, and meeting actions past their due date. Read only.",
+      "open_changes": "Change control",
+      "open_meetings": "Meetings",
+      "unavailable_changes": "You do not have the change control view right, so this part stays hidden.",
+      "unavailable_actions": "You do not have the meetings view right, so this part stays hidden.",
+      "changes_pending": "Pending changes",
+      "changes_approved": "Approved, not applied",
+      "changes_part": "Change requests",
+      "actions_part": "Meeting actions",
+      "actions_open": "Open actions",
+      "actions_overdue": "Overdue",
+      "actions_no_due": "No due date",
+      "kind_scope_change": "Scope",
+      "kind_date_change": "Date",
+      "kind_suspension": "Suspension",
+      "kind_resumption": "Resumption",
+      "kind_other": "Other"
     },
     "scurve": {
       "title": "Progress curve",
@@ -3571,6 +3629,11 @@
       "empty": "No saved snapshots yet: the curve appears after the first weekly snapshot.",
       "chart_label": "Progress curve: {{list}}",
       "basis": "{{n}} saved weekly snapshots, values frozen at their dates."
+    },
+    "region_health": {
+      "title": "Region health",
+      "open": "Open the Weekly status",
+      "week": "Week of {{date}}"
     }
   },
   "docs": {
@@ -3859,7 +3922,8 @@
       "motion": "Motion",
       "icon_style": "Icon weight",
       "menu_style": "Side menu",
-      "accent": "Accent colour"
+      "accent": "Accent colour",
+      "contrast": "Contrast"
     },
     "opt": {
       "density": {
@@ -3900,6 +3964,10 @@
         "orange": "Orange",
         "red": "Red",
         "amber": "Amber"
+      },
+      "contrast": {
+        "standard": "Standard",
+        "high": "High"
       }
     }
   },
@@ -4476,6 +4544,12 @@
     "yellow": "Pending approval. Documents uploaded, waiting for review or approval ({{approved}} of {{need}} approved).",
     "green": "Approved. Documents approved ({{approved}} of {{need}})."
   },
+  "regrules": {
+    "title": "Register rules",
+    "note": "Rules the database enforces for one register, for example that an invoice must name its Procurement order. Every change needs a reason and is audited.",
+    "saved": "Rule saved",
+    "change_title": "Change: {{rule}}"
+  },
   "regstate": {
     "title": "Register state",
     "note": "Switch a whole register off (it is hidden everywhere; nothing is deleted and switching it on again restores everything) or lock it (readable, but no new record and no change, except by a System Admin). Every change needs a reason and is audited.",
@@ -4664,6 +4738,8 @@
     "import_file": "Excel file (.xlsx)",
     "reason_short": "Reason (at least 3 characters)",
     "import_submit": "Import",
+    "template_current": "Download the template with the current values",
+    "import_unchanged": "{{count}} unchanged",
     "import_done": "{{count}} values imported",
     "bind_title": "Bind this list to a register column",
     "bind_pick_register": "Choose a register",
@@ -6206,7 +6282,26 @@
     "choice_off": "Everyone sees this design.",
     "defaults_title": "Organization appearance defaults",
     "defaults_note": "The appearance of everyone without a personal choice. An empty field keeps the built-in standard.",
-    "defaults_builtin": "Built-in standard ({{name}})"
+    "defaults_builtin": "Built-in standard ({{name}})",
+    "logo_title": "Workspace logo",
+    "logo_note": "Shown in the sidebar instead of the built-in badge. PNG, JPEG, SVG or WebP, 256 KiB at most.",
+    "logo_none": "No logo uploaded; the built-in badge shows.",
+    "logo_hidden": "The logo is hidden; the built-in badge shows. Hiding keeps the file.",
+    "logo_upload": "Upload logo",
+    "logo_replace": "Replace logo",
+    "logo_hide": "Hide logo",
+    "logo_show": "Show logo",
+    "logo_confirm_upload": "The logo shows in the sidebar for everyone. The change is audited with your reason.",
+    "logo_confirm_hide": "The logo disappears from the sidebar; the built-in badge shows. The file is kept. The change is audited with your reason.",
+    "logo_confirm_show": "The logo shows in the sidebar again. The change is audited with your reason.",
+    "logo_updated": "Uploaded by {{name}} on {{when}}",
+    "logo_alt": "Workspace logo",
+    "logo_public_note": "Outside the app, the logo is closed by default. Switch on where it may show; these places are public (anyone who opens the page sees it).",
+    "logo_login": "Show the logo on the sign-in pages (sign in, forgot and reset password)",
+    "logo_favicon": "Use the logo as the browser tab icon",
+    "logo_public_off": "The logo is hidden, so neither public place shows it.",
+    "logo_confirm_public_on": "The logo becomes visible to anyone who opens the selected public pages, without signing in. The change is audited with your reason.",
+    "logo_confirm_public_off": "The logo stops showing on the public pages. The file is kept. The change is audited with your reason."
   },
   "studioPanel": {
     "open": "Show the pending changes",
@@ -6292,6 +6387,9 @@
     "rewire": "Rewire: remove the direct links that the new task replaces",
     "place_after": "Place after",
     "gate_after": "Gate after milestone",
+    "no_closing_warning": "Milestones with tasks but no closing task: {{codes}}. They are done only when every counting task is done. Publishing is still allowed.",
+    "gate_move": "Move the gate",
+    "gate_to": "Opens the milestone",
     "no_free_gate": "Every milestone that has a next milestone already has a gate.",
     "sla_bad": "Give both SLA values, minimum not above maximum.",
     "docs_approval_note": "Who enters and who approves this task is set in the Responsibility Matrix.",
@@ -6491,6 +6589,18 @@
     "add": "Add schedule",
     "save_title": "Save the schedules"
   },
+  "chartv": {
+    "title": "Chart",
+    "axis": "Axis",
+    "measure": "Measure",
+    "count": "Number of rows",
+    "sum_of": "Sum of {{field}}",
+    "kind": "Drawing",
+    "bar": "Bars",
+    "pie": "Ring",
+    "empty": "No rows in this view.",
+    "label": "Chart of {{measure}} by {{axis}}"
+  },
   "analytics": {
     "title": "Analytics of this view",
     "counted": "{{n}} rows counted",
@@ -6506,6 +6616,13 @@
     "avg": "Average",
     "min": "Smallest",
     "max": "Largest"
+  },
+  "openrec": {
+    "title": "Opening a record",
+    "note": "Where a register record opens when you click its row: in the side drawer (the default) or on its own full page. A personal choice; it applies on every device you sign in from.",
+    "drawer": "Side drawer (default)",
+    "page": "Full page",
+    "back": "Back to {{name}}"
   },
   "tstd": {
     "empty": "Nothing to show.",
@@ -6685,6 +6802,20 @@
     "scope_hash": "Scope fingerprint",
     "approve_scope": "You approve exactly this scope. If it changed, the approval is refused and a new request is needed.",
     "plan_scope_note": "Counted for the chosen scope.",
+    "narrow_whole": "Narrowing works for Procurement, Issue Log, Risk Register, Car Dispatcher bookings, Financial Advances and the other register parts marked narrowable. Sites, Quality, Warehouse, As-built, Meetings and Change control are deleted whole only: their tasks, gates, documents and checks link to a site or a process, not to one record, so a region or batch filter could leave orphaned rows.",
+    "narrow_title": "Narrow the chosen parts (optional)",
+    "narrow_hint": "Only the records that match every filter you set are deleted. Everything else in the part stays, with its documents, comments and history. Leave all empty to delete the whole part.",
+    "narrow_regions": "Region",
+    "narrow_batches": "Import batch",
+    "narrow_no_batches": "No import batches for this part.",
+    "narrow_batch_meta": "{{rows}} rows · uploaded {{when}}",
+    "narrow_period": "Created between",
+    "narrow_from": "From (inclusive)",
+    "narrow_to": "To (inclusive)",
+    "narrow_active": "The counts above are for the narrowed scope.",
+    "narrow_clear": "Clear the narrowing",
+    "narrow_view": "Narrowed to:",
+    "narrow_dropped": "The narrowing is not used: the chosen parts cannot be narrowed.",
     "accounts_note": "{{count}} accounts would be deactivated.",
     "backup_choice": "Backup before the run",
     "require_backup": "Require a recent backup (recommended)",
@@ -6947,6 +7078,28 @@
     "last": "Last indexed: {{at}}",
     "never": "Nothing indexed yet."
   },
+  "push": {
+    "title": "Notifications on this device",
+    "note": "Get a short alert on this phone or computer when you have a new notification. The alert only says you have something new; open the inbox to read it. The bell and the e-mail stay as they are, and you can turn this off at any time.",
+    "server_off": "Device alerts are not turned on for this system yet. Ask your administrator.",
+    "unsupported": "This browser does not support device alerts.",
+    "on": "On for this device",
+    "off": "Off for this device",
+    "enable": "Turn on",
+    "disable": "Turn off",
+    "denied": "The browser blocked notifications. Allow them in the browser settings, then try again.",
+    "failed": "Could not change device alerts. Try again."
+  },
+  "wps": {
+    "title": "Web push (device alerts)",
+    "note": "Field engineers can turn on a short alert on their phone or computer (Profile > Notifications on this device). The alert carries no site or record text, only that something new is waiting in the inbox. The bell and the e-mail are unchanged.",
+    "on": "Web push is on. A person turns it on for their own browser in Profile.",
+    "off": "Web push is off because the server has no push keys. It stays off until the administrator sets VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY and VAPID_SUBJECT in the server environment. Nothing is sent and people see that device alerts are not available.",
+    "browsers": "Subscribed browsers",
+    "people": "People",
+    "last": "Last alert sent: {{at}}",
+    "never": "No alert sent yet."
+  },
   "as": {
     "title": "Archive",
     "note": "Which document cards Library > Archive shows and in what order, the default columns of its list and the most files a bulk zip may hold.",
@@ -6984,6 +7137,7 @@
     "board_hint": "Cards by milestone or status",
     "map": "Map",
     "map_hint": "Items on the map",
+    "chart_hint": "The rows as bars or a ring, by a field you choose",
     "calendar_hint": "On a month grid, by a date you choose"
   },
   "batchedit": {
@@ -7627,6 +7781,13 @@
     "domains": "Internal domains (comma separated)",
     "domains_note": "An address whose domain is not listed is external. With no domain listed every address counts as internal.",
     "confirm_note": "The change is audited and applies to the next mail."
+  },
+  "presence": {
+    "editing_record_one": "{{names}} is editing this record",
+    "editing_record_other": "{{names}} are editing this record",
+    "editing_task_one": "{{names}} is editing this task",
+    "editing_task_other": "{{names}} are editing this task",
+    "editing_join": ", "
   },
   "capture": {
     "dictate": "Dictate",

@@ -101,6 +101,9 @@ function workload(region: number | null) {
   return { items: [...rows.values()].sort((a, b) => b.late - a.late || b.open - a.open || a.holder.display_name.localeCompare(b.holder.display_name)), no_holder: none };
 }
 
+/** Every comment of the mock, task threads and register threads together (PM item 18 actions address a comment by id alone). */
+const everyComment = (): Comment[] => [...db().tasks, ...db().extra].flatMap((t) => t.comments ?? []).concat(Object.values(db().x.regComments).flat());
+
 export const xHandlers = [
   // ---- X1
   http.get(`${B}/notifications`, ({ request }) => { const g = guard(); if (g) return g; return inboxPage(new URL(request.url).searchParams); }),
@@ -177,6 +180,52 @@ export const xHandlers = [
     return HttpResponse.json(c, { status: 201 });
   }),
 
+  // ---- PM item 18 (0.15.247): a 👍 reaction and a resolved flag on any comment (task or register record)
+  http.put(`${B}/comments/:id/reactions`, async ({ params, request }) => {
+    const g = guard(); if (g) return g;
+    const c = everyComment().find((x) => x.id === params.id);
+    if (!c) return problem(404, 'not_found', 'Not found');
+    const { emoji } = (await request.json()) as { emoji?: string };
+    if (emoji !== '👍') return invalid('/emoji', 'unsupported');
+    const rs = c.reactions ?? [];
+    const cur = rs.find((r) => r.emoji === emoji);
+    if (cur) cur.mine = true;
+    else rs.push({ emoji, count: 1, mine: true });
+    c.reactions = rs;
+    save();
+    return new HttpResponse(null, { status: 204 });
+  }),
+  http.delete(`${B}/comments/:id/reactions`, async ({ params, request }) => {
+    const g = guard(); if (g) return g;
+    const c = everyComment().find((x) => x.id === params.id);
+    if (!c) return problem(404, 'not_found', 'Not found');
+    const { emoji } = (await request.json()) as { emoji?: string };
+    const cur = (c.reactions ?? []).find((r) => r.emoji === emoji);
+    if (cur?.mine) {
+      cur.count -= 1;
+      cur.mine = false;
+      if (cur.count <= 0) c.reactions = (c.reactions ?? []).filter((r) => r !== cur);
+      save();
+    }
+    return new HttpResponse(null, { status: 204 });
+  }),
+  http.put(`${B}/comments/:id/resolved`, ({ params }) => {
+    const g = guard(); if (g) return g;
+    const c = everyComment().find((x) => x.id === params.id);
+    if (!c) return problem(404, 'not_found', 'Not found');
+    c.resolved = { at: new Date().toISOString(), by: me() };
+    save();
+    return new HttpResponse(null, { status: 204 });
+  }),
+  http.delete(`${B}/comments/:id/resolved`, ({ params }) => {
+    const g = guard(); if (g) return g;
+    const c = everyComment().find((x) => x.id === params.id);
+    if (!c) return problem(404, 'not_found', 'Not found');
+    delete c.resolved;
+    save();
+    return new HttpResponse(null, { status: 204 });
+  }),
+
   // ---- X4 to X6
   http.get(`${B}/tasks/:id/time-in-state`, ({ params }) => { const g = guard(); if (g) return g; const t = find(params.id as string); return t ? HttpResponse.json(timeInState(t)) : problem(404, 'not_found', 'Task not found'); }),
   http.get(`${B}/tasks/:id/blocked-by`, ({ params }) => {
@@ -238,6 +287,20 @@ export const xHandlers = [
       .map((u) => ({ ...u, editable: u.author.id === me().id && today <= u.week_end }));
     const from = Number(q.get('cursor') ? atob(q.get('cursor') as string) : 0) || 0;
     return HttpResponse.json({ items: rows.slice(from, from + limit), page: { limit, next_cursor: from + limit < rows.length ? btoa(String(from + limit)) : null } });
+  }),
+  // Item 12 (0.15.241): the region health board — the current-week region updates, one row per region, missing flag otherwise.
+  http.get(`${B}/status-updates/region-health`, () => {
+    const g = guard(); if (g) return g;
+    const week = weekStartOf(tripoliToday());
+    const items = [1, 2, 3, 4, 5, 6, 7].map((region_id) => {
+      const u = db().x.statuses
+        .filter((x) => x.scope === 'region' && x.region_id === region_id && x.week_start === week)
+        .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))[0];
+      return u
+        ? { region_id, health: u.health, summary: u.summary, author: u.author, updated_at: u.updated_at, missing_update: false }
+        : { region_id, health: null, summary: null, author: null, updated_at: null, missing_update: true };
+    });
+    return HttpResponse.json({ week_start: week, items });
   }),
   http.post(`${B}/status-updates`, async ({ request }) => {
     const g = guard(); if (g) return g;
