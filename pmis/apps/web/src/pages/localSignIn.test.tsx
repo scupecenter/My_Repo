@@ -265,7 +265,7 @@ describe('hybrid mode list', () => {
       'GET /registers/:key/records/:id/history', 'GET /registers/:key/records/:id/versions', 'POST /registers/:key/records/:id/versions',
       'POST /registers/:key/records/:id/triage',
       // contract 0.7.0: approved-template entry (templates and import batches)
-      'GET /templates', 'GET /templates/:id/download', 'GET /import-batches', 'GET /data-hub/summary', 'POST /import-batches', 'GET /import-batches/:id', 'GET /import-batches/:id/rows', 'GET /import-batches/:id/error-report',
+      'GET /templates', 'GET /templates/:id/changes', 'GET /templates/:id/download', 'GET /import-batches', 'GET /data-hub/summary', 'POST /import-batches', 'GET /import-batches/:id', 'GET /import-batches/:id/rows', 'GET /import-batches/:id/error-report',
       'POST /import-batches/:id/submit', 'POST /import-batches/:id/decisions',
       // contract 0.12.8 (P3): the legacy Master import and its comparison report, the template mapping screen and the import aliases
       'GET /master-import/runs', 'POST /master-import/runs', 'GET /master-import/runs/:id', 'GET /master-import/runs/:id/diffs', 'GET /master-import/runs/:id/export',
@@ -293,7 +293,7 @@ describe('hybrid mode list', () => {
       // contract 0.15.242: the generic alert rules (apps/api: settings; migration 0342)
       'GET /settings/alert-rules', 'POST /settings/alert-rules', 'PUT /settings/alert-rules/:id',
       // contract 0.9.2: the self-service profile (details, email change and its decision, password, two-factor self-service, enforced mark)
-      'GET /me/profile', 'GET /me/sessions', 'POST /me/sessions/revoke-others', 'POST /me/sessions/:id/revoke', 'PATCH /me/profile', 'GET /admin/document-search-index', 'PATCH /me/preferences', 'POST /me/password', 'POST /me/email-change', 'DELETE /me/email-change',
+      'GET /me/profile', 'GET /me/sessions', 'POST /me/sessions/revoke-others', 'POST /me/sessions/:id/revoke', 'PATCH /me/profile', 'GET /admin/document-search-index', 'GET /me/push', 'POST /me/push/subscribe', 'POST /me/push/unsubscribe', 'GET /admin/web-push', 'PATCH /me/preferences', 'POST /me/password', 'POST /me/email-change', 'DELETE /me/email-change',
       'POST /me/two-factor/enrol/start', 'POST /me/two-factor/enrol/confirm', 'POST /me/two-factor/disable',
       'GET /email-change-requests', 'POST /email-change-requests/:id/decide', 'PUT /users/:id/two-factor/enforced',
       // contract 0.10.0: the logs core
@@ -332,8 +332,11 @@ describe('hybrid mode list', () => {
       'POST /sites/:id/change-proposals',
       'GET /saved-views', 'POST /saved-views', 'POST /saved-views/import', 'GET /saved-views/filter-fields', 'GET /saved-views/filter-fields/:field/values', 'GET /saved-views/:id', 'PATCH /saved-views/:id', 'POST /saved-views/:id/deactivate',
       'POST /saved-views/:id/restore', 'POST /saved-views/:id/transfer', 'GET /saved-views/:id/versions',
+      // contract 0.15.246 (item 17, migration 0345): the soft "... is editing this record" notice
+      'POST /presence/editing', 'POST /presence/editing/stop', 'GET /presence/editing',
+      'GET /me/drafts', 'GET /me/drafts/:key', 'PUT /me/drafts/:key',
       // contract 0.15.245 (0344): pin a saved view as a personal home card
-      'GET /me/home-pins', 'POST /saved-views/:id/pin', 'POST /saved-views/:id/unpin', 'GET /me/drafts', 'GET /me/drafts/:key', 'PUT /me/drafts/:key',
+      'GET /me/home-pins', 'POST /saved-views/:id/pin', 'POST /saved-views/:id/unpin',
       'DELETE /me/drafts/:key',
       // contract 0.13.2: follow-up group C (Q267 cancel of a mistaken Quality snag record)
       'POST /registers/quality/records/:id/cancel-snag',
@@ -346,7 +349,7 @@ describe('hybrid mode list', () => {
       // contract 0.14.5: the site map of the dashboard (OV-12)
       'GET /dashboard/site-map',
       // contract 0.14.6: the background threshold of batches (Settings, Imports)
-      'GET /settings/imports', 'PUT /settings/imports',
+      'GET /settings/imports', 'PUT /settings/imports', 'GET /settings/template-change-notice', 'PUT /settings/template-change-notice',
       // contract 0.15.1: the shared layout of the side menu
       'GET /settings/nav-layout', 'PUT /settings/nav-layout',
       // contract 0.15.41: Settings, Identity & themes
@@ -357,6 +360,8 @@ describe('hybrid mode list', () => {
       'GET /media/settings', 'PUT /media/settings', 'GET /media/items', 'GET /media/facets', 'GET /media/items/:kind/:id/thumbnail',
       'GET /settings/security-locks', 'PUT /settings/security-locks', 'GET /settings/download-locks', 'PUT /settings/download-locks',
       'GET /settings/support-access', 'PUT /settings/support-access', 'GET /support-access', 'POST /support-access', 'POST /support-access/revoke-all', 'POST /support-access/:id/revoke', 'GET /settings/new-device-code', 'PUT /settings/new-device-code', 'POST /settings/new-device-code/bypass', 'GET /settings/passkeys', 'PUT /settings/passkeys', 'GET /me/passkeys', 'POST /me/passkeys/register/options', 'POST /me/passkeys/register/verify', 'DELETE /me/passkeys/:id', 'POST /users/:id/passkeys/revoke',
+      // contract 0.15.232 (migration 0243): the workspace logo and where it shows outside the app
+      'PUT /settings/identity/logo', 'PATCH /settings/identity/logo', 'PATCH /settings/identity/logo/display', 'GET /ui/public/identity', 'GET /ui/public/logo/:purpose', 'GET /ui/assets/:key',
       // contract 0.15.4: the per-site workflow locks and the status of the sites of an import
       'POST /sites/workflow-locks', 'PUT /sites/:id/workflow-locks', 'GET /master-import/runs/:id/sites', 'GET /import-batches/:id/sites', 'GET /settings/calendars', 'GET /settings/holidays', 'POST /settings/holidays', 'PATCH /settings/holidays/:id', 'DELETE /settings/holidays/:id', 'POST /settings/holidays/:id/confirm', 'PUT /settings/weekend-days', 'POST /tasks/:task_id/delay-periods/:period_id/decision', 'DELETE /matrix/cells/:id', 'PUT /registers/hlc/records/:id/purchase-requests', 'GET /registers/dismantle/order-options', 'GET /registers/dismantle/rn-options', 'GET /registers/warehouse/order-options', 'GET /registers/car_dispatcher/order-options', 'GET /registers/financial_advances/order-options', 'GET /registers/issues/order-options', 'GET /registers/change_control/order-options', 'GET /registers/quality/order-options', 'GET /registers/financial_advances/advance-options', 'GET /registers/invoices/order-options', 'GET /registers/invoices/supplier-options', 'GET /settings/register-state', 'PUT /settings/register-state/:key', 'GET /registers/issues/risk-options', 'GET /registers/risks/:entity_id/issues', 'GET /registers/procurement/:entity_id/receipts', 'GET /registers/:key/:entity_id/related', 'GET /registers/contractor-companies', 'POST /registers/hlc/legacy-migration', 'GET /registers/:key/fields', 'POST /registers/:key/fields', 'PUT /registers/:key/fields-order', 'GET /registers/:key/fields/:code/impact', 'PATCH /registers/:key/fields/:code', 'PUT /registers/:key/fields/:code/default', 'DELETE /registers/:key/fields/:code', 'POST /registers/:key/sections', 'PATCH /registers/:key/sections/:id', 'DELETE /registers/:key/sections/:id', 'PATCH /registers/:key', 'POST /registers/:key/records/:id/transfer', 'POST /registers/:key/records/:id/lock', 'DELETE /registers/:key/records/:id/lock', 'POST /registers/:key/columns/:field/lock', 'DELETE /registers/:key/columns/:field/lock', 'GET /search', 'POST /search/site-ids', 'GET /settings/gecol-order-warnings', 'PUT /settings/gecol-order-warnings', 'GET /settings/derive-rules', 'PUT /settings/derive-rules', 'GET /settings/structural-freeze', 'PUT /settings/structural-freeze', 'POST /settings/structural-freeze/lift', 'GET /site-master/sections', 'GET /site-master/:menu/rows', 'PATCH /site-master/columns/:ord/sections', 'GET /site-master/columns', 'POST /site-master/columns', 'GET /site-master/columns/:ord', 'PATCH /site-master/columns/:ord', 'DELETE /site-master/columns/:ord', 'POST /site-master/columns/:ord/type-preview', 'POST /site-master/columns/:ord/deactivate', 'POST /site-master/columns/:ord/reactivate', 'GET /custom-fields', 'GET /custom-fields/:id', 'GET /site-master/sites/:siteId/sources', 'POST /sites/:id/admin-edits', 'GET /sites/:id/admin-edits', 'GET /settings/sla-rules', 'GET /settings/sla-tasks', 'PUT /settings/sla-tasks/:task_code/no-sla', 'GET /issues/stopped-rows', 'GET /settings/issue-task-map', 'PUT /settings/issue-task-map/:task_code', 'GET /settings/sla-rule-sets', 'POST /settings/sla-rule-sets', 'GET /settings/sla-rule-sets/:id', 'PATCH /settings/sla-rule-sets/:id', 'POST /settings/sla-rule-sets/:id/preview', 'POST /settings/sla-rule-sets/:id/publish', 'POST /users/:id/purge', 'GET /workflow/versions', 'POST /workflow/versions', 'GET /workflow/versions/:version', 'PUT /workflow/versions/:version', 'POST /workflow/versions/:version/remove', 'POST /workflow/versions/:version/discard', 'POST /workflow/versions/:version/migrations', 'POST /workflow/site-migrations/:id/revert', 'POST /workflow/versions/:version/publish', 'POST /workflow/versions/:version/tasks', 'POST /workflow/versions/:version/tasks/insert-preview', 'POST /workflow/versions/:version/tasks/insert', 'GET /workflow/versions/:version/sla-weight', 'GET /workflow/versions/:version/weight-totals', 'PUT /workflow/versions/:version/tasks/:task/sla-rule', 'POST /workflow/versions/:version/tasks/:task/sla-rules/:rule/remove', 'PUT /workflow/versions/:version/tasks/:task/weight', 'PUT /workflow/versions/:version/tasks/:task/closing', 'PUT /workflow/versions/:version/tasks/:task/successors', 'PATCH /workflow/versions/:version/tasks/:task', 'PUT /workflow/versions/:version/tasks/:task/predecessors', 'PUT /workflow/versions/:version/milestones/:code/task-order', 'PATCH /workflow/versions/:version/milestones/:code', 'PATCH /workflow/versions/:version/gates/:code', 'POST /workflow/versions/:version/migration-preview', 'GET /workflow/site-migrations', 'GET /settings/task-definitions',
       // 0.15.32 (F5)
@@ -374,7 +379,7 @@ describe('hybrid mode list', () => {
       // contract 0.15.60
       'GET /users/:id/mfa-exemption', 'PUT /users/:id/mfa-exemption', 'POST /users/:id/mfa-exemption/revoke', 'POST /groups', 'POST /me/notify-admins', 'POST /auth/employee-id',
       // contract 0.15.62 (migration 0146): the project data reset in Settings
-      'GET /settings/data-reset', 'PUT /settings/data-reset/settings', 'POST /settings/data-reset/requests', 'GET /settings/data-reset/plan', 'GET /settings/data-reset/requests/:id',
+      'GET /settings/data-reset', 'PUT /settings/data-reset/settings', 'POST /settings/data-reset/requests', 'GET /settings/data-reset/plan', 'GET /settings/data-reset/narrow-options', 'GET /settings/data-reset/requests/:id',
       'POST /settings/data-reset/requests/:id/approve', 'POST /settings/data-reset/requests/:id/cancel', 'POST /settings/data-reset/requests/:id/run',
       'POST /settings/data-reset/requests/:id/retry-files',
       // contract 0.15.70 (migration 0151): the Library menu (W5)
