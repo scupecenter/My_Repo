@@ -21,6 +21,7 @@ import { DraftBar, useDraft } from './DraftBar';
 import { FollowButton } from './FollowButton';
 import { RecordDocuments } from './RecordDocuments';
 import { RelatedRecords } from './RelatedRecords';
+import { SiteTaskField } from './SiteTaskField';
 import { IssueRiskSelect, RiskIssues, DismantleOrderSelect, DismantleRnSelect, HlcPurchaseRequests, OrderReceipts, WarehouseOrderSelect } from './P4cPanels';
 import { useRecordSlots } from '@/api/documents';
 import { Holders } from './HolderChip';
@@ -279,7 +280,9 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
                         ? <DismantleOrderSelect siteId={site?.id} part={rtype} value={data[f.code]} onChange={(v) => set(f.code, v)} editable={editable} invalid={!!show} />
                         : key === 'dismantle' && f.code === 'closing_rn_id'
                         ? <DismantleRnSelect siteId={site?.id} part={rtype} value={data[f.code]} onChange={(v) => set(f.code, v)} editable={editable} invalid={!!show} />
-                        : (key === 'issues' || key === 'quality') && f.code === 'procurement_order_id'
+                        : ((key === 'issues' && f.code === 'blocked_gate_or_task') || (key === 'change_control' && f.code === 'affected_task_code'))
+                        ? <SiteTaskField id={`reg-field-${f.code}`} siteId={site?.id} value={data[f.code]} onChange={(v) => set(f.code, v)} disabled={!editable} invalid={!!show} />
+                        : (key === 'issues' || key === 'quality' || key === 'change_control') && f.code === 'procurement_order_id'
                         ? <WarehouseOrderSelect registerKey={key} field="procurement_order_id" siteId={site?.id} value={data[f.code]} onChange={(v) => set(f.code, v)} editable={editable} invalid={!!show} />
                         : (key === 'car_dispatcher' || key === 'financial_advances') && f.code === 'procurement_record_id'
                         ? <WarehouseOrderSelect registerKey={key} field="procurement_record_id" siteId={key === 'financial_advances' ? site?.id : null} value={data[f.code]} onChange={(v) => set(f.code, v)} editable={editable} invalid={!!show} />

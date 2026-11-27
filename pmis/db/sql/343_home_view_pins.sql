@@ -1,5 +1,5 @@
 -- 0344_home_view_pins (contract 0.15.245): pin a saved view as a card on the home dashboard (owner request 2026-11-27, item 16 of the
--- PM-platforms research; monday dashboard widgets, Asana portfolios). Mirror: db/sql/343_home_view_pins.sql (kept identical).
+-- 2026-11-27 batch, item 16). Mirror: db/sql/343_home_view_pins.sql (kept identical).
 --
 -- Additive. Personal and permission-respecting: a pin is the caller's own, the pin check is the view's own read check (sv_can_read), and the
 -- counter the card shows is computed by the screen's own list endpoint for the caller. No grant, role, permission or audit change (a personal
