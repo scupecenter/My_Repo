@@ -1,7 +1,7 @@
 import { Lock } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useSecurityLocks, useSetSecurityLocks } from '@/api/settings';
+import { useDownloadLocks, useSecurityLocks, useSetDownloadLocks, useSetSecurityLocks } from '@/api/settings';
 import { errText, FormDialog } from '@/components/FormDialog';
 import { QueryFallback } from '@/components/States';
 import { useToast } from '@/components/Toast';
@@ -31,6 +31,7 @@ export function SecurityLocks() {
     { key: 'exporting', id: 'export', on: v.exporting },
   ];
   return (
+    <div className="space-y-4">
     <section className="card space-y-4 p-4" data-testid="page-security-locks">
       <div>
         <h2 className="flex items-center gap-2 font-bold"><Lock size={16} aria-hidden />{t('seclocks.title')}</h2>
@@ -44,6 +45,7 @@ export function SecurityLocks() {
               <span className="font-semibold">{t(`seclocks.${r.id}`)}</span>
               {(r.key === 'sharing' ? cur.block_public_sharing : cur.disable_export) && <span className="chip ms-2 bg-state-locked-bg text-state-locked-fg" data-testid={`locks-${r.id}-in-force`}>{t('seclocks.in_force')}</span>}
               <span className="block text-xs text-mute">{t(`seclocks.${r.id}_note`)}</span>
+              {r.id === 'export' && <span className="block text-xs text-mute" data-testid="locks-export-ui-note">{t('seclocks.export_ui_note')}</span>}
             </span>
           </label>
         ))}
@@ -60,6 +62,66 @@ export function SecurityLocks() {
             { onSuccess: () => { toast(t('settings.audited')); setOpen(false); setDraft(null); } })}>
           <p className="text-sm text-mute" data-testid="locks-confirm">
             {t('seclocks.confirm', { sharing: t(v.sharing ? 'locks.on' : 'locks.off'), exporting: t(v.exporting ? 'locks.on' : 'locks.off') })}
+          </p>
+        </FormDialog>
+      )}
+    </section>
+    <DownloadLocksCard />
+    </div>
+  );
+}
+
+type DlDraft = { templates: boolean; files: boolean; generated: boolean };
+
+/**
+ * The download lock categories (migration 0293, contract 0.15.193): blank templates, one uploaded file, one generated library document. Each switch is off by default, so
+ * nothing changes until a System Admin turns one on. Same rules as the lock keys above: a reason, a step-up, audited, and turning one off is as easy as turning it on.
+ */
+function DownloadLocksCard() {
+  const { t, i18n } = useTranslation();
+  const toast = useToast();
+  const q = useDownloadLocks(), set = useSetDownloadLocks();
+  const [draft, setDraft] = useState<DlDraft | null>(null);
+  const [open, setOpen] = useState(false);
+  if (!q.data) return <QueryFallback queries={[q]} testid="dllocks-loading" />;
+  const cur = q.data;
+  const base: DlDraft = { templates: cur.templates, files: cur.uploaded_files, generated: cur.generated_documents };
+  const v = draft ?? base;
+  const dirty = v.templates !== base.templates || v.files !== base.files || v.generated !== base.generated;
+  const ro = !cur.can_edit;
+  const ar = i18n.language === 'ar';
+  const rows: { key: keyof DlDraft; id: string }[] = [{ key: 'templates', id: 'templates' }, { key: 'files', id: 'files' }, { key: 'generated', id: 'generated' }];
+  const onWord = (b: boolean) => t(b ? 'locks.on' : 'locks.off');
+  return (
+    <section className="card space-y-4 p-4" data-testid="page-download-locks">
+      <div>
+        <h2 className="flex items-center gap-2 font-bold"><Lock size={16} aria-hidden />{t('dllocks.title')}</h2>
+        <p className="text-sm text-mute">{t('dllocks.note')}</p>
+      </div>
+      <div className="space-y-3">
+        {rows.map((r) => (
+          <label key={r.id} className="flex items-start gap-2 text-sm">
+            <input type="checkbox" className="mt-1" data-testid={`dllocks-${r.id}`} checked={v[r.key]} disabled={ro} onChange={(e) => setDraft({ ...v, [r.key]: e.target.checked })} />
+            <span>
+              <span className="font-semibold">{t(`dllocks.${r.id}`)}</span>
+              {base[r.key] && <span className="chip ms-2 bg-state-locked-bg text-state-locked-fg" data-testid={`dllocks-${r.id}-in-force`}>{t('seclocks.in_force')}</span>}
+              <span className="block text-xs text-mute">{t(`dllocks.${r.id}_note`)}</span>
+            </span>
+          </label>
+        ))}
+      </div>
+      <p className="text-xs text-mute" data-testid="dllocks-updated">
+        {cur.updated_by && cur.updated_at ? t('seclocks.updated', { name: cur.updated_by.display_name, when: fmtDateTime(cur.updated_at, ar ? 'ar' : 'en') }) : t('dllocks.never')}
+      </p>
+      {ro
+        ? <p className="text-sm text-mute" data-testid="dllocks-readonly">{t('seclocks.readonly')}</p>
+        : <button className="btn btn-accent" data-testid="dllocks-save" disabled={!dirty} onClick={() => setOpen(true)}>{t('common.save')}</button>}
+      {open && (
+        <FormDialog open onClose={() => setOpen(false)} testid="dllocks-dialog" title={t('dllocks.title')} busy={set.isPending} error={set.isError ? errText(set.error, t) : null}
+          onSubmit={(reason) => set.mutate({ version: cur.version, templates: v.templates, uploaded_files: v.files, generated_documents: v.generated, reason },
+            { onSuccess: () => { toast(t('settings.audited')); setOpen(false); setDraft(null); } })}>
+          <p className="text-sm text-mute" data-testid="dllocks-confirm">
+            {t('dllocks.confirm', { templates: onWord(v.templates), files: onWord(v.files), generated: onWord(v.generated) })}
           </p>
         </FormDialog>
       )}

@@ -388,6 +388,16 @@ describe('upload: staging, classification and the preview', () => {
     expect((await nobody.api.call('get', '/import-batches')).body.items.map((b: { id: string }) => b.id)).not.toContain(up.body.id);
     const noGrant = await actor(app, db, { grants: G('gecol', 'view'), regions: [R], modules: null });
     expect((await noGrant.api.call('get', `/import-batches/${up.body.id}`)).status).toBe(403);
+    // P4 (0365): the in-file duplicate has its own count, and the error report brings the refused rows back in the template layout plus an Errors sheet
+    expect(up.body.counts.duplicate).toBe(1);
+    const rep = await getBinary(t.entry.api, `/import-batches/${up.body.id}/error-report`);
+    expect(rep.status).toBe(200);
+    expect(String(rep.headers['content-type'])).toContain('spreadsheetml');
+    const wbRep = await load(rep.buffer);
+    expect(wbRep.getWorksheet('Data')).toBeTruthy();
+    expect(wbRep.getWorksheet('Errors')).toBeTruthy();
+    expect(wbRep.getWorksheet('Errors')!.rowCount).toBeGreaterThan(4);
+    expect((await q(db, `SELECT 1 FROM audit_log WHERE action = 'import_batch.error_report' AND entity_id = $1`, [up.body.id])).length).toBe(1);
     void r1;
   });
 

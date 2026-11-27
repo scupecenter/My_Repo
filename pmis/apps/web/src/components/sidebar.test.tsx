@@ -358,7 +358,7 @@ describe('Shared states', () => {
   });
 });
 
-/** 0242 (owner approval 2026-11-27, the PM-platforms proposal item 4): the personal sidebar of the profile. */
+/** 0242 (owner approval 2026-11-27, the improvement proposal item 4): the personal sidebar of the profile. */
 describe('the personal sidebar (0197)', () => {
   beforeEach(async () => { await signIn('pm'); });
   const seedSide = (sidebar: Record<string, unknown>) => {

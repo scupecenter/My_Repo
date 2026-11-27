@@ -71,7 +71,7 @@ interface BatchRow {
   historical_marked_by: string | null;
   historical_marked_at: Date | null;
   import_notes: { code: string; count: number }[] | null;
-  c_create: bigint; c_update: bigint; c_unchanged: bigint; c_error: bigint; c_pending: bigint; c_approved: bigint; c_rejected: bigint; c_held: bigint; c_saved: bigint; c_admin_approved: bigint; c_incomplete: bigint;
+  c_create: bigint; c_update: bigint; c_unchanged: bigint; c_error: bigint; c_pending: bigint; c_approved: bigint; c_rejected: bigint; c_held: bigint; c_saved: bigint; c_admin_approved: bigint; c_incomplete: bigint; c_duplicate: bigint;
   progress: Record<string, unknown> | null;
   ts: string;
 }
@@ -140,6 +140,11 @@ const unitSeparator = String.fromCharCode(0x1f);
 
 const TRUE_WORDS = new Set(['yes', 'y', 'true', '1']);
 const FALSE_WORDS = new Set(['no', 'n', 'false', '0']);
+
+interface ErrorReportRow {
+  sheet: string; row_no: number; row_key: string | null; site_code: string | null; record_type: string | null; task_code: string | null;
+  payload: { data?: Record<string, unknown>; custom?: Record<string, unknown> } | null; errors: { code?: string; column?: string; message?: string }[] | null;
+}
 
 @Injectable()
 export class ImportService {
@@ -694,7 +699,7 @@ export class ImportService {
         (k.cnt ->> 'c_create')::bigint AS c_create, (k.cnt ->> 'c_update')::bigint AS c_update, (k.cnt ->> 'c_unchanged')::bigint AS c_unchanged,
         (k.cnt ->> 'c_error')::bigint AS c_error, (k.cnt ->> 'c_pending')::bigint AS c_pending, (k.cnt ->> 'c_approved')::bigint AS c_approved,
         (k.cnt ->> 'c_rejected')::bigint AS c_rejected, (k.cnt ->> 'c_held')::bigint AS c_held, (k.cnt ->> 'c_saved')::bigint AS c_saved,
-        (k.cnt ->> 'c_admin_approved')::bigint AS c_admin_approved, (k.cnt ->> 'c_incomplete')::bigint AS c_incomplete,
+        (k.cnt ->> 'c_admin_approved')::bigint AS c_admin_approved, coalesce((k.cnt ->> 'c_duplicate')::bigint, 0) AS c_duplicate, (k.cnt ->> 'c_incomplete')::bigint AS c_incomplete,
         imp_batch_job_json(p.id::uuid) AS progress
       FROM (
         SELECT b.id::text AS id, d.template_id, v.version AS template_version, b.source, b.file_name, b.uploaded_by::text AS uploaded_by, b.created_at,
@@ -737,7 +742,7 @@ export class ImportService {
         counts: {
           create: Number(r.c_create), update: Number(r.c_update), unchanged: Number(r.c_unchanged), error: Number(r.c_error),
           pending: Number(r.c_pending), approved: Number(r.c_approved), rejected: Number(r.c_rejected), held: Number(r.c_held), saved: Number(r.c_saved),
-          admin_approved: Number(r.c_admin_approved), incomplete: Number(r.c_incomplete),
+          admin_approved: Number(r.c_admin_approved), incomplete: Number(r.c_incomplete), duplicate: Number(r.c_duplicate),
         },
         mode: r.mode,
         file_template_version: r.file_template_version,
@@ -875,6 +880,53 @@ export class ImportService {
       }),
       page: { limit, next_cursor: rows.length > limit && last ? encodeCursor([String(last.ord), String(last.row_no), last.id]) : null },
     };
+  }
+
+
+  /**
+   * P4 (migration 0365): the error report of a batch, an .xlsx the person who sent the data can correct and send again. The refused rows (errors and duplicates) are written back
+   * in the layout of the approved template (hidden `_tpl` sheet, the header row as issued) with the values the file had, so the corrected file is uploaded as it is; the reasons
+   * are on the extra sheet "Errors" (file row, key, column, reason), never in an extra column of the Data sheet, which the upload would refuse. A New sites, stream or Master
+   * batch has no register layout to write back: its report is the "Errors" sheet alone. Reading it is audited like a template download.
+   */
+  async errorReport(auth: AuthContext, id: string): Promise<{ buffer: Buffer; fileName: string }> {
+    const b = await this.getBatch(auth, id) as { template_id: string; register_key: string | null; entity: string | null; stream: string | null };
+    const rows = await this.db.tx.$queryRaw<ErrorReportRow[]>(Prisma.sql`
+      SELECT r.sheet, r.row_no, r.row_key, r.site_code, r.record_type, r.payload, r.errors, r.task_code
+      FROM v_import_rows r WHERE r.batch_id = ${id}::uuid AND r.action = 'error' ORDER BY r.ord, r.row_no, r.id LIMIT 5000`);
+    const errorsSheet = (wb: ExcelJS.Workbook) => {
+      const ws = wb.addWorksheet('Errors', { properties: { tabColor: { argb: 'FFB3261E' } } });
+      ws.addRow(['Row in the file', 'Sheet', 'Key', 'Site ID', 'Task', 'Column', 'Reason code', 'Reason']);
+      ws.getRow(1).font = { bold: true };
+      for (const r of rows) {
+        const errs = r.errors?.length ? r.errors : [{}];
+        for (const e of errs) ws.addRow([r.row_no, r.sheet, r.row_key ?? '', r.site_code ?? '', r.task_code ?? '', e.column ?? '', e.code ?? '', e.message ?? e.code ?? '']);
+      }
+      [14, 14, 28, 14, 12, 26, 22, 80].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+      ws.views = [{ state: 'frozen', ySplit: 1 }];
+    };
+    let buffer: Buffer;
+    const t = b.register_key && !b.stream && b.entity !== 'site' ? await this.templates.current(b.template_id) : null;
+    if (t && t.kind === 'register') {
+      const layout = rows.map((r) => {
+        const out: Record<string, unknown> = { site_code: r.site_code, record_type: r.record_type };
+        for (const c of t.columns) {
+          if (c.kind === 'field') out[c.code] = r.payload?.data?.[c.code];
+          else if (c.kind === 'custom') out[c.code] = r.payload?.custom?.[c.code];
+          if (Array.isArray(out[c.code])) out[c.code] = (out[c.code] as unknown[]).map(String).join('; ');
+        }
+        return out;
+      });
+      const me = await this.db.tx.$queryRaw<{ employee_id: string | null }[]>(Prisma.sql`SELECT employee_id FROM users WHERE id = ${auth.user.id}::uuid`);
+      buffer = await this.templates.build(t, t.columns, layout, { prefill: false, employeeId: me[0]?.employee_id?.trim() ?? null, issuedAt: new Date(), extra: errorsSheet });
+    } else {
+      const wb = new ExcelJS.Workbook();
+      wb.creator = 'GSDN Workspace';
+      errorsSheet(wb);
+      buffer = Buffer.from(await wb.xlsx.writeBuffer() as ArrayBuffer);
+    }
+    await this.db.tx.$queryRaw(Prisma.sql`SELECT log_audit_write('import_batch.error_report', 'import_batch', ${id}::text, NULL, ${JSON.stringify({ template_id: b.template_id, rows: rows.length })}::jsonb, NULL)`);
+    return { buffer, fileName: `${b.template_id}_errors_${new Date().toISOString().slice(0, 10)}.xlsx` };
   }
 
   // ------------------------------------------------------------------ writes
