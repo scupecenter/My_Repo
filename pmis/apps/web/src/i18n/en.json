@@ -407,6 +407,24 @@
     "maintenance": "A project data reset is running. Try again in a few minutes.",
     "scope_changed": "The scope is not the one you saw, or what it takes along changed. Read the request again or make a new one."
   },
+  "week": {
+    "title": "Weekly cycle plan",
+    "of": "The week of the selected day",
+    "previous": "Previous week",
+    "next": "Next week",
+    "site": "Site",
+    "state_planned": "Planned",
+    "state_done": "On target",
+    "state_below": "Below target",
+    "empty": "No sites in the plans of this week.",
+    "carry": "Carry over",
+    "carry_title": "Carry over from {{from}} to {{to}}",
+    "carry_hint": "Sites below target on this day that are not yet in the plan of the next working day. They are added there; the daily plan rules (region, lock) still apply.",
+    "carry_none": "Nothing to carry over: every site below target is already in the next plan.",
+    "carry_locked": "Day locked or no edit right",
+    "carry_do": "Carry over ({{n}})",
+    "carried": "{{n}} sites carried over"
+  },
   "common": {
     "search": "Search",
     "cancel": "Cancel",
@@ -1171,9 +1189,11 @@
     "section_documents_archive": "Archive",
     "section_documents_numbering": "Numbering",
     "section_data_counts": "GECOL / HLC counts",
+    "section_registers_recycle": "Recycle bin",
     "section_screens_motion": "Motion",
     "section_workflow_coverage": "Matrix coverage",
-    "section_screens_login": "Login page"
+    "section_screens_login": "Login page",
+    "section_screens_interface": "Interface"
   },
   "scopeMatch": {
     "title": "Team / scope match (Procurement)",
@@ -6048,6 +6068,7 @@
     "subtitle": "Daily progress of the day and the plan of the next working day, filled from system data.",
     "tab_progress": "Progress",
     "tab_tomorrow": "Tomorrow",
+    "tab_week": "Week",
     "date": "Date",
     "previous_day": "Previous day",
     "next_day": "Next day",
@@ -6524,6 +6545,27 @@
     "cancel": "Cancel",
     "save": "Save"
   },
+  "recycleBin": {
+    "title": "Recycle bin",
+    "note": "Voided register records can be restored for {{days}} days after they were voided. A restored record returns as a draft and goes through the workflow again. Nothing is deleted.",
+    "register": "Register",
+    "all": "All",
+    "search": "Search record, site or reason",
+    "edit_retention": "Change retention",
+    "none": "No voided record inside the retention window.",
+    "record": "Record",
+    "voided": "Voided",
+    "reason": "Reason",
+    "until": "Restorable until",
+    "restore": "Restore",
+    "restore_title": "Restore {{label}}",
+    "restore_note": "The record returns as a draft (level 1). Its history and audit stay.",
+    "restored": "Record restored as a draft.",
+    "days": "Days of retention (30 to 730)",
+    "blocked_open_version_exists": "A newer open version exists",
+    "blocked_site_slot_taken": "The site already has another record",
+    "audit_link": "Every void and restore is in the audit log."
+  },
   "motion": {
     "title": "Motion",
     "note": "One motion system for the whole app: dialogs, messages, cards, progress bars, charts and the map. This choice is saved in this browser, like the theme and the language.",
@@ -6574,6 +6616,20 @@
     "holders": "active",
     "none": "No gaps in this view.",
     "open_matrix": "Open the Responsibility Matrix"
+  },
+  "sd": {
+    "title": "Time in each state",
+    "entity": "Counted for",
+    "entity_task": "Tasks (per stage)",
+    "entity_register_record": "Register records (per register)",
+    "note": "Median and P85 working days of completed stays. Admin overrides are left out. Only the regions you can read are counted.",
+    "empty": "No completed stays yet.",
+    "col_group": "Stage / register",
+    "col_state": "State",
+    "col_region": "Region",
+    "col_count": "Stays",
+    "col_median": "Median (working days)",
+    "col_p85": "P85 (working days)"
   },
   "timeline": {
     "title": "Timeline",
@@ -6639,5 +6695,30 @@
     "never": "Not changed since installation.",
     "readonly": "Only a System Admin, or a person they delegated settings to for all regions, can change this.",
     "confirm": "Save the login page settings? The change is audited with your reason and shows on the sign-in page at once."
+  },
+  "ui": {
+    "new": "New",
+    "new_hint": "Recently added feature",
+    "settings_title": "Interface features",
+    "preview": "Preview",
+    "avatars_title": "Generated avatars",
+    "avatars_note": "A coloured avatar with the initials of a person, drawn by the system (no image is stored). It shows in the top bar and beside people in lists and tables.",
+    "av_style": "Style",
+    "av_style_gradient": "Gradient",
+    "av_style_geometric": "Geometric",
+    "av_style_initials": "Plain colour",
+    "av_style_none": "None",
+    "av_shape": "Shape",
+    "av_shape_circle": "Circle",
+    "av_shape_rounded": "Rounded square",
+    "av_palette": "Colours",
+    "av_palette_varied": "Varied per person",
+    "av_palette_brand": "Accent colour only",
+    "av_in_lists": "Show avatars beside people in lists and tables",
+    "new_title": "\"New\" badge",
+    "new_note": "A small badge beside a feature that now sits next to the older way to do the same thing.",
+    "new_enabled": "Show the \"New\" badge",
+    "new_days": "Days to show it after a feature is released",
+    "new_preview": "Shown beside new features until the days have passed."
   }
 }
