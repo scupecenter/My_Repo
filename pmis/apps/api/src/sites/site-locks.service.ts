@@ -37,6 +37,7 @@ export interface SiteStatusRow {
   warnings: number;
   errors: number;
   data_gaps: number;
+  data_gap_items: unknown[];
 }
 
 /**
@@ -75,6 +76,17 @@ export class SiteLocksService {
     return this.set(auth, [id], b.locked, b.reason);
   }
 
+  /**
+   * D49 part 3 (migration 0492): the upload policy accept_incomplete opens the sites of a Master import run before it is applied, through the same door as the
+   * switch of the screens (the unlock right of each region, a reason, a step-up, an audit row per site). Sites already open are unchanged; no site: nothing to do.
+   */
+  async openRunSites(auth: AuthContext, runId: string, why: string): Promise<Record<string, unknown> | null> {
+    const ids = (await this.db.tx.$queryRaw<{ id: string }[]>(Prisma.sql`
+      SELECT DISTINCT r.site_id::text AS id FROM master_reconciliation_rows r WHERE r.run_id = ${runId}::uuid AND r.site_id IS NOT NULL`)).map((r) => r.id);
+    if (ids.length === 0) return null;
+    return this.set(auth, ids, false, why);
+  }
+
   /** POST /sites/workflow-locks: a selection, or every site of a Master import run or of an import batch, with one reason. */
   async setMany(auth: AuthContext, raw: unknown): Promise<Record<string, unknown>> {
     const b = parse(bulkBody, raw);
@@ -109,7 +121,7 @@ export class SiteLocksService {
     const batches = src.groupId
       ? Prisma.sql`SELECT b.id FROM import_batches b WHERE b.group_id = ${src.groupId}::uuid`
       : src.kind === 'batch' ? Prisma.sql`SELECT ${src.id}::uuid` : Prisma.sql`SELECT NULL::uuid WHERE false`;
-    const rows = await this.db.tx.$queryRaw<(Omit<SiteStatusRow, 'done_tasks' | 'total_tasks' | 'warnings' | 'errors' | 'data_gaps'> & { done_tasks: bigint; total_tasks: bigint; warnings: bigint; errors: bigint; data_gaps: number; total: bigint })[]>(Prisma.sql`
+    const rows = await this.db.tx.$queryRaw<(Omit<SiteStatusRow, 'done_tasks' | 'total_tasks' | 'warnings' | 'errors' | 'data_gaps' | 'data_gap_items'> & { done_tasks: bigint; total_tasks: bigint; warnings: bigint; errors: bigint; data_gaps: number; data_gap_items: unknown[]; total: bigint })[]>(Prisma.sql`
       WITH src AS (${sites}),
       w AS (
         SELECT br.site_id, sum(CASE WHEN jsonb_typeof(br.warnings) = 'array' THEN jsonb_array_length(br.warnings) ELSE 0 END) AS warnings,
@@ -123,7 +135,7 @@ export class SiteLocksService {
             WHERE ti.site_id = s.id AND td.counts_toward_milestone AND ti.state = 'approved') AS done_tasks,
           (SELECT count(*) FROM task_instances ti JOIN task_definitions td ON td.id = ti.task_def_id
             WHERE ti.site_id = s.id AND td.counts_toward_milestone AND NOT ti.is_na AND ti.state NOT IN ('na', 'skipped')) AS total_tasks,
-          coalesce(w.warnings, 0) AS warnings, coalesce(w.errors, 0) AS errors, site_data_gap_count(s.id) AS data_gaps
+          coalesce(w.warnings, 0) AS warnings, coalesce(w.errors, 0) AS errors, site_data_gap_count(s.id) AS data_gaps, coalesce(site_data_gaps(s.id) -> 'items', '[]'::jsonb) AS data_gap_items
         FROM src JOIN sites s ON s.id = src.site_id LEFT JOIN w ON w.site_id = s.id
         ${regions === null ? Prisma.empty : Prisma.sql`WHERE s.region_id = ANY(${regions}::int[])`}
       )
@@ -131,7 +143,7 @@ export class SiteLocksService {
       ${gaps === 'only' ? Prisma.sql`WHERE base.data_gaps > 0 OR base.warnings > 0` : Prisma.empty}
       ORDER BY base.site_code LIMIT ${limit + 1} OFFSET ${offset}`);
     const page = rows.slice(0, limit).map((row) => { const { total, ...r } = row; void total; return {
-      ...r, done_tasks: Number(r.done_tasks), total_tasks: Number(r.total_tasks), warnings: Number(r.warnings), errors: Number(r.errors), data_gaps: Number(r.data_gaps),
+      ...r, data_gap_items: (Array.isArray(r.data_gap_items) ? r.data_gap_items : []).filter((g) => ['missing_actual_date', 'missing_field'].includes((g as { kind?: string }).kind ?? '')), done_tasks: Number(r.done_tasks), total_tasks: Number(r.total_tasks), warnings: Number(r.warnings), errors: Number(r.errors), data_gaps: Number(r.data_gaps),
     }; });
     return { items: page, page: { limit, next_cursor: rows.length > limit ? encodeCursor([String(offset + limit)]) : null, total: rows[0] ? Number(rows[0].total) : 0 } };
   }

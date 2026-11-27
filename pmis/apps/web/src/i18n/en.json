@@ -5493,7 +5493,16 @@
     "updated": "Last changed by {{name}} ({{id}}) on {{when}}.",
     "never": "Not changed since installation.",
     "readonly": "Only a System Admin, or a delegate of Settings edit for all regions, can change this value.",
-    "confirm": "Change the threshold from {{from}} to {{to}} rows. The next send or decision uses the new value."
+    "confirm": "Change the threshold from {{from}} to {{to}} rows. The next send or decision uses the new value.",
+    "policy_title": "Upload policy",
+    "policy_note": "What the Master import apply does with sites whose data is incomplete. Enforce keeps the sequencing locks of the sites (a row that breaks the sequence waits). Accept incomplete opens the sites of the file first, so the data enters in any order; it needs the right to unlock for the region, a reason and a step-up, and a task approved while a lock would have held it is flagged Admin override.",
+    "policy_enforce": "Enforce the sequence (default)",
+    "policy_enforce_hint": "Nothing changes: the locks of each site decide.",
+    "policy_accept_incomplete": "Accept incomplete data",
+    "policy_accept_incomplete_hint": "The sites of the file are opened when the file is applied. Sites created by the same apply keep their locks.",
+    "policy_current": "In force: {{policy}}.",
+    "policy_confirm": "Change the upload policy from {{from}} to {{to}}. The next apply of a Master import file uses it.",
+    "policy_save": "Save the policy"
   },
   "navEdit": {
     "edit": "Edit menu",

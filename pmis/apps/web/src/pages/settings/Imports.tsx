@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useImportsSettings, useSetImportsSettings } from '@/api/settings';
+import { useImportsSettings, useImportsUploadPolicy, useSetImportsSettings, useSetImportsUploadPolicy, type ImportsUploadPolicy } from '@/api/settings';
 import { errText, FormDialog } from '@/components/FormDialog';
 import { useToast } from '@/components/Toast';
 import { fieldErrors } from '@/lib/fields';
@@ -15,6 +15,55 @@ const MAX = 500;
  * for all regions changes it, with a reason (audited). The range is 10 to 500 rows, checked here and again by the database.
  */
 export function Imports() {
+  return (
+    <div className="space-y-4">
+      <ImportsThreshold />
+      <UploadPolicy />
+    </div>
+  );
+}
+
+/**
+ * Settings, Imports / Upload policy (contract 0.15.322, migration 0492, D49 part 3): what the Master import apply does with incomplete data. Enforce (default) changes
+ * nothing; Accept incomplete opens the sites of the file first (unlock right, reason, step-up, audited). Only the modes the server enforces are offered.
+ */
+function UploadPolicy() {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const q = useImportsUploadPolicy(), set = useSetImportsUploadPolicy();
+  const [draft, setDraft] = useState<ImportsUploadPolicy['policy'] | null>(null);
+  const [open, setOpen] = useState(false);
+  if (!q.data) return <QueryFallback queries={[q]} testid="upload-policy-loading" />;
+  const cur = q.data;
+  const pick = draft ?? cur.policy;
+  const dirty = pick !== cur.policy;
+  return (
+    <section className="card space-y-3 p-4" data-testid="page-upload-policy">
+      <h2 className="font-bold">{t('importsSettings.policy_title')}</h2>
+      <p className="text-sm text-mute">{t('importsSettings.policy_note')}</p>
+      <fieldset className="space-y-2" disabled={!cur.can_edit}>
+        {cur.policies.map((p) => (
+          <label key={p} className="flex items-start gap-2 text-sm">
+            <input type="radio" name="upload-policy" className="mt-1" data-testid={`upload-policy-${p}`} checked={pick === p} onChange={() => setDraft(p)} />
+            <span><span className="font-semibold">{t(`importsSettings.policy_${p}`)}</span><br /><span className="text-mute">{t(`importsSettings.policy_${p}_hint`)}</span></span>
+          </label>
+        ))}
+      </fieldset>
+      <p className="text-sm" data-testid="upload-policy-current">{t('importsSettings.policy_current', { policy: t(`importsSettings.policy_${cur.policy}`) })}</p>
+      {cur.can_edit
+        ? <button className="btn btn-accent" data-testid="upload-policy-save" disabled={!dirty} onClick={() => setOpen(true)}>{t('importsSettings.policy_save')}</button>
+        : <p className="text-sm text-mute" data-testid="upload-policy-readonly">{t('importsSettings.readonly')}</p>}
+      {open && (
+        <FormDialog open onClose={() => setOpen(false)} testid="upload-policy-dialog" title={t('importsSettings.policy_title')} busy={set.isPending} error={set.isError ? errText(set.error, t) : null}
+          onSubmit={(reason) => set.mutate({ version: cur.version, policy: pick, reason }, { onSuccess: () => { toast(t('settings.audited')); setOpen(false); setDraft(null); } })}>
+          <p className="text-sm text-mute" data-testid="upload-policy-confirm">{t('importsSettings.policy_confirm', { from: t(`importsSettings.policy_${cur.policy}`), to: t(`importsSettings.policy_${pick}`) })}</p>
+        </FormDialog>
+      )}
+    </section>
+  );
+}
+
+function ImportsThreshold() {
   const { t, i18n } = useTranslation();
   const toast = useToast();
   const q = useImportsSettings(), set = useSetImportsSettings();
