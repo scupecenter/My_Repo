@@ -51,3 +51,6 @@ V2–V10 قرارات لاحقة بـ PRs مستقلة: التقويم، الر�
 ## V5: فتح السجل صفحة كاملة (اختيار شخصي، نفس اليوم)
 
 كل مستخدم يختار أين يُفتح سجلّ السجلات عند نقر صفّه: الدرج الجانبي (الافتراضي كما كان) أو صفحة كاملة على عنوان خاص `/registers/:key/records/:id`. الاختيار في Settings ← Screens ← Records: شخصي (ليس افتراضي مؤسسة ولا لكل شاشة)، يُحفظ على الخادم في مخزن مسودّات المستخدم نفسه كتفضيل العرض المُتذكَّر (`form.viewpref.open-record`)، فيتبعه إلى كل جهاز، ولا يحتاج سببًا ولا سجل تدقيق. الصفحة ترسم جسم الدرج نفسه (`RegisterRecordBody`): الحقول والمستندات والتعليقات والسجل وكل الإجراءات متطابقة في الوضعين، وزرّ الإغلاق في الصفحة يعود إلى السجل. العنوان الصريح `?record=` يفتح الدرج دائمًا ليبقى للرابط المشترك معناه، و«جديد» يبقى درجًا في الحالتين. لا جدول ولا نقطة نهاية جديدة: لا هجرة ولا تغيير عقد.
+
+## P3: Approvals control rows (four to two)
+Inside the list card: row 1 holds the tabs, the quick filters (colours, stale) and the sort; Select all moved into the list header directly above the list (`approvals-list-header`). With the page toolbar that is two control rows in place of four. Behaviour, test ids and Tab order inside each group are unchanged; Select all now comes after the filters.

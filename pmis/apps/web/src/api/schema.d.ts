@@ -4309,6 +4309,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/finance-hub/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The Finance hub landing page, in one call (0.15.361)
+         * @description 0.15.361. Read-only summary cards over the two separate registers `financial_advances` and `invoices` - open advances (count, overdue count, and the open balance total where `fin_amounts_visible` shows the caller amounts - null otherwise), and open invoices (count by state, aging buckets over the received date, count past due). Each card is null when the caller cannot view that register's module, and every row counted is a row the register screen would show the caller (same module and region visibility, latest version only). The thresholds come from the `finance_hub` section of ui.features.
+         */
+        get: operations["getFinanceHubSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/exports/schedules": {
         parameters: {
             query?: never;
@@ -6269,6 +6289,30 @@ export interface paths {
          * @description 0.15.203. A System Admin, or a delegate of `settings` edit for all regions (403 `action_forbidden`). `days` 1 to 365 (422 `validation_failed`, path `/days`), a reason and If-Match. Saving the values in force is 409 `invalid_transition`. Audited as `template_change_notice_update` with the values before and after.
          */
         put: operations["setTemplateChangeNotice"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/imports/upload-policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The upload policy of the imports (imports.upload_policy)
+         * @description 0.15.322. Every signed-in user may read it. `enforce` (default) keeps the sequencing locks of the sites; `accept_incomplete` opens the sites of a Master import run before it is applied (see the apply).
+         */
+        get: operations["getImportsUploadPolicy"];
+        /**
+         * Change the upload policy (reason, If-Match, audited)
+         * @description 0.15.322. A System Admin, or a delegate of `settings` edit for all regions (403 `action_forbidden` otherwise). `policy` is `enforce` or `accept_incomplete` (422 `validation_failed`, path `/policy`; an unknown key 422 `unknown_field`), with a reason and If-Match. Saving the value in force is 409 `invalid_transition`. Audited as `imports_upload_policy_update` with before and after.
+         */
+        put: operations["setImportsUploadPolicy"];
         post?: never;
         delete?: never;
         options?: never;
@@ -12662,7 +12706,7 @@ export interface components {
             }[];
         };
         /** @enum {string} */
-        SearchType: "sites" | "registers" | "documents" | "meetings" | "people" | "contractors" | "tasks" | "warehouse_items";
+        SearchType: "sites" | "registers" | "documents" | "meetings" | "people" | "contractors" | "tasks" | "warehouse_items" | "snags";
         SearchHit: {
             id: string;
             /** @description Shown as is. `match_ranges` are offsets (UTF-16 code units, start inclusive, end exclusive) into this text. */
@@ -13778,6 +13822,8 @@ export interface components {
             errors: number;
             /** @description The missing required values of the site now. */
             data_gaps: number;
+            /** @description 0.15.322: what is missing, per site (the missing-data indicator of the upload preview); the gaps of an approved-as-is task are not listed here. */
+            data_gap_items: components["schemas"]["SiteDataGap"][];
         };
         SiteListItem: {
             /** Format: uuid */
@@ -16974,6 +17020,49 @@ export interface components {
             /** Format: date-time */
             at: string;
         };
+        /** @description 0.15.361. The Finance hub: which widgets of the page show, after how many days a disbursed, unsettled advance warns, and the two aging bounds of the open-invoice buckets. */
+        UiFinanceHub: {
+            widgets: {
+                advances: boolean;
+                invoices: boolean;
+                quick_links: boolean;
+                templates: boolean;
+            };
+            settle_warn_days: number;
+            aging_days: number[];
+        };
+        FinanceHubSummary: {
+            /** @description Null when the caller cannot view the financial_advances module. */
+            advances: {
+                /** @description Latest advances whose state is not settled, closed or cancelled. */
+                open_count: number;
+                /** @description Disbursed and unsettled for more than settle_warn_days. */
+                overdue_count: number;
+                /** @description Total open balance of the advances the caller may see amounts of (fin_amounts_visible); null when the rule shows the caller no amounts. */
+                open_amount: number | null;
+                /** @example LYD */
+                currency?: string;
+            } | null;
+            /** @description Null when the caller cannot view the invoices module. */
+            invoices: {
+                /** @description Latest invoices whose state is not Paid or Cancelled. */
+                open_count: number;
+                /** @description Open invoices per state (Received, UnderReview, Approved, Disputed); a state with none is listed with 0. */
+                by_state: {
+                    [key: string]: number;
+                };
+                aging: {
+                    /** @description Received up to aging_days[0] days ago. */
+                    first: number;
+                    /** @description Received aging_days[0]+1 to aging_days[1] days ago. */
+                    second: number;
+                    /** @description Received more than aging_days[1] days ago. */
+                    third: number;
+                };
+                /** @description Due date past, not Paid or Cancelled. */
+                overdue_count: number;
+            } | null;
+        };
         DataHubSummary: {
             batches: {
                 count: number;
@@ -16990,20 +17079,34 @@ export interface components {
             width: "narrow" | "medium" | "wide";
             show_tabs: boolean;
         };
+        /** @description 0.15.262. The unsaved-changes guard: the master switch and one switch per area. */
+        UiUnsavedGuard: {
+            enabled: boolean;
+            settings: boolean;
+            dialogs: boolean;
+            drawers: boolean;
+            inline: boolean;
+            composers: boolean;
+            navigation: boolean;
+        };
         /** @description 0.15.185. The sections of the interface features setting; every section is complete. */
         UiFeatures: {
             avatars: components["schemas"]["UiAvatars"];
             new_badge: components["schemas"]["UiNewBadge"];
             inbox: components["schemas"]["UiInbox"];
             data_hub: components["schemas"]["UiDataHub"];
+            finance_hub: components["schemas"]["UiFinanceHub"];
             panel: components["schemas"]["UiPanel"];
+            unsaved_guard: components["schemas"]["UiUnsavedGuard"];
         };
         UiFeaturesPatch: {
             avatars?: components["schemas"]["UiAvatars"];
             new_badge?: components["schemas"]["UiNewBadge"];
             inbox?: components["schemas"]["UiInbox"];
             data_hub?: components["schemas"]["UiDataHub"];
+            finance_hub?: components["schemas"]["UiFinanceHub"];
             panel?: components["schemas"]["UiPanel"];
+            unsaved_guard?: components["schemas"]["UiUnsavedGuard"];
         };
         UiFeaturesSetting: {
             sections: components["schemas"]["UiFeatures"];
@@ -17017,7 +17120,8 @@ export interface components {
             id: string;
             code: string;
             /** @enum {string} */
-            kind: "weekly_status_missing" | "record_idle";
+            kind: "weekly_status_missing" | "record_idle" | "kpi_threshold";
+            /** @description Per kind: weekly_status_missing {}, record_idle {register_key, state, days}, kpi_threshold {kpi (a catalogue code), op (above|below), value (the own threshold, 0..100000, in the unit of the KPI)}. */
             params: {
                 [key: string]: unknown;
             };
@@ -17031,6 +17135,8 @@ export interface components {
             body_ar: string;
             link: string | null;
             enabled: boolean;
+            /** @description 0.15.249: while locked, a rule takes no edit and cannot be disabled; the only accepted save is the unlock itself (audited). A locked rule still fires. */
+            locked: boolean;
             /** @description The If-Match of PUT /settings/alert-rules/{id}. */
             version: number;
             /** Format: date-time */
@@ -17041,7 +17147,7 @@ export interface components {
         AlertRuleInput: {
             code: string;
             /** @enum {string} */
-            kind: "weekly_status_missing" | "record_idle";
+            kind: "weekly_status_missing" | "record_idle" | "kpi_threshold";
             params: {
                 [key: string]: unknown;
             };
@@ -17054,6 +17160,8 @@ export interface components {
             body_ar: string;
             link?: string | null;
             enabled?: boolean;
+            /** @description 0.15.249: lock a rule against edits (unlock with a save that changes nothing else). */
+            locked?: boolean;
         };
         AlertRuleSaved: {
             /** Format: uuid */
@@ -17066,6 +17174,15 @@ export interface components {
                 kinds: {
                     kind: string;
                     params: string[];
+                }[];
+                /** @description 0.15.249: the KPI catalogue kpi_threshold rules pick from (dashboard settings catalogue). */
+                kpis: {
+                    code: string;
+                    label_en: string;
+                    label_ar: string;
+                    unit: string;
+                    /** @enum {string} */
+                    direction: "higher" | "lower";
                 }[];
                 audiences: ("system_admin" | "module")[];
                 registers: {
@@ -17766,6 +17883,8 @@ export interface components {
             is_custom?: boolean;
             /** @description 0.4.6. The form section of a base field (for example `Request`, `Validity`, `PTW checks`), in English, in the order of the fields. Absent for custom fields. */
             section?: string | null;
+            /** @description 0.15.156. The Arabic name of the field section (register_sections.name_ar, migration 0422); the web falls back to `section`. Absent when the section has no Arabic name yet. */
+            section_ar?: string | null;
             options?: {
                 value: string;
                 label_en: string;
@@ -18482,6 +18601,20 @@ export interface components {
             version: number;
             can_edit: boolean;
         };
+        /** @description 0.15.322. The setting `imports.upload_policy`: what the Master import apply does with incomplete data. */
+        ImportsUploadPolicy: {
+            /** @enum {string} */
+            policy: "enforce" | "accept_incomplete";
+            /** @enum {string} */
+            default_policy: "enforce";
+            policies: ("enforce" | "accept_incomplete")[];
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+            /** @description The ETag value. */
+            version: number;
+            can_edit: boolean;
+        };
         /** @description 0.15.203. The setting `templates.change_notice`. */
         TemplateChangeNotice: {
             enabled: boolean;
@@ -18496,6 +18629,11 @@ export interface components {
             /** @description The ETag value. */
             version: number;
             can_edit: boolean;
+        };
+        ImportsUploadPolicyInput: {
+            /** @enum {string} */
+            policy: "enforce" | "accept_incomplete";
+            reason: string;
         };
         TemplateChangeNoticeInput: {
             enabled: boolean;
@@ -18547,6 +18685,16 @@ export interface components {
              * @enum {string}
              */
             contrast?: "standard" | "high";
+            /**
+             * @description 0.15.369 (0526): the notification panel as an overlay, a floating window or docked.
+             * @enum {string}
+             */
+            inbox_panel?: "overlay" | "floating" | "docked";
+            /**
+             * @description 0.15.369 (0526): the corner of the floating panel.
+             * @enum {string}
+             */
+            inbox_anchor?: "end-top" | "end-bottom" | "start-top" | "start-bottom";
         };
         /** @description 0.15.231 (0242): the personal sidebar (proposal item 4). `hidden` the screens the menu does not show, `order` their order inside their heading (a screen the list does not name keeps the organization order, after the named ones), `badge_style` how the count badges draw (full = the number, dot = a dot, none = no badge), `pins` the pinned shortcuts on top (at most 20). A menu key is a short lowercase id (the entries of the side menu; an unknown key is ignored). */
         UiNav: {
@@ -30327,6 +30475,27 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
         };
     };
+    getFinanceHubSummary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The summary. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FinanceHubSummary"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
     listExportSchedules: {
         parameters: {
             query?: never;
@@ -33923,6 +34092,62 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TemplateChangeNotice"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getImportsUploadPolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The policy. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportsUploadPolicy"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setImportsUploadPolicy: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportsUploadPolicyInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportsUploadPolicy"];
                 };
             };
             401: components["responses"]["Unauthorized"];
