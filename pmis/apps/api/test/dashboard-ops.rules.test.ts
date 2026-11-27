@@ -311,7 +311,7 @@ describe('compareContractors (0.15.207, item 10)', () => {
     expect(r.map((x) => x.name)).toEqual(['A', 'B']);
     expect(r[0]).toMatchObject({ snags_open: 4, snags_overdue: 2, quality_failed: 1, quality_fail_pct: 5 });
     expect(r[1]?.quality_fail_pct).toBeNull();
-    expect(Object.keys(r[0]).some((k) => /amount|value|cost/.test(k))).toBe(false);
+    expect(Object.keys(r[0] ?? {}).some((k) => /amount|value|cost/.test(k))).toBe(false);
   });
   it('is capped at the limit', () => {
     const many = Array.from({ length: 15 }, (_, i) => it1(`P${i}`));
