@@ -1,6 +1,7 @@
 import { AlertOctagon, Archive, DatabaseBackup, Download, ShieldCheck, X } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { fmtDateTime } from '@/lib/time';
 import { useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '@/api/client';
 import {
@@ -54,7 +55,7 @@ export function DataReset() {
   const canNarrow = mode === 'custom' && chosen.length > 0 && chosen.every((c) => narrowable.has(c));
   const nb = canNarrow ? narrowBody(narrow) : undefined;
   const dry = useDataResetPlan(requested, mode === 'custom' && !!s && !open, nb);
-  const when = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleString(i18n.language === 'ar' ? 'ar' : 'en-GB', { dateStyle: 'medium', timeStyle: 'short' }) : '—');
+  const when = (iso: string | null | undefined) => (iso ? fmtDateTime(iso, i18n.language === 'ar' ? 'ar' : 'en') || '—' : '—');
   const close = () => setDialog(null);
 
   if (q.isError) {
