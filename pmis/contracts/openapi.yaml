@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.136
+  version: 0.15.137
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
