@@ -1214,6 +1214,7 @@
     "section_security_dlp": "DLP months",
     "section_screens_dashboard": "Dashboard",
     "section_screens_tables": "Tables (Display)",
+    "section_screens_records": "Records",
     "section_screens_daily-plan": "My Work (Daily Plan)",
     "section_screens_pm-schedules": "Preventive maintenance",
     "tab_ddl": "DDL",
@@ -6455,6 +6456,13 @@
     "avg": "Average",
     "min": "Smallest",
     "max": "Largest"
+  },
+  "openrec": {
+    "title": "Opening a record",
+    "note": "Where a register record opens when you click its row: in the side drawer (the default) or on its own full page. A personal choice; it applies on every device you sign in from.",
+    "drawer": "Side drawer (default)",
+    "page": "Full page",
+    "back": "Back to {{name}}"
   },
   "tstd": {
     "empty": "Nothing to show.",

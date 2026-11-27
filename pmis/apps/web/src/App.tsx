@@ -27,7 +27,7 @@ import { MockM365, MockStepUp, StepUpDone } from '@/pages/MockM365';
 import { MatrixPage } from '@/pages/Matrix';
 import { MyWork } from '@/pages/MyWork';
 import { DailyPlan } from '@/pages/DailyPlan';
-import { RegisterPage } from '@/pages/Register';
+import { RegisterPage, RegisterRecordPage } from '@/pages/Register';
 import { RegisterBatch } from '@/pages/RegisterBatch';
 import { DataHubPage } from '@/pages/DataHub';
 import { TemplatesPage } from '@/pages/Templates';
@@ -113,6 +113,8 @@ function gated(session: Session) {
         <Route path="sites/:siteId" element={<Site />} />
         <Route path="menu/:id" element={<MenuGroup />} />
         <Route path="registers/:key" element={<RegisterPage />} />
+        {/* V5: a record on its own page (the person chose so in Settings > Screens > Records) */}
+        <Route path="registers/:key/records/:id" element={<RegisterRecordPage />} />
         <Route path="warehouse" element={<Warehouse />} />
         <Route path="as-built/items" element={<AsBuiltItems />} />
         <Route path="registers/:key/batches/:batchId" element={<RegisterBatch />} />

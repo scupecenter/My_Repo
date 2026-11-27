@@ -23,6 +23,7 @@ import {
   useParams,
   useSearchParams,
 } from "react-router-dom";
+import * as Dialog from "@radix-ui/react-dialog";
 import { useMe } from "@/api/hooks";
 import {
   downloadTemplate,
@@ -30,6 +31,7 @@ import {
   useRecordLock,
   useRecordOp,
   useRegisterDefs,
+  useRegisterRecord,
   useRegisterRecords,
   useTemplates,
   useUpdateRecord,
@@ -44,6 +46,7 @@ import { PmDuePanel } from "@/components/PmDuePanel";
 import { ViewAnalytics } from "@/components/ViewAnalytics";
 import { LayoutPanel, type ViewOption } from "@/components/LayoutPanel";
 import { useRememberedView } from "@/lib/viewPreference";
+import { useOpenRecordMode } from "@/lib/openRecordPref";
 import { GridCellEditor, INLINE_TYPES } from "@/components/GridCellEditor";
 import { FieldValue } from "@/components/FieldValue";
 import { RegisterGrid } from "@/components/RegisterGrid";
@@ -56,7 +59,7 @@ import {
 } from "@/components/GridColumnAdmin";
 import { HlcLegacyDialog } from "@/components/P4cPanels";
 import { fieldLabel, showValue } from "@/components/RegisterFields";
-import { RegisterDrawer, STATE_TONE, TRIAGE_TONE } from "@/components/RegisterDrawer";
+import { RegisterDrawer, RegisterRecordBody, STATE_TONE, TRIAGE_TONE } from "@/components/RegisterDrawer";
 import {
   ALL_CAP,
   BY_STATE,
@@ -290,7 +293,11 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
 
   // contract 0.7.0: every register has its own approved template (Template.register_key)
   const tpl = templates.data?.find((x) => x.register_key === key);
-  const setRecord = (id: string | null) =>
+  // V5: a click on a record opens it on its own page when the person chose so (Settings > Screens > Records); the drawer stays the
+  // default, an explicit ?record= address still opens the drawer (a shared link keeps its meaning), and 'new' is always the drawer.
+  const [openMode] = useOpenRecordMode();
+  const setRecord = (id: string | null) => {
+    if (id && id !== "new" && openMode === "page") { nav(`/registers/${key}/records/${encodeURIComponent(id)}`); return; }
     setSp(
       (p) => {
         const n = new URLSearchParams(p);
@@ -300,6 +307,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
       },
       { replace: true },
     );
+  };
   // One View menu replaces the row of layout buttons: list, wide table, grid, board and (where the records carry a site) map. The choice is kept per
   // user and register on the server (lib/viewPreference).
   const viewOptions: ViewOption[] = [
@@ -1226,4 +1234,54 @@ export function RegisterPage() {
       <Navigate to="/my-work" replace />
     );
   return <RegisterList key={key} def={def} />;
+}
+
+/**
+ * Decision V5: a register record on its own full page (`/registers/:key/records/:id`), for the people who chose so in Settings >
+ * Screens > Records. The same body as the drawer (RegisterRecordBody), so the fields, the documents, the comments, the history and
+ * every action are identical in both; a new version (or any action that yields another record) moves the page to that record. The
+ * back link returns to the register's list. The body's title is a Radix Dialog.Title, so the page provides a bare Dialog.Root
+ * context (no dialog is drawn).
+ */
+export function RegisterRecordPage() {
+  const { t } = useTranslation();
+  const { key = "", id = "" } = useParams();
+  const defs = useRegisterDefs();
+  if (!isLive(key)) return <RegisterSoon name={key} />;
+  if (defs.isLoading) return <p className="text-mute">{t("common.loading")}</p>;
+  const def = defs.data?.find((d) => d.register_key === key);
+  if (!def)
+    return defs.isError ? (
+      <p role="alert" className="text-lateInk">
+        {t("errors.generic")}
+      </p>
+    ) : (
+      <Navigate to="/my-work" replace />
+    );
+  return <RegisterRecordView key={`${key}:${id}`} def={def} id={id} />;
+}
+
+function RegisterRecordView({ def, id }: { def: RegisterDefinition; id: string }) {
+  const { t, i18n } = useTranslation();
+  const nav = useNavigate();
+  const q = useRegisterRecord(def.register_key, id);
+  const name = (i18n.language === "ar" && def.name_ar) || def.name_en;
+  return (
+    <div className="mx-auto max-w-3xl space-y-3 p-4" data-testid="register-record-page">
+      <Link className="text-sm text-link" data-testid="register-record-back" to={`/registers/${def.register_key}`}>
+        {t("openrec.back", { name })}
+      </Link>
+      {q.data ? (
+        <Dialog.Root open modal={false} onOpenChange={(o) => { if (!o) nav(`/registers/${def.register_key}`); }}>
+          <div className="card p-4">
+            <RegisterRecordBody def={def} record={q.data} onCreated={(rid) => nav(`/registers/${def.register_key}/records/${encodeURIComponent(rid)}`)} />
+          </div>
+        </Dialog.Root>
+      ) : (
+        <p role={q.isError ? "alert" : undefined} className="card p-4 text-sm text-mute" data-testid="register-record-missing">
+          {q.isError ? t("regErrors.not_found") : t("common.loading")}
+        </p>
+      )}
+    </div>
+  );
 }

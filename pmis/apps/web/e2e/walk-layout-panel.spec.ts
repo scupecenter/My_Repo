@@ -139,3 +139,55 @@ test('layout panel walk: calendar view on Sites and a register, EN and AR', asyn
   await page.screenshot({ path: 'test-results/walk-layout-register-calendar-en.png' });
   await page.keyboard.press('Escape');
 });
+
+test('open-record walk: the setting in Settings > Screens, and a record on its own page, EN and AR', async ({ page }) => {
+  await signIn(page);
+
+  // V5: the personal setting in Settings > Screens > Records; the drawer is the default.
+  await page.goto('/admin/settings/screens/records');
+  await expect(page.getByTestId('page-openrecord-settings')).toBeVisible({ timeout: 20000 });
+  await expect(page.getByTestId('open-record-mode-drawer')).toHaveAttribute('aria-checked', 'true');
+  await page.screenshot({ path: 'test-results/walk-openrecord-settings-en.png' });
+
+  // One real record to open (the scratch DB starts empty and has no sites, so the Meetings register, which needs none): the
+  // required fields of its definition are filled, with the session's CSRF token on the write.
+  const session = await (await page.request.get('/api/v1/auth/session')).json();
+  const csrf = { 'X-CSRF-Token': session.csrf_token as string };
+  const defs = await (await page.request.get('/api/v1/registers')).json();
+  const def = defs.items.find((d: { register_key: string }) => d.register_key === 'meetings');
+  const data: Record<string, unknown> = {};
+  for (const f of def.fields as { code: string; type: string; required?: boolean; options?: { value: string }[] }[]) {
+    if (!f.required) continue;
+    data[f.code] = f.type === 'number' ? 1 : f.type === 'date' ? '2026-11-27' : f.type === 'yes_no' ? true : (f.type === 'list' && f.options?.length ? f.options[0].value : 'WALK-1');
+  }
+  const made = await page.request.post('/api/v1/registers/meetings/records', { headers: csrf, data: { data, record_type: def.record_types?.[0] } });
+  expect(made.status(), await made.text()).toBe(201);
+  const rec = await made.json();
+
+  // Choose the full page; a row click now lands on the record's own URL.
+  await page.getByTestId('open-record-mode-page').click();
+  await expect(page.getByTestId('open-record-mode-page')).toHaveAttribute('aria-checked', 'true');
+  await page.goto('/registers/meetings');
+  await expect(page.getByTestId('register-list-card')).toBeVisible({ timeout: 20000 });
+  await page.getByTestId(`reg-row-${rec.id}`).click();
+  await expect(page).toHaveURL(new RegExp(`/registers/meetings/records/${rec.id}`));
+  await expect(page.getByTestId('register-record-page')).toBeVisible({ timeout: 20000 });
+  await expect(page.getByTestId('register-drawer-body')).toBeVisible();
+  await page.screenshot({ path: 'test-results/walk-openrecord-page-en.png' });
+
+  // AR: the record page renders right-to-left with Arabic labels; the back link returns to the register.
+  await page.getByTestId('topbar-lang').click();
+  await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
+  await expect(page.getByTestId('register-record-page')).toBeVisible();
+  await page.screenshot({ path: 'test-results/walk-openrecord-page-ar.png' });
+  await page.getByTestId('register-record-back').click();
+  await expect(page).toHaveURL(/\/registers\/meetings$/);
+
+  // Back to English and to the drawer default, so nothing is left behind for the next walk.
+  await page.getByTestId('topbar-lang').click();
+  await expect(page.locator('html')).toHaveAttribute('dir', 'ltr');
+  await page.goto('/admin/settings/screens/records');
+  await expect(page.getByTestId('page-openrecord-settings')).toBeVisible({ timeout: 20000 });
+  await page.getByTestId('open-record-mode-drawer').click();
+  await expect(page.getByTestId('open-record-mode-drawer')).toHaveAttribute('aria-checked', 'true');
+});
