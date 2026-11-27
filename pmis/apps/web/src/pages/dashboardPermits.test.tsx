@@ -15,6 +15,7 @@ describe('Dashboard ops: permits and HSE card (0.15.200, item 3)', () => {
   it('shows the status mix, the validity pressure, the stop-work count and the PTW check gaps', async () => {
     await signIn('pm');
     dashPage();
+    // the first render of the whole Dashboard is slow under CI load (1000 ms default is not enough)
     const card = await screen.findByTestId('dash-ops-permits', {}, { timeout: 8000 });
     expect(card).toHaveTextContent('Permits and HSE');
     expect(screen.getByTestId('dash-permits-waiting')).toHaveTextContent('7');
