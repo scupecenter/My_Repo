@@ -6326,7 +6326,11 @@
     "go_m": "Messages",
     "go_l": "Workload",
     "go_r": "Status updates",
-    "note": "Shortcuts only open pages; your permissions still apply on each page."
+    "note": "Shortcuts only move and open; your permissions still apply on each page.",
+    "rows": "Next and previous row in a table",
+    "row_open": "Open the focused row",
+    "right_click": "Right-click",
+    "row_menu": "Row menu (Shift + right-click keeps the browser menu)"
   },
   "siteSummary": {
     "title": "Site summary",
@@ -6497,6 +6501,15 @@
     "holders": "active",
     "none": "No gaps in this view.",
     "open_matrix": "Open the Responsibility Matrix"
+  },
+  "rowActions": {
+    "label": "Row actions",
+    "open": "Open",
+    "open_tab": "Open in a new tab",
+    "select": "Select",
+    "unselect": "Unselect",
+    "copy": "Copy row",
+    "copied": "Row copied"
   },
   "records": {
     "pin": "Pin",
