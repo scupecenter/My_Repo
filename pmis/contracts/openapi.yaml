@@ -31,6 +31,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.242 (2026-11-27): generic if/then alert rules, notifications only (migration 0342, mirror `db/sql/341_alert_rules.sql`; CHANGELOG AlertRules; item 13 of the 2026-11-27 PM-platforms research). Additive. A System Admin manages the rules in Settings: `GET /settings/alert-rules` (the rules plus the closed catalogues the form offers), `POST /settings/alert-rules`, `PUT /settings/alert-rules/{id}` (If-Match, a reason, audited `alert_rule_create`/`alert_rule_update`). A rule is a closed condition kind with closed params (`weekly_status_missing`: the regions without a Weekly status update of the current working week; `record_idle` `{register_key, state, days}`: the current records of the register in the state for at least days), a closed audience (`system_admin`, or `module` with a module key: the users whose assignment reaches the module) and a title/body template in English and Arabic with placeholders. The daily job fires the enabled rules: one in-app notification per recipient, deduped by (rule, period, target), in the recipient's language; a rule never changes a record, a state or a holder. `NotificationKind` gains `alert_rule` (in-app only).
     - 0.15.203 (2026-11-27): the dashboard follow-up sections, quality snags and NCR (owner approval 2026-11-26, dashboard proposals item 6; migration 0304). Additive and read only. `GET /dashboard/ops` gains the section `quality` (`DashboardOpsQuality`): the open snags and NCRs of the in-scope sites, the average closure age of each, and the first-time acceptance rate (the decided inspections whose result is Pass). The section needs the quality view and answers available false without it. The dashboard settings catalogue gains the card `ops_quality`. No grant, role or permission change.
     - 0.15.202 (2026-11-27): the dashboard follow-up sections, contractor and supplier scorecard (owner approval 2026-11-26, dashboard proposals item 5; migration 0303). Additive and read only. `GET /dashboard/ops` gains the section `contractor_scorecard` (`DashboardOpsScorecard`): the aggregate of `GET /reports/contractor-performance`, so the card and the performance screen never disagree - the counts of parties per level, the on-time rectification rate of snags, the average delay days over the delayed parties, the rejection (quality fail) rate, the snag and quality totals, and the five worst parties with their worst figures. No amounts. The section needs the contractors view and answers available false without it. The dashboard settings catalogue gains the card `ops_contractors`. No grant, role or permission change.
     - 0.15.153 (2026-11-27): "My sessions" (no migration; CHANGELOG MySessions). Additive. `GET /me/sessions` (`listMySessions`): the caller's own live sessions (device, sign-in time, last activity, IP, `is_current`); `POST /me/sessions/{session_id}/revoke` (`revokeMySession`) ends one of the caller's own other sessions (404 for anyone else's, 422 `own_session` for the current one); `POST /me/sessions/revoke-others` (`revokeMyOtherSessions`) ends every other session of the caller. Own rows only, no permission and no step-up (it only narrows access); audited and in the security log.
@@ -7712,6 +7713,77 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '412': {$ref: '#/components/responses/PreconditionFailed'}
         '422': {$ref: '#/components/responses/Unprocessable'}
+  /settings/alert-rules:
+    get:
+      tags: [settings]
+      operationId: getAlertRules
+      summary: The alert rules and the closed catalogues of the form
+      description: |
+        0.15.242 (migration 0342): System Admin. `rules` are the saved rules (code, kind, params, audience, templates, enabled, version); `catalogue` lists the closed kinds with their params, the audiences, the active registers and the modules the form offers. The database owns the validation.
+      x-db-path: alert_rules_json
+      responses:
+        '200':
+          description: The rules and the catalogue.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AlertRulesResponse'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      tags: [settings]
+      operationId: createAlertRule
+      summary: Create an alert rule
+      description: |
+        0.15.242 (migration 0342): System Admin, a reason. Closed body (`unknown_key`): `code` (lowercase letters, digits and dashes, fixed once the rule exists, unique), `kind` (closed), `params` (closed per kind, field errors at `/params/<key>`), `audience` (`{"type":"system_admin"}` or `{"type":"module","module":"<module key>"}`), `title_en`, `title_ar`, `body_en`, `body_ar`, optional `link`, `enabled` (default true). Audited (`alert_rule_create`). Notifications only: a rule never changes a record, a state or a holder.
+      x-db-path: admin_alert_rule_save
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - {$ref: '#/components/schemas/AlertRuleInput'}
+              - {$ref: '#/components/schemas/WithReason'}
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AlertRuleSaved'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /settings/alert-rules/{id}:
+    put:
+      tags: [settings]
+      operationId: updateAlertRule
+      summary: Update an alert rule
+      description: |
+        0.15.242 (migration 0342): System Admin, a reason and If-Match (the rule's `version`). The whole rule is sent; the `code` does not change. Audited (`alert_rule_update`, before and after).
+      x-db-path: admin_alert_rule_save
+      parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - {$ref: '#/components/schemas/AlertRuleInput'}
+              - {$ref: '#/components/schemas/WithReason'}
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AlertRuleSaved'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
   /settings/ui-features:
     get:
       tags: [settings]
@@ -21781,6 +21853,82 @@ components:
         version: { type: integer, minimum: 0 }
         updated_at: { type: string, format: date-time }
         updated_by: { $ref: '#/components/schemas/UserRef' }
+    AlertRule:
+      type: object
+      required: [id, code, kind, params, audience, title_en, title_ar, body_en, body_ar, link, enabled, version, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string, pattern: '^[a-z0-9][a-z0-9-]{1,60}$' }
+        kind: { type: string, enum: [weekly_status_missing, record_idle] }
+        params: { type: object, additionalProperties: true }
+        audience: { type: object, additionalProperties: true, description: '{"type":"system_admin"} or {"type":"module","module":"<module key>"}.' }
+        title_en: { type: string, maxLength: 200 }
+        title_ar: { type: string, maxLength: 200 }
+        body_en: { type: string, maxLength: 2000 }
+        body_ar: { type: string, maxLength: 2000 }
+        link: { type: [string, 'null'] }
+        enabled: { type: boolean }
+        version: { type: integer, description: 'The If-Match of PUT /settings/alert-rules/{id}.' }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    AlertRuleInput:
+      type: object
+      required: [code, kind, params, audience, title_en, title_ar, body_en, body_ar]
+      properties:
+        code: { type: string, pattern: '^[a-z0-9][a-z0-9-]{1,60}$' }
+        kind: { type: string, enum: [weekly_status_missing, record_idle] }
+        params: { type: object, additionalProperties: true }
+        audience: { type: object, additionalProperties: true }
+        title_en: { type: string, maxLength: 200 }
+        title_ar: { type: string, maxLength: 200 }
+        body_en: { type: string, maxLength: 2000 }
+        body_ar: { type: string, maxLength: 2000 }
+        link: { type: [string, 'null'] }
+        enabled: { type: boolean }
+    AlertRuleSaved:
+      type: object
+      required: [id, version]
+      properties:
+        id: { type: string, format: uuid }
+        version: { type: integer }
+    AlertRulesResponse:
+      type: object
+      required: [rules, catalogue]
+      properties:
+        rules:
+          type: array
+          items: { $ref: '#/components/schemas/AlertRule' }
+        catalogue:
+          type: object
+          required: [kinds, audiences, registers, modules]
+          properties:
+            kinds:
+              type: array
+              items:
+                type: object
+                required: [kind, params]
+                properties:
+                  kind: { type: string }
+                  params: { type: array, items: { type: string } }
+            audiences: { type: array, items: { type: string, enum: [system_admin, module] } }
+            registers:
+              type: array
+              items:
+                type: object
+                required: [register_key, name_en, name_ar, module_key]
+                properties:
+                  register_key: { type: string }
+                  name_en: { type: string }
+                  name_ar: { type: [string, 'null'] }
+                  module_key: { type: string }
+            modules:
+              type: array
+              items:
+                type: object
+                required: [key, name_en]
+                properties:
+                  key: { type: string }
+                  name_en: { type: string }
     IdleTaskAlertSetting:
       type: object
       required: [enabled, working_days, version]
@@ -25277,7 +25425,7 @@ components:
     # ---------------------------------------------------------- notifications and logs
     NotificationKind:
       type: string
-      enum: [task_assigned, task_returned, task_approved, approval_due, reassigned, absence_alert, idle_task_alert, no_holder, holiday_tentative, delegation, mfa_exemption, template_updated, import_batch, system, mention, followed_change, task_rejected, no_eligible_holder, register_assigned, register_rejected, gate_closed_again, sla_negative_duration, email_change_requested, email_change_decided, security_alert, snag_raised, snag_review, snag_rejected, snag_closed, levels_converted, permit_transferred, phone_change_requested, phone_change_decided, security_notice, site_region_moved, assignment_request, data_reset_request]
+      enum: [task_assigned, task_returned, task_approved, approval_due, reassigned, absence_alert, idle_task_alert, no_holder, holiday_tentative, delegation, mfa_exemption, template_updated, import_batch, system, mention, followed_change, task_rejected, no_eligible_holder, register_assigned, register_rejected, gate_closed_again, sla_negative_duration, email_change_requested, email_change_decided, security_alert, snag_raised, snag_review, snag_rejected, snag_closed, levels_converted, permit_transferred, phone_change_requested, phone_change_decided, security_notice, site_region_moved, assignment_request, data_reset_request, alert_rule]
     Notification:
       type: object
       required: [id, kind, title, created_at, read_at]
