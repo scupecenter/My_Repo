@@ -60,11 +60,9 @@ describe('passkey doors', () => {
       expect(added).toMatchObject({ label: 'Phone', device_type: 'multiDevice' });
       expect(JSON.stringify(added)).not.toContain(KEY);
       expect((await c.query('SELECT * FROM auth_passkey_creds($1::uuid)', [u.id])).rows[0]).toMatchObject({ credential_id: CRED, public_key: KEY });
-      expect((await c.query(`SELECT auth_passkey_used($1::uuid, $2, 5) AS r`, [u.id, CRED])).rows[0].r).toBe('ok');
-      expect((await c.query(`SELECT auth_passkey_used($1::uuid, $2, 5) AS r`, [u.id, CRED])).rows[0].r).toBe('clone');
-      expect((await c.query(`SELECT auth_passkey_used($1::uuid, $2, 2) AS r`, [u.id, CRED])).rows[0].r).toBe('clone');
-      expect((await c.query(`SELECT auth_passkey_used($1::uuid, $2, 6) AS r`, [u.id, 'Z'.repeat(22)])).rows[0].r).toBe('unknown');
-      expect((await c.query(`SELECT auth_passkey_used($1::uuid, $2, 9) AS r`, [u.id, CRED])).rows[0].r).toBe('ok');
+      // outside a pending two-step sign-in of an account with two-step verification, a passkey proves nothing (the counter logic is covered in passkeys.test.ts)
+      expect((await c.query(`SELECT auth_passkey_used($1::uuid, $2, 5) AS r`, [u.id, CRED])).rows[0].r).toBe('refused');
+      expect((await c.query(`SELECT sign_count FROM auth_passkey WHERE credential_id = $1`, [CRED])).rows[0].sign_count).toBe('0');
       // someone else cannot revoke it; the admin can, the row stays
       await beginAs(c, adm.id);
       expect((await c.query(`SELECT passkey_revoke($1::uuid) AS r`, [added.id])).rows[0].r).toBe(false);

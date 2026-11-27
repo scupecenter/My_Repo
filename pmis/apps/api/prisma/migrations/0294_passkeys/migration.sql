@@ -132,17 +132,29 @@ BEGIN
   RETURN n = 1;
 END $$;
 
--- ok | clone | unknown. The counter must move forward (both zero is allowed: many authenticators never count). Atomic.
+-- ok | clone | unknown | refused. Only inside a pending two-step sign-in of an account that has two-step verification on and enrolled, while the feature is on.
+-- The counter must move forward (both zero is allowed: many authenticators never count), atomically. On ok it leaves the same proof the authenticator code leaves
+-- (user_totp.last_success_at, the replay step of the code is NOT touched), which auth_session_create already requires: the session door is unchanged.
 CREATE OR REPLACE FUNCTION auth_passkey_used(p_user uuid, p_credential text, p_new_count bigint) RETURNS text
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
 DECLARE n int;
 BEGIN
   PERFORM public.passkey_guard(p_user);
+  IF coalesce(public.app_ctx_user()::text, '') <> p_user::text THEN RETURN 'refused'; END IF;
+  IF NOT (public.passkey_cfg() ->> 'enabled')::boolean THEN RETURN 'refused'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.user_totp t WHERE t.user_id = p_user AND t.required AND t.secret_enc IS NOT NULL)
+     OR NOT EXISTS (SELECT 1 FROM public.auth_pending pd WHERE pd.user_id = p_user AND pd.kind = 'two_factor' AND pd.used_at IS NULL AND pd.expires_at > now())
+     OR EXISTS (SELECT 1 FROM public.local_credentials c WHERE c.user_id = p_user AND c.locked_until > now()) THEN
+    RETURN 'refused';
+  END IF;
   IF p_new_count IS NULL OR p_new_count < 0 THEN RETURN 'clone'; END IF;
   UPDATE public.auth_passkey SET sign_count = p_new_count, last_used_at = now()
    WHERE user_id = p_user AND credential_id = p_credential AND revoked_at IS NULL AND (sign_count < p_new_count OR (sign_count = 0 AND p_new_count = 0));
   GET DIAGNOSTICS n = ROW_COUNT;
-  IF n = 1 THEN RETURN 'ok'; END IF;
+  IF n = 1 THEN
+    UPDATE public.user_totp SET last_success_at = now(), failed_count = 0 WHERE user_id = p_user;
+    RETURN 'ok';
+  END IF;
   RETURN CASE WHEN EXISTS (SELECT 1 FROM public.auth_passkey WHERE user_id = p_user AND credential_id = p_credential AND revoked_at IS NULL) THEN 'clone' ELSE 'unknown' END;
 END $$;
 
