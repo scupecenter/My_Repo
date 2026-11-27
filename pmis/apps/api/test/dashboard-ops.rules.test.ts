@@ -7,6 +7,7 @@ import {
   bucketAges,
   receivePct,
   scorecardSummary,
+  approvalsByRole,
   firstPassPct,
   meanDays,
   ScorecardItem,
@@ -166,5 +167,45 @@ describe("item 6 rules: quality (0.15.203)", () => {
     expect(firstPassPct(9, 1)).toBe(90);
     expect(firstPassPct(1, 2)).toBe(33.3);
     expect(firstPassPct(3, 0)).toBe(100);
+  });
+});
+
+describe("item 7 rules: pending approvals by role (0.15.204)", () => {
+  const row = (role_id: string | null, days: number, state: string, name_en = "PM") => ({
+    role_id,
+    name_en: role_id ? name_en : null,
+    name_ar: null,
+    days,
+    state,
+  });
+
+  it("groups the waiting tasks by role, most waiting first, and counts the unassigned", () => {
+    const r = approvalsByRole([
+      row("r1", 3, "in_review", "PM"),
+      row("r1", 40, "in_approval", "PM"),
+      row("r2", 9, "in_review", "QC"),
+      row(null, 20, "in_review"),
+    ]);
+    expect(r.total).toBe(4);
+    expect(r.review).toBe(3);
+    expect(r.approve).toBe(1);
+    expect(r.unassigned).toBe(1);
+    expect(r.by_role.map((x) => x.role_id)).toEqual(["r1", "r2"]);
+    expect(r.by_role[0]?.count).toBe(2);
+    expect(r.by_role[0]?.oldest_days).toBe(40);
+    expect(r.by_role[0]?.buckets.find((b) => b.key === "over_30")?.count).toBe(1);
+    expect(r.waiting.total).toBe(4);
+    expect(r.waiting.oldest_days).toBe(40);
+  });
+
+  it("answers an empty shape when nothing waits", () => {
+    const r = approvalsByRole([]);
+    expect(r.total).toBe(0);
+    expect(r.review).toBe(0);
+    expect(r.approve).toBe(0);
+    expect(r.unassigned).toBe(0);
+    expect(r.by_role).toEqual([]);
+    expect(r.waiting.total).toBe(0);
+    expect(r.waiting.oldest_days).toBeNull();
   });
 });

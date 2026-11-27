@@ -213,6 +213,7 @@ export class FilterCatalogService {
   static modulesOf(screen: string): string[] | null {
     if (screen === 'dashboard') return ['dashboard', 'sites'];
     if (screen === 'warehouse-movements') return ['warehouse']; // the region scope of the list itself applies beside the compiled tree
+    if (screen === 'library-media') return ['sites.documents']; // Library > Media: the Documents view right, like the gallery list itself (saved views only, no filter builder)
     return siteMasterMenu(screen) ? ['sites'] : null;
   }
 
