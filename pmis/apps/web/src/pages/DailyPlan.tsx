@@ -10,6 +10,7 @@ import { SavedViews } from '@/components/SavedViews';
 import { ErrorState, LoadingSkeleton } from '@/components/States';
 import { ColumnMenu, DensityToggle, useTablePrefs } from '@/components/TableKit';
 import { useToast } from '@/components/Toast';
+import { WeekCycle } from '@/components/WeekCycle';
 import { UnifiedFilter } from '@/components/UnifiedFilter';
 import {
   cellValue, copyToClipboard, emailContent, EMPTY_FILTERS, filterRows, localToday, optionsOf, OVERRIDE_KEYS, OWNER_COLUMNS, type DailyPlanTab, type DpColumn, type DpFilters,
@@ -38,6 +39,7 @@ export function DailyPlan() {
   const toast = useToast();
   const me = useMe(true);
   const [sp, setSp] = useSearchParams();
+  const isWeek = sp.get('tab') === 'week';
   const tab: DailyPlanTab = sp.get('tab') === 'tomorrow' ? 'tomorrow' : 'progress';
   const date = sp.get('date') || localToday();
   const setParams = (kv: Record<string, string>) => setSp((prev) => { const n = new URLSearchParams(prev); for (const [k, v] of Object.entries(kv)) { if (v) n.set(k, v); else n.delete(k); } return n; }, { replace: true });
@@ -109,8 +111,8 @@ export function DailyPlan() {
 
       <div className="flex flex-wrap items-center gap-2">
         <div role="tablist" aria-label={t('dailyPlan.title')} className="inline-flex gap-1" data-testid="daily-plan-tabs">
-          {(['progress', 'tomorrow'] as const).map((k) => (
-            <button key={k} type="button" role="tab" aria-selected={tab === k} data-testid={`daily-plan-tab-${k}`} className={`btn ${tab === k ? 'btn-accent' : ''}`}
+          {(['progress', 'tomorrow', 'week'] as const).map((k) => (
+            <button key={k} type="button" role="tab" aria-selected={k === 'week' ? isWeek : !isWeek && tab === k} data-testid={`daily-plan-tab-${k}`} className={`btn ${(k === 'week' ? isWeek : !isWeek && tab === k) ? 'btn-accent' : ''}`}
               onClick={() => setParams({ tab: k === 'progress' ? '' : k })}>{t(`dailyPlan.tab_${k}`)}</button>
           ))}
         </div>
@@ -119,8 +121,9 @@ export function DailyPlan() {
           <input type="date" className="input w-auto" aria-label={t('dailyPlan.date')} data-testid="daily-plan-date" value={date} onChange={(e) => e.target.value && setParams({ date: e.target.value })} />
           <button type="button" className="btn px-2" aria-label={t('dailyPlan.next_day')} onClick={() => shift(1)}><ChevronRight size={16} className="rtl:rotate-180" aria-hidden /></button>
         </span>
-        <span className="text-sm text-mute" data-testid="daily-plan-shown-date">{t(tab === 'progress' ? 'dailyPlan.progress_of' : 'dailyPlan.tomorrow_of', { date: shownDate })}</span>
+        <span className="text-sm text-mute" data-testid="daily-plan-shown-date">{t(isWeek ? 'week.of' : tab === 'progress' ? 'dailyPlan.progress_of' : 'dailyPlan.tomorrow_of', { date: shownDate })}</span>
       </div>
+      {isWeek ? <WeekCycle date={date} regions={scope(progress.data)} onDate={(d) => setParams({ date: d })} /> : <>
 
       <div role="toolbar" className="flex flex-wrap items-center gap-2" data-testid="daily-plan-toolbar">
         <SavedViews screen={SCREEN} value={filters} empty={{ ...EMPTY_FILTERS, region: defaultScope }} table={table}
@@ -224,6 +227,7 @@ export function DailyPlan() {
           <p className="text-sm text-mute">{t('dailyPlan.unlock_hint')}</p>
         </FormDialog>
       )}
+      </>}
     </div>
   );
 }

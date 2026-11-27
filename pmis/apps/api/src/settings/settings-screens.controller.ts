@@ -49,6 +49,20 @@ export class SettingsScreensController {
     return r;
   }
 
+  @Get('ui-features')
+  async uiFeatures(@Res({ passthrough: true }) res: Response) {
+    const r = await this.screens.uiFeatures();
+    res.setHeader('ETag', etagHeader(r.version));
+    return r;
+  }
+
+  @Put('ui-features')
+  async setUiFeatures(@Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response) {
+    const r = await this.screens.setUiFeatures(ifMatch, body);
+    res.setHeader('ETag', etagHeader(r.version));
+    return r;
+  }
+
   @Get('notification-policy/catalogue')
   catalogue() {
     return this.screens.catalogue();
