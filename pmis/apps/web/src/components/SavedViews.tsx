@@ -1,10 +1,11 @@
-import { Bookmark, Save, Share2, Trash2, UserCheck } from 'lucide-react';
+import { Bookmark, Pin, PinOff, Save, Share2, Trash2, UserCheck } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useGroups, useRoles } from '@/api/admin';
 import { useRegions } from '@/api/sites';
 import type { UserPickerItem } from '@/api/types';
-import { importLocalViews, useSavedViewOps, useSavedViews, type LocalView, type SavedView, type SavedViewAudience, type SavedViewColumns, type SavedViewSort } from '@/api/views';
+import { importLocalViews, useHomePinOps, useHomePins, useSavedViewOps, useSavedViews, type LocalView, type SavedView, type SavedViewAudience, type SavedViewColumns, type SavedViewSort } from '@/api/views';
 import { loadPref } from '@/lib/localPref';
 import type { Prefs } from '@/lib/tablePrefs';
 import { errText, FormDialog } from './FormDialog';
@@ -47,6 +48,8 @@ export function SavedViews<F>({ screen, value, onApply, empty, table, sort, onSo
   const toast = useToast();
   const q = useSavedViews(screen);
   const ops = useSavedViewOps(screen);
+  const pinsQ = useHomePins();
+  const pinOps = useHomePinOps();
   const [cur, setCur] = useState('');
   const [naming, setNaming] = useState(false);
   const [name, setName] = useState('');
@@ -80,6 +83,18 @@ export function SavedViews<F>({ screen, value, onApply, empty, table, sort, onSo
     if (v && table && columnsApply(v, table, sharedScreen)) table.apply(v.columns);
     if (onSort) onSort(v?.sort ?? []);
   };
+
+  // 0.15.245: a link may name a view (?view_id, from the dashboard pins card): apply it once and drop the parameter.
+  const [sp, setSp] = useSearchParams();
+  const wantView = sp.get('view_id');
+  /* eslint-disable react-hooks/set-state-in-effect -- applying a linked view is a one-shot external trigger (the URL), not derived state */
+  useEffect(() => {
+    if (!wantView || !q.isSuccess) return;
+    const v = (q.data?.items ?? []).find((x) => x.id === wantView);
+    if (v) { setCur(v.id); apply(v); }
+    const next = new URLSearchParams(sp); next.delete('view_id'); setSp(next, { replace: true });
+  }, [wantView, q.isSuccess]); // eslint-disable-line react-hooks/exhaustive-deps
+  /* eslint-enable react-hooks/set-state-in-effect */
   const save = () => {
     const n = name.trim();
     if (!n) return;
@@ -100,6 +115,9 @@ export function SavedViews<F>({ screen, value, onApply, empty, table, sort, onSo
       {view?.stripped_columns ? <span className="chip bg-waitBg text-waitInk" data-testid="views-stripped" title={t('savedViews.stripped_hint')}>{t('savedViews.stripped', { count: view.stripped_columns })}</span> : null}
       {view?.owner_left && <span className="chip bg-lateBg text-lateInk" data-testid="views-owner-left">{t('savedViews.owner_left')}</span>}
       {view?.can_edit && <button type="button" className="btn px-2" data-testid="views-update" aria-label={t('savedViews.update')} title={t('savedViews.update')} disabled={ops.update.isPending} onClick={() => update(view)}><Save size={14} aria-hidden /></button>}
+      {view && <button type="button" className="btn px-2" data-testid="views-pin-home" aria-label={(pinsQ.data ?? []).some((p) => p.view_id === view.id) ? t('savedViews.unpin_home') : t('savedViews.pin_home')} title={(pinsQ.data ?? []).some((p) => p.view_id === view.id) ? t('savedViews.unpin_home') : t('savedViews.pin_home')} aria-pressed={(pinsQ.data ?? []).some((p) => p.view_id === view.id)} disabled={pinOps.pin.isPending || pinOps.unpin.isPending}
+        onClick={() => { const pinned = (pinsQ.data ?? []).some((p) => p.view_id === view.id); (pinned ? pinOps.unpin : pinOps.pin).mutate(view.id, { onSuccess: () => toast(t(pinned ? 'savedViews.unpinned_home' : 'savedViews.pinned_home')), onError: fail }); }}>
+        {(pinsQ.data ?? []).some((p) => p.view_id === view.id) ? <PinOff size={14} aria-hidden /> : <Pin size={14} aria-hidden />}</button>}
       {view?.can_share && <button type="button" className="btn px-2" data-testid="views-share" aria-label={t('savedViews.share')} title={t('savedViews.share')} onClick={() => setSharing(view)}><Share2 size={14} aria-hidden /></button>}
       {view?.can_edit && view.shared && <button type="button" className="btn px-2" data-testid="views-transfer" aria-label={t('savedViews.transfer')} title={t('savedViews.transfer')} onClick={() => setHanding(view)}><UserCheck size={14} aria-hidden /></button>}
       {view?.can_edit && <button type="button" className="btn px-2" data-testid="views-delete" aria-label={t('savedViews.deactivate')} title={t('savedViews.deactivate')}
