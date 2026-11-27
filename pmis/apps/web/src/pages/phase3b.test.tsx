@@ -512,6 +512,7 @@ describe('weight sets', () => {
     expect(screen.getByTestId('weights-publish-error--activities-0-items')).toBeInTheDocument();
     // Fix both levels: the sums turn to 100% before anything is saved.
     await u.click(within(screen.getByTestId('weights-publish-dialog')).getByRole('button', { name: 'Cancel' }));
+    await u.click(await screen.findByTestId('unsaved-discard')); // Decision 11: the typed reason asks before the dialog closes
     await setNum(u, 'weights-weight-h2', '50');
     await setNum(u, 'weights-item-weight-h1_2', '30');
     expect(screen.getByTestId('weights-sum-activities')).toHaveAttribute('data-ok', 'true');
