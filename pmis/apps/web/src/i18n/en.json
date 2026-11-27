@@ -2763,7 +2763,15 @@
     "kind_system": "System",
     "priority": "Priority",
     "priority_only": "Priority only",
-    "empty_priority": "Nothing needs you right now"
+    "empty_priority": "Nothing needs you right now",
+    "tabs": "Inbox tabs",
+    "tab_all": "All",
+    "tab_priority": "Priority",
+    "tab_mentions": "Mentions",
+    "tab_tasks": "Tasks",
+    "tab_approvals": "Approvals",
+    "tab_system": "System",
+    "empty_tab": "Nothing in this tab"
   },
   "tis": {
     "tab": "Time",
@@ -6823,7 +6831,13 @@
     "new_note": "A small badge beside a feature that now sits next to the older way to do the same thing.",
     "new_enabled": "Show the \"New\" badge",
     "new_days": "Days to show it after a feature is released",
-    "new_preview": "Shown beside new features until the days have passed."
+    "new_preview": "Shown beside new features until the days have passed.",
+    "inbox_title": "Inbox tabs and priority",
+    "inbox_note": "Tabs on the Inbox page and which kinds of notification count as priority. Priority items come first and carry a chip.",
+    "inbox_tabs": "Show tabs on the Inbox page",
+    "inbox_default_tab": "Tab that opens first",
+    "inbox_priority_kinds": "Kinds that count as priority",
+    "inbox_priority_note": "Mentions and approvals waiting are priority by default."
   },
   "related": {
     "title": "Related records",
