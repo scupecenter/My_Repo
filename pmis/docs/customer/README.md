@@ -12,6 +12,7 @@
 | [05-training-ar.md](05-training-ar.md) | مادة التدريب | Arabic training material per role |
 | [06-admin-guide-ar.md](06-admin-guide-ar.md) | دليل مدير النظام | Arabic administrator guide |
 | [03-architecture-and-data.md](03-architecture-and-data.md) | البنية ومخطط البيانات | Architecture, authentication, authorization/RLS, data entities, audit, backups, integrations, IT needs |
+| [08-workflow-studio-lists.md](08-workflow-studio-lists.md) | استوديو مسار العمل: القوائم والتعديل داخل الجدول | Workflow Studio: lists and editing in the table |
 
 ## وثائق مخططة لاحقاً | Planned later
 
