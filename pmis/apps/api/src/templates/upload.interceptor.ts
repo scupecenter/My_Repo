@@ -5,6 +5,7 @@ import type { Observable } from 'rxjs';
 import type { AuthContext } from '../auth/auth.types';
 import { SyslogService } from '../auth/syslog.service';
 import { ProblemException } from '../common/problem';
+import { limit } from '../ops/ops-limits';
 
 export interface UploadedFile {
   originalname: string;
@@ -19,7 +20,8 @@ const envInt = (name: string, fallback: number): number => {
   return Number.isFinite(v) && v > 0 ? Math.floor(v) : fallback;
 };
 export const importMaxBytes = (): number => envInt('PMIS_IMPORT_MAX_BYTES', 5 * 1024 * 1024);
-export const importMaxRows = (): number => envInt('PMIS_IMPORT_MAX_ROWS', 2000);
+/** Setting import.max_rows (Settings > Security > Limits); PMIS_IMPORT_MAX_ROWS is only its default. */
+export const importMaxRows = (): number => limit('import.max_rows');
 
 /**
  * Reads one multipart file into memory with a size limit. It runs inside the request transaction (after the session guard), so a refused file is
