@@ -55,7 +55,11 @@ export function Field() {
   useFieldWorker(cfg.enabled);
   const store = useMemo<FieldStore | null>(() => (me ? (typeof indexedDB === 'undefined' ? memoryStore() : indexedDbStore(me.user.id)) : null), [me]);
   const [queue, setQueue] = useState<FieldAction[]>([]);
-  const [siteId, setSiteId] = useState<string | null>(null);
+  // auto-fill: the site last worked on (only its id, kept on this device)
+  const siteKey = `gsdn-field-site-${me?.user.id ?? ''}`;
+  const [siteId, setSiteIdRaw] = useState<string | null>(null);
+  const setSiteId = (v: string | null) => { setSiteIdRaw(v); try { if (v) localStorage.setItem(siteKey, v); else localStorage.removeItem(siteKey); } catch { /* storage may be blocked */ } };
+  useEffect(() => { if (me) { try { setSiteIdRaw((cur) => cur ?? localStorage.getItem(siteKey)); } catch { /* ignore */ } } }, [me, siteKey]);
   const syncing = useRef(false);
 
   const reload = useCallback(async () => { if (store) setQueue(await store.list()); }, [store]);
