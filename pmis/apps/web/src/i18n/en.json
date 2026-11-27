@@ -6807,5 +6807,20 @@
     "new_enabled": "Show the \"New\" badge",
     "new_days": "Days to show it after a feature is released",
     "new_preview": "Shown beside new features until the days have passed."
+  },
+  "related": {
+    "title": "Related records",
+    "to": "Points to:",
+    "from": "Named by:",
+    "register": {
+      "procurement": "Procurement",
+      "warehouse": "Warehouse",
+      "dismantle": "Dismantle",
+      "issues": "Issue log",
+      "quality": "Quality",
+      "car_dispatcher": "Car dispatcher",
+      "financial_advances": "Financial advances",
+      "risks": "Risks"
+    }
   }
 }

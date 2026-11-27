@@ -31,6 +31,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.224 (2026-11-27): related records of a register record (migration 0324; CHANGELOG RelatedRecords). Additive and read only. New `GET /registers/{register_key}/{entity_id}/related` (`listRelatedRecords`): the current records linked to this record in both directions (`direction` `to`: the record this one names; `from`: records that name this one), grouped by register and link field (procurement order, Procurement request, risk, closing receipt). A group is listed only when the caller holds the view right of that register in that record's region (the responsibility matrix decides); nothing is stored and no permission changes.
     - 0.15.161 (2026-11-27): recurring preventive-maintenance schedules that create drafts only (migration 0261; CHANGELOG PmSchedules). Additive. `GET`/`PUT /settings/pm-schedules` (`getPmSchedules`, `setPmSchedules`) and `POST /pm-schedules/{schedule_id}/generate` (`generatePmScheduleDraft`). A schedule never creates anything by itself: a person presses Create draft on a due schedule and the draft is saved through the register's own create path as that person; no permission is widened.
     - 0.15.221 (2026-11-27): additive (migration 0321; CHANGELOG DismantleClosingRnLink). A Dismantle part closes by naming its signed Warehouse RN: new optional field `closing_rn_id` (entity id of a received RN of the part, cw_rn / te_rn, same site; needs the Warehouse view right in the RN's region). When set, `closing_rn_ref` is read from the RN's Doc No. and cannot be typed; without a link the typed reference still works. Field errors `rn_not_available`, `rn_other_site`, `invalid`. `GET /registers/dismantle/rn-options` lists the RNs. Also corrects the descriptions of the Issue log and Quality order-options paths.
     - 0.15.220 (2026-11-27): additive in shape, looser in rule (migration 0320; CHANGELOG WarehouseDocOrderLink). A warehouse delivery note (`cw_dn`, `te_dn`) and a return note (`cw_rn`, `te_rn`) can name a Procurement order with `procurement_order_id`, like a receipt (PL / OPEN); the same derived fields and rules apply. Only a stock adjustment (`adj`) still answers 422 `receipt_only`. `GET /registers/procurement/{entity_id}/receipts` lists the documents of every type except adjustments.
@@ -9936,6 +9937,31 @@ paths:
                 required: [items]
                 properties:
                   items: { type: array, items: { $ref: '#/components/schemas/ProcurementOrderReceipt' } }
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /registers/{register_key}/{entity_id}/related:
+    get:
+      tags: [registers]
+      operationId: listRelatedRecords
+      summary: The records linked to a register record, in both directions (0.15.224)
+      description: |
+        0.15.224. Read only. The current, not voided records this record names (`direction` `to`) and the records that name it (`direction` `from`), grouped by register and link field.
+        Needs the view right of `register_key`; each group is listed only when the caller also holds the view right of the other register in the record's region. A record
+        the caller cannot see, or an id with no current record, answers an empty list.
+      parameters:
+      - {name: register_key, in: path, required: true, schema: {type: string}}
+      - {name: entity_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: The groups.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [groups]
+                properties:
+                  groups: { type: array, items: { $ref: '#/components/schemas/RelatedRecordGroup' } }
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '422': {$ref: '#/components/responses/Unprocessable'}
@@ -22355,6 +22381,26 @@ components:
         movement_status: { type: string, enum: [pending, posted, cancelled] }
         lines: { type: integer }
         qty: { type: number }
+    RelatedRecordGroup:
+      type: object
+      description: '0.15.224. The records linked to a register record through one link field.'
+      required: [direction, register_key, field, items]
+      properties:
+        direction: { type: string, enum: [to, from] }
+        register_key: { type: string }
+        field: { type: string, description: 'The link field (a key of the record data) that holds the id.' }
+        items:
+          type: array
+          items:
+            type: object
+            required: [entity_id, record_id, state, title]
+            properties:
+              entity_id: { type: string, format: uuid }
+              record_id: { type: string, format: uuid }
+              record_type: { type: string }
+              state: { type: string }
+              site_id: { type: string, format: uuid }
+              title: { type: string }
     KanbanWip:
       type: object
       description: '0.15.32 (F5). The setting `kanban.wip_limits`: the WIP limit of each milestone column of the sites board, a warning only.'
