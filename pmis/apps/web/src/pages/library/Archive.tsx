@@ -1,4 +1,5 @@
 import * as Dialog from '@radix-ui/react-dialog';
+import { useDownloadGate } from '@/lib/downloadGate';
 import { ArrowLeft, Download, Eye, FileArchive, FilePlus2, FolderOpen, History, X } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -100,6 +101,7 @@ function FilePreview({ row, onClose }: { row: LibraryArchiveRow; onClose: () => 
 
 /** The versions of a file (GET /documents?file_group_id=, superseded ones included), each downloadable (audited). */
 function VersionHistory({ row, onClose }: { row: LibraryArchiveRow; onClose: () => void }) {
+  const gate = useDownloadGate();
   const { t } = useTranslation();
   const toast = useToast();
   const q = useDocuments({ file_group_id: row.file_group_id ?? undefined, include_superseded: true });
@@ -116,7 +118,7 @@ function VersionHistory({ row, onClose }: { row: LibraryArchiveRow; onClose: () 
                 <li key={d.file.id} className="flex items-center gap-2 py-2" data-testid={`lib-history-v${d.file.version}`}>
                   <span className="chip bg-card2 text-mute">v{d.file.version}</span>{d.file.is_current && <span className="chip bg-doneBg text-doneInk">{t('lib.current')}</span>}
                   <span className="flex-1 truncate">{d.file.download_name}</span><span className="text-mute">{String(d.file.uploaded_at).slice(0, 10)}</span>
-                  <button type="button" className="btn px-2 py-1" aria-label={t('lib.download')} onClick={() => void downloadFile(`/files/${d.file.id}/download`).catch((e) => toast((e as ApiError).message, 'err'))}><Download size={14} /></button>
+                  <button type="button" className="btn px-2 py-1" aria-label={t('lib.download')} disabled={gate.filesLocked} title={gate.note(gate.filesLocked)} onClick={() => void downloadFile(`/files/${d.file.id}/download`).catch((e) => toast((e as ApiError).message, 'err'))}><Download size={14} /></button>
                 </li>
               ))}
             </ul>
@@ -129,6 +131,7 @@ function VersionHistory({ row, onClose }: { row: LibraryArchiveRow; onClose: () 
 
 /** One row of the Archive list. */
 function Row({ r, n, tbl, onPreview, onHistory }: { r: LibraryArchiveRow; n: number; tbl: TableApi; onPreview: (r: LibraryArchiveRow) => void; onHistory: (r: LibraryArchiveRow) => void }) {
+  const gate = useDownloadGate();
   const { t, i18n } = useTranslation();
   const toast = useToast();
   const ar = i18n.language === 'ar';
@@ -151,7 +154,7 @@ function Row({ r, n, tbl, onPreview, onHistory }: { r: LibraryArchiveRow; n: num
       default: return (
         <span className="flex items-center gap-1">
           {r.file_id && <Tip text={t('lib.preview_file')}><button type="button" className="btn px-1.5 py-0.5" aria-label={t('lib.preview_file')} data-testid={`lib-row-preview-${r.key}`} onClick={() => onPreview(r)}><Eye size={14} /></button></Tip>}
-          {r.file_id && <Tip text={t('lib.download')}><button type="button" className="btn px-1.5 py-0.5" aria-label={t('lib.download')} onClick={() => void downloadFile(`/files/${r.file_id}/download`).catch((e) => toast((e as ApiError).message, 'err'))}><Download size={14} /></button></Tip>}
+          {r.file_id && <Tip text={t('lib.download')}><button type="button" className="btn px-1.5 py-0.5" aria-label={t('lib.download')} disabled={gate.filesLocked} title={gate.note(gate.filesLocked)} onClick={() => void downloadFile(`/files/${r.file_id}/download`).catch((e) => toast((e as ApiError).message, 'err'))}><Download size={14} /></button></Tip>}
           {r.file_group_id && <Tip text={t('lib.history')}><button type="button" className="btn px-1.5 py-0.5" aria-label={t('lib.history')} data-testid={`lib-row-history-${r.key}`} onClick={() => onHistory(r)}><History size={14} /></button></Tip>}
           {r.form_id && (r.status === 'due' || r.status === 'generated' || r.status === 'rejected') && (
             <Tip text={t('lib.generate')}><Link className="btn px-1.5 py-0.5" aria-label={t('lib.generate')} data-testid={`lib-row-generate-${r.key}`} to={`/library/forms?form=${r.form_id}&site=${r.site_id}&site_code=${encodeURIComponent(r.site_code)}`}><FilePlus2 size={14} /></Link></Tip>)}
@@ -169,6 +172,7 @@ function Row({ r, n, tbl, onPreview, onHistory }: { r: LibraryArchiveRow; n: num
 
 /** The list of one document type for every site of the caller's regions (W5-3), with the shared table standard of W8. */
 export function ArchiveList() {
+  const gate = useDownloadGate();
   const { t, i18n } = useTranslation();
   const toast = useToast();
   const { docCode = '' } = useParams();
@@ -227,11 +231,11 @@ export function ArchiveList() {
           extras={[{ key: 'superseded', label: t('lib.include_superseded'), group: 'fields', kind: 'bool', value: superseded ? '1' : '', set: (v) => setParams({ superseded: v ? 'true' : '' }) }]} />}
         extra={<PastedChip search={rows.data?.pages[0]?.search} />}
         count={<TableCount testid="lib-archive-count" noun="documents" total={counts?.total} filtered={counts?.filtered} active={active} onClear={() => setParams({ q: '', adv: '', superseded: '' })} />}
-        primary={<Tip text={t('lib.zip')}><button type="button" className="btn" data-testid="lib-archive-zip" aria-label={t('lib.zip')} disabled={zipping || !items.some((r) => r.file_id)} onClick={() => void zip()}><FileArchive size={16} /></button></Tip>}
+        primary={<Tip text={t('lib.zip')}><button type="button" className="btn" data-testid="lib-archive-zip" aria-label={t('lib.zip')} disabled={zipping || gate.exportLocked || !items.some((r) => r.file_id)} title={gate.note(gate.exportLocked)} onClick={() => void zip()}><FileArchive size={16} /></button></Tip>}
         columns={<ColumnMenu api={tbl} label={label} />}
         density={<DensityToggle api={tbl} />}
         display={<DisplayMenu api={tbl} />}
-        exporter={<Tip text={t('tstd.export_view')}><button type="button" className="btn" data-testid="lib-archive-export" aria-label={t('tstd.export_view')} onClick={() => void exportView()}><Download size={16} /></button></Tip>} />
+        exporter={<Tip text={t('tstd.export_view')}><button type="button" className="btn" data-testid="lib-archive-export" aria-label={t('tstd.export_view')} disabled={gate.exportLocked} title={gate.note(gate.exportLocked)} onClick={() => void exportView()}><Download size={16} /></button></Tip>} />
       <div className="card gx overflow-auto" {...displayAttrs(tbl.display)} data-testid="lib-archive-table" role="table" aria-label={title}>
         <div className="sticky top-0 z-20"><HeaderRow api={tbl} label={label} testid="lib-archive-head" /></div>
         <div role="rowgroup" style={{ minWidth: totalWidth(tbl.cols, false) }}>

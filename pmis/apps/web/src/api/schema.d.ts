@@ -6133,6 +6133,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/download-locks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The download lock categories, templates, uploaded files, generated documents (0.15.193)
+         * @description Every signed-in user may read it (the UI disables what is locked). `can_edit` is true for a System Admin only. All three are `false` until a System Admin turns one on.
+         */
+        get: operations["getDownloadLocks"];
+        /**
+         * Turn the download locks on or off (System Admin, reason, step-up, If-Match, audited) (0.15.193)
+         * @description System Admin only (403 `action_forbidden` otherwise, a delegate included). A reason (3+ characters), a step-up (401 `step_up_required`) and `If-Match` (428 / 412)
+         *     are required. Unknown keys and non-boolean values are 422. Saving the values already in force is 409 `invalid_transition`. Audited `download_locks_update`.
+         *     While a category is on, its route answers 403 `action_forbidden` with `errors[0].code` `download_locked`: `templates` (`GET /templates/{templateId}/download`),
+         *     `uploaded_files` (`GET /files/{id}/download`, which also feeds the on-screen preview and finished export files, and `GET /master-import/runs/{id}/file`), `generated_documents` (`GET /library/generated/{id}/download`, except
+         *     `purpose=view`). Reading and changing the locks is never locked.
+         */
+        put: operations["setDownloadLocks"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/security-locks": {
         parameters: {
             query?: never;
@@ -17195,6 +17223,27 @@ export interface components {
             animation: boolean;
             default_locale: ("en" | "ar") | null;
             support_links: components["schemas"]["SupportLink"][];
+        };
+        /** @description 0.15.193. The download lock categories (setting `security.download_locks`, migration 0293). */
+        DownloadLocks: {
+            /** @description true: the blank template download answers 403 `download_locked`. */
+            templates: boolean;
+            /** @description true: the single uploaded file download answers 403 `download_locked` (the on-screen preview uses the same route). */
+            uploaded_files: boolean;
+            /** @description true: a generated library document download or print answers 403 `download_locked` (`purpose=view` stays open). */
+            generated_documents: boolean;
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+            /** @description The ETag value. */
+            version: number;
+            /** @description A System Admin only. */
+            can_edit: boolean;
+        };
+        DownloadLocksInput: components["schemas"]["WithReason"] & {
+            templates: boolean;
+            uploaded_files: boolean;
+            generated_documents: boolean;
         };
         /** @description 0.15.190. The admin lock keys (setting `security.locks`, migration 0290). */
         SecurityLocks: {
@@ -31892,6 +31941,62 @@ export interface operations {
                 };
             };
             429: components["responses"]["TooManyRequests"];
+        };
+    };
+    getDownloadLocks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The download locks. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DownloadLocks"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setDownloadLocks: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DownloadLocksInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DownloadLocks"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
         };
     };
     getSecurityLocks: {

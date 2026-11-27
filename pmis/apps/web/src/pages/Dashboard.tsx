@@ -1,4 +1,5 @@
 import { Check, Download, Link2, MonitorPlay, PencilLine, Printer, RotateCcw } from "lucide-react";
+import { useDownloadGate } from '@/lib/downloadGate';
 import { useMemo, useState, type ReactNode, Fragment } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
@@ -532,6 +533,7 @@ function F13Panel({
 const DASH_VIEW_EMPTY = { region_id: "", cluster_code: "", scenario: "", stream: "", view: "" };
 
 export function Dashboard() {
+  const gate = useDownloadGate();
   const { t, i18n } = useTranslation();
   const ar = i18n.language === "ar";
   const [issuesBy, setIssuesBy] = useState<"owner" | "category" | "reason">("owner");
@@ -1292,6 +1294,8 @@ export function Dashboard() {
               <button
                 className="btn print:hidden"
                 data-testid="dash-print"
+                disabled={gate.exportLocked}
+                title={gate.note(gate.exportLocked)}
                 onClick={() => window.print()}
               >
                 <Printer size={16} />
