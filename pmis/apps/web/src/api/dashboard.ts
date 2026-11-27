@@ -74,6 +74,18 @@ export const useDashboardOps = (q: DashboardQuery, enabled = true) => {
   });
 };
 
+// ---------------------------------------------------------------- 0.7.2: the saved weekly Project Status snapshots (the S-curve card, dashboard proposals item 2)
+export type ProjectStatusSnapshot = S['ProjectStatusSnapshot'];
+type PageEnvelope = { page?: { limit: number; next_cursor: string | null; total?: number } };
+/** Read only. The frozen weekly values (actual %, planned %, plan index), never recomputed; needs `dashboard.view`. */
+export const useProjectStatusSnapshots = (enabled = true) =>
+  useQuery({
+    queryKey: ['project-status-snapshots'],
+    staleTime: 60_000,
+    enabled,
+    queryFn: () => api.get<PageEnvelope & { items?: ProjectStatusSnapshot[] }>('/project-status/snapshots'),
+  });
+
 // ---------------------------------------------------------------- 0.14.5: the site map (OV-12, SC-10)
 export type SiteMap = S['SiteMap'];
 export type SiteMapItem = S['SiteMapItem'];
