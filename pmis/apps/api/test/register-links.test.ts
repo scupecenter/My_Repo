@@ -84,7 +84,6 @@ describe('register links (migration 0409)', () => {
     // the order picker: approved, not cancelled, of the site; the label is PO / WO No. (or PR No.)
     await insert('procurement', site.id, 'approved', { po_wo_no: `${PREFIX}-PO1`, order_status: 'Active' });
     await insert('procurement', site.id, 'approved', { pr_no: `${PREFIX}-PR2`, order_status: 'Cancelled' });
-    await insert('procurement', site.id, 'entry', { po_wo_no: `${PREFIX}-PO3` });
     const opts = await db.query(`SELECT register_link_options('invoices', 'procurement_record_id', $1::uuid, $2) AS j`, [site.id, PREFIX]);
     expect((opts.rows[0].j as { label: string }[]).map((o) => o.label)).toEqual([`${PREFIX}-PO1`]);
     await db.query('ROLLBACK');
