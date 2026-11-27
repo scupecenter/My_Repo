@@ -30,12 +30,15 @@ test('walk: dashboard share link end to end', async ({ page }) => {
   // open the link: the banner names it and the dashboard renders
   await page.goto(new URL(url).pathname);
   await expect(page.getByTestId('shared-banner')).toBeVisible({ timeout: 15000 });
+  await expect(page.getByText('Loading...').first()).not.toBeVisible({ timeout: 20000 });
+  await page.waitForTimeout(800);
   await page.screenshot({ path: 'test-results/walk474-shared-en.png' });
 
   // Settings > Dashboard > Share links: the row shows, revoke works
   await page.goto('/admin/settings/screens/dashboard');
   const card = page.getByTestId('dsettings-shares');
   await expect(card).toBeVisible({ timeout: 15000 });
+  await card.scrollIntoViewIfNeeded();
   const table = page.getByTestId('dsettings-shares-table');
   await expect(table).toBeVisible();
   const row = table.locator('tr', { hasText: 'Weekly ops' }).first();
@@ -64,7 +67,9 @@ test('walk: dashboard share link end to end', async ({ page }) => {
   await page.waitForTimeout(400);
 
   await page.goto('/admin/settings/screens/dashboard');
-  await expect(page.getByTestId('dsettings-shares')).toBeVisible({ timeout: 15000 });
+  const cardAr = page.getByTestId('dsettings-shares');
+  await expect(cardAr).toBeVisible({ timeout: 15000 });
+  await cardAr.scrollIntoViewIfNeeded();
   await page.screenshot({ path: 'test-results/walk474-settings-ar.png' });
 
   // back to English for the next walk
