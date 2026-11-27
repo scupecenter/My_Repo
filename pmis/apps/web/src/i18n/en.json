@@ -2826,7 +2826,22 @@
     "done_enforce": "Two-factor is now enforced.",
     "done_unenforce": "Two-factor is no longer enforced."
   },
+  "exlog": {
+    "title": "Exports log",
+    "hint": "Every export you made, with its scope, state and how long the file can be downloaded. Scheduled exports appear here too.",
+    "schedule": "Scheduled export",
+    "whole": "Whole project",
+    "as_of": "as of",
+    "col_what": "Export",
+    "col_scope": "Scope",
+    "col_when": "When",
+    "col_status": "State",
+    "col_rows": "Rows",
+    "col_expires": "Download until"
+  },
   "tpl": {
+    "tab_templates": "Templates and uploads",
+    "tab_exports": "Exports",
     "title": "Templates and uploads",
     "subtitle": "Each register has one approved template, and the Site Master has one per stream and the whole Master. Download it, fill it, and upload the same file. Every row then goes through Entry and Review / Approve like a manual entry.",
     "catalogue": "Approved templates",
