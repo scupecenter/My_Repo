@@ -10,6 +10,7 @@ import {
   useResendEmailCode, useSelfDisableTwoFactor, useSelfEnrolConfirm, useSelfEnrolStart, useUpdateMyProfile, useVerifyEmailChange,
 } from '@/api/profile';
 import { errText } from '@/components/FormDialog';
+import { PushSection } from '@/components/PushSection';
 import { PageHeader } from '@/components/PageHeader';
 import { ErrorState, LoadingSkeleton } from '@/components/States';
 import { useToast } from '@/components/Toast';
@@ -67,6 +68,7 @@ export function Profile() {
         <PasswordSection p={p} />
         <TwoFactorSection p={p} />
         <MySessionsSection />
+        <PushSection />
       </div>
     </div>
   );

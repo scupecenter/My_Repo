@@ -31,6 +31,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.156 (2026-11-27): Web Push for field engineers (migration 0256; CHANGELOG WebPush). Additive. (1) `GET /me/push` (`getMyPush`): whether push is on for the server (`enabled`, `public_key`) and how many of the caller's browsers are subscribed. (2) `POST /me/push/subscribe` and `POST /me/push/unsubscribe`: own browsers only; subscribe answers 409 while the server has no VAPID keys. (3) `GET /admin/web-push` (`getAdminWebPush`, System Admin): on or off and the counts. The keys come only from the environment (VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT); with any missing push is off. The push carries no title or body, only a fixed notice that opens the inbox. The bell and the e-mail are unchanged.
     - 0.15.155 (2026-11-27): search inside uploaded document contents (migration 0255; CHANGELOG DocContentSearch). Additive. (1) `SearchHit` gains the optional `snippet` (documents group only): where the words were found inside the file, else null. (2) `GET /admin/document-search-index` (`getDocumentSearchIndex`): counts of indexed, empty, unsupported, too large, failed and pending files (System Admin). Text is extracted off the request path from clean-scan PDF and DOCX files and is visible only with the documents view right in the file's region.
     - 0.15.242 (2026-11-27): generic if/then alert rules, notifications only (migration 0342, mirror `db/sql/341_alert_rules.sql`; CHANGELOG AlertRules; item 13 of the 2026-11-27 PM-platforms research). Additive. A System Admin manages the rules in Settings: `GET /settings/alert-rules` (the rules plus the closed catalogues the form offers), `POST /settings/alert-rules`, `PUT /settings/alert-rules/{id}` (If-Match, a reason, audited `alert_rule_create`/`alert_rule_update`). A rule is a closed condition kind with closed params (`weekly_status_missing`: the regions without a Weekly status update of the current working week; `record_idle` `{register_key, state, days}`: the current records of the register in the state for at least days), a closed audience (`system_admin`, or `module` with a module key: the users whose assignment reaches the module) and a title/body template in English and Arabic with placeholders. The daily job fires the enabled rules: one in-app notification per recipient, deduped by (rule, period, target), in the recipient's language; a rule never changes a record, a state or a holder. `NotificationKind` gains `alert_rule` (in-app only).
     - 0.15.310 (2026-11-27): every register is downloadable (owner decision D48, 2026-11-27; no migration; CHANGELOG ExportAllRegisters). Additive. `GET /exports/parts` now also offers `car_dispatcher`, `financial_advances`, `incidents`, `lessons_learned` and `invoices`, and `POST /exports/master` accepts them in `parts` and as `view.source`; the 422 `not_in_master` of 0.15.34 is gone. Each writes its own sheet (Car Dispatcher, Financial Advances, Incidents, Lessons Learned, Invoices) with the register's template columns, header in row 1, no Master column. The rules are the other registers' rules: the export grant of the register's own module (no grant is seeded, so only a System Admin holds them until the owner grants them; Financial Advances and Invoices stay behind the finance grant), the export regions of that grant, voided rows left out of a full export, the field-level `in_export` switch and the personal-column rule. Settings and configuration are never exported. No schema change: `ExportPartKey` already listed the five keys.
@@ -352,6 +353,100 @@ tags:
     description: "Saved views of the list screens, shared with roles, groups, users or everyone (Q117), and the caller's server-side drafts (Q115)."
 
 paths:
+  /me/push:
+    get:
+      tags: [notifications]
+      operationId: getMyPush
+      summary: Web Push status of the caller (own browsers)
+      description: 0.15.156. `enabled` is false until the server has its VAPID keys. `this_browser` is true when the `endpoint` query matches one of the caller's subscriptions.
+      parameters:
+        - { name: endpoint, in: query, required: false, schema: { type: string, maxLength: 2048 } }
+      responses:
+        '200':
+          description: The status.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MyPush'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+  /me/push/subscribe:
+    post:
+      tags: [notifications]
+      operationId: subscribeMyPush
+      summary: Turn on Web Push for the caller's browser
+      description: 0.15.156. A browser that another person used is moved to the caller. 409 while push is not configured on the server.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [endpoint, keys]
+              properties:
+                endpoint: { type: string, format: uri, maxLength: 2048 }
+                keys:
+                  type: object
+                  additionalProperties: false
+                  required: [p256dh, auth]
+                  properties:
+                    p256dh: { type: string, minLength: 10, maxLength: 200 }
+                    auth: { type: string, minLength: 8, maxLength: 100 }
+                user_agent: { type: string, maxLength: 300 }
+      responses:
+        '200':
+          description: Subscribed.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, count]
+                properties:
+                  id: { type: string, format: uuid }
+                  count: { type: integer }
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /me/push/unsubscribe:
+    post:
+      tags: [notifications]
+      operationId: unsubscribeMyPush
+      summary: Turn off Web Push for the caller's browser
+      description: 0.15.156. Own rows only; an endpoint that is not the caller's removes nothing.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [endpoint]
+              properties:
+                endpoint: { type: string, format: uri, maxLength: 2048 }
+      responses:
+        '200':
+          description: Done.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [removed, count]
+                properties:
+                  removed: { type: integer }
+                  count: { type: integer }
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /admin/web-push:
+    get:
+      tags: [notifications]
+      operationId: getAdminWebPush
+      summary: Web Push on or off, with counts (System Admin)
+      description: 0.15.156. 403 for anyone but a System Admin.
+      responses:
+        '200':
+          description: The status.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AdminWebPush'}
   /admin/document-search-index:
     get:
       tags: [documents]
@@ -17534,6 +17629,24 @@ components:
           schema: { $ref: '#/components/schemas/TransitionResult' }
 
   schemas:
+    MyPush:
+      type: object
+      additionalProperties: false
+      required: [enabled, public_key, count, this_browser]
+      properties:
+        enabled: { type: boolean }
+        public_key: { type: [string, 'null'], description: 'The VAPID public key (public by design); null while push is off.' }
+        count: { type: integer }
+        this_browser: { type: boolean }
+    AdminWebPush:
+      type: object
+      additionalProperties: false
+      required: [enabled, subscriptions, users, last_pushed_at]
+      properties:
+        enabled: { type: boolean }
+        subscriptions: { type: integer }
+        users: { type: integer }
+        last_pushed_at: { type: [string, 'null'], format: date-time }
     ExportScheduleInput:
       type: object
       additionalProperties: false
