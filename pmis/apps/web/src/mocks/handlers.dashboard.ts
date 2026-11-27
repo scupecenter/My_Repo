@@ -155,6 +155,30 @@ export const dashboardHandlers = [
       },
     });
   }),
+  // 0.15.96: the follow-up sections (procurement and materials), synthetic figures
+  http.get(`${B}/dashboard/ops`, () => {
+    const g = guard(); if (g) return g;
+    if (!canUse()) return problem(403, 'module_forbidden', 'You cannot use dashboard');
+    return HttpResponse.json({
+      as_of: new Date().toISOString(), scope_regions: null,
+      procurement: {
+        available: true, open_total: 14,
+        pr_wait: { buckets: [{ key: 'd0_7', count: 2 }, { key: 'd8_14', count: 3 }, { key: 'd15_30', count: 1 }, { key: 'over_30', count: 1 }], total: 7, oldest_days: 41 },
+        po_wait: { buckets: [{ key: 'd0_7', count: 4 }, { key: 'd8_14', count: 2 }, { key: 'd15_30', count: 1 }, { key: 'over_30', count: 0 }], total: 7, oldest_days: 22 },
+        materials: {
+          available: true, receive_pct: 62.5, required_total: 800, dispatched_total: 500, sites_short: 3,
+          top_shortages: [
+            { site_id: '00000000-0000-4000-8000-000000000101', site_code: 'TR101', item_code: 'PWR-001', item_name: 'Rectifier module', missing: 4, required: 6, dispatched: 2, contractor: 'A&T Global' },
+            { site_id: '00000000-0000-4000-8000-000000000102', site_code: 'TR102', item_code: 'MW-014', item_name: 'ODU 7GHz', missing: 2, required: 4, dispatched: 2, contractor: 'A&T Global' },
+          ],
+          by_contractor: [
+            { party_id: '00000000-0000-4000-8000-000000000201', name: 'A&T Global', sites: 2, missing_lines: 2, missing_qty: 6 },
+            { party_id: null, name: '', sites: 1, missing_lines: 1, missing_qty: 3 },
+          ],
+        },
+      },
+    });
+  }),
   http.get(`${B}/dashboard/site-map`, () => {
     const g = guard(); if (g) return g;
     if (!canUse()) return problem(403, 'module_forbidden', 'You cannot use dashboard');
