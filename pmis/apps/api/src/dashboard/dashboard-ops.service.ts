@@ -4,6 +4,7 @@ import { AccessService } from "../access/access.service";
 import type { AuthContext } from "../auth/auth.types";
 import { Query } from "../common/query";
 import { DbService } from "../db/db.service";
+import { ContractorPerformanceService } from "../contractors/contractor-performance.service";
 import { FilterCatalogService } from "../views/filter-catalog.service";
 import { dashboardParams } from "./dashboard.service";
 import {
@@ -12,6 +13,7 @@ import {
   PTW_CHECK_KEYS,
   ptwCheckGaps,
   receivePct,
+  scorecardSummary,
 } from "./dashboard-ops.rules";
 
 interface OrderAges {
@@ -50,6 +52,9 @@ interface ShortageRow {
  *   - shortage: a warehouse site quantity with required over dispatched, on an active, not cancelled site.
  *   - contractor of a shortage line: the party of the site's newest open procurement order; lines of a site with no
  *     open order are unattributed. Amounts are not part of this section (no price is stored on a Procurement record).
+ *   - contractor scorecard (0.15.202, item 5): the aggregate of the contractor performance report — the counts per
+ *     level, the on-time rectification rate of snags, the average delay and the rejection (quality fail) rate, and
+ *     the five worst parties. No amounts. Needs contractors view, else available false.
  */
 @Injectable()
 export class DashboardOpsService {
@@ -57,6 +62,7 @@ export class DashboardOpsService {
     private readonly db: DbService,
     private readonly access: AccessService,
     private readonly filters: FilterCatalogService,
+    private readonly perf: ContractorPerformanceService,
   ) {}
 
   async get(_auth: AuthContext, q: Query): Promise<Record<string, unknown>> {
@@ -68,6 +74,7 @@ export class DashboardOpsService {
     const permitRegions = await this.access.regions("permits_hse", "view");
     const gecolRegions = await this.access.regions("gecol", "view");
     const hlcRegions = await this.access.regions("hlc", "view");
+    const contractorRegions = await this.access.regions("contractors", "view");
     const procScope = intersect(dash, procRegions);
     const whScope = intersect(dash, whRegions);
     const permitScope = intersect(dash, permitRegions);
@@ -78,6 +85,8 @@ export class DashboardOpsService {
     const permitsOk = permitRegions === null || permitRegions.length > 0;
     const gecolOk = gecolRegions === null || gecolRegions.length > 0;
     const hlcOk = hlcRegions === null || hlcRegions.length > 0;
+    const contractorsOk =
+      contractorRegions === null || contractorRegions.length > 0;
 
     const orders = procOk ? await this.ordersSection(procScope, p.region_id ?? null) : null;
     const adv = whOk ? await this.filters.fromQuery("dashboard", q) : null;
@@ -92,6 +101,9 @@ export class DashboardOpsService {
       : null;
     const hlc = hlcOk
       ? await this.hlcSection(hlcScope, p.region_id ?? null)
+      : null;
+    const score = contractorsOk
+      ? scorecardSummary((await this.perf.reportData()).items)
       : null;
 
     return {
@@ -144,6 +156,17 @@ export class DashboardOpsService {
           with_gaps: permits?.ptw.with_gaps ?? null,
           gaps: permits?.ptw.gaps ?? null,
         },
+      },
+      contractor_scorecard: {
+        available: contractorsOk,
+        parties: score?.parties ?? null,
+        by_level: score?.by_level ?? null,
+        avg_delay_days: score?.avg_delay_days ?? null,
+        on_time_pct: score?.on_time_pct ?? null,
+        quality_fail_pct: score?.quality_fail_pct ?? null,
+        snags: score?.snags ?? null,
+        quality: score?.quality ?? null,
+        worst: score?.worst ?? null,
       },
     };
   }
