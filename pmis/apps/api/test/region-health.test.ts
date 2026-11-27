@@ -8,16 +8,19 @@ import { actor, plainAdmin } from './wf-helpers';
 
 /**
  * Region health (contract 0.15.110, migration 0200; item 12 of the PM-platforms research). GET /status-updates/region-health: one row per visible
- * region, the current week's Weekly status update or the missing-update flag. Regions 6 and 7, as in x-status.
+ * region, the current week's Weekly status update or the missing-update flag. Regions 4 and 5: every CI file shares one throw-away database, and
+ * x-status (regions 6 and 7) and x-features (region 2) post current-week region updates of their own; 4 and 5 stay free (beforeAll sweeps them too).
  */
-const A = 6;
-const B = 7;
+const A = 4;
+const B = 5;
 let app: NestExpressApplication;
 let db: PgClient;
 
 beforeAll(async () => {
   app = await startApp();
   db = await superDb();
+  // A clean current week for the two regions, in case a seed or a parallel file ever writes one.
+  await db.query(`DELETE FROM status_updates WHERE region_id = ANY($1) AND week_start = public.cal_today() - extract(dow FROM public.cal_today())::int`, [[A, B]]);
 });
 afterAll(async () => {
   await db.end();
