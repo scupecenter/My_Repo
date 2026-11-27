@@ -28,6 +28,7 @@ const narrowSchema = z.object({
 const requestBody = z.object({
   reason: z.string().max(2000), confirm_text: confirm, parts: z.array(partCode).max(64).optional(),
   require_backup: z.boolean().optional(), no_backup_confirm: confirm.optional(), narrow: narrowSchema.optional(),
+  archive: z.enum(['none', 'download', 'keep_90']).optional(),
 }).strict();
 const idList = (n: number) => z.string().regex(/^[0-9a-f-]{1,36}(,[0-9a-f-]{1,36}){0,49}$/).transform((v) => v.split(',')).pipe(z.array(z.string()).max(n));
 const narrowQuery = z.object({
@@ -122,7 +123,7 @@ export class DataResetService {
     const requireBackup = b.require_backup ?? true;
     const narrow = b.narrow && Object.keys(b.narrow).length > 0 ? JSON.stringify(b.narrow) : null;
     return this.one(Prisma.sql`SELECT admin_data_reset_request(${b.reason}::text, ${b.confirm_text}::text, ${parts}::text[], ${requireBackup}::boolean,
-      ${b.no_backup_confirm ?? null}::text, ${narrow}::jsonb) AS r`);
+      ${b.no_backup_confirm ?? null}::text, ${narrow}::jsonb, ${b.archive ?? 'none'}::text) AS r`);
   }
 
   async approve(auth: AuthContext, rawId: string, ifMatch: string | undefined, raw: unknown): Promise<Json> {

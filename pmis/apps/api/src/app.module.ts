@@ -137,6 +137,7 @@ import { HistoricalWaiverController } from './settings/historical-waiver.control
 import { HistoricalWaiverService } from './settings/historical-waiver.service';
 import { DataResetController } from './settings/data-reset.controller';
 import { DataResetService } from './settings/data-reset.service';
+import { DataResetArchiveService } from './settings/data-reset-archive.service';
 import { MaintenanceService } from './settings/maintenance.service';
 import { SiteMasterController } from './site-master/site-master.controller';
 import { CustomFieldsController } from './custom-fields/custom-fields.controller';
@@ -272,7 +273,7 @@ export function appModuleFor(config: AppConfig) {
       AbsencesService, ReassignmentService, // 0.15.54 (migration 0140)
       DailyPlanService, // 0.15.67 (migration 0149)
       StaffRegistryService, // 0.15.56 (0142)
-      DataResetService, MaintenanceService, // 0.15.62 (0146)
+      DataResetService, DataResetArchiveService, MaintenanceService, // 0.15.62 (0146)
       LibraryMenuService, // 0.15.70 (0151, W5)
       DataHubService, // 0.15.311 (0400)
       DashboardCacheService, // short cache of the /dashboard figures (30 s, scope-keyed)

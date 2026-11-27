@@ -688,9 +688,35 @@ export class MasterExportService {
    * records the register list shows the caller (GET /registers/{key}/records: visibility, field rules, F3 filter), limited to the export regions; a
    * voided record is left out of a full or partial export. A view export keeps the list's own filters and the chosen columns in screen order.
    */
+  /**
+   * Contract 0.15.266 (migration 0368): the archive of a project data reset. One sheet per register on the CURRENT template (the sheet layout of the
+   * Master export, so the file can be uploaded again through the template), holding only the records the reset deletes, in every state. The caller
+   * runs it as the System Admin who makes the archive. Returns the rows per register.
+   */
+  async archiveRegisters(auth: AuthContext, filename: string, byRegister: Map<string, Set<string>>): Promise<SheetCount[]> {
+    const cat = await this.catalogue();
+    const regionNames = new Map((await this.db.tx.$queryRaw<{ id: number; name_en: string }[]>(Prisma.sql`SELECT id, name_en FROM regions`)).map((r) => [r.id, r.name_en]));
+    const wb = workbookWriter(filename);
+    const counts: SheetCount[] = [];
+    for (const [register, ids] of [...byRegister].sort((a, b) => a[0].localeCompare(b[0]))) {
+      const p = cat.find((c) => c.register === register);
+      if (!p) { counts.push({ sheet: register, part: register as PartKey, rows: 0 }); continue; }
+      counts.push(await this.registerSheet(wb, auth, p, null, regionNames, null, ids));
+    }
+    const about = new SheetWriter(wb.addWorksheet('Archive Info'));
+    const lines: [string, unknown][] = [['Archive of', 'project data reset'], ['Generated at', new Date().toISOString()],
+      ['Restore', 'Upload this file again through the template of each register: the rows enter L1 and then L2 as new data.'],
+      ...counts.map((c): [string, unknown] => [`Rows: ${c.sheet}`, c.rows])];
+    let n = 1;
+    for (const l of lines) about.write(n++, l, false);
+    await about.commit();
+    await wb.commit();
+    return counts;
+  }
+
   private async registerSheet(
     wb: ReturnType<typeof workbookWriter>, auth: AuthContext, p: PartInfo, regs: number[] | null, regionNames: Map<number, string>,
-    view: { filters: Record<string, unknown>; columns: string[] } | null,
+    view: { filters: Record<string, unknown>; columns: string[] } | null, only?: Set<string>,
   ): Promise<SheetCount> {
     const layout = await this.exportLayout(p);
     let columns: RegisterSheetColumn[] = layout.columns;
@@ -711,9 +737,10 @@ export class MasterExportService {
     const filters = view ? view.filters : {};
     for await (const items of this.pages((q) => this.registers.listRecords(auth, p.register as string, q), filters)) {
       for (const it of items) {
-        if (!view && it.state === 'voided') continue;
+        if (only && !only.has(String(it.entity_id))) continue;   // the archive of a reset: only the records it deletes, every state
+        if (!view && !only && it.state === 'voided') continue;
         const region = it.region_id === null || it.region_id === undefined ? null : Number(it.region_id);
-        if (regs !== null && region !== null && !regs.includes(region)) continue;
+        if (!only && regs !== null && region !== null && !regs.includes(region)) continue;
         const data = (it.data ?? {}) as Record<string, unknown>;
         const cust = (it.custom ?? {}) as Record<string, unknown>;
         sheet.write(n++, columns.map((c) => {
