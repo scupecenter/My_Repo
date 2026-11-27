@@ -3269,6 +3269,27 @@
       "draft_factor": "Draft",
       "draft_note": "A factor marked draft is not yet approved by the owner."
     },
+    "pst": {
+      "title": "Project Status detail",
+      "hint": "{{a}} activities, {{n}} items. Open a row to see its items.",
+      "expand": "Expand all",
+      "collapse": "Collapse all",
+      "expand_hint": "Open the items of every activity",
+      "collapse_hint": "Hide the items of every activity",
+      "col_name": "Activity / item",
+      "col_progress": "Progress",
+      "col_weight": "Weight",
+      "col_sites": "Sites done / in scope",
+      "progress_hint": "Weighted progress of the activity, or progress of the item",
+      "weight_hint": "Share of the project figure (items: share of the activity)",
+      "sites_hint": "Sites that finished the work out of the sites it applies to",
+      "open_row": "Show the {{n}} items",
+      "close_row": "Hide the {{n}} items",
+      "reason_not_weighted": "Not weighted in this set",
+      "reason_no_data": "No data yet",
+      "reason_central_hidden": "Project-wide item, outside this view",
+      "reason_not_applicable": "Does not apply here"
+    },
     "ps": {
       "title": "Project Status by activity",
       "no_data": "no data yet",

@@ -40,6 +40,7 @@ import {
   signed,
 } from "./dashboardBits";
 import { OpsProcurementCard } from "./dashboardOps";
+import { PsDetailTable } from "./dashboardPsTable";
 import { OpsScurveCard } from "./dashboardScurve";
 import { OpsPermitsCard } from "./dashboardPermits";
 import { OpsReadinessCard } from "./dashboardReadiness";
@@ -1957,6 +1958,13 @@ export function Dashboard() {
                       </ul>
                     </Card>
                   </div>
+                </>
+              ),
+
+              ps_detail: (
+                <>
+                  {/* 0.15.209: the compact A1..A8 table, the items of each heading hidden until opened */}
+                  <PsDetailTable activities={ps?.activities} />
                 </>
               ),
 
