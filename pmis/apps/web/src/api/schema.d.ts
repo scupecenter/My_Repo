@@ -16990,6 +16990,16 @@ export interface components {
             width: "narrow" | "medium" | "wide";
             show_tabs: boolean;
         };
+        /** @description 0.15.262. The unsaved-changes guard: the master switch and one switch per area. */
+        UiUnsavedGuard: {
+            enabled: boolean;
+            settings: boolean;
+            dialogs: boolean;
+            drawers: boolean;
+            inline: boolean;
+            composers: boolean;
+            navigation: boolean;
+        };
         /** @description 0.15.185. The sections of the interface features setting; every section is complete. */
         UiFeatures: {
             avatars: components["schemas"]["UiAvatars"];
@@ -16997,6 +17007,7 @@ export interface components {
             inbox: components["schemas"]["UiInbox"];
             data_hub: components["schemas"]["UiDataHub"];
             panel: components["schemas"]["UiPanel"];
+            unsaved_guard: components["schemas"]["UiUnsavedGuard"];
         };
         UiFeaturesPatch: {
             avatars?: components["schemas"]["UiAvatars"];
@@ -17004,6 +17015,7 @@ export interface components {
             inbox?: components["schemas"]["UiInbox"];
             data_hub?: components["schemas"]["UiDataHub"];
             panel?: components["schemas"]["UiPanel"];
+            unsaved_guard?: components["schemas"]["UiUnsavedGuard"];
         };
         UiFeaturesSetting: {
             sections: components["schemas"]["UiFeatures"];

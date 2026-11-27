@@ -1392,6 +1392,10 @@ export const settingsHandlers = [
         for (const k of Object.keys(o)) if (!['mode', 'width', 'show_tabs'].includes(k)) errs.push({ path: `${path}/${k}`, code: 'unknown_key' });
         oneOf(o, path, 'mode', ['popover', 'side_panel']); oneOf(o, path, 'width', ['narrow', 'medium', 'wide']);
         if (typeof o.show_tabs !== 'boolean') errs.push({ path: `${path}/show_tabs`, code: 'invalid' });
+      } else if (name === 'unsaved_guard') {
+        const keys = ['enabled', 'settings', 'dialogs', 'drawers', 'inline', 'composers', 'navigation'];
+        for (const k of Object.keys(o)) if (!keys.includes(k)) errs.push({ path: `${path}/${k}`, code: 'unknown_key' });
+        for (const k of keys) if (typeof o[k] !== 'boolean') errs.push({ path: `${path}/${k}`, code: o[k] === undefined ? 'required' : 'invalid' });
       } else if (name === 'data_hub') {
         for (const k of Object.keys(o)) if (!['widgets', 'badge', 'default_view'].includes(k)) errs.push({ path: `${path}/${k}`, code: 'unknown_key' });
         if (typeof o.badge !== 'boolean') errs.push({ path: `${path}/badge`, code: 'invalid' });
