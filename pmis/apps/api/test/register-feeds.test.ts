@@ -214,6 +214,20 @@ describe('Q225: a site field that changes rules goes through Change Control', ()
   });
 });
 
+describe('site code references (0323)', () => {
+  it('RF & Design backup_site must be another existing site; a risk lists existing site codes; an unchanged old value is never blocked', async () => {
+    const t = await team(app, db, 'rf_design', 'rf_design', R);
+    const bad = await t.entry.api.call('post', recPath('rf_design'), { site_id: t.site.id, data: { backup_site: `NOPE-${U}` } });
+    expect(bad.status, JSON.stringify(bad.body)).toBe(422);
+    expect(JSON.stringify(bad.body)).toContain('unknown_site');
+    const self = await t.entry.api.call('post', recPath('rf_design'), { site_id: t.site.id, data: { backup_site: t.site.code } });
+    expect(self.status, JSON.stringify(self.body)).toBe(422);
+    expect(JSON.stringify(self.body)).toContain('self_link');
+    const na = await t.entry.api.call('post', recPath('rf_design'), { site_id: t.site.id, data: { backup_site: 'N/A' } });
+    expect(na.status, JSON.stringify(na.body)).toBe(201);
+  });
+});
+
 describe('Issue to Risk link (0322)', () => {
   it('an issue names a risk the caller may see; a made-up or malformed id is refused; the pickers answer', async () => {
     const t = await team(app, db, 'issues', 'issues', R);
