@@ -106,7 +106,7 @@ export function DailyPlan() {
 
   return (
     <div className="space-y-3" data-testid="page-daily-plan">
-      <PageHeader title={t('dailyPlan.title')} subtitle={t('dailyPlan.subtitle')} testid="daily-plan-header"
+      <PageHeader title={t('dailyPlan.title')} subtitle={t('dailyPlan.subtitle')} testid="daily-plan-header" settings="daily_plan"
         context={canOpenSettings(me.data) ? <Link to="/admin/settings/my-work/daily-plan" className="btn px-2 py-1 text-xs" data-testid="daily-plan-settings-link"><Settings size={14} aria-hidden />{t('dailyPlan.settings')}</Link> : undefined} />
 
       <div className="flex flex-wrap items-center gap-2">

@@ -351,6 +351,8 @@
     "unavailable": "Card unavailable"
   },
   "errors": {
+    "export_locked": "Export is switched off by a System Admin (Settings > Security > Lock keys).",
+    "download_locked": "This download is switched off by a System Admin (Settings > Security > Lock keys).",
     "system_field": "This column is protected: only its name, section, order and visibility can change.",
     "conversion_blocked": "Some values cannot be converted. Fix them first.",
     "conversion_unconfirmed": "Confirm the conversion of the stored values.",
@@ -431,6 +433,11 @@
     "carry_locked": "Day locked or no edit right",
     "carry_do": "Carry over ({{n}})",
     "carried": "{{n}} sites carried over"
+  },
+  "panel": {
+    "tab_all": "All",
+    "tab_unread": "Unread",
+    "tab_priority": "Priority"
   },
   "common": {
     "search": "Search",
@@ -1179,6 +1186,7 @@
     "section_sla_dlp": "DLP months",
     "section_registers_columns": "Register columns",
     "section_registers_contractors": "Contractor rules",
+    "section_registers_derive": "Derived values (between registers)",
     "section_registers_gecol": "GECOL order warnings",
     "section_registers_issue-map": "Issue category by task",
     "section_registers_team-scope": "Team / scope match",
@@ -4811,7 +4819,10 @@
       "snag_raised": "A snag was raised",
       "team_safety_cert": "A team safety certificate expires",
       "mfa_exemption": "Your MFA exemption was granted or revoked (always mailed)",
-      "assignment_request": "A user asks for an assignment (always mailed)"
+      "assignment_request": "A user asks for an assignment (always mailed)",
+      "expiry_radar": "Expiry radar: documents about to expire",
+      "approval_digest": "Daily digest of what waits for your approval",
+      "weekly_digest": "Weekly digest"
     }
   },
   "dashSettings": {
@@ -4837,6 +4848,22 @@
     "move_up": "Move {{name}} up",
     "move_down": "Move {{name}} down",
     "invalid": "Every KPI needs a green and an amber value, and green must be better than amber for that KPI's direction."
+  },
+  "deriveRules": {
+    "title": "Derived values between registers",
+    "note": "A register can show a value taken from another register (for example the contractor of a GECOL record from Procurement). Only the configured value is shown, never the source record. It is computed when the record is read and is not stored. People who may see the target record see the value even without access to the source register. Each rule is audited when it is read.",
+    "enabled": "On",
+    "target": "Shown in",
+    "output": "Name",
+    "source_register": "Taken from",
+    "source": "Value",
+    "source_party": "The company of the source record",
+    "link": "Link field in the target record",
+    "site_fallback": "When the link is empty, use the latest approved record of the same site",
+    "link_none": "Match by site only",
+    "add": "Add a rule",
+    "remove": "Remove",
+    "key": "Rule code"
   },
   "gecolOrder": {
     "title": "GECOL order warnings",
@@ -5887,7 +5914,21 @@
     "on": "on",
     "off_word": "off"
   },
+  "dllocks": {
+    "title": "Download locks",
+    "note": "Three more switches for a System Admin, off until you turn one on. Nothing is deleted and no sign-in changes. You can turn a lock off again at any time.",
+    "templates": "Lock template downloads",
+    "templates_note": "The blank and pre-filled workbook templates cannot be downloaded.",
+    "files": "Lock uploaded file downloads",
+    "files_note": "A single uploaded document or finished export file cannot be downloaded or previewed on screen, and the Master import original file cannot be downloaded.",
+    "generated": "Lock generated document downloads",
+    "generated_note": "A generated library form cannot be downloaded or printed. Viewing it on screen stays open.",
+    "never": "Never changed: all three are off.",
+    "confirm": "Templates: {{templates}}. Uploaded files: {{files}}. Generated documents: {{generated}}. Your password is asked again and the change is written to the audit log.",
+    "locked_note": "Switched off by a System Admin (Settings > Security > Lock keys)."
+  },
   "seclocks": {
+    "export_ui_note": "Files the browser builds itself (CSV from the rows on screen, print) are switched off in the screens too. That part is a guard in the interface only: data already on screen can still be copied.",
     "title": "Lock keys",
     "note": "Two switches for a System Admin. Both are off until you turn one on. Nothing is deleted and no sign-in changes. You can turn a lock off again at any time.",
     "sharing": "Block public sharing",
@@ -7110,7 +7151,17 @@
     "inbox_tabs": "Show tabs on the Inbox page",
     "inbox_default_tab": "Tab that opens first",
     "inbox_priority_kinds": "Kinds that count as priority",
-    "inbox_priority_note": "Mentions and approvals waiting are priority by default."
+    "inbox_priority_note": "Mentions and approvals waiting are priority by default.",
+    "panel_title": "Notification panel",
+    "panel_note": "How the bell opens: a small popover, or a panel that slides in from the side with tabs.",
+    "panel_mode": "Bell opens",
+    "panel_mode_popover": "Small popover",
+    "panel_mode_side_panel": "Side panel",
+    "panel_width": "Panel width",
+    "panel_width_narrow": "Narrow",
+    "panel_width_medium": "Medium",
+    "panel_width_wide": "Wide",
+    "panel_tabs": "Show the tabs (All, Unread, Priority) in the panel"
   },
   "related": {
     "change_pending": "Change pending",
@@ -7258,5 +7309,21 @@
   },
   "cells": {
     "progress": "Progress"
+  },
+  "screenSettings": {
+    "title": "Settings for this screen"
+  },
+  "mailPolicy": {
+    "title": "Mail policy",
+    "note": "Who may be mailed. Notification mail goes to the person only for the kinds listed below in Mail notification kinds. Outside addresses stay off until you switch them on here.",
+    "lock": "The security lock that blocks public sharing is on: no mail goes to outside addresses while it is on.",
+    "enabled": "Notification mail is on (off stops all of it except security alerts)",
+    "mode": "Recipients",
+    "internal_only": "Internal only",
+    "internal_external": "Internal and external",
+    "inherit": "Same as above",
+    "domains": "Internal domains (comma separated)",
+    "domains_note": "An address whose domain is not listed is external. With no domain listed every address counts as internal.",
+    "confirm_note": "The change is audited and applies to the next mail."
   }
 }

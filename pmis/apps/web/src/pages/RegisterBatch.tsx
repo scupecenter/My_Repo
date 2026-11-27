@@ -18,6 +18,7 @@ import { useMe } from '@/api/hooks';
 import { isAdmin } from '@/lib/perm';
 import { registerErrorMessage } from '@/lib/registerErrors';
 import { ImportSitesPanel } from '@/components/WorkflowLocks';
+import { ScreenSettingsLink } from '@/components/ScreenSettingsLink';
 
 
 const ACTION_TONE: Record<string, string> = { create: 'bg-doneBg text-doneInk', update: 'bg-openBg text-openInk', unchanged: 'bg-lockBg text-lockInk', error: 'bg-lateBg text-lateInk' };
@@ -153,6 +154,7 @@ export function RegisterBatch() {
     <div data-testid="page-register-batch" data-status={b?.status}>
       <div className="mb-3 flex flex-wrap items-center gap-3">
         <div className="flex-1"><h1 className="text-2xl font-bold">{t('batch.title', { name })}</h1><p className="text-mute">{b?.file_name} {b && `· ${b.template_id} v${b.template_version}`}</p></div>
+        <ScreenSettingsLink screen="batch" />
         {back}
       </div>
       {!b ? <><p className="mb-2 text-mute" data-testid="batch-parsing">{t('batch.parsing')}</p><BatchSkeleton /></> : (

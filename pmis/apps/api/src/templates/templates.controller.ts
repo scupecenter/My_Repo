@@ -1,3 +1,4 @@
+import { ExportAction } from '../security/export-lock';
 import { Body, Controller, Get, Headers, HttpCode, Param, Post, Query, Req, Res, StreamableFile, UploadedFile as Upload, UseInterceptors } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { createHash } from 'node:crypto';
@@ -37,6 +38,7 @@ export class TemplatesController {
     return this.templates.changes(auth, templateId, n(from), n(to));
   }
 
+  @ExportAction({ category: 'templates' })
   @Get(':templateId/download')
   async download(
     @Auth() auth: AuthContext, @Param('templateId') templateId: string, @Query() q: Record<string, unknown>, @Req() req: Request, @Res({ passthrough: true }) res: Response,

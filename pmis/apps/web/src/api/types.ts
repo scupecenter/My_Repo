@@ -104,6 +104,7 @@ export type ImportsSettings = S['ImportsSettings'];
 export type TemplateChangeNotice = S['TemplateChangeNotice'];
 export type NavLayoutSetting = S['NavLayoutSetting'];
 export type SecurityLocks = S['SecurityLocks'];
+export type DownloadLocks = S['DownloadLocks'];
 export type SupportAccessSetting = S['SupportAccessSetting'];
 export type NewDeviceCodeSetting = S['NewDeviceCodeSetting'];
 export type UiIdentity = S['UiIdentity'];

@@ -534,26 +534,12 @@ export class RegistersService {
     const parties = partyIds.length
       ? await this.db.tx.$queryRaw<{ id: string; name: string; type: string }[]>(Prisma.sql`SELECT id::text AS id, name, type::text AS type FROM external_parties WHERE id = ANY(${partyIds}::uuid[])`)
       : [];
-    // 0.15.89: the Contractor shown on a GECOL / HLC record comes from Procurement by Site ID (read only, never written to the record):
-    // the Procurement record an HLC record links to, else the latest approved Procurement record of the site that names a company.
-    const procSites = [...new Set(rows.filter((r) => (r.register_key === 'gecol' || r.register_key === 'hlc') && r.site_id).map((r) => r.site_id as string))];
-    const procLinked = [...new Set(rows.filter((r) => r.register_key === 'hlc' && typeof r.data?.procurement_record_id === 'string').map((r) => r.data.procurement_record_id as string))].filter((x) => uuidSchema.safeParse(x).success);
-    const procBySite = new Map<string, { id: string; name: string; type: string }>();
-    const procById = new Map<string, { id: string; name: string; type: string }>();
-    if (procSites.length || procLinked.length) {
-      const pr = await this.db.tx.$queryRaw<{ rid: string; site_id: string | null; id: string; name: string; type: string; linked: boolean }[]>(Prisma.sql`
-        SELECT DISTINCT ON (r.id) r.id::text AS rid, r.site_id::text AS site_id, p.id::text AS id, p.name, p.type::text AS type, (r.id = ANY(${procLinked}::uuid[])) AS linked
-        FROM register_records r JOIN external_parties p ON p.id = r.external_party_id
-        WHERE r.register_key = 'procurement' AND r.is_current AND r.state = 'approved'
-          AND (r.site_id = ANY(${procSites}::uuid[]) OR r.id = ANY(${procLinked}::uuid[]))
-        ORDER BY r.id`);
-      const latest = await this.db.tx.$queryRaw<{ rid: string }[]>(Prisma.sql`
-        SELECT DISTINCT ON (r.site_id) r.id::text AS rid FROM register_records r
-        WHERE r.register_key = 'procurement' AND r.is_current AND r.state = 'approved' AND r.external_party_id IS NOT NULL AND r.site_id = ANY(${procSites}::uuid[])
-        ORDER BY r.site_id, r.approved_at DESC NULLS LAST, r.id`);
-      const by = new Map(pr.map((x) => [x.rid, x]));
-      for (const x of pr) procById.set(x.rid, { id: x.id, name: x.name, type: x.type });
-      for (const l of latest) { const x = by.get(l.rid); if (x?.site_id) procBySite.set(x.site_id, { id: x.id, name: x.name, type: x.type }); }
+    // 0363: cross-register derive. The values a register shows from ANOTHER register (the setting derive.rules; GECOL and HLC contractor from Procurement are the seeded rules),
+    // read through derive_values(): only the configured value of the matching source record, never the record. Computed on read, not stored, audited by the function.
+    const derivedBy = new Map<string, Record<string, unknown>>();
+    if (rows.length) {
+      const dv = await this.db.tx.$queryRaw<{ j: Record<string, Record<string, unknown>> | null }[]>(Prisma.sql`SELECT derive_values(${rows.map((r) => r.id)}::uuid[]) AS j`);
+      for (const [id, o] of Object.entries(dv[0]?.j ?? {})) derivedBy.set(id, o);
     }
     const byCell = new Map<string, MatrixAssigneeDto[]>();
     for (const a of assignees) {
@@ -641,10 +627,10 @@ export class RegistersService {
       // 0063 (Q150): the HLC purchase requests the record covers, and whether all are approved by HLC (C3)
       if (r.purchase_requests) dto.purchase_requests = r.purchase_requests;
       if (party) dto.external_party = party;
-      if (r.register_key === 'gecol' || r.register_key === 'hlc') {
-        const linked = typeof r.data?.procurement_record_id === 'string' ? procById.get(r.data.procurement_record_id) : undefined;
-        const pc = linked ?? (r.site_id ? procBySite.get(r.site_id) : undefined);
-        if (pc) dto.procurement_contractor = pc;
+      const derived = derivedBy.get(r.id);
+      if (derived) {
+        dto.derived = derived;
+        if (derived.procurement_contractor && (r.register_key === 'gecol' || r.register_key === 'hlc')) dto.procurement_contractor = derived.procurement_contractor;   // kept for the web screens of 0.15.90
       }
       if (r.created_by && refs.get(r.created_by)) dto.created_by = refs.get(r.created_by);
       if (r.approved_by && refs.get(r.approved_by)) dto.approved_by = refs.get(r.approved_by);
