@@ -6012,6 +6012,97 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/support-access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The support access setting (System Admin only) (0.15.191)
+         * @description System Admin only (403 `action_forbidden` otherwise). `enabled` is `false` until a System Admin turns it on. `modules` lists the modules a support grant may touch.
+         */
+        get: operations["getSupportAccess"];
+        /**
+         * Turn support access on or off and set its limits (System Admin, reason, step-up, If-Match, audited) (0.15.191)
+         * @description System Admin only. A reason (3+ characters), a step-up (401 `step_up_required`) and `If-Match` (428 / 412) are required. `max_hours` is 1 to 168, `default_hours` is 1 to `max_hours`.
+         *     Saving the values already in force is 409 `invalid_transition`. Audited `support_access_update` with before and after. Turning it off does not revoke grants already made.
+         */
+        put: operations["setSupportAccess"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/support-access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The support grants, newest first, with their state (System Admin only) (0.15.191)
+         * @description A support grant is a delegation whose reason starts with `[support-access] `. `state` is active, expired (by itself at `valid_to`) or revoked. At most 200.
+         */
+        get: operations["listSupportAccess"];
+        put?: never;
+        /**
+         * Give a user a few write rights for a limited time (System Admin, step-up, reason, rate limited) (0.15.191)
+         * @description System Admin only. Refused (409 `invalid_transition`) while support access is off. Creates an ordinary delegation (`idm_delegate`) with an expiry of now plus `hours` (default
+         *     `default_hours`, at most `max_hours`), no re-delegation and all regions. `rights` are from `templates.edit`, `fields.edit`, `documents.edit`, `warehouse.items.edit` (anything else is 422).
+         *     The target must be an active user other than the caller (422). At most 10 grants a minute (429 `rate_limited`). Audited as `delegation_created` with the reason prefixed `[support-access] `.
+         */
+        post: operations["grantSupportAccess"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/support-access/{delegation_id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * End one support grant now (System Admin, step-up, reason) (0.15.191)
+         * @description 404 for a delegation that is not a support grant, 409 `invalid_transition` when it is already revoked. Audited as `delegation_revoked`.
+         */
+        post: operations["revokeSupportAccess"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/support-access/revoke-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * End every support grant still in force (System Admin, step-up, reason) (0.15.191)
+         * @description Returns how many were ended. Expired and already revoked grants and ordinary delegations are not touched.
+         */
+        post: operations["revokeAllSupportAccess"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/historical-waiver": {
         parameters: {
             query?: never;
@@ -16658,6 +16749,33 @@ export interface components {
         SecurityLocksInput: components["schemas"]["WithReason"] & {
             block_public_sharing: boolean;
             disable_export: boolean;
+        };
+        /** @description 0.15.191. The support access setting (`security.support_access`, migration 0291). */
+        SupportAccessSetting: {
+            /** @description false until a System Admin turns it on. */
+            enabled: boolean;
+            max_hours: number;
+            default_hours: number;
+            /** @description The modules a support grant may touch. */
+            modules: string[];
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+            /** @description The ETag value. */
+            version: number;
+            can_edit: boolean;
+        };
+        SupportAccessSettingInput: components["schemas"]["WithReason"] & {
+            enabled: boolean;
+            max_hours: number;
+            default_hours: number;
+        };
+        SupportAccessGrantInput: components["schemas"]["WithReason"] & {
+            /** Format: uuid */
+            to_user_id: string;
+            rights: ("templates.edit" | "fields.edit" | "documents.edit" | "warehouse.items.edit")[];
+            /** @description Omitted = default_hours. */
+            hours?: number;
         };
         /** @description 0.15.1. The shared order of the side menu (setting `nav.layout`). */
         NavLayout: {
@@ -30952,6 +31070,176 @@ export interface operations {
             412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getSupportAccess: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The setting. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupportAccessSetting"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setSupportAccess: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SupportAccessSettingInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupportAccessSetting"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    listSupportAccess: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Support grants. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["Delegation"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    grantSupportAccess: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SupportAccessGrantInput"];
+            };
+        };
+        responses: {
+            /** @description Granted. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Delegation"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    revokeSupportAccess: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                delegation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"];
+            };
+        };
+        responses: {
+            /** @description Revoked. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Delegation"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    revokeAllSupportAccess: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"];
+            };
+        };
+        responses: {
+            /** @description Done. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        revoked: number;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     getHistoricalWaiver: {
