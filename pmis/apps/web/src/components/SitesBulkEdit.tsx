@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { saveSiteMasterCell, type SiteMasterMenuItem } from '@/api/siteMaster';
 import { errText } from '@/components/FormDialog';
 import { anyMissingParent, columnKind, columnOptions, editableOrds, planBulk, runBulk, SKIP_REASONS, toValue, type BulkOutcome, type BulkPlan, type BulkRow } from '@/lib/siteBulkEdit';
+import { DateInput } from '@/components/DateInput';
 
 type Phase = 'form' | 'running' | 'done';
 
@@ -78,7 +79,9 @@ export function SitesBulkEdit({ menu, rows, onClose, onRefresh }: { menu: SiteMa
                           {kind === 'boolean' ? <><option value="true">{t('common.yes')}</option><option value="false">{t('common.no')}</option></> : options.map((o) => <option key={o.value} value={o.value}>{label(o)}</option>)}
                         </select>
                       ) : (
-                        <input id="bulk-edit-value" data-testid="bulk-edit-value" data-input={kind} type={kind} step={kind === 'number' ? 'any' : undefined} className="input w-full" value={draft} onChange={(e) => setDraft(e.target.value)} />
+                        kind === 'date'
+                          ? <DateInput id="bulk-edit-value" data-testid="bulk-edit-value" data-input={kind} className="input w-full" value={draft} onChange={(e) => setDraft(e.target.value)} />
+                          : <input id="bulk-edit-value" data-testid="bulk-edit-value" data-input={kind} type={kind} step={kind === 'number' ? 'any' : undefined} className="input w-full" value={draft} onChange={(e) => setDraft(e.target.value)} />
                       )}
                       {kind === 'list' && anyMissingParent(rows, ord) && <p className="mt-1 text-xs text-mute" data-testid="bulk-edit-parent-hint">{t('sites.wide_bulk_pick_parent')}</p>}
                       </>}
