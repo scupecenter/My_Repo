@@ -106,7 +106,7 @@ export function RegisterWide({ pending, def, records, admin, regionName, onOpen,
   const lang = i18n.language;
   const key = def.register_key;
   const record = t('regviews.group_record'), flow = t('regviews.group_workflow');
-  const section = (f: RegisterField) => t(`regSections.${sectionIdOf(f.section)}`, { defaultValue: f.section ?? t('regSections.details') });
+  const section = (f: RegisterField) => t(`regSections.${sectionIdOf(f.section)}`, { defaultValue: (lang === 'ar' && f.section_ar) || f.section || t('regSections.details') });
   const fields = def.fields;
   const cols: WideColumn[] = [
     { key: 'region', header: t('sites.region'), top: record, minWidth: 120 },

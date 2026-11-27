@@ -15,6 +15,7 @@ import { oneParam } from '../common/query';
 import { parse, uuidSchema } from '../common/zod';
 import { DbService } from '../db/db.service';
 import { StorageService, newObjectKey } from '../documents/storage.service';
+import { SiteLocksService } from '../sites/site-locks.service';
 import { TaskViewService } from '../workflow/task-view.service';
 import { ImportJobsService } from '../templates/import-jobs.service';
 import { UPLOAD_ASYNC_FACTOR } from '../templates/import.service';
@@ -23,6 +24,7 @@ import type { UploadedFile } from '../templates/upload.interceptor';
 import { guardXlsx, normalizeSpreadsheetPrefixes } from '../templates/xlsx-guard';
 import { OoxmlError, OoxmlWorkbook, SheetCell, masterHeaders } from './ooxml-reader';
 import { RegisterSheets, RegisterTemplate, loadRegisterMaps, readRegisterSheets, registerSheetNames } from './register-sheets';
+import { limit } from '../ops/ops-limits';
 
 /**
  * Q1 and Q211: the admin-only legacy import of the real Site Master (no `_tpl`) and the comparison report of the parallel run.
@@ -35,7 +37,6 @@ export type LegacyRejectReason = 'not_xlsx' | 'macros_not_allowed' | 'size_or_ro
 
 const DIFF_KINDS = ['diff', 'missing_in_pmis', 'missing_in_master', 'exception'];
 const RESOLUTIONS = ['open', 'pmis_correct', 'master_correct', 'fixed', 'ignored'];
-const MAX_ROWS = 5000;
 
 const applyBody = z.object({
   mode: z.enum(['submit', 'draft']), reason: z.string().trim().min(3).max(2000),
@@ -88,7 +89,14 @@ export class MasterImportService {
     private readonly storage: StorageService,
     private readonly view: TaskViewService,
     private readonly jobs: ImportJobsService,
+    private readonly locks: SiteLocksService,
   ) {}
+
+  /** The upload policy in force (imports.upload_policy, migration 0492): enforce or accept_incomplete; anything else reads as enforce. */
+  private async uploadPolicy(): Promise<'enforce' | 'accept_incomplete'> {
+    const r = await this.db.tx.$queryRaw<{ p: string }[]>(Prisma.sql`SELECT imports_upload_policy_json() ->> 'policy' AS p`);
+    return r[0]?.p === 'accept_incomplete' ? 'accept_incomplete' : 'enforce';
+  }
 
   private async canUse(): Promise<boolean> {
     const r = await this.db.tx.$queryRaw<{ ok: boolean }[]>(Prisma.sql`SELECT mi_can_use() AS ok`);
@@ -126,7 +134,7 @@ export class MasterImportService {
     if (wb.sheetNames.includes(TPL_SHEET)) {
       return this.reject(auth, requestId, 'is_pmis_template', 'This file is a template issued by GSDN Workspace (it has the _tpl sheet): upload it on the Templates page. The legacy path is for the real Master only.', ctx);
     }
-    const master = wb.sheet('Master', MAX_ROWS + 10);
+    const master = wb.sheet('Master', limit('master_import.max_rows') + 10);
     const headers = master ? masterHeaders(master) : [];
     const rows: { row_no: number; cells: Record<string, SheetCell> }[] = [];
     if (master) {
@@ -134,7 +142,7 @@ export class MasterImportService {
         if (n <= 3) continue;
         // a row holds data when one of its cells is typed (the formula rows of an empty Master are skipped)
         if (![...cells.values()].some((c) => !c.f && c.v !== null)) continue;
-        if (rows.length >= MAX_ROWS) return this.reject(auth, requestId, 'size_or_rows_exceeded', `The Master sheet has more than ${MAX_ROWS} rows.`, ctx);
+        if (rows.length >= limit('master_import.max_rows')) return this.reject(auth, requestId, 'size_or_rows_exceeded', `The Master sheet has more than ${limit('master_import.max_rows')} rows.`, ctx);
         const out: Record<string, SheetCell> = {};
         for (const [L, c] of cells) if (c.v !== null && c.v !== '' && !c.e) out[L] = c;
         rows.push({ row_no: n, cells: out });
@@ -382,6 +390,12 @@ export class MasterImportService {
       if (!offer.allowed) throw problems.forbidden('action_forbidden', offer.reason ?? 'You may not create sites from the Master.');
       await this.stepUp.require(auth);
     }
+    // D49 part 3 (0492): the upload policy of Settings > Data > Imports. enforce (default) changes nothing. accept_incomplete opens the sites of the file first,
+    // through the switch of the screens (unlock right of each region, reason, step-up, audit per site), so the data enters in any order and an approval that bypasses
+    // a lock is flagged. The historical load opens its sites itself. The sites a create_sites apply creates are not in the file yet and keep their locks.
+    if (!body.historical_load && (await this.uploadPolicy()) === 'accept_incomplete') {
+      await this.locks.openRunSites(auth, id, `Upload policy accept incomplete, Master import run ${id}: ${body.reason}`.slice(0, 2000));
+    }
     const stepOk = Boolean(await this.stepUp.validUntil(auth));
     const hl = body.historical_load;
     // 0093: the register sheets are read here, from the file stored with the run (never from the request); the database checks the file's SHA-256 again
@@ -438,7 +452,7 @@ export class MasterImportService {
       if (e instanceof OoxmlError) throw new ProblemException(422, 'template_rejected', { detail: 'The file could not be read as an Excel workbook.', extra: { reason: 'not_xlsx' } });
       throw e;
     }
-    return { file_sha256: sha, ...readRegisterSheets(wb, maps, new Map(tpl.map((t) => [t.template_id, t]))) };
+    return { file_sha256: sha, ...readRegisterSheets(wb, maps, new Map(tpl.map((t) => [t.template_id, t])), limit('register_import.max_rows')) };
   }
 
   async resolve(auth: AuthContext, id: string, raw: unknown): Promise<Record<string, unknown>> {

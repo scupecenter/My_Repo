@@ -369,6 +369,10 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/presence/editing'],
   ['post', '/presence/editing/stop'],
   ['get', '/presence/editing'],
+  // Contract 0.15.245 (0344): pin a saved view as a personal card on the home dashboard.
+  ['get', '/me/home-pins'],
+  ['post', '/saved-views/:id/pin'],
+  ['post', '/saved-views/:id/unpin'],
   ['get', '/me/drafts'],
   ['get', '/me/drafts/:key'],
   ['put', '/me/drafts/:key'],
@@ -401,6 +405,9 @@ export const REAL_API_AUTH_USERS = [
   // Contract 0.14.6 (migration 0075; apps/api: settings): the background threshold of batches (imports.async_rows) in Settings, Imports.
   ['get', '/settings/imports'],
   ['put', '/settings/imports'],
+  // Contract 0.15.322 (migration 0492; apps/api: settings): the upload policy of the imports (D49 part 3).
+  ['get', '/settings/imports/upload-policy'],
+  ['put', '/settings/imports/upload-policy'],
   ['get', '/settings/template-change-notice'],
   ['put', '/settings/template-change-notice'],
   // Contract 0.15.1 (migration 0081; apps/api: settings): the shared layout of the side menu.
@@ -412,6 +419,9 @@ export const REAL_API_AUTH_USERS = [
   // Contract 0.15.97 (migration 0197; apps/api: settings): the sign-in page settings and its public read (Settings, Screens, Login page).
   ['get', '/settings/login-page'],
   ['put', '/settings/login-page'],
+  // Contract 0.15.312 (migration 0402; apps/api: settings): the operational limits (Settings, Security, Limits).
+  ['get', '/settings/ops-limits'],
+  ['put', '/settings/ops-limits'],
   ['get', '/settings/login-page/public'],
   // Contract 0.15.292: the media gallery (apps/api: media; migration 0396).
   ['get', '/media/settings'],

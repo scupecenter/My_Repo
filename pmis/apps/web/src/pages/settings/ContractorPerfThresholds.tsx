@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { UnsavedGuard } from '@/lib/unsavedGuard';
 import { useTranslation } from 'react-i18next';
 import { useContractorPerfThresholds, useSetContractorPerfThresholds } from '@/api/settings';
 import type { ContractorPerformanceSettings } from '@/api/types';
@@ -56,6 +57,7 @@ export function ContractorPerfThresholds() {
         </fieldset>
       ))}
       {!ro && <button className="btn btn-accent" data-testid="cperf-save" disabled={bad || !f} onClick={() => setOpen(true)}>{t('common.save')}</button>}
+      <UnsavedGuard scope="settings" dirty={!!f} needsReason label={t('ui.guard_settings')} onSave={(reason) => new Promise<boolean>((res) => set.mutate({ version: q.data.version, body: { reason, thresholds: body() } }, { onSuccess: () => res(true), onError: () => res(false) }))} />
       {open && (
         <FormDialog open onClose={() => setOpen(false)} testid="cperf-dialog" title={t('contractorPerf.thresholds_title')} busy={set.isPending}
           error={set.isError && !Object.keys(errs).length ? errText(set.error, t) : null}
