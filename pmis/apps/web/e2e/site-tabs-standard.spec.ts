@@ -16,7 +16,7 @@ for (const locale of ['en', 'ar'] as const) {
       await page.getByTestId(`site-section-${tab}`).click();
       await expect(page.getByTestId(tid).first()).toBeVisible();
       await expect(page.locator('[data-testid$="-search"]:visible').first()).toBeVisible();
-      await page.screenshot({ path: `/downloads/site-tab-${tab}-${locale}.png` });
+      if (process.env.SHOT_DIR) await page.screenshot({ path: `${process.env.SHOT_DIR}/site-tab-${tab}-${locale}.png` });
     }
   });
 }
