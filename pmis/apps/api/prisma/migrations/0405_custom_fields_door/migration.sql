@@ -1,4 +1,4 @@
--- 0405 (contract 0.15.265): the write door of the custom field definitions, admin_save_field (POST and PATCH /custom-fields, assignment from the project lead via Main).
+-- 0405 (contract 0.15.267): the write door of the custom field definitions, admin_save_field (POST and PATCH /custom-fields, assignment from the project lead via Main).
 -- Additive: one function, no table, no permission, role or grant change. The tables (field_definitions, field_list_values, field_permissions, migration 0007) and their guards
 -- (field_definitions_guard, field_list_values_guard, field_set_bump, the template trigger) already exist; this is the audited door that was documented (x-db-path admin_save_field) but never written.
 -- Who: System Admin, or a delegate of the custom fields (`fields` edit) for all regions (site_master_col_can_admin, the rule of the Master column doors). The API also asks for step-up.
