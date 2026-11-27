@@ -25,6 +25,8 @@ export interface DailyJobResult {
   digests?: number;
   /** 0360 (A3): expiry radar notices (in-app only) written by this run */
   expiryNotices?: number;
+  /** 0362 (A9): approval digest notices written by this run */
+  approvalDigests?: number;
 }
 
 /** The wall-clock parts of an instant in a time zone, and the zone's offset from UTC at that instant (milliseconds). */
@@ -127,6 +129,8 @@ export class JobsService implements OnApplicationBootstrap, OnModuleDestroy {
         if (digests > 0) result.digests = digests;
         const expiring = await this.expiryRadar();
         if (expiring > 0) result.expiryNotices = expiring;
+        const approvals = await this.approvalDigest();
+        if (approvals > 0) result.approvalDigests = approvals;
       }
       this.lastRun = { at: new Date(), result };
       await this.runs.finish(run, result ? 'ok' : 'skipped', result ? result.slaApplied + result.reminders + (result.snapshots ?? 0) + (result.contractorAlerts ?? 0) + (result.calendarReset ?? 0) : null, null,
@@ -231,6 +235,17 @@ export class JobsService implements OnApplicationBootstrap, OnModuleDestroy {
     if (n === null) {
       this.log.warn('expiry radar failed');
       await this.syslog.write('error', 'expiry radar failed', {});
+      return 0;
+    }
+    return n;
+  }
+
+  /** 0362 (A9): the daily approval digest, in-app notices to the Matrix holders of what waits at their level; stale days are the setting approvals.digest. */
+  private async approvalDigest(): Promise<number> {
+    const n = await this.runs.run('approval_digest', async (tx) => Number((await tx.$queryRaw<{ n: number }[]>`SELECT approval_digest_notify() AS n`)[0]?.n ?? 0));
+    if (n === null) {
+      this.log.warn('approval digest failed');
+      await this.syslog.write('error', 'approval digest failed', {});
       return 0;
     }
     return n;

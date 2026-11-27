@@ -39,6 +39,7 @@ import { OpsProcurementCard } from "./dashboardOps";
 import { OpsScurveCard } from "./dashboardScurve";
 import { OpsPermitsCard } from "./dashboardPermits";
 import { OpsReadinessCard } from "./dashboardReadiness";
+import { OpsScorecardCard } from "./dashboardScorecard";
 import { useDashboardSettings } from "@/api/dashboardSettings";
 import { GoalsPanel } from "@/components/GoalsPanel";
 import { SavedViews } from "@/components/SavedViews";
@@ -1423,6 +1424,13 @@ export function Dashboard() {
                 <>
                   {/* 0.15.201 (owner approval 2026-11-26, item 4): GECOL/HLC readiness, the waiting sites by age, civilly ready but not electrified */}
                   <OpsReadinessCard ops={ops.data} />
+                </>
+              ),
+
+              ops_contractors: (
+                <>
+                  {/* 0.15.202 (owner approval 2026-11-26, item 5): the contractor and supplier scorecard - levels, on-time rectification, avg delay, rejection, no amounts */}
+                  <OpsScorecardCard ops={ops.data} />
                 </>
               ),
 
