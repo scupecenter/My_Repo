@@ -21,14 +21,14 @@ Where the table says "verified", the behaviour was checked in the migration or s
 
 | Q | Class | Answer in one line | What changes |
 |---|---|---|---|
-| Q1 | B (L) | Two paths: an admin-only legacy Master import, and PMIS-issued templates with `_tpl`. Check the structure, preview the diff, and record the source, hash and result. Never write `_tpl` into the original without a saved copy. | The legacy import is **not built**: `tools/master-import/` holds only `mapping.csv`. Build the admin import path (P3). |
+| Q1 | B (L) | Two paths: an admin-only legacy Master import, and Workspace-issued templates with `_tpl`. Check the structure, preview the diff, and record the source, hash and result. Never write `_tpl` into the original without a saved copy. | The legacy import is **not built**: `tools/master-import/` holds only `mapping.csv`. Build the admin import path (P3). |
 | Q2 | B (M) | D-1 starts at MS4 when RFI applies and at MS1 when RFI is N/A. D-1 is not measured for Hot or Cold Swap. A missing date is a data gap, never today. | `sla_resolve_start`/`sla_task_date` (0017/0018/0042) send an N/A MS4 back to its predecessors, not to MS1, and nothing depends on the scenario (no `hot_swap` logic in any migration, verified). Add the MS1 fallback and the Swap exclusion (P1). |
 | Q3 | B (M) | Hot and Cold Swap make RFI N/A by scenario. A conflict with the AA:AD flags blocks scope approval until it is reviewed. The Master formula is shown only in the comparison. | `calc_refresh_site` sets `rfi := cw OR gecol OR hlc` (flags only, verified). Add the scenario rule, a conflict check and a comparison-only Master value (P1). |
 | Q4 | C | Enter the official Libyan calendar before the pilot. Do not invent dates. Unannounced holidays stay pending. Until the calendar is complete, a banner says only weekends are excluded. | Built: 2026–2027 is seeded with religious dates marked tentative, and there is a banner while next year is empty. **Needs the approved calendar.** Follow-up D4b: should tentative dates count in SLA? Today they do (`cal_holiday_count` ignores `tentative`). |
 | Q5 | A | The STA/ST report sits on B5, MOS proof on B8 and B9, and one upload may cover both. | Built in 0038 (`B4` doc on task B5, `B9` doc on B8 and B9). B4 has no survey document seeded; the owner names none. |
 | Q6 | D | Router-only sites need Router 1 and 0 of everything else. "Dispatch complete" compares against the approved need. | This conflicts with the owner's Q65 ("TE Dispatch Complete = date of the latest TE DN"). See D6. |
 | Q7 | B (S) | Days that no period covers are "unattributed delay". The R party is shown only as a suggestion and is kept out of the scorecard and penalties. | `dash_sec_delay` (0046) gives those days to the task's external party (`kind = external`) or `default_type`. Move them to `unattributed`, with `suggested_party` (P2). |
-| Q8 | B (S) | Use stable PMIS role codes and an editable, reviewed mapping table for the Master values. Imported titles never grant rights. Ambiguous values become import exceptions. | No mapping table exists (verified). Add a `role_aliases` table used by the legacy import (P3). **Needs the owner-approved mapping (C).** |
+| Q8 | B (S) | Use stable Workspace role codes and an editable, reviewed mapping table for the Master values. Imported titles never grant rights. Ambiguous values become import exceptions. | No mapping table exists (verified). Add a `role_aliases` table used by the legacy import (P3). **Needs the owner-approved mapping (C).** |
 | Q9 | B (S) | The gate date is the latest of the previous milestone and all applicable conditions. The gate is blocked while a condition is missing or a Stop Work is active. Keep the earlier opening date in history. Update the spec and add an ADR. | `gate_eval` computes this live. `site_gate_state` (0018) keeps only the current state, so no history. Add gate open/close events and an ADR (P1). |
 | Q10 | B (S) | Region code with EN/AR labels plus an alias table for import and export. Unknown values need handling. | Codes and labels are built (`regions`, 0013). No alias table: add `region_aliases` (P3). |
 | Q11 | B (M) | For GA:GE export the oldest open issue, else the latest closed one, and append "+N more". Add a separate full issues export. The UI shows critical issues first. Ties are broken by record id. | The Master-format export is **not built** (no service in `apps/api/src`). Record the rule in the spec and build it with the export (P3). |
@@ -109,7 +109,7 @@ Where the table says "verified", the behaviour was checked in the migration or s
 | Q208 | B (S) | Hold gate-locked rows as `gate_locked` instead of refusing them. Held rows are never applied automatically; they need a re-send. | 0051 refuses gate-locked rows. Hold them (P3). |
 | Q209 | B (S) | Importing a start or completion for a pending task needs an actual start date, never today. | 0051 defaults to today. Require the date (P3). |
 | Q210 | A | TPL-MASTER never writes scope, baseline or calculated fields. A Change Control bulk file may come later. | As built. |
-| Q211 | B (L) | Legacy path for the real Master, TPL-MASTER for PMIS files. Repeated reconciliation runs in the parallel month, a diff screen, and an XLSX diff export. | Neither the legacy import nor the comparison screen is built. Build them (P3). |
+| Q211 | B (L) | Legacy path for the real Master, TPL-MASTER for Workspace files. Repeated reconciliation runs in the parallel month, a diff screen, and an XLSX diff export. | Neither the legacy import nor the comparison screen is built. Build them (P3). |
 | Q212 | A | One source per field. Write-through only via a register draft with that register's L1 and L2. Grey cells until then. | As built. |
 | Q215 | B (S) | On conversion, also notify the old reviewer and the entry person. | 0050 notifies L2 holders only. Send a one-off notice for converted items (P11). |
 | Q216 | B (S) | Show the old review acts in task history, labelled "previous path before conversion". | Step history is kept, but there is no label in the UI. Add it (P11). |
@@ -334,7 +334,7 @@ Where the table says "verified", the behaviour was checked in the migration or s
 ## 3. C list: data the owner must provide
 
 1. **Q4 Holiday calendar.** The official Libyan public holidays for 2026 and 2027 (date, EN/AR name, national or religious) from an approved source; confirmation or correction of the 18 tentative religious dates in `db/seed/holidays-2026-2027.csv`; and the person who confirms them each year.
-2. **Q8 Role mapping.** An approved mapping of the 15 Master `StaffRole` values to GSDN Workspace roles, including which values are ambiguous (for example the generic "Site Engineer") and must become import exceptions.
+2. **Q8 Role mapping.** An approved mapping of the 15 Master `StaffRole` values to Workspace roles, including which values are ambiguous (for example the generic "Site Engineer") and must become import exceptions.
 3. **Q104 List values.** Codes, EN labels, AR labels, and the critical (approval-blocking) mark for CompanyType, CoStatus, TeamType, TeamStatus, Severity, QIResult, Activity, IssueStatus, RiskCat, ScopeCWTE, RiskResponse, RiskStatus, Trend, EHSCheck, ReviewStatus, SiteType, TowerOwner, TowerType, Ownership, TestPit, WLVendor and the As-Built vendor and type lists. Also the Arabic labels of the new fields.
 4. **Q107 Warehouse.** Confirmed need quantity per need unit for every TE item other than LPU Kit / Router / Cabinet / Battery (Cambium and Intracom sectors, MW half-link items, accessories). The manufacturer codes for the 10 TE items that have none (`SFP-SM-10G-10KM`, `ERKA-2X2-5`, `ERKA-4X0-75`, `FIBER-OUTDOOR`, `TELECOM-BRACKET`, `FIBER-CLAMP-4L8R`, and so on). Confirmation that CW-01…CW-28 may stay as internal codes.
 5. **Q116 Pipeline.** The choice between variant A (rings) and variant B (flat segmented track), after the working previews from P2.
@@ -363,7 +363,7 @@ Where the table says "verified", the behaviour was checked in the migration or s
 **D6 (Q6 vs Q65). TE Dispatch Complete.** Q65 (owner, 2026-10-29) says "TE Dispatch Complete = the date of the latest TE DN". The Q6 answer says "dispatch completion compares with the approved need of the site".
 - (a) Keep Q65: the date of the latest TE DN; the need rules only feed the warehouse KPIs.
 - (b) Replace Q65: complete when the approved need is met, with the latest DN date as the date.
-- (c) Both: the Q65 date for the Master comparison, and the need-based status in GSDN Workspace.
+- (c) Both: the Q65 date for the Master comparison, and the need-based status in Workspace.
 
 **D16 (Q16 vs Q121). Health index status.** The six factors are defined in rules.md §9, and Q121 approved D and I and removed the draft label (built, 0046). The Q16 answer says the definitions are "not given" and the indices stay experimental.
 - (a) Keep Q121: no draft label; review rules.md §9 if any factor is wrong.
@@ -413,7 +413,7 @@ Where the table says "verified", the behaviour was checked in the migration or s
 |---|---|
 | D0 | **All answers are binding owner decisions.** Build them. |
 | D4b | Tentative holidays **count** as holidays now, with a **"tentative date" badge** on the affected due dates; corrected when confirmed. |
-| D6 | **Both:** the date of the latest TE DN for the Master comparison (Q65), and a need-based complete / short status inside GSDN Workspace. |
+| D6 | **Both:** the date of the latest TE DN for the Master comparison (Q65), and a need-based complete / short status inside Workspace. |
 | D16 | **Draft label only on the factors not yet approved** (all except D and I). |
 | D108b | RF Height is a **number in metres plus an optional note** (for values like "30/45"). |
 | D112 | An older template version is **accepted when only non-input columns changed**; rejected when any input column changed. |

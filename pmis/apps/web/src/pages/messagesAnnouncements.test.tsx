@@ -16,7 +16,7 @@ import { UserDetailPage } from './UserDetail';
 import { Users } from './Users';
 
 const stepUpDone = () => api.post('/__mock/step-up');
-const T1 = '97000000-0000-4000-8000-000000000001'; // Ali Barka (1103) -> Mona Fathi (1102): original + 2 replies, unread for Mona
+const T1 = '97000000-0000-4000-8000-000000000001'; // Demo User 03 (1103) -> Demo User 02 (1102): original + 2 replies, unread for Demo User 02
 const A1 = '99000000-0000-4000-8000-000000000001';
 const messagesAt = (route = '/messages') => renderApp(<Routes><Route path="/messages" element={<Messages />} /><Route path="/messages/:threadId" element={<Messages />} /></Routes>, { route });
 const before = (a: HTMLElement, b: HTMLElement) => !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
@@ -81,11 +81,11 @@ describe('messages', () => {
     const u = userEvent.setup();
     messagesAt();
     const row = await screen.findByTestId(`thread-${T1}`);
-    expect(row).toHaveTextContent('Ali Barka');
+    expect(row).toHaveTextContent('Demo User 03');
     expect(row).toHaveTextContent('1103');
     expect(screen.getByTestId(`thread-preview-${T1}`)).toHaveTextContent('Understood, thank you.');
     expect(screen.getByTestId(`thread-unread-${T1}`)).toBeInTheDocument();
-    expect(screen.getAllByTestId(/^thread-[0-9a-f-]{36}$/)).toHaveLength(2); // Mona is in two threads
+    expect(screen.getAllByTestId(/^thread-[0-9a-f-]{36}$/)).toHaveLength(2); // Demo User 02 is in two threads
     await u.click(screen.getByTestId('messages-unread-only'));
     await waitFor(() => expect(screen.getAllByTestId(/^thread-[0-9a-f-]{36}$/).length).toBeGreaterThan(0));
     for (const r of screen.getAllByTestId(/^thread-[0-9a-f-]{36}$/)) expect(r).toHaveAttribute('data-unread', 'true');
@@ -134,7 +134,7 @@ describe('announcement pop-up', () => {
     renderApp(<><AnnouncementPopup /><button data-testid="behind">behind</button></>);
     const pop = await screen.findByTestId('ann-popup');
     expect(within(pop).getByTestId('ann-popup-title')).toHaveTextContent('Updated site access rules');
-    expect(pop).toHaveTextContent('Ahmed Salem');
+    expect(pop).toHaveTextContent('Demo User 01');
     expect(within(pop).getByTestId('ann-popup-body')).toHaveTextContent('access permit number');
     expect(within(pop).queryByRole('button', { name: /close/i })).toBeNull();
     // Escape and a click outside do nothing
@@ -192,7 +192,7 @@ describe('announcement pop-up', () => {
     const seen: (string | null)[] = [];
     server.use(http.get(`${API_BASE}/me/announcements/pending`, ({ request }) => {
       seen.push(request.headers.get('X-PMIS-Live'));
-      return HttpResponse.json({ items: [{ id: A1, title: 'For everyone', body: 'Body', created_at: '2026-10-27T08:00:00Z', created_by: { id: uid('1001'), display_name: 'Ahmed Salem', employee_id: '1001' } }] });
+      return HttpResponse.json({ items: [{ id: A1, title: 'For everyone', body: 'Body', created_at: '2026-10-27T08:00:00Z', created_by: { id: uid('1001'), display_name: 'Demo User 01', employee_id: '1001' } }] });
     }));
     renderApp(<App />, { route: '/' });
     expect(await screen.findByTestId('ann-popup')).toBeInTheDocument();
@@ -217,7 +217,7 @@ describe('announcements (sender)', () => {
     expect(send).toBeDisabled(); // no audience yet
     expect(within(dlg).getByTestId('ann-audience-hint')).toBeInTheDocument();
     // yourself is never a recipient: nobody matches
-    await u.type(within(dlg).getByTestId('ann-users-search'), 'Ahmed');
+    await u.type(within(dlg).getByTestId('ann-users-search'), 'Demo');
     await u.click(await within(dlg).findByTestId('ann-users-opt-1001'));
     expect(send).toBeEnabled();
     await u.click(send);
@@ -335,7 +335,7 @@ describe('departments and manager', () => {
     const u = userEvent.setup();
     renderApp(<Routes><Route path="/admin/users/:userId" element={<UserDetailPage />} /></Routes>, { route: `/admin/users/${uid('1103')}` });
     const mgr = await screen.findByTestId('org-manager-value');
-    await waitFor(() => expect(mgr).toHaveTextContent('Mona Fathi'));
+    await waitFor(() => expect(mgr).toHaveTextContent('Demo User 02'));
     expect(mgr).toHaveTextContent('1102');
     expect(screen.getByTestId('org-department-value')).toHaveTextContent('RF & Design');
 
@@ -343,17 +343,17 @@ describe('departments and manager', () => {
     const dlg = await screen.findByTestId('org-dialog');
     await u.selectOptions(within(dlg).getByTestId('org-department'), await within(dlg).findByRole('option', { name: 'Warehouse' }));
     await u.click(within(dlg).getByTestId('org-manager-chip-1102').querySelector('button')!);
-    await u.type(within(dlg).getByTestId('org-manager-search'), 'Omar');
+    await u.type(within(dlg).getByTestId('org-manager-search'), 'Demo');
     await u.click(await within(dlg).findByTestId('org-manager-opt-1203'));
     await u.click(screen.getByTestId('org-dialog-submit')); // reason first
     expect(await screen.findByTestId('org-dialog-reason-error')).toBeInTheDocument();
     await u.type(screen.getByTestId('org-dialog-reason'), 'Moved teams');
     await u.click(screen.getByTestId('org-dialog-submit'));
     await waitFor(() => expect(screen.queryByTestId('org-dialog')).toBeNull());
-    await waitFor(() => expect(screen.getByTestId('org-manager-value')).toHaveTextContent('Omar Khaled'));
+    await waitFor(() => expect(screen.getByTestId('org-manager-value')).toHaveTextContent('Demo User 05'));
     expect(screen.getByTestId('org-department-value')).toHaveTextContent('Warehouse');
 
-    // Mona (1102) reports to the PM; making her report to Ali (1103), who now reports to Omar -> the PM is above Omar, no loop. Make Omar report to Ali: loop.
+    // Demo User 02 (1102) reports to the PM; making her report to Demo User 03 (1103), who now reports to Demo User 01 -> the PM is above Demo User 01, no loop. Make Demo User 01 report to Demo User 03: loop.
     await expect(api.put(`/users/${uid('1203')}/org`, { body: { manager_id: uid('1103'), department_id: null, reason: 'try' } })).rejects.toMatchObject({ status: 422, problem: { errors: [{ code: 'manager_loop' }] } });
   });
 
@@ -361,19 +361,19 @@ describe('departments and manager', () => {
     await signIn('pm'); await stepUpDone();
     const u = userEvent.setup();
     renderApp(<Routes><Route path="/admin/users/:userId" element={<UserDetailPage />} /></Routes>, { route: `/admin/users/${uid('1102')}` });
-    await waitFor(() => expect(screen.getByTestId('org-manager-value')).toHaveTextContent('Ahmed Salem'));
+    await waitFor(() => expect(screen.getByTestId('org-manager-value')).toHaveTextContent('Demo User 01'));
     await u.click(screen.getByTestId('org-edit'));
     const dlg = await screen.findByTestId('org-dialog');
     await u.click(within(dlg).getByTestId('org-manager-chip-1001').querySelector('button')!);
-    await u.type(within(dlg).getByTestId('org-manager-search'), 'Ali');
-    await u.click(await within(dlg).findByTestId('org-manager-opt-1103')); // Ali reports to Mona: a loop
+    await u.type(within(dlg).getByTestId('org-manager-search'), 'Demo');
+    await u.click(await within(dlg).findByTestId('org-manager-opt-1103')); // Demo User 03 reports to Demo User 02: a loop
     await u.type(screen.getByTestId('org-dialog-reason'), 'Reorganisation');
     await u.click(screen.getByTestId('org-dialog-submit'));
     expect(await screen.findByTestId('org-dialog-error')).toHaveTextContent(/report to this person/i);
-    await waitFor(() => expect(screen.getByTestId('org-manager-value')).toHaveTextContent('Ahmed Salem')); // back to the old manager
+    await waitFor(() => expect(screen.getByTestId('org-manager-value')).toHaveTextContent('Demo User 01')); // back to the old manager
     // a person cannot be their own manager
     await u.clear(within(dlg).getByTestId('org-manager-search'));
-    await u.type(within(dlg).getByTestId('org-manager-search'), 'Mona');
+    await u.type(within(dlg).getByTestId('org-manager-search'), 'Demo');
     expect(await within(dlg).findByTestId('org-manager-opt-1102')).toBeDisabled();
   });
 });

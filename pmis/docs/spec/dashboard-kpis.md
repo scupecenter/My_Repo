@@ -1,4 +1,4 @@
-# Dashboard KPIs: the legacy reference and GSDN Workspace mapping (P3)
+# Dashboard KPIs: the legacy reference and Workspace mapping (P3)
 
 ## Sources
 - **Legacy dashboard (LD).** `docs/reference/legacy-dashboard/GSDN_Dashboard.html`, the repo copy with the XSS fixes. Its app script is `src/app.js` embedded verbatim (checked). Line numbers below are `app.js` lines, cited as "LD L123".
@@ -9,7 +9,7 @@
 - **Other spec.** `rules.md` §1–§9 and `stories-dashboard.md` (DB-01 … DB-13).
 - **Contract.** `contracts/openapi.yaml`, tags `dashboard` and `project-status`, plus `/sites` for the drill-downs.
 
-The legacy dashboard is the reference for KPI definitions and pipeline style (CLAUDE.md). The Master Dashboard sheet (D66, D67) is a separate design: its six tables are specified in DB-01 … DB-07, and §7 shows where the two meet. Where they differ from the legacy code, GSDN Workspace follows BP §06 dict and CLAUDE.md (§8).
+The legacy dashboard is the reference for KPI definitions and pipeline style (CLAUDE.md). The Master Dashboard sheet (D66, D67) is a separate design: its six tables are specified in DB-01 … DB-07, and §7 shows where the two meet. Where they differ from the legacy code, Workspace follows BP §06 dict and CLAUDE.md (§8).
 
 ---
 
@@ -95,11 +95,11 @@ The dashboard finds each column by its three header rows, never by its position 
 
 ## 3. Project Overview page (LD L800–L860)
 
-| ID | Item | Exact legacy definition | Master | Filters | Drill-down | PMIS source | PMIS must differ / gap |
+| ID | Item | Exact legacy definition | Master | Filters | Drill-down | Workspace source | Workspace must differ / gap |
 |---|---|---|---|---|---|---|---|
 | OV-01 | Health pill | B-14 | Project Status SPI; site overdue | all | none | `GET /dashboard/health-index` (`score`, `band`) | Replaced by the health index (rules.md §9; DF-08). Band thresholds open (Q35) |
 | OV-02 | Lede text | On-Air done of app; RFI done; weighted Actual vs Planned; sites behind baseline; ECD at the On-Air rate | DP, BZ, Project Status | all | none | pipeline + project-status | Working days and the 6-week rate (DF-02, DF-04) |
-| OV-03 | Weighted physical progress (hero) | Project Status Actual, with the Planned tick and SPI (SPI ≥ 0.95 ok, ≥ 0.85 watch) | Project Status sheet | **ignores** site filters (LD note L841) | none | `GET /project-status` (`progress_pct`, activities, `weight_set`) | Computed by GSDN Workspace (rules.md §6). Planned and SPI show "not available" until plan dates are complete (DB-08). Region and site scopes exist (rules.md §6 site filter). Ends at HOTO (CLAUDE.md) |
+| OV-03 | Weighted physical progress (hero) | Project Status Actual, with the Planned tick and SPI (SPI ≥ 0.95 ok, ≥ 0.85 watch) | Project Status sheet | **ignores** site filters (LD note L841) | none | `GET /project-status` (`progress_pct`, activities, `weight_set`) | Computed by Workspace (rules.md §6). Planned and SPI show "not available" until plan dates are complete (DB-08). Region and site scopes exist (rules.md §6 site filter). Ends at HOTO (CLAUDE.md) |
 | OV-04 | Site RFI | msAgg(j = RFI): done / app, bar, plan tick, delta, + period | BZ, BY | all | `ms` RFI done | `GET /dashboard/milestone-pipeline` node MS4 | The contract node lacks `plan` and `period` (G-D02) |
 | OV-05 | On-Air | msAgg(On-Air), as OV-04 | DP, DO | all | `ms` On-Air done | node MS6 | as OV-04 |
 | OV-06 | HOTO | msAgg(HOTO), as OV-04 (no period) | EY, EX | all | `ms` HOTO done | node MS9 | as OV-04 |
@@ -138,7 +138,7 @@ The config is at LD L917–L930.
 
 ### 4.1 Tab 1, Cockpit (LD L951)
 
-| ID | Item | Definition | PMIS source | Differ / gap |
+| ID | Item | Definition | Workspace source | Differ / gap |
 |---|---|---|---|---|
 | SC-01 | {CW, TE} weighted progress | The weight-averaged Actual of the matching activities: Σ w·a ÷ Σ w. Planned the same way (only if every activity has a Planned value) | `GET /project-status` activities | — |
 | SC-02, SC-03 | Prime and sub milestone | msAgg, as OV-04 | pipeline nodes | G-D02 |
@@ -157,7 +157,7 @@ The config is at LD L917–L930.
   - CW (12): CW access, CW survey, Report submitted, Report approved, CW DN approved, CW MOS, CW start, CW completion, CW PAC, GECOL power, HLC fiber, Site RFI.
   - TE (22): TE access … HOTO.
   - Pending = this step is not done but its predecessor (or gate) is done, or the BW/BX status reads "Pending". Not due = the predecessor is not done. GECOL and HLC apply only where AC or AD = Yes.
-  - PMIS must differ:
+  - Workspace must differ:
     - D67 sets CW 17 steps, TE 22 and Post-HOTO 3 (DF-16).
     - Done means approved (DF-01).
     - The `Scope = Done + Pending + Not Due` check applies (DB-01).
@@ -169,7 +169,7 @@ The config is at LD L917–L930.
   - Applicable, Planned to date, Achieved, and "vs plan" (done − plan);
   - On time % = onTime ÷ (onTime + late);
   - Median variance, Behind baseline (open past baseline) and Median days late.
-  - PMIS must differ:
+  - Workspace must differ:
     - D67 uses **Avg** Delay and adds Baseline Missing. Plan Coverage is removed (DF-17).
     - Working days (DF-02).
     - Gap G-D02.
@@ -185,8 +185,8 @@ The config is at LD L917–L930.
   - "All N sites".
   - No endpoint (G-D12).
 - **SC-20, SLA durations.** For each SLA step of the section: SLA max (wd), Completed n, Median, P85, Within max % (≤ max), and Open over max / open. Values come from the SLA sheet (working days).
-  - PMIS must differ:
-    - the source is GSDN Workspace SLA engine (rules.md §3);
+  - Workspace must differ:
+    - the source is Workspace SLA engine (rules.md §3);
     - D-1 starts from MS4 (CLAUDE.md, DF-21).
   - BP §06 dict also asks for P90 and the maximum.
   - Gap G-D11 (DB-10).
@@ -202,7 +202,7 @@ The config is at LD L917–L930.
   - waiting for TE readiness (next = TE Completion, `wait`);
   - uplink site not On-Air (next = On-Air, L names another site of the file that is not On-Air);
   - RFI not achieved and TE not done.
-- **SC-23, Open issues by owner:** bars by GB. **SC-24, Open issues table:** oldest first, with age > 60 d crit and > 30 d watch. PMIS: issues sort by D41 (rules.md §10) and there are several per site (DF-09).
+- **SC-23, Open issues by owner:** bars by GB. **SC-24, Open issues table:** oldest first, with age > 60 d crit and > 30 d watch. Workspace: issues sort by D41 (rules.md §10) and there are several per site (DF-09).
 - **SC-25, Risks matrix:** as OV-16.
 
 ### 4.6 Tab 6, Partners (LD L1152–L1181)
@@ -214,7 +214,7 @@ The config is at LD L917–L930.
   - Snags at PAC % = sites with Snags Found (BS or EG) = Yes ÷ max(PAC-dated sites, snag sites);
   - Open issues.
 - **SC-27, Per-partner mini bars:** % done per section milestone, with a plan tick (top 6).
-- PMIS must differ:
+- Workspace must differ:
   - BP §06 dict "contractor scorecard" counts SLA adherence on **approved attributed** days only, plus rejections, plan adherence, documentation and safety, with weights from settings (rules.md §8).
   - Snags come from snag records (DF-10).
   - No endpoint (G-D14).
@@ -229,7 +229,7 @@ The config is at LD L917–L930.
   - DLP ended, FAC due (FB ≤ T, FE empty);
   - CW FAC (FE ≤ T).
   - First-time pass at PAC = (CW complete − sites with BS = Yes) ÷ CW complete; snags cleared (BT).
-  - PMIS must differ:
+  - Workspace must differ:
     - BP §06 dict "acceptance quality" = CW PAC with no snags ÷ PAC (the denominator is the PAC, not CW complete), and the same for FAC (DF-10).
     - The closure part moves to the Final Closure KPI (DF-06).
 - **SC-29, Quality inspections panel.** Records for the section stage (Stage = cw or te, or blank) on sites in scope:
@@ -237,10 +237,10 @@ The config is at LD L917–L930.
   - by severity: Critical, Major, Minor;
   - past target (Target Date < T);
   - blocking (Blocking = Yes).
-  - PMIS: Status and Blocking come from the Quality register rules (D54; RG-QI).
+  - Workspace: Status and Blocking come from the Quality register rules (D54; RG-QI).
 - **SC-30, SC-31 (CW), GECOL and HLC:** Done vs Pending counts from BW and BX.
 - **SC-32 (TE), From On-Air to TE PAC.** Over the On-Air sites: SSV done (DS not blank) with % Pass; HWID; EIR; PAT; As-Built (dates ≤ T); TE PAC; TE FAC; TE snags raised (EG) and cleared (EH).
-- **SC-33 (TE), MW link RSL deviation:** a histogram of CZ (values with |x| < 40 only), with bins < −9, −9…−6, −6…−3, −3…−1, ±1, 1…3, 3…6, 6…9, > 9, and the "deviate by more than **3 dB**" count. PMIS must differ: the Master Setting "MW RSL tolerance" = **2 dB** (DF-15).
+- **SC-33 (TE), MW link RSL deviation:** a histogram of CZ (values with |x| < 40 only), with bins < −9, −9…−6, −6…−3, −3…−1, ±1, 1…3, 3…6, 6…9, > 9, and the "deviate by more than **3 dB**" count. Workspace must differ: the Master Setting "MW RSL tolerance" = **2 dB** (DF-15).
 - **SC-34 (TE), Cutover:** Success (DF matches success, pass or ok) vs rolled back or failed.
 - No endpoint for SC-28 … SC-34 (G-D15).
 
@@ -251,13 +251,13 @@ The config is at LD L917–L930.
   - TE: Vendor, TE installed, On-Air baseline, On-Air actual, TE PAC;
   - then Current, Next with its state tag, Days in step, Behind baseline and Open issue.
 - Search, CSV and a cap of 600 rows.
-- PMIS: the Sites list (`GET /sites`) with the CLAUDE.md Export button (Excel through the export service, not CSV). `SiteListItem` lacks the columns listed in G-D05.
+- Workspace: the Sites list (`GET /sites`) with the CLAUDE.md Export button (Excel through the export service, not CSV). `SiteListItem` lacks the columns listed in G-D05.
 
 ---
 
-## 5. KPIs GSDN Workspace adds (not in the legacy dashboard)
+## 5. KPIs Workspace adds (not in the legacy dashboard)
 
-| ID | KPI | Definition | PMIS source | Notes |
+| ID | KPI | Definition | Workspace source | Notes |
 |---|---|---|---|---|
 | PX-01 | Final Closure KPI | Sites closed, % closed, pending CW FAC and TE FAC with their ages (rules.md §6.1; DB-09) | `GET /dashboard/final-closure` | CLAUDE.md. Not mixed into Project Status. `FinalClosureKpi` lacks the "Not due" counts (in DLP) of the D67 pattern (G-D16). Formula open (Q16) |
 | PX-02 | Delay attribution | Delay days per responsible party, % unattributed, overlapping periods (rules.md §8; DB-10) | `GET /dashboard/delay-attribution` | AAT SE is never a party. `DelayAttribution` lacks % unattributed, the overlap count, and the per step, region and contractor breakdown (G-D17). Q7 |
@@ -294,15 +294,15 @@ They are listed so that the P3 backlog is complete (BP §06 dict rows 540–570)
 | (5) WH · Complete Units | DB-06 | none |
 | (6) Swap & Relocation | DB-07 | OV-18, OV-19 |
 
-## 8. Where GSDN Workspace definition must differ from the legacy code
+## 8. Where Workspace definition must differ from the legacy code
 
-| ID | Difference | Legacy | PMIS | Source |
+| ID | Difference | Legacy | Workspace | Source |
 |---|---|---|---|---|
 | DF-01 | Approved data only | Reads dates typed into the Master | Counts only approved values. A rejected document after approval leaves the KPIs (rules.md §2.2) | BP §06 dict; DB header; CLAUDE.md |
 | DF-02 | Working days | `days()` counts calendar days for overdue, age, variance, slips and issue age | Working days (Fri/Sat weekend plus holidays, rules.md §3) | BP §06 dict ("in working days") |
 | DF-03 | One reference date | Report Date plus a time-shiftable "as of" | Today. History comes from frozen weekly snapshots. BP §06 lists the double reference date as a bug of the current dashboard. Keeping "period from" is open (Q34) | BP §06 dict, row 571 |
 | DF-04 | Forecast velocity | Last 8 weeks ÷ 8 | Average of the last 6 weeks including zero weeks. ECD = today + remaining ÷ velocity | BP §06 dict "Burn-up · ECD" |
-| DF-05 | Project Status scope | Read from the Master sheet (which already ends at HOTO) | Computed by GSDN Workspace, ends at HOTO, editable weights. The pipeline still shows Final Closure | CLAUDE.md; D65; D66 |
+| DF-05 | Project Status scope | Read from the Master sheet (which already ends at HOTO) | Computed by Workspace, ends at HOTO, editable weights. The pipeline still shows Final Closure | CLAUDE.md; D65; D66 |
 | DF-06 | Final Closure | A partial funnel in the CW Quality tab | A separate Final Closure KPI (PX-01) | CLAUDE.md; rules.md §6.1 |
 | DF-07 | Delay | Only "behind baseline" | Delay attribution by party (PX-02) | CLAUDE.md; rules.md §8 |
 | DF-08 | Health | SPI / behind-share pill | Health index (PX-03) | CLAUDE.md; rules.md §9 |
@@ -362,7 +362,7 @@ They are listed so that the P3 backlog is complete (BP §06 dict rows 540–570)
 | Reference date | Q34: default today; a past date reads the weekly snapshot dated that day, otherwise it is computed from dated facts; `basis.source` says which | The legacy "period from" is not kept. |
 | Snapshots | PX-08 and DB-12: `site_snapshots` per site, `progress_snapshots` per region and for the project (Project Status, headline, pipeline, streams, health); written by `dash_snapshot_take`, never rewritten | Every Thursday (D186, since 0059; Sunday from 0046) and on the last day of each month (Q127, sections 11 and 12). |
 
-Not built (they stay in the backlog of sections 3 to 6): OV-07 and OV-10 (forecast, rate, burn-up, the weekly series), OV-13 (decisions required), OV-16 (risk matrix), OV-17 (data quality), OV-18 and OV-19 (Swap and Dismantle tables), PX-07 (WH Complete Units), PX-06 (Exceptions & Alerts), SC-13 (checkpoints), SC-18 (biggest slips), SC-26 and SC-27 (partner scorecards), SC-28 to SC-34 (quality and closure funnels). Each needs an owner answer or a source GSDN Workspace does not hold yet; none was invented.
+Not built (they stay in the backlog of sections 3 to 6): OV-07 and OV-10 (forecast, rate, burn-up, the weekly series), OV-13 (decisions required), OV-16 (risk matrix), OV-17 (data quality), OV-18 and OV-19 (Swap and Dismantle tables), PX-07 (WH Complete Units), PX-06 (Exceptions & Alerts), SC-13 (checkpoints), SC-18 (biggest slips), SC-26 and SC-27 (partner scorecards), SC-28 to SC-34 (quality and closure funnels). Each needs an owner answer or a source Workspace does not hold yet; none was invented.
 
 ## 11. Owner answers Q118 to Q127, built in contract 0.11.0 (migration 0046)
 

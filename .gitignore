@@ -17,3 +17,6 @@ pmis/apps/web/playwright-report/
 pmis/design/src/ar.json
 pmis/design/forms/out/
 pmis/tools/capacity-sizer/screenshot-*.png
+
+# a node_modules symlink or dir anywhere (a trailing slash would not match a symlink)
+node_modules

@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>GSDN Workspace Blueprint 1.1</title>
+<title>Workspace Blueprint 1.1</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Noto+Kufi+Arabic:wght@600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -84,7 +84,7 @@ td.fld{font-size:13.5px}
 .chg .it{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start;font-size:14.5px}
 .chg .k{font-size:11.5px;font-family:var(--f-mono);padding:2px 8px;border-radius:4px;white-space:nowrap;margin-top:3px}
 .k.add{background:var(--ok-soft);color:var(--ok)}.k.mv{background:var(--accent-soft);color:var(--accent)}.k.ren{background:var(--gate-soft);color:var(--gate)}
-/* Site 360 mock */
+/* Site Master mock */
 .mock{background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden}
 .mock .bar{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--line)}
 .mock .sid{font-family:var(--f-mono);font-size:18px;font-weight:500;direction:ltr}
@@ -154,13 +154,13 @@ a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 <div class="wrap" dir="rtl" lang="ar">
 
 <header class="top">
-  <span class="eyebrow">GSDN · Project Management Information System</span>
-  <h1>مخطط منظومة إدارة مشروع GSDN</h1>
+  <span class="eyebrow">Project · Project Management Information System</span>
+  <h1>مخطط منظومة إدارة مشروع Project</h1>
   <p class="lead">منظومة ويب على سيرفر خاص تحل محل ملف الماستر، وتصبح المصدر الوحيد لبيانات المشروع ومستنداته: بوابات المواقع والـ Milestones، الاعتماد والتوثيق، الخطط، المخزن، المشاكل، ولوحة القيادة.</p>
   <div class="meta">
     <span class="chip">الإصدار 1.1 · 24-10-2026</span>
-    <span class="chip">مبني على GSDN Site Master الجديد · 23 ورقة · 187 عموداً</span>
-    <span class="chip">مشروع واحد: GSDN</span>
+    <span class="chip">مبني على Project Site Master الجديد · 23 ورقة · 187 عموداً</span>
+    <span class="chip">مشروع واحد: Project</span>
   </div>
   <nav class="toc" aria-label="المحتويات">
     <a href="#s0">الملخص</a><a href="#s1">المبادئ</a><a href="#s2">هيكل المنظومة</a><a href="#s3">سير العمل</a><a href="#s4">الإدخال والاعتماد</a><a href="#s5">التوثيق</a><a href="#s6">الأوزان والمؤشرات</a><a href="#s7">الشاشات</a><a href="#s8">الخطط والحضور</a><a href="#s9">المشاكل والمخاطر</a><a href="#s10">المخزن</a><a href="#s11">المقاولون والفرق</a><a href="#s12">ضبط الجودة</a><a href="#s13">الإشعارات والتقارير</a><a href="#s14">الأدوار والمسؤوليات</a><a href="#s15">الذكاء الاصطناعي</a><a href="#s16">البنية</a><a href="#s17">الترحيل</a><a href="#s18">مراحل التنفيذ</a><a href="#s19">مدخلات مطلوبة</a><a href="#s20">أسئلة مفتوحة</a><a href="#s21">سجل التحديث 1.1</a>
@@ -169,7 +169,7 @@ a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
 <section id="s0">
   <h2><span class="n">00</span>الملخص التنفيذي</h2>
-  <div class="callout"><b>الغاية:</b> منظومة ويب على سيرفر خاص مع تطبيق هاتف، تحل محل ملف الماستر وتصبح المصدر الوحيد لبيانات مشروع GSDN ومستنداته، ويبقى الماستر قناة لرفع البيانات إليها (القسم 17). فريق المشروع وحده يستخدمها، والبيانات المالية خارج نطاقها.</div>
+  <div class="callout"><b>الغاية:</b> منظومة ويب على سيرفر خاص مع تطبيق هاتف، تحل محل ملف الماستر وتصبح المصدر الوحيد لبيانات مشروع Project ومستنداته، ويبقى الماستر قناة لرفع البيانات إليها (القسم 17). فريق المشروع وحده يستخدمها، والبيانات المالية خارج نطاقها.</div>
   <div class="callout"><b>الإصدار 1.1:</b> حُدِّث المخطط كاملاً ليطابق الماستر الجديد (23 ورقة، 187 عموداً في Master، وقرارات إعادة البناء D1 إلى D88)، ولوحة القيادة الجديدة، والاتفاقات الأخيرة: تعريف RFI، والأدوار الستة، ومسؤولية الخطوات. ما تغيّر وما يحتاج قراراً في <a href="#s21">القسم 21</a>.</div>
   <div class="grid2">
     <div class="card"><h3>كيف تعمل</h3><ul>
@@ -243,7 +243,7 @@ a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   <p class="cap">واجهة إنجليزية أساسية وعربية بتبديل لحظي. البيانات نفسها (المواقع، المناطق، المقاولون) تبقى كما تُدخل ولا تُعرَّب. البيانات المالية (قيم PO، الفواتير، الدفعات) خارج نطاق المنظومة. وفي أعلى كل الشاشات شريط بحث موحّد في المواقع والمستندات والقضايا والتعليقات والمقاولين والفرق والأرقام التسلسلية، بحسب صلاحيات المستخدم.</p>
 
   <h3 style="margin-top:6px">لوحة القيادة</h3>
-  <p class="muted">الأساس لوحة <b>GSDN Site Delivery Dashboard</b> الجديدة المبنية على الماستر الجديد، وورقة Dashboard داخل الماستر (6 جداول). في المنظومة تُبنى الصفحات نفسها على البيانات المعتمدة بدل ملف الماستر، مع الفلاتر نفسها و drill-down حتى صفحة الموقع 360.</p>
+  <p class="muted">الأساس لوحة <b>Project Site Delivery Dashboard</b> الجديدة المبنية على الماستر الجديد، وورقة Dashboard داخل الماستر (6 جداول). في المنظومة تُبنى الصفحات نفسها على البيانات المعتمدة بدل ملف الماستر، مع الفلاتر نفسها و drill-down حتى صفحة الموقع 360.</p>
   <div class="tbl-wrap">
     <table>
       <thead><tr><th>الصفحة</th><th>المحتوى في اللوحة الجديدة</th><th>يُضاف في المنظومة</th></tr></thead>
@@ -628,7 +628,7 @@ flowchart LR
     <div class="card"><h3>دورة النموذج</h3><ul>
       <li>يظهر الزر عندما تُفتح الخطوة (Pending)، ولا يظهر في خطوة مقفلة</li>
       <li>شاشة قبل الإصدار: حقول البيانات (الموقع، التواريخ، المقاول) كما هي في المنظومة ولا تُعدَّل إلا بالإدخال العادي، والحقول الحرة (الملاحظات، الموقّعون، التعليقات) تُعدَّل هنا</li>
-      <li>الإصدار بصيغتي Word و PDF، برقم مرجعي و QR، مثل <span class="mono">GSDN-CW PAC-MI001-01</span></li>
+      <li>الإصدار بصيغتي Word و PDF، برقم مرجعي و QR، مثل <span class="mono">Project-CW PAC-MI001-01</span></li>
       <li>طباعة وتوقيع وختم، ثم رفع في الخانة نفسها. الـ QR يطابق الموقع والنموذج، والرفع على موقع آخر يظهر تنبيهاً</li>
       <li>ثم المراجعة والاعتماد كأي مستند. النموذج الصادر غير المرفوع يظهر في تقرير النواقص</li></ul></div>
     <div class="card"><h3>القوالب</h3><ul>
@@ -1628,7 +1628,7 @@ erDiagram
         <tr><td>المخزن</td><td>احتياج من BOQ، و Site Receipt Date</td><td>احتياج محسوب من التصميم، و TE Dispatch Complete Date، وملخص بعشرة صفوف</td><td class="mono">10</td></tr>
         <tr><td>القضايا</td><td>Issue Log، وشدة بالأثر × العمر</td><td>أعمدة GA:GE، وترتيب حسب نوع الموقع ثم العمر</td><td class="mono">09</td></tr>
         <tr><td>الأدوار</td><td>مسؤول لكل مسار</td><td>6 أدوار رئيسية و9 فرعية، والمشرف من الجيل للإشراف فقط، وخطوات التركيب حتى On-Air على مورّد TE</td><td class="mono">14</td></tr>
-        <tr><td>لوحة القيادة</td><td>GSDN CW Checkpoint Report القديمة</td><td>GSDN Site Delivery Dashboard الجديدة: Project Overview و CW و TE بثمانية تبويبات</td><td class="mono">02</td></tr>
+        <tr><td>لوحة القيادة</td><td>Project CW Checkpoint Report القديمة</td><td>Project Site Delivery Dashboard الجديدة: Project Overview و CW و TE بثمانية تبويبات</td><td class="mono">02</td></tr>
       </tbody>
     </table>
   </div>
@@ -1646,7 +1646,7 @@ erDiagram
 </section>
 
 
-<footer>الإصدار 1.1 بتاريخ 24-10-2026. مبنية على GSDN Site Master الجديد (23 ورقة، 187 عموداً في Master، 13 سجلاً) وسجل قرارات إعادة بنائه D1 إلى D88، ولوحة GSDN Site Delivery Dashboard الجديدة، والاتفاقات الأخيرة: RFI نهاية الأعمال المدنية شاملة الكهرباء والفايبر، والأدوار الستة الرئيسية والتسعة الفرعية، والمشرف من الجيل للإشراف فقط، وخطوات التركيب حتى On-Air على مورّد TE. عشرة Milestones من Site Release إلى Final Closure وتسع بوابات مراحل. ما تغيّر عن الإصدار 1.0 ونقاط القرار في القسم 21.</footer>
+<footer>الإصدار 1.1 بتاريخ 24-10-2026. مبنية على Project Site Master الجديد (23 ورقة، 187 عموداً في Master، 13 سجلاً) وسجل قرارات إعادة بنائه D1 إلى D88، ولوحة Project Site Delivery Dashboard الجديدة، والاتفاقات الأخيرة: RFI نهاية الأعمال المدنية شاملة الكهرباء والفايبر، والأدوار الستة الرئيسية والتسعة الفرعية، والمشرف من الجيل للإشراف فقط، وخطوات التركيب حتى On-Air على مورّد TE. عشرة Milestones من Site Release إلى Final Closure وتسع بوابات مراحل. ما تغيّر عن الإصدار 1.0 ونقاط القرار في القسم 21.</footer>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.1/mermaid.min.js"></script>

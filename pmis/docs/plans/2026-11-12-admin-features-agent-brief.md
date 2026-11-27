@@ -1,4 +1,4 @@
-# Shared brief for the 5 feature agents (GSDN Workspace, repo /home/claude/my_repo, project in pmis/)
+# Shared brief for the 5 feature agents (Workspace, repo /home/claude/my_repo, project in pmis/)
 
 Read narrowly: pmis/CLAUDE.md (binding rules), the code you touch. Do not read whole blueprints.
 

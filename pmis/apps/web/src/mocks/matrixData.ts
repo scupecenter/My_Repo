@@ -82,7 +82,7 @@ export function initialMatrix(): Matrix {
     kind: 'register', register_key: 'site_creation', code: 'site_creation', name_en: 'Site creation', name_ar: 'إنشاء المواقع', approval_levels: 2,
     cells: [cell('site_creation', 1, ['1001']), cell('site_creation', 3, ['1001'])],
   });
-  // migration 0042: the Matrix row of the Procurement scope HLC, right after Procurement. L1 = the HLC Fiber Team (Nadia Hamed, 1207), L2 = the CW Team Lead (Q90).
+  // migration 0042: the Matrix row of the Procurement scope HLC, right after Procurement. L1 = the HLC Fiber Team (Demo User 09, 1207), L2 = the CW Team Lead (Q90).
   const at = stages.findIndex((r) => r.code === 'procurement') + 1;
   stages.splice(at, 0, {
     kind: 'register', register_key: 'procurement_hlc', code: 'procurement_hlc', name_en: 'Procurement - HLC scope', name_ar: 'المشتريات - نطاق HLC', approval_levels: 2,
