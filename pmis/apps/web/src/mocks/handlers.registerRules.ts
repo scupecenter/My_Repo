@@ -3,7 +3,7 @@ import { API_BASE as B } from '@/api/client';
 import { viewer } from './db';
 import { guard, problem } from './handlers';
 
-/** Contract 0.15.290: the registered suppliers of the invoice picker and the editable register rules, as register_rule_catalogue, reg_rules_json and admin_register_rules decide them. Synthetic. */
+/** Contract 0.15.331: the supplier companies of the invoice picker (0407) and the editable register rules, as register_rule_catalogue, reg_rules_json and admin_register_rules decide them. Synthetic. */
 const CATALOGUE = [
   { register_key: 'invoices', key: 'currency', type: 'text', default: 'LYD', label_en: 'Invoice currency', label_ar: 'عملة الفواتير' },
   { register_key: 'invoices', key: 'order_required', type: 'boolean', default: false, label_en: 'An invoice must name its Procurement order', label_ar: 'الفاتورة يجب أن تحدد أمر المشتريات' },
@@ -19,7 +19,7 @@ export const registerRulesHandlers = [
   http.get(`${B}/registers/invoices/supplier-options`, () => {
     const g = guard();
     if (g) return g;
-    return HttpResponse.json({ items: [{ entity_id: '11111111-1111-4111-8111-111111111111', name: 'Aljeel Contracting', company_type: 'Contractor', state: 'approved' }] });
+    return HttpResponse.json({ items: [{ id: '11111111-1111-4111-8111-111111111111', name: 'Aljeel Contracting', type: 'cw_contractor' }] });
   }),
   http.get(`${B}/settings/register-rules`, () => {
     const g = guard();
