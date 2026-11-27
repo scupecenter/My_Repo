@@ -4,9 +4,9 @@ These settings live on GitHub, not in the code. The owner applies them in the re
 
 ## 1. About box (the gear next to "About")
 
-- Description: `Site delivery workspace for telecom projects: registers, approvals, SLA and dashboards (NestJS, React, PostgreSQL, Arabic RTL).`
+- Description: `Telecom site delivery workspace: registers, approvals, SLA and dashboards (NestJS, React, PostgreSQL, Arabic RTL).`
 - Website: leave empty.
-- Topics: `telecom`, `pmis`, `nestjs`, `react`, `postgresql`, `arabic-rtl`.
+- Topics: `telecom`, `workspace`, `nestjs`, `react`, `postgresql`, `arabic-rtl`.
 
 ## 2. Branch protection for `main` (Settings > Branches > Add branch protection rule, pattern `main`)
 

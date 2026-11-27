@@ -12,7 +12,7 @@ Owner: `people-registry` agent. Sources: CLAUDE.md "Staff registry" (settles B13
 | `position` | Required free text (English label for now, see Open). |
 | `team` | `CW`, `TE`, `both` or `none`. |
 | `main_role` | One of the 6 main roles. A starting value only: the real role comes from the admin's assignments on Users & Roles. |
-| `region` | One of Tripoli, Middle, WM, Zawia, Benghazi, GM, Sebha, or `All`. Home region for display; it does not limit visibility (that stays in the assignments, B3). |
+| `region` | One of the regions, or `All`. Home region for display; it does not limit visibility (that stays in the assignments, B3). |
 | `status` | `active` or `inactive`. |
 | `notes` | Optional. |
 
@@ -67,7 +67,7 @@ Create, edit, deactivate, reactivate, import (batch ID, counts), link and unlink
 - `name_en text not null`, `name_ar text not null`
 - `email citext not null unique`, `phone text not null unique check (phone ~ '^\+218 9[0-9] [0-9]{3} [0-9]{4}$')`
 - `position text not null`, `team text not null check (team in ('CW','TE','both','none'))`
-- `main_role text`, `region text not null check (region in ('Tripoli','Middle','WM','Zawia','Benghazi','GM','Sebha','All'))`
+- `main_role text`, `region text not null check (region in ('Region A','Middle','WM','Region C','Region B','GM','Region D','All'))`
 - `status text not null default 'active' check (status in ('active','inactive'))`, `notes text`
 - `created_at`, `updated_at`, `updated_by`; no delete (revoke DELETE, trigger blocks it); writes through `app_has_permission`; audit trigger with before/after.
 - `users.employee_id` references it with a unique constraint (one account per ID).

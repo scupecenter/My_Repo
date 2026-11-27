@@ -12,8 +12,9 @@ import { useConfigGaps, useRegionVendors, useSaveRegionVendor, type RegionVendor
 import { NEED_TONE } from '@/components/SiteDispatch';
 import { errText, FormDialog } from '@/components/FormDialog';
 import { InlinePanel } from '@/components/InlinePanel';
+import { SavedViews } from '@/components/SavedViews';
 import { UnifiedFilter } from '@/components/UnifiedFilter';
-import { decodeFilter, encodeFilter } from '@/api/views';
+import { decodeFilter, encodeFilter, type FilterTree } from '@/api/views';
 import { useToast } from '@/components/Toast';
 import { hasGrant, isAdmin } from '@/lib/perm';
 import { registerErrorMessage } from '@/lib/registerErrors';
@@ -107,6 +108,7 @@ function Items() {
   return (
     <div data-testid="wh-items">
       <div className="mb-3 flex flex-wrap items-center gap-2">
+        <SavedViews<Record<string, unknown>> screen="warehouse-items" value={{ q, inactive }} empty={{ q: '', inactive: false }} onApply={(v) => { setQ(String(v.q ?? '')); setInactive(v.inactive === true); }} />
         <input className="input max-w-64" data-testid="wh-search" placeholder={t('wh.search')} aria-label={t('wh.search')} value={q} onChange={(e) => setQ(e.target.value)} />
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" data-testid="wh-show-inactive" checked={inactive} onChange={(e) => setInactive(e.target.checked)} />{t('wh.show_inactive')}</label>
         {admin && <button className="btn btn-primary ms-auto" data-testid="wh-new" onClick={() => open({ mode: 'new' })}><Plus size={16} />{t('wh.new_item')}</button>}
@@ -196,7 +198,9 @@ function Movements() {
   const items = (list.data?.items ?? []).filter((m) => m.kind === 'issue' || m.kind === 'return' || m.kind === 'quarantine_exit');
   return (
     <div data-testid="wh-movements">
-      <div className="mb-3 flex gap-2">
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <SavedViews<Record<string, unknown>> screen="warehouse-movements" value={{ status, ...(decodeFilter(adv) ? { advanced: decodeFilter(adv) } : {}) }} empty={{ status: '' }}
+          onApply={(v) => { setStatus(String(v.status ?? '')); setAdv(encodeFilter((v as { advanced?: FilterTree }).advanced)); }} />
         <select className="input w-auto" aria-label={t('wh.status')} data-testid="wh-filter-status" value={status} onChange={(e) => setStatus(e.target.value)}>
           <option value="">{t('wh.all_statuses')}</option>{['pending', 'posted', 'cancelled'].map((s) => <option key={s} value={s}>{t(`wh.st_${s}`)}</option>)}
         </select>
@@ -335,7 +339,10 @@ function Stock() {
   const cols = ['on_hand', 'reserved', 'pending_issue', 'pending_return', 'available', 'quarantine'] as const;
   return (
     <div data-testid="wh-stock">
-      <input className="input mb-3 max-w-64" data-testid="wh-stock-search" placeholder={t('wh.search')} aria-label={t('wh.search')} value={q} onChange={(e) => setQ(e.target.value)} />
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <SavedViews<Record<string, unknown>> screen="warehouse-stock" value={{ q }} empty={{ q: '' }} onApply={(v) => setQ(String(v.q ?? ''))} />
+        <input className="input max-w-64" data-testid="wh-stock-search" placeholder={t('wh.search')} aria-label={t('wh.search')} value={q} onChange={(e) => setQ(e.target.value)} />
+      </div>
       <div className="card overflow-x-auto">
         <table className="w-full text-sm">
           <thead><tr className="border-b border-line bg-card2 text-mute"><th className="px-3 py-2 text-start font-semibold">{t('wh.code')}</th><th className="px-3 py-2 text-start font-semibold">{t('wh.uom')}</th>{cols.map((c) => <th key={c} className="px-3 py-2 text-start font-semibold">{t(`wh.${c}`)}</th>)}<th /></tr></thead>
@@ -368,7 +375,8 @@ function Dispatch() {
   const items = list.data?.items ?? [];
   return (
     <div data-testid="wh-dispatch">
-      <div className="mb-3 flex gap-2">
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <SavedViews<Record<string, unknown>> screen="warehouse-dispatch" value={{ status }} empty={{ status: '' }} onApply={(v) => setStatus(String(v.status ?? ''))} />
         <select className="input w-auto" aria-label={t('wh.need_status')} data-testid="wh-dispatch-filter" value={status} onChange={(e) => setStatus(e.target.value)}>
           <option value="">{t('wh.all_statuses')}</option>{['complete', 'short', 'pending_configuration'].map((s) => <option key={s} value={s}>{t(`wh.ns_${s}`)}</option>)}
         </select>
