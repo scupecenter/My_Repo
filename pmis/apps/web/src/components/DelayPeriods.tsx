@@ -5,6 +5,7 @@ import { useAddDelayPeriod, useDecideDelayPeriod, useDelayPeriods, useVoidDelayP
 import { errText } from './FormDialog';
 import { ErrorState, LoadingSkeleton } from './States';
 import { useToast } from './Toast';
+import { DateInput } from '@/components/DateInput';
 
 const STATUS_TONE: Record<string, string> = { proposed: 'bg-waitBg text-waitInk', approved: 'bg-doneBg text-doneInk', rejected: 'bg-lateBg text-lateInk' };
 const NEEDS_PARTY: DelayParty[] = ['contractor', 'external'];
@@ -114,8 +115,8 @@ export function DelayPeriodsPanel({ taskId }: { taskId: string }) {
       {voidP.isError && <p role="alert" className="mt-1 text-sm text-lateInk">{errText(voidP.error, t)}</p>}
       {canPropose ? (
         <form className="mt-3 grid grid-cols-2 gap-2 text-sm" data-testid="delayp-form" onSubmit={(e) => { e.preventDefault(); submit(); }}>
-          <label>{t('delayp.from')}<input type="date" className="input mono" data-testid="delayp-from" value={form.from_date} onChange={(e) => setForm((f) => ({ ...f, from_date: e.target.value }))} required /></label>
-          <label>{t('delayp.to')}<input type="date" className="input mono" data-testid="delayp-to" min={form.from_date || undefined} value={form.to_date} onChange={(e) => setForm((f) => ({ ...f, to_date: e.target.value }))} required /></label>
+          <label>{t('delayp.from')}<DateInput className="input mono" data-testid="delayp-from" value={form.from_date} onChange={(e) => setForm((f) => ({ ...f, from_date: e.target.value }))} required /></label>
+          <label>{t('delayp.to')}<DateInput className="input mono" data-testid="delayp-to" min={form.from_date || undefined} value={form.to_date} onChange={(e) => setForm((f) => ({ ...f, to_date: e.target.value }))} required /></label>
           <label className="col-span-2">{t('delayp.party')}
             <select className="input" data-testid="delayp-party" value={form.party} onChange={(e) => setForm((f) => ({ ...f, party: e.target.value as DelayParty }))} required>
               <option value="" />
