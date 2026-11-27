@@ -20,8 +20,8 @@ describe('W8 Display menu', () => {
     await screen.findByTestId('site-row-TR101');
     expect(card()).toHaveAttribute('data-tsize', 'md');
     expect(card()).toHaveAttribute('data-tzebra', '1');
-    await u.click(screen.getByTestId('display-menu'));
-    const panel = await screen.findByTestId('display-panel');
+    await u.click(screen.getByTestId('sites-view'));
+    const panel = await screen.findByTestId('sites-view-panel');
     await u.click(within(panel).getByTestId('display-size-lg'));
     await u.click(within(panel).getByTestId('display-align-center'));
     await u.click(within(panel).getByTestId('display-density-normal'));
@@ -49,7 +49,7 @@ describe('W8 Display menu', () => {
     cleanup();
     renderApp(<Sites />, { route: '/sites?layout=list' });
     await screen.findByTestId('site-row-TR101');
-    await u.click(screen.getByTestId('display-menu'));
+    await u.click(screen.getByTestId('sites-view'));
     await u.click(await screen.findByTestId('display-reset'));
     expect(card()).toHaveAttribute('data-tsize', 'md');
     expect(card()).toHaveAttribute('data-density', 'comfortable');
@@ -64,9 +64,9 @@ describe('W8 Display menu', () => {
     await waitFor(() => expect(card()).toHaveAttribute('data-tsize', 'sm'));
     expect(card()).toHaveAttribute('data-density', 'compact');
     expect(card()).toHaveAttribute('data-tzebra', '0');
-    await u.click(screen.getByTestId('display-menu'));
+    await u.click(screen.getByTestId('sites-view'));
     // not an admin: no link to the defaults
-    expect(within(await screen.findByTestId('display-panel')).queryByTestId('display-settings-link')).toBeNull();
+    expect(within(await screen.findByTestId('sites-view-panel')).queryByTestId('display-settings-link')).toBeNull();
   });
 
   it('a saved view keeps the Display options and applies them again', async () => {
@@ -74,14 +74,14 @@ describe('W8 Display menu', () => {
     const u = userEvent.setup();
     renderApp(<Sites />, { route: '/sites?layout=list' });
     await screen.findByTestId('site-row-TR101');
-    await u.click(screen.getByTestId('display-menu'));
+    await u.click(screen.getByTestId('sites-view'));
     await u.click(await screen.findByTestId('display-size-sm'));
     await u.keyboard('{Escape}');
     await u.click(screen.getByTestId('views-save'));
     await u.type(screen.getByTestId('views-name'), 'Small text');
     await u.click(screen.getByTestId('views-name-ok'));
     await waitFor(() => expect(within(screen.getByTestId('views-select')).getAllByRole('option').map((o) => o.textContent)).toContain('Small text'));
-    await u.click(screen.getByTestId('display-menu'));
+    await u.click(screen.getByTestId('sites-view'));
     await u.click(await screen.findByTestId('display-reset'));
     await u.keyboard('{Escape}');
     expect(card()).toHaveAttribute('data-tsize', 'md');

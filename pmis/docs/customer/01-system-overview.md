@@ -163,7 +163,7 @@
 ## 14. الإطلاق
 
 (CLAUDE.md)
-1. **تجربة في منطقة واحدة (طرابلس) لأسبوعين.**
+1. **تجربة في منطقة واحدة لأسبوعين.**
 2. **تشغيل موازٍ شهراً:** يصدّر Workspace ملفاً بصيغة Master ويقارنه تلقائياً بالـMaster الحي. **يُتقاعد الـMaster بعد شهر بلا فروقات جوهرية.**
 3. **التدريب لكل دور:** فيديوهات عربية قصيرة، ودليل داخل التطبيق عند أول استخدام، وجلسة حية لكل مجموعة أدوار، وبطل دعم من Project Support.
 4. **معايير القبول:** نجاح اختبارات المسار الحرج الشاملة (E2E)، ومطابقة 100% لتواريخ المراحل في استيراد الـMaster الحقيقي، ولا أعطال حرجة مفتوحة، وتحقيق أهداف الأداء.
@@ -185,7 +185,7 @@
 
 ## 1. Purpose and scope
 
-- **Workspace** manages the Project site-delivery project (telecom sites across 7 Libyan regions). It replaces the Excel Site Master as the system of record and puts a **3-level approval workflow** on every task. (CLAUDE.md)
+- **Workspace** manages the Project site-delivery project (telecom sites across 7 regions). It replaces the Excel Site Master as the system of record and puts a **2-level (L1 and L2) approval workflow** on every task. (CLAUDE.md)
 - **Regions:** Tripoli, Middle, WM, Zawia, Benghazi, GM, Sebha. **Delivery scenarios:** New Build, Expansion, Hot Swap, Cold Swap, Relocation. **Overall status:** Not Started, In Progress, On Hold, Completed, Cancelled. (CLAUDE.md)
 - **Hosting:** an internal company server, never cloud. (CLAUDE.md, ADR 0001)
 - **Out of scope for now:** the mobile app (later, designed for now), HSE incidents and clock-in (deferred to mobile), team capacity and certificates (dropped), generated TE forms (deferred), local password sign-in (deferred). (CLAUDE.md)
@@ -337,7 +337,7 @@ Every create, rename, edit, deactivate or delete of configuration is a System Ad
 ## 14. Rollout
 
 (CLAUDE.md)
-1. **Pilot on one region (Tripoli) for 2 weeks.**
+1. **Pilot on one region for 2 weeks.**
 2. **Parallel run for 1 month:** Workspace exports a Master-format file and compares it automatically with the live Master. **The Master is retired after one month without material differences.**
 3. **Training per role:** short Arabic videos, an in-app guide on first use, one live session per role group, and a Project Support champion.
 4. **Acceptance criteria:** critical-path E2E tests pass, the real Master import matches 100% of milestone dates, no open critical bugs, and the performance targets are met.

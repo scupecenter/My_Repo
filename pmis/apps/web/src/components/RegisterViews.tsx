@@ -153,8 +153,8 @@ export type RegisterLane = 'none' | 'region' | 'type';
  * the order of its list (values outside the list and "Not set" after them), or one per approval state. Swimlanes by region or by record type.
  * Read only, as the Site Master board: a card opens the record, and a record moves only through its own form and actions.
  */
-export function RegisterBoard({ def, records, by, onBy, lane, onLane, regionName, onOpen, partial }: {
-  def: RegisterDefinition; records: RegisterRecord[]; by: string; onBy: (by: string) => void; lane: RegisterLane; onLane: (l: RegisterLane) => void;
+export function RegisterBoard({ def, records, by, lane, regionName, onOpen, partial }: {
+  def: RegisterDefinition; records: RegisterRecord[]; by: string; lane: RegisterLane;
   regionName: (id: number | null | undefined) => string; onOpen: (id: string) => void;
   /** the board holds only the first records of a larger filtered set */
   partial: { shown: number; total: number } | null;
@@ -188,21 +188,9 @@ export function RegisterBoard({ def, records, by, onBy, lane, onLane, regionName
     const f = def.fields.find((y) => y.in_list && y.code !== groupBy && r.data[y.code] !== undefined && r.data[y.code] !== null && r.data[y.code] !== '');
     return f ? valueText(f, r.data[f.code], lang, t) : '';
   };
-  const lanesOffered: RegisterLane[] = def.record_types?.length ? ['none', 'region', 'type'] : ['none', 'region'];
   return (
     <section className="space-y-2" data-testid="register-board" data-by={groupBy} aria-label={t('regviews.board_label', { name: (lang === 'ar' && def.name_ar) || def.name_en })}>
       <div className="flex flex-wrap items-center gap-2">
-        <label className="flex items-center gap-2 text-sm"><span className="text-mute">{t('regviews.board_by')}</span>
-          <select className="input w-auto py-1" data-testid="register-board-by" value={groupBy} onChange={(e) => onBy(e.target.value)}>
-            {choices.map((f) => <option key={f.code} value={f.code}>{fieldLabel(f, lang)}</option>)}
-            <option value={BY_STATE}>{t('regviews.by_state')}</option>
-          </select>
-        </label>
-        <label className="flex items-center gap-2 text-sm"><span className="text-mute">{t('board.swimlane')}</span>
-          <select className="input w-auto py-1" data-testid="register-board-lane" value={lane} onChange={(e) => onLane(e.target.value as RegisterLane)}>
-            {lanesOffered.map((l) => <option key={l} value={l}>{l === 'type' ? t('regviews.lane_type') : t(`board.lane_${l}`)}</option>)}
-          </select>
-        </label>
         {partial && <span className="chip bg-waitBg text-waitInk" role="note" data-testid="register-board-partial">{t('regviews.partial', { shown: partial.shown, total: partial.total })}</span>}
         <span className="ms-auto text-xs text-mute">{t('regviews.board_read_only')}</span>
       </div>
