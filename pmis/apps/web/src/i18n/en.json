@@ -5115,7 +5115,13 @@
     "tab_te": "TE",
     "move_up": "Move {{name}} up",
     "move_down": "Move {{name}} down",
-    "invalid": "Every KPI needs a green and an amber value, and green must be better than amber for that KPI's direction."
+    "invalid": "Every KPI needs a green and an amber value, and green must be better than amber for that KPI's direction.",
+    "partial_credit_title": "Partial credit for tasks in progress",
+    "partial_credit_note": "When on, a task that is started but not yet approved earns part of its progress (current level / required levels, PMI percent-complete). When off, only approved tasks count.",
+    "partial_credit_on": "Partial credit is ON.",
+    "partial_credit_off": "Partial credit is OFF (default).",
+    "partial_credit_turn_on": "Turn on",
+    "partial_credit_turn_off": "Turn off"
   },
   "deriveRules": {
     "title": "Derived values between registers",
