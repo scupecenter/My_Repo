@@ -15,6 +15,7 @@ import { decodeFilter, encodeFilter, type FilterTree } from '@/api/views';
 import { BallSince, ExternalParty, SlaOverrun, StaleBadge, TIMING_SORTS, sortByTiming, type TimingSort } from '@/components/TaskTiming';
 import { useToast } from '@/components/Toast';
 import { taskErrorMessage } from '@/lib/taskErrors';
+import { ScreenSettingsLink } from '@/components/ScreenSettingsLink';
 
 const TABS = ['all', 'review', 'approve'] as const;
 const COLOURS = ['red', 'amber', 'green'] as const;
@@ -67,7 +68,7 @@ export function Approvals() {
 
   return (
     <div data-testid="page-approvals">
-      <h1 className="text-2xl font-bold">{t('approvals.title')}</h1>
+      <div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-bold">{t('approvals.title')}</h1><span className="ms-auto"><ScreenSettingsLink screen="approvals" /></span></div>
       <p className="mb-4 text-mute">{t('approvals.subtitle')}</p>
       {/* W8: the shared toolbar (a master-detail list: no column chooser; the Display options apply to the list) */}
       <TableToolbar testid="approvals-toolbar" kind="list"

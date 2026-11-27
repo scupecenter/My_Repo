@@ -264,6 +264,10 @@ const MK = () => (C().mailKinds ??= initCfg().mailKinds);
 const locks: { block_public_sharing: boolean; disable_export: boolean; version: number; updated_at: string | null; updated_by: { id: string; display_name: string; employee_id: string | null } | null } =
   { block_public_sharing: false, disable_export: false, version: 1, updated_at: null, updated_by: null };
 const locksView = () => ({ ...locks, can_edit: isAdmin() });
+/** 0.15.193: the download lock categories (templates, uploaded files, generated documents), in memory, all off by default. */
+export const dlocks: { templates: boolean; uploaded_files: boolean; generated_documents: boolean; version: number; updated_at: string | null; updated_by: { id: string; display_name: string; employee_id: string | null } | null } =
+  { templates: false, uploaded_files: false, generated_documents: false, version: 1, updated_at: null, updated_by: null };
+const dlocksView = () => ({ ...dlocks, can_edit: isAdmin() });
 
 /** 0.15.191: support access (off by default) and the support grants, kept in memory like the lock keys. A grant is a time-limited delegation. */
 const support: { enabled: boolean; max_hours: number; default_hours: number; version: number; updated_at: string | null; updated_by: { id: string; display_name: string; employee_id: string | null } | null } =
@@ -727,6 +731,27 @@ export const settingsHandlers = [
     Object.assign(locks, { block_public_sharing: b.block_public_sharing, disable_export: b.disable_export, version: locks.version + 1, updated_at: new Date().toISOString(),
       updated_by: { id: uid(v.employee_id ?? '9999'), display_name: v.name, employee_id: v.employee_id } });
     const j = locksView();
+    return HttpResponse.json(j, tag(j.version));
+  }),
+
+  // ------------------------------------------------------------------ 0.15.193: download lock categories (all off by default)
+  http.get(`${B}/settings/download-locks`, () => { const g = guard(); if (g) return g; const j = dlocksView(); return HttpResponse.json(j, tag(j.version)); }),
+  http.put(`${B}/settings/download-locks`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    const KEYS = ['templates', 'uploaded_files', 'generated_documents'] as const;
+    const b = await body<Record<string, unknown> & { reason?: string }>(request);
+    const errs: { path: string; code: string }[] = Object.keys(b).filter((k) => ![...KEYS, 'reason'].includes(k as never)).map((k) => ({ path: `/${k}`, code: 'unknown_field' }));
+    for (const k of KEYS) if (typeof b[k] !== 'boolean') errs.push({ path: `/${k}`, code: 'required' });
+    if ((b.reason ?? '').trim().length < 3 || (b.reason ?? '').length > 1000) errs.push({ path: '/reason', code: 'required' });
+    if (errs.length) return fields(...errs);
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, dlocks.version); if (p) return p;
+    if (!stepUpValid()) return stepUp();
+    if (KEYS.every((k) => dlocks[k] === b[k])) return problem(409, 'invalid_transition', 'These are already the download locks in force.');
+    const v = viewer()!;
+    Object.assign(dlocks, { templates: b.templates, uploaded_files: b.uploaded_files, generated_documents: b.generated_documents, version: dlocks.version + 1, updated_at: new Date().toISOString(),
+      updated_by: { id: uid(v.employee_id ?? '9999'), display_name: v.name, employee_id: v.employee_id } });
+    const j = dlocksView();
     return HttpResponse.json(j, tag(j.version));
   }),
 
