@@ -10,6 +10,7 @@ import { useRegions } from '@/api/sites';
 import { errText } from './FormDialog';
 import { ScopePicker } from './ScopePicker';
 import { useToast } from './Toast';
+import { DateInput } from '@/components/DateInput';
 
 const TONE: Record<string, string> = { queued: 'bg-lockBg text-lockInk', running: 'bg-openBg text-openInk', done: 'bg-doneBg text-doneInk', failed: 'bg-lateBg text-lateInk', expired: 'bg-lockBg text-lockInk' };
 const TODAY = '2026-10-25';
@@ -56,7 +57,7 @@ export function ExportDialog({ open, onClose }: { open: boolean; onClose: () => 
             </div>
           )}
           <ScopePicker id="export-regions" label={t('export.regions')} options={(regions.data ?? []).map((r): [number, string] => [r.id, (ar && r.name_ar) || r.name_en])} value={reg} onChange={setReg} />
-          <label className="block text-sm font-semibold">{t('export.as_of')}<input type="date" max={TODAY} className="input mt-1 w-auto font-normal" data-testid="export-as-of" value={asOf} onChange={(e) => setAsOf(e.target.value)} /></label>
+          <label className="block text-sm font-semibold">{t('export.as_of')}<DateInput max={TODAY} className="input mt-1 w-auto font-normal" data-testid="export-as-of" value={asOf} onChange={(e) => setAsOf(e.target.value)} /></label>
           {start.isError && <p role="alert" data-testid="export-error" className="text-lateInk">{exportError(start.error, t, label)}</p>}
           <div className="flex justify-end gap-2">
             <button className="btn" onClick={onClose}>{t('common.close')}</button>

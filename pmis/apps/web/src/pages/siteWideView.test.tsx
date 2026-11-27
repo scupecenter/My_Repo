@@ -110,7 +110,7 @@ describe('Site Master wide table', () => {
       renderApp(<App />, { route: '/sites?section=te&layout=wide' });
       await userEvent.click(await screen.findByTestId('wide-edit-S360-001-78'));
       const input = screen.getByTestId('wide-input-S360-001-78');
-      expect(input).toHaveAttribute('type', 'date');
+      expect(input).toHaveAttribute('placeholder', 'YYYY-MM-DD');
       expect(screen.queryByTestId('wide-input-S360-002-78')).toBeNull();
       await userEvent.clear(input);
       await userEvent.type(input, '2026-04-01{Enter}');
