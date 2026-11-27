@@ -337,6 +337,8 @@ describe('hybrid mode list', () => {
       'POST /saved-views/:id/restore', 'POST /saved-views/:id/transfer', 'GET /saved-views/:id/versions',
       // contract 0.15.246 (item 17, migration 0345): the soft "... is editing this record" notice
       'POST /presence/editing', 'POST /presence/editing/stop', 'GET /presence/editing',
+      // contract 0.15.245 (0344): pin a saved view as a personal home card
+      'GET /me/home-pins', 'POST /saved-views/:id/pin', 'POST /saved-views/:id/unpin',
       'GET /me/drafts', 'GET /me/drafts/:key', 'PUT /me/drafts/:key',
       'DELETE /me/drafts/:key',
       // contract 0.13.2: follow-up group C (Q267 cancel of a mistaken Quality snag record)
@@ -356,7 +358,7 @@ describe('hybrid mode list', () => {
       // contract 0.15.41: Settings, Identity & themes
       'GET /settings/identity', 'PUT /settings/identity',
       // contract 0.15.97: Settings, Screens, Login page and its public read
-      'GET /settings/login-page', 'PUT /settings/login-page', 'GET /settings/login-page/public',
+      'GET /settings/login-page', 'PUT /settings/login-page', 'GET /settings/ops-limits', 'PUT /settings/ops-limits', 'GET /settings/login-page/public',
       // contract 0.15.292: the media gallery
       'GET /media/settings', 'PUT /media/settings', 'GET /media/items', 'GET /media/facets', 'GET /media/items/:kind/:id/thumbnail',
       'GET /settings/security-locks', 'PUT /settings/security-locks', 'GET /settings/download-locks', 'PUT /settings/download-locks',

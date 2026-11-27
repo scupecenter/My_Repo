@@ -35,6 +35,23 @@ export function useSavedViewOps(screen: string) {
   };
 }
 
+// ---------------------------------------------------------------------------------------------------------------- home pins (0.15.245, item 16)
+export type HomeViewPin = S['HomeViewPin'];
+
+const PIN_KEY = ['home-pins'] as const;
+/** The caller's pinned home views (id, name, screen), in the pin order. */
+export const useHomePins = () =>
+  useQuery({ queryKey: PIN_KEY, staleTime: 60_000, queryFn: async () => (await api.get<{ items: HomeViewPin[] }>('/me/home-pins')).items });
+
+export function useHomePinOps() {
+  const qc = useQueryClient();
+  const settle = () => void qc.invalidateQueries({ queryKey: PIN_KEY });
+  return {
+    pin: useMutation<{ view_id: string; pinned_home: boolean }, ApiError, string>({ mutationFn: (id) => api.post(`/saved-views/${id}/pin`, { body: {} }), onSuccess: settle }),
+    unpin: useMutation<{ view_id: string; pinned_home: boolean }, ApiError, string>({ mutationFn: (id) => api.post(`/saved-views/${id}/unpin`, { body: {} }), onSuccess: settle }),
+  };
+}
+
 export type LocalView = { id: string; name: string; filter: unknown };
 /** First use of a screen: the views the browser kept locally move to the server (idempotent per local id). */
 export const importLocalViews = (screen: string, items: LocalView[]) =>
