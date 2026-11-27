@@ -37,7 +37,7 @@ export function useReducedMotion(): boolean {
   return v;
 }
 
-/** A ClickUp-style filter chip: the label with the chosen values, a pop-over list of options with counts. */
+/** A filter chip: the label with the chosen values, a pop-over list of options with counts. */
 function FilterChip({ id, label, options, value, onChange }: { id: string; label: string; options: { v: string; label: string; n: number }[]; value: string[]; onChange: (v: string[]) => void }) {
   const { t } = useTranslation();
   const on = value.length > 0;

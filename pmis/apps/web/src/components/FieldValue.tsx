@@ -3,7 +3,7 @@ import type { RegisterField } from '@/api/types';
 import { showValue } from './RegisterFields';
 
 /**
- * Cell display of a field value (item 15 of the 2026-11-27 research, Smartsheet coloured dropdowns and monday status/progress columns):
+ * Cell display of a field value (item 15 of the 2026-11-27 research: coloured dropdowns and status/progress columns):
  * - a list value shows as a chip in the colour the admin set in Settings, Lists (a small dot keeps colour from being the only signal);
  * - a percentage shows as a number over a thin progress bar (one progressbar, the number in text);
  * - a date also reads relatively ("in 3 days"), red once it has passed, amber today, with the absolute date in the tooltip.
