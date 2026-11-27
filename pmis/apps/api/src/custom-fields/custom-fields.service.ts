@@ -1,31 +1,79 @@
-import { Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
-import { z } from 'zod';
-import type { AuthContext } from '../auth/auth.types';
-import { problems } from '../common/problem';
-import { parse } from '../common/zod';
-import { DbService } from '../db/db.service';
+import { Injectable } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
+import { z } from "zod";
+import type { AuthContext } from "../auth/auth.types";
+import { StepUpService } from "../auth/step-up.service";
+import { mapDbError } from "../common/db-errors";
+import { parseIfMatch } from "../common/etag";
+import { ProblemException, problems } from "../common/problem";
+import { parse } from "../common/zod";
+import { DbService } from "../db/db.service";
 
 /** The contract names (CustomFieldEntity) and the database enum (FieldEntityType). Types with no contract name (warehouse_serial) are not listed. */
 const TO_CONTRACT: Record<string, string> = {
-  site: 'site', milestone: 'milestone', gate: 'gate', task_instance: 'task', rf_design: 'rf_design', acquisition: 'acquisition', procurement: 'procurement',
-  external_party: 'contractors', gecol: 'gecol', hlc: 'hlc', permit: 'permits_hse', warehouse_item: 'warehouse', quality: 'quality', issue: 'issues', risk: 'risks',
-  change_request: 'change_control', readiness: 'readiness_handover', as_built: 'as_built', meeting: 'meetings',
+  site: "site",
+  milestone: "milestone",
+  gate: "gate",
+  task_instance: "task",
+  rf_design: "rf_design",
+  acquisition: "acquisition",
+  procurement: "procurement",
+  external_party: "contractors",
+  gecol: "gecol",
+  hlc: "hlc",
+  permit: "permits_hse",
+  warehouse_item: "warehouse",
+  quality: "quality",
+  issue: "issues",
+  risk: "risks",
+  change_request: "change_control",
+  readiness: "readiness_handover",
+  as_built: "as_built",
+  meeting: "meetings",
 };
-const TO_DB = Object.fromEntries(Object.entries(TO_CONTRACT).map(([db, c]) => [c, db]));
+const TO_DB = Object.fromEntries(
+  Object.entries(TO_CONTRACT).map(([db, c]) => [c, db]),
+);
 
-const query = z.object({
-  entity_type: z.enum(Object.keys(TO_DB) as [string, ...string[]]).optional(),
-  task_code: z.string().trim().min(1).max(80).optional(),
-  include_inactive: z.enum(['true', 'false']).optional(),
-}).strict();
+const query = z
+  .object({
+    entity_type: z.enum(Object.keys(TO_DB) as [string, ...string[]]).optional(),
+    task_code: z.string().trim().min(1).max(80).optional(),
+    include_inactive: z.enum(["true", "false"]).optional(),
+  })
+  .strict();
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 interface Row {
-  id: string; entity_type: string; task_code: string | null; code: string; label_en: string; label_ar: string | null; data_type: string; required: boolean;
-  validation: unknown; default_value: unknown; section: string | null; sort_order: number; in_templates: boolean; in_exports: boolean; in_list_filters: boolean;
-  master_export_column: string | null; is_active: boolean; version: number; list_values: { value: string; label_en: string; label_ar: string | null; is_active: boolean }[] | null;
-  visible_to: string[] | null; editable_by: string[] | null; has_values: boolean | null;
+  id: string;
+  entity_type: string;
+  task_code: string | null;
+  code: string;
+  label_en: string;
+  label_ar: string | null;
+  data_type: string;
+  required: boolean;
+  validation: unknown;
+  default_value: unknown;
+  section: string | null;
+  sort_order: number;
+  in_templates: boolean;
+  in_exports: boolean;
+  in_list_filters: boolean;
+  master_export_column: string | null;
+  is_active: boolean;
+  version: number;
+  list_values:
+    | {
+        value: string;
+        label_en: string;
+        label_ar: string | null;
+        is_active: boolean;
+      }[]
+    | null;
+  visible_to: string[] | null;
+  editable_by: string[] | null;
+  has_values: boolean | null;
 }
 
 /**
@@ -36,10 +84,15 @@ interface Row {
  */
 @Injectable()
 export class CustomFieldsService {
-  constructor(private readonly db: DbService) {}
+  constructor(
+    private readonly db: DbService,
+    private readonly stepUp: StepUpService,
+  ) {}
 
   private async isAdmin(): Promise<boolean> {
-    const r = await this.db.tx.$queryRaw<{ ok: boolean | null }[]>(Prisma.sql`SELECT site_master_col_can_admin() AS ok`);
+    const r = await this.db.tx.$queryRaw<{ ok: boolean | null }[]>(
+      Prisma.sql`SELECT site_master_col_can_admin() AS ok`,
+    );
     return r[0]?.ok === true;
   }
 
@@ -54,18 +107,36 @@ export class CustomFieldsService {
         NULL::boolean AS has_values
       FROM field_definitions fd
       WHERE fd.entity_type::text = ANY(${Object.keys(TO_CONTRACT)}::text[])
-        AND coalesce(app_resolve_field_access(app_actor(), fd.id)::text, 'edit') <> 'hidden' AND ${where}
+        AND (${admin} OR coalesce(app_resolve_field_access(app_actor(), fd.id)::text, 'edit') <> 'hidden') AND ${where}
       ORDER BY fd.entity_type::text, fd.sort_order, fd.code COLLATE "C"`);
   }
 
   private dto(r: Row) {
     return {
-      id: r.id, entity_type: TO_CONTRACT[r.entity_type]!, task_code: r.task_code, code: r.code, label_en: r.label_en, label_ar: r.label_ar, data_type: r.data_type === 'bool' ? 'yes_no' : r.data_type,
-      required: r.required, ...(r.validation ? { validation: r.validation } : {}), ...(r.default_value !== null && r.default_value !== undefined ? { default_value: r.default_value } : {}),
-      section: r.section, sort_order: r.sort_order, ...(r.list_values ? { list_values: r.list_values } : {}),
-      ...(r.visible_to ? { visible_to_role_ids: r.visible_to } : {}), ...(r.editable_by ? { editable_by_role_ids: r.editable_by } : {}),
-      in_templates: r.in_templates, in_exports: r.in_exports, in_list_filters: r.in_list_filters, master_export_column: r.master_export_column,
-      is_active: r.is_active, ...(r.has_values === null ? {} : { has_values: r.has_values }), version: r.version,
+      id: r.id,
+      entity_type: TO_CONTRACT[r.entity_type]!,
+      task_code: r.task_code,
+      code: r.code,
+      label_en: r.label_en,
+      label_ar: r.label_ar,
+      data_type: r.data_type === "bool" ? "yes_no" : r.data_type,
+      required: r.required,
+      ...(r.validation ? { validation: r.validation } : {}),
+      ...(r.default_value !== null && r.default_value !== undefined
+        ? { default_value: r.default_value }
+        : {}),
+      section: r.section,
+      sort_order: r.sort_order,
+      ...(r.list_values ? { list_values: r.list_values } : {}),
+      ...(r.visible_to ? { visible_to_role_ids: r.visible_to } : {}),
+      ...(r.editable_by ? { editable_by_role_ids: r.editable_by } : {}),
+      in_templates: r.in_templates,
+      in_exports: r.in_exports,
+      in_list_filters: r.in_list_filters,
+      master_export_column: r.master_export_column,
+      is_active: r.is_active,
+      ...(r.has_values === null ? {} : { has_values: r.has_values }),
+      version: r.version,
     };
   }
 
@@ -73,22 +144,132 @@ export class CustomFieldsService {
   async list(_auth: AuthContext, raw: Record<string, unknown>) {
     const q = parse(query, raw);
     const admin = await this.isAdmin();
-    const inactive = q.include_inactive === 'true';
-    if (inactive && !admin) throw problems.forbidden('action_forbidden', 'Only a System Admin, or a delegate of the custom fields for all regions, reads the inactive fields.');
+    const inactive = q.include_inactive === "true";
+    if (inactive && !admin)
+      throw problems.forbidden(
+        "action_forbidden",
+        "Only a System Admin, or a delegate of the custom fields for all regions, reads the inactive fields.",
+      );
     const where = Prisma.sql`(${inactive} OR fd.is_active)
       AND (${q.entity_type ?? null}::text IS NULL OR fd.entity_type::text = ${q.entity_type ? TO_DB[q.entity_type] : null}::text)
       AND (${q.task_code ?? null}::text IS NULL OR fd.task_code = ${q.task_code ?? null}::text)`;
     const rows = await this.rows(where, admin);
-    const v = await this.db.tx.$queryRaw<{ v: number }[]>(Prisma.sql`SELECT (coalesce(sum(version), 0) + count(*))::int AS v FROM field_definitions`);
-    return { items: rows.map((r) => this.dto(r)), field_set_version: v[0]?.v ?? 0 };
+    const v = await this.db.tx.$queryRaw<{ v: number }[]>(
+      Prisma.sql`SELECT (coalesce(sum(version), 0) + count(*))::int AS v FROM field_definitions`,
+    );
+    return {
+      items: rows.map((r) => this.dto(r)),
+      field_set_version: v[0]?.v ?? 0,
+    };
   }
 
   /** GET /custom-fields/{id} */
   async one(_auth: AuthContext, id: string) {
     if (!UUID.test(id)) throw problems.notFound();
     const admin = await this.isAdmin();
-    const rows = await this.rows(Prisma.sql`fd.id = ${id}::uuid AND (fd.is_active OR ${admin})`, admin);
+    const rows = await this.rows(
+      Prisma.sql`fd.id = ${id}::uuid AND (fd.is_active OR ${admin})`,
+      admin,
+    );
     if (!rows[0]) throw problems.notFound();
     return this.dto(rows[0]);
+  }
+
+  private async requireAdmin(): Promise<void> {
+    if (!(await this.isAdmin()))
+      throw problems.forbidden(
+        "action_forbidden",
+        "Only a System Admin, or a delegate of the custom fields for all regions, changes the custom fields.",
+      );
+  }
+
+  /** The body as the door wants it: the reason split off, the contract names turned into the database names. */
+  private input(
+    raw: unknown,
+    creating: boolean,
+  ): { reason: string; body: Record<string, unknown> } {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw))
+      throw problems.validation([
+        { path: "/", code: "invalid", message: "An object." },
+      ]);
+    const { reason, ...body } = raw as Record<string, unknown>;
+    if (typeof reason !== "string" || reason.trim().length < 3)
+      throw problems.validation([
+        {
+          path: "/reason",
+          code: "required",
+          message: "A reason of at least 3 characters.",
+        },
+      ]);
+    if (typeof body.entity_type === "string") {
+      const db = TO_DB[body.entity_type];
+      if (!db)
+        throw problems.validation([
+          {
+            path: "/entity_type",
+            code: "invalid",
+            message: "A custom field entity.",
+          },
+        ]);
+      body.entity_type = db;
+    }
+    if (body.data_type === "yes_no") body.data_type = "bool";
+    if (!creating && Object.keys(body).length < 1)
+      throw problems.validation([
+        {
+          path: "/",
+          code: "invalid",
+          message: "Send at least one field to change.",
+        },
+      ]);
+    return { reason: reason.trim(), body };
+  }
+
+  private async door(
+    id: string | null,
+    body: Record<string, unknown>,
+    reason: string,
+    version: number | null,
+  ): Promise<string> {
+    await this.db.tx.$executeRaw`SAVEPOINT cf_save`;
+    try {
+      const rows = await this.db.tx.$queryRaw<{ r: { id: string } | null }[]>(
+        Prisma.sql`SELECT admin_save_field(${id}::uuid, ${JSON.stringify(body)}::jsonb, ${reason}::text, ${version}::integer) AS r`,
+      );
+      await this.db.tx.$executeRaw`RELEASE SAVEPOINT cf_save`;
+      return rows[0]!.r!.id;
+    } catch (e) {
+      if (e instanceof ProblemException) throw e;
+      const p = mapDbError(e);
+      if (!p) throw e;
+      await this.db.tx.$executeRaw`ROLLBACK TO SAVEPOINT cf_save`;
+      throw p;
+    }
+  }
+
+  /** POST /custom-fields */
+  async create(auth: AuthContext, raw: unknown) {
+    await this.requireAdmin();
+    await this.stepUp.require(auth);
+    const { reason, body } = this.input(raw, true);
+    const id = await this.door(null, body, reason, null);
+    return this.one(auth, id);
+  }
+
+  /** PATCH /custom-fields/{id} (If-Match required). Never deletes: is_active=false hides the field. */
+  async update(
+    auth: AuthContext,
+    id: string,
+    ifMatch: string | undefined,
+    raw: unknown,
+  ) {
+    await this.requireAdmin();
+    if (!UUID.test(id)) throw problems.notFound();
+    const version = parseIfMatch(ifMatch);
+    await this.stepUp.require(auth);
+    const { reason, body } = this.input(raw, false);
+    await this.one(auth, id); // 404 when it does not exist
+    await this.door(id, body, reason, version);
+    return this.one(auth, id);
   }
 }
