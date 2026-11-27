@@ -78,6 +78,17 @@ export class ImportBatchesController {
     return dto;
   }
 
+  /** P4 (0365): the refused rows of the batch as an .xlsx to correct and upload again; the reasons are on the sheet "Errors". */
+  @Get(':id/error-report')
+  async errorReport(@Auth() auth: AuthContext, @Param('id') id: string, @Res({ passthrough: true }) res: Response): Promise<StreamableFile> {
+    const { buffer, fileName } = await this.imports.errorReport(auth, id);
+    res.setHeader('Content-Type', XLSX_MIME);
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName.replace(/[^A-Za-z0-9._-]/g, '_')}"`);
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    return new StreamableFile(buffer);
+  }
+
   @Get(':id/rows')
   rows(@Auth() auth: AuthContext, @Param('id') id: string, @Query() q: Record<string, unknown>) {
     return this.imports.listRows(auth, id, q);
