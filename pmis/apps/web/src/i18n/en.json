@@ -6596,5 +6596,17 @@
     "never": "Not changed since installation.",
     "readonly": "Only a System Admin, or a person they delegated settings to for all regions, can change this.",
     "confirm": "Save the login page settings? The change is audited with your reason and shows on the sign-in page at once."
+  },
+  "rel": {
+    "today": "today",
+    "tomorrow": "tomorrow",
+    "yesterday": "yesterday",
+    "in_days": "in {{count}} days",
+    "in_days_one": "in {{count}} day",
+    "days_ago": "{{count}} days ago",
+    "days_ago_one": "{{count}} day ago"
+  },
+  "cells": {
+    "progress": "Progress"
   }
 }
