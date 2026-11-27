@@ -22,7 +22,7 @@ export type UiPrefs = Partial<{ [K in UiPrefKey]: (typeof UI_PREF_OPTIONS)[K][nu
 
 /** The built-in standard of every dimension (ui_pref_defaults() in the database). */
 export const UI_PREF_DEFAULTS: Required<UiPrefs> = {
-  density: 'standard', font_scale: 'standard', radius: 'standard', motion: 'full', icon_style: 'regular', menu_style: 'default', accent: 'default', contrast: 'standard',
+  density: 'standard', font_scale: 'standard', radius: 'standard', motion: 'full', icon_style: 'regular', menu_style: 'default', accent: 'default', contrast: 'standard', inbox_panel: 'overlay', inbox_anchor: 'end-top',
 };
 
 /** A subset of the dimensions, each with one of its allowed values (PATCH /me/profile ui_prefs, PUT /settings/identity defaults). */
