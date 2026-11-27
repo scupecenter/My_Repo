@@ -1,4 +1,5 @@
 import { ArrowLeft, Send, SquarePen } from 'lucide-react';
+import { UnsavedGuard } from '@/lib/unsavedGuard';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams } from 'react-router-dom';
@@ -74,6 +75,7 @@ function ThreadView({ id }: { id: string }) {
   };
   return (
     <div className="space-y-3 p-4" data-testid="thread-detail">
+      <UnsavedGuard scope="composers" dirty={!!body.trim()} label={t('ui.guard_message')} onSave={() => { send(); return true; }} />
       <Link to="/messages" className="btn md:hidden" data-testid="thread-back"><ArrowLeft size={14} className="rtl:rotate-180" />{t('messages.back')}</Link>
       <div>
         <h2 className="text-xl font-bold" dir="auto" data-testid="thread-title">{th.subject}</h2>

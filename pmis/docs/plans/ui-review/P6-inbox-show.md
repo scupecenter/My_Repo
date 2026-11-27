@@ -1,0 +1,2 @@
+# P6: Inbox "Show" select
+The Inbox toolbar had All/Unread buttons, a "Hide/Only/Include snoozed" select and an "All kinds" select that duplicated the tabs. Now one `Show` select (`inbox-show`) holds the six combinations of unread/all and snoozed hidden/only/included. The kind select is gone; `?kind=` and saved views still work and show a removable chip (`inbox-kind-chip`). URL parameters (`unread`, `snoozed`, `kind`) and saved-view payloads are unchanged, so old links and views keep working.
