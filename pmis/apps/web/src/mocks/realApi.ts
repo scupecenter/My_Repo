@@ -717,6 +717,8 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/library/form-templates/:id/retire'],
   ['get', '/settings/library-archive'],
   ['put', '/settings/library-archive'],
+  ['get', '/settings/document-marks'],
+  ['put', '/settings/document-marks/:code'],
 ] as const;
 
 /** `GET /users/deleted` and `GET /users/picker` are other operations that the `:id` pattern would swallow; they stay mocked. */

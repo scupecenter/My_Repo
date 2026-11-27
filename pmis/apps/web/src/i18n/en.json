@@ -3589,6 +3589,11 @@
     }
   },
   "docs": {
+    "signed": "Signed",
+    "stamped": "Stamped",
+    "awaiting_signed": "Awaiting the signed and stamped copy: upload it as the next version.",
+    "mark_signed": "This file is the signed copy",
+    "mark_stamped": "This file is the stamped copy",
     "err": {
       "too_large": "The file is larger than the {{mb}} MB this document allows."
     },
@@ -7051,6 +7056,15 @@
     "people": "People",
     "last": "Last alert sent: {{at}}",
     "never": "No alert sent yet."
+  },
+  "marks": {
+    "title": "Signed and stamped copies",
+    "note": "Mark the document types that need a signed copy and a stamped copy. The upload then asks if the file is that copy and the slot shows it is awaited. Nothing is blocked.",
+    "signature": "Needs signed copy",
+    "stamp": "Needs stamped copy",
+    "reason": "Reason for the change",
+    "save": "Save",
+    "saved": "Saved."
   },
   "as": {
     "title": "Archive",
