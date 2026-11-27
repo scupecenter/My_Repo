@@ -13,6 +13,7 @@ import { useOpenAlertCount } from '@/api/logs';
 import { isAdmin } from '@/lib/perm';
 import { applyLocale, applyTheme, currentLocale, currentTheme } from '@/i18n';
 import { HYBRID } from '@/lib/hybrid';
+import { UnsavedGuardProvider } from '@/lib/unsavedGuard';
 import { loadPref, savePref as storePref } from '@/lib/localPref';
 import { applyAppearance } from '@/lib/appearance';
 import { API_BASE } from '@/api/client';
@@ -38,7 +39,12 @@ const ICONS_KEY = 'pmis.nav.icons';
 /** The menu hides by itself (a narrow rail that opens on hover) unless it is pinned; kept in the browser like the width and the icons-only choice. */
 const AUTO_KEY = 'pmis.nav.auto';
 
+/** The signed-in frame. The unsaved-changes guard (Decision 11) wraps everything inside it: links, the Back button and every screen's dirty state. */
 export function Shell() {
+  return <UnsavedGuardProvider><ShellFrame /></UnsavedGuardProvider>;
+}
+
+function ShellFrame() {
   const { t } = useTranslation();
   const me = useMe(true);
   const notes = useNotifications(true);

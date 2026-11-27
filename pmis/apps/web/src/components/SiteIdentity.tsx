@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { UnsavedGuard } from '@/lib/unsavedGuard';
 import { useTranslation } from 'react-i18next';
 import { useMe } from '@/api/hooks';
 import { useProposeSiteChange, type SiteIdentityProposal } from '@/api/qc';
@@ -76,6 +77,7 @@ export function SiteIdentity({ site }: { site: SiteDetail }) {
 
   return (
     <section className="mt-3 rounded-md border border-line p-3 text-sm" aria-label={t('siteIdentity.title')} data-testid="site-identity">
+      <UnsavedGuard scope="inline" dirty={!!form && Object.keys(body).length > 0} needsReason label={t('siteIdentity.title')} onSave={(reason) => new Promise<boolean>((res) => { if (!form || Object.keys(body).length === 0) { res(false); return; } propose.mutate({ identity: body, reason }, { onSuccess: () => { setForm(null); res(true); }, onError: () => res(false) }); })} />
       <div className="flex flex-wrap items-center gap-3">
         <span className="font-semibold">{t('siteIdentity.title')}</span>
         <span><span className="text-mute">{t('siteIdentity.site_id')}:</span> <b className="mono" data-testid="site-identity-site-code">{site.site_code}</b></span>
