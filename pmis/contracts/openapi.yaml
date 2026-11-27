@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.220
+  version: 0.15.221
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -31,6 +31,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.221 (2026-11-27): additive (migration 0321; CHANGELOG DismantleClosingRnLink). A Dismantle part closes by naming its signed Warehouse RN: new optional field `closing_rn_id` (entity id of a received RN of the part, cw_rn / te_rn, same site; needs the Warehouse view right in the RN's region). When set, `closing_rn_ref` is read from the RN's Doc No. and cannot be typed; without a link the typed reference still works. Field errors `rn_not_available`, `rn_other_site`, `invalid`. `GET /registers/dismantle/rn-options` lists the RNs. Also corrects the descriptions of the Issue log and Quality order-options paths.
     - 0.15.220 (2026-11-27): additive in shape, looser in rule (migration 0320; CHANGELOG WarehouseDocOrderLink). A warehouse delivery note (`cw_dn`, `te_dn`) and a return note (`cw_rn`, `te_rn`) can name a Procurement order with `procurement_order_id`, like a receipt (PL / OPEN); the same derived fields and rules apply. Only a stock adjustment (`adj`) still answers 422 `receipt_only`. `GET /registers/procurement/{entity_id}/receipts` lists the documents of every type except adjustments.
     - 0.15.157 (2026-11-27): duplicate-site warnings at creation (owner approval relayed 2026-11-26). Additive, migration 0257. The exact Site ID was already refused (`duplicate`, 0.14.0); new warnings, never blocking, in `warnings` of `POST /sites`, `GET` and `PATCH /site-drafts/{id}` and now also in each open draft of `GET /site-drafts`: `similar_site_code` (same code ignoring case, spaces, dashes), `duplicate_name` (English or Arabic name, of a site or a waiting draft), `close_coordinates` (within 100 metres). A match in the same region names the site; a match in another region says only that one exists. `SiteDraftWarning.code` gains the three codes. No new path, no permission change.
     - 0.15.111 (2026-11-27): duplicate-site warnings at creation (owner approval relayed 2026-11-26). Additive, migration 0202. The exact Site ID was already refused (`duplicate`, 0.14.0); new warnings, never blocking, in `warnings` of `POST /sites`, `GET` and `PATCH /site-drafts/{id}` and now also in each open draft of `GET /site-drafts`: `similar_site_code` (same code ignoring case, spaces, dashes), `duplicate_name` (English or Arabic name, of a site or a waiting draft), `close_coordinates` (within 100 metres). A match in the same region names the site; a match in another region says only that one exists. `SiteDraftWarning.code` gains the three codes. No new path, no permission change.
@@ -9525,6 +9526,29 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '422': {$ref: '#/components/responses/Unprocessable'}
+  /registers/dismantle/rn-options:
+    get:
+      tags: [registers]
+      operationId: listDismantleRnOptions
+      summary: The received Warehouse RNs that can close a Dismantle part (0.15.110)
+      description: |
+        0.15.110. Current, not voided, Received Warehouse RNs of the part (`record_type` cw gives cw_rn, te gives te_rn) on the site, in the regions where the caller holds the Warehouse view right (the responsibility matrix). Needs the Dismantle module.
+      parameters:
+      - {name: site_id, in: query, required: true, schema: {type: string, format: uuid}}
+      - {name: record_type, in: query, required: true, schema: {type: string, enum: [cw, te]}}
+      responses:
+        '200':
+          description: The RNs.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/DismantleRnOption' } }
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
   /registers/dismantle/order-options:
     get:
       tags: [registers]
@@ -9623,10 +9647,9 @@ paths:
     get:
       tags: [registers]
       operationId: listIssueOrderOptions
-      summary: The approved, active Procurement orders a warehouse receipt may name (0.15.90)
+      summary: The approved, active Procurement orders a Issue log record may name (0.15.95)
       description: |
-        0.15.95. The approved Procurement versions in force, not cancelled, that the caller can see; of the site `site_id` when it is given (a PL / OPEN receipt may have no site).
-        Needs the Issue log module; only the orders in regions where the caller also holds the Procurement view right (the responsibility matrix) are listed, and the same right is checked when a receipt is saved.
+        0.15.95. The approved Procurement versions in force, not cancelled, that the caller can see; of the site `site_id` when it is given. Needs the Issue log module; only the orders in regions where the caller also holds the Procurement view right (the responsibility matrix) are listed, and the same right is checked when the record is saved.
       parameters:
       - {name: site_id, in: query, required: false, schema: {type: string, format: uuid}}
       responses:
@@ -9646,10 +9669,9 @@ paths:
     get:
       tags: [registers]
       operationId: listQualityOrderOptions
-      summary: The approved, active Procurement orders a warehouse receipt may name (0.15.90)
+      summary: The approved, active Procurement orders a Quality record may name (0.15.95)
       description: |
-        0.15.95. The approved Procurement versions in force, not cancelled, that the caller can see; of the site `site_id` when it is given (a PL / OPEN receipt may have no site).
-        Needs the Quality module; only the orders in regions where the caller also holds the Procurement view right (the responsibility matrix) are listed, and the same right is checked when a receipt is saved.
+        0.15.95. The approved Procurement versions in force, not cancelled, that the caller can see; of the site `site_id` when it is given. Needs the Quality module; only the orders in regions where the caller also holds the Procurement view right (the responsibility matrix) are listed, and the same right is checked when the record is saved.
       parameters:
       - {name: site_id, in: query, required: false, schema: {type: string, format: uuid}}
       responses:
@@ -21991,6 +22013,17 @@ components:
         advances:
           type: array
           items: {type: object, properties: {entity_id: {type: string, format: uuid}, custodian_user_id: {type: [string, 'null'], format: uuid}, advance_state: {type: [string, 'null']}}}
+    DismantleRnOption:
+      type: object
+      required: [entity_id, record_id]
+      properties:
+        entity_id: {type: string, format: uuid}
+        record_id: {type: string, format: uuid}
+        site_id: {type: string, format: uuid}
+        record_type: {type: string, enum: [cw_rn, te_rn]}
+        doc_no: {type: string}
+        doc_date: {type: string}
+        txn_status: {type: string}
     DismantleOrderOption:
       type: object
       description: '0.12.11 (Q114). An approved, active Procurement order of a Dismantle part.'
