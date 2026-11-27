@@ -264,7 +264,7 @@ export class MediaService {
     try {
       made = await makeThumb(Buffer.concat(chunks), px, th.format, th.quality);
     } catch {
-      throw new ProblemException(415, 'thumbnail_unsupported', { detail: 'The image could not be read.' });
+      throw new ProblemException(415, 'thumbnail_unsupported', { detail: 'The image could not be read or is too small for a preview.' });
     }
     if (!made) throw new ProblemException(503, 'thumbnails_unavailable', { detail: 'The thumbnail maker is not available on this server.' });
     try {
