@@ -4128,6 +4128,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/data-hub/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The Data hub landing page, in one call (0.15.311)
+         * @description 0.15.311. Batches waiting for the caller (count and up to 5, with why each waits), templates whose current version was issued in the last 45 days with the column diff against the version before, and the caller's last download of each template (read from the template_download audit rows of the caller only). Read only. A caller without the templates module sees no batches. The other hub widgets use the endpoints of their own screens.
+         */
+        get: operations["getDataHubSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/exports/schedules": {
         parameters: {
             query?: never;
@@ -15928,6 +15948,80 @@ export interface components {
             default_tab: "all" | "priority" | "mentions" | "tasks" | "approvals" | "system";
             priority_kinds: ("mention" | "followed_change" | "task_assigned" | "task_returned" | "task_rejected" | "task_approved" | "approval_due" | "reassigned" | "absence_alert" | "idle_task_alert" | "no_holder" | "system")[];
         };
+        /** @description 0.15.311. The Data hub: which widgets of the landing page show, the badge on Uploads & batches, and the default view of each hub list screen. */
+        UiDataHub: {
+            widgets: {
+                quick_bar: boolean;
+                batches: boolean;
+                template_changes: boolean;
+                recent: boolean;
+                health: boolean;
+                admin: boolean;
+            };
+            badge: boolean;
+            default_view: {
+                /** @enum {string} */
+                templates: "cards" | "rows" | "table" | "compact";
+                /** @enum {string} */
+                uploads: "cards" | "rows" | "table" | "compact";
+                /** @enum {string} */
+                exports: "cards" | "rows" | "table" | "compact";
+                /** @enum {string} */
+                master_import: "cards" | "rows" | "table" | "compact";
+            };
+        };
+        DataHubBatch: {
+            /** Format: uuid */
+            id: string;
+            file_name: string;
+            /**
+             * @description send: the caller uploaded it and has not sent it; review_l2: the caller may approve it; returned: it came back to the caller; checking: still being staged (listed, not counted).
+             * @enum {string}
+             */
+            action: "send" | "review_l2" | "returned" | "checking";
+            status: string;
+            template_id: string;
+            template_version: number;
+            register_key?: string | null;
+            stream?: string | null;
+            counts: {
+                valid: number;
+                invalid: number;
+            };
+            /** Format: date-time */
+            uploaded_at?: string | null;
+            progress_pct?: number | null;
+        };
+        DataHubTemplateChange: {
+            template_id: string;
+            name_en: string;
+            name_ar?: string | null;
+            version: number;
+            /** Format: date-time */
+            issued_at: string;
+            reason?: string | null;
+            added: string[];
+            removed: string[];
+            renamed: string[];
+            /** @description The version of the caller last download of this template (null when never downloaded). */
+            my_version?: number | null;
+            mine_is_old: boolean;
+        };
+        DataHubDownload: {
+            template_id: string;
+            version?: number | null;
+            prefill: boolean;
+            /** Format: date-time */
+            at: string;
+        };
+        DataHubSummary: {
+            batches: {
+                count: number;
+                items: components["schemas"]["DataHubBatch"][];
+            };
+            template_changes: components["schemas"]["DataHubTemplateChange"][];
+            my_downloads: components["schemas"]["DataHubDownload"][];
+        };
         /** @description 0.15.251. How the bell opens the notifications. */
         UiPanel: {
             /** @enum {string} */
@@ -15941,12 +16035,14 @@ export interface components {
             avatars: components["schemas"]["UiAvatars"];
             new_badge: components["schemas"]["UiNewBadge"];
             inbox: components["schemas"]["UiInbox"];
+            data_hub: components["schemas"]["UiDataHub"];
             panel: components["schemas"]["UiPanel"];
         };
         UiFeaturesPatch: {
             avatars?: components["schemas"]["UiAvatars"];
             new_badge?: components["schemas"]["UiNewBadge"];
             inbox?: components["schemas"]["UiInbox"];
+            data_hub?: components["schemas"]["UiDataHub"];
             panel?: components["schemas"]["UiPanel"];
         };
         UiFeaturesSetting: {
@@ -28640,6 +28736,27 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             422: components["responses"]["Unprocessable"];
+        };
+    };
+    getDataHubSummary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The summary. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataHubSummary"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
         };
     };
     listExportSchedules: {
