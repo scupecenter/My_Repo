@@ -53,8 +53,8 @@ A dotted arrow is an id column with no `REFERENCES` constraint (the id is checke
 | Quality inspection | Snag | id column, no constraint | `quality_inspections.snag_id` | not checked in the catalogue |
 | Car dispatcher, Financial advances | Procurement order | register link | `procurement_record_id` | typed (text) |
 | Financial advances (expense, settlement) | Advance | register link | `advance_id` | checked in entry (approved advance of the same site, 0407); disbursed rule at submit; picker `advance-options` |
-| Invoices | Procurement record | register link | `procurement_record_id` | checked in entry (0407); picker `invoices/order-options`; listed in `record_related` |
-| Invoices | Contractor company | register link | `supplier_party_id` | optional, checked against active `external_parties` (0407); fills `supplier` when empty; picker `invoices/supplier-options` |
+| Invoices | Procurement record | register link | `procurement_record_id` | checked in entry (0407); PR No. and PO / WO No. read from the order (`order_pr_no`, `order_po_wo_no`, 0430); required when Settings > Register rules says so (`order_required`); picker `invoices/order-options`; listed in `record_related` |
+| Invoices | Contractor company | register link | `supplier_party_id` | optional, checked against active `external_parties` (0407); fills `supplier` when empty; required when Settings > Register rules says so (`supplier_required`, 0430); picker `invoices/supplier-options` |
 | HLC record | Procurement record | register link, listed in `record_related` (0407) | `procurement_record_id` (id of the Procurement version row) | derived |
 | Issues, snags, quality, orders, contract end | Contractor performance view (0180) | computed on read, no stored value | thresholds in setting `contractors.performance` | derived |
 | Warehouse DN / RN documents | Stock, per-site quantity, serials | posted by approved documents | `wh_movement_lines`, `warehouse_site_qty`, `warehouse_serials` | derived |
