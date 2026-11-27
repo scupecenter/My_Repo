@@ -1,5 +1,6 @@
 import {
   ArrowRightLeft,
+  BarChart3,
   CalendarDays,
   Columns3,
   Download,
@@ -23,6 +24,7 @@ import {
   useParams,
   useSearchParams,
 } from "react-router-dom";
+import * as Dialog from "@radix-ui/react-dialog";
 import { useMe } from "@/api/hooks";
 import {
   downloadTemplate,
@@ -30,6 +32,7 @@ import {
   useRecordLock,
   useRecordOp,
   useRegisterDefs,
+  useRegisterRecord,
   useRegisterRecords,
   useTemplates,
   useUpdateRecord,
@@ -41,9 +44,10 @@ import type { ExtraField } from "@/components/UnifiedFilter";
 import type { RegisterDefinition, RegisterRecord } from "@/api/types";
 import { TemplateExportMenu } from "@/components/TemplateExportMenu";
 import { PmDuePanel } from "@/components/PmDuePanel";
-import { ViewAnalytics } from "@/components/ViewAnalytics";
 import { LayoutPanel, type ViewOption } from "@/components/LayoutPanel";
+import type { ChartKind } from "@/components/ChartView";
 import { useRememberedView } from "@/lib/viewPreference";
+import { useOpenRecordMode } from "@/lib/openRecordPref";
 import { GridCellEditor, INLINE_TYPES } from "@/components/GridCellEditor";
 import { FieldValue } from "@/components/FieldValue";
 import { RegisterGrid } from "@/components/RegisterGrid";
@@ -56,13 +60,16 @@ import {
 } from "@/components/GridColumnAdmin";
 import { HlcLegacyDialog } from "@/components/P4cPanels";
 import { fieldLabel, showValue } from "@/components/RegisterFields";
-import { RegisterDrawer, STATE_TONE, TRIAGE_TONE } from "@/components/RegisterDrawer";
+import { RegisterDrawer, RegisterRecordBody, STATE_TONE, TRIAGE_TONE } from "@/components/RegisterDrawer";
 import {
   ALL_CAP,
   BY_STATE,
+  axisFields,
   defaultBoardBy,
   dateFields,
   layoutsOf,
+  numericFields,
+  RegisterChart,
   RegisterBoard,
   RegisterCalendar,
   RegisterMap,
@@ -106,13 +113,16 @@ import { isLive, OWNER_NOTE } from "@/lib/registerForms";
 
 const RF_KEYS = ["q", "region_id", "state", "record_type", "triage"] as const;
 // W2: a saved view also keeps the layout (list, wide, board, map) and the board's grouping and swimlane, as #185 does for Site Master
-const LAYOUT_KEYS = ["layout", "board_by", "lane", "calf"] as const;
+const LAYOUT_KEYS = ["layout", "board_by", "lane", "calf", "chx", "chm", "chk"] as const;
 type RegisterView = RecordFilters & {
   advanced?: FilterTree;
   layout?: string;
   board_by?: string;
   lane?: string;
   calf?: string;
+  chx?: string;
+  chm?: string;
+  chk?: string;
 };
 const VIEW_EMPTY: RegisterView = {
   q: "",
@@ -123,6 +133,9 @@ const VIEW_EMPTY: RegisterView = {
   board_by: "",
   lane: "",
   calf: "",
+  chx: "",
+  chm: "",
+  chk: "",
 };
 // P10: the saved-views control (and its share dialog, people picker and role/group queries) loads on its own, after the records, so it never
 // delays the first paint of the list.
@@ -197,6 +210,13 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
     (sp.get("lane") === "type" && !!def.record_types?.length)
       ? (sp.get("lane") as RegisterLane)
       : "none";
+  // V4: the chart's axis (`chx`: empty = the approval state, else a list or yes/no field), measure (`chm`: empty = a count, else a number
+  // field to sum) and kind (`chk`: bar by default, or pie), in the URL and the saved views
+  const chAxis = sp.get("chx") ?? "";
+  const chMeasure = sp.get("chm") ?? "";
+  const chKind: ChartKind = sp.get("chk") === "pie" ? "pie" : "bar";
+  const chAxisFields = axisFields(def);
+  const chNumeric = numericFields(def);
   // V2: the calendar's date field (`calf` in the URL and the saved views); the register's first date field is the default
   const calDates = dateFields(def);
   const calParam = sp.get("calf") ?? "";
@@ -290,7 +310,11 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
 
   // contract 0.7.0: every register has its own approved template (Template.register_key)
   const tpl = templates.data?.find((x) => x.register_key === key);
-  const setRecord = (id: string | null) =>
+  // V5: a click on a record opens it on its own page when the person chose so (Settings > Screens > Records); the drawer stays the
+  // default, an explicit ?record= address still opens the drawer (a shared link keeps its meaning), and 'new' is always the drawer.
+  const [openMode] = useOpenRecordMode();
+  const setRecord = (id: string | null) => {
+    if (id && id !== "new" && openMode === "page") { nav(`/registers/${key}/records/${encodeURIComponent(id)}`); return; }
     setSp(
       (p) => {
         const n = new URLSearchParams(p);
@@ -300,6 +324,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
       },
       { replace: true },
     );
+  };
   // One View menu replaces the row of layout buttons: list, wide table, grid, board and (where the records carry a site) map. The choice is kept per
   // user and register on the server (lib/viewPreference).
   const viewOptions: ViewOption[] = [
@@ -308,6 +333,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
     { id: "grid", label: t("view.grid"), hint: t("view.grid_hint"), icon: <Grid3x3 size={14} />, testid: "register-layout-grid" },
     { id: "board", label: t("board.board"), hint: t("view.board_hint"), icon: <Columns3 size={14} />, testid: "register-layout-board" },
     ...(layouts.includes("map") ? [{ id: "map", label: t("sites.map"), hint: t("view.map_hint"), icon: <MapIcon size={14} />, testid: "register-layout-map" }] : []),
+    { id: "chart", label: t("chartv.title"), hint: t("view.chart_hint"), icon: <BarChart3 size={14} />, testid: "register-layout-chart" },
     ...(layouts.includes("calendar") ? [{ id: "calendar", label: t("calview.title"), hint: t("view.calendar_hint"), icon: <CalendarDays size={14} />, testid: "register-layout-calendar" }] : []),
   ];
   const applyView = (id: string) => setParams({ view: id === "grid" ? "grid" : "", layout: id === "grid" || id === "list" ? "" : id });
@@ -662,6 +688,9 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
                 layout: layout === "list" ? "" : layout,
                 board_by: layout === "board" ? (sp.get("board_by") ?? "") : "",
                 lane: layout === "board" ? (sp.get("lane") ?? "") : "",
+                chx: layout === "chart" ? (sp.get("chx") ?? "") : "",
+                chm: layout === "chart" ? (sp.get("chm") ?? "") : "",
+                chk: layout === "chart" ? (sp.get("chk") ?? "") : "",
                 calf: layout === "calendar" ? (sp.get("calf") ?? "") : "",
                 ...(advTree ? { advanced: advTree } : {}),
               }}
@@ -698,7 +727,6 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
           <span className="flex items-center gap-2">
             {activeFilters > 0 && <span className="chip bg-accentSoft text-accentText" data-testid="toolbar-active-filters">{t("states.filters")} {activeFilters}</span>}
             <TableCount testid="register-count" noun={noun} total={screenTotal} filtered={total} active={activeFilters > 0} selected={picked.size} onClear={clearAll} />
-            <ViewAnalytics def={def} records={real} total={total} />
           </span>
         }
         layout={
@@ -707,7 +735,28 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
           <LayoutPanel
             testid="register-view"
             views={{ value: view === "grid" ? "grid" : layout, options: viewOptions, onChange: pickView }}
-            options={view === "vertical" && layout === "calendar" ? (
+            options={view === "vertical" && layout === "chart" ? (
+              <>
+                <label className="flex items-center gap-2 text-sm"><span className="text-mute">{t("chartv.axis")}</span>
+                  <select className="input w-auto py-1" data-testid="register-chart-axis" value={chAxis} onChange={(e) => setParams({ chx: e.target.value })}>
+                    <option value="">{t("analytics.by_state")}</option>
+                    {chAxisFields.map((x) => <option key={x.code} value={x.code}>{fieldLabel(x, i18n.language)}</option>)}
+                  </select>
+                </label>
+                <label className="flex items-center gap-2 text-sm"><span className="text-mute">{t("chartv.measure")}</span>
+                  <select className="input w-auto py-1" data-testid="register-chart-measure" value={chMeasure} onChange={(e) => setParams({ chm: e.target.value })}>
+                    <option value="">{t("chartv.count")}</option>
+                    {chNumeric.map((x) => <option key={x.code} value={x.code}>{fieldLabel(x, i18n.language)}</option>)}
+                  </select>
+                </label>
+                <label className="flex items-center gap-2 text-sm"><span className="text-mute">{t("chartv.kind")}</span>
+                  <select className="input w-auto py-1" data-testid="register-chart-kind" value={chKind} onChange={(e) => setParams({ chk: e.target.value === "bar" ? "" : e.target.value })}>
+                    <option value="bar">{t("chartv.bar")}</option>
+                    <option value="pie">{t("chartv.pie")}</option>
+                  </select>
+                </label>
+              </>
+            ) : view === "vertical" && layout === "calendar" ? (
               <label className="flex items-center gap-2 text-sm"><span className="text-mute">{t("calview.field")}</span>
                 <select className="input w-auto py-1" data-testid="register-calendar-field" value={calField?.code ?? ""} onChange={(e) => setParams({ calf: e.target.value === calDates[0]?.code ? "" : e.target.value })}>
                   {calDates.map((x) => <option key={x.code} value={x.code}>{fieldLabel(x, i18n.language)}</option>)}
@@ -1005,6 +1054,9 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
           {layout === "map" && (
             <RegisterMap records={real} regionId={f.region_id} partial={partial} />
           )}
+          {layout === "chart" && (
+            <RegisterChart def={def} records={real} axis={chAxis} measure={chMeasure} kind={chKind} partial={partial} />
+          )}
           {layout === "calendar" && (
             <RegisterCalendar def={def} records={real} field={calField} onOpen={setRecord} partial={partial} />
           )}
@@ -1226,4 +1278,54 @@ export function RegisterPage() {
       <Navigate to="/my-work" replace />
     );
   return <RegisterList key={key} def={def} />;
+}
+
+/**
+ * Decision V5: a register record on its own full page (`/registers/:key/records/:id`), for the people who chose so in Settings >
+ * Screens > Records. The same body as the drawer (RegisterRecordBody), so the fields, the documents, the comments, the history and
+ * every action are identical in both; a new version (or any action that yields another record) moves the page to that record. The
+ * back link returns to the register's list. The body's title is a Radix Dialog.Title, so the page provides a bare Dialog.Root
+ * context (no dialog is drawn).
+ */
+export function RegisterRecordPage() {
+  const { t } = useTranslation();
+  const { key = "", id = "" } = useParams();
+  const defs = useRegisterDefs();
+  if (!isLive(key)) return <RegisterSoon name={key} />;
+  if (defs.isLoading) return <p className="text-mute">{t("common.loading")}</p>;
+  const def = defs.data?.find((d) => d.register_key === key);
+  if (!def)
+    return defs.isError ? (
+      <p role="alert" className="text-lateInk">
+        {t("errors.generic")}
+      </p>
+    ) : (
+      <Navigate to="/my-work" replace />
+    );
+  return <RegisterRecordView key={`${key}:${id}`} def={def} id={id} />;
+}
+
+function RegisterRecordView({ def, id }: { def: RegisterDefinition; id: string }) {
+  const { t, i18n } = useTranslation();
+  const nav = useNavigate();
+  const q = useRegisterRecord(def.register_key, id);
+  const name = (i18n.language === "ar" && def.name_ar) || def.name_en;
+  return (
+    <div className="mx-auto max-w-3xl space-y-3 p-4" data-testid="register-record-page">
+      <Link className="text-sm text-link" data-testid="register-record-back" to={`/registers/${def.register_key}`}>
+        {t("openrec.back", { name })}
+      </Link>
+      {q.data ? (
+        <Dialog.Root open modal={false} onOpenChange={(o) => { if (!o) nav(`/registers/${def.register_key}`); }}>
+          <div className="card p-4">
+            <RegisterRecordBody def={def} record={q.data} onCreated={(rid) => nav(`/registers/${def.register_key}/records/${encodeURIComponent(rid)}`)} />
+          </div>
+        </Dialog.Root>
+      ) : (
+        <p role={q.isError ? "alert" : undefined} className="card p-4 text-sm text-mute" data-testid="register-record-missing">
+          {q.isError ? t("regErrors.not_found") : t("common.loading")}
+        </p>
+      )}
+    </div>
+  );
 }
