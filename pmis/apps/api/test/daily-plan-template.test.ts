@@ -107,12 +107,14 @@ describe('POST /daily-plans/import', () => {
     const f = await edit(await tplFile(l1, `?date=${D}&region_id=${REGION}`), (data, col, rowFor) => {
       data.getRow(rowFor(s1.code)).getCell(col('Planned Work')).value = 'Hand-written plan (import)';
       data.getRow(rowFor(s1.code)).getCell(col('Remark')).value = 'from the file';
+      data.getRow(rowFor(s1.code)).getCell(col('Reason (if not reach target)')).value = 'Rain stopped the crew'; // a row below target needs its reason
       const r2 = rowFor(s2.code);
       data.getRow(r2).getCell(col('Remove from plan (yes)')).value = 'yes';
       const n = data.rowCount + 1;
       data.getRow(n).getCell(col('Plan date (YYYY-MM-DD)')).value = D;
       data.getRow(n).getCell(col('Site ID')).value = s3.code;
       data.getRow(n).getCell(col('Planned Work')).value = 'Added by file';
+      data.getRow(n).getCell(col('Reason (if not reach target)')).value = 'Not started yet';
     });
     const res = await upload(l1, f);
     expect(res.status, JSON.stringify(res.body)).toBe(202);
