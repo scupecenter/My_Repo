@@ -6721,6 +6721,10 @@
   "tplmenu": {
     "title": "Templates & export"
   },
+  "layout": {
+    "title": "Layout",
+    "options": "Options of this view"
+  },
   "view": {
     "title": "View",
     "list": "List",

@@ -47,8 +47,10 @@ describe('sites board (Site Master)', () => {
     // keyboard: the cards are links in the tab order
     card.focus();
     expect(card).toHaveFocus();
-    // swimlanes by region
-    await u.selectOptions(screen.getByTestId('sites-board-swimlane'), 'region');
+    // swimlanes by region (chosen in the Layout panel, decision V1)
+    await u.click(screen.getByTestId('sites-view'));
+    await u.selectOptions(await screen.findByTestId('sites-board-swimlane'), 'region');
+    await u.keyboard('{Escape}');
     await screen.findByTestId('board-lane-title-1');
     await waitFor(() => expect(seen.some((s) => s.includes('swimlane=region'))).toBe(true));
   }, T);
@@ -75,7 +77,8 @@ describe('sites board (Site Master)', () => {
       await waitFor(() => expect(col).toHaveAttribute('data-over-wip', 'true'));
       expect(within(col).getByTestId('board-col-wip-site_release')).toHaveTextContent('فوق حد العمل الجاري');
       expect(within(col).getByRole('note')).toBeInTheDocument();
-      expect(screen.getByTestId('sites-board-swimlane')).toBeInTheDocument();
+      await userEvent.setup().click(screen.getByTestId('sites-view'));
+      expect(await screen.findByTestId('sites-board-swimlane')).toBeInTheDocument();
       expect(screen.getByTestId('sites-board')).toHaveAttribute('aria-label', 'لوحة المواقع حسب المعلم');
       expect(within(col).getByText('إطلاق الموقع')).toBeInTheDocument();
     } finally {
