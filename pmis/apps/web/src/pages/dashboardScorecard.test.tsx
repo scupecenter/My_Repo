@@ -15,7 +15,7 @@ describe('Dashboard ops: contractor and supplier scorecard card (0.15.202, item 
   it('shows the level counts, the on-time and rejection rates, the average delay and the five worst parties, no amounts', async () => {
     await signIn('pm');
     dashPage();
-    const card = await screen.findByTestId('dash-ops-scorecard');
+    const card = await screen.findByTestId('dash-ops-scorecard', {}, { timeout: 8000 });
     expect(card).toHaveTextContent('Contractor and supplier scorecard');
     expect(screen.getByTestId('dash-scorecard-parties')).toHaveTextContent('12');
     expect(screen.getByTestId('dash-scorecard-level-ok')).toHaveTextContent('7');

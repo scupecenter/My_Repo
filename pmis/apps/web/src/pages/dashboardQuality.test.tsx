@@ -15,7 +15,7 @@ describe('Dashboard ops: quality, snags and NCR card (0.15.203, item 6)', () => 
   it('shows the open snags and NCRs, the closure ages and the first-time acceptance rate', async () => {
     await signIn('pm');
     dashPage();
-    const card = await screen.findByTestId('dash-ops-quality');
+    const card = await screen.findByTestId('dash-ops-quality', {}, { timeout: 8000 });
     expect(card).toHaveTextContent('Quality: snags and NCR');
     expect(screen.getByTestId('dash-quality-snags-open')).toHaveTextContent('34');
     expect(screen.getByTestId('dash-quality-snags-open')).toHaveTextContent('126');

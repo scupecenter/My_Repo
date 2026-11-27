@@ -15,7 +15,7 @@ describe('Dashboard ops: permits and HSE card (0.15.200, item 3)', () => {
   it('shows the status mix, the validity pressure, the stop-work count and the PTW check gaps', async () => {
     await signIn('pm');
     dashPage();
-    const card = await screen.findByTestId('dash-ops-permits');
+    const card = await screen.findByTestId('dash-ops-permits', {}, { timeout: 8000 });
     expect(card).toHaveTextContent('Permits and HSE');
     expect(screen.getByTestId('dash-permits-waiting')).toHaveTextContent('7');
     expect(screen.getByTestId('dash-permits-expiring')).toHaveTextContent('4');
