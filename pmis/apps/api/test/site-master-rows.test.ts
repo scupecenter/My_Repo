@@ -108,7 +108,8 @@ describe('GET /site-master/{menu}/rows: the page and its values', () => {
     const filtered = await a.api.call('get', `/site-master/master/rows?site_code=${tripoli.code},${other.code}&scenario=expansion`);
     expect(filtered.body.filtered).toBe(1);
     expect(filtered.body.rows.map((r: { site_code: string }) => r.site_code)).toEqual([tripoli.code]);
-    expect(filtered.body.total).toBe(all.body.total);
+    // Other test files share this database and create sites concurrently, so the total can grow between the two calls.
+    expect(filtered.body.total).toBeGreaterThanOrEqual(all.body.total);
   });
 
   it('pages in the database: offset, limit and running row numbers', async () => {

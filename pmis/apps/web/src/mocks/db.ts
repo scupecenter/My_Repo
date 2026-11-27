@@ -106,6 +106,8 @@ const fresh = () => ({
   profiles: {} as Record<string, { display_name?: string; phone?: string | null; locale?: 'en' | 'ar'; theme?: 'light' | 'dark'; ui_brand?: Brand | null; email?: string; version: number }>,
   /** 0.15.41 (migration 0130): Settings, Identity & themes (setting ui.identity). */
   identity: initIdentity(),
+  /** 0.15.97 (migration 0197): Settings, Screens, Login page (setting ui.login_page). */
+  loginPage: initLoginPage(),
   emailChanges: [] as { id: string; account: string; old_email: string; new_email: string; status: 'pending' | 'approved' | 'rejected' | 'cancelled'; requested_at: string; decided_at: string | null; decision_reason: string | null; decided_by: string | null;
     /** 0.12.6 (Q158): the code "mailed" to the new address (the mock has no mail: it is always the demo code), and the check made. */
     code?: string | null; attempts?: number; verify_sent_at?: string | null; verify_expires_at?: string | null; verified_at?: string | null; verified_via?: 'code' | 'admin_check' | null; identity_check?: string | null }[],
@@ -173,6 +175,23 @@ export function sessionBody(): Session {
 function initIdentity() {
   return { default_brand: 'current' as Brand, allow_user_choice: true, version: 1, updated_at: null as string | null, updated_by: null as null | { id: string; display_name: string; employee_id: string | null } };
 }
+function initLoginPage() {
+  return {
+    announcement_en: '', announcement_ar: '', announcement_kind: 'info' as 'info' | 'maintenance', animation: true,
+    default_locale: null as 'en' | 'ar' | null, support_links: [] as { label_en: string; label_ar: string; url: string }[],
+    version: 1, updated_at: null as string | null, updated_by: null as null | { id: string; display_name: string; employee_id: string | null },
+  };
+}
+/** 0.15.97: the login page settings (older saved mock states have none). */
+export const loginPage = () => (db().loginPage ??= initLoginPage());
+/** 0.15.97: the public door answers only what the signed-out pages render (login_page_public). */
+export const loginPagePublic = () => {
+  const c = loginPage();
+  return {
+    announcement: c.announcement_en === '' && c.announcement_ar === '' ? null : { en: c.announcement_en, ar: c.announcement_ar, kind: c.announcement_kind },
+    animation: c.animation, default_locale: c.default_locale, support_links: c.support_links,
+  };
+};
 /** 0.15.41: the identity settings (older saved mock states have none). */
 export const identity = () => (db().identity ??= initIdentity());
 /** The design a user sees: their own while the admin allows a choice, else the organization default (ui_effective_brand). */

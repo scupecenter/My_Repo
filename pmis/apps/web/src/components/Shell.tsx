@@ -17,6 +17,7 @@ import { loadPref, savePref as storePref } from '@/lib/localPref';
 import { applyBrand } from '@/lib/brands';
 import { ExportDialog } from './ExportDialog';
 import { CommandPalette } from './CommandPalette';
+import { RowActions } from './RowActions';
 import { ShortcutsHelp } from './ShortcutsHelp';
 import { QuickTour } from './QuickTour';
 import { firstPeopleTab, PEOPLE_KEYS, PEOPLE_TABS } from './PeopleAdmin';
@@ -211,6 +212,7 @@ export function Shell() {
       </div>
       <ExportDialog open={exp} onClose={() => setExp(false)} />
       <ShortcutsHelp />
+      <RowActions />
       {me.data?.user.id && <QuickTour userId={me.data.user.id} />}
       <CommandPalette open={palette} onOpenChange={setPalette} items={items.map((i) => ({ key: i.key, to: i.to }))} />
     </div>
