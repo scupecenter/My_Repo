@@ -3,7 +3,7 @@ import type { Client as PgClient } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { startApp, superDb } from './helpers';
 import { G } from './reg-helpers';
-import { Actor, actor, plainAdmin } from './wf-helpers';
+import { Actor, actor, makeSite, plainAdmin } from './wf-helpers';
 
 /**
  * Migration 0406, contract 0.15.312: the Finance hub. The setting section finance_hub of ui.features is closed and complete; GET /finance-hub/summary
@@ -48,7 +48,8 @@ describe('Finance hub', () => {
   it('summary: a caller without a finance module gets null cards; the admin gets real counts under the threshold', async () => {
     const set = await admin.api.call('put', '/settings/ui-features', { sections: { finance_hub: HUB }, reason: 'Set the hub thresholds' }, { 'If-Match': String((await admin.api.call('get', '/settings/ui-features')).headers.etag) });
     expect(set.status).toBe(200);
-    const site = (await db.query(`SELECT id, region_id FROM sites LIMIT 1`)).rows[0] as { id: string; region_id: number };
+    const mk = await makeSite(db, 5);
+    const site = (await db.query(`SELECT id, region_id FROM sites WHERE id = $1`, [mk.id])).rows[0] as { id: string; region_id: number };
     const mkRec = (key: string, type: string | null, data: object) =>
       db.query(
         `INSERT INTO register_records (entity_id, register_key, record_type, site_id, region_id, is_global, is_current, state, current_level, levels_required, level_round, data, created_by, updated_at)

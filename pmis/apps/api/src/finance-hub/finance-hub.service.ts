@@ -56,16 +56,8 @@ export class FinanceHubService {
   private async advances(warnDays: number): Promise<FinanceHubAdvances | null> {
     const regs = await this.access.regions('financial_advances', 'view');
     if (regs !== null && regs.length === 0) return null;
-    const vis = regs === null ? Prisma.sql`true` : Prisma.sql`(r.is_global OR r.region_id = ANY(${regs}::int[]))`;
-    const rows = await this.db.tx.$queryRaw<{ open_count: bigint; overdue_count: bigint; open_amount: string | null }[]>(Prisma.sql`
-      SELECT count(*) FILTER (WHERE coalesce(r.data ->> 'advance_state', '') NOT IN ('settled', 'closed', 'cancelled')) AS open_count,
-             count(*) FILTER (WHERE r.data ->> 'advance_state' IN ('disbursed', 'settlement_in_progress')
-                              AND nullif(r.data ->> 'disbursed_date', '')::date < public.cal_today() - ${warnDays}::int) AS overdue_count,
-             sum(public.fin_balance(r.entity_id)) FILTER (WHERE coalesce(r.data ->> 'advance_state', '') NOT IN ('settled', 'closed', 'cancelled')
-                                                          AND public.fin_amounts_visible(r.id, 'advance', r.data)) AS open_amount
-      FROM public.register_records r
-      WHERE r.register_key = 'financial_advances' AND r.record_type = 'advance' AND ${vis}
-        AND NOT EXISTS (SELECT 1 FROM public.register_records n WHERE n.entity_id = r.entity_id AND n.version_no > r.version_no)`);
+    const rows = await this.db.tx.$queryRaw<{ open_count: bigint; overdue_count: bigint; open_amount: string | null }[]>(
+      Prisma.sql`SELECT open_count, overdue_count, open_amount FROM finance_hub_advances(${warnDays}::int)`);
     const row = rows[0];
     return { open_count: Number(row?.open_count ?? 0), overdue_count: Number(row?.overdue_count ?? 0), open_amount: row?.open_amount == null ? null : Number(row.open_amount), currency: 'LYD' };
   }
