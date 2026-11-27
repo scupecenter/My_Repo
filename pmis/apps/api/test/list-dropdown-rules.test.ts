@@ -73,6 +73,7 @@ const listOf = async (c: string) =>
     values: {
       id: string;
       code: string;
+      label_en: string;
       is_active: boolean;
       is_default: boolean;
       colour: string | null;
@@ -283,6 +284,46 @@ describe("dropdown lists (migration 0102)", () => {
     const alpha = (await listOf(L)).values.find((x) => x.code === "Alpha");
     expect(alpha?.colour).toBe("#2E86C1");
     expect((await listOf(L)).values.map((x) => x.code).sort()).toEqual(["Alpha", "Beta"]);
+  });
+
+  it("D54: the template filled with the current values is downloaded, edited and uploaded again (update by code, unchanged rows, new codes)", async () => {
+    const L = code("RoundTrip");
+    await createList(L);
+    await addValue(L, "Alpha", { label_en: "Alpha EN", colour: "#2E86C1" });
+    await addValue(L, "Beta", { label_en: "Beta EN" });
+    const res = await admin.api
+      .call("get", `/templates/TPL-LISTVALUES/download?list=${L}`)
+      .buffer(true)
+      .parse((r, cb) => {
+        const chunks: Buffer[] = [];
+        r.on("data", (c: Buffer) => chunks.push(c));
+        r.on("end", () => cb(null, Buffer.concat(chunks)));
+      });
+    expect(res.status).toBe(200);
+    const book = new ExcelJS.Workbook();
+    await book.xlsx.load(res.body as unknown as ExcelJS.Buffer);
+    const data = book.getWorksheet("Data")!;
+    const cells = (r: number) => [1, 2, 3, 4, 5, 6, 7].map((c) => (data.getRow(r).getCell(c).text ?? "").toString());
+    expect(cells(2).slice(0, 2)).toEqual(["Alpha", "Alpha EN"]);
+    expect(cells(2)[4]).toBe("#2E86C1");
+    expect(cells(3).slice(0, 2)).toEqual(["Beta", "Beta EN"]);
+    // edit one label, leave the other row, add a new code
+    data.getRow(2).getCell(2).value = "Alpha changed";
+    data.getRow(4).getCell(1).value = "Gamma";
+    data.getRow(4).getCell(2).value = "Gamma EN";
+    const buffer = Buffer.from(await book.xlsx.writeBuffer());
+    const up = await admin.api
+      .call("post", `/list-catalogues/${L}/values/import`, undefined)
+      .attach("file", buffer, "roundtrip.xlsx")
+      .field("reason", "D54 round trip");
+    expect(up.status).toBe(200);
+    expect(up.body).toMatchObject({ imported: 2, created: 1, updated: 1, unchanged: 1 });
+    const vals = (await listOf(L)).values;
+    expect(vals.find((x) => x.code === "Alpha")?.label_en).toBe("Alpha changed");
+    expect(vals.find((x) => x.code === "Beta")?.label_en).toBe("Beta EN");
+    expect(vals.map((x) => x.code).sort()).toEqual(["Alpha", "Beta", "Gamma"]);
+    // an unknown list is 404; a plain download stays empty
+    expect((await admin.api.call("get", "/templates/TPL-LISTVALUES/download?list=NoSuchList9")).status).toBe(404);
   });
 });
 
