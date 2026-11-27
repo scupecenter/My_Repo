@@ -5911,6 +5911,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/security-locks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The admin lock keys, block public sharing and disable export (0.15.190)
+         * @description Every signed-in user may read it (the UI hides what is locked). `can_edit` is true for a System Admin only. Both keys are `false` until a System Admin turns one on.
+         */
+        get: operations["getSecurityLocks"];
+        /**
+         * Turn the lock keys on or off (System Admin, reason, step-up, If-Match, audited) (0.15.190)
+         * @description System Admin only (403 `action_forbidden` otherwise, a delegate included). A reason (3+ characters), a step-up (401 `step_up_required`) and `If-Match` (428 / 412)
+         *     are required. Unknown keys and non-boolean values are 422. Saving the values already in force is 409 `invalid_transition`. Audited `security_locks_update` with both keys
+         *     before and after. Reading and changing the lock keys is never locked, so an admin can always turn a lock off again.
+         */
+        put: operations["setSecurityLocks"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/historical-waiver": {
         parameters: {
             query?: never;
@@ -16299,6 +16325,24 @@ export interface components {
             animation: boolean;
             default_locale: ("en" | "ar") | null;
             support_links: components["schemas"]["SupportLink"][];
+        };
+        /** @description 0.15.190. The admin lock keys (setting `security.locks`, migration 0290). */
+        SecurityLocks: {
+            /** @description true: no feature may create a public link (checked by `SecurityLocksService.assertSharingAllowed`). */
+            block_public_sharing: boolean;
+            /** @description true: every export route answers 403 `export_locked`. */
+            disable_export: boolean;
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+            /** @description The ETag value. */
+            version: number;
+            /** @description A System Admin only. */
+            can_edit: boolean;
+        };
+        SecurityLocksInput: components["schemas"]["WithReason"] & {
+            block_public_sharing: boolean;
+            disable_export: boolean;
         };
         /** @description 0.15.1. The shared order of the side menu (setting `nav.layout`). */
         NavLayout: {
@@ -30393,6 +30437,62 @@ export interface operations {
                 };
             };
             429: components["responses"]["TooManyRequests"];
+        };
+    };
+    getSecurityLocks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The lock keys. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SecurityLocks"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setSecurityLocks: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SecurityLocksInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SecurityLocks"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
         };
     };
     getHistoricalWaiver: {

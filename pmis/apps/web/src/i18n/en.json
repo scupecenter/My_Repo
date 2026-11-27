@@ -1134,6 +1134,7 @@
     "section_registers_lists": "Lists",
     "section_alerts_policy": "Notification policy",
     "section_alerts_mail": "Mail kinds",
+    "section_security_locks": "Lock keys",
     "section_security_dlp": "DLP months",
     "section_screens_dashboard": "Dashboard",
     "section_screens_tables": "Tables (Display)",
@@ -5531,6 +5532,21 @@
     "sahara": "Sahara",
     "obsidian_desc": "A near-black sidebar with a gold accent. A control-room look, best in the dark theme.",
     "sahara_desc": "A warm sand page with an emerald accent and a deep green sidebar. Calm for long reading, best in the light theme."
+  },
+  "seclocks": {
+    "title": "Lock keys",
+    "note": "Two switches for a System Admin. Both are off until you turn one on. Nothing is deleted and no sign-in changes. You can turn a lock off again at any time.",
+    "sharing": "Block public sharing",
+    "sharing_note": "No feature may create a link that opens without signing in. There is no public link in the system today; this switch keeps it that way for anything added later.",
+    "export": "Disable export",
+    "export_note": "Every export and file download of data is refused: Master export, document zips, log reports, announcement results, dashboard and Daily Plan files, My Work calendar. Blank templates and uploaded documents stay open.",
+    "in_force": "In force",
+    "updated": "Last changed by {{name}} on {{when}}.",
+    "never": "Never changed: both locks are off.",
+    "readonly": "Only a System Admin can change the lock keys.",
+    "confirm": "Block public sharing: {{sharing}}. Disable export: {{exporting}}. Your password is asked again and the change is written to the audit log.",
+    "on": "on",
+    "off": "off"
   },
   "identity": {
     "title": "Identity & themes",
