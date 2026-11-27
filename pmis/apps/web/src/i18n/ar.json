@@ -4464,6 +4464,8 @@
     "import_file": "ملف Excel (.xlsx)",
     "reason_short": "السبب (3 أحرف على الأقل)",
     "import_submit": "استيراد",
+    "template_current": "تنزيل القالب بالقيم الحالية",
+    "import_unchanged": "{{count}} بلا تغيير",
     "import_done": "تم استيراد {{count}} قيمة",
     "bind_title": "ربط هذه القائمة بعمود في سجل",
     "bind_pick_register": "اختر سجلاً",

@@ -198,7 +198,7 @@ export class TemplatesService {
     if (!t || !t.is_active) throw problems.notFound('This template does not exist.');
     if (t.kind === 'stream' || t.kind === 'master') return this.downloadSite(auth, t, q);
     if (t.kind === 'sites') return this.downloadNewSites(auth, t);
-    if (t.kind === 'list_values') return this.downloadListValues(auth, t);
+    if (t.kind === 'list_values') return this.downloadListValues(auth, t, q);
     if (t.kind === 'holidays') return this.downloadHolidays(auth, t);
     if (t.kind !== 'register' || !t.register_key || !t.module_key) throw problems.notFound('This template cannot be downloaded yet.');
     const regs = await this.access.requireRegions(t.module_key, 'view');
@@ -261,14 +261,30 @@ export class TemplatesService {
   }
 
   /** 0105 (F17): the approved template of a list's values. One row per value; the import reads it back (list-catalogues service). */
-  private async downloadListValues(auth: AuthContext, t: TemplateRow): Promise<{ buffer: Buffer; fileName: string }> {
+  /**
+   * The list values template. Empty (structure only) by default. With `list=<code>` (D54, D55) it is filled with the current active values of that list,
+   * in the columns of the template, so the admin downloads, edits and uploads it again (`POST /list-catalogues/{code}/values/import`).
+   */
+  private async downloadListValues(auth: AuthContext, t: TemplateRow, q: Record<string, unknown>): Promise<{ buffer: Buffer; fileName: string }> {
     await this.access.requireAdmin('fields', 'edit');
     if (!(await this.access.hasGrant(auth, 'templates', 'download_documents'))) throw problems.forbidden('action_forbidden', 'You need to download documents on templates.');
+    const list = oneParam(q, 'list');
+    let rows: Record<string, unknown>[] = [];
+    if (list !== undefined) {
+      if (!/^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(list)) throw problems.validation([{ path: '/list', code: 'invalid', message: 'list is the code of a dropdown list.' }]);
+      const cat = await this.db.tx.$queryRaw<{ code: string }[]>(Prisma.sql`SELECT code FROM list_catalogues WHERE code = ${list}`);
+      if (!cat[0]) throw problems.notFound('The list does not exist.');
+      const vals = await this.db.tx.$queryRaw<{ code: string; label_en: string; label_ar: string | null; aliases: string[]; colour: string | null; parent_code: string | null; sort_order: number }[]>(Prisma.sql`
+        SELECT v.code, v.label_en, v.label_ar, v.aliases, v.colour, p.code AS parent_code, v.sort_order
+        FROM list_values v LEFT JOIN list_values p ON p.id = v.parent_value_id
+        WHERE v.catalogue_code = ${list} AND v.is_active ORDER BY v.sort_order, v.code COLLATE "C" LIMIT 5000`);
+      rows = vals.map((v) => ({ code: v.code, label_en: v.label_en, label_ar: v.label_ar, aliases: (v.aliases ?? []).join(';'), colour: v.colour, parent_code: v.parent_code, sort_order: v.sort_order }));
+    }
     const issuedAt = new Date();
-    const buffer = await this.build(t, t.columns, [], { prefill: false, employeeId: null, issuedAt });
+    const buffer = await this.build(t, t.columns, rows, { prefill: list !== undefined, employeeId: null, issuedAt });
     await this.db.tx.$queryRaw(Prisma.sql`SELECT log_audit_write('template_download', 'template', ${t.template_id}::text, NULL,
-        ${JSON.stringify({ version: t.current_version, prefill: false, rows: 0, kind: t.kind })}::jsonb, NULL)`);
-    return { buffer, fileName: `${t.template_id}_v${t.current_version}_${issuedAt.toISOString().slice(0, 10)}.xlsx` };
+        ${JSON.stringify({ version: t.current_version, prefill: list !== undefined, rows: rows.length, kind: t.kind, list: list ?? null })}::jsonb, NULL)`);
+    return { buffer, fileName: `${t.template_id}${list ? `_${list}` : ''}_v${t.current_version}_${issuedAt.toISOString().slice(0, 10)}.xlsx` };
   }
 
   /** 0145 (B12, ADR 0011): the empty TPL-HOLIDAYS workbook, for a System Admin or a delegate of the calendar. */
