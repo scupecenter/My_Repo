@@ -12,6 +12,9 @@ import { parse, uuidSchema } from '../common/zod';
 import { DbService } from '../db/db.service';
 import { DocumentsService, SITE_DOCS } from '../documents/documents.service';
 import { StorageService } from '../documents/storage.service';
+import { RateLimiter } from '../auth/rate-limiter';
+import { SyslogService } from '../auth/syslog.service';
+import { limit } from '../ops/ops-limits';
 import { isThumbSource, loadSharp, makeThumb, thumbKey, thumbMime, ThumbFormat } from './thumbs';
 
 /**
@@ -54,6 +57,8 @@ export class MediaService {
     private readonly stepUp: StepUpService,
     private readonly docs: DocumentsService,
     private readonly storage: StorageService,
+    private readonly limiter: RateLimiter,
+    private readonly syslog: SyslogService,
   ) {}
 
   // ------------------------------------------------------------------------------------------------------------------ settings
@@ -225,7 +230,7 @@ export class MediaService {
   // ------------------------------------------------------------------------------------------------------------------ thumbnail
 
   /** GET /media/items/{kind}/{id}/thumbnail?size=small|medium. Visible only when the item itself is visible (404 otherwise); made on first request and kept beside the original. */
-  async thumbnail(kind: string, id: string, sizeRaw: string | undefined): Promise<{ file: StreamableFile; headers: Record<string, string> }> {
+  async thumbnail(auth: AuthContext, kind: string, id: string, sizeRaw: string | undefined): Promise<{ file: StreamableFile; headers: Record<string, string> }> {
     if (!['document_file', 'snag_photo'].includes(kind) || !uuidSchema.safeParse(id).success) throw problems.notFound();
     const size = sizeRaw === undefined ? 'small' : sizeRaw;
     if (size !== 'small' && size !== 'medium') throw problems.validation([{ path: '/size', code: 'invalid', message: 'size is small or medium.' }]);
@@ -256,6 +261,16 @@ export class MediaService {
       return { file: new StreamableFile(await this.storage.store.get(key), { type: mime }), headers };
     } catch {
       /* not made yet */
+    }
+    // SEC-2: only making a thumbnail costs; one already made is served above without counting. Per person, per minute, set in Settings > Security > Limits (0 = no limit).
+    const perMinute = limit('media.thumbnails_per_minute');
+    if (perMinute > 0) {
+      const wait = this.limiter.hit(`thumb:${auth.user.id}`, perMinute);
+      if (wait > 0) {
+        await this.syslog.write('warn', 'thumbnail_rate_limited', { limit: perMinute, kind }, auth.user.id);
+        // commit: the refusal must keep its System Log row (the request ends in an error, which otherwise rolls the transaction back)
+        throw new ProblemException(429, 'rate_limited', { detail: 'Too many thumbnails were made in the last minute. Try again later.', headers: { 'Retry-After': String(wait) }, commit: true });
+      }
     }
     const src = await this.storage.store.get(r.storage_key);
     const chunks: Buffer[] = [];

@@ -18893,11 +18893,11 @@ export interface components {
         /** @description 0.15.312. One operational limit. */
         OpsLimitItem: {
             /** @enum {string} */
-            key: "session.idle_hours" | "session.absolute_hours" | "stepup.seconds" | "assignments.max_rows" | "import.max_rows" | "master_import.max_rows" | "register_import.max_rows" | "prefill.max_rows" | "prefill.max_sites" | "export.max_rows" | "idempotency.max_entries";
+            key: "session.idle_hours" | "session.absolute_hours" | "stepup.seconds" | "assignments.max_rows" | "import.max_rows" | "master_import.max_rows" | "register_import.max_rows" | "prefill.max_rows" | "prefill.max_sites" | "export.max_rows" | "idempotency.max_entries" | "media.thumbnails_per_minute";
             /** @enum {string} */
-            group: "sessions" | "rows" | "exports";
+            group: "sessions" | "rows" | "exports" | "media";
             /** @enum {string} */
-            unit: "hours" | "seconds" | "rows" | "sites" | "entries";
+            unit: "hours" | "seconds" | "rows" | "sites" | "entries" | "per_minute";
             default: number;
             min: number;
             max: number;
@@ -34330,6 +34330,7 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
         };
     };
     putUiLogo: {

@@ -15,6 +15,7 @@ export const OPS_LIMIT_DEFAULTS = {
   'prefill.max_sites': 5000,
   'export.max_rows': 100_000,
   'idempotency.max_entries': 5000,
+  'media.thumbnails_per_minute': 120,
 } as const;
 
 export type OpsLimitKey = keyof typeof OPS_LIMIT_DEFAULTS;

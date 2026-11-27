@@ -2,7 +2,9 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { randomUUID } from 'node:crypto';
 import type { Client as PgClient } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { RateLimiter } from '../src/auth/rate-limiter';
 import { StorageService } from '../src/documents/storage.service';
+import { applyLimits, resetLimits } from '../src/ops/ops-limits';
 import { loadSharp } from '../src/media/thumbs';
 import { superDb, startApp } from './helpers';
 import { G } from './reg-helpers';
@@ -131,6 +133,27 @@ describe('Media gallery', () => {
     expect((b.body as Buffer).equals(a.body as Buffer)).toBe(true);
     expect((await docsQuality.api.call('get', `/media/items/document_file/${ids.current}/thumbnail?size=huge`)).status).toBe(422);
     expect((await docsQuality.api.call('get', `/media/items/document_file/${ids.pdf}/thumbnail`)).status).toBe(404);   // not in the images-only scope
+  });
+  it('SEC-2: making thumbnails is limited per person per minute (ops.limits); a thumbnail already made and a limit of 0 are never refused', async () => {
+    (app.get(RateLimiter) as unknown as { hits: Map<string, number[]> }).hits.clear();
+    try {
+      applyLimits({ 'media.thumbnails_per_minute': 1 }, ['media.thumbnails_per_minute']);
+      const medium = await docsQuality.api.call('get', `/media/items/document_file/${ids.current}/thumbnail?size=medium`);
+      expect(medium.status, JSON.stringify(medium.body)).toBe(200);                      // the first one made
+      const cached = await docsQuality.api.call('get', `/media/items/document_file/${ids.current}/thumbnail?size=small`);
+      expect(cached.status).toBe(200);                                                     // already made: free
+      const refused = await docsQuality.api.call('get', `/media/items/snag_photo/${ids.photo}/thumbnail?size=small`);
+      expect(refused.status).toBe(429);                                                    // a second one to make in the same minute
+      expect(refused.body).toMatchObject({ code: 'rate_limited' });
+      expect(Number(refused.headers['retry-after'])).toBeGreaterThan(0);
+      const logged = await db.query(`SELECT 1 FROM system_log WHERE message = 'thumbnail_rate_limited' LIMIT 1`);
+      expect(logged.rowCount).toBeGreaterThan(0);
+      applyLimits({ 'media.thumbnails_per_minute': 0 }, ['media.thumbnails_per_minute']);   // 0 = no limit
+      const free = await docsQuality.api.call('get', `/media/items/snag_photo/${ids.photo}/thumbnail?size=small`);
+      expect(free.status).toBe(200);
+    } finally {
+      resetLimits();
+    }
   });
 
   it('hides a withdrawal at once and never deletes the row', async () => {
