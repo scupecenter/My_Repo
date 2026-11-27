@@ -5,7 +5,7 @@ import { API_BASE } from '@/api/client';
  * Synthetic Site Master menus (contract 0.15.21). A small subset of the 187 Master columns, with the same sections as the
  * API's defaults, so the grid can be tested. The real columns come from master_columns.
  */
-type Col = { ord: number; letter: string; group_top: string | null; group_mid: string | null; header: string; sections: string[]; source_kind: string; source_note?: string | null };
+type Col = { ord: number; letter: string; group_top: string | null; group_mid: string | null; header: string; sections: string[]; source_kind: string; source_note?: string | null; value_type?: 'date' };
 const COLS: Col[] = [
   { ord: 1, letter: 'A', group_top: '#', group_mid: null, header: '#', sections: ['design_acq'], source_kind: 'derived' },
   { ord: 2, letter: 'B', group_top: 'RF & DESIGN', group_mid: 'Identification', header: 'Site ID', sections: ['design_acq'], source_kind: 'site' },
@@ -14,7 +14,7 @@ const COLS: Col[] = [
   { ord: 23, letter: 'W', group_top: 'Phase Gate', group_mid: 'Pre-CW Readiness', header: 'Pre-CW Readiness', sections: ['cw'], source_kind: 'milestone' },
   { ord: 24, letter: 'X', group_top: 'PRE-CW', group_mid: 'Project', header: 'Project Phase', sections: ['sow'], source_kind: 'site' },
   { ord: 33, letter: 'AG', group_top: 'PRE-CW', group_mid: 'CW Procurement', header: 'CW Delivery Model', sections: ['cw'], source_kind: 'site' },
-  { ord: 78, letter: 'BZ', group_top: 'TE INSTALLATION', group_mid: 'TE Access', header: 'TE Access Date', sections: ['te'], source_kind: 'register' },
+  { ord: 78, letter: 'BZ', group_top: 'TE INSTALLATION', group_mid: 'TE Access', header: 'TE Access Date', sections: ['te'], source_kind: 'register', value_type: 'date' },
   { ord: 144, letter: 'EN', group_top: 'CLUSTER OPTIMIZATION', group_mid: 'Cluster', header: 'Cluster ID', sections: ['hoto'], source_kind: 'derived', source_note: 'Cluster ID of the site (= G).' },
   { ord: 157, letter: 'FA', group_top: 'FINAL CLOSURE', group_mid: 'CW DLP / FAC', header: 'CW DLP Start Date', sections: ['om'], source_kind: 'derived', source_note: 'CW PAC Actual Date (BV).' },
   { ord: 170, letter: 'FN', group_top: 'DISMANTLE', group_mid: 'CW Dismantle (RN)', header: 'Site CW RFD', sections: ['dismantle'], source_kind: 'register' },

@@ -37,7 +37,7 @@ Owner: `people-registry` agent. Sources: CLAUDE.md "Staff registry" (settles B13
 ## 5. Hover card
 - Shown wherever a person holds a task: task grid, task drawer, Approvals, My Work, matrix. The employee ID is always printed beside the name.
 - Contents: name EN and AR, employee ID, position, team, region, email, phone, "Inactive" badge when relevant.
-- Field-level visibility: email and phone follow field-level permissions. Default: any signed-in Aljeel employee sees them; an admin can limit each to admins or to named roles. A hidden field shows "Not visible to you", never blank.
+- Field-level visibility: email and phone follow field-level permissions. Default: any signed-in Company employee sees them; an admin can limit each to admins or to named roles. A hidden field shows "Not visible to you", never blank.
 - Keyboard: the name is focusable (Tab); focus opens the card, blur or Escape closes it. Escape closes the card before any drawer or dialog behind it.
 - Pointer: opens on hover, stays open while the pointer is over the card, closes shortly after it leaves.
 - Touch: a tap opens it, a tap elsewhere closes it; the tap does not trigger the row action.

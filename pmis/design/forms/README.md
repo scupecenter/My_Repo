@@ -15,7 +15,7 @@ Run `npm i && npm run render`. Playwright is found through `require('playwright'
 ## Adding a TE form later (no code change)
 
 1. **Drop in the template.** Open the Document Library in the admin screen, create an entry of kind "generated form", and upload the HTML (self-contained: inline CSS, fonts and logo as data URIs). Use only `{{x}}`, `{{{x}}}`, `{{#each}}` and `{{#if}}`. Copy the pagination block from any CW template: `thead` for the header row, `@page` margin boxes for "Page X of Y", `break-inside: avoid` on rows.
-2. **Define the bindings.** In the same entry, map each placeholder to a data source from the binding catalogue (site, contractor, register fields, matrix signatories, movement lines, snags, linked document). The admin also sets the guard conditions in the entry (e.g. "no open snags"). Classify the document as issued by Aljeel, vendor-issued (upload only) or jointly signed.
+2. **Define the bindings.** In the same entry, map each placeholder to a data source from the binding catalogue (site, contractor, register fields, matrix signatories, movement lines, snags, linked document). The admin also sets the guard conditions in the entry (e.g. "no open snags"). Classify the document as issued by Company, vendor-issued (upload only) or jointly signed.
 3. **Set the number sequence.** Set a pattern such as `PAC-TE-{REGION}-{YYYY}-{NNNN}`, its scope and its reset rule.
 4. Publish. The form appears on the site task slot. Each PDF records the template version.
 

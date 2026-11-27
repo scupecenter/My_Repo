@@ -174,7 +174,7 @@ describe('forced enrolment', () => {
     const key = screen.getByTestId('enrol-key').textContent!.replace(/\s/g, '');
     expect(key).toMatch(/^[A-Z2-7]{32}$/);
     expect(cred('engineer')!.tf!.pending).toBe(key);
-    expect(otpauth(key, 'sami.nuri@example.com')).toContain('issuer=GSDN%20Workspace');
+    expect(otpauth(key, 'demo.user.06@example.com')).toContain('issuer=GSDN%20Workspace');
 
     await u.type(screen.getByTestId('enrol-code'), '000000');
     await u.click(screen.getByTestId('enrol-submit'));

@@ -42,7 +42,7 @@ export function initOrg() {
   const threads: MockThreadRow[] = [
     {
       id: '97000000-0000-4000-8000-000000000001', subject: 'Site visit schedule for Tripoli', a: uid('1103'), b: uid('1102'), started_by: uid('1103'),
-      original: m('1', '1103', 'Hello Mona,\nI plan the Tripoli site visits for next week.\nCan you confirm the order?', '2026-10-26T08:00:00Z'),
+      original: m('1', '1103', 'Hello Demo User 02,\nI plan the Tripoli site visits for next week.\nCan you confirm the order?', '2026-10-26T08:00:00Z'),
       replies: [m('2', '1102', 'Start with WM105, then GM117.', '2026-10-26T09:30:00Z'), m('3', '1103', 'Understood, thank you.', '2026-10-27T07:45:00Z')],
       read: { [uid('1103')]: '2026-10-27T07:45:00Z', [uid('1102')]: '2026-10-26T09:30:00Z' },
     },
@@ -58,7 +58,7 @@ export function initOrg() {
     },
   ];
 
-  // One sent announcement, answered by nearly everyone; Sami Nuri (1204) and Anis Gharyani (1310) have not answered yet.
+  // One sent announcement, answered by nearly everyone; Demo User 06 (1204) and Demo User 19 (1310) have not answered yet.
   const recipients = STAFF.filter((s) => s.status === 'active' && !['1001', '1210', '1211'].includes(s.employee_id)).map((s) => uid(s.employee_id));
   const answers: MockAnnRow['answers'] = {};
   recipients.forEach((r, i) => {

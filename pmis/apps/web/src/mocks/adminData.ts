@@ -50,7 +50,7 @@ export function initAdmin() {
     /** Soft-deleted accounts (B14). 9001 is synthetic: its email now belongs to another account, so it cannot be restored. */
     deleted: [
       { employee_id: '1104', name_en: byId('1104').name_en, email: byId('1104').email, status: 'disabled', deleted_at: '2026-10-10T09:00:00Z', deleted_by: '1001', reason: 'Left the company', version: 3 },
-      { employee_id: '9001', name_en: 'Rami Tester', email: 'ahmed.salem@example.com', status: 'disabled', deleted_at: '2026-10-12T09:00:00Z', deleted_by: '1001', reason: 'Duplicate account', version: 2 },
+      { employee_id: '9001', name_en: 'Demo Tester', email: 'demo.user.01@example.com', status: 'disabled', deleted_at: '2026-10-12T09:00:00Z', deleted_by: '1001', reason: 'Duplicate account', version: 2 },
     ] as MockDeleted[],
   };
 }

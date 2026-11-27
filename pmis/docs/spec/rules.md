@@ -1,4 +1,4 @@
-# GSDN Workspace: business rules (P0)
+# Workspace: business rules (P0)
 
 Sources: Blueprint v1.1 (`docs/reference/GSDN_Workspace_Blueprint_v1.1.html`, cited as "BP §nn"), the decisions log (`docs/reference/GSDN_Rebuild_Decisions.md`, cited as Dnn), the Master (cited by sheet and column; its reference is now the system itself — the `master_columns` table and the Master export, `POST /exports/master` — and the citations were read from the retired repository-root `GSDN_Site_Master.xlsx`), and `pmis/CLAUDE.md` (cited as "CLAUDE.md", binding product-owner decisions of 2026-10-24).
 Anything not stated in a source is marked **ASSUMPTION** and is listed in `open-questions.md` when it matters.
@@ -69,7 +69,7 @@ if S > R:                      # suspended on G0
 else:
     gate = G0
 ```
-**Owner answer Q180 (2026-11-04), built in migration 0052:** GSDN Workspace uses the **effective** dates, not the approval dates: the suspension starts on `suspension_start` and ends on the `resumption_date` of the first approved (or applied) resumption whose effective date is later; each falls back to its approval date when the effective date is empty. The window is **[start, resume)**: the start day is suspended, the resumption day is a working day again. A candidate date inside a window moves to the resumption date (and is checked again from there); inside a window without a resumption the gate stays locked. Both the effective and the approval dates are kept on the record (`cc_suspension_windows` flags a retroactive window). Drafts and rejected requests never count. The Master formula above stays the comparison value of the parallel run.
+**Owner answer Q180 (2026-11-04), built in migration 0052:** Workspace uses the **effective** dates, not the approval dates: the suspension starts on `suspension_start` and ends on the `resumption_date` of the first approved (or applied) resumption whose effective date is later; each falls back to its approval date when the effective date is empty. The window is **[start, resume)**: the start day is suspended, the resumption day is a working day again. A candidate date inside a window moves to the resumption date (and is checked again from there); inside a window without a resumption the gate stays locked. Both the effective and the approval dates are kept on the record (`cc_suspension_windows` flags a retroactive window). Drafts and rejected requests never count. The Master formula above stays the comparison value of the parallel run.
 - A suspension approved after the gate opened does not move that gate. It sets Overall Status to On Hold (§2.4), and the next gate is evaluated against it when that gate's candidate date arrives.
 - SLA during a suspension: the SLA counter stops in the contractor scorecard only. It keeps running in project KPIs. (BP §03)
   - ASSUMPTION: suspended working days are the working days between an approved Suspension and the next approved Resumption, and they are subtracted from the contractor-attributed delay (§8).
@@ -78,7 +78,7 @@ else:
 The first rule that matches applies:
 1. **Cancelled**: an approved Cancellation row exists in Change Control.
 2. **Completed**: Final Closure (FM) is valid.
-3. **On Hold**: on the Report Date (in GSDN Workspace, today), the latest approved Suspension is after the latest approved Resumption.
+3. **On Hold**: on the Report Date (in Workspace, today), the latest approved Suspension is after the latest approved Resumption.
 4. **In Progress**: Current Milestone is not "Not Started".
 5. **Not Started**: none of the above.
 
@@ -260,8 +260,8 @@ Need is computed per site, only for sites where TE applies.
 - **Cancelled sites (technical decision Q281, 2026-11-04):** a site whose overall status is Cancelled is left out of the TE dispatch list (`GET /warehouse/dispatch-status`) and of any need total built from it. It stays visible on its own site page (`GET /warehouse/dispatch-status/{site_id}`).
 - **Quarantine and its exits (technical decision Q270, 2026-11-04):** a Faulty or Damaged return is held in quarantine, outside On Hand and Available (Q105). Three Warehouse documents take it out again, each with a reason and approved by L2 like any warehouse document: *repaired back to stock* (an ADJ: quarantine to available, adds to On Hand), *written off* (an ADJ: quarantine to gone) and *returned to supplier* (a DN to the vendor: quarantine to out). A pending exit holds its quantity, so the same units cannot leave twice; the stock and the serials move on the final approval. A serial-tracked item names one serial per unit, each still in quarantine.
 
-## 8. Delay attribution (PMIS-only, v1). All formulas are ASSUMPTIONS for owner review.
-Sources: CLAUDE.md (each task shows its responsible external party; delays are attributed correctly); BP §09 (attribution periods); BP §14 (days above SLA attributed to the executor R; the Aljeel AAT SE is never charged).
+## 8. Delay attribution (Workspace-only, v1). All formulas are ASSUMPTIONS for owner review.
+Sources: CLAUDE.md (each task shows its responsible external party; delays are attributed correctly); BP §09 (attribution periods); BP §14 (days above SLA attributed to the executor R; the Company AAT SE is never charged).
 
 For a task instance with SLA max `M` and duration (or open age) `d`, in working days:
 1. **Overdue days** `O = max(0, d − M)`. A task with no SLA but with a baseline date: `O = working days from the baseline date to the actual date (or today)` (ASSUMPTION).
@@ -271,7 +271,7 @@ For a task instance with SLA max `M` and duration (or open age) `d`, in working 
    - ASSUMPTION: they stay on the default party, tagged "default (R)" so the two can be told apart. BP §09 says unattributed days are charged to no one; see open-questions Q7.
 5. **Reports:** delay days per party, per step, region and contractor; the % unattributed; the number of overlapping periods (BP §06 indicator "delay by party").
 
-## 9. Project health index (PMIS-only, v1). Every formula is an ASSUMPTION for owner review.
+## 9. Project health index (Workspace-only, v1). Every formula is an ASSUMPTION for owner review.
 Source: BP §06 level 4. The factors are progress, baseline adherence, SLA adherence, documentation completeness, first-time approval and open critical issues. Each factor is ≤ 100. A factor with no data is excluded and its weight redistributed. The index is kept separate from progress on purpose.
 
 | Factor | Formula (scope: active sites in the current filter) | Default weight |

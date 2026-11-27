@@ -13,7 +13,7 @@
 ## أ. المنصة والأساس (2026-10-24)
 
 - NestJS مع PostgreSQL على **خادم داخلي، وليس سحابة**.
-- الدخول بـ Microsoft 365 لموظفي Aljeel فقط؛ التحقق الثنائي عبر Entra لاحقاً.
+- الدخول بـ Microsoft 365 لموظفي Company فقط؛ التحقق الثنائي عبر Entra لاحقاً.
 - ألوان ERPNext (frappe-ui 1.0.2) بخط Cairo؛ وخط الإنجاز (pipeline) بأسلوب لوحة المتابعة القديمة.
 - **الإطلاق:** تجربة في طرابلس أسبوعين، ثم تشغيل موازٍ مع الـMaster شهراً.
 - أُنجز في P0: فريق الوكلاء، والمواصفات (69 مهمة، 92 قصة، القواعد، الأسئلة المفتوحة)، ومخطط البيانات (75 نموذجاً) وربط أعمدة الـMaster الـ187، ورموز التصميم والنموذج الأولي، ثم في 2026-10-25: عشر وثائق قرارات معمارية (ADR 0001–0010)، وعقد API الإصدار 0.1، وتقرير بوابة P0.
@@ -34,7 +34,7 @@
 | التاريخ | القرار | الرمز |
 |---|---|---|
 | 2026-10-25 | **سجل الموظفين:** رقم الموظف (4 أرقام) يظهر بجانب اسم كل مكلّف وببطاقة صغيرة بالمرور عليه؛ لا حذف نهائي بل تعطيل. | B13 (حسب CLAUDE.md) |
-| 2026-10-25 | **إعفاء مستخدم من التحقق الثنائي داخل PMIS** (بسبب وتحقق إضافي من المدير، لا أحد يعفي نفسه، تدقيق وبريد للمستخدم). لا يلغي MFA المفروض من Entra. | — |
+| 2026-10-25 | **إعفاء مستخدم من التحقق الثنائي داخل Workspace** (بسبب وتحقق إضافي من المدير، لا أحد يعفي نفسه، تدقيق وبريد للمستخدم). لا يلغي MFA المفروض من Entra. | — |
 | 2026-10-25 (3) | **خانة دخول واحدة:** بريد أو رقم وظيفي أو هاتف، ثم يُجري Microsoft 365 الدخول فعلياً. لا كلمات مرور في المنظومة، والشاشة لا تكشف إن كان الشخص مسجلاً. | — |
 | 2026-10-25 (3) | **الدخول المحلي (رقم/هاتف + كلمة مرور) مؤجل لمرحلة لاحقة.** | — |
 | 2026-10-25 (3) | **ظهور الهاتف والبريد في البطاقة:** افتراضياً لكل الموظفين المسجلين، وللمدير تحديد من يرى كل حقل أو إخفاؤه لموظف بعينه. | — |
@@ -107,7 +107,7 @@
 ## A. Platform and foundation (2026-10-24)
 
 - NestJS with PostgreSQL on an **internal server, never cloud**.
-- Microsoft 365 sign-in for Aljeel employees only; two-factor authentication through Entra later.
+- Microsoft 365 sign-in for Company employees only; two-factor authentication through Entra later.
 - ERPNext colours (frappe-ui 1.0.2) with the Cairo font; the pipeline component follows the style of the previous dashboard.
 - **Rollout:** a 2-week pilot in Tripoli, then a 1-month parallel run with the Master.
 - Delivered in P0: the agent team; the specification (69 tasks, 92 stories, rules, open questions); the data model (75 models) with the mapping of all 187 Master columns; design tokens and the prototype; then on 2026-10-25 ten architecture decision records (ADR 0001–0010), API contract v0.1 and the P0 gate report.
@@ -128,7 +128,7 @@
 | Date | Decision | Code |
 |---|---|---|
 | 2026-10-25 | **Staff registry:** the 4-digit employee ID is shown beside every assignee's name with a small card on hover; no hard delete, deactivate only. | B13 (per CLAUDE.md) |
-| 2026-10-25 | **Per-user MFA exemption inside GSDN Workspace** (reason and the admin's own step-up; nobody exempts themselves; audited and emailed). It does not cancel MFA enforced by Entra. | — |
+| 2026-10-25 | **Per-user MFA exemption inside Workspace** (reason and the admin's own step-up; nobody exempts themselves; audited and emailed). It does not cancel MFA enforced by Entra. | — |
 | 2026-10-25 (3) | **One sign-in box:** email, employee ID or phone; Microsoft 365 then performs the sign-in. No passwords in the system; the screen does not reveal whether a person is registered. | — |
 | 2026-10-25 (3) | **Local sign-in (ID/phone + password) deferred to a later phase.** | — |
 | 2026-10-25 (3) | **Phone and email on the card:** visible to all registered staff by default; the admin can choose who sees each field or hide it for one employee. | — |
