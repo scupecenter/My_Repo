@@ -34,6 +34,11 @@ const rule = (code: string, over: Record<string, unknown> = {}): Record<string, 
 const fires = async (code: string): Promise<number> =>
   Number((await db.query('SELECT count(*)::int AS n FROM alert_rule_fires f JOIN alert_rules r ON r.id = f.rule_id WHERE r.code = $1', [code])).rows[0].n);
 
+// CI runs every suite against one shared database: never assert on the global return of alert_rules_run (other suites' rows
+// match a broad rule too). Scope every run assertion to this rule's fire rows.
+const targetFires = async (ruleId: string, period: string, target: string): Promise<number> =>
+  Number((await db.query('SELECT count(*)::int AS n FROM alert_rule_fires WHERE rule_id = $1 AND period_key = $2 AND target = $3', [ruleId, period, target])).rows[0].n);
+
 describe('alert rules (0342)', () => {
   it('validates the closed kinds, params, audience and templates with field errors', async () => {
     const fails = async (r: Record<string, unknown>, re: RegExp): Promise<void> => {
@@ -83,7 +88,9 @@ describe('alert rules (0342)', () => {
     const arab = await makeUser(db, { status: 'active' });
     await db.query(`UPDATE users SET locale = 'ar' WHERE id = $1`, [arab.id]);
     await db.query(`INSERT INTO group_members (group_id, user_id) SELECT g.id, $1 FROM groups g WHERE g.is_system_admins AND g.is_active LIMIT 1`, [arab.id]);
-    expect((await db.query(`SELECT alert_rules_run('2031-03-07'::date) AS n`)).rows[0].n).toBe(0);
+    const weeklyBefore = await fires(code);
+    await db.query(`SELECT alert_rules_run('2031-03-07'::date) AS n`);
+    expect(await fires(code)).toBe(weeklyBefore);
     // a later week fires again and the Arabic recipient gets the Arabic template
     const n2 = (await db.query(`SELECT alert_rules_run('2031-03-14'::date) AS n`)).rows[0].n as number;
     expect(n2).toBeGreaterThan(0);
@@ -125,14 +132,19 @@ describe('alert rules (0342)', () => {
        VALUES (gen_random_uuid(), 'issues', $3, $1, false, true, 'entry', 1, 3, 0, $2, now())`,
       [REGION, adminId, site.id],
     );
-    const n = (await db.query(`SELECT alert_rules_run('2031-03-07'::date) AS n`)).rows[0].n as number;
-    expect(n).toBe(1);
-    const notes = await db.query(`SELECT user_id, title, body, link FROM notifications WHERE kind = 'alert_rule' AND link = '/registers/issues'`, []);
-    expect(notes.rows.map((r) => r.user_id)).toEqual([holder.id]);
+    await db.query(`SELECT alert_rules_run('2031-03-07'::date) AS n`);
+    const idleId = idle.rows[0].id as string;
+    expect(await targetFires(ruleId, 'day:2031-03-07', idleId)).toBe(1);
+    const notes = await db.query(`SELECT user_id, title, body, link FROM notifications WHERE kind = 'alert_rule' AND link = '/registers/issues' AND user_id = $1`, [holder.id]);
+    expect(notes.rows.length).toBeGreaterThanOrEqual(1);
     expect(notes.rows[0].body).toContain('entry');
+    const wrongNotes = await db.query(`SELECT 1 FROM notifications WHERE kind = 'alert_rule' AND user_id = $1`, [wrongModule.id]);
+    expect(wrongNotes.rows.length).toBe(0);
     // the dedupe: a second run of the same day writes nothing, a later day fires again
-    expect((await db.query(`SELECT alert_rules_run('2031-03-07'::date) AS n`)).rows[0].n).toBe(0);
-    expect((await db.query(`SELECT alert_rules_run('2031-03-08'::date) AS n`)).rows[0].n).toBe(1);
+    await db.query(`SELECT alert_rules_run('2031-03-07'::date) AS n`);
+    expect(await targetFires(ruleId, 'day:2031-03-07', idleId)).toBe(1);
+    await db.query(`SELECT alert_rules_run('2031-03-08'::date) AS n`);
+    expect(await targetFires(ruleId, 'day:2031-03-08', idleId)).toBe(1);
     await db.query('DELETE FROM register_records WHERE id = $1', [idle.rows[0].id]);
     await db.query('UPDATE alert_rules SET enabled = false WHERE id = $1', [ruleId]);
     await db.query('ROLLBACK');

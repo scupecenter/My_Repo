@@ -21472,13 +21472,6 @@ components:
         version: { type: integer, minimum: 0 }
         updated_at: { type: string, format: date-time }
         updated_by: { $ref: '#/components/schemas/UserRef' }
-    UiNewBadge:
-      type: object
-      additionalProperties: false
-      required: [enabled, days]
-      properties:
-        enabled: { type: boolean }
-        days: { type: integer, minimum: 1, maximum: 90 }
     AlertRule:
       type: object
       required: [id, code, kind, params, audience, title_en, title_ar, body_en, body_ar, link, enabled, version, created_at, updated_at]

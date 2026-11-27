@@ -236,6 +236,11 @@ export class JobsService implements OnApplicationBootstrap, OnModuleDestroy {
     if (n === null) {
       this.log.warn('alert rules failed');
       await this.syslog.write('error', 'alert rules failed', {});
+      return 0;
+    }
+    return n;
+  }
+
   /** 0360 (A3): the expiry radar (permit valid to, lease expiry, billing conversion), in-app notices to the Matrix holders; lead times are the setting expiry.radar. */
   private async expiryRadar(): Promise<number> {
     const n = await this.runs.run('expiry_radar', async (tx) => Number((await tx.$queryRaw<{ n: number }[]>`SELECT expiry_radar_notify() AS n`)[0]?.n ?? 0));

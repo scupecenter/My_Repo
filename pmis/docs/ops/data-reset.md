@@ -345,6 +345,8 @@ KEEP in "everything" and in every scope without the part; with the part, the act
 | sla_rules | KEEP | SLA rules. |
 | sla_rule_sets | KEEP | SLA rule set versions. |
 | sla_rule_set_items | KEEP | SLA rule set items. |
+| alert_rules | KEEP | If/then alert rules (configuration, 0342). |
+| alert_rule_fires | LOG | Alert-rule firing journal: one row per rule, period and target (0342). |
 | sla_master_columns | KEEP | SLA to Master column map (reference). |
 | work_calendars | KEEP | Calendar (weekend). |
 | holidays | KEEP | Holidays. |

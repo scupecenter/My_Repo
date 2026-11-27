@@ -270,3 +270,26 @@ BEGIN
     GRANT EXECUTE ON FUNCTION alert_rules_run(date) TO pmis_app;
   END IF;
 END $$;
+
+
+-- ---------------------------------------------------------------------------------------------------------------------
+-- Data reset coverage (0152): every table needs a decision in data_reset_plan(). alert_rules is configuration (KEEP, with the
+-- SLA rules), alert_rule_fires is the firing journal (LOG, with job_runs). data_reset_plan() is an accumulating function: patch
+-- the stored text idempotently (0361 pattern), never redefine it from an old base, so other in-flight tables survive.
+DO $$
+DECLARE def text;
+BEGIN
+  def := pg_get_functiondef('public.data_reset_plan()'::regprocedure);
+  IF position('''alert_rules''' IN def) = 0 THEN
+    IF position('''phase_gate_rules''' IN def) = 0 THEN RAISE EXCEPTION 'data_reset_plan: the keep list anchor was not found'; END IF;
+    def := replace(def, '''phase_gate_rules''', '''phase_gate_rules'', ''alert_rules''');
+  END IF;
+  IF position('''alert_rule_fires''' IN def) = 0 THEN
+    IF position('''job_runs''' IN def) = 0 THEN RAISE EXCEPTION 'data_reset_plan: the log list anchor was not found'; END IF;
+    def := replace(def, '''job_runs''', '''job_runs'', ''alert_rule_fires''');
+  END IF;
+  EXECUTE def;
+END $$;
+
+-- the reset role reads every classified table and takes the share lock of a KEEP/LOG table (0152 privilege check)
+GRANT SELECT, UPDATE ON public.alert_rules, public.alert_rule_fires TO pmis_reset_owner;
