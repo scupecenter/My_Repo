@@ -20,6 +20,7 @@ import { ContractorRules } from './ContractorRules';
 import { ContractorPerfThresholds } from './ContractorPerfThresholds';
 import { RecycleBinScreen } from './RecycleBin';
 import { MatrixCoverageScreen } from './MatrixCoverage';
+import { MatrixSimulateScreen } from './MatrixSimulate';
 import { GecolHlcCounts } from './GecolHlcCounts';
 import { Lists } from './Lists';
 import { RegisterColumns } from './RegisterColumns';
@@ -50,7 +51,7 @@ export interface SettingsTab { key: string; sections: SettingsSection[] }
 export const SETTINGS_TABS: readonly SettingsTab[] = [
   // Settings merge (owner approved 2026-11-25): Calendar + SLA rules + Weights all feed the SLA clock
   { key: 'sla', sections: [{ key: 'rules' }, { key: 'calendar' }, { key: 'weights' }] },
-  { key: 'workflow', sections: [{ key: 'editor' }, { key: 'columns' }, { key: 'freeze' }, { key: 'idle' }, { key: 'board' }, { key: 'coverage', adminOnly: true }] },
+  { key: 'workflow', sections: [{ key: 'editor' }, { key: 'columns' }, { key: 'freeze' }, { key: 'idle' }, { key: 'board' }, { key: 'coverage', adminOnly: true }, { key: 'simulate', adminOnly: true }] },
   // Lists (the dropdown catalogues, old ddl tab) now sit next to the register columns that use them
   { key: 'registers', sections: [{ key: 'columns' }, { key: 'lists' }, { key: 'contractors' }, { key: 'gecol' }, { key: 'team-scope' }, { key: 'issue-map' }, { key: 'recycle', adminOnly: true }] },
   // W5: the Document Library section is now named Document types (the old documents/library route redirects); Form templates and Archive are new
@@ -164,6 +165,7 @@ export function SettingsRoutes() {
           <Route path="idle" element={<Idle />} />
           <Route path="board" element={<KanbanWip />} />
           <Route path="coverage" element={<MatrixCoverageScreen />} />
+          <Route path="simulate" element={<MatrixSimulateScreen />} />
         </Route>
         <Route path="sla" element={<TabFrame tab="sla" />}>
           <Route index element={<Navigate to="rules" replace />} />

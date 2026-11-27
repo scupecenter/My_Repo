@@ -177,6 +177,34 @@ export const dashboardHandlers = [
           ],
         },
       },
+      gecol_hlc: {
+        gecol: {
+          available: true, in_scope: 18, powered: 9, no_record: 2, civil_ready_no_power: 3,
+          waiting: { buckets: [{ key: 'd0_7', count: 1 }, { key: 'd8_14', count: 2 }, { key: 'd15_30', count: 2 }, { key: 'over_30', count: 2 }], total: 7, oldest_days: 58 },
+        },
+        hlc: {
+          available: true, in_scope: 21, in_service: 12, no_record: 1, installed_not_in_service: 2,
+          waiting: { buckets: [{ key: 'd0_7', count: 3 }, { key: 'd8_14', count: 1 }, { key: 'd15_30', count: 1 }, { key: 'over_30', count: 1 }], total: 6, oldest_days: 34 },
+        },
+      },
+      permits_hse: {
+        available: true, total: 26,
+        by_status: [
+          { status: 'Approved', count: 15 },
+          { status: 'Applied', count: 7 },
+          { status: 'Rejected', count: 3 },
+          { status: 'N/A', count: 1 },
+        ],
+        waiting: 7, sites_without_permit: 5, expiring_14: 4, expired: 2, stop_work_active: 1,
+        ptw: {
+          open: 9, with_gaps: 4,
+          gaps: [
+            { key: 'loto', count: 3 },
+            { key: 'rescue_plan', count: 2 },
+            { key: 'toolbox_talk', count: 1 },
+          ],
+        },
+      },
     });
   }),
   http.get(`${B}/dashboard/site-map`, () => {

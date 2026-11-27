@@ -138,6 +138,7 @@ import { RecycleBinController } from './registers/recycle-bin.controller';
 import { RecycleBinService } from './registers/recycle-bin.service';
 import { MatrixService } from './matrix/matrix.service';
 import { EmailChangeRequestsController, MeController, PhoneChangeRequestsController } from './me/me.controller';
+import { MySessionsService } from './me/my-sessions.service';
 import { NotifyAdminsService } from './me/notify-admins.service';
 import { EmailChangesService, PhoneChangesService, ProfileService } from './me/profile.service';
 import { MailPort } from './mail/mail.port';
@@ -222,7 +223,7 @@ export function appModuleFor(config: AppConfig) {
       { provide: APP_CONFIG, useValue: config },
       DbService, SyslogService, LogHmacService, TwoFactorService, PasswordService, PasswordResetService, RateLimiter, SessionService, UserStateService, StepUpService,
       InvitationsService, // 0091
-      AccessService, AuthService, UsersRepo, MeService, NotifyAdminsService, ProfileService, EmailChangesService, PhoneChangesService, UsersService, GroupsService,
+      AccessService, AuthService, UsersRepo, MeService, NotifyAdminsService, MySessionsService, ProfileService, EmailChangesService, PhoneChangesService, UsersService, GroupsService,
       DepartmentsService, MessagesService, AnnouncementsService, IdempotencyService, RegionsService, RolesService, PermissionsService,
       AssignmentsService, DelegationsService, SitesService, SiteLocksService, SiteDraftsService, TaskViewService, TaskDetailService, WorkflowEditorService, WorkflowService, ApprovalsService, MyWorkService, OverridesService, CalendarService, SlaService, IssueStoppedService, JobsService, RegistersService, RecycleBinService, RegisterColumnsService, MatrixService, WarehouseService, WarehouseConfigService, AsBuiltItemsService,
       NotificationsService, FollowService, StatusUpdatesService, InsightsService, TemplatesService, ImportService, ImportJobsService, UploadInterceptor, StorageService, DocumentsService, DocsGridService, LibraryService, ZipService, StorageJobsService, SnagsService,

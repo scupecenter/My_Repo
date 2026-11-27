@@ -99,6 +99,7 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/matrix'],
   ['patch', '/matrix'],
   ['get', '/matrix/coverage'],
+  ['get', '/matrix/simulate'],
   // Contract 0.4.5: the register framework and its first four registers (apps/api: registers; migration 0019), every action the API implements.
   ['get', '/recycle-bin'],
   ['put', '/recycle-bin/retention'],
@@ -212,6 +213,9 @@ export const REAL_API_AUTH_USERS = [
   ['put', '/settings/contractor-performance'],
   // Contract 0.9.2: the self-service profile (apps/api: me, users; migration 0044). Details, email change request and its decision, password, two-factor self-service, enforced mark.
   ['get', '/me/profile'],
+  ['get', '/me/sessions'],
+  ['post', '/me/sessions/revoke-others'],
+  ['post', '/me/sessions/:id/revoke'],
   ['patch', '/me/profile'],
   ['patch', '/me/preferences'],
   ['post', '/me/password'],
@@ -427,6 +431,7 @@ export const REAL_API_AUTH_USERS = [
   ['put', '/registers/:key/fields-order'],
   ['get', '/registers/:key/fields/:code/impact'],
   ['patch', '/registers/:key/fields/:code'],
+  ['put', '/registers/:key/fields/:code/default'],
   ['delete', '/registers/:key/fields/:code'],
   ['post', '/registers/:key/sections'],
   ['patch', '/registers/:key/sections/:id'],

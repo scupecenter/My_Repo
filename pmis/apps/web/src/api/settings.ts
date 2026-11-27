@@ -86,7 +86,7 @@ export const useSetMailKinds = () => {
 export const useUiIdentity = () => useQuery({ queryKey: ['ui-identity'], queryFn: () => api.get<UiIdentity>('/settings/identity') });
 export const useSetUiIdentity = () => {
   const qc = useQueryClient();
-  return useMutation<UiIdentity, ApiError, { version: number; default_brand: UiBrand; allow_user_choice: boolean; reason: string }>({
+  return useMutation<UiIdentity, ApiError, { version: number; default_brand: UiBrand; allow_user_choice: boolean; defaults?: UiIdentity['defaults']; reason: string }>({
     mutationFn: ({ version, ...body }) => api.put('/settings/identity', { version, body }), onSettled: () => refresh(qc, 'ui-identity', 'me', 'my-profile'),
   });
 };
