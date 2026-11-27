@@ -74,54 +74,28 @@ SELECT tpl_sync_all();
 
 
 -- ---------------------------------------------------------------------------------------------------------------------
--- 5. The Settings data reset (0151): the new register is one resettable part, or the coverage check stops every reset. Both
---    functions are redefined from 0151; the only changes are the lessons_learned part row and the lessons_learned key of the register map.
+-- data_reset_parts()/data_reset_register_part(): patched in place and idempotently (0292 pattern) instead of redefined
+-- whole, so register parts added by other migrations are never dropped. The stored text is read with pg_get_functiondef
+-- and the lessons_learned row/key is inserted only when missing, anchored on the incidents row added by 0183.
 -- ---------------------------------------------------------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION data_reset_parts()
-RETURNS TABLE (code text, grp text, kind text, ord integer, label_en text, label_ar text, depends_on text[])
-LANGUAGE sql IMMUTABLE SET search_path = pg_catalog, public, pg_temp AS $$
-  SELECT * FROM (VALUES
-    ('sites',              'project',   'project',  10, 'Sites, tasks, milestones, gates and baselines', 'المواقع ومهامها ومعالمها وبواباتها والخطط الأساسية', '{}'::text[]),
-    ('documents',          'project',   'project',  20, 'Documents and generated forms (Library)', 'المستندات والنماذج المولّدة (المكتبة)', '{sites}'::text[]),
-    ('imports',            'project',   'project',  30, 'Imports, upload batches and exports', 'الاستيرادات ودفعات الرفع والتصديرات', '{sites}'::text[]),
-    ('notifications',      'project',   'project',  40, 'Notifications, inbox and follows', 'الإشعارات وصندوق الوارد والمتابعات', '{}'::text[]),
-    ('daily_plan',         'project',   'project',  50, 'Daily Plan', 'الخطة اليومية', '{sites}'::text[]),
-    ('kpi',                'project',   'project',  60, 'Project Status and KPI snapshots', 'حالة المشروع ولقطات مؤشرات الأداء', '{sites}'::text[]),
-    ('procurement',        'registers', 'project', 100, 'Procurement (PR / PO / WO, assignments)', 'المشتريات (PR / PO / WO والتكليفات)', '{sites}'::text[]),
-    ('gecol',              'registers', 'project', 110, 'GECOL Power', 'كهرباء GECOL', '{sites}'::text[]),
-    ('hlc',                'registers', 'project', 120, 'HLC fiber', 'ألياف HLC', '{sites}'::text[]),
-    ('permits',            'registers', 'project', 130, 'Permits & HSE', 'التصاريح والسلامة', '{sites}'::text[]),
-    ('warehouse',          'registers', 'project', 140, 'Warehouse (movements and stock; the item master stays)', 'المخزن (الحركات والأرصدة؛ يبقى دليل الأصناف)', '{sites}'::text[]),
-    ('quality',            'registers', 'project', 150, 'Quality Control (inspections and QC snags)', 'ضبط الجودة (الفحوص وملاحظات الجودة)', '{sites}'::text[]),
-    ('issues',             'registers', 'project', 160, 'Issue Log', 'سجل المشاكل', '{sites}'::text[]),
-    ('risks',              'registers', 'project', 170, 'Risk Register', 'سجل المخاطر', '{sites}'::text[]),
-    ('change_control',     'registers', 'project', 180, 'Change Control (and the scope exceptions it made)', 'ضبط التغيير (واستثناءات النطاق الناتجة عنه)', '{sites}'::text[]),
-    ('readiness',          'registers', 'project', 190, 'Readiness & Handover', 'الجاهزية والتسليم', '{sites}'::text[]),
-    ('as_built',           'registers', 'project', 200, 'As-Built (the item list stays)', 'كما نُفّذ (تبقى قائمة البنود)', '{sites}'::text[]),
-    ('meetings',           'registers', 'project', 210, 'Meetings', 'الاجتماعات', '{sites}'::text[]),
-    ('rf_design',          'registers', 'project', 220, 'RF & Design', 'الترددات والتصميم', '{sites}'::text[]),
-    ('acquisition',        'registers', 'project', 230, 'Acquisition', 'الاستحواذ', '{sites}'::text[]),
-    ('dismantle',          'registers', 'project', 240, 'Dismantle', 'الفك', '{sites}'::text[]),
-    ('deliverables',       'registers', 'project', 250, 'Deliverables', 'المخرجات', '{sites}'::text[]),
-    ('car_dispatcher',     'registers', 'project', 260, 'Car Dispatcher bookings (the vehicles stay)', 'حجوزات السيارات (تبقى المركبات)', '{sites,procurement}'::text[]),
-    ('financial_advances', 'registers', 'project', 270, 'Financial Advances', 'العهد المالية', '{sites,procurement}'::text[]),
-    ('incidents',          'registers', 'project', 280, 'Incidents & Security', 'الحوادث والأمن', '{sites}'::text[]),
-    ('lessons_learned',    'registers', 'project', 285, 'Lessons Learned', 'الدروس المستفادة', '{sites}'::text[]),
-    ('users',              'identity',  'identity', 900, 'Users: deactivate every account except the System Admins', 'المستخدمون: تعطيل كل الحسابات عدا مديري النظام', '{}'::text[]),
-    ('roles',              'identity',  'identity', 910, 'Roles, groups and delegations (role definitions and profiles stay)', 'الأدوار والمجموعات والتفويضات (تبقى تعريفات الأدوار والملفات)', '{}'::text[]),
-    ('staff',              'identity',  'identity', 920, 'Staff registry and absences', 'سجل الموظفين والغيابات', '{}'::text[])
-  ) v(code, grp, kind, ord, label_en, label_ar, depends_on)
-$$;
+DO $$
+DECLARE def text;
+  marker text := '    (''incidents'',          ''registers'', ''project'', 280, ''Incidents & Security'', ''الحوادث والأمن'', ''{sites}''::text[]),';
+  add text := E'\n    (''lessons_learned'',    ''registers'', ''project'', 285, ''Lessons Learned'', ''الدروس المستفادة'', ''{sites}''::text[]),';
+BEGIN
+  def := pg_get_functiondef('public.data_reset_parts()'::regprocedure);
+  IF position('lessons_learned' IN def) = 0 THEN
+    IF position(marker IN def) = 0 THEN RAISE EXCEPTION 'data_reset_parts() has no incidents row to patch'; END IF;
+    EXECUTE replace(def, marker, marker || add);
+  END IF;
+END $$;
 
-CREATE OR REPLACE FUNCTION data_reset_register_part(p_key text) RETURNS text
-LANGUAGE sql IMMUTABLE SET search_path = pg_catalog, public, pg_temp AS $$
-  SELECT CASE
-    WHEN p_key IN ('procurement', 'procurement_hlc') THEN 'procurement'
-    WHEN p_key IN ('permits_hse', 'permits_hse_acq', 'permits_hse_om', 'permits_hse_te') THEN 'permits'
-    WHEN p_key IN ('quality', 'quality_te') THEN 'quality'
-    WHEN p_key = 'readiness_handover' THEN 'readiness'
-    WHEN p_key = 'site_creation' THEN 'sites'
-    WHEN p_key IN ('gecol', 'hlc', 'warehouse', 'issues', 'risks', 'change_control', 'as_built', 'meetings', 'rf_design', 'acquisition', 'dismantle',
-                   'deliverables', 'car_dispatcher', 'financial_advances', 'daily_plan', 'incidents', 'lessons_learned') THEN p_key
-  END
-$$;
+DO $$
+DECLARE def text; marker text := ', ''incidents'') THEN p_key';
+BEGIN
+  def := pg_get_functiondef('public.data_reset_register_part(text)'::regprocedure);
+  IF position('lessons_learned' IN def) = 0 THEN
+    IF position(marker IN def) = 0 THEN RAISE EXCEPTION 'data_reset_register_part() has no incidents key to patch'; END IF;
+    EXECUTE replace(def, marker, ', ''incidents'', ''lessons_learned'') THEN p_key');
+  END IF;
+END $$;
