@@ -1,4 +1,4 @@
--- 0347: the appearance dimensions gain `contrast` (PM-platforms proposal item 19, the high-contrast mode; owner approval 2026-11-27
+-- 0347: the appearance dimensions gain `contrast` (item 19 of the 2026-11-27 batch, the high-contrast mode; owner approval 2026-11-27
 -- relayed by Main). Mirror: prisma/migrations/0347_user_contrast/migration.sql (kept identical to this file).
 --
 -- WHY. Low-vision users and bright-site conditions need stronger text and borders than the standard tokens give. The personal

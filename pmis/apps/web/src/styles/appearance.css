@@ -46,7 +46,7 @@ html[data-ui-accent=red] { --accent:var(--surface-red-8); --accentSoft:var(--sur
 html[data-ui-accent=amber] { --accent:var(--surface-amber-8); --accentSoft:var(--surface-amber-2); --accentText:var(--ink-amber-8); }
 html[data-ui-accent] { --accentHover:var(--accent); }
 
-/* Contrast (0347, PM-platforms item 19): the high-contrast mode strengthens only text and lines, never the status colours.
+/* Contrast (0347, item 19 of the 2026-11-27 batch): the high-contrast mode strengthens only text and lines, never the status colours.
    No attribute at `standard`, so the base tokens apply exactly as before; with no choice saved, the OS preference applies
    the high tokens (prefers-contrast: more) without storing anything. Last in the file so it wins over every design block. */
 html[data-ui-contrast=high]{

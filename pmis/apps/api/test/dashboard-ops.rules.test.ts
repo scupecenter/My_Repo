@@ -7,6 +7,8 @@ import {
   bucketAges,
   receivePct,
   scorecardSummary,
+  firstPassPct,
+  meanDays,
   ScorecardItem,
 } from "../src/dashboard/dashboard-ops.rules";
 
@@ -148,5 +150,21 @@ describe("dashboard ops: contractor and supplier scorecard (0.15.202)", () => {
     ]);
     expect(s.on_time_pct).toBe(66.7);
     expect(s.quality_fail_pct).toBe(33.3);
+  });
+});
+
+describe("item 6 rules: quality (0.15.203)", () => {
+  it("meanDays averages to one decimal and is null on an empty list", () => {
+    expect(meanDays([])).toBeNull();
+    expect(meanDays([4])).toBe(4);
+    expect(meanDays([1, 2])).toBe(1.5);
+    expect(meanDays([1, 2, 2])).toBe(1.7);
+  });
+
+  it("firstPassPct is Pass over Pass + Fail, one decimal, null when nothing is decided", () => {
+    expect(firstPassPct(0, 0)).toBeNull();
+    expect(firstPassPct(9, 1)).toBe(90);
+    expect(firstPassPct(1, 2)).toBe(33.3);
+    expect(firstPassPct(3, 0)).toBe(100);
   });
 });
