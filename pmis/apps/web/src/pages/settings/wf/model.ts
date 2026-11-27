@@ -2,7 +2,7 @@ import type { GateCondition } from '@/api/workflowEditor';
 
 /** The shapes the editor reads from a version (the contract types leave the names optional). */
 export type P = { task_code: string; stage_code: string; sort_order?: number; name_en?: string; name_ar?: string | null; is_active?: boolean; is_milestone_task?: boolean; has_documents?: boolean; counts_toward_milestone?: boolean; predecessors?: string[] };
-export type M = { code: string; name_en: string; name_ar?: string | null; is_active?: boolean; counts_in_project_status?: boolean };
+export type M = { code: string; name_en: string; name_ar?: string | null; is_active?: boolean; counts_in_project_status?: boolean; counts_in_weight?: boolean; weight_value?: number | string; weight_group?: string | null };
 export type G = { code: string; name_en: string; name_ar?: string | null; from_milestone: string; to_milestone: string; is_active?: boolean; sla_min_wd?: number | null; sla_max_wd?: number | null; conditions?: GateCondition[] };
 
 /** What the signed-in user may do on the shown version, and why not (a banner text), plus whether a write is in flight. */

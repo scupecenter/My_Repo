@@ -232,6 +232,16 @@ export const workflowEditorHandlers = [
     w.v.etag += 1;
     return HttpResponse.json({ version: json(w.v) }, { headers: { ETag: `"${w.v.etag}"` } });
   }),
+  http.put(`${B}/workflow/versions/:version/milestones/:milestone/weight`, async ({ params, request }) => {
+    const b = (await request.json()) as { counts_in_weight?: boolean; weight_value?: number; weight_group?: string | null; reason?: string };
+    const w = write(params, request, b); if ('r' in w) return w.r;
+    if (w.v.status !== 'draft') return problem(409, 'invalid_transition', 'The weight is changed in a draft version.');
+    const m = w.v.milestones.find((x) => x.code === params.milestone) as (Ver['milestones'][number] & { counts_in_weight?: boolean; weight_value?: number; weight_group?: string | null }) | undefined;
+    if (!m) return problem(404, 'not_found', 'The milestone does not exist in this version.');
+    m.counts_in_weight = b.counts_in_weight === true; m.weight_value = b.counts_in_weight ? (b.weight_value ?? 0) : 0; m.weight_group = b.counts_in_weight ? (b.weight_group ?? null) : null;
+    w.v.etag += 1;
+    return reply(w.v);
+  }),
   http.put(`${B}/workflow/versions/:version/tasks/:task/closing`, async ({ params, request }) => {
     const b = (await request.json()) as { closing?: boolean; reason?: string };
     const w = write(params, request, b); if ('r' in w) return w.r;

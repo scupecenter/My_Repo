@@ -277,6 +277,14 @@ export class WorkflowEditorService {
       ${b.weight_group ?? null}::text, ${b.reason}::text) AS r`);
   }
 
+  /** Migration 0490: counts in project weight, the percent and the weight group of a milestone (draft only; stored and shown, no progress calculation reads it). */
+  async setMilestoneWeight(auth: AuthContext, version: number, milestone: string, ifMatch: string | undefined, raw: unknown): Promise<Json> {
+    const b = parse(weightBody, raw);
+    const etag = await this.gate(auth, 'weights', 'edit', ifMatch);
+    return this.one(Prisma.sql`SELECT admin_wf_milestone_weight(${version}::int, ${etag}::int, ${milestone}::text, ${b.counts_in_weight}::boolean, ${b.weight_value ?? 0}::numeric,
+      ${b.weight_group ?? null}::text, ${b.reason}::text) AS r`);
+  }
+
   async publish(auth: AuthContext, version: number, ifMatch: string | undefined, raw: unknown): Promise<Json> {
     const b = parse(publishBody, raw);
     await this.access.requireAdmin('workflow_versions', 'administer');

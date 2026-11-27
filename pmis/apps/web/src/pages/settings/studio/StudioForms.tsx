@@ -235,7 +235,12 @@ export function MilestoneForm({ c, code }: { c: Ctx; code: string }) {
   const [en, setEn] = useState(m?.name_en ?? '');
   const [ar, setAr] = useState(m?.name_ar ?? '');
   const [cps, setCps] = useState(m?.counts_in_project_status !== false);
+  const [wOn, setWOn] = useState(!!m?.counts_in_weight), [wVal, setWVal] = useState(String(Number(m?.weight_value ?? 0))), [wGrp, setWGrp] = useState(m?.weight_group ?? '');
   if (!m) return null;
+  const grp = wGrp.trim().toUpperCase();
+  const wBad = wOn && (!/^[A-Z0-9_-]{1,20}$/.test(grp) || wVal === '' || Number(wVal) < 0 || Number(wVal) > 100);
+  const wSame = wOn === !!m.counts_in_weight && (!wOn || (Number(wVal) === Number(m.weight_value ?? 0) && grp === (m.weight_group ?? '')));
+  const gTotal = wOn && grp ? c.milestones.filter((x) => x.is_active !== false && x.code !== code && x.counts_in_weight && x.weight_group === grp).reduce((a, x) => a + Number(x.weight_value ?? 0), 0) + Number(wVal || 0) : null;
   const dis = !c.can.edit;
   const tasks = c.placements.filter((p) => p.stage_code === code).sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
   const gate = c.gates.find((g) => g.from_milestone === code && g.is_active !== false);
@@ -248,6 +253,17 @@ export function MilestoneForm({ c, code }: { c: Ctx; code: string }) {
         <label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" className="h-5 w-5" data-testid="studio-ms-cps" disabled={dis} checked={cps} onChange={(e) => setCps(e.target.checked)} />{t('studio.counts_in_status')}</label>
         <div className="flex justify-end"><button type="button" className="btn btn-accent min-h-11" data-testid="studio-ms-save" disabled={dis || !en.trim()} title={dis ? c.can.why ?? undefined : undefined}
           onClick={() => c.askReason({ title: `${t('wfe.rename')}: ${code}`, run: (reason, cb) => c.W.msLight.mutate({ code, name_en: en.trim(), name_ar: ar.trim(), counts_in_project_status: cps, reason }, cb) })}>{t('common.save')}</button></div>
+      </StudioCard>
+      <StudioCard title={t('studio.ms_weight')} testid="studio-card-ms-weight">
+        <p className="text-sm text-mute">{t('studio.ms_weight_hint')}</p>
+        <label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" className="h-5 w-5" data-testid="studio-ms-weight-on" disabled={!c.can.edit} checked={wOn} onChange={(e) => setWOn(e.target.checked)} />{t('studio.ms_weight_on')}</label>
+        {wOn && <div className="grid gap-3 sm:grid-cols-2">
+          <label className={lbl}>{t('studio.ms_weight_value')}<input type="number" min={0} max={100} className={field} dir="ltr" data-testid="studio-ms-weight-value" disabled={!c.can.edit} value={wVal} onChange={(e) => setWVal(e.target.value)} /></label>
+          <label className={lbl}>{t('studio.ms_weight_group')}<input className={field} dir="ltr" data-testid="studio-ms-weight-group" disabled={!c.can.edit} value={wGrp} onChange={(e) => setWGrp(e.target.value)} /></label>
+        </div>}
+        {gTotal !== null && <p role="status" className={`text-sm ${gTotal === 100 ? 'text-mute' : 'text-waitInk'}`} data-testid="studio-ms-weight-total">{t('studio.ms_weight_total', { group: grp, total: gTotal })}</p>}
+        <div className="flex justify-end"><button type="button" className="btn min-h-11" data-testid="studio-ms-weight-save" disabled={!c.can.edit || wBad || wSame} title={!c.can.edit ? c.can.why ?? undefined : undefined}
+          onClick={() => c.askReason({ title: `${t('studio.ms_weight')}: ${code}`, run: (reason, cb) => c.W.msWeight.mutate({ code, counts_in_weight: wOn, ...(wOn ? { weight_value: Number(wVal), weight_group: grp } : {}), reason }, cb) })}>{t('common.save')}</button></div>
       </StudioCard>
       <StudioCard title={t('studio.ms_tasks')} testid="studio-card-ms-tasks">
         <ol className="space-y-1" data-testid="studio-ms-tasks">

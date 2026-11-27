@@ -266,3 +266,33 @@ describe("weights in a draft and the publish check", () => {
     expect(r.body.outcome).toBe("deleted");
   });
 });
+
+describe("the weight of a milestone (0490: stored and shown only)", () => {
+  it("is refused outside a draft, set in a draft with a reason, listed in the version and copied to the next draft", async () => {
+    const list = await admin.api.call("get", BASE);
+    expect(list.status).toBe(200);
+    const items = list.body.items as { version: number; status: string }[];
+    let draft = items.find((x) => x.status === "draft")?.version;
+    const pubV = Math.max(...items.filter((x) => x.status === "published").map((x) => x.version));
+    const pub = await read(pubV);
+    const code = ((await admin.api.call("get", `${BASE}/${pubV}`)).body.milestones as { code: string }[])[0]!.code;
+    const body = { counts_in_weight: true, weight_value: 25, weight_group: "MS", reason: REASON };
+    expect((await admin.api.call("put", `${BASE}/${pubV}/milestones/${code}/weight`, body, hdr(pub.tag))).status).toBe(409);
+    if (!draft) {
+      const r = await admin.api.call("post", BASE, { parent_version: pubV, reason: REASON });
+      expect(r.status).toBe(201);
+      draft = r.body.version as number;
+    }
+    const d = await read(draft);
+    expect((await admin.api.call("put", `${BASE}/${draft}/milestones/${code}/weight`, { ...body, reason: "x" }, hdr(d.tag))).status).toBe(422);
+    const ok = await admin.api.call("put", `${BASE}/${draft}/milestones/${code}/weight`, body, hdr(d.tag));
+    expect(ok.status).toBe(200);
+    const v = await admin.api.call("get", `${BASE}/${draft}`);
+    const m = (v.body.milestones as { code: string; counts_in_weight: boolean; weight_value: number; weight_group: string | null }[]).find((x) => x.code === code)!;
+    expect(m).toMatchObject({ counts_in_weight: true, weight_group: "MS" });
+    expect(Number(m.weight_value)).toBe(25);
+    const d2 = await read(draft);
+    expect((await admin.api.call("put", `${BASE}/${draft}/milestones/${code}/weight`, body, hdr(d2.tag))).status).toBe(409);
+    expect((await plain.api.call("put", `${BASE}/${draft}/milestones/${code}/weight`, { ...body, weight_value: 30 }, hdr(d2.tag))).status).toBe(403);
+  });
+});

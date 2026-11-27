@@ -795,6 +795,9 @@ model StageDefinition {
   approval_levels          Int     @default(3)
   is_active                Boolean @default(true)
   stream_code              String? // the stream (Site Register sub-section) this stage belongs to; migration 0015
+  counts_in_weight         Boolean @default(false) // migration 0490: stored and shown only, no calculation reads it
+  weight_value             Decimal @default(0) @db.Decimal(7, 3)
+  weight_group             String?
 
   workflow     WorkflowDefinition @relation(fields: [workflow_id], references: [id], onDelete: Cascade)
   stream       WorkflowStream?    @relation(fields: [workflow_id, stream_code], references: [workflow_id, code])

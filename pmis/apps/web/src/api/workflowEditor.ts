@@ -130,6 +130,9 @@ export const useRemoveSlaRule = (v: number, etag: number) =>
 export type WeightInput = { counts_in_weight: boolean; weight_value?: number; weight_group?: string | null; reason: string };
 export const useSetWeight = (v: number, etag: number) =>
   useWrite<WeightInput & { code: string }, unknown>(v, etag, ({ code, ...body }, e) => api.put(`${base(v)}/tasks/${code}/weight`, { body, version: e }));
+/** Migration 0490: the weight of a milestone (draft only; stored and shown, no progress calculation reads it). */
+export const useSetMilestoneWeight = (v: number, etag: number) =>
+  useWrite<WeightInput & { code: string }, unknown>(v, etag, ({ code, ...body }, e) => api.put(`${base(v)}/milestones/${code}/weight`, { body, version: e }));
 export type WeightTotal = { group: string; total: number; tasks: number; ok: boolean };
 /** Live totals of the weight groups of a version (warns in the draft; publishing is refused while a group is not 100). */
 export const useWeightTotals = (v: number | null) =>

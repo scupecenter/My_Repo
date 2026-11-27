@@ -171,6 +171,23 @@ describe('Workflow Studio', () => {
     });
   }, 60_000);
 
+  it('stores the weight of a milestone in a draft and shows the group total (D53b)', async () => {
+    const u = userEvent.setup();
+    await open({ lift: true });
+    await u.click(screen.getByTestId('studio-ms-MS2'));
+    expect(await screen.findByTestId('studio-ms-weight-save')).toBeDisabled();
+    await u.click(screen.getByTestId('studio-ms-weight-on'));
+    await u.type(screen.getByTestId('studio-ms-weight-group'), 'ms');
+    await u.clear(screen.getByTestId('studio-ms-weight-value')); await u.type(screen.getByTestId('studio-ms-weight-value'), '40');
+    expect(screen.getByTestId('studio-ms-weight-total')).toHaveTextContent('MS totals 40 percent');
+    await u.click(await waitForEnabled('studio-ms-weight-save'));
+    await reasonAndSave(u);
+    await waitFor(async () => {
+      const v2 = await api.get<{ milestones: { code: string; counts_in_weight?: boolean; weight_value?: number; weight_group?: string | null }[] }>('/workflow/versions/2');
+      expect(v2.milestones.find((m) => m.code === 'MS2')).toMatchObject({ counts_in_weight: true, weight_value: 40, weight_group: 'MS' });
+    });
+  }, 60_000);
+
   it('reviews the changes with a Light badge, keeps Publish off until the reason and v2 are typed, and publishes', async () => {
     const u = userEvent.setup();
     await open({ lift: true });

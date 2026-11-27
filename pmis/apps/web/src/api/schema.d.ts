@@ -3647,6 +3647,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workflow/versions/{version}/milestones/{milestone_code}/weight": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Counts in project weight, weight value and weight group of a milestone (draft)
+         * @description Migration 0490 (admin_wf_milestone_weight). Needs weights.edit, a step-up and If-Match. A draft only (a published version answers 409 `invalid_transition`). The value is stored and shown; no progress calculation reads it.
+         */
+        put: operations["putMilestoneWeight"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workflow/versions/{version}/tasks/{task_code}/closing": {
         parameters: {
             query?: never;
@@ -14259,6 +14279,10 @@ export interface components {
             /** @enum {string} */
             formula_kind: "master" | "generic";
             counts_in_project_status: boolean;
+            /** @description 0.15.323 (migration 0490). Stored and shown only; no progress calculation reads it. */
+            counts_in_weight?: boolean;
+            weight_value?: number;
+            weight_group?: string | null;
             is_active?: boolean;
             master_export_column?: string | null;
             custom?: components["schemas"]["CustomValues"];
@@ -28675,6 +28699,45 @@ export interface operations {
         };
         responses: {
             /** @description The version and the weight totals */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    putMilestoneWeight: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": string;
+            };
+            path: {
+                version: number;
+                milestone_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    counts_in_weight: boolean;
+                    weight_value?: number;
+                    weight_group?: string | null;
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The version */
             200: {
                 headers: {
                     [name: string]: unknown;

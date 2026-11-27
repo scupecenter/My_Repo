@@ -121,6 +121,12 @@ export class WorkflowEditorController {
     return this.tag(res, await this.editor.setWeight(auth, version, task, ifMatch, body));
   }
 
+  /** Migration 0490: counts in project weight, percent and group of a milestone in a draft (stored and shown only). */
+  @Put('versions/:version/milestones/:milestone/weight')
+  async setMilestoneWeight(@Auth() auth: AuthContext, @Param('version', ParseIntPipe) version: number, @Param('milestone') milestone: string, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response): Promise<Json> {
+    return this.tag(res, await this.editor.setMilestoneWeight(auth, version, milestone, ifMatch, body));
+  }
+
   @Put('versions/:version/tasks/:task/closing')
   async setClosing(@Auth() auth: AuthContext, @Param('version', ParseIntPipe) version: number, @Param('task') task: string, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response): Promise<Json> {
     return this.tag(res, await this.editor.setClosing(auth, version, task, ifMatch, body));
