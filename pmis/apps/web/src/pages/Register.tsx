@@ -44,6 +44,7 @@ import { ViewAnalytics } from "@/components/ViewAnalytics";
 import { ViewMenu, type ViewOption } from "@/components/ViewMenu";
 import { useRememberedView } from "@/lib/viewPreference";
 import { GridCellEditor, INLINE_TYPES } from "@/components/GridCellEditor";
+import { FieldValue } from "@/components/FieldValue";
 import { RegisterGrid } from "@/components/RegisterGrid";
 import { RejectDialog } from "@/components/RejectDialog";
 import { TemplateUploadDialog } from "@/components/TemplateUploadDialog";
@@ -475,8 +476,9 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
   const cell = (id: string, r: (typeof items)[number]) => {
     if (id.startsWith("f:")) {
       const c = fieldCols.find((x) => `f:${x.code}` === id);
-      const txt = c ? showValue(c, r.data[c.code], i18n.language, t) : "-";
-      return txt === "-" ? <Empty /> : <Trunc text={txt} />;
+      if (!c) return <Empty />;
+      const txt = showValue(c, r.data[c.code], i18n.language, t);
+      return txt === "-" ? <Empty /> : <FieldValue f={c} v={r.data[c.code]} testid={`reg-cell-${r.id}-${c.code}`} />;
     }
     switch (id) {
       case "site":
