@@ -164,12 +164,15 @@ describe('W2 Procurement (records with a site): the view switcher of Site Master
       const sum = screen.getAllByTestId(/^board-col-count-/).reduce((n, e) => n + Number(e.textContent), 0);
       expect(sum).toBe(filtered);
     });
-    await u.selectOptions(screen.getByTestId('register-board-by'), 'state');
+    // the board's grouping and swimlanes live in the Layout panel (decision V1)
+    await u.click(screen.getByTestId('register-view'));
+    await u.selectOptions(await screen.findByTestId('register-board-by'), 'state');
     expect(where()).toContain('board_by=state');
     expect(await screen.findByTestId('board-col-entry')).toBeTruthy();
     expect(screen.getByTestId('board-col-approved')).toBeTruthy();
     expect(within(screen.getByTestId('board-col-approved')).getByTestId('board-col-count-approved').textContent).not.toBe('0');
     await u.selectOptions(screen.getByTestId('register-board-lane'), 'region');
+    await u.keyboard('{Escape}');
     expect(where()).toContain('lane=region');
     expect(screen.getAllByTestId(/^board-lane-title-/).length).toBeGreaterThan(0);
     await u.click(screen.getByTestId(`board-record-${ENTRY}`));
@@ -247,7 +250,8 @@ describe('W2 Meetings (global rows, no site coordinates): no Map, the board fall
     renderApp(<App />, { route: '/registers/meetings?layout=board' });
     const board = await screen.findByTestId('register-board');
     expect(board).toHaveAttribute('data-by', 'state');
-    expect(within(screen.getByTestId('register-board-by')).getAllByRole('option').map((o) => (o as HTMLOptionElement).value)).toEqual(['state']);
+    await userEvent.click(screen.getByTestId('register-view')); // the board options live in the Layout panel (V1)
+    expect(within(await screen.findByTestId('register-board-by')).getAllByRole('option').map((o) => (o as HTMLOptionElement).value)).toEqual(['state']);
     await waitFor(() => expect(screen.getByTestId('board-col-count-entry').textContent).toBe('1'));
     expect(screen.getByTestId(`board-record-${recId(15)}`)).toBeTruthy();
     // no record type on Meetings: the swimlanes are none and region
