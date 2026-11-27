@@ -15,7 +15,7 @@ DECLARE
   allowed text[] := ARRAY['label_en','label_ar','required','validation','default_value','section','sort_order','list_values','visible_to_role_ids','editable_by_role_ids',
                           'in_templates','in_exports','in_list_filters','master_export_column','is_active'];
   create_only text[] := ARRAY['entity_type','task_code','code','data_type'];
-  v_entity text; v_code text; v_type text; v_task text; before jsonb; after jsonb; lv jsonb; o jsonb; i int; seen text[] := '{}'; vis uuid[]; edt uuid[]; r record; rid uuid;
+  v_entity text; v_code text; v_type text; v_task text; before jsonb; after jsonb; lv jsonb; o jsonb; i int; seen text[] := '{}'; vis uuid[]; edt uuid[]; rl record; rid uuid;
   holds boolean := false; vk text; want_acc text; cur_acc text; has_vis boolean; has_edt boolean;
 BEGIN
   IF NOT coalesce(public.site_master_col_can_admin(), false) THEN
@@ -160,15 +160,15 @@ BEGIN
       (SELECT coalesce(jsonb_agg(p.role_id), '[]'::jsonb) FROM public.field_permissions p WHERE p.field_id = fid AND p.role_id IS NOT NULL AND p.access::text = 'edit') END) AS t(v);
     -- field rules are identity data: they are written only through the existing door idm_field_permission_set (reason, the actor needs `fields` edit, nobody changes a rule
     -- that applies to them, nobody gives more access than they have). Only the roles whose rule changes are touched; "edit" with no rule is the default and stays no rule.
-    FOR r IN SELECT id FROM public.roles WHERE is_active ORDER BY id LOOP
+    FOR rl IN SELECT id FROM public.roles WHERE is_active ORDER BY id LOOP
       want_acc := CASE
         WHEN cardinality(vis) = 0 AND cardinality(edt) = 0 THEN NULL
-        WHEN cardinality(vis) > 0 AND NOT (r.id = ANY(vis)) AND NOT (r.id = ANY(edt)) THEN 'hidden'
-        WHEN cardinality(edt) > 0 AND NOT (r.id = ANY(edt)) THEN 'read'
+        WHEN cardinality(vis) > 0 AND NOT (rl.id = ANY(vis)) AND NOT (rl.id = ANY(edt)) THEN 'hidden'
+        WHEN cardinality(edt) > 0 AND NOT (rl.id = ANY(edt)) THEN 'read'
         ELSE 'edit' END;
-      SELECT p.access::text INTO cur_acc FROM public.field_permissions p WHERE p.field_id = fid AND p.role_id = r.id;
+      SELECT p.access::text INTO cur_acc FROM public.field_permissions p WHERE p.field_id = fid AND p.role_id = rl.id;
       IF cur_acc IS DISTINCT FROM want_acc AND NOT (want_acc = 'edit' AND cur_acc IS NULL) THEN
-        PERFORM public.idm_field_permission_set(fid, r.id, NULL::uuid, want_acc::public."FieldAccess", btrim(p_reason));
+        PERFORM public.idm_field_permission_set(fid, rl.id, NULL::uuid, want_acc::public."FieldAccess", btrim(p_reason));
       END IF;
     END LOOP;
   END IF;
@@ -196,7 +196,7 @@ $$;
 
 GRANT SELECT, INSERT, UPDATE ON field_definitions, field_list_values TO pmis_definer;
 GRANT EXECUTE ON FUNCTION idm_field_permission_set(uuid, uuid, uuid, "FieldAccess", text) TO pmis_definer;
-GRANT SELECT ON roles, task_definitions TO pmis_definer;
+GRANT SELECT ON roles, task_definitions, field_permissions TO pmis_definer;
 DO $$
 DECLARE f text;
 BEGIN
