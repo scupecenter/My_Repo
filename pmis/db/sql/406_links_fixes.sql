@@ -27,11 +27,11 @@ BEGIN
   IF TG_OP = 'UPDATE' AND OLD.data ->> 'advance_id' IS NOT DISTINCT FROM d ->> 'advance_id' THEN RETURN NEW; END IF;  -- unchanged: never re-checked
   IF coalesce(d ->> 'advance_id', '') = '' THEN NEW.data := NEW.data - 'advance_id'; RETURN NEW; END IF;
   IF d ->> 'advance_id' !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN
-    PERFORM public.wf_err('validation_failed', jsonb_build_object('errors', jsonb_build_array(public.reg_err_item('/data/advance_id', 'unknown_advance', 'Choose an advance of this site.'))));
+    PERFORM public.wf_err('validation_failed', jsonb_build_object('errors', public.reg_err_item('/data/advance_id', 'unknown_advance', 'Choose an advance of this site.')));
   END IF;
   SELECT * INTO a FROM public.fa_latest('financial_advances') x WHERE x.record_type = 'advance' AND x.entity_id = (d ->> 'advance_id')::uuid;
   IF NOT FOUND OR a.site_id IS DISTINCT FROM NEW.site_id OR NOT public.app_region_check(a.region_id) THEN
-    PERFORM public.wf_err('validation_failed', jsonb_build_object('errors', jsonb_build_array(public.reg_err_item('/data/advance_id', 'unknown_advance', 'Choose an approved advance of this site.'))));
+    PERFORM public.wf_err('validation_failed', jsonb_build_object('errors', public.reg_err_item('/data/advance_id', 'unknown_advance', 'Choose an approved advance of this site.')));
   END IF;
   RETURN NEW;
 END $$;
