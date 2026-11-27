@@ -48,7 +48,7 @@ export interface StatusUpdateDto extends Omit<Row, 'author_id' | 'ts'> {
   author: UserRefDto;
 }
 
-/** Region health (contract 0.15.110, item 12): one row per visible region; the update fields are null when nothing was posted this week. */
+/** Region health (contract 0.15.241, item 12): one row per visible region; the update fields are null when nothing was posted this week. */
 export interface RegionHealthDto {
   region_id: number;
   health: string | null;
@@ -122,7 +122,7 @@ export class StatusUpdatesService {
     return { items: await this.dtos(page), page: { limit, next_cursor: rows.length > limit && last ? encodeCursor([last.week_start, last.ts, last.id]) : null } };
   }
 
-  /** GET /status-updates/region-health (contract 0.15.110): the current-week region updates of the Weekly status, one row per visible region. */
+  /** GET /status-updates/region-health (contract 0.15.241): the current-week region updates of the Weekly status, one row per visible region. */
   async regionHealth(): Promise<{ week_start: string; items: RegionHealthDto[] }> {
     const regions = await this.access.requireRegions('sites', 'view');
     const all = [1, 2, 3, 4, 5, 6, 7];

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.96
+  version: 0.15.241
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -32,7 +32,7 @@ info:
 
     ## Versions
     - 0.15.96 (2026-11-27): responsibility-matrix coverage screen (CHANGELOG MatrixCoverage; no migration). Additive and read only. `GET /matrix/coverage` (`getMatrixCoverage`, System Admin or an all-region delegate of the matrix): for each active stage and enabled register row and each of the seven regions, whether the matrix cell has an actor, so empty cells show before a task or record stalls. Settings > Workflow > Coverage.
-    - 0.15.110 (2026-11-27): region health on the dashboard and the Weekly status page (owner request 2026-11-27, item 12 of the PM-platforms research; migration 0200, mirror `db/sql/199_region_health.sql`; CHANGELOG RegionHealth). Additive. New `GET /status-updates/region-health` (`getRegionHealth`): one row per region the caller may view on `sites` (all seven when unrestricted), with the current working week's region update of the Weekly status (`health`, `summary`, `author`, `updated_at`) or `missing_update` true when the region has not posted this week; read only. The dashboard card catalogue gains `region_health` ("Region health"), shown at the end of a tab until the tab layout names it (migration 0108 rule). No table, no permission change.
+    - 0.15.241 (2026-11-27): region health on the dashboard and the Weekly status page (owner request 2026-11-27, item 12 of the PM-platforms research; migration 0341, mirror `db/sql/340_region_health.sql`; CHANGELOG RegionHealth). Additive. New `GET /status-updates/region-health` (`getRegionHealth`): one row per region the caller may view on `sites` (all seven when unrestricted), with the current working week's region update of the Weekly status (`health`, `summary`, `author`, `updated_at`) or `missing_update` true when the region has not posted this week; read only. The dashboard card catalogue gains `region_health` ("Region health"), shown at the end of a tab until the tab layout names it (migration 0108 rule). No table, no permission change.
     - 0.15.95 (2026-11-27): Issue log and Quality record link to a Procurement order (migration 0195; CHANGELOG IssueQualityOrderLink). Additive. New optional field `procurement_order_id` on `issues` and `quality`; when set, the contractor (`external_party`) is taken from the order (a different typed `external_party_id` is refused, 422 `contractor_from_order`; `order_not_active`, `order_other_site`, `invalid`), so the contractor performance view sees the issue and the inspection. `GET /registers/issues/order-options` and `GET /registers/quality/order-options` list the orders (own module view plus Procurement view).
     - 0.15.92 (2026-11-27): order picker for the Car dispatcher and Financial advances (CHANGELOG OrderPickersDispatchAdvances). Additive, no migration. `GET /registers/car_dispatcher/order-options` and `GET /registers/financial_advances/order-options` list the approved, active Procurement orders for the field `procurement_record_id` (the same list as the warehouse picker); each needs its own module view, and only orders in regions where the caller also holds the Procurement view right are listed.
     - 0.15.91 (2026-11-26): warehouse receipt to Procurement order link (migration 0181; CHANGELOG WarehouseProcurementLink). Additive. A warehouse receipt (PL or OPEN) may name the approved, active Procurement order it belongs to (`procurement_order_id`); `pr_no`, `po_wo_no` and `order_contractor` are then derived from the order (read only). New `GET /registers/warehouse/order-options` (the picker) and `GET /registers/procurement/{entity_id}/receipts` (the receipts against an order). New 422 codes `receipt_only`, `order_not_active`, `order_other_site`.
@@ -14589,7 +14589,7 @@ paths:
     get:
       tags: [status-updates]
       operationId: getRegionHealth
-      summary: Region health of the current week (0.15.110, item 12)
+      summary: Region health of the current week (0.15.241, item 12)
       description: One row per region the caller may view on `sites` (all seven when unrestricted). `health`, `summary`, `author` and `updated_at` come from the region's Weekly status update of the current working week (it opens on Sunday); they are null and `missing_update` is true when the region has not posted this week. Read only.
       responses:
         '200':

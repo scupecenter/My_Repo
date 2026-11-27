@@ -227,7 +227,7 @@ export const xHandlers = [
     const from = Number(q.get('cursor') ? atob(q.get('cursor') as string) : 0) || 0;
     return HttpResponse.json({ items: rows.slice(from, from + limit), page: { limit, next_cursor: from + limit < rows.length ? btoa(String(from + limit)) : null } });
   }),
-  // Item 12 (0.15.110): the region health board — the current-week region updates, one row per region, missing flag otherwise.
+  // Item 12 (0.15.241): the region health board — the current-week region updates, one row per region, missing flag otherwise.
   http.get(`${B}/status-updates/region-health`, () => {
     const g = guard(); if (g) return g;
     const week = weekStartOf(tripoliToday());

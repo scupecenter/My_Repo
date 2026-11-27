@@ -59,7 +59,7 @@ export const useTimeReport = (f: InsightFilter & { group_by: 'holder' | 'team'; 
 
 // ---------------------------------------------------------------------------------------------------------------- X7 status updates
 export type StatusFilter = { scope: string; region_id: string; team: string };
-/** Region health (0.15.110, item 12): the current-week health of every visible region plus the missing-update flag. */
+/** Region health (0.15.241, item 12): the current-week health of every visible region plus the missing-update flag. */
 export const useRegionHealth = () => useQuery({ queryKey: ['region-health'], queryFn: () => api.get<RegionHealthBoard>('/status-updates/region-health') });
 export const useStatusUpdates = (f: StatusFilter) =>
   useInfiniteQuery({

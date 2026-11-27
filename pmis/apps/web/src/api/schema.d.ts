@@ -9368,7 +9368,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Region health of the current week (0.15.110, item 12)
+         * Region health of the current week (0.15.241, item 12)
          * @description One row per region the caller may view on `sites` (all seven when unrestricted). `health`, `summary`, `author` and `updated_at` come from the region's Weekly status update of the current working week (it opens on Sunday); they are null and `missing_update` is true when the region has not posted this week. Read only.
          */
         get: operations["getRegionHealth"];

@@ -2682,7 +2682,7 @@ export function Dashboard() {
 
 const REGION_HEALTH_TONE: Record<string, string> = { on_track: "bg-openBg text-openInk", at_risk: "bg-waitBg text-waitInk", off_track: "bg-lateBg text-lateInk" };
 
-/** Item 12 (0.15.110): the region health card — the current-week Weekly-status health of every visible region, with the missing-update flag. */
+/** Item 12 (0.15.241): the region health card — the current-week Weekly-status health of every visible region, with the missing-update flag. */
 function RegionHealthCard() {
   const { t, i18n } = useTranslation();
   const q = useRegionHealth();
