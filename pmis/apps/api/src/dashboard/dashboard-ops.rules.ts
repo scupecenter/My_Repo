@@ -87,3 +87,87 @@ export function ptwCheckGaps(
     return v !== "Done" && v !== "N/A";
   });
 }
+
+/** The scorecard levels of the contractor performance report (migration 0180). */
+export type ScorecardLevel = "ok" | "amber" | "red" | "insufficient";
+
+/** The report item fields the dashboard scorecard reads (a subset of the contractor performance report item). */
+export interface ScorecardItem {
+  party_id: string;
+  name: string;
+  type: string;
+  delay_days: number;
+  issues_open: number;
+  snags: { total: number; open: number; overdue: number; returned: number };
+  quality: { total: number; failed: number };
+  level: ScorecardLevel;
+}
+
+export interface ScorecardSummary {
+  parties: number;
+  by_level: Record<ScorecardLevel, number>;
+  /** The mean delay days over the parties that have any delay, one decimal; null when nobody is delayed. */
+  avg_delay_days: number | null;
+  /** The share of snags not overdue (the on-time rectification rate), one decimal; null when there are no snags. */
+  on_time_pct: number | null;
+  /** The share of failed quality inspections (the rejection / NCR rate), one decimal; null when there are no inspections. */
+  quality_fail_pct: number | null;
+  snags: { total: number; open: number; overdue: number; returned: number };
+  quality: { total: number; failed: number };
+  /** The five worst parties (the report order is worst first): no amounts, the party and its worst figures only. */
+  worst: {
+    party_id: string;
+    name: string;
+    type: string;
+    level: ScorecardLevel;
+    delay_days: number;
+    snags_overdue: number;
+    quality_failed: number;
+  }[];
+}
+
+/**
+ * The scorecard section of the dashboard (0.15.202, item 5): the aggregate of the contractor performance report, so
+ * the card and the performance screen never disagree. On-time completion, the average delay and the rejection rate,
+ * with no amounts anywhere.
+ */
+export function scorecardSummary(items: ScorecardItem[]): ScorecardSummary {
+  const by_level: Record<ScorecardLevel, number> = { ok: 0, amber: 0, red: 0, insufficient: 0 };
+  const snags = { total: 0, open: 0, overdue: 0, returned: 0 };
+  const quality = { total: 0, failed: 0 };
+  let delaySum = 0;
+  let delayed = 0;
+  for (const it of items) {
+    by_level[it.level] += 1;
+    snags.total += it.snags.total;
+    snags.open += it.snags.open;
+    snags.overdue += it.snags.overdue;
+    snags.returned += it.snags.returned;
+    quality.total += it.quality.total;
+    quality.failed += it.quality.failed;
+    if (it.delay_days > 0) {
+      delaySum += it.delay_days;
+      delayed += 1;
+    }
+  }
+  const pct = (part: number, total: number): number | null =>
+    total > 0 ? Math.round((part * 1000) / total) / 10 : null;
+  return {
+    parties: items.length,
+    by_level,
+    avg_delay_days: delayed > 0 ? Math.round((delaySum * 10) / delayed) / 10 : null,
+    on_time_pct: pct(snags.total - snags.overdue, snags.total),
+    quality_fail_pct: pct(quality.failed, quality.total),
+    snags,
+    quality,
+    worst: items.slice(0, 5).map((it) => ({
+      party_id: it.party_id,
+      name: it.name,
+      type: it.type,
+      level: it.level,
+      delay_days: it.delay_days,
+      snags_overdue: it.snags.overdue,
+      quality_failed: it.quality.failed,
+    })),
+  };
+}
