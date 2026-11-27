@@ -393,6 +393,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
   const lockCol = useColumnLock(key);
   const voidRec = useRecordOp(key);
   const [bulk, setBulk] = useState<null | "lock" | "unlock" | "void">(null);
+  const [pickOpen, setPickOpen] = useState(false);
   const [colDlg, setColDlg] = useState<null | {
     code: string;
     locked: boolean;
@@ -579,62 +580,45 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
           {t(OWNER_NOTE[key])}
         </p>
       )}
-      <div
-        className="mb-3 flex flex-wrap items-center gap-2"
-        data-testid="register-column-locks"
-      >
-        <select
-          className="input w-auto"
-          aria-label={t("registers.column_lock_select")}
-          data-testid="register-column-lock-select"
-          value={colPick}
-          onChange={(e) => setColPick(e.target.value)}
-        >
-          <option value="">{t("registers.column_lock_select")}</option>
-          {def.fields
-            .filter((x) => !x.read_only && !x.locked)
-            .map((x) => (
-              <option key={x.code} value={x.code}>
-                {fieldLabel(x, i18n.language)}
-              </option>
-            ))}
-        </select>
-        {canEditColumns(me) && (
-          <Link
-            className="btn"
-            to="/admin/settings/registers/columns"
-            data-testid="register-columns-settings"
-          >
-            {t("settings.tab_register-columns")}
-          </Link>
-        )}
-        <button
-          type="button"
-          className="btn"
-          disabled={!colPick}
-          data-testid="register-column-lock"
-          onClick={() => setColDlg({ code: colPick, locked: true })}
-        >
-          <Lock size={16} />
-          {t("registers.column_lock")}
-        </button>
-        {def.fields
-          .filter((x) => x.locked)
-          .map((x) => (
-            <button
-              key={x.code}
-              type="button"
-              className="btn"
-              data-testid={`register-column-unlock-${x.code}`}
-              onClick={() => setColDlg({ code: x.code, locked: false })}
+      {/* P8: the column-lock controls live in the More menu; this dialog picks the column, the reason dialog below asks why */}
+      <Dialog.Root open={pickOpen} onOpenChange={setPickOpen}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-[70] bg-scrim/60" />
+          <Dialog.Content data-testid="register-column-locks" className="card fixed inset-x-0 top-1/4 z-[70] mx-auto w-[min(460px,92vw)] space-y-3 p-5">
+            <Dialog.Title className="font-bold">{t("registers.column_lock")}</Dialog.Title>
+            <Dialog.Description className="sr-only">{t("registers.column_lock_select")}</Dialog.Description>
+            <select
+              className="input w-full"
+              aria-label={t("registers.column_lock_select")}
+              data-testid="register-column-lock-select"
+              value={colPick}
+              onChange={(e) => setColPick(e.target.value)}
             >
-              <Unlock size={16} />
-              {t("registers.column_unlock", {
-                field: fieldLabel(x, i18n.language),
-              })}
-            </button>
-          ))}
-      </div>
+              <option value="">{t("registers.column_lock_select")}</option>
+              {def.fields
+                .filter((x) => !x.read_only && !x.locked)
+                .map((x) => (
+                  <option key={x.code} value={x.code}>
+                    {fieldLabel(x, i18n.language)}
+                  </option>
+                ))}
+            </select>
+            <div className="flex justify-end gap-2">
+              <button type="button" className="btn" onClick={() => setPickOpen(false)}>{t("common.cancel")}</button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                disabled={!colPick}
+                data-testid="register-column-lock-continue"
+                onClick={() => { setPickOpen(false); setColDlg({ code: colPick, locked: true }); }}
+              >
+                <Lock size={16} aria-hidden />
+                {t("registers.column_lock")}
+              </button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
       <RejectDialog
         open={colDlg !== null}
         title={
@@ -849,6 +833,33 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
                         icon: <WarehouseIcon size={16} />,
                         testid: "register-warehouse-screen",
                         onSelect: () => nav("/warehouse"),
+                      },
+                    ]
+                  : []),
+                {
+                  id: "col-lock",
+                  label: t("registers.column_lock"),
+                  icon: <Lock size={16} />,
+                  testid: "register-column-lock",
+                  onSelect: () => setPickOpen(true),
+                },
+                ...def.fields
+                  .filter((x) => x.locked)
+                  .map((x) => ({
+                    id: `col-unlock-${x.code}`,
+                    label: t("registers.column_unlock", { field: fieldLabel(x, i18n.language) }),
+                    icon: <Unlock size={16} />,
+                    testid: `register-column-unlock-${x.code}`,
+                    onSelect: () => setColDlg({ code: x.code, locked: false }),
+                  })),
+                ...(canEditColumns(me) && !grid.admin
+                  ? [
+                      {
+                        id: "col-settings",
+                        label: t("settings.tab_register-columns"),
+                        icon: <Columns3 size={16} />,
+                        testid: "register-columns-settings",
+                        onSelect: () => nav("/admin/settings/registers/columns"),
                       },
                     ]
                   : []),
