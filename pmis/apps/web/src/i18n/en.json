@@ -1201,7 +1201,9 @@
     "section_workflow_coverage": "Matrix coverage",
     "section_screens_login": "Login page",
     "section_screens_interface": "Interface",
-    "section_screens_goals": "Goals"
+    "section_screens_goals": "Goals",
+    "section_workflow_coverage": "Matrix coverage",
+    "section_workflow_simulate": "Who approves?"
   },
   "scopeMatch": {
     "title": "Team / scope match (Procurement)",
@@ -6860,5 +6862,24 @@
     "remove": "Remove goal",
     "add": "Add goal",
     "save_title": "Save the goals"
+  },
+  "matrixSimulate": {
+    "title": "Who approves?",
+    "note": "Read only. Pick a site and a stage task or a register to see who would hold L1 and L2 today: the matrix cell that decides, its rule, the people who would hold the level and how they reach it (named, role, group). Nothing is written and nobody is notified. A task cell decides before the stage cell, and a region cell before the default cell.",
+    "site_search": "Find a site",
+    "site": "Site",
+    "kind": "For",
+    "kind_task": "A stage task",
+    "kind_register": "A register",
+    "what": "Task or register",
+    "choose": "Choose",
+    "open_coverage": "Matrix coverage",
+    "source_region": "region cell",
+    "source_default": "default cell",
+    "source_none": "no cell",
+    "task_cell": "task cell",
+    "rule": "rule",
+    "nobody": "Nobody holds this level.",
+    "fallback": "Who could act through the admin path:"
   }
 }

@@ -456,6 +456,16 @@ export const settingsHandlers = [
   http.get(`${B}/recycle-bin`, () => { const g = guard(); if (g) return g; return HttpResponse.json(BIN, tag(BIN.version)); }),
   http.put(`${B}/recycle-bin/retention`, async ({ request }) => { const g = guard(); if (g) return g; const b = (await request.json()) as { retention_days: number }; BIN.retention_days = b.retention_days; BIN.version += 1; return HttpResponse.json({ retention_days: BIN.retention_days, version: BIN.version }, tag(BIN.version)); }),
   http.post(`${B}/recycle-bin/:id/restore`, ({ params }) => { const g = guard(); if (g) return g; const i = BIN.items.findIndex((x) => x.id === params.id); if (i < 0) return HttpResponse.json({ code: 'not_found' }, { status: 404 }); const [r] = BIN.items.splice(i, 1); return HttpResponse.json({ id: r!.id, register_key: r!.register_key, state: 'entry', version: r!.version + 1 }); }),
+  http.get(`${B}/matrix/simulate`, ({ request }) => {
+    const g = guard(); if (g) return g;
+    const u = new URL(request.url); const kind = u.searchParams.get('kind') === 'register' ? 'register' : 'task'; const code = u.searchParams.get('code') ?? '';
+    const person = (n: string, via: string | string[]) => ({ user_id: '00000000-0000-4000-8000-0000000000a1', name: n, email: `${n.toLowerCase().replace(/ /g, '.')}@example.test`, via });
+    return HttpResponse.json({ site: { id: u.searchParams.get('site_id'), site_code: 'S-1', name: 'Demo', region_id: 1 }, kind, code, name_en: code, name_ar: null, module: 'sites',
+      levels: [
+        { level_code: 'L1', source: 'region', task_specific: true, rule: 'any_one', holders: [person('Sara Ali', 'role: Field engineer')], fallback: [] },
+        { level_code: 'L2', source: 'default', task_specific: false, rule: null, holders: [], fallback: [person('Admin One', 'system_admin')] },
+      ] });
+  }),
   http.get(`${B}/matrix/coverage`, () => { const g = guard(); if (g) return g; return HttpResponse.json(MATRIX_COVERAGE); }),
   // ------------------------------------------------------------------ preventive-maintenance schedules (contract 0.15.161)
   http.get(`${B}/settings/pm-schedules`, () => { const g = guard(); if (g) return g; return HttpResponse.json(pmView(), tag(pmState.version)); }),
