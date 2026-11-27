@@ -10,6 +10,6 @@ The KPI catalog (0108) covers 10 operational KPIs only. Add SPI, progress vs pla
 - Rules that apply: additive migrations only, no permission widening, hide never delete, Arabic and English everywhere, everything configurable in Settings, no other platform names.
 - PR checklist when built: covered and excluded places with reasons, connections checked (registers, Settings, hub rule D55, gear, links, rights, templates), auto-fill and automation notes, Arabic changelog entry in the PR body (no CHANGELOG.md edit).
 
-## Numbering reserved (verify live against main and open PRs before use)
-- Migration: 0555 / db 554 (catalog rows)
-- Contract label: 0.15.374
+## Numbering reserved (block 0570-0589 and labels 0.15.430-0.15.449 assigned by the parent, 2026-11-27 21:38; verify live against main and open PRs before use)
+- Migration: 0572 / db 571 (catalog rows)
+- Contract label: 0.15.432
