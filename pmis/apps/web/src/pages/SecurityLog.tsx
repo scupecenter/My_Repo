@@ -10,6 +10,7 @@ import type { DeviceInfo } from '@/api/logs';
 import { PersonTag } from '@/components/PersonTag';
 import { UnifiedFilter } from '@/components/UnifiedFilter';
 import { decodeFilter, encodeFilter } from '@/api/views';
+import { IntegrityTooLarge, isTooLarge } from '@/components/logs/IntegrityTooLarge';
 import { useToast } from '@/components/Toast';
 import { hasGrant, isAdmin } from '@/lib/perm';
 
@@ -41,11 +42,12 @@ export function SecurityLog() {
   const [adv, setAdv] = useState('');
   const q = useSecurityLog(f, adv), verify = useVerifyIntegrity();
   const [res, setRes] = useState<Partial<Record<'audit' | 'security', LogIntegrity>>>({});
+  const [big, setBig] = useState<'audit' | 'security' | null>(null);
   const [exporting, setExporting] = useState(false);
   const admin = isAdmin(me.data), canExport = admin || hasGrant(me.data, 'export');
   const items = q.data ?? [];
   const ar = i18n.language === 'ar';
-  const run = (log: 'audit' | 'security') => verify.mutate(log, { onSuccess: (r) => setRes((x) => ({ ...x, [log]: r })), onError: (e) => toast(errText(e, t), 'err') });
+  const run = (log: 'audit' | 'security') => { setBig(null); verify.mutate(log, { onSuccess: (r) => setRes((x) => ({ ...x, [log]: r })), onError: (e) => (isTooLarge(e) ? setBig(log) : toast(errText(e, t), 'err')) }); };
   const doExport = () => { setExporting(true); exportSecurityLog(f).then(() => toast(t('seclog.exported'))).catch((e) => toast(errText(e, t), 'err')).finally(() => setExporting(false)); };
   return (
     <div data-testid="page-security-log" className="space-y-4">
@@ -54,6 +56,7 @@ export function SecurityLog() {
         {admin && (['audit', 'security'] as const).map((l) => <button key={l} className="btn" data-testid={`integrity-${l}`} disabled={verify.isPending} onClick={() => run(l)}><ShieldCheck size={14} />{t('seclog.verify', { log: t(`seclog.log_${l}`) })}</button>)}
         {canExport && <button className="btn" data-testid="seclog-export" disabled={exporting} onClick={doExport}><Download size={14} />{t('seclog.export')}</button>}
       </div>
+      {big && <IntegrityTooLarge log={big} onClose={() => setBig(null)} />}
       {(res.audit || res.security) && <div className="grid gap-3 md:grid-cols-2" data-testid="integrity-results">{res.audit && <IntegrityCard r={res.audit} />}{res.security && <IntegrityCard r={res.security} />}</div>}
       <div className="card flex flex-wrap items-end gap-3 p-3" data-testid="seclog-filters">
         <label className="text-sm font-semibold">{t('seclog.from')}<input type="date" className="input mt-1 font-normal" data-testid="seclog-from" value={f.from} onChange={(e) => setF({ ...f, from: e.target.value })} /></label>

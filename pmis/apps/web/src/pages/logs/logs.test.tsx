@@ -125,6 +125,17 @@ describe('Audit Log screen', () => {
     expect(screen.getByTestId('integrity-break-list-audit')).toHaveTextContent('#77');
   });
 
+  it('offers to start the check as a job when the chain is too long for one request (L5)', async () => {
+    await signIn('pm');
+    const u = userEvent.setup();
+    server.use(http.get(`${API_BASE}/audit-log/integrity`, () => HttpResponse.json({ type: 'about:blank', title: 'Unprocessable', status: 422, code: 'integrity_too_large', detail: 'too long', row_count: 900000, max_rows: 200000 }, { status: 422 })));
+    renderApp(<Routes><Route path="/" element={<AuditLog />} /><Route path="/admin/logs/integrity" element={<div data-testid="at-runs" />} /></Routes>);
+    await u.click(await screen.findByTestId('audit-integrity'));
+    expect(await screen.findByTestId('integrity-too-large-audit')).toBeInTheDocument();
+    await u.click(screen.getByTestId('integrity-start-job-audit'));
+    expect(await screen.findByTestId('at-runs')).toBeInTheDocument();
+  });
+
   it('exports through the export job and says so', async () => {
     await signIn('pm');
     const u = userEvent.setup();
