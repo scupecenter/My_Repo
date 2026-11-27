@@ -1,7 +1,7 @@
 import { screen } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
-import { SettingsAlias } from '@/App';
+import { MappingRedirect, SettingsAlias } from '@/App';
 import { PeopleAdminLayout } from '@/components/PeopleAdmin';
 import { renderApp, signIn } from '@/test/utils';
 import { SecurityAlerts } from '../logs/SecurityAlerts';
@@ -12,6 +12,7 @@ const app = (route: string) => renderApp(
   <Routes>
     <Route path="/admin/settings/*" element={<SettingsRoutes />} />
     <Route path="/settings/*" element={<SettingsAlias />} />
+    <Route path="/templates/mapping" element={<MappingRedirect />} />
     <Route path="/admin/logs/alerts" element={<SecurityAlerts />} />
     <Route element={<PeopleAdminLayout />}><Route path="/admin/users" element={<p>users</p>} /><Route path="/admin/matrix" element={<p>matrix</p>} /></Route>
   </Routes>, { route });
@@ -42,5 +43,15 @@ describe('Settings hub', () => {
     await signIn('pm');
     app('/admin/users');
     expect(await screen.findByTestId('screen-settings-link')).toHaveAttribute('href', '/admin/settings/security/limits');
+  });
+
+  it('keeps template mapping open for the templates right: a user with Templates but no Settings entry still reaches Settings > Data > Mapping, from the old address and the Templates link', async () => {
+    await signIn('reviewer');
+    const me = await (await import('@/api/client')).api.get<{ effective: { nav: string[] } }>('/me');
+    expect(me.effective.nav).toContain('templates');
+    expect(me.effective.nav).not.toContain('admin.settings');
+    app('/templates/mapping');
+    expect(await screen.findByTestId('tmap-fields')).toBeInTheDocument();
+    expect(screen.queryByTestId('tmap-add')).toBeNull(); // read only: the server decides who edits
   });
 });
