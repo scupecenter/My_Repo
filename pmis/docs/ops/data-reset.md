@@ -590,7 +590,7 @@ After a reset of the sites part, the owner's Master cannot be applied as it was 
 - **Invitations** (`user_invitations`) stay with the `roles` part: an open invitation may name a group or role assignment that the part removed; it
   should be revoked and sent again after such a reset (not automated).
 
-## Archive before delete (migration 0368, contract 0.15.266)
+## Archive before delete (migration 0371, contract 0.15.266)
 
 A request can ask for an archive of what the reset deletes. The choice is made with the request and never changes: `none` (as before), `download` (the run needs the archive made and downloaded once; kept 7 days at most) or `keep_90` (the run needs the archive made; kept 90 days, any number of downloads). It is shown to the approver. It is not part of `scope_hash`: the hash variants (backup choice, narrowing) stay as they are.
 

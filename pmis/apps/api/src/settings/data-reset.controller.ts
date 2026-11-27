@@ -77,7 +77,7 @@ export class DataResetController {
     return this.svc.retryFiles(auth, id, body);
   }
 
-  /** Contract 0.15.266 (migration 0368): makes the archive of an approved request (async: the request shows its state). */
+  /** Contract 0.15.266 (migration 0371): makes the archive of an approved request (async: the request shows its state). */
   @Post('requests/:id/archive')
   @HttpCode(202)
   makeArchive(@Auth() auth: AuthContext, @Param('id') id: string): Promise<Json> {

@@ -523,7 +523,7 @@ function NarrowView({ narrow }: { narrow: DataResetNarrow }) {
   );
 }
 
-/** Contract 0.15.266 (migration 0368, Data entry proposal P2): the archive made before the delete. Restore is the template upload again. */
+/** Contract 0.15.266 (migration 0371, Data entry proposal P2): the archive made before the delete. Restore is the template upload again. */
 function ArchiveChoice({ value, setValue, disabled }: { value: ArchiveMode; setValue: (v: ArchiveMode) => void; disabled: boolean }) {
   const { t } = useTranslation();
   const opts: { v: ArchiveMode; id: string }[] = [{ v: 'download', id: 'dr-archive-download' }, { v: 'keep_90', id: 'dr-archive-keep' }, { v: 'none', id: 'dr-archive-none-option' }];

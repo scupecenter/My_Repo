@@ -22,7 +22,7 @@ export type ErrorCode =
   | 'single_admin' | 'backup_missing' | 'request_expired' | 'reset_running' | 'plan_incomplete' | 'storage_not_supported' | 'quarantine_unavailable' | 'maintenance'
   // 0396 (0.15.292): the Media gallery thumbnails
   | 'thumbnail_unsupported' | 'thumbnails_unavailable'
-  // 0368 (0.15.266): the archive before a project data reset
+  // 0371 (0.15.266): the archive before a project data reset
   | 'archive_required' | 'archive_expired';
 
 export interface FieldError {

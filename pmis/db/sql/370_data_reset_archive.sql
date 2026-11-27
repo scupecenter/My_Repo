@@ -1,5 +1,5 @@
--- 0368_data_reset_archive: an archive of the rows a project data reset deletes, made before the delete (Data entry proposal P2, contract 0.15.266).
--- Mirror: db/sql/367_data_reset_archive.sql (kept byte-identical). The contract of the reset is docs/ops/data-reset.md.
+-- 0371_data_reset_archive: an archive of the rows a project data reset deletes, made before the delete (Data entry proposal P2, contract 0.15.266).
+-- Mirror: db/sql/370_data_reset_archive.sql (kept byte-identical). The contract of the reset is docs/ops/data-reset.md.
 --
 -- The request chooses an archive mode: none (as today), download (the archive is kept until it was downloaded once, 7 days at most) or keep_90 (kept 90 days, any
 -- number of downloads). The mode is immutable with the request. When it is not none, the run is refused until an archive of the request is ready (download: and
@@ -240,4 +240,4 @@ VALUES ('data_reset_archive_applied', 'workflow', NULL,
         jsonb_build_object('modes', jsonb_build_array('none', 'download', 'keep_90'), 'download', 'System Admin, step-up, security-log entry per download',
                            'gate', 'admin_data_reset_start refuses (409 archive_required) until the archive of the request is ready (download: and downloaded once)',
                            'doors', 'admin_data_reset_archive_begin, _done, _download, _due, _purged'),
-        'Archive before the project data reset deletes (migration 0368, Data entry proposal P2).');
+        'Archive before the project data reset deletes (migration 0371, Data entry proposal P2).');

@@ -15,7 +15,7 @@ export type DataResetNarrowOptions = S['DataResetNarrowOptions'];
 export type DataResetArchiveInfo = S['DataResetArchiveInfo'];
 export type ArchiveMode = 'none' | 'download' | 'keep_90';
 
-/** Contract 0.15.266 (migration 0368): the archive mode of a request (absent on a request made before: none) and the state of its archive. */
+/** Contract 0.15.266 (migration 0371): the archive mode of a request (absent on a request made before: none) and the state of its archive. */
 export const archiveMode = (r: Pick<DataResetRequest, 'archive'> | null | undefined): ArchiveMode => r?.archive?.mode ?? 'none';
 export const archiveOf = (r: Pick<DataResetRequest, 'archive'> | null | undefined) => r?.archive?.archive ?? null;
 /** The run is refused until the archive is ready (mode download: and downloaded once); the database decides, the screen only says why the button waits. */

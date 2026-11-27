@@ -20,7 +20,7 @@ type Json = Record<string, unknown>;
 interface Sel { records: { id: string; entity_id: string; register_key: string }[]; files: { storage_key: string; name: string }[] }
 
 /**
- * Contract 0.15.266 (migration 0368, Data entry proposal P2): the archive of a project data reset, made before the delete. A zip with the records of every register as an
+ * Contract 0.15.266 (migration 0371, Data entry proposal P2): the archive of a project data reset, made before the delete. A zip with the records of every register as an
  * .xlsx on the current template (so a restore is the template upload again, rows entering L1 then L2) and the stored files. The database doors decide who may make
  * and download it (System Admin, requester or approver, step-up) and write the security-log entry of each download; the API does what only it can: build and store the file.
  */
