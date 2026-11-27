@@ -70,7 +70,22 @@ describe('P7 in the Warehouse screen', () => {
     await u.click(screen.getByTestId('wh-tab-gaps'));
     expect(within(await screen.findByTestId('wh-gaps-pending')).getByText(/ANT-900 · Cambium Sector/)).toBeInTheDocument();
     expect(within(screen.getByTestId('wh-gaps-codes')).getByText(/CBL-FEED/)).toBeInTheDocument();
-    expect(within(screen.getByTestId('wh-gaps-vendor')).getAllByRole('listitem')).toHaveLength(6);
+    expect(await within(screen.getByTestId('wh-gaps-vendor')).findAllByText('Not set')).toHaveLength(7);
+  });
+
+  it('lets the admin set the WL vendor of a region from the gaps tab, with a reason (D58)', async () => {
+    await signIn('pm');
+    show('/warehouse');
+    const u = userEvent.setup();
+    await u.click(await screen.findByTestId('wh-tab-gaps'));
+    await u.click(await screen.findByTestId('wh-vendor-edit-7'));
+    await u.selectOptions(screen.getByTestId('wh-vendor-select'), 'Intracom');
+    await u.click(screen.getByTestId('wh-vendor-panel-submit'));
+    expect(await screen.findByTestId('wh-vendor-panel-reason-error')).toBeInTheDocument();
+    await u.type(screen.getByTestId('wh-vendor-panel-reason'), 'owner confirmed');
+    await u.click(screen.getByTestId('wh-vendor-panel-submit'));
+    expect(await within(await screen.findByTestId('wh-vendor-row-7')).findByText('Intracom')).toBeInTheDocument();
+    expect(screen.queryByTestId('wh-vendor-panel')).not.toBeInTheDocument();
   });
 
   it('lets the admin confirm a need quantity in the item dialog; the request carries the rule status', async () => {

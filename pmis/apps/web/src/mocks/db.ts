@@ -15,12 +15,12 @@ export { staffRef, uid };
 
 /** Accounts offered on the fake Microsoft page. `linked=false` = first sign-in (needs employee ID). */
 export const ACCOUNTS: Record<string, { employee_id: string | null; name: string; email: string; status: 'active' | 'pending_assignment'; nav: string[] }> = {
-  pm: { employee_id: '1001', name: 'Ahmed Salem', email: 'ahmed.salem@example.com', status: 'active', nav: ['my_work', 'daily_plan', 'inbox', 'workload', 'status_updates', 'approvals', 'sites', 'dashboard', 'templates', 'admin.users', 'admin.roles', 'admin.groups', 'admin.delegation', 'absence', 'admin.matrix', 'admin.settings', 'admin.security_log', 'audit', 'messages', 'announcements', 'procurement', 'gecol', 'hlc', 'permits_hse', 'dismantle', 'contractors', 'warehouse', 'quality', 'issues', 'risks', 'change_control', 'readiness', 'as_built', 'meetings', 'rf_design', 'acquisition', 'car_dispatcher', 'financial_advances'] },
-  reviewer: { employee_id: '1102', name: 'Mona Fathi', email: 'mona.fathi@example.com', status: 'active', nav: ['my_work', 'daily_plan', 'inbox', 'workload', 'status_updates', 'approvals', 'sites', 'templates', 'absence', 'messages', 'procurement', 'gecol', 'hlc', 'permits_hse', 'dismantle', 'warehouse', 'as_built'] },
-  auditor: { employee_id: '1103', name: 'Ali Barka', email: 'ali.barka@example.com', status: 'active', nav: ['my_work', 'inbox', 'approvals', 'admin.security_log', 'messages'] },
+  pm: { employee_id: '1001', name: 'Demo User 01', email: 'demo.user.01@example.com', status: 'active', nav: ['my_work', 'daily_plan', 'inbox', 'workload', 'status_updates', 'approvals', 'sites', 'dashboard', 'templates', 'admin.users', 'admin.roles', 'admin.groups', 'admin.delegation', 'absence', 'admin.matrix', 'admin.settings', 'admin.security_log', 'audit', 'messages', 'announcements', 'procurement', 'gecol', 'hlc', 'permits_hse', 'dismantle', 'contractors', 'warehouse', 'quality', 'issues', 'risks', 'change_control', 'readiness', 'as_built', 'meetings', 'rf_design', 'acquisition', 'car_dispatcher', 'financial_advances'] },
+  reviewer: { employee_id: '1102', name: 'Demo User 02', email: 'demo.user.02@example.com', status: 'active', nav: ['my_work', 'daily_plan', 'inbox', 'workload', 'status_updates', 'approvals', 'sites', 'templates', 'absence', 'messages', 'procurement', 'gecol', 'hlc', 'permits_hse', 'dismantle', 'warehouse', 'as_built'] },
+  auditor: { employee_id: '1103', name: 'Demo User 03', email: 'demo.user.03@example.com', status: 'active', nav: ['my_work', 'inbox', 'approvals', 'admin.security_log', 'messages'] },
   newbie: { employee_id: null, name: 'New Employee', email: 'new.employee@example.com', status: 'pending_assignment', nav: [] },
-  engineer: { employee_id: '1204', name: 'Sami Nuri', email: 'sami.nuri@example.com', status: 'active', nav: ['my_work', 'daily_plan', 'inbox', 'approvals', 'sites', 'status_updates', 'absence', 'messages'] },
-  pending: { employee_id: '1211', name: 'Wael Saadi', email: 'wael.saadi@example.com', status: 'pending_assignment', nav: [] },
+  engineer: { employee_id: '1204', name: 'Demo User 06', email: 'demo.user.06@example.com', status: 'active', nav: ['my_work', 'daily_plan', 'inbox', 'approvals', 'sites', 'status_updates', 'absence', 'messages'] },
+  pending: { employee_id: '1211', name: 'Demo User 13', email: 'demo.user.13@example.com', status: 'pending_assignment', nav: [] },
 };
 
 /** Demo passwords for the synthetic accounts (README). Local sign-in only; never real secrets. */
@@ -106,6 +106,8 @@ const fresh = () => ({
   profiles: {} as Record<string, { display_name?: string; phone?: string | null; locale?: 'en' | 'ar'; theme?: 'light' | 'dark'; ui_brand?: Brand | null; email?: string; version: number }>,
   /** 0.15.41 (migration 0130): Settings, Identity & themes (setting ui.identity). */
   identity: initIdentity(),
+  /** 0.15.97 (migration 0197): Settings, Screens, Login page (setting ui.login_page). */
+  loginPage: initLoginPage(),
   emailChanges: [] as { id: string; account: string; old_email: string; new_email: string; status: 'pending' | 'approved' | 'rejected' | 'cancelled'; requested_at: string; decided_at: string | null; decision_reason: string | null; decided_by: string | null;
     /** 0.12.6 (Q158): the code "mailed" to the new address (the mock has no mail: it is always the demo code), and the check made. */
     code?: string | null; attempts?: number; verify_sent_at?: string | null; verify_expires_at?: string | null; verified_at?: string | null; verified_via?: 'code' | 'admin_check' | null; identity_check?: string | null }[],
@@ -173,6 +175,23 @@ export function sessionBody(): Session {
 function initIdentity() {
   return { default_brand: 'current' as Brand, allow_user_choice: true, version: 1, updated_at: null as string | null, updated_by: null as null | { id: string; display_name: string; employee_id: string | null } };
 }
+function initLoginPage() {
+  return {
+    announcement_en: '', announcement_ar: '', announcement_kind: 'info' as 'info' | 'maintenance', animation: true,
+    default_locale: null as 'en' | 'ar' | null, support_links: [] as { label_en: string; label_ar: string; url: string }[],
+    version: 1, updated_at: null as string | null, updated_by: null as null | { id: string; display_name: string; employee_id: string | null },
+  };
+}
+/** 0.15.97: the login page settings (older saved mock states have none). */
+export const loginPage = () => (db().loginPage ??= initLoginPage());
+/** 0.15.97: the public door answers only what the signed-out pages render (login_page_public). */
+export const loginPagePublic = () => {
+  const c = loginPage();
+  return {
+    announcement: c.announcement_en === '' && c.announcement_ar === '' ? null : { en: c.announcement_en, ar: c.announcement_ar, kind: c.announcement_kind },
+    animation: c.animation, default_locale: c.default_locale, support_links: c.support_links,
+  };
+};
 /** 0.15.41: the identity settings (older saved mock states have none). */
 export const identity = () => (db().identity ??= initIdentity());
 /** The design a user sees: their own while the admin allows a choice, else the organization default (ui_effective_brand). */

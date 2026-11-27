@@ -81,7 +81,7 @@ The four forms bind to these records:
 
 ### 1.2 Fields
 
-| # | Form field (DN form) | Source in GSDN Workspace | Master | Fill | Proposed placeholder | Notes |
+| # | Form field (DN form) | Source in Workspace | Master | Fill | Proposed placeholder | Notes |
 |---|---|---|---|---|---|---|
 | 1 | DN Ref. No. | Generated form `number`, taken at generation (§6) | WH movement "Doc No." (D61) | P | `form.number` | No Prisma table (G-F01) |
 | 2 | DN Date | Date of generation, in the Africa/Tripoli timezone | WH movement "Date" | P | `form.date` | ASSUMPTION: issue date = generation date |
@@ -130,7 +130,7 @@ Serial numbers:
 
 ### 2.2 Fields
 
-| # | Form field (RN form) | Source in GSDN Workspace | Master | Fill | Proposed placeholder | Notes |
+| # | Form field (RN form) | Source in Workspace | Master | Fill | Proposed placeholder | Notes |
 |---|---|---|---|---|---|---|
 | 1 | RN Ref. No. | Generated form `number` (§6) | WH "Doc No." | P | `form.number` | G-F01 |
 | 2 | RN Date | Date of generation | WH "Date" | P | `form.date` | ASSUMPTION as for the DN |
@@ -153,7 +153,7 @@ Serial numbers:
 ### 2.3 Warehouse effect (CLAUDE.md; WH summary rows)
 - Approval of the signed RN posts the return. Until then the quantity shows as "pending return".
 - In the Master, Returned Good goes back into On Hand. Returned Faulty / Damaged is counted separately and is not in On Hand (WH summary rows 4 and 5, D61).
-- **ASSUMPTION:** GSDN Workspace keeps the same split, so the condition is needed per line (Q23).
+- **ASSUMPTION:** Workspace keeps the same split, so the condition is needed per line (Q23).
 
 ---
 
@@ -166,7 +166,7 @@ Serial numbers:
 
 ### 3.2 Fields: header and section 1, "Site Info."
 
-| # | Form field (PAC form) | Source in GSDN Workspace | Master | Fill | Proposed placeholder | Notes |
+| # | Form field (PAC form) | Source in Workspace | Master | Fill | Proposed placeholder | Notes |
 |---|---|---|---|---|---|---|
 | 1 | PAC Ref. No. | Generated form `number` (§6) | — | P | `form.number` | |
 | 2 | PAC Date | ASSUMPTION: the acceptance date entered in the prepare screen (default today). On approval of the signed scan it becomes B13 `actual_date`, which is Master BV | BV | P (E) | `pac.date` | Open, Q26 |
@@ -203,9 +203,9 @@ Serial numbers:
 | Block | Name | Position | Date, Signature and Stamp | Notes |
 |---|---|---|---|---|
 | Contractor | Contractor Name P (as row 5). Signee H | H | H | `external_parties` holds no signatory contact (G-F10) |
-| GSDN Site Engineer | P: holder of the B13 entry level (ASSUMPTION) | P from the staff registry `position` | H | Q20 |
-| GSDN CW Team Lead | P: approver of the stage (B2 default) | P | H | Q20 |
-| GSDN Project Manager | P: the holder of the Project Manager role (ASSUMPTION). The PM is not a matrix level of the RFI stage (B2) | P | H (signature and stamp) | Q20 |
+| Project Site Engineer | P: holder of the B13 entry level (ASSUMPTION) | P from the staff registry `position` | H | Q20 |
+| Project CW Team Lead | P: approver of the stage (B2 default) | P | H | Q20 |
+| Project Manager | P: the holder of the Project Manager role (ASSUMPTION). The PM is not a matrix level of the RFI stage (B2) | P | H (signature and stamp) | Q20 |
 
 ### 3.6 Section 5, "Acceptance Criteria Checklist"
 - The checklist has 7 groups and 34 items, each with Pass / Fail / N/A:
@@ -251,7 +251,7 @@ CLAUDE.md: "The PAC Accepted Item List (BoQ) is computed from the net quantities
 - **Disagreement in the sources:** BP §05 says the CW quantities in the PAC are the As-Built quantities, entered before issue. `stories-registers.md` RG-ASB repeats this. CLAUDE.md (newer) says net DN − RN, and CLAUDE.md wins. BP §06 "ready for closure" separately compares dispatched quantities with As-Built. Q33 asks whether the PAC prepare screen shows that comparison.
 
 ### 3.9 Footer, number and QR
-The source footer reads "GSDN CW Acceptance · CW Preliminary Acceptance Certificate (PAC)". The template must add the number, the page count and the QR code (G-F15).
+The source footer reads "Project CW Acceptance · CW Preliminary Acceptance Certificate (PAC)". The template must add the number, the page count and the QR code (G-F15).
 
 ### 3.10 Guards specific to the PAC
 - Generation is refused while any snag on the site is open (CLAUDE.md; contract 422 `open_snags`, `guard.open_snag_count`).
@@ -266,7 +266,7 @@ Task B15 "CW FAC" maps to Master FC, FD and FE (CW FAC Date) and starts SLA B-15
 
 ### 4.2 Fields
 
-| # | Form field (FAC form) | Source in GSDN Workspace | Master | Fill | Proposed placeholder | Notes |
+| # | Form field (FAC form) | Source in Workspace | Master | Fill | Proposed placeholder | Notes |
 |---|---|---|---|---|---|---|
 | 1 | FAC Ref. No. | Generated form `number` | — | P | `form.number` | |
 | 2 | FAC Date | ASSUMPTION: entered in the prepare screen (default today). On approval it becomes B15 `actual_date` (FE) | FE | P (E) | `fac.date` | Same pattern as the PAC Date (Q26) |
@@ -282,8 +282,8 @@ Task B15 "CW FAC" maps to Master FC, FD and FE (CW FAC Date) and starts SLA B-15
 | 12 | Retention Release Recommendation (RECOMMENDED / NOT RECOMMENDED) | **No model** | — | H | — | Q30; G-F12 |
 | 13 | Final Acceptance (GRANTED / WITHHELD) | **No model** | — | H | — | Q30 |
 | 14 | Remarks | `GeneratedForm.notes` | — | E | `form.notes` | |
-| 15 | GSDN CW Team Lead: Name / Date / Signature | Name P (Q20); the rest H | — | P/H | `sign.cw_team_lead.name` | |
-| 16 | GSDN Project Manager: Name / Date / Signature & Stamp | Name P: the approver of the Final Closure stage (B2) | — | P/H | `sign.project_manager.name` | |
+| 15 | Project CW Team Lead: Name / Date / Signature | Name P (Q20); the rest H | — | P/H | `sign.cw_team_lead.name` | |
+| 16 | Project Manager: Name / Date / Signature & Stamp | Name P: the approver of the Final Closure stage (B2) | — | P/H | `sign.project_manager.name` | |
 | 17 | Footer, number, QR | — | — | P | | G-F15 |
 
 The FAC form has no contractor signature block.

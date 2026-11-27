@@ -1,6 +1,6 @@
-# GSDN Workspace
+# Workspace
 
-Project management information system for the GSDN telecom site-delivery project (7 Libyan regions). It replaces the Excel Site Master as the system of record, with a 3-level approval workflow on every task.
+Project management information system for the Project telecom site-delivery project (7 Libyan regions). It replaces the Excel Site Master as the system of record, with a 3-level approval workflow on every task.
 
 **Start here:** [`pmis/HANDOVER.md`](pmis/HANDOVER.md). The binding rules are in [`pmis/CLAUDE.md`](pmis/CLAUDE.md), and the history of every decision and change is in [`pmis/CHANGELOG.md`](pmis/CHANGELOG.md).
 

@@ -86,14 +86,14 @@ function manualList() {
     const cur = manualInForce(c.code, today);
     const history = S().values.filter((v) => v.item_code === c.code).sort((a, b) => b.version - a.version).map((v) => ({
       id: v.id, version: v.version, value_pct: v.value_pct, effective_date: v.effective_date, reason: v.reason, created_at: v.created_at, in_force: v.id === cur?.id,
-      entered_by: { id: v.by, display_name: me?.name ?? 'Ahmed Salem', employee_id: me?.employee_id ?? null }, source: v.source, historical_correction: v.historical_correction,
+      entered_by: { id: v.by, display_name: me?.name ?? 'Demo User 01', employee_id: me?.employee_id ?? null }, source: v.source, historical_correction: v.historical_correction,
     }));
     const pl = planOf(c.code);
     return {
       item_code: c.code, name_en: c.name_en, name_ar: c.name_ar, weight: c.weight, activity_code: c.act, activity_name_en: c.act_en, activity_name_ar: c.act_ar,
       current: cur ? { value_pct: cur.value_pct, effective_date: cur.effective_date, version: cur.version, source: cur.source } : null, history,
       plan: pl ? { id: pl.id, version: pl.version, points: pl.points, reason: pl.reason, source: pl.source, created_at: pl.created_at, planned_pct_today: planPct(pl.points, today),
-        entered_by: { id: pl.by, display_name: me?.name ?? 'Ahmed Salem', employee_id: me?.employee_id ?? null } } : null,
+        entered_by: { id: pl.by, display_name: me?.name ?? 'Demo User 01', employee_id: me?.employee_id ?? null } } : null,
     };
   });
   return { as_of: today, can_edit: canEdit(), can_correct_history: canEdit(), open_period_from: firstOfMonth(), items,
@@ -155,6 +155,30 @@ export const dashboardHandlers = [
       },
     });
   }),
+  // 0.15.96: the follow-up sections (procurement and materials), synthetic figures
+  http.get(`${B}/dashboard/ops`, () => {
+    const g = guard(); if (g) return g;
+    if (!canUse()) return problem(403, 'module_forbidden', 'You cannot use dashboard');
+    return HttpResponse.json({
+      as_of: new Date().toISOString(), scope_regions: null,
+      procurement: {
+        available: true, open_total: 14,
+        pr_wait: { buckets: [{ key: 'd0_7', count: 2 }, { key: 'd8_14', count: 3 }, { key: 'd15_30', count: 1 }, { key: 'over_30', count: 1 }], total: 7, oldest_days: 41 },
+        po_wait: { buckets: [{ key: 'd0_7', count: 4 }, { key: 'd8_14', count: 2 }, { key: 'd15_30', count: 1 }, { key: 'over_30', count: 0 }], total: 7, oldest_days: 22 },
+        materials: {
+          available: true, receive_pct: 62.5, required_total: 800, dispatched_total: 500, sites_short: 3,
+          top_shortages: [
+            { site_id: '00000000-0000-4000-8000-000000000101', site_code: 'TR101', item_code: 'PWR-001', item_name: 'Rectifier module', missing: 4, required: 6, dispatched: 2, contractor: 'A&T Global' },
+            { site_id: '00000000-0000-4000-8000-000000000102', site_code: 'TR102', item_code: 'MW-014', item_name: 'ODU 7GHz', missing: 2, required: 4, dispatched: 2, contractor: 'A&T Global' },
+          ],
+          by_contractor: [
+            { party_id: '00000000-0000-4000-8000-000000000201', name: 'A&T Global', sites: 2, missing_lines: 2, missing_qty: 6 },
+            { party_id: null, name: '', sites: 1, missing_lines: 1, missing_qty: 3 },
+          ],
+        },
+      },
+    });
+  }),
   http.get(`${B}/dashboard/site-map`, () => {
     const g = guard(); if (g) return g;
     if (!canUse()) return problem(403, 'module_forbidden', 'You cannot use dashboard');
@@ -191,6 +215,30 @@ export const dashboardHandlers = [
     return new HttpResponse(new Uint8Array([0x50, 0x4b, 0x03, 0x04]), {
       headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'Content-Disposition': `attachment; filename="GSDN_Dashboard_${d.basis.ref_date}.xlsx"` },
     });
+  }),
+
+  // ---------------------------------------------------------------- 0.7.2: the saved weekly snapshots (frozen values; the S-curve card, dashboard proposals item 2)
+  http.get(`${B}/project-status/snapshots`, () => {
+    const g = guard(); if (g) return g;
+    if (!canUse()) return problem(403, 'module_forbidden', 'You cannot use dashboard');
+    // Synthetic weekly (Thursday) series: the plan runs ahead, the actual curve catches up lately.
+    const planned = [25, 30, 36, 42, 48, 54, 60, 66, 71, 76, 80, 84, 87, 90];
+    const actual = [22, 26, 31, 36, 41, 46, 50, 55, 60, 64, 68, 71, 74, 76.5];
+    const start = new Date('2026-08-20T00:00:00Z').getTime();
+    const items = planned.map((pl, i) => ({
+      id: `snap-${i + 1}`,
+      taken_on: new Date(start + i * 7 * 86_400_000).toISOString().slice(0, 10),
+      scope: 'project',
+      region_id: null,
+      progress_pct: actual[i],
+      planned_pct: pl,
+      spi: Math.round((actual[i]! / pl) * 1000) / 1000,
+      health_index: 80 + i,
+      weight_set: { id: 'ws-project-status-1', code: 'project_status', version: 3, effective_from: '2026-08-01', is_active: true },
+      kind: 'weekly',
+      kinds: ['weekly'],
+    }));
+    return HttpResponse.json({ items, page: { limit: 200, next_cursor: null } });
   }),
 
   // ---------------------------------------------------------------- Q118

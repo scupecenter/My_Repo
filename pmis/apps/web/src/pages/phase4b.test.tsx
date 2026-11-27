@@ -229,9 +229,9 @@ describe('X3 mentions', () => {
     const send = vi.fn();
     renderApp(<MentionBox label="Comment" pending={false} onSend={send} />);
     const box = screen.getByTestId('comment-input');
-    await u.type(box, 'please check @s');
+    await u.type(box, 'please check @d');
     expect(screen.queryByTestId('mention-list')).toBeNull(); // one letter is not enough
-    await u.type(box, 'a');
+    await u.type(box, 'e');
     const list = await screen.findByTestId('mention-list');
     const opt = await within(list).findByTestId('mention-opt-1204');
     await u.click(opt);
@@ -249,7 +249,7 @@ describe('X3 mentions', () => {
     const send = vi.fn();
     renderApp(<MentionBox label="Comment" pending={false} onSend={send} />);
     const box = screen.getByTestId('comment-input');
-    await u.type(box, '@sa');
+    await u.type(box, '@de');
     await u.click(await screen.findByTestId('mention-opt-1204'));
     await u.clear(box);
     await u.type(box, 'never mind');
@@ -265,7 +265,7 @@ describe('X3 mentions', () => {
     await u.type(screen.getByTestId('comment-input'), '   ');
     expect(screen.getByTestId('comment-send')).toBeDisabled();
     await u.clear(screen.getByTestId('comment-input'));
-    await u.type(screen.getByTestId('comment-input'), '@sa');
+    await u.type(screen.getByTestId('comment-input'), '@de');
     await screen.findByTestId('mention-list');
     await u.keyboard('{Escape}');
     expect(screen.queryByTestId('mention-list')).toBeNull();
@@ -282,8 +282,8 @@ describe('X3 mentions', () => {
     const list = await screen.findByTestId('comment-list');
     await waitFor(() => expect(within(list).getAllByTestId('mention-token')).toHaveLength(2)); // both tokens are shown as chips
     const reached = await within(list).findByTestId('comment-mentions');
-    expect(reached).toHaveTextContent('Sami Nuri'); // 1204 can read it
-    expect(reached).not.toHaveTextContent('Wael Saadi'); // 1211 cannot: no hint at all
+    expect(reached).toHaveTextContent('Demo User 06'); // 1204 can read it
+    expect(reached).not.toHaveTextContent('Demo User 13'); // 1211 cannot: no hint at all
   });
 
   it('a register record has a comment thread of its own with the same rules', async () => {
@@ -311,8 +311,8 @@ describe('X2 and X3 in the register drawer', () => {
     await u.type(await screen.findByTestId('comment-input'), 'ok @1204 @1211');
     await u.click(screen.getByTestId('comment-send'));
     const reached = await screen.findByTestId('comment-mentions');
-    expect(reached).toHaveTextContent('Sami Nuri');
-    expect(reached).not.toHaveTextContent('Wael Saadi');
+    expect(reached).toHaveTextContent('Demo User 06');
+    expect(reached).not.toHaveTextContent('Demo User 13');
     await u.click(follow);
     await waitFor(() => expect(follow).toHaveAttribute('aria-pressed', 'false'));
   });
@@ -375,7 +375,8 @@ describe('X5 workload and the time report', () => {
     expect(lates).toEqual([...lates].sort((a, b) => b - a));
     const first = rows[0]!;
     const emp = first.getAttribute('data-testid')!.replace('workload-row-', '');
-    await u.click(within(first).getByTestId(`workload-reassign-${emp}`));
+    // the table can render before useMe resolves; the reassign button only shows once the viewer's right is known
+    await u.click(await within(first).findByTestId(`workload-reassign-${emp}`));
     const dlg = await screen.findByTestId('cover-dialog');
     expect(within(dlg).getByTestId('cover-person-only')).toBeInTheDocument();
     expect(within(dlg).queryByTestId('cover-scope')).toBeNull(); // the Workload view decides about the person's open tasks only

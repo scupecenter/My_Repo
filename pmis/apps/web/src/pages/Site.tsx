@@ -13,11 +13,14 @@ import { SiteDocuments } from '@/components/SiteDocuments';
 import { SiteFields } from '@/components/SiteFields';
 import { SiteIdentity } from '@/components/SiteIdentity';
 import { SitePendingChanges } from '@/components/SitePendingChanges';
+import { SiteDismantle } from '@/components/SiteDismantle';
 import { SiteSnags } from '@/components/SiteSnags';
 import { SiteMasterSources } from '@/components/SiteMasterSource';
 import { SiteApplicability } from '@/components/SiteApplicability';
 import { SiteDispatchPanel } from '@/components/SiteDispatch';
 import { useSiteDispatch } from '@/api/warehouse';
+import { RecordPin } from '@/components/RecordPin';
+import { siteSignature } from '@/lib/recordMemory';
 import { SitePhaseTabs } from '@/components/SitePhaseTabs';
 import { DataGapsChip, LocksChip } from '@/components/WorkflowLocks';
 import { Pipeline } from '@/components/Pipeline';
@@ -117,6 +120,7 @@ export function Site() {
             <LocksChip siteId={s.id} locked={s.workflow_locks !== false} canManage={!!s.workflow_locks_info?.can_manage} />
             <DataGapsChip count={s.data_gaps ?? 0} items={s.data_gap_items} />
             <FollowButton target={{ kind: 'site', id: s.id }} entityId={s.id} />
+            <RecordPin rec={{ kind: 'site', id: s.id, code: s.site_code, name: s.name, path: `/sites/${s.id}` }} signature={siteSignature(s)} />
             <span className={`chip ${TONE[s.overall_status]}`} data-testid="site-status">{t(`status.${s.overall_status}`)}</span>
           </div>
           <SiteSummaryStrip site={s} />
@@ -162,7 +166,7 @@ export function Site() {
         filter={<UnifiedFilter screen="site-tasks" value={tadvTree} onChange={(tree) => setParam('tadv', encodeFilter(tree) || null)} onClearAll={() => setSp((p) => { const n = new URLSearchParams(p); n.delete('tq'); n.delete('tadv'); return n; }, { replace: true })} />}
         count={<TableCount testid="task-row-count" noun="tasks" total={taskTotal} filtered={rowStages.reduce((n, x) => n + x.tasks.length, 0)} active={!!(tq || tadvTree)} onClear={() => setSp((p) => { const n = new URLSearchParams(p); n.delete('tq'); n.delete('tadv'); return n; }, { replace: true })} />}
         switcher={switcher} display={displayMenu} exporter={exporter} />}
-      {dismantle ? <p className="card p-6 text-mute" data-testid="site-dismantle-todo">{t('site.dismantle_todo')}</p>
+      {dismantle ? <SiteDismantle siteId={siteId} />
         : off ? <p className="card p-6 text-mute" data-testid="site-stream-na">{t('site.stream_na')}</p>
         : grid.isLoading || !s ? <p className="text-mute">{t('common.loading')}</p>
         : layout === 'row' ? <div {...displayAttrs(timeline.display)} data-testid="task-row-display"><TaskRow stages={rowStages} selected={taskId ?? sp.get('row')} onVisible={setIds} onOpen={(id) => setSp((p) => { const n = new URLSearchParams(p); n.set('task', id); n.set('row', id); return n; }, { replace: true })} /></div>

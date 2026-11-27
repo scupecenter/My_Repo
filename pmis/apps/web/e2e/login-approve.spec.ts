@@ -51,7 +51,7 @@ for (const locale of ['en', 'ar'] as const) {
       await login(page, 'pm');
       await page.getByTestId('nav-admin.users').click();
       await page.getByTestId('users-new').click();
-      await page.getByTestId('new-user-name').fill('Sara Test');
+      await page.getByTestId('new-user-name').fill('Demo Test');
       await page.getByTestId('new-user-email').fill('sara.test@example.com');
       await page.getByTestId('new-user-employee-id').fill('4821');
       await page.getByTestId('new-user-dialog-reason').fill('New site engineer');

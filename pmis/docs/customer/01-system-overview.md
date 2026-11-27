@@ -10,7 +10,7 @@
 
 ## 1. الغرض والنطاق
 
-- **GSDN Workspace** نظام لإدارة مشروع تسليم مواقع GSDN (مواقع اتصالات في 7 مناطق ليبية). يحلّ محل ملف Excel «Site Master» كمرجع وحيد للبيانات، ويفرض **اعتماداً على ثلاثة مستويات** على كل مهمة. (CLAUDE.md)
+- **Workspace** نظام لإدارة مشروع تسليم مواقع Project (مواقع اتصالات في 7 مناطق ليبية). يحلّ محل ملف Excel «Site Master» كمرجع وحيد للبيانات، ويفرض **اعتماداً على ثلاثة مستويات** على كل مهمة. (CLAUDE.md)
 - **المناطق السبع:** Tripoli, Middle, WM, Zawia, Benghazi, GM, Sebha. (CLAUDE.md)
 - **سيناريوهات التسليم:** New Build, Expansion, Hot Swap, Cold Swap, Relocation. **الحالة العامة للموقع:** Not Started, In Progress, On Hold, Completed, Cancelled. (CLAUDE.md)
 - **الاستضافة:** خادم داخلي في الشركة، وليس سحابة. (CLAUDE.md، ADR 0001)
@@ -18,10 +18,10 @@
 
 ## 2. من يستخدم النظام
 
-- **موظفو الجيل (Aljeel) فقط** يدخلون النظام عبر Microsoft 365. **المقاولون والموردون وGECOL وHLC لا يدخلون أبداً**؛ الموظفون يُدخلون بياناتهم ويرفعون مستنداتهم نيابة عنهم، وتُظهر كل مهمة الجهة الخارجية المسؤولة (مثل A&T Global) حتى يُنسب التأخير بصورة صحيحة. (CLAUDE.md)
+- **موظفو الجيل (Company) فقط** يدخلون النظام عبر Microsoft 365. **المقاولون والموردون وGECOL وHLC لا يدخلون أبداً**؛ الموظفون يُدخلون بياناتهم ويرفعون مستنداتهم نيابة عنهم، وتُظهر كل مهمة الجهة الخارجية المسؤولة (مثل A&T Global) حتى يُنسب التأخير بصورة صحيحة. (CLAUDE.md)
 - **الأدوار الرئيسية الستة:** Project Manager، وRF & Design / Acquisition Team Lead، وCW Team Lead، وTE Team Lead، وInventory Supervisor، وProject Support. (CLAUDE.md)
 - **الأدوار الفرعية** (بيانات أولية قابلة للتعديل من الواجهة): RF Engineer وMW Engineer وAcquisition Team تحت RF & Design؛ Power Engineer وGECOL Power Team وHLC Fiber Team وSite Engineers (CW) تحت CW TL؛ Site Engineers (TE) وHOTO Engineer تحت TE TL؛ Project Procurement Team تحت Project Support. *ملاحظة: المصدر يذكر «9 أدوار فرعية» لكن القائمة المكتوبة فيه تحوي 10 أسماء؛ العدد النهائي يُؤكَّد لاحقاً.* (CLAUDE.md)
-- **مشرفو Aljeel الميدانيون (AAT SE)** يشرفون فقط، وخطوات تركيب TE حتى On-Air مسؤولية مورد TE (A&T Global). (CLAUDE.md)
+- **مشرفو Company الميدانيون (AAT SE)** يشرفون فقط، وخطوات تركيب TE حتى On-Air مسؤولية مورد TE (A&T Global). (CLAUDE.md)
 - **الأدوار يعرّفها مدير النظام بالكامل.** الستة والتسعة بيانات أولية فقط. يمكن للمدير إنشاء دور جديد باسم (EN/AR) ووصف واجبات، ودور أب (إن كان دوراً فرعياً)، وملف صلاحيات افتراضي، ومناطق ووحدات افتراضية، وهل يجوز له حمل مستويات المصفوفة (إدخال/مراجعة/اعتماد). **مثال دور «الإدارة» (Management):** الاطلاع على لوحة المتابعة وتقارير التقدم فقط، قراءة فقط على كل الوحدات وكل المناطق، بلا إدخال ولا اعتماد، ولا يظهر في خلايا المصفوفة. تُعطَّل الأدوار ولا تُحذف ما دامت مسندة. (CLAUDE.md، ADR 0003)
 - **مدير النظام (System Admin)** مجموعة من شخص أو أكثر بصلاحيات كاملة، ويمكنه **تفويض** أي صلاحية لأي شخص أو دور أو مجموعة، لكل المناطق أو لبعضها، بمدة أو حتى الإلغاء. ضمانات: لا أحد يمنح نفسه، والمفوَّض لا يعيد التفويض إلا بإذن صريح، ولا يزيل مديراً، ويبقى مدير فعّال واحد على الأقل دائماً، وكل إجراء مفوَّض يُسجَّل «فلان نيابةً عن مدير النظام». (CLAUDE.md)
 - **إسناد الأدوار متعدد-لمتعدد في الاتجاهين:** من الدور (اختيار عدة موظفين دفعة واحدة) أو من الشخص (عدة أدوار)، ولكل إسناد مستوى صلاحيته (view/entry/review/approve/admin) ومناطقه ووحداته وتواريخ صلاحيته. (CLAUDE.md)
@@ -99,7 +99,7 @@
 
 ## 8. سجل الموظفين وبطاقة الموظف
 
-- سجل لموظفي Aljeel: الرقم الوظيفي (4 أرقام)، الاسم EN/AR، الهاتف، البريد، المنصب، الفريق، المنطقة. هو القائمة المفحوصة عند أول دخول (الرقم موجود وغير مرتبط بحساب آخر). يُبذر مسودة ببيانات وهمية وتُستبدل بالحقيقية لاحقاً. (CLAUDE.md)
+- سجل لموظفي Company: الرقم الوظيفي (4 أرقام)، الاسم EN/AR، الهاتف، البريد، المنصب، الفريق، المنطقة. هو القائمة المفحوصة عند أول دخول (الرقم موجود وغير مرتبط بحساب آخر). يُبذر مسودة ببيانات وهمية وتُستبدل بالحقيقية لاحقاً. (CLAUDE.md)
 - يظهر الرقم الوظيفي بجانب اسم كل مكلّف (شبكة المهام والدرج والموافقات وعملي والمصفوفة)، وبالمرور أو التركيز تفتح **بطاقة صغيرة** ببيانات السجل. ظهور الهاتف والبريد: افتراضياً لكل موظف مسجَّل الدخول، ويمكن للمدير تحديد من يرى كل حقل أو إخفاؤه لموظف بعينه. التحديث بالتعديل أو الاستيراد من قالب معتمد، مع تدقيق، **ولا حذف نهائي**. (CLAUDE.md)
 
 ![بطاقة الموظف](../../design/screens/latest/10-hover-card.png)
@@ -111,7 +111,7 @@
 - **الدخول المحلي** (رقم وظيفي أو هاتف + كلمة مرور) **مؤجل لمرحلة لاحقة**؛ التصميم المقترح محفوظ في ADR 0002 §10 وسجل الموظفين يُستخدم الآن كي لا يلزم إعادة عمل. (CLAUDE.md)
 - **التحقق الثنائي (MFA):** يُفرض عبر Conditional Access في Entra. وتتحقق الواجهة الخلفية من `amr` عبر مفتاح يديره المدير، **مُطفأ حتى تفعّله IT**. التحقق الإضافي (step-up) مطلوب للاعتماد النهائي وتغيير الأدوار والمصفوفة والمجموعات والتفويض والحذف وتجاوزات المدير. حساب طوارئ محلي واحد (break-glass) بـTOTP من الشبكة الداخلية فقط، وكل استخدام يُسجَّل ويُرسل بالبريد. (CLAUDE.md)
 - **إعفاء مستخدم من MFA (طلب المالك 2026-10-25):** يزيل مدير النظام (أو مفوَّض) شرط MFA داخل Workspace عن مستخدم مسجَّل، إلى أن يُلغى أو إلى تاريخ نهاية، بسبب وstep-up للمدير نفسه؛ لا أحد يعفي نفسه، ويُدقَّق، ويصله بريد، وتظهر شارة «معفى من MFA». **لا يغيّر MFA المفروض من Entra** (تغييره عند IT). (CLAUDE.md)
-- اللغة: إنجليزية افتراضياً مع العربية (RTL) بتبديل فوري؛ وضعان فاتح وداكن؛ خط Cairo؛ ألوان ERPNext (frappe-ui) دون شعار ERPNext ولا اسمه. الهوية النهائية لـAljeel **تُؤكَّد لاحقاً**. (CLAUDE.md)
+- اللغة: إنجليزية افتراضياً مع العربية (RTL) بتبديل فوري؛ وضعان فاتح وداكن؛ خط Cairo؛ ألوان ERPNext (frappe-ui) دون شعار ERPNext ولا اسمه. الهوية النهائية للشركة **تُؤكَّد لاحقاً**. (CLAUDE.md)
 
 ![شاشة الدخول](../../design/screens/latest/01-login.png)
 ![الموافقات بالعربية في الوضع الداكن](../../design/screens/latest/12-approvals-ar-dark.png)
@@ -154,7 +154,7 @@
 | أقصى فقد للبيانات (RPO) | 15 دقيقة (أرشفة WAL كل 15 دقيقة + نسخة كاملة ليلية) | CLAUDE.md |
 | أقصى توقف (RTO) | 4 ساعات في أوقات العمل، مع خادم احتياطي وتجربة استعادة كل ربع سنة | CLAUDE.md |
 | الاحتفاظ بالنسخ الاحتياطية | 14 يومية، 8 أسبوعية، 12 شهرية، ونسخة في مبنى آخر | CLAUDE.md |
-| بيانات المشروع والمستندات | عمر المشروع + 10 سنوات، وأرشيف للقراءة فقط بعد الإغلاق. *افتراض يحتاج مطابقة العقد وسياسة أمن Aljeel — يُؤكَّد لاحقاً* | CLAUDE.md |
+| بيانات المشروع والمستندات | عمر المشروع + 10 سنوات، وأرشيف للقراءة فقط بعد الإغلاق. *افتراض يحتاج مطابقة العقد وسياسة أمن Company — يُؤكَّد لاحقاً* | CLAUDE.md |
 | سجل التدقيق | 10 سنوات، لا يُحذف، للإضافة فقط بفرض من قاعدة البيانات | CLAUDE.md |
 | سجل النظام/الأخطاء | 12 شهراً ثم يُحذف تلقائياً | CLAUDE.md |
 | الأداء | صفحات أقل من ثانيتين مع 1000 موقع و100 مستخدم متزامن | CLAUDE.md |
@@ -185,17 +185,17 @@
 
 ## 1. Purpose and scope
 
-- **GSDN Workspace** manages the GSDN site-delivery project (telecom sites across 7 Libyan regions). It replaces the Excel Site Master as the system of record and puts a **3-level approval workflow** on every task. (CLAUDE.md)
+- **Workspace** manages the Project site-delivery project (telecom sites across 7 Libyan regions). It replaces the Excel Site Master as the system of record and puts a **3-level approval workflow** on every task. (CLAUDE.md)
 - **Regions:** Tripoli, Middle, WM, Zawia, Benghazi, GM, Sebha. **Delivery scenarios:** New Build, Expansion, Hot Swap, Cold Swap, Relocation. **Overall status:** Not Started, In Progress, On Hold, Completed, Cancelled. (CLAUDE.md)
 - **Hosting:** an internal company server, never cloud. (CLAUDE.md, ADR 0001)
 - **Out of scope for now:** the mobile app (later, designed for now), HSE incidents and clock-in (deferred to mobile), team capacity and certificates (dropped), generated TE forms (deferred), local password sign-in (deferred). (CLAUDE.md)
 
 ## 2. Who uses it
 
-- **Only Aljeel employees** sign in, through Microsoft 365. **Vendors, contractors, GECOL, HLC and suppliers never sign in**; staff enter their data and upload their documents, and every task shows the responsible external party (for example A&T Global) so delays are attributed correctly. (CLAUDE.md)
+- **Only Company employees** sign in, through Microsoft 365. **Vendors, contractors, GECOL, HLC and suppliers never sign in**; staff enter their data and upload their documents, and every task shows the responsible external party (for example A&T Global) so delays are attributed correctly. (CLAUDE.md)
 - **Six main roles:** Project Manager; RF & Design / Acquisition Team Lead; CW Team Lead; TE Team Lead; Inventory Supervisor; Project Support. (CLAUDE.md)
 - **Sub-roles** (seed data, editable in the UI): RF Engineer, MW Engineer, Acquisition Team under RF & Design; Power Engineer, GECOL Power Team, HLC Fiber Team, Site Engineers (CW) under CW TL; Site Engineers (TE), HOTO Engineer under TE TL; Project Procurement Team under Project Support. *Note: the source says "9 sub-roles" but its written list has 10 names; the final count is to be confirmed.* (CLAUDE.md)
-- **Aljeel supervising engineers (AAT SE)** only supervise; TE installation steps through On-Air are the TE vendor's (A&T Global) responsibility. (CLAUDE.md)
+- **Company supervising engineers (AAT SE)** only supervise; TE installation steps through On-Air are the TE vendor's (A&T Global) responsibility. (CLAUDE.md)
 - **Roles are fully admin-defined.** The six and the sub-roles are seed data. The admin can create a role with an EN/AR name and duties, a parent role (for a sub-role), a default permission profile, default regions and modules, and whether it may hold matrix levels (entry/review/approve). **Example, a Management role:** view the dashboard and progress reports only, read-only on all modules and regions, no entry or approval, never offered in a matrix cell. Roles are deactivated, never deleted while assigned. (CLAUDE.md, ADR 0003)
 - **System Admin** is a group of one or more people with full control. The admin can **delegate** any right to any person, role or group, for all regions or selected ones, time-bound or until revoked. Safeguards: nobody grants rights to themselves; a delegate cannot re-delegate unless explicitly allowed; a delegate cannot remove an admin; at least one active admin always exists; every delegated action is logged "X on behalf of System Admin". (CLAUDE.md)
 - **Role assignment is many-to-many in both directions:** by role (select many employees at once) or by person (several roles). Each assignment carries its own permission level (view/entry/review/approve/admin), regions, modules and validity dates. (CLAUDE.md)
@@ -273,19 +273,19 @@ Separate modules, each with its own menu: **Procurement (PR/PO/WO), Contractors,
 
 ## 8. Staff registry and employee card
 
-- A registry of Aljeel staff holds the 4-digit employee ID, name EN/AR, phone, email, position, team and region. It is the list checked at first sign-in (the ID must exist and not be linked to another account). A draft with synthetic rows is seeded and replaced with real data later. (CLAUDE.md)
-- The employee ID appears beside the name wherever a person holds a task (task grid, drawer, Approvals, My Work, Matrix); hovering or focusing it opens a **small card** with the registry data. Phone and email default to visible to every signed-in Aljeel employee; the admin can choose who sees each field or hide it for one employee. Maintained by edit or import from an approved template, audited, **never hard-deleted**. (CLAUDE.md)
+- A registry of Company staff holds the 4-digit employee ID, name EN/AR, phone, email, position, team and region. It is the list checked at first sign-in (the ID must exist and not be linked to another account). A draft with synthetic rows is seeded and replaced with real data later. (CLAUDE.md)
+- The employee ID appears beside the name wherever a person holds a task (task grid, drawer, Approvals, My Work, Matrix); hovering or focusing it opens a **small card** with the registry data. Phone and email default to visible to every signed-in Company employee; the admin can choose who sees each field or hide it for one employee. Maintained by edit or import from an approved template, audited, **never hard-deleted**. (CLAUDE.md)
 
 ![Employee card](../../design/screens/latest/10-hover-card.png)
 
 ## 9. Sign-in
 
-- **One box (owner decision 2026-10-25):** the employee types their email, employee ID or registered phone. GSDN Workspace looks it up in the staff registry and sends the browser to Microsoft 365 with that person's email as `login_hint`; **Microsoft performs the actual sign-in** (password, MFA, Conditional Access). **GSDN Workspace never stores passwords.** The screen behaves the same whether or not a match is found, so it does not reveal who is registered. After the callback, the token's account must match the registry row. (CLAUDE.md, ADR 0002 §9b)
+- **One box (owner decision 2026-10-25):** the employee types their email, employee ID or registered phone. Workspace looks it up in the staff registry and sends the browser to Microsoft 365 with that person's email as `login_hint`; **Microsoft performs the actual sign-in** (password, MFA, Conditional Access). **Workspace never stores passwords.** The screen behaves the same whether or not a match is found, so it does not reveal who is registered. After the callback, the token's account must match the registry row. (CLAUDE.md, ADR 0002 §9b)
 - **First sign-in:** the account is created as "Pending assignment" and sees nothing until an admin assigns the role, team (CW/TE/both), permission level, regions and modules. The employee ID is entered once. (CLAUDE.md, ADR 0002)
 - **Local sign-in** (employee ID or phone + Workspace password) is **deferred to a later phase**; the proposed design is kept in ADR 0002 §10, and the staff registry is used now so no rework is needed. (CLAUDE.md)
 - **MFA:** enforced through Entra Conditional Access. The API checks the token's `amr` claim behind an admin toggle that is **off until IT enables MFA**. Step-up re-authentication is required for final approval, role/matrix/group changes, delegation, deletes and admin overrides. One break-glass local admin account (TOTP, internal network only) exists; every use is logged and emailed. (CLAUDE.md)
-- **Per-user MFA exemption (owner request 2026-10-25):** a System Admin (or delegate) can remove GSDN Workspace MFA requirement for a registered user, until revoked or until an end date, with a reason and the admin's own step-up. Nobody exempts themselves; it is audited, the user is emailed, and an "MFA exempt" badge shows. **It does not change MFA enforced by Entra**, which IT changes in Entra. (CLAUDE.md)
-- UI language: English by default, Arabic (RTL) as an instant switch; light and dark themes; Cairo font; ERPNext (frappe-ui) colours without the ERPNext logo or name. The final Aljeel brand is **to be confirmed**. (CLAUDE.md)
+- **Per-user MFA exemption (owner request 2026-10-25):** a System Admin (or delegate) can remove Workspace MFA requirement for a registered user, until revoked or until an end date, with a reason and the admin's own step-up. Nobody exempts themselves; it is audited, the user is emailed, and an "MFA exempt" badge shows. **It does not change MFA enforced by Entra**, which IT changes in Entra. (CLAUDE.md)
+- UI language: English by default, Arabic (RTL) as an instant switch; light and dark themes; Cairo font; ERPNext (frappe-ui) colours without the ERPNext logo or name. The final Company brand is **to be confirmed**. (CLAUDE.md)
 
 ![Sign-in](../../design/screens/latest/01-login.png)
 ![Approvals, Arabic, dark](../../design/screens/latest/12-approvals-ar-dark.png)
@@ -328,7 +328,7 @@ Every create, rename, edit, deactivate or delete of configuration is a System Ad
 | Max data loss (RPO) | 15 minutes (WAL archiving every 15 min plus a nightly full backup) | CLAUDE.md |
 | Max downtime (RTO) | 4 hours in working hours, with a standby server and a restore drill every quarter | CLAUDE.md |
 | Backup retention | 14 daily, 8 weekly, 12 monthly, with one copy in another building | CLAUDE.md |
-| Project data and documents | Life of the project plus 10 years, read-only archive after closure. *Assumption to confirm against the contract and Aljeel security policy — to be confirmed* | CLAUDE.md |
+| Project data and documents | Life of the project plus 10 years, read-only archive after closure. *Assumption to confirm against the contract and Company security policy — to be confirmed* | CLAUDE.md |
 | Audit log | 10 years, never deleted, append-only enforced in the database | CLAUDE.md |
 | System/error log | 12 months, then purged automatically | CLAUDE.md |
 | Performance | Pages under 2 s with 1000 sites and 100 concurrent users | CLAUDE.md |
@@ -338,7 +338,7 @@ Every create, rename, edit, deactivate or delete of configuration is a System Ad
 
 (CLAUDE.md)
 1. **Pilot on one region (Tripoli) for 2 weeks.**
-2. **Parallel run for 1 month:** GSDN Workspace exports a Master-format file and compares it automatically with the live Master. **The Master is retired after one month without material differences.**
+2. **Parallel run for 1 month:** Workspace exports a Master-format file and compares it automatically with the live Master. **The Master is retired after one month without material differences.**
 3. **Training per role:** short Arabic videos, an in-app guide on first use, one live session per role group, and a Project Support champion.
 4. **Acceptance criteria:** critical-path E2E tests pass, the real Master import matches 100% of milestone dates, no open critical bugs, and the performance targets are met.
 5. Real data is uploaded through the system once complete; until then, synthetic data only.

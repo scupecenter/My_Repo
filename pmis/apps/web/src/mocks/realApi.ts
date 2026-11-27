@@ -99,6 +99,9 @@ export const REAL_API_AUTH_USERS = [
   ['patch', '/matrix'],
   ['get', '/matrix/coverage'],
   // Contract 0.4.5: the register framework and its first four registers (apps/api: registers; migration 0019), every action the API implements.
+  ['get', '/recycle-bin'],
+  ['put', '/recycle-bin/retention'],
+  ['post', '/recycle-bin/:id/restore'],
   ['get', '/registers'],
   ['get', '/registers/:key/records'],
   ['post', '/registers/:key/records'],
@@ -373,6 +376,13 @@ export const REAL_API_AUTH_USERS = [
   // Contract 0.15.41 (migration 0130; apps/api: settings): the organization default UI design (Settings, Identity & themes).
   ['get', '/settings/identity'],
   ['put', '/settings/identity'],
+  // Contract 0.15.97 (migration 0197; apps/api: settings): the sign-in page settings and its public read (Settings, Screens, Login page).
+  ['get', '/settings/login-page'],
+  ['put', '/settings/login-page'],
+  ['get', '/settings/login-page/public'],
+  // Contract 0.15.190 (migration 0290; apps/api: settings): the admin lock keys (Settings, Security, Lock keys).
+  ['get', '/settings/security-locks'],
+  ['put', '/settings/security-locks'],
   // Contract 0.15.4 (migration 0085; apps/api: sites, master-import, templates): the per-site workflow locks (one site, many sites) and the status of the sites of
   // an import (missing data per site). The new site fields ride on the paths above.
   ['post', '/sites/workflow-locks'],
@@ -392,6 +402,7 @@ export const REAL_API_AUTH_USERS = [
   ['delete', '/matrix/cells/:id'],
   ['put', '/registers/hlc/records/:id/purchase-requests'],
   ['get', '/registers/dismantle/order-options'],
+  ['get', '/registers/dismantle/rn-options'],
   ['get', '/registers/warehouse/order-options'],
   ['get', '/registers/car_dispatcher/order-options'],
   ['get', '/registers/financial_advances/order-options'],
@@ -487,7 +498,12 @@ export const REAL_API_AUTH_USERS = [
   // (warehouse, as-built items, My Work, dashboard extras and settings, documents grid, fleet actions, invitations, admin overrides).
   ['get', '/settings/dashboard'],
   ['put', '/settings/dashboard'],
+  ['get', '/settings/pm-schedules'],
+  ['put', '/settings/pm-schedules'],
+  ['post', '/pm-schedules/:id/generate'],
   ['get', '/dashboard/extras'],
+  // Contract 0.15.106 (apps/api: dashboard-ops): the operations sections after F13, first the procurement and materials card.
+  ['get', '/dashboard/ops'],
   ['put', '/dashboard/pipeline-variant'],
   ['post', '/project-status/manual-items/:item_code/plan'],
   ['get', '/documents/grid'],
@@ -543,6 +559,9 @@ export const REAL_API_AUTH_USERS = [
   // Contract 0.15.64 (migration 0148, W8): the defaults of the Display menu of the site-data tables
   ['get', '/settings/table-display'],
   ['put', '/settings/table-display'],
+  // Contract 0.15.102 (migration 0196): the interface features setting
+  ['get', '/settings/ui-features'],
+  ['put', '/settings/ui-features'],
   ['get', '/settings/idle-task-alert'],
   ['put', '/settings/idle-task-alert'],
   ['get', '/settings/notification-policy/catalogue'],

@@ -67,20 +67,20 @@ const TPL_BY = { "Acquisition": "TPL-ACQ", "RF & Design": "TPL-RF", "Procurement
 
 const ROLES6 = ["Project Manager", "RF & Design / Acquisition Team Lead", "CW Team Lead", "TE Team Lead", "Inventory Supervisor", "Project Support"];
 const USERS = [
-  { id: "1001", name: "Ahmed Salem", role: "Project Manager", regions: "all", c: "#1f3a3d" },
-  { id: "1102", name: "Mona Fathi", role: "RF & Design / Acquisition Team Lead", regions: "all", c: "#6b5b95" },
-  { id: "1103", name: "Ali Barka", role: "RF Engineer", sub: "RF & Design / Acquisition Team Lead", regions: "all", c: "#88619a" },
-  { id: "1203", name: "Omar Khaled", role: "CW Team Lead", regions: "all", c: "#c8693f" },
-  { id: "1204", name: "Sami Nuri", role: "Site Engineers", sub: "CW Team Lead", regions: ["Tripoli Area", "Zawia Area"], c: "#d08b5b" },
-  { id: "1205", name: "Fadi Omran", role: "Site Engineers", sub: "CW Team Lead", regions: ["Middle Area", "WM Area"], c: "#b97a4f" },
-  { id: "1206", name: "Khalid Jaber", role: "GECOL Power Team", sub: "CW Team Lead", regions: "all", c: "#a0522d" },
-  { id: "1207", name: "Nadia Hamed", role: "HLC Fiber Team", sub: "CW Team Lead", regions: "all", c: "#8b6b3e" },
-  { id: "1305", name: "Hassan Ali", role: "TE Team Lead", regions: "all", c: "#2f6f8f" },
-  { id: "1306", name: "Tarek Mansour", role: "Site Engineers", sub: "TE Team Lead", regions: ["Tripoli Area", "Zawia Area", "WM Area"], c: "#3f86a8" },
-  { id: "1307", name: "Rami Saeed", role: "HOTO Engineer", sub: "TE Team Lead", regions: "all", c: "#4a90a4" },
-  { id: "1407", name: "Rania Saad", role: "Inventory Supervisor", regions: "all", c: "#4f8a6e" },
-  { id: "1508", name: "Laila Omar", role: "Project Support", regions: "all", c: "#7a7a72" },
-  { id: "1509", name: "Yousef Adel", role: "Project Procurement Team", sub: "Project Support", regions: "all", c: "#8f8f86" },
+  { id: "1001", name: "Demo User 01", role: "Project Manager", regions: "all", c: "#1f3a3d" },
+  { id: "1102", name: "Demo User 02", role: "RF & Design / Acquisition Team Lead", regions: "all", c: "#6b5b95" },
+  { id: "1103", name: "Demo User 03", role: "RF Engineer", sub: "RF & Design / Acquisition Team Lead", regions: "all", c: "#88619a" },
+  { id: "1203", name: "Demo User 05", role: "CW Team Lead", regions: "all", c: "#c8693f" },
+  { id: "1204", name: "Demo User 06", role: "Site Engineers", sub: "CW Team Lead", regions: ["Tripoli Area", "Zawia Area"], c: "#d08b5b" },
+  { id: "1205", name: "Demo User 07", role: "Site Engineers", sub: "CW Team Lead", regions: ["Middle Area", "WM Area"], c: "#b97a4f" },
+  { id: "1206", name: "Demo User 08", role: "GECOL Power Team", sub: "CW Team Lead", regions: "all", c: "#a0522d" },
+  { id: "1207", name: "Demo User 09", role: "HLC Fiber Team", sub: "CW Team Lead", regions: "all", c: "#8b6b3e" },
+  { id: "1305", name: "Demo User 14", role: "TE Team Lead", regions: "all", c: "#2f6f8f" },
+  { id: "1306", name: "Demo User 15", role: "Site Engineers", sub: "TE Team Lead", regions: ["Tripoli Area", "Zawia Area", "WM Area"], c: "#3f86a8" },
+  { id: "1307", name: "Demo User 16", role: "HOTO Engineer", sub: "TE Team Lead", regions: "all", c: "#4a90a4" },
+  { id: "1407", name: "Demo User 20", role: "Inventory Supervisor", regions: "all", c: "#4f8a6e" },
+  { id: "1508", name: "Demo User 22", role: "Project Support", regions: "all", c: "#7a7a72" },
+  { id: "1509", name: "Demo User 23", role: "Project Procurement Team", sub: "Project Support", regions: "all", c: "#8f8f86" },
 ];
 const U = Object.fromEntries(USERS.map(u => [u.id, u]));
 // responsibility matrix per stage: entry / review / approve (lists of employee IDs)

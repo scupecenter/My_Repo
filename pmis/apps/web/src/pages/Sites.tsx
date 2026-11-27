@@ -4,7 +4,7 @@ import { SiteMasterGrid, type SiteMasterGridRow } from '@/components/SiteMasterG
 import { SiteMasterSourcePanel } from '@/components/SiteMasterSource';
 import { useRefreshSiteMasterRows, useSaveSiteMasterCell, useSiteMasterRowsPaged, useSiteMasterSections } from '@/api/siteMaster';
 import { SitesBulkEdit } from '@/components/SitesBulkEdit';
-import { Columns3, Download, Grid3x3, FileDown, FilePlus2, FileUp, Map as MapIcon, Pencil, RotateCcw, Table2, TableProperties } from 'lucide-react';
+import { CalendarRange, Columns3, Download, Grid3x3, FileDown, FilePlus2, FileUp, Map as MapIcon, Pencil, RotateCcw, Table2, TableProperties } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
@@ -35,6 +35,7 @@ import { MiniRail } from '@/components/Pipeline';
 import { SiteMap } from '@/components/SiteMap';
 import { SitesWideBatch } from '@/components/SitesWideBatch';
 import { SitesBoard, SWIMLANES, type Swimlane } from '@/components/SitesBoard';
+import { SitesTimeline } from '@/components/SitesTimeline';
 import { useVirtual } from '@/components/useVirtual';
 import { SITE_MASTER_MASTER, SITE_MASTER_NAV } from '@/lib/siteMasterMenus';
 import { fmtDate } from '@/lib/time';
@@ -120,6 +121,7 @@ export function Sites() {
   const asMap = sp.get('layout') === 'map';
   // F5 (0.15.32): the read-only board by milestone (layout=board), with its swimlane in the URL (lane=region|contractor)
   const asBoard = sp.get('layout') === 'board';
+  const asTimeline = sp.get('layout') === 'timeline';
   const lane = (SWIMLANES as readonly string[]).includes(sp.get('lane') ?? '') ? (sp.get('lane') as Swimlane) : 'none';
   // 0.15.4 (migration 0085): the workflow locks (locked / open) and the sites with data gaps
   const locks = ['locked', 'open'].includes(sp.get('workflow_locks') ?? '') ? (sp.get('workflow_locks') as string) : '';
@@ -148,6 +150,7 @@ export function Sites() {
     { id: 'wide', label: t('sites.wide'), hint: t('view.wide_hint'), icon: <TableProperties size={14} />, testid: 'sites-layout-wide' },
     { id: 'grid', label: t('view.grid'), hint: t('view.grid_hint'), icon: <Grid3x3 size={14} />, testid: 'sites-layout-grid' },
     { id: 'board', label: t('board.board'), hint: t('view.board_hint'), icon: <Columns3 size={14} />, testid: 'sites-layout-board' },
+    { id: 'timeline', label: t('timeline.title'), hint: t('timeline.view_hint'), icon: <CalendarRange size={14} />, testid: 'sites-layout-timeline' },
     { id: 'map', label: t('sites.map'), hint: t('view.map_hint'), icon: <MapIcon size={14} />, testid: 'sites-layout' },
   ];
   const applyView = (id: string) => setParams({ layout: id === 'list' ? '' : id, sel: '' });
@@ -361,7 +364,7 @@ export function Sites() {
           {activeFilters > 0 && <span className="chip bg-accentSoft text-accentText" data-testid="toolbar-active-filters">{t('states.filters')} {activeFilters}</span>}
           <TableCount testid="sites-count" noun="sites" total={counts.total} filtered={counts.filtered} active={activeFilters > 0} selected={picked.size} onClear={clearAll} />
         </span>}
-        switcher={<ViewMenu testid="sites-view" title={t('view.title')} value={asMap ? 'map' : asBoard ? 'board' : asWide ? 'wide' : layout === 'grid' ? 'grid' : 'list'} options={viewOptions} onChange={pickView} />}
+        switcher={<ViewMenu testid="sites-view" title={t('view.title')} value={asMap ? 'map' : asTimeline ? 'timeline' : asBoard ? 'board' : asWide ? 'wide' : layout === 'grid' ? 'grid' : 'list'} options={viewOptions} onChange={pickView} />}
         density={<DensityToggle api={tbl} />}
         display={<DisplayMenu api={tbl} />}
         columns={<ColumnMenu api={tbl} label={label} />}
@@ -379,6 +382,9 @@ export function Sites() {
         // F5: the same filters as the list (the F3 tree included); stage, bucket and stream are list views and do not apply to the board
         <SitesBoard swimlane={lane} onSwimlane={(x) => setParams({ lane: x === 'none' ? '' : x })}
           query={{ q: f.q || undefined, region_id: f.region_id || undefined, scenario: f.scenario || undefined, overall_status: f.overall_status || undefined, ...extra }} />
+      ) : asTimeline ? (
+        // Item 7: read only, the same filters as the list
+        <SitesTimeline query={{ q: f.q || undefined, region_id: f.region_id || undefined, scenario: f.scenario || undefined, status: f.overall_status || undefined, site_code: siteCodes || undefined }} />
       ) : asMap ? (
         // SC-10: the same map as the dashboard; a stream sub-menu shows the sites whose current stream it is
         <SiteMap testid="sites-map" height={560} outer={{ region_id: f.region_id, scenario: f.scenario, ...(real ? { stream } : {}), ...(adv ? { filter: adv } : {}) }} />
