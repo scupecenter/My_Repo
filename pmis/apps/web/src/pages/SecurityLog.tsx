@@ -13,6 +13,7 @@ import { decodeFilter, encodeFilter } from '@/api/views';
 import { IntegrityTooLarge, isTooLarge } from '@/components/logs/IntegrityTooLarge';
 import { useToast } from '@/components/Toast';
 import { hasGrant, isAdmin } from '@/lib/perm';
+import { DateInput } from '@/components/DateInput';
 
 export const EVENTS: SecurityEvent[] = ['sign_in_started', 'sign_in_succeeded', 'callback_account_mismatch', 'sign_in_failed', 'signed_out', 'session_expired', 'session_revoked_by_admin', 'mfa_exemption_granted', 'mfa_exemption_revoked', 'step_up_passed', 'step_up_failed', 'break_glass_used'];
 /** The server may send a parsed `device`; otherwise the raw user agent is shown as the tooltip text. */
@@ -59,8 +60,8 @@ export function SecurityLog() {
       {big && <IntegrityTooLarge log={big} onClose={() => setBig(null)} />}
       {(res.audit || res.security) && <div className="grid gap-3 md:grid-cols-2" data-testid="integrity-results">{res.audit && <IntegrityCard r={res.audit} />}{res.security && <IntegrityCard r={res.security} />}</div>}
       <div className="card flex flex-wrap items-end gap-3 p-3" data-testid="seclog-filters">
-        <label className="text-sm font-semibold">{t('seclog.from')}<input type="date" className="input mt-1 font-normal" data-testid="seclog-from" value={f.from} onChange={(e) => setF({ ...f, from: e.target.value })} /></label>
-        <label className="text-sm font-semibold">{t('seclog.to')}<input type="date" className="input mt-1 font-normal" data-testid="seclog-to" value={f.to} onChange={(e) => setF({ ...f, to: e.target.value })} /></label>
+        <label className="text-sm font-semibold">{t('seclog.from')}<DateInput className="input mt-1 font-normal" data-testid="seclog-from" value={f.from} onChange={(e) => setF({ ...f, from: e.target.value })} /></label>
+        <label className="text-sm font-semibold">{t('seclog.to')}<DateInput className="input mt-1 font-normal" data-testid="seclog-to" value={f.to} onChange={(e) => setF({ ...f, to: e.target.value })} /></label>
         <label className="text-sm font-semibold">{t('seclog.outcome')}
           <select className="input mt-1 font-normal" data-testid="seclog-outcome" value={f.outcome} onChange={(e) => setF({ ...f, outcome: e.target.value })}><option value="">{t('common.all')}</option>{['success', 'failure', 'info'].map((o) => <option key={o} value={o}>{t(`seclog.outcome_${o}`)}</option>)}</select></label>
         <label className="text-sm font-semibold">{t('seclog.event')}

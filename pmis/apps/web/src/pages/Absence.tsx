@@ -10,6 +10,7 @@ import { PeoplePicker } from '@/components/PeoplePicker';
 import { PersonTag } from '@/components/PersonTag';
 import { useToast } from '@/components/Toast';
 import { canReassign } from '@/lib/x';
+import { DateInput } from '@/components/DateInput';
 
 const KINDS = ['annual', 'sick', 'emergency', 'other'] as const;
 export type Decision = 'reassign' | 'act_on_behalf' | 'keep';
@@ -110,8 +111,8 @@ export function Absence() {
               {KINDS.filter((k) => lead || k === 'annual').map((k) => <option key={k} value={k}>{t(`absence.kind_${k}`)}</option>)}</select></label>
           {lead && <div><b className="text-sm">{t('absence.person')}</b><PeoplePicker id="absence-who" single value={who} onChange={setWho} /><p className="text-xs text-mute">{t('absence.person_hint')}</p></div>}
           <div className="grid grid-cols-2 gap-3">
-            <label className="text-sm font-semibold">{t('absence.from')}<input type="date" className="input mt-1 font-normal" data-testid="absence-from" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
-            <label className="text-sm font-semibold">{t('absence.to')}<input type="date" className="input mt-1 font-normal" data-testid="absence-to" value={to} onChange={(e) => setTo(e.target.value)} /></label>
+            <label className="text-sm font-semibold">{t('absence.from')}<DateInput className="input mt-1 font-normal" data-testid="absence-from" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
+            <label className="text-sm font-semibold">{t('absence.to')}<DateInput className="input mt-1 font-normal" data-testid="absence-to" value={to} onChange={(e) => setTo(e.target.value)} /></label>
           </div>
           <label className="block text-sm font-semibold">{t('absence.note')}<input className="input mt-1 font-normal" data-testid="absence-note" maxLength={500} value={note} onChange={(e) => setNote(e.target.value)} /></label>
           {create.isError && <p role="alert" className="text-lateInk" data-testid="absence-error">{errText(create.error, t)}</p>}

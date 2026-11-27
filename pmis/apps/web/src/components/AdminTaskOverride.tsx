@@ -5,6 +5,7 @@ import { OVERRIDE_DATE_FIELDS, useCreateTaskOverride, useRevertOverride, type Da
 import type { TaskDetail } from '@/api/types';
 import { taskErrorMessage } from '@/lib/taskErrors';
 import { useToast } from './Toast';
+import { DateInput } from '@/components/DateInput';
 
 /**
  * Owner decision 2026-11-12 (2), contract 0.15.6: a System Admin sets any date of a task at once ("Edit date"), reason and step-up required, flagged "Admin override".
@@ -49,7 +50,7 @@ export function AdminTaskOverride({ task }: { task: TaskDetail }) {
                 {OVERRIDE_DATE_FIELDS.map((f) => <option key={f} value={f}>{t(`adminOverride.field.${f}`)}</option>)}
               </select></label>
             <label className="flex flex-col gap-1"><span className="text-mute">{t('adminOverride.new_date')}</span>
-              <input type="date" className="input mono" data-testid="admin-override-date" value={date} onChange={(e) => setDate(e.target.value)} /></label>
+              <DateInput className="input mono" data-testid="admin-override-date" value={date} onChange={(e) => setDate(e.target.value)} /></label>
           </div>
           <input className="input w-full" aria-label={t('adminOverride.reason')} placeholder={t('adminOverride.reason')} data-testid="admin-override-reason" value={reason} onChange={(e) => setReason(e.target.value)} />
           <p className="text-xs text-mute">{t('adminOverride.note')}</p>
