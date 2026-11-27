@@ -352,7 +352,7 @@ describe('hybrid mode list', () => {
       // contract 0.14.5: the site map of the dashboard (OV-12)
       'GET /dashboard/site-map',
       // contract 0.14.6: the background threshold of batches (Settings, Imports)
-      'GET /settings/imports', 'PUT /settings/imports', 'GET /settings/template-change-notice', 'PUT /settings/template-change-notice',
+      'GET /settings/imports', 'PUT /settings/imports', 'GET /settings/imports/upload-policy', 'PUT /settings/imports/upload-policy', 'GET /settings/template-change-notice', 'PUT /settings/template-change-notice',
       // contract 0.15.1: the shared layout of the side menu
       'GET /settings/nav-layout', 'PUT /settings/nav-layout',
       // contract 0.15.41: Settings, Identity & themes

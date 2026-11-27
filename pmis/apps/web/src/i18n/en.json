@@ -242,7 +242,8 @@
       "people": "People",
       "contractors": "Contractors",
       "tasks": "Tasks",
-      "warehouse_items": "Warehouse items"
+      "warehouse_items": "Warehouse items",
+      "snags": "QC snags"
     },
     "site_list": "Site ID in list",
     "site_list_found": "{{count}} found",
@@ -5570,7 +5571,16 @@
     "updated": "Last changed by {{name}} ({{id}}) on {{when}}.",
     "never": "Not changed since installation.",
     "readonly": "Only a System Admin, or a delegate of Settings edit for all regions, can change this value.",
-    "confirm": "Change the threshold from {{from}} to {{to}} rows. The next send or decision uses the new value."
+    "confirm": "Change the threshold from {{from}} to {{to}} rows. The next send or decision uses the new value.",
+    "policy_title": "Upload policy",
+    "policy_note": "What the Master import apply does with sites whose data is incomplete. Enforce keeps the sequencing locks of the sites (a row that breaks the sequence waits). Accept incomplete opens the sites of the file first, so the data enters in any order; it needs the right to unlock for the region, a reason and a step-up, and a task approved while a lock would have held it is flagged Admin override.",
+    "policy_enforce": "Enforce the sequence (default)",
+    "policy_enforce_hint": "Nothing changes: the locks of each site decide.",
+    "policy_accept_incomplete": "Accept incomplete data",
+    "policy_accept_incomplete_hint": "The sites of the file are opened when the file is applied. Sites created by the same apply keep their locks.",
+    "policy_current": "In force: {{policy}}.",
+    "policy_confirm": "Change the upload policy from {{from}} to {{to}}. The next apply of a Master import file uses it.",
+    "policy_save": "Save the policy"
   },
   "navEdit": {
     "edit": "Edit menu",
@@ -7528,6 +7538,23 @@
     "confirm": "Save the login page settings? The change is audited with your reason and shows on the sign-in page at once."
   },
   "ui": {
+    "guard_title": "Unsaved changes",
+    "guard_note": "Ask before anything with unsaved input is closed or left: the choices are Save and leave, Discard and leave, or Stay.",
+    "guard_enabled": "Ask before leaving unsaved changes",
+    "guard_comment": "A comment you typed",
+    "guard_message": "A message reply you typed",
+    "guard_settings": "Settings pages",
+    "guard_settings_hint": "Settings pages with edited, unsaved values",
+    "guard_dialogs": "Form dialogs",
+    "guard_dialogs_hint": "Dialogs with typed input",
+    "guard_drawers": "Side drawers",
+    "guard_drawers_hint": "Task and record drawers",
+    "guard_inline": "Inline edits",
+    "guard_inline_hint": "Site details and cells edited in place",
+    "guard_composers": "Comments and messages",
+    "guard_composers_hint": "Text typed but not sent",
+    "guard_navigation": "Leaving the page",
+    "guard_navigation_hint": "Links, the browser Back button and closing the tab",
     "new": "New",
     "new_hint": "Recently added feature",
     "settings_title": "Interface features",
@@ -7735,7 +7762,11 @@
     "kind_weekly_status_missing": "Weekly status missing",
     "kind_record_idle": "Record idle in a state",
     "kind_weekly_status_missing_help": "Fires for every region without a Weekly status update of the current working week. Placeholders: {{region}}.",
-    "kind_record_idle_help": "Fires for every current record of the register in the state for at least the days. Placeholders: {{record}}, {{state}}, {{days}}."
+    "kind_record_idle_help": "Fires for every current record of the register in the state for at least the days. Placeholders: {{record}}, {{state}}, {{days}}.",
+    "col_locked": "Locked", "kpi": "KPI", "op": "Comparison", "op_above": "above", "op_below": "below", "value": "Threshold",
+    "locked": "Locked (no edits until unlocked)",
+    "kind_kpi_threshold": "KPI crosses a threshold",
+    "kind_kpi_threshold_help": "Fires when the live KPI of the dashboard crosses the rule's own threshold. Placeholders: {{kpi}}, {{value}}, {{threshold}}."
   },
   "rel": {
     "today": "today",
@@ -7751,6 +7782,18 @@
   },
   "screenSettings": {
     "title": "Settings for this screen"
+  },
+  "unsaved": {
+    "title": "Unsaved changes",
+    "body": "You have changes that are not saved. What do you want to do?",
+    "stay": "Stay",
+    "stay_hint": "Go back to your changes",
+    "discard": "Discard and leave",
+    "discard_hint": "Leave without saving: the changes are lost",
+    "save": "Save and leave",
+    "save_hint": "Save the changes, then leave",
+    "reason_note": "Saving a setting needs a reason (3 characters at least).",
+    "save_failed": "The changes could not be saved, so you are still here."
   },
   "mailPolicy": {
     "title": "Mail policy",
