@@ -7651,7 +7651,11 @@
     "kind_weekly_status_missing": "تحديث أسبوعي مفقود",
     "kind_record_idle": "سجل خامد في حالة",
     "kind_weekly_status_missing_help": "تنطلق لكل منطقة بلا تحديث حالة أسبوعي لأسبوع العمل الحالي. العناصر النائبة: {{region}}.",
-    "kind_record_idle_help": "تنطلق لكل سجل حالي في السجل بقي في الحالة المدة المحددة. العناصر النائبة: {{record}}، {{state}}، {{days}}."
+    "kind_record_idle_help": "تنطلق لكل سجل حالي في السجل بقي في الحالة المدة المحددة. العناصر النائبة: {{record}}، {{state}}، {{days}}.",
+    "col_locked": "مقفلة", "kpi": "المؤشر", "op": "المقارنة", "op_above": "أعلى من", "op_below": "أدنى من", "value": "الحد",
+    "locked": "مقفلة (لا تعديل حتى فك القفل)",
+    "kind_kpi_threshold": "مؤشر يتجاوز حداً",
+    "kind_kpi_threshold_help": "تنطلق عندما يتجاوز مؤشر لوحة المتابعة الحي حد القاعدة الخاص. العناصر: {{kpi}}، {{value}}، {{threshold}}."
   },
   "rel": {
     "today": "اليوم",

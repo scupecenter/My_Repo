@@ -179,8 +179,8 @@ BEGIN
     th := (r.params ->> 'value')::numeric;
     hit := (r.params ->> 'op' = 'above' AND v > th) OR (r.params ->> 'op' = 'below' AND v < th);
     IF NOT hit THEN CONTINUE; END IF;
-    vs := trim(to_char(v, 'FM999999990.###'));
-    ts := trim(to_char(th, 'FM999999990.###'));
+    vs := p_values ->> (r.params ->> 'kpi');   -- the exact text the job computed (to_char with # rounds)
+    ts := r.params ->> 'value';
     t_en := replace(replace(replace(r.title_en, '{{kpi}}', k ->> 'label_en'), '{{value}}', vs), '{{threshold}}', ts);
     t_ar := replace(replace(replace(r.title_ar, '{{kpi}}', coalesce(k ->> 'label_ar', k ->> 'label_en')), '{{value}}', vs), '{{threshold}}', ts);
     b_en := replace(replace(replace(r.body_en, '{{kpi}}', k ->> 'label_en'), '{{value}}', vs), '{{threshold}}', ts);
@@ -212,6 +212,8 @@ BEGIN
     GRANT EXECUTE ON FUNCTION alert_rules_json() TO pmis_app;
     GRANT EXECUTE ON FUNCTION admin_alert_rule_save(jsonb, text, uuid, integer) TO pmis_app;
     GRANT EXECUTE ON FUNCTION alert_rules_kpi_run(jsonb, date) TO pmis_app;
+    -- the alert-rules management screen offers the KPI catalogue (immutable, hardcoded; the same rows dashboard_settings_json returns)
+    GRANT EXECUTE ON FUNCTION dashboard_settings_catalogue() TO pmis_app;
   END IF;
 END $$;
 
