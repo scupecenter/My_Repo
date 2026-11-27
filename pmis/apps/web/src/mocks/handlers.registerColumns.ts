@@ -265,6 +265,22 @@ export const registerColumnHandlers = [
       });
     },
   ),
+  http.put(`${B}/registers/:key/fields/:code/default`, async ({ params, request }) => {
+    const g = guard();
+    if (g) return g;
+    if (!isAdmin()) return forbidden();
+    const c = state(String(params.key))?.fields.find((f) => f.code === params.code);
+    if (!c) return problem(404, "not_found", "The column does not exist.");
+    const b = (await request.json()) as { value?: unknown; reason?: string };
+    if (!reasonOk(b)) return invalid("/reason", "required");
+    const value = b.value === undefined ? null : b.value;
+    (c as { default_value?: unknown }).default_value = value;
+    // the form reads the register definition: keep it in step (the real API serves it from the same column)
+    const rf = REGISTER_DEFS.find((d) => d.register_key === params.key)?.fields.find((f) => f.code === params.code);
+    if (rf) (rf as { default_value?: unknown }).default_value = value ?? undefined;
+    c.version += 1;
+    return HttpResponse.json({ code: c.code, version: c.version, default_value: value });
+  }),
   http.delete(
     `${B}/registers/:key/fields/:code`,
     async ({ params, request }) => {

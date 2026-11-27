@@ -43,6 +43,11 @@ export class RegisterColumnsController {
     return this.tag(res, await this.cols.update(auth, key, code, ifMatch, body));
   }
 
+  @Put(':key/fields/:code/default')
+  async setDefault(@Param('key') key: string, @Param('code') code: string, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response): Promise<Json> {
+    return this.tag(res, await this.cols.setDefault(key, code, ifMatch, body));
+  }
+
   @Delete(':key/fields/:code')
   @HttpCode(200)
   remove(@Auth() auth: AuthContext, @Param('key') key: string, @Param('code') code: string, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown): Promise<Json> {

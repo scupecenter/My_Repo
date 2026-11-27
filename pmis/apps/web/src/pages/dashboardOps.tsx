@@ -14,7 +14,7 @@ type Aging = NonNullable<
  * system as the existing cards). Ordered and hidden per tab from Settings > Dashboard, like every other card.
  */
 
-function AgingRow({
+export function AgingRow({
   label,
   aging,
   testid,
