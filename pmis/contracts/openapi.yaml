@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.185
+  version: 0.15.247
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -31,6 +31,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.247 (2026-11-27): reactions on comments and a resolved flag (PM-platforms proposal item 18, owner approval 2026-11-27; migration 0346, mirror `db/sql/345_comment_reactions_resolve.sql`). Additive. New paths: `PUT`/`DELETE /comments/{comment_id}/reactions` (the emoji in the body, `👍` only, 422 `validation_failed` otherwise; a reaction of the caller on any comment they can read, a task comment or a register-record comment; idempotent both ways, 404 for a comment the caller cannot read) and `PUT`/`DELETE /comments/{comment_id}/resolved` (marks the point resolved or opens it again; records `resolved_at`/`resolved_by`). `Comment` gains `reactions` (`emoji`, `count`, `mine`) and `resolved` (`at`, `by`). The bar to react or resolve is the same as to comment: reading the thread. Not audited. No existing field or behaviour changes.
     - 0.15.130 (2026-11-27): the admin alert `backup_missing` (owner approval relayed 2026-11-26). Additive, migration 0240. When no backup succeeded in the last 24 hours (the System Log rows the data reset reads) a security alert `backup_missing` (default severity high, configurable like the other rules) is raised once per calendar day by the job `backup_check` (every 6 hours) and one System Log row (source `backup_check`) is written. `SecurityAlertRule` and `AlertSeverityMap` gain `backup_missing`. No new endpoint.
     - 0.15.95 (2026-11-27): the admin alert `backup_missing` (owner approval relayed 2026-11-26). Additive, migration 0184. When no backup succeeded in the last 24 hours (the System Log rows the data reset reads) a security alert `backup_missing` (default severity high, configurable like the other rules) is raised once per calendar day by the job `backup_check` (every 6 hours) and one System Log row (source `backup_check`) is written. `SecurityAlertRule` and `AlertSeverityMap` gain `backup_missing`. No new endpoint.
     - 0.15.98 (2026-11-27): the dashboard follow-up sections (owner approval 2026-11-26, dashboard proposals item 1; migration 0230). Additive and read only. New `GET /dashboard/ops` (`getDashboardOps`, `DashboardOps`): the sections that follow the operations beyond F13, each part `available: false` when the caller may not see its module. First section `procurement`: the open orders (order status not one of the closing statuses of the contractor rules, as in `GET /reports/contractor-performance`), the PRs waiting for a PO/WO and the open PO/WOs, each aged in calendar days and bucketed 0-7, 8-14, 15-30, over 30, and the materials position: the receive rate (dispatched against required of `warehouse_site_qty` over the active, not cancelled sites), the count of sites with a shortage line, the top shortage lines with their contractor (the party of the site's newest open order; unattributed when none) and the shortage per contractor. No price is returned (no price is stored on a Procurement record). The dashboard settings catalogue gains the card `ops_procurement`, so the card shows, hides and orders per tab in Settings > Dashboard like every other card. No grant, role or permission change.
@@ -15884,6 +15885,63 @@ paths:
       responses:
         '204': {description: Discarded (also when there was none).}
         '401': {$ref: '#/components/responses/Unauthorized'}
+  /comments/{comment_id}/reactions:
+    parameters:
+      - $ref: '#/components/parameters/CommentId'
+    put:
+      tags: [tasks]
+      operationId: reactToComment
+      summary: React to a comment (0.15.247, PM item 18)
+      description: Adds the caller's reaction to any comment they can read, a task comment or a register-record comment (the same bar as commenting on it). The emoji travels in the body because the client path whitelist keeps non-ASCII out of URLs. 404 `not_found` for a comment the caller cannot read, so its existence is not revealed; 422 `validation_failed` for an unsupported emoji. Idempotent. Not audited.
+      x-db-path: comment_react
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CommentReactionInput'}
+      responses:
+        '204': {description: Reaction recorded (also when it was already there).}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': { $ref: '#/components/responses/Unprocessable' }
+    delete:
+      tags: [tasks]
+      operationId: unreactToComment
+      summary: Remove the caller's reaction (0.15.247)
+      description: Removes the caller's own reaction, named in the body like the PUT. 404 for a comment the caller cannot read. Idempotent.
+      x-db-path: comment_unreact
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CommentReactionInput'}
+      responses:
+        '204': {description: Reaction removed (also when it was not there).}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /comments/{comment_id}/resolved:
+    parameters:
+      - $ref: '#/components/parameters/CommentId'
+    put:
+      tags: [tasks]
+      operationId: resolveComment
+      summary: Mark a comment resolved (0.15.247, PM item 18)
+      description: Marks the point of the comment resolved and records who did it and when. Anyone who can read the thread may resolve, the same bar as commenting. 404 for a comment the caller cannot read. Not audited.
+      x-db-path: comment_set_resolved
+      responses:
+        '204': {description: Resolved.}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    delete:
+      tags: [tasks]
+      operationId: unresolveComment
+      summary: Open a resolved comment again (0.15.247)
+      description: Clears the resolved mark (`resolved_at` and `resolved_by` read as null again). 404 for a comment the caller cannot read.
+      x-db-path: comment_set_resolved
+      responses:
+        '204': {description: Open again.}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
 components:
   securitySchemes:
     cookieAuth:
@@ -16060,6 +16118,12 @@ components:
       in: path
       required: true
       description: Register record.
+      schema: {type: string, format: uuid}
+    CommentId:
+      name: comment_id
+      in: path
+      required: true
+      description: Comment.
       schema: {type: string, format: uuid}
     DocTypeId:
       name: doc_type_id
@@ -18436,7 +18500,29 @@ components:
         body: { type: string }
         is_rejection_note: { type: boolean }
         mentions: { type: array, items: { $ref: '#/components/schemas/UserRef' } }
+        reactions: { type: array, items: { $ref: '#/components/schemas/CommentReaction' }, description: '0.15.247. One entry per emoji used on the comment, with the count and whether the caller reacted.' }
+        resolved: { $ref: '#/components/schemas/CommentResolved' }
         created_at: { type: string, format: date-time }
+    CommentReactionInput:
+      type: object
+      required: [emoji]
+      additionalProperties: false
+      properties:
+        emoji: { type: string, enum: ['👍'], description: '0.15.247. Starts with 👍 only.' }
+    CommentReaction:
+      type: object
+      required: [emoji, count, mine]
+      properties:
+        emoji: { type: string, description: '0.15.247. Starts with 👍 only.' }
+        count: { type: integer }
+        mine: { type: boolean, description: 'The caller reacted with this emoji.' }
+    CommentResolved:
+      type: object
+      required: [at, by]
+      description: '0.15.247. Set while the comment is marked resolved; absent (null) while open.'
+      properties:
+        at: { type: string, format: date-time }
+        by: { $ref: '#/components/schemas/UserRef' }
     OverrideRequest:
       type: object
       required: [kind, reason]

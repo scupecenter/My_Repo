@@ -4,9 +4,9 @@ import { http, HttpResponse } from 'msw';
 import { Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import { api, API_BASE, ApiError } from '@/api/client';
-import type { Page, SiteTasks } from '@/api/types';
+import type { Comment, Page, SiteTasks } from '@/api/types';
 import { FollowButton } from '@/components/FollowButton';
-import { MentionBox } from '@/components/Comments';
+import { CommentsPanel, MentionBox } from '@/components/Comments';
 import { Shell } from '@/components/Shell';
 import { TaskDrawer } from '@/components/TaskDrawer';
 import { uid } from '@/mocks/ids';
@@ -497,5 +497,34 @@ describe('navigation (X1, X5, X7)', () => {
     expect(await screen.findByTestId('nav-inbox')).toBeInTheDocument();
     expect(screen.queryByTestId('nav-status_updates')).toBeNull();
     expect(screen.queryByTestId('nav-workload')).toBeNull();
+  });
+});
+
+describe('PM18 comment reactions and resolved (0.15.247)', () => {
+  const base: Comment = { id: 'c-1', author: { id: 'u-1', display_name: 'Demo User 01' }, body: 'please confirm', is_rejection_note: false, mentions: [], reactions: [{ emoji: '👍', count: 1, mine: false }], created_at: '2026-11-27T08:00:00Z' };
+
+  it('toggles the acknowledged reaction and the resolved flag through the parent handlers', async () => {
+    await signIn('pm');
+    const u = userEvent.setup();
+    const onReact = vi.fn(), onToggleResolved = vi.fn();
+    renderApp(<CommentsPanel items={[base]} loaded pending={false} onSend={vi.fn()} onReact={onReact} onToggleResolved={onToggleResolved} />);
+    const react = screen.getByTestId('comment-react-c-1');
+    expect(react).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByTestId('comment-react-count-c-1')).toHaveTextContent('1');
+    await u.click(react);
+    expect(onReact).toHaveBeenCalledWith('c-1', '👍', true);
+    await u.click(screen.getByTestId('comment-resolve-c-1'));
+    expect(onToggleResolved).toHaveBeenCalledWith('c-1', true);
+  });
+
+  it('names who resolved a comment and offers to reopen it', async () => {
+    await signIn('pm');
+    const u = userEvent.setup();
+    const onToggleResolved = vi.fn();
+    const resolved: Comment = { ...base, id: 'c-2', resolved: { at: '2026-11-27T09:00:00Z', by: { id: 'u-2', display_name: 'Demo User 02' } } };
+    renderApp(<CommentsPanel items={[resolved]} loaded pending={false} onSend={vi.fn()} onToggleResolved={onToggleResolved} />);
+    expect(screen.getByTestId('comment-resolved-c-2')).toHaveTextContent('Demo User 02');
+    await u.click(screen.getByTestId('comment-reopen-c-2'));
+    expect(onToggleResolved).toHaveBeenCalledWith('c-2', false);
   });
 });

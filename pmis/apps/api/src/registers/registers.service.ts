@@ -959,12 +959,12 @@ export class RegistersService {
     const cursor = decodeTypedCursor(oneParam(q, 'cursor'), ['ts', 'uuid']);
     const after = cursor ? Prisma.sql`AND (c.created_at, c.id) > (${cursor[0] as string}::timestamptz, ${cursor[1] as string}::uuid)` : Prisma.empty;
     const rows = await this.db.tx.$queryRaw<{ id: string; author_id: string; body: string; is_rejection_note: boolean; created_at: Date; ts: string }[]>(Prisma.sql`
-      SELECT c.id::text AS id, c.author_id::text AS author_id, c.body, c.is_rejection_note, c.created_at, ${Prisma.raw(TS_TEXT('c.created_at'))} AS ts
+      SELECT c.id::text AS id, c.author_id::text AS author_id, c.body, c.is_rejection_note, c.created_at, c.resolved_at, c.resolved_by::text, ${Prisma.raw(TS_TEXT('c.created_at'))} AS ts
       FROM comments c JOIN register_records r ON r.id = ${row.id}::uuid
       WHERE c.entity_type = 'register_record' AND c.entity_id = r.entity_id ${after} ORDER BY c.created_at, c.id LIMIT ${limit + 1}`);
     const page = rows.slice(0, limit);
     const last = page[page.length - 1];
-    return { items: await this.workflow.commentDtos(page), page: { limit, next_cursor: rows.length > limit && last ? encodeCursor([last.ts, last.id]) : null } };
+    return { items: await this.workflow.commentDtos(page, auth.user.id), page: { limit, next_cursor: rows.length > limit && last ? encodeCursor([last.ts, last.id]) : null } };
   }
 
   async addComment(auth: AuthContext, key: string, id: string, rawBody: unknown) {
@@ -972,9 +972,9 @@ export class RegistersService {
     const { row } = await this.rowFor(auth, key, id);
     const mentions = await resolveMentions(this.db.tx, body.body, body.mention_user_ids);
     const cid = await this.call<string>(auth, Prisma.sql`SELECT reg_add_comment(${key}::text, ${row.id}::uuid, ${body.body}::text, ${mentions}::uuid[])::text AS r`);
-    const rows = await this.db.tx.$queryRaw<{ id: string; author_id: string; body: string; is_rejection_note: boolean; created_at: Date }[]>(
-      Prisma.sql`SELECT id::text AS id, author_id::text AS author_id, body, is_rejection_note, created_at FROM comments WHERE id = ${cid}::uuid`);
-    const [dto] = await this.workflow.commentDtos(rows);
+    const rows = await this.db.tx.$queryRaw<{ id: string; author_id: string; body: string; is_rejection_note: boolean; created_at: Date; resolved_at: Date | null; resolved_by: string | null }[]>(
+      Prisma.sql`SELECT id::text AS id, author_id::text AS author_id, body, is_rejection_note, created_at, resolved_at, resolved_by::text FROM comments WHERE id = ${cid}::uuid`);
+    const [dto] = await this.workflow.commentDtos(rows, auth.user.id);
     return dto;
   }
 }

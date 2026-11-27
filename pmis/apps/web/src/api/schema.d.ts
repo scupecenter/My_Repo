@@ -10232,6 +10232,60 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/comments/{comment_id}/reactions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Comment. */
+                comment_id: components["parameters"]["CommentId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * React to a comment (0.15.247, PM item 18)
+         * @description Adds the caller's reaction to any comment they can read, a task comment or a register-record comment (the same bar as commenting on it). The emoji travels in the body because the client path whitelist keeps non-ASCII out of URLs. 404 `not_found` for a comment the caller cannot read, so its existence is not revealed; 422 `validation_failed` for an unsupported emoji. Idempotent. Not audited.
+         */
+        put: operations["reactToComment"];
+        post?: never;
+        /**
+         * Remove the caller's reaction (0.15.247)
+         * @description Removes the caller's own reaction, named in the body like the PUT. 404 for a comment the caller cannot read. Idempotent.
+         */
+        delete: operations["unreactToComment"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/comments/{comment_id}/resolved": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Comment. */
+                comment_id: components["parameters"]["CommentId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Mark a comment resolved (0.15.247, PM item 18)
+         * @description Marks the point of the comment resolved and records who did it and when. Anyone who can read the thread may resolve, the same bar as commenting. 404 for a comment the caller cannot read. Not audited.
+         */
+        put: operations["resolveComment"];
+        post?: never;
+        /**
+         * Open a resolved comment again (0.15.247)
+         * @description Clears the resolved mark (`resolved_at` and `resolved_by` read as null again). 404 for a comment the caller cannot read.
+         */
+        delete: operations["unresolveComment"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -12416,8 +12470,31 @@ export interface components {
             body: string;
             is_rejection_note?: boolean;
             mentions?: components["schemas"]["UserRef"][];
+            /** @description 0.15.247. One entry per emoji used on the comment, with the count and whether the caller reacted. */
+            reactions?: components["schemas"]["CommentReaction"][];
+            resolved?: components["schemas"]["CommentResolved"];
             /** Format: date-time */
             created_at: string;
+        };
+        CommentReactionInput: {
+            /**
+             * @description 0.15.247. Starts with 👍 only.
+             * @enum {string}
+             */
+            emoji: "👍";
+        };
+        CommentReaction: {
+            /** @description 0.15.247. Starts with 👍 only. */
+            emoji: string;
+            count: number;
+            /** @description The caller reacted with this emoji. */
+            mine: boolean;
+        };
+        /** @description 0.15.247. Set while the comment is marked resolved; absent (null) while open. */
+        CommentResolved: {
+            /** Format: date-time */
+            at: string;
+            by: components["schemas"]["UserRef"];
         };
         OverrideRequest: {
             /** @enum {string} */
@@ -20144,6 +20221,8 @@ export interface components {
         RegisterKeyPath: components["schemas"]["RegisterKey"];
         /** @description Register record. */
         RegisterRecordId: string;
+        /** @description Comment. */
+        CommentId: string;
         /** @description Document Library definition. */
         DocTypeId: string;
         /** @description Template ID such as TPL-SITE. */
@@ -38341,6 +38420,107 @@ export interface operations {
                 content?: never;
             };
             401: components["responses"]["Unauthorized"];
+        };
+    };
+    reactToComment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Comment. */
+                comment_id: components["parameters"]["CommentId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CommentReactionInput"];
+            };
+        };
+        responses: {
+            /** @description Reaction recorded (also when it was already there). */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    unreactToComment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Comment. */
+                comment_id: components["parameters"]["CommentId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CommentReactionInput"];
+            };
+        };
+        responses: {
+            /** @description Reaction removed (also when it was not there). */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    resolveComment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Comment. */
+                comment_id: components["parameters"]["CommentId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Resolved. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    unresolveComment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Comment. */
+                comment_id: components["parameters"]["CommentId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Open again. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
         };
     };
 }

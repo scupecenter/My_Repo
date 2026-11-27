@@ -101,6 +101,9 @@ function workload(region: number | null) {
   return { items: [...rows.values()].sort((a, b) => b.late - a.late || b.open - a.open || a.holder.display_name.localeCompare(b.holder.display_name)), no_holder: none };
 }
 
+/** Every comment of the mock, task threads and register threads together (PM item 18 actions address a comment by id alone). */
+const everyComment = (): Comment[] => [...db().tasks, ...db().extra].flatMap((t) => t.comments ?? []).concat(Object.values(db().x.regComments).flat());
+
 export const xHandlers = [
   // ---- X1
   http.get(`${B}/notifications`, ({ request }) => { const g = guard(); if (g) return g; return inboxPage(new URL(request.url).searchParams); }),
@@ -175,6 +178,52 @@ export const xHandlers = [
     db().x.regComments[r.entity_id] = [...(db().x.regComments[r.entity_id] ?? []), c];
     save();
     return HttpResponse.json(c, { status: 201 });
+  }),
+
+  // ---- PM item 18 (0.15.247): a 👍 reaction and a resolved flag on any comment (task or register record)
+  http.put(`${B}/comments/:id/reactions`, async ({ params, request }) => {
+    const g = guard(); if (g) return g;
+    const c = everyComment().find((x) => x.id === params.id);
+    if (!c) return problem(404, 'not_found', 'Not found');
+    const { emoji } = (await request.json()) as { emoji?: string };
+    if (emoji !== '👍') return invalid('/emoji', 'unsupported');
+    const rs = c.reactions ?? [];
+    const cur = rs.find((r) => r.emoji === emoji);
+    if (cur) cur.mine = true;
+    else rs.push({ emoji, count: 1, mine: true });
+    c.reactions = rs;
+    save();
+    return new HttpResponse(null, { status: 204 });
+  }),
+  http.delete(`${B}/comments/:id/reactions`, async ({ params, request }) => {
+    const g = guard(); if (g) return g;
+    const c = everyComment().find((x) => x.id === params.id);
+    if (!c) return problem(404, 'not_found', 'Not found');
+    const { emoji } = (await request.json()) as { emoji?: string };
+    const cur = (c.reactions ?? []).find((r) => r.emoji === emoji);
+    if (cur?.mine) {
+      cur.count -= 1;
+      cur.mine = false;
+      if (cur.count <= 0) c.reactions = (c.reactions ?? []).filter((r) => r !== cur);
+      save();
+    }
+    return new HttpResponse(null, { status: 204 });
+  }),
+  http.put(`${B}/comments/:id/resolved`, ({ params }) => {
+    const g = guard(); if (g) return g;
+    const c = everyComment().find((x) => x.id === params.id);
+    if (!c) return problem(404, 'not_found', 'Not found');
+    c.resolved = { at: new Date().toISOString(), by: me() };
+    save();
+    return new HttpResponse(null, { status: 204 });
+  }),
+  http.delete(`${B}/comments/:id/resolved`, ({ params }) => {
+    const g = guard(); if (g) return g;
+    const c = everyComment().find((x) => x.id === params.id);
+    if (!c) return problem(404, 'not_found', 'Not found');
+    delete c.resolved;
+    save();
+    return new HttpResponse(null, { status: 204 });
   }),
 
   // ---- X4 to X6
