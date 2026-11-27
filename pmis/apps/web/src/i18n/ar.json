@@ -1171,7 +1171,7 @@
     "section_documents_archive": "الأرشيف",
     "section_documents_numbering": "الترقيم",
     "section_data_counts": "أعداد GECOL / HLC",
-    "section_registers_recycle": "سلة المحذوفات"
+    "section_registers_recycle": "سلة المحذوفات",
     "section_screens_motion": "الحركة",
     "section_workflow_coverage": "تغطية المصفوفة",
     "section_screens_login": "صفحة الدخول"
@@ -6604,6 +6604,7 @@
     "blocked_open_version_exists": "توجد نسخة أحدث مفتوحة",
     "blocked_site_slot_taken": "للموقع سجل آخر في هذا السجل",
     "audit_link": "كل إلغاء واسترجاع مسجّل في سجل التدقيق."
+  },
   "motion": {
     "title": "الحركة",
     "note": "نظام حركة واحد لكل التطبيق: النوافذ والرسائل والبطاقات وأشرطة التقدم والمخططات والخريطة. يُحفظ الاختيار في هذا المتصفح مثل السمة واللغة.",

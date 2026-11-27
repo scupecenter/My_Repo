@@ -1171,7 +1171,7 @@
     "section_documents_archive": "Archive",
     "section_documents_numbering": "Numbering",
     "section_data_counts": "GECOL / HLC counts",
-    "section_registers_recycle": "Recycle bin"
+    "section_registers_recycle": "Recycle bin",
     "section_screens_motion": "Motion",
     "section_workflow_coverage": "Matrix coverage",
     "section_screens_login": "Login page"
@@ -6536,6 +6536,7 @@
     "blocked_open_version_exists": "A newer open version exists",
     "blocked_site_slot_taken": "The site already has another record",
     "audit_link": "Every void and restore is in the audit log."
+  },
   "motion": {
     "title": "Motion",
     "note": "One motion system for the whole app: dialogs, messages, cards, progress bars, charts and the map. This choice is saved in this browser, like the theme and the language.",
