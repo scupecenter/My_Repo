@@ -13,6 +13,7 @@ test('walk: dashboard share link end to end', async ({ page }) => {
 
   // EN pass: create a link from the dashboard toolbar
   await page.goto('/dashboard');
+  await page.getByTestId('dash-share').click(); // P2: the Share / Export menu holds the share-link action
   await page.getByTestId('dash-share-link').click();
   const dialog = page.getByTestId('dashshare-dialog');
   await expect(dialog).toBeVisible();
@@ -57,6 +58,7 @@ test('walk: dashboard share link end to end', async ({ page }) => {
   await page.goto('/dashboard');
   await page.getByTestId('topbar-lang').click();
   await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
+  await page.getByTestId('dash-share').click();
   await page.getByTestId('dash-share-link').click();
   await expect(page.getByTestId('dashshare-dialog')).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);

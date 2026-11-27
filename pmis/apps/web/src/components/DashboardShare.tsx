@@ -13,7 +13,7 @@ export const shareParamsOf = (sp: URLSearchParams): Record<string, string> =>
   Object.fromEntries(SHARE_KEYS.map((k) => [k, sp.get(k) ?? '']).filter(([, v]) => v !== ''));
 
 /** Create-a-link dialog on the dashboard toolbar (owner decision 2026-11-26 00:51): the link opens the same view, read-only, after the opener's own sign-in. */
-export function ShareDashboardButton({ sp }: { sp: URLSearchParams }) {
+export function ShareDashboardButton({ sp, inMenu = false }: { sp: URLSearchParams; inMenu?: boolean }) {
   const { t } = useTranslation();
   const toast = useToast();
   const create = useCreateShareLink();
@@ -38,7 +38,7 @@ export function ShareDashboardButton({ sp }: { sp: URLSearchParams }) {
 
   return (
     <>
-      <button className="btn" data-testid="dash-share-link" onClick={() => setOpen(true)}>
+      <button className={inMenu ? "btn justify-start" : "btn"} data-testid="dash-share-link" onClick={() => setOpen(true)}>
         <Share2 size={16} />
         {t('dashshare.share')}
       </button>
@@ -91,7 +91,7 @@ export function ShareDashboardButton({ sp }: { sp: URLSearchParams }) {
 export function SharedDashboard() {
   const { t } = useTranslation();
   const { token = '' } = useParams();
-  const [sp, setSp] = useSearchParams();
+  const [, setSp] = useSearchParams();
   const q = useResolveShareLink(token);
   const seeded = useRef(false);
   useEffect(() => {
@@ -133,7 +133,7 @@ export function ShareLinksCard() {
   const [ask, setAsk] = useState<DashboardShareLink | null>(null);
   const [reason, setReason] = useState('');
   const locale = i18n.language === 'ar' ? 'ar-LY' : 'en-GB';
-  const now = Date.now();
+  const [now] = useState(() => Date.now()); // when the card was opened: a link that expires meanwhile shows as expired after the next load
   const stateOf = (l: DashboardShareLink) =>
     l.revoked_at ? t('dashshare.st_revoked') : l.expires_at && Date.parse(l.expires_at) <= now ? t('dashshare.st_expired') : t('dashshare.st_active');
 

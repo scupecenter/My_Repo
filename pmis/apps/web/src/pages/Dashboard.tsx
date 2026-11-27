@@ -1,6 +1,7 @@
-import { Check, Download, Link2, MonitorPlay, PencilLine, Printer, RotateCcw } from "lucide-react";
+import { Check, ChevronDown, Download, Link2, MonitorPlay, PencilLine, Printer, RotateCcw, Share2 } from "lucide-react";
+import { loadPref, savePref } from "@/lib/localPref";
 import { useDownloadGate } from '@/lib/downloadGate';
-import { useMemo, useState, type ReactNode, Fragment } from "react";
+import { useEffect, useMemo, useState, type ReactNode, Fragment } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -26,7 +27,6 @@ import { SiteMap } from "@/components/SiteMap";
 import { ScreenSettingsLink } from "@/components/ScreenSettingsLink";
 import { EmptyState } from "@/components/States";
 import { useToast } from "@/components/Toast";
-import { ShareDashboardButton } from "@/components/DashboardShare";
 import { streamName } from "@/lib/streams";
 import { tripoliToday } from "@/lib/today";
 import { orderedVisible, type TabLayout } from "./dashboardLayout";
@@ -65,6 +65,7 @@ import {
   type DashTab,
 } from "./dashboardTabs";
 import { DateInput } from '@/components/DateInput';
+import { ShareDashboardButton } from "@/components/DashboardShare";
 
 type DashMilestone = Dash["pipeline"]["nodes"][number];
 const STATUSES = [
@@ -581,7 +582,17 @@ export function Dashboard() {
   const snaps = useProjectStatusSnapshots(!!d);
   const [exporting, setExporting] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
-  const [format, setFormat] = useState<ExportFormat>("xlsx");
+  const [format, setFormat] = useState<ExportFormat>(() => (loadPref<string>("dash.exportFormat", "xlsx") === "csv" ? "csv" : "xlsx"));
+  const [shareOpen, setShareOpen] = useState(false);
+  // the Share / Export menu closes on Escape and on a click outside it
+  useEffect(() => {
+    if (!shareOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setShareOpen(false); };
+    const onDown = (e: MouseEvent) => { if (!(e.target as HTMLElement | null)?.closest?.('[data-testid="dash-share-wrap"]')) setShareOpen(false); };
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("mousedown", onDown);
+    return () => { document.removeEventListener("keydown", onKey); document.removeEventListener("mousedown", onDown); };
+  }, [shareOpen]);
   // Q116: a local preview of the other pipeline style; the style in force is the setting (meta.pipeline_variant)
   const [preview, setPreview] = useState<"A" | "B" | null>(null);
   const canExport =
@@ -1256,70 +1267,98 @@ export function Dashboard() {
               {t("dash.reset")}
             </button>
           )}
-          <Link className="btn" data-testid="dash-tv" to={`/dashboard?${new URLSearchParams([...sp.entries(), ["tv", "1"]]).toString()}`}>
-            <MonitorPlay size={16} />
-            {t("dash.tv")}
-          </Link>
-          <ShareDashboardButton sp={sp} />
-          <button
-            className="btn"
-            data-testid="dash-copy-link"
-            title={t("dash.copy_link_hint")}
-            onClick={() => {
-              // the address already carries the tab and every filter; it opens after the normal sign-in and the reader's own permissions apply
-              void navigator.clipboard?.writeText(window.location.href).then(() => {
-                setLinkCopied(true);
-                window.setTimeout(() => setLinkCopied(false), 2000);
-              });
-            }}
-          >
-            {linkCopied ? <Check size={16} /> : <Link2 size={16} />}
-            {linkCopied ? t("dash.link_copied") : t("dash.copy_link")}
-          </button>
-          <Link
-            className="btn"
-            to="/dashboard/manual-items"
-            data-testid="dash-manual-link"
-          >
-            <PencilLine size={16} />
-            {t("dash.manual_link")}
-          </Link>
-          {canExport && (
-            <span className="flex items-center gap-1">
-              <select
-                className="input w-auto"
-                aria-label={t("dash.export_format")}
-                data-testid="dash-export-format"
-                value={format}
-                onChange={(e) => setFormat(e.target.value as ExportFormat)}
-              >
-                {(["xlsx", "csv"] as const).map((f) => (
-                  <option key={f} value={f}>
-                    {t(`dash.format.${f}`)}
-                  </option>
-                ))}
-              </select>
+          {/* P2: the six output buttons live in one menu; the controls and their test ids are unchanged, only closed (hidden, not removed) */}
+          <span className="relative print:hidden" data-testid="dash-share-wrap">
+            <button
+              type="button"
+              className="btn"
+              data-testid="dash-share"
+              aria-haspopup="true"
+              aria-expanded={shareOpen}
+              onClick={() => setShareOpen((o) => !o)}
+            >
+              <Share2 size={16} />
+              {t("dash.share_menu")}
+              <ChevronDown size={14} aria-hidden />
+            </button>
+            <div
+              role="group"
+              aria-label={t("dash.share_menu")}
+              data-testid="dash-share-panel"
+              className={`${shareOpen ? "flex" : "hidden"} absolute end-0 top-full z-30 mt-1 min-w-56 flex-col gap-1 rounded-lg border border-line bg-surface p-2 shadow-lg`}
+            >
+              <ShareDashboardButton sp={sp} inMenu />
+              <Link className="btn justify-start" data-testid="dash-tv" to={`/dashboard?${new URLSearchParams([...sp.entries(), ["tv", "1"]]).toString()}`}>
+                <MonitorPlay size={16} />
+                {t("dash.tv")}
+              </Link>
               <button
-                className="btn print:hidden"
-                data-testid="dash-print"
-                disabled={gate.exportLocked}
-                title={gate.note(gate.exportLocked)}
-                onClick={() => window.print()}
+                className="btn justify-start"
+                data-testid="dash-copy-link"
+                title={t("dash.copy_link_hint")}
+                onClick={() => {
+                  // the address already carries the tab and every filter; it opens after the normal sign-in and the reader's own permissions apply
+                  void navigator.clipboard?.writeText(window.location.href).then(() => {
+                    setLinkCopied(true);
+                    window.setTimeout(() => setLinkCopied(false), 2000);
+                  });
+                }}
               >
-                <Printer size={16} />
-                {t("dash.print")}
+                {linkCopied ? <Check size={16} /> : <Link2 size={16} />}
+                {linkCopied ? t("dash.link_copied") : t("dash.copy_link")}
               </button>
-              <button
-                className="btn btn-primary"
-                data-testid="dash-export"
-                disabled={exporting || !d}
-                onClick={doExport}
+              <Link
+                className="btn justify-start"
+                to="/dashboard/manual-items"
+                data-testid="dash-manual-link"
               >
-                <Download size={16} />
-                {t("dash.export")}
-              </button>
-            </span>
-          )}
+                <PencilLine size={16} />
+                {t("dash.manual_link")}
+              </Link>
+              {canExport && (
+                <>
+                  <label className="flex items-center justify-between gap-2 px-1 text-sm text-mute">
+                    {t("dash.export_format")}
+                    <select
+                      className="input w-auto"
+                      aria-label={t("dash.export_format")}
+                      data-testid="dash-export-format"
+                      value={format}
+                      onChange={(e) => {
+                        setFormat(e.target.value as ExportFormat);
+                        savePref("dash.exportFormat", e.target.value);
+                      }}
+                    >
+                      {(["xlsx", "csv"] as const).map((f) => (
+                        <option key={f} value={f}>
+                          {t(`dash.format.${f}`)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <button
+                    className="btn justify-start print:hidden"
+                    data-testid="dash-print"
+                    disabled={gate.exportLocked}
+                    title={gate.note(gate.exportLocked)}
+                    onClick={() => window.print()}
+                  >
+                    <Printer size={16} />
+                    {t("dash.print")}
+                  </button>
+                  <button
+                    className="btn btn-primary justify-start"
+                    data-testid="dash-export"
+                    disabled={exporting || !d}
+                    onClick={doExport}
+                  >
+                    <Download size={16} />
+                    {t("dash.export")}
+                  </button>
+                </>
+              )}
+            </div>
+          </span>
         </span>
         {!!basis?.snapshot_dates?.length && (
           <div
