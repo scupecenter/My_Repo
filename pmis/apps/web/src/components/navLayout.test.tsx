@@ -194,7 +194,9 @@ describe('the side menu with a shared layout', () => {
     expect(screen.getByTestId('nav-group-toggle-talk')).toHaveTextContent('تواصل');
     const day = screen.getByTestId('nav-group-day');
     expect(within(day).getByTestId('nav-group-talk')).toContainElement(screen.getByTestId('nav-inbox'));
-    expect(keysIn('nav-group-day')).toEqual(['nav-dashboard', 'nav-messages', 'nav-inbox', 'nav-my_work']);
+    // Dashboard is the fixed first row above the groups (nav-first), not a child of any heading
+    expect(keysIn('nav-group-day')).toEqual(['nav-messages', 'nav-inbox', 'nav-my_work']);
+    expect(screen.getByTestId('nav-first')).toContainElement(screen.getByTestId('nav-dashboard'));
     expect(screen.getByTestId('nav-edit')).toHaveTextContent('تعديل القائمة');
   });
 
