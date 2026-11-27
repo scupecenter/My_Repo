@@ -4,8 +4,8 @@
 -- Who: System Admin, or a delegate of the custom fields (`fields` edit) for all regions (site_master_col_can_admin, the rule of the Master column doors). The API also asks for step-up.
 -- Create (p_id NULL): entity_type, code, label_en, data_type are required. Update: only the keys sent change; entity_type, task_code, code and data_type never change on update
 --   (the contract has them in the create body only), and a field that holds values keeps its list options (they are switched off, never removed). Nothing is deleted: is_active=false hides the field.
--- Access: visible_to_role_ids and editable_by_role_ids write explicit field_permissions rows for every active role (hidden, read, edit) when either list is not empty, and remove them when both are empty
---   (no rule = the entity permission decides, ADR 0003). editable empty with visible set = visible roles may edit.
+-- Access: visible_to_role_ids and editable_by_role_ids become field rules per active role (hidden, read, edit; both empty = no rules, the entity permission decides, ADR 0003; editable empty with
+--   visible set = visible roles may edit). The rules are written ONLY through the existing identity door idm_field_permission_set, so its checks apply (a rule that applies to the actor is refused).
 -- p_version is the If-Match version (NULL on create). Audited as custom_field_create / custom_field_update with before and after and the reason.
 
 CREATE OR REPLACE FUNCTION admin_save_field(p_id uuid, p_input jsonb, p_reason text, p_version integer) RETURNS jsonb
@@ -16,7 +16,7 @@ DECLARE
                           'in_templates','in_exports','in_list_filters','master_export_column','is_active'];
   create_only text[] := ARRAY['entity_type','task_code','code','data_type'];
   v_entity text; v_code text; v_type text; v_task text; before jsonb; after jsonb; lv jsonb; o jsonb; i int; seen text[] := '{}'; vis uuid[]; edt uuid[]; r record; rid uuid;
-  holds boolean := false; vk text; has_vis boolean; has_edt boolean;
+  holds boolean := false; vk text; want_acc text; cur_acc text; has_vis boolean; has_edt boolean;
 BEGIN
   IF NOT coalesce(public.site_master_col_can_admin(), false) THEN
     RAISE EXCEPTION 'custom fields: System Admin or a delegate of the custom fields for all regions only' USING ERRCODE = 'insufficient_privilege';
@@ -102,7 +102,7 @@ BEGIN
     IF p_input ? vk THEN
       IF jsonb_typeof(p_input -> vk) <> 'array' OR EXISTS (SELECT 1 FROM jsonb_array_elements(p_input -> vk) e WHERE jsonb_typeof(e) <> 'string' OR (e #>> '{}') !~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$') THEN
         errs := errs || public.reg_err_item('/' || vk, 'invalid', 'A list of role ids.');
-      ELSIF EXISTS (SELECT 1 FROM jsonb_array_elements_text(p_input -> vk) e WHERE NOT EXISTS (SELECT 1 FROM public.roles r WHERE r.id = e::uuid AND r.is_active)) THEN
+      ELSIF EXISTS (SELECT 1 FROM jsonb_array_elements_text(p_input -> vk) AS t(v) WHERE NOT EXISTS (SELECT 1 FROM public.roles r WHERE r.id = t.v::uuid AND r.is_active)) THEN
         errs := errs || public.reg_err_item('/' || vk, 'unknown_role', 'An active role.');
       END IF;
     END IF;
@@ -154,20 +154,23 @@ BEGIN
   END IF;
 
   IF has_vis OR has_edt THEN
-    SELECT coalesce(array_agg(e::uuid), '{}') INTO vis FROM jsonb_array_elements_text(CASE WHEN has_vis THEN p_input -> 'visible_to_role_ids' ELSE
-      (SELECT coalesce(jsonb_agg(p.role_id), '[]'::jsonb) FROM public.field_permissions p WHERE p.field_id = fid AND p.role_id IS NOT NULL AND p.access::text IN ('read', 'edit')) END) e;
-    SELECT coalesce(array_agg(e::uuid), '{}') INTO edt FROM jsonb_array_elements_text(CASE WHEN has_edt THEN p_input -> 'editable_by_role_ids' ELSE
-      (SELECT coalesce(jsonb_agg(p.role_id), '[]'::jsonb) FROM public.field_permissions p WHERE p.field_id = fid AND p.role_id IS NOT NULL AND p.access::text = 'edit') END) e;
-    DELETE FROM public.field_permissions WHERE field_id = fid AND role_id IS NOT NULL;
-    IF cardinality(vis) > 0 OR cardinality(edt) > 0 THEN
-      FOR r IN SELECT id FROM public.roles WHERE is_active LOOP
-        INSERT INTO public.field_permissions (field_id, role_id, access)
-        VALUES (fid, r.id, (CASE
-          WHEN cardinality(vis) > 0 AND NOT (r.id = ANY(vis)) AND NOT (r.id = ANY(edt)) THEN 'hidden'
-          WHEN cardinality(edt) > 0 AND NOT (r.id = ANY(edt)) THEN 'read'
-          ELSE 'edit' END)::public."FieldAccess");
-      END LOOP;
-    END IF;
+    SELECT coalesce(array_agg(t.v::uuid), '{}') INTO vis FROM jsonb_array_elements_text(CASE WHEN has_vis THEN p_input -> 'visible_to_role_ids' ELSE
+      (SELECT coalesce(jsonb_agg(p.role_id), '[]'::jsonb) FROM public.field_permissions p WHERE p.field_id = fid AND p.role_id IS NOT NULL AND p.access::text IN ('read', 'edit')) END) AS t(v);
+    SELECT coalesce(array_agg(t.v::uuid), '{}') INTO edt FROM jsonb_array_elements_text(CASE WHEN has_edt THEN p_input -> 'editable_by_role_ids' ELSE
+      (SELECT coalesce(jsonb_agg(p.role_id), '[]'::jsonb) FROM public.field_permissions p WHERE p.field_id = fid AND p.role_id IS NOT NULL AND p.access::text = 'edit') END) AS t(v);
+    -- field rules are identity data: they are written only through the existing door idm_field_permission_set (reason, the actor needs `fields` edit, nobody changes a rule
+    -- that applies to them, nobody gives more access than they have). Only the roles whose rule changes are touched; "edit" with no rule is the default and stays no rule.
+    FOR r IN SELECT id FROM public.roles WHERE is_active ORDER BY id LOOP
+      want_acc := CASE
+        WHEN cardinality(vis) = 0 AND cardinality(edt) = 0 THEN NULL
+        WHEN cardinality(vis) > 0 AND NOT (r.id = ANY(vis)) AND NOT (r.id = ANY(edt)) THEN 'hidden'
+        WHEN cardinality(edt) > 0 AND NOT (r.id = ANY(edt)) THEN 'read'
+        ELSE 'edit' END;
+      SELECT p.access::text INTO cur_acc FROM public.field_permissions p WHERE p.field_id = fid AND p.role_id = r.id;
+      IF cur_acc IS DISTINCT FROM want_acc AND NOT (want_acc = 'edit' AND cur_acc IS NULL) THEN
+        PERFORM public.idm_field_permission_set(fid, r.id, NULL::uuid, want_acc::public."FieldAccess", btrim(p_reason));
+      END IF;
+    END LOOP;
   END IF;
 
   after := public.custom_field_json(fid);
@@ -192,7 +195,7 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, pg_te
 $$;
 
 GRANT SELECT, INSERT, UPDATE ON field_definitions, field_list_values TO pmis_definer;
-GRANT SELECT, INSERT, UPDATE, DELETE ON field_permissions TO pmis_definer;
+GRANT EXECUTE ON FUNCTION idm_field_permission_set(uuid, uuid, uuid, "FieldAccess", text) TO pmis_definer;
 GRANT SELECT ON roles, task_definitions TO pmis_definer;
 DO $$
 DECLARE f text;
