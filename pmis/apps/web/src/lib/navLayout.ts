@@ -27,12 +27,21 @@ export const NAV_SIDE: readonly NavItem[] = NAV.filter((n) => n.key === 'admin.u
 
 const groupName = (g: string, dict: { nav: Record<string, string> }) => dict.nav[`group_${g}`] ?? g;
 
+/** The Data hub heading: its screens, then the two admin screens (Data reset, Recycle bin) under their own sub-heading, so a non-admin never sees an empty one. */
+const DATA_ADMIN_KEYS = ['data_reset', 'recycle_bin'];
+function dataChildren(nav: readonly NavItem[]): (string | NavSub)[] {
+  const keys = nav.filter((n) => n.group === 'data').map((n) => n.key);
+  const admin = keys.filter((k) => DATA_ADMIN_KEYS.includes(k));
+  const main: (string | NavSub)[] = keys.filter((k) => !DATA_ADMIN_KEYS.includes(k));
+  return admin.length ? [...main, { id: 'data_admin', name_en: 'For admins', name_ar: 'للمسؤولين', icon: null, children: admin }] : main;
+}
+
 /** The layout of the code: the six groups with their screens in NAV order. */
 export function defaultLayout(nav: readonly NavItem[] = NAV_SIDE): Layout {
   return {
     headings: DEFAULT_GROUPS.map((g) => ({
       id: g, name_en: groupName(g, en), name_ar: groupName(g, ar), icon: null,
-      children: nav.filter((n) => n.group === g).map((n) => n.key),
+      children: g === 'data' ? dataChildren(nav) : nav.filter((n) => n.group === g).map((n) => n.key),
     })),
   };
 }

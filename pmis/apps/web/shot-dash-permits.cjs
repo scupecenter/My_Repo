@@ -1,13 +1,19 @@
 /* Visual verification shots for the dashboard ops card (not committed tooling; local run). */
 const { chromium } = require('playwright-core');
 
+// SEC-4: no credentials in the repository. Set SHOT_IDENTIFIER and SHOT_PASSWORD for the account the screens are shot with (the mock server's demo
+// accounts are listed in src/mocks/db.ts; never a real account).
+const IDENTIFIER = process.env.SHOT_IDENTIFIER;
+const PASSWORD = process.env.SHOT_PASSWORD;
+if (!IDENTIFIER || !PASSWORD) { console.error('Set SHOT_IDENTIFIER and SHOT_PASSWORD first.'); process.exit(1); }
+
 const BASE = 'http://localhost:5174';
 const OUT = '/downloads';
 
 async function login(page) {
   await page.goto(BASE + '/login');
-  await page.getByTestId('login-identifier').fill('1001');
-  await page.getByTestId('login-password').fill('Demo-Pm-2026-pass');
+  await page.getByTestId('login-identifier').fill(IDENTIFIER);
+  await page.getByTestId('login-password').fill(PASSWORD);
   await page.getByTestId('login-submit').click();
   await page.goto(BASE + '/dashboard');
   await page.getByTestId('page-dashboard').waitFor({ state: 'visible', timeout: 30000 });

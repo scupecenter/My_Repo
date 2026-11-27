@@ -197,6 +197,10 @@ jobs:
         working-directory: pmis
         run: shellcheck --severity=error tools/install/install-ubuntu.sh tools/install/update.sh tools/install/test-le-existing.sh tools/install/install-clamav.sh tools/install/install-file-backup.sh infra/backup/files-backup.sh infra/backup/files-restore.sh tools/install/install-db-backup.sh infra/backup/db-common.sh infra/backup/db-backup.sh infra/backup/db-backup-check.sh infra/backup/db-dump.sh infra/backup/db-restore.sh infra/backup/test-db-backup.sh infra/backup/test-files-backup.sh
 
+      - name: Neutral names in live docs
+        working-directory: pmis
+        run: bash tools/check-neutral-docs.sh
+
       - name: File backup copies the integrity anchors (fake restic)
         working-directory: pmis
         run: bash infra/backup/test-files-backup.sh
