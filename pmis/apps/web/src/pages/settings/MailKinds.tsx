@@ -1,4 +1,5 @@
 import { AlertTriangle, MailCheck } from 'lucide-react';
+import { UnsavedGuard } from '@/lib/unsavedGuard';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ApiError } from '@/api/client';
@@ -57,6 +58,7 @@ export function MailKinds() {
       </ul>
       {Object.keys(errs).filter((p) => p.startsWith('/kinds')).map((p) => <p key={p} role="alert" className="text-xs text-lateInk" data-testid={`err${p.replace(/\//g, '-')}`}>{t(`fieldError.${errs[p]}`, { defaultValue: errs[p] })}</p>)}
       <button className="btn btn-accent" data-testid="mail-kinds-save" disabled={!dirty} onClick={() => setOpen(true)}>{t('common.save')}</button>
+      <UnsavedGuard scope="settings" dirty={dirty} needsReason label={t('ui.guard_settings')} onSave={(reason) => new Promise<boolean>((res) => set.mutate({ version: cur.version, kinds: sel, reason }, { onSuccess: () => res(true), onError: () => res(false) }))} />
       {open && (
         <FormDialog open onClose={() => setOpen(false)} testid="mail-kinds-dialog" title={t('mailKinds.title')} busy={set.isPending} error={set.isError ? errText(set.error, t) : null}
           onSubmit={(reason) => set.mutate({ version: cur.version, kinds: sel, reason }, { onSuccess: () => { toast(t('settings.audited')); setOpen(false); setDraft(null); } })}>

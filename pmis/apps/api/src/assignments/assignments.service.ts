@@ -16,11 +16,11 @@ import { DbService } from '../db/db.service';
 import { TOP_LEVEL_KEYS } from '../permissions/catalogue';
 import { FilterCatalogService } from '../views/filter-catalog.service';
 import { ASSIGNMENT_INCLUDE, assignmentVersion, AssignmentDto, AssignmentRow, toAssignmentDto, UsersRepo } from '../users/users.repo';
+import { limit } from '../ops/ops-limits';
 
 const LEVELS = ['view', 'entry', 'review', 'approve', 'admin'] as const;
 const TEAMS = ['cw', 'te', 'both', 'none'] as const;
 /** Rows (users x roles) one request may create. The whole request is one transaction with a savepoint per row. */
-const MAX_ROWS = 2000;
 
 const reason = z.string().trim().min(3).max(1000);
 const regionId = z.number().int().min(1).max(7);
@@ -215,8 +215,8 @@ export class AssignmentsService {
   private async runAssign(auth: AuthContext, b: z.infer<typeof bulkAssignSchema>, requestId: string | undefined): Promise<BulkResultDto> {
     const userIds = [...new Set(b.user_ids)];
     const roleIds = [...new Set(b.role_ids)];
-    if (userIds.length * roleIds.length > MAX_ROWS) {
-      throw problems.validation([{ path: '/user_ids', code: 'too_many_rows', message: `One request creates at most ${MAX_ROWS} assignments (users x roles).` }]);
+    if (userIds.length * roleIds.length > limit('assignments.max_rows')) {
+      throw problems.validation([{ path: '/user_ids', code: 'too_many_rows', message: `One request creates at most ${limit('assignments.max_rows')} assignments (users x roles).` }]);
     }
     const d = b.defaults;
     await this.checkScope(d, '/defaults');

@@ -31,19 +31,28 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.204 (2026-11-27): the dashboard follow-up sections, pending approvals bottleneck (owner approval 2026-11-26, dashboard proposals item 7; migration 0305). Additive and read only. `GET /dashboard/ops` gains the section `approvals` (`DashboardOpsApprovals`): the tasks waiting for review or approval (states in_review and in_approval, the same population as the Approvals inbox), their ages in calendar days since the level opened, split review against approve, and the same ages grouped by the ball-in-court role so the bottleneck role shows. The section needs the approvals view (and the sites view, like the inbox) and answers available false without them. The dashboard settings catalogue gains the card `ops_approvals`. No grant, role or permission change.
     - 0.15.330 (2026-11-27): links and relations fixes, part 1 (D58; migration 0407, mirror `db/sql/406_links_fixes.sql`). Additive. `advance_id` of an expense or settlement is checked while the row is in entry (an approved advance of the same site; `unknown_advance`); invoices check `procurement_record_id` (`order_not_found`, `order_other_site`) and gain the optional field `supplier_party_id` (a company of the Contractors list; `unknown_company`; fills `supplier` when it is empty). New `GET /registers/financial_advances/advance-options`, `GET /registers/invoices/order-options` and `GET /registers/invoices/supplier-options` (read only, each needs its own module view). The related-records reader also lists the HLC record <-> Procurement record link. No grant, role or permission change.
     - 0.15.350 (2026-11-27): two admin alerts for operations (production readiness, item 4; migration 0421, mirror `db/sql/420_ops_alerts.sql`). Additive. `SecurityAlertRule` and `AlertSeverityMap` gain `backup_late` (the database backup check found WAL archiving or a backup late; default severity high; one alert per 6 hours) and `job_failed` (a background job run failed; default medium; one alert per job and day). They use the existing alert channel (bell, and mail to the System Admins by `email_min_severity`); the severity of each is set in Settings like the other rules. `mail.notification_kinds` is unchanged. No grant, role or permission change.
+    - 0.15.322 (2026-11-27): the upload policy of the imports, Enforce or Accept incomplete (owner decision D49 part 3, 2026-11-27; migration 0492, mirror `db/sql/491_upload_policy.sql`). Additive; the default is `enforce`, which is today's behaviour. (1) `GET /settings/imports/upload-policy` (every signed-in user) and `PUT /settings/imports/upload-policy` (a System Admin or an all-regions delegate of `settings` edit, a reason, If-Match, audited `imports_upload_policy_update` with before and after): the setting `imports.upload_policy`, `enforce` or `accept_incomplete`. (2) `POST /master-import/runs/{run_id}/apply` reads it. With `accept_incomplete` (and no historical-load option, which opens its sites itself) the sites of the file are opened first through the same door as `POST /sites/workflow-locks`: the unlock right of each region (403 `action_forbidden` otherwise), a step-up (401 `step_up_required`), an audit row per site; the tasks approved on an open site while a lock would have held them are flagged `lock_bypassed` (Admin override). Sites that a `create_sites` apply creates are not in the file yet and keep their locks. No right, role or grant changes. (3) `SiteImportStatus` (`GET /master-import/runs/{run_id}/sites`, `GET /import-batches/{batch_id}/sites`) gains `data_gap_items`: the items of `site_data_gaps` of each site, the per-row missing-data indicator. The third mode (valid rows only) is not part of this change.
     - 0.15.156 (2026-11-27): Web Push for field engineers (migration 0256; CHANGELOG WebPush). Additive. (1) `GET /me/push` (`getMyPush`): whether push is on for the server (`enabled`, `public_key`) and how many of the caller's browsers are subscribed. (2) `POST /me/push/subscribe` and `POST /me/push/unsubscribe`: own browsers only; subscribe answers 409 while the server has no VAPID keys. (3) `GET /admin/web-push` (`getAdminWebPush`, System Admin): on or off and the counts. The keys come only from the environment (VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT); with any missing push is off. The push carries no title or body, only a fixed notice that opens the inbox. The bell and the e-mail are unchanged.
+    - 0.15.262 (2026-11-27): the unsaved-changes guard joins `ui.features` as the section `unsaved_guard` (migration 0401, mirror `db/sql/400_ui_unsaved_guard.sql`; CHANGELOG UnsavedGuard, Decision 11). Additive: `UiFeatures` and `UiFeaturesPatch` gain `unsaved_guard` (`UiUnsavedGuard`: `enabled` and one boolean per area); a stored value without the section takes the seed (guard on everywhere). No new path.
     - 0.15.155 (2026-11-27): search inside uploaded document contents (migration 0255; CHANGELOG DocContentSearch). Additive. (1) `SearchHit` gains the optional `snippet` (documents group only): where the words were found inside the file, else null. (2) `GET /admin/document-search-index` (`getDocumentSearchIndex`): counts of indexed, empty, unsupported, too large, failed and pending files (System Admin). Text is extracted off the request path from clean-scan PDF and DOCX files and is visible only with the documents view right in the file's region.
     - 0.15.242 (2026-11-27): generic if/then alert rules, notifications only (migration 0342, mirror `db/sql/341_alert_rules.sql`; CHANGELOG AlertRules; item 13 of the 2026-11-27 PM-platforms research). Additive. A System Admin manages the rules in Settings: `GET /settings/alert-rules` (the rules plus the closed catalogues the form offers), `POST /settings/alert-rules`, `PUT /settings/alert-rules/{id}` (If-Match, a reason, audited `alert_rule_create`/`alert_rule_update`). A rule is a closed condition kind with closed params (`weekly_status_missing`: the regions without a Weekly status update of the current working week; `record_idle` `{register_key, state, days}`: the current records of the register in the state for at least days), a closed audience (`system_admin`, or `module` with a module key: the users whose assignment reaches the module) and a title/body template in English and Arabic with placeholders. The daily job fires the enabled rules: one in-app notification per recipient, deduped by (rule, period, target), in the recipient's language; a rule never changes a record, a state or a holder. `NotificationKind` gains `alert_rule` (in-app only).
+    - 0.15.249 (2026-11-27): kpi_threshold alert rules with editable thresholds, and enable/lock on every alert rule (owner approval 2026-11-27 relayed by Main; migration 0348, mirror `db/sql/347_kpi_threshold_alerts.sql`; CHANGELOG KpiThresholdAlerts). Additive. The generic alert rules (0.15.242) gain the third closed kind `kpi_threshold` `{kpi, op, value}`: the KPI is one of the dashboard settings catalogue, `op` is `above` or `below`, and `value` is the rule's own editable threshold (0..100000, in the unit of the KPI), independent of the dashboard green/amber bands. The daily job computes the live KPI values system-wide (the same queries the dashboard uses, no caller scope) and hands them to the database; a rule whose KPI crosses its threshold fires one in-app notification per recipient, deduped by (rule, day, kpi), with the placeholders {{kpi}}, {{value}} and {{threshold}} filled at fire time and the link defaulting to /dashboard. `AlertRule` and `AlertRuleInput` gain `locked`: while locked, a rule takes no edit and cannot be disabled - the only accepted save is the unlock itself (every other field unchanged), audited as `alert_rule_update`; a locked rule still fires. The alert-rules catalogue of `GET /settings/alert-rules` gains the KPI list the form offers. No new endpoint, grant, role or permission change.
     - 0.15.310 (2026-11-27): every register is downloadable (owner decision D48, 2026-11-27; no migration; CHANGELOG ExportAllRegisters). Additive. `GET /exports/parts` now also offers `car_dispatcher`, `financial_advances`, `incidents`, `lessons_learned` and `invoices`, and `POST /exports/master` accepts them in `parts` and as `view.source`; the 422 `not_in_master` of 0.15.34 is gone. Each writes its own sheet (Car Dispatcher, Financial Advances, Incidents, Lessons Learned, Invoices) with the register's template columns, header in row 1, no Master column. The rules are the other registers' rules: the export grant of the register's own module (no grant is seeded, so only a System Admin holds them until the owner grants them; Financial Advances and Invoices stay behind the finance grant), the export regions of that grant, voided rows left out of a full export, the field-level `in_export` switch and the personal-column rule. Settings and configuration are never exported. No schema change: `ExportPartKey` already listed the five keys.
     - 0.15.243 (2026-11-27): field quick capture for QC snags (owner request 2026-11-27; migration 0343; CHANGELOG FieldQuickCapture). Additive. The snag type photo rules `formats` list also accepts WEBM, MP4 and MOV, so a System Admin (or a Document Library configuration delegate) can let a snag type take a short field video through the existing `POST /snags/{snag_id}/photos` path; nothing is allowed by default (every type still lists only its own formats). A video has no EXIF date and is accepted with `unknown_capture_date`, like any photo without EXIF. No permission, visibility or authentication change; the photo rules, the format check and the upload limits are unchanged.
     - 0.15.248 (2026-11-27): high-contrast mode as an appearance dimension (item 19 of the 2026-11-27 batch, owner approval 2026-11-27 relayed by Main; migration 0347, mirror `db/sql/346_user_contrast.sql`; CHANGELOG HighContrast). Additive. `UiPrefs` gains `contrast` (`standard` = today's look, `high`): a personal choice (`MyProfilePatch.ui_prefs`), an organization default (`UiIdentityInput.defaults`, Settings > Identity), locked like every dimension while `identity.allow_user_choice` is false (403 `field_read_only`, `errors[0]` `{path: /ui_prefs, code: appearance_choice_locked}`), audited per dimension in `profile_updated`, resolved by `ui_effective_prefs`. The web paints `data-ui-contrast="high"`: stronger ink and line tokens only, the status colours and the designs are unchanged; `prefers-contrast: more` applies the high tokens while no choice is saved. No new column, grant, role or default changes.
+    - 0.15.320 (2026-11-27): list values export, download-edit-upload (owner decisions D54 and D55, 2026-11-27; no migration). Additive. (1) `GET /templates/TPL-LISTVALUES/download` takes `list=<catalogue code>`: the same template filled with the current active values of that list (code, labels, aliases, colour, parent value, sort order); without it the file stays empty as before. Same rights (System Admin or a delegate of `fields` edit, `download_documents` on `templates`), audited with the list code. (2) `POST /list-catalogues/{catalogue_code}/values/import` now updates a value whose code already exists (the code never changes; an empty cell leaves the value as it is; a row equal to the stored value is `unchanged`) and creates a new code, as before. The answer adds `created`, `updated` and `unchanged` next to `imported` (created plus updated). A code twice in the file is a 422 for that row. Every row applies or none does, as before. Values are never deleted or reactivated by a file.
     - 0.15.246 (2026-11-27): a soft "… is editing this record" notice (owner request 2026-11-27, item 17 of the 2026-11-27 batch; migration 0345; CHANGELOG RecordEditPresence). Additive and advisory only: nothing is locked. `POST /presence/editing` (`{kind, entity_id}`) is the editor's heartbeat (30 s; a row is stale after 2 minutes), `POST /presence/editing/stop` removes it at once, and `GET /presence/editing` (`kind`, `entity_id`) lists the other current editors of the entity (id, display name, since). Covers register records (kind `record`) and workflow tasks (kind `task`). No grant, role, permission, visibility or audit change.
+    - 0.15.331 (2026-11-27): register rules in Settings and the order's PR / PO on an invoice (migration 0430, mirror `db/sql/429_invoice_rules.sql`; decisions L1 and L2 of the relations review, on top of D58 / 0407). Additive. (1) `GET /settings/register-rules` (`listRegisterRules`) and `PUT /settings/register-rules/{register_key}` (`setRegisterRules`): the editable rules of a register (invoices: `currency`, `order_required`, `supplier_required`), System Admin or a `fields.edit` delegate, reason required, audited. (2) An invoice reads `order_pr_no` and `order_po_wo_no` from its Procurement order (derived, never typed). (3) Errors `order_required`, `supplier_required`, `unknown_rule`. The order and supplier links themselves are 0407's (`supplier_party_id`, `invoices/order-options`, `invoices/supplier-options`).
 
+    - 0.15.247 (2026-11-27): reactions on comments and a resolved flag (owner approval 2026-11-27, item 18 of the 2026-11-27 batch; migration 0346, mirror `db/sql/345_comment_reactions_resolve.sql`). Additive. New paths: `PUT`/`DELETE /comments/{comment_id}/reactions` (the emoji in the body, `👍` only, 422 `validation_failed` otherwise; a reaction of the caller on any comment they can read, a task comment or a register-record comment; idempotent both ways, 404 for a comment the caller cannot read) and `PUT`/`DELETE /comments/{comment_id}/resolved` (marks the point resolved or opens it again; records `resolved_at`/`resolved_by`). `Comment` gains `reactions` (`emoji`, `count`, `mine`) and `resolved` (`at`, `by`). The bar to react or resolve is the same as to comment: reading the thread. Not audited. No existing field or behaviour changes.
+    - 0.15.245 (2026-11-27): pin a saved view as a personal card on the home dashboard (owner request 2026-11-27, item 16 of the 2026-11-27 batch; migration 0344; CHANGELOG HomeViewPins). Additive. `POST /saved-views/{view_id}/pin` and `POST /saved-views/{view_id}/unpin` manage the caller's pins (at most 12, position kept; a view the caller may not read answers 404, exactly like `GET /saved-views/{view_id}`) and `GET /me/home-pins` (`HomeViewPin`) lists them in order (inactive views drop out). The card shows each pin with a counter the screen's own list endpoint computes for the caller, so the counts stay inside the caller's permissions; the dashboard settings catalogue gains the card `pinned_views` (Settings > Dashboard, shown by default). Personal display preference: no grant, role, permission, visibility or audit change.
     - 0.15.240 (2026-11-27): intake triage for the Issue Log and the Change Control Log (owner request 2026-11-27; migration 0340, mirror `db/sql/339_register_triage.sql`; CHANGELOG RegisterTriage). Additive. (1) `RegisterDefinition.triage_enabled` (true for `issues` and `change_control`): a record of such a register enters an intake queue (`RegisterRecord.triage.state` `pending`) on every insert, a new version included (the old decision is cleared). (2) New `POST /registers/{register_key}/records/{record_id}/triage` (`triageRegisterRecord`): one decision of the register's Matrix L2 holders of the record's region (a System Admin only when the row has no holder, exactly like an approval): `accept` (the record proceeds to its normal flow), `defer` (stays in the queue, with a note), `reject` (note and step-up required; the record is `voided`) and `merge` (`duplicate_of`, note and step-up; the record is `voided`, links the surviving record `triage.duplicate_of`, and the decision is noted on the surviving record's comment thread). `If-Match` is the record's version; `allowed_actions` gains `triage` while a record is pending or deferred and the caller may decide. `GET /registers/{register_key}/records` takes `triage` (one of `TriageState`). (3) Audited as `register_record_triage` with before and after; `RegisterRecordStep.action` gains `triage_accept`, `triage_reject`, `triage_merge`, `triage_defer`; the creator is notified (`NotificationKind` gains `triage_decision`). No grant, role or default changes.
     - 0.15.266 (2026-11-27): an archive before the project data reset deletes (Data entry proposal P2, approved by the owner 2026-11-27; migration 0371, mirror `db/sql/370_data_reset_archive.sql`). Additive and backward compatible: a request without `archive` is mode none as before. `POST /settings/data-reset/requests` takes optional `archive` (none, download, keep_90), stored and immutable with the request (not part of `scope_hash`). New `POST .../requests/{request_id}/archive` (make, async) and `GET .../archive/download` (System Admin, step-up, a security-log entry per download). `DataResetRequest.archive` (`DataResetArchiveInfo`). `POST .../run` is 409 `archive_required` until the archive is ready (download, and downloaded once). Kept 7 days at most (download) or 90 days (keep_90), then removed. New `ErrorCode` `archive_required`, `archive_expired`.
     - 0.15.265 (2026-11-27): the project data reset can be narrowed inside a register part (Data entry proposal P1, approved by the owner 2026-11-27; migration 0370, mirror `db/sql/369_data_reset_narrow.sql`). Additive and backward compatible: a request without `narrow` is the whole part as before. `POST /settings/data-reset/requests` takes optional `narrow` (`DataResetNarrow`: `regions`, `batches`, `from`, `to`; every given key must match): the register entities that match go, the others stay with everything that hangs off them (every version of a record, steps, documents and files, comments, drafts, links). The unit is the entity; `from`/`to` are the days the entity was first created (inclusive, Africa/Tripoli); `batches` are import batches the record came from. Only parts whose data follows one register record can be narrowed (`DataResetPart.narrowable`); a narrowing needs chosen parts (not everything) and any other part is 422. A part the chosen one takes along (procurement takes car_dispatcher and financial_advances) loses only the entities linked to the selected procurement records. The narrowing is stored in `DataResetScope.narrow` and bound into `scope_hash`/`approved_scope_hash`: an approver who saw another narrowing is 409 `scope_changed`. `GET /settings/data-reset/plan` takes `regions`, `batches`, `from`, `to` (the dry run of the narrowed scope, `DataResetPlan.narrow`). New `GET /settings/data-reset/narrow-options?part=` lists the regions and the recent import batches of the part for the picker. System Admin only, no delegation.
+    - 0.15.312 (2026-11-27): operational limits in Settings (review item 5, owner decision 35; migration 0402, mirror `db/sql/401_ops_limits.sql`). Additive; every default is the number the code used before, so nothing changes until a System Admin changes a value. New paths `GET` and `PUT /settings/ops-limits` (`getOpsLimits`, `setOpsLimits`, schemas `OpsLimits`, `OpsLimitItem`, `OpsLimitsInput`). Every signed-in user reads the catalogue and the values in force; only a System Admin changes them (a `settings` delegate does not), with a reason, a step-up and `If-Match`, audited `ops_limits_update` with the stored values before and after. Eleven limits: session idle hours (8) and absolute hours (12), step-up seconds (300, it also honours the earlier setting `stepup_max_age_seconds` until a value is saved here), and the row or entry caps of the assignments request (2000), imports (2000), Master import (5000), register import (5000), template prefill rows and sites (5000), log export (100000) and the idempotency store (5000). A key that is left out of `values` returns to its default. 422 for an unknown key, a non-integer, a value outside its range or an absolute session shorter than the idle limit.
     - 0.15.264 (2026-11-27): `GET /custom-fields` and `GET /custom-fields/{field_id}` now have an implementation (they were documented only; the list was always empty). No migration, no schema change. Everyone signed in reads the active fields their field rules do not hide; inactive fields and the role lists are for a System Admin or an all-regions delegate of the custom fields. POST and PATCH stay documented, not built (proposal to follow).
     - 0.15.226 (2026-11-27): the Deliverables register is enabled (migration 0326; Q71): site-scoped, linked to a task and a gate of the site, with the document and acceptance reference rules. Additive: `deliverables` joins `RegisterKey` and `ExportPartKey` (not in the Master sheet); no new endpoint.
     - 0.15.261 (2026-11-27): mail policy (migration 0364, mirror `db/sql/363_mail_policy.sql`). Additive. New `GET/PUT /settings/mail-policy` (the setting `mail.policy`: global switch, internal only or internal plus external recipients, internal domains, per kind switch and mode). `expiry_radar`, `approval_digest` and `weekly_digest` join the mail kind catalogue (still mailed only when listed in `mail.notification_kinds`). Defaults keep today's behaviour.
@@ -86,6 +95,7 @@ info:
     - 0.15.185 (2026-11-27): interface features setting (migration 0280, mirror `db/sql/279_ui_features.sql`; CHANGELOG UiFeatures). Additive. `GET`/`PUT /settings/ui-features`: one guarded setting with a closed object per feature section (`UiFeatures`: `avatars` and `new_badge` now; the inbox, menu, hub and mobile sections of items 6 to 15 are added by later migrations). Read by every signed-in user; written by a System Admin or an all-regions delegate of `admin.settings` with a reason and If-Match, audited.
     - 0.15.230 (2026-11-27): appearance profiles (owner approval 2026-11-27, the improvement proposal items 1-3; migration 0241; CHANGELOG AppearanceProfiles). Additive. (1) `User` and `MyProfile` gain `ui_prefs` (the stored personal appearance choices; `{}` = the organization defaults) and `appearance` (what the user sees: own choices, else the organization defaults; `ui_effective_prefs`). `MyProfile.identity` gains `defaults` (the organization appearance defaults) and `pref_options` (the dimensions with their allowed values). (2) `MyProfilePatch` gains `ui_prefs` (`UiPrefs`, a subset of the dimensions; while `allow_user_choice` is false a value is 403 `field_read_only`, `errors[0]` `{path: /ui_prefs, code: appearance_choice_locked}`); audited per dimension in `profile_updated`. (3) `UiIdentity` gains `defaults` and `pref_options`; `UiIdentityInput` gains optional `defaults` (omitted keeps the current ones). The dimensions: `density`, `font_scale`, `radius`, `motion`, `icon_style`, `menu_style`, `accent` (`UiPrefs`).
     - 0.15.231 (2026-11-27): the personal sidebar (owner approval 2026-11-27, the improvement proposal item 4; migration 0242; CHANGELOG SidebarPrefs). Additive. `UiPrefsSelf` (the `ui_prefs` of `User`, `MyProfile` and `MyProfilePatch`) gains the key `sidebar` (`UiNav`): `hidden` (screens the menu does not show), `order` (their order inside their heading), `badge_style` (full / dot / none), `pins` (at most 20 pinned shortcuts). The organization layout and the permission filter still apply first; the overlay only hides, reorders inside a heading, restyles badges and pins. A `ui_prefs` body without `sidebar` keeps the stored one; while `identity.allow_user_choice` is false a sidebar-only change stays allowed. Audited per key in `profile_updated`.
+    - 0.15.232 (2026-11-27): the workspace logo in the identity (owner approval 2026-11-27, the improvement proposal item 5; migration 0243; CHANGELOG WorkspaceLogo). Additive. The table `ui_assets` keeps small identity images ('logo'); `UiIdentity` gains `logo` (`UiAsset`, null when none was uploaded). `GET /ui/assets/{key}` serves the bytes of an enabled asset to every signed-in user (404 otherwise). A System Admin or a delegate of `settings` edit for all regions uploads with `PUT /settings/identity/logo` (multipart `file` + `reason`, If-Match on the asset version; an upload always enables; audited `ui_asset_update`) and shows or hides it with `PATCH /settings/identity/logo` (`{enabled, reason}`; hiding keeps the row: hide never delete). The logo may also show on the sign-in pages and as the browser tab icon, both OFF by default (owner decision 2026-11-27): `UiAsset` gains `show_on_login` and `use_as_favicon`; `PATCH /settings/identity/logo/display` (`setUiLogoDisplay`, reason, step-up, If-Match, audited `ui_asset_update`) sets them; the public reads `GET /ui/public/identity` and `GET /ui/public/logo/{purpose}` (no session, 30 s cache, rate limited) answer only for an enabled logo whose purpose is on, else null / 404.
     - 0.15.92 (2026-11-27): order picker for the Car dispatcher and Financial advances (CHANGELOG OrderPickersDispatchAdvances). Additive, no migration. `GET /registers/car_dispatcher/order-options` and `GET /registers/financial_advances/order-options` list the approved, active Procurement orders for the field `procurement_record_id` (the same list as the warehouse picker); each needs its own module view, and only orders in regions where the caller also holds the Procurement view right are listed.
     - 0.15.91 (2026-11-26): warehouse receipt to Procurement order link (migration 0181; CHANGELOG WarehouseProcurementLink). Additive. A warehouse receipt (PL or OPEN) may name the approved, active Procurement order it belongs to (`procurement_order_id`); `pr_no`, `po_wo_no` and `order_contractor` are then derived from the order (read only). New `GET /registers/warehouse/order-options` (the picker) and `GET /registers/procurement/{entity_id}/receipts` (the receipts against an order). New 422 codes `receipt_only`, `order_not_active`, `order_other_site`.
     - 0.15.151 (2026-11-27): scheduled recurring Master export (migration 0251; CHANGELOG MasterExportSchedule). Additive. `GET/PUT /exports/schedules` and `DELETE /exports/schedules/{id}` (`listExportSchedules`, `saveExportSchedule`, `deleteExportSchedule`): the caller's own schedules (daily, weekly on a weekday, monthly on day 1 to 28; the whole Master or chosen parts and regions; at most 5). No job runs as a person: `GET /exports/master` (first page) starts the caller's due schedules in the caller's own request through the normal start path, so every grant check applies then; the file appears in the exports list when the owner next opens Exports. A schedule that cannot start records `last_error`.
@@ -93,6 +103,7 @@ info:
     - 0.15.150 (2026-11-27): recycle bin for voided register records (migration 0250; CHANGELOG RecycleBin). Additive. (1) `GET /recycle-bin` (`getRecycleBin`): the voided records inside the retention window, with who voided, why, until when each can be restored and `blocked` when a restore is not possible. (2) `POST /recycle-bin/{id}/restore` (`restoreRegisterRecord`): returns the record to a draft (`entry`, level 1); needs If-Match, a reason and a step-up. (3) `PUT /recycle-bin/retention` (`setRecycleBinRetention`): 30 to 730 days, default 90. System Admin only; nothing is deleted.
     - 0.15.94 (2026-11-26): `GET /audit-log/field-history` takes `field` as optional (item 2 of the 2026-11-26 review; no migration). Additive. Without `field` it returns every field change of the record (a register record by its logical `entity_id`, a task by its task id), newest first, at most 200: the field diff of the History tab. Changes of a field the caller may not see are left out (a `hidden` field rule, and the amounts of Financial Advances for a caller who may not see amounts); the reader rules (decision B4) and the audit of the read are unchanged. `entity_type` and `entity_id` stay required (422).
     - 0.15.93 (2026-11-26): global search also reads tasks and warehouse items (owner approval 2026-11-26; no migration). Additive. `SearchType` gains `tasks` (the tasks of the sites the caller may view, same Site Register right and regions as the site list; the hit opens `/sites/{id}?task={task_id}`) and `warehouse_items` (needs `warehouse` view, as `GET /warehouse/items`; items are global). Read only, a group the caller may not read is left out as before.
+    - 0.15.399 (2026-11-27): global search also reads QC snags and finds warehouse items by their type (no migration). Additive. `SearchType` gains `snags` (the Quality module and the Site Register right of the snag's region, as the snag list; the text is the snag type code and names, the description, severity, scope, status and the site; the hit opens `/sites/{id}?tab=snags`). The `warehouse_items` group now also matches the item's group (its type, for example the category), so a type word finds every item of it. Read only, a group the caller may not read is left out as before.
     - 0.15.89 (2026-11-26): contractor performance view (migration 0180; CHANGELOG ContractorPerformance). Additive and read only. (1) `GET /reports/contractor-performance` (`getContractorPerformance`): one row per active contractor, computed on read from the delay days of its issues, its snags, its quality results, its Procurement orders and its contract end; nothing is typed or stored. (2) `GET/PUT /settings/contractor-performance` (`getContractorPerformanceThresholds`, `setContractorPerformanceThresholds`): the amber and red thresholds and the least sample, audited as `contractor_performance_thresholds_update`. No table, no permission change.
     - 0.15.85 (2026-11-26): the dashboard issues section gains two read-only breakdowns (migration 0172; issue work package 3). `DashboardIssues` gains `by_category` and `by_reason`: the open issues of the section grouped by the stored IssueCategory / BlockerReason list code, each row with the code (null when the field is empty), the list labels, the count of issues and the count of distinct sites (the same two measures as `by_owner`, Q36). The labels follow Settings > Lists; a hidden or renamed value keeps counting under its new label, a code no longer in the list counts under the code itself. Nothing existing changes and no permission or visibility changes.
     - 0.15.84 (2026-11-26): the read-only GECOL / HLC counts screen (owner request 2026-11-26, a step before any move of GECOL or HLC data). Additive, no migration. `GET /reports/gecol-hlc-counts` (System Admin or a delegate holding `admin.settings` view for all regions) counts the GECOL, HLC and Procurement register records (the latest version of each record, by state and Procurement by scope), the GECOL records that already hold a PR number or a request date, the HLC records linked or not linked to a Procurement request, and the sites that have the GECOL or HLC scope. It reads only; nothing is changed.
@@ -101,6 +112,7 @@ info:
     - 0.15.82 (2026-11-26): `GET /me/tasks.ics` returns My Work (do now and late) as an iCalendar file. Needs the session like every call; same rights and region scope as `GET /me/tasks`; nothing public and no token link. No migration.
     - 0.15.81 (2026-11-26): two more UI designs, `obsidian` and `sahara` (migration 0164): `UiBrand` gains the two names (users.ui_brand, `ui.identity` default_brand, `PATCH /me/profile`). Visual only; the four existing designs, the light/dark theme and the storage are unchanged.
     - 0.15.80 (2026-11-26): what a role sees of the Dashboard (migration 0163). `Role.dashboard_tabs` (any non-empty combination of `pmo`, `cw`, `te`; default all three) and `Role.hide_messages_inbox` (default false); `RolePatch` sets them (System Admin only, 403 `delegate_forbidden` for a delegate; reason, step-up; audited as `role_dashboard_access_set`). `EffectivePermissions.dashboard_tabs` is the union over the roles held now (a System Admin or a user with no active role: all three). `GET /dashboard`, `/dashboard/extras`, `/dashboard/export` and `/project-status*` answer 403 `action_forbidden` outside the caller's tabs (`pmo` includes the others; view CW needs `cw`, view TE needs `te`, any other view or none needs `pmo`). A role that hides Messages and Inbox removes only the two menu entries of its holders (`effective.nav`); the pages and the API are unchanged. No grant, role or default changes.
+    - 0.15.500 (2026-11-27): the role code is editable (owner decision D51; migration 0500; no new route). `RolePatch.code` (`^[A-Z][A-Z0-9_]{1,40}$`; reason and step-up as for any role edit; audited as `role_code_changed` with the old and the new code). 422 `validation_failed` for a bad format or for a built-in role whose code the platform uses by name (PM, CW_TL, TE_TL and the other seeded roles, plus QC_GENERAL, FLEET_DISPATCHER, FIN_OFFICER), 409 `duplicate` when the code exists. History, saved filters and exports that quote the old code are not rewritten. `Role.description_ar` and `RoleInput.description_ar` were already in the contract; the Roles dialog now edits them.
     - 0.15.79 (2026-11-26): "Forgot password" by email: `POST /auth/local/password-reset/request` (always the same 202) and `POST /auth/local/password-reset/confirm` (one-time link, 204). Local-password accounts only; System Admins and M365 or break-glass accounts are excluded. No existing endpoint changes.
     - 0.15.78 (2026-11-25): `PATCH /users/{user_id}` also takes `display_name`; `employee_id` is now edited by the admin (4 digits, unique, audited as `user_identity`, never your own row). E-mail and phone stay on the verified request flow. No new endpoint.
     - 0.15.77 (2026-11-25): Real delete of a warehouse item that has no data (owner decision 2026-11-25): `DELETE /warehouse/items/{item_id}?reason=` (System Admin or the `warehouse_items` delegate, reason, If-Match, audited). Allowed only when no movement line (any status), serial, site quantity or As-Built link points to the item; otherwise 409 `item_in_use` and the item can only be deactivated (PATCH `is_active: false`, unchanged). The item answer carries `deletable` (read-only). Migration 0160.
@@ -232,6 +244,7 @@ info:
     - 0.2.0 (2026-10-25): additive. No operation or schema of 0.1 was removed or renamed (ADR 0011).
     - 0.1.0 (2026-10-25): first contract for P1. Breaking changes are recorded in `docs/adr/` (ADR 0001 §6).
     - 0.15.204 (2026-11-27): the dashboard follow-up sections, pending approvals bottleneck (owner approval 2026-11-26, dashboard proposals item 7; migration 0305). Additive and read only. `GET /dashboard/ops` gains the section `approvals` (`DashboardOpsApprovals`): the tasks waiting for review or approval (states in_review and in_approval, the same population as the Approvals inbox), their ages in calendar days since the level opened, split review against approve, and the same ages grouped by the ball-in-court role so the bottleneck role shows. The section needs the approvals view (and the sites view, like the inbox) and answers available false without them. The dashboard settings catalogue gains the card `ops_approvals`. No grant, role or permission change.
+    - 0.15.205 (2026-11-27): the dashboard follow-up sections, change requests and overdue meeting actions (owner approval 2026-11-26, dashboard proposals item 8; migration 0306). Additive and read only. `GET /dashboard/ops` gains the section `changes_meetings` (`DashboardOpsChangesMeetings`): the change requests still pending (status requested) with their ages since the request date and a count per kind, the approved ones not yet applied, and the meeting actions not closed with the overdue ones aged by days late. Each part needs its own module view (change control, meetings) and answers `available: false` with null figures without it. No amounts.
 
     ## Changes since 0.1
     - **Auth**: `GET /auth/login` accepts `identifier` (email, 4-digit employee ID or E.164 phone) and answers 302 the same way whether or not it matches; rate limited (ADR 0002 §9b). Local password sign-in stays deferred and is not in the contract.
@@ -6825,6 +6838,87 @@ paths:
                 properties:
                   items: { type: array, items: { $ref: '#/components/schemas/Setting' } }
         '401': { $ref: '#/components/responses/Unauthorized' }
+  /settings/register-rules:
+    get:
+      tags: [settings]
+      operationId: listRegisterRules
+      summary: The editable rules of the registers and their values
+      x-db-path: reg_rules_json
+      description: |
+        0.15.331 (migration 0430). System Admin or a delegate of `fields.edit` for all regions. `catalogue` lists the keys that can be edited (register, key, type, default, labels), `items` the registers that have some with their current `rules`.
+      responses:
+        '200':
+          description: The rules.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [catalogue, items]
+                properties:
+                  catalogue:
+                    type: array
+                    items:
+                      type: object
+                      required: [register_key, key, type, label_en]
+                      properties:
+                        register_key: { type: string }
+                        key: { type: string }
+                        type: { type: string, enum: [boolean, text] }
+                        default: {}
+                        label_en: { type: string }
+                        label_ar: { type: string }
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [register_key, name_en, rules, version]
+                      properties:
+                        register_key: { type: string }
+                        name_en: { type: string }
+                        name_ar: { type: [string, 'null'] }
+                        rules: { type: object, additionalProperties: true }
+                        version: { type: integer }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /settings/register-rules/{register_key}:
+    parameters:
+      - $ref: '#/components/parameters/RegisterKeyAny'
+    put:
+      tags: [settings]
+      operationId: setRegisterRules
+      summary: Change rules of one register
+      x-db-path: admin_register_rules
+      description: |
+        0.15.331 (migration 0430). Only keys of the catalogue (422 `unknown_rule`), each with the right type (422 `invalid`). A reason is required, the ETag is checked and the change is audited with before and after.
+      parameters:
+        - { name: If-Match, in: header, required: false, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rules, reason]
+              properties:
+                rules: { type: object, additionalProperties: { oneOf: [{ type: boolean }, { type: string }] } }
+                reason: { $ref: '#/components/schemas/Reason' }
+      responses:
+        '200':
+          description: The new rules.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [register_key, rules, version]
+                properties:
+                  register_key: { type: string }
+                  rules: { type: object, additionalProperties: true }
+                  version: { type: integer }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
   /settings/sla-rules:
     get:
       tags: [settings]
@@ -9659,14 +9753,13 @@ paths:
         '404': {$ref: '#/components/responses/NotFound'}
         '410': {description: The archive is no longer kept., content: {application/problem+json: {schema: {$ref: '#/components/schemas/Problem'}}}}
         '503': {$ref: '#/components/responses/ServiceUnavailable'}
-  /settings/imports:
+  /settings/template-change-notice:
     get:
       tags: [settings]
-      operationId: getImportsSettings
-      summary: The background threshold of batches (imports.async_rows)
+      operationId: getTemplateChangeNotice
+      summary: The notice of a new template version (templates.change_notice)
       description: |
-        0.14.6. Every signed-in user may read it. A send or a decision of a batch (New sites, register, stream, and each staged batch of a Master import apply) with more
-        rows than `async_rows` runs in the background (202, status `processing`). `can_edit` is true for a System Admin or a delegate of `settings` edit for all regions.
+        0.15.203 (P3). Every signed-in user may read it. `enabled`: the daily job writes an in-app notice to the entry holders of a register when its template gets a new version; `days`: how long after the version is issued a person is still told. `can_edit` is true for a System Admin or a delegate of `settings` edit for all regions.
       responses:
         '200':
           description: The setting.
@@ -9674,24 +9767,22 @@ paths:
             ETag: {$ref: '#/components/headers/ETag'}
           content:
             application/json:
-              schema: {$ref: '#/components/schemas/ImportsSettings'}
+              schema: {$ref: '#/components/schemas/TemplateChangeNotice'}
         '401': {$ref: '#/components/responses/Unauthorized'}
     put:
       tags: [settings]
-      operationId: setImportsSettings
-      summary: Change the background threshold (reason, If-Match, audited)
+      operationId: setTemplateChangeNotice
+      summary: Change the notice of a new template version (reason, If-Match, audited)
       description: |
-        0.14.6. A System Admin, or a delegate of `settings` edit for all regions (403 `action_forbidden` otherwise, also for a delegate limited to some regions). A whole number
-        from 10 to 500 (422 `validation_failed`, path `/async_rows`), a reason and If-Match; an unknown key is refused (422 `unknown_field`). Saving the value in force is
-        409 `invalid_transition`. Audited as `imports_async_rows_update` with the value, who and when before and after. The next send or decision reads the new value.
-      x-db-path: admin_set_imports_async_rows
+        0.15.203. A System Admin, or a delegate of `settings` edit for all regions (403 `action_forbidden`). `days` 1 to 365 (422 `validation_failed`, path `/days`), a reason and If-Match. Saving the values in force is 409 `invalid_transition`. Audited as `template_change_notice_update` with the values before and after.
+      x-db-path: admin_set_template_change_notice
       parameters:
       - {$ref: '#/components/parameters/IfMatch'}
       requestBody:
         required: true
         content:
           application/json:
-            schema: {$ref: '#/components/schemas/ImportsSettingsInput'}
+            schema: {$ref: '#/components/schemas/TemplateChangeNoticeInput'}
       responses:
         '200':
           description: Saved.
@@ -9699,7 +9790,49 @@ paths:
             ETag: {$ref: '#/components/headers/ETag'}
           content:
             application/json:
-              schema: {$ref: '#/components/schemas/ImportsSettings'}
+              schema: {$ref: '#/components/schemas/TemplateChangeNotice'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /settings/imports/upload-policy:
+    get:
+      tags: [settings]
+      operationId: getImportsUploadPolicy
+      summary: The upload policy of the imports (imports.upload_policy)
+      description: '0.15.322. Every signed-in user may read it. `enforce` (default) keeps the sequencing locks of the sites; `accept_incomplete` opens the sites of a Master import run before it is applied (see the apply).'
+      responses:
+        '200':
+          description: The policy.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ImportsUploadPolicy'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+    put:
+      tags: [settings]
+      operationId: setImportsUploadPolicy
+      summary: Change the upload policy (reason, If-Match, audited)
+      description: '0.15.322. A System Admin, or a delegate of `settings` edit for all regions (403 `action_forbidden` otherwise). `policy` is `enforce` or `accept_incomplete` (422 `validation_failed`, path `/policy`; an unknown key 422 `unknown_field`), with a reason and If-Match. Saving the value in force is 409 `invalid_transition`. Audited as `imports_upload_policy_update` with before and after.'
+      x-db-path: admin_set_imports_upload_policy
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ImportsUploadPolicyInput'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ImportsUploadPolicy'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '409': {$ref: '#/components/responses/Conflict'}
@@ -10045,6 +10178,212 @@ paths:
             image/jpeg: {schema: {type: string, format: binary}}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '404': {$ref: '#/components/responses/NotFound'}
+  /settings/identity/logo:
+    put:
+      tags:
+      - settings
+      operationId: putUiLogo
+      summary: Upload the workspace logo (reason, step-up, If-Match, audited) (0.15.107)
+      description: 'A System Admin, or a delegate of `settings` edit for all regions (403 `action_forbidden` otherwise, also for a delegate limited to some regions). A `reason`
+
+        (3+ characters), a step-up (401 `step_up_required`) and, once a logo exists, `If-Match` on the asset `version` (428 / 412) are required. The body is the
+
+        image: PNG, JPEG, SVG or WebP, 256 KiB at most (422 `errors[0]` `{path: /file}`). An upload always enables the logo and bumps the version. Audited
+
+        `ui_asset_update` with the metadata (never the bytes) before and after.
+
+        '
+      x-step-up: true
+      x-db-path: admin_put_ui_asset
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+              - file
+              - reason
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: 'The logo image: PNG, JPEG, SVG or WebP, 256 KiB at most (422 `errors[0]` `{path: /file}`).'
+                reason:
+                  type: string
+                  minLength: 3
+                  maxLength: 1000
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UiAsset'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+    patch:
+      tags:
+      - settings
+      operationId: setUiLogoEnabled
+      summary: Show or hide the workspace logo (reason, step-up, If-Match, audited) (0.15.107)
+      description: 'Hiding keeps the row and its bytes (hide never delete): the sidebar falls back to the built-in badge until the logo is enabled again. The same rights,
+
+        reason, step-up and If-Match rules as the upload; a missing logo is 422 `errors[0]` `{path: /key, code: not_found}` and saving the state in force is 409
+
+        `invalid_transition`. Audited `ui_asset_update`.
+
+        '
+      x-step-up: true
+      x-db-path: admin_set_ui_asset_enabled
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UiAssetEnabledInput'
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UiAsset'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+  /settings/identity/logo/display:
+    patch:
+      tags: [settings]
+      operationId: setUiLogoDisplay
+      summary: Where the logo shows outside the app, the sign-in pages and the browser tab icon (reason, step-up, If-Match, audited) (0.15.232)
+      description: |
+        Both switches are off until an admin turns one on, so nothing about the logo is public by default. A switch has an effect only while the logo is enabled.
+        Same rights, reason, step-up and If-Match rules as the upload; a missing logo is 422 `errors[0]` `{path: /key, code: not_found}`, saving the values in force is
+        409 `invalid_transition`. Audited `ui_asset_update` with before and after.
+      x-step-up: true
+      x-db-path: admin_set_ui_asset_display
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/UiAssetDisplayInput'}
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/UiAsset'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /ui/public/identity:
+    get:
+      tags: [settings]
+      operationId: getUiPublicIdentity
+      summary: Which public pages show the logo (no session) (0.15.232)
+      description: |
+        No session. Only whether the sign-in pages and the tab icon use the logo, with the version for cache busting; `null` for a purpose that is off (the default). Nothing
+        about users, no audit data. Cached 30 seconds and rate limited per address (429 `rate_limited`).
+      x-db-path: ui_asset_public_state
+      responses:
+        '200':
+          description: The public identity.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/UiPublicIdentity'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /ui/public/logo/{purpose}:
+    get:
+      tags: [settings]
+      operationId: getUiPublicLogo
+      summary: The logo image for the sign-in pages or the tab icon (no session) (0.15.232)
+      description: |
+        No session. The bytes of the enabled logo, only while the admin switched this purpose on; otherwise 404. SVG is served with a sandboxing Content-Security-Policy and
+        `nosniff`. Cached 30 seconds and rate limited per address.
+      x-db-path: ui_asset_public
+      parameters:
+      - {name: purpose, in: path, required: true, schema: {type: string, enum: [login, favicon]}}
+      responses:
+        '200':
+          description: The image.
+          content:
+            image/png: {schema: {type: string, format: binary}}
+            image/jpeg: {schema: {type: string, format: binary}}
+            image/svg+xml: {schema: {type: string, format: binary}}
+            image/webp: {schema: {type: string, format: binary}}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /ui/assets/{key}:
+    get:
+      tags:
+      - settings
+      operationId: getUiAsset
+      summary: The bytes of an enabled identity image (0.15.107)
+      description: Every signed-in user may read it (the logo is the organization identity, not user data). 404 when the key is unknown or the asset is hidden. Cache with the `version` of `UiIdentity.logo` as the query `v`.
+      x-db-path: ui_asset_get
+      parameters:
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^[a-z0-9_]{1,40}$
+      responses:
+        '200':
+          description: The image.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/svg+xml:
+              schema:
+                type: string
+                format: binary
+            image/webp:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
   /settings/login-page:
     get:
       tags: [settings]
@@ -10574,6 +10913,54 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '429': {$ref: '#/components/responses/TooManyRequests'}
+  /settings/ops-limits:
+    get:
+      tags: [settings]
+      operationId: getOpsLimits
+      summary: The operational limits, with the value in force and the default of each (0.15.312)
+      description: Every signed-in user may read it. `can_edit` is true for a System Admin only. A value that was never saved reads as its default.
+      x-db-path: ops_limits_state
+      responses:
+        '200':
+          description: The limits.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/OpsLimits'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+    put:
+      tags: [settings]
+      operationId: setOpsLimits
+      summary: Change the operational limits (System Admin, reason, step-up, If-Match, audited) (0.15.312)
+      description: |
+        System Admin only (403 `action_forbidden` otherwise, a delegate included). A reason (3+ characters), a step-up (401 `step_up_required`) and `If-Match` (428 / 412)
+        are required. `values` holds the limits that differ from their default; a key that is left out returns to its default. 422 for an unknown key, a value that is not a
+        whole number, a value outside its range, or an absolute session length shorter than the idle limit. Saving what is already in force is 409 `invalid_transition`.
+        Audited `ops_limits_update` with the stored values before and after.
+      x-step-up: true
+      x-db-path: admin_set_ops_limits
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/OpsLimitsInput'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/OpsLimits'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
   /settings/historical-waiver:
     get:
       tags: [settings]
@@ -13339,6 +13726,27 @@ paths:
                     type: array
                     items: {$ref: '#/components/schemas/Template'}
         '401': {$ref: '#/components/responses/Unauthorized'}
+  /templates/{template_id}/changes:
+    parameters:
+    - {$ref: '#/components/parameters/TemplateId'}
+    get:
+      tags: [templates]
+      operationId: getTemplateChanges
+      summary: What changed between two versions of a template (columns added, removed, renamed)
+      description: |
+        P3 (0.15.203). Compares `template_versions.columns` by column code. `to` defaults to the current version, `from` to the version before it. Read only; a caller who may not see the template gets 404 as for `GET /templates`.
+        A version that was never issued (for example from > current) answers 404. The first version has nothing to compare: `from` is null and the lists are empty.
+      parameters:
+      - {name: from, in: query, schema: {type: integer, minimum: 1}}
+      - {name: to, in: query, schema: {type: integer, minimum: 1}}
+      responses:
+        '200':
+          description: The differences.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/TemplateChanges'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
   /templates/{template_id}/download:
     parameters:
     - {$ref: '#/components/parameters/TemplateId'}
@@ -13362,6 +13770,10 @@ paths:
         schema:
           type: array
           items: {type: string, format: uuid}
+      - name: list
+        in: query
+        description: '0.15.320. Only for `TPL-LISTVALUES`: the code of a dropdown list. The file holds the current active values of that list (at most 5000), ready to edit and upload again.'
+        schema: {type: string, pattern: '^[A-Za-z][A-Za-z0-9_]{0,63}$'}
       - name: prefill
         in: query
         description: Pre-fill with the current records of the register (at most 5000 rows).
@@ -17691,6 +18103,127 @@ paths:
         '200': {description: Removed (also when there was none).}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '422': {$ref: '#/components/responses/Unprocessable'}
+  /comments/{comment_id}/reactions:
+    parameters:
+      - $ref: '#/components/parameters/CommentId'
+    put:
+      tags: [tasks]
+      operationId: reactToComment
+      summary: React to a comment (0.15.247, PM item 18)
+      description: Adds the caller's reaction to any comment they can read, a task comment or a register-record comment (the same bar as commenting on it). The emoji travels in the body because the client path whitelist keeps non-ASCII out of URLs. 404 `not_found` for a comment the caller cannot read, so its existence is not revealed; 422 `validation_failed` for an unsupported emoji. Idempotent. Not audited.
+      x-db-path: comment_react
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CommentReactionInput'}
+      responses:
+        '204': {description: Reaction recorded (also when it was already there).}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': { $ref: '#/components/responses/Unprocessable' }
+    delete:
+      tags: [tasks]
+      operationId: unreactToComment
+      summary: Remove the caller's reaction (0.15.247)
+      description: Removes the caller's own reaction, named in the body like the PUT. 404 for a comment the caller cannot read. Idempotent.
+      x-db-path: comment_unreact
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CommentReactionInput'}
+      responses:
+        '204': {description: Reaction removed (also when it was not there).}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /comments/{comment_id}/resolved:
+    parameters:
+      - $ref: '#/components/parameters/CommentId'
+    put:
+      tags: [tasks]
+      operationId: resolveComment
+      summary: Mark a comment resolved (0.15.247, PM item 18)
+      description: Marks the point of the comment resolved and records who did it and when. Anyone who can read the thread may resolve, the same bar as commenting. 404 for a comment the caller cannot read. Not audited.
+      x-db-path: comment_set_resolved
+      responses:
+        '204': {description: Resolved.}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    delete:
+      tags: [tasks]
+      operationId: unresolveComment
+      summary: Open a resolved comment again (0.15.247)
+      description: Clears the resolved mark (`resolved_at` and `resolved_by` read as null again). 404 for a comment the caller cannot read.
+      x-db-path: comment_set_resolved
+      responses:
+        '204': {description: Open again.}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /me/home-pins:
+    get:
+      tags: [saved-views]
+      operationId: getHomePins
+      summary: The caller's pinned home views (0.15.245)
+      description: >-
+        0.15.245 (migration 0344). The views the caller pinned as cards on the home dashboard, in the pin order. A pin is personal; a view
+        that was deactivated or became unreadable drops out of the list. The counter a card shows is computed by the screen's own list
+        endpoint for the caller, so it always stays inside the caller's permissions.
+      responses:
+        '200':
+          description: The caller's pinned views, in the pin order.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: '#/components/schemas/HomeViewPin'}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+  /saved-views/{view_id}/pin:
+    post:
+      tags: [saved-views]
+      operationId: pinSavedViewHome
+      summary: Pin a saved view as a card on the home dashboard (0.15.245)
+      description: >-
+        0.15.245 (migration 0344). Personal: the pin is the caller's own. A view the caller may not read answers 404, exactly like
+        `GET /saved-views/{view_id}`. At most 12 pins per caller (422 `validation_failed`, `/view` `too_many`); pinning again is a no-op.
+      parameters:
+        - {name: view_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: Pinned.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [view_id, pinned_home]
+                properties:
+                  view_id: {type: string, format: uuid}
+                  pinned_home: {type: boolean, enum: [true]}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /saved-views/{view_id}/unpin:
+    post:
+      tags: [saved-views]
+      operationId: unpinSavedViewHome
+      summary: Unpin a saved view from the home dashboard (0.15.245)
+      description: 0.15.245 (migration 0344). Removes the caller's pin; a missing pin is a no-op.
+      parameters:
+        - {name: view_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: Unpinned.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [view_id, pinned_home]
+                properties:
+                  view_id: {type: string, format: uuid}
+                  pinned_home: {type: boolean, enum: [false]}
+        '401': {$ref: '#/components/responses/Unauthorized'}
 components:
   securitySchemes:
     cookieAuth:
@@ -17867,6 +18400,12 @@ components:
       in: path
       required: true
       description: Register record.
+      schema: {type: string, format: uuid}
+    CommentId:
+      name: comment_id
+      in: path
+      required: true
+      description: Comment.
       schema: {type: string, format: uuid}
     DocTypeId:
       name: doc_type_id
@@ -18867,7 +19406,7 @@ components:
                         expired: { type: integer, minimum: 0 }
     SearchType:
       type: string
-      enum: [sites, registers, documents, meetings, people, contractors, tasks, warehouse_items]
+      enum: [sites, registers, documents, meetings, people, contractors, tasks, warehouse_items, snags]
     SearchHit:
       type: object
       additionalProperties: false
@@ -19723,6 +20262,7 @@ components:
       type: object
       minProperties: 1
       properties:
+        code: { type: string, pattern: '^[A-Z][A-Z0-9_]{1,40}$', description: '0.15.500 (0500, D51). Changes the code; built-in codes are locked (422), a duplicate is 409.' }
         name_en: { type: string, minLength: 2 }
         name_ar: { type: string }
         description_en: { type: string }
@@ -20063,7 +20603,7 @@ components:
         field: { type: string, description: 'missing_field: the site field (`delivery_scenario`).' }
     SiteImportStatus:
       type: object
-      required: [site_id, site_code, region_id, overall_status, workflow_locks, done_tasks, total_tasks, warnings, errors, data_gaps]
+      required: [site_id, site_code, region_id, overall_status, workflow_locks, done_tasks, total_tasks, warnings, errors, data_gaps, data_gap_items]
       properties:
         site_id: { type: string, format: uuid }
         site_code: { type: string }
@@ -20079,6 +20619,7 @@ components:
         warnings: { type: integer, description: 'Warnings of the rows of the import (missing data and the other warnings).' }
         errors: { type: integer, description: 'Rows of the import refused for an invalid value.' }
         data_gaps: { type: integer, description: 'The missing required values of the site now.' }
+        data_gap_items: { type: array, items: { $ref: '#/components/schemas/SiteDataGap' }, description: '0.15.322: what is missing, per site (the missing-data indicator of the upload preview); the gaps of an approved-as-is task are not listed here.' }
     SiteListItem:
       type: object
       required: [id, site_code, name, region_id, overall_status, rail]
@@ -20485,7 +21026,29 @@ components:
         body: { type: string }
         is_rejection_note: { type: boolean }
         mentions: { type: array, items: { $ref: '#/components/schemas/UserRef' } }
+        reactions: { type: array, items: { $ref: '#/components/schemas/CommentReaction' }, description: '0.15.247. One entry per emoji used on the comment, with the count and whether the caller reacted.' }
+        resolved: { $ref: '#/components/schemas/CommentResolved' }
         created_at: { type: string, format: date-time }
+    CommentReactionInput:
+      type: object
+      required: [emoji]
+      additionalProperties: false
+      properties:
+        emoji: { type: string, enum: ['👍'], description: '0.15.247. Starts with 👍 only.' }
+    CommentReaction:
+      type: object
+      required: [emoji, count, mine]
+      properties:
+        emoji: { type: string, description: '0.15.247. Starts with 👍 only.' }
+        count: { type: integer }
+        mine: { type: boolean, description: 'The caller reacted with this emoji.' }
+    CommentResolved:
+      type: object
+      required: [at, by]
+      description: '0.15.247. Set while the comment is marked resolved; absent (null) while open.'
+      properties:
+        at: { type: string, format: date-time }
+        by: { $ref: '#/components/schemas/UserRef' }
     OverrideRequest:
       type: object
       required: [kind, reason]
@@ -21798,6 +22361,27 @@ components:
                 email: { $ref: '#/components/schemas/StaffFieldVisibility' }
                 phone: { $ref: '#/components/schemas/StaffFieldVisibility' }
     # ---------------------------------------------------------- templates and import batches
+    TemplateChanges:
+      type: object
+      required: [template_id, from, to, issued_at, reason, added, removed, renamed]
+      properties:
+        template_id: {type: string}
+        from: {type: [integer, 'null']}
+        to: {type: integer}
+        issued_at: {type: [string, 'null'], format: date-time}
+        reason: {type: [string, 'null']}
+        added: {type: array, items: {$ref: '#/components/schemas/TemplateColumnRef'}}
+        removed: {type: array, items: {$ref: '#/components/schemas/TemplateColumnRef'}}
+        renamed:
+          type: array
+          items:
+            type: object
+            required: [code, from_label, to_label]
+            properties: {code: {type: string}, from_label: {type: string}, to_label: {type: string}}
+    TemplateColumnRef:
+      type: object
+      required: [code, label]
+      properties: {code: {type: string}, label: {type: string}}
     Template:
       type: object
       required: [template_id, name_en, kind, current_version, is_active]
@@ -22946,16 +23530,30 @@ components:
         mode: { type: string, enum: [popover, side_panel] }
         width: { type: string, enum: [narrow, medium, wide] }
         show_tabs: { type: boolean }
+    UiUnsavedGuard:
+      type: object
+      description: '0.15.262. The unsaved-changes guard: the master switch and one switch per area.'
+      additionalProperties: false
+      required: [enabled, settings, dialogs, drawers, inline, composers, navigation]
+      properties:
+        enabled: { type: boolean }
+        settings: { type: boolean }
+        dialogs: { type: boolean }
+        drawers: { type: boolean }
+        inline: { type: boolean }
+        composers: { type: boolean }
+        navigation: { type: boolean }
     UiFeatures:
       type: object
       description: '0.15.185. The sections of the interface features setting; every section is complete.'
-      required: [avatars, new_badge, inbox, panel, data_hub]
+      required: [avatars, new_badge, inbox, panel, data_hub, unsaved_guard]
       properties:
         avatars: { $ref: '#/components/schemas/UiAvatars' }
         new_badge: { $ref: '#/components/schemas/UiNewBadge' }
         inbox: { $ref: '#/components/schemas/UiInbox' }
         data_hub: { $ref: '#/components/schemas/UiDataHub' }
         panel: { $ref: '#/components/schemas/UiPanel' }
+        unsaved_guard: { $ref: '#/components/schemas/UiUnsavedGuard' }
     UiFeaturesPatch:
       type: object
       additionalProperties: false
@@ -22965,6 +23563,7 @@ components:
         inbox: { $ref: '#/components/schemas/UiInbox' }
         data_hub: { $ref: '#/components/schemas/UiDataHub' }
         panel: { $ref: '#/components/schemas/UiPanel' }
+        unsaved_guard: { $ref: '#/components/schemas/UiUnsavedGuard' }
     UiFeaturesSetting:
       type: object
       required: [sections, version]
@@ -22975,12 +23574,12 @@ components:
         updated_by: { $ref: '#/components/schemas/UserRef' }
     AlertRule:
       type: object
-      required: [id, code, kind, params, audience, title_en, title_ar, body_en, body_ar, link, enabled, version, created_at, updated_at]
+      required: [id, code, kind, params, audience, title_en, title_ar, body_en, body_ar, link, enabled, locked, version, created_at, updated_at]
       properties:
         id: { type: string, format: uuid }
         code: { type: string, pattern: '^[a-z0-9][a-z0-9-]{1,60}$' }
-        kind: { type: string, enum: [weekly_status_missing, record_idle] }
-        params: { type: object, additionalProperties: true }
+        kind: { type: string, enum: [weekly_status_missing, record_idle, kpi_threshold] }
+        params: { type: object, additionalProperties: true, description: 'Per kind: weekly_status_missing {}, record_idle {register_key, state, days}, kpi_threshold {kpi (a catalogue code), op (above|below), value (the own threshold, 0..100000, in the unit of the KPI)}.' }
         audience: { type: object, additionalProperties: true, description: '{"type":"system_admin"} or {"type":"module","module":"<module key>"}.' }
         title_en: { type: string, maxLength: 200 }
         title_ar: { type: string, maxLength: 200 }
@@ -22988,6 +23587,7 @@ components:
         body_ar: { type: string, maxLength: 2000 }
         link: { type: [string, 'null'] }
         enabled: { type: boolean }
+        locked: { type: boolean, description: '0.15.249: while locked, a rule takes no edit and cannot be disabled; the only accepted save is the unlock itself (audited). A locked rule still fires.' }
         version: { type: integer, description: 'The If-Match of PUT /settings/alert-rules/{id}.' }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
@@ -22996,7 +23596,7 @@ components:
       required: [code, kind, params, audience, title_en, title_ar, body_en, body_ar]
       properties:
         code: { type: string, pattern: '^[a-z0-9][a-z0-9-]{1,60}$' }
-        kind: { type: string, enum: [weekly_status_missing, record_idle] }
+        kind: { type: string, enum: [weekly_status_missing, record_idle, kpi_threshold] }
         params: { type: object, additionalProperties: true }
         audience: { type: object, additionalProperties: true }
         title_en: { type: string, maxLength: 200 }
@@ -23005,6 +23605,7 @@ components:
         body_ar: { type: string, maxLength: 2000 }
         link: { type: [string, 'null'] }
         enabled: { type: boolean }
+        locked: { type: boolean, description: '0.15.249: lock a rule against edits (unlock with a save that changes nothing else).' }
     AlertRuleSaved:
       type: object
       required: [id, version]
@@ -23020,7 +23621,7 @@ components:
           items: { $ref: '#/components/schemas/AlertRule' }
         catalogue:
           type: object
-          required: [kinds, audiences, registers, modules]
+          required: [kinds, kpis, audiences, registers, modules]
           properties:
             kinds:
               type: array
@@ -23030,6 +23631,18 @@ components:
                 properties:
                   kind: { type: string }
                   params: { type: array, items: { type: string } }
+            kpis:
+              type: array
+              description: '0.15.249: the KPI catalogue kpi_threshold rules pick from (dashboard settings catalogue).'
+              items:
+                type: object
+                required: [code, label_en, label_ar, unit, direction]
+                properties:
+                  code: { type: string }
+                  label_en: { type: string }
+                  label_ar: { type: string }
+                  unit: { type: string }
+                  direction: { type: string, enum: [higher, lower] }
             audiences: { type: array, items: { type: string, enum: [system_admin, module] } }
             registers:
               type: array
@@ -23725,6 +24338,7 @@ components:
         default_value: { description: '0.15.154. Prefilled on a new record by the form (absent = none).' }
         is_custom: { type: boolean }
         section: { type: [string, 'null'], description: '0.4.6. The form section of a base field (for example `Request`, `Validity`, `PTW checks`), in English, in the order of the fields. Absent for custom fields.' }
+        section_ar: { type: [string, 'null'], description: '0.15.156. The Arabic name of the field section (register_sections.name_ar, migration 0422); the web falls back to `section`. Absent when the section has no Arabic name yet.' }
         options:
           type: array
           items:
@@ -24407,6 +25021,47 @@ components:
         updated_by: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }], description: 'Who changed it last (null: the value of the installation).' }
         version: { type: integer, description: The ETag value. }
         can_edit: { type: boolean }
+    ImportsUploadPolicy:
+      type: object
+      description: '0.15.322. The setting `imports.upload_policy`: what the Master import apply does with incomplete data.'
+      required: [policy, default_policy, policies, version, can_edit]
+      properties:
+        policy: { type: string, enum: [enforce, accept_incomplete] }
+        default_policy: { type: string, enum: [enforce] }
+        policies: { type: array, items: { type: string, enum: [enforce, accept_incomplete] } }
+        updated_at: { type: [string, 'null'], format: date-time }
+        updated_by: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+        version: { type: integer, description: The ETag value. }
+        can_edit: { type: boolean }
+    TemplateChangeNotice:
+      type: object
+      description: '0.15.203. The setting `templates.change_notice`.'
+      required: [enabled, days, default_days, min, max, version, can_edit]
+      properties:
+        enabled: { type: boolean }
+        days: { type: integer, minimum: 1, maximum: 365 }
+        default_days: { type: integer, description: '14' }
+        min: { type: integer }
+        max: { type: integer }
+        updated_at: { type: [string, 'null'], format: date-time }
+        updated_by: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+        version: { type: integer, description: The ETag value. }
+        can_edit: { type: boolean }
+    ImportsUploadPolicyInput:
+      type: object
+      additionalProperties: false
+      required: [policy, reason]
+      properties:
+        policy: { type: string, enum: [enforce, accept_incomplete] }
+        reason: { type: string, minLength: 3, maxLength: 1000 }
+    TemplateChangeNoticeInput:
+      type: object
+      additionalProperties: false
+      required: [enabled, days, reason]
+      properties:
+        enabled: { type: boolean }
+        days: { type: integer, minimum: 1, maximum: 365 }
+        reason: { type: string, minLength: 3, maxLength: 1000 }
     NavSubHeading:
       type: object
       description: '0.15.1. A sub-heading of the side menu (under a main heading): screen keys only, no deeper level.'
@@ -24481,10 +25136,91 @@ components:
         defaults: { $ref: '#/components/schemas/UiPrefs', description: '0.15.230 (0241): the organization appearance defaults.' }
         pref_options: { type: object, additionalProperties: { type: array, items: { type: string } }, description: '0.15.230 (0241): the dimensions with their allowed values (ui_pref_options).' }
         brands: { type: array, items: { $ref: '#/components/schemas/UiBrand' } }
+        logo:
+          oneOf:
+          - $ref: '#/components/schemas/UiAsset'
+          - type: 'null'
+          description: '0.15.232 (0243): the workspace logo (ui_asset_state). null: none was uploaded; the sidebar shows the built-in badge.'
         updated_at: { type: [string, 'null'], format: date-time }
         updated_by: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
         version: { type: integer, description: The ETag value. }
         can_edit: { type: boolean, description: 'A System Admin or a delegate of `settings` edit for all regions.' }
+    UiAsset:
+      type: object
+      description: 0.15.232 (0243). An identity image (migration 0243, table ui_assets). The bytes are served by `GET /ui/assets/{key}`; this is the metadata.
+      required:
+      - key
+      - mime
+      - enabled
+      - show_on_login
+      - use_as_favicon
+      - version
+      properties:
+        key:
+          type: string
+          pattern: ^[a-z0-9_]{1,40}$
+          description: '''logo'' today.'
+        show_on_login:
+          type: boolean
+          description: 'Shown on the sign-in pages (public). false by default; an admin turns it on in Settings > Identity.'
+        use_as_favicon:
+          type: boolean
+          description: 'Used as the browser tab icon (public). false by default.'
+        mime:
+          type: string
+          enum:
+          - image/png
+          - image/jpeg
+          - image/svg+xml
+          - image/webp
+        enabled:
+          type: boolean
+          description: 'false hides it (the row stays: hide never delete).'
+        version:
+          type: integer
+          description: The asset ETag value (If-Match on the logo endpoints).
+        updated_at:
+          type: string
+          format: date-time
+        updated_by:
+          oneOf:
+          - $ref: '#/components/schemas/UserRef'
+          - type: 'null'
+    UiAssetDisplayInput:
+      type: object
+      additionalProperties: false
+      required: [show_on_login, use_as_favicon, reason]
+      properties:
+        show_on_login: {type: boolean}
+        use_as_favicon: {type: boolean}
+        reason: {type: string, minLength: 3, maxLength: 1000}
+    UiPublicIdentity:
+      type: object
+      required: [login, favicon]
+      properties:
+        login:
+          oneOf:
+          - {$ref: '#/components/schemas/UiPublicLogo'}
+          - {type: 'null'}
+        favicon:
+          oneOf:
+          - {$ref: '#/components/schemas/UiPublicLogo'}
+          - {type: 'null'}
+    UiPublicLogo:
+      type: object
+      required: [version, mime]
+      properties:
+        version: {type: integer}
+        mime: {type: string, enum: [image/png, image/jpeg, image/svg+xml, image/webp]}
+    UiAssetEnabledInput:
+      allOf:
+      - $ref: '#/components/schemas/WithReason'
+      - type: object
+        required:
+        - enabled
+        properties:
+          enabled:
+            type: boolean
     UiIdentityInput:
       allOf:
         - $ref: '#/components/schemas/WithReason'
@@ -24765,6 +25501,36 @@ components:
           properties:
             user_id: { type: string, format: uuid }
             minutes: { type: integer, minimum: 1, maximum: 60 }
+    OpsLimitItem:
+      type: object
+      description: '0.15.312. One operational limit.'
+      required: [key, group, unit, default, min, max, value, is_default]
+      properties:
+        key: { type: string, enum: [session.idle_hours, session.absolute_hours, stepup.seconds, assignments.max_rows, import.max_rows, master_import.max_rows, register_import.max_rows, prefill.max_rows, prefill.max_sites, export.max_rows, idempotency.max_entries] }
+        group: { type: string, enum: [sessions, rows, exports] }
+        unit: { type: string, enum: [hours, seconds, rows, sites, entries] }
+        default: { type: integer }
+        min: { type: integer }
+        max: { type: integer }
+        value: { type: integer, description: The value in force. }
+        is_default: { type: boolean, description: 'true when no value was saved for this key.' }
+    OpsLimits:
+      type: object
+      description: '0.15.312. The operational limits (setting `ops.limits`, migration 0402).'
+      required: [items, version, can_edit]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/OpsLimitItem' } }
+        updated_at: { type: [string, 'null'], format: date-time }
+        updated_by: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+        version: { type: integer, description: The ETag value. }
+        can_edit: { type: boolean, description: A System Admin only. }
+    OpsLimitsInput:
+      allOf:
+        - $ref: '#/components/schemas/WithReason'
+        - type: object
+          required: [values]
+          properties:
+            values: { type: object, additionalProperties: { type: integer }, description: 'The limits that differ from their default, key to value. A key that is left out returns to its default.' }
     NavLayout:
       type: object
       description: '0.15.1. The shared order of the side menu (setting `nav.layout`).'
@@ -24896,7 +25662,7 @@ components:
     DashboardOps:
       type: object
       description: '0.15.106: the follow-up sections of the dashboard (owner approval 2026-11-26).'
-      required: [as_of, scope_regions, procurement, permits_hse, gecol_hlc, contractor_scorecard, quality, approvals]
+      required: [as_of, scope_regions, procurement, permits_hse, gecol_hlc, contractor_scorecard, quality, approvals, changes_meetings]
       properties:
         as_of: {type: string, format: date-time}
         scope_regions:
@@ -24909,6 +25675,7 @@ components:
         contractor_scorecard: {$ref: '#/components/schemas/DashboardOpsScorecard'}
         quality: {$ref: '#/components/schemas/DashboardOpsQuality'}
         approvals: {$ref: '#/components/schemas/DashboardOpsApprovals'}
+        changes_meetings: {$ref: '#/components/schemas/DashboardOpsChangesMeetings'}
     DashboardOpsProcurement:
       type: object
       description: '0.15.106: procurement and materials (dashboard proposals item 1).'
@@ -25062,6 +25829,44 @@ components:
                     count: {type: integer}
           description: "One entry per ball-in-court role, most waiting tasks first."
         unassigned: {type: [integer, 'null'], description: "The waiting tasks with no ball-in-court role (a group holds them, or nobody yet)."}
+    DashboardOpsChangesMeetings:
+      type: object
+      description: "0.15.205 (item 8): the pending change requests and the overdue meeting actions."
+      required: [available, changes, actions]
+      properties:
+        available: {type: boolean, description: "False when the caller has neither the change control nor the meetings view."}
+        changes:
+          type: object
+          required: [available, pending, approved_not_applied, by_kind, pending_aging]
+          properties:
+            available: {type: boolean, description: "False without the change control view; every figure is then null."}
+            pending: {type: [integer, 'null'], description: "Change requests with status requested."}
+            approved_not_applied: {type: [integer, 'null'], description: "Change requests approved and not yet applied."}
+            by_kind:
+              type: [array, 'null']
+              description: "The pending change requests per kind, most first."
+              items:
+                type: object
+                required: [kind, count]
+                properties:
+                  kind: {type: string, enum: [scope_change, date_change, suspension, resumption, other]}
+                  count: {type: integer}
+            pending_aging:
+              anyOf:
+                - $ref: '#/components/schemas/DashboardOpsAging'
+                - type: 'null'
+        actions:
+          type: object
+          required: [available, open, overdue, no_due_date, overdue_aging]
+          properties:
+            available: {type: boolean, description: "False without the meetings view; every figure is then null."}
+            open: {type: [integer, 'null'], description: "Meeting actions open or in progress."}
+            overdue: {type: [integer, 'null'], description: "Open actions whose due date is before today."}
+            no_due_date: {type: [integer, 'null'], description: "Open actions with no due date."}
+            overdue_aging:
+              anyOf:
+                - $ref: '#/components/schemas/DashboardOpsAging'
+                - type: 'null'
     DashboardOpsQuality:
       type: object
       description: "0.15.203 (item 6): the open snags and NCRs of the in-scope sites, the average closure age of each and the first-time acceptance rate."
@@ -27126,6 +27931,17 @@ components:
         display_name: {type: string}
         employee_id: {type: [string, 'null']}
         since: {type: string, format: date-time, description: When this editing spell began.}
+    HomeViewPin:
+      type: object
+      description: '0.15.245: one pinned home view (migration 0344). The card''s counter is computed by the screen''s own list endpoint for the caller.'
+      required: [view_id, name, screen_key, filters, position]
+      additionalProperties: false
+      properties:
+        view_id: {type: string, format: uuid}
+        name: {type: string, maxLength: 120, description: The view's current name.}
+        screen_key: {$ref: '#/components/schemas/SavedViewScreenKey'}
+        filters: {type: object, additionalProperties: true, description: 'The view''s filters, scrubbed for the caller like a read of the view (hidden fields left out).' }
+        position: {type: integer, minimum: 1}
     SavedView:
       type: object
       required: [id, screen_key, name, filters, columns, sort, stripped_columns, owner, owner_left, is_owner, shared, can_edit, can_share, is_active, version, imported, created_at, updated_at]

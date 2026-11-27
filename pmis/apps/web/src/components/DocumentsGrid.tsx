@@ -1,4 +1,5 @@
 import { AlertTriangle, CheckCircle2, Circle, Clock, Lock, Minus, MinusCircle, PlayCircle, XCircle } from 'lucide-react';
+import { UnsavedGuard } from '@/lib/unsavedGuard';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ApiError } from '@/api/client';
@@ -83,6 +84,7 @@ export function DocumentsGrid() {
           ))}
         </div>
         <div className="mt-2 flex gap-2">
+          <UnsavedGuard scope="inline" dirty={draft !== null} label={t('docsGrid.save_columns')} onSave={() => new Promise<boolean>((res) => saveView.mutate(draft ?? [], { onSuccess: () => { toast(t('docsGrid.columns_saved')); setDraft(null); res(true); }, onError: () => res(false) }))} />
           <button type="button" className="btn btn-accent" data-testid="docs-grid-save-columns" disabled={saveView.isPending || draft === null}
             onClick={() => saveView.mutate(draft ?? [], { onSuccess: () => { toast(t('docsGrid.columns_saved')); setDraft(null); } })}>{t('docsGrid.save_columns')}</button>
           <button type="button" className="btn" onClick={() => setDraft([])}>{t('docsGrid.show_all')}</button>

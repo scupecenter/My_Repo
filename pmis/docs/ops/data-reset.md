@@ -440,6 +440,7 @@ KEEP in "everything" and in every scope without the part; with the part, the act
 | announcement_recipients | KEEP | Announcement recipients. |
 | announcement_responses | KEEP | Answers (append-only). |
 | saved_views | KEEP | Saved views (user preferences). |
+| home_view_pins | KEEP | Saved views pinned as home dashboard cards (personal display preference, 0344). |
 | saved_view_versions | KEEP | Saved view history (append-only). |
 | saved_view_targets | KEEP | Saved view sharing. |
 | saved_view_region_targets | KEEP | Saved view sharing. |
@@ -482,6 +483,7 @@ KEEP in "everything" and in every scope without the part; with the part, the act
 | document_record_snapshots | of kept records | Snapshot of a record's documents. |
 | comments | comments on kept records | Task comments and comments on project records go. |
 | comment_mentions | mentions of kept comments | Follow their comment. |
+| comment_reactions | MIXED | Reactions on a comment; they follow the comment’s parts (0346). |
 | levels_conversions | conversions of kept records | Two-level conversions of tasks and project records go. |
 | import_batches | batches a kept record points at (`historical_direct_batch_id`) | Needed by the foreign key of the kept row; every other batch goes. |
 | import_batch_rows | rows of kept batches | Follow their batch. |

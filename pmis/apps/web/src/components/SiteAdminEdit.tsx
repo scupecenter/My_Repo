@@ -1,4 +1,5 @@
 import { ShieldAlert, Undo2 } from 'lucide-react';
+import { UnsavedGuard } from '@/lib/unsavedGuard';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAdminEditSite, useRevertOverride, type SiteAdminEditBody } from '@/api/adminEdit';
@@ -82,6 +83,7 @@ export function SiteAdminEdit({ site }: { site: SiteDetail }) {
   const items = site.admin_edits?.items ?? [];
   return (
     <section className="mt-3 rounded-md border border-line p-3 text-sm" aria-label={t('siteAdminEdit.title')} data-testid="site-admin-edit">
+      <UnsavedGuard scope="inline" dirty={!!form && touched} needsReason label={t('siteAdminEdit.title')} onSave={(reason) => new Promise<boolean>((res) => { if (!b || !touched) { res(false); return; } edit.mutate({ ...b, reason }, { onSuccess: () => { setForm(null); res(true); }, onError: () => res(false) }); })} />
       <div className="flex flex-wrap items-center gap-3">
         <span className="font-semibold">{t('siteAdminEdit.title')}</span>
         {site.admin_override_active && <span className="chip bg-waitBg text-waitInk" data-testid="site-admin-badge" title={t('siteAdminEdit.badge_title')}><ShieldAlert size={12} className="me-1" aria-hidden />{t('override.badge')}</span>}

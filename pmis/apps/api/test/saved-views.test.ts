@@ -248,3 +248,53 @@ describe('drafts (Q115)', () => {
     expect((await ann.api.call('get', `/me/drafts/${key}`)).status).toBe(404);
   });
 });
+
+describe('home pins (0.15.245, migration 0344, item 16)', () => {
+  it('pins, lists in order, caps at 12, and another user cannot pin a view invisible to them', async () => {
+    const ann = await actor(app, db, { grants: SITES_VIEW });
+    const ben = await actor(app, db, { grants: SITES_VIEW });
+
+    // A private view of ann's: ben may not pin it (404, like a read).
+    const priv = await create(ann, { screen_key: 'sites', name: nm('PinPriv'), filters: {} });
+    expect(priv.status).toBe(201);
+    expect((await ben.api.call('post', `/saved-views/${priv.body.id}/pin`)).status).toBe(404);
+
+    // Pin 12 views, check the order, then a 13th is refused.
+    const ids: string[] = [];
+    for (let n = 1; n <= 12; n += 1) {
+      const v = await create(ann, { screen_key: 'sites', name: nm(`Pin${n}`), filters: {} });
+      expect(v.status).toBe(201);
+      ids.push(v.body.id as string);
+      const p = await ann.api.call('post', `/saved-views/${ids[n - 1]}/pin`);
+      expect(p.status).toBe(200);
+      expect(p.body).toEqual({ view_id: ids[n - 1], pinned_home: true });
+    }
+    const extra = await create(ann, { screen_key: 'sites', name: nm('PinExtra'), filters: {} });
+    expect((await ann.api.call('post', `/saved-views/${extra.body.id}/pin`)).status).toBe(422);
+
+    const mine = await ann.api.call('get', '/me/home-pins');
+    expect(mine.status).toBe(200);
+    expect(mine.body.items.map((p: { view_id: string }) => p.view_id)).toEqual(ids);
+    expect(mine.body.items.map((p: { position: number }) => p.position)).toEqual(ids.map((_v, n) => n + 1));
+    expect(mine.body.items[0]).toMatchObject({ name: nm('Pin1'), screen_key: 'sites' });
+
+    // Another user's pins stay empty; pin again is a no-op; unpin removes and unpin again is a no-op.
+    expect((await ben.api.call('get', '/me/home-pins')).body.items).toEqual([]);
+    expect((await ann.api.call('post', `/saved-views/${ids[0]}/pin`)).status).toBe(200);
+    expect((await ann.api.call('post', `/saved-views/${ids[0]}/unpin`)).body).toEqual({ view_id: ids[0], pinned_home: false });
+    expect((await ann.api.call('post', `/saved-views/${ids[0]}/unpin`)).status).toBe(200);
+    const after = await ann.api.call('get', '/me/home-pins');
+    expect(after.body.items).toHaveLength(11);
+
+    // A deactivated view drops out of the pins list.
+    expect((await ann.api.call('post', `/saved-views/${ids[1]}/deactivate`, {}, { 'If-Match': '*' })).status).toBe(200);
+    const rest = await ann.api.call('get', '/me/home-pins');
+    expect(rest.body.items.map((p: { view_id: string }) => p.view_id)).not.toContain(ids[1]);
+
+    // The dashboard card catalogue names the new card.
+    const admin = await plainAdmin(app, db);
+    const cat = await admin.api.call('get', '/settings/dashboard');
+    expect(cat.status).toBe(200);
+    expect(JSON.stringify(cat.body)).toContain('pinned_views');
+  });
+});

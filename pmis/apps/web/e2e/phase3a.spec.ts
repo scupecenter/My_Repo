@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { login, withStepUp, type DemoAccount } from './helpers';
+import { login, withStepUp, type DemoAccount, signOutViaMenu } from './helpers';
 
 async function signIn(page: Page, locale: 'en' | 'ar', account: DemoAccount) {
   await page.addInitScript((l) => { if (!localStorage.getItem('pmis.locale')) localStorage.setItem('pmis.locale', l); }, locale);
@@ -22,7 +22,7 @@ for (const locale of ['en', 'ar'] as const) {
       await page.getByTestId('assign-dialog-submit').click();
       await expect(page.getByTestId('user-status-1211')).toHaveAttribute('data-testid', 'user-status-1211');
       await expect(page.getByTestId('assign-dialog')).toHaveCount(0);
-      await page.getByTestId('topbar-signout').click();
+      await signOutViaMenu(page);
       await login(page, 'pending');
       await expect(page.getByTestId('page-my-work')).toBeVisible();
       await expect(page.getByTestId('pending-screen')).toHaveCount(0);

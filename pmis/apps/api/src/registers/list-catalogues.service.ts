@@ -376,21 +376,60 @@ export class ListCataloguesService {
       rows.push({ line: r, body });
     }
 
+    // D54: a downloaded file holds the current values, so a code that already exists is an update (the code itself never changes) and a new code is created.
+    // An empty cell leaves the value as it is. A row identical to the stored value is counted as unchanged and writes nothing.
+    const existing = new Map(
+      (
+        await this.db.tx.$queryRaw<
+          { id: string; code: string; label_en: string; label_ar: string | null; aliases: string[]; colour: string | null; parent_code: string | null; sort_order: number }[]
+        >(Prisma.sql`
+          SELECT v.id::text AS id, v.code, v.label_en, v.label_ar, v.aliases, v.colour, p.code AS parent_code, v.sort_order
+          FROM list_values v LEFT JOIN list_values p ON p.id = v.parent_value_id WHERE v.catalogue_code = ${code}`)
+      ).map((v) => [v.code, v]),
+    );
     const errors: { path: string; code: string; message: string }[] = [];
-    let applied = 0;
+    let created = 0;
+    let updated = 0;
+    let unchanged = 0;
+    const seen = new Set<string>();
     for (const row of rows) {
+      const rowCode = String(row.body.code ?? "");
+      if (seen.has(rowCode)) {
+        errors.push({ path: `/line ${row.line}`, code: "duplicate_in_file", message: `The value code ${rowCode} appears twice in the file.` });
+        continue;
+      }
+      seen.add(rowCode);
+      const old = existing.get(rowCode);
       try {
+        if (!old) {
+          await this.call(
+            Prisma.sql`SELECT admin_save_list_value(${code}::text, NULL::uuid, ${JSON.stringify(row.body)}::jsonb, ${why}::text, NULL::int)`,
+          );
+          created++;
+          continue;
+        }
+        const patch: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(row.body)) {
+          if (k === "code") continue;
+          const same = k === "aliases" ? [...(v as string[])].sort().join(";") === [...(old.aliases ?? [])].sort().join(";") : (old as unknown as Record<string, unknown>)[k] === v;
+          if (!same) patch[k] = v;
+        }
+        if (Object.keys(patch).length === 0) {
+          unchanged++;
+          continue;
+        }
         await this.call(
-          Prisma.sql`SELECT admin_save_list_value(${code}::text, NULL::uuid, ${JSON.stringify(row.body)}::jsonb, ${why}::text, NULL::int)`,
+          Prisma.sql`SELECT admin_save_list_value(${code}::text, ${old.id}::uuid, ${JSON.stringify(patch)}::jsonb, ${why}::text, NULL::int)`,
         );
-        applied++;
+        updated++;
       } catch (e) {
         if (!(e instanceof ProblemException)) throw e;
         errors.push({ path: `/line ${row.line}`, code: "invalid", message: e.message });
       }
     }
+    const applied = created + updated;
     if (errors.length > 0) throw problems.validation(errors.slice(0, 50));
-    await this.syslog.write("info", "list values imported", { list: code, applied, version }, auth.user.id, requestId, "list-import");
-    return { ...(await this.get(code)), imported: applied };
+    await this.syslog.write("info", "list values imported", { list: code, applied, created, updated, unchanged, version }, auth.user.id, requestId, "list-import");
+    return { ...(await this.get(code)), imported: applied, created, updated, unchanged };
   }
 }

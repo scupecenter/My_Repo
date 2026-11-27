@@ -446,13 +446,22 @@ function ImportValues({ list }: { list: ListCatalogue }) {
       setDlErr(errText(e, t));
     }
   };
+  // D54: the same template filled with the current values of this list, to edit and upload again
+  const current = async () => {
+    setDlErr(null);
+    try {
+      await downloadFile(`/templates/TPL-LISTVALUES/download?list=${encodeURIComponent(list.code)}`);
+    } catch (e) {
+      setDlErr(errText(e, t));
+    }
+  };
   const submit = () => {
     if (!file) return;
     imp.mutate(
       { code: list.code, file, reason: reason.trim() },
       {
         onSuccess: (r) => {
-          toast(t("lists.import_done", { count: r.imported ?? 0 }));
+          toast(t("lists.import_done", { count: r.imported ?? 0 }) + (r.unchanged ? ` (${t("lists.import_unchanged", { count: r.unchanged })})` : ""));
           setFile(null);
           setReason("");
         },
@@ -467,6 +476,10 @@ function ImportValues({ list }: { list: ListCatalogue }) {
         <button type="button" className="btn" data-testid="lists-template" onClick={() => void template()}>
           <Download size={14} />
           {t("lists.template_download")}
+        </button>
+        <button type="button" className="btn" data-testid="lists-template-current" onClick={() => void current()}>
+          <Download size={14} />
+          {t("lists.template_current")}
         </button>
         <input type="file" accept=".xlsx" data-testid="lists-import-file" aria-label={t("lists.import_file")} onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
         <input className="input max-w-64" data-testid="lists-import-reason" aria-label={t("lists.reason_short")} placeholder={t("lists.reason_short")} value={reason} onChange={(e) => setReason(e.target.value)} />
