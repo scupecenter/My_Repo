@@ -59,6 +59,7 @@ import {
   writeRemembered,
   type DashTab,
 } from "./dashboardTabs";
+import { DateInput } from '@/components/DateInput';
 
 type DashMilestone = Dash["pipeline"]["nodes"][number];
 const STATUSES = [
@@ -1206,8 +1207,7 @@ export function Dashboard() {
         </label>
         <label className="text-sm font-semibold">
           {t("dash.ref_date")}
-          <input
-            type="date"
+          <DateInput
             className="input mt-1 w-auto font-normal"
             data-testid="dash-ref-date"
             max={today}

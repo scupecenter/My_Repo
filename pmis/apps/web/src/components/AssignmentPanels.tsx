@@ -6,6 +6,7 @@ import type { RegisterRecord } from '@/api/types';
 import { registerErrorMessage } from '@/lib/registerErrors';
 import { PeoplePicker } from './PeoplePicker';
 import { useToast } from './Toast';
+import { DateInput } from '@/components/DateInput';
 
 export type Member = { user_id: string; member_role: 'supervisor' | 'executor'; is_lead?: boolean };
 
@@ -96,7 +97,7 @@ export function ExtendBooking({ record, onDone }: { record: RegisterRecord; onDo
   return (
     <ChildAction label={t('fleet.extend')} testid="reg-extend" busy={m.isPending || !to} error={m.isError ? reservedMessage(t, m.error) ?? registerErrorMessage(t, m.error) : null}
       onGo={() => m.mutate({ to_date: to }, { onSuccess: (r) => { toast(t('fleet.extended')); onDone(r.id); } })}>
-      <label className="text-sm text-mute">{t('fleet.extend_to')}<input type="date" className="input mono" data-testid="reg-extend-to" value={to} onChange={(e) => setTo(e.target.value)} /></label>
+      <label className="text-sm text-mute">{t('fleet.extend_to')}<DateInput className="input mono" data-testid="reg-extend-to" value={to} onChange={(e) => setTo(e.target.value)} /></label>
     </ChildAction>
   );
 }
@@ -111,7 +112,7 @@ export function TopUp({ record, onDone }: { record: RegisterRecord; onDone: (id:
     <ChildAction label={t('fleet.top_up')} testid="reg-topup" busy={m.isPending || (!amount && !to)} error={m.isError ? registerErrorMessage(t, m.error) : null}
       onGo={() => m.mutate({ ...(amount ? { requested_amount: Number(amount) } : {}), ...(to ? { period_to: to } : {}) }, { onSuccess: (r) => { toast(t('fleet.topped_up')); onDone(r.id); } })}>
       <label className="text-sm text-mute">{t('fleet.top_up_amount')}<input type="number" min={0} className="input mono" data-testid="reg-topup-amount" value={amount} onChange={(e) => setAmount(e.target.value)} /></label>
-      <label className="text-sm text-mute">{t('fleet.period_to')}<input type="date" className="input mono" data-testid="reg-topup-to" value={to} onChange={(e) => setTo(e.target.value)} /></label>
+      <label className="text-sm text-mute">{t('fleet.period_to')}<DateInput className="input mono" data-testid="reg-topup-to" value={to} onChange={(e) => setTo(e.target.value)} /></label>
     </ChildAction>
   );
 }

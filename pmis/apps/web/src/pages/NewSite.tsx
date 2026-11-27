@@ -8,6 +8,7 @@ import type { SiteDraft, SiteDraftInput } from '@/api/types';
 import { PageHeader } from '@/components/PageHeader';
 import { RejectDialog } from '@/components/RejectDialog';
 import { useToast } from '@/components/Toast';
+import { DateInput } from '@/components/DateInput';
 
 const SCENARIOS = ['new_build', 'expansion', 'hot_swap', 'cold_swap', 'relocation'];
 const SITE_SCENARIOS = ['Indoor', 'Outdoor'];
@@ -79,7 +80,9 @@ export function NewSite() {
   const field = (k: string, label: string, o: { dir?: 'rtl' | 'ltr'; type?: string; required?: boolean } = {}) => (
     <div>
       <label htmlFor={`ns-${k}`} className="text-sm font-semibold">{label}{o.required && <span aria-hidden> *</span>}</label>
-      <input id={`ns-${k}`} data-testid={`ns-${k}`} className="input mt-1" type={o.type ?? 'text'} dir={o.dir} value={f[k] ?? ''} onChange={(e) => set(k)(e.target.value)} aria-invalid={!!errors[k]} />
+      {o.type === 'date'
+        ? <DateInput id={`ns-${k}`} data-testid={`ns-${k}`} className="input mt-1" value={f[k] ?? ''} onChange={(e) => set(k)(e.target.value)} />
+        : <input id={`ns-${k}`} data-testid={`ns-${k}`} className="input mt-1" type={o.type ?? 'text'} dir={o.dir} value={f[k] ?? ''} onChange={(e) => set(k)(e.target.value)} aria-invalid={!!errors[k]} />}
       {errors[k] && <p role="alert" className="mt-1 text-sm text-lateInk" data-testid={`ns-error-${k}`}>{errors[k]}</p>}
     </div>
   );

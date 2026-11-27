@@ -18,6 +18,7 @@ import { CodeInput, TwoFactorService, TWO_FACTOR_PARAMS } from './two-factor.ser
 import { SecurityLogService } from '../logs/security-log.service';
 import { applyContext, RequestContext, UA_MAX } from '../logs/context';
 import { deviceCodeBody, NewDeviceService, newDeviceMailText } from '../security/new-device.service';
+import { PasskeyService, passkeySignInBody } from '../security/passkeys.service';
 
 /** The context of a sign-in request that has no session yet. */
 const signInCtx = (ip: string | null, userAgent: string | undefined, requestId: string, sessionId?: string): RequestContext => ({
@@ -116,6 +117,7 @@ export class AuthService {
     private readonly twoFactor: TwoFactorService,
     private readonly securityLog: SecurityLogService,
     private readonly newDevice: NewDeviceService,
+    private readonly passkeys: PasskeyService,
   ) {}
 
   async sessionBody(auth: AuthContext, csrf = auth.session.csrfToken): Promise<SessionBody> {
@@ -369,6 +371,48 @@ export class AuthService {
     if ('fail' in out) {
       if (out.fail === 'expired') throw problems.unauthenticated('This sign-in has expired. Enter your password again.');
       throw this.twoFactor.problem(out.fail as 'bad' | 'replay' | 'locked', false);
+    }
+    return this.sessionFor(out.created.token, ip);
+  }
+
+  /** POST /auth/local/2fa/passkey/options: the passkey challenge for the pending two-factor sign-in (empty when the account has none or the feature is off). */
+  async passkeySignInOptions(pendingToken: string | undefined, ip: string | null, requestId: string): Promise<{ available: boolean; options: Record<string, unknown> | null }> {
+    const ipWait = this.limiter.hit(`2fa:ip:${ip ?? 'unknown'}`, LOGIN_LIMIT_PER_IP);
+    if (ipWait) throw problems.rateLimited(ipWait);
+    const { userId } = await this.pendingOf(pendingToken, 'two_factor');
+    const userWait = this.limiter.hit(`2fa:user:${userId}`, LOGIN_LIMIT_PER_IP);
+    if (userWait) throw problems.rateLimited(userWait);
+    const options = await this.asUser(userId, () => this.passkeys.signInOptions(userId), signInCtx(ip, undefined, requestId));
+    return { available: options !== null, options };
+  }
+
+  /** POST /auth/local/2fa/passkey: a passkey instead of the code. Same pending sign-in, same single use, same session as the code path. */
+  async passkeySignIn(pendingToken: string | undefined, rawBody: unknown, ip: string | null, userAgent: string | undefined, requestId: string): Promise<{ token: string; body: SessionBody }> {
+    const body = parse(passkeySignInBody, rawBody);
+    const ipWait = this.limiter.hit(`2fa:ip:${ip ?? 'unknown'}`, LOGIN_LIMIT_PER_IP);
+    if (ipWait) throw problems.rateLimited(ipWait);
+    const { userId } = await this.pendingOf(pendingToken, 'two_factor');
+    const userWait = this.limiter.hit(`2fa:user:${userId}`, LOGIN_LIMIT_PER_IP);
+    if (userWait) throw problems.rateLimited(userWait);
+    const out = await this.asUser(userId, async () => {
+      const r = await this.passkeys.signInVerify(userId, body.response);
+      if (r !== 'ok') {
+        await this.twoFactor.logFailure(userId, 'bad', 'passkey', ip, 'sign_in', requestId, r === 'clone' ? 'counter_not_forward' : undefined);
+        return { fail: r } as const;
+      }
+      if (!(await this.twoFactor.consumePending(pendingToken as string, userId))) return { fail: 'expired' } as const;
+      await this.syslog.write('info', 'local_sign_in_ok', { via: 'passkey', two_factor: true, ip }, userId, requestId);
+      return { created: await this.sessions.create(userId, 'local', ip, userAgent) } as const;
+    }, signInCtx(ip, userAgent, requestId));
+    if (!('fail' in out)) {
+      const c = signInCtx(ip, userAgent, requestId, out.created.id);
+      await this.securityLog.write({ event: 'two_factor_passed', outcome: 'success', userId, ctx: c, detail: { via: 'passkey', purpose: 'sign_in' } });
+      await this.securityLog.write({ event: 'sign_in_succeeded', outcome: 'success', userId, ctx: c, detail: { method: 'password_passkey' } });
+    }
+    this.states.invalidate(userId);
+    if ('fail' in out) {
+      if (out.fail === 'expired') throw problems.unauthenticated('This sign-in has expired. Enter your password again.');
+      throw new ProblemException(401, 'invalid_code', { detail: 'The passkey could not be verified. Try again, or use the code.', commit: true });
     }
     return this.sessionFor(out.created.token, ip);
   }
