@@ -15696,8 +15696,8 @@ paths:
                         target_id: {type: string, format: uuid}
                         reason: {type: string}
                         locked_at: {type: string}
-                        locked_by: {type: string, nullable: true}
-                        label: {type: string, nullable: true}
+                        locked_by: {type: [string, 'null']}
+                        label: {type: [string, 'null']}
                   columns:
                     type: array
                     items:
@@ -15709,7 +15709,7 @@ paths:
                         field: {type: string}
                         reason: {type: string}
                         locked_at: {type: string}
-                        locked_by: {type: string, nullable: true}
+                        locked_by: {type: [string, 'null']}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
   /entity-locks/columns/{kind}/{field}:
