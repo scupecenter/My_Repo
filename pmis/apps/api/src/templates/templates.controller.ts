@@ -30,6 +30,14 @@ export class TemplatesController {
     return this.templates.list(auth);
   }
 
+  @Get(':templateId/changes')
+  changes(@Auth() auth: AuthContext, @Param('templateId') templateId: string, @Query('from') from?: string, @Query('to') to?: string) {
+    if (!/^TPL-[A-Z0-9_-]{2,40}$/.test(templateId)) throw problems.notFound('This template does not exist.');
+    const n = (v?: string): number | null => (v !== undefined && /^[1-9][0-9]{0,5}$/.test(v) ? Number(v) : null);
+    if ((from !== undefined && n(from) === null) || (to !== undefined && n(to) === null)) throw problems.validation([{ path: '/from', code: 'invalid', message: 'from and to are version numbers.' }]);
+    return this.templates.changes(auth, templateId, n(from), n(to));
+  }
+
   @ExportAction({ category: 'templates' })
   @Get(':templateId/download')
   async download(
