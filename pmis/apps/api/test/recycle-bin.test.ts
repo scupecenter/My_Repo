@@ -5,7 +5,7 @@ import { startApp, superDb } from './helpers';
 import { HLC, createRec, post, team } from './reg-helpers';
 import { plainAdmin } from './wf-helpers';
 
-/** Contract 0.15.98 (migration 0220): the recycle bin lists voided register records and a System Admin restores one to a draft. */
+/** Contract 0.15.98 (migration 0250): the recycle bin lists voided register records and a System Admin restores one to a draft. */
 let app: NestExpressApplication;
 let db: PgClient;
 

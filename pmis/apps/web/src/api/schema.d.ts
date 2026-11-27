@@ -6642,7 +6642,7 @@ export interface paths {
         };
         /**
          * Voided register records that can still be restored (System Admin)
-         * @description 0.15.120. The records voided inside the retention window (newest first, at most 500). `blocked` is `open_version_exists` or `site_slot_taken` when a restore would break a rule. 403 for anyone but a System Admin.
+         * @description 0.15.150. The records voided inside the retention window (newest first, at most 500). `blocked` is `open_version_exists` or `site_slot_taken` when a restore would break a rule. 403 for anyone but a System Admin.
          */
         get: operations["getRecycleBin"];
         put?: never;
@@ -6663,7 +6663,7 @@ export interface paths {
         get?: never;
         /**
          * Set the retention of the recycle bin (System Admin)
-         * @description 0.15.120. Days a voided record can be restored, 30 to 730. Needs If-Match and a reason; audited as `recycle_bin_retention_update`.
+         * @description 0.15.150. Days a voided record can be restored, 30 to 730. Needs If-Match and a reason; audited as `recycle_bin_retention_update`.
          */
         put: operations["setRecycleBinRetention"];
         post?: never;
@@ -6684,7 +6684,7 @@ export interface paths {
         put?: never;
         /**
          * Restore a voided register record to a draft (System Admin)
-         * @description 0.15.120. Only a voided record inside the retention window; it returns as `entry`, level 1, and goes through the workflow again. Refused when a newer open version exists or the site already has another record in a one-per-site register. Needs If-Match (the record version), a reason and a step-up. Audited as `register_record_restore`.
+         * @description 0.15.150. Only a voided record inside the retention window; it returns as `entry`, level 1, and goes through the workflow again. Refused when a newer open version exists or the site already has another record in a one-per-site register. Needs If-Match (the record version), a reason and a step-up. Audited as `register_record_restore`.
          */
         post: operations["restoreRegisterRecord"];
         delete?: never;
