@@ -1,5 +1,5 @@
 -- 0345_record_edit_presence (contract 0.15.246): a soft "… is editing this record" notice (owner request 2026-11-27, item 17 of the
--- PM-platforms research; Google Docs style presence, advisory only). Mirror: db/sql/344_record_edit_presence.sql (kept identical).
+-- 2026-11-27 batch, item 17, advisory only). Mirror: db/sql/344_record_edit_presence.sql (kept identical).
 --
 -- Additive. A notice, never a lock: nothing is blocked, hidden or widened. The signal is the editor's own heartbeat; a reader sees only the
 -- display name of another editor of the same record, exactly what a colleague already sees on the record itself. No grant, role, permission,

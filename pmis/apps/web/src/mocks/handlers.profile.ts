@@ -6,6 +6,21 @@ import { API_BASE } from '@/api/client';
 import type { MyProfile } from '@/api/profile';
 import { accountKeyOf, ACCOUNTS, cred, db, effectiveBrand, effectivePrefs, identity, save, sessionBody, STAFF, stepUpValid, tfLabel, viewer } from './db';
 import { APPEARANCE_OPTIONS } from '../lib/appearance';
+/** 0197: the sidebar object of the mock door: known keys only, the badge style of the list, lists of menu keys (the real check is ui_nav_check). */
+const NAV_KEY = /^[a-z0-9_.]{1,60}$/;
+const navOk = (v: unknown): boolean => {
+  if (v === null || typeof v !== 'object' || Array.isArray(v)) return false;
+  const r = v as Record<string, unknown>;
+  for (const [k, x] of Object.entries(r)) {
+    if (k === 'badge_style') { if (x !== 'full' && x !== 'dot' && x !== 'none') return false; continue; }
+    if (k === 'hidden' || k === 'order' || k === 'pins') {
+      if (!Array.isArray(x) || x.length > (k === 'pins' ? 20 : 200) || x.some((e) => typeof e !== 'string' || !NAV_KEY.test(e))) return false;
+      continue;
+    }
+    return false;
+  }
+  return true;
+};
 import { isBrand } from '@/lib/brands';
 import { checkCode, codeProblem, GENERIC, needAdmin, recordFailure, userByParam, whoOf } from './handlers.auth';
 import { guard, problem, stepUp } from './handlers';
@@ -130,6 +145,7 @@ export const profileHandlers = [
       const p = b.ui_prefs;
       if (p === null || typeof p !== 'object' || Array.isArray(p)) errors.push({ path: '/ui_prefs', code: 'invalid' });
       else for (const [k, v] of Object.entries(p)) {
+        if (k === 'sidebar') { if (v === null || typeof v !== 'object' || Array.isArray(v) || !navOk(v)) { errors.push({ path: '/ui_prefs', code: 'invalid' }); break; } continue; }
         const opts = (APPEARANCE_OPTIONS as Record<string, readonly string[]>)[k];
         if (!opts || typeof v !== 'string' || !opts.includes(v)) { errors.push({ path: '/ui_prefs', code: 'invalid' }); break; }
       }
@@ -138,11 +154,22 @@ export const profileHandlers = [
     if (b.ui_brand != null && !identity().allow_user_choice) {
       return problem(403, 'field_read_only', 'The administrator set one design for everyone', { errors: [{ path: '/ui_brand', code: 'brand_choice_locked' }] });
     }
-    if (b.ui_prefs != null && !identity().allow_user_choice) {
+    if (b.ui_prefs != null && Object.keys(b.ui_prefs).some((k) => k !== 'sidebar') && !identity().allow_user_choice) {
       return problem(403, 'field_read_only', 'The administrator set one design for everyone', { errors: [{ path: '/ui_prefs', code: 'appearance_choice_locked' }] });
     }
     if ('ui_brand' in b) o.ui_brand = isBrand(b.ui_brand) ? b.ui_brand : null;
-    if (b.ui_prefs != null) o.ui_prefs = { ...(b.ui_prefs as Record<string, string>) };
+    // 0196 + 0197 (the door's rules): the dimensions are replaced when the body names one (or has no sidebar), a sidebar-only body
+    // keeps them; the sidebar is replaced when the body carries it, kept otherwise.
+    if (b.ui_prefs != null) {
+      const p = b.ui_prefs as Record<string, unknown>;
+      const cur = { ...(o.ui_prefs ?? {}) };
+      const hasDim = Object.keys(p).some((k) => k !== 'sidebar');
+      const next: Record<string, unknown> = hasDim ? {} : Object.fromEntries(Object.entries(cur).filter(([k]) => k in APPEARANCE_OPTIONS));
+      for (const [k, v] of Object.entries(p)) if (k !== 'sidebar') next[k] = v;
+      const side = 'sidebar' in p ? p.sidebar : cur.sidebar;
+      if (side !== null && typeof side === 'object' && !Array.isArray(side) && Object.keys(side).length) next.sidebar = side;
+      o.ui_prefs = next;
+    }
     if (typeof b.display_name === 'string') o.display_name = b.display_name.trim();
     if (b.locale) o.locale = b.locale as 'en' | 'ar';
     if (b.theme) o.theme = b.theme as 'light' | 'dark';

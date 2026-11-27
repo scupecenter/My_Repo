@@ -211,6 +211,10 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/reports/contractor-performance'],
   ['get', '/settings/contractor-performance'],
   ['put', '/settings/contractor-performance'],
+  // Contract 0.15.242: the generic alert rules (apps/api: settings; migration 0342).
+  ['get', '/settings/alert-rules'],
+  ['post', '/settings/alert-rules'],
+  ['put', '/settings/alert-rules/:id'],
   // Contract 0.9.2: the self-service profile (apps/api: me, users; migration 0044). Details, email change request and its decision, password, two-factor self-service, enforced mark.
   ['get', '/me/profile'],
   ['get', '/me/sessions'],
@@ -423,6 +427,7 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/registers/car_dispatcher/order-options'],
   ['get', '/registers/financial_advances/order-options'],
   ['get', '/registers/issues/order-options'],
+  ['get', '/registers/change_control/order-options'],
   ['get', '/registers/quality/order-options'],
   ['get', '/registers/issues/risk-options'],
   ['get', '/registers/risks/:entity_id/issues'],
