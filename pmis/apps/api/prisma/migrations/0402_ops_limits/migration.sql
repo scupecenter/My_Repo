@@ -256,12 +256,12 @@ DO $$
 DECLARE f text;
 BEGIN
   FOREACH f IN ARRAY ARRAY['ops_limits_catalogue()', 'ops_limits_stored()', 'ops_limits_effective()', 'ops_limit(text)', 'ops_limits_public()', 'ops_limits_state()',
-                           'admin_set_ops_limits(jsonb,text,integer)', 'idm_stepup_seconds()'] LOOP
+                           'admin_set_ops_limits(jsonb,text,integer)'] LOOP
     EXECUTE format('ALTER FUNCTION %s OWNER TO pmis_definer', f);
     EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC', f);
     EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO pmis_definer', f);
   END LOOP;
-  -- the sign-in functions run as pmis_identity_owner and read the session limits
+  -- idm_stepup_seconds() keeps its owner and grants (CREATE OR REPLACE above); the sign-in functions run as pmis_identity_owner and read the limits
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'pmis_identity_owner') THEN
     GRANT EXECUTE ON FUNCTION ops_limit(text) TO pmis_identity_owner;
   END IF;
