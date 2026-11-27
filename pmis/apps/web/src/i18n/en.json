@@ -351,6 +351,8 @@
     "unavailable": "Card unavailable"
   },
   "errors": {
+    "export_locked": "Export is switched off by a System Admin (Settings > Security > Lock keys).",
+    "download_locked": "This download is switched off by a System Admin (Settings > Security > Lock keys).",
     "system_field": "This column is protected: only its name, section, order and visibility can change.",
     "conversion_blocked": "Some values cannot be converted. Fix them first.",
     "conversion_unconfirmed": "Confirm the conversion of the stored values.",
@@ -602,7 +604,11 @@
     "override_revert": "Override reverted",
     "reopen": "Reopened",
     "migrate": "Migrated",
-    "transfer": "Transferred"
+    "transfer": "Transferred",
+    "triage_accept": "Accepted at intake",
+    "triage_reject": "Rejected at intake",
+    "triage_merge": "Merged as a duplicate",
+    "triage_defer": "Deferred at intake"
   },
   "level": {
     "entry": "Entry",
@@ -1184,6 +1190,7 @@
     "section_sla_dlp": "DLP months",
     "section_registers_columns": "Register columns",
     "section_registers_contractors": "Contractor rules",
+    "section_registers_derive": "Derived values (between registers)",
     "section_registers_gecol": "GECOL order warnings",
     "section_registers_issue-map": "Issue category by task",
     "section_registers_team-scope": "Team / scope match",
@@ -1933,6 +1940,13 @@
     "approved": "Approved",
     "voided": "Voided"
   },
+  "triageState": {
+    "pending": "Waiting for intake review",
+    "accepted": "Accepted at intake",
+    "deferred": "Deferred at intake",
+    "rejected": "Rejected at intake",
+    "merged": "Merged as a duplicate"
+  },
   "regSections": {
     "site": "Site",
     "site_scope": "Site and scope",
@@ -2076,6 +2090,23 @@
     "transfer": "Transfer the draft",
     "transferred": "The draft was moved to a qualified holder.",
     "transfer_note": "The person holding this draft no longer holds Data Entry (L1) of the permit's stream. Transfer it so a qualified holder can finish it; nothing in it is lost.",
+    "triage_title": "Intake review",
+    "triage_hint": "New records and new versions wait here for one decision of the reviewer (L2) before they move on.",
+    "triage_accept": "Accept",
+    "triage_defer": "Defer",
+    "triage_reject": "Reject",
+    "triage_merge": "Merge as duplicate",
+    "triage_done": "Intake decision recorded",
+    "triage_defer_title": "Defer the record",
+    "triage_reject_title": "Reject the record at intake",
+    "triage_merge_title": "Merge the record as a duplicate",
+    "triage_merge_pick": "The surviving record",
+    "triage_note_optional": "Note (optional)",
+    "triage_decision_line": "{{action}} · {{name}} · {{date}}",
+    "triage_duplicate_of": "The record this one was merged into",
+    "triage_filter": "Intake state",
+    "triage_all": "Every intake state",
+    "triage_send": "Decide",
     "inline_saved": "Saved. You can undo for 8 seconds.",
     "inline_undone": "Change undone.",
     "contractor": "Contractor",
@@ -2280,6 +2311,55 @@
     "open_site": "Open site",
     "processing_started": "The batch is being processed in the background. The bar shows the progress.",
     "processing_busy": "Processing…"
+  },
+  "batchReview": {
+    "kpis": "Upload counts",
+    "kpi_rows": "Rows checked",
+    "kpi_rows_sub": "{{pct}}% valid",
+    "kpi_valid": "Valid",
+    "kpi_duplicate": "Duplicates",
+    "kpi_invalid": "Rejected",
+    "kpi_held": "Held",
+    "hint_rows": "All rows of the file that were checked.",
+    "hint_valid": "Rows that can go into the approval flow: new, changed or identical.",
+    "hint_duplicate": "Rows that repeat a record already in the file. Only the first one is kept; fix or remove the others.",
+    "hint_invalid": "Rows refused for a reason in a cell. Download the error report, correct them and upload again.",
+    "hint_held": "Rows waiting for an earlier approval or a gate.",
+    "step1_sub": "{{rows}} rows checked {{when}}",
+    "step2_sub": "{{open}} waiting for L2, {{held}} held",
+    "step3_sub": "{{approved}} approved, {{rejected}} returned",
+    "step_waiting": "Not yet",
+    "search": "Search the rows",
+    "search_ph": "Search row, Site ID, value or reason",
+    "filters": "Filter the rows",
+    "sort": "Sort",
+    "sort_row": "File order",
+    "sort_result": "Problems first",
+    "sort_key": "Key",
+    "show_all": "All",
+    "show_valid": "Valid",
+    "show_invalid": "Rejected",
+    "show_duplicate": "Duplicates",
+    "show_held": "Held",
+    "show_warnings": "Warnings",
+    "report": "Error report (.xlsx)",
+    "report_hint": "Download the refused rows in the template layout, with the reason of each on the sheet Errors. Correct them and upload the file again.",
+    "report_none": "No refused rows in this batch.",
+    "selection": "Selected rows",
+    "selected": "{{count}} row(s) selected",
+    "clear": "Clear",
+    "approve_selected": "Approve selected ({{count}})",
+    "return_selected": "Return selected",
+    "return_selected_title": "Return {{count}} selected row(s) to the sender",
+    "select_all": "Select all open rows",
+    "select_row": "Select row {{n}}",
+    "empty_all": "This batch has no rows.",
+    "empty_search": "No row matches your search.",
+    "empty_invalid": "No rejected rows. Send all the valid ones.",
+    "empty_duplicate": "No duplicate rows.",
+    "empty_held": "No held rows.",
+    "empty_warnings": "No row has a warning.",
+    "show_everything": "Show all rows"
   },
   "batchProgress": {
     "title": "Import progress",
@@ -2668,6 +2748,15 @@
     "rule_version": "A file from an older version is refused: download the template again when it changes.",
     "rule_xlsx": "Only .xlsx files up to 5 MB, with values (no formulas, no macros).",
     "rule_flow": "Nothing is saved to the register until the rows go through the approval levels.",
+    "up_step_1": "File",
+    "up_step_2": "Check",
+    "up_step_3": "Review",
+    "up_drop": "Drop the filled template here",
+    "up_or_browse": "or click to choose an .xlsx file",
+    "up_replace": "click or drop to replace",
+    "up_size": "{{kb}} KB",
+    "up_checked": "File checked: {{total}} rows, {{valid}} valid",
+    "up_report_note": "Rejected and duplicate rows stay out of the flow. Download the report, correct the rows and upload the file again.",
     "file": "Filled template (.xlsx)",
     "upload": "Upload and check",
     "download_current": "Download the current version",
@@ -4730,10 +4819,14 @@
       "site_region_moved": "A site moved to your region",
       "sla_negative_duration": "SLA data alert (negative duration)",
       "snag_closed": "A snag was closed",
+      "triage_decision": "An intake decision on a record you created",
       "snag_raised": "A snag was raised",
       "team_safety_cert": "A team safety certificate expires",
       "mfa_exemption": "Your MFA exemption was granted or revoked (always mailed)",
-      "assignment_request": "A user asks for an assignment (always mailed)"
+      "assignment_request": "A user asks for an assignment (always mailed)",
+      "expiry_radar": "Expiry radar: documents about to expire",
+      "approval_digest": "Daily digest of what waits for your approval",
+      "weekly_digest": "Weekly digest"
     }
   },
   "dashSettings": {
@@ -4759,6 +4852,22 @@
     "move_up": "Move {{name}} up",
     "move_down": "Move {{name}} down",
     "invalid": "Every KPI needs a green and an amber value, and green must be better than amber for that KPI's direction."
+  },
+  "deriveRules": {
+    "title": "Derived values between registers",
+    "note": "A register can show a value taken from another register (for example the contractor of a GECOL record from Procurement). Only the configured value is shown, never the source record. It is computed when the record is read and is not stored. People who may see the target record see the value even without access to the source register. Each rule is audited when it is read.",
+    "enabled": "On",
+    "target": "Shown in",
+    "output": "Name",
+    "source_register": "Taken from",
+    "source": "Value",
+    "source_party": "The company of the source record",
+    "link": "Link field in the target record",
+    "site_fallback": "When the link is empty, use the latest approved record of the same site",
+    "link_none": "Match by site only",
+    "add": "Add a rule",
+    "remove": "Remove",
+    "key": "Rule code"
   },
   "gecolOrder": {
     "title": "GECOL order warnings",
@@ -5809,7 +5918,21 @@
     "on": "on",
     "off_word": "off"
   },
+  "dllocks": {
+    "title": "Download locks",
+    "note": "Three more switches for a System Admin, off until you turn one on. Nothing is deleted and no sign-in changes. You can turn a lock off again at any time.",
+    "templates": "Lock template downloads",
+    "templates_note": "The blank and pre-filled workbook templates cannot be downloaded.",
+    "files": "Lock uploaded file downloads",
+    "files_note": "A single uploaded document or finished export file cannot be downloaded or previewed on screen, and the Master import original file cannot be downloaded.",
+    "generated": "Lock generated document downloads",
+    "generated_note": "A generated library form cannot be downloaded or printed. Viewing it on screen stays open.",
+    "never": "Never changed: all three are off.",
+    "confirm": "Templates: {{templates}}. Uploaded files: {{files}}. Generated documents: {{generated}}. Your password is asked again and the change is written to the audit log.",
+    "locked_note": "Switched off by a System Admin (Settings > Security > Lock keys)."
+  },
   "seclocks": {
+    "export_ui_note": "Files the browser builds itself (CSV from the rows on screen, print) are switched off in the screens too. That part is a guard in the interface only: data already on screen can still be copied.",
     "title": "Lock keys",
     "note": "Two switches for a System Admin. Both are off until you turn one on. Nothing is deleted and no sign-in changes. You can turn a lock off again at any time.",
     "sharing": "Block public sharing",
@@ -7190,5 +7313,21 @@
   },
   "cells": {
     "progress": "Progress"
+  },
+  "screenSettings": {
+    "title": "Settings for this screen"
+  },
+  "mailPolicy": {
+    "title": "Mail policy",
+    "note": "Who may be mailed. Notification mail goes to the person only for the kinds listed below in Mail notification kinds. Outside addresses stay off until you switch them on here.",
+    "lock": "The security lock that blocks public sharing is on: no mail goes to outside addresses while it is on.",
+    "enabled": "Notification mail is on (off stops all of it except security alerts)",
+    "mode": "Recipients",
+    "internal_only": "Internal only",
+    "internal_external": "Internal and external",
+    "inherit": "Same as above",
+    "domains": "Internal domains (comma separated)",
+    "domains_note": "An address whose domain is not listed is external. With no domain listed every address counts as internal.",
+    "confirm_note": "The change is audited and applies to the next mail."
   }
 }

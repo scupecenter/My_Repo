@@ -31,6 +31,15 @@ export interface TransitionInfo {
 }
 
 const STATES = ['entry', 'in_review', 'in_approval', 'approved', 'voided'];
+const TRIAGE_STATES = ['pending', 'accepted', 'rejected', 'duplicate', 'deferred'];
+/** 0340: one triage decision (accept / reject / merge duplicate / defer). The note is required for reject and merge (the database checks again). */
+const triageSchema = z
+  .object({
+    action: z.enum(['accept', 'reject', 'merge', 'defer']),
+    note: z.string().trim().min(1).max(2000).optional(),
+    duplicate_of: uuidSchema.optional(),
+  })
+  .strict();
 const OPEN_STATES = ['entry', 'in_review', 'in_approval'];
 
 const createSchema = z
@@ -119,6 +128,13 @@ interface RecordRow {
   votes_needed: bigint | null;
   votes_done: bigint | null;
   entry_holder: boolean;
+  triage_state: string | null;
+  triage_note: string | null;
+  triage_by: string | null;
+  triage_at: Date | null;
+  triage_duplicate_of: string | null;
+  triage_holder: boolean | null;
+  triage_has_holder: boolean | null;
   pin_holds: boolean | null;
   ball_since: Date | null;
   ball_held_wd: number | null;
@@ -139,6 +155,7 @@ interface DefRow {
   multiple_per_site: boolean;
   record_types: string[];
   approval_levels: number;
+  triage_enabled: boolean;
 }
 
 interface FieldRow {
@@ -198,7 +215,7 @@ export class RegistersService {
   /** The register of the path: it must exist and be enabled (404 otherwise) and the caller must be able to use its module (403). */
   private async definition(key: string): Promise<DefRow> {
     const rows = await this.db.tx.$queryRaw<DefRow[]>(Prisma.sql`
-      SELECT register_key, name_en, name_ar, module_key, site_scoped, multiple_per_site, record_types, approval_levels
+      SELECT register_key, name_en, name_ar, module_key, site_scoped, multiple_per_site, record_types, approval_levels, triage_enabled
       FROM register_definitions WHERE register_key = ${key} AND is_active AND enabled`);
     const d = rows[0];
     if (!d) throw problems.notFound('This register does not exist.');
@@ -227,7 +244,7 @@ export class RegistersService {
 
   async list(auth: AuthContext): Promise<{ items: unknown[] }> {
     const defs = await this.db.tx.$queryRaw<DefRow[]>(Prisma.sql`
-      SELECT register_key, name_en, name_ar, module_key, site_scoped, multiple_per_site, record_types, approval_levels
+      SELECT register_key, name_en, name_ar, module_key, site_scoped, multiple_per_site, record_types, approval_levels, triage_enabled
       FROM register_definitions WHERE is_active AND enabled ORDER BY sort_order`);
     const items: unknown[] = [];
     for (const d of defs) {
@@ -363,6 +380,9 @@ export class RegistersService {
         r.approved_by::text AS approved_by, r.source, r.version,
         k.kind, k.cell_id::text AS cell_id, k.rule::text AS rule, k.has_holder, k.is_holder, k.votes_needed, k.votes_done,
         reg_is_eligible(r.id, 'entry', ${actor}::uuid) AS entry_holder,
+        r.triage_state, r.triage_note, r.triage_by::text AS triage_by, r.triage_at, r.triage_duplicate_of::text AS triage_duplicate_of,
+        CASE WHEN r.triage_state IN ('pending', 'deferred') THEN reg_is_eligible(r.id, 'approve', ${actor}::uuid) END AS triage_holder,
+        CASE WHEN r.triage_state IN ('pending', 'deferred') THEN reg_has_holder(r.id, 'approve') END AS triage_has_holder,
         CASE WHEN r.ball_in_court_user_id IS NOT NULL AND r.state = 'entry' THEN reg_is_eligible(r.id, 'entry', r.ball_in_court_user_id) END AS pin_holds,
         -- F2 (0.15.30): the ball at the current level since the level opened, in working days (the default calendar; registers have no SLA rule)
         CASE WHEN r.state IN ('entry', 'in_review', 'in_approval') THEN coalesce(r.level_opened_at, r.submitted_at, r.updated_at) END AS ball_since,
@@ -426,6 +446,11 @@ export class RegistersService {
     }
     const rtype = oneParam(q, 'record_type');
     if (rtype !== undefined) conds.push(Prisma.sql`r.record_type = ${rtype}`);
+    const triage = oneParam(q, 'triage');
+    if (triage !== undefined) {
+      if (!TRIAGE_STATES.includes(triage)) throw problems.validation([{ path: '/triage', code: 'invalid', message: `triage is one of ${TRIAGE_STATES.join(', ')}.` }]);
+      conds.push(Prisma.sql`r.triage_state = ${triage}`);
+    }
     const entity = oneParam(q, 'entity_id');
     if (entity !== undefined) {
       if (!uuidSchema.safeParse(entity).success) throw problems.validation([{ path: '/entity_id', code: 'invalid', message: 'entity_id is a uuid.' }]);
@@ -518,7 +543,7 @@ export class RegistersService {
   private async dtos(auth: AuthContext, rows: RecordRow[]): Promise<Record<string, unknown>[]> {
     if (rows.length === 0) return [];
     const cells = [...new Set(rows.map((r) => r.cell_id).filter((x): x is string => !!x))];
-    const userIds = [...new Set(rows.flatMap((r) => [r.pinned, r.created_by, r.approved_by]).filter((x): x is string => !!x))];
+    const userIds = [...new Set(rows.flatMap((r) => [r.pinned, r.created_by, r.approved_by, r.triage_by]).filter((x): x is string => !!x))];
     const partyIds = [...new Set(rows.map((r) => r.external_party_id).filter((x): x is string => !!x))];
     const assignees = cells.length
       ? await this.db.tx.$queryRaw<{ cell_id: string; kind: string; ref_id: string; label: string; employee_id: string | null; status: string | null; deleted: boolean | null }[]>(Prisma.sql`
@@ -534,26 +559,12 @@ export class RegistersService {
     const parties = partyIds.length
       ? await this.db.tx.$queryRaw<{ id: string; name: string; type: string }[]>(Prisma.sql`SELECT id::text AS id, name, type::text AS type FROM external_parties WHERE id = ANY(${partyIds}::uuid[])`)
       : [];
-    // 0.15.89: the Contractor shown on a GECOL / HLC record comes from Procurement by Site ID (read only, never written to the record):
-    // the Procurement record an HLC record links to, else the latest approved Procurement record of the site that names a company.
-    const procSites = [...new Set(rows.filter((r) => (r.register_key === 'gecol' || r.register_key === 'hlc') && r.site_id).map((r) => r.site_id as string))];
-    const procLinked = [...new Set(rows.filter((r) => r.register_key === 'hlc' && typeof r.data?.procurement_record_id === 'string').map((r) => r.data.procurement_record_id as string))].filter((x) => uuidSchema.safeParse(x).success);
-    const procBySite = new Map<string, { id: string; name: string; type: string }>();
-    const procById = new Map<string, { id: string; name: string; type: string }>();
-    if (procSites.length || procLinked.length) {
-      const pr = await this.db.tx.$queryRaw<{ rid: string; site_id: string | null; id: string; name: string; type: string; linked: boolean }[]>(Prisma.sql`
-        SELECT DISTINCT ON (r.id) r.id::text AS rid, r.site_id::text AS site_id, p.id::text AS id, p.name, p.type::text AS type, (r.id = ANY(${procLinked}::uuid[])) AS linked
-        FROM register_records r JOIN external_parties p ON p.id = r.external_party_id
-        WHERE r.register_key = 'procurement' AND r.is_current AND r.state = 'approved'
-          AND (r.site_id = ANY(${procSites}::uuid[]) OR r.id = ANY(${procLinked}::uuid[]))
-        ORDER BY r.id`);
-      const latest = await this.db.tx.$queryRaw<{ rid: string }[]>(Prisma.sql`
-        SELECT DISTINCT ON (r.site_id) r.id::text AS rid FROM register_records r
-        WHERE r.register_key = 'procurement' AND r.is_current AND r.state = 'approved' AND r.external_party_id IS NOT NULL AND r.site_id = ANY(${procSites}::uuid[])
-        ORDER BY r.site_id, r.approved_at DESC NULLS LAST, r.id`);
-      const by = new Map(pr.map((x) => [x.rid, x]));
-      for (const x of pr) procById.set(x.rid, { id: x.id, name: x.name, type: x.type });
-      for (const l of latest) { const x = by.get(l.rid); if (x?.site_id) procBySite.set(x.site_id, { id: x.id, name: x.name, type: x.type }); }
+    // 0363: cross-register derive. The values a register shows from ANOTHER register (the setting derive.rules; GECOL and HLC contractor from Procurement are the seeded rules),
+    // read through derive_values(): only the configured value of the matching source record, never the record. Computed on read, not stored, audited by the function.
+    const derivedBy = new Map<string, Record<string, unknown>>();
+    if (rows.length) {
+      const dv = await this.db.tx.$queryRaw<{ j: Record<string, Record<string, unknown>> | null }[]>(Prisma.sql`SELECT derive_values(${rows.map((r) => r.id)}::uuid[]) AS j`);
+      for (const [id, o] of Object.entries(dv[0]?.j ?? {})) derivedBy.set(id, o);
     }
     const byCell = new Map<string, MatrixAssigneeDto[]>();
     for (const a of assignees) {
@@ -629,6 +640,15 @@ export class RegistersService {
         version: r.version,
         warnings: Array.isArray(r.warnings) ? r.warnings : [],
       };
+      if (r.triage_state) {
+        dto.triage = {
+          state: r.triage_state,
+          note: r.triage_note,
+          at: r.triage_at,
+          duplicate_of: r.triage_duplicate_of,
+          ...(r.triage_by && refs.get(r.triage_by) ? { by: refs.get(r.triage_by) } : {}),
+        };
+      }
       const dc = docsOf.get(r.entity_id);
       const dot = dc ? evidenceDot(dc) : undefined;
       if (dot) dto.docs = dot;
@@ -641,10 +661,10 @@ export class RegistersService {
       // 0063 (Q150): the HLC purchase requests the record covers, and whether all are approved by HLC (C3)
       if (r.purchase_requests) dto.purchase_requests = r.purchase_requests;
       if (party) dto.external_party = party;
-      if (r.register_key === 'gecol' || r.register_key === 'hlc') {
-        const linked = typeof r.data?.procurement_record_id === 'string' ? procById.get(r.data.procurement_record_id) : undefined;
-        const pc = linked ?? (r.site_id ? procBySite.get(r.site_id) : undefined);
-        if (pc) dto.procurement_contractor = pc;
+      const derived = derivedBy.get(r.id);
+      if (derived) {
+        dto.derived = derived;
+        if (derived.procurement_contractor && (r.register_key === 'gecol' || r.register_key === 'hlc')) dto.procurement_contractor = derived.procurement_contractor;   // kept for the web screens of 0.15.90
       }
       if (r.created_by && refs.get(r.created_by)) dto.created_by = refs.get(r.created_by);
       if (r.approved_by && refs.get(r.approved_by)) dto.approved_by = refs.get(r.approved_by);
@@ -679,6 +699,8 @@ export class RegistersService {
         const mine = (r.pinned ?? r.created_by) === auth.user.id;
         if ((!r.is_holder && mine && !(auth.state.isAdmin && r.has_holder === false)) || (r.is_holder && r.pinned !== null && r.pinned !== auth.user.id && r.pin_holds === false)) actions.push('transfer');
       }
+      // 0340: intake triage (issues and change control while enabled): the L2 holders of the register's matrix row decide; the database decides again
+      if (active && (r.triage_state === 'pending' || r.triage_state === 'deferred') && (r.triage_holder === true || (auth.state.isAdmin && r.triage_has_holder === false))) actions.push('triage');
       if (active && (await can(module, 'delete', r.region_id))) actions.push('void');
       if (r.state === 'approved' && r.is_current && !r.has_open && r.entry_holder && (await can(module, 'edit', r.region_id))) actions.push('new_version');
       // Q267: a System Admin cancels an approved Quality snag record entered by mistake (its QC snag is cancelled with it; a closed QC snag is history)
@@ -852,6 +874,26 @@ export class RegistersService {
       release ? Prisma.sql`SELECT reg_release_record(${id}::uuid, ${version}::int) AS r` : Prisma.sql`SELECT reg_claim_record(${id}::uuid, ${version}::int) AS r`,
     );
     return this.get(auth, key, id, info);
+  }
+
+  /**
+   * 0340: intake triage for the enabled registers (Issue Log, Change Control). Accept, reject (voids), merge as a duplicate (voids, links the
+   * surviving record) or defer, with a note to the person who entered the record. Reject and merge ask for a step-up like a void does. The
+   * database decides the holder, the state and the version again.
+   */
+  async triage(auth: AuthContext, key: string, id: string, ifMatch: string | undefined, rawBody: unknown): Promise<Record<string, unknown>> {
+    const version = parseIfMatch(ifMatch);
+    const body = parse(triageSchema, rawBody ?? {});
+    if ((body.action === 'reject' || body.action === 'merge') && !body.note) {
+      throw new ProblemException(422, 'note_required', { detail: 'A note is required for a rejection and for a merge.', errors: [{ path: '/note', code: 'required', message: 'A note is required.' }] });
+    }
+    await this.rowFor(auth, key, id);
+    const stepOk = Boolean(await this.stepUp.validUntil(auth));
+    await this.call<Record<string, unknown>>(
+      auth,
+      Prisma.sql`SELECT reg_triage_act(${id}::uuid, ${version}::int, ${body.action}::text, ${body.note ?? null}::text, ${body.duplicate_of ?? null}::uuid, ${stepOk}::boolean) AS r`,
+    );
+    return this.get(auth, key, id);
   }
 
   /** 0054 (Q221): move a permit draft to a qualified entry holder (the database decides who may and to whom). */
