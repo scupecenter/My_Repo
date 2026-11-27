@@ -2,7 +2,8 @@ import { SiteActivity } from '@/components/SiteActivity';
 import { SiteGantt } from '@/components/SiteGantt';
 import { SiteSummaryStrip } from '@/components/SiteSummaryStrip';
 import type { TasksExportColumnCode } from '@/api/types';
-import { ArrowLeft, Layers } from 'lucide-react';
+import { ArrowLeft, CalendarRange, Layers, Table2 } from 'lucide-react';
+import { LayoutPanel, type ViewOption } from '@/components/LayoutPanel';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
@@ -97,11 +98,11 @@ export function Site() {
   const tadvTree = decodeFilter(sp.get('tadv') ?? '');
   const rowStages = tq ? stages.map((x) => ({ ...x, tasks: x.tasks.filter((k) => taskMatches(k, tq, (i18n.language === 'ar' && k.name_ar) || k.name_en)) })) : stages;
   // W8 item 3: List (default) or Timeline, remembered per user; both sit in the shared toolbar with Export current view
-  const switcher = (
-    <div className="flex rounded-md border border-line" role="group" aria-label={t('site.layout')} data-testid="site-layout">
-      {([['list', 'list'], ['row', 'timeline']] as const).map(([l, name]) => <button key={l} type="button" aria-pressed={layout === l} data-testid={`site-layout-${name}`} onClick={() => { setLayout(l); savePref(LAYOUT_KEY, name); }} className={`px-2 py-1 text-xs ${layout === l ? 'bg-sideOn font-semibold text-accentText' : 'text-mute hover:bg-hover'}`}>{t(`tstd.layout_${name}`)}</button>)}
-    </div>
-  );
+  const siteViews: ViewOption[] = [
+    { id: 'list', label: t('tstd.layout_list'), hint: t('view.site_list_hint'), icon: <Table2 size={14} />, testid: 'site-layout-list' },
+    { id: 'timeline', label: t('tstd.layout_timeline'), hint: t('view.site_timeline_hint'), icon: <CalendarRange size={14} />, testid: 'site-layout-timeline' },
+  ];
+  const switcher = <LayoutPanel testid="site-view" views={{ value: layout === 'row' ? 'timeline' : 'list', options: siteViews, onChange: (id) => { setLayout(id === 'timeline' ? 'row' : 'list'); savePref(LAYOUT_KEY, id === 'timeline' ? 'timeline' : 'list'); } }} />;
   const exporter = <ExportViewButton testid="grid-export-view" source="tasks" filters={{ site_id: siteId, ...(stage ? { stage_code: stage } : {}), ...(pq.stream ? { stream: pq.stream } : {}), ...(pq.view ? { view: pq.view } : {}), ...(sp.get('tadv') ? { filter: sp.get('tadv') } : {}) }} columns={TASK_COLUMNS} />;
   const displayMenu = <DisplayMenu api={timeline} />;
 

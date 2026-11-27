@@ -6748,6 +6748,10 @@
     "options": "Options of this view"
   },
   "view": {
+    "site_list_hint": "The tasks as a table you can edit",
+    "site_timeline_hint": "The tasks as a row per stage, read only",
+    "mywork_list_hint": "Your work in three buckets",
+    "mywork_board_hint": "Your tasks by approval state",
     "title": "View",
     "list": "List",
     "list_hint": "One row per item, the usual table",
