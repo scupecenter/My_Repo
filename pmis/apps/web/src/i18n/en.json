@@ -4736,7 +4736,10 @@
       "snag_raised": "A snag was raised",
       "team_safety_cert": "A team safety certificate expires",
       "mfa_exemption": "Your MFA exemption was granted or revoked (always mailed)",
-      "assignment_request": "A user asks for an assignment (always mailed)"
+      "assignment_request": "A user asks for an assignment (always mailed)",
+      "expiry_radar": "Expiry radar: documents about to expire",
+      "approval_digest": "Daily digest of what waits for your approval",
+      "weekly_digest": "Weekly digest"
     }
   },
   "dashSettings": {
@@ -7226,5 +7229,18 @@
   },
   "screenSettings": {
     "title": "Settings for this screen"
+  },
+  "mailPolicy": {
+    "title": "Mail policy",
+    "note": "Who may be mailed. Notification mail goes to the person only for the kinds listed below in Mail notification kinds. Outside addresses stay off until you switch them on here.",
+    "lock": "The security lock that blocks public sharing is on: no mail goes to outside addresses while it is on.",
+    "enabled": "Notification mail is on (off stops all of it except security alerts)",
+    "mode": "Recipients",
+    "internal_only": "Internal only",
+    "internal_external": "Internal and external",
+    "inherit": "Same as above",
+    "domains": "Internal domains (comma separated)",
+    "domains_note": "An address whose domain is not listed is external. With no domain listed every address counts as internal.",
+    "confirm_note": "The change is audited and applies to the next mail."
   }
 }

@@ -7209,6 +7209,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/mail-policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The mail policy (0.15.261)
+         * @description 0.15.261. System Admin only (403 `action_forbidden` otherwise). `enabled` is the global switch, `mode` is `internal_only` or `internal_external` for every kind, `kinds` may
+         *     override it per kind. An address is external when its domain is not in `internal_domains` (empty list: every address is internal). External mail also needs the security
+         *     lock `block_public_sharing` to be off (`block_public_sharing` shows its state). Security alerts and mandatory mail are never stopped by the policy.
+         */
+        get: operations["getMailPolicy"];
+        /**
+         * Save the mail policy (System Admin, step-up, reason, If-Match, audited)
+         * @description 0.15.261. Field errors (422 `validation_failed`): `/enabled`, `/mode`, `/internal_domains[/i]`, `/kinds[/kind]` (`unknown_kind`, `invalid`), `unknown_key`. Audited as `mail_policy_update`.
+         */
+        put: operations["setMailPolicy"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/mail-notification-kinds": {
         parameters: {
             query?: never;
@@ -17553,6 +17579,32 @@ export interface components {
         MailNotificationKindsInput: components["schemas"]["WithReason"] & {
             /** @description Notification kinds that are also mailed to the person. An empty list keeps every notification in-app. */
             kinds: string[];
+        };
+        MailPolicyInput: {
+            enabled: boolean;
+            /** @enum {string} */
+            mode: "internal_only" | "internal_external";
+            internal_domains: string[];
+            kinds: {
+                [key: string]: {
+                    enabled: boolean;
+                    /** @enum {string} */
+                    mode: "inherit" | "internal_only" | "internal_external";
+                };
+            };
+        };
+        /** @description 0.15.261. The setting `mail.policy`. */
+        MailPolicy: components["schemas"]["MailPolicyInput"] & {
+            version: number;
+            /** @description The security lock; while on, no external mail is sent. */
+            block_public_sharing: boolean;
+            catalogue: {
+                kind: string;
+                recommended: boolean;
+            }[];
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
         };
         /** @description 0.14.2 (Q441). The setting `mail.notification_kinds` and the kinds it may name. */
         MailNotificationKinds: {
@@ -33891,6 +33943,62 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+        };
+    };
+    getMailPolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The setting. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MailPolicy"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setMailPolicy: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"] & components["schemas"]["MailPolicyInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MailPolicy"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
         };
     };
     getMailNotificationKinds: {
