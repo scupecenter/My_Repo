@@ -1171,7 +1171,8 @@
     "section_documents_numbering": "Numbering",
     "section_data_counts": "GECOL / HLC counts",
     "section_screens_motion": "Motion",
-    "section_workflow_coverage": "Matrix coverage"
+    "section_workflow_coverage": "Matrix coverage",
+    "section_screens_login": "Login page"
   },
   "scopeMatch": {
     "title": "Team / scope match (Procurement)",
@@ -2720,7 +2721,10 @@
     "kind_gate_closed_again": "Gate closed again",
     "kind_sla_negative_duration": "SLA data alert",
     "kind_site_region_moved": "Site moved to your region",
-    "kind_system": "System"
+    "kind_system": "System",
+    "priority": "Priority",
+    "priority_only": "Priority only",
+    "empty_priority": "Nothing needs you right now"
   },
   "tis": {
     "tab": "Time",
@@ -6278,7 +6282,12 @@
       "p2": "Approvals, documents and follow-up in one place",
       "p3": "Built for civil work and telecom installation teams",
       "secure": "Protected sign-in with audit and optional two-factor"
-    }
+    },
+    "announcement": "Announcement",
+    "support": "Support",
+    "status_available": "System available",
+    "status_checking": "Checking the system…",
+    "status_unavailable": "The system cannot be reached right now"
   },
   "forgot": {
     "title": "Reset your password",
@@ -6317,7 +6326,11 @@
     "go_m": "Messages",
     "go_l": "Workload",
     "go_r": "Status updates",
-    "note": "Shortcuts only open pages; your permissions still apply on each page."
+    "note": "Shortcuts only move and open; your permissions still apply on each page.",
+    "rows": "Next and previous row in a table",
+    "row_open": "Open the focused row",
+    "right_click": "Right-click",
+    "row_menu": "Row menu (Shift + right-click keeps the browser menu)"
   },
   "siteSummary": {
     "title": "Site summary",
@@ -6502,5 +6515,59 @@
     "col_count": "Stays",
     "col_median": "Median (working days)",
     "col_p85": "P85 (working days)"
+  },
+  "rowActions": {
+    "label": "Row actions",
+    "open": "Open",
+    "open_tab": "Open in a new tab",
+    "select": "Select",
+    "unselect": "Unselect",
+    "copy": "Copy row",
+    "copied": "Row copied"
+  },
+  "records": {
+    "pin": "Pin",
+    "unpin": "Unpin",
+    "pinned": "Pinned records",
+    "recent": "Recent records",
+    "clear": "Clear",
+    "changed": "Changed since you last opened it",
+    "pin_full": "You can pin up to {{max}} records. Unpin one first."
+  },
+  "postLogin": {
+    "title": "Signing you in…",
+    "note": "Preparing your workspace",
+    "version": "Version {{v}}"
+  },
+  "loginPage": {
+    "title": "Login page",
+    "note": "What the sign-in page shows: the announcement, the background animation, the default language and the support links. Nothing here changes the sign-in mechanism.",
+    "announcement": "Announcement",
+    "ann_en": "Text (English)",
+    "ann_ar": "Text (Arabic)",
+    "ann_kind": "Kind",
+    "ann_hide": "Both texts empty: no banner.",
+    "kind_info": "Information",
+    "kind_maintenance": "Maintenance",
+    "animation": "Background animation",
+    "animation_note": "A calm telecom network behind the sign-in pages. A visitor who prefers reduced motion never sees it.",
+    "locale": "Default language",
+    "locale_browser": "Browser (English)",
+    "locale_en": "English",
+    "locale_ar": "Arabic",
+    "locale_note": "Applies until the visitor picks a language once; their choice stays.",
+    "links": "Support links",
+    "links_note": "Up to 5 links under the sign-in form (http, https or mailto).",
+    "link_label_en": "Label (English)",
+    "link_label_ar": "Label (Arabic)",
+    "link_url": "https://… or mailto:…",
+    "link_add": "Add a link",
+    "link_remove": "Remove",
+    "version": "System version",
+    "version_note": "Shown to signed-in users only (the post-login screen). It is never on the public sign-in page.",
+    "updated": "Last changed by {{name}} on {{when}}",
+    "never": "Not changed since installation.",
+    "readonly": "Only a System Admin, or a person they delegated settings to for all regions, can change this.",
+    "confirm": "Save the login page settings? The change is audited with your reason and shows on the sign-in page at once."
   }
 }
