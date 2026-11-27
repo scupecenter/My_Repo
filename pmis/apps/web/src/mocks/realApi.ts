@@ -389,6 +389,12 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/settings/login-page'],
   ['put', '/settings/login-page'],
   ['get', '/settings/login-page/public'],
+  // Contract 0.15.292: the media gallery (apps/api: media; migration 0396).
+  ['get', '/media/settings'],
+  ['put', '/media/settings'],
+  ['get', '/media/items'],
+  ['get', '/media/facets'],
+  ['get', '/media/items/:kind/:id/thumbnail'],
   // Contract 0.15.190 (migration 0290; apps/api: settings): the admin lock keys (Settings, Security, Lock keys).
   ['get', '/settings/security-locks'],
   ['put', '/settings/security-locks'],
