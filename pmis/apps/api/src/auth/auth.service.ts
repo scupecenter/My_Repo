@@ -50,7 +50,7 @@ function codeInput(b: { code?: string; recovery_code?: string }): CodeInput | nu
 const employeeIdSchema = z.object({ employee_id: z.string().regex(/^[0-9]{4}$/) }).strict();
 const changePasswordSchema =z.object({ current_password: z.string().max(128), new_password: z.string().max(1024) }).strict();
 
-/** Sign-in rate limits (Q168, progressive per address): the numbers are in Settings > Security > Limits (migration 0521); the defaults are 10 failures over 15 minutes, then a wait that doubles from 2 s up to 60 s, and 5 attempts per account. */
+/** Sign-in rate limits (Q168, progressive per address): the numbers are in Settings > Security > Limits (migration 0563); the defaults are 10 failures over 15 minutes, then a wait that doubles from 2 s up to 60 s, and 5 attempts per account. */
 export const PASSWORD_CHANGE_LIMIT = 10;
 
 interface LookupRow {

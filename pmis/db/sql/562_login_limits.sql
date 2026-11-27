@@ -1,4 +1,4 @@
--- 0521: the sign-in rate-limit numbers in Settings > Security > Limits (follow-up of 0402, relayed by Main).
+-- 0563: the sign-in rate-limit numbers in Settings > Security > Limits (follow-up of 0402, relayed by Main).
 --
 -- WHY. How many failed sign-ins one address may make before the wait starts (10), the window they are counted over (15 minutes), the first and longest wait (2 s and 60 s)
 -- and how many attempts one account may make (5) were numbers inside auth.service.ts. A System Admin could not see or change them. They join the 0402 catalogue.
