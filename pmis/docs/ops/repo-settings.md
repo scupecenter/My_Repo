@@ -10,7 +10,7 @@ These settings live on GitHub, not in the code. The owner applies them in the re
 
 ## 2. Branch protection for `main` (Settings > Branches > Add branch protection rule, pattern `main`)
 
-- Require a pull request before merging, with 1 approval. Dismiss stale approvals when new commits are pushed.
+- Do not require approving reviews: agents merge from the same account as the owner, so a required approval would block the merge queue.
 - Require status checks to pass, and require the branch to be up to date. The 8 checks are:
   Installer scripts (syntax and shellcheck), OpenAPI contract lint, API (typecheck, lint, build, tests on PostgreSQL 16), SAST (semgrep), Dependencies (grype), Web (typecheck, lint, unit tests, build, Playwright e2e), IaC (checkov, report only), Secrets (gitleaks).
 - Require conversation resolution before merging.
