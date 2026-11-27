@@ -604,7 +604,11 @@
     "override_revert": "تراجع عن التجاوز",
     "reopen": "أُعيد فتحها",
     "migrate": "نُقلت",
-    "transfer": "نُقل"
+    "transfer": "نُقل",
+    "triage_accept": "قُبل عند الفرز",
+    "triage_reject": "رُفض عند الفرز",
+    "triage_merge": "دُمج كمكرر",
+    "triage_defer": "أُجل عند الفرز"
   },
   "level": {
     "entry": "إدخال",
@@ -1936,6 +1940,13 @@
     "approved": "معتمد",
     "voided": "ملغى"
   },
+  "triageState": {
+    "pending": "بانتظار فرز الإدخال",
+    "accepted": "مقبول عند الفرز",
+    "deferred": "مؤجل عند الفرز",
+    "rejected": "مرفوض عند الفرز",
+    "merged": "مدمج كمكرر"
+  },
   "regSections": {
     "site": "الموقع",
     "site_scope": "الموقع والنطاق",
@@ -2079,6 +2090,23 @@
     "transfer": "نقل المسودة",
     "transferred": "نُقلت المسودة إلى مسؤول مؤهل.",
     "transfer_note": "صاحب هذه المسودة لم يعد يحمل إدخال البيانات (L1) لمسار هذا التصريح. انقلها ليكملها مسؤول مؤهل؛ لا يضيع شيء من بياناتها.",
+    "triage_title": "فرز الإدخال",
+    "triage_hint": "تنتظر السجلات الجديدة والإصدارات الجديدة هنا قرارًا واحدًا من المعتمد (م2) قبل أن تتابع.",
+    "triage_accept": "قبول",
+    "triage_defer": "تأجيل",
+    "triage_reject": "رفض",
+    "triage_merge": "دمج كمكرر",
+    "triage_done": "سُجل قرار الفرز",
+    "triage_defer_title": "تأجيل السجل",
+    "triage_reject_title": "رفض السجل عند الفرز",
+    "triage_merge_title": "دمج السجل كمكرر",
+    "triage_merge_pick": "السجل الباقي",
+    "triage_note_optional": "ملاحظة (اختيارية)",
+    "triage_decision_line": "{{action}} · {{name}} · {{date}}",
+    "triage_duplicate_of": "السجل الذي دُمج فيه هذا السجل",
+    "triage_filter": "حالة الفرز",
+    "triage_all": "كل حالات الفرز",
+    "triage_send": "تأكيد القرار",
     "inline_saved": "تم الحفظ. يمكنك التراجع خلال 8 ثوان.",
     "inline_undone": "تم التراجع عن التعديل.",
     "contractor": "المقاول",
@@ -4815,6 +4843,7 @@
       "site_region_moved": "موقع انتقل إلى منطقتك",
       "sla_negative_duration": "تنبيه بيانات SLA (مدة سالبة)",
       "snag_closed": "أُغلقت ملاحظة",
+      "triage_decision": "قرار فرز على سجل أنشأته",
       "snag_raised": "رُفعت ملاحظة",
       "team_safety_cert": "شهادة سلامة فريق تنتهي",
       "mfa_exemption": "منح إعفائك من التحقق متعدد العوامل أو إلغاؤه (يُرسل بالبريد دائماً)",
