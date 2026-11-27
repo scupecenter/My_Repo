@@ -30,7 +30,7 @@ const CR = () => (C().contractorRules ??= initCfg().contractorRules);
 /** Contractor performance (contract 0.15.89): demo thresholds, kept in memory; the report is computed from them in the mock like the API does. */
 const PERF_DEFAULT = { min_sample: 3, snag_overdue_pct: { amber: 10, red: 25 }, snag_return_pct: { amber: 20, red: 40 }, quality_fail_pct: { amber: 10, red: 20 }, contract_expiry_days: { amber: 60, red: 15 } };
 interface AlertRuleRow {
-  id: string; code: string; kind: 'weekly_status_missing' | 'record_idle'; params: Record<string, unknown>; audience: Record<string, unknown>;
+  id: string; code: string; kind: 'weekly_status_missing' | 'record_idle' | 'link_orphans'; params: Record<string, unknown>; audience: Record<string, unknown>;
   title_en: string; title_ar: string; body_en: string; body_ar: string; link: string | null; enabled: boolean; version: number;
   created_at: string; updated_at: string;
 }
@@ -1491,12 +1491,19 @@ export const settingsHandlers = [
   http.get(`${B}/reports/contractors-completeness`, () => { const g = guard(); if (g) return g; return HttpResponse.json(COMPLETENESS); }),
 
   // ------------------------------------------------------------------ alert rules (0.15.242, migration 0342): notifications only
+  http.get(`${B}/settings/alert-rules/link-orphans`, () => {
+    const g = needAdmin(); if (g) return g;
+    return HttpResponse.json({ links: [
+      { register_key: 'invoices', field_code: 'procurement_record_id', target_register: 'procurement', rows_with_value: 12, orphan_rows: 2, examples: ['00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-0000000000a2'] },
+      { register_key: 'financial_advances', field_code: 'advance_id', target_register: 'financial_advances', rows_with_value: 5, orphan_rows: 0, examples: [] },
+    ] });
+  }),
   http.get(`${B}/settings/alert-rules`, () => {
     const g = needAdmin(); if (g) return g;
     return HttpResponse.json({
       rules: ALERT_RULES,
       catalogue: {
-        kinds: [{ kind: 'weekly_status_missing', params: [] }, { kind: 'record_idle', params: ['register_key', 'state', 'days'] }],
+        kinds: [{ kind: 'weekly_status_missing', params: [] }, { kind: 'record_idle', params: ['register_key', 'state', 'days'] }, { kind: 'link_orphans', params: ['register_key', 'field_code', 'min_rows'] }],
         audiences: ['system_admin', 'module'],
         registers: [{ register_key: 'issues', name_en: 'Issue Log', name_ar: 'سجل البلاغات', module_key: 'sites' }, { register_key: 'change_control', name_en: 'Change Control Log', name_ar: 'سجل التحكم بالتغيير', module_key: 'sites' }],
         modules: [{ key: 'sites', name_en: 'Sites' }, { key: 'procurement', name_en: 'Procurement' }],
@@ -1507,11 +1514,11 @@ export const settingsHandlers = [
     const g = needAdmin(); if (g) return g;
     const b = await body<Record<string, unknown>>(request);
     const r = reasonErr(b.reason as string | undefined); if (r) return r;
-    if (typeof b.kind !== 'string' || !['weekly_status_missing', 'record_idle'].includes(b.kind)) return fields({ path: '/kind', code: 'invalid' });
+    if (typeof b.kind !== 'string' || !['weekly_status_missing', 'record_idle', 'link_orphans'].includes(b.kind)) return fields({ path: '/kind', code: 'invalid' });
     if (ALERT_RULES.some((x) => x.code === b.code)) return fields({ path: '/code', code: 'conflict' });
     const row = {
       id: `00000000-0000-4000-8000-${String(ALERT_RULES.length + 1).padStart(12, '0')}`,
-      code: String(b.code), kind: b.kind as 'weekly_status_missing' | 'record_idle',
+      code: String(b.code), kind: b.kind as 'weekly_status_missing' | 'record_idle' | 'link_orphans',
       params: (b.params ?? {}) as Record<string, unknown>, audience: (b.audience ?? { type: 'system_admin' }) as Record<string, unknown>,
       title_en: String(b.title_en ?? ''), title_ar: String(b.title_ar ?? ''), body_en: String(b.body_en ?? ''), body_ar: String(b.body_ar ?? ''),
       link: (b.link ?? null) as string | null, enabled: b.enabled !== false, version: 1,

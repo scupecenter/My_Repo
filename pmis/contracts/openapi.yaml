@@ -107,6 +107,7 @@ info:
     - 0.15.83 (2026-11-26): the evidence dot of the Site Master wide table (owner request 2026-11-26). Additive, read only, no migration. Each cell of `GET /site-master/{menu}/rows` may carry `docs` (`state` red when a document still has to be uploaded, yellow when all are uploaded but not all approved, green when all are approved; the counts `need`, `approved`, `pending`, `missing`, `rejected`, `expired`), computed from the mandatory document slots of the task behind the cell. Nothing is written and no permission changes. Each register record (`RegisterRecord`) may carry the same `docs`, computed from the mandatory slots of its logical record (`register_entity_id`).
     - 0.15.82 (2026-11-26): `GET /me/tasks.ics` returns My Work (do now and late) as an iCalendar file. Needs the session like every call; same rights and region scope as `GET /me/tasks`; nothing public and no token link. No migration.
     - 0.15.81 (2026-11-26): two more UI designs, `obsidian` and `sahara` (migration 0164): `UiBrand` gains the two names (users.ui_brand, `ui.identity` default_brand, `PATCH /me/profile`). Visual only; the four existing designs, the light/dark theme and the storage are unchanged.
+    - 0.15.510 (2026-11-27): the orphans alert of the register links (D60 follow-up; migration 0650, mirror `db/sql/649_link_orphans_alert.sql`). Additive. New alert kind `link_orphans` for the generic alert rules (params `register_key`, `field_code`, `min_rows`; one in-app notification per declared link with at least `min_rows` dangling rows, once per working week) and `GET /settings/alert-rules/link-orphans` (`getLinkOrphans`, System Admin): the dangling counts per link with up to 20 example record ids.
     - 0.15.80 (2026-11-26): what a role sees of the Dashboard (migration 0163). `Role.dashboard_tabs` (any non-empty combination of `pmo`, `cw`, `te`; default all three) and `Role.hide_messages_inbox` (default false); `RolePatch` sets them (System Admin only, 403 `delegate_forbidden` for a delegate; reason, step-up; audited as `role_dashboard_access_set`). `EffectivePermissions.dashboard_tabs` is the union over the roles held now (a System Admin or a user with no active role: all three). `GET /dashboard`, `/dashboard/extras`, `/dashboard/export` and `/project-status*` answer 403 `action_forbidden` outside the caller's tabs (`pmo` includes the others; view CW needs `cw`, view TE needs `te`, any other view or none needs `pmo`). A role that hides Messages and Inbox removes only the two menu entries of its holders (`effective.nav`); the pages and the API are unchanged. No grant, role or default changes.
     - 0.15.500 (2026-11-27): the role code is editable (owner decision D51; migration 0500; no new route). `RolePatch.code` (`^[A-Z][A-Z0-9_]{1,40}$`; reason and step-up as for any role edit; audited as `role_code_changed` with the old and the new code). 422 `validation_failed` for a bad format or for a built-in role whose code the platform uses by name (PM, CW_TL, TE_TL and the other seeded roles, plus QC_GENERAL, FLEET_DISPATCHER, FIN_OFFICER), 409 `duplicate` when the code exists. History, saved filters and exports that quote the old code are not rewritten. `Role.description_ar` and `RoleInput.description_ar` were already in the contract; the Roles dialog now edits them.
     - 0.15.79 (2026-11-26): "Forgot password" by email: `POST /auth/local/password-reset/request` (always the same 202) and `POST /auth/local/password-reset/confirm` (one-time link, 204). Local-password accounts only; System Admins and M365 or break-glass accounts are excluded. No existing endpoint changes.
@@ -8064,6 +8065,37 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '422': {$ref: '#/components/responses/Unprocessable'}
+  /settings/alert-rules/link-orphans:
+    get:
+      tags: [settings]
+      operationId: getLinkOrphans
+      summary: The register links that leave records dangling, with example ids (0.15.510)
+      description: |
+        0.15.510 (migration 0650): System Admin. Per declared link (register_links): `rows_with_value`, `orphan_rows` (current rows whose id is no current record of the target) and up to 20 `examples` (record ids). The same count feeds the alert kind `link_orphans`.
+      x-db-path: register_link_orphans_json
+      responses:
+        '200':
+          description: The links.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [links]
+                properties:
+                  links:
+                    type: array
+                    items:
+                      type: object
+                      required: [register_key, field_code, target_register, rows_with_value, orphan_rows, examples]
+                      properties:
+                        register_key: {type: string}
+                        field_code: {type: string}
+                        target_register: {type: string}
+                        rows_with_value: {type: integer}
+                        orphan_rows: {type: integer}
+                        examples: {type: array, items: {type: string, format: uuid}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
   /settings/alert-rules/{id}:
     put:
       tags: [settings]
@@ -23465,7 +23497,7 @@ components:
       properties:
         id: { type: string, format: uuid }
         code: { type: string, pattern: '^[a-z0-9][a-z0-9-]{1,60}$' }
-        kind: { type: string, enum: [weekly_status_missing, record_idle] }
+        kind: { type: string, enum: [weekly_status_missing, record_idle, link_orphans] }
         params: { type: object, additionalProperties: true }
         audience: { type: object, additionalProperties: true, description: '{"type":"system_admin"} or {"type":"module","module":"<module key>"}.' }
         title_en: { type: string, maxLength: 200 }
@@ -23482,7 +23514,7 @@ components:
       required: [code, kind, params, audience, title_en, title_ar, body_en, body_ar]
       properties:
         code: { type: string, pattern: '^[a-z0-9][a-z0-9-]{1,60}$' }
-        kind: { type: string, enum: [weekly_status_missing, record_idle] }
+        kind: { type: string, enum: [weekly_status_missing, record_idle, link_orphans] }
         params: { type: object, additionalProperties: true }
         audience: { type: object, additionalProperties: true }
         title_en: { type: string, maxLength: 200 }

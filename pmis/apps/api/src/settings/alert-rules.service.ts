@@ -62,12 +62,19 @@ export class AlertRulesService {
         kinds: [
           { kind: 'weekly_status_missing', params: [] },
           { kind: 'record_idle', params: ['register_key', 'state', 'days'] },
+          { kind: 'link_orphans', params: ['register_key', 'field_code', 'min_rows'] },
         ],
         audiences: ['system_admin', 'module'],
         registers,
         modules: MODULES.map((m) => ({ key: m.key, name_en: m.name_en })),
       },
     };
+  }
+
+  /** GET /settings/alert-rules/link-orphans (0.15.510, migration 0650): the dangling-link report with example ids, System Admin. */
+  async linkOrphans() {
+    await this.requireAdmin();
+    return { links: (await this.db.tx.$queryRaw<{ j: unknown[] }[]>(Prisma.sql`SELECT register_link_orphans_json(20) AS j`))[0]!.j };
   }
 
   /** POST /settings/alert-rules: create a rule. */

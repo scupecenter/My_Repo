@@ -7730,7 +7730,12 @@
     "kind_weekly_status_missing": "Weekly status missing",
     "kind_record_idle": "Record idle in a state",
     "kind_weekly_status_missing_help": "Fires for every region without a Weekly status update of the current working week. Placeholders: {{region}}.",
-    "kind_record_idle_help": "Fires for every current record of the register in the state for at least the days. Placeholders: {{record}}, {{state}}, {{days}}."
+    "kind_record_idle_help": "Fires for every current record of the register in the state for at least the days. Placeholders: {{record}}, {{state}}, {{days}}.",
+    "kind_link_orphans": "Links leave records dangling",
+    "kind_link_orphans_help": "Fires weekly for every declared register link that has at least the minimum rows (1 when empty) holding an id which is no current record of the target. Leave the register and field empty to check every link. Placeholders: {{register}}, {{field}}, {{target}}, {{count}}.",
+    "min_rows": "Minimum rows",
+    "any_link": "Any link",
+    "field_code": "Field"
   },
   "rel": {
     "today": "today",
