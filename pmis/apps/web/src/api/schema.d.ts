@@ -5809,7 +5809,7 @@ export interface paths {
         };
         /**
          * What the reset picker offers for narrowing (System Admin only)
-         * @description 0.15.265 (migration 0366, `data_reset_narrow_options`). A System Admin acting without delegation. The regions and the 200 most recent import batches of the part (`part`), with their row counts, and the narrowable parts.
+         * @description 0.15.265 (migration 0370, `data_reset_narrow_options`). A System Admin acting without delegation. The regions and the 200 most recent import batches of the part (`part`), with their row counts, and the narrowable parts.
          */
         get: operations["getDataResetNarrowOptions"];
         put?: never;

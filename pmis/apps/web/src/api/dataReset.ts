@@ -48,7 +48,7 @@ export const useDataResetPlan = (parts: string[] | null, enabled = true, narrow?
     }),
   });
 
-/** Contract 0.15.265 (migration 0366): the regions and recent import batches the picker offers for narrowing a part (null: any part). */
+/** Contract 0.15.265 (migration 0370): the regions and recent import batches the picker offers for narrowing a part (null: any part). */
 export const useDataResetNarrowOptions = (part: string | null, enabled = true) =>
   useQuery({
     queryKey: ['data-reset', 'narrow-options', part ?? '*'], enabled, retry: false, refetchOnWindowFocus: false,

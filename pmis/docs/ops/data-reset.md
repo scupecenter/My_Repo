@@ -113,7 +113,7 @@ equal to `scope_hash`); start and execute check again that the closure of the re
 map refuses with 409 `scope_changed`). The scope of a request never changes (row guard): a changed scope is a new request. A request without parts is
 everything. `GET /settings/data-reset/plan?parts=...` (`data_reset_dry_run`) counts a scope per part and per table without changing anything.
 
-### Narrowing a scope (migration 0366, contract 0.15.265)
+### Narrowing a scope (migration 0370, contract 0.15.265)
 
 A scope may carry a filter (`scope.narrow`: `regions`, `batches`, `from`, `to`; every given filter must match; days are in the system time zone, first creation date). It is part of the
 `scope_hash` the approver sees and cannot change after the request. `data_reset_narrowable()` lists the parts that accept it: acquisition, car_dispatcher, deliverables,

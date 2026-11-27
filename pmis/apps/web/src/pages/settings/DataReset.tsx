@@ -438,7 +438,7 @@ function BackupView({ r, hours, testid = 'dr-request-backup' }: { r: DataResetRe
 const dayText = (d: string | undefined, lang: string) => (d ? new Date(`${d}T00:00:00`).toLocaleDateString(lang === 'ar' ? 'ar' : 'en-GB', { dateStyle: 'medium' }) : '');
 
 /**
- * Contract 0.15.265 (migration 0366): narrow the chosen register parts to regions, import batches and a first-created period (every given filter must match).
+ * Contract 0.15.265 (migration 0370): narrow the chosen register parts to regions, import batches and a first-created period (every given filter must match).
  * The dry run above recounts with the filter; the filter is part of the scope the approver sees and the hash they approve.
  */
 function NarrowPicker({ part, narrow, setNarrow, disabled }: { part: string | null; narrow: DataResetNarrow; setNarrow: (n: DataResetNarrow) => void; disabled: boolean }) {

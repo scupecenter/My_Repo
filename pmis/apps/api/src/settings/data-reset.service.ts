@@ -20,7 +20,7 @@ const confirm = z.string().max(200);
 /** A part code of the catalogue (`data_reset_parts`); the database decides which exist and adds the dependent parts. */
 const partCode = z.string().regex(/^[a-z_]{2,40}$/);
 /** Contract 0.15.72: `require_backup` (absent = true, as before) and, when false, the typed phrase `NO BACKUP` in `no_backup_confirm` (the database checks it). */
-/** Contract 0.15.265 (migration 0366): a narrowing of the chosen register parts to regions, import batches and a first-created period (all must match). */
+/** Contract 0.15.265 (migration 0370): a narrowing of the chosen register parts to regions, import batches and a first-created period (all must match). */
 const narrowSchema = z.object({
   regions: z.array(z.number().int().positive()).max(50).optional(), batches: z.array(z.string().uuid()).max(50).optional(),
   from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),

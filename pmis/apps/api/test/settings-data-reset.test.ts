@@ -296,7 +296,7 @@ describe('the scope of a request (0.15.71)', () => {
     expect(c.status).toBe(200);
   });
 
-  it('narrowing (migration 0366): the dry run counts only the matching records, the filter is bound into the scope hash, and parts that cannot follow one record refuse it', async () => {
+  it('narrowing (migration 0370): the dry run counts only the matching records, the filter is bound into the scope hash, and parts that cannot follow one record refuse it', async () => {
     const count = async (q2: string) => {
       const r = await admin1.api.call('get', `/settings/data-reset/plan?${q2}`);
       expect(r.status).toBe(200);
