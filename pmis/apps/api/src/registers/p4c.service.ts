@@ -49,6 +49,19 @@ export class P4cService {
     return { items };
   }
 
+  /** GET /registers/dismantle/rn-options?site_id=&record_type= : the received Warehouse RNs of the part (CW / TE) on the site that close a Dismantle part (0210). */
+  async dismantleRnOptions(auth: AuthContext, q: Record<string, unknown>): Promise<{ items: unknown[] }> {
+    await this.access.requireRegions('dismantle', 'view');
+    const site = oneParam(q, 'site_id');
+    const part = oneParam(q, 'record_type');
+    const errs: FieldError[] = [];
+    if (!site || !uuidSchema.safeParse(site).success) errs.push({ path: '/site_id', code: 'invalid', message: 'site_id is a uuid.' });
+    if (part !== 'cw' && part !== 'te') errs.push({ path: '/record_type', code: 'invalid', message: 'record_type is cw or te.' });
+    if (errs.length) throw problems.validation(errs);
+    const items = await this.registers.call<unknown[]>(auth, Prisma.sql`SELECT dismantle_rn_options(${site}::uuid, ${part}::text) AS r`);
+    return { items };
+  }
+
   /** GET /registers/warehouse/order-options?site_id= : the approved, active Procurement orders a PL / OPEN receipt may name (row-level security applies). */
   async warehouseOrderOptions(auth: AuthContext, q: Record<string, unknown>, module = 'warehouse'): Promise<{ items: unknown[] }> {
     await this.access.requireRegions(module, 'view');

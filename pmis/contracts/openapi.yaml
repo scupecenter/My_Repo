@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.185
+  version: 0.15.221
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -31,6 +31,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.132 (2026-11-27): additive (migration 0210; CHANGELOG DismantleClosingRnLink). A Dismantle part closes by naming its signed Warehouse RN: new optional field `closing_rn_id` (entity id of a received RN of the part, cw_rn / te_rn, same site; needs the Warehouse view right in the RN's region). When set, `closing_rn_ref` is read from the RN's Doc No. and cannot be typed; without a link the typed reference still works. Field errors `rn_not_available`, `rn_other_site`, `invalid`. `GET /registers/dismantle/rn-options` lists the RNs. Also corrects the descriptions of the Issue log and Quality order-options paths.
     - 0.15.130 (2026-11-27): the admin alert `backup_missing` (owner approval relayed 2026-11-26). Additive, migration 0240. When no backup succeeded in the last 24 hours (the System Log rows the data reset reads) a security alert `backup_missing` (default severity high, configurable like the other rules) is raised once per calendar day by the job `backup_check` (every 6 hours) and one System Log row (source `backup_check`) is written. `SecurityAlertRule` and `AlertSeverityMap` gain `backup_missing`. No new endpoint.
     - 0.15.95 (2026-11-27): the admin alert `backup_missing` (owner approval relayed 2026-11-26). Additive, migration 0184. When no backup succeeded in the last 24 hours (the System Log rows the data reset reads) a security alert `backup_missing` (default severity high, configurable like the other rules) is raised once per calendar day by the job `backup_check` (every 6 hours) and one System Log row (source `backup_check`) is written. `SecurityAlertRule` and `AlertSeverityMap` gain `backup_missing`. No new endpoint.
     - 0.15.98 (2026-11-27): the dashboard follow-up sections (owner approval 2026-11-26, dashboard proposals item 1; migration 0230). Additive and read only. New `GET /dashboard/ops` (`getDashboardOps`, `DashboardOps`): the sections that follow the operations beyond F13, each part `available: false` when the caller may not see its module. First section `procurement`: the open orders (order status not one of the closing statuses of the contractor rules, as in `GET /reports/contractor-performance`), the PRs waiting for a PO/WO and the open PO/WOs, each aged in calendar days and bucketed 0-7, 8-14, 15-30, over 30, and the materials position: the receive rate (dispatched against required of `warehouse_site_qty` over the active, not cancelled sites), the count of sites with a shortage line, the top shortage lines with their contractor (the party of the site's newest open order; unattributed when none) and the shortage per contractor. No price is returned (no price is stored on a Procurement record). The dashboard settings catalogue gains the card `ops_procurement`, so the card shows, hides and orders per tab in Settings > Dashboard like every other card. No grant, role or permission change.
@@ -9520,6 +9521,29 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '422': {$ref: '#/components/responses/Unprocessable'}
+  /registers/dismantle/rn-options:
+    get:
+      tags: [registers]
+      operationId: listDismantleRnOptions
+      summary: The received Warehouse RNs that can close a Dismantle part (0.15.110)
+      description: |
+        0.15.110. Current, not voided, Received Warehouse RNs of the part (`record_type` cw gives cw_rn, te gives te_rn) on the site, in the regions where the caller holds the Warehouse view right (the responsibility matrix). Needs the Dismantle module.
+      parameters:
+      - {name: site_id, in: query, required: true, schema: {type: string, format: uuid}}
+      - {name: record_type, in: query, required: true, schema: {type: string, enum: [cw, te]}}
+      responses:
+        '200':
+          description: The RNs.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/DismantleRnOption' } }
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
   /registers/dismantle/order-options:
     get:
       tags: [registers]
@@ -9618,10 +9642,9 @@ paths:
     get:
       tags: [registers]
       operationId: listIssueOrderOptions
-      summary: The approved, active Procurement orders a warehouse receipt may name (0.15.90)
+      summary: The approved, active Procurement orders a Issue log record may name (0.15.95)
       description: |
-        0.15.95. The approved Procurement versions in force, not cancelled, that the caller can see; of the site `site_id` when it is given (a PL / OPEN receipt may have no site).
-        Needs the Issue log module; only the orders in regions where the caller also holds the Procurement view right (the responsibility matrix) are listed, and the same right is checked when a receipt is saved.
+        0.15.95. The approved Procurement versions in force, not cancelled, that the caller can see; of the site `site_id` when it is given. Needs the Issue log module; only the orders in regions where the caller also holds the Procurement view right (the responsibility matrix) are listed, and the same right is checked when the record is saved.
       parameters:
       - {name: site_id, in: query, required: false, schema: {type: string, format: uuid}}
       responses:
@@ -9641,10 +9664,9 @@ paths:
     get:
       tags: [registers]
       operationId: listQualityOrderOptions
-      summary: The approved, active Procurement orders a warehouse receipt may name (0.15.90)
+      summary: The approved, active Procurement orders a Quality record may name (0.15.95)
       description: |
-        0.15.95. The approved Procurement versions in force, not cancelled, that the caller can see; of the site `site_id` when it is given (a PL / OPEN receipt may have no site).
-        Needs the Quality module; only the orders in regions where the caller also holds the Procurement view right (the responsibility matrix) are listed, and the same right is checked when a receipt is saved.
+        0.15.95. The approved Procurement versions in force, not cancelled, that the caller can see; of the site `site_id` when it is given. Needs the Quality module; only the orders in regions where the caller also holds the Procurement view right (the responsibility matrix) are listed, and the same right is checked when the record is saved.
       parameters:
       - {name: site_id, in: query, required: false, schema: {type: string, format: uuid}}
       responses:
@@ -21873,6 +21895,17 @@ components:
         advances:
           type: array
           items: {type: object, properties: {entity_id: {type: string, format: uuid}, custodian_user_id: {type: [string, 'null'], format: uuid}, advance_state: {type: [string, 'null']}}}
+    DismantleRnOption:
+      type: object
+      required: [entity_id, record_id]
+      properties:
+        entity_id: {type: string, format: uuid}
+        record_id: {type: string, format: uuid}
+        site_id: {type: string, format: uuid}
+        record_type: {type: string, enum: [cw_rn, te_rn]}
+        doc_no: {type: string}
+        doc_date: {type: string}
+        txn_status: {type: string}
     DismantleOrderOption:
       type: object
       description: '0.12.11 (Q114). An approved, active Procurement order of a Dismantle part.'
