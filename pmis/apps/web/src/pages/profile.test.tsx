@@ -285,3 +285,18 @@ describe('two-factor self-service', () => {
     expect(await screen.findByTestId('two-factor-enforced-state')).toHaveAttribute('data-enforced', 'true');
   });
 });
+
+describe('My sessions (contract 0.15.101)', () => {
+  it('lists my devices, signs out of another one and then of all the others; this device has no button', async () => {
+    await signIn('pm');
+    const u = userEvent.setup();
+    renderApp(<Routes><Route path="/profile" element={<Profile />} /></Routes>, { route: '/profile' });
+    const list = await screen.findByTestId('my-sessions');
+    expect(await within(list).findByTestId('my-session-current')).toBeInTheDocument();
+    expect(list.querySelectorAll('li')).toHaveLength(2);
+    expect(list.querySelectorAll('[data-testid^="my-session-end-"]')).toHaveLength(1);
+    await u.click(await screen.findByTestId('my-sessions-end-others'));
+    await waitFor(() => expect(list.querySelectorAll('li')).toHaveLength(1));
+    expect(screen.queryByTestId('my-sessions-end-others')).toBeNull();
+  });
+});

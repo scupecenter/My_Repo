@@ -64,3 +64,11 @@ export function useRenameRegister(key: string) {
     mutationFn: ({ version, ...body }) => api.patch(`/registers/${key}`, { version, body }), onSettled: settle,
   });
 }
+
+/** 0.15.103: the default value of a column (null clears it), prefilled by the register form on a new record. */
+export function useSetColumnDefault(key: string) {
+  const settle = useSettle(key);
+  return useMutation<{ code: string; version: number; default_value?: unknown }, ApiError, { code: string; version?: number; value: unknown; reason: string }>({
+    mutationFn: ({ code, version, value, reason }) => api.put(`/registers/${key}/fields/${code}/default`, { version, body: { value, reason } }), onSettled: settle,
+  });
+}

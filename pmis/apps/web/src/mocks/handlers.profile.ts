@@ -4,7 +4,8 @@
 import { http, HttpResponse } from 'msw';
 import { API_BASE } from '@/api/client';
 import type { MyProfile } from '@/api/profile';
-import { accountKeyOf, ACCOUNTS, cred, db, effectiveBrand, identity, save, sessionBody, STAFF, stepUpValid, tfLabel, viewer } from './db';
+import { accountKeyOf, ACCOUNTS, cred, db, effectiveBrand, effectivePrefs, identity, save, sessionBody, STAFF, stepUpValid, tfLabel, viewer } from './db';
+import { APPEARANCE_OPTIONS } from '../lib/appearance';
 import { isBrand } from '@/lib/brands';
 import { checkCode, codeProblem, GENERIC, needAdmin, recordFailure, userByParam, whoOf } from './handlers.auth';
 import { guard, problem, stepUp } from './handlers';
@@ -12,7 +13,7 @@ import { passwordRules } from './handlers.auth';
 import { newRecoveryCodes, newSecret, otpauth } from './totp';
 
 const B = API_BASE;
-const SELF_EDITABLE = ['display_name', 'locale', 'theme', 'ui_brand'];
+const SELF_EDITABLE = ['display_name', 'locale', 'theme', 'ui_brand', 'ui_prefs'];
 /** The code the mock "mails" to a requested new address (there is no mail in the mock). */
 export const MOCK_EMAIL_CODE = 'ABCD-2345';
 const ADMIN_OWNED = ['email', 'phone', 'employee_id', 'status', 'team', 'teams', 'region', 'region_id', 'region_ids', 'regions', 'role', 'roles', 'role_ids', 'assignments', 'department', 'department_id', 'manager', 'manager_id', 'position', 'title', 'groups'];
@@ -65,7 +66,8 @@ export function profileBody(): MyProfile {
   return {
     id: sessionBody().user!.id, display_name: nameOf(key) || v.name, email: emailOf(key) || v.email, employee_id: v.employee_id,
     phone: phoneOf(key), locale: o.locale ?? 'en', theme: o.theme ?? 'light', status: v.status,
-    ui_brand: o.ui_brand ?? null, brand: effectiveBrand(o.ui_brand), identity: { default_brand: identity().default_brand, allow_user_choice: identity().allow_user_choice },
+    ui_brand: o.ui_brand ?? null, brand: effectiveBrand(o.ui_brand), ui_prefs: o.ui_prefs ?? {}, appearance: effectivePrefs(o.ui_prefs),
+    identity: { default_brand: identity().default_brand, allow_user_choice: identity().allow_user_choice, defaults: identity().defaults, pref_options: identity().pref_options },
     auth_method: db().session!.method ?? 'm365', local_sign_in: !!c?.enabled, editable_fields: SELF_EDITABLE as MyProfile['editable_fields'],
     admin_owned: { roles: v.key === 'pm' ? [{ id: '0f000000-0000-4000-8000-000000000001', code: 'PM', name_en: 'Project Manager', name_ar: 'مدير المشروع' }] : [], teams: [], region_ids: 'all', department: null, manager: null },
     two_factor: { state, enforced, recovery_codes_remaining: state === 'on' ? c!.tf!.codes.length : 0, can_enable: local && state === 'off', can_disable: local && state === 'on' && !enforced },
@@ -98,7 +100,14 @@ const sessionBodyIdOf = (key: string) => {
   return u?.local?.id ?? `00000000-0000-4000-8000-${(u?.employee_id || ACCOUNTS[key]?.employee_id || '0').padStart(12, '0')}`;
 };
 
+let MY_SESSIONS = [
+  { session_id: '00000000-0000-4000-8000-0000000000c1', signed_in_at: '2026-11-27T08:00:00Z', last_activity_at: '2026-11-27T09:00:00Z', ip: '10.0.0.5', device: { browser: 'Chrome', os: 'Windows', type: 'desktop' }, auth_method: 'local', is_current: true },
+  { session_id: '00000000-0000-4000-8000-0000000000c2', signed_in_at: '2026-11-26T08:00:00Z', last_activity_at: '2026-11-26T18:00:00Z', ip: '10.0.0.9', device: { browser: 'Safari', os: 'iOS', type: 'mobile' }, auth_method: 'local', is_current: false },
+];
 export const profileHandlers = [
+  http.get(`${B}/me/sessions`, () => { const g = guard(); if (g) return g; return HttpResponse.json({ items: MY_SESSIONS }); }),
+  http.post(`${B}/me/sessions/revoke-others`, () => { const g = guard(); if (g) return g; const n = MY_SESSIONS.filter((s) => !s.is_current).length; MY_SESSIONS = MY_SESSIONS.filter((s) => s.is_current); return HttpResponse.json({ revoked_count: n }); }),
+  http.post(`${B}/me/sessions/:id/revoke`, ({ params }) => { const g = guard(); if (g) return g; MY_SESSIONS = MY_SESSIONS.filter((s) => s.session_id !== params.id || s.is_current); return HttpResponse.json({ revoked_count: 1 }); }),
   http.get(`${B}/me/profile`, () => { const g = guard(); if (g) return g; return withEtag(profileBody()); }),
 
   http.patch(`${B}/me/profile`, async ({ request }) => {
@@ -117,11 +126,23 @@ export const profileHandlers = [
     if ('locale' in b && !['en', 'ar'].includes(b.locale as string)) errors.push({ path: '/locale', code: 'invalid' });
     if ('theme' in b && !['light', 'dark'].includes(b.theme as string)) errors.push({ path: '/theme', code: 'invalid' });
     if ('ui_brand' in b && b.ui_brand !== null && !isBrand(b.ui_brand)) errors.push({ path: '/ui_brand', code: 'invalid' });
+    if ('ui_prefs' in b) {
+      const p = b.ui_prefs;
+      if (p === null || typeof p !== 'object' || Array.isArray(p)) errors.push({ path: '/ui_prefs', code: 'invalid' });
+      else for (const [k, v] of Object.entries(p)) {
+        const opts = (APPEARANCE_OPTIONS as Record<string, readonly string[]>)[k];
+        if (!opts || typeof v !== 'string' || !opts.includes(v)) { errors.push({ path: '/ui_prefs', code: 'invalid' }); break; }
+      }
+    }
     if (errors.length) return problem(422, 'validation_failed', 'Validation failed', { errors });
     if (b.ui_brand != null && !identity().allow_user_choice) {
       return problem(403, 'field_read_only', 'The administrator set one design for everyone', { errors: [{ path: '/ui_brand', code: 'brand_choice_locked' }] });
     }
+    if (b.ui_prefs != null && !identity().allow_user_choice) {
+      return problem(403, 'field_read_only', 'The administrator set one design for everyone', { errors: [{ path: '/ui_prefs', code: 'appearance_choice_locked' }] });
+    }
     if ('ui_brand' in b) o.ui_brand = isBrand(b.ui_brand) ? b.ui_brand : null;
+    if (b.ui_prefs != null) o.ui_prefs = { ...(b.ui_prefs as Record<string, string>) };
     if (typeof b.display_name === 'string') o.display_name = b.display_name.trim();
     if (b.locale) o.locale = b.locale as 'en' | 'ar';
     if (b.theme) o.theme = b.theme as 'light' | 'dark';

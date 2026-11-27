@@ -19,7 +19,9 @@ import { NewBadge } from '@/components/NewBadge';
 import { ContractorRules } from './ContractorRules';
 import { ContractorPerfThresholds } from './ContractorPerfThresholds';
 import { RecycleBinScreen } from './RecycleBin';
+import { ExportSchedulesScreen } from './ExportSchedules';
 import { MatrixCoverageScreen } from './MatrixCoverage';
+import { MatrixSimulateScreen } from './MatrixSimulate';
 import { GecolHlcCounts } from './GecolHlcCounts';
 import { Lists } from './Lists';
 import { RegisterColumns } from './RegisterColumns';
@@ -35,6 +37,7 @@ import { GoalsSettings } from './GoalsSettings';
 import { Identity } from './Identity';
 import { SecurityLocks } from './SecurityLocks';
 import { SupportAccess } from './SupportAccess';
+import { NewDeviceCode } from './NewDeviceCode';
 import { DisplaySettings } from './DisplaySettings';
 import { PmSchedulesSettings } from './PmSchedulesSettings';
 import { DailyPlanSettings } from './DailyPlanSettings';
@@ -50,16 +53,16 @@ export interface SettingsTab { key: string; sections: SettingsSection[] }
 export const SETTINGS_TABS: readonly SettingsTab[] = [
   // Settings merge (owner approved 2026-11-25): Calendar + SLA rules + Weights all feed the SLA clock
   { key: 'sla', sections: [{ key: 'rules' }, { key: 'calendar' }, { key: 'weights' }] },
-  { key: 'workflow', sections: [{ key: 'editor' }, { key: 'columns' }, { key: 'freeze' }, { key: 'idle' }, { key: 'board' }, { key: 'coverage', adminOnly: true }] },
+  { key: 'workflow', sections: [{ key: 'editor' }, { key: 'columns' }, { key: 'freeze' }, { key: 'idle' }, { key: 'board' }, { key: 'coverage', adminOnly: true }, { key: 'simulate', adminOnly: true }] },
   // Lists (the dropdown catalogues, old ddl tab) now sit next to the register columns that use them
   { key: 'registers', sections: [{ key: 'columns' }, { key: 'lists' }, { key: 'contractors' }, { key: 'gecol' }, { key: 'team-scope' }, { key: 'issue-map' }, { key: 'recycle', adminOnly: true }] },
   // W5: the Document Library section is now named Document types (the old documents/library route redirects); Form templates and Archive are new
   { key: 'documents', sections: [{ key: 'types' }, { key: 'forms' }, { key: 'archive' }, { key: 'numbering' }] },
-  { key: 'data', sections: [{ key: 'imports' }, { key: 'historical' }, { key: 'counts', adminOnly: true }, { key: 'reset', adminOnly: true }] },
+  { key: 'data', sections: [{ key: 'imports' }, { key: 'historical' }, { key: 'counts', adminOnly: true }, { key: 'export' }, { key: 'reset', adminOnly: true }] },
   // Notification policy + Mail kinds (admin only): both are what is sent to people
   { key: 'alerts', sections: [{ key: 'policy' }, { key: 'mail', adminOnly: true }, { key: 'rules', adminOnly: true }] },
   // DLP months is a data-protection rule, so it moved here from SLA
-  { key: 'security', sections: [{ key: 'staff' }, { key: 'retention' }, { key: 'dlp' }, { key: 'locks' }, { key: 'support' }] },
+  { key: 'security', sections: [{ key: 'staff' }, { key: 'retention' }, { key: 'dlp' }, { key: 'locks' }, { key: 'support' }, { key: 'newdevice' }] },
   // Screens: what users see by default (Dashboard, Display menu of the tables, My Work Daily Plan)
   { key: 'screens', sections: [{ key: 'dashboard' }, { key: 'tables' }, { key: 'daily-plan' }, { key: 'goals' }, { key: 'pm-schedules' }, { key: 'motion' }, { key: 'login' }, { key: 'interface' }] },
   { key: 'identity', sections: [] },
@@ -165,6 +168,7 @@ export function SettingsRoutes() {
           <Route path="idle" element={<Idle />} />
           <Route path="board" element={<KanbanWip />} />
           <Route path="coverage" element={<MatrixCoverageScreen />} />
+          <Route path="simulate" element={<MatrixSimulateScreen />} />
         </Route>
         <Route path="sla" element={<TabFrame tab="sla" />}>
           <Route index element={<Navigate to="rules" replace />} />
@@ -195,6 +199,7 @@ export function SettingsRoutes() {
           <Route path="imports" element={<Imports />} />
           <Route path="historical" element={<HistoricalWaiver />} />
           <Route path="counts" element={<GecolHlcCounts />} />
+          <Route path="export" element={<ExportSchedulesScreen />} />
           <Route path="reset" element={<DataReset />} />
         </Route>
         <Route path="security" element={<TabFrame tab="security" />}>
@@ -204,6 +209,7 @@ export function SettingsRoutes() {
           <Route path="dlp" element={<Dlp />} />
           <Route path="locks" element={<SecurityLocks />} />
           <Route path="support" element={<SupportAccess />} />
+          <Route path="newdevice" element={<NewDeviceCode />} />
         </Route>
         {Object.entries(LEGACY_SETTINGS_PATHS).map(([old, to]) => <Route key={old} path={old} element={<LegacyRedirect to={to} />} />)}
       </Route>
