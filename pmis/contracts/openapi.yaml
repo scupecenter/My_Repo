@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.151
+  version: 0.15.248
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -31,6 +31,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.248 (2026-11-27): high-contrast mode as an appearance dimension (PM-platforms research item 19, owner approval 2026-11-27 relayed by Main; migration 0347, mirror `db/sql/346_user_contrast.sql`; CHANGELOG HighContrast). Additive. `UiPrefs` gains `contrast` (`standard` = today's look, `high`): a personal choice (`MyProfilePatch.ui_prefs`), an organization default (`UiIdentityInput.defaults`, Settings > Identity), locked like every dimension while `identity.allow_user_choice` is false (403 `field_read_only`, `errors[0]` `{path: /ui_prefs, code: appearance_choice_locked}`), audited per dimension in `profile_updated`, resolved by `ui_effective_prefs`. The web paints `data-ui-contrast="high"`: stronger ink and line tokens only, the status colours and the designs are unchanged; `prefers-contrast: more` applies the high tokens while no choice is saved. No new column, grant, role or default changes.
     - 0.15.153 (2026-11-27): "My sessions" (no migration; CHANGELOG MySessions). Additive. `GET /me/sessions` (`listMySessions`): the caller's own live sessions (device, sign-in time, last activity, IP, `is_current`); `POST /me/sessions/{session_id}/revoke` (`revokeMySession`) ends one of the caller's own other sessions (404 for anyone else's, 422 `own_session` for the current one); `POST /me/sessions/revoke-others` (`revokeMyOtherSessions`) ends every other session of the caller. Own rows only, no permission and no step-up (it only narrows access); audited and in the security log.
     - 0.15.135 (2026-11-27): the Lessons Learned register (owner approval 2026-11-26, C3; migration 0184): one register for the lessons of the project, from an incident, a snag, a delay or any experience, with the recommendation and where it was applied. Additive. Register key `lessons_learned` in `/registers` and `/registers/{key}` records with its own fields and the standard two levels, the Dropdown list LessonCategory in Settings, the module `lessons_learned` in the permissions grid (no grant seeded), the nav key in the catalogue, the template TPL-LESSONS-LEARNED and the master export part. Existing registers and data are untouched.
     - 0.15.201 (2026-11-27): the dashboard follow-up sections, GECOL and HLC readiness (owner approval 2026-11-26, dashboard proposals item 4; migration 0200). Additive and read only. `GET /dashboard/ops` gains the section `gecol_hlc` (`DashboardOpsGecolHlc`) with one part per utility (`DashboardOpsUtilityReadiness`). GECOL: the active, not cancelled sites with the GECOL scope, the powered ones (power_on_date set), the waiting ones aged since the GECOL request date in the buckets 0-7, 8-14, 15-30, over 30 calendar days, the in-scope sites with no GECOL record at all, and the civilly ready but not electrified (the CW PAC, task B13, is approved but the power is not on). HLC: the same over the HLC scope, in service when in_service_date is set, aged since the HLC record's request date or, without one, the PR date of the linked Procurement order, plus the installed lines not yet in service. Each part needs the view right of its register and answers available false without it. The dashboard settings catalogue gains the card `ops_gecol_hlc`. Corrective: `DashboardOpsProcurement.pr_wait` and `po_wait` are documented nullable, as the service has always answered when the caller may not see the Procurement register. No grant, role or permission change.
@@ -23113,6 +23114,7 @@ components:
         icon_style: { type: string, enum: [light, regular, bold] }
         menu_style: { type: string, enum: [default, rail, autohide] }
         accent: { type: string, enum: [default, teal, blue, violet, green, orange, red, amber] }
+        contrast: { type: string, enum: [standard, high], description: '0.15.248 (0347): the high-contrast mode.' }
     UiIdentity:
       type: object
       description: '0.15.41. Settings, Identity & themes (setting `ui.identity`, migration 0130).'

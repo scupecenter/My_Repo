@@ -1,6 +1,6 @@
 /**
  * Appearance profiles (owner approval 2026-11-27, the PM-platforms proposal items 1-3; migration 0241, contract 0.15.230).
- * Seven dimensions, each changeable alone, applied at once on <html> as data-ui-* attributes; the token blocks live in styles/appearance.css.
+ * Eight dimensions, each changeable alone, applied at once on <html> as data-ui-* attributes; the token blocks live in styles/appearance.css.
  * The effective set comes from the server (GET /me user.appearance: own choices, else the organization defaults); the last seen set is cached
  * so a reload does not flash. Independent of the UI design (brand) and of the light/dark theme.
  */
@@ -14,6 +14,7 @@ export const APPEARANCE_OPTIONS = {
   icon_style: ['light', 'regular', 'bold'],
   menu_style: ['default', 'rail', 'autohide'],
   accent: ['default', 'teal', 'blue', 'violet', 'green', 'orange', 'red', 'amber'],
+  contrast: ['standard', 'high'], // 0347 (item 19): the high-contrast mode
 } as const;
 
 export type AppearanceKey = keyof typeof APPEARANCE_OPTIONS;
@@ -21,7 +22,7 @@ export type Appearance = Partial<{ [K in AppearanceKey]: (typeof APPEARANCE_OPTI
 
 /** The built-in standard of every dimension (ui_pref_defaults() in the database). */
 export const APPEARANCE_DEFAULTS: Required<Appearance> = {
-  density: 'standard', font_scale: 'standard', radius: 'standard', motion: 'full', icon_style: 'regular', menu_style: 'default', accent: 'default',
+  density: 'standard', font_scale: 'standard', radius: 'standard', motion: 'full', icon_style: 'regular', menu_style: 'default', accent: 'default', contrast: 'standard',
 };
 
 /** The ready-made profiles of proposal item 1; the theme flips for `night` are saved through the profile like the theme button. */

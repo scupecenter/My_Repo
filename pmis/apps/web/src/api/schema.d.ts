@@ -17119,6 +17119,11 @@ export interface components {
             menu_style?: "default" | "rail" | "autohide";
             /** @enum {string} */
             accent?: "default" | "teal" | "blue" | "violet" | "green" | "orange" | "red" | "amber";
+            /**
+             * @description 0.15.248 (0347): the high-contrast mode.
+             * @enum {string}
+             */
+            contrast?: "standard" | "high";
         };
         /** @description 0.15.41. Settings, Identity & themes (setting `ui.identity`, migration 0130). */
         UiIdentity: {

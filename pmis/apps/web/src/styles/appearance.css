@@ -45,3 +45,37 @@ html[data-ui-accent=orange] { --accent:var(--surface-orange-8); --accentSoft:var
 html[data-ui-accent=red] { --accent:var(--surface-red-8); --accentSoft:var(--surface-red-2); --accentText:var(--ink-red-8); }
 html[data-ui-accent=amber] { --accent:var(--surface-amber-8); --accentSoft:var(--surface-amber-2); --accentText:var(--ink-amber-8); }
 html[data-ui-accent] { --accentHover:var(--accent); }
+
+/* Contrast (0347, PM-platforms item 19): the high-contrast mode strengthens only text and lines, never the status colours.
+   No attribute at `standard`, so the base tokens apply exactly as before; with no choice saved, the OS preference applies
+   the high tokens (prefers-contrast: more) without storing anything. Last in the file so it wins over every design block. */
+html[data-ui-contrast=high]{
+  --ink:oklch(0.13 0 0);
+  --mute:oklch(0.3 0 0);
+  --faint:oklch(0.36 0 0);
+  --line:oklch(0.55 0 0);
+  --line2:oklch(0.68 0 0);
+}
+html[data-theme=dark][data-ui-contrast=high]{
+  --ink:oklch(0.99 0 0);
+  --mute:oklch(0.87 0 0);
+  --faint:oklch(0.8 0 0);
+  --line:oklch(0.62 0 0);
+  --line2:oklch(0.55 0 0);
+}
+@media (prefers-contrast: more){
+  html:not([data-ui-contrast]){
+    --ink:oklch(0.13 0 0);
+    --mute:oklch(0.3 0 0);
+    --faint:oklch(0.36 0 0);
+    --line:oklch(0.55 0 0);
+    --line2:oklch(0.68 0 0);
+  }
+  html[data-theme=dark]:not([data-ui-contrast]){
+    --ink:oklch(0.99 0 0);
+    --mute:oklch(0.87 0 0);
+    --faint:oklch(0.8 0 0);
+    --line:oklch(0.62 0 0);
+    --line2:oklch(0.55 0 0);
+  }
+}
