@@ -84,7 +84,7 @@ The four forms bind to these records:
 | # | Form field (DN form) | Source in Workspace | Master | Fill | Proposed placeholder | Notes |
 |---|---|---|---|---|---|---|
 | 1 | DN Ref. No. | Generated form `number`, taken at generation (§6) | WH movement "Doc No." (D61) | P | `form.number` | No Prisma table (G-F01) |
-| 2 | DN Date | Date of generation, in the Africa/Tripoli timezone | WH movement "Date" | P | `form.date` | ASSUMPTION: issue date = generation date |
+| 2 | DN Date | Date of generation, in the business time zone | WH movement "Date" | P | `form.date` | ASSUMPTION: issue date = generation date |
 | 3 | Site ID | `sites.site_code` | Master B | P | `site.code` | |
 | 4 | Site Name | `sites.name` | Master D | P | `site.name` | |
 | 5 | Site Region (7 boxes: Tripoli, Middle, Zawia, WM, Sebha, Benghazi, GM) | `sites.region_id` → `regions.code`. The matching box is ticked. | Master E ("X Area", Q10) | P | `site.region_code` | Box labels match the CLAUDE.md region names |
