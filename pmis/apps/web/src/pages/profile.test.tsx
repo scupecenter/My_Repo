@@ -58,9 +58,9 @@ describe('details', () => {
     expect(screen.getByTestId('pf-save')).toBeDisabled();
     expect(within(screen.getByTestId('profile-details')).queryByRole('textbox', { name: /phone/i })).toBeNull();
     await u.clear(name);
-    await u.type(name, 'Sami N. Renamed');
+    await u.type(name, 'Demo N. Renamed');
     await u.click(screen.getByTestId('pf-save'));
-    await waitFor(() => expect(db().profiles.engineer).toMatchObject({ display_name: 'Sami N. Renamed', version: 2 }));
+    await waitFor(() => expect(db().profiles.engineer).toMatchObject({ display_name: 'Demo N. Renamed', version: 2 }));
     expect(await screen.findByTestId('pf-save')).toBeDisabled();
     const e = await fail(api.patch('/me/profile', { body: { employee_id: '9999' }, version: 2 }));
     expect(e.status).toBe(403);
@@ -83,7 +83,7 @@ describe('email change', () => {
     await u.type(screen.getByTestId('pf-email-password'), DEMO_PASSWORDS.engineer);
     await u.click(screen.getByTestId('pf-email-submit'));
     expect(await screen.findByTestId('pf-email-pending')).toHaveTextContent('sami.new@example.com');
-    expect(screen.getByTestId('pf-email')).toHaveTextContent('sami.nuri@example.com');
+    expect(screen.getByTestId('pf-email')).toHaveTextContent('demo.user.06@example.com');
     expect(screen.queryByTestId('pf-email-form')).toBeNull();
     await u.click(screen.getByTestId('pf-email-cancel'));
     expect(await screen.findByTestId('pf-email-form')).toBeInTheDocument();

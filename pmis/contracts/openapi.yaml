@@ -32,6 +32,8 @@ info:
 
     ## Versions
     - 0.15.160 (2026-11-27): goals with automatic progress (migration 0260; CHANGELOG Goals). Additive. `GET`/`PUT /settings/goals` (`getGoals`, `setGoals`) and `GET /goals/progress` (`getGoalsProgress`). Progress is counted from approved milestone tasks, as the On-Air counter does; no permission is widened.
+    - 0.15.130 (2026-11-27): the admin alert `backup_missing` (owner approval relayed 2026-11-26). Additive, migration 0240. When no backup succeeded in the last 24 hours (the System Log rows the data reset reads) a security alert `backup_missing` (default severity high, configurable like the other rules) is raised once per calendar day by the job `backup_check` (every 6 hours) and one System Log row (source `backup_check`) is written. `SecurityAlertRule` and `AlertSeverityMap` gain `backup_missing`. No new endpoint.
+    - 0.15.95 (2026-11-27): the admin alert `backup_missing` (owner approval relayed 2026-11-26). Additive, migration 0184. When no backup succeeded in the last 24 hours (the System Log rows the data reset reads) a security alert `backup_missing` (default severity high, configurable like the other rules) is raised once per calendar day by the job `backup_check` (every 6 hours) and one System Log row (source `backup_check`) is written. `SecurityAlertRule` and `AlertSeverityMap` gain `backup_missing`. No new endpoint.
     - 0.15.98 (2026-11-27): the dashboard follow-up sections (owner approval 2026-11-26, dashboard proposals item 1; migration 0230). Additive and read only. New `GET /dashboard/ops` (`getDashboardOps`, `DashboardOps`): the sections that follow the operations beyond F13, each part `available: false` when the caller may not see its module. First section `procurement`: the open orders (order status not one of the closing statuses of the contractor rules, as in `GET /reports/contractor-performance`), the PRs waiting for a PO/WO and the open PO/WOs, each aged in calendar days and bucketed 0-7, 8-14, 15-30, over 30, and the materials position: the receive rate (dispatched against required of `warehouse_site_qty` over the active, not cancelled sites), the count of sites with a shortage line, the top shortage lines with their contractor (the party of the site's newest open order; unattributed when none) and the shortage per contractor. No price is returned (no price is stored on a Procurement record). The dashboard settings catalogue gains the card `ops_procurement`, so the card shows, hides and orders per tab in Settings > Dashboard like every other card. No grant, role or permission change.
     - 0.15.97 (2026-11-27): the sign-in page settings (owner request 2026-11-26; migration 0197). Additive. New `GET/PUT /settings/login-page` (`getLoginPage`, `setLoginPage`; setting `ui.login_page`): the sign-in page announcement (English and Arabic, kind info or maintenance, both texts empty hides it), the background animation switch, the default language of the signed-out pages and up to five support links ({label_en, label_ar, url}; http(s) or mailto only). Every signed-in user reads the state (the post-login splash shows `server_version` from it); a System Admin or a delegate of `settings` edit for all regions changes it with a reason, a step-up and If-Match (audited `login_page_update`, before and after). New `GET /settings/login-page/public` (`getLoginPagePublic`, no session): ONLY what the sign-in page renders (announcement, animation, default_locale, support_links) - no version, no audit data, nothing about users; cached 30 seconds and rate limited per address. No permission, visibility or authentication change.
     - 0.15.96 (2026-11-27): responsibility-matrix coverage screen (CHANGELOG MatrixCoverage; no migration). Additive and read only. `GET /matrix/coverage` (`getMatrixCoverage`, System Admin or an all-region delegate of the matrix): for each active stage and enabled register row and each of the seven regions, whether the matrix cell has an actor, so empty cells show before a task or record stalls. Settings > Workflow > Coverage.
@@ -23839,7 +23841,7 @@ components:
         host: { type: [string, 'null'] }
     SecurityAlertRule:
       type: string
-      enum: [failed_sign_ins, failed_sign_ins_ip, new_ip, large_export, admin_set_changed, retention_reduced, alert_settings_weakened, audit_integrity_failure, malware_upload, break_glass_used]
+      enum: [failed_sign_ins, failed_sign_ins_ip, new_ip, large_export, admin_set_changed, retention_reduced, alert_settings_weakened, audit_integrity_failure, malware_upload, break_glass_used, backup_missing]
     AlertSeverity:
       type: string
       enum: [info, low, medium, high, critical]
@@ -23847,7 +23849,7 @@ components:
     AlertSeverityMap:
       type: object
       additionalProperties: false
-      description: 'Severity per configurable rule (0.12.3, Q168). Defaults: failed_sign_ins medium, failed_sign_ins_ip medium, new_ip low, large_export medium, admin_set_changed high, alert_settings_weakened high, malware_upload high, break_glass_used critical.'
+      description: 'Severity per configurable rule (0.12.3, Q168). Defaults: failed_sign_ins medium, failed_sign_ins_ip medium, new_ip low, large_export medium, admin_set_changed high, alert_settings_weakened high, malware_upload high, break_glass_used critical, backup_missing high (0.15.130).'
       properties:
         failed_sign_ins: { $ref: '#/components/schemas/AlertSeverity' }
         failed_sign_ins_ip: { $ref: '#/components/schemas/AlertSeverity' }
@@ -23857,6 +23859,7 @@ components:
         alert_settings_weakened: { $ref: '#/components/schemas/AlertSeverity' }
         malware_upload: { $ref: '#/components/schemas/AlertSeverity' }
         break_glass_used: { $ref: '#/components/schemas/AlertSeverity' }
+        backup_missing: { $ref: '#/components/schemas/AlertSeverity' }
     SecurityAlert:
       type: object
       required: [id, at, rule, severity, summary, status]

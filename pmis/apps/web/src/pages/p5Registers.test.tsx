@@ -84,9 +84,9 @@ describe('Meetings: structured fields and the conversion of the old text (Q12, Q
     // the old free text is not offered on a new record
     expect(screen.queryByTestId('reg-field-attendees')).toBeNull();
     // a person is picked by name and shown as a chip
-    await u.type(screen.getByTestId('reg-field-attendee_users'), 'Mona');
+    await u.type(screen.getByTestId('reg-field-attendee_users'), 'Demo');
     await u.click(await screen.findByTestId('reg-field-attendee_users-opt-1102'));
-    expect(screen.getByTestId('reg-field-attendee_users-chips')).toHaveTextContent('Mona Fathi');
+    expect(screen.getByTestId('reg-field-attendee_users-chips')).toHaveTextContent('Demo User 02');
   });
 
   it('converts the old text after review, once; owners and the due date are given for the converted actions', async () => {
@@ -101,7 +101,7 @@ describe('Meetings: structured fields and the conversion of the old text (Q12, Q
     expect(within(prop).getByText('Send the LLD')).toBeInTheDocument();
     expect(screen.getByTestId('reg-legacy-minutes')).toHaveTextContent('A reference is not an upload');
     expect(screen.getByTestId('reg-legacy-dialog-submit')).toBeDisabled();   // owner and due date first
-    await u.type(screen.getByTestId('reg-legacy-owner'), 'Ahmed');
+    await u.type(screen.getByTestId('reg-legacy-owner'), 'Demo');
     await u.click(await screen.findByTestId('reg-legacy-owner-opt-1001'));
     await u.type(screen.getByTestId('reg-legacy-due'), '2026-11-20');
     await u.click(screen.getByTestId('reg-legacy-x-1'));   // drop "Book the crane"

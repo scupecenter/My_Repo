@@ -29,7 +29,7 @@
 
 ```mermaid
 flowchart LR
-  U[المتصفح / Browser<br/>موظف Aljeel] -->|HTTPS داخلي| P[proxy<br/>TLS - شهادة داخلية]
+  U[المتصفح / Browser<br/>موظف Company] -->|HTTPS داخلي| P[proxy<br/>TLS - شهادة داخلية]
   P --> W[web<br/>ملفات ثابتة React]
   P --> A[api<br/>NestJS]
   A --> DB[(PostgreSQL 16<br/>RLS + سجل تدقيق)]
@@ -77,7 +77,7 @@ sequenceDiagram
 
 (ADR 0002) **تفاصيل:**
 - المتصفح **لا يحمل رموز Entra**؛ الجلسة على الخادم في Redis، بمهلة خمول 8 ساعات وحد أقصى 12 ساعة، ورأس `X-CSRF-Token` لكل طلب كتابة.
-- يُطابَق المستخدم على `oid` لا على البريد، ويجب أن يكون `tid` هو مستأجر Aljeel، وإلا يُرفض الدخول ويُسجَّل في سجل النظام.
+- يُطابَق المستخدم على `oid` لا على البريد، ويجب أن يكون `tid` هو مستأجر Company، وإلا يُرفض الدخول ويُسجَّل في سجل النظام.
 - مفتاح `require_mfa` مُطفأ حتى تفعّله IT. ويمكن إعفاء مستخدم بعينه داخل Workspace فقط (لا يغيّر Entra).
 - حساب الطوارئ (break-glass): اسم مستخدم وكلمة مرور وTOTP، من الشبكة الداخلية فقط، جلسة حتى 60 دقيقة، وقفل 15 دقيقة بعد 5 محاولات فاشلة، ويُرسل بريد لكل المديرين.
 - فقدان Redis يعني تسجيل خروج الجميع دون فقد بيانات.
@@ -184,7 +184,7 @@ sequenceDiagram
 
 ```mermaid
 flowchart LR
-  U[Browser<br/>Aljeel employee] -->|internal HTTPS| P[proxy<br/>TLS - internal CA]
+  U[Browser<br/>Company employee] -->|internal HTTPS| P[proxy<br/>TLS - internal CA]
   P --> W[web<br/>static React files]
   P --> A[api<br/>NestJS]
   A --> DB[(PostgreSQL 16<br/>RLS + audit log)]
@@ -232,8 +232,8 @@ sequenceDiagram
 
 (ADR 0002) **Details:**
 - The browser **holds no Entra tokens**; the session lives on the server in Redis, with an 8-hour idle timeout and a 12-hour maximum, and an `X-CSRF-Token` header on every write request.
-- The user is matched on `oid`, never on email; `tid` must be the Aljeel tenant, otherwise sign-in is refused and written to the System Log.
-- The `require_mfa` toggle is off until IT enables it. A single user can be exempted inside GSDN Workspace only (it does not change Entra).
+- The user is matched on `oid`, never on email; `tid` must be the Company tenant, otherwise sign-in is refused and written to the System Log.
+- The `require_mfa` toggle is off until IT enables it. A single user can be exempted inside Workspace only (it does not change Entra).
 - Break-glass account: username, password and TOTP, internal network only, session up to 60 minutes, locked for 15 minutes after 5 failures, and an email to all admins on use.
 - Losing Redis signs everyone out but loses no data.
 - **Local password sign-in is deferred** (ADR 0002 §10).

@@ -63,7 +63,7 @@ describe('login errors', () => {
   it('signs in with an email, an employee ID or a phone, and lands on My Work', async () => {
     const u = userEvent.setup();
     renderApp(<App />, { route: '/login' });
-    await fillLogin(u, '+218 91 200 1000', DEMO_PASSWORDS.pm);
+    await fillLogin(u, '+218 90 000 0001', DEMO_PASSWORDS.pm);
     expect(await screen.findByTestId('page-my-work')).toBeInTheDocument();
   });
 });
@@ -162,7 +162,7 @@ describe('create user', () => {
     const u = userEvent.setup();
     renderApp(<Users />);
     await u.click(await screen.findByTestId('users-new'));
-    await u.type(screen.getByTestId('new-user-name'), 'Sara Test');
+    await u.type(screen.getByTestId('new-user-name'), 'Demo Test');
     await u.type(screen.getByTestId('new-user-email'), 'sara.test@example.com');
     await u.type(screen.getByTestId('new-user-employee-id'), '4821');
     await u.type(screen.getByTestId('new-user-phone'), '+218 91 555 0100');
@@ -191,7 +191,7 @@ describe('create user', () => {
     renderApp(<Users />);
     await u.click(await screen.findByTestId('users-new'));
     await u.type(screen.getByTestId('new-user-name'), 'Copy Cat');
-    await u.type(screen.getByTestId('new-user-email'), 'ahmed.salem@example.com');
+    await u.type(screen.getByTestId('new-user-email'), 'demo.user.01@example.com');
     await u.type(screen.getByTestId('new-user-employee-id'), '1001');
     await u.type(screen.getByTestId('new-user-dialog-reason'), 'Testing duplicates');
     await u.click(screen.getByTestId('new-user-dialog-submit'));
