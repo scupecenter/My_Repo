@@ -18,6 +18,7 @@ import { registerHandlers } from './handlers.registers';
 import { registerColumnHandlers } from './handlers.registerColumns';
 import { registerStateHandlers } from './handlers.registerState';
 import { registerRulesHandlers } from './handlers.registerRules';
+import { registerLinksHandlers } from './handlers.registerLinks';
 import { listHandlers } from './handlers.lists';
 import { p4cHandlers } from './handlers.p4c';
 import { warehouseHandlers } from './handlers.warehouse';
@@ -39,4 +40,4 @@ import { p9Handlers } from './handlers.p9';
 import { dailyPlanHandlers } from './handlers.dailyPlan';
 import { libraryHandlers } from './handlers.library';
 // the real server first (hybrid), then the routes with no API yet (501 not_available), then the mocks (P0 of the 2026-11-17 audit: invitations used to come first)
-export const worker = setupWorker(...siteMasterWideHandlers, ...realApiHandlers(), ...notAvailableHandlers(), ...dailyPlanHandlers, ...libraryHandlers, ...invitationHandlers, ...dataResetHandlers, ...masterImportHandlers, ...workflowLocksHandlers, ...workflowEditorHandlers, ...siteColumnHandlers, ...presenceHandlers, ...viewsHandlers, ...boardHandlers, ...logsWebHandlers, ...p9Handlers, ...logsHandlers, ...xHandlers, ...p4cHandlers, ...listHandlers, ...registerColumnHandlers, ...registerStateHandlers, ...registerHandlers, ...warehouseHandlers, ...fleetHandlers, ...authHandlers, ...passwordResetHandlers, ...profileHandlers, ...qcHandlers, ...documentHandlers, ...docsGridHandlers, ...searchHandlers, ...settingsHandlers, ...handlers, ...scenarioHandlers, ...siteCreationHandlers, ...siteHandlers, ...adminHandlers, ...orgHandlers, ...dashboardHandlers, ...siteMasterHandlers, ...registerRulesHandlers);
+export const worker = setupWorker(...siteMasterWideHandlers, ...realApiHandlers(), ...notAvailableHandlers(), ...dailyPlanHandlers, ...libraryHandlers, ...invitationHandlers, ...dataResetHandlers, ...masterImportHandlers, ...workflowLocksHandlers, ...workflowEditorHandlers, ...siteColumnHandlers, ...presenceHandlers, ...viewsHandlers, ...boardHandlers, ...logsWebHandlers, ...p9Handlers, ...logsHandlers, ...xHandlers, ...p4cHandlers, ...listHandlers, ...registerColumnHandlers, ...registerStateHandlers, ...registerHandlers, ...warehouseHandlers, ...fleetHandlers, ...authHandlers, ...passwordResetHandlers, ...profileHandlers, ...qcHandlers, ...documentHandlers, ...docsGridHandlers, ...searchHandlers, ...settingsHandlers, ...handlers, ...scenarioHandlers, ...siteCreationHandlers, ...siteHandlers, ...adminHandlers, ...orgHandlers, ...dashboardHandlers, ...siteMasterHandlers, ...registerRulesHandlers, ...registerLinksHandlers);

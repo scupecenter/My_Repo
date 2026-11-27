@@ -24,6 +24,8 @@ import { RecordDocuments } from './RecordDocuments';
 import { RelatedRecords } from './RelatedRecords';
 import { SiteTaskField } from './SiteTaskField';
 import { SiteGateField } from './SiteGateField';
+import { RegisterLinkSelect } from './RegisterLinkSelect';
+import { useRegisterLinks } from '@/api/registerLinks';
 import { IssueRiskSelect, RiskIssues, DismantleOrderSelect, DismantleRnSelect, HlcPurchaseRequests, OrderReceipts, WarehouseOrderSelect, AdvanceSelect, SupplierSelect } from './P4cPanels';
 import { useRecordSlots } from '@/api/documents';
 import { Holders } from './HolderChip';
@@ -145,6 +147,7 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
   const addComment = useAddRegisterComment(key, record?.id ?? '');
   // 0.12.5: a register with a file field reads the record's slots too (the slots of a record without a site come with Q228)
   const hasFile = rawDef.fields.some((f) => f.type === 'file');
+  const links = useRegisterLinks();
   const recSlots = useRecordSlots(key, record && (record.site_id || hasFile) ? record.id : null);
   const ctx = { refs: record?.refs, files: (recSlots.data?.items ?? []).flatMap((sl) => sl.files.filter((f) => !f.superseded_by).map((f) => ({ id: f.id, name: f.original_name }))) };
   const docsMissing = record?.state === 'entry' ? (recSlots.data?.missing_for_submit ?? []) : [];
@@ -376,6 +379,8 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
                         ? <AdvanceSelect siteId={site?.id} value={data[f.code]} onChange={(v) => set(f.code, v)} editable={editable} invalid={!!show} />
                         : key === 'warehouse' && f.code === 'procurement_order_id'
                         ? <WarehouseOrderSelect siteId={site?.id} value={data[f.code]} onChange={(v) => set(f.code, v)} editable={editable} invalid={!!show} />
+                        : (links.data?.links ?? []).some((l) => l.from_register === rk && l.field === f.code && l.enabled !== false)
+                        ? <RegisterLinkSelect registerKey={rk} field={f.code} siteId={site?.id} value={data[f.code]} onChange={(v) => set(f.code, v)} editable={editable} invalid={!!show} />
                         : editable && !(key === 'dismantle' && f.code === 'closing_rn_ref' && data.closing_rn_id) ? <FieldInput field={f} value={data[f.code]} onChange={(v) => set(f.code, v)} invalid={!!show} ctx={ctx} />
                         : f.type === 'child_list' ? <FieldInput field={f} value={data[f.code]} onChange={() => undefined} disabled ctx={ctx} />
                         : <div className="font-semibold whitespace-pre-line" data-testid={`reg-view-${f.code}`}>{showValue(f, data[f.code], lang, t, ctx)}</div>}

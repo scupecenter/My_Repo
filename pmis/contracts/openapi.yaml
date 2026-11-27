@@ -45,6 +45,7 @@ info:
     - 0.15.240 (2026-11-27): intake triage for the Issue Log and the Change Control Log (owner request 2026-11-27; migration 0340, mirror `db/sql/339_register_triage.sql`; CHANGELOG RegisterTriage). Additive. (1) `RegisterDefinition.triage_enabled` (true for `issues` and `change_control`): a record of such a register enters an intake queue (`RegisterRecord.triage.state` `pending`) on every insert, a new version included (the old decision is cleared). (2) New `POST /registers/{register_key}/records/{record_id}/triage` (`triageRegisterRecord`): one decision of the register's Matrix L2 holders of the record's region (a System Admin only when the row has no holder, exactly like an approval): `accept` (the record proceeds to its normal flow), `defer` (stays in the queue, with a note), `reject` (note and step-up required; the record is `voided`) and `merge` (`duplicate_of`, note and step-up; the record is `voided`, links the surviving record `triage.duplicate_of`, and the decision is noted on the surviving record's comment thread). `If-Match` is the record's version; `allowed_actions` gains `triage` while a record is pending or deferred and the caller may decide. `GET /registers/{register_key}/records` takes `triage` (one of `TriageState`). (3) Audited as `register_record_triage` with before and after; `RegisterRecordStep.action` gains `triage_accept`, `triage_reject`, `triage_merge`, `triage_defer`; the creator is notified (`NotificationKind` gains `triage_decision`). No grant, role or default changes.
     - 0.15.264 (2026-11-27): `GET /custom-fields` and `GET /custom-fields/{field_id}` now have an implementation (they were documented only; the list was always empty). No migration, no schema change. Everyone signed in reads the active fields their field rules do not hide; inactive fields and the role lists are for a System Admin or an all-regions delegate of the custom fields. POST and PATCH stay documented, not built (proposal to follow).
     - 0.15.226 (2026-11-27): the Deliverables register is enabled (migration 0326; Q71): site-scoped, linked to a task and a gate of the site, with the document and acceptance reference rules. Additive: `deliverables` joins `RegisterKey` and `ExportPartKey` (not in the Master sheet); no new endpoint.
+    - 0.15.332 (2026-11-27): one catalogue of the links between registers (migration 0431; CHANGELOG RegisterLinkCatalogue, decision L3 of the relations review). Additive. `GET /settings/register-links` (`listRegisterLinks`, every signed-in user) and `PUT /settings/register-links` (`saveRegisterLinks`, System Admin, reason, If-Match, audited; a link is switched off, never removed). `GET /registers/{register_key}/link-options?field=&site_id=` (`listLinkOptions`) lists the candidates of any link field. The Related-records panel, the form picker and one blocking write check (422 `link_invalid`, `link_not_found`, `link_other_site`; only when the field changes) all read the same catalogue.
     - 0.15.261 (2026-11-27): mail policy (migration 0364, mirror `db/sql/363_mail_policy.sql`). Additive. New `GET/PUT /settings/mail-policy` (the setting `mail.policy`: global switch, internal only or internal plus external recipients, internal domains, per kind switch and mode). `expiry_radar`, `approval_digest` and `weekly_digest` join the mail kind catalogue (still mailed only when listed in `mail.notification_kinds`). Defaults keep today's behaviour.
     - 0.15.300 (2026-11-27): Content-Security-Policy report endpoint (SEC-3 of the phase 1 security review; no migration; CHANGELOG CspReport). Additive. New public `POST /csp-report`: browsers post violation reports of the policy nginx sends (report-only by default). Answers 204 with no body, accepts `application/csp-report` and `application/reports+json`, 16 KB at most, 429 above 30 per minute per address. It reads nothing from the database and changes nothing; it logs a short sanitised line. No permission change.
     - 0.15.260 (2026-11-27): cross-register derive (migration 0363, mirror `db/sql/362_derive_rules.sql`; owner approval 2026-11-27). Additive. New `GET/PUT /settings/derive-rules` (the setting `derive.rules`: which value a register shows from another register; If-Match, reason, audited; field errors `unknown_key`, `unknown_register`, `same_register`, `unknown_field`, `duplicate`, `invalid`, `too_many`). `RegisterRecord.derived` carries the derived values of the record by output name; `procurement_contractor` of GECOL and HLC is now the seeded rule and keeps its shape. A derived value is computed on read from the configured source field of the matching source record only (never the record), needs no permission on the source register, is shown only for target records the caller may read, and each person's first read of a rule in 10 minutes is audited (`derive_disclosed`). No grant, role or permission change.
@@ -6824,6 +6825,89 @@ paths:
                 properties:
                   items: { type: array, items: { $ref: '#/components/schemas/Setting' } }
         '401': { $ref: '#/components/responses/Unauthorized' }
+  /settings/register-links:
+    get:
+      tags: [settings]
+      operationId: listRegisterLinks
+      summary: The catalogue of the links between registers
+      x-db-path: register_links_json
+      description: |
+        0.15.332 (migration 0431). Every signed-in user (the record form draws its pickers from it). `can_edit` tells whether the caller may change it.
+      responses:
+        '200':
+          description: The links.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RegisterLinks' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    put:
+      tags: [settings]
+      operationId: saveRegisterLinks
+      summary: Save the catalogue (the whole list)
+      x-db-path: admin_register_links_save
+      description: |
+        0.15.332 (migration 0431). System Admin or an all-regions delegate of `settings` edit. A reason is required, the ETag is checked, the change is audited with before and after. A link missing from the list is refused (`no_delete`): switch it off with `enabled: false`. A built-in link keeps its target.
+      parameters:
+        - { name: If-Match, in: header, required: false, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [links, reason]
+              properties:
+                links: { type: array, items: { $ref: '#/components/schemas/RegisterLink' } }
+                reason: { $ref: '#/components/schemas/Reason' }
+      responses:
+        '200':
+          description: The saved catalogue.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RegisterLinks' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /registers/{register_key}/link-options:
+    parameters:
+      - $ref: '#/components/parameters/RegisterKeyAny'
+    get:
+      tags: [registers]
+      operationId: listLinkOptions
+      summary: The candidates of a link field (0.15.332)
+      description: |
+        0.15.332. The records the field `field` of this register may name, from the link catalogue: current, not voided records of the target register the caller may see (the responsibility matrix), of the site `site_id` when the link is same-site. A Procurement link returns the approved active orders (as the order pickers). Needs the view right of this register.
+      parameters:
+        - { name: field, in: query, required: true, schema: { type: string } }
+        - { name: site_id, in: query, required: false, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: The candidates.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [entity_id]
+                      properties:
+                        entity_id: { type: string, format: uuid }
+                        record_id: { type: string, format: uuid }
+                        title: { type: string }
+                        state: { type: string }
+                        record_type: { type: string }
+                        site_id: { type: [string, 'null'], format: uuid }
+                        po_wo_no: { type: string }
+                        pr_no: { type: string }
+                        external_party: { type: object, additionalProperties: true }
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
   /settings/register-rules:
     get:
       tags: [settings]
@@ -19155,6 +19239,28 @@ components:
         code: { $ref: '#/components/schemas/ErrorCode' }
         message: { type: string }
         conflicts: { type: array, items: { type: string, format: uuid }, description: '0.12.6 (Q18): the existing assignments this row overlaps (dates, region and module).' }
+    RegisterLink:
+      type: object
+      required: [from_register, field, to_register]
+      properties:
+        from_register: { type: string }
+        field: { type: string }
+        to_register: { type: string }
+        label_en: { type: [string, 'null'] }
+        label_ar: { type: [string, 'null'] }
+        picker: { type: string, enum: [order, record] }
+        validate: { type: boolean }
+        same_site: { type: boolean }
+        approved_only: { type: boolean }
+        enabled: { type: boolean }
+        builtin: { type: boolean }
+    RegisterLinks:
+      type: object
+      required: [links, version, can_edit]
+      properties:
+        links: { type: array, items: { $ref: '#/components/schemas/RegisterLink' } }
+        version: { type: integer }
+        can_edit: { type: boolean }
     RegisterState:
       type: object
       required: [register_key, name_en, enabled, locked, version, records]

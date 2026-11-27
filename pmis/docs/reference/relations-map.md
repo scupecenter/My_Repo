@@ -58,7 +58,7 @@ A dotted arrow is an id column with no `REFERENCES` constraint (the id is checke
 | HLC record | Procurement record | register link, listed in `record_related` (0407) | `procurement_record_id` (id of the Procurement version row) | derived |
 | Issues, snags, quality, orders, contract end | Contractor performance view (0180) | computed on read, no stored value | thresholds in setting `contractors.performance` | derived |
 | Warehouse DN / RN documents | Stock, per-site quantity, serials | posted by approved documents | `wh_movement_lines`, `warehouse_site_qty`, `warehouse_serials` | derived |
-| Register records (procurement, warehouse, dismantle, issues, quality, car dispatcher, financial advances, risks) | Related records panel (0324) | computed on read, no stored value | `record_related(register, entity)`; the link list is one VALUES list in the function | derived |
+| Register records (procurement, warehouse, dismantle, issues, quality, car dispatcher, financial advances, risks) | Related records panel (0324) | computed on read, no stored value | `record_related(register, entity)`; the link list is the setting `registers.links` (0431, Settings > Register links) | derived |
 | Change Control | Procurement order, task | register link, typed by pick-list | `procurement_order_id`, `affected_task_code` (0325); the order shows the change-pending mark through `record_related` | chosen |
 | Issues | Task | text field filled by a task picker | `blocked_gate_or_task` (the task code) | chosen |
 | Register decisions, task approvals, snags | Notifications | `x_notify_watchers`, policy in setting `notifications.policy` | `notifications` | derived |
@@ -74,6 +74,8 @@ A dotted arrow is an id column with no `REFERENCES` constraint (the id is checke
 4. **Contract end.** *(done, migration 0212)* `external_party_contracts` is the single source of the contract dates; `external_parties.contract_start` / `contract_end` are a mirror the database rebuilds on every contract change (earliest start, latest end of the active contracts; an open-ended contract leaves the end empty). The performance view reads the contracts first.
 5. **Constraints.** The id columns without a `REFERENCES` constraint (dotted in section 2) rely on the writing function. Adding the constraints is additive but needs a data check first (orphan ids), so it is a proposal for a later migration, not part of this document.
 6. **Notifications.** Each module raises its own notice; no single function applies the policy (channel, digest, escalation).
+
+7. **One link catalogue.** *(done, 0431)* The setting `registers.links` is the single list of the links (from register, field, to register, picker, check on save, same site, approved only, on or off). It draws the form picker of any link field, feeds the Related records panel and drives one blocking check on write for every register. A later link is added in Settings or with `register_link_add()`; HLC's many-to-many `hlc_pr_links` stays its own mechanism.
 
 ## 5. Appendix: every foreign key (parent, then children)
 

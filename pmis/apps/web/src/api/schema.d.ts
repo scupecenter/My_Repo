@@ -4444,6 +4444,53 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/register-links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The catalogue of the links between registers
+         * @description 0.15.332 (migration 0431). Every signed-in user (the record form draws its pickers from it). `can_edit` tells whether the caller may change it.
+         */
+        get: operations["listRegisterLinks"];
+        /**
+         * Save the catalogue (the whole list)
+         * @description 0.15.332 (migration 0431). System Admin or an all-regions delegate of `settings` edit. A reason is required, the ETag is checked, the change is audited with before and after. A link missing from the list is refused (`no_delete`): switch it off with `enabled: false`. A built-in link keeps its target.
+         */
+        put: operations["saveRegisterLinks"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/registers/{register_key}/link-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A register key (see `GET /registers`). */
+                register_key: components["parameters"]["RegisterKeyAny"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The candidates of a link field (0.15.332)
+         * @description 0.15.332. The records the field `field` of this register may name, from the link catalogue: current, not voided records of the target register the caller may see (the responsibility matrix), of the site `site_id` when the link is same-site. A Procurement link returns the approved active orders (as the order pickers). Needs the view right of this register.
+         */
+        get: operations["listLinkOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/register-rules": {
         parameters: {
             query?: never;
@@ -12545,6 +12592,25 @@ export interface components {
             message?: string;
             /** @description 0.12.6 (Q18): the existing assignments this row overlaps (dates, region and module). */
             conflicts?: string[];
+        };
+        RegisterLink: {
+            from_register: string;
+            field: string;
+            to_register: string;
+            label_en?: string | null;
+            label_ar?: string | null;
+            /** @enum {string} */
+            picker?: "order" | "record";
+            validate?: boolean;
+            same_site?: boolean;
+            approved_only?: boolean;
+            enabled?: boolean;
+            builtin?: boolean;
+        };
+        RegisterLinks: {
+            links: components["schemas"]["RegisterLink"][];
+            version: number;
+            can_edit: boolean;
         };
         RegisterState: {
             register_key: string;
@@ -30014,6 +30080,106 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+        };
+    };
+    listRegisterLinks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The links. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegisterLinks"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    saveRegisterLinks: {
+        parameters: {
+            query?: never;
+            header?: {
+                "If-Match"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    links: components["schemas"]["RegisterLink"][];
+                    reason: components["schemas"]["Reason"];
+                };
+            };
+        };
+        responses: {
+            /** @description The saved catalogue. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegisterLinks"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listLinkOptions: {
+        parameters: {
+            query: {
+                field: string;
+                site_id?: string;
+            };
+            header?: never;
+            path: {
+                /** @description A register key (see `GET /registers`). */
+                register_key: components["parameters"]["RegisterKeyAny"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The candidates. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            /** Format: uuid */
+                            entity_id: string;
+                            /** Format: uuid */
+                            record_id?: string;
+                            title?: string;
+                            state?: string;
+                            record_type?: string;
+                            /** Format: uuid */
+                            site_id?: string | null;
+                            po_wo_no?: string;
+                            pr_no?: string;
+                            external_party?: {
+                                [key: string]: unknown;
+                            };
+                        }[];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     listRegisterRules: {

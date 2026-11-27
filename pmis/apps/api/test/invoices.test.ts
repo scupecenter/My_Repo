@@ -44,8 +44,10 @@ describe('invoices register', () => {
 
   it('lists the order link in the related-records reader', async () => {
     const def = await db.query(`SELECT pg_get_functiondef('public.record_related(text,uuid)'::regprocedure) AS d`);
-    expect(def.rows[0].d).toContain(`'invoices'`);
-    expect(def.rows[0].d).toContain(`'hlc'`); // D58 (0407): the HLC <-> Procurement link
+    const links = await db.query(`SELECT 1 FROM register_links_active() WHERE from_register = 'invoices' AND field = 'procurement_record_id'`);
+    expect(def.rows[0].d.includes(`'invoices'`) || (def.rows[0].d.includes('register_links_active') && links.rowCount === 1)).toBe(true);
+    const hlc = await db.query(`SELECT 1 FROM register_links_active() WHERE from_register = 'hlc' AND field = 'procurement_record_id'`);
+    expect(def.rows[0].d.includes(`'hlc'`) || hlc.rowCount === 1).toBe(true); // D58 (0407): the HLC <-> Procurement link
   });
 
   it('checks the order link and the supplier company, and fills the supplier name (D58)', async () => {
