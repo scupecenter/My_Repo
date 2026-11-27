@@ -2937,6 +2937,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/matrix/coverage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Matrix cells with nobody to act (read only, admin)
+         * @description 0.15.96. Read only. For each active stage row and enabled register row, each of the seven regions and each level (L1, L2): the deciding cell (region cell before the default cell, as the approval engine finds it), the number of named assignees and the number of active people who can act (named users, role holders with a current assignment of enough level, region and module, group members). `empty` = no cell or no assignee; `no_active_holder` = named but nobody active can act. Needs `admin.matrix` view or edit (403 otherwise). Changes nothing.
+         */
+        get: operations["getMatrixCoverage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/matrix": {
         parameters: {
             query?: never;
@@ -12492,6 +12512,42 @@ export interface components {
          * @enum {string}
          */
         MatrixRowKey: "procurement" | "procurement_hlc" | "contractors" | "rf_design" | "acquisition" | "gecol" | "hlc" | "permits_hse" | "permits_hse_te" | "permits_hse_acq" | "permits_hse_om" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "deliverables" | "dismantle" | "quality_te" | "site_creation";
+        MatrixCoverage: {
+            workflow_version: number;
+            /** Format: date-time */
+            as_of: string;
+            regions: {
+                id: number;
+                code: string;
+                name_en: string;
+                name_ar: string | null;
+            }[];
+            summary: {
+                cells: number;
+                ok: number;
+                empty: number;
+                no_active_holder: number;
+            };
+            rows: {
+                kind: string;
+                code: string;
+                name_en: string;
+                name_ar: string | null;
+                module: string;
+                gaps: number;
+                cells: {
+                    region_id: number;
+                    /** @enum {string} */
+                    level_code: "L1" | "L2";
+                    /** @enum {string} */
+                    source: "region" | "default" | "none";
+                    assignees: number;
+                    holders: number;
+                    /** @enum {string} */
+                    status: "ok" | "empty" | "no_active_holder";
+                }[];
+            }[];
+        };
         Matrix: {
             workflow_version: number;
             /** @description Matrix revision (ETag). Rises with every saved change, in any workflow version. */
@@ -24820,6 +24876,31 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             422: components["responses"]["Unprocessable"];
+        };
+    };
+    getMatrixCoverage: {
+        parameters: {
+            query?: {
+                workflow_version?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The coverage. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatrixCoverage"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     getMatrix: {

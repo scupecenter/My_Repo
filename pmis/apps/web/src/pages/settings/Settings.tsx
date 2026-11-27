@@ -17,6 +17,7 @@ import { MailKinds } from './MailKinds';
 import { useMe } from '@/api/hooks';
 import { ContractorRules } from './ContractorRules';
 import { ContractorPerfThresholds } from './ContractorPerfThresholds';
+import { MatrixCoverageScreen } from './MatrixCoverage';
 import { GecolHlcCounts } from './GecolHlcCounts';
 import { Lists } from './Lists';
 import { RegisterColumns } from './RegisterColumns';
@@ -40,7 +41,7 @@ export interface SettingsTab { key: string; sections: SettingsSection[] }
 export const SETTINGS_TABS: readonly SettingsTab[] = [
   // Settings merge (owner approved 2026-11-25): Calendar + SLA rules + Weights all feed the SLA clock
   { key: 'sla', sections: [{ key: 'rules' }, { key: 'calendar' }, { key: 'weights' }] },
-  { key: 'workflow', sections: [{ key: 'editor' }, { key: 'columns' }, { key: 'freeze' }, { key: 'idle' }, { key: 'board' }] },
+  { key: 'workflow', sections: [{ key: 'editor' }, { key: 'columns' }, { key: 'freeze' }, { key: 'idle' }, { key: 'board' }, { key: 'coverage', adminOnly: true }] },
   // Lists (the dropdown catalogues, old ddl tab) now sit next to the register columns that use them
   { key: 'registers', sections: [{ key: 'columns' }, { key: 'lists' }, { key: 'contractors' }, { key: 'gecol' }, { key: 'team-scope' }, { key: 'issue-map' }] },
   // W5: the Document Library section is now named Document types (the old documents/library route redirects); Form templates and Archive are new
@@ -150,6 +151,7 @@ export function SettingsRoutes() {
           <Route path="freeze" element={<Freeze />} />
           <Route path="idle" element={<Idle />} />
           <Route path="board" element={<KanbanWip />} />
+          <Route path="coverage" element={<MatrixCoverageScreen />} />
         </Route>
         <Route path="sla" element={<TabFrame tab="sla" />}>
           <Route index element={<Navigate to="rules" replace />} />
