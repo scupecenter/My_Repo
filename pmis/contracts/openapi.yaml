@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.221
+  version: 0.15.200
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -31,6 +31,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.200 (2026-11-27): the dashboard follow-up sections, permits and HSE (owner approval 2026-11-26, dashboard proposals item 3; migration 0301). Additive and read only. `GET /dashboard/ops` gains the section `permits_hse` (`DashboardOpsPermitsHse`), over the permit records of the active, not cancelled sites: the status mix, the permits waiting for approval (status Applied), the sites with no permit record, the approved dated permits expiring within the next 14 calendar days and the expired ones, the open stop-work orders (not yet lifted), and the safety checks of the open PTWs (permit type beginning PTW, status Applied or Approved). A check counts as covered only when it is Done or N/A; the section reports the open PTWs with at least one gap and the gaps per check. The incident side of item 3 lands with the Incidents register. The dashboard settings catalogue gains the card `ops_permits_hse`. No grant, role or permission change.
     - 0.15.221 (2026-11-27): additive (migration 0321; CHANGELOG DismantleClosingRnLink). A Dismantle part closes by naming its signed Warehouse RN: new optional field `closing_rn_id` (entity id of a received RN of the part, cw_rn / te_rn, same site; needs the Warehouse view right in the RN's region). When set, `closing_rn_ref` is read from the RN's Doc No. and cannot be typed; without a link the typed reference still works. Field errors `rn_not_available`, `rn_other_site`, `invalid`. `GET /registers/dismantle/rn-options` lists the RNs. Also corrects the descriptions of the Issue log and Quality order-options paths.
     - 0.15.220 (2026-11-27): additive in shape, looser in rule (migration 0320; CHANGELOG WarehouseDocOrderLink). A warehouse delivery note (`cw_dn`, `te_dn`) and a return note (`cw_rn`, `te_rn`) can name a Procurement order with `procurement_order_id`, like a receipt (PL / OPEN); the same derived fields and rules apply. Only a stock adjustment (`adj`) still answers 422 `receipt_only`. `GET /registers/procurement/{entity_id}/receipts` lists the documents of every type except adjustments.
     - 0.15.157 (2026-11-27): duplicate-site warnings at creation (owner approval relayed 2026-11-26). Additive, migration 0257. The exact Site ID was already refused (`duplicate`, 0.14.0); new warnings, never blocking, in `warnings` of `POST /sites`, `GET` and `PATCH /site-drafts/{id}` and now also in each open draft of `GET /site-drafts`: `similar_site_code` (same code ignoring case, spaces, dashes), `duplicate_name` (English or Arabic name, of a site or a waiting draft), `close_coordinates` (within 100 metres). A match in the same region names the site; a match in another region says only that one exists. `SiteDraftWarning.code` gains the three codes. No new path, no permission change.
@@ -22422,7 +22423,7 @@ components:
     DashboardOps:
       type: object
       description: '0.15.106: the follow-up sections of the dashboard (owner approval 2026-11-26).'
-      required: [as_of, scope_regions, procurement]
+      required: [as_of, scope_regions, procurement, permits_hse]
       properties:
         as_of: {type: string, format: date-time}
         scope_regions:
@@ -22430,6 +22431,7 @@ components:
           items: {$ref: '#/components/schemas/RegionId'}
           description: The regions the figures cover (null = every region).
         procurement: {$ref: '#/components/schemas/DashboardOpsProcurement'}
+        permits_hse: {$ref: '#/components/schemas/DashboardOpsPermitsHse'}
     DashboardOpsProcurement:
       type: object
       description: '0.15.106: procurement and materials (dashboard proposals item 1).'
@@ -22492,6 +22494,43 @@ components:
               sites: {type: integer}
               missing_lines: {type: integer}
               missing_qty: {type: number}
+    DashboardOpsPermitsHse:
+      type: object
+      description: '0.15.200: permits and HSE (dashboard proposals item 3).'
+      required: [available, total, by_status, waiting, sites_without_permit, expiring_14, expired, stop_work_active, ptw]
+      properties:
+        available: {type: boolean, description: False when the caller may not see the Permits and HSE register; the other fields are then null.}
+        total: {type: [integer, 'null'], description: 'The permit records of the active, not cancelled sites.'}
+        by_status:
+          type: [array, 'null']
+          description: The status mix, the most frequent first; (none) gathers the blank statuses.
+          items:
+            type: object
+            required: [status, count]
+            properties:
+              status: {type: string}
+              count: {type: integer}
+        waiting: {type: [integer, 'null'], description: Permits with status Applied.}
+        sites_without_permit: {type: [integer, 'null'], description: 'The active, not cancelled sites with no permit record at all.'}
+        expiring_14: {type: [integer, 'null'], description: The approved dated permits whose validity ends within the next 30 calendar days.}
+        expired: {type: [integer, 'null'], description: The approved dated permits whose validity has passed.}
+        stop_work_active: {type: [integer, 'null'], description: Stop-work orders not yet lifted.}
+        ptw:
+          type: [object, 'null']
+          description: The safety checks of the open PTWs (permit type beginning PTW, status Applied or Approved). A check counts as covered only when it is Done or N/A.
+          required: [open, with_gaps, gaps]
+          properties:
+            open: {type: integer}
+            with_gaps: {type: integer, description: The open PTWs missing at least one check.}
+            gaps:
+              type: array
+              description: The gaps per check, only the checks that are missing somewhere.
+              items:
+                type: object
+                required: [key, count]
+                properties:
+                  key: {type: string, enum: [jsa_tra, toolbox_talk, work_at_height, lifting_plan, loto, rescue_plan]}
+                  count: {type: integer}
     DashboardTabLayout:
       type: object
       required: [order, hidden]

@@ -37,6 +37,7 @@ import {
 } from "./dashboardBits";
 import { OpsProcurementCard } from "./dashboardOps";
 import { OpsScurveCard } from "./dashboardScurve";
+import { OpsPermitsCard } from "./dashboardPermits";
 import { useDashboardSettings } from "@/api/dashboardSettings";
 import { SavedViews } from "@/components/SavedViews";
 import { UnifiedFilter } from "@/components/UnifiedFilter";
@@ -1406,6 +1407,13 @@ export function Dashboard() {
                 <>
                   {/* owner approval 2026-11-26, item 2: planned vs actual of the saved weekly snapshots, weekly velocity and the 100% forecast */}
                   <OpsScurveCard snaps={snaps.data} />
+                </>
+              ),
+
+              ops_permits_hse: (
+                <>
+                  {/* 0.15.200 (owner approval 2026-11-26, item 3): permit status mix, validity pressure, stop-work and the PTW check gaps */}
+                  <OpsPermitsCard ops={ops.data} />
                 </>
               ),
 
