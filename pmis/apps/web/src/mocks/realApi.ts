@@ -126,6 +126,7 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/import-batches'],
   ['get', '/import-batches/:id'],
   ['get', '/import-batches/:id/rows'],
+  ['get', '/import-batches/:id/error-report'],
   ['post', '/import-batches/:id/submit'],
   ['post', '/import-batches/:id/decisions'],
   // Contract 0.12.8 (P3, migration 0060): the legacy Master import and its comparison report, the template mapping screen and the import aliases.
