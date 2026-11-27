@@ -29,6 +29,7 @@ import { MyWork } from '@/pages/MyWork';
 import { DailyPlan } from '@/pages/DailyPlan';
 import { RegisterPage } from '@/pages/Register';
 import { RegisterBatch } from '@/pages/RegisterBatch';
+import { DataHubPage } from '@/pages/DataHub';
 import { TemplatesPage } from '@/pages/Templates';
 import { LibraryForms } from '@/pages/library/Forms';
 import { LibraryTemplates } from '@/pages/library/Templates';
@@ -65,6 +66,7 @@ import { MailDelivery } from '@/pages/logs/MailDelivery';
 import { IntegrityRuns } from '@/pages/logs/IntegrityRuns';
 import { SystemLog } from '@/pages/logs/SystemLog';
 import { SettingsRoutes } from '@/pages/settings/Settings';
+import { FaviconSync } from '@/components/PublicLogo';
 
 function Soon() {
   const { t } = useTranslation();
@@ -115,6 +117,7 @@ function gated(session: Session) {
         <Route path="warehouse" element={<Warehouse />} />
         <Route path="as-built/items" element={<AsBuiltItems />} />
         <Route path="registers/:key/batches/:batchId" element={<RegisterBatch />} />
+        <Route path="data-hub" element={<DataHubPage />} />
         <Route path="templates" element={<TemplatesPage />} />
         {/* W5: Library (Forms and Archive) */}
         <Route path="library" element={<Navigate to="/library/forms" replace />} />
@@ -167,6 +170,8 @@ export function App() {
     return () => setPasswordChangeHandler(null);
   }, [qc]);
   return (
+    <>
+    <FaviconSync />
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -177,5 +182,6 @@ export function App() {
       {USE_MOCKS && <Route path="/mock-m365/step-up" element={<MockStepUp />} />}
       <Route path="/*" element={<Gate />} />
     </Routes>
+    </>
   );
 }

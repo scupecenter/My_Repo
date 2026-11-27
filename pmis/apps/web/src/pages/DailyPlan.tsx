@@ -8,7 +8,9 @@ import { errText, FormDialog } from '@/components/FormDialog';
 import { PageHeader } from '@/components/PageHeader';
 import { SavedViews } from '@/components/SavedViews';
 import { ErrorState, LoadingSkeleton } from '@/components/States';
-import { ColumnMenu, DensityToggle, useTablePrefs } from '@/components/TableKit';
+import { LayoutPanel } from '@/components/LayoutPanel';
+import { ColumnMenu, useTablePrefs } from '@/components/TableKit';
+import { displayAttrs } from '@/components/TableStandard';
 import { useToast } from '@/components/Toast';
 import { WeekCycle } from '@/components/WeekCycle';
 import { UnifiedFilter } from '@/components/UnifiedFilter';
@@ -16,6 +18,7 @@ import {
   cellValue, copyToClipboard, emailContent, EMPTY_FILTERS, filterRows, localToday, optionsOf, OVERRIDE_KEYS, OWNER_COLUMNS, type DailyPlanTab, type DpColumn, type DpFilters,
 } from '@/lib/dailyPlan';
 import type { ColDef } from '@/lib/tablePrefs';
+import { DateInput } from '@/components/DateInput';
 
 const SCREEN = 'daily-plan';
 const WIDE = new Set<DpColumn>(['planned_work', 'actual_work', 'reason', 'remark', 'sow', 'contractor', 'aat_se']);
@@ -118,7 +121,7 @@ export function DailyPlan() {
         </div>
         <span className="inline-flex items-center gap-1">
           <button type="button" className="btn px-2" aria-label={t('dailyPlan.previous_day')} onClick={() => shift(-1)}><ChevronLeft size={16} className="rtl:rotate-180" aria-hidden /></button>
-          <input type="date" className="input w-auto" aria-label={t('dailyPlan.date')} data-testid="daily-plan-date" value={date} onChange={(e) => e.target.value && setParams({ date: e.target.value })} />
+          <DateInput className="input w-auto" aria-label={t('dailyPlan.date')} data-testid="daily-plan-date" value={date} onChange={(e) => e.target.value && setParams({ date: e.target.value })} />
           <button type="button" className="btn px-2" aria-label={t('dailyPlan.next_day')} onClick={() => shift(1)}><ChevronRight size={16} className="rtl:rotate-180" aria-hidden /></button>
         </span>
         <span className="text-sm text-mute" data-testid="daily-plan-shown-date">{t(isWeek ? 'week.of' : tab === 'progress' ? 'dailyPlan.progress_of' : 'dailyPlan.tomorrow_of', { date: shownDate })}</span>
@@ -144,7 +147,7 @@ export function DailyPlan() {
         <span className="ms-auto flex flex-wrap items-center gap-2">
           <span className="text-sm text-mute" data-testid="daily-plan-count">{t('dailyPlan.count', { count: rows.length })}</span>
           {plans.some((p) => p.can_edit) && <button type="button" className="btn btn-accent" data-testid="daily-plan-add" onClick={() => setAdding(true)}><Plus size={16} aria-hidden />{t('dailyPlan.add_site')}</button>}
-          <DensityToggle api={table} />
+          <LayoutPanel testid="daily-plan-layout" table={table} />
           <ColumnMenu api={table} label={(id) => t(`dailyPlan.col.${id}`)} />
           <button type="button" className="btn" data-testid="daily-plan-export" disabled={!progress.data} onClick={doExport}><Download size={16} aria-hidden />{t('dailyPlan.export')}</button>
           <button type="button" className="btn" data-testid="daily-plan-copy" disabled={!progress.data || !tomorrow.data} onClick={() => void copy()}><ClipboardCopy size={16} aria-hidden />{t('dailyPlan.copy')}</button>
@@ -168,7 +171,7 @@ export function DailyPlan() {
       )}
 
       {day.isLoading || (tab === 'tomorrow' && !next && progress.isLoading) ? <LoadingSkeleton /> : day.isError ? <ErrorState onRetry={() => void day.refetch()} message={errText(day.error, t)} /> : (
-        <div className="card overflow-x-auto" dir="ltr" data-testid="daily-plan-table-wrap">
+        <div className="card overflow-x-auto" dir="ltr" data-testid="daily-plan-table-wrap" {...displayAttrs(table.display)}>
           <table className={`w-full text-sm ${table.density === 'compact' ? 'leading-tight' : ''}`} data-testid="daily-plan-table" data-tab={tab}>
             <thead className="sticky top-0 bg-card text-mute">
               <tr>

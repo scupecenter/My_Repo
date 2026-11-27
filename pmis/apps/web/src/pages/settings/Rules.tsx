@@ -6,6 +6,7 @@ import { errText, FormDialog } from '@/components/FormDialog';
 import { useToast } from '@/components/Toast';
 import { fieldErrors } from '@/lib/fields';
 import { FieldErr } from './Calendar';
+import { DateInput } from '@/components/DateInput';
 
 export { FREEZE_CONFIRM } from '@/components/FreezePanel';
 
@@ -31,7 +32,7 @@ export function Dlp() {
         <div className="grid gap-3 sm:grid-cols-3">
           <label className="text-sm font-semibold">{t('rules.dlp_cw')}<input type="number" min={0} max={120} className="input mt-1 font-normal" data-testid="dlp-cw" value={v.cw} onChange={(e) => setF({ ...v, cw: e.target.value })} /><FieldErr errs={errs} path="/cw_months" /></label>
           <label className="text-sm font-semibold">{t('rules.dlp_te')}<input type="number" min={0} max={120} className="input mt-1 font-normal" data-testid="dlp-te" value={v.te} onChange={(e) => setF({ ...v, te: e.target.value })} /><FieldErr errs={errs} path="/te_months" /></label>
-          <label className="text-sm font-semibold">{t('rules.effective_from')}<input type="date" className="input mt-1 font-normal" data-testid="dlp-from" value={v.from} onChange={(e) => setF({ ...v, from: e.target.value })} /><FieldErr errs={errs} path="/effective_from" /></label>
+          <label className="text-sm font-semibold">{t('rules.effective_from')}<DateInput className="input mt-1 font-normal" data-testid="dlp-from" value={v.from} onChange={(e) => setF({ ...v, from: e.target.value })} /><FieldErr errs={errs} path="/effective_from" /></label>
         </div>
         <button className="btn btn-accent" data-testid="dlp-publish" disabled={bad} onClick={() => setOpen(true)}>{t('rules.publish_version')}</button>
       </section>

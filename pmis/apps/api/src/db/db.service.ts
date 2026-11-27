@@ -18,6 +18,18 @@ const als = new AsyncLocalStorage<TxStore>();
  * The only door to the database. Inside a request, `tx` is the request transaction that already carries
  * the verified session context (app_begin, migration 0069). Outside one it is the plain client.
  */
+/** The URL with `connection_limit` set to the configured pool size, unless the URL already names one (an explicit URL setting wins). */
+export function withPoolSize(url: string, size: number | undefined): string {
+  if (size === undefined) return url;
+  try {
+    const u = new URL(url);
+    if (!u.searchParams.has('connection_limit')) u.searchParams.set('connection_limit', String(size));
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
+
 @Injectable()
 export class DbService implements OnModuleDestroy {
   readonly client: PrismaClient;
@@ -26,7 +38,7 @@ export class DbService implements OnModuleDestroy {
     const key = parseContextKey(config.contextKey);
     if (!key) throw new Error('PMIS_CONTEXT_KEY is missing or not 64 hex characters');
     setContextKey(key);
-    const client = new PrismaClient({ datasourceUrl: config.databaseUrl, log: [{ emit: 'event', level: 'error' }] });
+    const client = new PrismaClient({ datasourceUrl: withPoolSize(config.databaseUrl, config.dbPoolSize), log: [{ emit: 'event', level: 'error' }] });
     // A refusal of the workflow engine (wf:<code>:<json>, for example a stale If-Match) is an answer to the caller, not a server error.
     client.$on('error', (e) => {
       if (/wf:[a-z_]+:\{|ERROR: matrix: /.test(e.message)) return; // matrix_save refuses a missing right with a "matrix: ..." message (403 for the caller)

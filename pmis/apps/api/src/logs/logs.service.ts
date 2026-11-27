@@ -768,6 +768,8 @@ function alertDetail(rule: string, d: Record<string, unknown> | null): string | 
     case 'retention_reduced': return `Retention reduced (audit row ${String(d.audit_id)}).`;
     case 'audit_integrity_failure': return `${String(d.log)} log: ${String(d.break_count)} break(s).`;
     case 'backup_missing': return d.last_success_at ? `Last successful backup: ${String(d.last_success_at)}. The window is ${String(d.window_hours)} hours.` : `No successful backup is recorded. The window is ${String(d.window_hours)} hours.`;
+    case 'backup_late': return typeof d.message === 'string' ? d.message : null;
+    case 'job_failed': return `Job ${String(d.job)}: ${String(d.error)}`;
     default: return null;
   }
 }

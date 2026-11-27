@@ -1,15 +1,21 @@
-import { Camera, Check, Download, FileUp, Plus, Trash2, Undo2 } from 'lucide-react';
+import { Camera, Check, Download, FileUp, Pencil, Plus, Trash2, Undo2 } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ApiError } from '@/api/client';
 import { downloadDocument } from '@/api/documents';
 import { useDecideEvidence, useRaiseSnag, useSiteSnags, useSnagOp, useSnagPhoto, useSnagSeverities, useSnagTypes, useWithdrawSnagPhoto, type Snag } from '@/api/qc';
 import { taskErrorMessage } from '@/lib/taskErrors';
+import { AnnotatePhoto } from './AnnotatePhoto';
+import { DictateButton } from './DictateButton';
+import { RecordVideo } from './RecordVideo';
 import { RejectDialog } from './RejectDialog';
+import { useTablePrefs } from './TableKit';
+import { displayAttrs, ExportCsvButton, SearchBox, TableCount, TableToolbar } from './TableStandard';
 import { useToast } from './Toast';
 
 const STATE_TONE: Record<string, string> = { open: 'bg-lateBg text-lateInk', fix_submitted: 'bg-openBg text-openInk', in_review: 'bg-waitBg text-waitInk', closed: 'bg-doneBg text-doneInk', cancelled: 'bg-lockBg text-lockInk' };
 const MB = 1024 * 1024;
+const SNAG_DEFS = [{ id: 'snag', w: 400 }];
 
 /** The words of a refused photo: the EXIF date before the raise, the format, the size, or the server's message. */
 export function snagError(t: (k: string, o?: Record<string, unknown>) => string, e: unknown): string {
@@ -33,7 +39,9 @@ function SnagCard({ snag, siteId }: { snag: Snag; siteId: string }) {
   const shots = rules.shot_types ?? [];
   const [shot, setShot] = useState(shots[0] ?? '');
   const [rejecting, setRejecting] = useState(false);
+  const [annotate, setAnnotate] = useState<File | null>(null);
   const camRef = useRef<HTMLInputElement>(null);
+  const annRef = useRef<HTMLInputElement>(null);
   const can = (a: string) => (snag.allowed_actions ?? []).includes(a as never);
   const typeName = (i18n.language === 'ar' && snag.snag_type.name_ar) || snag.snag_type.name_en;
   const busy = up.isPending || del.isPending || op.isPending || ev.isPending;
@@ -48,6 +56,7 @@ function SnagCard({ snag, siteId }: { snag: Snag; siteId: string }) {
     if (rules.max_size_mb && f.size > rules.max_size_mb * MB) { toast(t('snags.err.too_large', { mb: rules.max_size_mb }), 'err'); return; }
     up.mutate({ snag, file: f, shot_type: shot || null }, { onSuccess: () => toast(t('snags.photo_added')), onError: (e) => toast(`${f.name}: ${snagError(t, e)}`, 'err') });
   };
+
   const run = (o: 'submit' | 'approve' | 'reject', note?: string) =>
     op.mutate({ snag, op: o, note }, { onSuccess: () => { setRejecting(false); toast(t(`snags.done_${o}`)); }, onError: (e) => { setRejecting(false); toast(snagError(t, e), 'err'); } });
   const photos = snag.photos ?? [];
@@ -114,6 +123,14 @@ function SnagCard({ snag, siteId }: { snag: Snag; siteId: string }) {
           <button type="button" className="btn text-sm" onClick={() => camRef.current?.click()}><Camera size={14} />{t('docs.camera')}</button>
           <input ref={camRef} type="file" accept="image/*" capture="environment" className="sr-only" tabIndex={-1} aria-hidden="true"
             onChange={(e) => { const f = e.target.files?.[0]; if (f) send(f); e.target.value = ''; }} />
+          <button type="button" className="btn text-sm" data-testid={`snag-annotate-open-${snag.id}`} title={t('capture.annotate_title')} onClick={() => annRef.current?.click()}><Pencil size={14} />{t('capture.annotate')}</button>
+          <input ref={annRef} type="file" accept="image/*" className="sr-only" tabIndex={-1} aria-hidden="true" data-testid={`snag-annotate-input-${snag.id}`}
+            onChange={(e) => { const f = e.target.files?.[0]; if (f && f.type.startsWith('image/')) setAnnotate(f); e.target.value = ''; }} />
+          <RecordVideo formats={rules.formats ?? []} testid={`snag-video-${snag.id}`} onFile={send} />
+          {annotate && (
+            <AnnotatePhoto file={annotate} testid={`snag-annotate-${snag.id}`}
+              onUse={(f) => { setAnnotate(null); send(f); }} onCancel={() => setAnnotate(null)} />
+          )}
         </div>
       )}
       {snag.state !== 'closed' && (snag.photos_missing?.length ?? 0) > 0 && can('upload') && (
@@ -167,7 +184,10 @@ function RaiseForm({ siteId, onDone }: { siteId: string; onDone: () => void }) {
           </select>
         </label>
         <label className="text-sm">{t('snags.title')}
-          <input className="input mt-1" data-testid="snag-raise-title" value={title} maxLength={200} onChange={(e) => setTitle(e.target.value)} />
+          <span className="mt-1 flex items-center gap-1">
+            <input className="input flex-1" data-testid="snag-raise-title" value={title} maxLength={200} onChange={(e) => setTitle(e.target.value)} />
+            <DictateButton testid="snag-raise-dictate" onText={(said) => setTitle((cur) => (cur.trim() ? `${cur.trim()} ${said}` : said).slice(0, 200))} />
+          </span>
         </label>
       </div>
       <label className="block text-sm">{t('snags.description')}
@@ -183,22 +203,32 @@ function RaiseForm({ siteId, onDone }: { siteId: string; onDone: () => void }) {
 
 /** The QC snags of a site (owner answers Q131 / Q132): photos of the fix by L1, approval by L2 closes the snag; an open snag blocks its stream's PAC / FAC. */
 export function SiteSnags({ siteId }: { siteId: string }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const q = useSiteSnags(siteId);
   const [raising, setRaising] = useState(false);
+  const [search, setSearch] = useState('');
+  // the table standard for a card list (as Approvals): search, count, Display and the export of the view; no column chooser (a card has no columns)
+  const tbl = useTablePrefs('site-snags', SNAG_DEFS);
+  const typeLabel = (x: Snag) => (i18n.language === 'ar' && x.snag_type.name_ar) || x.snag_type.name_en;
+  const all = q.data?.items ?? [];
+  const needle = search.trim().toLowerCase();
+  const items = needle ? all.filter((s) => [s.title, s.scope, s.state, s.severity ?? '', typeLabel(s)].join(' ').toLowerCase().includes(needle)) : all;
   return (
     <div className="space-y-3" data-testid="site-snags">
-      <div className="flex items-center gap-2">
-        <p className="me-auto text-sm text-mute" data-testid="snag-open-count">{t('snags.open_count', { count: q.data?.open_count ?? 0 })}</p>
-        {!raising && <button className="btn" data-testid="snag-raise" onClick={() => setRaising(true)}><Plus size={14} />{t('snags.raise')}</button>}
-      </div>
+      <TableToolbar testid="site-snags-toolbar" kind="list"
+        search={<SearchBox value={search} onChange={setSearch} testid="site-snags-search" placeholder={t('tstd.search_table')} />}
+        count={<TableCount testid="site-snags-count" noun="items" total={all.length} filtered={items.length} active={!!needle} onClear={() => setSearch('')} />}
+        primary={!raising ? <button className="btn" data-testid="snag-raise" onClick={() => setRaising(true)}><Plus size={14} />{t('snags.raise')}</button> : undefined}
+        exporter={<ExportCsvButton testid="site-snags-export" name="site-snags" head={[t('snags.title'), t('snags.scope'), t('docs.c_status'), t('snags.severity')]}
+          rows={() => items.map((s) => [s.title, s.scope, t(`snagState.${s.state}`), s.severity ?? ''])} />} />
+      <p className="text-sm text-mute" data-testid="snag-open-count">{t('snags.open_count', { count: q.data?.open_count ?? 0 })}</p>
       {raising && <RaiseForm siteId={siteId} onDone={() => setRaising(false)} />}
       {q.isLoading ? <p className="text-mute">{t('common.loading')}</p>
         : q.isError ? <p role="alert" className="text-lateInk" data-testid="snags-error">{t('snags.load_failed')}</p>
           : (
-            <ul className="space-y-2" data-testid="snag-list">
-              {(q.data?.items ?? []).map((s) => <SnagCard key={`${s.id}-${s.version}`} snag={s} siteId={siteId} />)}
-              {!q.data?.items.length && <li className="text-mute">{t('snags.none')}</li>}
+            <ul className="space-y-2" data-testid="snag-list" {...displayAttrs(tbl.display)}>
+              {items.map((s) => <SnagCard key={`${s.id}-${s.version}`} snag={s} siteId={siteId} />)}
+              {!items.length && <li className="text-mute">{t('snags.none')}</li>}
             </ul>
           )}
     </div>
