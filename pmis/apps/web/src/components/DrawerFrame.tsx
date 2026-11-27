@@ -74,15 +74,12 @@ export function DrawerFrame({
   });
   const dirty = useRef(false);
   const opener = useRef<HTMLElement | null>(null);
-  const [isDirty, setIsDirty] = useState(false);
   const put = (s: Size) => {
     setSize(s);
     savePref(key, s);
   };
   // Decision 11: the shared guard (three choices, the setting ui.features.unsaved_guard); the body reports its dirty state through useReportDirty
-  const srcRef = useRef<GuardSource>({ scope: 'drawers', dirty: false, label: name }); // one object for the life of the frame, so settle() reaches the entry every ask reads
-  const src = srcRef.current;
-  src.dirty = isDirty; src.label = name;
+  const src: GuardSource = { scope: 'drawers', dirty: () => dirty.current, label: name }; // read at the moment of the ask, so settle() takes effect at once
   useUnsavedGuard(src);
   const ask = useAskLeave(src);
   const guard = (go: () => void) => ask(go);
@@ -166,12 +163,9 @@ export function DrawerFrame({
             value={{
               report: (d) => {
                 dirty.current = d;
-                setIsDirty(d);
               },
               settle: () => {
-                src.dirty = false;
                 dirty.current = false;
-                setIsDirty(false);
               },
             }}
           >

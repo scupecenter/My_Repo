@@ -1,5 +1,5 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { UNSAFE_NavigationContext } from 'react-router-dom';
 import { useUiFeatures } from '@/api/uiFeatures';
@@ -14,7 +14,8 @@ export type GuardScope = 'settings' | 'dialogs' | 'drawers' | 'inline' | 'compos
 
 export interface GuardSource {
   scope: GuardScope;
-  dirty: boolean;
+  /** true or false, or a function read at the moment of the ask (a screen that settles a save synchronously, before it navigates, answers false from its ref) */
+  dirty: boolean | (() => boolean);
   /** Saves the input; false (or a throw) means it could not be saved, so the user stays with an error; 'stay' means the save was started and the screen closes itself when it succeeds. Omit when the area has no way to save from here. */
   onSave?: (reason: string) => Promise<boolean | 'stay' | void> | boolean | 'stay' | void;
   /** The save needs a reason (Settings doors): the leave dialog then asks for it (3 characters at least) and passes it to onSave. */
@@ -32,6 +33,7 @@ interface Api {
 }
 
 const Ctx = createContext<Api | null>(null);
+const isDirty = (s: GuardSource): boolean => (typeof s.dirty === 'function' ? s.dirty() : s.dirty);
 
 export function UnsavedGuardProvider({ children }: { children: ReactNode }) {
   const ui = useUiFeatures().unsaved_guard;
@@ -40,9 +42,9 @@ export function UnsavedGuardProvider({ children }: { children: ReactNode }) {
   const [pending, setPending] = useState<Pending | null>(null);
   const skip = useRef(false);
   const enabledFor = useCallback((scope: GuardScope) => ui.enabled && ui[scope], [ui]);
-  const live = useCallback(() => [...sources.current.values()].filter((s) => s.dirty && enabledFor(s.scope)), [enabledFor]);
+  const live = useCallback(() => [...sources.current.values()].filter((s) => isDirty(s) && enabledFor(s.scope)), [enabledFor]);
   const askLeave = useCallback((list: GuardSource[], proceed: () => void) => {
-    const dirty = list.filter((s) => s.dirty && enabledFor(s.scope));
+    const dirty = list.filter((s) => isDirty(s) && enabledFor(s.scope));
     if (!dirty.length) proceed();
     // the user already answered: the navigation inside `proceed` (a drawer moving to another row, a dialog closing) must not ask again
     else setPending({ sources: dirty, proceed: () => { skip.current = true; try { proceed(); } finally { skip.current = false; } } });
@@ -54,6 +56,7 @@ export function UnsavedGuardProvider({ children }: { children: ReactNode }) {
   }), [askLeave, enabledFor]);
 
   // in-app navigation: every link and navigate() call goes through the router's navigator
+  // eslint-disable-next-line react-hooks/immutability
   useEffect(() => {
     const n = nav.navigator as unknown as { push: (...a: unknown[]) => void; replace: (...a: unknown[]) => void; go: (d: number) => void };
     if (!ui.enabled || !ui.navigation) return undefined;
@@ -62,6 +65,8 @@ export function UnsavedGuardProvider({ children }: { children: ReactNode }) {
       if (skip.current) { orig.apply(n, a); return; }
       askLeave(live(), () => { skip.current = true; try { orig.apply(n, a); } finally { skip.current = false; } });
     };
+    // the router's navigator is patched on purpose: every in-app navigation (links, navigate()) must pass the guard, and it is restored on cleanup
+    // eslint-disable-next-line react-hooks/immutability
     n.push = wrap(push); n.replace = wrap(replace);
     n.go = (d: number) => { if (skip.current) go.call(n, d); else askLeave(live(), () => { skip.current = true; go.call(n, d); skip.current = false; }); };
     return () => { n.push = push; n.replace = replace; n.go = go; };
@@ -150,8 +155,8 @@ export const useGuardApi = (): Api => useContext(Ctx) ?? NOOP;
 /** Registers the dirty state of a screen. The newest `onSave` is always used; the entry goes away when the screen unmounts. */
 export function useUnsavedGuard(s: GuardSource): void {
   const { register, unregister } = useGuardApi();
-  const id = useRef(`g${Math.random().toString(36).slice(2)}`).current;
-  register(id, s);
+  const id = useId();
+  useEffect(() => { register(id, s); }); // after every render, so the newest dirty state and onSave are the ones read
   useEffect(() => () => unregister(id), [id, unregister]);
 }
 
