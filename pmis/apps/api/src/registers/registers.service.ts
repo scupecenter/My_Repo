@@ -142,6 +142,7 @@ interface DefRow {
 }
 
 interface FieldRow {
+  default_value?: unknown;
   register_key: string;
   code: string;
   label_en: string;
@@ -285,7 +286,7 @@ export class RegistersService {
   /** The raw field rows of a register with the catalogues they read (cached for one request). */
   private async fieldRows(key: string): Promise<{ rows: FieldRow[]; cats: Map<string, CatalogueInfo> }> {
     const rows = await this.db.tx.$queryRaw<FieldRow[]>(Prisma.sql`
-      SELECT register_key, code, label_en, label_ar, field_type, required, derived, options, in_list, section, list_catalogue
+      SELECT register_key, code, label_en, label_ar, field_type, required, derived, options, in_list, section, list_catalogue, default_value
       FROM register_fields WHERE register_key = ${key} AND is_active ORDER BY sort_order, code COLLATE "C"`);
     const codes = new Set<string>();
     for (const f of rows) {
@@ -325,6 +326,7 @@ export class RegistersService {
         in_list: f.in_list,
         is_custom: false,
         ...(f.section ? { section: f.section } : {}),
+        ...(f.default_value !== null && f.default_value !== undefined ? { default_value: f.default_value } : {}),
         ...(options ? { options } : {}),
         ...(cat ? { list: cat.ref } : {}),
         ...(f.field_type === 'child_list'

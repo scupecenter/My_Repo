@@ -61,3 +61,29 @@ export function receivePct(
   const capped = Math.max(0, Math.min(dispatched, required));
   return Math.round((capped * 1000) / required) / 10;
 }
+
+// ---------------------------------------------------------------- item 3 (0.15.200): permits and HSE
+
+/** The six PTW safety checks (the permits_hse fields jsa_tra to rescue_plan), in display order. */
+export const PTW_CHECK_KEYS = [
+  "jsa_tra",
+  "toolbox_talk",
+  "work_at_height",
+  "lifting_plan",
+  "loto",
+  "rescue_plan",
+] as const;
+export type PtwCheckKey = (typeof PTW_CHECK_KEYS)[number];
+
+/**
+ * The PTW safety checks a permit still misses: a check counts as covered only when its value is "Done" or "N/A";
+ * a missing, pending or free value is a gap (the permits form lists exactly these values).
+ */
+export function ptwCheckGaps(
+  checks: Record<string, unknown> | null,
+): PtwCheckKey[] {
+  return PTW_CHECK_KEYS.filter((k) => {
+    const v = checks?.[k];
+    return v !== "Done" && v !== "N/A";
+  });
+}

@@ -8,6 +8,7 @@ type S = components['schemas'];
 export type MyProfile = S['MyProfile'];
 export type MyProfilePatch = S['MyProfilePatch'];
 export type MyTwoFactor = S['MyTwoFactor'];
+export type MySession = S['MySession'];
 export type EmailChangeRequest = S['EmailChangeRequest'];
 export type EmailChangeRequestAdmin = S['EmailChangeRequestAdmin'];
 export type EmailChangeStatus = S['EmailChangeStatus'];
@@ -138,5 +139,22 @@ export function useSetTwoFactorEnforced(userId: string) {
       void qc.invalidateQueries({ queryKey: ['user', userId] });
       void qc.invalidateQueries({ queryKey: ['users'] });
     },
+  });
+}
+
+/** 0.15.101: my own live sessions and ending them (own rows only). */
+export const useMySessions = () => useQuery({ queryKey: ['my-sessions'], queryFn: () => api.get<{ items: MySession[] }>('/me/sessions').then((r) => r.items) });
+export function useEndMySession() {
+  const qc = useQueryClient();
+  return useMutation<{ revoked_count: number }, ApiError, string>({
+    mutationFn: (id) => api.post(`/me/sessions/${id}/revoke`, { body: {} }),
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ['my-sessions'] }); },
+  });
+}
+export function useEndMyOtherSessions() {
+  const qc = useQueryClient();
+  return useMutation<{ revoked_count: number }, ApiError, void>({
+    mutationFn: () => api.post('/me/sessions/revoke-others', { body: {} }),
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ['my-sessions'] }); },
   });
 }
