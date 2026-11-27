@@ -7174,5 +7174,8 @@
   },
   "cells": {
     "progress": "Progress"
+  },
+  "screenSettings": {
+    "title": "Settings for this screen"
   }
 }
