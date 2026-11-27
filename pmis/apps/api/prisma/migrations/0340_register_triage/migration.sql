@@ -1,5 +1,5 @@
--- 0188_register_triage: intake triage for the Issue Log and the Change Control Log (accept / reject / merge duplicate / defer, with a note).
--- Mirror: db/sql/187_register_triage.sql (kept identical to prisma/migrations/0188_register_triage/migration.sql).
+-- 0340_register_triage: intake triage for the Issue Log and the Change Control Log (accept / reject / merge duplicate / defer, with a note).
+-- Mirror: db/sql/339_register_triage.sql (kept identical to prisma/migrations/0340_register_triage/migration.sql).
 --
 --   Owner request (relayed 2026-11-27, benchmark Linear Triage): new issues and change requests land in a triage queue; the register's L2 holder
 --   (the Responsibility Matrix row of the register, no new permission and no widening) accepts, rejects, merges as a duplicate of another record,

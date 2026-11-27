@@ -77,7 +77,7 @@ export class RegistersController {
     return this.act('reject', auth, key, id, ifMatch, body, res);
   }
 
-  /** 0188: one triage decision on a record of a triage-enabled register (Issue Log, Change Control). */
+  /** 0340: one triage decision on a record of a triage-enabled register (Issue Log, Change Control). */
   @Post(':key/records/:id/triage')
   @HttpCode(200)
   triage(

@@ -32,7 +32,7 @@ export interface TransitionInfo {
 
 const STATES = ['entry', 'in_review', 'in_approval', 'approved', 'voided'];
 const TRIAGE_STATES = ['pending', 'accepted', 'rejected', 'duplicate', 'deferred'];
-/** 0188: one triage decision (accept / reject / merge duplicate / defer). The note is required for reject and merge (the database checks again). */
+/** 0340: one triage decision (accept / reject / merge duplicate / defer). The note is required for reject and merge (the database checks again). */
 const triageSchema = z
   .object({
     action: z.enum(['accept', 'reject', 'merge', 'defer']),
@@ -711,7 +711,7 @@ export class RegistersService {
         const mine = (r.pinned ?? r.created_by) === auth.user.id;
         if ((!r.is_holder && mine && !(auth.state.isAdmin && r.has_holder === false)) || (r.is_holder && r.pinned !== null && r.pinned !== auth.user.id && r.pin_holds === false)) actions.push('transfer');
       }
-      // 0188: intake triage (issues and change control while enabled): the L2 holders of the register's matrix row decide; the database decides again
+      // 0340: intake triage (issues and change control while enabled): the L2 holders of the register's matrix row decide; the database decides again
       if (active && (r.triage_state === 'pending' || r.triage_state === 'deferred') && (r.triage_holder === true || (auth.state.isAdmin && r.triage_has_holder === false))) actions.push('triage');
       if (active && (await can(module, 'delete', r.region_id))) actions.push('void');
       if (r.state === 'approved' && r.is_current && !r.has_open && r.entry_holder && (await can(module, 'edit', r.region_id))) actions.push('new_version');
@@ -889,7 +889,7 @@ export class RegistersService {
   }
 
   /**
-   * 0188: intake triage for the enabled registers (Issue Log, Change Control). Accept, reject (voids), merge as a duplicate (voids, links the
+   * 0340: intake triage for the enabled registers (Issue Log, Change Control). Accept, reject (voids), merge as a duplicate (voids, links the
    * surviving record) or defer, with a note to the person who entered the record. Reject and merge ask for a step-up like a void does. The
    * database decides the holder, the state and the version again.
    */

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.100
+  version: 0.15.240
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -31,7 +31,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
-    - 0.15.100 (2026-11-27): intake triage for the Issue Log and the Change Control Log (owner request 2026-11-27; migration 0188, mirror `db/sql/187_register_triage.sql`; CHANGELOG RegisterTriage). Additive. (1) `RegisterDefinition.triage_enabled` (true for `issues` and `change_control`): a record of such a register enters an intake queue (`RegisterRecord.triage.state` `pending`) on every insert, a new version included (the old decision is cleared). (2) New `POST /registers/{register_key}/records/{record_id}/triage` (`triageRegisterRecord`): one decision of the register's Matrix L2 holders of the record's region (a System Admin only when the row has no holder, exactly like an approval): `accept` (the record proceeds to its normal flow), `defer` (stays in the queue, with a note), `reject` (note and step-up required; the record is `voided`) and `merge` (`duplicate_of`, note and step-up; the record is `voided`, links the surviving record `triage.duplicate_of`, and the decision is noted on the surviving record's comment thread). `If-Match` is the record's version; `allowed_actions` gains `triage` while a record is pending or deferred and the caller may decide. `GET /registers/{register_key}/records` takes `triage` (one of `TriageState`). (3) Audited as `register_record_triage` with before and after; `RegisterRecordStep.action` gains `triage_accept`, `triage_reject`, `triage_merge`, `triage_defer`; the creator is notified (`NotificationKind` gains `triage_decision`). No grant, role or default changes.
+    - 0.15.240 (2026-11-27): intake triage for the Issue Log and the Change Control Log (owner request 2026-11-27; migration 0340, mirror `db/sql/339_register_triage.sql`; CHANGELOG RegisterTriage). Additive. (1) `RegisterDefinition.triage_enabled` (true for `issues` and `change_control`): a record of such a register enters an intake queue (`RegisterRecord.triage.state` `pending`) on every insert, a new version included (the old decision is cleared). (2) New `POST /registers/{register_key}/records/{record_id}/triage` (`triageRegisterRecord`): one decision of the register's Matrix L2 holders of the record's region (a System Admin only when the row has no holder, exactly like an approval): `accept` (the record proceeds to its normal flow), `defer` (stays in the queue, with a note), `reject` (note and step-up required; the record is `voided`) and `merge` (`duplicate_of`, note and step-up; the record is `voided`, links the surviving record `triage.duplicate_of`, and the decision is noted on the surviving record's comment thread). `If-Match` is the record's version; `allowed_actions` gains `triage` while a record is pending or deferred and the caller may decide. `GET /registers/{register_key}/records` takes `triage` (one of `TriageState`). (3) Audited as `register_record_triage` with before and after; `RegisterRecordStep.action` gains `triage_accept`, `triage_reject`, `triage_merge`, `triage_defer`; the creator is notified (`NotificationKind` gains `triage_decision`). No grant, role or default changes.
     - 0.15.96 (2026-11-27): responsibility-matrix coverage screen (CHANGELOG MatrixCoverage; no migration). Additive and read only. `GET /matrix/coverage` (`getMatrixCoverage`, System Admin or an all-region delegate of the matrix): for each active stage and enabled register row and each of the seven regions, whether the matrix cell has an actor, so empty cells show before a task or record stalls. Settings > Workflow > Coverage.
     - 0.15.95 (2026-11-27): Issue log and Quality record link to a Procurement order (migration 0195; CHANGELOG IssueQualityOrderLink). Additive. New optional field `procurement_order_id` on `issues` and `quality`; when set, the contractor (`external_party`) is taken from the order (a different typed `external_party_id` is refused, 422 `contractor_from_order`; `order_not_active`, `order_other_site`, `invalid`), so the contractor performance view sees the issue and the inspection. `GET /registers/issues/order-options` and `GET /registers/quality/order-options` list the orders (own module view plus Procurement view).
     - 0.15.92 (2026-11-27): order picker for the Car dispatcher and Financial advances (CHANGELOG OrderPickersDispatchAdvances). Additive, no migration. `GET /registers/car_dispatcher/order-options` and `GET /registers/financial_advances/order-options` list the approved, active Procurement orders for the field `procurement_record_id` (the same list as the warehouse picker); each needs its own module view, and only orders in regions where the caller also holds the Procurement view right are listed.
@@ -10523,7 +10523,7 @@ paths:
         schema: {type: string}
       - name: triage
         in: query
-        description: '0.15.100: only records whose intake triage is in this state (triage-enabled registers).'
+        description: '0.15.240: only records whose intake triage is in this state (triage-enabled registers).'
         schema: {$ref: '#/components/schemas/TriageState'}
       - name: entity_id
         in: query
@@ -11011,9 +11011,9 @@ paths:
     post:
       tags: [registers]
       operationId: triageRegisterRecord
-      summary: One intake-triage decision on a record (Issue Log, Change Control) (0.15.100)
+      summary: One intake-triage decision on a record (Issue Log, Change Control) (0.15.240)
       description: |
-        0.15.100. A record of a triage-enabled register enters the queue `pending` on every insert and waits for one decision of the register's
+        0.15.240. A record of a triage-enabled register enters the queue `pending` on every insert and waits for one decision of the register's
         Matrix L2 holders of the record's region (a System Admin only when the row has no holder, exactly like an approval; 403
         `action_forbidden` / `not_eligible_holder` otherwise). `If-Match` is the record's version. The decision (`TriageRequest`):
         `accept` lets the record proceed to its normal flow, `defer` keeps it in the queue (a note may say why), `reject` and `merge` void
@@ -21486,7 +21486,7 @@ components:
         multiple_per_site: { type: boolean }
         record_types: { type: array, items: { type: string }, description: 'For example pr, po, wo for procurement.' }
         approval_levels: { type: integer, const: 2, description: 'Always 2 since 0.6.1 (L1 Data Entry, L2 Data Reviewer & Approver), from the register row of the Responsibility Matrix.' }
-        triage_enabled: { type: boolean, description: '0.15.100. Intake triage on the register (the Issue Log and the Change Control Log): new records and new versions enter the queue (`pending`) and wait for a triage decision.' }
+        triage_enabled: { type: boolean, description: '0.15.240. Intake triage on the register (the Issue Log and the Change Control Log): new records and new versions enter the queue (`pending`) and wait for a triage decision.' }
         fields: { type: array, items: { $ref: '#/components/schemas/RegisterField' }, description: 'Base fields plus active custom fields visible to the caller.' }
         record_count: { type: integer }
         entry_scopes:
@@ -21547,7 +21547,7 @@ components:
         triage:
           type: object
           additionalProperties: false
-          description: '0.15.100. The intake triage of a record of a triage-enabled register (absent while the record was never queued).'
+          description: '0.15.240. The intake triage of a record of a triage-enabled register (absent while the record was never queued).'
           required: [state, note, at, duplicate_of]
           properties:
             state: { $ref: '#/components/schemas/TriageState' }
@@ -22160,12 +22160,12 @@ components:
     TriageState:
       type: string
       enum: [pending, accepted, deferred, rejected, merged]
-      description: '0.15.100. Intake triage: waiting (`pending`, `deferred`) or decided (`accepted`, `rejected`, `merged`).'
+      description: '0.15.240. Intake triage: waiting (`pending`, `deferred`) or decided (`accepted`, `rejected`, `merged`).'
     TriageRequest:
       type: object
       additionalProperties: false
       required: [action]
-      description: '0.15.100: one intake-triage decision. The note is required for `reject` and `merge`; `merge` also names the surviving record.'
+      description: '0.15.240: one intake-triage decision. The note is required for `reject` and `merge`; `merge` also names the surviving record.'
       properties:
         action: { type: string, enum: [accept, reject, merge, defer] }
         note: { type: string, maxLength: 2000 }

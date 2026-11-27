@@ -13,8 +13,8 @@ const Routed = () => (
   </Routes>
 );
 
-/** 0.15.100: intake triage of the Issue Log and the Change Control Log (accept / reject / merge as a duplicate / defer). */
-describe('Register intake triage (0.15.100)', () => {
+/** 0.15.240: intake triage of the Issue Log and the Change Control Log (accept / reject / merge as a duplicate / defer). */
+describe('Register intake triage (0.15.240)', () => {
   it('a pending record shows its queue chip in the list and is accepted from the drawer', async () => {
     await signIn('pm');
     renderApp(<Routed />, { route: '/registers/issues' });

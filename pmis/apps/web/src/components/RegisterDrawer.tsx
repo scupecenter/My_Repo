@@ -29,7 +29,7 @@ import { RejectDialog } from './RejectDialog';
 import { useToast } from './Toast';
 
 export const STATE_TONE: Record<string, string> = { entry: 'bg-lockBg text-lockInk', in_review: 'bg-waitBg text-waitInk', in_approval: 'bg-openBg text-openInk', approved: 'bg-doneBg text-doneInk', voided: 'bg-lateBg text-lateInk' };
-/** 0.15.100: the intake-triage states of a record of a triage-enabled register (Issue Log, Change Control). */
+/** 0.15.240: the intake-triage states of a record of a triage-enabled register (Issue Log, Change Control). */
 export const TRIAGE_TONE: Record<string, string> = { pending: 'bg-waitBg text-waitInk', deferred: 'bg-waitBg text-waitInk', accepted: 'bg-doneBg text-doneInk', rejected: 'bg-lateBg text-lateInk', merged: 'bg-lockBg text-lockInk' };
 type Data = Record<string, unknown>;
 type SiteSel = { id: string; code: string; region_id?: number } | null;
@@ -82,7 +82,7 @@ function Warnings({ record, labelOf }: { record: RegisterRecord; labelOf: (code:
   );
 }
 
-/** 0.15.100: defer (note optional), reject (note) and merge (the surviving record + a note) all ask first; accept is one tap. */
+/** 0.15.240: defer (note optional), reject (note) and merge (the surviving record + a note) all ask first; accept is one tap. */
 function TriageDialog({ open, op, registerKey, selfId, onClose, onSend }: { open: boolean; op: TriageOp | null; registerKey: string; selfId: string; onClose: () => void; onSend: (note: string, duplicateOf?: string) => void }) {
   const { t } = useTranslation();
   const [note, setNote] = useState('');

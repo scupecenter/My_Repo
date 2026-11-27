@@ -57,7 +57,7 @@ function entryPermitTypes() {
   });
 }
 const rk = (r: MockRecord) => rowKey(r.register_key, r.data);
-/** 0.15.100: the registers with intake triage (the Issue Log and the Change Control Log). */
+/** 0.15.240: the registers with intake triage (the Issue Log and the Change Control Log). */
 const TRIAGE_KEYS = ['issues', 'change_control'];
 /** The scopes the viewer may enter (RegisterDefinition.entry_scopes): the scopes of the register row when they hold its L1, plus each scope whose row they hold. */
 function entryScopes(def: RegisterDefinition): string[] | undefined {
@@ -137,7 +137,7 @@ function actions(r: MockRecord): RegisterRecord['allowed_actions'] {
   if (viewer()?.key === 'pm' && r.register_key === 'quality' && r.record_type === 'snag' && isCurrent(r) && !hasOpenVersion(r)) out.push('cancel_snag');
   // Q221: a permit draft whose holder no longer holds L1 of its stream row is handed over (contract 0.12.2)
   if (r.register_key === 'permits_hse' && r.state === 'entry' && !r.transferred && !canAt(row, 1, L) && r.created_by === viewer()?.employee_id) out.push('transfer');
-  // 0.15.100: the reviewer (L2 holder) decides a record waiting in the intake queue
+  // 0.15.240: the reviewer (L2 holder) decides a record waiting in the intake queue
   if ((r.triage?.state === 'pending' || r.triage?.state === 'deferred') && canAt(row, L, L)) out.push('triage');
   // 0103 (0.15.22): a locked record is read-only for everyone but a System Admin (the `pm` account in the mock)
   if (r.locked && viewer()?.key !== 'pm') return out.filter((a) => a !== 'edit' && a !== 'submit' && a !== 'void' && a !== 'new_version');
@@ -345,7 +345,7 @@ export const registerHandlers = [
     return tag(r);
   }),
 
-  // 0.15.100: one intake-triage decision (accept / reject / merge as a duplicate / defer) of the reviewer (L2)
+  // 0.15.240: one intake-triage decision (accept / reject / merge as a duplicate / defer) of the reviewer (L2)
   http.post(`${B}/registers/:key/records/:id/triage`, async ({ params, request }) => {
     const g = guard(); if (g) return g;
     const r = R().records.find((x) => x.id === params.id && x.register_key === params.key);

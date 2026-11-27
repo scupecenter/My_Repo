@@ -7080,8 +7080,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * One intake-triage decision on a record (Issue Log, Change Control) (0.15.100)
-         * @description 0.15.100. A record of a triage-enabled register enters the queue `pending` on every insert and waits for one decision of the register's
+         * One intake-triage decision on a record (Issue Log, Change Control) (0.15.240)
+         * @description 0.15.240. A record of a triage-enabled register enters the queue `pending` on every insert and waits for one decision of the register's
          *     Matrix L2 holders of the record's region (a System Admin only when the row has no holder, exactly like an approval; 403
          *     `action_forbidden` / `not_eligible_holder` otherwise). `If-Match` is the record's version. The decision (`TriageRequest`):
          *     `accept` lets the record proceed to its normal flow, `defer` keeps it in the queue (a note may say why), `reject` and `merge` void
@@ -15742,7 +15742,7 @@ export interface components {
              * @constant
              */
             approval_levels: 2;
-            /** @description 0.15.100. Intake triage on the register (the Issue Log and the Change Control Log): new records and new versions enter the queue (`pending`) and wait for a triage decision. */
+            /** @description 0.15.240. Intake triage on the register (the Issue Log and the Change Control Log): new records and new versions enter the queue (`pending`) and wait for a triage decision. */
             triage_enabled?: boolean;
             /** @description Base fields plus active custom fields visible to the caller. */
             fields: components["schemas"]["RegisterField"][];
@@ -15808,7 +15808,7 @@ export interface components {
             return_count?: number;
             last_return_note?: string | null;
             allowed_actions?: ("edit" | "submit" | "review" | "approve" | "reject" | "void" | "claim" | "release" | "new_version" | "transfer" | "cancel_snag" | "triage")[];
-            /** @description 0.15.100. The intake triage of a record of a triage-enabled register (absent while the record was never queued). */
+            /** @description 0.15.240. The intake triage of a record of a triage-enabled register (absent while the record was never queued). */
             triage?: {
                 state: components["schemas"]["TriageState"];
                 note: string | null;
@@ -16388,11 +16388,11 @@ export interface components {
             }[];
         };
         /**
-         * @description 0.15.100. Intake triage: waiting (`pending`, `deferred`) or decided (`accepted`, `rejected`, `merged`).
+         * @description 0.15.240. Intake triage: waiting (`pending`, `deferred`) or decided (`accepted`, `rejected`, `merged`).
          * @enum {string}
          */
         TriageState: "pending" | "accepted" | "deferred" | "rejected" | "merged";
-        /** @description 0.15.100: one intake-triage decision. The note is required for `reject` and `merge`; `merge` also names the surviving record. */
+        /** @description 0.15.240: one intake-triage decision. The note is required for `reject` and `merge`; `merge` also names the surviving record. */
         TriageRequest: {
             /** @enum {string} */
             action: "accept" | "reject" | "merge" | "defer";
@@ -31683,7 +31683,7 @@ export interface operations {
                 region_id?: components["schemas"]["RegionId"];
                 state?: components["schemas"]["RegisterRecordState"];
                 record_type?: string;
-                /** @description 0.15.100: only records whose intake triage is in this state (triage-enabled registers). */
+                /** @description 0.15.240: only records whose intake triage is in this state (triage-enabled registers). */
                 triage?: components["schemas"]["TriageState"];
                 /** @description All versions of one logical record. */
                 entity_id?: string;

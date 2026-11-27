@@ -7,7 +7,7 @@ import { G, createRec, post, recPath, team, type Team } from './reg-helpers';
 import { actor } from './wf-helpers';
 
 /**
- * Migration 0188: intake triage for the Issue Log and the Change Control Log. New records land in the queue (triage_state pending); the
+ * Migration 0340: intake triage for the Issue Log and the Change Control Log. New records land in the queue (triage_state pending); the
  * register's L2 (approve) holder accepts, rejects, merges as a duplicate or defers with a note. Reject and merge void the record and ask for
  * a step-up. Region 7 like the other register suites, one test at a time (the matrix lock).
  */
@@ -33,7 +33,7 @@ const ISSUE = { pending_issue: 'x', raised_date: '2026-01-05', issue_status: 'Op
 const triage = (t: Team, id: string, version: number, body: unknown, who: 'entry' | 'review' | 'approve' = 'approve') =>
   post(t[who].api, 'issues', id, 'triage', version, body);
 
-describe('register triage (0188)', () => {
+describe('register triage (0340)', () => {
   it('enables triage on issues and change control only, and starts new records pending', async () => {
     const flags = await q<{ register_key: string; triage_enabled: boolean }>(db, `SELECT register_key, triage_enabled FROM register_definitions ORDER BY register_key`);
     const on = flags.filter((f) => f.triage_enabled).map((f) => f.register_key);
