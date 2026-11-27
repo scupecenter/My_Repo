@@ -412,6 +412,9 @@ export const REAL_API_AUTH_USERS = [
   // Contract 0.15.97 (migration 0197; apps/api: settings): the sign-in page settings and its public read (Settings, Screens, Login page).
   ['get', '/settings/login-page'],
   ['put', '/settings/login-page'],
+  // Contract 0.15.312 (migration 0402; apps/api: settings): the operational limits (Settings, Security, Limits).
+  ['get', '/settings/ops-limits'],
+  ['put', '/settings/ops-limits'],
   ['get', '/settings/login-page/public'],
   // Contract 0.15.292: the media gallery (apps/api: media; migration 0396).
   ['get', '/media/settings'],
