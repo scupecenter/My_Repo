@@ -438,6 +438,12 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/me/passkeys/register/verify'],
   ['delete', '/me/passkeys/:id'],
   ['post', '/users/:id/passkeys/revoke'],
+  ['put', '/settings/identity/logo'],
+  ['patch', '/settings/identity/logo'],
+  ['patch', '/settings/identity/logo/display'],
+  ['get', '/ui/public/identity'],
+  ['get', '/ui/public/logo/:purpose'],
+  ['get', '/ui/assets/:key'],
   // Contract 0.15.4 (migration 0085; apps/api: sites, master-import, templates): the per-site workflow locks (one site, many sites) and the status of the sites of
   // an import (missing data per site). The new site fields ride on the paths above.
   ['post', '/sites/workflow-locks'],
@@ -681,6 +687,7 @@ export const REAL_API_AUTH_USERS = [
   ['put', '/settings/data-reset/settings'],
   ['post', '/settings/data-reset/requests'],
   ['get', '/settings/data-reset/plan'],
+  ['get', '/settings/data-reset/narrow-options'],
   ['get', '/settings/data-reset/requests/:id'],
   ['post', '/settings/data-reset/requests/:id/approve'],
   ['post', '/settings/data-reset/requests/:id/cancel'],

@@ -227,7 +227,20 @@ export const dashboardHandlers = [
         ncrs: { open: 6, closed: 41, avg_close_days: 14.2 },
         first_pass_pct: 92.4,
       },
-      // 0.15.204: pending approvals bottleneck, synthetic figures
+      // 0.15.205: change requests and overdue meeting actions, synthetic figures
+      changes_meetings: {
+        available: true,
+        changes: {
+          available: true, pending: 7, approved_not_applied: 2,
+          by_kind: [{ kind: 'scope_change', count: 4 }, { kind: 'date_change', count: 2 }, { kind: 'suspension', count: 1 }],
+          pending_aging: { buckets: [{ key: 'd0_7', count: 3 }, { key: 'd8_14', count: 2 }, { key: 'd15_30', count: 1 }, { key: 'over_30', count: 1 }], total: 7, oldest_days: 38 },
+        },
+        actions: {
+          available: true, open: 19, overdue: 8, no_due_date: 3,
+          overdue_aging: { buckets: [{ key: 'd0_7', count: 3 }, { key: 'd8_14', count: 2 }, { key: 'd15_30', count: 2 }, { key: 'over_30', count: 1 }], total: 8, oldest_days: 41 },
+        },
+      },
+            // 0.15.204: pending approvals bottleneck, synthetic figures
       approvals: {
         available: true, total: 23, review: 14, approve: 9, unassigned: 3,
         waiting: { buckets: [{ key: 'd0_7', count: 9 }, { key: 'd8_14', count: 6 }, { key: 'd15_30', count: 5 }, { key: 'over_30', count: 3 }], total: 23, oldest_days: 47 },
