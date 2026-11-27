@@ -31,6 +31,7 @@ afterAll(async () => {
 
 describe("users list at scale", () => {
   it("returns a page of 200 fast, in name order, with cursor and total", async () => {
+    await admin.api.call("get", `/users?limit=5`); // warm the app (connections, plans) so a cold shared runner does not count
     const t0 = Date.now();
     const res = await admin.api.call("get", `/users?limit=200&q=${TAG}`);
     const ms = Date.now() - t0;
