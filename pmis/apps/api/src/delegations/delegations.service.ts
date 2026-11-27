@@ -194,7 +194,7 @@ export class DelegationsService {
     return Number(r[0]?.n ?? 0) > 0;
   }
 
-  private async dtos(ids: string[]): Promise<DelegationDto[]> {
+  async dtos(ids: string[]): Promise<DelegationDto[]> {
     if (ids.length === 0) return [];
     const rows = await this.db.tx.delegation.findMany({ where: { id: { in: ids } }, include: INCLUDE });
     const byId = new Map(rows.map((r) => [r.id, r]));

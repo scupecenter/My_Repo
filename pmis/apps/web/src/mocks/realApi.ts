@@ -380,6 +380,13 @@ export const REAL_API_AUTH_USERS = [
   // Contract 0.15.190 (migration 0290; apps/api: settings): the admin lock keys (Settings, Security, Lock keys).
   ['get', '/settings/security-locks'],
   ['put', '/settings/security-locks'],
+  // Contract 0.15.191 (migration 0291; apps/api: security): support access (Settings, Security, Support access).
+  ['get', '/settings/support-access'],
+  ['put', '/settings/support-access'],
+  ['get', '/support-access'],
+  ['post', '/support-access'],
+  ['post', '/support-access/revoke-all'],
+  ['post', '/support-access/:id/revoke'],
   // Contract 0.15.4 (migration 0085; apps/api: sites, master-import, templates): the per-site workflow locks (one site, many sites) and the status of the sites of
   // an import (missing data per site). The new site fields ride on the paths above.
   ['post', '/sites/workflow-locks'],
@@ -405,7 +412,10 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/registers/financial_advances/order-options'],
   ['get', '/registers/issues/order-options'],
   ['get', '/registers/quality/order-options'],
+  ['get', '/registers/issues/risk-options'],
+  ['get', '/registers/risks/:entity_id/issues'],
   ['get', '/registers/procurement/:entity_id/receipts'],
+  ['get', '/registers/:key/:entity_id/related'],
   ['get', '/registers/contractor-companies'],
   ['post', '/registers/hlc/legacy-migration'],
   ['get', '/registers/:key/fields'],
@@ -495,6 +505,9 @@ export const REAL_API_AUTH_USERS = [
   // (warehouse, as-built items, My Work, dashboard extras and settings, documents grid, fleet actions, invitations, admin overrides).
   ['get', '/settings/dashboard'],
   ['put', '/settings/dashboard'],
+  ['get', '/settings/goals'],
+  ['put', '/settings/goals'],
+  ['get', '/goals/progress'],
   ['get', '/settings/pm-schedules'],
   ['put', '/settings/pm-schedules'],
   ['post', '/pm-schedules/:id/generate'],
