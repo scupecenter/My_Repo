@@ -9,6 +9,7 @@ import { errText, FormDialog } from "@/components/FormDialog";
 import { fieldLabel, SitePicker } from "@/components/RegisterFields";
 import { QueryFallback } from "@/components/States";
 import { useToast } from "@/components/Toast";
+import { DateInput } from '@/components/DateInput';
 
 const UNITS = ["week", "month"] as const;
 /** Field types a schedule can pre-fill as plain text. */
@@ -86,7 +87,7 @@ export function PmSchedulesSettings() {
                   </select>
                 </div>
                 <label className="block space-y-1"><span className="text-xs font-semibold text-mute">{t("pm.next_due")}</span>
-                  <input type="date" dir="ltr" className="input w-full" data-testid={`pm-next-${g.id}`} value={g.next_due} onChange={(e) => change(i, { next_due: e.target.value })} /></label>
+                  <DateInput dir="ltr" className="input w-full" data-testid={`pm-next-${g.id}`} value={g.next_due} onChange={(e) => change(i, { next_due: e.target.value })} /></label>
               </div>
               <div className="space-y-1.5">
                 <div className="text-xs font-semibold text-mute">{t("pm.template")}</div>
