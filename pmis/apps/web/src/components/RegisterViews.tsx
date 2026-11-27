@@ -255,7 +255,7 @@ export function RegisterMap({ records, regionId, partial }: { records: RegisterR
 
 /** Decision V2: the register's records on a month calendar, read only, on the date field chosen in the Layout panel. */
 export function RegisterCalendar({ def, records, field, onOpen, partial }: {
-  def: RegisterDefinition; records: RegisterRecord[]; field: RegisterField | undefined; onOpen: (id: string) => void; partial?: { shown: number; total: number };
+  def: RegisterDefinition; records: RegisterRecord[]; field: RegisterField | undefined; onOpen: (id: string) => void; partial?: { shown: number; total: number } | null;
 }) {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
