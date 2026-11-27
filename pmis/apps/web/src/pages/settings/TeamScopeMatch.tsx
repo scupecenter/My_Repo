@@ -138,7 +138,7 @@ export function TeamScopeMatch({ readOnly = false }: { readOnly?: boolean }) {
           <button className="btn btn-accent" data-testid="tsm-save" disabled={!draft || !q.data} onClick={() => setOpen(true)}>{t('scopeMatch.save')}</button>
         </>
       )}
-      <UnsavedGuard scope="settings" dirty={!!draft} needsReason label={t('ui.guard_settings')} onSave={(reason) => new Promise<boolean>((res) => set.mutate({ version: q.data.version, body: { ...body, reason } }, { onSuccess: () => res(true), onError: () => res(false) }))} />
+      <UnsavedGuard scope="settings" dirty={!!draft} needsReason label={t('ui.guard_settings')} onSave={(reason) => new Promise<boolean>((res) => set.mutate({ version: q.data?.version ?? 0, body: { ...body, reason } }, { onSuccess: () => res(true), onError: () => res(false) }))} />
       {open && q.data && (
         <FormDialog open onClose={() => setOpen(false)} testid="tsm-dialog" title={t('scopeMatch.title')} busy={set.isPending} error={set.isError ? errText(set.error, t) : null}
           onSubmit={(reason) => set.mutate({ version: q.data.version, body: { ...body, reason } }, { onSuccess: () => { toast(t('settings.audited')); setOpen(false); setDraft(null); } })} />
