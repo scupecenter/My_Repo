@@ -351,6 +351,8 @@
     "unavailable": "Card unavailable"
   },
   "errors": {
+    "export_locked": "Export is switched off by a System Admin (Settings > Security > Lock keys).",
+    "download_locked": "This download is switched off by a System Admin (Settings > Security > Lock keys).",
     "system_field": "This column is protected: only its name, section, order and visibility can change.",
     "conversion_blocked": "Some values cannot be converted. Fix them first.",
     "conversion_unconfirmed": "Confirm the conversion of the stored values.",
@@ -431,6 +433,11 @@
     "carry_locked": "Day locked or no edit right",
     "carry_do": "Carry over ({{n}})",
     "carried": "{{n}} sites carried over"
+  },
+  "panel": {
+    "tab_all": "All",
+    "tab_unread": "Unread",
+    "tab_priority": "Priority"
   },
   "common": {
     "search": "Search",
@@ -5804,7 +5811,21 @@
     "on": "on",
     "off_word": "off"
   },
+  "dllocks": {
+    "title": "Download locks",
+    "note": "Three more switches for a System Admin, off until you turn one on. Nothing is deleted and no sign-in changes. You can turn a lock off again at any time.",
+    "templates": "Lock template downloads",
+    "templates_note": "The blank and pre-filled workbook templates cannot be downloaded.",
+    "files": "Lock uploaded file downloads",
+    "files_note": "A single uploaded document or finished export file cannot be downloaded or previewed on screen, and the Master import original file cannot be downloaded.",
+    "generated": "Lock generated document downloads",
+    "generated_note": "A generated library form cannot be downloaded or printed. Viewing it on screen stays open.",
+    "never": "Never changed: all three are off.",
+    "confirm": "Templates: {{templates}}. Uploaded files: {{files}}. Generated documents: {{generated}}. Your password is asked again and the change is written to the audit log.",
+    "locked_note": "Switched off by a System Admin (Settings > Security > Lock keys)."
+  },
   "seclocks": {
+    "export_ui_note": "Files the browser builds itself (CSV from the rows on screen, print) are switched off in the screens too. That part is a guard in the interface only: data already on screen can still be copied.",
     "title": "Lock keys",
     "note": "Two switches for a System Admin. Both are off until you turn one on. Nothing is deleted and no sign-in changes. You can turn a lock off again at any time.",
     "sharing": "Block public sharing",
@@ -7041,7 +7062,17 @@
     "inbox_tabs": "Show tabs on the Inbox page",
     "inbox_default_tab": "Tab that opens first",
     "inbox_priority_kinds": "Kinds that count as priority",
-    "inbox_priority_note": "Mentions and approvals waiting are priority by default."
+    "inbox_priority_note": "Mentions and approvals waiting are priority by default.",
+    "panel_title": "Notification panel",
+    "panel_note": "How the bell opens: a small popover, or a panel that slides in from the side with tabs.",
+    "panel_mode": "Bell opens",
+    "panel_mode_popover": "Small popover",
+    "panel_mode_side_panel": "Side panel",
+    "panel_width": "Panel width",
+    "panel_width_narrow": "Narrow",
+    "panel_width_medium": "Medium",
+    "panel_width_wide": "Wide",
+    "panel_tabs": "Show the tabs (All, Unread, Priority) in the panel"
   },
   "related": {
     "change_pending": "Change pending",
@@ -7189,5 +7220,8 @@
   },
   "cells": {
     "progress": "Progress"
+  },
+  "screenSettings": {
+    "title": "Settings for this screen"
   }
 }
