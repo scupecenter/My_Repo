@@ -14,7 +14,7 @@ export function LibraryTemplates() {
   const forms = useLibraryForms();
   return (
     <div data-testid="page-library-templates">
-      <PageHeader title={t('lib.templates_title')} subtitle={t('lib.templates_sub')} />
+      <PageHeader title={t('lib.templates_title')} subtitle={t('lib.templates_sub')} settings="library_templates" />
       <LibraryTabs />
       {!forms.data ? <QueryFallback queries={[forms]} /> : !forms.data.can_configure ? <EmptyState testid="lib-templates-denied" title={t('lib.templates_denied')} /> : <FormTemplates />}
     </div>
