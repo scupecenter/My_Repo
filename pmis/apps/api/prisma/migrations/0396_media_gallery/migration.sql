@@ -182,3 +182,16 @@ INSERT INTO audit_log (action, entity_type, entity_id, after, reason)
 VALUES ('media_gallery_applied', 'workflow', NULL,
         jsonb_build_object('setting', 'media.gallery', 'read', 'media_gallery_state', 'write', 'admin_set_media_gallery', 'audit', jsonb_build_array('media_gallery_update')),
         'Owner decision GAL-1, 2026-11-27: the central Media gallery settings, edited from Settings > Documents > Media (migration 0396).');
+
+-- Saved views of Library > Media (screen library-media, module sites.documents like library-archive). The screen list lives in sv_screen_module, which several
+-- changes extend, so this adds one WHEN to the definition in force instead of copying the whole body (an older copy would drop the others' screens).
+DO $$
+DECLARE d text;
+BEGIN
+  d := pg_get_functiondef('public.sv_screen_module(text)'::regprocedure);
+  IF position('library-media' IN d) = 0 THEN
+    d := regexp_replace(d, 'ELSE NULL\s+END', E'WHEN ''library-media'' THEN ''sites.documents'' -- 0396 (GAL-1)\n    ELSE NULL END');
+    IF position('library-media' IN d) = 0 THEN RAISE EXCEPTION 'sv_screen_module has an unexpected shape'; END IF;
+    EXECUTE d;
+  END IF;
+END $$;

@@ -193,4 +193,10 @@ describe('Media gallery', () => {
     await set({ enabled: false });
     expect((await docsQuality.api.call('get', '/media/items')).body).toMatchObject({ enabled: false, items: [] });
   });
+  it('keeps saved views of the Media tab (screen library-media) for who may see Documents only', async () => {
+    const ok = await docsQuality.api.call('post', '/saved-views', { screen_key: 'library-media', name: `Media ${randomUUID().slice(0, 6)}`, filters: { source: 'snags' } });
+    expect([200, 201], JSON.stringify(ok.body)).toContain(ok.status);
+    expect((await docsQuality.api.call('get', '/saved-views?screen_key=library-media')).status).toBe(200);
+    expect((await nobody.api.call('post', '/saved-views', { screen_key: 'library-media', name: `Media ${randomUUID().slice(0, 6)}`, filters: {} })).status).toBe(403);
+  });
 });
