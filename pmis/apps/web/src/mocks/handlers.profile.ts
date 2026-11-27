@@ -123,6 +123,7 @@ export const profileHandlers = [
   http.get(`${B}/me/sessions`, () => { const g = guard(); if (g) return g; return HttpResponse.json({ items: MY_SESSIONS }); }),
   http.post(`${B}/me/sessions/revoke-others`, () => { const g = guard(); if (g) return g; const n = MY_SESSIONS.filter((s) => !s.is_current).length; MY_SESSIONS = MY_SESSIONS.filter((s) => s.is_current); return HttpResponse.json({ revoked_count: n }); }),
   http.post(`${B}/me/sessions/:id/revoke`, ({ params }) => { const g = guard(); if (g) return g; MY_SESSIONS = MY_SESSIONS.filter((s) => s.session_id !== params.id || s.is_current); return HttpResponse.json({ revoked_count: 1 }); }),
+  http.get(`${B}/me/push`, () => { const g = guard(); if (g) return g; return HttpResponse.json({ enabled: false, public_key: null, count: 0, this_browser: false }); }),
   http.get(`${B}/me/profile`, () => { const g = guard(); if (g) return g; return withEtag(profileBody()); }),
 
   http.patch(`${B}/me/profile`, async ({ request }) => {

@@ -27,6 +27,8 @@ export type BlockedBy = S['BlockedBy'];
 export type StatusUpdate = S['StatusUpdate'];
 export type StatusUpdateInput = S['StatusUpdateInput'];
 export type StatusHealth = S['StatusHealth'];
+export type RegionHealth = S['RegionHealth'];
+export type RegionHealthBoard = S['RegionHealthBoard'];
 export type TransitionResult = S['TransitionResult'];
 export type Page<T> = { items: T[]; page: S['PageInfo'] };
 /** W8 (0.15.64): the counts of a site-data list (every row the caller may see, the rows matching the filters) and the result of a pasted list of Site IDs. */
