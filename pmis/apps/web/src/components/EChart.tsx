@@ -62,7 +62,7 @@ export function EChart({ build, height = 220, label, testid, renderer = 'svg', o
         ro.observe(el.current);
       }
     }).catch(() => undefined);
-    return () => { dead = true; ro?.disconnect(); chart.current?.dispose(); chart.current = null; };
+    return () => { dead = true; ro?.disconnect(); try { chart.current?.dispose(); } catch { /* a canvas already gone at teardown (jsdom) is not an error */ } chart.current = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the renderer is fixed for the life of the chart
   }, []);
 
