@@ -1,4 +1,5 @@
 import * as Dialog from '@radix-ui/react-dialog';
+import { useDownloadGate } from '@/lib/downloadGate';
 import { Copy, Download, X } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -151,6 +152,7 @@ function Filters({ f, set }: { f: SysFilter; set: (f: SysFilter) => void }) {
 }
 
 export function SystemLog() {
+  const gate = useDownloadGate();
   const { t } = useTranslation();
   const toast = useToast();
   const me = useMe(true);
@@ -187,7 +189,7 @@ export function SystemLog() {
         count={<span className="text-sm text-mute" data-testid="syslog-count">{t('syslog.shown', { count: q.items.length })}</span>}
         tools={<>
           <ColumnMenu api={tbl} label={(id) => t(`syslog.c_${id}`)} />
-          {canExport && <button className="btn" data-testid="syslog-export" disabled={!q.items.length} onClick={doExport}><Download size={14} />{t('syslog.export')}</button>}
+          {canExport && <button className="btn" data-testid="syslog-export" disabled={!q.items.length || gate.exportLocked} title={gate.note(gate.exportLocked)} onClick={doExport}><Download size={14} />{t('syslog.export')}</button>}
         </>} />
       <Filters f={f} set={setF} />
       <LogTable tbl={tbl} label={(id) => t(`syslog.c_${id}`)} rows={q.items} rowId={(r) => String(r.id)} cell={cell} onOpen={setSel} activeId={sel ? String(sel.id) : null} testid="syslog-table"

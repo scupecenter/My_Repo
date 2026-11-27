@@ -127,6 +127,7 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/import-batches'],
   ['get', '/import-batches/:id'],
   ['get', '/import-batches/:id/rows'],
+  ['get', '/import-batches/:id/error-report'],
   ['post', '/import-batches/:id/submit'],
   ['post', '/import-batches/:id/decisions'],
   // Contract 0.12.8 (P3, migration 0060): the legacy Master import and its comparison report, the template mapping screen and the import aliases.
@@ -364,6 +365,8 @@ export const REAL_API_AUTH_USERS = [
   // Contract 0.14.2 (settings screens, migration 0072; apps/api: calendar, settings): the official calendar confirmation (Q440) and the mail notification kinds (Q441).
   ['get', '/settings/calendar-confirmation'],
   ['put', '/settings/calendar-confirmation'],
+  ['get', '/settings/mail-policy'],
+  ['put', '/settings/mail-policy'],
   ['get', '/settings/mail-notification-kinds'],
   ['put', '/settings/mail-notification-kinds'],
   // Contract 0.14.3 (Q462, migration 0073; apps/api: settings): the one-time historical-load document waiver. The "historical load" option of the batch screens uses the
@@ -389,6 +392,9 @@ export const REAL_API_AUTH_USERS = [
   // Contract 0.15.190 (migration 0290; apps/api: settings): the admin lock keys (Settings, Security, Lock keys).
   ['get', '/settings/security-locks'],
   ['put', '/settings/security-locks'],
+  // Contract 0.15.193 (migration 0293; apps/api: security): the download lock categories (Settings, Security, Lock keys).
+  ['get', '/settings/download-locks'],
+  ['put', '/settings/download-locks'],
   // Contract 0.15.191 (migration 0291; apps/api: security): support access (Settings, Security, Support access).
   ['get', '/settings/support-access'],
   ['put', '/settings/support-access'],
@@ -452,6 +458,8 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/search/site-ids'],
   ['get', '/settings/gecol-order-warnings'],
   ['put', '/settings/gecol-order-warnings'],
+  ['get', '/settings/derive-rules'],
+  ['put', '/settings/derive-rules'],
   ['get', '/settings/structural-freeze'],
   ['put', '/settings/structural-freeze'],
   ['post', '/settings/structural-freeze/lift'],

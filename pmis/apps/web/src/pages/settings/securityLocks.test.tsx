@@ -33,4 +33,26 @@ describe('Settings, Lock keys', () => {
     await u.click(screen.getByTestId('locks-dialog-submit'));
     await waitFor(() => expect(screen.queryByTestId('locks-export-in-force')).toBeNull());
   });
+
+  it('saves a download category switch, shows it in force, and turns it off again (0293)', async () => {
+    await signIn('pm');
+    const u = userEvent.setup();
+    locks();
+    expect(await screen.findByTestId('page-download-locks')).toBeInTheDocument();
+    expect(screen.getByTestId('locks-export-ui-note')).toBeInTheDocument();
+    for (const k of ['templates', 'files', 'generated']) expect(screen.getByTestId(`dllocks-${k}`)).not.toBeChecked();
+    expect(screen.getByTestId('dllocks-save')).toBeDisabled();
+    await u.click(screen.getByTestId('dllocks-templates'));
+    await u.click(screen.getByTestId('dllocks-save'));
+    await api.post('/__mock/step-up');
+    await u.type(await screen.findByTestId('dllocks-dialog-reason'), 'Owner decision 2026-11-27');
+    await u.click(screen.getByTestId('dllocks-dialog-submit'));
+    expect(await screen.findByTestId('dllocks-templates-in-force')).toBeInTheDocument();
+    expect(screen.queryByTestId('dllocks-files-in-force')).toBeNull();
+    await u.click(screen.getByTestId('dllocks-templates'));
+    await u.click(screen.getByTestId('dllocks-save'));
+    await u.type(await screen.findByTestId('dllocks-dialog-reason'), 'Back to normal');
+    await u.click(screen.getByTestId('dllocks-dialog-submit'));
+    await waitFor(() => expect(screen.queryByTestId('dllocks-templates-in-force')).toBeNull());
+  });
 });
