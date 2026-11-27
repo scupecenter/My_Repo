@@ -41,7 +41,7 @@ export function NotificationBell({ count }: { count: number }) {
     : all;
   const rows = shown.slice(0, side ? 30 : 8);
   const trigger = (
-    <button className="btn relative" data-testid="topbar-bell" aria-label={t('top.notifications')} aria-haspopup="dialog" onClick={side ? () => setOpen(true) : undefined}>
+    <button className="btn relative" data-testid="topbar-bell" aria-label={count > 0 ? `${t('top.notifications')}: ${count}` : t('top.notifications')} aria-haspopup="dialog" onClick={side ? () => setOpen(true) : undefined}>
       <Bell size={16} />
       {count > 0 && <span data-testid="bell-count" className="absolute -top-2 -end-2 grid h-5 min-w-5 place-items-center rounded-full bg-late px-1 text-xs text-lateOn">{count}</span>}
     </button>

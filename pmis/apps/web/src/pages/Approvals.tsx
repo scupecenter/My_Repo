@@ -119,7 +119,7 @@ export function Approvals() {
           )}
           <ul data-testid="approvals-list" {...displayAttrs(tbl.display)}>
             {items.map((i, k) => (
-              <li key={i.task.id} data-testid={`approval-row-${i.task.id}`} data-site={i.task.site_code} aria-selected={sel === i.task.id}
+              <li key={i.task.id} data-testid={`approval-row-${i.task.id}`} data-site={i.task.site_code} aria-current={sel === i.task.id ? 'true' : undefined}
                 role="listitem" data-zebra={k % 2 ? '1' : '0'}
                 className={`flex items-center gap-3 border-b border-line ${tbl.display.density === 'compact' ? 'p-1.5' : tbl.display.density === 'normal' ? 'p-2' : 'p-3'} ${sel === i.task.id ? 'bg-openBg' : tbl.display.zebra && k % 2 ? 'bg-card2 hover:bg-hover' : 'hover:bg-hover'}`}>
                 <span data-col="rowno" className="w-6 shrink-0"><RowNo n={k + 1} /></span>

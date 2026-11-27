@@ -212,13 +212,13 @@ export function Shell() {
             <Search size={16} /><span className="flex-1 text-start">{t('top.search')}</span><kbd className="mono rounded border border-line px-1 text-xs">Ctrl K</kbd>
           </button>
           <button className="btn" data-testid="topbar-export" onClick={() => setExp(true)}><Download size={16} />{t('export.open')}</button>
-          <button className="btn" data-testid="topbar-lang" aria-label={t('top.language')} onClick={switchLang}>{lang === 'en' ? 'ع' : 'EN'}</button>
+          <button className="btn" data-testid="topbar-lang" aria-label={`${t('top.language')}: ${lang === 'en' ? 'ع' : 'EN'}`} onClick={switchLang}>{lang === 'en' ? 'ع' : 'EN'}</button>
           <button className="btn" data-testid="topbar-theme" aria-label={t('top.theme')} onClick={switchTheme}>{theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}</button>
           <QuickCreate me={me.data} allowed={allowed} />
           <NotificationBell count={pending} />
           <Popover.Root>
             <Popover.Trigger asChild>
-              <button className="flex items-center gap-2 rounded-full border border-line px-2 py-1 text-sm" data-testid="topbar-user" aria-label={t('top.account')}>
+              <button className="flex items-center gap-2 rounded-full border border-line px-2 py-1 text-sm" data-testid="topbar-user" title={t('top.account')}>
                 <Avatar name={me.data?.user.display_name} size="sm" />
                 {me.data?.user.display_name}
               </button>
