@@ -53,7 +53,7 @@ for (const locale of ['en', 'ar'] as const) {
     await expect(page.getByTestId('site-documents')).toBeVisible();
     await expect(page.locator('[data-testid^="doc-row-"]').first()).toBeVisible();
     await page.getByTestId('docs-filter-doc').fill('ZZZ');
-    await expect(page.getByTestId('docs-empty')).toBeVisible();
+    await expect(page.getByTestId('docs-table-empty')).toBeVisible();
     await page.getByTestId('docs-filter-doc').fill('');
     await expect(page.locator('[data-testid^="doc-row-"]').first()).toBeVisible();
     const download = page.waitForEvent('download');

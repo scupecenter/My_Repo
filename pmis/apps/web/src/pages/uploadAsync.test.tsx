@@ -50,7 +50,7 @@ describe('a big TPL-MASTER upload (0.15.3)', () => {
     const done = await screen.findByTestId('upload-done', {}, { timeout: 10_000 });
     const parts = within(done).getByTestId('template-upload-parts');
     expect(within(parts).getAllByRole('link')).toHaveLength(3);
-    expect(within(done).getByTestId('upload-warning-column_not_owned')).toHaveTextContent('3 value(s) ignored');
+    expect(within(done).getByTestId('upload-warning-column_not_owned')).toHaveTextContent('3 values ignored');
     expect(screen.queryByTestId('batch-progress-parsing-label')).not.toBeInTheDocument();
   }, 30_000);
 

@@ -8,13 +8,13 @@ Sources: CLAUDE.md, "Workflow rules" (visibility) and the default stack line "ro
   **Then** they see all regions and all modules their permission level allows.
 
 ## VI-02 Region restriction
-- **Given** a user limited to Tripoli and Zawia
+- **Given** a user limited to Region A and Region C
   **When** they open the site grid, a register, the dashboard, an export, a search or a zip download
   **Then** only rows for sites in those regions are returned. The filter is applied on the server.
 - **Given** the same user
-  **When** they request a site in Benghazi by its ID
+  **When** they request a site in Region B by its ID
   **Then** they get 404. The API does not reveal that the site exists. (ASSUMPTION)
-- Regions are the 7 values: Tripoli, Middle, WM, Zawia, Benghazi, GM and Sebha. The Master stores them as "Tripoli Area" and so on (see open-questions Q10).
+- Regions are a configured list. The Master stores each as "<region> Area" (see open-questions Q10).
 
 ## VI-03 Module restriction
 - **Given** a user whose modules are limited to Warehouse and Quality
@@ -24,12 +24,12 @@ Sources: CLAUDE.md, "Workflow rules" (visibility) and the default stack line "ro
 
 ## VI-03b Visibility from several assignments
 Source: CLAUDE.md, "Role assignment is many-to-many"; AU-10.
-- **Given** a user with two active rows: Tripoli for all modules, and Benghazi for Warehouse only
+- **Given** a user with two active rows: Region A for all modules, and Region B for Warehouse only
   **When** they open the Warehouse module
-  **Then** they see Tripoli and Benghazi sites.
+  **Then** they see Region A and Region B sites.
 - **Given** the same user
   **When** they open Quality
-  **Then** they see Tripoli sites only.
+  **Then** they see Region A sites only.
 - Read visibility is the union of the user's active rows, per module.
 - Write rights are checked against the single row that matches the role used for the action (AU-10), never against the union.
 - **Given** a row that expires

@@ -4,6 +4,26 @@
  */
 
 export interface paths {
+    "/admin/document-search-index": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Status of the document contents search index (System Admin)
+         * @description 0.15.155. Counts of the files whose text is searchable. Indexing runs in the background every few minutes. 403 for anyone but a System Admin.
+         */
+        get: operations["getDocumentSearchIndex"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/login": {
         parameters: {
             query?: never;
@@ -288,6 +308,46 @@ export interface paths {
          *     is set. Rate limited (429). Failures are written to the security log.
          */
         post: operations["localDeviceCode"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/local/2fa/passkey/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The passkey challenge for the pending two-step sign-in (0.15.194)
+         * @description Needs the pending sign-in cookie `pmis_2fa` (`next` = `two_factor`). Answers `available` false and `options` null when passkeys are off or the account has none: the page then shows only the code. Otherwise `options` is the WebAuthn request (challenge valid 5 minutes, single use, user verification required). Rate limited (429).
+         */
+        post: operations["localPasskeyOptions"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/local/2fa/passkey": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Second step with a passkey instead of the authenticator code (0.15.194)
+         * @description Needs the pending sign-in cookie. `response` is the browser's WebAuthn assertion. Checked: single-use challenge, origin, relying party, user verification, signature, and a sign counter that moves forward (a replayed or cloned credential is refused). Failure is 401 `invalid_code` and is written to the security log (`two_factor_failed`, `via` passkey). The pending sign-in is single use. On success the session cookie is set, same as the code path.
+         */
+        post: operations["localPasskeySignIn"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4128,6 +4188,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/data-hub/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The Data hub landing page, in one call (0.15.311)
+         * @description 0.15.311. Batches waiting for the caller (count and up to 5, with why each waits), templates whose current version was issued in the last 45 days with the column diff against the version before, and the caller's last download of each template (read from the template_download audit rows of the caller only). Read only. A caller without the templates module sees no batches. The other hub widgets use the endpoints of their own screens.
+         */
+        get: operations["getDataHubSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/exports/schedules": {
         parameters: {
             query?: never;
@@ -6316,6 +6396,130 @@ export interface paths {
          * @description Returns how many were ended. Expired and already revoked grants and ordinary delegations are not touched.
          */
         post: operations["revokeAllSupportAccess"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/passkeys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The passkey setting (0.15.194)
+         * @description Every signed-in user reads `enabled` and `ready` (`ready` is false when `APP_BASE_URL` is not an https address, so passkeys cannot be turned on). `updated_by` is shown to a System Admin only. `enabled` is `false` until a System Admin turns it on.
+         */
+        get: operations["getPasskeys"];
+        /**
+         * Turn passkeys on or off (System Admin, reason, step-up, If-Match, audited) (0.15.194)
+         * @description System Admin only. A reason (3+ characters), a step-up (401 `step_up_required`) and `If-Match` (428 / 412) are required. Turning it on needs `ready` (409 `invalid_transition` otherwise). Saving the value already in force is 409. Turning it off stops the passkey option at sign-in and keeps every passkey row; the authenticator code is never affected. Audited `passkeys_update`.
+         */
+        put: operations["setPasskeys"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/passkeys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My passkeys (0.15.194)
+         * @description The caller's own active passkeys (never the key material). `can_add` is true only when the account has two-step verification on and enrolled.
+         */
+        get: operations["listMyPasskeys"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/passkeys/register/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start adding a passkey (step-up) (0.15.194)
+         * @description A step-up is required (401 `step_up_required`). 409 `invalid_transition` when passkeys are off, not ready, or the account has no two-step verification. The answer is the WebAuthn creation options (attestation none, user verification required); the challenge is valid 5 minutes and single use. Rate limited (429).
+         */
+        post: operations["startPasskeyRegistration"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/passkeys/register/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Finish adding a passkey (step-up) (0.15.194)
+         * @description A step-up is required. `response` is the browser's WebAuthn attestation, `label` names the passkey (1 to 80 characters). At most 10 active passkeys per account. Audited `passkey_added`. A response that does not verify, or whose challenge was used or expired, is 400 `validation_failed`.
+         */
+        post: operations["finishPasskeyRegistration"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/passkeys/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove one of my passkeys (step-up) (0.15.194)
+         * @description The caller's own passkey only (404 otherwise). The row is kept and marked revoked. Works even when passkeys are off. Audited `passkey_revoked`.
+         */
+        delete: operations["removeMyPasskey"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users/{id}/passkeys/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Revoke every passkey of one account (System Admin, reason, step-up) (0.15.194)
+         * @description The recovery for a lost device. The authenticator code keeps working. Audited `passkeys_revoked_by_admin`. Returns how many were revoked.
+         */
+        post: operations["revokeUserPasskeys"];
         delete?: never;
         options?: never;
         head?: never;
@@ -11762,6 +11966,18 @@ export interface components {
             /** @description The app route to open (a relative path). */
             href: string;
             match_ranges: number[][];
+            /** @description 0.15.155. Documents group: the text around the match inside the file contents (normalised), null when the file matched by name. */
+            snippet?: string | null;
+        };
+        DocumentSearchIndex: {
+            indexed: number;
+            empty: number;
+            unsupported: number;
+            too_large: number;
+            failed: number;
+            pending: number;
+            /** Format: date-time */
+            last_extracted_at: string | null;
         };
         SearchGroup: {
             type: components["schemas"]["SearchType"];
@@ -15928,6 +16144,80 @@ export interface components {
             default_tab: "all" | "priority" | "mentions" | "tasks" | "approvals" | "system";
             priority_kinds: ("mention" | "followed_change" | "task_assigned" | "task_returned" | "task_rejected" | "task_approved" | "approval_due" | "reassigned" | "absence_alert" | "idle_task_alert" | "no_holder" | "system")[];
         };
+        /** @description 0.15.311. The Data hub: which widgets of the landing page show, the badge on Uploads & batches, and the default view of each hub list screen. */
+        UiDataHub: {
+            widgets: {
+                quick_bar: boolean;
+                batches: boolean;
+                template_changes: boolean;
+                recent: boolean;
+                health: boolean;
+                admin: boolean;
+            };
+            badge: boolean;
+            default_view: {
+                /** @enum {string} */
+                templates: "cards" | "rows" | "table" | "compact";
+                /** @enum {string} */
+                uploads: "cards" | "rows" | "table" | "compact";
+                /** @enum {string} */
+                exports: "cards" | "rows" | "table" | "compact";
+                /** @enum {string} */
+                master_import: "cards" | "rows" | "table" | "compact";
+            };
+        };
+        DataHubBatch: {
+            /** Format: uuid */
+            id: string;
+            file_name: string;
+            /**
+             * @description send: the caller uploaded it and has not sent it; review_l2: the caller may approve it; returned: it came back to the caller; checking: still being staged (listed, not counted).
+             * @enum {string}
+             */
+            action: "send" | "review_l2" | "returned" | "checking";
+            status: string;
+            template_id: string;
+            template_version: number;
+            register_key?: string | null;
+            stream?: string | null;
+            counts: {
+                valid: number;
+                invalid: number;
+            };
+            /** Format: date-time */
+            uploaded_at?: string | null;
+            progress_pct?: number | null;
+        };
+        DataHubTemplateChange: {
+            template_id: string;
+            name_en: string;
+            name_ar?: string | null;
+            version: number;
+            /** Format: date-time */
+            issued_at: string;
+            reason?: string | null;
+            added: string[];
+            removed: string[];
+            renamed: string[];
+            /** @description The version of the caller last download of this template (null when never downloaded). */
+            my_version?: number | null;
+            mine_is_old: boolean;
+        };
+        DataHubDownload: {
+            template_id: string;
+            version?: number | null;
+            prefill: boolean;
+            /** Format: date-time */
+            at: string;
+        };
+        DataHubSummary: {
+            batches: {
+                count: number;
+                items: components["schemas"]["DataHubBatch"][];
+            };
+            template_changes: components["schemas"]["DataHubTemplateChange"][];
+            my_downloads: components["schemas"]["DataHubDownload"][];
+        };
         /** @description 0.15.251. How the bell opens the notifications. */
         UiPanel: {
             /** @enum {string} */
@@ -15941,12 +16231,14 @@ export interface components {
             avatars: components["schemas"]["UiAvatars"];
             new_badge: components["schemas"]["UiNewBadge"];
             inbox: components["schemas"]["UiInbox"];
+            data_hub: components["schemas"]["UiDataHub"];
             panel: components["schemas"]["UiPanel"];
         };
         UiFeaturesPatch: {
             avatars?: components["schemas"]["UiAvatars"];
             new_badge?: components["schemas"]["UiNewBadge"];
             inbox?: components["schemas"]["UiInbox"];
+            data_hub?: components["schemas"]["UiDataHub"];
             panel?: components["schemas"]["UiPanel"];
         };
         UiFeaturesSetting: {
@@ -17577,6 +17869,48 @@ export interface components {
             /** @description Omitted = default_hours. */
             hours?: number;
         };
+        /** @description 0.15.194. The passkey setting (`security.passkeys`, migration 0294). */
+        PasskeySetting: {
+            /** @description false until a System Admin turns it on. */
+            enabled: boolean;
+            /** @description Whether the workspace address (APP_BASE_URL, https) is set, so a relying party exists. */
+            ready: boolean;
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+            /** @description The ETag value. */
+            version: number;
+            can_edit: boolean;
+        };
+        PasskeySettingInput: components["schemas"]["WithReason"] & {
+            enabled: boolean;
+        };
+        PasskeyItem: {
+            /** Format: uuid */
+            id: string;
+            label: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            last_used_at: string | null;
+            /** @enum {string} */
+            device_type: "singleDevice" | "multiDevice";
+            backed_up: boolean;
+        };
+        MyPasskeys: {
+            enabled: boolean;
+            ready: boolean;
+            /** @description True only when the account has two-step verification on and enrolled. */
+            can_add: boolean;
+            items: components["schemas"]["PasskeyItem"][];
+        };
+        PasskeySignInOptions: {
+            available: boolean;
+            /** @description The WebAuthn request options, or null. */
+            options: {
+                [key: string]: unknown;
+            } | null;
+        };
         /** @description 0.15.192. The new-device email code setting (`security.new_device_code`, migration 0292). */
         NewDeviceCodeSetting: {
             /** @description false until a System Admin turns it on. */
@@ -18122,7 +18456,7 @@ export interface components {
         PhotoRules: {
             min_count?: number;
             shot_types?: string[];
-            formats?: ("JPG" | "PNG" | "HEIC")[];
+            formats?: ("JPG" | "PNG" | "HEIC" | "WEBM" | "MP4" | "MOV")[];
             max_size_mb?: number;
         };
         DocumentPlacement: {
@@ -21655,6 +21989,28 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    getDocumentSearchIndex: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The counts. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentSearchIndex"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
     authLogin: {
         parameters: {
             query?: {
@@ -21989,6 +22345,64 @@ export interface operations {
             content: {
                 "application/json": {
                     code: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Signed in. */
+            200: {
+                headers: {
+                    "Set-Cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Session"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    localPasskeyOptions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description The options, or none. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasskeySignInOptions"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    localPasskeySignIn: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    response: {
+                        [key: string]: unknown;
+                    };
                 };
             };
         };
@@ -28642,6 +29056,27 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
         };
     };
+    getDataHubSummary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The summary. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataHubSummary"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
     listExportSchedules: {
         parameters: {
             query?: never;
@@ -32658,6 +33093,194 @@ export interface operations {
         };
         responses: {
             /** @description Done. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        revoked: number;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getPasskeys: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The setting. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasskeySetting"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setPasskeys: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasskeySettingInput"];
+            };
+        };
+        responses: {
+            /** @description The setting now in force. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasskeySetting"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    listMyPasskeys: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The passkeys. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyPasskeys"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    startPasskeyRegistration: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The WebAuthn creation options. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    finishPasskeyRegistration: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    label: string;
+                    response: {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description The new passkey. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasskeyItem"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    removeMyPasskey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    revokeUserPasskeys: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"];
+            };
+        };
+        responses: {
+            /** @description Revoked. */
             200: {
                 headers: {
                     [name: string]: unknown;

@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 import { useMe } from '@/api/hooks';
 import { useRegions } from '@/api/sites';
+import { useRegisterDefs } from '@/api/registers';
 import type { UserRef } from '@/api/types';
 import { useStateDurations, useTimeReport, useWorkload } from '@/api/x';
 import { useDurationUnits } from '@/components/InsightPanels';
@@ -105,10 +106,13 @@ function TimeReport({ region }: { region: string }) {
 function StateDurations({ region }: { region: string }) {
   const { t, i18n } = useTranslation();
   const regions = useRegions().data ?? [];
+  const defs = useRegisterDefs().data ?? [];
   const [entity, setEntity] = useState<'task' | 'register_record'>('task');
   const q = useStateDurations(entity, region);
   const rn = (id: number | null) => { const r = regions.find((x) => x.id === id); return id == null ? '—' : (i18n.language === 'ar' && r?.name_ar) || r?.name_en || String(id); };
-  const gn = (g: string | null) => (g == null ? '—' : entity === 'task' ? t(`stage.${g}`, { defaultValue: g }) : g);
+  const gn = (g: string | null) => (g == null ? '—' : entity === 'task' ? t(`stage.${g}`, { defaultValue: g }) : regName(g));
+  const regName = (k: string) => { const d = defs.find((x) => x.register_key === k); return (i18n.language === 'ar' && d?.name_ar) || d?.name_en || t(`sd.register_${k}`, { defaultValue: k }); };
+  const stateName = (st: string) => (entity === 'task' ? t(`level.${st}`, { defaultValue: t(`regState.${st}`, { defaultValue: st }) }) : t(`regState.${st}`, { defaultValue: st }));
   return (
     <section aria-label={t('sd.title')} data-testid="state-durations">
       <div className="mb-2 flex items-center gap-2">
@@ -125,7 +129,7 @@ function StateDurations({ region }: { region: string }) {
             {q.data.items.map((r, i) => (
               <tr key={`${r.group_key}|${r.state}|${r.region_id}|${i}`} className="border-t border-line" data-testid="sd-row">
                 <td className="p-2">{gn(r.group_key)}</td>
-                <td className="p-2">{t(`regState.${r.state}`, { defaultValue: r.state })}</td>
+                <td className="p-2">{stateName(r.state)}</td>
                 <td className="p-2">{rn(r.region_id)}</td>
                 <td className="mono p-2">{r.count}</td>
                 <td className="mono p-2">{r.median_working_days}</td>
