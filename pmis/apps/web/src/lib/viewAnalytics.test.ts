@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { breakdown, numberStats } from './viewAnalytics';
+import { breakdown, measureBreakdown, numberStats } from './viewAnalytics';
 
 describe('view analytics', () => {
   it('counts rows by value, largest first, with the empty value named', () => {
@@ -18,5 +18,14 @@ describe('view analytics', () => {
   it('totals numbers and skips text and empty values', () => {
     expect(numberStats([1, '2', 'x', null, ''], (r) => r)).toEqual({ n: 2, sum: 3, avg: 1.5, min: 1, max: 2 });
     expect(numberStats(['a'], (r) => r)).toBeNull();
+  });
+  it('weighs rows by a number field (the chart mode), empty weights as 0, the tail merged', () => {
+    const rows = [
+      { g: 'a', n: 2 }, { g: 'a', n: 3 }, { g: 'b', n: 10 }, { g: '', n: 1 }, { g: 'c', n: 'x' }, { g: 'c', n: null },
+    ];
+    const s = measureBreakdown(rows, (r) => r.g, (r) => r.n, 'None', 'Other');
+    expect(s.map((x) => [x.label, x.value])).toEqual([['b', 10], ['a', 5], ['None', 1], ['c', 0]]);
+    expect(measureBreakdown(rows, (r) => r.g, () => 1, 'None', 'Other', 2).at(-1)).toMatchObject({ key: 'other', value: 2 });
+    expect(measureBreakdown([], () => '', () => 1, 'None', 'Other')).toEqual([]);
   });
 });

@@ -1,11 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
-import { answerAnnouncements, login, type DemoAccount } from './helpers';
+import { answerAnnouncements, login, type DemoAccount, signOutViaMenu } from './helpers';
 
 async function signIn(page: Page, locale: 'en' | 'ar', account: DemoAccount) {
   await page.addInitScript((l) => { if (!localStorage.getItem('pmis.locale')) localStorage.setItem('pmis.locale', l); }, locale);
   await login(page, account);
 }
-const signOut = (page: Page) => page.getByTestId('topbar-signout').click();
+const signOut = (page: Page) => signOutViaMenu(page);
 
 for (const locale of ['en', 'ar'] as const) {
   test.describe(locale, () => {
