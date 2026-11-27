@@ -32,6 +32,7 @@ info:
 
     ## Versions
     - 0.15.204 (2026-11-27): the dashboard follow-up sections, pending approvals bottleneck (owner approval 2026-11-26, dashboard proposals item 7; migration 0305). Additive and read only. `GET /dashboard/ops` gains the section `approvals` (`DashboardOpsApprovals`): the tasks waiting for review or approval (states in_review and in_approval, the same population as the Approvals inbox), their ages in calendar days since the level opened, split review against approve, and the same ages grouped by the ball-in-court role so the bottleneck role shows. The section needs the approvals view (and the sites view, like the inbox) and answers available false without them. The dashboard settings catalogue gains the card `ops_approvals`. No grant, role or permission change.
+    - 0.15.407 (2026-11-27): the Daily Plan template, hardening layer 3b (migration 0564, mirror `db/sql/563_daily_plan_template.sql`). Additive. (1) `Template.template_kind` lists `daily_plan`: `TPL-DAILY-PLAN`, downloaded with `GET /templates/TPL-DAILY-PLAN/download` (blank, or with `date` and `region_id` filled with the plan as the caller sees it). (2) `POST /daily-plans/import` (`importDailyPlan`): the template only, applied at once and all or nothing through the doors of the screen (`dp_add_site`, `dp_save_row`, `dp_remove_site`), so rights, region, lock and audit apply per row; one refused row refuses the file (`errors[]` at `/rows/<line>/<field>`); other files are 422 `template_rejected`. The editable parts are the manual values, Reason, Remark, sites added or removed by hand; Site name and Region are ignored. The Permits sub-streams and Procurement-HLC are covered by the existing templates (round-trip tests added).
     - 0.15.330 (2026-11-27): links and relations fixes, part 1 (D58; migration 0407, mirror `db/sql/406_links_fixes.sql`). Additive. `advance_id` of an expense or settlement is checked while the row is in entry (an approved advance of the same site; `unknown_advance`); invoices check `procurement_record_id` (`order_not_found`, `order_other_site`) and gain the optional field `supplier_party_id` (a company of the Contractors list; `unknown_company`; fills `supplier` when it is empty). New `GET /registers/financial_advances/advance-options`, `GET /registers/invoices/order-options` and `GET /registers/invoices/supplier-options` (read only, each needs its own module view). The related-records reader also lists the HLC record <-> Procurement record link. No grant, role or permission change.
     - 0.15.350 (2026-11-27): two admin alerts for operations (production readiness, item 4; migration 0421, mirror `db/sql/420_ops_alerts.sql`). Additive. `SecurityAlertRule` and `AlertSeverityMap` gain `backup_late` (the database backup check found WAL archiving or a backup late; default severity high; one alert per 6 hours) and `job_failed` (a background job run failed; default medium; one alert per job and day). They use the existing alert channel (bell, and mail to the System Admins by `email_min_severity`); the severity of each is set in Settings like the other rules. `mail.notification_kinds` is unchanged. No grant, role or permission change.
     - 0.15.322 (2026-11-27): the upload policy of the imports, Enforce or Accept incomplete (owner decision D49 part 3, 2026-11-27; migration 0492, mirror `db/sql/491_upload_policy.sql`). Additive; the default is `enforce`, which is today's behaviour. (1) `GET /settings/imports/upload-policy` (every signed-in user) and `PUT /settings/imports/upload-policy` (a System Admin or an all-regions delegate of `settings` edit, a reason, If-Match, audited `imports_upload_policy_update` with before and after): the setting `imports.upload_policy`, `enforce` or `accept_incomplete`. (2) `POST /master-import/runs/{run_id}/apply` reads it. With `accept_incomplete` (and no historical-load option, which opens its sites itself) the sites of the file are opened first through the same door as `POST /sites/workflow-locks`: the unlock right of each region (403 `action_forbidden` otherwise), a step-up (401 `step_up_required`), an audit row per site; the tasks approved on an open site while a lock would have held them are flagged `lock_bypassed` (Admin override). Sites that a `create_sites` apply creates are not in the file yet and keep their locks. No right, role or grant changes. (3) `SiteImportStatus` (`GET /master-import/runs/{run_id}/sites`, `GET /import-batches/{batch_id}/sites`) gains `data_gap_items`: the items of `site_data_gaps` of each site, the per-row missing-data indicator. The third mode (valid rows only) is not part of this change.
@@ -8214,6 +8215,49 @@ paths:
               schema: {$ref: '#/components/schemas/DailyPlanDay'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /daily-plans/import:
+    post:
+      tags: [daily-plan]
+      operationId: importDailyPlan
+      summary: Upload the TPL-DAILY-PLAN template (applied at once, all or nothing)
+      description: |
+        0.15.407 (migration 0564). The approved xlsx template `TPL-DAILY-PLAN` only (download: `GET /templates/TPL-DAILY-PLAN/download`, blank or with `date` and `region_id`). One row per date and site. The rows go through the same database doors as the screen (`dp_add_site`, `dp_save_row`, `dp_remove_site`), so the region scope, the Matrix level (L1 edits), the day lock, the audit and the plan version apply per row. What a file changes: the manual values of the auto-filled columns, Reason, Remark, a site added by hand (a row for a site not in the plan) and a site removed by hand (`Remove from plan` = yes). A cell equal to the value now shown, or empty, changes nothing. Site name and Region are read only and ignored. One refused row (a locked day, a region the caller may not edit, an unknown Site ID, a bad value) refuses the whole file: 422 `validation_failed` with `errors[]` at `/rows/<line>/<field>`. A file of another template, an older version or a changed header is 422 `template_rejected`.
+      parameters:
+      - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: {type: string, format: binary}
+      responses:
+        '202':
+          description: Applied.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, rows, updated, added, removed, unchanged, template_id, template_version, status]
+                properties:
+                  id: {type: string, format: uuid}
+                  rows: {type: integer}
+                  updated: {type: integer}
+                  added: {type: integer}
+                  removed: {type: integer}
+                  unchanged: {type: integer}
+                  template_id: {type: string, example: TPL-DAILY-PLAN}
+                  template_version: {type: integer}
+                  source: {type: string, example: template}
+                  file_name: {type: string}
+                  status: {type: string, example: applied}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '413': {$ref: '#/components/responses/PayloadTooLarge'}
         '422': {$ref: '#/components/responses/Unprocessable'}
   /daily-plans/export:
     get:
@@ -22343,7 +22387,7 @@ components:
         name_ar: { type: [string, 'null'] }
         kind: { type: string, enum: [data_import, assignment_import, config_import, master] }
         module_key: { $ref: '#/components/schemas/ModuleKey' }
-        template_kind: { type: string, enum: [register, stream, master, sites, list_values, holidays], description: 'A register template (one per register), a Site Register stream template (`TPL-DESIGN-ACQ`, `-CW`, `-TE`, `-CL`), the whole Master (`TPL-MASTER`) or, since 0.14.0, the New sites template (`TPL-NEW-SITES`, kind `sites`: one row per new site, entered through batch and L2). `list_values` (0.15.23): the values of a list (`TPL-LISTVALUES`). `holidays` (0.15.61): the holidays of the work calendar (`TPL-HOLIDAYS`, for a System Admin or a delegate of the calendar).' }
+        template_kind: { type: string, enum: [register, stream, master, sites, list_values, holidays, daily_plan], description: 'A register template (one per register), a Site Register stream template (`TPL-DESIGN-ACQ`, `-CW`, `-TE`, `-CL`), the whole Master (`TPL-MASTER`) or, since 0.14.0, the New sites template (`TPL-NEW-SITES`, kind `sites`: one row per new site, entered through batch and L2). `list_values` (0.15.23): the values of a list (`TPL-LISTVALUES`). `holidays` (0.15.61): the holidays of the work calendar (`TPL-HOLIDAYS`, for a System Admin or a delegate of the calendar). `daily_plan` (0.15.407): the Daily Plan (`TPL-DAILY-PLAN`), downloaded here and uploaded with `POST /daily-plans/import`.' }
         register_key: { type: [string, 'null'], description: 'The register the template enters (`gecol` for TPL-GECOL). Null for a Site Register stream template or TPL-MASTER.' }
         stream: { type: [string, 'null'], description: 'The stream of a Site Register stream template (Q73): DESIGN_ACQ, CW, TE or CLOSURE.' }
         current_version: { type: integer, minimum: 1, description: 'Shown as "v3". Exactly one version is current; older versions are rejected on upload. A new version is issued by the database when the register''s fields or custom fields change.' }
