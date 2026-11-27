@@ -41,7 +41,7 @@ import type { RegisterDefinition, RegisterRecord } from "@/api/types";
 import { TemplateExportMenu } from "@/components/TemplateExportMenu";
 import { PmDuePanel } from "@/components/PmDuePanel";
 import { ViewAnalytics } from "@/components/ViewAnalytics";
-import { ViewMenu, type ViewOption } from "@/components/ViewMenu";
+import { LayoutPanel, type ViewOption } from "@/components/LayoutPanel";
 import { useRememberedView } from "@/lib/viewPreference";
 import { GridCellEditor, INLINE_TYPES } from "@/components/GridCellEditor";
 import { FieldValue } from "@/components/FieldValue";
@@ -55,14 +55,16 @@ import {
 } from "@/components/GridColumnAdmin";
 import { HlcLegacyDialog } from "@/components/P4cPanels";
 import { fieldLabel, showValue } from "@/components/RegisterFields";
-import { RegisterDrawer, STATE_TONE } from "@/components/RegisterDrawer";
+import { RegisterDrawer, STATE_TONE, TRIAGE_TONE } from "@/components/RegisterDrawer";
 import {
   ALL_CAP,
+  BY_STATE,
   defaultBoardBy,
   layoutsOf,
   RegisterBoard,
   RegisterMap,
   RegisterWide,
+  statusFields,
   type RegisterLane,
   type RegisterLayout,
 } from "@/components/RegisterViews";
@@ -70,13 +72,12 @@ import { useToast } from "@/components/Toast";
 import { BatchEditBar } from "@/components/BatchEditBar";
 import { useBatchEdit } from "@/lib/useBatchEdit";
 import { MoreMenu, PageHeader } from "@/components/PageHeader";
-import { DisplayMenu, displayAttrs, PastedChip, ROWNO_COL, RowNo, SearchBox, ShownFooter, TableCount, TableToolbar } from "@/components/TableStandard";
+import { displayAttrs, PastedChip, ROWNO_COL, RowNo, SearchBox, ShownFooter, TableCount, TableToolbar } from "@/components/TableStandard";
 import type { CountedPage } from "@/api/types";
 import {
   ActiveChips,
   BulkBar,
   ColumnMenu,
-  DensityToggle,
   Empty,
   gxRow,
   HeaderRow,
@@ -100,7 +101,7 @@ import {
 import { registerErrorMessage } from "@/lib/registerErrors";
 import { isLive, OWNER_NOTE } from "@/lib/registerForms";
 
-const RF_KEYS = ["q", "region_id", "state", "record_type"] as const;
+const RF_KEYS = ["q", "region_id", "state", "record_type", "triage"] as const;
 // W2: a saved view also keeps the layout (list, wide, board, map) and the board's grouping and swimlane, as #185 does for Site Master
 const LAYOUT_KEYS = ["layout", "board_by", "lane"] as const;
 type RegisterView = RecordFilters & {
@@ -153,6 +154,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
     region_id: sp.get("region_id") ?? "",
     state: sp.get("state") ?? "",
     record_type: sp.get("record_type") ?? "",
+    triage: sp.get("triage") ?? "",
   };
   // F3 (0.15.31): the AND/OR filter tree lives in the URL as JSON (adv) and goes to the server as `filter`, which compiles it
   const adv = sp.get("adv") ?? "";
@@ -232,6 +234,9 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
   const filterExtras: ExtraField[] = [
     { key: "region_id", label: t("sites.all_regions"), kind: "text", hidden: true, value: f.region_id, set: set("region_id"), chip: `${t("sites.region")}: ${f.region_id ? regionName(f.region_id) : ""}` },
     { key: "state", label: t("registers.all_states"), kind: "text", hidden: true, value: f.state, set: set("state"), chip: `${t("registers.state")}: ${f.state ? t(`regState.${f.state}`) : ""}` },
+    ...(def.triage_enabled
+      ? [{ key: "triage", label: t("registers.triage_all"), group: "fields", kind: "enum" as const, options: ["pending", "accepted", "deferred", "rejected", "merged"].map((x) => ({ value: x, label: t(`triageState.${x}`) })), value: f.triage ?? "", set: set("triage") }]
+      : []),
     ...(def.record_types?.length && !tabDefs.length
       ? [{ key: "record_type", label: t("registers.record_type"), group: "fields", kind: "enum" as const, options: def.record_types.map((x) => ({ value: x, label: x.toUpperCase() })), value: f.record_type, set: set("record_type") }]
       : []),
@@ -501,13 +506,24 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
         );
       case "state":
         return (
-          <StatusChip
-            tone={STATE_TONE[r.state]}
-            testid={`reg-state-${r.id}`}
-            text={t(`regState.${r.state}`)}
-          >
-            {t(`regState.${r.state}`)}
-          </StatusChip>
+          <>
+            <StatusChip
+              tone={STATE_TONE[r.state]}
+              testid={`reg-state-${r.id}`}
+              text={t(`regState.${r.state}`)}
+            >
+              {t(`regState.${r.state}`)}
+            </StatusChip>
+            {r.triage && (r.triage.state === "pending" || r.triage.state === "deferred") && (
+              <StatusChip
+                tone={TRIAGE_TONE[r.triage.state]}
+                testid={`reg-triage-${r.id}`}
+                text={t(`triageState.${r.triage.state}`)}
+              >
+                {t(`triageState.${r.triage.state}`)}
+              </StatusChip>
+            )}
+          </>
         );
       default:
         return r.ball_in_court &&
@@ -674,13 +690,28 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
             <ViewAnalytics def={def} records={real} total={total} />
           </span>
         }
-        switcher={
-          <ViewMenu
+        layout={
+          /* V1: one Layout panel — the view switcher, the board's grouping and swimlanes while the board is on, and the Display options of the
+             table layouts (list and wide table) */
+          <LayoutPanel
             testid="register-view"
-            title={t("view.title")}
-            value={view === "grid" ? "grid" : layout}
-            options={viewOptions}
-            onChange={pickView}
+            views={{ value: view === "grid" ? "grid" : layout, options: viewOptions, onChange: pickView }}
+            options={view === "vertical" && layout === "board" ? (
+              <>
+                <label className="flex items-center gap-2 text-sm"><span className="text-mute">{t("regviews.board_by")}</span>
+                  <select className="input w-auto py-1" data-testid="register-board-by" value={boardBy} onChange={(e) => setParams({ board_by: e.target.value === defaultBoardBy(def) ? "" : e.target.value })}>
+                    {statusFields(def).map((f) => <option key={f.code} value={f.code}>{fieldLabel(f, i18n.language)}</option>)}
+                    <option value={BY_STATE}>{t("regviews.by_state")}</option>
+                  </select>
+                </label>
+                <label className="flex items-center gap-2 text-sm"><span className="text-mute">{t("board.swimlane")}</span>
+                  <select className="input w-auto py-1" data-testid="register-board-lane" value={lane} onChange={(e) => setParams({ lane: e.target.value === "none" ? "" : e.target.value })}>
+                    {(def.record_types?.length ? ["none", "region", "type"] : ["none", "region"]).map((l) => <option key={l} value={l}>{l === "type" ? t("regviews.lane_type") : t(`board.lane_${l}`)}</option>)}
+                  </select>
+                </label>
+              </>
+            ) : undefined}
+            table={view === "vertical" && (layout === "list" || layout === "wide") ? tbl : undefined}
           />
         }
         primary={
@@ -693,9 +724,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
             {t("registers.new")}
           </button>
         }
-        density={view === "vertical" ? <DensityToggle api={tbl} /> : undefined}
         columns={view === "vertical" ? <ColumnMenu api={tbl} label={label} /> : undefined}
-        display={view === "vertical" ? <DisplayMenu api={tbl} /> : undefined}
         exporter={
             <TemplateExportMenu
               testid="register-tools"
@@ -950,9 +979,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
               def={def}
               records={real}
               by={boardBy}
-              onBy={(x) => setParams({ board_by: x === defaultBoardBy(def) ? "" : x })}
               lane={lane}
-              onLane={(x) => setParams({ lane: x === "none" ? "" : x })}
               regionName={(id) => rname(id as number | null)}
               onOpen={setRecord}
               partial={partial}
