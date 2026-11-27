@@ -12,6 +12,7 @@ import { errText, FormDialog } from "@/components/FormDialog";
 import { useToast } from "@/components/Toast";
 import { moveRow, tabRows, toLayout, type CardRow } from "../dashboardLayout";
 import { QueryFallback } from '@/components/States';
+import { ShareLinksCard } from '@/components/DashboardShare';
 
 const TABS: DashboardTab[] = ["pmo", "cw", "te"];
 type Thresholds = DashboardSettingsInput["thresholds"];
@@ -94,6 +95,7 @@ export function DashboardSettings() {
   });
 
   return (
+    <>
     <section
       className="card space-y-4 p-4"
       data-testid="page-dashboard-settings"
@@ -318,5 +320,7 @@ export function DashboardSettings() {
         />
       )}
     </section>
+      <ShareLinksCard />
+    </>
   );
 }

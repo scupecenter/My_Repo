@@ -11131,6 +11131,184 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/dashboard/share-links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 0.15.501 (0546). My dashboard share links (a System Admin sees all). */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The links. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            items: components["schemas"]["DashboardShareLink"][];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** 0.15.501 (0546). Create a share link to a dashboard query. Requires dashboard.view; reason; audited as dashboard_share_created. The link grants nothing by itself: the opener needs a session and sees their own data. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        label?: string;
+                        /** @description Only the GET /dashboard query parameters. */
+                        params: Record<string, never>;
+                        /** @description Days until the link expires (default 30). */
+                        days?: number;
+                        reason: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description The created link and its path. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id?: string;
+                            token?: string;
+                            label?: string;
+                            params?: Record<string, never>;
+                            /** Format: date-time */
+                            expires_at?: string;
+                            /** @description The web path of the shared view: /dashboard/shared/<token>. */
+                            path?: string;
+                        };
+                    };
+                };
+                403: components["responses"]["Forbidden"];
+                422: components["responses"]["Unprocessable"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dashboard/share-links/{id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 0.15.501 (0546). Revoke a share link (the creator or a System Admin; reason; audited as dashboard_share_revoked). Opening a revoked link answers 410 gone. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        reason: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Revoked. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                403: components["responses"]["Forbidden"];
+                404: components["responses"]["NotFound"];
+                /** @description Already revoked (conflict). */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dashboard/shared/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 0.15.501 (0546). Open a share link: the envelope (label + dashboard query) for the shared read-only view. Counts and audits the open (dashboard_share_opened); a refused open (expired or revoked) is audited as dashboard_share_refused and answers 410 gone. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    token: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The envelope. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DashboardShareResolve"];
+                    };
+                };
+                404: components["responses"]["NotFound"];
+                /** @description gone: the link expired or was revoked. */
+                410: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/dashboard": {
         parameters: {
             query?: never;
@@ -12706,7 +12884,7 @@ export interface components {
             conflicts?: components["schemas"]["ScopeConflict"][];
         };
         /** @enum {string} */
-        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "plan_locked" | "insufficient_stock" | "item_in_use" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "invalid_code" | "invalid_enrol_code" | "enrol_code_expired" | "password_change_required" | "weak_password" | "internal_error" | "team_scope_mismatch" | "two_factor_enforced" | "scope_scenario_conflict" | "too_many_rows" | "integrity_too_large" | "mail_not_configured" | "self_approval_forbidden" | "document_rule_pending" | "file_pending_scan" | "list_not_configured" | "list_parent_mismatch" | "email_not_verified" | "batch_processing" | "vehicle_already_reserved" | "upload_processing" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "invitation_invalid" | "system_field" | "conversion_unconfirmed" | "column_in_use" | "input_already_mapped" | "field_already_mapped" | "single_admin" | "backup_missing" | "request_expired" | "reset_running" | "plan_incomplete" | "storage_not_supported" | "quarantine_unavailable" | "maintenance" | "scope_changed" | "thumbnail_unsupported" | "thumbnails_unavailable";
+        ErrorCode: "validation_failed" | "gone" | "conflict" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "plan_locked" | "insufficient_stock" | "item_in_use" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "invalid_code" | "invalid_enrol_code" | "enrol_code_expired" | "password_change_required" | "weak_password" | "internal_error" | "team_scope_mismatch" | "two_factor_enforced" | "scope_scenario_conflict" | "too_many_rows" | "integrity_too_large" | "mail_not_configured" | "self_approval_forbidden" | "document_rule_pending" | "file_pending_scan" | "list_not_configured" | "list_parent_mismatch" | "email_not_verified" | "batch_processing" | "vehicle_already_reserved" | "upload_processing" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "invitation_invalid" | "system_field" | "conversion_unconfirmed" | "column_in_use" | "input_already_mapped" | "field_already_mapped" | "single_admin" | "backup_missing" | "request_expired" | "reset_running" | "plan_incomplete" | "storage_not_supported" | "quarantine_unavailable" | "maintenance" | "scope_changed" | "thumbnail_unsupported" | "thumbnails_unavailable";
         PageEnvelope: {
             items: unknown[];
             page: components["schemas"]["PageInfo"];
@@ -21823,6 +22001,37 @@ export interface components {
                     [key: string]: number;
                 };
             }[];
+        };
+        /** @description 0.15.501 (0546). A durable, revocable link to a read-only dashboard view. The link is only an envelope for the dashboard query: opening it needs a session and the data is the normal GET /dashboard of the opener (their own role and region visibility). Every create, open and revoke is audited. */
+        DashboardShareLink: {
+            /** Format: uuid */
+            id: string;
+            label: string;
+            /** @description Only the GET /dashboard query parameters (ref_date, region_id, cluster_code, scenario, stream, view, exclude_overrides). */
+            params: Record<string, never>;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            expires_at?: string | null;
+            /** Format: date-time */
+            revoked_at?: string | null;
+            open_count: number;
+            /** Format: date-time */
+            last_opened_at?: string | null;
+            created_by_name?: string;
+            /** @description The caller created it (they may revoke it; a System Admin revokes any). */
+            mine?: boolean;
+        };
+        /** @description 0.15.501. The envelope of an opened share link; the web renders the dashboard with these params. */
+        DashboardShareResolve: {
+            /** Format: uuid */
+            id: string;
+            label: string;
+            params: Record<string, never>;
+            /** Format: date-time */
+            expires_at?: string | null;
+            /** @description Display name of the creator. */
+            created_by?: string;
         };
         ProjectStatusSnapshot: {
             /** Format: uuid */

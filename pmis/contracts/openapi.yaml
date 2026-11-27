@@ -17076,6 +17076,85 @@ paths:
               schema: {$ref: '#/components/schemas/FinalClosureKpi'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
+  /dashboard/share-links:
+    get:
+      tags: [dashboard]
+      summary: '0.15.501 (0546). My dashboard share links (a System Admin sees all).'
+      responses:
+        '200':
+          description: The links.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/DashboardShareLink' } }
+    post:
+      tags: [dashboard]
+      summary: '0.15.501 (0546). Create a share link to a dashboard query. Requires dashboard.view; reason; audited as dashboard_share_created. The link grants nothing by itself: the opener needs a session and sees their own data.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [params, reason]
+              properties:
+                label: { type: string, maxLength: 120 }
+                params: { type: object, description: 'Only the GET /dashboard query parameters.' }
+                days: { type: integer, minimum: 1, maximum: 365, description: 'Days until the link expires (default 30).' }
+                reason: { type: string }
+      responses:
+        '200':
+          description: The created link and its path.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string, format: uuid }
+                  token: { type: string }
+                  label: { type: string }
+                  params: { type: object }
+                  expires_at: { type: string, format: date-time }
+                  path: { type: string, description: 'The web path of the shared view: /dashboard/shared/<token>.' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /dashboard/share-links/{id}/revoke:
+    post:
+      tags: [dashboard]
+      summary: '0.15.501 (0546). Revoke a share link (the creator or a System Admin; reason; audited as dashboard_share_revoked). Opening a revoked link answers 410 gone.'
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string }
+      responses:
+        '200': { description: Revoked. }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: 'Already revoked (conflict).' }
+  /dashboard/shared/{token}:
+    get:
+      tags: [dashboard]
+      summary: '0.15.501 (0546). Open a share link: the envelope (label + dashboard query) for the shared read-only view. Counts and audits the open (dashboard_share_opened); a refused open (expired or revoked) is audited as dashboard_share_refused and answers 410 gone.'
+      parameters:
+        - { name: token, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: The envelope.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DashboardShareResolve' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '410': { description: 'gone: the link expired or was revoked.' }
   /dashboard:
     get:
       tags: [dashboard]
@@ -19329,6 +19408,8 @@ components:
       type: string
       enum:
         - validation_failed
+        - gone
+        - conflict
         - unauthenticated
         - mfa_required
         - step_up_required
@@ -28086,6 +28167,31 @@ components:
               progress_pct: { type: number }
               planned_pct: { type: [number, 'null'] }
               activities: { type: object, additionalProperties: { type: number }, description: 'Activity code to progress %.' }
+    DashboardShareLink:
+      type: object
+      description: '0.15.501 (0546). A durable, revocable link to a read-only dashboard view. The link is only an envelope for the dashboard query: opening it needs a session and the data is the normal GET /dashboard of the opener (their own role and region visibility). Every create, open and revoke is audited.'
+      required: [id, label, params, created_at, open_count]
+      properties:
+        id: { type: string, format: uuid }
+        label: { type: string }
+        params: { type: object, description: 'Only the GET /dashboard query parameters (ref_date, region_id, cluster_code, scenario, stream, view, exclude_overrides).' }
+        created_at: { type: string, format: date-time }
+        expires_at: { type: [string, 'null'], format: date-time }
+        revoked_at: { type: [string, 'null'], format: date-time }
+        open_count: { type: integer }
+        last_opened_at: { type: [string, 'null'], format: date-time }
+        created_by_name: { type: string }
+        mine: { type: boolean, description: 'The caller created it (they may revoke it; a System Admin revokes any).' }
+    DashboardShareResolve:
+      type: object
+      description: '0.15.501. The envelope of an opened share link; the web renders the dashboard with these params.'
+      required: [id, label, params]
+      properties:
+        id: { type: string, format: uuid }
+        label: { type: string }
+        params: { type: object }
+        expires_at: { type: [string, 'null'], format: date-time }
+        created_by: { type: string, description: 'Display name of the creator.' }
     ProjectStatusSnapshot:
       type: object
       required: [id, taken_on, progress_pct, weight_set]

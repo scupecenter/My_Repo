@@ -26,6 +26,7 @@ import { SiteMap } from "@/components/SiteMap";
 import { ScreenSettingsLink } from "@/components/ScreenSettingsLink";
 import { EmptyState } from "@/components/States";
 import { useToast } from "@/components/Toast";
+import { ShareDashboardButton } from "@/components/DashboardShare";
 import { streamName } from "@/lib/streams";
 import { tripoliToday } from "@/lib/today";
 import { orderedVisible, type TabLayout } from "./dashboardLayout";
@@ -1259,6 +1260,7 @@ export function Dashboard() {
             <MonitorPlay size={16} />
             {t("dash.tv")}
           </Link>
+          <ShareDashboardButton sp={sp} />
           <button
             className="btn"
             data-testid="dash-copy-link"
