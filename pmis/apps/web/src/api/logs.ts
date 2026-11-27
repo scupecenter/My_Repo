@@ -155,7 +155,7 @@ export type AlertSettings = components['schemas']['SecurityAlertSettings'];
 export type AlertSettingsInput = components['schemas']['SecurityAlertSettingsInput'];
 export type Severity = components['schemas']['AlertSeverity'];
 export const SEVERITIES: Severity[] = ['info', 'low', 'medium', 'high', 'critical'];
-export const RULES_WITH_SEVERITY = ['failed_sign_ins', 'failed_sign_ins_ip', 'new_ip', 'large_export', 'admin_set_changed', 'alert_settings_weakened', 'malware_upload', 'break_glass_used', 'backup_missing'] as const;
+export const RULES_WITH_SEVERITY = ['failed_sign_ins', 'failed_sign_ins_ip', 'new_ip', 'large_export', 'admin_set_changed', 'alert_settings_weakened', 'malware_upload', 'break_glass_used', 'backup_missing', 'backup_late', 'job_failed'] as const;
 
 export const useMailStatus = () => useQuery({ queryKey: ['mail-status'], queryFn: () => api.get<MailStatus>('/admin/mail/status') });
 export const useMailOutbox = (status: string) => usePaged<MailOutboxItem>('mail-outbox', '/admin/mail/outbox', { status: status || undefined });
