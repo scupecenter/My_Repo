@@ -15,7 +15,8 @@ describe('Dashboard ops: pending approvals bottleneck card (0.15.204, item 7)', 
   it('shows the waiting counts, the review and approve split and the ages per role', async () => {
     await signIn('pm');
     dashPage();
-    const card = await screen.findByTestId('dash-ops-approvals');
+    // the first render of the whole Dashboard is slow under CI load (1000 ms default is not enough)
+    const card = await screen.findByTestId('dash-ops-approvals', {}, { timeout: 8000 });
     expect(card).toHaveTextContent('Pending approvals bottleneck');
     expect(screen.getByTestId('dash-approvals-total')).toHaveTextContent('23');
     expect(screen.getByTestId('dash-approvals-review')).toHaveTextContent('14');
