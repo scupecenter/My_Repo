@@ -41,8 +41,8 @@ export interface SiteMasterRowsQuery {
 /** The eight Site Master menus in menu order: Master first, then the sections. */
 export const SITE_MASTER_MENU_KEYS: SiteMasterMenu[] = ['master', 'design_acq', 'sow', 'cw', 'te', 'hoto', 'dismantle', 'om'];
 
-export const useSiteMasterSections = () =>
-  useQuery({ queryKey: ['site-master-sections'], queryFn: () => api.get<SiteMasterSections>('/site-master/sections') });
+export const useSiteMasterSections = (enabled = true) =>
+  useQuery({ queryKey: ['site-master-sections'], queryFn: () => api.get<SiteMasterSections>('/site-master/sections'), enabled });
 
 /** One page of a menu's rows with the Master values of its columns; the values are read from the set-based view, one query per page. */
 export const useSiteMasterRows = (menu: string | undefined, query: SiteMasterRowsQuery) =>

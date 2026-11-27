@@ -1,4 +1,5 @@
 import { Logger } from '@nestjs/common';
+import { json } from 'express';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { appModuleFor } from './app.module';
@@ -18,6 +19,8 @@ export async function createApp(config: AppConfig, opts: { logger?: boolean } = 
   // nginx sits in front on this host: believe X-Forwarded-For from the loopback address only.
   app.set('trust proxy', 'loopback');
   app.useBodyParser('json', { limit: '100kb' });
+  // SEC-3: browsers send CSP reports as application/csp-report or application/reports+json. Parsed on that one path only; every other route keeps JSON only.
+  app.use(`/${API_PREFIX}/csp-report`, json({ type: ['application/csp-report', 'application/reports+json'], limit: '16kb' }));
   app.use(requestIdMiddleware);
   app.use(securityHeaders);
   // 0146: while a project data reset runs, every route but the progress reads answers 503 (before the session guard and the request transaction)
