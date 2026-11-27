@@ -13,7 +13,7 @@ const GROUPS = ['sessions', 'rows', 'exports'] as const;
 const id = (key: string): string => key.replace(/\./g, '_');
 
 /**
- * Settings, Security, Limits (migration 0402, contract 0.15.263): the numbers that used to sit in the code, in three groups. Everyone reads them; only a System Admin
+ * Settings, Security, Limits (migration 0402, contract 0.15.312): the numbers that used to sit in the code, in three groups. Everyone reads them; only a System Admin
  * changes them, with a reason and a step-up, and the change is audited. Every default is the number the system used before. A field that equals its default is
  * not stored, so "back to default" is just typing the default (or the button beside the field).
  */
