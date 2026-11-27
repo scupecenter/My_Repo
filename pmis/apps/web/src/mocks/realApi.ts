@@ -424,6 +424,7 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/registers/car_dispatcher/order-options'],
   ['get', '/registers/financial_advances/order-options'],
   ['get', '/registers/issues/order-options'],
+  ['get', '/registers/change_control/order-options'],
   ['get', '/registers/quality/order-options'],
   ['get', '/registers/issues/risk-options'],
   ['get', '/registers/risks/:entity_id/issues'],

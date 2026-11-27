@@ -21,6 +21,7 @@ export function RelatedRecords({ registerKey, entityId }: { registerKey: string;
                 <li key={i.record_id} className="flex flex-wrap gap-x-3">
                   <Link className="mono underline" to={`/registers/${g.register_key}?record=${i.record_id}`}>{i.title}</Link>
                   <span className="text-mute">{t(`regState.${i.state}`, { defaultValue: i.state })}</span>
+                  {g.register_key === 'change_control' && g.direction === 'from' && ['entry', 'in_review', 'in_approval'].includes(i.state) && <span className="chip bg-waitBg text-waitInk" data-testid="reg-change-pending">{t('related.change_pending')}</span>}
                 </li>
               ))}
             </ul>
