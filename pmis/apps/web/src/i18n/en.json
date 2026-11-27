@@ -405,7 +405,9 @@
     "storage_not_supported": "The documents are in S3/MinIO: the reset cannot move them from here.",
     "quarantine_unavailable": "The quarantine folder cannot be made in the document store. Nothing was changed.",
     "maintenance": "A project data reset is running. Try again in a few minutes.",
-    "scope_changed": "The scope is not the one you saw, or what it takes along changed. Read the request again or make a new one."
+    "scope_changed": "The scope is not the one you saw, or what it takes along changed. Read the request again or make a new one.",
+    "unknown_register": "Not a register.",
+    "unknown_site": "Not a site."
   },
   "week": {
     "title": "Weekly cycle plan",
@@ -1157,6 +1159,7 @@
     "section_screens_dashboard": "Dashboard",
     "section_screens_tables": "Tables (Display)",
     "section_screens_daily-plan": "My Work (Daily Plan)",
+    "section_screens_pm-schedules": "Preventive maintenance",
     "tab_ddl": "DDL",
     "tab_data": "Data",
     "tab_alerts": "Notifications",
@@ -5872,6 +5875,34 @@
     "sla_choice_required": "Choose one: set the SLA, or say that this task has no SLA. It is never left empty.",
     "sla_none_reason": "Why has it no SLA? (short reason)",
     "sla_undecided_warning": "These tasks have no SLA decision yet: {{codes}}. You can still publish; set an SLA or mark them as having none in Settings > SLA."
+  },
+  "pm": {
+    "due_title": "Maintenance due",
+    "manage": "Manage schedules",
+    "create_draft": "Create draft",
+    "created": "Draft created. It goes through the normal review and approval.",
+    "settings_title": "Preventive maintenance",
+    "settings_note": "A schedule says: every N weeks or months a draft record is due in a register. Nothing is created by a timer. A person who may create records in that register presses Create draft, here or on the register screen, and the draft is saved as that person and goes through the normal review and approval.",
+    "none": "No schedules yet.",
+    "name_en": "Name (English)",
+    "name_ar": "Name (Arabic)",
+    "register": "Register",
+    "site": "Site",
+    "every": "Every",
+    "unit": "Unit",
+    "unit_week": "weeks",
+    "unit_month": "months",
+    "next_due": "Next due",
+    "template": "Values filled in the draft",
+    "field": "Field",
+    "value": "Value",
+    "add_field": "Add a value",
+    "remove_field": "Remove value",
+    "active": "Active",
+    "open_register": "Open the register",
+    "remove": "Remove schedule",
+    "add": "Add schedule",
+    "save_title": "Save the schedules"
   },
   "analytics": {
     "title": "Analytics of this view",
