@@ -6157,6 +6157,70 @@ export interface paths {
         patch: operations["setUiLogoEnabled"];
         trace?: never;
     };
+    "/settings/identity/logo/display": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Where the logo shows outside the app, the sign-in pages and the browser tab icon (reason, step-up, If-Match, audited) (0.15.232)
+         * @description Both switches are off until an admin turns one on, so nothing about the logo is public by default. A switch has an effect only while the logo is enabled.
+         *     Same rights, reason, step-up and If-Match rules as the upload; a missing logo is 422 `errors[0]` `{path: /key, code: not_found}`, saving the values in force is
+         *     409 `invalid_transition`. Audited `ui_asset_update` with before and after.
+         */
+        patch: operations["setUiLogoDisplay"];
+        trace?: never;
+    };
+    "/ui/public/identity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Which public pages show the logo (no session) (0.15.232)
+         * @description No session. Only whether the sign-in pages and the tab icon use the logo, with the version for cache busting; `null` for a purpose that is off (the default). Nothing
+         *     about users, no audit data. Cached 30 seconds and rate limited per address (429 `rate_limited`).
+         */
+        get: operations["getUiPublicIdentity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ui/public/logo/{purpose}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The logo image for the sign-in pages or the tab icon (no session) (0.15.232)
+         * @description No session. The bytes of the enabled logo, only while the admin switched this purpose on; otherwise 404. SVG is served with a sandboxing Content-Security-Policy and
+         *     `nosniff`. Cached 30 seconds and rate limited per address.
+         */
+        get: operations["getUiPublicLogo"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/ui/assets/{key}": {
         parameters: {
             query?: never;
@@ -17319,6 +17383,10 @@ export interface components {
         UiAsset: {
             /** @description 'logo' today. */
             key: string;
+            /** @description Shown on the sign-in pages (public). false by default; an admin turns it on in Settings > Identity. */
+            show_on_login: boolean;
+            /** @description Used as the browser tab icon (public). false by default. */
+            use_as_favicon: boolean;
             /** @enum {string} */
             mime: "image/png" | "image/jpeg" | "image/svg+xml" | "image/webp";
             /** @description false hides it (the row stays: hide never delete). */
@@ -17328,6 +17396,20 @@ export interface components {
             /** Format: date-time */
             updated_at?: string;
             updated_by?: components["schemas"]["UserRef"] | null;
+        };
+        UiAssetDisplayInput: {
+            show_on_login: boolean;
+            use_as_favicon: boolean;
+            reason: string;
+        };
+        UiPublicIdentity: {
+            login: components["schemas"]["UiPublicLogo"] | null;
+            favicon: components["schemas"]["UiPublicLogo"] | null;
+        };
+        UiPublicLogo: {
+            version: number;
+            /** @enum {string} */
+            mime: "image/png" | "image/jpeg" | "image/svg+xml" | "image/webp";
         };
         UiAssetEnabledInput: components["schemas"]["WithReason"] & {
             enabled: boolean;
@@ -32164,6 +32246,87 @@ export interface operations {
             412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    setUiLogoDisplay: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UiAssetDisplayInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UiAsset"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getUiPublicIdentity: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The public identity. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UiPublicIdentity"];
+                };
+            };
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    getUiPublicLogo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                purpose: "login" | "favicon";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The image. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/png": string;
+                    "image/jpeg": string;
+                    "image/svg+xml": string;
+                    "image/webp": string;
+                };
+            };
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
         };
     };
     getUiAsset: {

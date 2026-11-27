@@ -1,7 +1,7 @@
 import { Lock } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { usePutUiLogo, useSetUiIdentity, useSetUiLogoEnabled, useUiIdentity } from '@/api/settings';
+import { usePutUiLogo, useSetUiIdentity, useSetUiLogoDisplay, useSetUiLogoEnabled, useUiIdentity } from '@/api/settings';
 import { errText, FormDialog } from '@/components/FormDialog';
 import { useToast } from '@/components/Toast';
 import { BRAND_SWATCHES, BRANDS, type Brand } from '@/lib/brands';
@@ -45,7 +45,8 @@ export function Identity() {
   const { t, i18n } = useTranslation();
   const toast = useToast();
   const q = useUiIdentity(), set = useSetUiIdentity();
-  const putLogo = usePutUiLogo(), setLogo = useSetUiLogoEnabled();
+  const putLogo = usePutUiLogo(), setLogo = useSetUiLogoEnabled(), setDisplay = useSetUiLogoDisplay();
+  const [display, setDisplayDraft] = useState<{ login: boolean; fav: boolean } | null>(null);
   const [draft, setDraft] = useState<{ brand: Brand; allow: boolean; defaults: Appearance } | null>(null);
   const [open, setOpen] = useState(false);
   const [logoDialog, setLogoDialog] = useState<'upload' | 'hide' | 'show' | null>(null);
@@ -124,6 +125,22 @@ export function Identity() {
             </>
           )}
         </div>
+        {cur.logo && (
+          <div className="mt-3 space-y-1" data-testid="identity-logo-public">
+            <p className="text-xs text-mute">{t('identity.logo_public_note')}</p>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" data-testid="identity-logo-login" checked={cur.logo.show_on_login} disabled={ro || !cur.logo.enabled}
+                onChange={(e) => setDisplayDraft({ login: e.target.checked, fav: cur.logo!.use_as_favicon })} />
+              {t('identity.logo_login')}
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" data-testid="identity-logo-favicon" checked={cur.logo.use_as_favicon} disabled={ro || !cur.logo.enabled}
+                onChange={(e) => setDisplayDraft({ login: cur.logo!.show_on_login, fav: e.target.checked })} />
+              {t('identity.logo_favicon')}
+            </label>
+            {!cur.logo.enabled && <p className="text-xs text-mute" data-testid="identity-logo-public-off">{t('identity.logo_public_off')}</p>}
+          </div>
+        )}
       </fieldset>
       <div className="rounded-md bg-card2 p-3 text-sm" data-testid="identity-status-locked">
         <p className="mb-2 flex items-center gap-1 font-semibold"><Lock size={14} aria-hidden />{t('identity.status_locked')}</p>
@@ -159,6 +176,13 @@ export function Identity() {
           onSubmit={(reason) => { const f = logoFile.current; if (!f) return; putLogo.mutate({ file: f, reason, version: cur.logo?.version ?? null },
             { onSuccess: () => { toast(t('settings.audited')); setLogoDialog(null); logoFile.current = null; } }); }}>
           <p className="text-sm text-mute" data-testid="identity-logo-confirm-upload">{t('identity.logo_confirm_upload')}</p>
+        </FormDialog>
+      )}
+      {display && cur.logo && (
+        <FormDialog open onClose={() => setDisplayDraft(null)} testid="identity-logo-display-dialog" title={t('identity.logo_title')} busy={setDisplay.isPending} error={setDisplay.isError ? errText(setDisplay.error, t) : null}
+          onSubmit={(reason) => setDisplay.mutate({ version: cur.logo!.version, show_on_login: display.login, use_as_favicon: display.fav, reason },
+            { onSuccess: () => { toast(t('settings.audited')); setDisplayDraft(null); } })}>
+          <p className="text-sm text-mute" data-testid="identity-logo-confirm-display">{t(display.login || display.fav ? 'identity.logo_confirm_public_on' : 'identity.logo_confirm_public_off')}</p>
         </FormDialog>
       )}
       {(logoDialog === 'hide' || logoDialog === 'show') && cur.logo && (

@@ -176,7 +176,7 @@ export function sessionBody(): Session {
 function initIdentity() {
   return { default_brand: 'current' as Brand, allow_user_choice: true, defaults: {} as Record<string, string>, pref_options: APPEARANCE_OPTIONS as unknown as Record<string, string[]>, version: 1, updated_at: null as string | null, updated_by: null as null | { id: string; display_name: string; employee_id: string | null },
     /** 0243: the workspace logo metadata (ui_assets); the bytes live in uiAssetBytes (not persisted). */
-    logo: null as null | { key: string; mime: string; enabled: boolean; version: number; updated_at: string; updated_by: { id: string; display_name: string; employee_id: string | null } | null } };
+    logo: null as null | { key: string; mime: string; enabled: boolean; show_on_login: boolean; use_as_favicon: boolean; version: number; updated_at: string; updated_by: { id: string; display_name: string; employee_id: string | null } | null } };
 }
 function initLoginPage() {
   return {

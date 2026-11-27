@@ -110,6 +110,82 @@ describe('The workspace logo (0243): PUT/PATCH /settings/identity/logo and GET /
   });
 });
 
+describe('The logo outside the app (0243): sign-in pages and tab icon, closed by default', () => {
+  const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  const R = 'Owner decision 2026-11-27, logo';
+  const anon = () => new Api(app);
+  const display = (who: Actor, show_on_login: unknown, use_as_favicon: unknown, tag?: string, reason: string | undefined = R) =>
+    who.api.call('patch', '/settings/identity/logo/display', { show_on_login, use_as_favicon, ...(reason === undefined ? {} : { reason }) }, tag === undefined ? {} : { 'If-Match': tag });
+  const state = async () => (await admin.api.call('get', '/settings/identity')).body.logo;
+  const displayAudits = () => q<{ before: any; after: any; reason: string }>(db,
+    `SELECT before, after, reason FROM audit_log WHERE action = 'ui_asset_update' AND entity_id = 'logo' ORDER BY id`);
+
+  it('both places are OFF by default and the public routes answer nothing', async () => {
+    const st = await state();
+    expect(st).toMatchObject({ show_on_login: false, use_as_favicon: false });
+    const pub = await anon().call('get', '/ui/public/identity');
+    expect(pub.status).toBe(200);
+    expect(pub.body).toEqual({ login: null, favicon: null });
+    expect((await anon().call('get', '/ui/public/logo/login')).status).toBe(404);
+    expect((await anon().call('get', '/ui/public/logo/favicon')).status).toBe(404);
+    expect((await anon().call('get', '/ui/public/logo/other')).status).toBe(404);
+  });
+
+  it('an admin switches the sign-in pages on: anyone can read them, with safe headers; the tab icon stays off; audited with before and after', async () => {
+    const st = await state();
+    const res = await display(admin, true, false, `"${st.version}"`);
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ show_on_login: true, use_as_favicon: false, version: st.version + 1 });
+    const pub = await anon().call('get', '/ui/public/identity');
+    expect(pub.body).toMatchObject({ login: { version: st.version + 1, mime: 'image/png' }, favicon: null });
+    const img = await anon().call('get', '/ui/public/logo/login').buffer(true).parse((r, cb) => {
+      const chunks: Buffer[] = [];
+      r.on('data', (c: Buffer) => chunks.push(c));
+      r.on('end', () => cb(null, Buffer.concat(chunks)));
+    });
+    expect(img.status).toBe(200);
+    expect(img.headers['content-type']).toBe('image/png');
+    expect(img.headers['x-content-type-options']).toBe('nosniff');
+    expect(Buffer.compare(img.body as Buffer, PNG)).toBe(0);
+    expect((await anon().call('get', '/ui/public/logo/favicon')).status).toBe(404);
+    const logs = await displayAudits();
+    expect(logs.at(-1)).toMatchObject({ reason: R });
+    expect(JSON.stringify(logs.at(-1))).not.toContain('89504e');
+  });
+
+  it('hiding the logo closes both public places; the switches are kept; showing it opens them again', async () => {
+    let st = await state();
+    await display(admin, true, true, `"${st.version}"`);
+    st = await state();
+    const off = await admin.api.call('patch', '/settings/identity/logo', { enabled: false, reason: R }, { 'If-Match': `"${st.version}"` });
+    expect(off.status).toBe(200);
+    expect((await anon().call('get', '/ui/public/identity')).body).toEqual({ login: null, favicon: null });
+    expect((await anon().call('get', '/ui/public/logo/login')).status).toBe(404);
+    expect((await anon().call('get', '/ui/public/logo/favicon')).status).toBe(404);
+    expect(await state()).toMatchObject({ enabled: false, show_on_login: true, use_as_favicon: true });
+    st = await state();
+    await admin.api.call('patch', '/settings/identity/logo', { enabled: true, reason: R }, { 'If-Match': `"${st.version}"` });
+    expect((await anon().call('get', '/ui/public/identity')).body).toMatchObject({ login: { mime: 'image/png' }, favicon: { mime: 'image/png' } });
+    st = await state();
+    await display(admin, false, false, `"${st.version}"`);
+    expect((await anon().call('get', '/ui/public/identity')).body).toEqual({ login: null, favicon: null });
+  });
+
+  it('refuses a non-admin, a bad body, a missing reason, a stale or missing version and a change that changes nothing', async () => {
+    const st = await state();
+    const tag = `"${st.version}"`;
+    expect((await display(plain, true, false, tag)).status).toBe(403);
+    expect((await display(admin, 'yes', false, tag)).status).toBe(422);
+    expect((await display(admin, true, undefined, tag)).status).toBe(422);
+    expect((await display(admin, true, false, tag, undefined)).status).toBe(422);
+    expect((await display(admin, true, false, '"999"')).status).toBe(412);
+    expect((await display(admin, true, false)).status).toBe(428);
+    expect((await display(admin, false, false, tag)).status).toBe(409);
+    expect((await display(noStep, true, false, tag)).status).toBe(401);
+    expect(await state()).toMatchObject({ show_on_login: false, use_as_favicon: false, version: st.version });
+  });
+});
+
 describe('Settings, Identity & themes: GET and PUT /settings/identity', () => {
   it('every signed-in user reads the default (current, choice allowed); only a System Admin or an all-regions settings delegate may edit', async () => {
     for (const [who, can] of [[plain, false], [regDelegate, false], [allDelegate, true], [admin, true]] as [Actor, boolean][]) {

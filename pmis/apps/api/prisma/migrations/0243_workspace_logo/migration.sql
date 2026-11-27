@@ -19,6 +19,8 @@
 --      ui_asset_update with before and after metadata (never the bytes).
 --   5. admin_set_ui_asset_enabled(p_key, p_enabled, p_reason, p_version): enables/disables without a new upload (the row and its
 --      bytes stay). Same checks; a missing row is 422 not_found; a no-op is invalid_transition. Audited ui_asset_update.
+--   5b. admin_set_ui_asset_display + ui_asset_public_state + ui_asset_public: the sign-in page logo and the browser tab icon, both OFF by
+--      default (section 3b). The public doors answer only for an enabled logo whose purpose is switched on.
 --   6. ui_identity_state() gains `logo` (ui_asset_state('logo')), so GET /settings/identity and GET /me identity.logo carry it and
 --      the sidebar renders the image without an extra round trip.
 --
@@ -36,6 +38,9 @@ CREATE TABLE ui_assets (
   mime text NOT NULL CONSTRAINT ui_assets_mime_check CHECK (mime IN ('image/png', 'image/jpeg', 'image/svg+xml', 'image/webp')),
   bytes bytea NOT NULL CONSTRAINT ui_assets_bytes_check CHECK (octet_length(bytes) BETWEEN 1 AND 262144),
   enabled boolean NOT NULL DEFAULT true,
+  -- Where the logo is shown outside the signed-in app (both CLOSED by default; an admin opens each in Settings > Identity).
+  show_on_login boolean NOT NULL DEFAULT false,
+  use_as_favicon boolean NOT NULL DEFAULT false,
   version integer NOT NULL DEFAULT 1 CONSTRAINT ui_assets_version_check CHECK (version >= 1),
   updated_at timestamptz NOT NULL DEFAULT now(),
   updated_by uuid REFERENCES users (id)
@@ -70,6 +75,8 @@ BEGIN
     'key', a.key,
     'mime', a.mime,
     'enabled', a.enabled,
+    'show_on_login', a.show_on_login,
+    'use_as_favicon', a.use_as_favicon,
     'version', a.version,
     'updated_at', to_jsonb(a.updated_at),
     'updated_by', coalesce(public.wfe_user_ref(a.updated_by), 'null'::jsonb));
@@ -140,6 +147,52 @@ BEGIN
 END $$;
 
 -- ---------------------------------------------------------------------------------------------------------------------
+-- 3b. Where the logo shows outside the app: the sign-in page and the browser tab icon (owner decision 2026-11-27, both OFF by default)
+--     admin_set_ui_asset_display: the audited write door (same rights as the upload: System Admin or an all-regions delegate of
+--     `settings` edit, reason, If-Match, invalid_transition when nothing changes; a flag may be set only on an uploaded logo).
+--     ui_asset_public_state(): the PUBLIC read (no session): only {login: {version, mime}|null, favicon: {version, mime}|null}; a
+--     purpose appears only when the logo is enabled AND that purpose is switched on. Nothing about users, no audit data.
+--     ui_asset_public(p_purpose): the PUBLIC bytes of the logo for 'login' or 'favicon', same conditions, else no rows (404).
+-- ---------------------------------------------------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION admin_set_ui_asset_display(p_key text, p_show_on_login boolean, p_use_as_favicon boolean, p_reason text, p_version integer DEFAULT NULL) RETURNS jsonb
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
+DECLARE cur jsonb; res jsonb;
+BEGIN
+  IF public.app_actor() IS NULL THEN RAISE EXCEPTION 'no signed-in actor' USING ERRCODE = 'insufficient_privilege'; END IF;
+  PERFORM public.calc_require_admin('settings', true);
+  PERFORM public.calc_require_reason(p_reason);
+  IF p_show_on_login IS NULL THEN PERFORM public.wfe_err1('/show_on_login', 'required', 'Say whether the logo shows on the sign-in page.'); END IF;
+  IF p_use_as_favicon IS NULL THEN PERFORM public.wfe_err1('/use_as_favicon', 'required', 'Say whether the logo is the browser tab icon.'); END IF;
+  PERFORM 1 FROM public.ui_assets WHERE key = p_key FOR UPDATE;
+  cur := public.ui_asset_state(p_key);
+  IF cur = 'null'::jsonb THEN PERFORM public.wfe_err1('/key', 'not_found', 'No logo has been uploaded.'); END IF;
+  IF p_version IS NOT NULL AND p_version <> (cur ->> 'version')::integer THEN PERFORM public.wf_err('precondition_failed'); END IF;
+  IF (cur ->> 'show_on_login')::boolean = p_show_on_login AND (cur ->> 'use_as_favicon')::boolean = p_use_as_favicon THEN
+    PERFORM public.wf_err('invalid_transition', jsonb_build_object('detail', 'The logo is already shown this way.'));
+  END IF;
+  UPDATE public.ui_assets SET show_on_login = p_show_on_login, use_as_favicon = p_use_as_favicon, version = version + 1,
+         updated_by = public.app_actor(), updated_at = clock_timestamp()
+   WHERE key = p_key;
+  res := public.ui_asset_state(p_key);
+  PERFORM public.log_audit_write('ui_asset_update', 'ui_asset', p_key, cur - 'updated_at' - 'updated_by', res - 'updated_at' - 'updated_by', btrim(p_reason));
+  RETURN res;
+END $$;
+
+CREATE OR REPLACE FUNCTION ui_asset_public_state() RETURNS jsonb
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
+  SELECT jsonb_build_object(
+    'login',   coalesce((SELECT jsonb_build_object('version', a.version, 'mime', a.mime) FROM public.ui_assets a WHERE a.key = 'logo' AND a.enabled AND a.show_on_login), 'null'::jsonb),
+    'favicon', coalesce((SELECT jsonb_build_object('version', a.version, 'mime', a.mime) FROM public.ui_assets a WHERE a.key = 'logo' AND a.enabled AND a.use_as_favicon), 'null'::jsonb))
+$$;
+
+CREATE OR REPLACE FUNCTION ui_asset_public(p_purpose text) RETURNS TABLE(mime text, bytes bytea, version integer)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
+  SELECT a.mime, a.bytes, a.version FROM public.ui_assets a
+   WHERE a.key = 'logo' AND a.enabled
+     AND ((p_purpose = 'login' AND a.show_on_login) OR (p_purpose = 'favicon' AND a.use_as_favicon))
+$$;
+
+-- ---------------------------------------------------------------------------------------------------------------------
 -- 4. The identity read gains the logo
 -- ---------------------------------------------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION ui_identity_state() RETURNS jsonb
@@ -167,13 +220,13 @@ END $$;
 DO $$
 DECLARE f text;
 BEGIN
-  FOREACH f IN ARRAY ARRAY['ui_asset_state(text)', 'ui_asset_get(text)', 'admin_put_ui_asset(text,text,bytea,text,integer)', 'admin_set_ui_asset_enabled(text,boolean,text,integer)', 'ui_identity_state()'] LOOP
+  FOREACH f IN ARRAY ARRAY['ui_asset_state(text)', 'ui_asset_get(text)', 'admin_put_ui_asset(text,text,bytea,text,integer)', 'admin_set_ui_asset_enabled(text,boolean,text,integer)', 'admin_set_ui_asset_display(text,boolean,boolean,text,integer)', 'ui_asset_public_state()', 'ui_asset_public(text)', 'ui_identity_state()'] LOOP
     EXECUTE format('ALTER FUNCTION %s OWNER TO pmis_definer', f);
     EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC', f);
     EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO pmis_definer', f);
   END LOOP;
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'pmis_app') THEN
-    GRANT EXECUTE ON FUNCTION ui_asset_state(text), ui_asset_get(text), admin_put_ui_asset(text, text, bytea, text, integer), admin_set_ui_asset_enabled(text, boolean, text, integer), ui_identity_state() TO pmis_app;
+    GRANT EXECUTE ON FUNCTION ui_asset_state(text), ui_asset_get(text), admin_put_ui_asset(text, text, bytea, text, integer), admin_set_ui_asset_enabled(text, boolean, text, integer), admin_set_ui_asset_display(text, boolean, boolean, text, integer), ui_asset_public_state(), ui_asset_public(text), ui_identity_state() TO pmis_app;
   END IF;
 END $$;
 
@@ -197,5 +250,5 @@ GRANT SELECT, UPDATE ON public.ui_assets TO pmis_reset_owner;
 INSERT INTO audit_log (action, entity_type, entity_id, after, reason)
 VALUES ('ui_identity_applied', 'workflow', NULL,
         jsonb_build_object('table', 'ui_assets (the workspace logo)', 'read', jsonb_build_array('ui_asset_state', 'ui_asset_get', 'ui_identity_state (logo)'),
-          'write', jsonb_build_array('admin_put_ui_asset', 'admin_set_ui_asset_enabled'), 'audit', jsonb_build_array('ui_asset_update')),
+          'write', jsonb_build_array('admin_put_ui_asset', 'admin_set_ui_asset_enabled', 'admin_set_ui_asset_display'), 'public', jsonb_build_array('ui_asset_public_state', 'ui_asset_public'), 'audit', jsonb_build_array('ui_asset_update')),
         'Owner approval 2026-11-27 (PM-platforms proposal, item 5): the workspace logo in the identity; the admin uploads it in Settings > Identity and it replaces the built-in sidebar badge (migration 0198).');

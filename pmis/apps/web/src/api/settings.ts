@@ -165,6 +165,16 @@ export const useSetUiLogoEnabled = () => {
     onSettled: () => refresh(qc, 'ui-identity', 'me', 'my-profile'),
   });
 };
+/** 0.15.232 (0243): where the logo shows outside the app (sign-in pages, browser tab icon); both off by default. */
+export const useSetUiLogoDisplay = () => {
+  const qc = useQueryClient();
+  return useMutation<UiAsset, ApiError, { version: number; show_on_login: boolean; use_as_favicon: boolean; reason: string }>({
+    mutationFn: ({ version, ...body }) => api.patch('/settings/identity/logo/display', { version, body }),
+    onSettled: () => refresh(qc, 'ui-identity', 'me', 'my-profile', 'ui-public-identity'),
+  });
+};
+/** The public read (no session): which public pages show the logo. Both null until an admin switches one on. */
+export const useUiPublicIdentity = () => useQuery({ queryKey: ['ui-public-identity'], queryFn: () => api.get<UiPublicIdentity>('/ui/public/identity'), staleTime: 30_000, retry: 1 });
 export const useImportsSettings = () => useQuery({ queryKey: ['imports-settings'], queryFn: () => api.get<ImportsSettings>('/settings/imports') });
 export const useSetImportsSettings = () => {
   const qc = useQueryClient();

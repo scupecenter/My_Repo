@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { AccessService } from '../access/access.service';
 import type { AuthContext } from '../auth/auth.types';
 import { StepUpService } from '../auth/step-up.service';
+import { RateLimiter } from '../auth/rate-limiter';
 import { parseIfMatch } from '../common/etag';
 import { parse } from '../common/zod';
 import { problems } from '../common/problem';
@@ -27,6 +28,10 @@ export interface UiAssetDto {
   key: string;
   mime: 'image/png' | 'image/jpeg' | 'image/svg+xml' | 'image/webp';
   enabled: boolean;
+  /** Shown on the sign-in page (off by default; the public read needs it with `enabled`). */
+  show_on_login: boolean;
+  /** Used as the browser tab icon (off by default). */
+  use_as_favicon: boolean;
   version: number;
   updated_at: string | null;
   updated_by: { id: string; display_name: string; employee_id: string | null } | null;
@@ -36,6 +41,21 @@ const logoEnabledBody = z.object({
   enabled: z.boolean(),
   reason: z.string().trim().min(3).max(1000),
 }).strict();
+
+const logoDisplayBody = z.object({
+  show_on_login: z.boolean(),
+  use_as_favicon: z.boolean(),
+  reason: z.string().trim().min(3).max(1000),
+}).strict();
+
+/** The public read (no session): which purposes show the logo, with the version for cache busting. */
+export interface UiPublicIdentityDto {
+  login: { version: number; mime: UiAssetDto['mime'] } | null;
+  favicon: { version: number; mime: UiAssetDto['mime'] } | null;
+}
+export const UI_PUBLIC_PURPOSES = ['login', 'favicon'] as const;
+const PUBLIC_LIMIT_PER_IP = 120;
+const PUBLIC_WINDOW_MS = 60_000;
 
 export const UI_LOGO_MAX_BYTES = 262144;
 
@@ -62,7 +82,7 @@ export interface UiIdentityDto {
  */
 @Injectable()
 export class UiIdentityService {
-  constructor(private readonly db: DbService, private readonly access: AccessService, private readonly stepUp: StepUpService) {}
+  constructor(private readonly db: DbService, private readonly access: AccessService, private readonly stepUp: StepUpService, private readonly limiter: RateLimiter) {}
 
   private async one(sql: Prisma.Sql): Promise<UiIdentityDto> {
     const rows = await this.db.tx.$queryRaw<{ r: UiIdentityDto }[]>(sql);
@@ -108,6 +128,36 @@ export class UiIdentityService {
     const etag = parseIfMatch(ifMatch);
     await this.stepUp.require(auth);
     return this.asset(Prisma.sql`SELECT admin_set_ui_asset_enabled('logo', ${b.enabled}::boolean, ${b.reason}::text, ${etag}::int) AS r`);
+  }
+
+  /** PATCH /settings/identity/logo/display (0243): where the logo shows outside the app (sign-in page, browser tab icon). */
+  async setLogoDisplay(auth: AuthContext, ifMatch: string | undefined, raw: unknown): Promise<UiAssetDto> {
+    const b = parse(logoDisplayBody, raw);
+    await this.access.requireAdmin('settings', 'edit');
+    const etag = parseIfMatch(ifMatch);
+    await this.stepUp.require(auth);
+    return this.asset(Prisma.sql`SELECT admin_set_ui_asset_display('logo', ${b.show_on_login}::boolean, ${b.use_as_favicon}::boolean, ${b.reason}::text, ${etag}::int) AS r`);
+  }
+
+  private hitPublic(ip: string | null): void {
+    const wait = this.limiter.hit(`ui-public:ip:${ip ?? 'unknown'}`, PUBLIC_LIMIT_PER_IP, PUBLIC_WINDOW_MS);
+    if (wait) throw problems.rateLimited(wait);
+  }
+
+  /** GET /ui/public/identity (no session): only which public places show the logo. */
+  async publicIdentity(ip: string | null): Promise<UiPublicIdentityDto> {
+    this.hitPublic(ip);
+    const rows = await this.db.tx.$queryRaw<{ r: UiPublicIdentityDto }[]>(Prisma.sql`SELECT ui_asset_public_state() AS r`);
+    return rows[0]!.r;
+  }
+
+  /** GET /ui/public/logo/:purpose (no session): the logo bytes for the sign-in page or the tab icon, only while switched on. */
+  async publicLogo(purpose: string, ip: string | null): Promise<{ mime: string; bytes: Buffer; version: number }> {
+    this.hitPublic(ip);
+    if (!(UI_PUBLIC_PURPOSES as readonly string[]).includes(purpose)) throw problems.notFound();
+    const rows = await this.db.tx.$queryRaw<{ mime: string; bytes: Buffer; version: number }[]>`SELECT mime, bytes, version FROM ui_asset_public(${purpose}::text)`;
+    if (!rows[0]) throw problems.notFound();
+    return rows[0];
   }
 
   /** GET /ui/assets/:key (0243): the bytes of an enabled identity image. */

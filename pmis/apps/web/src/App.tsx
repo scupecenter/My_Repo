@@ -65,6 +65,7 @@ import { MailDelivery } from '@/pages/logs/MailDelivery';
 import { IntegrityRuns } from '@/pages/logs/IntegrityRuns';
 import { SystemLog } from '@/pages/logs/SystemLog';
 import { SettingsRoutes } from '@/pages/settings/Settings';
+import { FaviconSync } from '@/components/PublicLogo';
 
 function Soon() {
   const { t } = useTranslation();
@@ -167,6 +168,8 @@ export function App() {
     return () => setPasswordChangeHandler(null);
   }, [qc]);
   return (
+    <>
+    <FaviconSync />
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -177,5 +180,6 @@ export function App() {
       {USE_MOCKS && <Route path="/mock-m365/step-up" element={<MockStepUp />} />}
       <Route path="/*" element={<Gate />} />
     </Routes>
+    </>
   );
 }

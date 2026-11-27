@@ -844,7 +844,7 @@ export const settingsHandlers = [
     const v = viewer()!;
     const bytes = new Uint8Array(await file!.arrayBuffer!());
     putUiAssetBytes('logo', String(file!.type), bytes);
-    identity().logo = { key: 'logo', mime: String(file!.type), enabled: true, version: (identity().logo?.version ?? 0) + 1, updated_at: new Date().toISOString(),
+    identity().logo = { key: 'logo', mime: String(file!.type), enabled: true, show_on_login: identity().logo?.show_on_login ?? false, use_as_favicon: identity().logo?.use_as_favicon ?? false, version: (identity().logo?.version ?? 0) + 1, updated_at: new Date().toISOString(),
       updated_by: { id: uid(v.employee_id ?? '9999'), display_name: v.name, employee_id: v.employee_id } };
     save();
     return HttpResponse.json(identity().logo, tag(identity().logo!.version));
@@ -864,6 +864,36 @@ export const settingsHandlers = [
     identity().logo!.enabled = b.enabled as boolean; identity().logo!.version += 1; identity().logo!.updated_at = new Date().toISOString();
     save();
     return HttpResponse.json(identity().logo, tag(identity().logo!.version));
+  }),
+  http.patch(`${B}/settings/identity/logo/display`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    const b = await body<{ show_on_login?: unknown; use_as_favicon?: unknown; reason?: string } & Record<string, unknown>>(request);
+    const errs: { path: string; code: string }[] = Object.keys(b).filter((k) => !['show_on_login', 'use_as_favicon', 'reason'].includes(k)).map((k) => ({ path: `/${k}`, code: 'unknown_field' }));
+    if (typeof b.show_on_login !== 'boolean') errs.push({ path: '/show_on_login', code: 'required' });
+    if (typeof b.use_as_favicon !== 'boolean') errs.push({ path: '/use_as_favicon', code: 'required' });
+    if ((b.reason ?? '').trim().length < 3 || (b.reason ?? '').length > 1000) errs.push({ path: '/reason', code: 'required' });
+    if (errs.length) return fields(...errs);
+    if (!identity().logo) return fields({ path: '/key', code: 'not_found' });
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, identity().logo!.version); if (p) return p;
+    if (!stepUpValid()) return stepUp();
+    const l = identity().logo!;
+    if (l.show_on_login === b.show_on_login && l.use_as_favicon === b.use_as_favicon) return problem(409, 'invalid_transition', 'The logo is already shown this way.');
+    l.show_on_login = b.show_on_login as boolean; l.use_as_favicon = b.use_as_favicon as boolean; l.version += 1; l.updated_at = new Date().toISOString();
+    save();
+    return HttpResponse.json(l, tag(l.version));
+  }),
+  // Public reads (no session): only for an enabled logo whose purpose an admin switched on (both off by default).
+  http.get(`${B}/ui/public/identity`, () => {
+    const l = identity().logo;
+    const on = (k: 'show_on_login' | 'use_as_favicon') => (l && l.enabled && l[k] ? { version: l.version, mime: l.mime } : null);
+    return HttpResponse.json({ login: on('show_on_login'), favicon: on('use_as_favicon') }, { headers: { 'Cache-Control': 'public, max-age=30' } });
+  }),
+  http.get(`${B}/ui/public/logo/:purpose`, ({ params }) => {
+    const l = identity().logo; const a = uiAssetBytesOf('logo');
+    const k = params.purpose === 'login' ? 'show_on_login' : params.purpose === 'favicon' ? 'use_as_favicon' : null;
+    if (!a || !l || !k || !l.enabled || !l[k]) return problem(404, 'not_found', 'The resource does not exist or is not visible to you.');
+    return new HttpResponse(a.bytes, { headers: { 'Content-Type': a.mime, ETag: `"${l.version}"` } });
   }),
   http.get(`${B}/ui/assets/:key`, ({ params }) => {
     const g = guard(); if (g) return g;
