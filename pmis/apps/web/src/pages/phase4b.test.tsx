@@ -54,22 +54,31 @@ describe('X1 inbox', () => {
     expect(screen.queryByTestId(`inbox-item-${N(5)}`)).toBeNull();
   });
 
+  it('P6: a kind from the address or a saved view shows as a removable chip', async () => {
+    await signIn('pm');
+    const u = userEvent.setup();
+    inbox('/inbox?kind=mention');
+    await waitFor(() => expect(ids()).toEqual([N(3)]));
+    expect(screen.getByTestId('inbox-kind-chip')).toBeInTheDocument();
+    await u.click(screen.getByTestId('inbox-kind-clear'));
+    await waitFor(() => expect(ids().length).toBeGreaterThan(1));
+    expect(screen.queryByTestId('inbox-kind-chip')).toBeNull();
+  });
+
   it('filters by unread, by kind and by the snoozed choice, and keeps the filter in the address', async () => {
     await signIn('pm');
     const u = userEvent.setup();
     inbox();
     await screen.findByTestId('inbox-list');
-    await u.click(screen.getByTestId('inbox-show-unread'));
+    await u.selectOptions(screen.getByTestId('inbox-show'), 'unread');
     await waitFor(() => expect(ids()).toHaveLength(3));
     expect(screen.queryByTestId(`inbox-item-${N(4)}`)).toBeNull();
-    await u.selectOptions(screen.getByTestId('inbox-kind'), 'mention');
-    await waitFor(() => expect(ids()).toEqual([N(3)]));
-    await u.selectOptions(screen.getByTestId('inbox-kind'), '');
-    await u.click(screen.getByTestId('inbox-show-all'));
-    await u.selectOptions(screen.getByTestId('inbox-snoozed'), 'only');
+    expect(screen.queryByTestId('inbox-kind')).toBeNull(); // P6: the kind select duplicated the tabs
+    await u.selectOptions(screen.getByTestId('inbox-show'), 'all');
+    await u.selectOptions(screen.getByTestId('inbox-show'), 'snoozed');
     await waitFor(() => expect(ids()).toEqual([N(5)]));
     expect(screen.getByTestId(`inbox-snoozed-chip-${N(5)}`)).toBeInTheDocument();
-    await u.selectOptions(screen.getByTestId('inbox-snoozed'), 'include');
+    await u.selectOptions(screen.getByTestId('inbox-show'), 'all_incl');
     await waitFor(() => expect(ids()).toHaveLength(5));
   });
 
@@ -98,12 +107,12 @@ describe('X1 inbox', () => {
     await u.click(await screen.findByTestId(`inbox-snooze-in_a_week-${N(2)}`));
     await waitFor(() => expect(screen.queryByTestId(`inbox-item-${N(2)}`)).toBeNull());
     expect(screen.getByTestId('inbox-unread')).toHaveTextContent('2 unread'); // a snoozed item does not count
-    await u.selectOptions(screen.getByTestId('inbox-snoozed'), 'only');
+    await u.selectOptions(screen.getByTestId('inbox-show'), 'snoozed');
     await waitFor(() => expect(ids().sort()).toEqual([N(2), N(5)].sort()));
     await u.click(screen.getByTestId(`inbox-snooze-${N(2)}`));
     await u.click(await screen.findByTestId(`inbox-unsnooze-${N(2)}`));
     await waitFor(() => expect(ids()).toEqual([N(5)]));
-    await u.selectOptions(screen.getByTestId('inbox-snoozed'), 'hide');
+    await u.selectOptions(screen.getByTestId('inbox-show'), 'all');
     await waitFor(() => expect(screen.getByTestId(`inbox-item-${N(2)}`)).toBeInTheDocument());
   });
 
@@ -141,7 +150,7 @@ describe('X1 inbox', () => {
     inbox('/inbox?unread=1');
     expect(await screen.findByTestId('inbox-empty')).toHaveTextContent('No unread items');
     server.use(http.get(`${API_BASE}/notifications`, () => HttpResponse.json({ type: 'x', title: 'Boom', status: 500, code: 'unknown' }, { status: 500 })));
-    await u.click(screen.getByTestId('inbox-show-all'));
+    await u.selectOptions(screen.getByTestId('inbox-show'), 'all');
     expect(await screen.findByTestId('inbox-error')).toBeInTheDocument();
     server.resetHandlers();
     await u.click(screen.getByTestId('inbox-error-retry'));
