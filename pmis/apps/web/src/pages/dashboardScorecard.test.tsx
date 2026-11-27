@@ -15,6 +15,7 @@ describe('Dashboard ops: contractor and supplier scorecard card (0.15.202, item 
   it('shows the level counts, the on-time and rejection rates, the average delay and the five worst parties, no amounts', async () => {
     await signIn('pm');
     dashPage();
+    // the first render of the whole Dashboard is slow under CI load (1000 ms default is not enough)
     const card = await screen.findByTestId('dash-ops-scorecard', {}, { timeout: 8000 });
     expect(card).toHaveTextContent('Contractor and supplier scorecard');
     expect(screen.getByTestId('dash-scorecard-parties')).toHaveTextContent('12');
