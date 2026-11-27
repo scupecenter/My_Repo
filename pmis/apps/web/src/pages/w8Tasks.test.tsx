@@ -25,7 +25,7 @@ describe('W8 site task list', () => {
     // the shared toolbar is complete: views, search, + Filter, the count, the layouts, columns, density, Export
     const bar = screen.getByTestId('task-grid-toolbar');
     for (const a of ['data-has-search', 'data-has-filter', 'data-has-views', 'data-has-columns', 'data-has-density', 'data-has-export']) expect(bar).toHaveAttribute(a);
-    expect(within(bar).getByTestId('site-layout-timeline')).toBeInTheDocument();
+    expect(within(bar).getByTestId('site-view')).toBeInTheDocument();
     expect(screen.getByTestId('task-grid-count-text')).toHaveTextContent(/^\d+ tasks$/);
   });
 
@@ -58,6 +58,6 @@ describe('W8 site task list', () => {
     renderApp(<SiteAt />, { route: `/sites/${SITE}` });
     expect(await screen.findByTestId('task-row')).toBeInTheDocument();
     expect(screen.getByTestId('task-row-toolbar')).toBeInTheDocument();
-    expect(screen.getByTestId('site-layout-timeline')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('site-view')).toHaveAttribute('aria-label', expect.stringMatching(/Timeline|الخط/));
   });
 });

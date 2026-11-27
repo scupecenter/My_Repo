@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { api, ApiError, downloadFile, type RequestOptions } from './client';
-import type { AlertRuleInput, AlertRuleSaved, AlertRulesResponse, IssueStoppedRowList, IssueTaskMapItem, IssueTaskMapList,
+import type { PasskeyItem, PasskeySetting, MyPasskeys, AlertRuleInput, AlertRuleSaved, AlertRulesResponse, IssueStoppedRowList, IssueTaskMapItem, IssueTaskMapList,
   ActiveSession, ActOnBehalfRequest, DownloadLocks, UiAsset, UiPublicIdentity, Calendar, CalendarConfirmation, MailNotificationKinds, ImportsSettings, ContractorPerformanceReport, ContractorPerformanceThresholds, ContractorPerformanceSettings, NavLayoutSetting, UiIdentity, UiBrand, LoginPage, SecurityLocks, SupportAccessSetting, Delegation, LoginPagePublic, SupportLink, NavLayoutT, ContractorRules, ContractorRulesInput, GecolHlcCounts, ContractorsCompletenessReport, TeamScopeMismatchReport, DeletedUser, PurgedUser, DlpSettings, DlpVersion, DlpVersionInput, Holiday, HolidayChangeResult, HolidayInput, HolidayPatch, HolidaySummary, IdleTaskAlertSetting, Job, LogIntegrity, LogRetention, LogRetentionInput, NewDeviceCodeSetting,
   NotificationPolicy, NotificationPolicyInput, NotificationTypeDef, Page, ReassignmentAlert, SecurityLogEntry, SessionRevokeResult, SlaPublishPreview, SlaRuleSet, SlaRuleSetPublishResult, SlaRuleSetSummary, SlaTaskRule, StaffCard, StaffVisibility, StructuralFreeze,
   TaskDefinition, TeamScopeMatch, TeamScopeMatchInput, TransitionResultT, User, UserDetail, WeekendDaysResult, WeightSet, WeightSetCode, WeightSetInput, WeightSetPreview, WeightSetPublishResult, WorkflowVersion, WorkflowVersionSummary,
@@ -194,6 +194,26 @@ export const useSetUiLogoDisplay = () => {
 };
 /** The public read (no session): which public pages show the logo. Both null until an admin switches one on. */
 export const useUiPublicIdentity = () => useQuery({ queryKey: ['ui-public-identity'], queryFn: () => api.get<UiPublicIdentity>('/ui/public/identity'), staleTime: 30_000, retry: 1 });
+/** 0.15.194 (migration 0294): passkeys as an alternative second step (setting security.passkeys), the own passkeys, and the admin recovery. */
+export const usePasskeySetting = () => useQuery({ queryKey: ['passkey-setting'], queryFn: () => api.get<PasskeySetting>('/settings/passkeys') });
+export const useSetPasskeys = () => {
+  const qc = useQueryClient();
+  return useMutation<PasskeySetting, ApiError, { version: number; enabled: boolean; reason: string }>({
+    mutationFn: ({ version, ...body }) => api.put('/settings/passkeys', { version, body }), onSettled: () => refresh(qc, 'passkey-setting', 'my-passkeys'),
+  });
+};
+export const useMyPasskeys = () => useQuery({ queryKey: ['my-passkeys'], queryFn: () => api.get<MyPasskeys>('/me/passkeys') });
+export const usePasskeyRegisterOptions = () => useMutation<Record<string, unknown>, ApiError, void>({ gcTime: 0, mutationFn: () => api.post('/me/passkeys/register/options') });
+export const usePasskeyRegisterVerify = () => {
+  const qc = useQueryClient();
+  return useMutation<PasskeyItem, ApiError, { label: string; response: Record<string, unknown> }>({ mutationFn: (body) => api.post('/me/passkeys/register/verify', { body }), onSettled: () => refresh(qc, 'my-passkeys') });
+};
+export const useRemovePasskey = () => {
+  const qc = useQueryClient();
+  return useMutation<void, ApiError, string>({ mutationFn: (id) => api.del(`/me/passkeys/${id}`), onSettled: () => refresh(qc, 'my-passkeys') });
+};
+export const useAdminRevokePasskeys = (userId: string) =>
+  useMutation<{ revoked: number }, ApiError, { reason: string }>({ mutationFn: (body) => api.post(`/users/${userId}/passkeys/revoke`, { body }) });
 export const useImportsSettings = () => useQuery({ queryKey: ['imports-settings'], queryFn: () => api.get<ImportsSettings>('/settings/imports') });
 export const useSetImportsSettings = () => {
   const qc = useQueryClient();

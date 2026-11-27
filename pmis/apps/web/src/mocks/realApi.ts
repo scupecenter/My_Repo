@@ -16,6 +16,9 @@ export const REAL_API_AUTH_USERS = [
   // Contract 0.5.0 and 0.6.0: two-factor (TOTP) for local accounts and its one-time enrolment code (apps/api: auth, users; migrations 0033, 0034).
   ['post', '/auth/local/2fa'],
   ['post', '/auth/local/2fa/device-code'],
+  // Contract 0.15.194 (migration 0294; apps/api: security, auth): passkeys as an alternative second step.
+  ['post', '/auth/local/2fa/passkey/options'],
+  ['post', '/auth/local/2fa/passkey'],
   ['post', '/auth/local/2fa/enrol/start'],
   ['post', '/auth/local/2fa/enrol/confirm'],
   ['post', '/auth/local/2fa/recovery-codes'],
@@ -224,6 +227,7 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/me/sessions/revoke-others'],
   ['post', '/me/sessions/:id/revoke'],
   ['patch', '/me/profile'],
+  ['get', '/admin/document-search-index'],
   ['patch', '/me/preferences'],
   ['post', '/me/password'],
   ['post', '/me/email-change'],
@@ -407,6 +411,14 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/settings/new-device-code'],
   ['put', '/settings/new-device-code'],
   ['post', '/settings/new-device-code/bypass'],
+  // Contract 0.15.194 (migration 0294): the passkey setting, the own passkeys and the admin recovery.
+  ['get', '/settings/passkeys'],
+  ['put', '/settings/passkeys'],
+  ['get', '/me/passkeys'],
+  ['post', '/me/passkeys/register/options'],
+  ['post', '/me/passkeys/register/verify'],
+  ['delete', '/me/passkeys/:id'],
+  ['post', '/users/:id/passkeys/revoke'],
   ['put', '/settings/identity/logo'],
   ['patch', '/settings/identity/logo'],
   ['patch', '/settings/identity/logo/display'],

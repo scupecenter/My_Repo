@@ -236,7 +236,7 @@ describe('hybrid mode list', () => {
     expect(REAL_API_AUTH_USERS.map(([m, p]) => `${m.toUpperCase()} ${p}`)).toEqual([
       'POST /auth/local/login', 'POST /auth/local/password', 'POST /auth/local/password-reset/request', 'POST /auth/local/password-reset/confirm', 'POST /auth/local/step-up',
       // contract 0.5.0: two-factor
-      'POST /auth/local/2fa', 'POST /auth/local/2fa/device-code', 'POST /auth/local/2fa/enrol/start', 'POST /auth/local/2fa/enrol/confirm', 'POST /auth/local/2fa/recovery-codes',
+      'POST /auth/local/2fa', 'POST /auth/local/2fa/device-code', 'POST /auth/local/2fa/passkey/options', 'POST /auth/local/2fa/passkey', 'POST /auth/local/2fa/enrol/start', 'POST /auth/local/2fa/enrol/confirm', 'POST /auth/local/2fa/recovery-codes',
       'GET /auth/session', 'POST /auth/logout', 'GET /me',
       'GET /users', 'GET /users/picker', 'GET /users/deleted', 'POST /users', 'GET /users/:id', 'PATCH /users/:id', 'POST /users/:id/password-reset', 'PUT /users/:id/two-factor', 'POST /users/:id/two-factor/reset', 'POST /users/:id/two-factor/enrol-code', 'POST /users/:id/delete', 'POST /users/:id/restore', 'GET /groups', 'GET /groups/:id',
       'POST /groups/:id/members', 'DELETE /groups/:id/members/:userId',
@@ -293,7 +293,7 @@ describe('hybrid mode list', () => {
       // contract 0.15.242: the generic alert rules (apps/api: settings; migration 0342)
       'GET /settings/alert-rules', 'POST /settings/alert-rules', 'PUT /settings/alert-rules/:id',
       // contract 0.9.2: the self-service profile (details, email change and its decision, password, two-factor self-service, enforced mark)
-      'GET /me/profile', 'GET /me/sessions', 'POST /me/sessions/revoke-others', 'POST /me/sessions/:id/revoke', 'PATCH /me/profile', 'PATCH /me/preferences', 'POST /me/password', 'POST /me/email-change', 'DELETE /me/email-change',
+      'GET /me/profile', 'GET /me/sessions', 'POST /me/sessions/revoke-others', 'POST /me/sessions/:id/revoke', 'PATCH /me/profile', 'GET /admin/document-search-index', 'PATCH /me/preferences', 'POST /me/password', 'POST /me/email-change', 'DELETE /me/email-change',
       'POST /me/two-factor/enrol/start', 'POST /me/two-factor/enrol/confirm', 'POST /me/two-factor/disable',
       'GET /email-change-requests', 'POST /email-change-requests/:id/decide', 'PUT /users/:id/two-factor/enforced',
       // contract 0.10.0: the logs core
@@ -352,7 +352,7 @@ describe('hybrid mode list', () => {
       // contract 0.15.97: Settings, Screens, Login page and its public read
       'GET /settings/login-page', 'PUT /settings/login-page', 'GET /settings/login-page/public',
       'GET /settings/security-locks', 'PUT /settings/security-locks', 'GET /settings/download-locks', 'PUT /settings/download-locks',
-      'GET /settings/support-access', 'PUT /settings/support-access', 'GET /support-access', 'POST /support-access', 'POST /support-access/revoke-all', 'POST /support-access/:id/revoke', 'GET /settings/new-device-code', 'PUT /settings/new-device-code', 'POST /settings/new-device-code/bypass',
+      'GET /settings/support-access', 'PUT /settings/support-access', 'GET /support-access', 'POST /support-access', 'POST /support-access/revoke-all', 'POST /support-access/:id/revoke', 'GET /settings/new-device-code', 'PUT /settings/new-device-code', 'POST /settings/new-device-code/bypass', 'GET /settings/passkeys', 'PUT /settings/passkeys', 'GET /me/passkeys', 'POST /me/passkeys/register/options', 'POST /me/passkeys/register/verify', 'DELETE /me/passkeys/:id', 'POST /users/:id/passkeys/revoke',
       // contract 0.15.232 (migration 0243): the workspace logo and where it shows outside the app
       'PUT /settings/identity/logo', 'PATCH /settings/identity/logo', 'PATCH /settings/identity/logo/display', 'GET /ui/public/identity', 'GET /ui/public/logo/:purpose', 'GET /ui/assets/:key',
       // contract 0.15.4: the per-site workflow locks and the status of the sites of an import

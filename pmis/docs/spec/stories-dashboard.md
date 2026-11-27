@@ -19,7 +19,7 @@ All counts use approved data only and exclude Cancelled sites and N/A steps (BP 
   **Then** each row shows Scope, Done, Pending, Not Due, % Done, Overdue Open, Achieved Late, Avg Delay and Baseline Missing (D66, D67). Plan Coverage is not shown.
 
 ## DB-03 Overall Progress by Region
-- **Given** the 7 regions
+- **Given** the regions
   **When** the table loads
   **Then** it shows a CW block (7 milestones) and a TE block (6 milestones) for each region (D67).
 

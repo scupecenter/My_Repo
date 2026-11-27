@@ -43,7 +43,7 @@ describe('Settings, historical load', () => {
     await u.click(screen.getByTestId('hw-open-dialog-submit'));
     await waitFor(() => expect(screen.getByTestId('hw-status')).toHaveTextContent('Open'));
     expect(screen.getByTestId('hw-cutoff')).toHaveTextContent('2026-02-28');
-    expect(screen.getByTestId('hw-expires')).toHaveTextContent('30 day(s) left');
+    expect(screen.getByTestId('hw-expires')).toHaveTextContent('30 days left');
     expect(screen.getByTestId('hw-reason')).toHaveTextContent('Initial load of the Master');
     expect(screen.queryByTestId('hw-open')).not.toBeInTheDocument();
 

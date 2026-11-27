@@ -8,6 +8,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { api, downloadFile, type ApiError } from '@/api/client';
 import { downloadGenerated, generatedHtml, printHtml, useArchiveRows, useGenerateDocument, useLibraryForms, usePreviewForm, type LibraryForm, type LibraryGeneratedDocument } from '@/api/library';
 import { PageHeader } from '@/components/PageHeader';
+import { SavedViews } from '@/components/SavedViews';
 import { EmptyState, QueryFallback } from '@/components/States';
 import { SearchBox, TableCount } from '@/components/TableStandard';
 import { useToast } from '@/components/Toast';
@@ -138,6 +139,7 @@ export function LibraryForms() {
         </span>) : undefined} />
       <LibraryTabs />
       <div className="mb-3 flex flex-wrap items-center gap-2">
+        <SavedViews<Record<string, unknown>> screen="library-forms" value={{ q }} empty={{ q: '' }} onApply={(v) => setParam({ q: String(v.q ?? '') })} />
         <SearchBox testid="lib-forms-search" value={q} onChange={(v) => setParam({ q: v })} placeholder={t('lib.search_forms')} />
         <span className="ms-auto"><TableCount testid="lib-forms-count" noun="items" total={all.length} filtered={items.length} active={!!needle} onClear={() => setParam({ q: '' })} /></span>
       </div>
