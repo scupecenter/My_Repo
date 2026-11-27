@@ -31,7 +31,7 @@ export const useDismantleOrders = (siteId: string | null | undefined, part: stri
     queryFn: () => api.get<{ items: DismantleOrderOption[] }>('/registers/dismantle/order-options', { query: { site_id: siteId!, record_type: part! } }).then((r) => r.items),
   });
 
-/** GET /registers/dismantle/rn-options: the received Warehouse RNs of the part on the site (0210). */
+/** GET /registers/dismantle/rn-options: the received Warehouse RNs of the part on the site (0321). */
 export const useDismantleRns = (siteId: string | null | undefined, part: string | null | undefined, enabled: boolean) =>
   useQuery({
     queryKey: ['dismantle-rns', siteId, part], enabled: enabled && !!siteId && (part === 'cw' || part === 'te'),

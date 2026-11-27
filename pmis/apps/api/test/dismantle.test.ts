@@ -408,7 +408,7 @@ describe("rules enforced in the database", () => {
       { data: { supervising_engineer: randomUUID() } },
     );
     expect(stranger.body.errors[0].code).toBe("unknown_user");
-    // 0210: the closing RN link. A made-up RN, a malformed id and an RN that is not a received RN of the part are refused; the typed reference is not read from them.
+    // 0321: the closing RN link. A made-up RN, a malformed id and an RN that is not a received RN of the part are refused; the typed reference is not read from them.
     const noSuchRn = await patch(t.entry.api, KEY, rec.body.id, rec.body.version, { data: { closed: true, closing_rn_id: randomUUID() } });
     expect(noSuchRn.status, JSON.stringify(noSuchRn.body)).toBe(422);
     expect(JSON.stringify(noSuchRn.body)).toContain("rn_not_available");

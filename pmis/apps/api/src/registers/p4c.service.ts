@@ -49,7 +49,7 @@ export class P4cService {
     return { items };
   }
 
-  /** GET /registers/dismantle/rn-options?site_id=&record_type= : the received Warehouse RNs of the part (CW / TE) on the site that close a Dismantle part (0210). */
+  /** GET /registers/dismantle/rn-options?site_id=&record_type= : the received Warehouse RNs of the part (CW / TE) on the site that close a Dismantle part (0321). */
   async dismantleRnOptions(auth: AuthContext, q: Record<string, unknown>): Promise<{ items: unknown[] }> {
     await this.access.requireRegions('dismantle', 'view');
     const site = oneParam(q, 'site_id');

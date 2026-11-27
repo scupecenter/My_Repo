@@ -1,5 +1,5 @@
--- 0210_dismantle_closing_rn_link: a Dismantle part closes by naming its signed Warehouse RN (picked from a list); the RN reference is then READ from the RN.
--- Mirror: db/sql/209_dismantle_closing_rn_link.sql (kept identical to prisma/migrations/0210_dismantle_closing_rn_link/migration.sql).
+-- 0321_dismantle_closing_rn_link: a Dismantle part closes by naming its signed Warehouse RN (picked from a list); the RN reference is then READ from the RN.
+-- Mirror: db/sql/320_dismantle_closing_rn_link.sql (kept identical to prisma/migrations/0321_dismantle_closing_rn_link/migration.sql).
 --
 --   Q101 (2026-11-01) left a text field, `closing_rn_ref`, until the Warehouse register exists. It exists now (0026), so the text is replaced by a link, without removing the text:
 --   a new optional field `closing_rn_id` (the entity id of a Warehouse RN) is picked from the RNs of the same site and of the part (CW part: cw_rn, TE part: te_rn). When it is set,
