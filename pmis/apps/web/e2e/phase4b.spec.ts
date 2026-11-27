@@ -31,9 +31,9 @@ for (const [locale, theme] of [['en', 'light'], ['ar', 'dark']] as const) {
       await page.getByTestId('inbox-snooze-30000000-0000-4000-8000-000000000002').click();
       await page.getByTestId('inbox-snooze-tomorrow-30000000-0000-4000-8000-000000000002').click();
       await expect(page.getByTestId('inbox-item-30000000-0000-4000-8000-000000000002')).toHaveCount(0);
-      await page.getByTestId('inbox-snoozed').selectOption('only');
+      await page.getByTestId('inbox-show').selectOption('snoozed');
       await expect(page.getByTestId('inbox-item-30000000-0000-4000-8000-000000000002')).toBeVisible();
-      await page.getByTestId('inbox-snoozed').selectOption('hide');
+      await page.getByTestId('inbox-show').selectOption('all');
 
       await page.getByTestId(`inbox-open-${MENTION}`).click();
       await expect(page.getByTestId('task-drawer-body')).toBeVisible();

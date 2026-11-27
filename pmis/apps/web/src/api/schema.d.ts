@@ -6975,6 +6975,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/ops-limits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The operational limits, with the value in force and the default of each (0.15.312)
+         * @description Every signed-in user may read it. `can_edit` is true for a System Admin only. A value that was never saved reads as its default.
+         */
+        get: operations["getOpsLimits"];
+        /**
+         * Change the operational limits (System Admin, reason, step-up, If-Match, audited) (0.15.312)
+         * @description System Admin only (403 `action_forbidden` otherwise, a delegate included). A reason (3+ characters), a step-up (401 `step_up_required`) and `If-Match` (428 / 412)
+         *     are required. `values` holds the limits that differ from their default; a key that is left out returns to its default. 422 for an unknown key, a value that is not a
+         *     whole number, a value outside its range, or an absolute session length shorter than the idle limit. Saving what is already in force is 409 `invalid_transition`.
+         *     Audited `ops_limits_update` with the stored values before and after.
+         */
+        put: operations["setOpsLimits"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/historical-waiver": {
         parameters: {
             query?: never;
@@ -11785,6 +11812,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me/home-pins": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The caller's pinned home views (0.15.245)
+         * @description 0.15.245 (migration 0344). The views the caller pinned as cards on the home dashboard, in the pin order. A pin is personal; a view that was deactivated or became unreadable drops out of the list. The counter a card shows is computed by the screen's own list endpoint for the caller, so it always stays inside the caller's permissions.
+         */
+        get: operations["getHomePins"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/saved-views/{view_id}/pin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pin a saved view as a card on the home dashboard (0.15.245)
+         * @description 0.15.245 (migration 0344). Personal: the pin is the caller's own. A view the caller may not read answers 404, exactly like `GET /saved-views/{view_id}`. At most 12 pins per caller (422 `validation_failed`, `/view` `too_many`); pinning again is a no-op.
+         */
+        post: operations["pinSavedViewHome"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/saved-views/{view_id}/unpin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Unpin a saved view from the home dashboard (0.15.245)
+         * @description 0.15.245 (migration 0344). Removes the caller's pin; a missing pin is a no-op.
+         */
+        post: operations["unpinSavedViewHome"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -13349,6 +13436,8 @@ export interface components {
             reason: components["schemas"]["Reason"];
         };
         RolePatch: {
+            /** @description 0.15.500 (0500, D51). Changes the code; built-in codes are locked (422), a duplicate is 409. */
+            code?: string;
             name_en?: string;
             name_ar?: string;
             description_en?: string;
@@ -18801,6 +18890,39 @@ export interface components {
             user_id: string;
             minutes?: number;
         };
+        /** @description 0.15.312. One operational limit. */
+        OpsLimitItem: {
+            /** @enum {string} */
+            key: "session.idle_hours" | "session.absolute_hours" | "stepup.seconds" | "assignments.max_rows" | "import.max_rows" | "master_import.max_rows" | "register_import.max_rows" | "prefill.max_rows" | "prefill.max_sites" | "export.max_rows" | "idempotency.max_entries";
+            /** @enum {string} */
+            group: "sessions" | "rows" | "exports";
+            /** @enum {string} */
+            unit: "hours" | "seconds" | "rows" | "sites" | "entries";
+            default: number;
+            min: number;
+            max: number;
+            /** @description The value in force. */
+            value: number;
+            /** @description true when no value was saved for this key. */
+            is_default: boolean;
+        };
+        /** @description 0.15.312. The operational limits (setting `ops.limits`, migration 0402). */
+        OpsLimits: {
+            items: components["schemas"]["OpsLimitItem"][];
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+            /** @description The ETag value. */
+            version: number;
+            /** @description A System Admin only. */
+            can_edit: boolean;
+        };
+        OpsLimitsInput: components["schemas"]["WithReason"] & {
+            /** @description The limits that differ from their default, key to value. A key that is left out returns to its default. */
+            values: {
+                [key: string]: number;
+            };
+        };
         /** @description 0.15.1. The shared order of the side menu (setting `nav.layout`). */
         NavLayout: {
             headings: components["schemas"]["NavHeading"][];
@@ -21349,6 +21471,19 @@ export interface components {
              * @description When this editing spell began.
              */
             since: string;
+        };
+        /** @description 0.15.245: one pinned home view (migration 0344). The card's counter is computed by the screen's own list endpoint for the caller. */
+        HomeViewPin: {
+            /** Format: uuid */
+            view_id: string;
+            /** @description The view's current name. */
+            name: string;
+            screen_key: components["schemas"]["SavedViewScreenKey"];
+            /** @description The view's filters, scrubbed for the caller like a read of the view (hidden fields left out). */
+            filters: {
+                [key: string]: unknown;
+            };
+            position: number;
         };
         SavedView: {
             /** Format: uuid */
@@ -35014,6 +35149,62 @@ export interface operations {
             429: components["responses"]["TooManyRequests"];
         };
     };
+    getOpsLimits: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The limits. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpsLimits"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setOpsLimits: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OpsLimitsInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpsLimits"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
     getHistoricalWaiver: {
         parameters: {
             query?: never;
@@ -43601,6 +43792,87 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    getHomePins: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The caller's pinned views, in the pin order. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["HomeViewPin"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    pinSavedViewHome: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                view_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Pinned. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        view_id: string;
+                        /** @enum {boolean} */
+                        pinned_home: true;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    unpinSavedViewHome: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                view_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Unpinned. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        view_id: string;
+                        /** @enum {boolean} */
+                        pinned_home: false;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
         };
     };
 }

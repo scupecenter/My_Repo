@@ -1,11 +1,10 @@
-import { ChevronLeft, ChevronRight, ClipboardCopy, Download, Lock, LockOpen, Pencil, Plus, Search, Settings, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ClipboardCopy, Download, Lock, LockOpen, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router-dom';
-import { useMe } from '@/api/hooks';
 import { exportDailyPlan, useDailyPlan, useDailyPlanOps, useDailyPlanSettings, type DailyPlanDay, type DailyPlanRegion, type DailyPlanRow } from '@/api/dailyPlan';
 import { errText, FormDialog } from '@/components/FormDialog';
-import { PageHeader } from '@/components/PageHeader';
+import { MoreMenu, PageHeader } from '@/components/PageHeader';
 import { SavedViews } from '@/components/SavedViews';
 import { ErrorState, LoadingSkeleton } from '@/components/States';
 import { LayoutPanel } from '@/components/LayoutPanel';
@@ -24,13 +23,6 @@ const SCREEN = 'daily-plan';
 const WIDE = new Set<DpColumn>(['planned_work', 'actual_work', 'reason', 'remark', 'sow', 'contractor', 'aat_se']);
 const colDefs = (cols: DpColumn[]): ColDef[] => cols.map((id) => ({ id, w: id === 'no' ? 56 : WIDE.has(id) ? 220 : 130, pinned: id === 'no' || id === 'site_code' }));
 
-/** The person may open Settings > My Work > Daily Plan (a System Admin, or edit on the settings of the administration). */
-function canOpenSettings(me: ReturnType<typeof useMe>['data']): boolean {
-  if (!me) return false;
-  if (me.is_system_admin) return true;
-  return me.effective.grants.some((g) => g.action === 'edit' && (g.module_key === '*' || g.module_key === 'admin' || g.module_key === 'admin.settings'));
-}
-
 /**
  * My Work > Daily Plan (plan W7, owner decisions 2026-11-23): Daily Progress of a day and Tomorrow Plan of the next working day, one plan per region per day.
  * The rows come filled from system data; L1 changes them by hand (audited), adds or removes sites and gives the Reason and Remark; L2 locks the day.
@@ -40,7 +32,6 @@ function canOpenSettings(me: ReturnType<typeof useMe>['data']): boolean {
 export function DailyPlan() {
   const { t, i18n } = useTranslation();
   const toast = useToast();
-  const me = useMe(true);
   const [sp, setSp] = useSearchParams();
   const isWeek = sp.get('tab') === 'week';
   const tab: DailyPlanTab = sp.get('tab') === 'tomorrow' ? 'tomorrow' : 'progress';
@@ -109,8 +100,7 @@ export function DailyPlan() {
 
   return (
     <div className="space-y-3" data-testid="page-daily-plan">
-      <PageHeader title={t('dailyPlan.title')} subtitle={t('dailyPlan.subtitle')} testid="daily-plan-header" settings="daily_plan"
-        context={canOpenSettings(me.data) ? <Link to="/admin/settings/my-work/daily-plan" className="btn px-2 py-1 text-xs" data-testid="daily-plan-settings-link"><Settings size={14} aria-hidden />{t('dailyPlan.settings')}</Link> : undefined} />
+      <PageHeader title={t('dailyPlan.title')} subtitle={t('dailyPlan.subtitle')} testid="daily-plan-header" />
 
       <div className="flex flex-wrap items-center gap-2">
         <div role="tablist" aria-label={t('dailyPlan.title')} className="inline-flex gap-1" data-testid="daily-plan-tabs">
@@ -148,9 +138,19 @@ export function DailyPlan() {
           <span className="text-sm text-mute" data-testid="daily-plan-count">{t('dailyPlan.count', { count: rows.length })}</span>
           {plans.some((p) => p.can_edit) && <button type="button" className="btn btn-accent" data-testid="daily-plan-add" onClick={() => setAdding(true)}><Plus size={16} aria-hidden />{t('dailyPlan.add_site')}</button>}
           <LayoutPanel testid="daily-plan-layout" table={table} />
+<<<<<<< HEAD
           <ColumnMenu density={false} api={table} label={(id) => t(`dailyPlan.col.${id}`)} />
           <button type="button" className="btn" data-testid="daily-plan-export" disabled={!progress.data} onClick={doExport}><Download size={16} aria-hidden />{t('dailyPlan.export')}</button>
           <button type="button" className="btn" data-testid="daily-plan-copy" disabled={!progress.data || !tomorrow.data} onClick={() => void copy()}><ClipboardCopy size={16} aria-hidden />{t('dailyPlan.copy')}</button>
+=======
+          <ColumnMenu api={table} label={(id) => t(`dailyPlan.col.${id}`)} />
+          <MoreMenu
+            settings="daily_plan"
+            items={[
+              { id: 'export', label: t('dailyPlan.export'), icon: <Download size={16} aria-hidden />, testid: 'daily-plan-export', disabled: !progress.data, onSelect: doExport },
+              { id: 'copy', label: t('dailyPlan.copy'), icon: <ClipboardCopy size={16} aria-hidden />, testid: 'daily-plan-copy', disabled: !progress.data || !tomorrow.data, onSelect: () => void copy() },
+            ]} />
+>>>>>>> origin/main
         </span>
       </div>
 

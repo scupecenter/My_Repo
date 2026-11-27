@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
 import { api, API_BASE, ApiError } from '@/api/client';
+import { isBuiltInRoleCode } from '@/lib/roleCodes';
 import { server } from '@/mocks/server';
 import { renderApp, signIn } from '@/test/utils';
 import { Assignments } from './Assignments';
@@ -140,6 +141,33 @@ describe('roles', () => {
     await u.click(within(dlg).getByTestId('role-dialog-submit'));
     await waitFor(() => expect(posted).not.toBeNull());
     expect((posted as Record<string, unknown> | null)?.parent_role_id ?? null).toBeNull();
+  });
+
+  it('the code is editable with a warning; a built-in code is locked; the Arabic description is saved (D51)', async () => {
+    await signIn('pm'); await stepUpDone();
+    const u = userEvent.setup();
+    let patched: Record<string, unknown> | null = null;
+    server.use(http.patch(`${API_BASE}/roles/:id`, async ({ request }) => {
+      patched = (await request.json()) as Record<string, unknown>;
+      return HttpResponse.json({ id: 'a0000000-0000-4000-8000-000000000002', code: 'X', name_en: 'X', is_active: true, can_hold_matrix_levels: true, version: 2 });
+    }));
+    renderApp(<Roles />);
+    const list = await screen.findByTestId('roles-list');
+    await waitFor(() => expect(within(list).getAllByTestId(/^role-row-/).length).toBeGreaterThan(3));
+    const free = within(list).getAllByTestId(/^role-row-/)[0].getAttribute('data-testid')!.replace('role-row-', '');
+    expect(isBuiltInRoleCode('PM')).toBe(true);
+    expect(isBuiltInRoleCode('NEW_CODE')).toBe(false);
+    await u.click(screen.getByTestId(`role-edit-${free}`));
+    const dlg = await screen.findByTestId('role-dialog');
+    const code = within(dlg).getByTestId('role-code');
+    expect(code).not.toBeDisabled();
+    await u.clear(code); await u.type(code, 'NEW_CODE');
+    expect(within(dlg).getByTestId('role-code-warning')).toBeInTheDocument();
+    await u.type(within(dlg).getByTestId('role-desc-ar'), 'وصف');
+    await u.type(within(dlg).getByTestId('role-dialog-reason'), 'Rename');
+    await u.click(within(dlg).getByTestId('role-dialog-submit'));
+    await waitFor(() => expect(patched).not.toBeNull());
+    expect(patched).toMatchObject({ code: 'NEW_CODE', description_ar: expect.stringContaining('وصف') });
   });
 
   it('the Arabic role texts never say main or sub (رئيسي / فرعي)', async () => {
