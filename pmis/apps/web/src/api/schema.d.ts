@@ -6027,6 +6027,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/data-reset/narrow-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What the reset picker offers for narrowing (System Admin only)
+         * @description 0.15.265 (migration 0370, `data_reset_narrow_options`). A System Admin acting without delegation. The regions and the 200 most recent import batches of the part (`part`), with their row counts, and the narrowable parts.
+         */
+        get: operations["getDataResetNarrowOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/data-reset/settings": {
         parameters: {
             query?: never;
@@ -17039,6 +17059,8 @@ export interface components {
             selected: boolean;
             /** @description In the closure only because a chosen part takes it along. */
             added: boolean;
+            /** @description 0.15.265. The part can be narrowed to regions, batches or a period (its data follows one register record). */
+            narrowable?: boolean;
         };
         DataResetScope: {
             /** @description 1; 0 for a request made before 0.15.71 (`legacy`: everything as it was then). */
@@ -17052,8 +17074,48 @@ export interface components {
             everything?: boolean;
             /** @description The identity parts of the closure. */
             identity?: components["schemas"]["DataResetPartCode"][];
-            /** @description SHA-256 of the closure. */
+            /** @description SHA-256 of the closure (with the narrowing when there is one). */
             hash?: string;
+            /** @description 0.15.265. The narrowing of the scope (normal form), null when the whole part goes. */
+            narrow?: components["schemas"]["DataResetNarrow"] | null;
+        };
+        /** @description 0.15.265. Narrows the chosen register parts to the entities that match every given key. */
+        DataResetNarrow: {
+            /** @description Region ids (any of). */
+            regions?: number[];
+            /** @description Import batch ids (any of): the record came from the batch directly or through a row. */
+            batches?: string[];
+            /**
+             * Format: date
+             * @description First-created day, inclusive (Africa/Tripoli).
+             */
+            from?: string;
+            /**
+             * Format: date
+             * @description First-created day, inclusive (Africa/Tripoli).
+             */
+            to?: string;
+            readonly version?: number;
+        };
+        DataResetNarrowOptions: {
+            narrowable: components["schemas"]["DataResetPartCode"][];
+            regions: {
+                id: number;
+                code: string;
+                name_en: string;
+                name_ar?: string | null;
+            }[];
+            batches: {
+                /** Format: uuid */
+                id: string;
+                file_name: string;
+                register_key?: string | null;
+                rows_total: number;
+                status: string;
+                /** Format: date-time */
+                created_at: string;
+                historical_load?: boolean;
+            }[];
         };
         DataResetPlan: {
             scope: components["schemas"]["DataResetScope"];
@@ -17068,6 +17130,8 @@ export interface components {
             error?: string | null;
             /** @description 0.15.71. The catalogue in screen order, with the rows of each part and whether the scope selects it. */
             parts: components["schemas"]["DataResetPart"][];
+            /** @description 0.15.265. The narrowing the counts are for. */
+            narrow?: components["schemas"]["DataResetNarrow"] | null;
         };
         DataResetFiles: {
             total: number;
@@ -32956,6 +33020,14 @@ export interface operations {
             query?: {
                 /** @description Comma-separated part codes (for example `issues,risks`). */
                 parts?: string;
+                /** @description 0.15.265. Narrow to these region ids (comma-separated). */
+                regions?: string;
+                /** @description 0.15.265. Narrow to the records that came from these import batches (comma-separated ids). */
+                batches?: string;
+                /** @description 0.15.265. Narrow to entities first created on or after this day. */
+                from?: string;
+                /** @description 0.15.265. Narrow to entities first created on or before this day. */
+                to?: string;
             };
             header?: never;
             path?: never;
@@ -32970,6 +33042,31 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DataResetPlan"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getDataResetNarrowOptions: {
+        parameters: {
+            query?: {
+                part?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The options. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataResetNarrowOptions"];
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -33033,6 +33130,7 @@ export interface operations {
                      * @default true
                      */
                     require_backup?: boolean;
+                    narrow?: components["schemas"]["DataResetNarrow"];
                     /** @description 0.15.72. Required when `require_backup` is false: the typed phrase `NO BACKUP` (`DataResetState.no_backup_phrase`; 422 `confirmation_mismatch` at `/no_backup_confirm` otherwise). Ignored when a backup is required. */
                     no_backup_confirm?: string;
                 };

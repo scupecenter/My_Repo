@@ -222,4 +222,31 @@ describe('Settings, data reset', () => {
       expect(ar.errors[k]).toBeTruthy();
     }
   });
+  it('narrowing (0.15.265): the picker appears for narrowable parts only, the filter reaches the request and the approver view, a clear button resets it', async () => {
+    await signIn('pm'); await stepUpDone();
+    const u = userEvent.setup();
+    page();
+    await u.click(await screen.findByTestId('dr-scope-custom'));
+    expect(screen.getByTestId('dr-narrow-whole')).toHaveTextContent(en.dr.narrow_whole);
+    await u.click(screen.getByTestId('dr-part-sites'));
+    expect(screen.queryByTestId('dr-narrow')).not.toBeInTheDocument();       // sites go whole
+    await u.click(screen.getByTestId('dr-part-sites'));
+    await u.click(screen.getByTestId('dr-part-procurement'));
+    expect(await screen.findByTestId('dr-narrow')).toBeInTheDocument();
+    await u.click(await screen.findByTestId('dr-narrow-region-1'));
+    expect(screen.getByTestId('dr-narrow-active')).toBeInTheDocument();
+    expect(screen.getByTestId('dr-narrow-clear')).toHaveAccessibleName(en.dr.narrow_clear);
+    await u.click(screen.getByTestId('dr-narrow-clear'));
+    expect(screen.queryByTestId('dr-narrow-active')).not.toBeInTheDocument();
+    await u.click(screen.getByTestId('dr-narrow-region-1'));
+    await u.type(screen.getByTestId('dr-reason'), 'Owner decision: only Tripoli orders');
+    await u.type(screen.getByTestId('dr-phrase'), 'RESET pmis');
+    await u.click(screen.getByTestId('dr-submit'));
+    await screen.findByTestId('dr-request-narrow');
+    await waitFor(() => expect(screen.getByTestId('dr-request-narrow')).toHaveTextContent('Tripoli'));
+  });
+
+  it('the narrowing strings exist in English and Arabic', () => {
+    for (const k of Object.keys(en.dr).filter((x) => x.startsWith('narrow_'))) expect((ar.dr as Record<string, string>)[k]).toBeTruthy();
+  });
 });
