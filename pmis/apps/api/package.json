@@ -13,6 +13,7 @@
     "dev": "tsx watch --env-file-if-exists=.env src/main.ts",
     "test": "vitest run",
     "test:perf": "vitest run test/dashboard-perf.test.ts",
+    "test:load": "LOAD_TEST=1 vitest run test/load-test.test.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "eslint src test --max-warnings 0"
   },
