@@ -467,6 +467,8 @@
     "tab_priority": "الأولوية"
   },
   "common": {
+    "pick_date": "اختيار التاريخ من التقويم",
+    "date_hint": "التاريخ بصيغة YYYY-MM-DD",
     "search": "بحث",
     "cancel": "إلغاء",
     "loading": "جارٍ التحميل…",

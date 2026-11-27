@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { ApiError } from '@/api/client';
 import { GRID_STATUSES, useDocsGrid, useDocsGridView, useMarkNotRequired, useSaveDocsGridView, type GridColumn, type GridRow, type GridStatus } from '@/api/docsGrid';
 import { useToast } from './Toast';
+import { DateInput } from '@/components/DateInput';
 
 /** Status colour, icon and label of a grid cell: the icon carries the meaning too, so the colour is never the only cue. */
 const LOOK: Record<GridStatus, { tone: string; Icon: typeof Circle }> = {
@@ -68,8 +69,8 @@ export function DocumentsGrid() {
             <option value="">{t('docsGrid.all_statuses')}</option>
             {GRID_STATUSES.map((s) => <option key={s} value={s}>{label(s)}</option>)}
           </select></label>
-        <label className="text-sm">{t('docsGrid.from')}<input type="date" className="input mt-1" data-testid="docs-grid-from" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
-        <label className="text-sm">{t('docsGrid.to')}<input type="date" className="input mt-1" data-testid="docs-grid-to" value={to} onChange={(e) => setTo(e.target.value)} /></label>
+        <label className="text-sm">{t('docsGrid.from')}<DateInput className="input mt-1" data-testid="docs-grid-from" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
+        <label className="text-sm">{t('docsGrid.to')}<DateInput className="input mt-1" data-testid="docs-grid-to" value={to} onChange={(e) => setTo(e.target.value)} /></label>
       </div>
       <details className="card p-2 text-sm" data-testid="docs-grid-columns">
         <summary className="cursor-pointer">{t('docsGrid.columns')}</summary>

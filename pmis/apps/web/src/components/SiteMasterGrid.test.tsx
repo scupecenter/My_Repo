@@ -215,7 +215,7 @@ describe("Site Master grid", () => {
     renderApp(<SiteMasterGrid menu={cw} rows={rows} onEditCell={onEditCell} />);
     fireEvent.doubleClick(screen.getByTestId("site-master-grid-cell-S-003-3"));
     const input = screen.getByTestId("site-master-grid-input-S-003-3") as HTMLInputElement;
-    expect(input.type).toBe("date");
+    expect(input.placeholder).toBe("YYYY-MM-DD"); // the shared date field (typed ISO), not the browser date control
     fireEvent.change(input, { target: { value: "2026-04-01" } });
     fireEvent.keyDown(input, { key: "Enter" });
     expect(onEditCell).toHaveBeenCalledWith(

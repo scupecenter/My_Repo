@@ -16,6 +16,7 @@ import {
   cellValue, copyToClipboard, emailContent, EMPTY_FILTERS, filterRows, localToday, optionsOf, OVERRIDE_KEYS, OWNER_COLUMNS, type DailyPlanTab, type DpColumn, type DpFilters,
 } from '@/lib/dailyPlan';
 import type { ColDef } from '@/lib/tablePrefs';
+import { DateInput } from '@/components/DateInput';
 
 const SCREEN = 'daily-plan';
 const WIDE = new Set<DpColumn>(['planned_work', 'actual_work', 'reason', 'remark', 'sow', 'contractor', 'aat_se']);
@@ -118,7 +119,7 @@ export function DailyPlan() {
         </div>
         <span className="inline-flex items-center gap-1">
           <button type="button" className="btn px-2" aria-label={t('dailyPlan.previous_day')} onClick={() => shift(-1)}><ChevronLeft size={16} className="rtl:rotate-180" aria-hidden /></button>
-          <input type="date" className="input w-auto" aria-label={t('dailyPlan.date')} data-testid="daily-plan-date" value={date} onChange={(e) => e.target.value && setParams({ date: e.target.value })} />
+          <DateInput className="input w-auto" aria-label={t('dailyPlan.date')} data-testid="daily-plan-date" value={date} onChange={(e) => e.target.value && setParams({ date: e.target.value })} />
           <button type="button" className="btn px-2" aria-label={t('dailyPlan.next_day')} onClick={() => shift(1)}><ChevronRight size={16} className="rtl:rotate-180" aria-hidden /></button>
         </span>
         <span className="text-sm text-mute" data-testid="daily-plan-shown-date">{t(isWeek ? 'week.of' : tab === 'progress' ? 'dailyPlan.progress_of' : 'dailyPlan.tomorrow_of', { date: shownDate })}</span>

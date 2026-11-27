@@ -15,6 +15,7 @@ import { useToast } from '@/components/Toast';
 import { hasGrant, isAdmin } from '@/lib/perm';
 import type { ColDef } from '@/lib/tablePrefs';
 import { csvCell } from './ActivityReport';
+import { DateInput } from '@/components/DateInput';
 
 /**
  * System Log (owner request 2026-11-09, contract 0.15.2): errors and warnings of the server, the importer, template checks and mail, for a System Admin or
@@ -143,8 +144,8 @@ function Filters({ f, set }: { f: SysFilter; set: (f: SysFilter) => void }) {
         <div className="min-w-48 flex-1"><L k="syslog.f_search"><input className="input" type="search" data-testid="syslog-q" placeholder={t('syslog.f_search_hint')} value={f.q} onChange={(e) => up({ q: e.target.value })} /></L></div>
         <L k="syslog.f_level"><select className="input" data-testid="syslog-level" value={f.level} onChange={(e) => up({ level: e.target.value })}><option value="">{t('common.all')}</option>{SYS_LEVELS.map((l) => <option key={l} value={l}>{t(`syslog.level_${l}`)}</option>)}</select></L>
         <L k="syslog.f_source"><input className="input mono" dir="ltr" list="syslog-sources" data-testid="syslog-source" placeholder={t('syslog.f_source_hint')} value={f.source} onChange={(e) => up({ source: e.target.value })} /><datalist id="syslog-sources">{SYS_SOURCES.map((s) => <option key={s} value={s} />)}</datalist></L>
-        <L k="syslog.f_from"><input type="date" className="input" data-testid="syslog-from" value={f.from} onChange={(e) => up({ from: e.target.value })} /></L>
-        <L k="syslog.f_to"><input type="date" className="input" data-testid="syslog-to" value={f.to} onChange={(e) => up({ to: e.target.value })} /></L>
+        <L k="syslog.f_from"><DateInput className="input" data-testid="syslog-from" value={f.from} onChange={(e) => up({ from: e.target.value })} /></L>
+        <L k="syslog.f_to"><DateInput className="input" data-testid="syslog-to" value={f.to} onChange={(e) => up({ to: e.target.value })} /></L>
       </div>
       <ActiveChips chips={chips} onClear={() => set(EMPTY_SYS_FILTER)} />
     </section>

@@ -18,6 +18,7 @@ import { EnforceTwoFactorDialog, LocalBadges, ResetPasswordDialog, SystemAdminDi
 import { isAdmin } from '@/lib/perm';
 import { fmtDateTime } from '@/lib/time';
 import { MfaBadge, STATUS_TONE } from './Users';
+import { DateInput } from '@/components/DateInput';
 
 function EditDialog({ userId, rows, onClose }: { userId: string; rows: Assignment[]; onClose: () => void }) {
   const { t, i18n } = useTranslation();
@@ -39,7 +40,7 @@ function EditDialog({ userId, rows, onClose }: { userId: string; rows: Assignmen
         </select></label>
       <ScopePicker id="edit-regions" label={t('assign.regions')} options={(regions.data ?? []).map((r): [number, string] => [r.id, (ar && r.name_ar) || r.name_en])} value={reg} onChange={setReg} />
       <ScopePicker id="edit-modules" label={t('assign.modules')} options={MODULES.map((m): [string, string] => [m, t(`module.${m}`)])} value={mods} onChange={setMods} />
-      <label className="block text-sm font-semibold">{t('assign.valid_to')}<input type="date" className="input mt-1 font-normal" data-testid="edit-valid-to" value={to} onChange={(e) => setTo(e.target.value)} /></label>
+      <label className="block text-sm font-semibold">{t('assign.valid_to')}<DateInput className="input mt-1 font-normal" data-testid="edit-valid-to" value={to} onChange={(e) => setTo(e.target.value)} /></label>
     </FormDialog>
   );
 }
@@ -81,7 +82,7 @@ function MfaCard({ userId, isSelf }: { userId: string; isSelf: boolean }) {
       {open && (
         <FormDialog open onClose={() => setOpen(null)} testid="mfa-dialog" title={open === 'set' ? t('mfa.exempt') : t('mfa.revoke')} busy={set.isPending} error={set.isError ? errText(set.error, t) : null}
           onSubmit={(reason) => set.mutate(open === 'set' ? { reason, until: until ? `${until}T23:59:59Z` : null } : { reason, revoke: true }, { onSuccess: () => { toast(t('mfa.saved')); setOpen(null); } })}>
-          {open === 'set' && <label className="block text-sm font-semibold">{t('mfa.until_label')}<input type="date" className="input mt-1 font-normal" data-testid="mfa-until" value={until} onChange={(e) => setUntil(e.target.value)} /><span className="text-xs font-normal text-mute">{t('mfa.until_hint')}</span></label>}
+          {open === 'set' && <label className="block text-sm font-semibold">{t('mfa.until_label')}<DateInput className="input mt-1 font-normal" data-testid="mfa-until" value={until} onChange={(e) => setUntil(e.target.value)} /><span className="text-xs font-normal text-mute">{t('mfa.until_hint')}</span></label>}
         </FormDialog>
       )}
     </section>
