@@ -18,6 +18,7 @@ import { useMe } from '@/api/hooks';
 import { NewBadge } from '@/components/NewBadge';
 import { ContractorRules } from './ContractorRules';
 import { ContractorPerfThresholds } from './ContractorPerfThresholds';
+import { RecycleBinScreen } from './RecycleBin';
 import { MatrixCoverageScreen } from './MatrixCoverage';
 import { GecolHlcCounts } from './GecolHlcCounts';
 import { Lists } from './Lists';
@@ -34,6 +35,7 @@ import { Identity } from './Identity';
 import { SecurityLocks } from './SecurityLocks';
 import { SupportAccess } from './SupportAccess';
 import { DisplaySettings } from './DisplaySettings';
+import { PmSchedulesSettings } from './PmSchedulesSettings';
 import { DailyPlanSettings } from './DailyPlanSettings';
 import { MotionSettings } from './MotionSettings';
 import { LoginPageSettings } from './LoginPage';
@@ -48,7 +50,7 @@ export const SETTINGS_TABS: readonly SettingsTab[] = [
   { key: 'sla', sections: [{ key: 'rules' }, { key: 'calendar' }, { key: 'weights' }] },
   { key: 'workflow', sections: [{ key: 'editor' }, { key: 'columns' }, { key: 'freeze' }, { key: 'idle' }, { key: 'board' }, { key: 'coverage', adminOnly: true }] },
   // Lists (the dropdown catalogues, old ddl tab) now sit next to the register columns that use them
-  { key: 'registers', sections: [{ key: 'columns' }, { key: 'lists' }, { key: 'contractors' }, { key: 'gecol' }, { key: 'team-scope' }, { key: 'issue-map' }] },
+  { key: 'registers', sections: [{ key: 'columns' }, { key: 'lists' }, { key: 'contractors' }, { key: 'gecol' }, { key: 'team-scope' }, { key: 'issue-map' }, { key: 'recycle', adminOnly: true }] },
   // W5: the Document Library section is now named Document types (the old documents/library route redirects); Form templates and Archive are new
   { key: 'documents', sections: [{ key: 'types' }, { key: 'forms' }, { key: 'archive' }, { key: 'numbering' }] },
   { key: 'data', sections: [{ key: 'imports' }, { key: 'historical' }, { key: 'counts', adminOnly: true }, { key: 'reset', adminOnly: true }] },
@@ -57,7 +59,7 @@ export const SETTINGS_TABS: readonly SettingsTab[] = [
   // DLP months is a data-protection rule, so it moved here from SLA
   { key: 'security', sections: [{ key: 'staff' }, { key: 'retention' }, { key: 'dlp' }, { key: 'locks' }, { key: 'support' }] },
   // Screens: what users see by default (Dashboard, Display menu of the tables, My Work Daily Plan)
-  { key: 'screens', sections: [{ key: 'dashboard' }, { key: 'tables' }, { key: 'daily-plan' }, { key: 'motion' }, { key: 'login' }, { key: 'interface' }] },
+  { key: 'screens', sections: [{ key: 'dashboard' }, { key: 'tables' }, { key: 'daily-plan' }, { key: 'pm-schedules' }, { key: 'motion' }, { key: 'login' }, { key: 'interface' }] },
   { key: 'identity', sections: [] },
 ];
 
@@ -141,6 +143,7 @@ export function SettingsRoutes() {
           <Route path="dashboard" element={<DashboardSettings />} />
           <Route path="tables" element={<DisplaySettings />} />
           <Route path="daily-plan" element={<DailyPlanSettings />} />
+          <Route path="pm-schedules" element={<PmSchedulesSettings />} />
           <Route path="motion" element={<MotionSettings />} />
           <Route path="login" element={<LoginPageSettings />} />
           <Route path="interface" element={<InterfaceSettings />} />
@@ -169,6 +172,7 @@ export function SettingsRoutes() {
           <Route index element={<Navigate to="columns" replace />} />
           <Route path="columns" element={<RegisterColumns />} />
           <Route path="lists" element={<Lists />} />
+          <Route path="recycle" element={<RecycleBinScreen />} />
           <Route path="contractors" element={<><ContractorRules /><ContractorPerfThresholds /></>} />
           <Route path="gecol" element={<GecolOrderWarnings />} />
           <Route path="team-scope" element={<TeamScopeMatch />} />

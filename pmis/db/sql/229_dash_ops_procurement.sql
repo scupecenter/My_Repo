@@ -1,7 +1,7 @@
 -- 0230_dash_ops_procurement (contract 0.15.98): the dashboard follow-up card "Procurement and materials" (owner approval 2026-11-26,
 -- dashboard proposals item 1). Mirror: db/sql/229_dash_ops_procurement.sql (kept identical).
 --
--- Additive: one card code, ops_procurement, is added to the dashboard settings catalogue (migration 0108), keeping the ops_scurve card of 0189, so the card can be shown,
+-- Additive: one card code, ops_procurement, is added to the dashboard settings catalogue (migration 0108), keeping the ops_scurve card of 0198, so the card can be shown,
 -- hidden and ordered per tab in Settings > Dashboard like every other card. A card in the catalogue that no saved list names is shown
 -- at the end, so the card appears by default. No table, no data, no grant, no permission and no threshold changes.
 
