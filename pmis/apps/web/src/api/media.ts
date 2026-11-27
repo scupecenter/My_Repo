@@ -54,6 +54,6 @@ export const useMediaThumb = (it: MediaItem, size: 'small' | 'medium') =>
 /** Where the owning record is shown. */
 export function mediaLinkTo(l: Record<string, unknown>): string | null {
   const s = (k: string) => (typeof l[k] === 'string' ? (l[k] as string) : null);
-  if (l.kind === 'register' && s('register_key')) return `/registers/${s('register_key')}`;
+  if (l.kind === 'register' && s('register_key')) return s('record_id') ? `/registers/${s('register_key')}?record=${s('record_id')}` : `/registers/${s('register_key')}`;
   return s('site_id') ? `/sites/${s('site_id')}` : null;
 }

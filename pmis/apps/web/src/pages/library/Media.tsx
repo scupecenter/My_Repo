@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router-dom';
 import { downloadFile } from '@/api/client';
 import { EMPTY_MEDIA_FILTER, mediaLinkTo, useMediaFacets, useMediaItems, useMediaThumb, type MediaFilter, type MediaItem } from '@/api/media';
+import { DateInput } from '@/components/DateInput';
 import { PageHeader } from '@/components/PageHeader';
 import { SavedViews } from '@/components/SavedViews';
 import { EmptyState, QueryFallback } from '@/components/States';
@@ -70,8 +71,8 @@ export function LibraryMedia() {
           {sel('doc_code', t('media.f_type'), (facets.data?.document_types ?? []).map((d) => ({ v: d.code, l: `${(ar && d.name_ar) || d.name_en} (${d.count})` })))}
           {sel('snag_type', t('media.f_snag_type'), (facets.data?.snag_types ?? []).map((d) => ({ v: d.code, l: (ar && d.name_ar) || d.name_en })))}
           {sel('status', t('media.f_status'), [{ v: 'pending_evidence', l: t('media.state_pending_evidence') }, { v: 'withdrawn', l: t('media.state_withdrawn') }])}
-          <label className="text-xs font-semibold text-mute">{t('media.f_from')}<input type="date" className="input ms-1" data-testid="media-f-from" value={f.uploaded_from} onChange={(e) => set({ uploaded_from: e.target.value })} /></label>
-          <label className="text-xs font-semibold text-mute">{t('media.f_to')}<input type="date" className="input ms-1" data-testid="media-f-to" value={f.uploaded_to} onChange={(e) => set({ uploaded_to: e.target.value })} /></label>
+          <label className="text-xs font-semibold text-mute">{t('media.f_from')}<DateInput className="input ms-1" data-testid="media-f-from" value={f.uploaded_from} onChange={(e) => set({ uploaded_from: e.target.value })} /></label>
+          <label className="text-xs font-semibold text-mute">{t('media.f_to')}<DateInput className="input ms-1" data-testid="media-f-to" value={f.uploaded_to} onChange={(e) => set({ uploaded_to: e.target.value })} /></label>
         </span>}
         count={<span className="text-sm text-mute" data-testid="media-count">{t('media.count', { count: items.length })}{active > 0 && <button type="button" className="btn ms-2 px-2 py-0.5 text-xs" data-testid="media-clear" onClick={() => setSp(new URLSearchParams(), { replace: true })}>{t('media.clear')}</button>}</span>} />
       {!q.data ? <QueryFallback queries={[q]} /> : off ? <EmptyState testid="media-off" title={t('media.off')} /> : !items.length ? <EmptyState testid="media-empty" title={t('media.empty')} /> : (
