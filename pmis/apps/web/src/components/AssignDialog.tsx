@@ -7,6 +7,7 @@ import { errText, FormDialog } from './FormDialog';
 import { PeoplePicker } from './PeoplePicker';
 import { ScopePicker, useModuleOptions } from './ScopePicker';
 import { useToast } from './Toast';
+import { DateInput } from '@/components/DateInput';
 
 export const LEVELS = ['view', 'entry', 'review', 'approve', 'admin'] as const;
 export const TEAMS = ['cw', 'te', 'both', 'none'] as const;
@@ -96,7 +97,7 @@ export function AssignDialog({ open, onClose, initialPeople = [], initialMode = 
         <label className="text-sm font-semibold">{t('assign.profile')}
           <select className="input mt-1 font-normal" data-testid="assign-profile" value={profile} onChange={(e) => setProfile(e.target.value)}><option value="">{t('assign.role_default')}</option>{(profiles.data ?? []).map((p) => <option key={p.id} value={p.id}>{(ar && p.name_ar) || p.name_en}</option>)}</select></label>
         <label className="text-sm font-semibold">{t('assign.valid_to')}
-          <input type="date" className="input mt-1 font-normal" data-testid="assign-valid-to" value={to} onChange={(e) => setTo(e.target.value)} /></label>
+          <DateInput className="input mt-1 font-normal" data-testid="assign-valid-to" value={to} onChange={(e) => setTo(e.target.value)} /></label>
       </div>
       <ScopePicker id="assign-regions" label={t('assign.regions')} options={(regions.data ?? []).map((r): [number, string] => [r.id, (ar && r.name_ar) || r.name_en])} value={reg} onChange={setReg} />
       <ScopePicker id="assign-modules" label={t('assign.modules')} options={modules} value={mods} onChange={setMods} />

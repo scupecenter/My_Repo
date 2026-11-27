@@ -467,6 +467,8 @@
     "tab_priority": "Priority"
   },
   "common": {
+    "pick_date": "Pick a date from the calendar",
+    "date_hint": "Date as YYYY-MM-DD",
     "search": "Search",
     "cancel": "Cancel",
     "loading": "Loading…",

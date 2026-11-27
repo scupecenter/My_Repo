@@ -6,6 +6,7 @@ import { usePicker } from '@/api/sites';
 import type { Page, RegisterField, SiteListItem } from '@/api/types';
 import { DATE_MAX, DATE_MIN, type FieldIssue } from '@/lib/registerForms';
 import { ChildListInput, FileFieldInput, MultiSiteInput, MultiUserInput, showTyped, type FieldCtx } from './RegisterFieldTypes';
+import { DateInput } from '@/components/DateInput';
 
 export const fieldLabel = (f: RegisterField, lang: string) => (lang === 'ar' && f.label_ar) || f.label_en;
 
@@ -45,7 +46,7 @@ export function FieldInput({ field, value, onChange, disabled, invalid, ctx }: {
   const common = { id, 'data-testid': id, disabled: ro, 'aria-invalid': invalid || undefined, 'aria-describedby': invalid ? `${id}-error` : undefined };
   switch (field.type) {
     case 'date':
-      return <input type="date" className="input mono" min={DATE_MIN} max={DATE_MAX} value={(value as string) ?? ''} onChange={(e) => onChange(e.target.value)} {...common} />;
+      return <DateInput className="input mono" min={DATE_MIN} max={DATE_MAX} value={(value as string) ?? ''} onChange={(e) => onChange(e.target.value)} {...common} />;
     case 'number':
       return <input type="number" className="input mono" value={(value as number | string) ?? ''} onChange={(e) => onChange(e.target.value === '' ? '' : Number(e.target.value))} {...common} />;
     case 'yes_no':

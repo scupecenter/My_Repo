@@ -23,6 +23,7 @@ import { FieldHistory } from './logs/FieldHistory';
 import { ChangeDiff } from './logs/ChangeDiff';
 import { RejectDialog } from './RejectDialog';
 import { useToast } from './Toast';
+import { DateInput } from '@/components/DateInput';
 
 function Comments({ task }: { task: TaskDetail }) {
   const { t } = useTranslation();
@@ -124,7 +125,7 @@ function Body({ task, regFields, intent }: { task: TaskDetail; regFields: TaskRe
           {([['planned_date', 'plan', 'grid.plan'], ['actual_start', 'start', 'drawer.actual_start'], ['actual_date', 'actual', 'grid.actual']] as const).map(([f, id, label]) => (
             <div key={f}>
               <label className="block"><span className="text-mute">{t(label)}</span>
-                <input type="date" className="input mono" data-testid={`drawer-${id}-date`} disabled={!edit} value={draft[f]} onChange={(e) => setDraft((d) => ({ ...d, [f]: e.target.value }))} />
+                <DateInput className="input mono" data-testid={`drawer-${id}-date`} disabled={!edit} value={draft[f]} onChange={(e) => setDraft((d) => ({ ...d, [f]: e.target.value }))} />
               </label>
               <FieldHistory entityType="task" entityId={task.id} field={f} label={t(label)} />
             </div>
@@ -140,7 +141,7 @@ function Body({ task, regFields, intent }: { task: TaskDetail; regFields: TaskRe
             /* 0.12.0 (Q13): the Layout Submitted Date, its own field (never taken from another date) */
             <div>
               <label className="block"><span className="text-mute">{t('drawer.layout_submitted')}</span>
-                <input type="date" className="input mono" data-testid="drawer-layout-date" disabled={!edit} value={layout} onChange={(e) => setLayout(e.target.value)} />
+                <DateInput className="input mono" data-testid="drawer-layout-date" disabled={!edit} value={layout} onChange={(e) => setLayout(e.target.value)} />
               </label>
             </div>
           )}
