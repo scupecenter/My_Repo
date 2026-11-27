@@ -15,6 +15,8 @@ export const APPEARANCE_OPTIONS = {
   menu_style: ['default', 'rail', 'autohide'],
   accent: ['default', 'teal', 'blue', 'violet', 'green', 'orange', 'red', 'amber'],
   contrast: ['standard', 'high'], // 0347 (item 19): the high-contrast mode
+  inbox_panel: ['overlay', 'floating', 'docked'], // 0526: the notification panel as an overlay, a movable floating window or docked at the edge
+  inbox_anchor: ['end-top', 'end-bottom', 'start-top', 'start-bottom'], // 0526: the corner of the floating panel (a drag snaps to the nearest)
 } as const;
 
 export type AppearanceKey = keyof typeof APPEARANCE_OPTIONS;
@@ -22,7 +24,7 @@ export type Appearance = Partial<{ [K in AppearanceKey]: (typeof APPEARANCE_OPTI
 
 /** The built-in standard of every dimension (ui_pref_defaults() in the database). */
 export const APPEARANCE_DEFAULTS: Required<Appearance> = {
-  density: 'standard', font_scale: 'standard', radius: 'standard', motion: 'full', icon_style: 'regular', menu_style: 'default', accent: 'default', contrast: 'standard',
+  density: 'standard', font_scale: 'standard', radius: 'standard', motion: 'full', icon_style: 'regular', menu_style: 'default', accent: 'default', contrast: 'standard', inbox_panel: 'overlay', inbox_anchor: 'end-top',
 };
 
 /** The ready-made profiles of proposal item 1; the theme flips for `night` are saved through the profile like the theme button. */

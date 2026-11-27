@@ -160,6 +160,19 @@ export class SavedViewsService {
     return this.scrub(await this.run<SavedViewDto>(Prisma.sql`SELECT sv_get(${id}::uuid) AS r`));
   }
 
+  // ------------------------------------------------------------------ home pins (0.15.245, item 16)
+  /** Pin or unpin a view as a card on the caller's home dashboard. Personal; the database re-checks that the caller may read the view. */
+  async pin(_auth: AuthContext, id: string, on: boolean): Promise<{ view_id: string; pinned_home: boolean }> {
+    if (!uuidSchema.safeParse(id).success) throw problems.notFound();
+    return this.run(Prisma.sql`SELECT ${on ? Prisma.sql`home_pin_view` : Prisma.sql`home_unpin_view`}(${id}::uuid) AS r`);
+  }
+
+  /** The caller's pinned views (id, name, screen, filters), in the pin order; the filters are scrubbed like a read of the view. */
+  async homePins(): Promise<{ items: { view_id: string; name: string; screen_key: string; filters: Record<string, unknown>; position: number }[] }> {
+    const pins = await this.run<{ view_id: string; name: string; screen_key: string; filters: Record<string, unknown>; position: number }[]>(Prisma.sql`SELECT home_pins() AS r`);
+    return { items: await Promise.all(pins.map(async (p) => ({ ...p, filters: (await this.scrub({ screen_key: p.screen_key, filters: p.filters } as SavedViewDto)).filters }))) };
+  }
+
   /**
    * "Within the creator's scope" (Q117): a shared view may only carry a region filter inside the sharer's regions for the screen's module.
    * The recipients' own rights still filter the rows; this keeps a lead of one region from publishing a view of another.
