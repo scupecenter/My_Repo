@@ -8,8 +8,7 @@ import { useHomePins, type HomeViewPin } from "@/api/views";
 import { Card } from "./dashboardBits";
 
 /**
- * Pinned views (contract 0.15.245, migration 0344; owner request 2026-11-27, PM-platforms research item 16: monday dashboard widgets,
- * Asana portfolios). The caller's pinned saved views as one card, ordered and hidden per tab from Settings > Dashboard like every other card.
+ * Pinned views (contract 0.15.245, migration 0344; owner request 2026-11-27, item 16 of the 2026-11-27 batch). The caller's pinned saved views as one card, ordered and hidden per tab from Settings > Dashboard like every other card.
  * Personal: the pins are the caller's own (GET /me/home-pins). The counter of a pin is the screen's own list endpoint called with the view's
  * filters and limit 1, so the count is exactly what the caller may see there; the counter is shown for the sites and register screens. A pin
  * opens its screen with the view applied (?view_id).
