@@ -9,11 +9,13 @@ import { api } from '@/api/client';
 import { useLogout, useMe, useNotifications, useSession } from '@/api/hooks';
 import { useMenuCounts, useUnreadTotal } from '@/api/msg';
 import { useOpenAlertCount } from '@/api/logs';
-import { canViewModule, hasGrant, isAdmin } from '@/lib/perm';
+import { isAdmin } from '@/lib/perm';
 import { applyLocale, applyTheme, currentLocale, currentTheme } from '@/i18n';
 import { HYBRID } from '@/lib/hybrid';
 import { loadPref, savePref as storePref } from '@/lib/localPref';
 import { applyAppearance } from '@/lib/appearance';
+import { sanitizeUiNav, type UiNav } from '@/lib/sidebarPrefs';
+import { useUpdateMyProfile } from '@/api/profile';
 import { applyBrand } from '@/lib/brands';
 import { ExportDialog } from './ExportDialog';
 import { CommandPalette } from './CommandPalette';
@@ -22,8 +24,9 @@ import { NotificationBell } from './NotificationPanel';
 import { ShortcutsHelp } from './ShortcutsHelp';
 import { Avatar } from './Avatar';
 import { QuickTour } from './QuickTour';
-import { firstPeopleTab, PEOPLE_KEYS, PEOPLE_TABS } from './PeopleAdmin';
-import { ADMIN_ONLY, ANY_OF, BY_GRANT, BY_MODULE_VIEW, NAV } from './navItems';
+import { PEOPLE_TABS } from './PeopleAdmin';
+import { permittedNavItems, visibleNavItems } from '@/lib/visibleNav';
+import { NAV } from './navItems';
 import { SIDEBAR_DEFAULT, SIDEBAR_MAX, SIDEBAR_MIN, SidebarBody, SidebarSplitter } from './Sidebar';
 
 export { NAV };
@@ -72,6 +75,27 @@ export function Shell() {
   const userAppearance = me.data?.user.appearance;
   useEffect(() => { if (userAppearance) applyAppearance(userAppearance); }, [userAppearance]);
 
+  // 0242 (proposal item 4): the personal sidebar of the profile. The pins of a browser that had them only locally
+  // (pmis.nav.favs) move into the profile once, so they follow the user to every device.
+  const side: UiNav = sanitizeUiNav(me.data?.user.ui_prefs?.sidebar ?? {});
+  const updateProfile = useUpdateMyProfile();
+  const savePins = (pins: string[]) => {
+    const v = me.data?.user.version;
+    if (v === undefined) return;
+    updateProfile.mutate({ version: Number(v), patch: { ui_prefs: { sidebar: { ...side, pins } } } });
+  };
+  const migratedPins = useRef(false);
+  useEffect(() => {
+    if (!me.data || migratedPins.current) return;
+    migratedPins.current = true;
+    const stored = me.data.user.ui_prefs?.sidebar;
+    if (stored?.pins !== undefined) return;
+    let local: string[] = [];
+    try { const raw = JSON.parse(localStorage.getItem('pmis.nav.favs') ?? '[]'); if (Array.isArray(raw)) local = raw.filter((x): x is string => typeof x === 'string'); } catch { /* nothing to move */ }
+    if (local.length) savePins(local.slice(0, 20));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [me.data?.user.id]);
+
   // 0.15.42: the language and theme saved on the server follow the user to a new device
   const userTheme = me.data?.user.theme;
   const userLocale = me.data?.user.locale;
@@ -83,18 +107,13 @@ export function Shell() {
 
   const allowed = new Set(me.data?.effective.nav ?? []);
   const unread = useUnreadTotal(allowed.has('messages')).data ?? 0;
-  const items = NAV.filter((n) => (BY_GRANT[n.key] ? hasGrant(me.data, BY_GRANT[n.key]) : BY_MODULE_VIEW[n.key] ? canViewModule(me.data, BY_MODULE_VIEW[n.key]) : ANY_OF[n.key] ? ANY_OF[n.key]!.some((m) => allowed.has(m)) : ADMIN_ONLY.has(n.key) ? isAdmin(me.data) : allowed.has(n.key)));
   const waiting = useMenuCounts(allowed.has('approvals'), allowed.has('my_work'));
   const counts = { approvals: waiting.approvals, my_work: waiting.my_work };
   const alerts = useOpenAlertCount(isAdmin(me.data)).data ?? 0;
   // Users, Online now, Roles, Groups, Delegation and the Matrix are tabs of one screen: one sidebar entry, opening the first allowed tab.
-  const peopleTo = firstPeopleTab(me.data);
   const inPeople = PEOPLE_TABS.some((p) => loc.pathname === p.to || loc.pathname.startsWith(`${p.to}/`));
-  const sideItems = NAV.flatMap((n) => {
-    if (n.key === 'admin.users') return peopleTo ? [{ ...n, to: peopleTo }] : [];
-    if (PEOPLE_KEYS.has(n.key)) return [];
-    return items.some((i) => i.key === n.key) ? [n] : [];
-  });
+  const sideItems = visibleNavItems(me.data);
+  const paletteItems = permittedNavItems(me.data);
   const pending = notes.data?.unread_count ?? 0;
   const current = inPeople ? NAV.find((n) => n.key === 'admin.users') : [...NAV].sort((a, b) => b.to.length - a.to.length).find((n) => loc.pathname.startsWith(n.to));
   // saved on the server (PATCH /me/preferences, 0.15.42); the cached /me is updated so the effects above do not switch it back
@@ -157,7 +176,7 @@ export function Shell() {
         onFocus={auto ? () => setHover(true) : undefined} onBlur={auto ? (e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setHover(false); } : undefined}
         className={`side-scope ${auto ? 'fixed start-0 z-40' : 'sticky'} top-0 hidden h-screen shrink-0 flex-col border-e border-line bg-side md:flex`}>
         {brand}
-        <SidebarBody items={sideItems} compact={rail} unread={unread} alerts={alerts} counts={counts} activeKey={activeKey} />
+        <SidebarBody items={sideItems} compact={rail} unread={unread} alerts={alerts} counts={counts} activeKey={activeKey} side={side} onPinsChange={savePins} />
         {/* the sample-data label only in the pure mock build (P0 of the 2026-11-17 audit: it also showed against the real server) */}
         {!rail && import.meta.env.VITE_USE_MOCKS === 'true' && !HYBRID && <div className="border-t border-line px-4 py-3 text-xs text-faint">Synthetic data</div>}
         {!rail && <SidebarSplitter width={width} onChange={resize} asideRef={asideRef} />}
@@ -170,7 +189,7 @@ export function Shell() {
               <div className="flex items-center gap-2 px-4 py-4 font-bold"><span className="grid h-8 w-8 place-items-center rounded-md bg-accent text-accentInk">G</span>{t('app.name')}</div>
               <button ref={closeRef} className="btn min-h-11 min-w-11" data-testid="drawer-close" aria-label={t('nav.close_menu')} onClick={() => setDrawer(false)}><X size={16} aria-hidden /></button>
             </div>
-            <SidebarBody items={sideItems} compact={false} unread={unread} alerts={alerts} counts={counts} activeKey={activeKey} onNavigate={() => setDrawer(false)} />
+            <SidebarBody items={sideItems} compact={false} unread={unread} alerts={alerts} counts={counts} activeKey={activeKey} onNavigate={() => setDrawer(false)} side={side} onPinsChange={savePins} />
           </div>
         </div>
       )}
@@ -224,7 +243,7 @@ export function Shell() {
       <ShortcutsHelp />
       <RowActions />
       {me.data?.user.id && <QuickTour userId={me.data.user.id} />}
-      <CommandPalette open={palette} onOpenChange={setPalette} items={items.map((i) => ({ key: i.key, to: i.to }))} />
+      <CommandPalette open={palette} onOpenChange={setPalette} items={paletteItems.map((i) => ({ key: i.key, to: i.to }))} />
     </div>
   );
 }
