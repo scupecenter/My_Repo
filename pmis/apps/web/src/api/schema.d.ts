@@ -271,6 +271,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/local/2fa/device-code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Second step of a sign-in from a new browser - the 6-digit code mailed to the account (0.15.192)
+         * @description Needs the pending sign-in cookie `pmis_2fa` from `POST /auth/local/login` when it answered `next` = `device_code`. Only exists while an admin has turned the
+         *     new-device code on (it is off by default). The code works once and ends after `code_minutes`. A wrong code is 422 `invalid_code`; the fifth wrong code ends the
+         *     challenge (401 `unauthenticated`: sign in again). On success the browser is remembered for this account (a hash of the `pmis_dev` cookie), the session cookie
+         *     is set. Rate limited (429). Failures are written to the security log.
+         */
+        post: operations["localDeviceCode"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/local/2fa/enrol/start": {
         parameters: {
             query?: never;
@@ -739,6 +762,66 @@ export interface paths {
          *     page) and a mail; the request is audited (`admins_notified`). Not for the break-glass account or before a forced password change (403).
          */
         post: operations["notifyAdmins"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My own live sessions (devices)
+         * @description 0.15.153. Only the caller's own sessions, newest activity first (at most 50). `device` is parsed from the user agent (browser, OS, type). The current one has `is_current` true.
+         */
+        get: operations["listMySessions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/sessions/revoke-others": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign out of every other device
+         * @description 0.15.153. Ends all the caller's other sessions and keeps the current one. No body.
+         */
+        post: operations["revokeMyOtherSessions"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/sessions/{session_id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign out of one of my other devices
+         * @description 0.15.153. Own sessions only (404 for any other id); the current session is refused (422 `own_session`, use sign out).
+         */
+        post: operations["revokeMySession"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4045,6 +4128,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/exports/schedules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The caller's scheduled Master exports (0.15.151)
+         * @description 0.15.151. Own schedules only, with the next due instant (project time zone) and whether one is due now.
+         */
+        get: operations["listExportSchedules"];
+        /**
+         * Create or change a scheduled Master export (0.15.151)
+         * @description 0.15.151. Without `id` a schedule is created (at most 5 each); with `id` one of the caller's own is replaced. `weekday` (0 Sunday to 6) for weekly, `day_of_month` (1 to 28) for monthly. `spec.parts` empty or absent means the whole Master. Whether the caller may export the parts is checked when the export starts, not when it is saved.
+         */
+        put: operations["saveExportSchedule"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/exports/schedules/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete a scheduled Master export (0.15.151)
+         * @description 0.15.151. One of the caller's own schedules; the exports it already made stay.
+         */
+        delete: operations["deleteExportSchedule"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/exports/master": {
         parameters: {
             query?: never;
@@ -6117,6 +6244,52 @@ export interface paths {
          * @description Returns how many were ended. Expired and already revoked grants and ordinary delegations are not touched.
          */
         post: operations["revokeAllSupportAccess"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/new-device-code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The new-device email code setting (System Admin only) (0.15.192)
+         * @description System Admin only (403 `action_forbidden` otherwise). `enabled` is `false` until a System Admin turns it on. `mail_ready` says whether the mail server is set up (the code is sent by email).
+         */
+        get: operations["getNewDeviceCode"];
+        /**
+         * Turn the new-device email code on or off (System Admin, reason, step-up, If-Match, audited) (0.15.192)
+         * @description System Admin only. A reason (3+ characters), a step-up (401 `step_up_required`) and `If-Match` (428 / 412) are required. Turning it on needs the mail server (409 `invalid_transition` otherwise).
+         *     `code_minutes` is 5 to 30. System Admins are outside the feature unless `include_admins` is true, so the person who can turn it off can always sign in. Saving the values already in force is 409.
+         *     Audited `new_device_code_update` with before and after. Sessions already open are not touched.
+         */
+        put: operations["setNewDeviceCode"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/new-device-code/bypass": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Let one account sign in once from any browser without the code (System Admin, reason, step-up, audited) (0.15.192)
+         * @description The recovery path. `minutes` is 1 to 60 (default 30). The bypass is used up by the account's next sign-in. Audited `new_device_bypass`. Rate limited.
+         */
+        post: operations["bypassNewDeviceCode"];
         delete?: never;
         options?: never;
         head?: never;
@@ -10631,6 +10804,60 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        ExportScheduleInput: {
+            /** Format: uuid */
+            id?: string;
+            name: string;
+            /** @enum {string} */
+            cadence: "daily" | "weekly" | "monthly";
+            weekday?: number;
+            day_of_month?: number;
+            spec?: {
+                parts?: string[];
+                regions?: number[];
+            };
+            enabled?: boolean;
+        };
+        ExportSchedule: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** @enum {string} */
+            cadence: "daily" | "weekly" | "monthly";
+            weekday?: number;
+            day_of_month?: number;
+            spec: {
+                parts?: string[];
+                regions?: number[];
+            };
+            enabled: boolean;
+            created_at: string;
+            last_started_at?: string | null;
+            /** Format: uuid */
+            last_job_id?: string | null;
+            last_error?: string | null;
+            /** Format: date-time */
+            next_due_at: string;
+            due: boolean;
+        };
+        ExportScheduleList: {
+            items: components["schemas"]["ExportSchedule"][];
+        };
+        MySession: {
+            /** Format: uuid */
+            session_id: string;
+            /** Format: date-time */
+            signed_in_at: string;
+            /** Format: date-time */
+            last_activity_at: string;
+            ip: string | null;
+            device: components["schemas"]["Device"] | null;
+            auth_method: string;
+            is_current: boolean;
+        };
+        MySessionRevokeResult: {
+            revoked_count: number;
+        };
         MatrixSimulation: {
             site: {
                 /** Format: uuid */
@@ -11559,7 +11786,7 @@ export interface components {
          * @description Part key. Every register key used by `/registers` (including `dismantle`), plus the four non-register parts.
          * @enum {string}
          */
-        ExportPartKey: "procurement" | "contractors" | "gecol" | "hlc" | "permits_hse" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "dismantle" | "car_dispatcher" | "financial_advances" | "incidents" | "sites" | "milestones" | "tasks" | "project_status" | "rf_design" | "acquisition";
+        ExportPartKey: "procurement" | "contractors" | "gecol" | "hlc" | "permits_hse" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "dismantle" | "car_dispatcher" | "financial_advances" | "incidents" | "lessons_learned" | "sites" | "milestones" | "tasks" | "project_status" | "rf_design" | "acquisition";
         ExportPart: {
             key: components["schemas"]["ExportPartKey"];
             label_en: string;
@@ -11737,10 +11964,10 @@ export interface components {
             /** @constant */
             authenticated: false;
             /**
-             * @description `two_factor`: call `POST /auth/local/2fa`. `enrol`: two-factor is on but no authenticator is set up; call the enrolment endpoints.
+             * @description `two_factor`: call `POST /auth/local/2fa`. `enrol`: two-factor is on but no authenticator is set up; call the enrolment endpoints. `device_code` (0.15.192, only when an admin turned the new-device code on): call `POST /auth/local/2fa/device-code` with the code mailed to the account.
              * @enum {string}
              */
-            next: "two_factor" | "enrol";
+            next: "two_factor" | "enrol" | "device_code";
             /** Format: date-time */
             expires_at: string;
         };
@@ -16162,7 +16389,7 @@ export interface components {
             required_missing?: number | null;
         };
         /** @enum {string} */
-        RegisterKey: "procurement" | "contractors" | "gecol" | "hlc" | "permits_hse" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "dismantle" | "car_dispatcher" | "financial_advances" | "incidents";
+        RegisterKey: "procurement" | "contractors" | "gecol" | "hlc" | "permits_hse" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "dismantle" | "car_dispatcher" | "financial_advances" | "incidents" | "lessons_learned";
         RegisterField: {
             code: string;
             label_en: string;
@@ -17044,6 +17271,32 @@ export interface components {
             /** @description Omitted = default_hours. */
             hours?: number;
         };
+        /** @description 0.15.192. The new-device email code setting (`security.new_device_code`, migration 0292). */
+        NewDeviceCodeSetting: {
+            /** @description false until a System Admin turns it on. */
+            enabled: boolean;
+            code_minutes: number;
+            /** @description false: System Admins are outside the feature (the recovery path). */
+            include_admins: boolean;
+            /** @description Whether the mail server is set up. */
+            mail_ready: boolean;
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+            /** @description The ETag value. */
+            version: number;
+            can_edit: boolean;
+        };
+        NewDeviceCodeSettingInput: components["schemas"]["WithReason"] & {
+            enabled: boolean;
+            code_minutes: number;
+            include_admins: boolean;
+        };
+        NewDeviceBypassInput: components["schemas"]["WithReason"] & {
+            /** Format: uuid */
+            user_id: string;
+            minutes?: number;
+        };
         /** @description 0.15.1. The shared order of the side menu (setting `nav.layout`). */
         NavLayout: {
             headings: components["schemas"]["NavHeading"][];
@@ -17119,6 +17372,7 @@ export interface components {
             scope_regions: components["schemas"]["RegionId"][] | null;
             procurement: components["schemas"]["DashboardOpsProcurement"];
             permits_hse: components["schemas"]["DashboardOpsPermitsHse"];
+            gecol_hlc: components["schemas"]["DashboardOpsGecolHlc"];
         };
         /** @description 0.15.106: procurement and materials (dashboard proposals item 1). */
         DashboardOpsProcurement: {
@@ -17204,6 +17458,29 @@ export interface components {
                     count: number;
                 }[];
             } | null;
+        };
+        /** @description 0.15.201: GECOL and HLC readiness (dashboard proposals item 4). */
+        DashboardOpsGecolHlc: {
+            gecol: components["schemas"]["DashboardOpsUtilityReadiness"];
+            hlc: components["schemas"]["DashboardOpsUtilityReadiness"];
+        };
+        /** @description 0.15.201: the readiness of one utility (GECOL power or HLC fiber) over its scoped sites. */
+        DashboardOpsUtilityReadiness: {
+            /** @description False when the caller may not see the register; the other fields are then null. */
+            available: boolean;
+            /** @description The active, not cancelled sites with the scope. */
+            in_scope: number | null;
+            /** @description GECOL only: power_on_date set; null in the HLC part. */
+            powered: number | null;
+            /** @description HLC only: in_service_date set; null in the GECOL part. */
+            in_service: number | null;
+            waiting: components["schemas"]["DashboardOpsAging"] | null;
+            /** @description In-scope sites with no record of the register at all. */
+            no_record: number | null;
+            /** @description GECOL only: the CW PAC (task B13) is approved but the power is not on; null in the HLC part. */
+            civil_ready_no_power: number | null;
+            /** @description HLC only: installation_date set but not in service yet; null in the GECOL part. */
+            installed_not_in_service: number | null;
         };
         DashboardTabLayout: {
             /** @description Card codes in display order. */
@@ -21282,6 +21559,36 @@ export interface operations {
             429: components["responses"]["TooManyRequests"];
         };
     };
+    localDeviceCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    code: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Signed in. */
+            200: {
+                headers: {
+                    "Set-Cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Session"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
     startTwoFactorEnrolment: {
         parameters: {
             query?: never;
@@ -21986,6 +22293,75 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             422: components["responses"]["Unprocessable"];
             429: components["responses"]["TooManyRequests"];
+        };
+    };
+    listMySessions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sessions. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["MySession"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    revokeMyOtherSessions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Done. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MySessionRevokeResult"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    revokeMySession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: components["parameters"]["SessionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Ended. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MySessionRevokeResult"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     getMyProfile: {
@@ -27847,6 +28223,78 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
         };
     };
+    listExportSchedules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The schedules. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportScheduleList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    saveExportSchedule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExportScheduleInput"];
+            };
+        };
+        responses: {
+            /** @description The caller's schedules after the change. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportScheduleList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    deleteExportSchedule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The caller's schedules after the change. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportScheduleList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
     listMasterExports: {
         parameters: {
             query?: {
@@ -31664,6 +32112,94 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             422: components["responses"]["Unprocessable"];
+        };
+    };
+    getNewDeviceCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The setting. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NewDeviceCodeSetting"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setNewDeviceCode: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewDeviceCodeSettingInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NewDeviceCodeSetting"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    bypassNewDeviceCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewDeviceBypassInput"];
+            };
+        };
+        responses: {
+            /** @description Allowed until. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: date-time */
+                        until: string;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
         };
     };
     getHistoricalWaiver: {

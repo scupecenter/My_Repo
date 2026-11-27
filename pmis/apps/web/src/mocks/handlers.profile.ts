@@ -100,7 +100,14 @@ const sessionBodyIdOf = (key: string) => {
   return u?.local?.id ?? `00000000-0000-4000-8000-${(u?.employee_id || ACCOUNTS[key]?.employee_id || '0').padStart(12, '0')}`;
 };
 
+let MY_SESSIONS = [
+  { session_id: '00000000-0000-4000-8000-0000000000c1', signed_in_at: '2026-11-27T08:00:00Z', last_activity_at: '2026-11-27T09:00:00Z', ip: '10.0.0.5', device: { browser: 'Chrome', os: 'Windows', type: 'desktop' }, auth_method: 'local', is_current: true },
+  { session_id: '00000000-0000-4000-8000-0000000000c2', signed_in_at: '2026-11-26T08:00:00Z', last_activity_at: '2026-11-26T18:00:00Z', ip: '10.0.0.9', device: { browser: 'Safari', os: 'iOS', type: 'mobile' }, auth_method: 'local', is_current: false },
+];
 export const profileHandlers = [
+  http.get(`${B}/me/sessions`, () => { const g = guard(); if (g) return g; return HttpResponse.json({ items: MY_SESSIONS }); }),
+  http.post(`${B}/me/sessions/revoke-others`, () => { const g = guard(); if (g) return g; const n = MY_SESSIONS.filter((s) => !s.is_current).length; MY_SESSIONS = MY_SESSIONS.filter((s) => s.is_current); return HttpResponse.json({ revoked_count: n }); }),
+  http.post(`${B}/me/sessions/:id/revoke`, ({ params }) => { const g = guard(); if (g) return g; MY_SESSIONS = MY_SESSIONS.filter((s) => s.session_id !== params.id || s.is_current); return HttpResponse.json({ revoked_count: 1 }); }),
   http.get(`${B}/me/profile`, () => { const g = guard(); if (g) return g; return withEtag(profileBody()); }),
 
   http.patch(`${B}/me/profile`, async ({ request }) => {

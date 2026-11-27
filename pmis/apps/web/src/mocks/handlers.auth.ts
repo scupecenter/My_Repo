@@ -6,6 +6,7 @@ import { ENROL_CODE_MS, matchStep, newEnrolCode, newRecoveryCodes, newSecret, no
 import { guard, problem, stepUp } from './handlers';
 import { userOf } from './handlers.admin';
 import { uid } from './ids';
+import { NEW_DEVICE_MOCK_CODE, newDeviceState } from './newDevice';
 
 const B = API_BASE;
 const LOCK_AFTER = 5, LOCK_MS = 15 * 60_000, RATE_PER_MIN = 10;
@@ -149,7 +150,27 @@ export const authHandlers = [
       save();
       return HttpResponse.json({ authenticated: false, next, expires_at: new Date(until).toISOString() });
     }
+    // 0.15.192: new-device email code (off by default; never for System Admins unless included, never for two-factor accounts).
+    if (newDeviceState.enabled && !c.tf?.on && (key !== 'pm' || newDeviceState.include_admins) && !newDeviceState.known.has(key)) {
+      if (newDeviceState.bypass.delete(key)) { startSession(key); save(); return HttpResponse.json(sessionBody()); }
+      const until = now + PENDING_MS;
+      db().pending = { account: key, kind: 'device_code', until };
+      save();
+      return HttpResponse.json({ authenticated: false, next: 'device_code', expires_at: new Date(until).toISOString() });
+    }
     startSession(key);
+    save();
+    return HttpResponse.json(sessionBody());
+  }),
+
+  http.post(`${B}/auth/local/2fa/device-code`, async ({ request }) => {
+    const p = db().pending;
+    if (!p || p.kind !== 'device_code' || p.until <= Date.now()) return problem(401, 'unauthenticated', 'This sign-in has expired. Enter your password again.');
+    const b = (await request.json().catch(() => ({}))) as { code?: string };
+    if (typeof b.code !== 'string' || !/^[0-9]{6}$/.test(b.code)) return problem(422, 'validation_failed', 'Send the 6-digit code', { errors: [{ path: '/code', code: 'invalid' }] });
+    if (b.code !== NEW_DEVICE_MOCK_CODE) return problem(422, 'invalid_code', 'This code is not right.', { errors: [{ path: '/code', code: 'invalid' }] });
+    newDeviceState.known.add(p.account);
+    startSession(p.account);
     save();
     return HttpResponse.json(sessionBody());
   }),
