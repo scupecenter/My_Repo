@@ -6,6 +6,7 @@ import { downloadFile } from '@/api/client';
 import { useMe, useMyTasks } from '@/api/hooks';
 import type { TaskSummary } from '@/api/types';
 import { Holders } from '@/components/HolderChip';
+import { LayoutPanel } from '@/components/LayoutPanel';
 import { MyWorkCalendar } from '@/components/MyWorkCalendar';
 import { PersonTag } from '@/components/PersonTag';
 import { TaskDrawer } from '@/components/TaskDrawer';
@@ -13,8 +14,8 @@ import { BallSince, ExternalParty, SlaOverrun, StaleBadge } from '@/components/T
 import { TasksBoard } from '@/components/TasksBoard';
 import { SavedViews } from '@/components/SavedViews';
 import { UnifiedFilter } from '@/components/UnifiedFilter';
-import { ColumnMenu, DensityToggle, Empty, HeaderRow, pin, rowPad, totalWidth, tracks, Trunc, useTablePrefs, type TableApi } from '@/components/TableKit';
-import { DisplayMenu, displayAttrs, ExportCsvButton, PastedChip, ROWNO_COL, RowNo, SearchBox, TableCount, TableToolbar } from '@/components/TableStandard';
+import { ColumnMenu, Empty, HeaderRow, pin, rowPad, totalWidth, tracks, Trunc, useTablePrefs, type TableApi } from '@/components/TableKit';
+import { displayAttrs, ExportCsvButton, PastedChip, ROWNO_COL, RowNo, SearchBox, TableCount, TableToolbar } from '@/components/TableStandard';
 import { decodeFilter, encodeFilter, type FilterTree } from '@/api/views';
 import type { ColDef } from '@/lib/tablePrefs';
 
@@ -134,8 +135,7 @@ export function MyWork() {
         count={<TableCount testid="my-work-count" noun="tasks" total={screenTotal} filtered={filtered} active={active} onClear={clearAll} />}
         switcher={switcher}
         columns={<ColumnMenu api={tbl} label={label} />}
-        density={<DensityToggle api={tbl} />}
-        display={<DisplayMenu api={tbl} />}
+        layout={<LayoutPanel testid="my-work-display" table={tbl} />}
         exporter={<ExportCsvButton testid="my-work-export" name="my-work" head={['#', t('approvals.bucket'), label('site'), t('grid.code'), label('task'), label('sla')]}
           rows={() => { let i = 0; return BUCKETS.flatMap(([k]) => (qs[k].data?.items ?? []).map((x) => [++i, t(`myWork.${k}`), x.site_code, x.task_code, (i18n.language === 'ar' && x.name_ar) || x.name_en, x.sla?.colour ?? ''])); }} />} />
       <div className="card gx overflow-auto" {...displayAttrs(tbl.display)} data-testid="my-work-table">

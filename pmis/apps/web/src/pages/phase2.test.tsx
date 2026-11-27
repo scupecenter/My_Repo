@@ -110,7 +110,8 @@ describe('Site page: list by default, Timeline as the second option (W8 item 3)'
     await signIn('reviewer');
     renderApp(<SiteAt />, siteRoute());
     expect(await screen.findByTestId(`grid-open-${A1}`)).toBeInTheDocument();
-    expect(screen.getByTestId('site-layout-list')).toHaveAttribute('aria-pressed', 'true');
+    await userEvent.click(screen.getByTestId('site-layout'));
+    expect(await screen.findByTestId('site-layout-list')).toHaveAttribute('aria-checked', 'true');
     await userEvent.click(screen.getByTestId('site-layout-timeline'));
     const row = await screen.findByTestId('task-row');
     expect(row.querySelectorAll('[data-testid^="row-stage-"]').length).toBeGreaterThan(0);

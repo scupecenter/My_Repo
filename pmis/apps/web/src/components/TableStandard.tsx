@@ -1,12 +1,9 @@
 import * as Popover from '@radix-ui/react-popover';
-import { Copy, Download, Search, SlidersHorizontal } from 'lucide-react';
+import { Copy, Download, Search } from 'lucide-react';
 import type { ClipboardEvent, ReactNode } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
-import { useMe } from '@/api/hooks';
 import type { Me } from '@/api/types';
-import { DENSITIES, type ColDef, type Display } from '@/lib/tablePrefs';
-import type { TableApi } from './TableKit';
+import type { ColDef, Display } from '@/lib/tablePrefs';
 import { Tip } from './Tip';
 
 /**
@@ -241,51 +238,6 @@ export function displayAttrs(d: Display): Record<string, string> {
 
 /** Extra pixels of a virtualised row when long text wraps on two lines. */
 export const WRAP_EXTRA = 18;
-
-/**
- * The Display menu of the toolbar (W8 item 4): text size, alignment of text cells, row density, wrap long text, zebra rows. Stored per user and per
- * screen with the column prefs (so saved views keep it); unset options follow the defaults of Administration > Settings > Display, which the menu
- * links to for the users who may change them.
- */
-export function DisplayMenu({ api }: { api: TableApi }) {
-  const { t } = useTranslation();
-  const me = useMe(true).data;
-  const d = api.display;
-  const radio = <T extends string>(name: string, values: readonly T[], cur: T, set: (v: T) => void, label: (v: T) => string) => (
-    <div className="space-y-1" role="radiogroup" aria-label={t(`tstd.display_${name}`)}>
-      <div className="text-xs font-semibold text-mute">{t(`tstd.display_${name}`)}</div>
-      <div className="flex flex-wrap gap-1">
-        {values.map((v) => (
-          <button key={v} type="button" role="radio" aria-checked={cur === v} data-testid={`display-${name}-${v}`} onClick={() => set(v)}
-            className={`btn px-2 py-1 text-xs ${cur === v ? 'bg-accentSoft text-accentText' : ''}`}>{label(v)}</button>
-        ))}
-      </div>
-    </div>
-  );
-  return (
-    <Popover.Root>
-      <Tip text={t('tstd.display')}>
-        <Popover.Trigger asChild>
-          <button type="button" className="btn" data-testid="display-menu" aria-label={t('tstd.display')}><SlidersHorizontal size={16} /></button>
-        </Popover.Trigger>
-      </Tip>
-      <Popover.Portal>
-        <Popover.Content align="end" sideOffset={6} className="card z-50 w-72 space-y-3 p-3 text-sm shadow-lg" data-testid="display-panel">
-          {radio('size', ['sm', 'md', 'lg'] as const, d.size, (v) => api.setDisplay({ size: v }), (v) => t(`tstd.size_${v}`))}
-          {radio('align', ['start', 'center'] as const, d.align, (v) => api.setDisplay({ align: v }), (v) => t(`tstd.align_${v}`))}
-          {radio('density', DENSITIES, d.density, (v) => api.setDensity(v), (v) => t(`table.${v}`))}
-          <label className="flex items-center gap-2"><input type="checkbox" data-testid="display-wrap" checked={d.wrap} onChange={(e) => api.setDisplay({ wrap: e.target.checked })} />{t('tstd.display_wrap')}</label>
-          <label className="flex items-center gap-2"><input type="checkbox" data-testid="display-pin" checked={!api.prefs.unpinned} onChange={(e) => api.setPinned(e.target.checked)} />{t('tstd.display_pin')}</label>
-          <label className="flex items-center gap-2"><input type="checkbox" data-testid="display-zebra" checked={d.zebra} onChange={(e) => api.setDisplay({ zebra: e.target.checked })} />{t('tstd.display_zebra')}</label>
-          <div className="flex items-center gap-2 border-t border-line pt-2">
-            <button type="button" className="btn px-2 py-1 text-xs" data-testid="display-reset" onClick={api.resetDisplay}>{t('tstd.display_reset')}</button>
-            {canEditDisplayDefaults(me) && <Link to="/admin/settings/screens/tables" className="ms-auto text-xs text-link" data-testid="display-settings-link">{t('tstd.display_settings')}</Link>}
-          </div>
-        </Popover.Content>
-      </Popover.Portal>
-    </Popover.Root>
-  );
-}
 
 /** One cell of a CSV line: quoted when it holds a separator, a quote or a new line; a leading formula sign is neutralised (CSV injection). */
 export function csvCell(v: unknown): string {
