@@ -173,7 +173,8 @@
     "daily_plan": "الخطة اليومية",
     "group_library": "المكتبة",
     "library.forms": "النماذج",
-    "library.archive": "الأرشيف"
+    "library.archive": "الأرشيف",
+    "incidents": "الحوادث والأمن"
   },
   "top": {
     "search": "ابحث أو انتقل إلى…",
@@ -1940,7 +1941,10 @@
     "details": "تفاصيل",
     "purchase_request": "طلب الشراء",
     "in_service": "دخول الخدمة",
-    "execution": "التنفيذ"
+    "execution": "التنفيذ",
+    "incident": "الحادث",
+    "people_damage": "الأشخاص والأضرار",
+    "resolution": "المعالجة"
   },
   "procAssign": {
     "title": "التكليف",

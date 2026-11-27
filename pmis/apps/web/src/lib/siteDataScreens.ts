@@ -25,6 +25,7 @@ export const REGISTER_SCREENS: { key: string; name: string; site: boolean; why?:
   { key: 'gecol', name: 'GECOL Power', site: true },
   { key: 'hlc', name: 'HLC Fiber', site: true },
   { key: 'permits_hse', name: 'Permits & HSE', site: true },
+  { key: 'incidents', name: 'Incidents & Security', site: true },
   { key: 'warehouse', name: 'Warehouse', site: false, why: 'stock movements are not site records' },
   { key: 'quality', name: 'Quality Control', site: true },
   { key: 'issues', name: 'Issue Log', site: true },
