@@ -204,6 +204,23 @@ export const incidents: RegisterDefinition = {
     F('remark', 'Remark', 'ملاحظات', 'text', 'Remark'),
   ],
 };
+// Migration 0326 (Q71): Deliverables, the manual log behind the Project Status items; linked to a task and a gate of the site.
+export const deliverables: RegisterDefinition = {
+  register_key: 'deliverables', name_en: 'Deliverables', name_ar: 'المخرجات', module_key: 'deliverables', site_scoped: true, multiple_per_site: true, approval_levels: 2,
+  fields: [
+    F('deliverable_no', 'Deliverable No.', 'رقم المخرج', 'text', 'Deliverable', { required: true, in_list: true }),
+    F('deliverable_kind', 'Kind', 'النوع', 'list', 'Deliverable', { required: true, in_list: true, options: ['HLD', 'DOC', 'NMS-S', 'BILL', 'PILOT', 'NMS-I', 'NMS-A', 'TRN'] }),
+    F('title', 'Title', 'العنوان', 'text', 'Deliverable', { required: true, in_list: true }),
+    F('task_code', 'Task', 'المهمة', 'text', 'Links', { in_list: true }),
+    F('gate_code', 'Gate', 'البوابة', 'text', 'Links', { in_list: true }),
+    F('due_date', 'Due Date', 'تاريخ الاستحقاق', 'date', 'Acceptance', { in_list: true }),
+    F('submitted_date', 'Submitted Date', 'تاريخ التقديم', 'date', 'Acceptance', { in_list: true }),
+    F('accepted_date', 'Accepted Date', 'تاريخ القبول', 'date', 'Acceptance', { in_list: true }),
+    F('acceptance_ref', 'Acceptance Ref.', 'مرجع القبول', 'text', 'Acceptance', { required: true, in_list: true }),
+    F('deliverable_state', 'Deliverable state', 'حالة المخرج', 'list', 'Acceptance', { in_list: true, options: ['Planned', 'Submitted', 'Accepted', 'Rejected', 'Cancelled'] }),
+    F('remark', 'Remark', 'ملاحظات', 'text', 'Remark'),
+  ],
+};
 // Owner approval 2026-11-27 (migration 0185): Invoices, the supplier and contractor invoices from receipt to payment.
 export const invoices: RegisterDefinition = {
   register_key: 'invoices', name_en: 'Invoices', name_ar: 'الفواتير', module_key: 'invoices', site_scoped: true, multiple_per_site: true, approval_levels: 2,
@@ -228,7 +245,7 @@ export const REGISTER_DEFS: RegisterDefinition[] = [
   more('quality', 'Quality', 'الجودة', 'quality', true, ['qc', 'snag', 'itp', 'ncr']), more('issues', 'Issue Log', 'سجل المشاكل', 'issues', true), more('risks', 'Risk Register', 'سجل المخاطر', 'risks', false),
   more('change_control', 'Change Control', 'ضبط التغيير', 'change_control', true), more('readiness_handover', 'Readiness & Handover', 'الجاهزية والتسليم', 'readiness', true),
   more('as_built', 'As-Built', 'كما نُفّذ', 'as_built', true, ['cw_part', 'te_part']), meetings,
-  more('rf_design', 'RF Design', 'تصميم RF', 'rf_design', true), more('acquisition', 'Acquisition', 'الاستحواذ', 'acquisition', true), dismantle, carDispatcher, financialAdvances, incidents, lessonsLearned, invoices,
+  more('rf_design', 'RF Design', 'تصميم RF', 'rf_design', true), more('acquisition', 'Acquisition', 'الاستحواذ', 'acquisition', true), dismantle, carDispatcher, financialAdvances, incidents, lessonsLearned, invoices, deliverables,
 ];
 /** The template of each register (contract 0.7.0: one `TPL-*` per register, issued by the database). Only these four have a sample upload in the mock. */
 // 0.15.240: intake triage on the Issue Log and the Change Control Log (RegisterDefinition.triage_enabled)
@@ -241,6 +258,7 @@ export const TEMPLATE_OF_REGISTER: Record<string, string> = {
   quality: 'TPL-QUALITY', issues: 'TPL-ISSUES', risks: 'TPL-RISKS', change_control: 'TPL-CHANGES', readiness_handover: 'TPL-READINESS', as_built: 'TPL-AS-BUILT', meetings: 'TPL-MEETINGS', dismantle: 'TPL-DISMANTLE',
   lessons_learned: 'TPL-LESSONS-LEARNED',
   invoices: 'TPL-INVOICES',
+  deliverables: 'TPL-DELIVERABLES',
   incidents: 'TPL-INCIDENTS',
 };
 

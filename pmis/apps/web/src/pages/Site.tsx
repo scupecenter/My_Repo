@@ -1,9 +1,9 @@
 import { SiteActivity } from '@/components/SiteActivity';
+import { LayoutPanel } from '@/components/LayoutPanel';
 import { SiteGantt } from '@/components/SiteGantt';
 import { SiteSummaryStrip } from '@/components/SiteSummaryStrip';
 import type { TasksExportColumnCode } from '@/api/types';
 import { ArrowLeft, CalendarRange, Layers, Table2 } from 'lucide-react';
-import { LayoutPanel, type ViewOption } from '@/components/LayoutPanel';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
@@ -32,7 +32,7 @@ import { SavedViews } from '@/components/SavedViews';
 import { UnifiedFilter } from '@/components/UnifiedFilter';
 import { decodeFilter, encodeFilter, type FilterTree } from '@/api/views';
 import { TaskRow } from '@/components/TaskRow';
-import { DisplayMenu, displayAttrs, SearchBox, TableCount, TableToolbar } from '@/components/TableStandard';
+import { displayAttrs, SearchBox, TableCount, TableToolbar } from '@/components/TableStandard';
 import { useTablePrefs } from '@/components/TableKit';
 import { loadPref, savePref } from '@/lib/localPref';
 import { phaseEmpty, phaseFromUrl, phaseQuery, sitePhases, type SitePhase } from '@/lib/sitePhases';
@@ -97,14 +97,16 @@ export function Site() {
   const tq = sp.get('tq') ?? '';
   const tadvTree = decodeFilter(sp.get('tadv') ?? '');
   const rowStages = tq ? stages.map((x) => ({ ...x, tasks: x.tasks.filter((k) => taskMatches(k, tq, (i18n.language === 'ar' && k.name_ar) || k.name_en)) })) : stages;
-  // W8 item 3: List (default) or Timeline, remembered per user; both sit in the shared toolbar with Export current view
-  const siteViews: ViewOption[] = [
-    { id: 'list', label: t('tstd.layout_list'), hint: t('view.site_list_hint'), icon: <Table2 size={14} />, testid: 'site-layout-list' },
-    { id: 'timeline', label: t('tstd.layout_timeline'), hint: t('view.site_timeline_hint'), icon: <CalendarRange size={14} />, testid: 'site-layout-timeline' },
-  ];
-  const switcher = <LayoutPanel testid="site-view" views={{ value: layout === 'row' ? 'timeline' : 'list', options: siteViews, onChange: (id) => { setLayout(id === 'timeline' ? 'row' : 'list'); savePref(LAYOUT_KEY, id === 'timeline' ? 'timeline' : 'list'); } }} />;
+  // W8 item 3: List (default) or Timeline, remembered per user; both live in the unified Layout panel with the Display options (decision V1)
+  const layoutViews = {
+    value: layout === 'row' ? 'timeline' : 'list',
+    options: [
+      { id: 'list', label: t('tstd.layout_list'), hint: t('view.list_hint'), icon: <Table2 size={14} />, testid: 'site-layout-list' },
+      { id: 'timeline', label: t('tstd.layout_timeline'), hint: t('timeline.view_hint'), icon: <CalendarRange size={14} />, testid: 'site-layout-timeline' },
+    ],
+    onChange: (id: string) => { const l = id === 'timeline' ? 'row' : 'list'; setLayout(l); savePref(LAYOUT_KEY, id); },
+  };
   const exporter = <ExportViewButton testid="grid-export-view" source="tasks" filters={{ site_id: siteId, ...(stage ? { stage_code: stage } : {}), ...(pq.stream ? { stream: pq.stream } : {}), ...(pq.view ? { view: pq.view } : {}), ...(sp.get('tadv') ? { filter: sp.get('tadv') } : {}) }} columns={TASK_COLUMNS} />;
-  const displayMenu = <DisplayMenu api={timeline} />;
 
   return (
     <div data-testid="page-site">
@@ -166,12 +168,12 @@ export function Site() {
         search={<SearchBox testid="task-row-search" value={tq} onChange={(x) => setParam('tq', x || null)} placeholder={t('tstd.search_tasks')} />}
         filter={<UnifiedFilter screen="site-tasks" value={tadvTree} onChange={(tree) => setParam('tadv', encodeFilter(tree) || null)} onClearAll={() => setSp((p) => { const n = new URLSearchParams(p); n.delete('tq'); n.delete('tadv'); return n; }, { replace: true })} />}
         count={<TableCount testid="task-row-count" noun="tasks" total={taskTotal} filtered={rowStages.reduce((n, x) => n + x.tasks.length, 0)} active={!!(tq || tadvTree)} onClear={() => setSp((p) => { const n = new URLSearchParams(p); n.delete('tq'); n.delete('tadv'); return n; }, { replace: true })} />}
-        switcher={switcher} display={displayMenu} exporter={exporter} />}
+        layout={<LayoutPanel testid="site-layout" views={layoutViews} table={timeline} />} exporter={exporter} />}
       {dismantle ? <SiteDismantle siteId={siteId} />
         : off ? <p className="card p-6 text-mute" data-testid="site-stream-na">{t('site.stream_na')}</p>
         : grid.isLoading || !s ? <p className="text-mute">{t('common.loading')}</p>
         : layout === 'row' ? <div {...displayAttrs(timeline.display)} data-testid="task-row-display"><TaskRow stages={rowStages} selected={taskId ?? sp.get('row')} onVisible={setIds} onOpen={(id) => setSp((p) => { const n = new URLSearchParams(p); n.set('task', id); n.set('row', id); return n; }, { replace: true })} /></div>
-        : <TaskGrid key={`${phase?.code ?? ''}|${stage ?? 'all'}`} siteId={siteId} stages={stages} switcher={switcher} exporter={exporter} selected={taskId ?? sp.get('row')} onVisible={setIds} onOpen={(id) => setSp((p) => { const n = new URLSearchParams(p); n.set('task', id); n.set('row', id); return n; }, { replace: true })} />}
+        : <TaskGrid key={`${phase?.code ?? ''}|${stage ?? 'all'}`} siteId={siteId} stages={stages} layoutTestid="site-layout" views={layoutViews} exporter={exporter} selected={taskId ?? sp.get('row')} onVisible={setIds} onOpen={(id) => setSp((p) => { const n = new URLSearchParams(p); n.set('task', id); n.set('row', id); return n; }, { replace: true })} />}
       {layout === 'list' && <p className="mt-2 text-xs text-mute">{t('grid.keys')}</p>}
       </>}
       <TaskDrawer nav={{ ids, onGo: (id) => setSp((p) => { const n = new URLSearchParams(p); n.set('task', id); n.set('row', id); return n; }, { replace: true }) }} registerFields={grid.data?.stages.flatMap((x) => x.tasks).find((x) => x.id === taskId)?.register_fields} taskId={taskId} onClose={() => setParam('task', null)} />
