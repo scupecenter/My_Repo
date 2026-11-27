@@ -40,6 +40,11 @@ export function LocksChip({ siteId, locked, canManage }: { siteId: string; locke
   );
 }
 
+/** One line per missing value (the title of the chip and the list of the import status page). */
+function gapLines(t: (k: string, o?: Record<string, unknown>) => string, items: SiteDataGap[] | undefined): string[] {
+  return (items ?? []).map((g) => (g.kind === 'missing_actual_date' ? t('locks.gap_task', { task: g.task_code, next: g.successor_code }) : t('locks.gap_field', { field: t(`locks.field_${g.field}`, { defaultValue: g.field ?? '' }) })));
+}
+
 /** "Data gaps": the missing required values of a site (the title lists them). */
 export function DataGapsChip({ count, items, testid = 'site-data-gaps' }: { count: number; items?: SiteDataGap[]; testid?: string }) {
   const { t } = useTranslation();
@@ -78,7 +83,10 @@ export function ImportSitesPanel({ source, id, canManage }: { source: 'run' | 'b
               <td className="px-2">{s.next_milestone ? t(`stage.${s.next_milestone}`, { defaultValue: s.next_milestone }) : '—'}</td>
               <td className="mono px-2">{s.done_tasks}/{s.total_tasks}</td>
               <td className="px-2" data-testid={`import-site-locks-${s.site_code}`}>{t(s.workflow_locks ? 'locks.on' : 'locks.off')}</td>
-              <td className="px-2" data-testid={`import-site-missing-${s.site_code}`}>{s.warnings + s.data_gaps > 0 ? <span className="chip bg-lateBg text-lateInk">{t('locks.missing_n', { warnings: s.warnings, gaps: s.data_gaps })}</span> : '—'}</td>
+              <td className="px-2" data-testid={`import-site-missing-${s.site_code}`}>{s.warnings + s.data_gaps > 0 ? <>
+                <span className="chip bg-lateBg text-lateInk" title={gapLines(t, s.data_gap_items).join('\n') || undefined}>{t('locks.missing_n', { warnings: s.warnings, gaps: s.data_gaps })}</span>
+                {(s.data_gap_items ?? []).length > 0 && <ul className="mt-1 list-disc ps-4 text-xs text-mute" data-testid={`import-site-gaps-${s.site_code}`}>{gapLines(t, s.data_gap_items).map((l) => <li key={l}>{l}</li>)}</ul>}
+              </> : '—'}</td>
             </tr>
           ))}</tbody>
         </table>

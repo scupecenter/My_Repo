@@ -170,6 +170,7 @@ interface FieldRow {
   options: unknown;
   in_list: boolean;
   section: string | null;
+  section_ar: string | null;
   list_catalogue: string | null;
 }
 
@@ -303,8 +304,10 @@ export class RegistersService {
   /** The raw field rows of a register with the catalogues they read (cached for one request). */
   private async fieldRows(key: string): Promise<{ rows: FieldRow[]; cats: Map<string, CatalogueInfo> }> {
     const rows = await this.db.tx.$queryRaw<FieldRow[]>(Prisma.sql`
-      SELECT register_key, code, label_en, label_ar, field_type, required, derived, options, in_list, section, list_catalogue, default_value
-      FROM register_fields WHERE register_key = ${key} AND is_active ORDER BY sort_order, code COLLATE "C"`);
+      SELECT rf.register_key, rf.code, rf.label_en, rf.label_ar, rf.field_type, rf.required, rf.derived, rf.options, rf.in_list, rf.section, rs.name_ar AS section_ar, rf.list_catalogue, rf.default_value
+      FROM register_fields rf
+      LEFT JOIN register_sections rs ON rs.register_key = rf.register_key AND rs.name_en = rf.section
+      WHERE rf.register_key = ${key} AND rf.is_active ORDER BY rf.sort_order, rf.code COLLATE "C"`);
     const codes = new Set<string>();
     for (const f of rows) {
       if (f.list_catalogue) codes.add(f.list_catalogue);
@@ -343,6 +346,7 @@ export class RegistersService {
         in_list: f.in_list,
         is_custom: false,
         ...(f.section ? { section: f.section } : {}),
+        ...(f.section_ar ? { section_ar: f.section_ar } : {}),
         ...(f.default_value !== null && f.default_value !== undefined ? { default_value: f.default_value } : {}),
         ...(options ? { options } : {}),
         ...(cat ? { list: cat.ref } : {}),

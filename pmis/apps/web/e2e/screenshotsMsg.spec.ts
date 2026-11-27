@@ -51,7 +51,7 @@ for (const [locale, theme] of [['en', 'light'], ['ar', 'dark']] as const) {
     await page.getByTestId('users-tab-departments').click();
     await page.getByTestId('dept-row-CIVIL').waitFor();
     await shot('departments');
-    await page.getByTestId('users-tab-active').click();
+    await page.getByTestId('people-tab-users').click();
     await page.getByTestId('user-open-1103').click();
     await page.getByTestId('org-manager-value').waitFor();
     await shot('user-org');

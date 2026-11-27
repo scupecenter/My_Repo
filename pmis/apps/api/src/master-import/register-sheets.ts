@@ -35,6 +35,7 @@ export interface RegisterSkip { sheet: string; kind: 'register'; ref: string; re
 export interface RegisterNote { sheet: string; ref: string; code: string; count: number; cells?: string[]; headers?: string[] }
 export interface RegisterSheets { parts: RegisterPart[]; skipped: RegisterSkip[]; notes: RegisterNote[] }
 
+/** Default row cap of a register sheet; the service passes the register_import.max_rows limit (Settings > Security > Limits). */
 export const REGISTER_MAX_ROWS = 5000;
 const BLANK_TOKENS = new Set(['n/a', 'na', 'pending', 'cancelled', 'canceled']);
 const PERSONAL_HEADER = /landlord|contact|phone|e-?mail/i;
