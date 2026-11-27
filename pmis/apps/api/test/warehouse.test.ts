@@ -778,6 +778,17 @@ describe("receipt to Procurement order link (0181)", () => {
   });
 });
 
+describe("Issue log and Quality order picker (0195)", () => {
+  it("serves the order picker routes for issues and quality (a caller needs the module view; a bad site id is refused)", async () => {
+    for (const k of ["issues", "quality"]) {
+      const r = await t.entry.api.call("get", `/registers/${k}/order-options?site_id=nope`);
+      expect([403, 422], JSON.stringify(r.body)).toContain(r.status);
+      const ok = await admin.api.call("get", `/registers/${k}/order-options`);
+      expect([200, 403], JSON.stringify(ok.body)).toContain(ok.status);
+    }
+  });
+});
+
 describe("scope and permissions", () => {
   it("lists movements and stock by site; another region does not see the site documents, and a caller without the module or the create right is refused", async () => {
     const bySite = await t.entry.api.call(

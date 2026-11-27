@@ -6,7 +6,7 @@ import {
   receivePct,
 } from "../src/dashboard/dashboard-ops.rules";
 
-describe("dashboard ops: PR/PO aging buckets (0.15.101)", () => {
+describe("dashboard ops: PR/PO aging buckets (0.15.106)", () => {
   it("the buckets are 0-7, 8-14, 15-30 and over 30 calendar days, in order", () => {
     expect(AGE_BUCKETS.map((b) => b.key)).toEqual([
       "d0_7",
@@ -53,7 +53,7 @@ describe("dashboard ops: PR/PO aging buckets (0.15.101)", () => {
   });
 });
 
-describe("dashboard ops: the materials receive rate (0.15.101)", () => {
+describe("dashboard ops: the materials receive rate (0.15.106)", () => {
   it("is dispatched against required, one decimal; nothing required gives null", () => {
     expect(receivePct(10, 5)).toBe(50);
     expect(receivePct(3, 1)).toBe(33.3);

@@ -27,7 +27,7 @@ interface ShortageRow {
 }
 
 /**
- * GET /dashboard/ops (contract 0.15.101): the follow-up sections of the dashboard beyond F13. First section: procurement
+ * GET /dashboard/ops (contract 0.15.106): the follow-up sections of the dashboard beyond F13. First section: procurement
  * and materials (owner approval 2026-11-26). Read only, not audited. The caller's dashboard.view regions limit every
  * section; the orders also need procurement.view and the materials warehouse.view; a part the caller may not see
  * answers available false. The pure rules are in dashboard-ops.rules.ts.

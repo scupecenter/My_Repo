@@ -24,7 +24,16 @@ import { useToast } from "@/components/Toast";
 import { streamName } from "@/lib/streams";
 import { tripoliToday } from "@/lib/today";
 import { orderedVisible, type TabLayout } from "./dashboardLayout";
-import { Bar, Card, Kpi, pct, signed } from "./dashboardBits";
+import {
+  Bar,
+  Card,
+  Kpi,
+  MiniShare,
+  MoreLine,
+  num,
+  pct,
+  signed,
+} from "./dashboardBits";
 import { OpsProcurementCard } from "./dashboardOps";
 import { useDashboardSettings } from "@/api/dashboardSettings";
 import { SavedViews } from "@/components/SavedViews";
@@ -518,6 +527,7 @@ const DASH_VIEW_EMPTY = { region_id: "", cluster_code: "", scenario: "", stream:
 export function Dashboard() {
   const { t, i18n } = useTranslation();
   const ar = i18n.language === "ar";
+  const [issuesBy, setIssuesBy] = useState<"owner" | "category" | "reason">("owner");
   const toast = useToast();
   const nav = useNavigate();
   const [sp, setSp] = useSearchParams();
@@ -747,8 +757,9 @@ export function Dashboard() {
           data: rows.map((r) => r.owner_name ?? t("dash.issues.no_owner")),
           axisLabel: {
             color: p.ink,
-            width: 100,
+            width: ar ? 160 : 100,
             overflow: "truncate",
+            ellipsis: "…",
             align: rtl ? "left" : "right",
             margin: 10,
           },
@@ -767,7 +778,7 @@ export function Dashboard() {
         ],
       };
     },
-    [d, t],
+    [d, t, ar],
   );
 
   const catBars = useMemo(
@@ -794,8 +805,9 @@ export function Dashboard() {
           data: rows.map(label),
           axisLabel: {
             color: p.ink,
-            width: 100,
+            width: ar ? 160 : 100,
             overflow: "truncate",
+            ellipsis: "…",
             align: rtl ? "left" : "right",
             margin: 10,
           },
@@ -845,8 +857,9 @@ export function Dashboard() {
           data: rows.map(label),
           axisLabel: {
             color: p.ink,
-            width: 100,
+            width: ar ? 160 : 100,
             overflow: "truncate",
+            ellipsis: "…",
             align: rtl ? "left" : "right",
             margin: 10,
           },
@@ -893,8 +906,9 @@ export function Dashboard() {
           data: rows.map(label),
           axisLabel: {
             color: p.ink,
-            width: 110,
+            width: ar ? 170 : 110,
             overflow: "truncate",
+            ellipsis: "…",
             align: rtl ? "left" : "right",
             margin: 10,
           },
@@ -908,7 +922,7 @@ export function Dashboard() {
         ],
       };
     },
-    [d, t],
+    [d, t, ar],
   );
 
   const gauge = useMemo(
@@ -1016,6 +1030,17 @@ export function Dashboard() {
   const ps = d?.headline.project_status;
   const fc = d?.headline.final_closure;
   const basis = d?.basis;
+  /** The data basis of a card. The headline, pipeline and stream figures come from a snapshot when one exists; SLA, issues, delay and health are computed as of the date. */
+  const basisNote = (group: "headline" | "dated"): string | undefined => {
+    if (!basis) return undefined;
+    const kind =
+      basis.source === "live"
+        ? "live"
+        : group === "headline" && basis.source === "snapshot"
+          ? "snapshot"
+          : "computed";
+    return t(`dash.card_basis.${kind}`, { date: basis.ref_date });
+  };
   const mileKpi = (code: string, key: string) => {
     const m = ms(code);
     return (
@@ -1369,7 +1394,7 @@ export function Dashboard() {
 
               ops_procurement: (
                 <>
-                  {/* 0.15.101 (owner approval 2026-11-26, item 1): open PR/PO aging, receive rate and shortage per contractor */}
+                  {/* 0.15.106 (owner approval 2026-11-26, item 1): open PR/PO aging, receive rate and shortage per contractor */}
                   <OpsProcurementCard ops={ops.data} />
                 </>
               ),
@@ -1630,7 +1655,7 @@ export function Dashboard() {
                 <>
                   {/* pipeline */}
                   <Card
-                    title={t("dash.pipeline.title")}
+                    title={t("dash.pipeline.title")} basisNote={basisNote("headline")}
                     testid="dash-pipeline"
                     aside={
                       <span className="flex flex-wrap items-center gap-2 text-sm text-mute">
@@ -1758,7 +1783,7 @@ export function Dashboard() {
                 <>
                   {/* health + activities */}
                   <div className="grid gap-3 lg:grid-cols-2">
-                    <Card title={t("dash.health.title")} testid="dash-health">
+                    <Card title={t("dash.health.title")} basisNote={basisNote("dated")} testid="dash-health">
                       <div className="grid items-center gap-3 sm:grid-cols-[180px_1fr]">
                         <div className="text-center">
                           <EChart
@@ -1839,7 +1864,7 @@ export function Dashboard() {
                         </p>
                       )}
                     </Card>
-                    <Card title={t("dash.ps.title")} testid="dash-ps">
+                    <Card title={t("dash.ps.title")} basisNote={basisNote("headline")} testid="dash-ps">
                       <ul className="space-y-2">
                         {(ps?.activities ?? []).map((a) => (
                           <li key={a.code} data-testid={`dash-ps-${a.code}`}>
@@ -1872,7 +1897,7 @@ export function Dashboard() {
                 <>
                   {/* streams */}
                   <Card
-                    title={t("dash.streams.title")}
+                    title={t("dash.streams.title")} basisNote={basisNote("headline")}
                     testid="dash-streams"
                     aside={
                       <span className="text-sm text-mute">
@@ -2020,7 +2045,7 @@ export function Dashboard() {
                   {/* SLA */}
                   <div className="grid gap-3 lg:grid-cols-2">
                     <Card
-                      title={t("dash.sla.title")}
+                      title={t("dash.sla.title")} basisNote={basisNote("dated")}
                       testid="dash-sla"
                       aside={
                         <Link
@@ -2195,7 +2220,7 @@ export function Dashboard() {
                       )}
                     </Card>
                     <Card
-                      title={t("dash.issues.title")}
+                      title={t("dash.issues.title")} basisNote={basisNote("dated")}
                       testid="dash-issues"
                       aside={
                         d.issues ? (
@@ -2224,7 +2249,7 @@ export function Dashboard() {
                               data-testid="dash-issues-open"
                             >
                               {t("dash.issues.open")}{" "}
-                              <b className="ms-1 tnum">{d.issues.open_total}</b>
+                              <b className="ms-1 tnum">{num(d.issues.open_total)}</b>
                             </span>
                             <span
                               className="chip border border-line"
@@ -2232,7 +2257,7 @@ export function Dashboard() {
                             >
                               {t("dash.issues.sites")}{" "}
                               <b className="ms-1 tnum">
-                                {d.issues.sites_with_open_issue}
+                                {num(d.issues.sites_with_open_issue)}
                               </b>
                             </span>
                             {d.issues.oldest_age_wd != null && (
@@ -2243,7 +2268,27 @@ export function Dashboard() {
                               </span>
                             )}
                           </div>
+                          <div
+                            className="mb-2 flex flex-wrap gap-1"
+                            role="group"
+                            aria-label={t("dash.issues.switch")}
+                            data-testid="dash-issues-switch"
+                          >
+                            {(["owner", "category", "reason"] as const).map((k) => (
+                              <button
+                                key={k}
+                                type="button"
+                                className={`btn ${issuesBy === k ? "btn-primary" : ""}`}
+                                aria-pressed={issuesBy === k}
+                                data-testid={`dash-issues-by-${k}`}
+                                onClick={() => setIssuesBy(k)}
+                              >
+                                {t(`dash.issues.by_${k}`)}
+                              </button>
+                            ))}
+                          </div>
                           {d.issues.by_owner.length > 0 && (
+                            <div className={issuesBy === "owner" ? "" : "hidden"}>
                             <EChart
                               build={ownerBars}
                               height={Math.max(
@@ -2260,10 +2305,12 @@ export function Dashboard() {
                               })}
                               testid="dash-issues-chart"
                             />
+                            <MoreLine total={d.issues.by_owner.length} testid="dash-issues-more-owner" />
+                            </div>
                           )}
                           {d.issues.by_category.length > 0 && (
-                            <>
-                              <h3 className="mt-3 mb-1 text-sm font-semibold">
+                            <div className={issuesBy === "category" ? "" : "hidden"}>
+                              <h3 className="mb-1 text-sm font-semibold">
                                 {t("dash.issues.by_category")}
                               </h3>
                               <p className="mb-1 text-xs text-mute">
@@ -2294,11 +2341,12 @@ export function Dashboard() {
                                 })}
                                 testid="dash-issues-cat-chart"
                               />
-                            </>
+                              <MoreLine total={d.issues.by_category.length} testid="dash-issues-more-category" />
+                            </div>
                           )}
                           {d.issues.by_reason.length > 0 && (
-                            <>
-                              <h3 className="mt-3 mb-1 text-sm font-semibold">
+                            <div className={issuesBy === "reason" ? "" : "hidden"}>
+                              <h3 className="mb-1 text-sm font-semibold">
                                 {t("dash.issues.by_reason")}
                               </h3>
                               <p className="mb-1 text-xs text-mute">
@@ -2328,7 +2376,8 @@ export function Dashboard() {
                                 })}
                                 testid="dash-issues-reason-chart"
                               />
-                            </>
+                              <MoreLine total={d.issues.by_reason.length} testid="dash-issues-more-reason" />
+                            </div>
                           )}
                           <ul
                             className="mt-2 flex flex-wrap gap-2 text-xs"
@@ -2340,7 +2389,7 @@ export function Dashboard() {
                                 className="chip border border-line"
                               >
                                 {t(`dash.issues.age.${b.key}`)}{" "}
-                                <b className="ms-1 tnum">{b.count}</b>
+                                <b className="ms-1 tnum">{num(b.count)}</b>
                               </li>
                             ))}
                           </ul>
@@ -2348,7 +2397,7 @@ export function Dashboard() {
                       )}
                     </Card>
                     <Card
-                      title={t("dash.delay.title")}
+                      title={t("dash.delay.title")} basisNote={basisNote("dated")}
                       testid="dash-delay"
                       aside={
                         <span
@@ -2379,13 +2428,14 @@ export function Dashboard() {
                             })}
                             testid="dash-delay-chart"
                           />
+                          <MoreLine total={d.delay.items.length} testid="dash-delay-more" />
                           <div
                             className="mt-2 text-xs text-mute"
                             data-testid="dash-delay-note"
                           >
                             <span data-testid="dash-delay-total">
                               {t("dash.delay.total", {
-                                n: d.delay.total_late_working_days,
+                                n: num(d.delay.total_late_working_days),
                                 a: d.delay.attributed_pct ?? 0,
                                 u: d.delay.unattributed_pct,
                               })}
@@ -2393,21 +2443,21 @@ export function Dashboard() {
                             {(d.delay.suspended_working_days ?? 0) > 0 && (
                               <span data-testid="dash-delay-suspended">
                                 {t("dash.delay.suspended", {
-                                  n: d.delay.suspended_working_days,
+                                  n: num(d.delay.suspended_working_days),
                                 })}{" "}
                               </span>
                             )}
                             {(d.delay.proposed_working_days ?? 0) > 0 && (
                               <span data-testid="dash-delay-proposed">
                                 {t("dash.delay.proposed", {
-                                  n: d.delay.proposed_working_days,
+                                  n: num(d.delay.proposed_working_days),
                                 })}{" "}
                               </span>
                             )}
                             {(d.delay.data_gap_working_days ?? 0) > 0 && (
                               <span data-testid="dash-delay-gap">
                                 {t("dash.delay.gap", {
-                                  n: d.delay.data_gap_working_days,
+                                  n: num(d.delay.data_gap_working_days),
                                 })}{" "}
                               </span>
                             )}
@@ -2467,15 +2517,17 @@ export function Dashboard() {
                                 </Link>
                               </td>
                               <td className="px-2 text-end tnum">
-                                {r.sites_total}
+                                {num(r.sites_total)}
                               </td>
                               {STATUSES.slice(0, 4).map((s) => (
                                 <td key={s} className="px-2 text-end tnum">
-                                  {r.by_overall_status?.[s] ?? 0}
+                                  {num(r.by_overall_status?.[s] ?? 0)}
+                                  <MiniShare part={r.by_overall_status?.[s] ?? 0} total={r.sites_total} />
                                 </td>
                               ))}
                               <td className="px-2 text-end tnum">
-                                {r.late ?? 0}
+                                {num(r.late ?? 0)}
+                                <MiniShare part={r.late ?? 0} total={r.sites_total} tone="bg-late" />
                               </td>
                               <td className="min-w-32 px-2">
                                 <div className="flex items-center gap-2">

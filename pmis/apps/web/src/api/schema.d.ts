@@ -6045,6 +6045,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/registers/issues/order-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The approved, active Procurement orders a warehouse receipt may name (0.15.90)
+         * @description 0.15.95. The approved Procurement versions in force, not cancelled, that the caller can see; of the site `site_id` when it is given (a PL / OPEN receipt may have no site).
+         *     Needs the Issue log module; only the orders in regions where the caller also holds the Procurement view right (the responsibility matrix) are listed, and the same right is checked when a receipt is saved.
+         */
+        get: operations["listIssueOrderOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/registers/quality/order-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The approved, active Procurement orders a warehouse receipt may name (0.15.90)
+         * @description 0.15.95. The approved Procurement versions in force, not cancelled, that the caller can see; of the site `site_id` when it is given (a PL / OPEN receipt may have no site).
+         *     Needs the Quality module; only the orders in regions where the caller also holds the Procurement view right (the responsibility matrix) are listed, and the same right is checked when a receipt is saved.
+         */
+        get: operations["listQualityOrderOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/registers/procurement/{entity_id}/receipts": {
         parameters: {
             query?: never;
@@ -9378,6 +9420,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/dashboard/ops": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The follow-up sections of the dashboard (0.15.106)
+         * @description The sections that follow the operations beyond F13 (owner approval 2026-11-26, dashboard proposals). Read only; not audited (a read, like `GET /dashboard`).
+         *     **Who sees what (B3).** Needs `dashboard.view` (403 `module_forbidden otherwise") and the tab rule of 0.15.80 applies as in `GET /dashboard/extras`.
+         *     The caller's `dashboard.view` regions limit every section. A part whose module the caller may not see answers `available: false` with null figures.
+         *     **Section `procurement`** (item 1, migration 0190): the orders need `procurement.view`, the materials `warehouse.view`.
+         *     An **open order** is a Procurement record whose order status is not one of the closing statuses of the contractor rules (the same rule as
+         *     `GET /reports/contractor-performance`, so the two screens never disagree). `pr_wait` ages the open orders that have a PR date and no PO/WO yet
+         *     from the PR date; `po_wait` ages the open orders that have a PO/WO from the PO/WO date; both in calendar days, bucketed 0-7, 8-14, 15-30, over 30.
+         *     The **materials** position reads `warehouse_site_qty` over the active, not cancelled sites of the caller's regions (the unified `filter` narrows
+         *     them as in `GET /dashboard/extras`): `receive_pct` is dispatched against required (capped at 100%, null when nothing is required),
+         *     `sites_short` counts the sites with at least one shortage line (required over dispatched), `top_shortages` lists the ten biggest missing
+         *     lines with the contractor of the site, and `by_contractor` groups the shortage per contractor. The contractor of a line is the party of the
+         *     site's newest open order; a site with no open order is unattributed (empty name, null party). No price is returned: no price is stored on a
+         *     Procurement record (the financial summary is a separate, restricted card).
+         */
+        get: operations["getDashboardOps"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/dashboard/milestone-pipeline": {
         parameters: {
             query?: never;
@@ -9565,38 +9639,6 @@ export interface paths {
          *     **Counters (0.15.24).** `counters` holds the SLA breaches and at-risk tasks of the open tasks (task states open, entry, in review, in approval and rejected), by stage, using the SLA status of each task (red past the maximum, amber past the warning share); the data quality KPI (sites with a gap of the sites checked); and every KPI of the dashboard catalogue with its value, its saved thresholds and its colour. A KPI with no value (no base, or no monthly target) is listed in `pending_kpis` and has a null value; since 0.15.29 all seven former gaps have a source, and `site360_menus` counts the sites per Site Master view. The same B3 scope applies (sites of the caller's regions; `available: false` without `sites.view`).
          */
         get: operations["getDashboardExtras"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/dashboard/ops": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * The follow-up sections of the dashboard (0.15.101)
-         * @description The sections that follow the operations beyond F13 (owner approval 2026-11-26, dashboard proposals). Read only; not audited (a read, like `GET /dashboard`).
-         *     **Who sees what (B3).** Needs `dashboard.view` (403 `module_forbidden otherwise") and the tab rule of 0.15.80 applies as in `GET /dashboard/extras`.
-         *     The caller's `dashboard.view` regions limit every section. A part whose module the caller may not see answers `available: false` with null figures.
-         *     **Section `procurement`** (item 1, migration 0190): the orders need `procurement.view`, the materials `warehouse.view`.
-         *     An **open order** is a Procurement record whose order status is not one of the closing statuses of the contractor rules (the same rule as
-         *     `GET /reports/contractor-performance`, so the two screens never disagree). `pr_wait` ages the open orders that have a PR date and no PO/WO yet
-         *     from the PR date; `po_wait` ages the open orders that have a PO/WO from the PO/WO date; both in calendar days, bucketed 0-7, 8-14, 15-30, over 30.
-         *     The **materials** position reads `warehouse_site_qty` over the active, not cancelled sites of the caller's regions (the unified `filter` narrows
-         *     them as in `GET /dashboard/extras`): `receive_pct` is dispatched against required (capped at 100%, null when nothing is required),
-         *     `sites_short` counts the sites with at least one shortage line (required over dispatched), `top_shortages` lists the ten biggest missing
-         *     lines with the contractor of the site, and `by_contractor` groups the shortage per contractor. The contractor of a line is the party of the
-         *     site's newest open order; a site with no open order is unattributed (empty name, null party). No price is returned: no price is stored on a
-         *     Procurement record (the financial summary is a separate, restricted card).
-         */
-        get: operations["getDashboardOps"];
         put?: never;
         post?: never;
         delete?: never;
@@ -16170,6 +16212,65 @@ export interface components {
             updated_at?: string | null;
             updated_by?: components["schemas"]["UserRef"] | null;
         };
+        /** @description 0.15.106: the follow-up sections of the dashboard (owner approval 2026-11-26). */
+        DashboardOps: {
+            /** Format: date-time */
+            as_of: string;
+            /** @description The regions the figures cover (null = every region). */
+            scope_regions: components["schemas"]["RegionId"][] | null;
+            procurement: components["schemas"]["DashboardOpsProcurement"];
+        };
+        /** @description 0.15.106: procurement and materials (dashboard proposals item 1). */
+        DashboardOpsProcurement: {
+            /** @description False when the caller may not see the Procurement register; the order figures are then null. */
+            available: boolean;
+            /** @description Open orders (status not one of the closing statuses of the contractor rules). */
+            open_total: number | null;
+            pr_wait: components["schemas"]["DashboardOpsAging"];
+            po_wait: components["schemas"]["DashboardOpsAging"];
+            materials: components["schemas"]["DashboardOpsMaterials"];
+        };
+        DashboardOpsAging: {
+            /** @description Every bucket once, in order d0_7, d8_14, d15_30, over_30 (calendar days). */
+            buckets: {
+                /** @enum {string} */
+                key: "d0_7" | "d8_14" | "d15_30" | "over_30";
+                count: number;
+            }[];
+            total: number;
+            oldest_days: number | null;
+        };
+        DashboardOpsMaterials: {
+            /** @description False when the caller may not see the Warehouse; the other fields are then null. */
+            available: boolean;
+            /** @description Dispatched against required, capped at 100; null when nothing is required. */
+            receive_pct: number | null;
+            required_total: number | null;
+            dispatched_total: number | null;
+            /** @description Active, not cancelled sites with at least one shortage line. */
+            sites_short: number | null;
+            top_shortages: {
+                /** Format: uuid */
+                site_id: string;
+                site_code: string;
+                item_code: string;
+                item_name: string;
+                missing: number;
+                required: number;
+                dispatched: number;
+                /** @description The party of the site's newest open order; null when unattributed. */
+                contractor: string | null;
+            }[] | null;
+            /** @description The shortage per contractor, the biggest first. The row with party_id null gathers the unattributed lines. */
+            by_contractor: {
+                /** Format: uuid */
+                party_id: string | null;
+                name: string;
+                sites: number;
+                missing_lines: number;
+                missing_qty: number;
+            }[] | null;
+        };
         DashboardTabLayout: {
             /** @description Card codes in display order. */
             order: string[];
@@ -19383,65 +19484,6 @@ export interface components {
             by_milestone?: {
                 [key: string]: number;
             };
-        };
-        /** @description 0.15.101: the follow-up sections of the dashboard (owner approval 2026-11-26). */
-        DashboardOps: {
-            /** Format: date-time */
-            as_of: string;
-            /** @description The regions the figures cover (null = every region). */
-            scope_regions: components["schemas"]["RegionId"][] | null;
-            procurement: components["schemas"]["DashboardOpsProcurement"];
-        };
-        /** @description 0.15.101: procurement and materials (dashboard proposals item 1). */
-        DashboardOpsProcurement: {
-            /** @description False when the caller may not see the Procurement register; the order figures are then null. */
-            available: boolean;
-            /** @description Open orders (status not one of the closing statuses of the contractor rules). */
-            open_total: number | null;
-            pr_wait: components["schemas"]["DashboardOpsAging"];
-            po_wait: components["schemas"]["DashboardOpsAging"];
-            materials: components["schemas"]["DashboardOpsMaterials"];
-        };
-        DashboardOpsAging: {
-            /** @description Every bucket once, in order d0_7, d8_14, d15_30, over_30 (calendar days). */
-            buckets: {
-                /** @enum {string} */
-                key: "d0_7" | "d8_14" | "d15_30" | "over_30";
-                count: number;
-            }[];
-            total: number;
-            oldest_days: number | null;
-        };
-        DashboardOpsMaterials: {
-            /** @description False when the caller may not see the Warehouse; the other fields are then null. */
-            available: boolean;
-            /** @description Dispatched against required, capped at 100; null when nothing is required. */
-            receive_pct: number | null;
-            required_total: number | null;
-            dispatched_total: number | null;
-            /** @description Active, not cancelled sites with at least one shortage line. */
-            sites_short: number | null;
-            top_shortages: {
-                /** Format: uuid */
-                site_id: string;
-                site_code: string;
-                item_code: string;
-                item_name: string;
-                missing: number;
-                required: number;
-                dispatched: number;
-                /** @description The party of the site's newest open order; null when unattributed. */
-                contractor: string | null;
-            }[] | null;
-            /** @description The shortage per contractor, the biggest first. The row with party_id null gathers the unattributed lines. */
-            by_contractor: {
-                /** Format: uuid */
-                party_id: string | null;
-                name: string;
-                sites: number;
-                missing_lines: number;
-                missing_qty: number;
-            }[] | null;
         };
         /** @description 0.15.18: the F13 sections of the dashboard (owner decisions 2026-11-15). */
         DashboardExtras: {
@@ -30376,6 +30418,60 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
         };
     };
+    listIssueOrderOptions: {
+        parameters: {
+            query?: {
+                site_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The orders. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["WarehouseOrderOption"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listQualityOrderOptions: {
+        parameters: {
+            query?: {
+                site_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The orders. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["WarehouseOrderOption"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
     listProcurementOrderReceipts: {
         parameters: {
             query?: never;
@@ -36669,6 +36765,33 @@ export interface operations {
             403: components["responses"]["Forbidden"];
         };
     };
+    getDashboardOps: {
+        parameters: {
+            query?: {
+                /** @description 0.15.45: a `FilterTree` as one JSON string (at most 8000 characters), compiled against the screen `dashboard` of `GET /saved-views/filter-fields` (the `sites` fields) and evaluated on the sites the caller may see; it only narrows (the caller's `dashboard.view` regions and every other filter still apply). Needs `sites.view` (403 `module_forbidden`). 422 `validation_failed` with `unknown_field` (also for a field hidden from the caller), `invalid_operator`, `invalid_value`, `too_deep` or `too_many`. */
+                filter?: components["parameters"]["DashboardFilterTree"];
+                region_id?: components["schemas"]["RegionId"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The sections. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardOps"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
     getMilestonePipeline: {
         parameters: {
             query?: {
@@ -36895,33 +37018,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DashboardExtras"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            422: components["responses"]["Unprocessable"];
-        };
-    };
-    getDashboardOps: {
-        parameters: {
-            query?: {
-                /** @description 0.15.45: a `FilterTree` as one JSON string (at most 8000 characters), compiled against the screen `dashboard` of `GET /saved-views/filter-fields` (the `sites` fields) and evaluated on the sites the caller may see; it only narrows (the caller's `dashboard.view` regions and every other filter still apply). Needs `sites.view` (403 `module_forbidden`). 422 `validation_failed` with `unknown_field` (also for a field hidden from the caller), `invalid_operator`, `invalid_value`, `too_deep` or `too_many`. */
-                filter?: components["parameters"]["DashboardFilterTree"];
-                region_id?: components["schemas"]["RegionId"];
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The sections. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DashboardOps"];
                 };
             };
             401: components["responses"]["Unauthorized"];
