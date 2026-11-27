@@ -25,13 +25,13 @@ export class MediaController {
   }
 
   @Get('items')
-  items(@Auth() auth: AuthContext, @Query() q: Record<string, unknown>) {
-    return this.svc.list(auth, q);
+  items(@Query() q: Record<string, unknown>) {
+    return this.svc.list(q);
   }
 
   @Get('facets')
-  facets(@Auth() auth: AuthContext) {
-    return this.svc.facets(auth);
+  facets() {
+    return this.svc.facets();
   }
 
   @Get('items/:kind/:id/thumbnail')

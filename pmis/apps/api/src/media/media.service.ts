@@ -171,7 +171,7 @@ export class MediaService {
     return { kind: 'site', site_id: r.site_id };
   }
 
-  async list(_auth: AuthContext, q: Query) {
+  async list(q: Query) {
     const cfg = await this.config();
     if (!cfg.enabled) return { enabled: false, items: [], page: { limit: cfg.page_size, next_cursor: null } };
     const limit = q.limit === undefined ? cfg.page_size : parseLimit(q.limit);
@@ -201,7 +201,7 @@ export class MediaService {
   }
 
   /** Filter values the screen offers: the document types that have an image in the gallery's scope and the snag types. */
-  async facets(_auth: AuthContext) {
+  async facets() {
     const cfg = await this.config();
     if (!cfg.enabled) return { document_types: [], snag_types: [], registers: [] };
     const regions = await this.access.requireRegions(SITE_DOCS, 'view');
