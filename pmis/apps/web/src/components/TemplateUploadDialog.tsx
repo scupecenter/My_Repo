@@ -10,6 +10,7 @@ import type { ImportBatch, UploadedBatch } from '@/api/types';
 import { registerErrorMessage } from '@/lib/registerErrors';
 import { HistoricalLoadOption, historicalReady, NO_HISTORICAL, type HistoricalChoice } from './HistoricalLoadOption';
 import { UploadResult } from './UploadResult';
+import { TemplateVersionNotice } from './TemplateChanges';
 import { Tip } from './Tip';
 import { pct } from './BatchProgress';
 
@@ -80,6 +81,7 @@ export function TemplateUploadDialog({ open, onClose, templateId, templateName, 
           <Dialog.Title className="text-lg font-bold">{t('tpl.upload_title', { name: templateName })}</Dialog.Title>
           <Dialog.Description className="text-mute">{t('tpl.upload_hint')}</Dialog.Description>
           <UploadSteps step={result ? 3 : upload.isPending ? 2 : 1} />
+          {!result && kind === 'register' && <TemplateVersionNotice templateId={templateId} />}
           {!result && (
             <>
               <ul className="list-disc space-y-1 ps-5 text-sm text-mute">

@@ -265,7 +265,7 @@ describe('hybrid mode list', () => {
       'GET /registers/:key/records/:id/history', 'GET /registers/:key/records/:id/versions', 'POST /registers/:key/records/:id/versions',
       'POST /registers/:key/records/:id/triage',
       // contract 0.7.0: approved-template entry (templates and import batches)
-      'GET /templates', 'GET /templates/:id/download', 'GET /import-batches', 'GET /data-hub/summary', 'POST /import-batches', 'GET /import-batches/:id', 'GET /import-batches/:id/rows', 'GET /import-batches/:id/error-report',
+      'GET /templates', 'GET /templates/:id/changes', 'GET /templates/:id/download', 'GET /import-batches', 'GET /data-hub/summary', 'POST /import-batches', 'GET /import-batches/:id', 'GET /import-batches/:id/rows', 'GET /import-batches/:id/error-report',
       'POST /import-batches/:id/submit', 'POST /import-batches/:id/decisions',
       // contract 0.12.8 (P3): the legacy Master import and its comparison report, the template mapping screen and the import aliases
       'GET /master-import/runs', 'POST /master-import/runs', 'GET /master-import/runs/:id', 'GET /master-import/runs/:id/diffs', 'GET /master-import/runs/:id/export',
@@ -347,7 +347,7 @@ describe('hybrid mode list', () => {
       // contract 0.14.5: the site map of the dashboard (OV-12)
       'GET /dashboard/site-map',
       // contract 0.14.6: the background threshold of batches (Settings, Imports)
-      'GET /settings/imports', 'PUT /settings/imports', 'GET /settings/duplicate-rows', 'PUT /settings/duplicate-rows',
+      'GET /settings/imports', 'PUT /settings/imports', 'GET /settings/duplicate-rows', 'PUT /settings/duplicate-rows', 'GET /settings/template-change-notice', 'PUT /settings/template-change-notice',
       // contract 0.15.1: the shared layout of the side menu
       'GET /settings/nav-layout', 'PUT /settings/nav-layout',
       // contract 0.15.41: Settings, Identity & themes

@@ -31,7 +31,7 @@ import { Lists } from './Lists';
 import { RegisterColumns } from './RegisterColumns';
 import { HistoricalWaiver } from './HistoricalWaiver';
 import { DataReset } from './DataReset';
-import { Imports } from './Imports';
+import { Imports, TemplateNoticeCard } from './Imports';
 import { DuplicateRowsCard } from './DuplicateRows';
 import { KanbanWip } from './KanbanWip';
 import { NumberSequences } from './NumberSequences';
@@ -209,7 +209,7 @@ export function SettingsRoutes() {
         </Route>
         <Route path="data" element={<TabFrame tab="data" />}>
           <Route index element={<Navigate to="imports" replace />} />
-          <Route path="imports" element={<><Imports /><DuplicateRowsCard /></>} />
+          <Route path="imports" element={<><Imports /><TemplateNoticeCard /><DuplicateRowsCard /></>} />
           <Route path="historical" element={<HistoricalWaiver />} />
           <Route path="counts" element={<GecolHlcCounts />} />
           <Route path="export" element={<ExportSchedulesScreen />} />

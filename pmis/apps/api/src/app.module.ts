@@ -99,6 +99,8 @@ import { TeamScopeMatchService } from './settings/team-scope-match.service';
 import { GecolOrderWarningsController } from './settings/gecol-order-warnings.controller';
 import { GecolOrderWarningsService } from './settings/gecol-order-warnings.service';
 import { ImportsSettingsController } from './settings/imports-settings.controller';
+import { TemplateNoticeSettingsController } from './settings/template-notice-settings.controller';
+import { TemplateNoticeSettingsService } from './settings/template-notice-settings.service';
 import { KanbanController } from './kanban/kanban.controller';
 import { KanbanService } from './kanban/kanban.service';
 import { ImportsSettingsService } from './settings/imports-settings.service';
@@ -233,6 +235,7 @@ export function appModuleFor(config: AppConfig) {
       DashboardController, DashboardSettingsController, GoalsController, PmSchedulesController, DashboardOpsController, SupportAccessController, DownloadLocksController, UiPublicController, UiAssetsController, SecurityLocksController, DelayPeriodsController, WeightsController, TeamScopeMatchController, GecolOrderWarningsController, DeriveRulesController, MailKindsController, MailPolicyController, ImportsSettingsController, KanbanController, NavLayoutController, HistoricalWaiverController, SiteMasterController, SiteMasterColumnsController, CustomFieldsController, StructuralFreezeController, UiIdentityController, LoginPageController, SettingsScreensController, AlertRulesController, P4cController, FleetController, AuditLogController, SecurityLogController, LogsAdminController, NewDeviceController,
       MediaController, // 0.15.292 (own line: the long lines above conflict on every merge)
       PasskeySettingController, PasskeyController, // S4
+      TemplateNoticeSettingsController,
       CspReportController, // SEC-3
       DuplicateRowsSettingsController,
       ScenarioSettingsController, SiteApplicabilityController, // P1 (0052)
@@ -263,6 +266,7 @@ export function appModuleFor(config: AppConfig) {
       MediaService, // 0.15.292
       PasskeyService, // S4
       DuplicateRowsSettingsService,
+      TemplateNoticeSettingsService,
       ScenarioService, // P1 (0052)
       ListCataloguesService,
       // P8 mails (MailPort) go through P9's mail outbox
