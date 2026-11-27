@@ -40,7 +40,7 @@ afterAll(async () => {
 
 const explainMs = async (sql: string): Promise<number> => {
   const r = await db.query(`EXPLAIN (ANALYZE, FORMAT JSON) ${sql}`);
-  return Number((r.rows[0]['QUERY PLAN'] as { 'Execution Time': number }[])[0]['Execution Time']);
+  return Number((r.rows[0]!['QUERY PLAN'] as { 'Execution Time': number }[])[0]['Execution Time']);
 };
 
 describe('registers list at scale', () => {
