@@ -15,10 +15,10 @@ for (const locale of ['en', 'ar'] as const) {
     await page.getByTestId('nav-permits_hse').click();
     await expect(page.getByTestId('page-register-permits_hse')).toBeVisible();
     await show(page, 'f:valid_to');
-    await page.screenshot({ path: `/downloads/lcd-1-permits-${locale}.png` });
+    await page.screenshot({ path: `test-results/lcd-1-permits-${locale}.png` });
     await page.getByTestId('nav-procurement').click();
     await expect(page.getByTestId('page-register-procurement')).toBeVisible();
     await show(page, 'f:receipt_pct');
-    await page.screenshot({ path: `/downloads/lcd-2-proc-${locale}.png` });
+    await page.screenshot({ path: `test-results/lcd-2-proc-${locale}.png` });
   });
 }
