@@ -717,6 +717,14 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/library/form-templates/:id/retire'],
   ['get', '/settings/library-archive'],
   ['put', '/settings/library-archive'],
+  // Contract 0.15.401 (migration 0560): structure proposals, the change of a register's columns made from a modified template.
+  ['get', '/structure-proposals'],
+  ['post', '/structure-proposals'],
+  ['post', '/structure-proposals/upload'],
+  ['get', '/structure-proposals/:id'],
+  ['get', '/structure-proposals/:id/differences'],
+  ['post', '/structure-proposals/:id/decision'],
+  ['post', '/structure-proposals/:id/revert'],
 ] as const;
 
 /** `GET /users/deleted` and `GET /users/picker` are other operations that the `:id` pattern would swallow; they stay mocked. */

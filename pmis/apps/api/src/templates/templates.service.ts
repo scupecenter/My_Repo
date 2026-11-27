@@ -8,6 +8,7 @@ import { boolParam, oneParam } from '../common/query';
 import { uuidSchema } from '../common/zod';
 import { DbService } from '../db/db.service';
 import { SitesService } from '../sites/sites.service';
+import { writeStructureSheet, type StructureField } from './structure-sheet';
 
 /** One column of a template (the JSON that tpl_columns() stores with every version). */
 export interface TplColumn {
@@ -258,7 +259,13 @@ export class TemplatesService {
 
     const me = await this.db.tx.$queryRaw<{ employee_id: string | null; display_name: string }[]>(Prisma.sql`SELECT employee_id, display_name FROM users WHERE id = ${auth.user.id}::uuid`);
     const issuedAt = new Date();
-    const buffer = await this.build(t, cols, rows, { prefill, employeeId: me[0]?.employee_id?.trim() ?? null, issuedAt });
+    // 0560: who may edit the columns gets the Structure sheet, written from the live definition at the moment of the download
+    let structure: StructureField[] | undefined;
+    if (await this.access.isAdmin('fields', 'edit')) {
+      const sj = await this.db.tx.$queryRaw<{ r: { fields: StructureField[] } }[]>(Prisma.sql`SELECT reg_fields_admin_json(${t.register_key}::text) AS r`);
+      structure = sj[0]?.r.fields;
+    }
+    const buffer = await this.build(t, cols, rows, { prefill, employeeId: me[0]?.employee_id?.trim() ?? null, issuedAt, structure });
 
     // migration 0045: pmis_app writes no log row itself; the ip and the device come from the request context
     void ip;
@@ -600,7 +607,7 @@ export class TemplatesService {
     return s;
   }
 
-  async build(t: TemplateRow, cols: TplColumn[], rows: Record<string, unknown>[], meta: { prefill: boolean; employeeId: string | null; issuedAt: Date; extra?: (wb: ExcelJS.Workbook) => void }): Promise<Buffer> {
+  async build(t: TemplateRow, cols: TplColumn[], rows: Record<string, unknown>[], meta: { prefill: boolean; employeeId: string | null; issuedAt: Date; extra?: (wb: ExcelJS.Workbook) => void; structure?: StructureField[] }): Promise<Buffer> {
     return this.buildBook(t, [{ sheet: DATA_SHEET, cols, rows }], meta, []);
   }
 
@@ -666,7 +673,7 @@ export class TemplatesService {
 
   /** The approved-template workbook: the data sheet(s), an instructions sheet, a Columns sheet for the Site Register templates, the hidden lists and the hidden `_tpl`. */
   async buildBook(
-    t: TemplateRow, parts: BookPart[], meta: { prefill: boolean; employeeId: string | null; issuedAt: Date; extra?: (wb: ExcelJS.Workbook) => void }, extraKv: [string, string | number][],
+    t: TemplateRow, parts: BookPart[], meta: { prefill: boolean; employeeId: string | null; issuedAt: Date; extra?: (wb: ExcelJS.Workbook) => void; structure?: StructureField[] }, extraKv: [string, string | number][],
   ): Promise<Buffer> {
     const wb = new ExcelJS.Workbook();
     wb.creator = 'GSDN Workspace';
@@ -680,6 +687,7 @@ export class TemplatesService {
     });
     const ins = wb.addWorksheet('Instructions', { properties: { tabColor: { argb: 'FF2E7D90' } } });
     const colsSheet = isSite ? wb.addWorksheet('Columns') : null;
+    if (meta.structure) writeStructureSheet(wb, meta.structure);   // 0560: the Structure sheet of a register template (System Admin or fields.edit only)
     const lists = wb.addWorksheet(LISTS_SHEET);
     const tpl = wb.addWorksheet(TPL_SHEET);
 

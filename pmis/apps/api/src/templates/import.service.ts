@@ -444,7 +444,7 @@ export class ImportService {
     const max = importMaxRows();
     const warnings: UploadWarning[] = [];
     const staged: { sheet: string; header_checksum: string; rows: unknown[] }[] = [];
-    const helper = new Set([TPL_SHEET, LISTS_SHEET, 'Instructions', 'Columns']);
+    const helper = new Set([TPL_SHEET, LISTS_SHEET, 'Instructions', 'Columns', 'Structure']);
     for (const ws of wb.worksheets) {
       if (helper.has(ws.name)) continue;
       const part = parts.find((p) => p.sheet === ws.name);
