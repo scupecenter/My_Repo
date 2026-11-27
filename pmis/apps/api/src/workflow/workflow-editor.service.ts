@@ -23,6 +23,10 @@ const slaRuleBody = z.object({
 const weightBody = z.object({
   counts_in_weight: z.boolean(), weight_value: z.number().min(0).max(100).optional(), weight_group: z.string().trim().max(20).nullable().optional(), reason,
 }).strict();
+/** Migration 0542: estimated man-days and an optional planned duration of a task (draft only); they feed the suggested weight in the editor. */
+const estimateBody = z.object({
+  est_man_days: z.number().min(0).max(100000).nullable(), planned_duration_days: z.number().int().min(1).max(3650).nullable().optional(), reason,
+}).strict();
 const confirmImpact = z.string().max(200).optional();
 const code = z.string().trim().min(1).max(40);
 const nameEn = z.string().trim().min(1).max(200);
@@ -275,6 +279,14 @@ export class WorkflowEditorService {
     const etag = await this.gate(auth, 'weights', 'edit', ifMatch);
     return this.one(Prisma.sql`SELECT admin_wf_task_weight(${version}::int, ${etag}::int, ${task}::text, ${b.counts_in_weight}::boolean, ${b.weight_value ?? 0}::numeric,
       ${b.weight_group ?? null}::text, ${b.reason}::text) AS r`);
+  }
+
+  /** Migration 0542: estimated man-days and planned duration of a task (draft only). The suggested weight they produce is advice, never auto-applied. */
+  async setEstimate(auth: AuthContext, version: number, task: string, ifMatch: string | undefined, raw: unknown): Promise<Json> {
+    const b = parse(estimateBody, raw);
+    const etag = await this.gate(auth, 'weights', 'edit', ifMatch);
+    return this.one(Prisma.sql`SELECT admin_wf_task_estimate(${version}::int, ${etag}::int, ${task}::text, ${b.est_man_days ?? null}::numeric,
+      ${b.planned_duration_days ?? null}::int, ${b.reason}::text) AS r`);
   }
 
   async publish(auth: AuthContext, version: number, ifMatch: string | undefined, raw: unknown): Promise<Json> {

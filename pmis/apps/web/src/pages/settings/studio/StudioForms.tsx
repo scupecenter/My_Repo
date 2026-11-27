@@ -52,6 +52,7 @@ export function slaProps(it: SlaWeightItem | undefined) {
     sla: it?.sla ? { min: it.sla.min_working_days, max: it.sla.max_working_days, rule_id: it.sla.id, unit: it.sla.unit, start_event: it.sla.start_event, calendar_code: it.sla.calendar_code, warning_pct: it.sla.warning_pct,
       breach_owner_role: it.sla.breach_owner_role, escalation_role: it.sla.escalation_role, pause_on_client_wait: it.sla.pause_on_client_wait } : undefined,
     weight: { counts: !!it?.counts_in_weight, value: Number(it?.weight_value ?? 0), group: it?.weight_group ?? null },
+    estimate: { man_days: it?.est_man_days != null ? Number(it.est_man_days) : null, duration: it?.planned_duration_days ?? null, suggested: it?.suggested_weight != null ? Number(it.suggested_weight) : null },
   };
 }
 export function baseOf(it: SlaWeightItem | undefined) {

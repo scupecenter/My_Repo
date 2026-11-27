@@ -121,6 +121,12 @@ export class WorkflowEditorController {
     return this.tag(res, await this.editor.setWeight(auth, version, task, ifMatch, body));
   }
 
+  /** Migration 0542: estimated man-days and planned duration of a task in a draft. */
+  @Put('versions/:version/tasks/:task/estimate')
+  async setEstimate(@Auth() auth: AuthContext, @Param('version', ParseIntPipe) version: number, @Param('task') task: string, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response): Promise<Json> {
+    return this.tag(res, await this.editor.setEstimate(auth, version, task, ifMatch, body));
+  }
+
   @Put('versions/:version/tasks/:task/closing')
   async setClosing(@Auth() auth: AuthContext, @Param('version', ParseIntPipe) version: number, @Param('task') task: string, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response): Promise<Json> {
     return this.tag(res, await this.editor.setClosing(auth, version, task, ifMatch, body));
