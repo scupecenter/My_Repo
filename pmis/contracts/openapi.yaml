@@ -238,6 +238,7 @@ info:
     - 0.1.0 (2026-10-25): first contract for P1. Breaking changes are recorded in `docs/adr/` (ADR 0001 §6).
     - 0.15.204 (2026-11-27): the dashboard follow-up sections, pending approvals bottleneck (owner approval 2026-11-26, dashboard proposals item 7; migration 0305). Additive and read only. `GET /dashboard/ops` gains the section `approvals` (`DashboardOpsApprovals`): the tasks waiting for review or approval (states in_review and in_approval, the same population as the Approvals inbox), their ages in calendar days since the level opened, split review against approve, and the same ages grouped by the ball-in-court role so the bottleneck role shows. The section needs the approvals view (and the sites view, like the inbox) and answers available false without them. The dashboard settings catalogue gains the card `ops_approvals`. No grant, role or permission change.
     - 0.15.205 (2026-11-27): the dashboard follow-up sections, change requests and overdue meeting actions (owner approval 2026-11-26, dashboard proposals item 8; migration 0306). Additive and read only. `GET /dashboard/ops` gains the section `changes_meetings` (`DashboardOpsChangesMeetings`): the change requests still pending (status requested) with their ages since the request date and a count per kind, the approved ones not yet applied, and the meeting actions not closed with the overdue ones aged by days late. Each part needs its own module view (change control, meetings) and answers `available: false` with null figures without it. No amounts.
+    - 0.15.367 (2026-11-27): phase scope on the dashboard (approved by Ahmed 2026-11-27 20:28, relayed by the main agent; no migration in this part). Additive and read only. `GET /dashboard/ops` gains the section `phase_scope` (`DashboardOpsPhaseScope`): the registered, not cancelled sites per project phase (`sites.project_phase`) with the sites on air (approved On-Air task), the progress and the derived target, plus `monthly_on_air_auto`, the monthly On-Air target derived from the scope (sites not yet on air over the months left to the latest planned date of the On-Air task). Every figure is computed from the sites; nothing is typed. Needs the dashboard view; no amounts.
 
     ## Changes since 0.1
     - **Auth**: `GET /auth/login` accepts `identifier` (email, 4-digit employee ID or E.164 phone) and answers 302 the same way whether or not it matches; rate limited (ADR 0002 §9b). Local password sign-in stays deferred and is not in the contract.
@@ -25354,7 +25355,7 @@ components:
     DashboardOps:
       type: object
       description: '0.15.106: the follow-up sections of the dashboard (owner approval 2026-11-26).'
-      required: [as_of, scope_regions, procurement, permits_hse, gecol_hlc, contractor_scorecard, quality, approvals, changes_meetings]
+      required: [as_of, scope_regions, procurement, permits_hse, gecol_hlc, contractor_scorecard, quality, approvals, changes_meetings, phase_scope]
       properties:
         as_of: {type: string, format: date-time}
         scope_regions:
@@ -25368,6 +25369,7 @@ components:
         quality: {$ref: '#/components/schemas/DashboardOpsQuality'}
         approvals: {$ref: '#/components/schemas/DashboardOpsApprovals'}
         changes_meetings: {$ref: '#/components/schemas/DashboardOpsChangesMeetings'}
+        phase_scope: {$ref: '#/components/schemas/DashboardOpsPhaseScope'}
     DashboardOpsProcurement:
       type: object
       description: '0.15.106: procurement and materials (dashboard proposals item 1).'
@@ -25521,6 +25523,39 @@ components:
                     count: {type: integer}
           description: "One entry per ball-in-court role, most waiting tasks first."
         unassigned: {type: [integer, 'null'], description: "The waiting tasks with no ball-in-court role (a group holds them, or nobody yet)."}
+    DashboardOpsPhaseScope:
+      type: object
+      description: "0.15.367: the registered, not cancelled sites per project phase (sites.project_phase) with the share on air, and the targets derived from them. Only the sites and their On-Air task are read; nothing is typed."
+      required: [available, phases, total, monthly_on_air_auto]
+      properties:
+        available: {type: boolean, description: "False when the caller has no dashboard region; every figure is then null."}
+        phases:
+          type: [array, 'null']
+          items: {$ref: '#/components/schemas/DashboardPhaseScopeRow'}
+          description: "One row per phase, in natural order; the sites with no phase are one row with phase null, last."
+        total: {oneOf: [{$ref: '#/components/schemas/DashboardPhaseScopeRow'}, {type: 'null'}]}
+        monthly_on_air_auto:
+          type: [object, 'null']
+          description: "The monthly On-Air target derived from the scope: sites not yet on air over the months left to the latest planned date of the On-Air task (30-day months, at least one). value is null when no planned date exists or nothing is left."
+          required: [value, remaining, planned_end, months_left]
+          properties:
+            value: {type: [integer, 'null']}
+            remaining: {type: integer}
+            planned_end: {type: [string, 'null'], format: date}
+            months_left: {type: [integer, 'null']}
+    DashboardPhaseScopeRow:
+      type: object
+      required: [phase, sites, completed, in_progress, not_started, on_hold, on_air, progress_pct, target_sites]
+      properties:
+        phase: {type: [string, 'null'], description: "The project phase of the site; null = no phase recorded."}
+        sites: {type: integer}
+        completed: {type: integer}
+        in_progress: {type: integer}
+        not_started: {type: integer}
+        on_hold: {type: integer}
+        on_air: {type: integer, description: "Sites whose On-Air task (MS6) is approved."}
+        progress_pct: {type: [number, 'null'], description: "on_air over sites, in percent (one decimal)."}
+        target_sites: {type: integer, description: "The target of the phase: all its registered sites. Derived, never typed."}
     DashboardOpsChangesMeetings:
       type: object
       description: "0.15.205 (item 8): the pending change requests and the overdue meeting actions."

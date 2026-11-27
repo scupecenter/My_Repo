@@ -3272,6 +3272,26 @@
       "draft_factor": "Draft",
       "draft_note": "A factor marked draft is not yet approved by the owner."
     },
+    "phase": {
+      "title": "Phase scope",
+      "hint": "Registered sites per project phase (cancelled sites left out) and how many are on air. Every figure and target is computed from the sites; nothing is typed.",
+      "none": "No phase recorded",
+      "unavailable": "The phase scope is not available for your regions.",
+      "total": "Sites in scope",
+      "total_hint": "Registered, not cancelled sites of the scope",
+      "on_air": "On air",
+      "onair_hint": "Sites whose On-Air task is approved",
+      "monthly": "Monthly On-Air target",
+      "monthly_hint": "Computed: sites not yet on air spread over the months left to the latest planned On-Air date",
+      "monthly_basis": "({{n}} sites over {{m}} months to {{d}})",
+      "no_target": "no target (no planned date)",
+      "col_phase": "Phase",
+      "col_sites": "Sites",
+      "col_on_air": "On air",
+      "col_progress": "Progress",
+      "col_target": "Target",
+      "target_hint": "Target of the phase: all its registered sites (derived)"
+    },
     "ps": {
       "title": "Project Status by activity",
       "no_data": "no data yet",

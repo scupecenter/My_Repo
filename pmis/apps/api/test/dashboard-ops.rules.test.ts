@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   ptwCheckGaps,
+  phaseScope,
+  autoMonthlyOnAir,
   PTW_CHECK_KEYS,
   AGE_BUCKETS,
   ageBucket,
@@ -251,5 +253,22 @@ describe("item 8 rules: change requests and meeting actions (0.15.205)", () => {
     expect(changesSummary([]).pending).toBe(0);
     expect(changesSummary([]).pending_aging.oldest_days).toBeNull();
     expect(actionsSummary([]).overdue).toBe(0);
+  });
+});
+
+describe('phase scope (0.15.367)', () => {
+  const row = (phase: string | null, sites: number, on_air: number) => ({ phase, sites, completed: 0, in_progress: sites - on_air, not_started: 0, on_hold: 0, on_air });
+  it('counts the sites per phase, derives the target from them and puts no phase last', () => {
+    const r = phaseScope([row(null, 4, 0), row('Phase 10', 10, 5), row('Phase 2', 20, 5)]);
+    expect(r.phases.map((p) => p.phase)).toEqual(['Phase 2', 'Phase 10', null]);
+    expect(r.phases[0]).toMatchObject({ sites: 20, target_sites: 20, progress_pct: 25 });
+    expect(r.total).toMatchObject({ sites: 34, target_sites: 34, on_air: 10, progress_pct: 29.4 });
+    expect(phaseScope([]).total).toMatchObject({ sites: 0, progress_pct: null });
+  });
+  it('spreads the sites not yet on air over the months left, never below one month', () => {
+    expect(autoMonthlyOnAir(30, '2027-03-01', '2026-11-27')).toEqual({ value: 8, months_left: 4 });
+    expect(autoMonthlyOnAir(30, '2026-11-01', '2026-11-27')).toEqual({ value: 30, months_left: 1 });
+    expect(autoMonthlyOnAir(30, null, '2026-11-27')).toEqual({ value: null, months_left: null });
+    expect(autoMonthlyOnAir(0, '2027-03-01', '2026-11-27')).toEqual({ value: null, months_left: null });
   });
 });

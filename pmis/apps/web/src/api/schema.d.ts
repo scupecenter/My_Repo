@@ -18909,6 +18909,7 @@ export interface components {
             quality: components["schemas"]["DashboardOpsQuality"];
             approvals: components["schemas"]["DashboardOpsApprovals"];
             changes_meetings: components["schemas"]["DashboardOpsChangesMeetings"];
+            phase_scope: components["schemas"]["DashboardOpsPhaseScope"];
         };
         /** @description 0.15.106: procurement and materials (dashboard proposals item 1). */
         DashboardOpsProcurement: {
@@ -19047,6 +19048,37 @@ export interface components {
             }[] | null;
             /** @description The waiting tasks with no ball-in-court role (a group holds them, or nobody yet). */
             unassigned: number | null;
+        };
+        /** @description 0.15.367: the registered, not cancelled sites per project phase (sites.project_phase) with the share on air, and the targets derived from them. Only the sites and their On-Air task are read; nothing is typed. */
+        DashboardOpsPhaseScope: {
+            /** @description False when the caller has no dashboard region; every figure is then null. */
+            available: boolean;
+            /** @description One row per phase, in natural order; the sites with no phase are one row with phase null, last. */
+            phases: components["schemas"]["DashboardPhaseScopeRow"][] | null;
+            total: components["schemas"]["DashboardPhaseScopeRow"] | null;
+            /** @description The monthly On-Air target derived from the scope: sites not yet on air over the months left to the latest planned date of the On-Air task (30-day months, at least one). value is null when no planned date exists or nothing is left. */
+            monthly_on_air_auto: {
+                value: number | null;
+                remaining: number;
+                /** Format: date */
+                planned_end: string | null;
+                months_left: number | null;
+            } | null;
+        };
+        DashboardPhaseScopeRow: {
+            /** @description The project phase of the site; null = no phase recorded. */
+            phase: string | null;
+            sites: number;
+            completed: number;
+            in_progress: number;
+            not_started: number;
+            on_hold: number;
+            /** @description Sites whose On-Air task (MS6) is approved. */
+            on_air: number;
+            /** @description on_air over sites, in percent (one decimal). */
+            progress_pct: number | null;
+            /** @description The target of the phase: all its registered sites. Derived, never typed. */
+            target_sites: number;
         };
         /** @description 0.15.205 (item 8): the pending change requests and the overdue meeting actions. */
         DashboardOpsChangesMeetings: {
