@@ -447,6 +447,8 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/AdminWebPush'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
   /admin/document-search-index:
     get:
       tags: [documents]
