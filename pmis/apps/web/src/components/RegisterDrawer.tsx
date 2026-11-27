@@ -6,6 +6,7 @@ import { Link } from 'react-router-dom';
 import { useSession } from '@/api/hooks';
 import { useCancelSnagRecord, useCreateRecord, useNewVersion, useRecordClaim, useRecordHistory, useRecordOp, useRecordTriage, useRecordTransfer, useRegisterRecord, useRegisterRecords, useUpdateRecord, useContractorCompanies, type RecordOp, type TriageOp } from '@/api/registers';
 import { useMatrix } from '@/api/sites';
+import { EditingNotice } from './EditingNotice';
 import { useAddRegisterComment, useRegisterComments } from '@/api/x';
 import type { RegisterDefinition, RegisterRecord } from '@/api/types';
 import { registerErrorMessage, serverFieldIssues } from '@/lib/registerErrors';
@@ -259,6 +260,7 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
       {record && <DrawerTabs value={tab} onChange={setTab} tabs={[{ id: 'data', label: t('drawer.tab_data') }, { id: 'documents', label: t('docs.tab') }, { id: 'comments', label: t('drawer.comments') }, { id: 'history', label: t('drawer.history') }]} />}
       <div className="flex-1 space-y-4 overflow-y-auto p-4">
         <div {...panelProps('data', tab)} className="space-y-4">
+        {record && <EditingNotice kind="record" id={record.id} editing={editable} testid="reg-editing-notice" />}
         {editable && <DraftBar draft={dr} onRestore={(v) => { if (v.data && typeof v.data === 'object') setData(v.data as Data); if (typeof v.record_type === 'string') setRtype(v.record_type); setDirty(true); }} />}
         {OWNER_NOTE[key] && <p className="rounded-md bg-card2 p-3 text-sm" data-testid="reg-owner-note">{t(OWNER_NOTE[key])}</p>}
         {src && record?.site_id && (
@@ -483,3 +485,4 @@ export function RegisterDrawer({ def, recordId, onClose, onOpen, nav }: { def: R
     </DrawerFrame>
   );
 }
+

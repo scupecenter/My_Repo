@@ -1208,6 +1208,7 @@
     "section_sla_weights": "Weights",
     "section_registers_lists": "Lists",
     "section_alerts_policy": "Notification policy",
+    "section_alerts_push": "Web push",
     "section_alerts_mail": "Mail kinds",
     "section_security_locks": "Lock keys",
     "section_security_support": "Support access",
@@ -3087,7 +3088,10 @@
     "only_leads": "Only a lead of this region (the reassign right), or a System Admin, writes its update. An author edits only until the week ends.",
     "empty": "No status updates yet",
     "empty_lead": "Write the first update of the week.",
-    "empty_hint": "Leads publish one update per region or team each week."
+    "empty_hint": "Leads publish one update per region or team each week.",
+    "health_board": "Region health",
+    "missing_update": "Missing update",
+    "missing_hint": "No update posted for this week yet."
   },
   "dash": {
     "tabs": {
@@ -3500,7 +3504,16 @@
       "quality_ncrs_open": "NCR open",
       "quality_ncrs_note": "{{closed}} closed",
       "quality_avg_close": "Avg closure",
-      "quality_first_pass": "First-time acceptance"
+      "quality_first_pass": "First-time acceptance",
+      "approvals_title": "Pending approvals bottleneck",
+      "approvals_hint": "The tasks waiting for review or approval of the sites in scope, aged since the level opened, per role. Read only.",
+      "open_approvals": "Approvals inbox",
+      "unavailable_approvals": "You do not have the approvals view right, so this section stays hidden.",
+      "approvals_total": "Waiting",
+      "approvals_review": "Review",
+      "approvals_approve": "Approve",
+      "approvals_unassigned": "No role",
+      "approvals_oldest": "oldest {{n}}d"
     },
     "scurve": {
       "title": "Progress curve",
@@ -3515,6 +3528,11 @@
       "empty": "No saved snapshots yet: the curve appears after the first weekly snapshot.",
       "chart_label": "Progress curve: {{list}}",
       "basis": "{{n}} saved weekly snapshots, values frozen at their dates."
+    },
+    "region_health": {
+      "title": "Region health",
+      "open": "Open the Weekly status",
+      "week": "Week of {{date}}"
     }
   },
   "docs": {
@@ -3803,7 +3821,8 @@
       "motion": "Motion",
       "icon_style": "Icon weight",
       "menu_style": "Side menu",
-      "accent": "Accent colour"
+      "accent": "Accent colour",
+      "contrast": "Contrast"
     },
     "opt": {
       "density": {
@@ -3844,6 +3863,10 @@
         "orange": "Orange",
         "red": "Red",
         "amber": "Amber"
+      },
+      "contrast": {
+        "standard": "Standard",
+        "high": "High"
       }
     }
   },
@@ -6629,6 +6652,20 @@
     "scope_hash": "Scope fingerprint",
     "approve_scope": "You approve exactly this scope. If it changed, the approval is refused and a new request is needed.",
     "plan_scope_note": "Counted for the chosen scope.",
+    "narrow_whole": "Narrowing works for Procurement, Issue Log, Risk Register, Car Dispatcher bookings, Financial Advances and the other register parts marked narrowable. Sites, Quality, Warehouse, As-built, Meetings and Change control are deleted whole only: their tasks, gates, documents and checks link to a site or a process, not to one record, so a region or batch filter could leave orphaned rows.",
+    "narrow_title": "Narrow the chosen parts (optional)",
+    "narrow_hint": "Only the records that match every filter you set are deleted. Everything else in the part stays, with its documents, comments and history. Leave all empty to delete the whole part.",
+    "narrow_regions": "Region",
+    "narrow_batches": "Import batch",
+    "narrow_no_batches": "No import batches for this part.",
+    "narrow_batch_meta": "{{rows}} rows · uploaded {{when}}",
+    "narrow_period": "Created between",
+    "narrow_from": "From (inclusive)",
+    "narrow_to": "To (inclusive)",
+    "narrow_active": "The counts above are for the narrowed scope.",
+    "narrow_clear": "Clear the narrowing",
+    "narrow_view": "Narrowed to:",
+    "narrow_dropped": "The narrowing is not used: the chosen parts cannot be narrowed.",
     "accounts_note": "{{count}} accounts would be deactivated.",
     "backup_choice": "Backup before the run",
     "require_backup": "Require a recent backup (recommended)",
@@ -6890,6 +6927,28 @@
     "failed": "Could not be read (retried daily)",
     "last": "Last indexed: {{at}}",
     "never": "Nothing indexed yet."
+  },
+  "push": {
+    "title": "Notifications on this device",
+    "note": "Get a short alert on this phone or computer when you have a new notification. The alert only says you have something new; open the inbox to read it. The bell and the e-mail stay as they are, and you can turn this off at any time.",
+    "server_off": "Device alerts are not turned on for this system yet. Ask your administrator.",
+    "unsupported": "This browser does not support device alerts.",
+    "on": "On for this device",
+    "off": "Off for this device",
+    "enable": "Turn on",
+    "disable": "Turn off",
+    "denied": "The browser blocked notifications. Allow them in the browser settings, then try again.",
+    "failed": "Could not change device alerts. Try again."
+  },
+  "wps": {
+    "title": "Web push (device alerts)",
+    "note": "Field engineers can turn on a short alert on their phone or computer (Profile > Notifications on this device). The alert carries no site or record text, only that something new is waiting in the inbox. The bell and the e-mail are unchanged.",
+    "on": "Web push is on. A person turns it on for their own browser in Profile.",
+    "off": "Web push is off because the server has no push keys. It stays off until the administrator sets VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY and VAPID_SUBJECT in the server environment. Nothing is sent and people see that device alerts are not available.",
+    "browsers": "Subscribed browsers",
+    "people": "People",
+    "last": "Last alert sent: {{at}}",
+    "never": "No alert sent yet."
   },
   "as": {
     "title": "Archive",
@@ -7576,6 +7635,13 @@
     "domains": "Internal domains (comma separated)",
     "domains_note": "An address whose domain is not listed is external. With no domain listed every address counts as internal.",
     "confirm_note": "The change is audited and applies to the next mail."
+  },
+  "presence": {
+    "editing_record_one": "{{names}} is editing this record",
+    "editing_record_other": "{{names}} are editing this record",
+    "editing_task_one": "{{names}} is editing this task",
+    "editing_task_other": "{{names}} are editing this task",
+    "editing_join": ", "
   },
   "capture": {
     "dictate": "Dictate",

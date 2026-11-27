@@ -165,6 +165,7 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/reports/time-in-state'],
   ['get', '/reports/workload'],
   ['get', '/status-updates'],
+  ['get', '/status-updates/region-health'], // 0.15.241, item 12
   ['post', '/status-updates'],
   ['patch', '/status-updates/:id'],
   // Contract 0.7.2: the main dashboard, Project Status and the weight sets (apps/api: dashboard; migration 0039).
@@ -228,6 +229,10 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/me/sessions/:id/revoke'],
   ['patch', '/me/profile'],
   ['get', '/admin/document-search-index'],
+  ['get', '/me/push'],
+  ['post', '/me/push/subscribe'],
+  ['post', '/me/push/unsubscribe'],
+  ['get', '/admin/web-push'],
   ['patch', '/me/preferences'],
   ['post', '/me/password'],
   ['post', '/me/email-change'],
@@ -354,6 +359,10 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/saved-views/:id/restore'],
   ['post', '/saved-views/:id/transfer'],
   ['get', '/saved-views/:id/versions'],
+  // Contract 0.15.246 (item 17, migration 0345): the soft "… is editing this record" notice.
+  ['post', '/presence/editing'],
+  ['post', '/presence/editing/stop'],
+  ['get', '/presence/editing'],
   ['get', '/me/drafts'],
   ['get', '/me/drafts/:key'],
   ['put', '/me/drafts/:key'],
@@ -670,6 +679,7 @@ export const REAL_API_AUTH_USERS = [
   ['put', '/settings/data-reset/settings'],
   ['post', '/settings/data-reset/requests'],
   ['get', '/settings/data-reset/plan'],
+  ['get', '/settings/data-reset/narrow-options'],
   ['get', '/settings/data-reset/requests/:id'],
   ['post', '/settings/data-reset/requests/:id/approve'],
   ['post', '/settings/data-reset/requests/:id/cancel'],

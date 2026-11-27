@@ -275,7 +275,7 @@ describe('hybrid mode list', () => {
       'GET /notifications', 'POST /notifications/read-all', 'POST /notifications/:id/read', 'POST /notifications/:id/unread', 'POST /notifications/:id/snooze',
       'GET /me/follows', 'PUT /sites/:id/follow', 'DELETE /sites/:id/follow', 'PUT /registers/:key/records/:id/follow', 'DELETE /registers/:key/records/:id/follow',
       'GET /registers/:key/records/:id/comments', 'POST /registers/:key/records/:id/comments', 'GET /tasks/:id/time-in-state', 'GET /tasks/:id/blocked-by',
-      'GET /reports/time-in-state', 'GET /reports/workload', 'GET /status-updates', 'POST /status-updates', 'PATCH /status-updates/:id',
+      'GET /reports/time-in-state', 'GET /reports/workload', 'GET /status-updates', 'GET /status-updates/region-health', 'POST /status-updates', 'PATCH /status-updates/:id',
       // contract 0.7.2: the main dashboard, Project Status, weight sets
       'GET /dashboard', 'GET /dashboard/export', 'GET /project-status', 'GET /project-status/snapshots',
       'GET /settings/weight-sets', 'POST /settings/weight-sets', 'GET /settings/weight-sets/:id', 'PUT /settings/weight-sets/:id', 'POST /settings/weight-sets/:id/preview', 'POST /settings/weight-sets/:id/publish',
@@ -293,7 +293,7 @@ describe('hybrid mode list', () => {
       // contract 0.15.242: the generic alert rules (apps/api: settings; migration 0342)
       'GET /settings/alert-rules', 'POST /settings/alert-rules', 'PUT /settings/alert-rules/:id',
       // contract 0.9.2: the self-service profile (details, email change and its decision, password, two-factor self-service, enforced mark)
-      'GET /me/profile', 'GET /me/sessions', 'POST /me/sessions/revoke-others', 'POST /me/sessions/:id/revoke', 'PATCH /me/profile', 'GET /admin/document-search-index', 'PATCH /me/preferences', 'POST /me/password', 'POST /me/email-change', 'DELETE /me/email-change',
+      'GET /me/profile', 'GET /me/sessions', 'POST /me/sessions/revoke-others', 'POST /me/sessions/:id/revoke', 'PATCH /me/profile', 'GET /admin/document-search-index', 'GET /me/push', 'POST /me/push/subscribe', 'POST /me/push/unsubscribe', 'GET /admin/web-push', 'PATCH /me/preferences', 'POST /me/password', 'POST /me/email-change', 'DELETE /me/email-change',
       'POST /me/two-factor/enrol/start', 'POST /me/two-factor/enrol/confirm', 'POST /me/two-factor/disable',
       'GET /email-change-requests', 'POST /email-change-requests/:id/decide', 'PUT /users/:id/two-factor/enforced',
       // contract 0.10.0: the logs core
@@ -331,7 +331,10 @@ describe('hybrid mode list', () => {
       // contract 0.12.10: P4a (Q225 site change proposals)
       'POST /sites/:id/change-proposals',
       'GET /saved-views', 'POST /saved-views', 'POST /saved-views/import', 'GET /saved-views/filter-fields', 'GET /saved-views/filter-fields/:field/values', 'GET /saved-views/:id', 'PATCH /saved-views/:id', 'POST /saved-views/:id/deactivate',
-      'POST /saved-views/:id/restore', 'POST /saved-views/:id/transfer', 'GET /saved-views/:id/versions', 'GET /me/drafts', 'GET /me/drafts/:key', 'PUT /me/drafts/:key',
+      'POST /saved-views/:id/restore', 'POST /saved-views/:id/transfer', 'GET /saved-views/:id/versions',
+      // contract 0.15.246 (item 17, migration 0345): the soft "... is editing this record" notice
+      'POST /presence/editing', 'POST /presence/editing/stop', 'GET /presence/editing',
+      'GET /me/drafts', 'GET /me/drafts/:key', 'PUT /me/drafts/:key',
       'DELETE /me/drafts/:key',
       // contract 0.13.2: follow-up group C (Q267 cancel of a mistaken Quality snag record)
       'POST /registers/quality/records/:id/cancel-snag',
@@ -372,7 +375,7 @@ describe('hybrid mode list', () => {
       // contract 0.15.60
       'GET /users/:id/mfa-exemption', 'PUT /users/:id/mfa-exemption', 'POST /users/:id/mfa-exemption/revoke', 'POST /groups', 'POST /me/notify-admins', 'POST /auth/employee-id',
       // contract 0.15.62 (migration 0146): the project data reset in Settings
-      'GET /settings/data-reset', 'PUT /settings/data-reset/settings', 'POST /settings/data-reset/requests', 'GET /settings/data-reset/plan', 'GET /settings/data-reset/requests/:id',
+      'GET /settings/data-reset', 'PUT /settings/data-reset/settings', 'POST /settings/data-reset/requests', 'GET /settings/data-reset/plan', 'GET /settings/data-reset/narrow-options', 'GET /settings/data-reset/requests/:id',
       'POST /settings/data-reset/requests/:id/approve', 'POST /settings/data-reset/requests/:id/cancel', 'POST /settings/data-reset/requests/:id/run',
       'POST /settings/data-reset/requests/:id/retry-files',
       // contract 0.15.70 (migration 0151): the Library menu (W5)
