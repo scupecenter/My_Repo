@@ -10,6 +10,7 @@
 | [01-system-overview.md](01-system-overview.md) | وثيقة وصف النظام | System overview: scope, roles, workflow, visibility, registers, documents, sign-in, configuration, NFRs, rollout |
 | [02-change-log-for-customer.md](02-change-log-for-customer.md) | سجل التعديلات للعميل (منذ 2026-10-24) | Customer change log grouped by topic, with decision codes |
 | [03-architecture-and-data.md](03-architecture-and-data.md) | البنية ومخطط البيانات | Architecture, authentication, authorization/RLS, data entities, audit, backups, integrations, IT needs |
+| [05-field-mode.md](05-field-mode.md) | وضع الميدان (دون اتصال)، المرحلة 1 | Field mode (offline), phase 1: what is stored, the queue, sync and conflict rules |
 
 ## وثائق مخططة لاحقاً | Planned later
 
