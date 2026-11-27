@@ -11,7 +11,7 @@ export const PART_KEYS = [
   'sites', 'milestones', 'tasks', 'project_status',
   'procurement', 'gecol', 'hlc', 'permits_hse', 'warehouse', 'quality', 'issues', 'risks', 'change_control', 'readiness_handover', 'as_built', 'meetings', 'contractors',
   'rf_design', 'acquisition', 'dismantle', 'car_dispatcher', 'financial_advances',
-  'incidents', 'lessons_learned', 'invoices',
+  'incidents', 'lessons_learned', 'invoices', 'deliverables',
 ] as const;
 export type PartKey = (typeof PART_KEYS)[number];
 
@@ -36,7 +36,7 @@ const DEFAULT_SHEETS: Partial<Record<PartKey, string>> = {
   quality: 'Quality Inspections', change_control: 'Change Control', readiness_handover: 'Readiness & Handover', warehouse: 'Warehouse', issues: 'Issue Log',
   meetings: 'Meetings', contractors: 'Contractors', dismantle: 'Dismantle', procurement: 'PR-PO', gecol: 'GECOL', hlc: 'HLC', permits_hse: 'Permits & HSE',
   risks: 'Risk Register', as_built: 'As-Built', rf_design: 'RF & Design', acquisition: 'Acquisition',
-  car_dispatcher: 'Car Dispatcher', financial_advances: 'Financial Advances', incidents: 'Incidents', lessons_learned: 'Lessons Learned', invoices: 'Invoices',
+  car_dispatcher: 'Car Dispatcher', financial_advances: 'Financial Advances', incidents: 'Incidents', lessons_learned: 'Lessons Learned', invoices: 'Invoices', deliverables: 'Deliverables',
 };
 
 export function partSheet(key: PartKey, map: RegisterMap | undefined): string {

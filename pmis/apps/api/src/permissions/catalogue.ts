@@ -50,6 +50,7 @@ export const MODULES: ModuleDef[] = [
   { key: 'incidents', name_en: 'Incidents & Security', actions: OPERATIONAL },
   { key: 'lessons_learned', name_en: 'Lessons Learned', actions: OPERATIONAL },
   { key: 'invoices', name_en: 'Invoices', actions: OPERATIONAL },
+  { key: 'deliverables', name_en: 'Deliverables', actions: OPERATIONAL },
   { key: 'absence', name_en: 'Absence', actions: ['view', 'create', 'edit', 'delete'] },
   { key: 'messages', name_en: 'Messages', actions: ['view', 'create'] },
   { key: 'announcements', name_en: 'Announcements', actions: ['view', 'create'] },
