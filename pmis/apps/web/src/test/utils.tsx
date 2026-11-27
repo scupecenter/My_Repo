@@ -6,6 +6,7 @@ import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { applyLocale } from '@/i18n';
 import { StepUpProvider } from '@/components/StepUp';
+import { UnsavedGuardProvider } from '@/lib/unsavedGuard';
 import { ToastProvider } from '@/components/Toast';
 import { api, setCsrfToken } from '@/api/client';
 
@@ -19,7 +20,7 @@ export function renderApp(ui: ReactElement, { route = '/', locale = 'en' as 'en'
   applyLocale(locale);
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return { qc, ...render(
-    <QueryClientProvider client={qc}><MemoryRouter initialEntries={[route]} useTransitions={false}><ToastProvider><StepUpProvider>{ui}</StepUpProvider></ToastProvider></MemoryRouter></QueryClientProvider>,
+    <QueryClientProvider client={qc}><MemoryRouter initialEntries={[route]} useTransitions={false}><ToastProvider><StepUpProvider><UnsavedGuardProvider>{ui}</UnsavedGuardProvider></StepUpProvider></ToastProvider></MemoryRouter></QueryClientProvider>,
   ) };
 }
 
