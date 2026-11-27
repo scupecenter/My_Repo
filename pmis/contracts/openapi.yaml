@@ -242,6 +242,7 @@ info:
     - 0.2.0 (2026-10-25): additive. No operation or schema of 0.1 was removed or renamed (ADR 0011).
     - 0.1.0 (2026-10-25): first contract for P1. Breaking changes are recorded in `docs/adr/` (ADR 0001 §6).
     - 0.15.204 (2026-11-27): the dashboard follow-up sections, pending approvals bottleneck (owner approval 2026-11-26, dashboard proposals item 7; migration 0305). Additive and read only. `GET /dashboard/ops` gains the section `approvals` (`DashboardOpsApprovals`): the tasks waiting for review or approval (states in_review and in_approval, the same population as the Approvals inbox), their ages in calendar days since the level opened, split review against approve, and the same ages grouped by the ball-in-court role so the bottleneck role shows. The section needs the approvals view (and the sites view, like the inbox) and answers available false without them. The dashboard settings catalogue gains the card `ops_approvals`. No grant, role or permission change.
+    - 0.15.408 (2026-11-27): hardening layer 1a, locks for the Warehouse (migration 0565). Additive. `GET /entity-locks` lists the open locks of a kind; `POST` and `DELETE` on `/entity-locks/{kind}/{id}` lock or unlock one Warehouse item or movement (the kinds `daily_plan` and `daily_plan_row` are used from the next migration), and `POST` and `DELETE` on `/entity-locks/columns/{kind}/{field}` lock or unlock a column for every record. Same model as the register locks: the administer right, a reason, step-up and an audit entry; a locked record or column answers 403 `register_locked` from the item and movement writers for everyone except a System Admin. `DELETE /warehouse/items/{id}` no longer deletes: it hides the item (`is_active` false, reason, audit); the response keeps `deleted` and adds `hidden`. No grant, role or permission change.
     - 0.15.205 (2026-11-27): the dashboard follow-up sections, change requests and overdue meeting actions (owner approval 2026-11-26, dashboard proposals item 8; migration 0306). Additive and read only. `GET /dashboard/ops` gains the section `changes_meetings` (`DashboardOpsChangesMeetings`): the change requests still pending (status requested) with their ages since the request date and a count per kind, the approved ones not yet applied, and the meeting actions not closed with the overdue ones aged by days late. Each part needs its own module view (change control, meetings) and answers `available: false` with null figures without it. No amounts.
 
     ## Changes since 0.1
@@ -15667,6 +15668,169 @@ paths:
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/Conflict'}
         '422': {$ref: '#/components/responses/Unprocessable'}
+  /entity-locks:
+    get:
+      tags: [warehouse]
+      operationId: listEntityLocks
+      summary: Open locks of the Warehouse and the Daily Plan (0.15.408)
+      parameters:
+      - {name: kind, in: query, required: false, schema: {type: string, enum: [wh_item, wh_movement, daily_plan, daily_plan_row]}}
+      responses:
+        '200':
+          description: The open record locks and column locks.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [records, columns]
+                properties:
+                  records:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, kind, target_id, reason, locked_at]
+                      properties:
+                        id: {type: string, format: uuid}
+                        kind: {type: string}
+                        target_id: {type: string, format: uuid}
+                        reason: {type: string}
+                        locked_at: {type: string}
+                        locked_by: {type: string, nullable: true}
+                        label: {type: string, nullable: true}
+                  columns:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, kind, field, reason, locked_at]
+                      properties:
+                        id: {type: string, format: uuid}
+                        kind: {type: string}
+                        field: {type: string}
+                        reason: {type: string}
+                        locked_at: {type: string}
+                        locked_by: {type: string, nullable: true}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /entity-locks/columns/{kind}/{field}:
+    parameters:
+    - {name: kind, in: path, required: true, schema: {type: string, enum: [wh_item, wh_movement, daily_plan_row]}}
+    - {name: field, in: path, required: true, schema: {type: string}}
+    post:
+      tags: [warehouse]
+      operationId: lockEntityColumn
+      summary: Lock a column for every record of the kind (0.15.408)
+      description: Administer in every region. A reason and step-up are required; audited. A locked column refuses a write that sets it (403 `register_locked`), except from a System Admin.
+      x-step-up: true
+      x-db-path: ent_column_lock_set
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WithReason'}
+      responses:
+        '200':
+          description: Locked.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [kind, field, locked]
+                properties:
+                  kind: {type: string}
+                  field: {type: string}
+                  locked: {type: boolean}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+    delete:
+      tags: [warehouse]
+      operationId: unlockEntityColumn
+      summary: Unlock a column (0.15.408)
+      x-step-up: true
+      x-db-path: ent_column_lock_set
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WithReason'}
+      responses:
+        '200':
+          description: Unlocked.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [kind, field, locked]
+                properties:
+                  kind: {type: string}
+                  field: {type: string}
+                  locked: {type: boolean}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /entity-locks/{kind}/{target_id}:
+    parameters:
+    - {name: kind, in: path, required: true, schema: {type: string, enum: [wh_item, wh_movement, daily_plan, daily_plan_row]}}
+    - {name: target_id, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      tags: [warehouse]
+      operationId: lockEntity
+      summary: Lock one item, movement, plan or plan row (0.15.408)
+      description: The administer right of the target (items and movements in the Warehouse, plans and rows in the Daily Plan region). A reason and step-up are required; audited. A locked target refuses changes (403 `register_locked`) except from a System Admin.
+      x-step-up: true
+      x-db-path: ent_lock_set
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WithReason'}
+      responses:
+        '200':
+          description: Locked.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [kind, id, locked]
+                properties:
+                  kind: {type: string}
+                  id: {type: string, format: uuid}
+                  locked: {type: boolean}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+    delete:
+      tags: [warehouse]
+      operationId: unlockEntity
+      summary: Unlock one item, movement, plan or plan row (0.15.408)
+      x-step-up: true
+      x-db-path: ent_lock_set
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WithReason'}
+      responses:
+        '200':
+          description: Unlocked.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [kind, id, locked]
+                properties:
+                  kind: {type: string}
+                  id: {type: string, format: uuid}
+                  locked: {type: boolean}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
   /warehouse/items/{item_id}:
     parameters:
     - {$ref: '#/components/parameters/WarehouseItemId'}
@@ -15715,8 +15879,8 @@ paths:
     delete:
       tags: [warehouse]
       operationId: deleteWarehouseItem
-      summary: Delete an item that has no data (deactivate is the other way)
-      description: Allowed only when no movement line, serial, site quantity or As-Built link points to the item (`deletable`). Otherwise 409 `item_in_use`; deactivate it instead.
+      summary: Hide an item (never deleted since 0.15.408)
+      description: Since 0.15.408 (migration 0565) the item is hidden, not deleted (`is_active` false, version moves, reason and audit `warehouse_item_hide`). Its movements, serials and history stay. A locked item answers 403 `register_locked`.
       x-db-path: admin_delete_warehouse_item
       parameters:
       - name: reason
@@ -15735,6 +15899,7 @@ paths:
                 properties:
                   id: {type: string, format: uuid}
                   deleted: {type: boolean}
+                  hidden: {type: boolean}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}

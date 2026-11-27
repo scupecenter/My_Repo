@@ -9,6 +9,7 @@ import { useRegions } from '@/api/sites';
 import type { StockLevel, StockMovement, WarehouseItem } from '@/api/types';
 import { useItemColumns, type ItemColumn } from '@/api/warehouseColumns';
 import { useConfigGaps, useRegionVendors, useSaveRegionVendor, type RegionVendor, useDeleteItem, useDispatchList, useMovements, useQuarantineExit, useReverseMovement, useSaveItem, useStock, useWhItems, type QuarantineExitBody } from '@/api/warehouse';
+import { EntityColumnLocks, EntityLockButton } from '@/components/EntityLocks';
 import { NEED_TONE } from '@/components/SiteDispatch';
 import { errText, FormDialog } from '@/components/FormDialog';
 import { InlinePanel } from '@/components/InlinePanel';
@@ -113,6 +114,10 @@ function Items() {
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" data-testid="wh-show-inactive" checked={inactive} onChange={(e) => setInactive(e.target.checked)} />{t('wh.show_inactive')}</label>
         {admin && <button className="btn btn-primary ms-auto" data-testid="wh-new" onClick={() => open({ mode: 'new' })}><Plus size={16} />{t('wh.new_item')}</button>}
       </div>
+      {admin && <EntityColumnLocks kind="wh_item" testid="wh-column-locks" options={[
+        ...(['name_en', 'name_ar', 'uom', 'category', 'serial_tracked', 'code_source', 'manufacturer', 'contract_qty', 'planned_delivery_date', 'progress_item_code'] as const).map((c) => ({ code: c, label: t(`wh.${c === 'serial_tracked' ? 'serial' : c}`, { defaultValue: c }) })),
+        ...cols.map((c) => ({ code: c.code, label: colLabel(c) })),
+      ]} />}
       <div className="card overflow-x-auto">
         <table className="w-full text-sm">
           <thead><tr className="border-b border-line bg-card2 text-start text-mute">{['code', 'name', 'uom', 'category', 'serial', 'status'].map((c) => <th key={c} className="px-3 py-2 text-start font-semibold">{t(`wh.${c}`)}</th>)}{cols.map((c) => <th key={c.code} className="px-3 py-2 text-start font-semibold" data-testid={`wh-colh-${c.code}`}>{colLabel(c)}</th>)}<th /></tr></thead>
@@ -126,7 +131,7 @@ function Items() {
                 <td className="px-3 py-2"><span className={`chip ${x.is_active ? 'bg-doneBg text-doneInk' : 'bg-lockBg text-lockInk'}`}>{t(x.is_active ? 'wh.active' : 'wh.inactive')}</span></td>
                 <td className="px-3 py-2 text-end">{admin && x.is_active && <>
                   <button className="btn" data-testid={`wh-edit-${x.code}`} onClick={() => open({ mode: 'edit', item: x })}>{t('wh.edit')}</button>{' '}
-                  <button className="btn" data-testid={`wh-off-${x.code}`} onClick={() => open({ mode: 'off', item: x })}>{t('wh.deactivate')}</button>{x.deletable && <>{' '}<button className="btn" data-testid={`wh-del-${x.code}`} onClick={() => open({ mode: 'del', item: x })}>{t('wh.delete')}</button></>}</>}</td>
+                  <button className="btn" data-testid={`wh-off-${x.code}`} onClick={() => open({ mode: 'off', item: x })}>{t('wh.deactivate')}</button>{' '}<button className="btn" data-testid={`wh-del-${x.code}`} onClick={() => open({ mode: 'del', item: x })}>{t('wh.delete')}</button>{' '}<EntityLockButton kind="wh_item" id={x.id} testid={`wh-lock-${x.code}`} /></>}</td>
               </tr>
             ))}
           </tbody>

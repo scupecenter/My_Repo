@@ -26,7 +26,50 @@ const bad = (b: Body) => String(b.reason ?? '').trim().length < 3 ? problem(422,
 type MockCol = { code: string; label_en: string; label_ar: string | null; data_type: string; required: boolean; section: string | null; sort_order: number; in_templates: boolean; in_exports: boolean; in_list_filters: boolean; is_active: boolean; version: number; has_values: boolean };
 const itemCols: MockCol[] = [];
 
+/** 0565: the entity locks of the Warehouse and the Daily Plan (in memory, reset with the module). */
+const ENT_LOCKS: { id: string; kind: string; target_id: string; reason: string; locked_at: string; locked_by: string | null; label: string | null }[] = [];
+const ENT_COLS: { id: string; kind: string; field: string; reason: string; locked_at: string; locked_by: string | null }[] = [];
+
 export const warehouseHandlers = [
+  http.get(`${B}/entity-locks`, ({ request }) => {
+    const g = guard(); if (g) return g;
+    const kind = new URL(request.url).searchParams.get('kind');
+    return HttpResponse.json({ records: ENT_LOCKS.filter((l) => !kind || l.kind === kind), columns: ENT_COLS.filter((c) => !kind || c.kind === kind) });
+  }),
+  http.post(`${B}/entity-locks/columns/:kind/:field`, async ({ params, request }) => {
+    const g = guard(); if (g) return g;
+    if (!admin()) return problem(403, 'forbidden', 'Not allowed');
+    const b = (await request.json()) as Body; const e = bad(b); if (e) return e;
+    if (ENT_COLS.some((c) => c.kind === params.kind && c.field === params.field)) return problem(409, 'invalid_transition', 'This column is already locked.');
+    ENT_COLS.push({ id: crypto.randomUUID(), kind: String(params.kind), field: String(params.field), reason: String(b.reason), locked_at: new Date().toISOString(), locked_by: null });
+    return HttpResponse.json({ kind: params.kind, field: params.field, locked: true });
+  }),
+  http.delete(`${B}/entity-locks/columns/:kind/:field`, async ({ params, request }) => {
+    const g = guard(); if (g) return g;
+    if (!admin()) return problem(403, 'forbidden', 'Not allowed');
+    const b = (await request.json()) as Body; const e = bad(b); if (e) return e;
+    const i = ENT_COLS.findIndex((c) => c.kind === params.kind && c.field === params.field);
+    if (i < 0) return problem(409, 'invalid_transition', 'This column is not locked.');
+    ENT_COLS.splice(i, 1);
+    return HttpResponse.json({ kind: params.kind, field: params.field, locked: false });
+  }),
+  http.post(`${B}/entity-locks/:kind/:id`, async ({ params, request }) => {
+    const g = guard(); if (g) return g;
+    if (!admin()) return problem(403, 'forbidden', 'Not allowed');
+    const b = (await request.json()) as Body; const e = bad(b); if (e) return e;
+    if (ENT_LOCKS.some((l) => l.kind === params.kind && l.target_id === params.id)) return problem(409, 'invalid_transition', 'This record is already locked.');
+    ENT_LOCKS.push({ id: crypto.randomUUID(), kind: String(params.kind), target_id: String(params.id), reason: String(b.reason), locked_at: new Date().toISOString(), locked_by: null, label: null });
+    return HttpResponse.json({ kind: params.kind, id: params.id, locked: true });
+  }),
+  http.delete(`${B}/entity-locks/:kind/:id`, async ({ params, request }) => {
+    const g = guard(); if (g) return g;
+    if (!admin()) return problem(403, 'forbidden', 'Not allowed');
+    const b = (await request.json()) as Body; const e = bad(b); if (e) return e;
+    const i = ENT_LOCKS.findIndex((l) => l.kind === params.kind && l.target_id === params.id);
+    if (i < 0) return problem(409, 'invalid_transition', 'This record is not locked.');
+    ENT_LOCKS.splice(i, 1);
+    return HttpResponse.json({ kind: params.kind, id: params.id, locked: false });
+  }),
   http.get(`${B}/warehouse/item-columns`, ({ request }) => {
     const g = guard(); if (g) return g;
     const all = new URL(request.url).searchParams.get('include_inactive') === 'true';
@@ -99,9 +142,10 @@ export const warehouseHandlers = [
     if (!it) return problem(404, 'not_found', 'Item not found');
     const s = stale(request, it.version); if (s) return s;
     if ((new URL(request.url).searchParams.get('reason') ?? '').trim().length < 3) return problem(422, 'validation_failed', 'Reason is required');
-    if (W().inUse.includes(it.code) || W().stock.some((x) => x.item_code === it.code) || it.as_built_item_code) return problem(409, 'item_in_use', 'Item has data: deactivate it instead');
-    W().items.splice(W().items.indexOf(it), 1);
-    return HttpResponse.json({ id: it.id, deleted: true });
+    // 0565: hide, never delete (is_active false, the version moves)
+    if (ENT_LOCKS.some((l) => l.kind === 'wh_item' && l.target_id === it.id)) return problem(403, 'register_locked', 'This record is locked');
+    it.is_active = false; it.version += 1;
+    return HttpResponse.json({ id: it.id, deleted: true, hidden: true });
   }),
   http.get(`${B}/warehouse/stock`, ({ request }) => {
     const g = guard(); if (g) return g;
