@@ -1,26 +1,26 @@
 employee_id,name_en,name_ar,email,phone,position,team,main_role,region,status,notes
-1001,Ahmed Salem,أحمد سالم,ahmed.salem@example.com,+218 91 200 1000,Project Manager,both,Project Manager,All,active,Demo login in the prototype
-1102,Mona Fathi,منى فتحي,mona.fathi@example.com,+218 92 207 1113,RF & Design / Acquisition Team Lead,none,RF & Design / Acquisition Team Lead,All,active,
-1103,Ali Barka,علي بركة,ali.barka@example.com,+218 94 214 1226,RF Engineer,none,RF & Design / Acquisition Team Lead,Tripoli,active,
-1104,Karim Zaroug,كريم زروق,karim.zaroug@example.com,+218 91 221 1339,MW Engineer,none,RF & Design / Acquisition Team Lead,Benghazi,inactive,"Left the company; deactivated, history kept"
-1203,Omar Khaled,عمر خالد,omar.khaled@example.com,+218 92 228 1452,CW Team Lead,CW,CW Team Lead,All,active,
-1204,Sami Nuri,سامي نوري,sami.nuri@example.com,+218 94 235 1565,Site Engineer (CW),CW,CW Team Lead,Tripoli,active,
-1205,Fadi Omran,فادي عمران,fadi.omran@example.com,+218 91 242 1678,Site Engineer (CW),CW,CW Team Lead,Middle,active,
-1206,Khalid Jaber,خالد جابر,khalid.jaber@example.com,+218 92 249 1791,GECOL Power Coordinator,CW,CW Team Lead,Zawia,active,
-1207,Nadia Hamed,نادية حامد,nadia.hamed@example.com,+218 94 256 1904,HLC Fiber Engineer,CW,CW Team Lead,Tripoli,active,
-1208,Marwa Tarhuni,مروة الترهوني,marwa.tarhuni@example.com,+218 91 263 2017,Site Engineer (CW),CW,CW Team Lead,Benghazi,active,
-1209,Idris Mabrouk,إدريس مبروك,idris.mabrouk@example.com,+218 92 270 2130,Site Engineer (CW),CW,CW Team Lead,Sebha,active,
-1210,Hana Zidan,هناء زيدان,hana.zidan@example.com,+218 94 277 2243,Site Engineer (CW),CW,CW Team Lead,Middle,active,Pending assignment in the prototype
-1211,Wael Saadi,وائل السعدي,wael.saadi@example.com,+218 91 284 2356,Site Engineer (CW),CW,CW Team Lead,WM,active,Pending assignment in the prototype
-1305,Hassan Ali,حسن علي,hassan.ali@example.com,+218 92 291 2469,TE Team Lead,TE,TE Team Lead,All,active,
-1306,Tarek Mansour,طارق منصور,tarek.mansour@example.com,+218 94 298 2582,Site Engineer (TE),TE,TE Team Lead,Tripoli,active,
-1307,Rami Saeed,رامي سعيد,rami.saeed@example.com,+218 91 305 2695,HOTO Engineer,TE,TE Team Lead,WM,active,
-1308,Salma Younis,سلمى يونس,salma.younis@example.com,+218 92 312 2808,Site Engineer (TE),TE,TE Team Lead,Zawia,active,
-1309,Jamal Fituri,جمال فيتوري,jamal.fituri@example.com,+218 94 319 2921,Site Engineer (TE),TE,TE Team Lead,GM,active,
-1310,Anis Gharyani,أنيس الغرياني,anis.gharyani@example.com,+218 91 326 3034,Site Engineer (TE),TE,TE Team Lead,Sebha,active,
-1407,Rania Saad,رانيا سعد,rania.saad@example.com,+218 92 333 3147,Inventory Supervisor,none,Inventory Supervisor,All,active,
-1408,Huda Bashir,هدى بشير,huda.bashir@example.com,+218 94 340 3260,Warehouse Keeper,none,Inventory Supervisor,Benghazi,active,
-1508,Laila Omar,ليلى عمر,laila.omar@example.com,+218 91 347 3373,Project Support Lead,none,Project Support,All,active,
-1509,Yousef Adel,يوسف عادل,yousef.adel@example.com,+218 92 354 3486,Procurement Officer,none,Project Support,Tripoli,active,
-1510,Salem Aswad,سالم الأسود,salem.aswad@example.com,+218 94 361 3599,Project Coordinator,none,Project Support,GM,active,
-1999,Noor Hadi,نور هادي,noor.hadi@example.com,+218 91 368 3712,Site Engineer (CW),CW,CW Team Lead,Zawia,active,Pending assignment in the prototype
+1001,Demo User 01,مستخدم تجريبي 01,demo.user.01@example.com,+218 90 000 0001,Project Manager,both,Project Manager,All,active,Demo login in the prototype
+1102,Demo User 02,مستخدم تجريبي 02,demo.user.02@example.com,+218 90 000 0002,RF & Design / Acquisition Team Lead,none,RF & Design / Acquisition Team Lead,All,active,
+1103,Demo User 03,مستخدم تجريبي 03,demo.user.03@example.com,+218 90 000 0003,RF Engineer,none,RF & Design / Acquisition Team Lead,Tripoli,active,
+1104,Demo User 04,مستخدم تجريبي 04,demo.user.04@example.com,+218 90 000 0004,MW Engineer,none,RF & Design / Acquisition Team Lead,Benghazi,inactive,"Left the company; deactivated, history kept"
+1203,Demo User 05,مستخدم تجريبي 05,demo.user.05@example.com,+218 90 000 0005,CW Team Lead,CW,CW Team Lead,All,active,
+1204,Demo User 06,مستخدم تجريبي 06,demo.user.06@example.com,+218 90 000 0006,Site Engineer (CW),CW,CW Team Lead,Tripoli,active,
+1205,Demo User 07,مستخدم تجريبي 07,demo.user.07@example.com,+218 90 000 0007,Site Engineer (CW),CW,CW Team Lead,Middle,active,
+1206,Demo User 08,مستخدم تجريبي 08,demo.user.08@example.com,+218 90 000 0008,GECOL Power Coordinator,CW,CW Team Lead,Zawia,active,
+1207,Demo User 09,مستخدم تجريبي 09,demo.user.09@example.com,+218 90 000 0009,HLC Fiber Engineer,CW,CW Team Lead,Tripoli,active,
+1208,Demo User 10,مستخدم تجريبي 10,demo.user.10@example.com,+218 90 000 0010,Site Engineer (CW),CW,CW Team Lead,Benghazi,active,
+1209,Demo User 11,مستخدم تجريبي 11,demo.user.11@example.com,+218 90 000 0011,Site Engineer (CW),CW,CW Team Lead,Sebha,active,
+1210,Demo User 12,مستخدم تجريبي 12,demo.user.12@example.com,+218 90 000 0012,Site Engineer (CW),CW,CW Team Lead,Middle,active,Pending assignment in the prototype
+1211,Demo User 13,مستخدم تجريبي 13,demo.user.13@example.com,+218 90 000 0013,Site Engineer (CW),CW,CW Team Lead,WM,active,Pending assignment in the prototype
+1305,Demo User 14,مستخدم تجريبي 14,demo.user.14@example.com,+218 90 000 0014,TE Team Lead,TE,TE Team Lead,All,active,
+1306,Demo User 15,مستخدم تجريبي 15,demo.user.15@example.com,+218 90 000 0015,Site Engineer (TE),TE,TE Team Lead,Tripoli,active,
+1307,Demo User 16,مستخدم تجريبي 16,demo.user.16@example.com,+218 90 000 0016,HOTO Engineer,TE,TE Team Lead,WM,active,
+1308,Demo User 17,مستخدم تجريبي 17,demo.user.17@example.com,+218 90 000 0017,Site Engineer (TE),TE,TE Team Lead,Zawia,active,
+1309,Demo User 18,مستخدم تجريبي 18,demo.user.18@example.com,+218 90 000 0018,Site Engineer (TE),TE,TE Team Lead,GM,active,
+1310,Demo User 19,مستخدم تجريبي 19,demo.user.19@example.com,+218 90 000 0019,Site Engineer (TE),TE,TE Team Lead,Sebha,active,
+1407,Demo User 20,مستخدم تجريبي 20,demo.user.20@example.com,+218 90 000 0020,Inventory Supervisor,none,Inventory Supervisor,All,active,
+1408,Demo User 21,مستخدم تجريبي 21,demo.user.21@example.com,+218 90 000 0021,Warehouse Keeper,none,Inventory Supervisor,Benghazi,active,
+1508,Demo User 22,مستخدم تجريبي 22,demo.user.22@example.com,+218 90 000 0022,Project Support Lead,none,Project Support,All,active,
+1509,Demo User 23,مستخدم تجريبي 23,demo.user.23@example.com,+218 90 000 0023,Procurement Officer,none,Project Support,Tripoli,active,
+1510,Demo User 24,مستخدم تجريبي 24,demo.user.24@example.com,+218 90 000 0024,Project Coordinator,none,Project Support,GM,active,
+1999,Demo User 25,مستخدم تجريبي 25,demo.user.25@example.com,+218 90 000 0025,Site Engineer (CW),CW,CW Team Lead,Zawia,active,Pending assignment in the prototype

@@ -1,4 +1,4 @@
-# GSDN Master Rebuild — سجل القرارات
+# Project Master Rebuild — سجل القرارات
 
 ## المراجع
 - Master: ورقة Master في `GSDN_Master_Rebuilt.xlsx` (تنسخ حرفياً: الشكل، التقسيم، الألوان، الخط، الدمج، التجميد، الفلتر).

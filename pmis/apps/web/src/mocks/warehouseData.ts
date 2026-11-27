@@ -11,7 +11,7 @@ const asb = (n: number, code: string, section: 'cw' | 'te', name_en: string, nam
 const mv = (n: number, doc_no: string, record_type: StockMovement['record_type'], kind: StockMovement['kind'], status: StockMovement['status'], site_code: string, itemN: number, code: string, qty: number): StockMovement => ({
   id: id('c', n), doc_no, record_type, kind, status, site_id: null, site_code, register_record_id: id('e', n), reserved: status === 'pending' && kind === 'issue', version: 1,
   doc_no_locked: status === 'posted', sequence_key: null, doc_date: '2026-10-20',
-  lines: [{ item_id: id('b', itemN), item_code: code, qty }], created_by: { id: id('1', 1), display_name: 'Ahmed Salem' }, created_at: '2026-10-20T08:00:00Z', posted_at: status === 'posted' ? '2026-10-21T08:00:00Z' : null,
+  lines: [{ item_id: id('b', itemN), item_code: code, qty }], created_by: { id: id('1', 1), display_name: 'Demo User 01' }, created_at: '2026-10-20T08:00:00Z', posted_at: status === 'posted' ? '2026-10-21T08:00:00Z' : null,
 });
 
 export function initWarehouse() {

@@ -356,17 +356,17 @@
   ],
   "signatories": {
     "applicant": {
-      "name": "Ahmed Al-Mabrouk",
+      "name": "Demo User 28",
       "position": "Site Engineer",
       "date": "2026-10-12"
     },
     "reviewer_se": {
-      "name": "Salem Ben Omran",
+      "name": "Demo User 33",
       "position": "Senior Engineer",
       "date": "2026-10-12"
     },
     "approver_inventory": {
-      "name": "Khaled Al-Sharif",
+      "name": "Demo User 29",
       "position": "Inventory Supervisor",
       "date": "2026-10-12"
     }

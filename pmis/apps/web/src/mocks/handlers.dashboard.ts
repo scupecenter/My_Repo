@@ -86,14 +86,14 @@ function manualList() {
     const cur = manualInForce(c.code, today);
     const history = S().values.filter((v) => v.item_code === c.code).sort((a, b) => b.version - a.version).map((v) => ({
       id: v.id, version: v.version, value_pct: v.value_pct, effective_date: v.effective_date, reason: v.reason, created_at: v.created_at, in_force: v.id === cur?.id,
-      entered_by: { id: v.by, display_name: me?.name ?? 'Ahmed Salem', employee_id: me?.employee_id ?? null }, source: v.source, historical_correction: v.historical_correction,
+      entered_by: { id: v.by, display_name: me?.name ?? 'Demo User 01', employee_id: me?.employee_id ?? null }, source: v.source, historical_correction: v.historical_correction,
     }));
     const pl = planOf(c.code);
     return {
       item_code: c.code, name_en: c.name_en, name_ar: c.name_ar, weight: c.weight, activity_code: c.act, activity_name_en: c.act_en, activity_name_ar: c.act_ar,
       current: cur ? { value_pct: cur.value_pct, effective_date: cur.effective_date, version: cur.version, source: cur.source } : null, history,
       plan: pl ? { id: pl.id, version: pl.version, points: pl.points, reason: pl.reason, source: pl.source, created_at: pl.created_at, planned_pct_today: planPct(pl.points, today),
-        entered_by: { id: pl.by, display_name: me?.name ?? 'Ahmed Salem', employee_id: me?.employee_id ?? null } } : null,
+        entered_by: { id: pl.by, display_name: me?.name ?? 'Demo User 01', employee_id: me?.employee_id ?? null } } : null,
     };
   });
   return { as_of: today, can_edit: canEdit(), can_correct_history: canEdit(), open_period_from: firstOfMonth(), items,
