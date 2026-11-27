@@ -131,7 +131,8 @@ function TriageDialog({ open, op, registerKey, selfId, onClose, onSend }: { open
   );
 }
 
-function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; record: RegisterRecord | null; onCreated: (id: string) => void }) {
+/** The record form, tabs and actions of a register record: the body of the drawer, and (decision V5) the body of the full record page. */
+export function RegisterRecordBody({ def: rawDef, record, onCreated }: { def: RegisterDefinition; record: RegisterRecord | null; onCreated: (id: string) => void }) {
   const { t, i18n } = useTranslation();
   const toast = useToast();
   const key = rawDef.register_key;
@@ -478,8 +479,8 @@ export function RegisterDrawer({ def, recordId, onClose, onOpen, nav }: { def: R
   const q = useRegisterRecord(def.register_key, isNew ? null : recordId);
   return (
     <DrawerFrame name="register" testid="register-drawer" wide={640} open={!!recordId} onClose={onClose} nav={nav && !isNew ? { ids: nav, current: recordId, onGo: onOpen } : undefined}>
-      {isNew ? <Body key="new" def={def} record={null} onCreated={onOpen} />
-        : q.data ? <Body key={`${q.data.id}`} def={def} record={q.data} onCreated={onOpen} />
+      {isNew ? <RegisterRecordBody key="new" def={def} record={null} onCreated={onOpen} />
+        : q.data ? <RegisterRecordBody key={`${q.data.id}`} def={def} record={q.data} onCreated={onOpen} />
           : <div className="p-4"><Dialog.Title className="font-bold">{q.isError ? t('regErrors.not_found') : t('common.loading')}</Dialog.Title></div>}
     </DrawerFrame>
   );

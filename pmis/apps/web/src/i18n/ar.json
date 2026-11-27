@@ -1215,6 +1215,7 @@
     "section_security_dlp": "أشهر DLP",
     "section_screens_dashboard": "لوحة المعلومات",
     "section_screens_tables": "الجداول (العرض)",
+    "section_screens_records": "السجلات",
     "section_screens_daily-plan": "عملي (الخطة اليومية)",
     "section_screens_pm-schedules": "الصيانة الوقائية",
     "tab_ddl": "DDL",
@@ -6568,6 +6569,13 @@
     "avg": "المتوسط",
     "min": "الأصغر",
     "max": "الأكبر"
+  },
+  "openrec": {
+    "title": "فتح السجل",
+    "note": "أين يُفتح سجلّ السجلّات عند نقر صفّه: في الدرج الجانبي (الافتراضي) أو في صفحة كاملة مستقلة. خيار شخصي يعمل على كل جهاز تدخل منه.",
+    "drawer": "درج جانبي (الافتراضي)",
+    "page": "صفحة كاملة",
+    "back": "عودة إلى {{name}}"
   },
   "tstd": {
     "empty": "لا يوجد ما يُعرض.",
