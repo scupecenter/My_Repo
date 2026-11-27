@@ -769,7 +769,7 @@ describe("receipt to Procurement order link (0181)", () => {
     expect(junk.status).toBe(422);
     expect(JSON.stringify(junk.body)).toContain("invalid");
   });
-  it("a delivery note and a return note take the order field like a receipt (0213); an adjustment refuses it", async () => {
+  it("a delivery note and a return note take the order field like a receipt (0320); an adjustment refuses it", async () => {
     for (const type of ["cw_dn", "cw_rn"] as const) {
       const bad = await move({ ...doc(type), site_id: site.id, procurement_order_id: randomUUID(), lines: [{ item_id: tower.id, qty: 1 }] });
       expect(bad.status, JSON.stringify(bad.body)).toBe(422);

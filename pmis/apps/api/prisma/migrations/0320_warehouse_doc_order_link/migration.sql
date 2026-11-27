@@ -1,5 +1,5 @@
--- 0213_warehouse_doc_order_link: every warehouse document except a stock adjustment (receipt PL / OPEN, delivery note DN, return note RN) can name its Procurement order.
--- Mirror: db/sql/212_warehouse_doc_order_link.sql (kept identical to prisma/migrations/0213_warehouse_doc_order_link/migration.sql).
+-- 0320_warehouse_doc_order_link: every warehouse document except a stock adjustment (receipt PL / OPEN, delivery note DN, return note RN) can name its Procurement order.
+-- Mirror: db/sql/319_warehouse_doc_order_link.sql (kept identical to prisma/migrations/0320_warehouse_doc_order_link/migration.sql).
 --
 --   0181 let a receipt (PL / OPEN) name its order; PR No., PO / WO No. and the contractor are read from the order. A delivery note (cw_dn / te_dn: materials issued to a site) and a return
 --   note (cw_rn / te_rn) belong to an order too, so they get the same optional picker and the same derived fields, with the same rules (an approved, active order the caller may see
