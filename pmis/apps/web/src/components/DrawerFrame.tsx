@@ -10,6 +10,7 @@ import {
   type PointerEvent as RPointerEvent,
   type ReactNode,
 } from "react";
+import { useAskLeave, useUnsavedGuard, type GuardSource } from "@/lib/unsavedGuard";
 import { useTranslation } from "react-i18next";
 import { loadPref, savePref } from "@/lib/localPref";
 import { Tip } from "./Tip";
@@ -24,9 +25,14 @@ const clampW = (w: number) =>
     ),
   );
 
-const Ctx = createContext<{ report: (dirty: boolean) => void }>({
+const Ctx = createContext<{ report: (dirty: boolean) => void; settle: () => void }>({
   report: () => {},
+  settle: () => {},
 });
+/** The body calls this the moment its save went through and just before it navigates (to the saved record, for instance): the navigation is then not asked about. */
+export function useDrawerSettled(): () => void {
+  return useContext(Ctx).settle;
+}
 /** A drawer body tells its frame whether it holds unsaved input, so closing or moving to another row can ask first (plan E6, R4). */
 export function useReportDirty(dirty: boolean) {
   const { report } = useContext(Ctx);
@@ -68,15 +74,15 @@ export function DrawerFrame({
   });
   const dirty = useRef(false);
   const opener = useRef<HTMLElement | null>(null);
-  const [pending, setPending] = useState<null | (() => void)>(null);
   const put = (s: Size) => {
     setSize(s);
     savePref(key, s);
   };
-  const guard = (go: () => void) => {
-    if (dirty.current) setPending(() => go);
-    else go();
-  };
+  // Decision 11: the shared guard (three choices, the setting ui.features.unsaved_guard); the body reports its dirty state through useReportDirty
+  const src: GuardSource = { scope: 'drawers', dirty: () => dirty.current, label: name }; // read at the moment of the ask, so settle() takes effect at once
+  useUnsavedGuard(src);
+  const ask = useAskLeave(src);
+  const guard = (go: () => void) => ask(go);
 
   const i = nav?.current ? nav.ids.indexOf(nav.current) : -1;
   const step = (d: -1 | 1) => {
@@ -158,6 +164,9 @@ export function DrawerFrame({
               report: (d) => {
                 dirty.current = d;
               },
+              settle: () => {
+                dirty.current = false;
+              },
             }}
           >
             <div className="flex h-full flex-col">
@@ -228,51 +237,6 @@ export function DrawerFrame({
               <div className="min-h-0 flex-1">{children}</div>
             </div>
           </Ctx.Provider>
-          {pending && (
-            <div
-              role="alertdialog"
-              aria-labelledby="dr-discard-t"
-              data-testid="drawer-discard"
-              className="absolute inset-0 z-20 flex items-center justify-center bg-scrim/50 p-4"
-              onKeyDown={(e) => {
-                if (e.key === "Escape") {
-                  e.stopPropagation();
-                  setPending(null);
-                }
-              }}
-            >
-              <div className="card w-full max-w-sm space-y-3 p-4">
-                <h2 id="dr-discard-t" className="font-bold">
-                  {t("drawer.discard_title")}
-                </h2>
-                <p className="text-sm text-mute">{t("drawer.discard_body")}</p>
-                <div className="flex justify-end gap-2">
-                  <button
-                    type="button"
-                    autoFocus
-                    className="btn"
-                    data-testid="drawer-discard-keep"
-                    onClick={() => setPending(null)}
-                  >
-                    {t("drawer.discard_keep")}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-danger"
-                    data-testid="drawer-discard-go"
-                    onClick={() => {
-                      const go = pending;
-                      setPending(null);
-                      dirty.current = false;
-                      go();
-                    }}
-                  >
-                    {t("drawer.discard_go")}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

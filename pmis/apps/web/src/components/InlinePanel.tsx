@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useAskLeave, useUnsavedGuard, type GuardSource } from '@/lib/unsavedGuard';
 
 /**
  * Settings, edit in place: the same contract as FormDialog (same testids `<testid>-reason`, `-reason-error`, `-error`, `-submit`, same mandatory reason of
@@ -16,9 +17,15 @@ export function InlinePanel({ onClose, title, testid, children, onSubmit, submit
   const ref = useRef<HTMLElement>(null);
   useEffect(() => { ref.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' }); }, []);
   const short = withReason && reason.trim().length < 3;
+  // Decision 11: typed input is guarded for Cancel, Esc and for leaving the page
+  const [typed, setTyped] = useState(false);
+  const src: GuardSource = { scope: 'inline', dirty: typed, label: title, onSave: () => { if (short || disabled || busy) { setTouched(true); return false; } onSubmit(reason.trim()); return 'stay'; } };
+  useUnsavedGuard(src);
+  const ask = useAskLeave(src);
+  const close = () => ask(onClose);
   return (
     <Tag ref={ref as never} data-testid={testid} role="group" aria-label={title} className="space-y-3 rounded-md border border-line bg-card2 p-4"
-      onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}>
+      onInput={() => setTyped(true)} onKeyDown={(e) => { if (e.key === 'Escape') close(); }}>
       <h3 className="font-bold">{title}</h3>
       {children}
       {withReason && (
@@ -30,7 +37,7 @@ export function InlinePanel({ onClose, title, testid, children, onSubmit, submit
       )}
       {error && <p role="alert" data-testid={`${testid}-error`} className="text-lateInk">{error}</p>}
       <div className="flex justify-end gap-2">
-        <button type="button" className="btn" onClick={onClose}>{t('common.cancel')}</button>
+        <button type="button" className="btn" onClick={close}>{t('common.cancel')}</button>
         <button type="button" className="btn btn-accent" data-testid={`${testid}-submit`} disabled={busy || disabled} onClick={() => (short ? setTouched(true) : onSubmit(reason.trim()))}>{submitLabel ?? t('common.save')}</button>
       </div>
     </Tag>

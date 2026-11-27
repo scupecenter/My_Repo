@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useCalendar, useCalendarConfirmation, useCreateHoliday, useDeleteHoliday, useHolidayChange, useHolidays, useImportHolidays, useSetCalendarConfirmation, useSetWeekend } from '@/api/settings';
 import type { Holiday } from '@/api/types';
 import { errText, FormDialog } from '@/components/FormDialog';
+import { UnsavedGuard } from '@/lib/unsavedGuard';
 import { InlineCell } from '@/components/InlineCell';
 import { InlinePanel } from '@/components/InlinePanel';
 import { useToast } from '@/components/Toast';
@@ -183,6 +184,7 @@ export function Calendar() {
           <p className="text-xs text-mute">{t('cal.recalc_note')}</p>
         </FormDialog>
       )}
+      <UnsavedGuard scope="settings" dirty={!!days} needsReason label={t('ui.guard_settings')} onSave={(reason) => new Promise<boolean>((res) => weekend.mutate({ weekend_days: wk, reason }, { onSuccess: () => { setDays(null); res(true); }, onError: () => res(false) }))} />
       {dlg?.kind === 'weekend' && (
         <FormDialog open onClose={() => setDlg(null)} testid="weekend-dialog" title={t('cal.weekend')} busy={weekend.isPending} error={weekend.isError ? errText(weekend.error, t) : null}
           onSubmit={(reason) => weekend.mutate({ weekend_days: wk, reason }, { onSuccess: (r) => { toast(`${t('settings.audited')} ${t('cal.recalculated', { count: r.affected_open_tasks })}`); setDays(null); setDlg(null); } })}><p className="text-sm text-mute">{t('cal.recalc_note')}</p></FormDialog>

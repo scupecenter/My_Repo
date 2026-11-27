@@ -1,4 +1,5 @@
 import { ShieldAlert } from 'lucide-react';
+import { UnsavedGuard } from '@/lib/unsavedGuard';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ApiError } from '@/api/client';
@@ -63,6 +64,7 @@ export function MailPolicy() {
         ))}
       </ul>
       {Object.keys(errs).map((p) => <p key={p} role="alert" className="text-xs text-lateInk" data-testid={`mp-err${p.replace(/\//g, '-')}`}>{p}: {errs[p]}</p>)}
+      <UnsavedGuard scope="settings" dirty={dirty} needsReason label={t('ui.guard_settings')} onSave={(reason) => new Promise<boolean>((res) => set.mutate({ version: cur.version, reason, enabled: d.enabled, mode: d.mode as 'internal_only' | 'internal_external', internal_domains: domains, kinds: d.kinds as never }, { onSuccess: () => { setDraft(null); res(true); }, onError: () => res(false) }))} />
       <button className="btn btn-accent" data-testid="mail-policy-save" disabled={!dirty} onClick={() => setOpen(true)}>{t('common.save')}</button>
       {open && (
         <FormDialog open onClose={() => setOpen(false)} testid="mail-policy-dialog" title={t('mailPolicy.title')} busy={set.isPending} error={set.isError ? errText(set.error, t) : null}
