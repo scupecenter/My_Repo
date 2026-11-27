@@ -5809,6 +5809,22 @@
     "sla_none_reason": "Why has it no SLA? (short reason)",
     "sla_undecided_warning": "These tasks have no SLA decision yet: {{codes}}. You can still publish; set an SLA or mark them as having none in Settings > SLA."
   },
+  "analytics": {
+    "title": "Analytics of this view",
+    "counted": "{{n}} rows counted",
+    "partial": "Counting the {{n}} loaded rows of {{total}}. Scroll or load more to count the rest.",
+    "group_by": "Count by",
+    "by_state": "Approval state",
+    "none": "Not set",
+    "other": "Other",
+    "empty": "No rows in this view.",
+    "number_field": "Totals of",
+    "no_numbers": "No numbers in the loaded rows.",
+    "sum": "Total",
+    "avg": "Average",
+    "min": "Smallest",
+    "max": "Largest"
+  },
   "tstd": {
     "count_all": "{{total}} {{noun}}",
     "count_of": "<b>{{filtered}}</b> of {{total}} {{noun}}",
