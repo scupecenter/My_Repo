@@ -22,7 +22,6 @@ export function RecordVideo({ formats, onFile, testid }: { formats: string[]; on
   const allowed = formats.map((f) => f.toLowerCase());
   const wantsMp4 = allowed.includes('mp4') && !allowed.includes('webm');
   const mime = wantsMp4 ? 'video/mp4' : 'video/webm';
-  const ext = wantsMp4 ? 'mp4' : 'webm';
 
   const stopAll = () => {
     if (timerRef.current) clearTimeout(timerRef.current);
