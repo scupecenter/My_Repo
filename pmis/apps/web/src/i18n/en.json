@@ -1202,7 +1202,9 @@
     "section_workflow_coverage": "Matrix coverage",
     "section_screens_login": "Login page",
     "section_screens_interface": "Interface",
-    "section_screens_goals": "Goals"
+    "section_screens_goals": "Goals",
+    "section_workflow_coverage": "Matrix coverage",
+    "section_workflow_simulate": "Who approves?"
   },
   "scopeMatch": {
     "title": "Team / scope match (Procurement)",
@@ -2067,7 +2069,9 @@
     "inline_undone": "Change undone.",
     "contractor": "Contractor",
     "contractor_company": "Contractor company",
-    "contractor_hint": "Pick from the companies with an active contract. The contract is checked against the scope at submit."
+    "contractor_hint": "Pick from the companies with an active contract. The contract is checked against the scope at submit.",
+    "prefilled": "Prefilled",
+    "prefilled_hint": "Filled from the default set in Settings; change it if it does not apply."
   },
   "regErrors": {
     "register_locked": "This is locked: only a System Admin can change it until it is unlocked.",
@@ -3215,7 +3219,23 @@
         "rescue_plan": "Rescue plan"
       },
       "expiring_14": "Expiring in 14 days",
-      "no_permit": "Sites with no permit"
+      "no_permit": "Sites with no permit",
+      "readiness_title": "Power and fiber readiness (GECOL / HLC)",
+      "readiness_hint": "The sites waiting on power or fiber, aged since the request. Read only.",
+      "gecol_title": "GECOL power",
+      "hlc_title": "HLC fiber",
+      "open_gecol": "GECOL register",
+      "open_hlc": "HLC register",
+      "in_scope": "Sites in scope",
+      "powered": "Powered",
+      "in_service": "In service",
+      "no_record": "No record",
+      "civil_ready_no_power": "Civilly ready, no power",
+      "installed_not_in_service": "Installed, not in service",
+      "waiting_power": "Waiting for power",
+      "waiting_fiber": "Waiting for fiber",
+      "unavailable_gecol": "You cannot see the GECOL register, so these figures are not shown.",
+      "unavailable_hlc": "You cannot see the HLC register, so these figures are not shown."
     },
     "scurve": {
       "title": "Progress curve",
@@ -3495,6 +3515,69 @@
     "appearance_default": "Use organization default ({{name}})",
     "appearance_note": "The design of the menus and buttons. Light or dark is the Theme above; status colours never change.",
     "appearance_locked": "Your administrator set one design for everyone ({{name}}), so you cannot choose your own."
+  },
+  "appearance": {
+    "title": "Appearance",
+    "subtitle": "Your own look of the whole app: density, type size, corners, motion, icons, the menu and the accent. Every change shows at once before you save it.",
+    "preset": "Ready-made profile",
+    "preset_classic": "Classic",
+    "preset_comfortable": "Comfortable",
+    "preset_night": "Night",
+    "preset_compact": "Compact",
+    "apply": "Apply",
+    "revert": "Revert",
+    "preview_note": "What you see now is a preview. Apply saves it to your account; Revert returns to the saved appearance.",
+    "org_default": "Organization default ({{name}})",
+    "dim": {
+      "density": "Density",
+      "font_scale": "Type size",
+      "radius": "Corners",
+      "motion": "Motion",
+      "icon_style": "Icon weight",
+      "menu_style": "Side menu",
+      "accent": "Accent colour"
+    },
+    "opt": {
+      "density": {
+        "comfortable": "Comfortable",
+        "standard": "Standard",
+        "compact": "Compact"
+      },
+      "font_scale": {
+        "small": "Small",
+        "standard": "Standard",
+        "large": "Large"
+      },
+      "radius": {
+        "sharp": "Sharp",
+        "standard": "Standard",
+        "rounded": "Rounded"
+      },
+      "motion": {
+        "full": "Full",
+        "reduced": "Reduced"
+      },
+      "icon_style": {
+        "light": "Light",
+        "regular": "Regular",
+        "bold": "Bold"
+      },
+      "menu_style": {
+        "default": "Default",
+        "rail": "Icons only",
+        "autohide": "Hide until the edge"
+      },
+      "accent": {
+        "default": "Of the design",
+        "teal": "Teal",
+        "blue": "Blue",
+        "violet": "Violet",
+        "green": "Green",
+        "orange": "Orange",
+        "red": "Red",
+        "amber": "Amber"
+      }
+    }
   },
   "emailChange": {
     "tab": "Email changes",
@@ -4179,7 +4262,12 @@
     "add_impact_tpl": "Impact: a new version of the register template is issued with this column. Files made from the old template still upload; the new column stays empty in them. Existing records keep this column empty until filled.",
     "add_impact": "Impact: existing records keep this column empty until filled. It is not in the template, so no new template version is issued.",
     "move_up": "Move {{code}} up",
-    "move_down": "Move {{code}} down"
+    "move_down": "Move {{code}} down",
+    "default_value": "Default",
+    "default_edit": "Default value of {{code}}",
+    "default_title": "Default value of {{code}}",
+    "default_note": "Prefilled on a new record and shown as prefilled; the person can change it. The server never fills it in by itself (imports and API calls are unchanged).",
+    "default_clear": "Clear the default"
   },
   "lists": {
     "colour": "Colour",
@@ -5703,7 +5791,10 @@
     "readonly": "Only a System Admin, or a person they delegated settings to for all regions, can change this.",
     "confirm": "Default design: {{name}}. {{choice}} The change is audited with your reason.",
     "choice_on": "Users may choose their own design.",
-    "choice_off": "Everyone sees this design."
+    "choice_off": "Everyone sees this design.",
+    "defaults_title": "Organization appearance defaults",
+    "defaults_note": "The appearance of everyone without a personal choice. An empty field keeps the built-in standard.",
+    "defaults_builtin": "Built-in standard ({{name}})"
   },
   "studioPanel": {
     "open": "Show the pending changes",
@@ -6900,5 +6991,24 @@
     "remove": "Remove goal",
     "add": "Add goal",
     "save_title": "Save the goals"
+  },
+  "matrixSimulate": {
+    "title": "Who approves?",
+    "note": "Read only. Pick a site and a stage task or a register to see who would hold L1 and L2 today: the matrix cell that decides, its rule, the people who would hold the level and how they reach it (named, role, group). Nothing is written and nobody is notified. A task cell decides before the stage cell, and a region cell before the default cell.",
+    "site_search": "Find a site",
+    "site": "Site",
+    "kind": "For",
+    "kind_task": "A stage task",
+    "kind_register": "A register",
+    "what": "Task or register",
+    "choose": "Choose",
+    "open_coverage": "Matrix coverage",
+    "source_region": "region cell",
+    "source_default": "default cell",
+    "source_none": "no cell",
+    "task_cell": "task cell",
+    "rule": "rule",
+    "nobody": "Nobody holds this level.",
+    "fallback": "Who could act through the admin path:"
   }
 }

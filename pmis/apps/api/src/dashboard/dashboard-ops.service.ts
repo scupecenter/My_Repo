@@ -66,12 +66,18 @@ export class DashboardOpsService {
     const procRegions = await this.access.regions("procurement", "view");
     const whRegions = await this.access.regions("warehouse", "view");
     const permitRegions = await this.access.regions("permits_hse", "view");
+    const gecolRegions = await this.access.regions("gecol", "view");
+    const hlcRegions = await this.access.regions("hlc", "view");
     const procScope = intersect(dash, procRegions);
     const whScope = intersect(dash, whRegions);
     const permitScope = intersect(dash, permitRegions);
+    const gecolScope = intersect(dash, gecolRegions);
+    const hlcScope = intersect(dash, hlcRegions);
     const procOk = procRegions === null || procRegions.length > 0;
     const whOk = whRegions === null || whRegions.length > 0;
     const permitsOk = permitRegions === null || permitRegions.length > 0;
+    const gecolOk = gecolRegions === null || gecolRegions.length > 0;
+    const hlcOk = hlcRegions === null || hlcRegions.length > 0;
 
     const orders = procOk ? await this.ordersSection(procScope, p.region_id ?? null) : null;
     const adv = whOk ? await this.filters.fromQuery("dashboard", q) : null;
@@ -80,6 +86,12 @@ export class DashboardOpsService {
       : null;
     const permits = permitsOk
       ? await this.permitsSection(permitScope, p.region_id ?? null)
+      : null;
+    const gecol = gecolOk
+      ? await this.gecolSection(gecolScope, p.region_id ?? null)
+      : null;
+    const hlc = hlcOk
+      ? await this.hlcSection(hlcScope, p.region_id ?? null)
       : null;
 
     return {
@@ -100,6 +112,24 @@ export class DashboardOpsService {
           by_contractor: materials?.by_contractor ?? null,
         },
       },
+      gecol_hlc: {
+        gecol: {
+          available: gecolOk,
+          in_scope: gecol?.in_scope ?? null,
+          powered: gecol?.powered ?? null,
+          waiting: gecol?.waiting ?? null,
+          no_record: gecol?.no_record ?? null,
+          civil_ready_no_power: gecol?.civil_ready_no_power ?? null,
+        },
+        hlc: {
+          available: hlcOk,
+          in_scope: hlc?.in_scope ?? null,
+          in_service: hlc?.in_service ?? null,
+          waiting: hlc?.waiting ?? null,
+          no_record: hlc?.no_record ?? null,
+          installed_not_in_service: hlc?.installed_not_in_service ?? null,
+        },
+      },
       permits_hse: {
         available: permitsOk,
         total: permits?.total ?? null,
@@ -115,6 +145,102 @@ export class DashboardOpsService {
           gaps: permits?.ptw.gaps ?? null,
         },
       },
+    };
+  }
+
+  /**
+   * The GECOL power position (0.15.201, item 4): the active, not cancelled sites with the GECOL scope, the powered
+   * ones (power_on_date set), the waiting ones with their age since the GECOL request date (bucketed 0-7, 8-14,
+   * 15-30, over 30), the in-scope sites with no GECOL record at all, and the civilly ready but not electrified: the
+   * CW PAC (task B13) is approved but the power is not on yet.
+   */
+  private async gecolSection(
+    scope: number[] | null,
+    region: number | null,
+  ): Promise<{
+    in_scope: number;
+    powered: number;
+    waiting: AgeBuckets;
+    no_record: number;
+    civil_ready_no_power: number;
+  }> {
+    const where = Prisma.sql`
+      ${scope === null ? Prisma.empty : Prisma.sql`AND s.region_id = ANY(${scope}::int[])`}
+      ${region ? Prisma.sql`AND s.region_id = ${region}` : Prisma.empty}`;
+    const counts = await this.db.tx.$queryRaw<
+      { in_scope: number; powered: number; no_record: number; civil_ready_no_power: number }[]
+    >(Prisma.sql`
+      SELECT count(*)::int AS in_scope,
+             count(*) FILTER (WHERE g.power_on_date IS NOT NULL)::int AS powered,
+             count(*) FILTER (WHERE g.id IS NULL)::int AS no_record,
+             count(*) FILTER (WHERE g.power_on_date IS NULL AND pac.approved_date IS NOT NULL)::int AS civil_ready_no_power
+      FROM sites s
+      LEFT JOIN gecol_records g ON g.site_id = s.id AND g.region_id = s.region_id
+      LEFT JOIN LATERAL (
+        SELECT ti.approved_date FROM task_instances ti
+        JOIN task_definitions td ON td.id = ti.task_def_id
+        WHERE ti.site_id = s.id AND td.code = 'B13' AND ti.approved_date IS NOT NULL
+        LIMIT 1
+      ) pac ON true
+      WHERE s.is_active AND s.overall_status <> 'cancelled' AND s.scope_gecol_power = 'yes' ${where}`);
+    const ages = await this.db.tx.$queryRaw<{ days: number | null }[]>(Prisma.sql`
+      SELECT (CURRENT_DATE - g.request_date)::int AS days
+      FROM sites s JOIN gecol_records g ON g.site_id = s.id AND g.region_id = s.region_id
+      WHERE s.is_active AND s.overall_status <> 'cancelled' AND s.scope_gecol_power = 'yes'
+        AND g.power_on_date IS NULL ${where}`);
+    const c = counts[0] ?? { in_scope: 0, powered: 0, no_record: 0, civil_ready_no_power: 0 };
+    return {
+      in_scope: c.in_scope,
+      powered: c.powered,
+      waiting: bucketAges(ages.map((r) => r.days).filter((d): d is number => d !== null)),
+      no_record: c.no_record,
+      civil_ready_no_power: c.civil_ready_no_power,
+    };
+  }
+
+  /**
+   * The HLC fiber position (0.15.201, item 4): the active, not cancelled sites with the HLC scope, the in-service
+   * ones (in_service_date set), the waiting ones with their age since the request (the HLC record's request date,
+   * else the PR date of the linked Procurement order), the installed lines not yet in service, and the in-scope
+   * sites with no HLC record at all.
+   */
+  private async hlcSection(
+    scope: number[] | null,
+    region: number | null,
+  ): Promise<{
+    in_scope: number;
+    in_service: number;
+    waiting: AgeBuckets;
+    no_record: number;
+    installed_not_in_service: number;
+  }> {
+    const where = Prisma.sql`
+      ${scope === null ? Prisma.empty : Prisma.sql`AND s.region_id = ANY(${scope}::int[])`}
+      ${region ? Prisma.sql`AND s.region_id = ${region}` : Prisma.empty}`;
+    const counts = await this.db.tx.$queryRaw<
+      { in_scope: number; in_service: number; no_record: number; installed_not_in_service: number }[]
+    >(Prisma.sql`
+      SELECT count(*)::int AS in_scope,
+             count(*) FILTER (WHERE h.in_service_date IS NOT NULL)::int AS in_service,
+             count(*) FILTER (WHERE h.id IS NULL)::int AS no_record,
+             count(*) FILTER (WHERE h.in_service_date IS NULL AND h.installation_date IS NOT NULL)::int AS installed_not_in_service
+      FROM sites s
+      LEFT JOIN hlc_records h ON h.site_id = s.id AND h.region_id = s.region_id
+      WHERE s.is_active AND s.overall_status <> 'cancelled' AND s.scope_hlc_fiber = 'yes' ${where}`);
+    const ages = await this.db.tx.$queryRaw<{ days: number | null }[]>(Prisma.sql`
+      SELECT (CURRENT_DATE - coalesce(h.request_date, pr.pr_date))::int AS days
+      FROM sites s
+      JOIN hlc_records h ON h.site_id = s.id AND h.region_id = s.region_id
+      LEFT JOIN procurement_records pr ON pr.id = h.procurement_record_id
+      WHERE s.is_active AND s.overall_status <> 'cancelled' AND s.scope_hlc_fiber = 'yes'
+        AND h.in_service_date IS NULL ${where}`);
+    const c = counts[0] ?? { in_scope: 0, in_service: 0, no_record: 0, installed_not_in_service: 0 };
+    return {
+      in_scope: c.in_scope,
+      in_service: c.in_service,
+      waiting: bucketAges(ages.map((r) => r.days).filter((d): d is number => d !== null)),
+      no_record: c.no_record,
+      installed_not_in_service: c.installed_not_in_service,
     };
   }
 

@@ -142,3 +142,24 @@ describe('register columns: edit in place next to the pencil', () => {
     expect(await screen.findByText('Renamed inline')).toBeInTheDocument();
   });
 });
+
+describe('register columns (0.15.103): the default value of a column', () => {
+  it('is admin only, is set from the column list, reaches the form defaults and can be cleared', async () => {
+    await signIn('engineer');
+    expect(await errCode(api.put('/registers/gecol/fields/remark/default', { body: { value: 'x', reason: 'Prefill the remark' } }))).toBe('403:action_forbidden');
+    await signIn('pm');
+    const u = userEvent.setup();
+    page();
+    await u.click(await screen.findByTestId('regcols-default-edit-remark'));
+    const dlg = await screen.findByTestId('column-default');
+    await u.type(within(dlg).getByTestId('reg-field-remark'), 'Checked on site');
+    await u.type(within(dlg).getByTestId('column-default-reason'), 'Owner asked for a prefill');
+    await u.click(within(dlg).getByTestId('column-default-submit'));
+    await waitFor(() => expect(screen.getByTestId('regcols-default-remark')).toHaveTextContent('Checked on site'));
+    const { columnDefaults } = await import('@/lib/registerForms');
+    const { REGISTER_DEFS } = await import('@/mocks/registersData');
+    expect(columnDefaults(REGISTER_DEFS.find((d) => d.register_key === 'gecol'))).toEqual({ remark: 'Checked on site' });
+    await api.put('/registers/gecol/fields/remark/default', { body: { value: null, reason: 'Not needed any more' } });
+    expect(columnDefaults(REGISTER_DEFS.find((d) => d.register_key === 'gecol'))).toEqual({});
+  });
+});

@@ -143,9 +143,18 @@ export const OWNER_NOTE: Record<string, string> = { procurement: 'registers.owne
  * 0042: when the caller may enter one scope only (the HLC Fiber Team in Procurement: `entry_scopes` = ["HLC"]), that scope is preset.
  */
 export const defaultsFor = (key: string, def?: RegisterDefinition): Data => {
-  if (key === 'permits_hse') return { has_expiry: true };
+  // 0.15.103: the admin's per-column defaults (Settings > Register columns) sit under the built-in ones
+  const base: Data = { ...columnDefaults(def) };
+  if (key === 'permits_hse') return { ...base, has_expiry: true };
   const scopes = def?.entry_scopes;
-  return scopes && scopes.length === 1 ? { scope: scopes[0] } : {};
+  return scopes && scopes.length === 1 ? { ...base, scope: scopes[0] } : base;
+};
+
+/** The default values the admin set on the columns of a register (contract 0.15.103); only for a new record, shown as prefilled. */
+export const columnDefaults = (def?: RegisterDefinition): Data => {
+  const out: Data = {};
+  for (const f of def?.fields ?? []) if (f.default_value !== undefined && f.default_value !== null && !f.read_only) out[f.code] = f.default_value;
+  return out;
 };
 
 /**
