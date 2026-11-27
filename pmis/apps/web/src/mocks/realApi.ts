@@ -379,6 +379,13 @@ export const REAL_API_AUTH_USERS = [
   // Contract 0.15.190 (migration 0290; apps/api: settings): the admin lock keys (Settings, Security, Lock keys).
   ['get', '/settings/security-locks'],
   ['put', '/settings/security-locks'],
+  // Contract 0.15.191 (migration 0291; apps/api: security): support access (Settings, Security, Support access).
+  ['get', '/settings/support-access'],
+  ['put', '/settings/support-access'],
+  ['get', '/support-access'],
+  ['post', '/support-access'],
+  ['post', '/support-access/revoke-all'],
+  ['post', '/support-access/:id/revoke'],
   // Contract 0.15.4 (migration 0085; apps/api: sites, master-import, templates): the per-site workflow locks (one site, many sites) and the status of the sites of
   // an import (missing data per site). The new site fields ride on the paths above.
   ['post', '/sites/workflow-locks'],

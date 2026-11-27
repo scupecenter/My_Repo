@@ -248,6 +248,18 @@ const MK = () => (C().mailKinds ??= initCfg().mailKinds);
 const locks: { block_public_sharing: boolean; disable_export: boolean; version: number; updated_at: string | null; updated_by: { id: string; display_name: string; employee_id: string | null } | null } =
   { block_public_sharing: false, disable_export: false, version: 1, updated_at: null, updated_by: null };
 const locksView = () => ({ ...locks, can_edit: isAdmin() });
+
+/** 0.15.191: support access (off by default) and the support grants, kept in memory like the lock keys. A grant is a time-limited delegation. */
+const support: { enabled: boolean; max_hours: number; default_hours: number; version: number; updated_at: string | null; updated_by: { id: string; display_name: string; employee_id: string | null } | null } =
+  { enabled: false, max_hours: 72, default_hours: 24, version: 1, updated_at: null, updated_by: null };
+type SupportGrant = { id: string; to: { id: string; display_name: string; employee_id: string | null }; from: { id: string; display_name: string; employee_id: string | null }; rights: string[]; valid_from: string; valid_to: string; revoked: boolean; revoked_at: string | null; reason: string };
+const supportGrants: SupportGrant[] = [];
+const SUPPORT_RIGHTS = ['templates.edit', 'fields.edit', 'documents.edit', 'warehouse.items.edit'];
+const supportView = () => ({ ...support, modules: ['templates', 'fields', 'lists', 'document_types', 'warehouse_items'], can_edit: true });
+const supportDto = (g: SupportGrant) => ({
+  id: g.id, from_user: g.from, to_user: g.to, target_kind: 'user', target: { kind: 'user', id: g.to.id, label: g.to.display_name }, scope: 'partial', rights: g.rights, region_codes: [], module_codes: [],
+  allow_redelegate: false, valid_from: g.valid_from, valid_to: g.valid_to, state: g.revoked ? 'revoked' : new Date(g.valid_to) <= new Date() ? 'expired' : 'active', reason: g.reason, revoked_at: g.revoked_at,
+});
 const identityView = () => ({ ...identity(), brands: [...BRANDS], can_edit: isAdmin() });
 /** 0.15.97: the login page settings with the system version (shown to signed-in users only). */
 const loginPageView = () => ({ ...loginPage(), server_version: '0.15.97', can_edit: isAdmin() });
@@ -652,6 +664,70 @@ export const settingsHandlers = [
       updated_by: { id: uid(v.employee_id ?? '9999'), display_name: v.name, employee_id: v.employee_id } });
     const j = locksView();
     return HttpResponse.json(j, tag(j.version));
+  }),
+
+  // ------------------------------------------------------------------ 0.15.191: support access (System Admin only)
+  http.get(`${B}/settings/support-access`, () => { const g = needAdmin(); if (g) return g; const j = supportView(); return HttpResponse.json(j, tag(j.version)); }),
+  http.put(`${B}/settings/support-access`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    const b = await body<{ enabled?: unknown; max_hours?: unknown; default_hours?: unknown; reason?: string } & Record<string, unknown>>(request);
+    const errs: { path: string; code: string }[] = Object.keys(b).filter((k) => !['enabled', 'max_hours', 'default_hours', 'reason'].includes(k)).map((k) => ({ path: `/${k}`, code: 'unknown_field' }));
+    if (typeof b.enabled !== 'boolean') errs.push({ path: '/enabled', code: 'required' });
+    const okH = (n: unknown): n is number => typeof n === 'number' && Number.isInteger(n) && n >= 1 && n <= 168;
+    if (!okH(b.max_hours)) errs.push({ path: '/max_hours', code: 'invalid' });
+    if (!okH(b.default_hours) || (okH(b.max_hours) && b.default_hours > b.max_hours)) errs.push({ path: '/default_hours', code: 'invalid' });
+    if ((b.reason ?? '').trim().length < 3 || (b.reason ?? '').length > 1000) errs.push({ path: '/reason', code: 'required' });
+    if (errs.length) return fields(...errs);
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, support.version); if (p) return p;
+    if (!stepUpValid()) return stepUp();
+    if (support.enabled === b.enabled && support.max_hours === b.max_hours && support.default_hours === b.default_hours) return problem(409, 'invalid_transition', 'These are already the support access settings.');
+    const v = viewer()!;
+    Object.assign(support, { enabled: b.enabled, max_hours: b.max_hours, default_hours: b.default_hours, version: support.version + 1, updated_at: new Date().toISOString(),
+      updated_by: { id: uid(v.employee_id ?? '9999'), display_name: v.name, employee_id: v.employee_id } });
+    const j = supportView();
+    return HttpResponse.json(j, tag(j.version));
+  }),
+  http.get(`${B}/support-access`, () => { const g = needAdmin(); if (g) return g; return HttpResponse.json({ items: [...supportGrants].reverse().map(supportDto) }); }),
+  http.post(`${B}/support-access`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    const b = await body<{ to_user_id?: unknown; rights?: unknown; hours?: unknown; reason?: string } & Record<string, unknown>>(request);
+    const errs: { path: string; code: string }[] = Object.keys(b).filter((k) => !['to_user_id', 'rights', 'hours', 'reason'].includes(k)).map((k) => ({ path: `/${k}`, code: 'unknown_field' }));
+    if (typeof b.to_user_id !== 'string' || b.to_user_id.length < 8) errs.push({ path: '/to_user_id', code: 'invalid' });
+    if (!Array.isArray(b.rights) || b.rights.length === 0 || !b.rights.every((r) => SUPPORT_RIGHTS.includes(r as string))) errs.push({ path: '/rights', code: 'not_allowed' });
+    const hours = b.hours === undefined ? support.default_hours : b.hours;
+    if (typeof hours !== 'number' || !Number.isInteger(hours) || hours < 1 || hours > support.max_hours) errs.push({ path: '/hours', code: 'invalid' });
+    if ((b.reason ?? '').trim().length < 3 || (b.reason ?? '').length > 900) errs.push({ path: '/reason', code: 'required' });
+    if (errs.length) return fields(...errs);
+    if (!stepUpValid()) return stepUp();
+    if (!support.enabled) return problem(409, 'invalid_transition', 'Support access is switched off.');
+    const v = viewer()!;
+    const me = { id: uid(v.employee_id ?? '9999'), display_name: v.name, employee_id: v.employee_id };
+    const now = new Date();
+    const row: SupportGrant = { id: `sg-${supportGrants.length + 1}-${now.getTime()}`, to: { id: b.to_user_id as string, display_name: 'Support user', employee_id: null }, from: me, rights: b.rights as string[],
+      valid_from: now.toISOString(), valid_to: new Date(now.getTime() + (hours as number) * 3_600_000).toISOString(), revoked: false, revoked_at: null, reason: `[support-access] ${(b.reason as string).trim()}` };
+    supportGrants.push(row);
+    return HttpResponse.json(supportDto(row), { status: 201 });
+  }),
+  http.post(`${B}/support-access/revoke-all`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    const b = await body<{ reason?: string } & Record<string, unknown>>(request);
+    if ((b.reason ?? '').trim().length < 3) return fields({ path: '/reason', code: 'required' });
+    if (!stepUpValid()) return stepUp();
+    let n = 0;
+    for (const r of supportGrants) if (!r.revoked && new Date(r.valid_to) > new Date()) { r.revoked = true; r.revoked_at = new Date().toISOString(); n += 1; }
+    return HttpResponse.json({ revoked: n });
+  }),
+  http.post(`${B}/support-access/:id/revoke`, async ({ request, params }) => {
+    const g = needAdmin(); if (g) return g;
+    const b = await body<{ reason?: string } & Record<string, unknown>>(request);
+    if ((b.reason ?? '').trim().length < 3) return fields({ path: '/reason', code: 'required' });
+    if (!stepUpValid()) return stepUp();
+    const r = supportGrants.find((x) => x.id === params.id);
+    if (!r) return problem(404, 'not_found', 'No such support grant');
+    if (r.revoked) return problem(409, 'invalid_transition', 'The support grant is already revoked.');
+    r.revoked = true; r.revoked_at = new Date().toISOString();
+    return HttpResponse.json(supportDto(r));
   }),
 
   // ------------------------------------------------------------------ 0.15.1: the shared layout of the side menu
