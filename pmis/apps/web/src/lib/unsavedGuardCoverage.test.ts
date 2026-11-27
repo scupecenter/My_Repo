@@ -29,8 +29,6 @@ const EXCLUDED: Record<string, string> = {
   // OPEN GAPS found by this scan, still to be wired (listed so the test stays honest; remove the entry when wired)
   'pages/settings/SlaRules.tsx': 'GAP: per-row edits map, to wire',
   'components/NavLayoutEditor.tsx': 'GAP: heading layout draft (Settings > Menu), to wire',
-  'components/DocumentsGrid.tsx': 'GAP: column order draft, to wire',
-  'components/DelayPeriods.tsx': 'GAP: delay period form, to wire',
   'pages/settings/RecycleBin.tsx': 'row selector for a FormDialog',
 };
 const DRAFT = /const \[(draft|form|dirty|edit|editing)[A-Za-z]*, set/;
