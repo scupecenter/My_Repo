@@ -101,6 +101,24 @@ describe('catalogue and download', () => {
     expect(au[0]!.after).toMatchObject({ version: gecol.current_version, prefill: false });
   });
 
+  it('P3: says what changed between two versions of a template (added, removed, renamed columns by code), read only and in scope only', async () => {
+    const t = await tplTeam(app, db, 'gecol', 'gecol', R);
+    const cur = (await t.entry.api.call('get', '/templates')).body.items[0].current_version as number;
+    const now = await t.entry.api.call('get', '/templates/TPL-GECOL/changes');
+    expect(now.status).toBe(200);
+    expect(now.body).toMatchObject({ template_id: 'TPL-GECOL', to: cur });
+    for (const k of ['added', 'removed', 'renamed']) expect(Array.isArray(now.body[k])).toBe(true);
+    expect(now.body.from).toBe(cur > 1 ? cur - 1 : null);
+    if (cur === 1) expect([now.body.added, now.body.removed, now.body.renamed]).toEqual([[], [], []]);
+    // a version that was never issued, a malformed id and a malformed version
+    expect((await t.entry.api.call('get', `/templates/TPL-GECOL/changes?to=${cur + 50}`)).status).toBe(404);
+    expect((await t.entry.api.call('get', '/templates/nope/changes')).status).toBe(404);
+    expect((await t.entry.api.call('get', '/templates/TPL-GECOL/changes?from=abc')).status).toBe(422);
+    // somebody who holds no register module does not see the template
+    const nobody = await actor(app, db, { grants: G('templates', 'view'), regions: [R], modules: null });
+    expect((await nobody.api.call('get', '/templates/TPL-GECOL/changes')).status).toBe(404);
+  });
+
   it('keeps the list fields as drop-downs and refuses a caller without the right (permission denied)', async () => {
     const t = await tplTeam(app, db, 'procurement', 'procurement', R);
     const dl = await downloadTemplate(t.entry.api, 'TPL-PROCUREMENT');
