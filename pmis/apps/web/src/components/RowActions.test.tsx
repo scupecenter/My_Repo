@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import '@/i18n';
@@ -36,21 +36,21 @@ describe('row shortcuts and menu', () => {
     expect(screen.getByTestId('r-b')).toHaveFocus();
   });
 
-  it('right-click opens the row menu: open, select, copy; Escape closes it and returns the focus', async () => {
+  it('the context menu opens the row menu: open, select, copy; Escape closes it and returns the focus', async () => {
     const u = userEvent.setup();
     const open = vi.fn();
     render(<Grid onOpen={open} />);
-    await u.pointer({ keys: '[MouseRight]', target: screen.getByTestId('r-b') });
+    fireEvent.contextMenu(screen.getByTestId('r-b'));
     const menu = await screen.findByTestId('row-menu');
     expect(menu).toBeInTheDocument();
     await u.click(screen.getByTestId('row-menu-select'));
     expect(screen.getByLabelText('sel-b')).toBeChecked();
-    await u.pointer({ keys: '[MouseRight]', target: screen.getByTestId('r-b') });
+    fireEvent.contextMenu(screen.getByTestId('r-b'));
     expect(await screen.findByTestId('row-menu-select')).toHaveTextContent(/Unselect/);
     await u.keyboard('{Escape}');
     expect(screen.queryByTestId('row-menu')).toBeNull();
     expect(screen.getByTestId('r-b')).toHaveFocus();
-    await u.pointer({ keys: '[MouseRight]', target: screen.getByTestId('r-c') });
+    fireEvent.contextMenu(screen.getByTestId('r-c'));
     await u.click(screen.getByTestId('row-menu-open'));
     expect(open).toHaveBeenCalledWith('c');
   });
