@@ -89,6 +89,7 @@ info:
     - 0.15.96 (2026-11-27): responsibility-matrix coverage screen (CHANGELOG MatrixCoverage; no migration). Additive and read only. `GET /matrix/coverage` (`getMatrixCoverage`, System Admin or an all-region delegate of the matrix): for each active stage and enabled register row and each of the seven regions, whether the matrix cell has an actor, so empty cells show before a task or record stalls. Settings > Workflow > Coverage.
     - 0.15.241 (2026-11-27): region health on the dashboard and the Weekly status page (owner request 2026-11-27, item 12 of the 2026-11-27 batch; migration 0341, mirror `db/sql/340_region_health.sql`; CHANGELOG RegionHealth). Additive. New `GET /status-updates/region-health` (`getRegionHealth`): one row per region the caller may view on `sites` (all seven when unrestricted), with the current working week's region update of the Weekly status (`health`, `summary`, `author`, `updated_at`) or `missing_update` true when the region has not posted this week; read only. The dashboard card catalogue gains `region_health` ("Region health"), shown at the end of a tab until the tab layout names it (migration 0108 rule). No table, no permission change.
     - 0.15.95 (2026-11-27): Issue log and Quality record link to a Procurement order (migration 0195; CHANGELOG IssueQualityOrderLink). Additive. New optional field `procurement_order_id` on `issues` and `quality`; when set, the contractor (`external_party`) is taken from the order (a different typed `external_party_id` is refused, 422 `contractor_from_order`; `order_not_active`, `order_other_site`, `invalid`), so the contractor performance view sees the issue and the inspection. `GET /registers/issues/order-options` and `GET /registers/quality/order-options` list the orders (own module view plus Procurement view).
+    - 0.15.361 (2026-11-27): the Finance hub (owner decision D57, 2026-11-27; migration 0406, mirror `db/sql/405_finance_hub.sql`). Additive: new `GET /finance-hub/summary` (read-only cards over the two separate registers `financial_advances` and `invoices`, each with the visibility of its own screen; advance amounts are only totalled where `fin_amounts_visible` already shows them, so a caller who cannot see amounts gets counts and nulls); `UiFeatures` and `UiFeaturesPatch` gain `finance_hub` (`UiFinanceHub` - widget switches, after how many days a disbursed, unsettled advance warns, the two aging bounds of the open-invoice buckets). A stored value without the section takes the seed. No permission change.
     - 0.15.311 (2026-11-27): the Data hub (owner approval 2026-11-27; migration 0400, mirror `db/sql/399_data_hub.sql`; CHANGELOG DataHub). Additive: new `GET /data-hub/summary` (batches waiting for the caller, recent template changes, the caller's last template downloads; read only, same visibility as the batch list and the template catalogue); `UiFeatures` and `UiFeaturesPatch` gain `data_hub` (`UiDataHub`: widget switches, the Uploads & batches badge, the default view of each hub list). A stored value without the section takes the seed. No permission change.
     - 0.15.251 (2026-11-27): the notification panel joins `ui.features` as the section `panel` (migration 0282, mirror `db/sql/281_ui_panel.sql`; CHANGELOG UiPanel). Additive: `UiFeatures` and `UiFeaturesPatch` gain `panel` (`UiPanel`: `mode` popover or side_panel, `width`, `show_tabs`); a stored value without the section takes the seed (popover). No new path.
     - 0.15.250 (2026-11-27): inbox tabs and priority join `ui.features` as the section `inbox` (migration 0281, mirror `db/sql/280_ui_inbox.sql`; CHANGELOG UiInbox). Additive: `UiFeatures` and `UiFeaturesPatch` gain `inbox` (`UiInbox`: `tabs_enabled`, `default_tab`, `priority_kinds`); a stored value without the section takes the seed. No new path.
@@ -6672,6 +6673,19 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/DataHubSummary'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+  /finance-hub/summary:
+    get:
+      tags: [templates]
+      operationId: getFinanceHubSummary
+      summary: The Finance hub landing page, in one call (0.15.361)
+      description: 0.15.361. Read-only summary cards over the two separate registers `financial_advances` and `invoices` - open advances (count, overdue count, and the open balance total where `fin_amounts_visible` shows the caller amounts - null otherwise), and open invoices (count by state, aging buckets over the received date, count past due). Each card is null when the caller cannot view that register's module, and every row counted is a row the register screen would show the caller (same module and region visibility, latest version only). The thresholds come from the `finance_hub` section of ui.features.
+      responses:
+        '200':
+          description: The summary.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/FinanceHubSummary'}
         '401': {$ref: '#/components/responses/Unauthorized'}
   /exports/schedules:
     get:
@@ -23464,6 +23478,51 @@ components:
         version: { type: [integer, 'null'] }
         prefill: { type: boolean }
         at: { type: string, format: date-time }
+    UiFinanceHub:
+      type: object
+      description: '0.15.361. The Finance hub: which widgets of the page show, after how many days a disbursed, unsettled advance warns, and the two aging bounds of the open-invoice buckets.'
+      additionalProperties: false
+      required: [widgets, settle_warn_days, aging_days]
+      properties:
+        widgets:
+          type: object
+          additionalProperties: false
+          required: [advances, invoices, quick_links, templates]
+          properties:
+            advances: { type: boolean }
+            invoices: { type: boolean }
+            quick_links: { type: boolean }
+            templates: { type: boolean }
+        settle_warn_days: { type: integer, minimum: 1, maximum: 365 }
+        aging_days: { type: array, minItems: 2, maxItems: 2, items: { type: integer, minimum: 1, maximum: 365 } }
+    FinanceHubSummary:
+      type: object
+      required: [advances, invoices]
+      properties:
+        advances:
+          type: [object, 'null']
+          description: Null when the caller cannot view the financial_advances module.
+          required: [open_count, overdue_count, open_amount]
+          properties:
+            open_count: { type: integer, minimum: 0, description: 'Latest advances whose state is not settled, closed or cancelled.' }
+            overdue_count: { type: integer, minimum: 0, description: 'Disbursed and unsettled for more than settle_warn_days.' }
+            open_amount: { type: [number, 'null'], description: 'Total open balance of the advances the caller may see amounts of (fin_amounts_visible); null when the rule shows the caller no amounts.' }
+            currency: { type: string, example: LYD }
+        invoices:
+          type: [object, 'null']
+          description: Null when the caller cannot view the invoices module.
+          required: [open_count, by_state, aging, overdue_count]
+          properties:
+            open_count: { type: integer, minimum: 0, description: 'Latest invoices whose state is not Paid or Cancelled.' }
+            by_state: { type: object, additionalProperties: { type: integer, minimum: 0 }, description: 'Open invoices per state (Received, UnderReview, Approved, Disputed); a state with none is listed with 0.' }
+            aging:
+              type: object
+              required: [first, second, third]
+              properties:
+                first: { type: integer, minimum: 0, description: 'Received up to aging_days[0] days ago.' }
+                second: { type: integer, minimum: 0, description: 'Received aging_days[0]+1 to aging_days[1] days ago.' }
+                third: { type: integer, minimum: 0, description: 'Received more than aging_days[1] days ago.' }
+            overdue_count: { type: integer, minimum: 0, description: 'Due date past, not Paid or Cancelled.' }
     DataHubSummary:
       type: object
       required: [batches, template_changes, my_downloads]
@@ -23501,12 +23560,13 @@ components:
     UiFeatures:
       type: object
       description: '0.15.185. The sections of the interface features setting; every section is complete.'
-      required: [avatars, new_badge, inbox, panel, data_hub, unsaved_guard]
+      required: [avatars, new_badge, inbox, panel, data_hub, unsaved_guard, finance_hub]
       properties:
         avatars: { $ref: '#/components/schemas/UiAvatars' }
         new_badge: { $ref: '#/components/schemas/UiNewBadge' }
         inbox: { $ref: '#/components/schemas/UiInbox' }
         data_hub: { $ref: '#/components/schemas/UiDataHub' }
+        finance_hub: { $ref: '#/components/schemas/UiFinanceHub' }
         panel: { $ref: '#/components/schemas/UiPanel' }
         unsaved_guard: { $ref: '#/components/schemas/UiUnsavedGuard' }
     UiFeaturesPatch:
@@ -23517,6 +23577,7 @@ components:
         new_badge: { $ref: '#/components/schemas/UiNewBadge' }
         inbox: { $ref: '#/components/schemas/UiInbox' }
         data_hub: { $ref: '#/components/schemas/UiDataHub' }
+        finance_hub: { $ref: '#/components/schemas/UiFinanceHub' }
         panel: { $ref: '#/components/schemas/UiPanel' }
         unsaved_guard: { $ref: '#/components/schemas/UiUnsavedGuard' }
     UiFeaturesSetting:
