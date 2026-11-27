@@ -116,7 +116,9 @@ export class UiIdentityService {
     const r = z.string().trim().min(3).max(1000).safeParse(reason);
     if (!r.success) throw problems.validation([{ path: '/reason', code: 'invalid', message: 'A reason of 3+ characters is required.' }]);
     await this.access.requireAdmin('settings', 'edit');
-    const etag = parseIfMatch(ifMatch);
+    // The very first upload has no version to send; once a logo exists, If-Match is required like everywhere else.
+    const first = (ifMatch === undefined || ifMatch.trim() === '') && !(await this.get()).logo;
+    const etag = first ? null : parseIfMatch(ifMatch);
     await this.stepUp.require(auth);
     return this.asset(Prisma.sql`SELECT admin_put_ui_asset('logo', ${file.mimetype}::text, ${file.buffer}::bytea, ${r.data}::text, ${etag}::int) AS r`);
   }
