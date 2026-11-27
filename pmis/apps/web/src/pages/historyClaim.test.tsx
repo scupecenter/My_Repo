@@ -42,4 +42,16 @@ describe('Daily Plan history, claim and triage', () => {
     expect(await screen.findByTestId('daily-plan-triage-1')).toBeInTheDocument();
     expect(screen.queryByTestId('daily-plan-claim-1')).toBeNull();
   });
+
+  it('shows the history of a warehouse item and restores the old name through the normal writer', async () => {
+    await signIn('pm');
+    const u = userEvent.setup();
+    renderApp(<App />, { route: '/warehouse' });
+    await u.click(await screen.findByTestId('wh-history-ANT-900'));
+    const dlg = await screen.findByTestId('wh-history-dialog');
+    expect(await within(dlg).findByText(/name_en:/)).toBeInTheDocument();
+    await u.click(within(dlg).getByTestId('wh-history-dialog-restore'));
+    await waitFor(() => expect(screen.queryByTestId('wh-history-dialog')).toBeNull());
+    expect(await screen.findByText(/\(old\)/)).toBeInTheDocument();
+  });
 });

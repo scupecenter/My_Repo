@@ -141,8 +141,19 @@ function Items() {
       {hist && <HistoryDialog testid="wh-history-dialog" title={t('history.title_item', { code: hist.code })} entries={histQ.data} loading={histQ.isLoading} onClose={() => setHist(null)}
         onRestore={(e) => {
           // Restore = the old values through the normal writer (PATCH items/:id): rights, locks, reason and audit as for any edit
-          const EDITABLE = ['name_en', 'name_ar', 'uom', 'category', 'serial_tracked'];
+          // every field the item writer accepts; the code (identity), version and timestamps are not restorable
+          const EDITABLE = ['name_en', 'name_ar', 'uom', 'category', 'serial_tracked', 'manufacturer', 'contract_qty', 'planned_delivery_date', 'progress_item_code', 'code_source', 'is_active'];
           const body: Record<string, unknown> = Object.fromEntries(e.changes.filter((c) => EDITABLE.includes(c.field)).map((c) => [c.field, c.from ?? null]));
+          const cc = e.changes.find((c) => c.field === 'custom');
+          if (cc) {
+            // extra columns: the old values, and null for a column that had no value before
+            const was = (cc.from ?? {}) as Record<string, unknown>; const now = (cc.to ?? {}) as Record<string, unknown>;
+            const custom: Record<string, unknown> = {};
+            Object.keys({ ...was, ...now }).forEach((k) => { if (JSON.stringify(was[k] ?? null) !== JSON.stringify(now[k] ?? null)) custom[k] = was[k] ?? null; });
+            if (Object.keys(custom).length) body.custom = custom;
+          }
+          const nr = e.changes.find((c) => c.field === 'need_rules');
+          if (nr && Array.isArray(nr.from)) body.need_rules = nr.from;
           if (!Object.keys(body).length) return;
           save.mutate({ item: hist, body: { ...body, reason: `Restore ${e.action} ${e.at.slice(0, 10)}` } }, { onSuccess: () => { setHist(null); toast(t('history.restored')); }, onError: (er) => toast(registerErrorMessage(t, er), 'err') });
         }} />}
