@@ -24,8 +24,15 @@ export class DataResetController {
 
   /** Contract 0.15.71: the dry run of a chosen scope (`?parts=a,b`). */
   @Get('plan')
-  plan(@Query('parts') parts: unknown): Promise<Json> {
-    return this.svc.plan(parts);
+  plan(@Query('parts') parts: unknown, @Query() all: Record<string, unknown>): Promise<Json> {
+    const { regions, batches, from, to } = all;
+    return this.svc.plan(parts, { regions, batches, from, to });
+  }
+
+  /** Contract 0.15.262: the regions and recent import batches the picker offers for narrowing (`?part=gecol`). */
+  @Get('narrow-options')
+  narrowOptions(@Query('part') part: unknown): Promise<Json> {
+    return this.svc.narrowOptions(part);
   }
 
   @Put('settings')

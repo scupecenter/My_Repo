@@ -42,6 +42,7 @@ info:
     - 0.15.246 (2026-11-27): a soft "… is editing this record" notice (owner request 2026-11-27, item 17 of the 2026-11-27 batch; migration 0345; CHANGELOG RecordEditPresence). Additive and advisory only: nothing is locked. `POST /presence/editing` (`{kind, entity_id}`) is the editor's heartbeat (30 s; a row is stale after 2 minutes), `POST /presence/editing/stop` removes it at once, and `GET /presence/editing` (`kind`, `entity_id`) lists the other current editors of the entity (id, display name, since). Covers register records (kind `record`) and workflow tasks (kind `task`). No grant, role, permission, visibility or audit change.
 
     - 0.15.240 (2026-11-27): intake triage for the Issue Log and the Change Control Log (owner request 2026-11-27; migration 0340, mirror `db/sql/339_register_triage.sql`; CHANGELOG RegisterTriage). Additive. (1) `RegisterDefinition.triage_enabled` (true for `issues` and `change_control`): a record of such a register enters an intake queue (`RegisterRecord.triage.state` `pending`) on every insert, a new version included (the old decision is cleared). (2) New `POST /registers/{register_key}/records/{record_id}/triage` (`triageRegisterRecord`): one decision of the register's Matrix L2 holders of the record's region (a System Admin only when the row has no holder, exactly like an approval): `accept` (the record proceeds to its normal flow), `defer` (stays in the queue, with a note), `reject` (note and step-up required; the record is `voided`) and `merge` (`duplicate_of`, note and step-up; the record is `voided`, links the surviving record `triage.duplicate_of`, and the decision is noted on the surviving record's comment thread). `If-Match` is the record's version; `allowed_actions` gains `triage` while a record is pending or deferred and the caller may decide. `GET /registers/{register_key}/records` takes `triage` (one of `TriageState`). (3) Audited as `register_record_triage` with before and after; `RegisterRecordStep.action` gains `triage_accept`, `triage_reject`, `triage_merge`, `triage_defer`; the creator is notified (`NotificationKind` gains `triage_decision`). No grant, role or default changes.
+    - 0.15.265 (2026-11-27): the project data reset can be narrowed inside a register part (Data entry proposal P1, approved by the owner 2026-11-27; migration 0370, mirror `db/sql/369_data_reset_narrow.sql`). Additive and backward compatible: a request without `narrow` is the whole part as before. `POST /settings/data-reset/requests` takes optional `narrow` (`DataResetNarrow`: `regions`, `batches`, `from`, `to`; every given key must match): the register entities that match go, the others stay with everything that hangs off them (every version of a record, steps, documents and files, comments, drafts, links). The unit is the entity; `from`/`to` are the days the entity was first created (inclusive, Africa/Tripoli); `batches` are import batches the record came from. Only parts whose data follows one register record can be narrowed (`DataResetPart.narrowable`); a narrowing needs chosen parts (not everything) and any other part is 422. A part the chosen one takes along (procurement takes car_dispatcher and financial_advances) loses only the entities linked to the selected procurement records. The narrowing is stored in `DataResetScope.narrow` and bound into `scope_hash`/`approved_scope_hash`: an approver who saw another narrowing is 409 `scope_changed`. `GET /settings/data-reset/plan` takes `regions`, `batches`, `from`, `to` (the dry run of the narrowed scope, `DataResetPlan.narrow`). New `GET /settings/data-reset/narrow-options?part=` lists the regions and the recent import batches of the part for the picker. System Admin only, no delegation.
     - 0.15.264 (2026-11-27): `GET /custom-fields` and `GET /custom-fields/{field_id}` now have an implementation (they were documented only; the list was always empty). No migration, no schema change. Everyone signed in reads the active fields their field rules do not hide; inactive fields and the role lists are for a System Admin or an all-regions delegate of the custom fields. POST and PATCH stay documented, not built (proposal to follow).
     - 0.15.226 (2026-11-27): the Deliverables register is enabled (migration 0326; Q71): site-scoped, linked to a task and a gate of the site, with the document and acceptance reference rules. Additive: `deliverables` joins `RegisterKey` and `ExportPartKey` (not in the Master sheet); no new endpoint.
     - 0.15.261 (2026-11-27): mail policy (migration 0364, mirror `db/sql/363_mail_policy.sql`). Additive. New `GET/PUT /settings/mail-policy` (the setting `mail.policy`: global switch, internal only or internal plus external recipients, internal domains, per kind switch and mode). `expiry_radar`, `approval_digest` and `weekly_digest` join the mail kind catalogue (still mailed only when listed in `mail.notification_kinds`). Defaults keep today's behaviour.
@@ -9336,12 +9337,34 @@ paths:
         required: false
         description: Comma-separated part codes (for example `issues,risks`).
         schema: {type: string, pattern: '^[a-z_]{2,40}(,[a-z_]{2,40}){0,63}$'}
+      - {name: regions, in: query, required: false, description: '0.15.265. Narrow to these region ids (comma-separated).', schema: {type: string, pattern: '^[0-9]{1,6}(,[0-9]{1,6}){0,49}$'}}
+      - {name: batches, in: query, required: false, description: '0.15.265. Narrow to the records that came from these import batches (comma-separated ids).', schema: {type: string}}
+      - {name: from, in: query, required: false, description: '0.15.265. Narrow to entities first created on or after this day.', schema: {type: string, format: date}}
+      - {name: to, in: query, required: false, description: '0.15.265. Narrow to entities first created on or before this day.', schema: {type: string, format: date}}
       responses:
         '200':
           description: The plan of the scope.
           content:
             application/json:
               schema: {$ref: '#/components/schemas/DataResetPlan'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /settings/data-reset/narrow-options:
+    get:
+      tags: [settings]
+      operationId: getDataResetNarrowOptions
+      summary: What the reset picker offers for narrowing (System Admin only)
+      description: 0.15.265 (migration 0370, `data_reset_narrow_options`). A System Admin acting without delegation. The regions and the 200 most recent import batches of the part (`part`), with their row counts, and the narrowable parts.
+      x-db-path: data_reset_narrow_options
+      parameters:
+      - {name: part, in: query, required: false, schema: {type: string, pattern: '^[a-z_]{2,40}$'}}
+      responses:
+        '200':
+          description: The options.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DataResetNarrowOptions'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '422': {$ref: '#/components/responses/Unprocessable'}
@@ -9412,6 +9435,7 @@ paths:
                   items: {$ref: '#/components/schemas/DataResetPartCode'}
                   description: '0.15.71. The parts to reset (codes of `DataResetState.plan.parts`). Absent: everything as before (every project part, no identity part). The database adds the dependent parts; unknown codes are 422 `validation_failed` (`/parts`, `unknown_part`).'
                 require_backup: {type: boolean, default: true, description: '0.15.72. True (the default, as before): the run needs a successful database backup within `backup_max_age_hours`. False: the run skips only that check; the deleted data cannot be restored from a backup. Bound into `scope_hash`; never changes after the request.'}
+                narrow: {$ref: '#/components/schemas/DataResetNarrow'}
                 no_backup_confirm: {type: string, maxLength: 200, description: '0.15.72. Required when `require_backup` is false: the typed phrase `NO BACKUP` (`DataResetState.no_backup_phrase`; 422 `confirmation_mismatch` at `/no_backup_confirm` otherwise). Ignored when a backup is required.'}
       responses:
         '201':
@@ -23284,6 +23308,7 @@ components:
         requested: {type: boolean, description: 'Chosen in the scope of this plan.'}
         selected: {type: boolean, description: 'In the closure of the scope.'}
         added: {type: boolean, description: 'In the closure only because a chosen part takes it along.'}
+        narrowable: {type: boolean, description: '0.15.265. The part can be narrowed to regions, batches or a period (its data follows one register record).'}
     DataResetScope:
       type: object
       properties:
@@ -23294,7 +23319,39 @@ components:
         added: {type: array, items: {$ref: '#/components/schemas/DataResetPartCode'}}
         everything: {type: boolean, description: 'Every project part is in the closure.'}
         identity: {type: array, items: {$ref: '#/components/schemas/DataResetPartCode'}, description: 'The identity parts of the closure.'}
-        hash: {type: string, description: 'SHA-256 of the closure.'}
+        hash: {type: string, description: 'SHA-256 of the closure (with the narrowing when there is one).'}
+        narrow: {oneOf: [{$ref: '#/components/schemas/DataResetNarrow'}, {type: 'null'}], description: '0.15.265. The narrowing of the scope (normal form), null when the whole part goes.'}
+    DataResetNarrow:
+      type: object
+      additionalProperties: false
+      description: '0.15.265. Narrows the chosen register parts to the entities that match every given key.'
+      properties:
+        regions: {type: array, maxItems: 50, items: {type: integer, minimum: 1}, description: 'Region ids (any of).'}
+        batches: {type: array, maxItems: 50, items: {type: string, format: uuid}, description: 'Import batch ids (any of): the record came from the batch directly or through a row.'}
+        from: {type: string, format: date, description: 'First-created day, inclusive (Africa/Tripoli).'}
+        to: {type: string, format: date, description: 'First-created day, inclusive (Africa/Tripoli).'}
+        version: {type: integer, readOnly: true}
+    DataResetNarrowOptions:
+      type: object
+      required: [narrowable, regions, batches]
+      properties:
+        narrowable: {type: array, items: {$ref: '#/components/schemas/DataResetPartCode'}}
+        regions:
+          type: array
+          items: {type: object, required: [id, code, name_en], properties: {id: {type: integer}, code: {type: string}, name_en: {type: string}, name_ar: {type: [string, 'null']}}}
+        batches:
+          type: array
+          items:
+            type: object
+            required: [id, file_name, rows_total, status, created_at]
+            properties:
+              id: {type: string, format: uuid}
+              file_name: {type: string}
+              register_key: {type: [string, 'null']}
+              rows_total: {type: integer}
+              status: {type: string}
+              created_at: {type: string, format: date-time}
+              historical_load: {type: boolean}
     DataResetPlan:
       type: object
       required: [tables, delete_rows, keep_rows, files, parts, scope]
@@ -23307,6 +23364,7 @@ components:
         files: {type: integer, description: 'Stored files of the rows that would be deleted (moved, never deleted).'}
         error: {type: [string, 'null'], description: 'Why the plan cannot be counted (a table without a decision, a right missing); a run is then refused (409 `plan_incomplete`). The tables are empty while a run is open.'}
         parts: {type: array, items: {$ref: '#/components/schemas/DataResetPart'}, description: '0.15.71. The catalogue in screen order, with the rows of each part and whether the scope selects it.'}
+        narrow: {oneOf: [{$ref: '#/components/schemas/DataResetNarrow'}, {type: 'null'}], description: '0.15.265. The narrowing the counts are for.'}
     DataResetFiles:
       type: object
       required: [total, moved, missing, refused, pending, problems]
