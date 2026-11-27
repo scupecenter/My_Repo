@@ -310,6 +310,7 @@ export function RecordLinkSelect({ registerKey, field, siteId, value, onChange, 
   registerKey: string; field: string; siteId: string | null | undefined; value: unknown; onChange: (v: string | null) => void; editable: boolean; invalid?: boolean; targetLabel?: string;
 }) {
   const { t } = useTranslation();
+  const hint = t(`p4c.link_hint_${field}`, { defaultValue: '' });
   const q = useRegisterLinkOptions(registerKey, field, siteId, editable);
   const items = q.data ?? [];
   const cur = typeof value === 'string' ? value : '';
@@ -325,6 +326,7 @@ export function RecordLinkSelect({ registerKey, field, siteId, value, onChange, 
           </select>
         )
         : <div className="font-semibold" data-testid={`reg-view-${field}`}>{chosen ? chosen.label : cur ? cur.slice(0, 8) : '—'}</div>}
+      {hint !== '' && <p className="text-sm text-mute">{hint}</p>}
     </div>
   );
 }

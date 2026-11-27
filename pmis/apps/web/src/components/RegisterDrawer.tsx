@@ -25,7 +25,7 @@ import { RelatedRecords } from './RelatedRecords';
 import { SiteTaskField } from './SiteTaskField';
 import { SiteGateField } from './SiteGateField';
 import { useRegisterLinks } from '@/api/p4c';
-import { IssueRiskSelect, RiskIssues, DismantleOrderSelect, DismantleRnSelect, HlcPurchaseRequests, OrderReceipts, WarehouseOrderSelect, RecordLinkSelect, AdvanceSelect, SupplierSelect } from './P4cPanels';
+import { IssueRiskSelect, RiskIssues, DismantleOrderSelect, DismantleRnSelect, HlcPurchaseRequests, OrderReceipts, RecordLinkSelect, SupplierSelect } from './P4cPanels';
 import { useRecordSlots } from '@/api/documents';
 import { Holders } from './HolderChip';
 import { Balance, ExtendBooking, MembersEditor, ReadinessBadge, reservedMessage, TopUp, VehiclePicker } from './AssignmentPanels';
@@ -366,19 +366,9 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
                         ? <SiteTaskField id={`reg-field-${f.code}`} siteId={site?.id} value={data[f.code]} onChange={(v) => set(f.code, v)} disabled={!editable} invalid={!!show} />
                         : key === 'deliverables' && f.code === 'gate_code'
                         ? <SiteGateField id={`reg-field-${f.code}`} siteId={site?.id} value={data[f.code]} onChange={(v) => set(f.code, v)} disabled={!editable} invalid={!!show} />
-                        : (key === 'issues' || key === 'quality' || key === 'change_control') && f.code === 'procurement_order_id'
-                        ? <WarehouseOrderSelect registerKey={key} field="procurement_order_id" siteId={site?.id} value={data[f.code]} onChange={(v) => set(f.code, v)} editable={editable} invalid={!!show} />
-                        : (key === 'car_dispatcher' || key === 'financial_advances') && f.code === 'procurement_record_id'
-                        ? <WarehouseOrderSelect registerKey={key} field="procurement_record_id" siteId={key === 'financial_advances' ? site?.id : null} value={data[f.code]} onChange={(v) => set(f.code, v)} editable={editable} invalid={!!show} />
-                        : key === 'invoices' && f.code === 'procurement_record_id'
-                        ? <WarehouseOrderSelect registerKey="invoices" field="procurement_record_id" siteId={site?.id} value={data[f.code]} onChange={(v) => set(f.code, v)} editable={editable} invalid={!!show} />
                         : key === 'invoices' && f.code === 'supplier_party_id'
                         ? <SupplierSelect value={data[f.code]} onChange={(v) => set(f.code, v)} editable={editable} invalid={!!show} />
-                        : key === 'financial_advances' && f.code === 'advance_id'
-                        ? <AdvanceSelect siteId={site?.id} value={data[f.code]} onChange={(v) => set(f.code, v)} editable={editable} invalid={!!show} />
-                        : key === 'warehouse' && f.code === 'procurement_order_id'
-                        ? <WarehouseOrderSelect siteId={site?.id} value={data[f.code]} onChange={(v) => set(f.code, v)} editable={editable} invalid={!!show} />
-                        : declaredLinks?.some((l) => l.field === f.code)
+                        : key !== 'hlc' && declaredLinks?.some((l) => l.field === f.code)
                         ? <RecordLinkSelect registerKey={key} field={f.code} siteId={site?.id} value={data[f.code]} onChange={(v) => set(f.code, v)} editable={editable} invalid={!!show} targetLabel={declaredLinks.find((l) => l.field === f.code)?.target_register} />
                         : editable && !(key === 'dismantle' && f.code === 'closing_rn_ref' && data.closing_rn_id) ? <FieldInput field={f} value={data[f.code]} onChange={(v) => set(f.code, v)} invalid={!!show} ctx={ctx} />
                         : f.type === 'child_list' ? <FieldInput field={f} value={data[f.code]} onChange={() => undefined} disabled ctx={ctx} />

@@ -68,4 +68,25 @@ describe('register links (migration 0409)', () => {
     expect(ok.rows[0].id).toBeTruthy();
     await db.query('ROLLBACK');
   });
+
+  it('applies the data filters, the label tokens and the seeded picker rules (0410)', async () => {
+    await db.query('BEGIN');
+    await beginAs(db, adminId);
+    const site = await makeSite(db, REGION, { prefix: `${PREFIX}F`.toUpperCase() });
+    const adv = await db.query(`SELECT data_in, same_site FROM register_links WHERE register_key = 'financial_advances' AND field_code = 'advance_id'`);
+    expect(adv.rows[0].data_in).toEqual({ advance_state: ['disbursed', 'settlement_in_progress'] });
+    expect(adv.rows[0].same_site).toBe(true);
+    expect((await db.query(`SELECT register_link_filter_ok('{"s":"a"}'::jsonb, '{"s":["a","b"]}'::jsonb, NULL) AS ok`)).rows[0].ok).toBe(true);
+    expect((await db.query(`SELECT register_link_filter_ok('{"s":"c"}'::jsonb, '{"s":["a","b"]}'::jsonb, NULL) AS ok`)).rows[0].ok).toBe(false);
+    expect((await db.query(`SELECT register_link_filter_ok('{}'::jsonb, '{"s":["a"]}'::jsonb, NULL) AS ok`)).rows[0].ok).toBe(false);
+    expect((await db.query(`SELECT register_link_filter_ok('{"o":"Cancelled"}'::jsonb, NULL, '{"o":["cancel%"]}'::jsonb) AS ok`)).rows[0].ok).toBe(false);
+    expect((await db.query(`SELECT register_link_filter_ok('{"o":"Active"}'::jsonb, NULL, '{"o":["cancel%"]}'::jsonb) AS ok`)).rows[0].ok).toBe(true);
+    // the order picker: approved, not cancelled, of the site; the label is PO / WO No. (or PR No.)
+    await insert('procurement', site.id, 'approved', { po_wo_no: `${PREFIX}-PO1`, order_status: 'Active' });
+    await insert('procurement', site.id, 'approved', { pr_no: `${PREFIX}-PR2`, order_status: 'Cancelled' });
+    await insert('procurement', site.id, 'entry', { po_wo_no: `${PREFIX}-PO3` });
+    const opts = await db.query(`SELECT register_link_options('invoices', 'procurement_record_id', $1::uuid, $2) AS j`, [site.id, PREFIX]);
+    expect((opts.rows[0].j as { label: string }[]).map((o) => o.label)).toEqual([`${PREFIX}-PO1`]);
+    await db.query('ROLLBACK');
+  });
 });
