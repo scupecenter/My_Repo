@@ -56,9 +56,25 @@ export class P4cController {
     return this.p4c.warehouseOrderOptions(auth, q, 'quality');
   }
 
+  @Get('issues/risk-options')
+  issueRiskOptions(@Auth() auth: AuthContext) {
+    return this.p4c.issueRiskOptions(auth);
+  }
+
+  @Get('risks/:entity_id/issues')
+  riskIssues(@Auth() auth: AuthContext, @Param('entity_id') entityId: string) {
+    return this.p4c.riskIssues(auth, entityId);
+  }
+
   @Get('procurement/:entity_id/receipts')
   orderReceipts(@Auth() auth: AuthContext, @Param('entity_id') entityId: string) {
     return this.p4c.orderReceipts(auth, entityId);
+  }
+
+  /** 0324: the records linked to this record, in both directions. */
+  @Get(':register_key/:entity_id/related')
+  related(@Auth() auth: AuthContext, @Param('register_key') key: string, @Param('entity_id') entityId: string) {
+    return this.p4c.relatedRecords(auth, key, entityId);
   }
 
   @Post('hlc/legacy-migration')

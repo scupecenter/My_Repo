@@ -45,11 +45,32 @@ export const useWarehouseOrders = (siteId: string | null | undefined, enabled: b
     queryFn: () => api.get<{ items: S['WarehouseOrderOption'][] }>(`/registers/${key}/order-options`, { query: siteId ? { site_id: siteId } : {} }).then((r) => r.items),
   });
 
+/** GET /registers/issues/risk-options: the risks an Issue may name as realised (0322). */
+export const useIssueRisks = (enabled: boolean) =>
+  useQuery({
+    queryKey: ['issue-risks'], enabled,
+    queryFn: () => api.get<{ items: S['IssueRiskOption'][] }>('/registers/issues/risk-options').then((r) => r.items),
+  });
+
+/** GET /registers/risks/{entity_id}/issues: the issues that realise a risk (0322). */
+export const useRiskIssues = (entityId: string | null | undefined) =>
+  useQuery({
+    queryKey: ['risk-issues', entityId], enabled: !!entityId,
+    queryFn: () => api.get<{ items: S['RiskRealisedIssue'][] }>(`/registers/risks/${entityId}/issues`).then((r) => r.items),
+  });
+
 /** GET /registers/procurement/{entity_id}/receipts: the warehouse receipts against an order. */
 export const useOrderReceipts = (entityId: string | null | undefined) =>
   useQuery({
     queryKey: ['order-receipts', entityId], enabled: !!entityId,
     queryFn: () => api.get<{ items: S['ProcurementOrderReceipt'][] }>(`/registers/procurement/${entityId}/receipts`).then((r) => r.items),
+  });
+
+/** GET /registers/{key}/{entity_id}/related: the records linked to this record, both directions (0324). */
+export const useRelatedRecords = (key: string | null | undefined, entityId: string | null | undefined) =>
+  useQuery({
+    queryKey: ['related-records', key, entityId], enabled: !!key && !!entityId,
+    queryFn: () => api.get<{ groups: S['RelatedRecordGroup'][] }>(`/registers/${key}/${entityId}/related`).then((r) => r.groups),
   });
 
 /** POST /registers/hlc/legacy-migration: the preview (dry_run) or the run (reason; the server asks for a step-up). */
