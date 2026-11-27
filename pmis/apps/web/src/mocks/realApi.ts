@@ -502,6 +502,9 @@ export const REAL_API_AUTH_USERS = [
   // (warehouse, as-built items, My Work, dashboard extras and settings, documents grid, fleet actions, invitations, admin overrides).
   ['get', '/settings/dashboard'],
   ['put', '/settings/dashboard'],
+  ['get', '/settings/goals'],
+  ['put', '/settings/goals'],
+  ['get', '/goals/progress'],
   ['get', '/settings/pm-schedules'],
   ['put', '/settings/pm-schedules'],
   ['post', '/pm-schedules/:id/generate'],
