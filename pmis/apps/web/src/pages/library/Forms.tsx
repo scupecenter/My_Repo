@@ -129,7 +129,7 @@ export function LibraryForms() {
   const setParam = (kv: Record<string, string>) => setSp((p) => { const n = new URLSearchParams(p); for (const [k, v] of Object.entries(kv)) { if (v) n.set(k, v); else n.delete(k); } return n; }, { replace: true });
   return (
     <div data-testid="page-library-forms">
-      <PageHeader title={t('lib.forms_title')} subtitle={t('lib.forms_sub')} context={forms.data?.can_configure ? (
+      <PageHeader title={t('lib.forms_title')} subtitle={t('lib.forms_sub')} settings="library_forms" context={forms.data?.can_configure ? (
         <span className="ms-auto flex flex-wrap gap-1" data-testid="lib-settings-links">
           <Link className="btn px-2 py-1 text-xs" to="/library/templates">{t('lib.link_forms')}</Link>
           <Link className="btn px-2 py-1 text-xs" to="/admin/settings/documents/types">{t('lib.link_types')}</Link>
