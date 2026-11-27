@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { api, ApiError, downloadFile, type RequestOptions } from './client';
-import type { AlertRuleInput, AlertRuleSaved, AlertRulesResponse, IssueStoppedRowList, IssueTaskMapItem, IssueTaskMapList,
-  ActiveSession, ActOnBehalfRequest, DownloadLocks, Calendar, CalendarConfirmation, MailNotificationKinds, ImportsSettings, TemplateChangeNotice, ContractorPerformanceReport, ContractorPerformanceThresholds, ContractorPerformanceSettings, NavLayoutSetting, UiIdentity, UiBrand, LoginPage, SecurityLocks, SupportAccessSetting, Delegation, LoginPagePublic, SupportLink, NavLayoutT, ContractorRules, ContractorRulesInput, GecolHlcCounts, ContractorsCompletenessReport, TeamScopeMismatchReport, DeletedUser, PurgedUser, DlpSettings, DlpVersion, DlpVersionInput, Holiday, HolidayChangeResult, HolidayInput, HolidayPatch, HolidaySummary, IdleTaskAlertSetting, Job, LogIntegrity, LogRetention, LogRetentionInput, NewDeviceCodeSetting,
+import type { PasskeyItem, PasskeySetting, MyPasskeys, AlertRuleInput, AlertRuleSaved, AlertRulesResponse, IssueStoppedRowList, IssueTaskMapItem, IssueTaskMapList,
+  ActiveSession, ActOnBehalfRequest, DownloadLocks, Calendar, CalendarConfirmation, MailNotificationKinds, ImportsSettings, ContractorPerformanceReport, ContractorPerformanceThresholds, ContractorPerformanceSettings, NavLayoutSetting, UiIdentity, UiBrand, LoginPage, SecurityLocks, SupportAccessSetting, Delegation, LoginPagePublic, SupportLink, NavLayoutT, ContractorRules, ContractorRulesInput, GecolHlcCounts, ContractorsCompletenessReport, TeamScopeMismatchReport, DeletedUser, PurgedUser, DlpSettings, DlpVersion, DlpVersionInput, Holiday, HolidayChangeResult, HolidayInput, HolidayPatch, HolidaySummary, IdleTaskAlertSetting, Job, LogIntegrity, LogRetention, LogRetentionInput, NewDeviceCodeSetting,
   NotificationPolicy, NotificationPolicyInput, NotificationTypeDef, Page, ReassignmentAlert, SecurityLogEntry, SessionRevokeResult, SlaPublishPreview, SlaRuleSet, SlaRuleSetPublishResult, SlaRuleSetSummary, SlaTaskRule, StaffCard, StaffVisibility, StructuralFreeze,
   TaskDefinition, TeamScopeMatch, TeamScopeMatchInput, TransitionResultT, User, UserDetail, WeekendDaysResult, WeightSet, WeightSetCode, WeightSetInput, WeightSetPreview, WeightSetPublishResult, WorkflowVersion, WorkflowVersionSummary,
 } from './types';
@@ -163,6 +163,26 @@ export const useSetNewDeviceCode = () => {
 };
 export const useBypassNewDevice = () =>
   useMutation<{ until: string }, ApiError, { user_id: string; minutes?: number; reason: string }>({ mutationFn: (body) => api.post('/settings/new-device-code/bypass', { body }) });
+/** 0.15.194 (migration 0294): passkeys as an alternative second step (setting security.passkeys), the own passkeys, and the admin recovery. */
+export const usePasskeySetting = () => useQuery({ queryKey: ['passkey-setting'], queryFn: () => api.get<PasskeySetting>('/settings/passkeys') });
+export const useSetPasskeys = () => {
+  const qc = useQueryClient();
+  return useMutation<PasskeySetting, ApiError, { version: number; enabled: boolean; reason: string }>({
+    mutationFn: ({ version, ...body }) => api.put('/settings/passkeys', { version, body }), onSettled: () => refresh(qc, 'passkey-setting', 'my-passkeys'),
+  });
+};
+export const useMyPasskeys = () => useQuery({ queryKey: ['my-passkeys'], queryFn: () => api.get<MyPasskeys>('/me/passkeys') });
+export const usePasskeyRegisterOptions = () => useMutation<Record<string, unknown>, ApiError, void>({ gcTime: 0, mutationFn: () => api.post('/me/passkeys/register/options') });
+export const usePasskeyRegisterVerify = () => {
+  const qc = useQueryClient();
+  return useMutation<PasskeyItem, ApiError, { label: string; response: Record<string, unknown> }>({ mutationFn: (body) => api.post('/me/passkeys/register/verify', { body }), onSettled: () => refresh(qc, 'my-passkeys') });
+};
+export const useRemovePasskey = () => {
+  const qc = useQueryClient();
+  return useMutation<void, ApiError, string>({ mutationFn: (id) => api.del(`/me/passkeys/${id}`), onSettled: () => refresh(qc, 'my-passkeys') });
+};
+export const useAdminRevokePasskeys = (userId: string) =>
+  useMutation<{ revoked: number }, ApiError, { reason: string }>({ mutationFn: (body) => api.post(`/users/${userId}/passkeys/revoke`, { body }) });
 export const useImportsSettings = () => useQuery({ queryKey: ['imports-settings'], queryFn: () => api.get<ImportsSettings>('/settings/imports') });
 export const useSetImportsSettings = () => {
   const qc = useQueryClient();
@@ -493,6 +513,7 @@ export function usePublishWeights(id: string) {
 
 // 0.15.85: every task with its SLA status (Settings > SLA, "Tasks and their SLA") and the explicit "no SLA" choice
 import type { SlaTaskList } from './types';
+import type { TemplateChangeNotice } from './types';
 export const useSlaTasks = () => useQuery({ queryKey: ['slaTasks'], queryFn: () => api.get<SlaTaskList>('/settings/sla-tasks') });
 export const useSetSlaNoSla = () => {
   const qc = useQueryClient();

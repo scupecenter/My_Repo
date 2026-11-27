@@ -5,6 +5,7 @@ import { useFreeze, useLiftFreeze, useSetFreeze } from '@/api/settings';
 import { fieldErrors } from '@/lib/fields';
 import { errText, FormDialog } from './FormDialog';
 import { useToast } from './Toast';
+import { DateInput } from '@/components/DateInput';
 
 export const FREEZE_CONFIRM = 'structural-freeze';
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -58,8 +59,8 @@ export function FreezeCard({ compact, canLock = true }: { compact?: boolean; can
           onSubmit={(reason) => lock.mutate({ version: f.version, starts_on: from, ends_on: to, reason }, { onSuccess: () => { toast(t('settings.audited')); setDlg(null); } })}>
           <p className="text-sm text-mute">{t('wfe.lock.lock_hint')}</p>
           <div className="flex flex-wrap gap-3">
-            <label className="text-sm font-semibold">{t('wfe.lock.from')}<input type="date" className="input mt-1 font-normal" dir="ltr" data-testid="freeze-from" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
-            <label className="text-sm font-semibold">{t('wfe.lock.to')}<input type="date" className="input mt-1 font-normal" dir="ltr" data-testid="freeze-to" value={to} onChange={(e) => setTo(e.target.value)} /></label>
+            <label className="text-sm font-semibold">{t('wfe.lock.from')}<DateInput className="input mt-1 font-normal" dir="ltr" data-testid="freeze-from" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
+            <label className="text-sm font-semibold">{t('wfe.lock.to')}<DateInput className="input mt-1 font-normal" dir="ltr" data-testid="freeze-to" value={to} onChange={(e) => setTo(e.target.value)} /></label>
           </div>
           {lockErrs['/ends_on'] && <p role="alert" className="text-sm text-lateInk">{t('wfe.lock.window_invalid')}</p>}
         </FormDialog>

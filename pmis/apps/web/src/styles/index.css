@@ -127,6 +127,11 @@
   .auth-shell[data-anim='1'] .auth-enter{animation:auth-enter .5s cubic-bezier(.2,.7,.3,1) both}
   .auth-shell[data-anim='1'] .auth-enter-d1{animation-delay:.08s}
   .auth-shell[data-anim='1'] .auth-enter-d2{animation-delay:.16s}
+  /* The sign-in button is the main call to action (visual review 2026-11-27, item 9): a deeper shade of the design's accent (toward its own text-accent, so it
+     follows every design and both themes) and a disabled state that still reads as the primary button, not as an inactive one. */
+  .auth-card .btn-accent{background-color:color-mix(in srgb,var(--accent) 55%,var(--accentText));font-weight:700}
+  .auth-card .btn-accent:not(:disabled):hover{background-color:color-mix(in srgb,var(--accent) 42%,var(--accentText));opacity:1}
+  .auth-card .btn-accent:disabled{opacity:.85}
   .auth-shell[data-anim='1'] .auth-card .btn-accent{transition:transform .12s ease,opacity .12s ease}
   .auth-shell[data-anim='1'] .auth-card .btn-accent:not(:disabled):hover{transform:translateY(-1px)}
   .postlogin .postlogin-bar i{animation:postlogin-fill 2.4s cubic-bezier(.2,.6,.3,1) both}

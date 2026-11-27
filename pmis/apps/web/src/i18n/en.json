@@ -467,6 +467,8 @@
     "tab_priority": "Priority"
   },
   "common": {
+    "pick_date": "Pick a date from the calendar",
+    "date_hint": "Date as YYYY-MM-DD",
     "search": "Search",
     "cancel": "Cancel",
     "loading": "Loading…",
@@ -1234,6 +1236,7 @@
     "section_my-work_daily-plan": "Daily Plan",
     "section_documents_types": "Document types",
     "section_documents_forms": "Form templates",
+    "section_documents_search": "Search index",
     "section_documents_archive": "Archive",
     "section_documents_numbering": "Numbering",
     "section_data_counts": "GECOL / HLC counts",
@@ -1246,6 +1249,7 @@
     "section_screens_data-hub": "Data hub",
     "section_screens_goals": "Goals",
     "section_security_newdevice": "New-device code",
+    "section_security_passkeys": "Passkeys",
     "section_workflow_simulate": "Who approves?",
     "section_alerts_rules": "Alert rules"
   },
@@ -6325,6 +6329,8 @@
     "max": "Largest"
   },
   "tstd": {
+    "empty": "Nothing to show.",
+    "search_table": "Search this table",
     "count_all": "{{total}} {{noun}}",
     "count_of": "<b>{{filtered}}</b> of {{total}} {{noun}}",
     "count_of_plain": "{{filtered}} of {{total}} {{noun}}",
@@ -6749,6 +6755,18 @@
     "preview_missing": "No value for: {{list}}",
     "unknown": "Not a known path: {{list}}"
   },
+  "dsi": {
+    "title": "Document search index",
+    "note": "Global search finds words inside uploaded PDF and Word (DOCX) files, not only file names. The text is read in the background every few minutes from files that passed the virus scan, so a new upload becomes searchable shortly after. Old files are indexed the same way. Results respect your documents permission and regions. Images, spreadsheets and other formats are searched by name only.",
+    "indexed": "Indexed files",
+    "pending": "Waiting to be indexed",
+    "empty": "No text found",
+    "unsupported": "Name only (format not read)",
+    "too_large": "Too large (over 25 MB)",
+    "failed": "Could not be read (retried daily)",
+    "last": "Last indexed: {{at}}",
+    "never": "Nothing indexed yet."
+  },
   "as": {
     "title": "Archive",
     "note": "Which document cards Library > Archive shows and in what order, the default columns of its list and the most files a bulk zip may hold.",
@@ -6771,6 +6789,10 @@
     "options": "Options of this view"
   },
   "view": {
+    "site_list_hint": "The tasks as a table you can edit",
+    "site_timeline_hint": "The tasks as a row per stage, read only",
+    "mywork_list_hint": "Your work in three buckets",
+    "mywork_board_hint": "Your tasks by approval state",
     "title": "View",
     "list": "List",
     "list_hint": "One row per item, the usual table",
@@ -6900,6 +6922,10 @@
     "actual": "Actual"
   },
   "siteActivity": {
+    "c_entity": "Entity",
+    "c_action": "Action",
+    "c_actor": "Who",
+    "c_at": "When",
     "tab": "Activity",
     "empty": "No activity recorded for this site.",
     "system": "System",
@@ -7267,6 +7293,40 @@
     "remove": "Remove goal",
     "add": "Add goal",
     "save_title": "Save the goals"
+  },
+  "passkeys": {
+    "title": "Passkeys",
+    "note": "A passkey (fingerprint, face, screen lock or a security key) can replace the 6-digit code at the second step of the password sign-in. It adds nothing new to the sign-in: the code and the recovery codes keep working.",
+    "enable": "Let people use passkeys at the second step",
+    "enable_note": "Off by default. Only for accounts that already have two-step verification: nobody is forced to add one, and an account never ends up with a passkey only. Single Sign-On (Microsoft 365) accounts are not affected: their sign-in and second step belong to Microsoft.",
+    "not_ready": "The workspace web address (APP_BASE_URL, https) is not set on the server, so this cannot be turned on yet.",
+    "recovery_note": "Recovery: a System Admin can remove all passkeys of a person from the user page, and turning this off keeps the registered passkeys (they work again when it is turned back on). The code and the recovery codes work in every case.",
+    "save": "Save",
+    "updated": "Last changed by {{name}} on {{when}}.",
+    "readonly": "Only a System Admin can see and change the passkey setting.",
+    "confirm_set": "Passkeys will be {{state}}. This is recorded in the audit log.",
+    "on": "turned on",
+    "off_word": "turned off",
+    "mine_title": "Passkeys",
+    "mine_note": "Use a passkey instead of the 6-digit code when you sign in. Adding one asks you to confirm your password first. You can always use the code or a recovery code.",
+    "none": "You have no passkey yet.",
+    "added": "added {{when}}",
+    "last_used": "last used {{when}}",
+    "remove": "Remove",
+    "remove_note": "This passkey will stop working. Your code and recovery codes are not affected.",
+    "label": "Name for this passkey",
+    "label_ph": "For example: work laptop",
+    "add": "Add a passkey",
+    "failed": "The passkey could not be added.",
+    "not_ready_user": "Passkeys are not ready on this server yet. Ask a System Admin.",
+    "needs_two_factor": "Passkeys are an alternative to the code, so two-step verification must be on first.",
+    "unsupported": "This browser does not support passkeys.",
+    "use": "Use a passkey",
+    "signin_failed": "The passkey was not accepted. Use your code or a recovery code instead.",
+    "revoke": "Remove passkeys",
+    "revoke_title": "Remove all passkeys of {{name}}",
+    "revoke_note": "Every passkey of this person is removed (for example a lost device). Their code and recovery codes are not touched, so they can still sign in.",
+    "revoked": "Passkeys removed: {{count}}"
   },
   "newdevice": {
     "title": "New-device code",
