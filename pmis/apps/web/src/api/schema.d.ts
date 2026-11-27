@@ -4128,6 +4128,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/exports/schedules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The caller's scheduled Master exports (0.15.151)
+         * @description 0.15.151. Own schedules only, with the next due instant (project time zone) and whether one is due now.
+         */
+        get: operations["listExportSchedules"];
+        /**
+         * Create or change a scheduled Master export (0.15.151)
+         * @description 0.15.151. Without `id` a schedule is created (at most 5 each); with `id` one of the caller's own is replaced. `weekday` (0 Sunday to 6) for weekly, `day_of_month` (1 to 28) for monthly. `spec.parts` empty or absent means the whole Master. Whether the caller may export the parts is checked when the export starts, not when it is saved.
+         */
+        put: operations["saveExportSchedule"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/exports/schedules/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete a scheduled Master export (0.15.151)
+         * @description 0.15.151. One of the caller's own schedules; the exports it already made stay.
+         */
+        delete: operations["deleteExportSchedule"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/exports/master": {
         parameters: {
             query?: never;
@@ -10734,6 +10778,45 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        ExportScheduleInput: {
+            /** Format: uuid */
+            id?: string;
+            name: string;
+            /** @enum {string} */
+            cadence: "daily" | "weekly" | "monthly";
+            weekday?: number;
+            day_of_month?: number;
+            spec?: {
+                parts?: string[];
+                regions?: number[];
+            };
+            enabled?: boolean;
+        };
+        ExportSchedule: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** @enum {string} */
+            cadence: "daily" | "weekly" | "monthly";
+            weekday?: number;
+            day_of_month?: number;
+            spec: {
+                parts?: string[];
+                regions?: number[];
+            };
+            enabled: boolean;
+            created_at: string;
+            last_started_at?: string | null;
+            /** Format: uuid */
+            last_job_id?: string | null;
+            last_error?: string | null;
+            /** Format: date-time */
+            next_due_at: string;
+            due: boolean;
+        };
+        ExportScheduleList: {
+            items: components["schemas"]["ExportSchedule"][];
+        };
         MySession: {
             /** Format: uuid */
             session_id: string;
@@ -28074,6 +28157,78 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             422: components["responses"]["Unprocessable"];
+        };
+    };
+    listExportSchedules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The schedules. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportScheduleList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    saveExportSchedule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExportScheduleInput"];
+            };
+        };
+        responses: {
+            /** @description The caller's schedules after the change. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportScheduleList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    deleteExportSchedule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The caller's schedules after the change. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportScheduleList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
         };
     };
     listMasterExports: {

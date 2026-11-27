@@ -571,6 +571,9 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/exports/master'],
   ['get', '/exports/master'],
   ['get', '/exports/master/:id/download'],
+  ['get', '/exports/schedules'],
+  ['put', '/exports/schedules'],
+  ['delete', '/exports/schedules/:id'],
   // Contract 0.15.61 (migration 0145; apps/api: settings, calendar): DLP versions, the idle-task alert, the notification policy and its catalogue, and the
   // holidays import (TPL-HOLIDAYS). They answered 501 not_available until the API served them.
   ['get', '/settings/dlp'],
