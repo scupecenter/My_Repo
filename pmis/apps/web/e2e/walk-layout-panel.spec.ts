@@ -43,15 +43,16 @@ test('layout panel walk: Sites master, EN and AR, list and board', async ({ page
   await page.screenshot({ path: 'test-results/walk-layout-sites-board-ar.png' });
 });
 
-test('layout panel walk: display-only panels on My Work, Approvals, Daily Plan and Library Archive', async ({ page }) => {
+test('layout panel walk: the unified panel on My Work, and the display-only panels on Approvals, Daily Plan and Library Archive', async ({ page }) => {
   await signIn(page);
 
   // My Work: the display options moved into the panel; its list/board switcher stays until V7.
   await page.goto('/my-work');
-  await expect(page.getByTestId('my-work-display')).toBeVisible({ timeout: 20000 });
-  await page.getByTestId('my-work-display').click();
-  await expect(page.getByTestId('my-work-display-display')).toBeVisible();
-  await expect(page.getByTestId('my-work-display-views')).toHaveCount(0);
+  await expect(page.getByTestId('my-work-view')).toBeVisible({ timeout: 20000 });
+  await page.getByTestId('my-work-view').click();
+  await expect(page.getByTestId('my-work-view-display')).toBeVisible();
+  await expect(page.getByTestId('my-work-view-views')).toBeVisible();
+  await expect(page.getByTestId('my-work-display')).toHaveCount(0);
   await page.screenshot({ path: 'test-results/walk-layout-my-work-en.png' });
   await page.keyboard.press('Escape');
 
@@ -83,8 +84,8 @@ test('layout panel walk: display-only panels on My Work, Approvals, Daily Plan a
   await page.getByTestId('topbar-lang').click();
   await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
   await page.goto('/my-work');
-  await page.getByTestId('my-work-display').click();
-  await expect(page.getByTestId('my-work-display-display')).toBeVisible();
+  await page.getByTestId('my-work-view').click();
+  await expect(page.getByTestId('my-work-view-display')).toBeVisible();
   await page.screenshot({ path: 'test-results/walk-layout-my-work-ar.png' });
 });
 
