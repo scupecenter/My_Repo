@@ -129,7 +129,7 @@ export function DataReset() {
           <p className="font-semibold" data-testid="dr-request-status">{t(`dr.status_${req.status}`)}</p>
           <ScopeView r={req} catalogue={catalogue} />
           <BackupView r={req} hours={s.settings.backup_max_age_hours} />
-          <ArchivePanel r={req} canMake={s.can.start && req.status === 'approved'} making={makeArchive.isPending} error={makeArchive.isError ? errText(makeArchive.error, t) : null}
+          <ArchivePanel r={req} canMake={!!s.can.start && req.status === 'approved'} making={makeArchive.isPending} error={makeArchive.isError ? errText(makeArchive.error, t) : null}
             onMake={() => { makeArchive.reset(); makeArchive.mutate({ id: req.id }); }} when={when} />
           <dl className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 text-sm">
             <dt>{t('dr.requested_by')}</dt><dd data-testid="dr-requested-by">{req.requested_by.display_name} · {when(req.requested_at)}</dd>
