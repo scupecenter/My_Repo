@@ -359,6 +359,12 @@ const importsView = () => {
   const c = IM();
   return { async_rows: c.async_rows, default_async_rows: 50, min: 10, max: 500, updated_at: c.updated_at, updated_by: c.updated_by ? ref(c.updated_by) : null, version: c.version, can_edit: isAdmin() };
 };
+/** D49 part 3 (0.15.322): imports.upload_policy. */
+const policyView = () => {
+  const c = IM();
+  return { policy: c.upload_policy ?? 'enforce', default_policy: 'enforce', policies: ['enforce', 'accept_incomplete'], updated_at: c.policy_updated_at ?? null,
+    updated_by: c.policy_updated_by ? ref(c.policy_updated_by) : null, version: c.policy_version ?? 1, can_edit: isAdmin() };
+};
 const confirmation = () => {
   const c = CC(), h = C().holidays, y = Number(TODAY.slice(0, 4));
   const blockers = [y, y + 1].flatMap((yr): { code: 'no_holidays' | 'tentative_remaining'; year: number; count: number }[] => {
@@ -429,6 +435,7 @@ const DASH_CATALOGUE = {
     { code: 'regions', label_en: 'Regions', label_ar: 'المناطق' },
     { code: 'region_health', label_en: 'Region health', label_ar: 'صحة المناطق' },
     { code: 'ops_procurement', label_en: 'Procurement and materials', label_ar: 'المشتريات والمواد' },
+    { code: 'pinned_views', label_en: 'Pinned views', label_ar: 'العروض المثبتة' },
     { code: 'ops_scurve', label_en: 'Progress curve: planned vs actual, velocity and forecast', label_ar: 'منحنى التقدم: المخطط مقابل الفعلي والسرعة والتوقع' },
     { code: 'ops_permits_hse', label_en: 'Permits and HSE: status, validity, stop-work and PTW checks', label_ar: 'التصاريح والسلامة: الحالة والصلاحية وإيقاف العمل وفحوصات تصاريح العمل' },
     { code: 'ops_gecol_hlc', label_en: 'Power and fiber readiness: GECOL and HLC waiting sites by age', label_ar: 'جاهزية الكهرباء والألياف: مواقع GECOL وHLC المنتظرة حسب العمر' },
@@ -667,6 +674,23 @@ export const settingsHandlers = [
     if (IM().async_rows === b.async_rows) return problem(409, 'invalid_transition', `The threshold is already ${String(b.async_rows)} rows.`);
     Object.assign(IM(), { async_rows: b.async_rows as number, version: IM().version + 1, updated_at: new Date().toISOString(), updated_by: viewer()!.employee_id! }); save();
     const j = importsView();
+    return HttpResponse.json(j, tag(j.version));
+  }),
+
+  // ------------------------------------------------------------------ 0.15.322: the upload policy of the imports (D49 part 3)
+  http.get(`${B}/settings/imports/upload-policy`, () => { const g = guard(); if (g) return g; const j = policyView(); return HttpResponse.json(j, tag(j.version)); }),
+  http.put(`${B}/settings/imports/upload-policy`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, policyView().version); if (p) return p;
+    const b = await body<{ policy?: unknown; reason?: string } & Record<string, unknown>>(request);
+    const errs: { path: string; code: string }[] = Object.keys(b).filter((k) => !['policy', 'reason'].includes(k)).map((k) => ({ path: `/${k}`, code: 'unknown_field' }));
+    if ((b.reason ?? '').trim().length < 3 || (b.reason ?? '').length > 1000) errs.push({ path: '/reason', code: 'required' });
+    if (b.policy !== 'enforce' && b.policy !== 'accept_incomplete') errs.push({ path: '/policy', code: 'invalid' });
+    if (errs.length) return fields(...errs);
+    if (policyView().policy === b.policy) return problem(409, 'invalid_transition', `The upload policy is already ${String(b.policy)}.`);
+    Object.assign(IM(), { upload_policy: b.policy as 'enforce' | 'accept_incomplete', policy_version: (IM().policy_version ?? 1) + 1, policy_updated_at: new Date().toISOString(), policy_updated_by: viewer()!.employee_id! }); save();
+    const j = policyView();
     return HttpResponse.json(j, tag(j.version));
   }),
 
@@ -1391,6 +1415,10 @@ export const settingsHandlers = [
         for (const k of Object.keys(o)) if (!['mode', 'width', 'show_tabs'].includes(k)) errs.push({ path: `${path}/${k}`, code: 'unknown_key' });
         oneOf(o, path, 'mode', ['popover', 'side_panel']); oneOf(o, path, 'width', ['narrow', 'medium', 'wide']);
         if (typeof o.show_tabs !== 'boolean') errs.push({ path: `${path}/show_tabs`, code: 'invalid' });
+      } else if (name === 'unsaved_guard') {
+        const keys = ['enabled', 'settings', 'dialogs', 'drawers', 'inline', 'composers', 'navigation'];
+        for (const k of Object.keys(o)) if (!keys.includes(k)) errs.push({ path: `${path}/${k}`, code: 'unknown_key' });
+        for (const k of keys) if (typeof o[k] !== 'boolean') errs.push({ path: `${path}/${k}`, code: o[k] === undefined ? 'required' : 'invalid' });
       } else if (name === 'data_hub') {
         for (const k of Object.keys(o)) if (!['widgets', 'badge', 'default_view'].includes(k)) errs.push({ path: `${path}/${k}`, code: 'unknown_key' });
         if (typeof o.badge !== 'boolean') errs.push({ path: `${path}/badge`, code: 'invalid' });

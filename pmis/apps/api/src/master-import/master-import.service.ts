@@ -15,6 +15,7 @@ import { oneParam } from '../common/query';
 import { parse, uuidSchema } from '../common/zod';
 import { DbService } from '../db/db.service';
 import { StorageService, newObjectKey } from '../documents/storage.service';
+import { SiteLocksService } from '../sites/site-locks.service';
 import { TaskViewService } from '../workflow/task-view.service';
 import { ImportJobsService } from '../templates/import-jobs.service';
 import { UPLOAD_ASYNC_FACTOR } from '../templates/import.service';
@@ -88,7 +89,14 @@ export class MasterImportService {
     private readonly storage: StorageService,
     private readonly view: TaskViewService,
     private readonly jobs: ImportJobsService,
+    private readonly locks: SiteLocksService,
   ) {}
+
+  /** The upload policy in force (imports.upload_policy, migration 0492): enforce or accept_incomplete; anything else reads as enforce. */
+  private async uploadPolicy(): Promise<'enforce' | 'accept_incomplete'> {
+    const r = await this.db.tx.$queryRaw<{ p: string }[]>(Prisma.sql`SELECT imports_upload_policy_json() ->> 'policy' AS p`);
+    return r[0]?.p === 'accept_incomplete' ? 'accept_incomplete' : 'enforce';
+  }
 
   private async canUse(): Promise<boolean> {
     const r = await this.db.tx.$queryRaw<{ ok: boolean }[]>(Prisma.sql`SELECT mi_can_use() AS ok`);
@@ -381,6 +389,12 @@ export class MasterImportService {
       const offer = await this.createSitesOffer();
       if (!offer.allowed) throw problems.forbidden('action_forbidden', offer.reason ?? 'You may not create sites from the Master.');
       await this.stepUp.require(auth);
+    }
+    // D49 part 3 (0492): the upload policy of Settings > Data > Imports. enforce (default) changes nothing. accept_incomplete opens the sites of the file first,
+    // through the switch of the screens (unlock right of each region, reason, step-up, audit per site), so the data enters in any order and an approval that bypasses
+    // a lock is flagged. The historical load opens its sites itself. The sites a create_sites apply creates are not in the file yet and keep their locks.
+    if (!body.historical_load && (await this.uploadPolicy()) === 'accept_incomplete') {
+      await this.locks.openRunSites(auth, id, `Upload policy accept incomplete, Master import run ${id}: ${body.reason}`.slice(0, 2000));
     }
     const stepOk = Boolean(await this.stepUp.validUntil(auth));
     const hl = body.historical_load;

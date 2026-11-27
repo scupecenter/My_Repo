@@ -66,8 +66,8 @@ BEGIN
   END IF;
   src := pg_get_functiondef('public.ui_features_validate(jsonb)'::regprocedure);
   IF position('finance_hub' IN src) = 0 THEN
-    IF position(E'\n  RETURN errs;' IN src) = 0 OR position('''data_hub'')' IN src) = 0 THEN RAISE EXCEPTION 'ui_features_validate() has no spot to patch'; END IF;
-    src := replace(src, '''data_hub'')', '''data_hub'', ''finance_hub'')');
+    IF position(E'\n  RETURN errs;' IN src) = 0 OR src !~ '''data_hub''(, ''[a-z_]+'')*\)' THEN RAISE EXCEPTION 'ui_features_validate() has no spot to patch'; END IF;
+    src := regexp_replace(src, '''data_hub''((, ''[a-z_]+'')*)\)', '''data_hub''\1, ''finance_hub'')');
     EXECUTE replace(src, E'\n  RETURN errs;', E'\n' || blk || '  RETURN errs;');
   END IF;
 END $$;
