@@ -1,3 +1,4 @@
+import { UnsavedGuard } from '@/lib/unsavedGuard';
 import { Gauge } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -73,6 +74,10 @@ export function OpsLimits() {
       <p className="text-xs text-mute" data-testid="oplimits-updated">
         {cur.updated_by && cur.updated_at ? t('oplimits.updated', { name: cur.updated_by.display_name, when: fmtDateTime(cur.updated_at, ar ? 'ar' : 'en') }) : t('oplimits.never')}
       </p>
+      {!ro && (
+        <UnsavedGuard scope="settings" dirty={dirty && !invalid} needsReason label={t('ui.guard_settings')}
+          onSave={(reason) => new Promise<boolean>((res) => set.mutate({ version: cur.version, values: values(), reason }, { onSuccess: () => { setDraft({}); res(true); }, onError: () => res(false) }))} />
+      )}
       {ro
         ? <p className="text-sm text-mute" data-testid="oplimits-readonly">{t('oplimits.readonly')}</p>
         : (
