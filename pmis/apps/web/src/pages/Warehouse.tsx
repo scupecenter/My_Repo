@@ -8,7 +8,7 @@ import { useRegisterRecord, useUpdateRecord } from '@/api/registers';
 import { useRegions } from '@/api/sites';
 import type { StockLevel, StockMovement, WarehouseItem } from '@/api/types';
 import { useItemColumns, type ItemColumn } from '@/api/warehouseColumns';
-import { useConfigGaps, useDeleteItem, useDispatchList, useMovements, useQuarantineExit, useReverseMovement, useSaveItem, useStock, useWhItems, type QuarantineExitBody } from '@/api/warehouse';
+import { useConfigGaps, useRegionVendors, useSaveRegionVendor, type RegionVendor, useDeleteItem, useDispatchList, useMovements, useQuarantineExit, useReverseMovement, useSaveItem, useStock, useWhItems, type QuarantineExitBody } from '@/api/warehouse';
 import { NEED_TONE } from '@/components/SiteDispatch';
 import { errText, FormDialog } from '@/components/FormDialog';
 import { InlinePanel } from '@/components/InlinePanel';
@@ -404,11 +404,48 @@ function GapBox({ k, rows }: { k: string; rows: string[] }) {
   );
 }
 
+/** D58: the WL vendor of each region (Cambium or Intracom), set here by the System Admin or a delegate: the server decides who may (admin right on the item master), with a reason, version and audit. */
+function RegionVendors({ rn }: { rn: (id: number) => string }) {
+  const { t } = useTranslation();
+  const q = useRegionVendors();
+  const save = useSaveRegionVendor();
+  const [edit, setEdit] = useState<RegionVendor | null>(null);
+  const [v, setV] = useState('');
+  const rows = q.data?.items ?? [];
+  const missing = rows.filter((r) => !r.wl_vendor).length;
+  return (
+    <section className="card p-3 md:col-span-2" data-testid="wh-gaps-vendor">
+      <h2 className="mb-2 font-semibold">{t('wh.gaps_vendor')} <span className="text-mute">({missing})</span></h2>
+      <table className="w-full text-sm"><tbody>
+        {rows.map((r) => (
+          <tr key={r.region_id} className="border-b border-line last:border-0" data-testid={`wh-vendor-row-${r.region_id}`}>
+            <td className="px-2 py-1">{rn(r.region_id)}</td>
+            <td className="px-2 py-1">{r.wl_vendor ?? <span className="text-mute">{t('wh.vendor_unset')}</span>}</td>
+            <td className="px-2 py-1 text-end"><button className="btn" data-testid={`wh-vendor-edit-${r.region_id}`} onClick={() => { setEdit(r); setV(r.wl_vendor ?? ''); }}>{t('common.edit')}</button></td>
+          </tr>
+        ))}
+      </tbody></table>
+      {edit && (
+        <div className="mt-3">
+          <InlinePanel testid="wh-vendor-panel" title={t('wh.vendor_edit', { region: rn(edit.region_id) })} onClose={() => setEdit(null)} busy={save.isPending}
+            error={save.isError ? registerErrorMessage(t, save.error) : null}
+            onSubmit={(reason) => save.mutate({ region_id: edit.region_id, version: edit.version, wl_vendor: v === '' ? null : (v as 'Cambium' | 'Intracom'), reason }, { onSuccess: () => setEdit(null) })}>
+            <select className="input w-auto" aria-label={t('wh.vendor_pick')} data-testid="wh-vendor-select" value={v} onChange={(e) => setV(e.target.value)}>
+              <option value="">{t('wh.vendor_unset')}</option><option value="Cambium">Cambium</option><option value="Intracom">Intracom</option>
+            </select>
+          </InlinePanel>
+        </div>
+      )}
+    </section>
+  );
+}
+
 /** Q107: the owner data that is still missing (need quantities, manufacturer codes, region WL vendor, numbering of the other regions). */
 function Gaps() {
   const { t, i18n } = useTranslation();
   const q = useConfigGaps();
   const regs = useRegions().data ?? [];
+  const admin = isAdmin(useMe(true).data);
   if (q.isLoading) return <p className="text-mute">{t('common.loading')}</p>;
   if (q.isError || !q.data) return <p role="alert" className="text-lateInk">{t('errors.generic')}</p>;
   const g = q.data;
@@ -417,7 +454,7 @@ function Gaps() {
     <div className="grid gap-3 md:grid-cols-2" data-testid="wh-gaps">
       <GapBox k="pending" rows={g.pending_need_rules.map((r) => `${r.item_code} · ${r.need_unit}`)} />
       <GapBox k="codes" rows={g.provisional_codes.map((r) => `${r.item_code} · ${r.item_name}`)} />
-      <GapBox k="vendor" rows={g.regions_without_wl_vendor.map(rn)} />
+      {admin ? <RegionVendors rn={rn} /> : <GapBox k="vendor" rows={g.regions_without_wl_vendor.map(rn)} />}
       <GapBox k="sequence" rows={g.regions_without_sequence.map((r) => `${rn(r.region_id ?? 0)}: ${(r.record_types ?? []).map((x) => x.toUpperCase()).join(', ')}`)} />
     </div>
   );
