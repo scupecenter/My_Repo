@@ -4,6 +4,8 @@
  * The effective set comes from the server (GET /me user.appearance: own choices, else the organization defaults); the last seen set is cached
  * so a reload does not flash. Independent of the UI design (brand) and of the light/dark theme.
  */
+import { currentMotion } from './motion';
+
 export const APPEARANCE_OPTIONS = {
   density: ['comfortable', 'standard', 'compact'],
   font_scale: ['small', 'standard', 'large'],
