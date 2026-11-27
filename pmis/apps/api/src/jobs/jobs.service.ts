@@ -3,6 +3,7 @@ import { SyslogService } from '../auth/syslog.service';
 import { APP_CONFIG, AppConfig } from '../config/config';
 import { DbService } from '../db/db.service';
 import { JobRunsService } from '../logs/job-runs.service';
+import { DashboardExtrasService } from '../dashboard/dashboard-extras.service';
 
 export const JOB_HOUR = 2;
 export const JOB_TIME_ZONE = 'Africa/Tripoli';
@@ -78,6 +79,7 @@ export class JobsService implements OnApplicationBootstrap, OnModuleDestroy {
     private readonly syslog: SyslogService,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
     private readonly runs: JobRunsService,
+    private readonly dash: DashboardExtrasService,
   ) {}
 
   get enabled(): boolean {
@@ -239,7 +241,13 @@ export class JobsService implements OnApplicationBootstrap, OnModuleDestroy {
   /** 0342: the generic alert rules, in-app notifications only; alert_rules_run finds the targets of the day and writes one notification per
    * recipient per rule per period and target (deduped), so a second run the same day adds nothing. A failure is logged and leaves the other steps alone. */
   private async alertRules(): Promise<number> {
-    const n = await this.runs.run('alert_rules', async (tx) => Number((await tx.$queryRaw<{ n: number }[]>`SELECT alert_rules_run() AS n`)[0]?.n ?? 0));
+    const n = await this.runs.run('alert_rules', async (tx) => {
+      const base = Number((await tx.$queryRaw<{ n: number }[]>`SELECT alert_rules_run() AS n`)[0]?.n ?? 0);
+      // 0348: the kpi_threshold rules compare the live system-wide KPI values with each rule's own editable threshold.
+      const values = await this.dash.kpiValuesForJob();
+      const kpi = Number((await tx.$queryRaw<{ n: number }[]>`SELECT alert_rules_kpi_run(${JSON.stringify(values)}::jsonb) AS n`)[0]?.n ?? 0);
+      return base + kpi;
+    });
     if (n === null) {
       this.log.warn('alert rules failed');
       await this.syslog.write('error', 'alert rules failed', {});
