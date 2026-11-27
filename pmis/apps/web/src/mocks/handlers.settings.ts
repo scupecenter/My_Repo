@@ -1444,6 +1444,18 @@ export const settingsHandlers = [
         if (typeof o.attribution !== 'string' || o.attribution.length > 200) errs.push({ path: `${path}/attribution`, code: 'invalid' });
         if (typeof o.center_lat !== 'number' || o.center_lat < -85 || o.center_lat > 85) errs.push({ path: `${path}/center_lat`, code: 'invalid' });
         if (typeof o.center_lon !== 'number' || o.center_lon < -180 || o.center_lon > 180) errs.push({ path: `${path}/center_lon`, code: 'invalid' });
+      } else if (name === 'finance_hub') {
+        for (const k of Object.keys(o)) if (!['widgets', 'settle_warn_days', 'aging_days'].includes(k)) errs.push({ path: `${path}/${k}`, code: 'unknown_key' });
+        const w = o.widgets as Record<string, unknown> | undefined;
+        if (!w || typeof w !== 'object') errs.push({ path: `${path}/widgets`, code: 'invalid' });
+        else for (const k of Object.keys(w)) {
+          if (!['advances', 'invoices', 'quick_links', 'templates'].includes(k)) errs.push({ path: `${path}/widgets/${k}`, code: 'unknown_key' });
+          else if (typeof w[k] !== 'boolean') errs.push({ path: `${path}/widgets/${k}`, code: 'invalid' });
+        }
+        if (!Number.isInteger(o.settle_warn_days)) errs.push({ path: `${path}/settle_warn_days`, code: 'invalid' });
+        else if ((o.settle_warn_days as number) < 1 || (o.settle_warn_days as number) > 365) errs.push({ path: `${path}/settle_warn_days`, code: 'out_of_range' });
+        const a = o.aging_days;
+        if (!Array.isArray(a) || a.length !== 2 || !a.every((x) => Number.isInteger(x) && x >= 1 && x <= 365) || (a[0] as number) >= (a[1] as number)) errs.push({ path: `${path}/aging_days`, code: 'invalid' });
       } else errs.push({ path, code: 'unknown_key' });
     }
     if ((b.reason ?? '').trim().length < 3) errs.push({ path: '/reason', code: 'required' });
