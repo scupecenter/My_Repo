@@ -55,7 +55,7 @@ import {
 } from "@/components/GridColumnAdmin";
 import { HlcLegacyDialog } from "@/components/P4cPanels";
 import { fieldLabel, showValue } from "@/components/RegisterFields";
-import { RegisterDrawer, STATE_TONE } from "@/components/RegisterDrawer";
+import { RegisterDrawer, STATE_TONE, TRIAGE_TONE } from "@/components/RegisterDrawer";
 import {
   ALL_CAP,
   BY_STATE,
@@ -101,7 +101,7 @@ import {
 import { registerErrorMessage } from "@/lib/registerErrors";
 import { isLive, OWNER_NOTE } from "@/lib/registerForms";
 
-const RF_KEYS = ["q", "region_id", "state", "record_type"] as const;
+const RF_KEYS = ["q", "region_id", "state", "record_type", "triage"] as const;
 // W2: a saved view also keeps the layout (list, wide, board, map) and the board's grouping and swimlane, as #185 does for Site Master
 const LAYOUT_KEYS = ["layout", "board_by", "lane"] as const;
 type RegisterView = RecordFilters & {
@@ -154,6 +154,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
     region_id: sp.get("region_id") ?? "",
     state: sp.get("state") ?? "",
     record_type: sp.get("record_type") ?? "",
+    triage: sp.get("triage") ?? "",
   };
   // F3 (0.15.31): the AND/OR filter tree lives in the URL as JSON (adv) and goes to the server as `filter`, which compiles it
   const adv = sp.get("adv") ?? "";
@@ -233,6 +234,9 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
   const filterExtras: ExtraField[] = [
     { key: "region_id", label: t("sites.all_regions"), kind: "text", hidden: true, value: f.region_id, set: set("region_id"), chip: `${t("sites.region")}: ${f.region_id ? regionName(f.region_id) : ""}` },
     { key: "state", label: t("registers.all_states"), kind: "text", hidden: true, value: f.state, set: set("state"), chip: `${t("registers.state")}: ${f.state ? t(`regState.${f.state}`) : ""}` },
+    ...(def.triage_enabled
+      ? [{ key: "triage", label: t("registers.triage_all"), group: "fields", kind: "enum" as const, options: ["pending", "accepted", "deferred", "rejected", "merged"].map((x) => ({ value: x, label: t(`triageState.${x}`) })), value: f.triage ?? "", set: set("triage") }]
+      : []),
     ...(def.record_types?.length && !tabDefs.length
       ? [{ key: "record_type", label: t("registers.record_type"), group: "fields", kind: "enum" as const, options: def.record_types.map((x) => ({ value: x, label: x.toUpperCase() })), value: f.record_type, set: set("record_type") }]
       : []),
@@ -502,13 +506,24 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
         );
       case "state":
         return (
-          <StatusChip
-            tone={STATE_TONE[r.state]}
-            testid={`reg-state-${r.id}`}
-            text={t(`regState.${r.state}`)}
-          >
-            {t(`regState.${r.state}`)}
-          </StatusChip>
+          <>
+            <StatusChip
+              tone={STATE_TONE[r.state]}
+              testid={`reg-state-${r.id}`}
+              text={t(`regState.${r.state}`)}
+            >
+              {t(`regState.${r.state}`)}
+            </StatusChip>
+            {r.triage && (r.triage.state === "pending" || r.triage.state === "deferred") && (
+              <StatusChip
+                tone={TRIAGE_TONE[r.triage.state]}
+                testid={`reg-triage-${r.id}`}
+                text={t(`triageState.${r.triage.state}`)}
+              >
+                {t(`triageState.${r.triage.state}`)}
+              </StatusChip>
+            )}
+          </>
         );
       default:
         return r.ball_in_court &&
@@ -736,6 +751,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
         }
         more={
             <MoreMenu
+              settings={key === 'gecol' ? 'register_gecol' : key === 'issues' ? 'register_issues' : key === 'contractors' ? 'register_contractors' : 'register'}
               items={[
                 ...(key === "as_built"
                   ? [

@@ -153,3 +153,22 @@ describe('Q151: the GECOL order warnings (Settings)', () => {
     expect(await errCode(api.put('/settings/gecol-order-warnings', { version: 2, body: { reason: 'bad', enabled: true, chains: [['request_date', 'meter_no']], billing_after: null } }))).toBe('422:validation_failed');
   });
 });
+
+describe('Derived values between registers (Settings, 0.15.260)', () => {
+  it('shows the seeded GECOL and HLC rules, saves a new rule with a reason and refuses a rule that reads its own register', async () => {
+    await signIn('pm');
+    renderApp(<Routes><Route path="/admin/settings/*" element={<SettingsRoutes />} /></Routes>, { route: '/admin/settings/registers/derive' });
+    const u = userEvent.setup();
+    expect(await screen.findByTestId('derive-rule-1')).toBeInTheDocument();
+    expect((screen.getByTestId('derive-target-0') as HTMLSelectElement).value).toBe('gecol');
+    expect((screen.getByTestId('derive-link-1') as HTMLSelectElement).value).toBe('procurement_record_id');
+    await u.click(screen.getByTestId('derive-add'));
+    expect(screen.getByTestId('derive-rule-2')).toBeInTheDocument();
+    await u.click(screen.getByTestId('derive-save'));
+    await u.type(await screen.findByTestId('derive-dialog-reason'), 'third rule for the test');
+    await u.click(screen.getByTestId('derive-dialog-submit'));
+    await waitFor(async () => expect((await api.get<{ rules: unknown[] }>('/settings/derive-rules')).rules).toHaveLength(3));
+    expect(await errCode(api.put('/settings/derive-rules', { version: 1, body: { reason: 'stale', rules: [] } }))).toBe('412:precondition_failed');
+    expect(await errCode(api.put('/settings/derive-rules', { version: 2, body: { reason: 'bad', rules: [{ key: 'x', enabled: true, target_register: 'gecol', output: 'o', source_register: 'gecol', source: 'external_party', link_field: null }] } }))).toBe('422:validation_failed');
+  });
+});

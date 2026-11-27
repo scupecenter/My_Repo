@@ -36,6 +36,7 @@ export class LibraryMenuController {
     return this.lib.generate(id, body);
   }
 
+  @ExportAction({ category: 'generated_documents', exceptQuery: { name: 'purpose', values: ['view'] } })
   @Get('library/generated/:id/download')
   async download(@Param('id') id: string, @Query('purpose') purpose: string | undefined, @Res({ passthrough: true }) res: Response) {
     const r = await this.lib.download(id, purpose);

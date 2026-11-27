@@ -99,7 +99,7 @@ export function SavedViews<F>({ screen, value, onApply, empty, table, sort, onSo
 }
 
 /**
- * Saved views as tabs (item 3, Monday and ClickUp style): the default view first, then my views, then the views shared with me. Arrow keys, Home and End move
+ * Saved views as tabs (item 3, tabbed view switcher): the default view first, then my views, then the views shared with me. Arrow keys, Home and End move
  * between tabs (the direction follows the page, so RTL mirrors). On a narrow screen the select above shows instead, so nothing is lost. A shared view
  * shows its owner in the tooltip. Same state as the select: choosing a tab applies the view.
  */
