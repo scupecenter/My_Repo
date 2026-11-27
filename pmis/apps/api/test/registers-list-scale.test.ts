@@ -25,7 +25,7 @@ beforeAll(async () => {
   await db.query(`SET session_replication_role = replica`); // bulk fixture: no row triggers
   await db.query(
     `INSERT INTO register_records (entity_id, register_key, record_type, is_global, state, levels_required, data, created_at, updated_at)
-     SELECT gen_random_uuid(), $1, NULL, true, 'entry', 3, jsonb_build_object('title', $2 || ' ' || g), now() - (g || ' seconds')::interval, now() FROM generate_series(1, ${N}) g`,
+     SELECT gen_random_uuid(), $1, NULL, true, 'entry', 3, jsonb_build_object('title', $2 || '-' || g), now() - (g || ' seconds')::interval, now() FROM generate_series(1, ${N}) g`,
     [KEY, TAG],
   );
   await db.query(`SET session_replication_role = DEFAULT`);
@@ -72,7 +72,7 @@ describe('registers list at scale', () => {
   });
 
   it('a search and a filter keep the same results and counts', async () => {
-    const res = await admin.api.call('get', `/registers/${KEY}/records?limit=20&q=${TAG}%2077`);
+    const res = await admin.api.call('get', `/registers/${KEY}/records?limit=20&q=${TAG}-77`);
     expect(res.status).toBe(200);
     const f = (res.body.counts as { filtered: number }).filtered;
     expect(f).toBeGreaterThan(0);
