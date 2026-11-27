@@ -43,7 +43,7 @@ export function TemplatesPage() {
   const down = (x: Template, prefill: boolean) => downloadTemplate(x.template_id, { prefill }).then((n) => toast(t('grid.downloaded', { name: n })), (e) => toast(registerErrorMessage(t, e), 'err'));
   const set = (k: string, v: string) => setSp((p) => { const n = new URLSearchParams(p); if (v) n.set(k, v); else n.delete(k); return n; }, { replace: true });
   const all = (templates.data ?? []).filter((x) => x.register_key || x.stream || x.template_kind);
-  // Ahmed's grouping: the Master (and the new-sites, list and holiday files), then the sections (streams), then the registers and logs
+  // Grouping: the Master (and the new-sites, list and holiday files), then the sections (streams), then the registers and logs
   const groupOf = (x: Template): 'master' | 'sections' | 'registers' => (kindOf(x) === 'register' ? 'registers' : kindOf(x) === 'stream' ? 'sections' : 'master');
   const GROUPS = ['master', 'sections', 'registers'] as const;
   const entries = GROUPS.flatMap((g) => all.filter((x) => groupOf(x) === g));
