@@ -265,7 +265,10 @@ archived for 20 minutes (`WAL_LATE_SECONDS`); the last archive attempt failed; a
 (`BACKUP_LATE_HOURS`); the weekly copy is older than 8 days or the monthly copy older than 32 days; the pg_dump copy is older than 26 hours;
 or pgBackRest reports a stanza status other than 0. The row names the repository and the age. Response: read the PostgreSQL log
 (`/var/log/postgresql/postgresql-16-main.log`), then `pgbackrest info` and `journalctl -u gsdn-pmis-db-basebackup`, fix the cause, and run the
-backup by hand. This is a System Log row, not a security alert (Q370 asks whether it should also raise one).
+backup by hand. From migration 0421 the same problem also raises the security alert `backup_late` (one per 6 hours): it appears in the bell of
+the System Admins and is mailed to them by the alert settings (`email_min_severity`; the severity of the rule is set in Settings > Security log
+> Alert rules). A failed background job raises `job_failed` the same way (one per job and day). `mail.notification_kinds` is not involved.
+To prove the mail path after install, run `sudo -u postgres psql -d <db> -c "SELECT backup_late_alert('test')"` and check the Mail outbox.
 
 ### 8.7 Restore drill (quarterly, and before go-live)
 

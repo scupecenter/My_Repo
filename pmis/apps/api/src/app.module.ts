@@ -19,7 +19,7 @@ import { ImportBatchesController, TemplatesController } from './templates/templa
 import { TemplatesService } from './templates/templates.service';
 import { UploadInterceptor } from './templates/upload.interceptor';
 import { RegistersController } from './registers/registers.controller';
-import { RegisterColumnsController } from './registers/register-columns.controller';
+import { RegisterColumnsController, RegisterStateController } from './registers/register-columns.controller';
 import { RegisterColumnsService } from './registers/register-columns.service';
 import { RegistersService } from './registers/registers.service';
 // P5 (migration 0057): the list catalogue
@@ -44,6 +44,7 @@ import { AuthController } from './auth/auth.controller';
 import { AuthService } from './auth/auth.service';
 import { LogHmacService } from './auth/log-hmac.service';
 import { PasswordService } from './auth/password.service';
+import { CspReportController } from './security/csp-report.controller';
 import { RateLimiter } from './auth/rate-limiter';
 import { SessionGuard } from './auth/session.guard';
 import { SessionService } from './auth/session.service';
@@ -122,6 +123,8 @@ import { ExportLockInterceptor } from './security/export-lock';
 import { UiIdentityService } from './settings/ui-identity.service';
 import { LoginPageController } from './settings/login-page.controller';
 import { LoginPageService } from './settings/login-page.service';
+import { MediaController } from './media/media.controller';
+import { MediaService } from './media/media.service';
 import { SettingsScreensController } from './settings/settings-screens.controller';
 import { SettingsScreensService } from './settings/settings-screens.service';
 import { AlertRulesController } from './settings/alert-rules.controller';
@@ -219,10 +222,12 @@ export function appModuleFor(config: AppConfig) {
       InvitationsController, PublicInvitationsController, // 0091: before UsersController, so /users/invitations is not read as /users/{user_id}
       AuthController, MeController, EmailChangeRequestsController, PhoneChangeRequestsController, UsersController, GroupsController, DepartmentsController, MessagesController,
       AnnouncementsController, MeAnnouncementsController, RegionsController, RolesController, PermissionsController, AssignmentsController,
-      DocumentTextController, DelegationsController, SitesController, SiteDraftsController, TasksController, WorkflowEditorController, TaskDefinitionsController, CalendarController, SlaController, IssueStoppedController, RegistersController, RecycleBinController, RegisterColumnsController, MatrixController, WarehouseController, AsBuiltItemsController, NumberSequencesController,
+      DocumentTextController, DelegationsController, SitesController, SiteDraftsController, TasksController, WorkflowEditorController, TaskDefinitionsController, CalendarController, SlaController, IssueStoppedController, RegistersController, RecycleBinController, RegisterColumnsController, MatrixController, WarehouseController, AsBuiltItemsController, NumberSequencesController, RegisterStateController,
       NotificationsController, FollowController, StatusUpdatesController, InsightsController, TemplatesController, ImportBatchesController, DocumentsController, DocumentsGridController, LibraryController, SnagsController,
       DashboardController, DashboardSettingsController, GoalsController, PmSchedulesController, DashboardOpsController, SupportAccessController, DownloadLocksController, SecurityLocksController, DelayPeriodsController, WeightsController, TeamScopeMatchController, GecolOrderWarningsController, DeriveRulesController, MailKindsController, MailPolicyController, ImportsSettingsController, KanbanController, NavLayoutController, HistoricalWaiverController, SiteMasterController, SiteMasterColumnsController, CustomFieldsController, StructuralFreezeController, UiIdentityController, LoginPageController, SettingsScreensController, AlertRulesController, P4cController, FleetController, AuditLogController, SecurityLogController, LogsAdminController, NewDeviceController,
+      MediaController, // 0.15.292 (own line: the long lines above conflict on every merge)
       PasskeySettingController, PasskeyController, // S4
+      CspReportController, // SEC-3
       ScenarioSettingsController, SiteApplicabilityController, // P1 (0052)
       MailController, HealthController,
       ListCataloguesController,
@@ -247,6 +252,7 @@ export function appModuleFor(config: AppConfig) {
       AssignmentsService, DelegationsService, SitesService, SiteLocksService, SiteDraftsService, TaskViewService, TaskDetailService, WorkflowEditorService, WorkflowService, ApprovalsService, MyWorkService, OverridesService, CalendarService, SlaService, IssueStoppedService, JobsService, RegistersService, RecycleBinService, RegisterColumnsService, MatrixService, WarehouseService, WarehouseConfigService, AsBuiltItemsService,
       NotificationsService, DocumentTextService, FollowService, StatusUpdatesService, InsightsService, TemplatesService, ImportService, ImportJobsService, UploadInterceptor, StorageService, DocumentsService, DocsGridService, LibraryService, ZipService, StorageJobsService, SnagsService,
       DashboardService, DashboardSettingsService, GoalsService, PmSchedulesService, SiteMapService, ProjectStatusService, DelayPeriodsService, WeightsService, TeamScopeMatchService, GecolOrderWarningsService, DeriveRulesService, MailKindsService, MailPolicyService, ImportsSettingsService, KanbanService, NavLayoutService, HistoricalWaiverService, SiteMasterService, SiteMasterColumnsService, CustomFieldsService, StructuralFreezeService, UiIdentityService, LoginPageService, SettingsScreensService, AlertRulesService, P4cService, FleetService, LogsService, SecurityLogService, JobRunsService, MailService, IntegrityService, DashboardExtrasService, DashboardOpsService, SecurityLocksService, SupportAccessService, DownloadLocksService, NewDeviceService,
+      MediaService, // 0.15.292
       PasskeyService, // S4
       ScenarioService, // P1 (0052)
       ListCataloguesService,

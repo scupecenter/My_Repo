@@ -5,10 +5,11 @@ import { ApiError } from '@/api/client';
 import { useApprovals, useBulk, useDecide } from '@/api/hooks';
 import type { ApprovalItem } from '@/api/types';
 import { Holders } from '@/components/HolderChip';
+import { LayoutPanel } from '@/components/LayoutPanel';
 import { PersonTag } from '@/components/PersonTag';
 import { RejectDialog } from '@/components/RejectDialog';
 import { QuickFilter, useTablePrefs } from '@/components/TableKit';
-import { DisplayMenu, displayAttrs, ExportCsvButton, PastedChip, RowNo, SearchBox, TableCount, TableToolbar } from '@/components/TableStandard';
+import { displayAttrs, ExportCsvButton, PastedChip, RowNo, SearchBox, TableCount, TableToolbar } from '@/components/TableStandard';
 import { SavedViews } from '@/components/SavedViews';
 import { UnifiedFilter } from '@/components/UnifiedFilter';
 import { decodeFilter, encodeFilter, type FilterTree } from '@/api/views';
@@ -78,7 +79,7 @@ export function Approvals() {
         filter={<UnifiedFilter screen="tasks-board" value={advTree} onChange={(tree) => setAdv(encodeFilter(tree))} onClearAll={clearAll} />}
         extra={<PastedChip search={list.data?.search} />}
         count={<TableCount testid="approvals-count" noun="tasks" total={list.data?.counts?.total ?? items.length} filtered={list.data?.counts?.filtered ?? items.length} active={active} selected={picked.length} onClear={clearAll} />}
-        display={<DisplayMenu api={tbl} />}
+        layout={<LayoutPanel testid="approvals-layout" table={tbl} />}
         exporter={<ExportCsvButton testid="approvals-export" name="approvals" head={['#', t('sites.code'), t('grid.code'), t('grid.task'), t('approvals.entered_by'), t('approvals.sla')]}
           rows={() => items.map((i, k) => [k + 1, i.task.site_code, i.task.task_code, i.task.name_en, i.submitted_by?.display_name ?? '', i.task.sla?.colour ?? ''])} />} />
       <div className="grid gap-4 lg:grid-cols-[minmax(320px,5fr)_7fr]">
