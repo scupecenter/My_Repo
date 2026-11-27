@@ -119,3 +119,4 @@ GRANT SELECT (id, template_id, number, site_id, region_id, task_id, doc_type_id,
 -- 0163: no new table and no new right: roles.dashboard_tabs and roles.hide_messages_inbox are changed only through idm_role_set_dashboard_access (System Admin, step-up, audit); pmis_app reads the result through app_dashboard_tabs and app_nav_hidden.
 REVOKE ALL ON task_sla_choices FROM pmis_app;  -- 0170: the explicit no-SLA choices only through admin_task_sla_none and sla_task_overview (owner pmis_definer, audited)
 REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON issue_task_map FROM pmis_app;  -- 0171: the task -> issue category map only through admin_issue_task_map_save
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON document_texts FROM pmis_app;  -- 0255: the file text only through document_text_put (owner pmis_definer)
