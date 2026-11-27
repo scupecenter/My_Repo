@@ -102,3 +102,39 @@ test('layout panel walk: a register (procurement) keeps board by/lane in the pan
   await expect(page.getByTestId('register-view-display')).toHaveCount(0);
   await page.screenshot({ path: 'test-results/walk-layout-register-board-en.png' });
 });
+
+test('layout panel walk: calendar view on Sites and a register, EN and AR', async ({ page }) => {
+  await signIn(page);
+
+  // Sites: the calendar is a view of the Layout panel; its date field is chosen in the panel options.
+  await page.goto('/sites');
+  await expect(page.getByTestId('sites-view')).toBeVisible({ timeout: 20000 });
+  await page.getByTestId('sites-view').click();
+  await page.getByTestId('sites-layout-calendar').click();
+  await expect(page.getByTestId('sites-calendar')).toBeVisible({ timeout: 20000 });
+  await expect(page.getByRole('gridcell').first()).toBeVisible();
+  await page.getByTestId('sites-view').click();
+  await expect(page.getByTestId('sites-calendar-field')).toBeVisible();
+  await expect(page.getByTestId('sites-view-display')).toHaveCount(0);
+  await page.screenshot({ path: 'test-results/walk-layout-sites-calendar-en.png' });
+  await page.keyboard.press('Escape');
+
+  // AR: the grid stays LTR inside the RTL page, with localized names.
+  await page.getByTestId('topbar-lang').click();
+  await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
+  await expect(page.getByRole('grid')).toHaveAttribute('dir', 'ltr');
+  await page.getByTestId('sites-view').click();
+  await expect(page.getByTestId('sites-calendar-field')).toBeVisible();
+  await page.screenshot({ path: 'test-results/walk-layout-sites-calendar-ar.png' });
+  await page.keyboard.press('Escape');
+  await page.getByTestId('topbar-lang').click();
+  await expect(page.locator('html')).toHaveAttribute('dir', 'ltr');
+
+  // A register with date fields: same view, field select in the panel, kept in the URL.
+  await page.goto('/registers/procurement?layout=calendar');
+  await expect(page.getByTestId('register-calendar')).toBeVisible({ timeout: 20000 });
+  await page.getByTestId('register-view').click();
+  await expect(page.getByTestId('register-calendar-field')).toBeVisible();
+  await page.screenshot({ path: 'test-results/walk-layout-register-calendar-en.png' });
+  await page.keyboard.press('Escape');
+});
