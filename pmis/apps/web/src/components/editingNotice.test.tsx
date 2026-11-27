@@ -6,6 +6,7 @@ import en from '@/i18n/en.json';
 import ar from '@/i18n/ar.json';
 import { renderApp, signIn } from '@/test/utils';
 import { RegisterPage } from '@/pages/Register';
+import { EditingNotice } from './EditingNotice';
 
 /** 0.15.246 (migration 0345, item 17): the soft "… is editing this record" notice in the register record editor. */
 const firstRecord = async () => {
@@ -39,8 +40,19 @@ describe('Editing notice (0.15.246, item 17)', () => {
     expect(notice).toHaveTextContent('is editing this record');
   }, 30_000);
 
-  it('has the same registers.editing_notice keys in English and Arabic', () => {
-    const keys = (d: unknown) => Object.keys((d as Record<string, Record<string, unknown>>).registers).filter((k) => k.startsWith('editing_notice')).sort();
+  it('shows the notice on a task record too (kind task; the feature covers every record screen)', async () => {
+    const TASK = '66666666-7777-4888-8999-000000000777';
+    await signIn('reviewer');
+    await api.post('/presence/editing', { body: { kind: 'task', entity_id: TASK } });
+    await signIn('pm');
+    renderApp(<EditingNotice kind="task" id={TASK} editing testid="task-editing-notice" />);
+    const notice = await screen.findByTestId('task-editing-notice', undefined, { timeout: 10_000 });
+    expect(notice).toHaveTextContent('Demo User 02');
+    expect(notice).toHaveTextContent('is editing this task');
+  }, 30_000);
+
+  it('has the same presence.editing_ keys in English and Arabic', () => {
+    const keys = (d: unknown) => Object.keys((d as Record<string, Record<string, unknown>>).presence).filter((k) => k.startsWith('editing_')).sort();
     expect(keys(ar)).toEqual(keys(en));
   });
 });

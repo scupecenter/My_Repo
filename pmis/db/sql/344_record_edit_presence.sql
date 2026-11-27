@@ -5,7 +5,7 @@
 -- display name of another editor of the same record, exactly what a colleague already sees on the record itself. No grant, role, permission,
 -- visibility or audit change (personal activity signal, like the online/idle presence of user_state).
 --   1. record_edit_presence: one row per user and edited entity, refreshed by the heartbeat (30 s), stale after 2 minutes.
---   2. edit_presence_ping(text, text): upsert the caller's row (kind 'record', the register record id) and sweep stale rows.
+--   2. edit_presence_ping(text, text): upsert the caller's row (kind 'record' = a register record, 'task' = a workflow task) and sweep stale rows.
 --   3. edit_presence_list(text, text): the other current editors of the entity (id, display name, since), freshest first.
 
 -- ---------------------------------------------------------------------------------------------------------------------
@@ -13,7 +13,7 @@
 -- ---------------------------------------------------------------------------------------------------------------------
 CREATE TABLE record_edit_presence (
   user_id     uuid NOT NULL REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE,
-  entity_kind text NOT NULL CHECK (entity_kind IN ('record')),
+  entity_kind text NOT NULL CHECK (entity_kind IN ('record', 'task')),
   entity_id   uuid NOT NULL,
   started_at  timestamptz NOT NULL DEFAULT now(),
   seen_at     timestamptz NOT NULL DEFAULT now(),

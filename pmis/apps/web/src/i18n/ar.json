@@ -2072,10 +2072,7 @@
     "contractor_company": "شركة المقاول",
     "contractor_hint": "اختر من الشركات ذات العقد الفعّال. يُفحص العقد مقابل النطاق عند الإرسال.",
     "prefilled": "معبّأ مسبقًا",
-    "prefilled_hint": "عُبِّئ من القيمة الافتراضية في الإعدادات؛ غيّره إن لم تنطبق.",
-    "editing_notice_one": "{{names}} يحرّر هذا السجل الآن",
-    "editing_notice_other": "{{names}} يحرّرون هذا السجل الآن",
-    "editing_notice_join": "، "
+    "prefilled_hint": "عُبِّئ من القيمة الافتراضية في الإعدادات؛ غيّره إن لم تنطبق."
   },
   "regErrors": {
     "register_locked": "هذا مقفل: لا يغيّره إلا مدير النظام حتى يُفك قفله.",
@@ -7176,5 +7173,12 @@
     "rule": "القاعدة",
     "nobody": "لا أحد يحمل هذا المستوى.",
     "fallback": "من يستطيع التصرف عبر مسار المسؤول:"
+  },
+  "presence": {
+    "editing_record_one": "{{names}} يحرّر هذا السجل الآن",
+    "editing_record_other": "{{names}} يحرّرون هذا السجل الآن",
+    "editing_task_one": "{{names}} يحرّر هذه المهمة الآن",
+    "editing_task_other": "{{names}} يحرّرون هذه المهمة الآن",
+    "editing_join": "، "
   }
 }

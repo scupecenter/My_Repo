@@ -19673,10 +19673,10 @@ export interface components {
         };
         EditPresencePing: {
             /**
-             * @description V1: register records only.
+             * @description register records and workflow tasks.
              * @enum {string}
              */
-            kind: "record";
+            kind: "record" | "task";
             /** Format: uuid */
             entity_id: string;
         };
@@ -40321,7 +40321,7 @@ export interface operations {
     listEditPresence: {
         parameters: {
             query: {
-                kind: "record";
+                kind: "record" | "task";
                 entity_id: string;
             };
             header?: never;

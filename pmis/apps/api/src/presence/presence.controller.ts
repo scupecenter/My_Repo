@@ -6,7 +6,7 @@ import { DbService } from '../db/db.service';
 
 /**
  * Soft "… is editing this record" notice (contract 0.15.246, migration 0345; owner request 2026-11-27, research item 17). Advisory only, never
- * a lock. The editor's heartbeat keeps a row fresh (2 minutes); the list shows the other current editors of the entity. V1: kind `record`.
+ * a lock. The editor's heartbeat keeps a row fresh (2 minutes); the list shows the other current editors of the entity. Kinds: `record` (a register record) and `task` (a workflow task).
  */
 @Controller('presence')
 export class PresenceController {
@@ -23,7 +23,7 @@ export class PresenceController {
     }
   }
 
-  private static readonly KINDS = new Set(['record']);
+  private static readonly KINDS = new Set(['record', 'task']);
   private static readonly UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
   private static args(body: unknown): { kind: string; id: string } {

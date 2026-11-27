@@ -24,4 +24,26 @@ for (const c of [{ locale: 'en', theme: 'light', suffix: 'en' }, { locale: 'ar',
     await expect(notice).toContainText('Demo User 02');
     await page.screenshot({ path: `test-results/pres-1-notice-${c.suffix}.png`, fullPage: false });
   });
+
+  // Item 17 widened: the same notice in the task drawer (kind `task`). SB128 has B9 in entry, editable by the pm.
+  test(`editing notice on a task (${c.suffix})`, async ({ page }) => {
+    await page.addInitScript(([l, t]) => { localStorage.setItem('pmis.locale', l); localStorage.setItem('pmis.theme', t); localStorage.setItem('pmis.site.layout', '"list"'); }, [c.locale, c.theme]);
+    await login(page, 'pm');
+    const site = '50000000-0000-4000-8000-000000000028';
+    await page.goto(`/sites/${site}`);
+    await expect(page.getByTestId('pipeline')).toBeVisible();
+    const id = await page.evaluate(async (sid) => {
+      const r = await fetch(`/api/v1/sites/${sid}/tasks`);
+      const j = (await r.json()) as { stages: { tasks: { id: string; task_code: string }[] }[] };
+      return j.stages.flatMap((s) => s.tasks).find((t) => t.task_code === 'B9')!.id;
+    }, site);
+    await page.evaluate(async (tid) => {
+      await fetch('/api/v1/__mock/presence-seed', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'task', entity_id: tid, name: 'Demo User 02' }) });
+    }, id);
+    await page.goto(`/sites/${site}?task=${id}`);
+    const notice = page.getByTestId('task-editing-notice');
+    await expect(notice).toBeVisible();
+    await expect(notice).toContainText('Demo User 02');
+    await page.screenshot({ path: `test-results/pres-2-task-${c.suffix}.png` });
+  });
 }

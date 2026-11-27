@@ -20,7 +20,7 @@ export const presenceHandlers = [
   http.post(`${B}/presence/editing`, async ({ request }) => {
     const g = guard(); if (g) return g;
     const b = await request.json() as { kind?: string; entity_id?: string };
-    if (b.kind !== 'record' || !b.entity_id) return invalid(b.kind !== 'record' ? '/kind' : '/entity_id');
+    if ((b.kind !== 'record' && b.kind !== 'task') || !b.entity_id) return invalid(b.kind !== 'record' && b.kind !== 'task' ? '/kind' : '/entity_id');
     const v = viewer()!;
     const now = Date.now();
     const rows = S().filter((r) => now - r.seen < FRESH);

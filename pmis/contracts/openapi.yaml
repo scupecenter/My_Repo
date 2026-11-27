@@ -31,7 +31,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
-    - 0.15.246 (2026-11-27): a soft "… is editing this record" notice (owner request 2026-11-27, PM-platforms research item 17; migration 0345; CHANGELOG RecordEditPresence). Additive and advisory only: nothing is locked. `POST /presence/editing` (`{kind, entity_id}`) is the editor's heartbeat (30 s; a row is stale after 2 minutes), `POST /presence/editing/stop` removes it at once, and `GET /presence/editing` (`kind`, `entity_id`) lists the other current editors of the entity (id, display name, since). V1 covers register records (kind `record`). No grant, role, permission, visibility or audit change.
+    - 0.15.246 (2026-11-27): a soft "… is editing this record" notice (owner request 2026-11-27, PM-platforms research item 17; migration 0345; CHANGELOG RecordEditPresence). Additive and advisory only: nothing is locked. `POST /presence/editing` (`{kind, entity_id}`) is the editor's heartbeat (30 s; a row is stale after 2 minutes), `POST /presence/editing/stop` removes it at once, and `GET /presence/editing` (`kind`, `entity_id`) lists the other current editors of the entity (id, display name, since). Covers register records (kind `record`) and workflow tasks (kind `task`). No grant, role, permission, visibility or audit change.
 
     - 0.15.202 (2026-11-27): the dashboard follow-up sections, contractor and supplier scorecard (owner approval 2026-11-26, dashboard proposals item 5; migration 0303). Additive and read only. `GET /dashboard/ops` gains the section `contractor_scorecard` (`DashboardOpsScorecard`): the aggregate of `GET /reports/contractor-performance`, so the card and the performance screen never disagree - the counts of parties per level, the on-time rectification rate of snags, the average delay days over the delayed parties, the rejection (quality fail) rate, the snag and quality totals, and the five worst parties with their worst figures. No amounts. The section needs the contractors view and answers available false without it. The dashboard settings catalogue gains the card `ops_contractors`. No grant, role or permission change.
     - 0.15.153 (2026-11-27): "My sessions" (no migration; CHANGELOG MySessions). Additive. `GET /me/sessions` (`listMySessions`): the caller's own live sessions (device, sign-in time, last activity, IP, `is_current`); `POST /me/sessions/{session_id}/revoke` (`revokeMySession`) ends one of the caller's own other sessions (404 for anyone else's, 422 `own_session` for the current one); `POST /me/sessions/revoke-others` (`revokeMyOtherSessions`) ends every other session of the caller. Own rows only, no permission and no step-up (it only narrows access); audited and in the security log.
@@ -16653,7 +16653,7 @@ paths:
         0.15.246 (migration 0345). Advisory "… is editing" presence: the editors of the entity other than the caller whose heartbeat is fresh
         (2 minutes). The caller themself is never listed.
       parameters:
-        - {name: kind, in: query, required: true, schema: {type: string, enum: [record]}}
+        - {name: kind, in: query, required: true, schema: {type: string, enum: [record, task]}}
         - {name: entity_id, in: query, required: true, schema: {type: string, format: uuid}}
       responses:
         '200':
@@ -25523,7 +25523,7 @@ components:
       additionalProperties: false
       required: [kind, entity_id]
       properties:
-        kind: {type: string, enum: [record], description: 'V1: register records only.'}
+        kind: {type: string, enum: [record, task], description: 'register records and workflow tasks.'}
         entity_id: {type: string, format: uuid}
     EditPresenceEditor:
       type: object

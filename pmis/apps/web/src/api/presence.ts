@@ -13,7 +13,7 @@ export type EditPresenceEditor = { id: string; display_name: string; employee_id
 const KEY = (kind: string, id: string) => ['edit-presence', kind, id] as const;
 const LIVE = { headers: { 'X-PMIS-Live': '1' } };
 
-export function useEditPresence(kind: 'record', id: string | null | undefined, editing: boolean) {
+export function useEditPresence(kind: 'record' | 'task', id: string | null | undefined, editing: boolean) {
   const qc = useQueryClient();
   const active = editing && !!id;
   useEffect(() => {

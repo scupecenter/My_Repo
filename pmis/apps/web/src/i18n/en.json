@@ -2072,10 +2072,7 @@
     "contractor_company": "Contractor company",
     "contractor_hint": "Pick from the companies with an active contract. The contract is checked against the scope at submit.",
     "prefilled": "Prefilled",
-    "prefilled_hint": "Filled from the default set in Settings; change it if it does not apply.",
-    "editing_notice_one": "{{names}} is editing this record",
-    "editing_notice_other": "{{names}} are editing this record",
-    "editing_notice_join": ", "
+    "prefilled_hint": "Filled from the default set in Settings; change it if it does not apply."
   },
   "regErrors": {
     "register_locked": "This is locked: only a System Admin can change it until it is unlocked.",
@@ -7108,5 +7105,12 @@
     "rule": "rule",
     "nobody": "Nobody holds this level.",
     "fallback": "Who could act through the admin path:"
+  },
+  "presence": {
+    "editing_record_one": "{{names}} is editing this record",
+    "editing_record_other": "{{names}} are editing this record",
+    "editing_task_one": "{{names}} is editing this task",
+    "editing_task_other": "{{names}} are editing this task",
+    "editing_join": ", "
   }
 }
