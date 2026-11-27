@@ -17120,7 +17120,8 @@ export interface components {
             id: string;
             code: string;
             /** @enum {string} */
-            kind: "weekly_status_missing" | "record_idle";
+            kind: "weekly_status_missing" | "record_idle" | "kpi_threshold";
+            /** @description Per kind: weekly_status_missing {}, record_idle {register_key, state, days}, kpi_threshold {kpi (a catalogue code), op (above|below), value (the own threshold, 0..100000, in the unit of the KPI)}. */
             params: {
                 [key: string]: unknown;
             };
@@ -17134,6 +17135,8 @@ export interface components {
             body_ar: string;
             link: string | null;
             enabled: boolean;
+            /** @description 0.15.249: while locked, a rule takes no edit and cannot be disabled; the only accepted save is the unlock itself (audited). A locked rule still fires. */
+            locked: boolean;
             /** @description The If-Match of PUT /settings/alert-rules/{id}. */
             version: number;
             /** Format: date-time */
@@ -17144,7 +17147,7 @@ export interface components {
         AlertRuleInput: {
             code: string;
             /** @enum {string} */
-            kind: "weekly_status_missing" | "record_idle";
+            kind: "weekly_status_missing" | "record_idle" | "kpi_threshold";
             params: {
                 [key: string]: unknown;
             };
@@ -17157,6 +17160,8 @@ export interface components {
             body_ar: string;
             link?: string | null;
             enabled?: boolean;
+            /** @description 0.15.249: lock a rule against edits (unlock with a save that changes nothing else). */
+            locked?: boolean;
         };
         AlertRuleSaved: {
             /** Format: uuid */
@@ -17169,6 +17174,15 @@ export interface components {
                 kinds: {
                     kind: string;
                     params: string[];
+                }[];
+                /** @description 0.15.249: the KPI catalogue kpi_threshold rules pick from (dashboard settings catalogue). */
+                kpis: {
+                    code: string;
+                    label_en: string;
+                    label_ar: string;
+                    unit: string;
+                    /** @enum {string} */
+                    direction: "higher" | "lower";
                 }[];
                 audiences: ("system_admin" | "module")[];
                 registers: {
