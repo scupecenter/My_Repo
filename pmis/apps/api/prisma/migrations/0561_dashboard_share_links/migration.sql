@@ -111,3 +111,20 @@ GRANT SELECT ON dashboard_share_links TO pmis_app;
 GRANT EXECUTE ON FUNCTION dashboard_share_create(jsonb, text) TO pmis_app;
 GRANT EXECUTE ON FUNCTION dashboard_share_revoke(uuid, text) TO pmis_app;
 GRANT EXECUTE ON FUNCTION dashboard_share_resolve(text) TO pmis_app;
+
+-- The data reset decision (145): the links are kept, like the saved views they complement - a link grants nothing
+-- by itself and a kept link after a reset only shows the opener their own (then empty) dashboard. Patched in place,
+-- anchored on the data_reset_marker row of the keep list.
+DO $$
+DECLARE def text;
+  marker text := '    ''data_reset_marker''';
+  add text := E'    ''dashboard_share_links'',\n    ''data_reset_marker''';
+BEGIN
+  def := pg_get_functiondef('public.data_reset_plan()'::regprocedure);
+  IF position('''dashboard_share_links''' IN def) = 0 THEN
+    IF position(marker IN def) = 0 THEN RAISE EXCEPTION 'data_reset_plan() has no data_reset_marker row to patch'; END IF;
+    EXECUTE replace(def, marker, add);
+  END IF;
+END $$;
+
+GRANT SELECT, UPDATE ON dashboard_share_links TO pmis_reset_owner;

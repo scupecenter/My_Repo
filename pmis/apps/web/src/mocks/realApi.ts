@@ -174,6 +174,11 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/status-updates/region-health'], // 0.15.241, item 12
   ['post', '/status-updates'],
   ['patch', '/status-updates/:id'],
+  // Contract 0.15.402 (0561): dashboard share links (apps/api: dashboard-shares.controller).
+  ['get', '/dashboard/share-links'],
+  ['post', '/dashboard/share-links'],
+  ['post', '/dashboard/share-links/:id/revoke'],
+  ['get', '/dashboard/shared/:token'],
   // Contract 0.7.2: the main dashboard, Project Status and the weight sets (apps/api: dashboard; migration 0039).
   ['get', '/dashboard'],
   ['get', '/dashboard/export'],
