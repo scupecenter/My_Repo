@@ -28,14 +28,14 @@ export class SavedViewsController {
 
   /** F3 (0.15.31): the whitelist of filter fields of a list screen, for the filter builder. */
   @Get('saved-views/filter-fields')
-  filterFields(@Query() q: Record<string, unknown>) {
-    return this.svc.filterFields(q);
+  filterFields(@Auth() auth: AuthContext, @Query() q: Record<string, unknown>) {
+    return this.svc.filterFields(q, auth);
   }
 
   /** 0.15.49: the values of one enum field that match `q` (server-side search of a value list that was cut at 500). */
   @Get('saved-views/filter-fields/:field/values')
-  filterFieldValues(@Param('field') field: string, @Query() q: Record<string, unknown>) {
-    return this.svc.filterFieldValues(field, q);
+  filterFieldValues(@Auth() auth: AuthContext, @Param('field') field: string, @Query() q: Record<string, unknown>) {
+    return this.svc.filterFieldValues(field, q, auth);
   }
 
   @Post('saved-views/import')

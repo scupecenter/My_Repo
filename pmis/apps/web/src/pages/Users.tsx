@@ -18,6 +18,8 @@ import { Departments } from '@/pages/Departments';
 import { IdBadge } from '@/components/PersonTag';
 import { type EmailChangeRequestAdmin, type PhoneChangeRequestAdmin, useDecideEmailChange, useDecidePhoneChange, useEmailChangeRequests, usePhoneChangeRequests } from '@/api/profile';
 import { fmtDateTime } from '@/lib/time';
+import { UnifiedFilter } from '@/components/UnifiedFilter';
+import { decodeFilter, encodeFilter } from '@/api/views';
 
 export const STATUS_TONE: Record<string, string> = { active: 'bg-doneBg text-doneInk', pending_assignment: 'bg-waitBg text-waitInk', suspended: 'bg-lateBg text-lateInk', disabled: 'bg-lockBg text-lockInk' };
 
@@ -208,12 +210,14 @@ export function Users() {
   };
   const [act, setAct] = useState<Act | null>(null);
   const [f, setF] = useState({ q: '', status: '', role_id: '' });
+  // the + Filter tree of the screen users (the module view grant of the list applies to it as well)
+  const [adv, setAdv] = useState('');
   const [sel, setSel] = useState<Record<string, User>>({});
   const [dlg, setDlg] = useState(false);
   const [creating, setCreating] = useState(false);
   const [inviting, setInviting] = useState(false);
   const canCreate = isAdmin(me.data) || !!me.data?.effective.grants.some((g) => (g.action as string) === 'create' && ['users', 'admin.users'].includes(g.module_key as string));
-  const users = useUsers(f), roles = useRoles();
+  const users = useUsers({ ...f, filter: adv || undefined }), roles = useRoles();
   const items = users.data?.items ?? [];
   const chosen = Object.values(sel);
   const toggle = (u: User) => setSel((s) => { const n = { ...s }; if (n[u.id]) delete n[u.id]; else n[u.id] = u; return n; });
@@ -235,6 +239,7 @@ export function Users() {
           <option value="">{t('users.all_roles')}</option>
           {(roles.data ?? []).map((r) => <option key={r.id} value={r.id}>{r.name_en}</option>)}
         </select>
+        <UnifiedFilter screen="users" value={decodeFilter(adv)} onChange={(tree) => setAdv(encodeFilter(tree))} onClearAll={() => setAdv('')} />
         <span className="flex-1" />
         {canCreate && <button className="btn" data-testid="users-invite" onClick={() => setInviting(true)}><Mail size={16} />{t('invite.open')}</button>}
         {canCreate && <button className="btn" data-testid="users-new" onClick={() => setCreating(true)}><UserRoundPlus size={16} />{t('newUser.open')}</button>}

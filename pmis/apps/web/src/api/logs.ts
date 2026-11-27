@@ -12,7 +12,7 @@ export type Via = 'manual' | 'template' | 'bulk' | 'api' | 'job';
 export const VIAS: Via[] = ['manual', 'template', 'bulk', 'api', 'job'];
 export type DeviceInfo = { browser: string; os: string; type: 'desktop' | 'mobile' | 'tablet' | 'bot' | 'other' };
 export type LogActor = { id: string; name: string; employee_id: string | null };
-export type PagedList<T> = { items: T[]; page: { limit: number; next_cursor: string | null; total?: number } };
+export type PagedList<T> = { items: T[]; page: { limit: number; next_cursor: string | null; total?: number; filter_window?: { rows: number; full: boolean } } };
 
 /** Fields the Audit Log rows carry once the server adds them; the contract's AuditEntry does not have them yet. */
 export type AuditRow = AuditEntry & { via?: Via | null; device?: DeviceInfo | null; user_agent?: string | null; session_id?: string | null; auth_method?: 'local' | 'oidc' | null };
@@ -60,10 +60,11 @@ function usePaged<T>(key: string, path: string, query: Record<string, string | n
     queryFn: ({ pageParam }) => api.get<PagedList<T>>(path, { query: { ...query, limit: opts.limit ?? 50, cursor: pageParam || undefined }, headers: opts.live ? { 'X-PMIS-Live': '1' } : undefined }),
     getNextPageParam: (last) => last.page.next_cursor ?? undefined,
   });
-  return Object.assign(q, { items: q.data?.pages.flatMap((p) => p.items) ?? [] });
+  return Object.assign(q, { items: q.data?.pages.flatMap((p) => p.items) ?? [], windowFull: q.data?.pages.some((p) => p.page.filter_window?.full) ?? false });
 }
 
-export const useAuditLog = (f: LogFilter) => usePaged<AuditRow>('audit-log', '/audit-log', filterQuery(f, 'audit'));
+/** `adv` is the encoded + Filter tree of the screen audit-log; the server reads it over the newest rows the caller may see (page.filter_window). */
+export const useAuditLog = (f: LogFilter, adv?: string) => usePaged<AuditRow>('audit-log', '/audit-log', { ...filterQuery(f, 'audit'), filter: adv || undefined });
 export const useFieldChanges = (f: LogFilter) => usePaged<FieldChange>('field-changes', '/audit-log/field-changes', filterQuery(f, 'field'));
 
 /** Fetches only when `enabled` (the popover is open). Newest first. */

@@ -9,8 +9,8 @@ type Snap = { rollback: () => void };
 export const useWhItems = (f: { q: string; include_inactive: boolean }, enabled = true) =>
   useQuery({ queryKey: ['wh-items', f], enabled, queryFn: () => api.get<Page<WarehouseItem>>('/warehouse/items', { query: { ...f, limit: 200 } }) });
 export const useStock = (q: string) => useQuery({ queryKey: ['wh-stock', q], queryFn: () => api.get<Page<StockLevel>>('/warehouse/stock', { query: { q, limit: 200 } }) });
-export const useMovements = (status: string) =>
-  useQuery({ queryKey: ['wh-movements', status], queryFn: () => api.get<Page<StockMovement>>('/warehouse/movements', { query: { status, limit: 200 } }) });
+export const useMovements = (status: string, filter?: string) =>
+  useQuery({ queryKey: ['wh-movements', status, filter ?? ''], queryFn: () => api.get<Page<StockMovement>>('/warehouse/movements', { query: { status, filter: filter || undefined, limit: 200 } }) });
 // Migration 0053 (P7): the TE dispatch of the sites (D6) and the owner data still missing (Q107).
 export const useDispatchList = (need_status: string) =>
   useQuery({ queryKey: ['wh-dispatch', need_status], queryFn: () => api.get<Page<SiteDispatch>>('/warehouse/dispatch-status', { query: { ...(need_status ? { need_status } : {}), limit: 200 } }) });

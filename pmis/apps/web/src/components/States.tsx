@@ -11,7 +11,7 @@ export function LoadingSkeleton({ rows = 5, testid = 'state-loading' }: { rows?:
   const { t } = useTranslation();
   return (
     <div role="status" aria-busy="true" aria-label={t('common.loading')} data-testid={testid} className="space-y-2 p-4">
-      {Array.from({ length: rows }, (_, i) => <div key={i} className="h-8 animate-pulse rounded-md bg-card2 motion-reduce:animate-none" />)}
+      {Array.from({ length: rows }, (_, i) => <div key={i} className="h-8 motion-shimmer rounded-md bg-card2" />)}
     </div>
   );
 }

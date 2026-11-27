@@ -390,6 +390,8 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/registers/warehouse/order-options'],
   ['get', '/registers/car_dispatcher/order-options'],
   ['get', '/registers/financial_advances/order-options'],
+  ['get', '/registers/issues/order-options'],
+  ['get', '/registers/quality/order-options'],
   ['get', '/registers/procurement/:entity_id/receipts'],
   ['get', '/registers/contractor-companies'],
   ['post', '/registers/hlc/legacy-migration'],

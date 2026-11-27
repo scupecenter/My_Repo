@@ -99,7 +99,7 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
   const docsMissing = record?.state === 'entry' ? (recSlots.data?.missing_for_submit ?? []) : [];
   const [data, setData] = useState<Data>(record?.data ?? defaultsFor(rawDef.register_key, rawDef));
   // 0.15.88: the Contractor company of a Procurement / GECOL / HLC record (record column external_party_id; Procurement picks it, GECOL and HLC show it read-only)
-  const hasContractor = ['procurement', 'gecol', 'hlc'].includes(rawDef.register_key);
+  const hasContractor = ['procurement', 'gecol', 'hlc', 'issues', 'quality'].includes(rawDef.register_key);
   const [party, setParty] = useState<string>(record?.external_party?.id ?? '');
   const companies = useContractorCompanies(rawDef.register_key === 'procurement');
   const [site, setSite] = useState<SiteSel>(record?.site_id ? { id: record.site_id, code: record.site_code ?? '', region_id: record.region_id as number | undefined } : null);
@@ -269,6 +269,8 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
                         ? <VehiclePicker value={data.vehicle_id} onChange={(v) => set('vehicle_id', v)} from={data.from_date as string} to={data.to_date as string} vehicleType={data.required_type as string} bookingId={record?.id} disabled={!editable} invalid={!!show} />
                         : key === 'dismantle' && f.code === 'procurement_order_id'
                         ? <DismantleOrderSelect siteId={site?.id} part={rtype} value={data[f.code]} onChange={(v) => set(f.code, v)} editable={editable} invalid={!!show} />
+                        : (key === 'issues' || key === 'quality') && f.code === 'procurement_order_id'
+                        ? <WarehouseOrderSelect registerKey={key} field="procurement_order_id" siteId={site?.id} value={data[f.code]} onChange={(v) => set(f.code, v)} editable={editable} invalid={!!show} />
                         : (key === 'car_dispatcher' || key === 'financial_advances') && f.code === 'procurement_record_id'
                         ? <WarehouseOrderSelect registerKey={key} field="procurement_record_id" siteId={key === 'financial_advances' ? site?.id : null} value={data[f.code]} onChange={(v) => set(f.code, v)} editable={editable} invalid={!!show} />
                         : key === 'warehouse' && f.code === 'procurement_order_id'

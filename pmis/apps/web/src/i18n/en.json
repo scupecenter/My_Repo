@@ -1158,7 +1158,8 @@
     "section_documents_types": "Document types",
     "section_documents_forms": "Form templates",
     "section_documents_archive": "Archive",
-    "section_data_counts": "GECOL / HLC counts"
+    "section_data_counts": "GECOL / HLC counts",
+    "section_screens_motion": "Motion"
   },
   "scopeMatch": {
     "title": "Team / scope match (Procurement)",
@@ -3523,7 +3524,8 @@
     "r_none": "No sensitive changes this month.",
     "r_xlsx": "Excel workbook",
     "sev_info": "Info",
-    "fh_restore": "Restore"
+    "fh_restore": "Restore",
+    "filter_window": "The filter looked through the newest 20,000 rows you can see. Narrow the dates to search further back."
   },
   "siteIdentity": {
     "title": "Site identity",
@@ -6420,5 +6422,16 @@
     "why": "Reason for the change",
     "cancel": "Cancel",
     "save": "Save"
+  },
+  "motion": {
+    "title": "Motion",
+    "note": "One motion system for the whole app: dialogs, messages, cards, progress bars, charts and the map. This choice is saved in this browser, like the theme and the language.",
+    "auto": "Automatic",
+    "auto_note": "Follow the operating system setting for reduced motion.",
+    "reduced": "Reduced",
+    "reduced_note": "No transitions or animations anywhere, including charts and the map.",
+    "preview": "Preview of a dialog opening",
+    "replay": "Replay",
+    "link_display": "Tables (Display) settings"
   }
 }

@@ -17,6 +17,7 @@ import { DbService } from '../db/db.service';
 import { MailMessage, MailPort } from '../mail/mail.port';
 import { MailService } from '../mail/mail.service';
 import { SecurityLogService } from '../logs/security-log.service';
+import { FilterCatalogService } from '../views/filter-catalog.service';
 import { notifyByMail, PROFILE_MAIL } from '../me/profile.service';
 import { AssignmentDto, GroupRef, PickerItem, PurgedUserDto, UserDto, UsersRepo } from './users.repo';
 
@@ -123,6 +124,7 @@ export class UsersService {
     private readonly mail: MailPort,
     private readonly securityLog: SecurityLogService,
     private readonly mailer: MailService,
+    private readonly filters: FilterCatalogService,
   ) {}
 
   async list(auth: AuthContext, q: Query): Promise<{ items: UserDto[]; page: { limit: number; next_cursor: string | null; total: number } }> {
@@ -145,8 +147,9 @@ export class UsersService {
       regionId = /^[1-7]$/.test(regionRaw) ? Number(regionRaw) : NaN;
       if (Number.isNaN(regionId)) throw problems.validation([{ path: '/region_id', code: 'invalid', message: 'Region is 1 to 7.' }]);
     }
+    const adv = await this.filters.fromQuery('users', q); // the + Filter tree of the screen users (the module view grant is checked above)
     const { rows, total } = await this.repo.list(
-      { status, roleId, groupId, regionId },
+      { status, roleId, groupId, regionId, adv },
       limit,
       cursor ? [cursor[0] as string, cursor[1] as string] : null,
       text ? likePattern(text) : null,

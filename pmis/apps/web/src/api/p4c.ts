@@ -32,7 +32,7 @@ export const useDismantleOrders = (siteId: string | null | undefined, part: stri
   });
 
 /** GET /registers/warehouse/order-options: the approved, active orders a PL / OPEN receipt may name (of the site when it has one). */
-export const useWarehouseOrders = (siteId: string | null | undefined, enabled: boolean, key: 'warehouse' | 'car_dispatcher' | 'financial_advances' = 'warehouse') =>
+export const useWarehouseOrders = (siteId: string | null | undefined, enabled: boolean, key: 'warehouse' | 'car_dispatcher' | 'financial_advances' | 'issues' | 'quality' = 'warehouse') =>
   useQuery({
     queryKey: ['warehouse-orders', key, siteId ?? null], enabled,
     queryFn: () => api.get<{ items: S['WarehouseOrderOption'][] }>(`/registers/${key}/order-options`, { query: siteId ? { site_id: siteId } : {} }).then((r) => r.items),

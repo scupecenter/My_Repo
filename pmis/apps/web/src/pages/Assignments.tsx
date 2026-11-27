@@ -6,6 +6,8 @@ import { useRegions } from '@/api/sites';
 import { AssignDialog } from '@/components/AssignDialog';
 import { errText, FormDialog } from '@/components/FormDialog';
 import { PersonTag } from '@/components/PersonTag';
+import { UnifiedFilter } from '@/components/UnifiedFilter';
+import { decodeFilter, encodeFilter } from '@/api/views';
 import { useToast } from '@/components/Toast';
 
 /** By-role view of assignments (`GET /assignments`): pick a role, assign many people at once, or end many rows at once. */
@@ -15,7 +17,8 @@ export function Assignments() {
   const toast = useToast();
   const roles = useRoles(), regions = useRegions();
   const [roleId, setRoleId] = useState(''), [ended, setEnded] = useState(false);
-  const list = useAssignments({ role_id: roleId, include_ended: ended });
+  const [adv, setAdv] = useState('');
+  const list = useAssignments({ role_id: roleId, include_ended: ended, filter: adv || undefined });
   const end = useEndByRole();
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [dlg, setDlg] = useState<null | 'assign' | 'end'>(null);
@@ -39,6 +42,7 @@ export function Assignments() {
           {(roles.data ?? []).map((r) => <option key={r.id} value={r.id}>{rname(r)}</option>)}
         </select>
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" data-testid="assignments-ended" checked={ended} onChange={(e) => setEnded(e.target.checked)} />{t('assign.include_ended')}</label>
+        <UnifiedFilter screen="assignments" value={decodeFilter(adv)} onChange={(tree) => setAdv(encodeFilter(tree))} onClearAll={() => setAdv('')} />
         <span className="text-sm text-mute" data-testid="assignments-total">{t('assign.total', { count: total })}</span>
       </div>
       <div className="card overflow-x-auto"><table className="w-full text-sm">
