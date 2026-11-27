@@ -10,6 +10,6 @@ dashboard.health_bands {green:85, amber:70} is a SQL setting (038:935), removed 
 - Rules that apply: additive migrations only, no permission widening, hide never delete, Arabic and English everywhere, everything configurable in Settings, no other platform names.
 - PR checklist when built: covered and excluded places with reasons, connections checked (registers, Settings, hub rule D55, gear, links, rights, templates), auto-fill and automation notes, Arabic changelog entry in the PR body (no CHANGELOG.md edit).
 
-## Numbering reserved (verify live against main and open PRs before use)
-- Migration: 0560 / db 559 if editable (guard), else none
-- Contract label: 0.15.377
+## Numbering reserved (block 0570-0589 and labels 0.15.430-0.15.449 assigned by the parent, 2026-11-27 21:38; verify live against main and open PRs before use)
+- Migration: 0574 / db 573 if editable (guard), else none
+- Contract label: 0.15.435
