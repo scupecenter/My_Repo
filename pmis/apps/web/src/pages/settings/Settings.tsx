@@ -17,6 +17,7 @@ import { MailKinds } from './MailKinds';
 import { useMe } from '@/api/hooks';
 import { ContractorRules } from './ContractorRules';
 import { ContractorPerfThresholds } from './ContractorPerfThresholds';
+import { MatrixCoverageScreen } from './MatrixCoverage';
 import { GecolHlcCounts } from './GecolHlcCounts';
 import { Lists } from './Lists';
 import { RegisterColumns } from './RegisterColumns';
@@ -30,6 +31,7 @@ import { DashboardSettings } from './DashboardSettings';
 import { Identity } from './Identity';
 import { DisplaySettings } from './DisplaySettings';
 import { DailyPlanSettings } from './DailyPlanSettings';
+import { MotionSettings } from './MotionSettings';
 
 export interface SettingsSection { key: string; adminOnly?: boolean }
 export interface SettingsTab { key: string; sections: SettingsSection[] }
@@ -38,7 +40,7 @@ export interface SettingsTab { key: string; sections: SettingsSection[] }
 export const SETTINGS_TABS: readonly SettingsTab[] = [
   // Settings merge (owner approved 2026-11-25): Calendar + SLA rules + Weights all feed the SLA clock
   { key: 'sla', sections: [{ key: 'rules' }, { key: 'calendar' }, { key: 'weights' }] },
-  { key: 'workflow', sections: [{ key: 'editor' }, { key: 'columns' }, { key: 'freeze' }, { key: 'idle' }, { key: 'board' }] },
+  { key: 'workflow', sections: [{ key: 'editor' }, { key: 'columns' }, { key: 'freeze' }, { key: 'idle' }, { key: 'board' }, { key: 'coverage', adminOnly: true }] },
   // Lists (the dropdown catalogues, old ddl tab) now sit next to the register columns that use them
   { key: 'registers', sections: [{ key: 'columns' }, { key: 'lists' }, { key: 'contractors' }, { key: 'gecol' }, { key: 'team-scope' }, { key: 'issue-map' }] },
   // W5: the Document Library section is now named Document types (the old documents/library route redirects); Form templates and Archive are new
@@ -49,7 +51,7 @@ export const SETTINGS_TABS: readonly SettingsTab[] = [
   // DLP months is a data-protection rule, so it moved here from SLA
   { key: 'security', sections: [{ key: 'staff' }, { key: 'retention' }, { key: 'dlp' }] },
   // Screens: what users see by default (Dashboard, Display menu of the tables, My Work Daily Plan)
-  { key: 'screens', sections: [{ key: 'dashboard' }, { key: 'tables' }, { key: 'daily-plan' }] },
+  { key: 'screens', sections: [{ key: 'dashboard' }, { key: 'tables' }, { key: 'daily-plan' }, { key: 'motion' }] },
   { key: 'identity', sections: [] },
 ];
 
@@ -133,6 +135,7 @@ export function SettingsRoutes() {
           <Route path="dashboard" element={<DashboardSettings />} />
           <Route path="tables" element={<DisplaySettings />} />
           <Route path="daily-plan" element={<DailyPlanSettings />} />
+          <Route path="motion" element={<MotionSettings />} />
         </Route>
         <Route path="alerts" element={<TabFrame tab="alerts" />}>
           <Route index element={<Navigate to="policy" replace />} />
@@ -146,6 +149,7 @@ export function SettingsRoutes() {
           <Route path="freeze" element={<Freeze />} />
           <Route path="idle" element={<Idle />} />
           <Route path="board" element={<KanbanWip />} />
+          <Route path="coverage" element={<MatrixCoverageScreen />} />
         </Route>
         <Route path="sla" element={<TabFrame tab="sla" />}>
           <Route index element={<Navigate to="rules" replace />} />

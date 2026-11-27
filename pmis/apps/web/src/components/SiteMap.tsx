@@ -2,6 +2,7 @@ import * as Popover from '@radix-ui/react-popover';
 import { ChevronDown, ExternalLink, List, Map as MapIcon, Maximize2, Minimize2, RotateCcw, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { currentMotion } from '@/lib/motion';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useSiteMap } from '@/api/dashboard';
 import { useRegions, useSite, useSiteTasks } from '@/api/sites';
@@ -24,7 +25,7 @@ const OPEN_STATES = new Set(['open', 'entry', 'in_review', 'in_approval']);
 /** True when the person asked the system for less motion: the lights then do not pulse (a steady halo instead). */
 export function useReducedMotion(): boolean {
   const q = '(prefers-reduced-motion: reduce)';
-  const get = () => typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia(q).matches;
+  const get = () => currentMotion() === 'reduced' || (typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia(q).matches);
   const [v, setV] = useState(get);
   useEffect(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
