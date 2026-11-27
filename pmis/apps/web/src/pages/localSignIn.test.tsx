@@ -258,6 +258,7 @@ describe('hybrid mode list', () => {
       // contract 0.4.6: the Responsibility Matrix
       'GET /matrix', 'PATCH /matrix', 'GET /matrix/coverage',
       // contract 0.4.5: registers
+      'GET /recycle-bin', 'PUT /recycle-bin/retention', 'POST /recycle-bin/:id/restore',
       'GET /registers', 'GET /registers/:key/records', 'POST /registers/:key/records', 'GET /registers/:key/records/:id', 'PATCH /registers/:key/records/:id',
       'POST /registers/:key/records/:id/submit', 'POST /registers/:key/records/:id/review', 'POST /registers/:key/records/:id/approve', 'POST /registers/:key/records/:id/reject',
       'POST /registers/:key/records/:id/claim', 'POST /registers/:key/records/:id/release', 'POST /registers/:key/records/:id/void',
