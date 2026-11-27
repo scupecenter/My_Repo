@@ -422,6 +422,13 @@ describe('Q142 and Q110: teams, companies and contracts in the Contractors regis
     const c = await q<{ party_id: string; scopes: string[]; end_date: string; status: string; origin: string }>(db,
       'SELECT party_id, scopes, end_date::text, status, origin FROM external_party_contracts WHERE id = $1', [done.body.entity_id]);
     expect(c[0]).toEqual({ party_id: party, scopes: ['CW', 'Tower Erection'], end_date: '2027-12-31', status: 'active', origin: 'contract' });
+    // 0212: the party's contract dates are a mirror of its active contracts (earliest start, latest end)
+    const mirror = await q<{ s: string | null; e: string | null }>(db, 'SELECT contract_start::text AS s, contract_end::text AS e FROM external_parties WHERE id = $1', [party]);
+    expect(mirror[0]).toEqual({ s: '2026-01-01', e: '2027-12-31' });
+    await db.query("UPDATE external_party_contracts SET status = 'terminated' WHERE id = $1", [done.body.entity_id]);
+    expect((await q<{ e: string | null }>(db, 'SELECT contract_end::text AS e FROM external_parties WHERE id = $1', [party]))[0]!.e).toBe('2027-12-31'); // no active contract left: the mirror keeps its value
+    await db.query("UPDATE external_party_contracts SET status = 'active', end_date = '2028-06-30' WHERE id = $1", [done.body.entity_id]);
+    expect((await q<{ e: string | null }>(db, 'SELECT contract_end::text AS e FROM external_parties WHERE id = $1', [party]))[0]!.e).toBe('2028-06-30');
     // a second contract with the same reference for the same company is refused at submit
     const dup = await create({ record_type: 'contract', data: { contractor: name, contract_ref: 'k-2', contract_start: '2026-02-01', contract_scopes: 'CW' } });
     expect((await post(t.entry.api, 'contractors', dup.body.id, 'submit', dup.body.version)).body.errors[0]).toMatchObject({ code: 'duplicate' });
