@@ -111,7 +111,7 @@ function Items() {
       cell: (x) => <span className="mono font-bold">{x.code}{x.code_source === 'internal_provisional' && <span className="chip ms-2 bg-waitBg font-normal text-waitInk" data-testid={`wh-provisional-${x.code}`} title={t('wh.code_source')}>{t('wh.cs_internal_provisional')}</span>}</span> },
     { id: 'name', label: t('wh.name'), w: 260, multi: true, text: (x) => name(x),
       cell: (x) => <>{name(x)}{(() => { const pend = (x.need_rules ?? []).filter((r) => r.status !== 'confirmed').length; return pend > 0 ? <span className="chip ms-2 bg-waitBg text-waitInk" data-testid={`wh-need-pending-${x.code}`}>{t('wh.need_pending_n', { count: pend })}</span> : null; })()}</> },
-    { id: 'uom', label: t('wh.uom'), w: 90, text: (x) => x.uom, cell: (x) => x.uom },
+    { id: 'uom', label: t('wh.uom'), w: 90, text: (x) => x.uom ?? '', cell: (x) => x.uom },
     { id: 'category', label: t('wh.category'), w: 140, text: (x) => x.category ?? '', cell: (x) => x.category ?? '—' },
     { id: 'serial', label: t('wh.serial'), w: 90, text: (x) => (x.serial_tracked ? t('wh.yes') : t('wh.no')), cell: (x) => (x.serial_tracked ? t('wh.yes') : t('wh.no')) },
     ...cols.map((c): StdCol<WarehouseItem> => ({ id: `cv_${c.code}`, label: colLabel(c), w: 140, text: (x) => showVal(c, (x.custom ?? {})[c.code]), cell: (x) => <span data-testid={`wh-cv-${x.code}-${c.code}`}>{showVal(c, (x.custom ?? {})[c.code])}</span> })),
@@ -323,7 +323,7 @@ function Stock() {
   const cols = ['on_hand', 'reserved', 'pending_issue', 'pending_return', 'available', 'quarantine'] as const;
   const stdCols: StdCol<StockLevel>[] = [
     { id: 'code', label: t('wh.code'), w: 260, pinned: true, text: (s) => `${s.item_code} ${s.item_name}`, cell: (s) => <><b className="mono">{s.item_code}</b> {s.item_name}</> },
-    { id: 'uom', label: t('wh.uom'), w: 90, text: (s) => s.uom, cell: (s) => s.uom },
+    { id: 'uom', label: t('wh.uom'), w: 90, text: (s) => s.uom ?? '', cell: (s) => s.uom },
     ...cols.map((c): StdCol<StockLevel> => ({ id: c, label: t(`wh.${c}`), w: 120, multi: c === 'quarantine', text: (s) => String(s[c] ?? 0),
       cell: (s) => <span data-testid={`wh-stock-${s.item_code}-${c}`} className={c === 'quarantine' && (s[c] ?? 0) > 0 ? 'text-lateInk' : ''} title={c === 'quarantine' ? t('wh.quarantine_hint') : undefined}>
         {(s[c] ?? 0).toLocaleString(i18n.language)}
