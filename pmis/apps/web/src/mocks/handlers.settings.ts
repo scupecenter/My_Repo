@@ -30,8 +30,8 @@ const CR = () => (C().contractorRules ??= initCfg().contractorRules);
 /** Contractor performance (contract 0.15.89): demo thresholds, kept in memory; the report is computed from them in the mock like the API does. */
 const PERF_DEFAULT = { min_sample: 3, snag_overdue_pct: { amber: 10, red: 25 }, snag_return_pct: { amber: 20, red: 40 }, quality_fail_pct: { amber: 10, red: 20 }, contract_expiry_days: { amber: 60, red: 15 } };
 interface AlertRuleRow {
-  id: string; code: string; kind: 'weekly_status_missing' | 'record_idle' | 'advance_unsettled' | 'invoice_due_soon'; params: Record<string, unknown>; audience: Record<string, unknown>;
-  title_en: string; title_ar: string; body_en: string; body_ar: string; link: string | null; enabled: boolean; version: number;
+  id: string; code: string; kind: 'weekly_status_missing' | 'record_idle' | 'kpi_threshold' | 'advance_unsettled' | 'invoice_due_soon'; params: Record<string, unknown>; audience: Record<string, unknown>;
+  title_en: string; title_ar: string; body_en: string; body_ar: string; link: string | null; enabled: boolean; locked: boolean; version: number;
   created_at: string; updated_at: string;
 }
 const ALERT_RULES: AlertRuleRow[] = [
@@ -39,7 +39,7 @@ const ALERT_RULES: AlertRuleRow[] = [
     id: '00000000-0000-4000-8000-000000000001', code: 'weekly-status-missing', kind: 'weekly_status_missing', params: {}, audience: { type: 'system_admin' },
     title_en: 'Weekly status missing: {{region}}', title_ar: 'تحديث أسبوعي مفقود: {{region}}',
     body_en: 'No Weekly status update was filed for {{region}} this working week.', body_ar: 'لم يُقدَّم تحديث الحالة الأسبوعي لمنطقة {{region}} هذا الأسبوع.',
-    link: '/project-status', enabled: true, version: 1, created_at: '2026-11-27T00:00:00.000Z', updated_at: '2026-11-27T00:00:00.000Z',
+    link: '/project-status', enabled: true, locked: false, version: 1, created_at: '2026-11-27T00:00:00.000Z', updated_at: '2026-11-27T00:00:00.000Z',
   },
 ];
 let perf = { thresholds: structuredClone(PERF_DEFAULT), version: 1 };
@@ -1524,7 +1524,8 @@ export const settingsHandlers = [
     return HttpResponse.json({
       rules: ALERT_RULES,
       catalogue: {
-        kinds: [{ kind: 'weekly_status_missing', params: [] }, { kind: 'record_idle', params: ['register_key', 'state', 'days'] }, { kind: 'advance_unsettled', params: ['days'] }, { kind: 'invoice_due_soon', params: ['days'] }],
+        kinds: [{ kind: 'weekly_status_missing', params: [] }, { kind: 'record_idle', params: ['register_key', 'state', 'days'] }, { kind: 'kpi_threshold', params: ['kpi', 'op', 'value'] }, { kind: 'advance_unsettled', params: ['days'] }, { kind: 'invoice_due_soon', params: ['days'] }],
+        kpis: [{ code: 'sla_breach', label_en: 'SLA breaches (open tasks past the maximum)', label_ar: 'تجاوزات SLA', unit: 'pct', direction: 'lower' }, { code: 'stale_tasks', label_en: 'Stale tasks (idle for N working days)', label_ar: 'مهام راكدة', unit: 'pct', direction: 'lower' }],
         audiences: ['system_admin', 'module'],
         registers: [{ register_key: 'issues', name_en: 'Issue Log', name_ar: 'سجل البلاغات', module_key: 'sites' }, { register_key: 'change_control', name_en: 'Change Control Log', name_ar: 'سجل التحكم بالتغيير', module_key: 'sites' }],
         modules: [{ key: 'sites', name_en: 'Sites' }, { key: 'procurement', name_en: 'Procurement' }],
@@ -1535,14 +1536,14 @@ export const settingsHandlers = [
     const g = needAdmin(); if (g) return g;
     const b = await body<Record<string, unknown>>(request);
     const r = reasonErr(b.reason as string | undefined); if (r) return r;
-    if (typeof b.kind !== 'string' || !['weekly_status_missing', 'record_idle', 'advance_unsettled', 'invoice_due_soon'].includes(b.kind)) return fields({ path: '/kind', code: 'invalid' });
+    if (typeof b.kind !== 'string' || !['weekly_status_missing', 'record_idle', 'kpi_threshold', 'advance_unsettled', 'invoice_due_soon'].includes(b.kind)) return fields({ path: '/kind', code: 'invalid' });
     if (ALERT_RULES.some((x) => x.code === b.code)) return fields({ path: '/code', code: 'conflict' });
     const row = {
       id: `00000000-0000-4000-8000-${String(ALERT_RULES.length + 1).padStart(12, '0')}`,
-      code: String(b.code), kind: b.kind as 'weekly_status_missing' | 'record_idle' | 'advance_unsettled' | 'invoice_due_soon',
+      code: String(b.code), kind: b.kind as 'weekly_status_missing' | 'record_idle' | 'kpi_threshold' | 'advance_unsettled' | 'invoice_due_soon',
       params: (b.params ?? {}) as Record<string, unknown>, audience: (b.audience ?? { type: 'system_admin' }) as Record<string, unknown>,
       title_en: String(b.title_en ?? ''), title_ar: String(b.title_ar ?? ''), body_en: String(b.body_en ?? ''), body_ar: String(b.body_ar ?? ''),
-      link: (b.link ?? null) as string | null, enabled: b.enabled !== false, version: 1,
+      link: (b.link ?? null) as string | null, enabled: b.enabled !== false, locked: b.locked === true, version: 1,
       created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
     };
     ALERT_RULES.push(row);
@@ -1556,10 +1557,11 @@ export const settingsHandlers = [
     const p = ver(request, row.version); if (p) return p;
     const b = await body<Record<string, unknown>>(request);
     const r = reasonErr(b.reason as string | undefined); if (r) return r;
+    if (row.locked && b.locked !== false) return fields({ path: '/locked', code: 'rule_locked' });
     Object.assign(row, {
       kind: b.kind ?? row.kind, params: b.params ?? row.params, audience: b.audience ?? row.audience,
       title_en: b.title_en ?? row.title_en, title_ar: b.title_ar ?? row.title_ar, body_en: b.body_en ?? row.body_en, body_ar: b.body_ar ?? row.body_ar,
-      link: b.link === undefined ? row.link : b.link, enabled: b.enabled ?? row.enabled, version: row.version + 1, updated_at: new Date().toISOString(),
+      link: b.link === undefined ? row.link : b.link, enabled: b.enabled ?? row.enabled, locked: b.locked ?? row.locked, version: row.version + 1, updated_at: new Date().toISOString(),
     });
     return HttpResponse.json({ id: row.id, version: row.version });
   }),

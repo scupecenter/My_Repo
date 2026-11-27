@@ -56,6 +56,45 @@ describe('Settings, alert rules', () => {
     expect(dialog).not.toBeInTheDocument();
   });
 
+  it('creates a kpi_threshold rule with its own editable threshold and locks it', async () => {
+    const u = userEvent.setup();
+    await signIn('pm');
+    page();
+    await u.click(await screen.findByTestId('ar-new'));
+    await u.type(screen.getByTestId('ar-code'), 'sla-breach-high');
+    await u.selectOptions(screen.getByTestId('ar-kind'), 'kpi_threshold');
+    expect(screen.getByTestId('ar-save')).toBeDisabled();
+    await u.selectOptions(screen.getByTestId('ar-kpi'), 'sla_breach');
+    await u.selectOptions(screen.getByTestId('ar-op'), 'above');
+    await u.type(screen.getByTestId('ar-value'), '8');
+    await u.type(screen.getByTestId('ar-title_en'), 'SLA breaches above {{threshold}}');
+    await u.type(screen.getByTestId('ar-title_ar'), 'تجاوزات SLA فوق {{threshold}}');
+    await u.type(screen.getByTestId('ar-body_en'), '{{kpi}} is {{value}}.');
+    await u.type(screen.getByTestId('ar-body_ar'), '{{kpi}} الآن {{value}}.');
+    expect(screen.getByTestId('ar-save')).toBeEnabled();
+    await u.click(screen.getByTestId('ar-save'));
+    await u.type(await screen.findByTestId('ar-dialog-reason'), 'Watch the SLA band');
+    await u.click(screen.getByTestId('ar-dialog-submit'));
+    expect(await screen.findByTestId('ar-row-sla-breach-high')).toHaveTextContent('KPI crosses a threshold');
+
+    // lock it: the row shows Locked, and a later edit that changes anything else is refused rule_locked until the unlock
+    await u.click(screen.getByTestId('ar-edit-sla-breach-high'));
+    await u.click(screen.getByTestId('ar-locked'));
+    await u.click(screen.getByTestId('ar-save'));
+    await u.type(await screen.findByTestId('ar-dialog-reason'), 'Freeze the rule');
+    await u.click(screen.getByTestId('ar-dialog-submit'));
+    const row = await screen.findByTestId('ar-row-sla-breach-high');
+    expect(row.children[4]).toHaveTextContent('Yes');
+
+    await u.click(screen.getByTestId('ar-edit-sla-breach-high'));
+    await u.clear(screen.getByTestId('ar-title_en'));
+    await u.type(screen.getByTestId('ar-title_en'), 'Changed while locked');
+    await u.click(screen.getByTestId('ar-save'));
+    await u.type(await screen.findByTestId('ar-dialog-reason'), 'Try an edit');
+    await u.click(screen.getByTestId('ar-dialog-submit'));
+    expect(await screen.findByRole('alert')).toHaveTextContent('rule_locked');
+  });
+
   it('offers the two financial kinds with an optional days value', async () => {
     const u = userEvent.setup();
     await signIn('pm');
