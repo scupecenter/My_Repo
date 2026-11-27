@@ -7,6 +7,7 @@ import type { Notification } from '@/api/types';
 import { useInbox, useNotificationOps, type InboxFilter } from '@/api/x';
 import { errText } from '@/components/FormDialog';
 import { PageHeader, Toolbar } from '@/components/PageHeader';
+import { SavedViews } from '@/components/SavedViews';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/States';
 import { TaskDrawer } from '@/components/TaskDrawer';
 import { useToast } from '@/components/Toast';
@@ -94,6 +95,8 @@ export function Inbox() {
       <Toolbar
         settings="inbox"
         filters={<>
+          <SavedViews<Record<string, unknown>> screen="inbox" value={{ unread: filter.unread ? '1' : '', snoozed: filter.snoozed === 'hide' ? '' : filter.snoozed, kind: filter.kind, tab: tabParam ?? '' }} empty={{ unread: '', snoozed: '', kind: '', tab: '' }}
+            onApply={(v) => setF({ unread: String(v.unread ?? ''), snoozed: String(v.snoozed ?? ''), kind: String(v.kind ?? ''), tab: String(v.tab ?? ''), priority: '' })} />
           <div role="group" aria-label={t('inbox.show')} className="inline-flex overflow-hidden rounded-md border border-line">
             {([['', 'inbox.all'], ['1', 'inbox.unread']] as const).map(([v, k]) => (
               <button key={k} type="button" aria-pressed={(filter.unread ? '1' : '') === v} data-testid={`inbox-show-${v ? 'unread' : 'all'}`} onClick={() => setF({ unread: v })}

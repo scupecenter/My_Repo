@@ -61,6 +61,7 @@ function hitOption(hit: SearchHit, type: string, go: (to: string) => void): Opti
       <span className="block">
         <span className="block"><Highlighted text={hit.title} ranges={hit.match_ranges} /></span>
         {hit.subtitle && <span className="block text-xs text-mute">{hit.subtitle}</span>}
+        {hit.snippet && <span className="block text-xs italic text-mute" data-testid={`palette-snippet-${hit.id}`}>{hit.snippet}</span>}
       </span>
     ),
   };

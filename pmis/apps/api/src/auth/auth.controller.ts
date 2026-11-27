@@ -66,6 +66,27 @@ export class AuthController {
     return session;
   }
 
+  /** Second step with a passkey (0294): the challenge for the pending sign-in. */
+  @Public()
+  @Post('local/2fa/passkey/options')
+  @HttpCode(200)
+  async passkeyOptions(@Req() req: Request): Promise<{ available: boolean; options: Record<string, unknown> | null }> {
+    this.needJson(req);
+    return this.auth.passkeySignInOptions(this.twoFactor.pendingTokenFrom(req), req.ip ?? null, req.id ?? '');
+  }
+
+  /** Second step with a passkey (0294) instead of the code. */
+  @Public()
+  @Post('local/2fa/passkey')
+  @HttpCode(200)
+  async passkeySignIn(@Req() req: Request, @Res({ passthrough: true }) res: Response, @Body() body: unknown): Promise<SessionBody> {
+    this.needJson(req);
+    const { token, body: session } = await this.auth.passkeySignIn(this.twoFactor.pendingTokenFrom(req), body, req.ip ?? null, req.header('user-agent'), req.id ?? '');
+    this.twoFactor.clearPendingCookie(res);
+    this.sessions.setCookie(res, token);
+    return session;
+  }
+
   /** Second step of a sign-in from a new browser (0292): the code mailed to the account. Same pending cookie as the two-factor step. */
   @Public()
   @Post('local/2fa/device-code')
