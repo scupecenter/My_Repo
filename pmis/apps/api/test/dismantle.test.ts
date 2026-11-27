@@ -53,6 +53,7 @@ describe("enable and list", () => {
       "work_start_date",
       "work_end_date",
       "closing_rn_ref",
+      "closing_rn_id",
       "closed",
     ]);
     expect(
