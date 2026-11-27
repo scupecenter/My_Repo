@@ -6583,6 +6583,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/registers/change_control/order-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The approved, active Procurement orders a Change Control record may name (0.15.225)
+         * @description 0.15.225. The approved Procurement versions in force, not cancelled, that the caller can see; of the site `site_id` when it is given. Needs the Change Control module; only the orders in regions where the caller also holds the Procurement view right (the responsibility matrix) are listed, and the same right is checked when the record is saved.
+         */
+        get: operations["listChangeControlOrderOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/registers/quality/order-options": {
         parameters: {
             query?: never;
@@ -15794,16 +15814,26 @@ export interface components {
             default_tab: "all" | "priority" | "mentions" | "tasks" | "approvals" | "system";
             priority_kinds: ("mention" | "followed_change" | "task_assigned" | "task_returned" | "task_rejected" | "task_approved" | "approval_due" | "reassigned" | "absence_alert" | "idle_task_alert" | "no_holder" | "system")[];
         };
+        /** @description 0.15.251. How the bell opens the notifications. */
+        UiPanel: {
+            /** @enum {string} */
+            mode: "popover" | "side_panel";
+            /** @enum {string} */
+            width: "narrow" | "medium" | "wide";
+            show_tabs: boolean;
+        };
         /** @description 0.15.185. The sections of the interface features setting; every section is complete. */
         UiFeatures: {
             avatars: components["schemas"]["UiAvatars"];
             new_badge: components["schemas"]["UiNewBadge"];
             inbox: components["schemas"]["UiInbox"];
+            panel: components["schemas"]["UiPanel"];
         };
         UiFeaturesPatch: {
             avatars?: components["schemas"]["UiAvatars"];
             new_badge?: components["schemas"]["UiNewBadge"];
             inbox?: components["schemas"]["UiInbox"];
+            panel?: components["schemas"]["UiPanel"];
         };
         UiFeaturesSetting: {
             sections: components["schemas"]["UiFeatures"];
@@ -32780,6 +32810,33 @@ export interface operations {
         };
     };
     listIssueOrderOptions: {
+        parameters: {
+            query?: {
+                site_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The orders. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["WarehouseOrderOption"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listChangeControlOrderOptions: {
         parameters: {
             query?: {
                 site_id?: string;
