@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { ProfileUiPrefs } from '../settings/ui-prefs';
 import { Prisma } from '@prisma/client';
 import { contentVersion } from '../common/etag';
 import { DbService } from '../db/db.service';
@@ -22,8 +23,8 @@ export interface UserDto extends UserRef {
   ui_brand: 'current' | 'aljeel' | 'executive' | 'field' | 'obsidian' | 'sahara' | null;
   /** 0130: the design the user sees (ui_effective_brand). */
   brand: 'current' | 'aljeel' | 'executive' | 'field' | 'obsidian' | 'sahara';
-  /** 0241: the stored personal appearance choices; {} = the organization defaults. */
-  ui_prefs: Record<string, string>;
+  /** 0241: the stored personal appearance choices; {} = the organization defaults. 0197: may carry the key `sidebar` (the personal side menu). */
+  ui_prefs: ProfileUiPrefs;
   /** 0241: the appearance the user sees (ui_effective_prefs: own choices, else the organization defaults). */
   appearance: Record<string, string>;
   is_break_glass: boolean;
@@ -73,7 +74,7 @@ interface UserDbRow {
   theme: string;
   ui_brand: string | null;
   brand: string;
-  ui_prefs: Record<string, string>;
+  ui_prefs: ProfileUiPrefs;
   appearance: Record<string, string>;
   is_break_glass: boolean;
   last_login_at: Date | null;

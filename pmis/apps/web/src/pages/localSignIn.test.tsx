@@ -273,7 +273,10 @@ describe('hybrid mode list', () => {
       // contract 0.4.10 and 0.7.1: phase 4b (inbox, follow, register comments, time in state, workload, blocked-by, status updates)
       'GET /notifications', 'POST /notifications/read-all', 'POST /notifications/:id/read', 'POST /notifications/:id/unread', 'POST /notifications/:id/snooze',
       'GET /me/follows', 'PUT /sites/:id/follow', 'DELETE /sites/:id/follow', 'PUT /registers/:key/records/:id/follow', 'DELETE /registers/:key/records/:id/follow',
-      'GET /registers/:key/records/:id/comments', 'POST /registers/:key/records/:id/comments', 'GET /tasks/:id/time-in-state', 'GET /tasks/:id/blocked-by',
+      'GET /registers/:key/records/:id/comments', 'POST /registers/:key/records/:id/comments',
+      // contract 0.15.247: a reaction and a resolved flag on any comment
+      'PUT /comments/:id/reactions', 'DELETE /comments/:id/reactions', 'PUT /comments/:id/resolved', 'DELETE /comments/:id/resolved',
+      'GET /tasks/:id/time-in-state', 'GET /tasks/:id/blocked-by',
       'GET /reports/time-in-state', 'GET /reports/workload', 'GET /status-updates', 'POST /status-updates', 'PATCH /status-updates/:id',
       // contract 0.7.2: the main dashboard, Project Status, weight sets
       'GET /dashboard', 'GET /dashboard/export', 'GET /project-status', 'GET /project-status/snapshots',
@@ -289,6 +292,8 @@ describe('hybrid mode list', () => {
       'GET /settings/team-scope-match', 'PUT /settings/team-scope-match',
       // contract 0.12.9: P4b contractor rules and the two reports
       'GET /settings/contractor-rules', 'PUT /settings/contractor-rules', 'GET /reports/team-scope-mismatch', 'GET /reports/contractors-completeness', 'GET /reports/gecol-hlc-counts', 'GET /reports/contractor-performance', 'GET /settings/contractor-performance', 'PUT /settings/contractor-performance',
+      // contract 0.15.242: the generic alert rules (apps/api: settings; migration 0342)
+      'GET /settings/alert-rules', 'POST /settings/alert-rules', 'PUT /settings/alert-rules/:id',
       // contract 0.9.2: the self-service profile (details, email change and its decision, password, two-factor self-service, enforced mark)
       'GET /me/profile', 'GET /me/sessions', 'POST /me/sessions/revoke-others', 'POST /me/sessions/:id/revoke', 'PATCH /me/profile', 'PATCH /me/preferences', 'POST /me/password', 'POST /me/email-change', 'DELETE /me/email-change',
       'POST /me/two-factor/enrol/start', 'POST /me/two-factor/enrol/confirm', 'POST /me/two-factor/disable',

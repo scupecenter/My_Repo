@@ -117,5 +117,19 @@ BEGIN
   EXECUTE def;
 END $$;
 
+-- data_reset_core is an accumulating function too: patch the stored text idempotently. comment_reactions goes with its parent comment
+-- (ON DELETE CASCADE), next to comment_mentions in the cascaded list, or the coverage check stops every plan (CI: settings-data-reset).
+DO $$
+DECLARE def text;
+BEGIN
+  def := pg_get_functiondef('public.data_reset_core(boolean,text,jsonb,uuid,uuid,text[],uuid[])'::regprocedure);
+  IF position('''comment_reactions''' IN def) = 0 THEN
+    IF position('''team_scope_checks'', ''comment_mentions'', ''site_gate_events'',' IN def) = 0 THEN RAISE EXCEPTION 'data_reset_core: the cascaded anchor was not found'; END IF;
+    def := replace(def, '''team_scope_checks'', ''comment_mentions'', ''site_gate_events'',',
+      '''team_scope_checks'', ''comment_mentions'', ''comment_reactions'', ''site_gate_events'',');
+  END IF;
+  EXECUTE def;
+END $$;
+
 -- the reset role reads every classified table and deletes the rows of a MIXED table part by part (0152 privilege check)
 GRANT SELECT, DELETE ON public.comment_reactions TO pmis_reset_owner;

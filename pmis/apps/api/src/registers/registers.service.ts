@@ -159,7 +159,7 @@ interface FieldRow {
 interface ChildColumn { code: string; label_en?: string; label_ar?: string | null; type: string; required?: boolean; list_catalogue?: string }
 interface CatalogueInfo {
   ref: { code: string; status: string; critical: boolean; allow_other: boolean };
-  options: { value: string; label_en: string; label_ar: string | null; groups?: string[] }[];
+  options: { value: string; label_en: string; label_ar: string | null; groups?: string[]; colour?: string | null }[];
   all: Set<string>;
 }
 const childColumns = (f: { field_type: string; options: unknown }): ChildColumn[] =>
@@ -270,13 +270,13 @@ export class RegistersService {
     if (codes.length === 0) return out;
     const cats = await this.db.tx.$queryRaw<{ code: string; status: string; critical: boolean; allow_other: boolean }[]>(Prisma.sql`
       SELECT code, status, critical, allow_other FROM list_catalogues WHERE code = ANY(${codes}::text[])`);
-    const vals = await this.db.tx.$queryRaw<{ catalogue_code: string; code: string; label_en: string; label_ar: string | null; groups: string[]; is_active: boolean }[]>(Prisma.sql`
-      SELECT catalogue_code, code, label_en, label_ar, groups, is_active FROM list_values WHERE catalogue_code = ANY(${codes}::text[]) ORDER BY sort_order, code COLLATE "C"`);
+    const vals = await this.db.tx.$queryRaw<{ catalogue_code: string; code: string; label_en: string; label_ar: string | null; groups: string[]; is_active: boolean; colour: string | null }[]>(Prisma.sql`
+      SELECT catalogue_code, code, label_en, label_ar, groups, is_active, colour FROM list_values WHERE catalogue_code = ANY(${codes}::text[]) ORDER BY sort_order, code COLLATE "C"`);
     for (const c of cats) {
       const mine = vals.filter((v) => v.catalogue_code === c.code);
       out.set(c.code, {
         ref: { code: c.code, status: c.status, critical: c.critical, allow_other: c.allow_other },
-        options: mine.filter((v) => v.is_active).map((v) => ({ value: v.code, label_en: v.label_en, label_ar: v.label_ar, ...(v.groups.length ? { groups: v.groups } : {}) })),
+        options: mine.filter((v) => v.is_active).map((v) => ({ value: v.code, label_en: v.label_en, label_ar: v.label_ar, ...(v.groups.length ? { groups: v.groups } : {}), ...(v.colour ? { colour: v.colour } : {}) })),
         all: new Set(mine.map((v) => v.code)),
       });
     }
@@ -302,7 +302,7 @@ export class RegistersService {
     const out: unknown[] = [];
     const lockedCols = new Set((await this.db.tx.$queryRaw<{ field_code: string }[]>(Prisma.sql`SELECT field_code FROM register_column_locks WHERE register_key = ${key} AND unlocked_at IS NULL`)).map((x) => x.field_code));
     for (const f of rows) {
-      let options: { value: string; label_en: string; label_ar?: string | null }[] | undefined;
+      let options: { value: string; label_en: string; label_ar?: string | null; colour?: string | null }[] | undefined;
       const cat = f.list_catalogue ? cats.get(f.list_catalogue) : undefined;
       // the permit streams (0054, Q220) keep their names even when the list catalogue (0057) holds only the codes
       const labels = key === 'permits_hse' && f.code === 'permit_stream' ? PERMIT_STREAMS : undefined;

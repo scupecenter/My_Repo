@@ -154,6 +154,11 @@ export const REAL_API_AUTH_USERS = [
   ['delete', '/registers/:key/records/:id/follow'],
   ['get', '/registers/:key/records/:id/comments'],
   ['post', '/registers/:key/records/:id/comments'],
+  // Contract 0.15.247 (0346): a reaction and a resolved flag on any comment.
+  ['put', '/comments/:id/reactions'],
+  ['delete', '/comments/:id/reactions'],
+  ['put', '/comments/:id/resolved'],
+  ['delete', '/comments/:id/resolved'],
   ['get', '/tasks/:id/time-in-state'],
   ['get', '/tasks/:id/blocked-by'],
   ['get', '/reports/time-in-state'],
@@ -211,6 +216,10 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/reports/contractor-performance'],
   ['get', '/settings/contractor-performance'],
   ['put', '/settings/contractor-performance'],
+  // Contract 0.15.242: the generic alert rules (apps/api: settings; migration 0342).
+  ['get', '/settings/alert-rules'],
+  ['post', '/settings/alert-rules'],
+  ['put', '/settings/alert-rules/:id'],
   // Contract 0.9.2: the self-service profile (apps/api: me, users; migration 0044). Details, email change request and its decision, password, two-factor self-service, enforced mark.
   ['get', '/me/profile'],
   ['get', '/me/sessions'],
