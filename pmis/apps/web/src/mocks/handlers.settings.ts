@@ -370,6 +370,7 @@ const DASH_CATALOGUE = {
     { code: 'gates_issues_delay', label_en: 'Blocked gates, issues and delay attribution', label_ar: 'البوابات المعطلة والقضايا والتأخير' },
     { code: 'regions', label_en: 'Regions', label_ar: 'المناطق' },
     { code: 'ops_procurement', label_en: 'Procurement and materials', label_ar: 'المشتريات والمواد' },
+    { code: 'ops_scurve', label_en: 'Progress curve: planned vs actual, velocity and forecast', label_ar: 'منحنى التقدم: المخطط مقابل الفعلي والسرعة والتوقع' },
   ],
 };
 const dashSeedThresholds = Object.fromEntries(DASH_CATALOGUE.kpis.map((k) => [k.code, { green: k.default_green, amber: k.default_amber }]));
@@ -393,6 +394,15 @@ const SLA_TASKS: MockSlaTask[] = [
 ];
 const slaCounts = () => ({ total: SLA_TASKS.length, set: SLA_TASKS.filter((x) => x.mode === 'set').length, none: SLA_TASKS.filter((x) => x.mode === 'none').length, undecided: SLA_TASKS.filter((x) => x.mode === 'undecided').length, in_draft: SLA_TASKS.filter((x) => x.in_draft).length });
 
+/** GET/PUT/POST /recycle-bin (contract 0.15.98): demo voided records. */
+const BIN = {
+  retention_days: 90, version: 1,
+  items: [
+    { id: '00000000-0000-4000-8000-0000000000a1', register_key: 'procurement', register_name_en: 'Procurement', register_name_ar: null, label: 'GN-0012 / Procurement v1', site_id: null, site_code: 'GN-0012', version: 4, version_no: 1, voided_at: '2026-11-20T09:00:00.000Z', voided_by: null, voided_by_name: 'Demo Admin', void_reason: 'Entered on the wrong site', restorable_until: '2027-02-18T09:00:00.000Z', blocked: null as string | null },
+    { id: '00000000-0000-4000-8000-0000000000a2', register_key: 'gecol', register_name_en: 'GECOL', register_name_ar: null, label: 'GN-0031 / GECOL v1', site_id: null, site_code: 'GN-0031', version: 3, version_no: 1, voided_at: '2026-11-22T09:00:00.000Z', voided_by: null, voided_by_name: 'Demo Admin', void_reason: 'Duplicate', restorable_until: '2027-02-20T09:00:00.000Z', blocked: 'site_slot_taken' },
+  ],
+};
+
 /** GET /matrix/coverage (contract 0.15.94): demo numbers only. */
 const MATRIX_COVERAGE = {
   workflow_version: 1,
@@ -409,8 +419,37 @@ const MATRIX_COVERAGE = {
   ],
 };
 
+/** Preventive-maintenance schedules (contract 0.15.161): the list in memory; "Create draft" only moves the next due date (the mock saves no record). */
+type MockPm = { id: string; name_en: string; name_ar?: string | null; register_key: string; site_id?: string | null; record_type?: string | null; data: Record<string, unknown>; every: number; unit: 'week' | 'month'; next_due: string; active?: boolean; last_generated_at?: string; last_record_id?: string };
+let pmState = { version: 0, schedules: [] as MockPm[], updated_at: null as string | null, updated_by: null as null | { id: string; display_name: string } };
+const PM_CATALOGUE = { registers: [{ key: 'procurement', name_en: 'Procurement', name_ar: 'المشتريات', site_scoped: false }], units: ['week', 'month'] };
+const pmView = () => ({ ...pmState, today: tripoliToday(), catalogue: PM_CATALOGUE });
+
 export const settingsHandlers = [
+  http.get(`${B}/recycle-bin`, () => { const g = guard(); if (g) return g; return HttpResponse.json(BIN, tag(BIN.version)); }),
+  http.put(`${B}/recycle-bin/retention`, async ({ request }) => { const g = guard(); if (g) return g; const b = (await request.json()) as { retention_days: number }; BIN.retention_days = b.retention_days; BIN.version += 1; return HttpResponse.json({ retention_days: BIN.retention_days, version: BIN.version }, tag(BIN.version)); }),
+  http.post(`${B}/recycle-bin/:id/restore`, ({ params }) => { const g = guard(); if (g) return g; const i = BIN.items.findIndex((x) => x.id === params.id); if (i < 0) return HttpResponse.json({ code: 'not_found' }, { status: 404 }); const [r] = BIN.items.splice(i, 1); return HttpResponse.json({ id: r!.id, register_key: r!.register_key, state: 'entry', version: r!.version + 1 }); }),
   http.get(`${B}/matrix/coverage`, () => { const g = guard(); if (g) return g; return HttpResponse.json(MATRIX_COVERAGE); }),
+  // ------------------------------------------------------------------ preventive-maintenance schedules (contract 0.15.161)
+  http.get(`${B}/settings/pm-schedules`, () => { const g = guard(); if (g) return g; return HttpResponse.json(pmView(), tag(pmState.version)); }),
+  http.put(`${B}/settings/pm-schedules`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    const b = (await request.json()) as { schedules: MockPm[] };
+    pmState = { ...pmState, version: pmState.version + 1, schedules: b.schedules.map((x) => ({ ...x, last_generated_at: pmState.schedules.find((o) => o.id === x.id)?.last_generated_at, last_record_id: pmState.schedules.find((o) => o.id === x.id)?.last_record_id })), updated_at: new Date().toISOString() };
+    return HttpResponse.json(pmView(), tag(pmState.version));
+  }),
+  http.post(`${B}/pm-schedules/:id/generate`, ({ params }) => {
+    const g = guard(); if (g) return g;
+    const x = pmState.schedules.find((o) => o.id === params.id);
+    if (!x) return problem(404, 'not_found', 'Schedule not found');
+    const today = tripoliToday();
+    if (x.active === false || x.next_due > today) return problem(409, 'invalid_transition', 'This schedule is not due.');
+    let d = new Date(`${x.next_due}T00:00:00Z`);
+    while (d.toISOString().slice(0, 10) <= today) { if (x.unit === 'week') d = new Date(d.getTime() + 7 * x.every * 86400000); else d.setUTCMonth(d.getUTCMonth() + x.every); }
+    x.next_due = d.toISOString().slice(0, 10); x.last_generated_at = new Date().toISOString(); x.last_record_id = crypto.randomUUID();
+    pmState = { ...pmState, version: pmState.version + 1 };
+    return HttpResponse.json({ record_id: x.last_record_id, register_key: x.register_key, next_due: x.next_due }, { status: 201 });
+  }),
   // ------------------------------------------------------------------ dashboard settings (F20, contract 0.15.24)
   http.get(`${B}/settings/dashboard`, () => { const g = guard(); if (g) return g; return HttpResponse.json(dashView(), tag(dashState.version)); }),
   http.put(`${B}/settings/dashboard`, async ({ request }) => {

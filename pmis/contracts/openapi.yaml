@@ -32,6 +32,12 @@ info:
 
     ## Versions
     - 0.15.224 (2026-11-27): related records of a register record (migration 0324; CHANGELOG RelatedRecords). Additive and read only. New `GET /registers/{register_key}/{entity_id}/related` (`listRelatedRecords`): the current records linked to this record in both directions (`direction` `to`: the record this one names; `from`: records that name this one), grouped by register and link field (procurement order, Procurement request, risk, closing receipt). A group is listed only when the caller holds the view right of that register in that record's region (the responsibility matrix decides); nothing is stored and no permission changes.
+    - 0.15.161 (2026-11-27): recurring preventive-maintenance schedules that create drafts only (migration 0261; CHANGELOG PmSchedules). Additive. `GET`/`PUT /settings/pm-schedules` (`getPmSchedules`, `setPmSchedules`) and `POST /pm-schedules/{schedule_id}/generate` (`generatePmScheduleDraft`). A schedule never creates anything by itself: a person presses Create draft on a due schedule and the draft is saved through the register's own create path as that person; no permission is widened.
+    - 0.15.221 (2026-11-27): additive (migration 0321; CHANGELOG DismantleClosingRnLink). A Dismantle part closes by naming its signed Warehouse RN: new optional field `closing_rn_id` (entity id of a received RN of the part, cw_rn / te_rn, same site; needs the Warehouse view right in the RN's region). When set, `closing_rn_ref` is read from the RN's Doc No. and cannot be typed; without a link the typed reference still works. Field errors `rn_not_available`, `rn_other_site`, `invalid`. `GET /registers/dismantle/rn-options` lists the RNs. Also corrects the descriptions of the Issue log and Quality order-options paths.
+    - 0.15.220 (2026-11-27): additive in shape, looser in rule (migration 0320; CHANGELOG WarehouseDocOrderLink). A warehouse delivery note (`cw_dn`, `te_dn`) and a return note (`cw_rn`, `te_rn`) can name a Procurement order with `procurement_order_id`, like a receipt (PL / OPEN); the same derived fields and rules apply. Only a stock adjustment (`adj`) still answers 422 `receipt_only`. `GET /registers/procurement/{entity_id}/receipts` lists the documents of every type except adjustments.
+    - 0.15.157 (2026-11-27): duplicate-site warnings at creation (owner approval relayed 2026-11-26). Additive, migration 0257. The exact Site ID was already refused (`duplicate`, 0.14.0); new warnings, never blocking, in `warnings` of `POST /sites`, `GET` and `PATCH /site-drafts/{id}` and now also in each open draft of `GET /site-drafts`: `similar_site_code` (same code ignoring case, spaces, dashes), `duplicate_name` (English or Arabic name, of a site or a waiting draft), `close_coordinates` (within 100 metres). A match in the same region names the site; a match in another region says only that one exists. `SiteDraftWarning.code` gains the three codes. No new path, no permission change.
+    - 0.15.111 (2026-11-27): duplicate-site warnings at creation (owner approval relayed 2026-11-26). Additive, migration 0202. The exact Site ID was already refused (`duplicate`, 0.14.0); new warnings, never blocking, in `warnings` of `POST /sites`, `GET` and `PATCH /site-drafts/{id}` and now also in each open draft of `GET /site-drafts`: `similar_site_code` (same code ignoring case, spaces, dashes), `duplicate_name` (English or Arabic name, of a site or a waiting draft), `close_coordinates` (within 100 metres). A match in the same region names the site; a match in another region says only that one exists. `SiteDraftWarning.code` gains the three codes. No new path, no permission change.
+    - 0.15.96 (2026-11-27): duplicate-site warnings at creation (owner approval relayed 2026-11-26). Additive, migration 0185. The exact Site ID was already refused (`duplicate`, 0.14.0); new warnings, never blocking, in `warnings` of `POST /sites`, `GET` and `PATCH /site-drafts/{id}` and now also in each open draft of `GET /site-drafts`: `similar_site_code` (same code ignoring case, spaces, dashes), `duplicate_name` (English or Arabic name, of a site or a waiting draft), `close_coordinates` (within 100 metres). A match in the same region names the site; a match in another region says only that one exists. `SiteDraftWarning.code` gains the three codes. No new path, no permission change.
     - 0.15.130 (2026-11-27): the admin alert `backup_missing` (owner approval relayed 2026-11-26). Additive, migration 0240. When no backup succeeded in the last 24 hours (the System Log rows the data reset reads) a security alert `backup_missing` (default severity high, configurable like the other rules) is raised once per calendar day by the job `backup_check` (every 6 hours) and one System Log row (source `backup_check`) is written. `SecurityAlertRule` and `AlertSeverityMap` gain `backup_missing`. No new endpoint.
     - 0.15.95 (2026-11-27): the admin alert `backup_missing` (owner approval relayed 2026-11-26). Additive, migration 0184. When no backup succeeded in the last 24 hours (the System Log rows the data reset reads) a security alert `backup_missing` (default severity high, configurable like the other rules) is raised once per calendar day by the job `backup_check` (every 6 hours) and one System Log row (source `backup_check`) is written. `SecurityAlertRule` and `AlertSeverityMap` gain `backup_missing`. No new endpoint.
     - 0.15.98 (2026-11-27): the dashboard follow-up sections (owner approval 2026-11-26, dashboard proposals item 1; migration 0230). Additive and read only. New `GET /dashboard/ops` (`getDashboardOps`, `DashboardOps`): the sections that follow the operations beyond F13, each part `available: false` when the caller may not see its module. First section `procurement`: the open orders (order status not one of the closing statuses of the contractor rules, as in `GET /reports/contractor-performance`), the PRs waiting for a PO/WO and the open PO/WOs, each aged in calendar days and bucketed 0-7, 8-14, 15-30, over 30, and the materials position: the receive rate (dispatched against required of `warehouse_site_qty` over the active, not cancelled sites), the count of sites with a shortage line, the top shortage lines with their contractor (the party of the site's newest open order; unattributed when none) and the shortage per contractor. No price is returned (no price is stored on a Procurement record). The dashboard settings catalogue gains the card `ops_procurement`, so the card shows, hides and orders per tab in Settings > Dashboard like every other card. No grant, role or permission change.
@@ -41,6 +47,7 @@ info:
     - 0.15.185 (2026-11-27): interface features setting (migration 0280, mirror `db/sql/279_ui_features.sql`; CHANGELOG UiFeatures). Additive. `GET`/`PUT /settings/ui-features`: one guarded setting with a closed object per feature section (`UiFeatures`: `avatars` and `new_badge` now; the inbox, menu, hub and mobile sections of items 6 to 15 are added by later migrations). Read by every signed-in user; written by a System Admin or an all-regions delegate of `admin.settings` with a reason and If-Match, audited.
     - 0.15.92 (2026-11-27): order picker for the Car dispatcher and Financial advances (CHANGELOG OrderPickersDispatchAdvances). Additive, no migration. `GET /registers/car_dispatcher/order-options` and `GET /registers/financial_advances/order-options` list the approved, active Procurement orders for the field `procurement_record_id` (the same list as the warehouse picker); each needs its own module view, and only orders in regions where the caller also holds the Procurement view right are listed.
     - 0.15.91 (2026-11-26): warehouse receipt to Procurement order link (migration 0181; CHANGELOG WarehouseProcurementLink). Additive. A warehouse receipt (PL or OPEN) may name the approved, active Procurement order it belongs to (`procurement_order_id`); `pr_no`, `po_wo_no` and `order_contractor` are then derived from the order (read only). New `GET /registers/warehouse/order-options` (the picker) and `GET /registers/procurement/{entity_id}/receipts` (the receipts against an order). New 422 codes `receipt_only`, `order_not_active`, `order_other_site`.
+    - 0.15.150 (2026-11-27): recycle bin for voided register records (migration 0250; CHANGELOG RecycleBin). Additive. (1) `GET /recycle-bin` (`getRecycleBin`): the voided records inside the retention window, with who voided, why, until when each can be restored and `blocked` when a restore is not possible. (2) `POST /recycle-bin/{id}/restore` (`restoreRegisterRecord`): returns the record to a draft (`entry`, level 1); needs If-Match, a reason and a step-up. (3) `PUT /recycle-bin/retention` (`setRecycleBinRetention`): 30 to 730 days, default 90. System Admin only; nothing is deleted.
     - 0.15.94 (2026-11-26): `GET /audit-log/field-history` takes `field` as optional (item 2 of the 2026-11-26 review; no migration). Additive. Without `field` it returns every field change of the record (a register record by its logical `entity_id`, a task by its task id), newest first, at most 200: the field diff of the History tab. Changes of a field the caller may not see are left out (a `hidden` field rule, and the amounts of Financial Advances for a caller who may not see amounts); the reader rules (decision B4) and the audit of the read are unchanged. `entity_type` and `entity_id` stay required (422).
     - 0.15.93 (2026-11-26): global search also reads tasks and warehouse items (owner approval 2026-11-26; no migration). Additive. `SearchType` gains `tasks` (the tasks of the sites the caller may view, same Site Register right and regions as the site list; the hit opens `/sites/{id}?task={task_id}`) and `warehouse_items` (needs `warehouse` view, as `GET /warehouse/items`; items are global). Read only, a group the caller may not read is left out as before.
     - 0.15.89 (2026-11-26): contractor performance view (migration 0180; CHANGELOG ContractorPerformance). Additive and read only. (1) `GET /reports/contractor-performance` (`getContractorPerformance`): one row per active contractor, computed on read from the delay days of its issues, its snags, its quality results, its Procurement orders and its contract end; nothing is typed or stored. (2) `GET/PUT /settings/contractor-performance` (`getContractorPerformanceThresholds`, `setContractorPerformanceThresholds`): the amber and red thresholds and the least sample, audited as `contractor_performance_thresholds_update`. No table, no permission change.
@@ -9105,6 +9112,87 @@ paths:
         '412': {$ref: '#/components/responses/PreconditionFailed'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /settings/pm-schedules:
+    get:
+      tags: [settings]
+      operationId: getPmSchedules
+      summary: The preventive-maintenance schedules the caller may see (0.15.161)
+      description: |
+        0.15.161. Schedules kept in the settings table as `pm.schedules`. A schedule says: every `every` weeks or months create a DRAFT record in register `register_key`
+        (for `site_id`, with the field values in `data`). `next_due` is the next date a draft is due; `today` is the calendar day of the system. A schedule never creates
+        anything by itself. A caller sees the schedules of the registers the caller may view; an administrator with `admin.settings` edit sees all of them.
+      responses:
+        '200':
+          description: The schedules.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PmSchedules'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+    put:
+      tags: [settings]
+      operationId: setPmSchedules
+      summary: Save the schedules (reason, If-Match, audited, versioned)
+      description: |
+        0.15.161. System Admin, or a delegation of `admin.settings` edit for all regions (403 `action_forbidden` otherwise). The body replaces the whole list; the run
+        history of a schedule (`last_generated_at`, `last_record_id`) is kept by the database. Field errors (422 `validation_failed`): `unknown_key`, `invalid`,
+        `duplicate`, `unknown_register`, `unknown_site`, `required` (a site is needed), `too_many`. One audit row per save.
+      x-db-path: admin_save_pm_schedules
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - {$ref: '#/components/schemas/WithReason'}
+              - {$ref: '#/components/schemas/PmSchedulesInput'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PmSchedules'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /pm-schedules/{schedule_id}/generate:
+    post:
+      tags: [registers]
+      operationId: generatePmScheduleDraft
+      summary: Create the draft of a due schedule, as the caller (0.15.161)
+      description: |
+        0.15.161. Saves ONE draft record (state `entry`) in the schedule's register through the register's own create path, as the caller: the register's rights, region
+        rules and field rules apply unchanged (no permission is widened). Then the next due date moves past today in steps of the schedule (never a backlog).
+        404 when the schedule does not exist or the caller may not view its register; 409 `invalid_transition` when the schedule is switched off or not due yet.
+        Errors of the register (403, 422) are returned as they are.
+      x-db-path: pm_schedule_mark_generated
+      parameters:
+      - {name: schedule_id, in: path, required: true, schema: {type: string}}
+      responses:
+        '201':
+          description: The draft was created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [record_id, register_key, next_due]
+                additionalProperties: false
+                properties:
+                  record_id: { type: string, format: uuid }
+                  register_key: { type: string }
+                  next_due: { type: [string, 'null'], format: date }
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
   /settings/kanban-wip:
     get:
       tags: [settings]
@@ -9521,6 +9609,29 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '422': {$ref: '#/components/responses/Unprocessable'}
+  /registers/dismantle/rn-options:
+    get:
+      tags: [registers]
+      operationId: listDismantleRnOptions
+      summary: The received Warehouse RNs that can close a Dismantle part (0.15.110)
+      description: |
+        0.15.110. Current, not voided, Received Warehouse RNs of the part (`record_type` cw gives cw_rn, te gives te_rn) on the site, in the regions where the caller holds the Warehouse view right (the responsibility matrix). Needs the Dismantle module.
+      parameters:
+      - {name: site_id, in: query, required: true, schema: {type: string, format: uuid}}
+      - {name: record_type, in: query, required: true, schema: {type: string, enum: [cw, te]}}
+      responses:
+        '200':
+          description: The RNs.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/DismantleRnOption' } }
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
   /registers/dismantle/order-options:
     get:
       tags: [registers]
@@ -9619,10 +9730,9 @@ paths:
     get:
       tags: [registers]
       operationId: listIssueOrderOptions
-      summary: The approved, active Procurement orders a warehouse receipt may name (0.15.90)
+      summary: The approved, active Procurement orders a Issue log record may name (0.15.95)
       description: |
-        0.15.95. The approved Procurement versions in force, not cancelled, that the caller can see; of the site `site_id` when it is given (a PL / OPEN receipt may have no site).
-        Needs the Issue log module; only the orders in regions where the caller also holds the Procurement view right (the responsibility matrix) are listed, and the same right is checked when a receipt is saved.
+        0.15.95. The approved Procurement versions in force, not cancelled, that the caller can see; of the site `site_id` when it is given. Needs the Issue log module; only the orders in regions where the caller also holds the Procurement view right (the responsibility matrix) are listed, and the same right is checked when the record is saved.
       parameters:
       - {name: site_id, in: query, required: false, schema: {type: string, format: uuid}}
       responses:
@@ -9642,10 +9752,9 @@ paths:
     get:
       tags: [registers]
       operationId: listQualityOrderOptions
-      summary: The approved, active Procurement orders a warehouse receipt may name (0.15.90)
+      summary: The approved, active Procurement orders a Quality record may name (0.15.95)
       description: |
-        0.15.95. The approved Procurement versions in force, not cancelled, that the caller can see; of the site `site_id` when it is given (a PL / OPEN receipt may have no site).
-        Needs the Quality module; only the orders in regions where the caller also holds the Procurement view right (the responsibility matrix) are listed, and the same right is checked when a receipt is saved.
+        0.15.95. The approved Procurement versions in force, not cancelled, that the caller can see; of the site `site_id` when it is given. Needs the Quality module; only the orders in regions where the caller also holds the Procurement view right (the responsibility matrix) are listed, and the same right is checked when the record is saved.
       parameters:
       - {name: site_id, in: query, required: false, schema: {type: string, format: uuid}}
       responses:
@@ -9667,7 +9776,7 @@ paths:
       operationId: listProcurementOrderReceipts
       summary: The warehouse receipts against a Procurement order (0.15.91)
       description: |
-        0.15.91. The current, not voided PL / OPEN receipts whose `procurement_order_id` is this order, with the number of lines and the total quantity. Needs the Procurement module
+        0.15.91 (0.15.111: every document type except an adjustment). The current, not voided warehouse documents whose `procurement_order_id` is this order, with the number of lines and the total quantity. Needs the Procurement module
         (view) and the Warehouse module; the receipts the caller cannot see are not listed.
       parameters:
       - {name: entity_id, in: path, required: true, schema: {type: string, format: uuid}}
@@ -10342,6 +10451,92 @@ paths:
         '412': {$ref: '#/components/responses/PreconditionFailed'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /recycle-bin:
+    get:
+      tags: [registers]
+      operationId: getRecycleBin
+      summary: Voided register records that can still be restored (System Admin)
+      description: 0.15.150. The records voided inside the retention window (newest first, at most 500). `blocked` is `open_version_exists` or `site_slot_taken` when a restore would break a rule. 403 for anyone but a System Admin.
+      responses:
+        '200':
+          description: The bin.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RecycleBin'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /recycle-bin/retention:
+    put:
+      tags: [registers]
+      operationId: setRecycleBinRetention
+      summary: Set the retention of the recycle bin (System Admin)
+      description: 0.15.150. Days a voided record can be restored, 30 to 730. Needs If-Match and a reason; audited as `recycle_bin_retention_update`.
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [retention_days, reason]
+              properties:
+                retention_days: { type: integer, minimum: 30, maximum: 730 }
+                reason: { type: string, minLength: 3, maxLength: 1000 }
+      responses:
+        '200':
+          description: The new retention.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [retention_days, version]
+                properties:
+                  retention_days: { type: integer }
+                  version: { type: integer }
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /recycle-bin/{id}/restore:
+    post:
+      tags: [registers]
+      operationId: restoreRegisterRecord
+      summary: Restore a voided register record to a draft (System Admin)
+      description: 0.15.150. Only a voided record inside the retention window; it returns as `entry`, level 1, and goes through the workflow again. Refused when a newer open version exists or the site already has another record in a one-per-site register. Needs If-Match (the record version), a reason and a step-up. Audited as `register_record_restore`.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [reason]
+              properties:
+                reason: { type: string, minLength: 3, maxLength: 1000 }
+      responses:
+        '200':
+          description: The restored record.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, register_key, state, version]
+                properties:
+                  id: { type: string, format: uuid }
+                  register_key: { type: string }
+                  state: { type: string, enum: [entry] }
+                  version: { type: integer }
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
   /registers:
     get:
       tags: [registers]
@@ -16252,6 +16447,92 @@ components:
           schema: { $ref: '#/components/schemas/TransitionResult' }
 
   schemas:
+    PmScheduleInput:
+      type: object
+      required: [id, name_en, register_key, data, every, unit, next_due]
+      additionalProperties: false
+      properties:
+        id: { type: string, pattern: '^[a-z0-9-]{3,40}$' }
+        name_en: { type: string, minLength: 1, maxLength: 120 }
+        name_ar: { type: [string, 'null'], maxLength: 120 }
+        register_key: { type: string }
+        site_id: { type: [string, 'null'], format: uuid, description: 'Required when the register is site scoped.' }
+        record_type: { type: [string, 'null'], maxLength: 40 }
+        data: { type: object, additionalProperties: true, description: 'Field values of the draft, by field code (at most 4000 characters).' }
+        every: { type: integer, minimum: 1, maximum: 52 }
+        unit: { type: string, enum: [week, month] }
+        next_due: { type: string, format: date }
+        active: { type: boolean }
+    PmSchedulesInput:
+      type: object
+      required: [schedules]
+      additionalProperties: false
+      properties:
+        schedules:
+          type: array
+          maxItems: 100
+          items: {$ref: '#/components/schemas/PmScheduleInput'}
+    PmSchedule:
+      allOf:
+      - {$ref: '#/components/schemas/PmScheduleInput'}
+      - type: object
+        properties:
+          last_generated_at: { type: string, format: date-time }
+          last_record_id: { type: string, format: uuid }
+    PmSchedules:
+      type: object
+      required: [version, schedules, today, catalogue, updated_at, updated_by]
+      properties:
+        version: { type: integer }
+        schedules:
+          type: array
+          items: {$ref: '#/components/schemas/PmSchedule'}
+        today: { type: string, format: date }
+        catalogue:
+          type: object
+          required: [registers, units]
+          properties:
+            registers:
+              type: array
+              items:
+                type: object
+                required: [key, name_en, name_ar, site_scoped]
+                properties: { key: {type: string}, name_en: {type: string}, name_ar: {type: string}, site_scoped: {type: boolean} }
+            units:
+              type: array
+              items: {type: string}
+        updated_at: { type: [string, 'null'], format: date-time }
+        updated_by:
+          type: [object, 'null']
+          required: [id, display_name]
+          properties: { id: {type: string}, display_name: {type: string} }
+    RecycleBin:
+      type: object
+      required: [retention_days, version, items]
+      properties:
+        retention_days: { type: integer }
+        version: { type: integer }
+        items:
+          type: array
+          items:
+            type: object
+            required: [id, register_key, register_name_en, register_name_ar, label, site_id, site_code, version, version_no, voided_at, voided_by, voided_by_name, void_reason, restorable_until, blocked]
+            properties:
+              id: { type: string, format: uuid }
+              register_key: { type: string }
+              register_name_en: { type: string }
+              register_name_ar: { type: [string, 'null'] }
+              label: { type: string }
+              site_id: { type: [string, 'null'], format: uuid }
+              site_code: { type: [string, 'null'] }
+              version: { type: integer }
+              version_no: { type: integer }
+              voided_at: { type: string, format: date-time }
+              voided_by: { type: [string, 'null'], format: uuid }
+              voided_by_name: { type: [string, 'null'] }
+              void_reason: { type: [string, 'null'] }
+              restorable_until: { type: string, format: date-time }
+              blocked: { type: [string, 'null'], enum: [open_version_exists, site_slot_taken, null] }
     IssueStoppedRow:
       type: object
       required: [site_code, task_code, stage_code, state, why, category, not_classified]
@@ -21899,6 +22180,17 @@ components:
         advances:
           type: array
           items: {type: object, properties: {entity_id: {type: string, format: uuid}, custodian_user_id: {type: [string, 'null'], format: uuid}, advance_state: {type: [string, 'null']}}}
+    DismantleRnOption:
+      type: object
+      required: [entity_id, record_id]
+      properties:
+        entity_id: {type: string, format: uuid}
+        record_id: {type: string, format: uuid}
+        site_id: {type: string, format: uuid}
+        record_type: {type: string, enum: [cw_rn, te_rn]}
+        doc_no: {type: string}
+        doc_date: {type: string}
+        txn_status: {type: string}
     DismantleOrderOption:
       type: object
       description: '0.12.11 (Q114). An approved, active Procurement order of a Dismantle part.'
@@ -21934,7 +22226,7 @@ components:
       properties:
         entity_id: { type: string, format: uuid }
         record_id: { type: string, format: uuid }
-        record_type: { type: string, enum: [pl, open] }
+        record_type: { type: string, enum: [te_dn, cw_dn, te_rn, cw_rn, pl, open] }
         state: { type: string }
         doc_no: { type: string }
         doc_date: { type: string }
@@ -23368,7 +23660,7 @@ components:
       required: [field, code, message]
       properties:
         field: { type: string }
-        code: { type: string, enum: [cluster_will_be_created, outside_libya, list_other] }
+        code: { type: string, enum: [cluster_will_be_created, outside_libya, list_other, similar_site_code, duplicate_name, close_coordinates] }
         message: { type: string }
     SiteDraftDecision:
       type: object
