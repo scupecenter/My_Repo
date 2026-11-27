@@ -6292,6 +6292,7 @@
     "scope_hash": "Scope fingerprint",
     "approve_scope": "You approve exactly this scope. If it changed, the approval is refused and a new request is needed.",
     "plan_scope_note": "Counted for the chosen scope.",
+    "narrow_whole": "Narrowing works for Procurement, Issue Log, Risk Register, Car Dispatcher bookings, Financial Advances and the other register parts marked narrowable. Sites, Quality, Warehouse, As-built, Meetings and Change control are deleted whole only: their tasks, gates, documents and checks link to a site or a process, not to one record, so a region or batch filter could leave orphaned rows.",
     "narrow_title": "Narrow the chosen parts (optional)",
     "narrow_hint": "Only the records that match every filter you set are deleted. Everything else in the part stays, with its documents, comments and history. Leave all empty to delete the whole part.",
     "narrow_regions": "Region",

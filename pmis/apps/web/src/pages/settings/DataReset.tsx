@@ -152,6 +152,7 @@ export function DataReset() {
           <h3 className="font-bold">{t('dr.new_request')}</h3>
           <ScopePicker catalogue={catalogue} mode={mode} setMode={setMode} chosen={chosen} setChosen={setChosen} disabled={!s.can.request}
             closure={mode === 'everything' ? (s.everything ?? []) : (dry.data?.scope.parts ?? closureOf(chosen, catalogue))} />
+          {mode === 'custom' && <p className="text-sm text-mute" data-testid="dr-narrow-whole">{t('dr.narrow_whole')}</p>}
           {canNarrow && <NarrowPicker part={chosen.length === 1 ? chosen[0] : null} narrow={narrow} setNarrow={setNarrow} disabled={!s.can.request} />}
           {mode === 'custom' && chosen.length > 0 && !canNarrow && !narrowEmpty(narrow) && <p className="text-sm text-lateInk" data-testid="dr-narrow-dropped">{t('dr.narrow_dropped')}</p>}
           <BackupChoice requireBackup={requireBackup} setRequireBackup={(v) => { setRequireBackup(v); setNoBackupTyped(''); }} typed={noBackupTyped} setTyped={setNoBackupTyped}
