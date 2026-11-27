@@ -7602,6 +7602,8 @@
     "th_medium": "Medium (px)",
     "th_quality": "Quality",
     "th_max": "Largest source (MB)",
+    "th_rate": "Thumbnails per person per minute",
+    "th_rate_note": "Limits how many thumbnails one person can make per minute. A thumbnail already kept is shown without counting. Above the limit the card shows its type icon until the next minute.",
     "th_format": "Thumbnail format",
     "readonly": "You can view these settings. A System Admin or a settings delegate changes them.",
     "confirm": "The change is audited with your reason."

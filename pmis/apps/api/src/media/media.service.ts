@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { AccessService } from '../access/access.service';
 import type { AuthContext } from '../auth/auth.types';
+import { RateLimiter } from '../auth/rate-limiter';
 import { StepUpService } from '../auth/step-up.service';
 import { decodeTypedCursor, encodeCursor, likePattern, parseLimit } from '../common/cursor';
 import { parseIfMatch } from '../common/etag';
@@ -28,14 +29,14 @@ const putBody = z.object({
   enabled: z.boolean(), snag_photos: z.boolean(), include_site_documents: z.boolean(), image_only: z.boolean(), show_withdrawn: z.boolean(),
   document_kinds: z.array(z.string()).max(5), register_keys: z.array(z.string()).max(60), exclude_doc_codes: z.array(z.string()).max(100),
   page_size: z.number().int(),
-  thumbnails: z.object({ enabled: z.boolean(), small_px: z.number().int(), medium_px: z.number().int(), quality: z.number().int(), format: z.string(), max_source_mb: z.number().int() }).strict(),
+  thumbnails: z.object({ enabled: z.boolean(), small_px: z.number().int(), medium_px: z.number().int(), quality: z.number().int(), format: z.string(), max_source_mb: z.number().int(), rate_per_min: z.number().int() }).strict(),
   reason: z.string().trim().min(3).max(1000),
 }).strict();
 
 export interface MediaCfg {
   enabled: boolean; snag_photos: boolean; include_site_documents: boolean; image_only: boolean; show_withdrawn: boolean;
   document_kinds: string[]; register_keys: string[]; exclude_doc_codes: string[]; page_size: number;
-  thumbnails: { enabled: boolean; small_px: number; medium_px: number; quality: number; format: ThumbFormat; max_source_mb: number };
+  thumbnails: { enabled: boolean; small_px: number; medium_px: number; quality: number; format: ThumbFormat; max_source_mb: number; rate_per_min: number };
 }
 export type MediaSettingsDto = MediaCfg & { updated_at: string | null; updated_by: { id: string; display_name: string; employee_id: string | null } | null; version: number; can_edit: boolean; thumbnails_available: boolean };
 
@@ -54,6 +55,7 @@ export class MediaService {
     private readonly stepUp: StepUpService,
     private readonly docs: DocumentsService,
     private readonly storage: StorageService,
+    private readonly limiter: RateLimiter,
   ) {}
 
   // ------------------------------------------------------------------------------------------------------------------ settings
@@ -225,7 +227,7 @@ export class MediaService {
   // ------------------------------------------------------------------------------------------------------------------ thumbnail
 
   /** GET /media/items/{kind}/{id}/thumbnail?size=small|medium. Visible only when the item itself is visible (404 otherwise); made on first request and kept beside the original. */
-  async thumbnail(kind: string, id: string, sizeRaw: string | undefined): Promise<{ file: StreamableFile; headers: Record<string, string> }> {
+  async thumbnail(auth: AuthContext, kind: string, id: string, sizeRaw: string | undefined): Promise<{ file: StreamableFile; headers: Record<string, string> }> {
     if (!['document_file', 'snag_photo'].includes(kind) || !uuidSchema.safeParse(id).success) throw problems.notFound();
     const size = sizeRaw === undefined ? 'small' : sizeRaw;
     if (size !== 'small' && size !== 'medium') throw problems.validation([{ path: '/size', code: 'invalid', message: 'size is small or medium.' }]);
@@ -257,6 +259,9 @@ export class MediaService {
     } catch {
       /* not made yet */
     }
+    // SEC-2: only the making of a thumbnail counts, per person and minute (Settings > Documents > Media); a kept thumbnail was served above
+    const wait = this.limiter.hit(`media-thumb:${auth.user.id}`, th.rate_per_min);
+    if (wait > 0) throw new ProblemException(429, 'rate_limited', { detail: `Too many thumbnails were made for you in the last minute (limit ${th.rate_per_min}). Try again in ${wait} s.`, headers: { 'Retry-After': String(wait) } });
     const src = await this.storage.store.get(r.storage_key);
     const chunks: Buffer[] = [];
     for await (const c of src) chunks.push(Buffer.isBuffer(c) ? c : Buffer.from(c as Uint8Array));

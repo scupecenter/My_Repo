@@ -18,7 +18,7 @@ const item = (id: string, over: Partial<MediaItem> = {}): MediaItem => ({
 });
 const settings = (): MediaSettings => ({
   enabled: true, snag_photos: true, document_kinds: ['photo'], register_keys: [], include_site_documents: true, exclude_doc_codes: [], image_only: true, show_withdrawn: false, page_size: 60,
-  thumbnails: { enabled: true, small_px: 320, medium_px: 960, quality: 78, format: 'webp', max_source_mb: 25 }, version: 3, can_edit: true, thumbnails_available: true,
+  thumbnails: { enabled: true, small_px: 320, medium_px: 960, quality: 78, format: 'webp', max_source_mb: 25, rate_per_min: 240 }, version: 3, can_edit: true, thumbnails_available: true,
 });
 
 describe('Library > Media', () => {

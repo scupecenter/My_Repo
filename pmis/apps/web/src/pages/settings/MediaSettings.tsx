@@ -54,12 +54,14 @@ export function MediaSettingsScreen() {
       {num('ms-page-size', t('mediaSet.page_size'), v.page_size, (n) => patch({ page_size: n }), 12, 200)}
       <fieldset className="space-y-3"><legend className="mb-1 text-sm font-semibold">{t('mediaSet.thumbs')}</legend>
         {bool('ms-th-enabled', t('mediaSet.th_enabled'), cur.thumbnails_available ? t('mediaSet.th_enabled_note') : t('mediaSet.th_unavailable'), v.thumbnails.enabled, (b) => th({ enabled: b }))}
-        <div className="grid gap-3 sm:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-5">
           {num('ms-th-small', t('mediaSet.th_small'), v.thumbnails.small_px, (n) => th({ small_px: n }), 64, 1024)}
           {num('ms-th-medium', t('mediaSet.th_medium'), v.thumbnails.medium_px, (n) => th({ medium_px: n }), 128, 2048)}
           {num('ms-th-quality', t('mediaSet.th_quality'), v.thumbnails.quality, (n) => th({ quality: n }), 30, 95)}
           {num('ms-th-max', t('mediaSet.th_max'), v.thumbnails.max_source_mb, (n) => th({ max_source_mb: n }), 1, 100)}
+          {num('ms-th-rate', t('mediaSet.th_rate'), v.thumbnails.rate_per_min, (n) => th({ rate_per_min: n }), 10, 2000)}
         </div>
+        <p className="text-xs text-mute">{t('mediaSet.th_rate_note')}</p>
         <div className="flex gap-2" role="radiogroup" aria-label={t('mediaSet.th_format')}>{(['webp', 'jpeg'] as const).map((f) => (
           <label key={f} className={`chip cursor-pointer border ${v.thumbnails.format === f ? 'border-accent bg-accentSoft text-accentText' : 'border-line bg-card text-mute'}`}>
             <input type="radio" name="ms-format" className="sr-only" data-testid={`ms-format-${f}`} checked={v.thumbnails.format === f} disabled={ro} onChange={() => th({ format: f })} />{f}</label>))}</div>

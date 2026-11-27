@@ -24,7 +24,7 @@ let nobody: Actor;        // no Documents grant
 const REASON = 'Owner decision GAL-1 2026-11-27';
 const DEFAULT = {
   enabled: true, snag_photos: true, document_kinds: ['photo', 'scanned_document'], register_keys: [], include_site_documents: true, exclude_doc_codes: [], image_only: true,
-  show_withdrawn: false, page_size: 48, thumbnails: { enabled: true, small_px: 240, medium_px: 640, quality: 78, format: 'webp', max_source_mb: 50 },
+  show_withdrawn: false, page_size: 48, thumbnails: { enabled: true, small_px: 240, medium_px: 640, quality: 78, format: 'webp', max_source_mb: 50, rate_per_min: 240 },
 };
 const ids: Record<string, string> = {};
 let png = Buffer.alloc(0);
@@ -192,6 +192,28 @@ describe('Media gallery', () => {
     expect((await items(docsQuality))[0]).toMatchObject({ has_thumbnail: false });
     await set({ enabled: false });
     expect((await docsQuality.api.call('get', '/media/items')).body).toMatchObject({ enabled: false, items: [] });
+  });
+  it('SEC-2: a person may make only rate_per_min thumbnails a minute; a kept thumbnail is served without counting; the setting is validated', async () => {
+    const tag = async (): Promise<string> => String((await settings(admin)).headers.etag);
+    expect((await put(admin, full({ enabled: true, thumbnails: { ...DEFAULT.thumbnails, rate_per_min: 5 } }), await tag())).status).toBe(422);
+    expect((await put(admin, full({ enabled: true, thumbnails: { ...DEFAULT.thumbnails, rate_per_min: 3000 } }), await tag())).status).toBe(422);
+    expect((await put(admin, full({ enabled: true, show_withdrawn: true, thumbnails: { ...DEFAULT.thumbnails, rate_per_min: 10 } }), await tag())).status).toBe(200);
+    expect((await settings(docsOnly)).body.thumbnails.rate_per_min).toBe(10);
+    const slot = (await db.query(`SELECT slot_id FROM document_files WHERE id = $1`, [ids.current])).rows[0].slot_id as string;
+    const made: string[] = [];
+    for (let i = 0; i < 11; i++) made.push(await addFile(slot, `rate-${i}.png`));
+    const statuses: number[] = [];
+    for (const id of made) statuses.push((await docsQuality.api.call('get', `/media/items/document_file/${id}/thumbnail`)).status);
+    const firstOver = statuses.indexOf(429);                                                           // earlier tests of this person may already have used some of the 10
+    expect(firstOver).toBeGreaterThan(0);
+    expect(firstOver).toBeLessThanOrEqual(10);
+    expect(statuses.slice(0, firstOver).every((x) => x === 200)).toBe(true);
+    const over = await docsQuality.api.call('get', `/media/items/document_file/${made[firstOver]}/thumbnail`);
+    expect(over.status).toBe(429);
+    expect(Number(over.headers['retry-after'])).toBeGreaterThan(0);
+    // a thumbnail already kept does not count
+    expect((await docsQuality.api.call('get', `/media/items/document_file/${made[0]}/thumbnail`)).status).toBe(200);   // kept earlier: no new making, no count
+    await put(admin, full({ enabled: true, show_withdrawn: true }), await tag());
   });
   it('keeps saved views of the Media tab (screen library-media) for who may see Documents only', async () => {
     const ok = await docsQuality.api.call('post', '/saved-views', { screen_key: 'library-media', name: `Media ${randomUUID().slice(0, 6)}`, filters: { source: 'snags' } });
