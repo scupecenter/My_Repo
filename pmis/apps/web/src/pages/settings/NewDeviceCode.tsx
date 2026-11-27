@@ -1,4 +1,5 @@
 import { MailCheck } from 'lucide-react';
+import { UnsavedGuard } from '@/lib/unsavedGuard';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePicker } from '@/api/admin';
@@ -76,6 +77,7 @@ export function NewDeviceCode() {
         {until && <p className="text-sm" role="status" data-testid="newdevice-bypass-until">{t('newdevice.bypass_until', { when: fmtDateTime(until, ar ? 'ar' : 'en') })}</p>}
       </div>
 
+      <UnsavedGuard scope="settings" dirty={dirty} needsReason label={t('ui.guard_settings')} onSave={(reason) => new Promise<boolean>((res) => set.mutate({ version: cur.version, enabled: v.enabled, code_minutes: v.minutes, include_admins: v.admins, reason }, { onSuccess: () => res(true), onError: () => res(false) }))} />
       {pending?.kind === 'set' && (
         <FormDialog open onClose={close} testid="newdevice-dialog" title={t('newdevice.title')} busy={set.isPending} error={err(set)}
           onSubmit={(reason) => set.mutate({ version: cur.version, enabled: v.enabled, code_minutes: v.minutes, include_admins: v.admins, reason }, { onSuccess: () => { toast(t('settings.audited')); close(); setDraft(null); } })}>
