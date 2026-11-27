@@ -3192,7 +3192,30 @@
       "col_contractor": "Contractor",
       "unattributed": "Unattributed",
       "by_contractor": "Shortage per contractor",
-      "contractor_row": "{{qty}} missing · {{lines}} lines · {{sites}} sites"
+      "contractor_row": "{{qty}} missing · {{lines}} lines · {{sites}} sites",
+      "permits_title": "Permits and HSE",
+      "permits_hint": "The permit position of the visible sites: status mix, validity pressure, open stop-work and the PTW safety checks. Read only.",
+      "unavailable_permits": "You cannot see the Permits and HSE register, so these figures are not shown.",
+      "waiting": "Waiting for approval",
+      "expired": "Expired",
+      "stop_work_active": "Stop-work active",
+      "by_status": "Permits by status",
+      "permits_empty": "No permit records on the visible sites.",
+      "ptw_title": "PTW safety checks",
+      "ptw_open": "Open PTWs",
+      "ptw_with_gaps": "With missing checks",
+      "ptw_none": "No open PTWs on the visible sites.",
+      "ptw_clear": "Every open PTW has its six checks covered.",
+      "ptw_check": {
+        "jsa_tra": "JSA / TRA",
+        "toolbox_talk": "Toolbox talk",
+        "work_at_height": "Work at height",
+        "lifting_plan": "Lifting plan",
+        "loto": "LOTO",
+        "rescue_plan": "Rescue plan"
+      },
+      "expiring_14": "Expiring in 14 days",
+      "no_permit": "Sites with no permit"
     },
     "scurve": {
       "title": "Progress curve",
