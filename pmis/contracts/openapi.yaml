@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.136
+  version: 0.15.138
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -35,6 +35,7 @@ info:
     - 0.15.203 (2026-11-27): the dashboard follow-up sections, quality snags and NCR (owner approval 2026-11-26, dashboard proposals item 6; migration 0304). Additive and read only. `GET /dashboard/ops` gains the section `quality` (`DashboardOpsQuality`): the open snags and NCRs of the in-scope sites, the average closure age of each, and the first-time acceptance rate (the decided inspections whose result is Pass). The section needs the quality view and answers available false without it. The dashboard settings catalogue gains the card `ops_quality`. No grant, role or permission change.
     - 0.15.202 (2026-11-27): the dashboard follow-up sections, contractor and supplier scorecard (owner approval 2026-11-26, dashboard proposals item 5; migration 0303). Additive and read only. `GET /dashboard/ops` gains the section `contractor_scorecard` (`DashboardOpsScorecard`): the aggregate of `GET /reports/contractor-performance`, so the card and the performance screen never disagree - the counts of parties per level, the on-time rectification rate of snags, the average delay days over the delayed parties, the rejection (quality fail) rate, the snag and quality totals, and the five worst parties with their worst figures. No amounts. The section needs the contractors view and answers available false without it. The dashboard settings catalogue gains the card `ops_contractors`. No grant, role or permission change.
     - 0.15.153 (2026-11-27): "My sessions" (no migration; CHANGELOG MySessions). Additive. `GET /me/sessions` (`listMySessions`): the caller's own live sessions (device, sign-in time, last activity, IP, `is_current`); `POST /me/sessions/{session_id}/revoke` (`revokeMySession`) ends one of the caller's own other sessions (404 for anyone else's, 422 `own_session` for the current one); `POST /me/sessions/revoke-others` (`revokeMyOtherSessions`) ends every other session of the caller. Own rows only, no permission and no step-up (it only narrows access); audited and in the security log.
+    - 0.15.138 (2026-11-27): switch a whole register on or off and lock it from Settings (audit item 1 of the relations review; migration 0381). Additive. New paths `GET /settings/register-state` (`listRegisterStates`) and `PUT /settings/register-state/{register_key}` (`setRegisterState`); new schema `RegisterState`. Disabled hides (nothing touched), locked refuses new and changed records with 403 `register_locked` for non-admins; audited; System Admin gate as for the register rename. Existing behaviour is unchanged until an admin uses it.
     - 0.15.136 (2026-11-27): the Invoices register (owner approval 2026-11-27; migrations 0185 and 0380): the supplier and contractor invoices from receipt to payment, linked to the procurement record they bill. Additive. Register key `invoices` in `/registers` and `/registers/{key}` records with its own fields (invoice date, received date, due date, paid date for invoice ages) and the standard two levels, the Dropdown lists InvoiceState and InvoiceKind in Settings, the module `invoices` in the permissions grid (no grant seeded), the nav key, the template TPL-INVOICES, the master-export exclusion, the data reset part, and the order link in the Related-records panel. Existing registers and data are untouched.
     - 0.15.135 (2026-11-27): the Lessons Learned register (owner approval 2026-11-26, C3; migration 0184): one register for the lessons of the project, from an incident, a snag, a delay or any experience, with the recommendation and where it was applied. Additive. Register key `lessons_learned` in `/registers` and `/registers/{key}` records with its own fields and the standard two levels, the Dropdown list LessonCategory in Settings, the module `lessons_learned` in the permissions grid (no grant seeded), the nav key in the catalogue, the template TPL-LESSONS-LEARNED and the master export part. Existing registers and data are untouched.
     - 0.15.201 (2026-11-27): the dashboard follow-up sections, GECOL and HLC readiness (owner approval 2026-11-26, dashboard proposals item 4; migration 0200). Additive and read only. `GET /dashboard/ops` gains the section `gecol_hlc` (`DashboardOpsGecolHlc`) with one part per utility (`DashboardOpsUtilityReadiness`). GECOL: the active, not cancelled sites with the GECOL scope, the powered ones (power_on_date set), the waiting ones aged since the GECOL request date in the buckets 0-7, 8-14, 15-30, over 30 calendar days, the in-scope sites with no GECOL record at all, and the civilly ready but not electrified (the CW PAC, task B13, is approved but the power is not on). HLC: the same over the HLC scope, in service when in_service_date is set, aged since the HLC record's request date or, without one, the PR date of the linked Procurement order, plus the installed lines not yet in service. Each part needs the view right of its register and answers available false without it. The dashboard settings catalogue gains the card `ops_gecol_hlc`. Corrective: `DashboardOpsProcurement.pr_wait` and `po_wait` are documented nullable, as the service has always answered when the caller may not see the Procurement register. No grant, role or permission change.
@@ -8932,6 +8933,74 @@ paths:
         '412': {$ref: '#/components/responses/PreconditionFailed'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /settings/register-state:
+    get:
+      tags: [settings]
+      operationId: listRegisterStates
+      summary: Every register with its enabled and locked state (disabled registers included)
+      x-db-path: reg_state_json
+      description: |
+        0.15.138 (migration 0381). System Admin or a delegate of `fields.edit` for all regions. Disabled registers are listed so they can be switched back on.
+      responses:
+        '200':
+          description: The registers.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/RegisterState' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /settings/register-state/{register_key}:
+    parameters:
+      - $ref: '#/components/parameters/RegisterKeyAny'
+    put:
+      tags: [settings]
+      operationId: setRegisterState
+      summary: Enable, disable and lock or unlock a whole register
+      x-db-path: admin_register_state
+      description: |
+        0.15.138 (migration 0381). Disabling HIDES the register (no record, step, template or history is touched; enabling restores it). Locking keeps it readable
+        but refuses a new record and every change to a record (screen, upload, workflow step, derive, QC snag of the register) with 403 `register_locked`; System
+        Admins, the Settings data reset and the migration role are exempt (like the record and column locks of 0103). A reason is required; the change is audited
+        with before and after. Same gate as renaming a register: no permission is widened.
+      parameters:
+        - { name: If-Match, in: header, required: false, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                enabled: { type: boolean }
+                locked: { type: boolean }
+                reason: { $ref: '#/components/schemas/Reason' }
+      responses:
+        '200':
+          description: The new state.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [register_key, enabled, locked, version]
+                properties:
+                  register_key: { type: string }
+                  enabled: { type: boolean }
+                  locked: { type: boolean }
+                  reason: { type: [string, 'null'] }
+                  changed_at: { type: [string, 'null'], format: date-time }
+                  version: { type: integer }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
   /settings/structural-freeze:
     get:
       tags: [settings]
@@ -18134,6 +18203,20 @@ components:
         code: { $ref: '#/components/schemas/ErrorCode' }
         message: { type: string }
         conflicts: { type: array, items: { type: string, format: uuid }, description: '0.12.6 (Q18): the existing assignments this row overlaps (dates, region and module).' }
+    RegisterState:
+      type: object
+      required: [register_key, name_en, enabled, locked, version, records]
+      properties:
+        register_key: { type: string }
+        name_en: { type: string }
+        name_ar: { type: [string, 'null'] }
+        module_key: { type: string }
+        enabled: { type: boolean }
+        locked: { type: boolean }
+        reason: { type: [string, 'null'] }
+        changed_at: { type: [string, 'null'], format: date-time }
+        version: { type: integer }
+        records: { type: integer, description: Current records that are not voided. }
     Reason:
       type: string
       minLength: 3
