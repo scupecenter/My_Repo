@@ -16,6 +16,7 @@ import { tripoliToday } from '@/lib/today';
 import { useUiFeatures } from '@/api/uiFeatures';
 import { byPriority, INBOX_TABS, inTab, isPriority, type InboxTab } from '@/lib/inboxPriority';
 import { notificationTarget, snoozeDate } from '@/lib/x';
+import { DateInput } from '@/components/DateInput';
 
 const KINDS = ['mention', 'followed_change', 'task_assigned', 'task_returned', 'task_rejected', 'task_approved', 'approval_due', 'reassigned', 'absence_alert', 'idle_task_alert', 'no_holder', 'system'] as const;
 
@@ -34,7 +35,7 @@ function SnoozeMenu({ n, onPick }: { n: Notification; onPick: (until: string | n
             <button key={c} type="button" className="btn w-full justify-start" data-testid={`inbox-snooze-${c}-${n.id}`} onClick={() => pick(snoozeDate(c, today))}>{t(`inbox.snooze_${c}`)}</button>
           ))}
           <label className="block text-xs text-mute">{t('inbox.snooze_date')}
-            <input type="date" className="input mt-1" min={snoozeDate('tomorrow', today)} data-testid={`inbox-snooze-date-${n.id}`} value={date} onChange={(e) => setDate(e.target.value)} />
+            <DateInput className="input mt-1" min={snoozeDate('tomorrow', today)} data-testid={`inbox-snooze-date-${n.id}`} value={date} onChange={(e) => setDate(e.target.value)} />
           </label>
           <button type="button" className="btn w-full" data-testid={`inbox-snooze-pick-${n.id}`} disabled={!date || date < snoozeDate('tomorrow', today)} onClick={() => pick(date)}>{t('inbox.snooze_until_date')}</button>
           {n.snoozed_until && <button type="button" className="btn w-full" data-testid={`inbox-unsnooze-${n.id}`} onClick={() => pick(null)}>{t('inbox.unsnooze')}</button>}

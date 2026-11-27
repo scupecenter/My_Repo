@@ -21,6 +21,7 @@ import {
 } from "./FilterBuilder";
 import { Check, ChoiceList } from "./ChoiceList";
 import { FormDialog } from "./FormDialog";
+import { DateInput } from '@/components/DateInput';
 
 /**
  * The unified filter (owner request 2026-11-22): ONE "+ Filter" button opens one dropdown (Radix Popover) with a search box and the fields grouped
@@ -390,8 +391,7 @@ function FieldEditor({
         </div>
         {mode === "between" && (
           <div className="flex flex-wrap items-center gap-2">
-            <input
-              type="date"
+            <DateInput
               className="input min-h-11 w-40"
               aria-label={t("filterBuilder.from")}
               data-testid="filter-date-from"
@@ -399,8 +399,7 @@ function FieldEditor({
               onChange={(e) => setFrom(e.target.value)}
             />
             <span className="text-mute">{t("filterBuilder.and_word")}</span>
-            <input
-              type="date"
+            <DateInput
               className="input min-h-11 w-40"
               aria-label={t("filterBuilder.to")}
               data-testid="filter-date-to"
