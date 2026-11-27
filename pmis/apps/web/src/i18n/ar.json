@@ -1159,7 +1159,8 @@
     "section_documents_forms": "قوالب النماذج",
     "section_documents_archive": "الأرشيف",
     "section_data_counts": "أعداد GECOL / HLC",
-    "section_screens_motion": "الحركة"
+    "section_screens_motion": "الحركة",
+    "section_workflow_coverage": "تغطية المصفوفة"
   },
   "scopeMatch": {
     "title": "مطابقة الفريق والنطاق (المشتريات)",
@@ -6501,5 +6502,28 @@
     "preview": "معاينة لفتح نافذة",
     "replay": "إعادة التشغيل",
     "link_display": "إعدادات الجداول (العرض)"
+  },
+  "matrixCoverage": {
+    "title": "تغطية المصفوفة",
+    "note": "للقراءة فقط. يعرض خلايا مصفوفة المسؤوليات التي لا يستطيع أحد التنفيذ فيها، لكل صف ومنطقة ومستوى. لا يغيّر شيئاً في المصفوفة.",
+    "as_of": "حتى",
+    "version": "نسخة سير العمل",
+    "summary": "{{ok}} مغطّاة، {{empty}} فارغة، {{nobody}} معيَّنة بلا أحد نشط، من أصل {{cells}} خلية",
+    "gaps_only": "إظهار الفجوات فقط",
+    "region": "المنطقة",
+    "module": "الوحدة",
+    "all": "الكل",
+    "row": "الصف",
+    "kind_stage": "مرحلة",
+    "ok": "مغطّاة",
+    "empty": "فارغة",
+    "no_active_holder": "لا أحد نشط",
+    "source_region": "خلية المنطقة",
+    "source_default": "الخلية الافتراضية",
+    "source_none": "لا خلية",
+    "assignees": "معيَّن",
+    "holders": "نشط",
+    "none": "لا فجوات في هذا العرض.",
+    "open_matrix": "فتح مصفوفة المسؤوليات"
   }
 }
