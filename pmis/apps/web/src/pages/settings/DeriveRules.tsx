@@ -1,4 +1,5 @@
 import { Plus, X } from 'lucide-react';
+import { UnsavedGuard } from '@/lib/unsavedGuard';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDeriveRules, useSetDeriveRules, type DeriveRule } from '@/api/p4c';
@@ -73,6 +74,7 @@ export function DeriveRulesScreen() {
         <button type="button" className="btn" data-testid="derive-add" disabled={cur.length >= 60} onClick={() => setDraft([...cur, blank()])}><Plus size={14} />{t('deriveRules.add')}</button>
         <button className="btn btn-accent" data-testid="derive-save" disabled={!draft || invalid} onClick={() => setOpen(true)}>{t('scopeMatch.save')}</button>
       </div>
+      <UnsavedGuard scope="settings" dirty={!!draft} needsReason label={t('ui.guard_settings')} onSave={(reason) => new Promise<boolean>((res) => set.mutate({ version: q.data!.version, body: { rules: cur, reason } }, { onSuccess: () => res(true), onError: () => res(false) }))} />
       {open && (
         <FormDialog open onClose={() => setOpen(false)} testid="derive-dialog" title={t('deriveRules.title')} busy={set.isPending} error={set.isError ? errText(set.error, t) : null}
           onSubmit={(reason) => set.mutate({ version: q.data!.version, body: { rules: cur, reason } }, { onSuccess: () => { toast(t('settings.audited')); setOpen(false); setDraft(null); } })} />

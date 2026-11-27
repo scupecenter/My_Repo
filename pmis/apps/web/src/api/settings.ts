@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { api, ApiError, downloadFile, type RequestOptions } from './client';
-import type { PasskeyItem, PasskeySetting, MyPasskeys, AlertRuleInput, AlertRuleSaved, AlertRulesResponse, IssueStoppedRowList, IssueTaskMapItem, IssueTaskMapList,
+import type { OpsLimits, PasskeyItem, PasskeySetting, MyPasskeys, AlertRuleInput, AlertRuleSaved, AlertRulesResponse, IssueStoppedRowList, IssueTaskMapItem, IssueTaskMapList,
   ActiveSession, ActOnBehalfRequest, DownloadLocks, UiAsset, UiPublicIdentity, Calendar, CalendarConfirmation, MailNotificationKinds, ImportsSettings, ContractorPerformanceReport, ContractorPerformanceThresholds, ContractorPerformanceSettings, NavLayoutSetting, UiIdentity, UiBrand, LoginPage, SecurityLocks, SupportAccessSetting, Delegation, LoginPagePublic, SupportLink, NavLayoutT, ContractorRules, ContractorRulesInput, GecolHlcCounts, ContractorsCompletenessReport, TeamScopeMismatchReport, DeletedUser, PurgedUser, DlpSettings, DlpVersion, DlpVersionInput, Holiday, HolidayChangeResult, HolidayInput, HolidayPatch, HolidaySummary, IdleTaskAlertSetting, Job, LogIntegrity, LogRetention, LogRetentionInput, NewDeviceCodeSetting,
   NotificationPolicy, NotificationPolicyInput, NotificationTypeDef, Page, ReassignmentAlert, SecurityLogEntry, SessionRevokeResult, SlaPublishPreview, SlaRuleSet, SlaRuleSetPublishResult, SlaRuleSetSummary, SlaTaskRule, StaffCard, StaffVisibility, StructuralFreeze,
   TaskDefinition, TeamScopeMatch, TeamScopeMatchInput, TransitionResultT, User, UserDetail, WeekendDaysResult, WeightSet, WeightSetCode, WeightSetInput, WeightSetPreview, WeightSetPublishResult, WorkflowVersion, WorkflowVersionSummary,
@@ -194,6 +194,14 @@ export const useSetUiLogoDisplay = () => {
 };
 /** The public read (no session): which public pages show the logo. Both null until an admin switches one on. */
 export const useUiPublicIdentity = () => useQuery({ queryKey: ['ui-public-identity'], queryFn: () => api.get<UiPublicIdentity>('/ui/public/identity'), staleTime: 30_000, retry: 1 });
+/** 0.15.312 (migration 0402): the operational limits (setting ops.limits). Read by everyone, changed by a System Admin only, with a reason and a step-up. */
+export const useOpsLimits = () => useQuery({ queryKey: ['ops-limits'], queryFn: () => api.get<OpsLimits>('/settings/ops-limits') });
+export const useSetOpsLimits = () => {
+  const qc = useQueryClient();
+  return useMutation<OpsLimits, ApiError, { version: number; values: Record<string, number>; reason: string }>({
+    mutationFn: ({ version, ...body }) => api.put('/settings/ops-limits', { version, body }), onSettled: () => refresh(qc, 'ops-limits'),
+  });
+};
 /** 0.15.194 (migration 0294): passkeys as an alternative second step (setting security.passkeys), the own passkeys, and the admin recovery. */
 export const usePasskeySetting = () => useQuery({ queryKey: ['passkey-setting'], queryFn: () => api.get<PasskeySetting>('/settings/passkeys') });
 export const useSetPasskeys = () => {
@@ -219,6 +227,16 @@ export const useSetImportsSettings = () => {
   const qc = useQueryClient();
   return useMutation<ImportsSettings, ApiError, { version: number; async_rows: number; reason: string }>({
     mutationFn: ({ version, ...body }) => api.put('/settings/imports', { version, body }), onSettled: () => refresh(qc, 'imports-settings'),
+  });
+};
+
+/** 0.15.322 (D49 part 3): the upload policy of the imports (imports.upload_policy): enforce (default) or accept_incomplete. Read by everyone; changed like the threshold. */
+export type ImportsUploadPolicy = import('./schema').components['schemas']['ImportsUploadPolicy'];
+export const useImportsUploadPolicy = () => useQuery({ queryKey: ['imports-upload-policy'], queryFn: () => api.get<ImportsUploadPolicy>('/settings/imports/upload-policy') });
+export const useSetImportsUploadPolicy = () => {
+  const qc = useQueryClient();
+  return useMutation<ImportsUploadPolicy, ApiError, { version: number; policy: ImportsUploadPolicy['policy']; reason: string }>({
+    mutationFn: ({ version, ...body }) => api.put('/settings/imports/upload-policy', { version, body }), onSettled: () => refresh(qc, 'imports-upload-policy'),
   });
 };
 
