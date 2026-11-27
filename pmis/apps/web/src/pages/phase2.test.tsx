@@ -190,7 +190,7 @@ describe('Responsibility Matrix', () => {
     const u = userEvent.setup();
     const cell = await screen.findByTestId('matrix-cell-pre_cw-1');
     await u.click(within(cell).getByTestId('matrix-add'));
-    await u.type(await screen.findByTestId('matrix-picker-q'), 'Hana');
+    await u.type(await screen.findByTestId('matrix-picker-q'), 'Demo');
     await u.click(await screen.findByTestId('matrix-opt-user-1210'));
     expect(within(screen.getByTestId('matrix-cell-pre_cw-1')).getByTestId('person-id-1210')).toBeInTheDocument();
     await u.click(screen.getByTestId('matrix-all-pre_cw-1'));

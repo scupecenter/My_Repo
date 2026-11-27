@@ -206,11 +206,11 @@ describe('Task actions on the real endpoints', () => {
   it('says in plain words that another holder has claimed the level (409 already_claimed)', async () => {
     await asReviewer();
     const t = touch(A1)!;
-    t.claimed_by = { id: '00000000-0000-4000-8000-000000000042', display_name: 'Mona Fathi' };
+    t.claimed_by = { id: '00000000-0000-4000-8000-000000000042', display_name: 'Demo User 02' };
     renderApp(<SiteAt />, { route: `/sites/${siteIdOf(0)}?task=${A1}` });
     await api.post('/__mock/step-up');
     await userEvent.click(await screen.findByTestId('drawer-approve'));
-    expect(await screen.findByText('Mona Fathi has already claimed this level.')).toBeInTheDocument();
+    expect(await screen.findByText('Demo User 02 has already claimed this level.')).toBeInTheDocument();
     expect(screen.getByTestId('drawer-state')).toHaveTextContent('Awaiting approval'); // rolled back
   });
 
@@ -255,7 +255,7 @@ describe('Task actions on the real endpoints', () => {
     expect(taskErrorMessage(t, err('mandatory_fields_missing', 422, { missing: ['actual_date'] }))).toBe('Fill the mandatory fields first: actual_date.');
     expect(taskErrorMessage(t, err('mandatory_slots_missing', 422))).toBe('Upload the mandatory documents first.');
     expect(taskErrorMessage(t, err('note_required', 422))).toMatch(/note/);
-    expect(taskErrorMessage(t, err('already_claimed', 409, { claimed_by: { display_name: 'Sami' } }))).toBe('Sami has already claimed this level.');
+    expect(taskErrorMessage(t, err('already_claimed', 409, { claimed_by: { display_name: 'Demo' } }))).toBe('Demo has already claimed this level.');
     expect(taskErrorMessage(t, err('not_eligible_holder', 403))).toMatch(/do not hold/);
     expect(taskErrorMessage(t, err('step_up_required', 401))).toBe('');
   });

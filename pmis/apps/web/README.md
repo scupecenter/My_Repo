@@ -1,6 +1,6 @@
-# GSDN Workspace web (phase 1)
+# Workspace web (phase 1)
 
-React 18, TypeScript, Vite, Tailwind (tokens from `design/tokens.css`), TanStack Query, react-router, react-i18next (EN + AR, RTL by `dir` + logical CSS only). Auth is the backend-for-frontend session cookie (ADR 0002): no MSAL and no tokens in the browser. Sign-in is a local PMIS account now (ADR 0012); Microsoft 365 stays in the code behind `VITE_M365_ENABLED`.
+React 18, TypeScript, Vite, Tailwind (tokens from `design/tokens.css`), TanStack Query, react-router, react-i18next (EN + AR, RTL by `dir` + logical CSS only). Auth is the backend-for-frontend session cookie (ADR 0002): no MSAL and no tokens in the browser. Sign-in is a local Workspace account now (ADR 0012); Microsoft 365 stays in the code behind `VITE_M365_ENABLED`.
 
 Phase 1 screens: app shell (sidebar by `effective.nav`, Ctrl+K palette, language, theme, notifications), one-box login (identifier + password), change password (forced after a temporary one, voluntary from the user menu), step-up by password, New user and Reset password with a show-once temporary password (Users & Roles), first-sign-in employee ID, pending assignment, My Work, Approvals (drawer pane, approve/pass/return with note, bulk with one step-up), employee hover card (`PersonTag`).
 
@@ -39,11 +39,11 @@ Type the employee ID, email or phone in the one box, plus the password. The mock
 
 | Account | Identifier (any of) | Demo password | Notes |
 |---|---|---|---|
-| Project Manager (System Admin) | `1001`, `ahmed.salem@example.com`, `+218 91 200 1000` | `Demo-Pm-2026-pass` | final approver, all admin screens |
-| Team Lead (reviewer) | `1102`, `mona.fathi@example.com` | `Demo-Lead-2026-pass` | |
-| Security auditor | `1103`, `ali.barka@example.com` | `Demo-Audit-2026-pass` | sees the security log |
-| Staff engineer | `1204`, `sami.nuri@example.com` | `Demo-Staff-2026-pass` | has one unanswered announcement in the seed, so the blocking pop-up shows after sign-in (e2e helper `answerAnnouncements`) |
-| Pending assignment | `1211`, `wael.saadi@example.com` | `Demo-Pending-2026-pass` | sees the pending screen |
+| Project Manager (System Admin) | `1001`, `demo.user.01@example.com`, `+218 90 000 0001` | `Demo-Pm-2026-pass` | final approver, all admin screens |
+| Team Lead (reviewer) | `1102`, `demo.user.02@example.com` | `Demo-Lead-2026-pass` | |
+| Security auditor | `1103`, `demo.user.03@example.com` | `Demo-Audit-2026-pass` | sees the security log |
+| Staff engineer | `1204`, `demo.user.06@example.com` | `Demo-Staff-2026-pass` | has one unanswered announcement in the seed, so the blocking pop-up shows after sign-in (e2e helper `answerAnnouncements`) |
+| Pending assignment | `1211`, `demo.user.13@example.com` | `Demo-Pending-2026-pass` | sees the pending screen |
 | First sign-in | `new.employee@example.com` | `Demo-First-2026-pass` | must change the password, then enters the employee ID |
 
 These are synthetic and exist only in the mock layer (a normal production build does not contain them; a hybrid build does). Users created in the mock get a temporary password shown once. Mock state lives in `localStorage` key `pmis-mock-db`; clear it to reset. The old fake Microsoft page (`/mock-m365`) is still in the code and is reached only through the hidden Microsoft 365 button (`VITE_M365_ENABLED=true`).

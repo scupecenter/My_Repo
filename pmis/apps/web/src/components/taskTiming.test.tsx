@@ -17,7 +17,7 @@ const mk = (id: string, o: { colour: 'green' | 'amber' | 'red'; elapsed: number;
   sla: { min_wd: 3, max_wd: 5, elapsed_wd: o.elapsed, colour: o.colour, late_wd: o.late, left_wd: o.left, measured: true },
   idle_working_days: o.stale ? 4 : 0, stale: o.stale, stale_after_wd: 2, last_activity_at: '2026-11-10T10:00:00.000Z',
 });
-const A = holder('00000000-0000-4000-8000-000000001101', 'Alia Synthetic');
+const A = holder('00000000-0000-4000-8000-000000001101', 'Demo Synthetic');
 const B = holder('00000000-0000-4000-8000-000000001102', 'Bashir Synthetic');
 const tasks = [
   mk('t1', { colour: 'green', elapsed: 1, late: 0, left: 4, held: 1, stale: false, who: A }),

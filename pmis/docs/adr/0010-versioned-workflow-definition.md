@@ -51,7 +51,7 @@ The 10 milestones and 9 gates are now seed version 1 of an admin-configurable **
    - **SLA** rules and **baselines** are keyed by codes (`baseline_entries.milestone_code` already is). A new milestone has no baseline until a Baseline Re-plan, so it is excluded from baseline adherence (health factor B).
 5. **Master-format export and the parallel run.**
    - The Master has fixed columns for the 10 milestones, 9 gates and their baselines.
-   - The export writes each milestone and gate at its `master_export_column`. A node without a column is **not exported** and is listed in the export's "PMIS-only" sheet.
+   - The export writes each milestone and gate at its `master_export_column`. A node without a column is **not exported** and is listed in the export's "Workspace-only" sheet.
    - A Master column whose node is missing from the site's version is exported **blank**, and the comparator marks it "expected difference (workflow vN)" instead of a mismatch.
    - Any light or structural change that touches a node with a Master column, or a gate condition that differs from the Master formula, shows a warning.
    - From `parallel_run_start` to `parallel_run_end` (settings), the warning needs an explicit typed confirmation, recorded in the audit row.
