@@ -257,12 +257,17 @@ const progress = (s: Pick<WeightSet, 'activities'>) => Math.round(s.activities.r
 
 /** Q440: the confirmation state, with what stops a confirmation (the current and the next year need holidays, none tentative). A store saved before 0.14.2 starts from the seed. */
 const CC = () => (C().calConfirm ??= initCfg().calConfirm);
+const MP = () => (C().mailPolicy ??= initCfg().mailPolicy);
 const MK = () => (C().mailKinds ??= initCfg().mailKinds);
 /** 0.15.1: nav.layout (a store saved before 0.15.1 starts from the seed). */
 /** 0.15.190: the admin lock keys, kept in memory like the other small settings of the mock (both off by default). */
 const locks: { block_public_sharing: boolean; disable_export: boolean; version: number; updated_at: string | null; updated_by: { id: string; display_name: string; employee_id: string | null } | null } =
   { block_public_sharing: false, disable_export: false, version: 1, updated_at: null, updated_by: null };
 const locksView = () => ({ ...locks, can_edit: isAdmin() });
+/** 0.15.193: the download lock categories (templates, uploaded files, generated documents), in memory, all off by default. */
+export const dlocks: { templates: boolean; uploaded_files: boolean; generated_documents: boolean; version: number; updated_at: string | null; updated_by: { id: string; display_name: string; employee_id: string | null } | null } =
+  { templates: false, uploaded_files: false, generated_documents: false, version: 1, updated_at: null, updated_by: null };
+const dlocksView = () => ({ ...dlocks, can_edit: isAdmin() });
 
 /** 0.15.191: support access (off by default) and the support grants, kept in memory like the lock keys. A grant is a time-limited delegation. */
 const support: { enabled: boolean; max_hours: number; default_hours: number; version: number; updated_at: string | null; updated_by: { id: string; display_name: string; employee_id: string | null } | null } =
@@ -730,6 +735,27 @@ export const settingsHandlers = [
     return HttpResponse.json(j, tag(j.version));
   }),
 
+  // ------------------------------------------------------------------ 0.15.193: download lock categories (all off by default)
+  http.get(`${B}/settings/download-locks`, () => { const g = guard(); if (g) return g; const j = dlocksView(); return HttpResponse.json(j, tag(j.version)); }),
+  http.put(`${B}/settings/download-locks`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    const KEYS = ['templates', 'uploaded_files', 'generated_documents'] as const;
+    const b = await body<Record<string, unknown> & { reason?: string }>(request);
+    const errs: { path: string; code: string }[] = Object.keys(b).filter((k) => ![...KEYS, 'reason'].includes(k as never)).map((k) => ({ path: `/${k}`, code: 'unknown_field' }));
+    for (const k of KEYS) if (typeof b[k] !== 'boolean') errs.push({ path: `/${k}`, code: 'required' });
+    if ((b.reason ?? '').trim().length < 3 || (b.reason ?? '').length > 1000) errs.push({ path: '/reason', code: 'required' });
+    if (errs.length) return fields(...errs);
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, dlocks.version); if (p) return p;
+    if (!stepUpValid()) return stepUp();
+    if (KEYS.every((k) => dlocks[k] === b[k])) return problem(409, 'invalid_transition', 'These are already the download locks in force.');
+    const v = viewer()!;
+    Object.assign(dlocks, { templates: b.templates, uploaded_files: b.uploaded_files, generated_documents: b.generated_documents, version: dlocks.version + 1, updated_at: new Date().toISOString(),
+      updated_by: { id: uid(v.employee_id ?? '9999'), display_name: v.name, employee_id: v.employee_id } });
+    const j = dlocksView();
+    return HttpResponse.json(j, tag(j.version));
+  }),
+
   // ------------------------------------------------------------------ 0.15.192: new-device email code (System Admin only)
   http.get(`${B}/settings/new-device-code`, () => { const g = needAdmin(); if (g) return g; const j = newDeviceView(); return HttpResponse.json(j, tag(j.version)); }),
   http.put(`${B}/settings/new-device-code`, async ({ request }) => {
@@ -872,6 +898,30 @@ export const settingsHandlers = [
     Object.assign(MK(), { kinds: [...(b.kinds as string[])].sort(), unknown: [], version: MK().version + 1, updated_at: new Date().toISOString(), updated_by: viewer()!.employee_id! }); save();
     const m = MK();
     return HttpResponse.json({ kinds: m.kinds, unknown_kinds: [], catalogue: MAIL_KIND_CATALOGUE, version: m.version, updated_at: m.updated_at, updated_by: ref(m.updated_by!) }, tag(m.version));
+  }),
+
+  // ------------------------------------------------------------------ 0.15.261: the mail policy (System Admin only)
+  http.get(`${B}/settings/mail-policy`, () => {
+    const g = needAdmin(); if (g) return g;
+    const m = MP();
+    return HttpResponse.json({ ...m, catalogue: MAIL_KIND_CATALOGUE, block_public_sharing: false, updated_by: m.updated_by ? ref(m.updated_by) : null }, tag(m.version));
+  }),
+  http.put(`${B}/settings/mail-policy`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    if (!stepUpValid()) return stepUp();
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, MP().version); if (p) return p;
+    const b = await body<{ reason?: string; enabled?: boolean; mode?: string; internal_domains?: string[]; kinds?: Record<string, { enabled: boolean; mode: string }> }>(request);
+    const errs: { path: string; code: string }[] = [];
+    if ((b.reason ?? '').trim().length < 3) errs.push({ path: '/reason', code: 'required' });
+    if (typeof b.enabled !== 'boolean') errs.push({ path: '/enabled', code: 'required' });
+    if (b.mode !== 'internal_only' && b.mode !== 'internal_external') errs.push({ path: '/mode', code: 'invalid' });
+    (b.internal_domains ?? []).forEach((d, i) => { if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(d)) errs.push({ path: `/internal_domains/${i}`, code: 'invalid' }); });
+    Object.keys(b.kinds ?? {}).forEach((k) => { if (!MAIL_KIND_CATALOGUE.some((c) => c.kind === k)) errs.push({ path: `/kinds/${k}`, code: 'unknown_kind' }); });
+    if (errs.length) return fields(...errs);
+    Object.assign(MP(), { enabled: b.enabled!, mode: b.mode!, internal_domains: b.internal_domains ?? [], kinds: b.kinds ?? {}, version: MP().version + 1, updated_at: new Date().toISOString(), updated_by: viewer()!.employee_id! }); save();
+    const m = MP();
+    return HttpResponse.json({ ...m, catalogue: MAIL_KIND_CATALOGUE, block_public_sharing: false, updated_by: ref(m.updated_by!) }, tag(m.version));
   }),
 
   // ------------------------------------------------------------------ SLA rule sets (0.2.6)
@@ -1125,6 +1175,10 @@ export const settingsHandlers = [
         oneOf(o, path, 'default_tab', ['all', 'priority', 'mentions', 'tasks', 'approvals', 'system']);
         const kinds = ['mention', 'followed_change', 'task_assigned', 'task_returned', 'task_rejected', 'task_approved', 'approval_due', 'reassigned', 'absence_alert', 'idle_task_alert', 'no_holder', 'system'];
         if (!Array.isArray(o.priority_kinds) || o.priority_kinds.some((x) => !kinds.includes(String(x)))) errs.push({ path: `${path}/priority_kinds`, code: 'invalid' });
+      } else if (name === 'panel') {
+        for (const k of Object.keys(o)) if (!['mode', 'width', 'show_tabs'].includes(k)) errs.push({ path: `${path}/${k}`, code: 'unknown_key' });
+        oneOf(o, path, 'mode', ['popover', 'side_panel']); oneOf(o, path, 'width', ['narrow', 'medium', 'wide']);
+        if (typeof o.show_tabs !== 'boolean') errs.push({ path: `${path}/show_tabs`, code: 'invalid' });
       } else errs.push({ path, code: 'unknown_key' });
     }
     if ((b.reason ?? '').trim().length < 3) errs.push({ path: '/reason', code: 'required' });

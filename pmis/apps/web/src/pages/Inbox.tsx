@@ -91,6 +91,7 @@ export function Inbox() {
         </div>
       )}
       <Toolbar
+        settings="inbox"
         filters={<>
           <div role="group" aria-label={t('inbox.show')} className="inline-flex overflow-hidden rounded-md border border-line">
             {([['', 'inbox.all'], ['1', 'inbox.unread']] as const).map(([v, k]) => (
