@@ -10,10 +10,11 @@ import { allArchiveRows, archiveZip, useArchive, useArchiveRows, useArchiveSetti
 import { decodeFilter, encodeFilter, type FilterTree } from '@/api/views';
 import { LibraryTabs } from './LibraryTabs';
 import { PageHeader } from '@/components/PageHeader';
+import { LayoutPanel } from '@/components/LayoutPanel';
 import { SavedViews } from '@/components/SavedViews';
 import { EmptyState, QueryFallback } from '@/components/States';
-import { ColumnMenu, DensityToggle, Empty, HeaderRow, pin, rowPad, totalWidth, tracks, Trunc, useTablePrefs, type TableApi } from '@/components/TableKit';
-import { DisplayMenu, displayAttrs, PastedChip, ROWNO_COL, RowNo, SearchBox, ShownFooter, TableCount, TableToolbar, toCsv } from '@/components/TableStandard';
+import { ColumnMenu, Empty, HeaderRow, pin, rowPad, totalWidth, tracks, Trunc, useTablePrefs, type TableApi } from '@/components/TableKit';
+import { displayAttrs, PastedChip, ROWNO_COL, RowNo, SearchBox, ShownFooter, TableCount, TableToolbar, toCsv } from '@/components/TableStandard';
 import { useToast } from '@/components/Toast';
 import { Tip } from '@/components/Tip';
 import { UnifiedFilter } from '@/components/UnifiedFilter';
@@ -233,8 +234,7 @@ export function ArchiveList() {
         count={<TableCount testid="lib-archive-count" noun="documents" total={counts?.total} filtered={counts?.filtered} active={active} onClear={() => setParams({ q: '', adv: '', superseded: '' })} />}
         primary={<Tip text={t('lib.zip')}><button type="button" className="btn" data-testid="lib-archive-zip" aria-label={t('lib.zip')} disabled={zipping || gate.exportLocked || !items.some((r) => r.file_id)} title={gate.note(gate.exportLocked)} onClick={() => void zip()}><FileArchive size={16} /></button></Tip>}
         columns={<ColumnMenu api={tbl} label={label} />}
-        density={<DensityToggle api={tbl} />}
-        display={<DisplayMenu api={tbl} />}
+        layout={<LayoutPanel testid="lib-archive-layout" table={tbl} />}
         exporter={<Tip text={t('tstd.export_view')}><button type="button" className="btn" data-testid="lib-archive-export" aria-label={t('tstd.export_view')} disabled={gate.exportLocked} title={gate.note(gate.exportLocked)} onClick={() => void exportView()}><Download size={16} /></button></Tip>} />
       <div className="card gx overflow-auto" {...displayAttrs(tbl.display)} data-testid="lib-archive-table" role="table" aria-label={title}>
         <div className="sticky top-0 z-20"><HeaderRow api={tbl} label={label} testid="lib-archive-head" /></div>
