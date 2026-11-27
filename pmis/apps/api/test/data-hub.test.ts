@@ -6,7 +6,7 @@ import { G } from './reg-helpers';
 import { Actor, actor, plainAdmin } from './wf-helpers';
 
 /**
- * Migration 0370, contract 0.15.270: the Data hub. The setting section data_hub of ui.features is closed and complete; GET /data-hub/summary answers every
+ * Migration 0400, contract 0.15.270: the Data hub. The setting section data_hub of ui.features is closed and complete; GET /data-hub/summary answers every
  * signed-in user with what concerns them; "your last downloads" reads only the caller's own template_download audit rows.
  */
 let app: NestExpressApplication;

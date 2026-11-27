@@ -34,7 +34,7 @@ test('data hub: landing, quick download (audited), settings hide a widget, EN an
   await page.screenshot({ path: 'test-results/walk-datahub-downloads-en.png', fullPage: true });
 
   // the gear opens the one settings place; hide template changes and save through the real door
-  await page.getByTestId('hub-settings-gear').click();
+  await page.getByTestId('screen-settings-link').click();
   await expect(page.getByTestId('page-dh-settings')).toBeVisible();
   await page.getByTestId('dh-widget-template_changes').uncheck();
   await page.getByTestId('dh-view-templates-rows').click();

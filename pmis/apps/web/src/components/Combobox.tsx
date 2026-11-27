@@ -15,14 +15,17 @@ export function Combobox({ testid, label, placeholder, value, options, onChange,
   const uid = useId();
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
-  const [active, setActive] = useState(0);
+  const [nav, setNav] = useState<{ k: string; i: number } | null>(null);
   const input = useRef<HTMLInputElement>(null);
   const current = options.find((o) => o.id === value);
   const shown = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return needle ? options.filter((o) => `${o.label} ${o.search ?? ''} ${o.hint ?? ''}`.toLowerCase().includes(needle)) : options;
   }, [options, q]);
-  useEffect(() => { setActive(Math.max(0, shown.findIndex((o) => o.id === value))); }, [shown, value, open]);
+  // The highlighted row follows the selected one whenever the list, the value or the open state changes; arrows move it until then.
+  const sig = `${open}|${value}|${shown.map((o) => o.id).join(',')}`;
+  const active = nav && nav.k === sig ? nav.i : Math.max(0, shown.findIndex((o) => o.id === value));
+  const setActive = (i: number) => setNav({ k: sig, i });
   useEffect(() => { if (autoFocus) input.current?.focus(); }, [autoFocus]);
   const pick = (o: ComboOption | undefined) => { if (!o || o.disabled) return; onChange(o.id); setOpen(false); setQ(''); };
   const move = (d: number) => { if (!shown.length) return; let i = active; for (let n = 0; n < shown.length; n++) { i = (i + d + shown.length) % shown.length; if (!shown[i]?.disabled) break; } setActive(i); };

@@ -13,8 +13,6 @@ import { batchPath } from '@/api/types';
 import { PageHeader } from '@/components/PageHeader';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/States';
 import { TemplateQuickBar } from '@/components/TemplateQuickBar';
-import { Tip } from '@/components/Tip';
-import { canEditDisplayDefaults } from '@/components/TableStandard';
 import { ICONS, ICON_PROPS, type Concept } from '@/lib/icons';
 import { isAdmin } from '@/lib/perm';
 
@@ -68,16 +66,7 @@ export function DataHubPage() {
 
   return (
     <div data-testid="page-data-hub">
-      <PageHeader title={t('dhub.title')} subtitle={t('dhub.subtitle')} context={
-        <span className="ms-auto flex flex-wrap gap-1">
-          {canEditDisplayDefaults(me.data) && (
-            <Tip text={t('dhub.settings_hint')}>
-              <Link to="/admin/settings/screens/data-hub" className="btn px-2 py-1" data-testid="hub-settings-gear" aria-label={t('dhub.settings_hint')}>
-                {(() => { const I = ICONS.settings; return <I {...ICON_PROPS} size={16} />; })()}
-              </Link>
-            </Tip>
-          )}
-        </span>} />
+      <PageHeader title={t('dhub.title')} subtitle={t('dhub.subtitle')} settings="data_hub" />
       {!anyWidget && <EmptyState title={t('dhub.all_hidden')} />}
       {w.quick_bar && (
         <section className="card mb-4 p-4" data-testid="hub-widget-quick_bar" aria-label={t('dhub.quick_title')}>

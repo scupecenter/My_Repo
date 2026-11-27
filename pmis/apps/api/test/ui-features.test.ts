@@ -38,6 +38,7 @@ const AV = { style: 'geometric', shape: 'rounded', palette: 'brand', in_lists: f
 const NB = { enabled: false, days: 30 };
 const INBOX_SEED = { tabs_enabled: true, default_tab: 'all', priority_kinds: ['mention', 'approval_due', 'task_returned', 'task_rejected', 'idle_task_alert', 'no_holder', 'absence_alert'] };
 const HUB_SEED = { widgets: { quick_bar: true, batches: true, template_changes: true, recent: true, health: true, admin: true }, badge: true, default_view: { templates: 'cards', uploads: 'table', exports: 'table', master_import: 'table' } };
+const PANEL_SEED = { mode: 'popover', width: 'medium', show_tabs: true };
 const INBOX = { tabs_enabled: true, default_tab: 'priority', priority_kinds: ['mention', 'system'] };
 
 describe('Settings > Screens > Interface (ui.features)', () => {
@@ -49,6 +50,7 @@ describe('Settings > Screens > Interface (ui.features)', () => {
       new_badge: { enabled: true, days: 14 },
       inbox: INBOX_SEED,
       data_hub: HUB_SEED,
+      panel: PANEL_SEED,
     });
     expect(etag(res)).toBe(`"${res.body.version}"`);
   });
@@ -86,11 +88,11 @@ describe('Settings > Screens > Interface (ui.features)', () => {
     expect((await put(admin, { sections: { new_badge: NB }, reason: 'Stale' }, etag(cur))).status).toBe(412);
     const both = await put(admin, { sections: { avatars: AV, new_badge: NB }, reason: 'Both sections' }, etag(res));
     expect(both.status).toBe(200);
-    expect(both.body.sections).toEqual({ avatars: AV, new_badge: NB, inbox: INBOX_SEED, data_hub: HUB_SEED });
+    expect(both.body.sections).toEqual({ avatars: AV, new_badge: NB, inbox: INBOX_SEED, panel: PANEL_SEED, data_hub: HUB_SEED });
     const rows = await db.query("SELECT entity_id, before, after, reason FROM audit_log WHERE action = 'ui_features_update' ORDER BY id DESC LIMIT 1");
-    expect(rows.rows[0]).toMatchObject({ entity_id: 'ui.features', reason: 'Both sections', after: { avatars: AV, new_badge: NB, inbox: INBOX_SEED, data_hub: HUB_SEED } });
+    expect(rows.rows[0]).toMatchObject({ entity_id: 'ui.features', reason: 'Both sections', after: { avatars: AV, new_badge: NB, inbox: INBOX_SEED, panel: PANEL_SEED, data_hub: HUB_SEED } });
     expect(rows.rows[0].before.avatars).toEqual(AV);
-    expect((await plain.api.call('get', '/settings/ui-features')).body.sections).toEqual({ avatars: AV, new_badge: NB, inbox: INBOX_SEED, data_hub: HUB_SEED });
+    expect((await plain.api.call('get', '/settings/ui-features')).body.sections).toEqual({ avatars: AV, new_badge: NB, inbox: INBOX_SEED, panel: PANEL_SEED, data_hub: HUB_SEED });
     const back = await put(admin, {
       sections: { avatars: { style: 'gradient', shape: 'circle', palette: 'varied', in_lists: true }, new_badge: { enabled: true, days: 14 } }, reason: 'Back to the default',
     }, etag(both));
@@ -109,7 +111,22 @@ describe('Settings > Screens > Interface (ui.features)', () => {
     expect(ok.body.sections.inbox).toEqual(INBOX);
     expect(ok.body.sections.avatars).toEqual(cur.body.sections.avatars);
     expect((await plain.api.call('get', '/settings/ui-features')).body.sections.inbox).toEqual(INBOX);
-    const back = await put(admin, { sections: { inbox: INBOX_SEED, data_hub: HUB_SEED }, reason: 'Back to the default' }, etag(ok));
+    const back = await put(admin, { sections: { inbox: INBOX_SEED, panel: PANEL_SEED, data_hub: HUB_SEED }, reason: 'Back to the default' }, etag(ok));
+    expect(back.status).toBe(200);
+  });
+
+  it('the panel section (0282): saved on its own, closed, values checked, and the other sections keep their value', async () => {
+    const cur = await admin.api.call('get', '/settings/ui-features');
+    const bad = await put(admin, { sections: { panel: { mode: 'drawer', width: 'huge', show_tabs: 'yes', extra: 1 } }, reason: 'Bad panel' }, etag(cur));
+    expect(bad.status).toBe(422);
+    expect(codes(bad)).toEqual(['/sections/panel/extra:unknown_key', '/sections/panel/mode:invalid', '/sections/panel/show_tabs:invalid', '/sections/panel/width:invalid']);
+    const PANEL = { mode: 'side_panel', width: 'wide', show_tabs: false };
+    const ok = await put(admin, { sections: { panel: PANEL }, reason: 'Side panel' }, etag(cur));
+    expect(ok.status).toBe(200);
+    expect(ok.body.sections.panel).toEqual(PANEL);
+    expect(ok.body.sections.inbox).toEqual(cur.body.sections.inbox);
+    expect((await plain.api.call('get', '/settings/ui-features')).body.sections.panel).toEqual(PANEL);
+    const back = await put(admin, { sections: { panel: PANEL_SEED }, reason: 'Back to the default' }, etag(ok));
     expect(back.status).toBe(200);
   });
 

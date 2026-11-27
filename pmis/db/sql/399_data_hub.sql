@@ -1,10 +1,10 @@
--- 0370_data_hub: the Data hub (Data entry group renamed, owner decision 2026-11-27). Two additions, both additive:
+-- 0400_data_hub: the Data hub (Data entry group renamed, owner decision 2026-11-27). Two additions, both additive:
 --  1. the section "data_hub" of the guarded ui.features setting (Settings > Screens > Data hub): which widgets of the hub landing page show, the badge on
 --     Uploads & batches, and the default view of each hub list screen (cards, rows, table, compact). A stored value without the section takes the seed.
 --     Only ui_features_seed() and ui_features_validate() are replaced; no table, no permission change, nothing public.
 --  2. data_hub_my_downloads(): the caller's own last download of each template (version and time), read from the audit rows template_download that
 --     every download already writes. It reads only rows whose actor is the caller, so it opens nothing new ("Your last downloads" on the hub).
--- Mirror: db/sql/369_data_hub.sql (kept byte-identical).
+-- Mirror: db/sql/399_data_hub.sql (kept byte-identical).
 
 SELECT set_config('app.region_ids', '*', true);
 
@@ -14,12 +14,13 @@ LANGUAGE sql IMMUTABLE SET search_path = pg_catalog, public, pg_temp AS $$
            "new_badge": {"enabled": true, "days": 14},
            "inbox": {"tabs_enabled": true, "default_tab": "all",
                      "priority_kinds": ["mention", "approval_due", "task_returned", "task_rejected", "idle_task_alert", "no_holder", "absence_alert"]},
+           "panel": {"mode": "popover", "width": "medium", "show_tabs": true},
            "data_hub": {"widgets": {"quick_bar": true, "batches": true, "template_changes": true, "recent": true, "health": true, "admin": true},
                         "badge": true,
                         "default_view": {"templates": "cards", "uploads": "table", "exports": "table", "master_import": "table"}}}'::jsonb
 $$;
 
--- Checks every section object; appends field errors to errs. This is the validator of 0281 with the "data_hub" branch added.
+-- Checks every section object; appends field errors to errs. This is the validator of 0282 (panel) with the "data_hub" branch added.
 CREATE OR REPLACE FUNCTION ui_features_validate(p_sections jsonb) RETURNS jsonb
 LANGUAGE plpgsql IMMUTABLE SET search_path = pg_catalog, public, pg_temp AS $$
 DECLARE errs jsonb := '[]'::jsonb; k text; s jsonb; kk text; n integer; el jsonb; w jsonb; v jsonb;
@@ -28,7 +29,7 @@ BEGIN
     RETURN public.reg_err_item('/sections', 'required', 'An object of sections.') || '[]'::jsonb;
   END IF;
   FOR k IN SELECT jsonb_object_keys(p_sections) LOOP
-    IF k NOT IN ('avatars', 'new_badge', 'inbox', 'data_hub') THEN errs := errs || public.reg_err_item('/sections/' || k, 'unknown_key', 'Unknown section.'); END IF;
+    IF k NOT IN ('avatars', 'new_badge', 'inbox', 'panel', 'data_hub') THEN errs := errs || public.reg_err_item('/sections/' || k, 'unknown_key', 'Unknown section.'); END IF;
   END LOOP;
 
   s := p_sections -> 'avatars';
@@ -94,6 +95,23 @@ BEGIN
     END IF;
   END IF;
 
+  s := p_sections -> 'panel';
+  IF s IS NOT NULL THEN
+    IF jsonb_typeof(s) <> 'object' THEN
+      errs := errs || public.reg_err_item('/sections/panel', 'invalid', 'An object.');
+    ELSE
+      FOR kk IN SELECT jsonb_object_keys(s) LOOP
+        IF kk NOT IN ('mode', 'width', 'show_tabs') THEN errs := errs || public.reg_err_item('/sections/panel/' || kk, 'unknown_key', 'Unknown key.'); END IF;
+      END LOOP;
+      IF jsonb_typeof(s -> 'mode') IS DISTINCT FROM 'string' OR (s ->> 'mode') NOT IN ('popover', 'side_panel') THEN
+        errs := errs || public.reg_err_item('/sections/panel/mode', 'invalid', 'popover or side_panel.'); END IF;
+      IF jsonb_typeof(s -> 'width') IS DISTINCT FROM 'string' OR (s ->> 'width') NOT IN ('narrow', 'medium', 'wide') THEN
+        errs := errs || public.reg_err_item('/sections/panel/width', 'invalid', 'narrow, medium or wide.'); END IF;
+      IF jsonb_typeof(s -> 'show_tabs') IS DISTINCT FROM 'boolean' THEN
+        errs := errs || public.reg_err_item('/sections/panel/show_tabs', 'invalid', 'true or false.'); END IF;
+    END IF;
+  END IF;
+
   s := p_sections -> 'data_hub';
   IF s IS NOT NULL THEN
     IF jsonb_typeof(s) <> 'object' THEN
@@ -128,6 +146,15 @@ BEGIN
 END $$;
 
 
+-- The menu keys of the Data hub heading (a saved menu layout is refused for a key the catalogue does not list). Additive; an existing key is kept.
+INSERT INTO nav_item_catalogue (key, default_group, ord, added_in) VALUES
+  ('data_hub', 'data', 110, '0400'),
+  ('master_import', 'data', 111, '0400'),
+  ('column_mapping', 'data', 112, '0400'),
+  ('data_reset', 'data', 113, '0400'),
+  ('recycle_bin', 'data', 114, '0400')
+ON CONFLICT (key) DO NOTHING;
+
 -- The caller's last download of each template: [{template_id, version, prefill, at}], newest first. Rows of other users are never read.
 CREATE OR REPLACE FUNCTION data_hub_my_downloads(p_limit integer DEFAULT 20) RETURNS jsonb
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
@@ -149,7 +176,7 @@ END $$;
 INSERT INTO audit_log (action, entity_type, entity_id, after, reason)
 VALUES ('data_hub_applied', 'workflow', NULL,
         jsonb_build_object('ui_features', 'section data_hub added to ui.features', 'door', 'data_hub_my_downloads()'),
-        'Data hub setting section and last-downloads reader (migration 0370, contract 0.15.270).');
+        'Data hub setting section and last-downloads reader (migration 0400, contract 0.15.270).');
 
 DO $$
 DECLARE f text;

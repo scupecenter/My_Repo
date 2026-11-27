@@ -12,8 +12,10 @@ import { IssueTaskMap } from './IssueTaskMap';
 import { WeightSets } from './WeightSets';
 import { StaffVisibility } from './StaffVisibility';
 import { TeamScopeMatch } from './TeamScopeMatch';
+import { DeriveRulesScreen } from './DeriveRules';
 import { GecolOrderWarnings } from './GecolOrderWarnings';
 import { MailKinds } from './MailKinds';
+import { MailPolicy } from './MailPolicy';
 import { useMe } from '@/api/hooks';
 import { NewBadge } from '@/components/NewBadge';
 import { ContractorRules } from './ContractorRules';
@@ -42,6 +44,7 @@ import { DisplaySettings } from './DisplaySettings';
 import { PmSchedulesSettings } from './PmSchedulesSettings';
 import { DailyPlanSettings } from './DailyPlanSettings';
 import { MotionSettings } from './MotionSettings';
+import { AlertRules } from './AlertRules';
 import { LoginPageSettings } from './LoginPage';
 import { DataHubSettings } from './DataHubSettings';
 import { InterfaceSettings } from './InterfaceSettings';
@@ -55,12 +58,12 @@ export const SETTINGS_TABS: readonly SettingsTab[] = [
   { key: 'sla', sections: [{ key: 'rules' }, { key: 'calendar' }, { key: 'weights' }] },
   { key: 'workflow', sections: [{ key: 'editor' }, { key: 'columns' }, { key: 'freeze' }, { key: 'idle' }, { key: 'board' }, { key: 'coverage', adminOnly: true }, { key: 'simulate', adminOnly: true }] },
   // Lists (the dropdown catalogues, old ddl tab) now sit next to the register columns that use them
-  { key: 'registers', sections: [{ key: 'columns' }, { key: 'lists' }, { key: 'contractors' }, { key: 'gecol' }, { key: 'team-scope' }, { key: 'issue-map' }, { key: 'recycle', adminOnly: true }] },
+  { key: 'registers', sections: [{ key: 'columns' }, { key: 'lists' }, { key: 'contractors' }, { key: 'gecol' }, { key: 'derive' }, { key: 'team-scope' }, { key: 'issue-map' }, { key: 'recycle', adminOnly: true }] },
   // W5: the Document Library section is now named Document types (the old documents/library route redirects); Form templates and Archive are new
   { key: 'documents', sections: [{ key: 'types' }, { key: 'forms' }, { key: 'archive' }, { key: 'numbering' }] },
   { key: 'data', sections: [{ key: 'imports' }, { key: 'historical' }, { key: 'counts', adminOnly: true }, { key: 'export' }, { key: 'reset', adminOnly: true }] },
   // Notification policy + Mail kinds (admin only): both are what is sent to people
-  { key: 'alerts', sections: [{ key: 'policy' }, { key: 'mail', adminOnly: true }] },
+  { key: 'alerts', sections: [{ key: 'policy' }, { key: 'mail', adminOnly: true }, { key: 'rules', adminOnly: true }] },
   // DLP months is a data-protection rule, so it moved here from SLA
   { key: 'security', sections: [{ key: 'staff' }, { key: 'retention' }, { key: 'dlp' }, { key: 'locks' }, { key: 'support' }, { key: 'newdevice' }] },
   // Screens: what users see by default (Dashboard, Display menu of the tables, My Work Daily Plan)
@@ -158,7 +161,8 @@ export function SettingsRoutes() {
         <Route path="alerts" element={<TabFrame tab="alerts" />}>
           <Route index element={<Navigate to="policy" replace />} />
           <Route path="policy" element={<Notifications />} />
-          <Route path="mail" element={<MailKinds />} />
+          <Route path="mail" element={<><MailPolicy /><MailKinds /></>} />
+          <Route path="rules" element={<AlertRules />} />
         </Route>
         <Route path="workflow" element={<TabFrame tab="workflow" />}>
           <Route index element={<Navigate to="editor" replace />} />
@@ -183,6 +187,7 @@ export function SettingsRoutes() {
           <Route path="recycle" element={<RecycleBinScreen />} />
           <Route path="contractors" element={<><ContractorRules /><ContractorPerfThresholds /></>} />
           <Route path="gecol" element={<GecolOrderWarnings />} />
+          <Route path="derive" element={<DeriveRulesScreen />} />
           <Route path="team-scope" element={<TeamScopeMatch />} />
           <Route path="issue-map" element={<IssueTaskMap />} />
         </Route>

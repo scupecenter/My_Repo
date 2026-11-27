@@ -561,7 +561,7 @@ export class TemplatesService {
     return s;
   }
 
-  async build(t: TemplateRow, cols: TplColumn[], rows: Record<string, unknown>[], meta: { prefill: boolean; employeeId: string | null; issuedAt: Date }): Promise<Buffer> {
+  async build(t: TemplateRow, cols: TplColumn[], rows: Record<string, unknown>[], meta: { prefill: boolean; employeeId: string | null; issuedAt: Date; extra?: (wb: ExcelJS.Workbook) => void }): Promise<Buffer> {
     return this.buildBook(t, [{ sheet: DATA_SHEET, cols, rows }], meta, []);
   }
 
@@ -627,7 +627,7 @@ export class TemplatesService {
 
   /** The approved-template workbook: the data sheet(s), an instructions sheet, a Columns sheet for the Site Register templates, the hidden lists and the hidden `_tpl`. */
   async buildBook(
-    t: TemplateRow, parts: BookPart[], meta: { prefill: boolean; employeeId: string | null; issuedAt: Date }, extraKv: [string, string | number][],
+    t: TemplateRow, parts: BookPart[], meta: { prefill: boolean; employeeId: string | null; issuedAt: Date; extra?: (wb: ExcelJS.Workbook) => void }, extraKv: [string, string | number][],
   ): Promise<Buffer> {
     const wb = new ExcelJS.Workbook();
     wb.creator = 'GSDN Workspace';
@@ -734,6 +734,7 @@ export class TemplatesService {
     lines.forEach((l, i) => { const cell = ins.getCell(i + 1, 1); cell.value = l; cell.alignment = { wrapText: true, vertical: 'top' }; });
     ins.getCell(1, 1).font = { bold: true, size: 13 };
     wb.views = [{ x: 0, y: 0, width: 12000, height: 8000, firstSheet: 0, activeTab: 0, visibility: 'visible' }];
+    meta.extra?.(wb);   // P4 (migration 0365): the error report adds its Errors sheet to the re-uploadable copy
 
     const out = await wb.xlsx.writeBuffer();
     return Buffer.from(out as ArrayBuffer);

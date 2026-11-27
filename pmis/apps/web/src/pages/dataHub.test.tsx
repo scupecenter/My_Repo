@@ -27,8 +27,8 @@ describe('Data hub landing', () => {
     expect(screen.getByTestId('hub-widget-health')).toBeInTheDocument();
     expect(screen.getByTestId('hub-link-data-reset')).toHaveAttribute('href', '/admin/settings/data/reset');
     expect(screen.getByTestId('hub-link-recycle-bin')).toHaveAttribute('href', '/admin/settings/registers/recycle');
-    expect(screen.getByTestId('hub-settings-gear')).toHaveAttribute('href', '/admin/settings/screens/data-hub');
-    expect(screen.getByTestId('hub-settings-gear')).toHaveAttribute('aria-label');
+    expect(screen.getByTestId('screen-settings-link')).toHaveAttribute('href', '/admin/settings/screens/data-hub');
+    expect(screen.getByTestId('screen-settings-link')).toHaveAttribute('aria-label');
   });
 
   it('cascading dropdowns: the action list follows the template, and a download is the same call as the card', async () => {

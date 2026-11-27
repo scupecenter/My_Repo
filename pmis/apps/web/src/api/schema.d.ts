@@ -4958,6 +4958,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/alert-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The alert rules and the closed catalogues of the form
+         * @description 0.15.242 (migration 0342): System Admin. `rules` are the saved rules (code, kind, params, audience, templates, enabled, version); `catalogue` lists the closed kinds with their params, the audiences, the active registers and the modules the form offers. The database owns the validation.
+         */
+        get: operations["getAlertRules"];
+        put?: never;
+        /**
+         * Create an alert rule
+         * @description 0.15.242 (migration 0342): System Admin, a reason. Closed body (`unknown_key`): `code` (lowercase letters, digits and dashes, fixed once the rule exists, unique), `kind` (closed), `params` (closed per kind, field errors at `/params/<key>`), `audience` (`{"type":"system_admin"}` or `{"type":"module","module":"<module key>"}`), `title_en`, `title_ar`, `body_en`, `body_ar`, optional `link`, `enabled` (default true). Audited (`alert_rule_create`). Notifications only: a rule never changes a record, a state or a holder.
+         */
+        post: operations["createAlertRule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/alert-rules/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Update an alert rule
+         * @description 0.15.242 (migration 0342): System Admin, a reason and If-Match (the rule's `version`). The whole rule is sent; the `code` does not change. Audited (`alert_rule_update`, before and after).
+         */
+        put: operations["updateAlertRule"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/ui-features": {
         parameters: {
             query?: never;
@@ -6153,6 +6197,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/download-locks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The download lock categories, templates, uploaded files, generated documents (0.15.193)
+         * @description Every signed-in user may read it (the UI disables what is locked). `can_edit` is true for a System Admin only. All three are `false` until a System Admin turns one on.
+         */
+        get: operations["getDownloadLocks"];
+        /**
+         * Turn the download locks on or off (System Admin, reason, step-up, If-Match, audited) (0.15.193)
+         * @description System Admin only (403 `action_forbidden` otherwise, a delegate included). A reason (3+ characters), a step-up (401 `step_up_required`) and `If-Match` (428 / 412)
+         *     are required. Unknown keys and non-boolean values are 422. Saving the values already in force is 409 `invalid_transition`. Audited `download_locks_update`.
+         *     While a category is on, its route answers 403 `action_forbidden` with `errors[0].code` `download_locked`: `templates` (`GET /templates/{templateId}/download`),
+         *     `uploaded_files` (`GET /files/{id}/download`, which also feeds the on-screen preview and finished export files, and `GET /master-import/runs/{id}/file`), `generated_documents` (`GET /library/generated/{id}/download`, except
+         *     `purpose=view`). Reading and changing the locks is never locked.
+         */
+        put: operations["setDownloadLocks"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/security-locks": {
         parameters: {
             query?: never;
@@ -6551,6 +6623,26 @@ export interface paths {
          * @description 0.15.95. The approved Procurement versions in force, not cancelled, that the caller can see; of the site `site_id` when it is given. Needs the Issue log module; only the orders in regions where the caller also holds the Procurement view right (the responsibility matrix) are listed, and the same right is checked when the record is saved.
          */
         get: operations["listIssueOrderOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/registers/change_control/order-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The approved, active Procurement orders a Change Control record may name (0.15.225)
+         * @description 0.15.225. The approved Procurement versions in force, not cancelled, that the caller can see; of the site `site_id` when it is given. Needs the Change Control module; only the orders in regions where the caller also holds the Procurement view right (the responsibility matrix) are listed, and the same right is checked when the record is saved.
+         */
+        get: operations["listChangeControlOrderOptions"];
         put?: never;
         post?: never;
         delete?: never;
@@ -7033,6 +7125,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/derive-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The cross-register derive rules (0.15.260)
+         * @description 0.15.260. Each rule says which value of a source register a target register shows (the source record's external party, or one field), found by a link field of the target
+         *     record, else by the same site. Reading needs the Settings screen. `registers` lists the registers and fields a rule may name.
+         */
+        get: operations["getDeriveRules"];
+        /**
+         * Save the cross-register derive rules (reason, If-Match, audited)
+         * @description 0.15.260. System Admin, or a delegation of `admin.settings` edit for all regions. Field errors: `unknown_key`, `unknown_register`, `same_register`, `unknown_field`,
+         *     `duplicate`, `invalid`, `too_many`, `required`.
+         */
+        put: operations["setDeriveRules"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/dashboard": {
         parameters: {
             query?: never;
@@ -7104,6 +7222,32 @@ export interface paths {
          */
         get: operations["getGoalsProgress"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/mail-policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The mail policy (0.15.261)
+         * @description 0.15.261. System Admin only (403 `action_forbidden` otherwise). `enabled` is the global switch, `mode` is `internal_only` or `internal_external` for every kind, `kinds` may
+         *     override it per kind. An address is external when its domain is not in `internal_domains` (empty list: every address is internal). External mail also needs the security
+         *     lock `block_public_sharing` to be off (`block_public_sharing` shows its state). Security alerts and mandatory mail are never stopped by the policy.
+         */
+        get: operations["getMailPolicy"];
+        /**
+         * Save the mail policy (System Admin, step-up, reason, If-Match, audited)
+         * @description 0.15.261. Field errors (422 `validation_failed`): `/enabled`, `/mode`, `/internal_domains[/i]`, `/kinds[/kind]` (`unknown_kind`, `invalid`), `unknown_key`. Audited as `mail_policy_update`.
+         */
+        put: operations["setMailPolicy"];
         post?: never;
         delete?: never;
         options?: never;
@@ -8121,6 +8265,31 @@ export interface paths {
         };
         /** Preview: rows with action, diff and errors */
         get: operations["listImportBatchRows"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/import-batches/{batch_id}/error-report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Import batch. */
+                batch_id: components["parameters"]["BatchId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The refused rows of a batch as an .xlsx to correct and upload again (0365, P4)
+         * @description The error and duplicate rows written back in the layout of the approved template (hidden `_tpl` sheet, header row as issued) with the values the file had, so the
+         *     corrected file is uploaded as it is, plus the sheet `Errors` (row in the file, key, column, reason code, reason). The reasons are never an extra column of the Data
+         *     sheet (an upload with an extra column is refused). A New sites, stream or Master batch answers the `Errors` sheet alone. Audited as `import_batch.error_report`.
+         */
+        get: operations["downloadImportBatchErrorReport"];
         put?: never;
         post?: never;
         delete?: never;
@@ -11780,7 +11949,7 @@ export interface components {
          * @description Part key. Every register key used by `/registers` (including `dismantle`), plus the four non-register parts.
          * @enum {string}
          */
-        ExportPartKey: "procurement" | "contractors" | "gecol" | "hlc" | "permits_hse" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "dismantle" | "car_dispatcher" | "financial_advances" | "incidents" | "lessons_learned" | "sites" | "milestones" | "tasks" | "project_status" | "rf_design" | "acquisition";
+        ExportPartKey: "procurement" | "contractors" | "gecol" | "hlc" | "permits_hse" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "dismantle" | "car_dispatcher" | "financial_advances" | "incidents" | "lessons_learned" | "invoices" | "sites" | "milestones" | "tasks" | "project_status" | "rf_design" | "acquisition";
         ExportPart: {
             key: components["schemas"]["ExportPartKey"];
             label_en: string;
@@ -12090,8 +12259,8 @@ export interface components {
             theme?: "light" | "dark";
             /** @description 0.15.41. The personal UI design; null goes back to the organization default. While `identity.allow_user_choice` is false a non-null value is 403 `field_read_only` (`errors[0]` `{path: /ui_brand, code: brand_choice_locked}`); null stays allowed. Audited in `profile_updated`. */
             ui_brand?: components["schemas"]["UiBrand"] | null;
-            /** @description 0.15.230 (0241). The personal appearance choices; a subset of the dimensions. While `identity.allow_user_choice` is false a value is 403 `field_read_only` (`errors[0]` `{path: /ui_prefs, code: appearance_choice_locked}`). Audited per dimension in `profile_updated`. */
-            ui_prefs?: components["schemas"]["UiPrefs"];
+            /** @description 0.15.230 (0241). The personal appearance choices; a subset of the dimensions. While `identity.allow_user_choice` is false a value is 403 `field_read_only` (`errors[0]` `{path: /ui_prefs, code: appearance_choice_locked}`). Audited per dimension in `profile_updated`. 0.15.231 (0242): gains the key `sidebar` (`UiNav`, the personal sidebar); a sidebar-only change stays allowed while the appearance is locked. */
+            ui_prefs?: components["schemas"]["UiPrefsSelf"];
         };
         /** @description 0.9.2. The "My profile" page. */
         MyProfile: {
@@ -12115,8 +12284,8 @@ export interface components {
             ui_brand: components["schemas"]["UiBrand"] | null;
             /** @description 0.15.41. The design the user sees. */
             brand: components["schemas"]["UiBrand"];
-            /** @description 0.15.230 (0241). The stored personal appearance choices; empty = the organization defaults. */
-            ui_prefs: components["schemas"]["UiPrefs"];
+            /** @description 0.15.230 (0241). The stored personal appearance choices; empty = the organization defaults. 0.15.231 (0242): may carry the key `sidebar` (`UiNav`). */
+            ui_prefs: components["schemas"]["UiPrefsSelf"];
             /** @description 0.15.230 (0241). The appearance the user sees (ui_effective_prefs): own choices, else the organization defaults. */
             appearance: components["schemas"]["UiPrefs"];
             /** @description 0.15.41. The organization default and whether a personal design is allowed (drives the Appearance control). */
@@ -12194,8 +12363,8 @@ export interface components {
             ui_brand?: components["schemas"]["UiBrand"] | null;
             /** @description 0.15.41. The design the user sees: `ui_brand` while the admin allows a personal choice and one is set, else the organization default. Independent of `theme`. */
             brand?: components["schemas"]["UiBrand"];
-            /** @description 0.15.230 (0241). The stored personal appearance choices; empty = the organization defaults. */
-            ui_prefs?: components["schemas"]["UiPrefs"];
+            /** @description 0.15.230 (0241). The stored personal appearance choices; empty = the organization defaults. 0.15.231 (0242): may carry the key `sidebar` (`UiNav`). */
+            ui_prefs?: components["schemas"]["UiPrefsSelf"];
             /** @description 0.15.230 (0241). The appearance the user sees (ui_effective_prefs): own choices, else the organization defaults. */
             appearance?: components["schemas"]["UiPrefs"];
             is_break_glass?: boolean;
@@ -14801,6 +14970,8 @@ export interface components {
                 admin_approved?: number;
                 /** @description 0087: of those, the rows approved with missing data (flagged `incomplete`). */
                 incomplete?: number;
+                /** @description 0365 (P4): of the `error` rows, those refused because the same record is already in the file (`duplicate_in_file`). Counted inside `error`, shown as a category of its own. */
+                duplicate?: number;
             };
             /** @description Always null (a big upload reports its progress in `progress`, 0.15.3). */
             job_id?: string | null;
@@ -15818,18 +15989,28 @@ export interface components {
             template_changes: components["schemas"]["DataHubTemplateChange"][];
             my_downloads: components["schemas"]["DataHubDownload"][];
         };
+        /** @description 0.15.251. How the bell opens the notifications. */
+        UiPanel: {
+            /** @enum {string} */
+            mode: "popover" | "side_panel";
+            /** @enum {string} */
+            width: "narrow" | "medium" | "wide";
+            show_tabs: boolean;
+        };
         /** @description 0.15.185. The sections of the interface features setting; every section is complete. */
         UiFeatures: {
             avatars: components["schemas"]["UiAvatars"];
             new_badge: components["schemas"]["UiNewBadge"];
             inbox: components["schemas"]["UiInbox"];
             data_hub: components["schemas"]["UiDataHub"];
+            panel: components["schemas"]["UiPanel"];
         };
         UiFeaturesPatch: {
             avatars?: components["schemas"]["UiAvatars"];
             new_badge?: components["schemas"]["UiNewBadge"];
             inbox?: components["schemas"]["UiInbox"];
             data_hub?: components["schemas"]["UiDataHub"];
+            panel?: components["schemas"]["UiPanel"];
         };
         UiFeaturesSetting: {
             sections: components["schemas"]["UiFeatures"];
@@ -15837,6 +16018,74 @@ export interface components {
             /** Format: date-time */
             updated_at?: string;
             updated_by?: components["schemas"]["UserRef"];
+        };
+        AlertRule: {
+            /** Format: uuid */
+            id: string;
+            code: string;
+            /** @enum {string} */
+            kind: "weekly_status_missing" | "record_idle";
+            params: {
+                [key: string]: unknown;
+            };
+            /** @description {"type":"system_admin"} or {"type":"module","module":"<module key>"}. */
+            audience: {
+                [key: string]: unknown;
+            };
+            title_en: string;
+            title_ar: string;
+            body_en: string;
+            body_ar: string;
+            link: string | null;
+            enabled: boolean;
+            /** @description The If-Match of PUT /settings/alert-rules/{id}. */
+            version: number;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        AlertRuleInput: {
+            code: string;
+            /** @enum {string} */
+            kind: "weekly_status_missing" | "record_idle";
+            params: {
+                [key: string]: unknown;
+            };
+            audience: {
+                [key: string]: unknown;
+            };
+            title_en: string;
+            title_ar: string;
+            body_en: string;
+            body_ar: string;
+            link?: string | null;
+            enabled?: boolean;
+        };
+        AlertRuleSaved: {
+            /** Format: uuid */
+            id: string;
+            version: number;
+        };
+        AlertRulesResponse: {
+            rules: components["schemas"]["AlertRule"][];
+            catalogue: {
+                kinds: {
+                    kind: string;
+                    params: string[];
+                }[];
+                audiences: ("system_admin" | "module")[];
+                registers: {
+                    register_key: string;
+                    name_en: string;
+                    name_ar: string | null;
+                    module_key: string;
+                }[];
+                modules: {
+                    key: string;
+                    name_en: string;
+                }[];
+            };
         };
         IdleTaskAlertSetting: {
             enabled: boolean;
@@ -16459,7 +16708,7 @@ export interface components {
             required_missing?: number | null;
         };
         /** @enum {string} */
-        RegisterKey: "procurement" | "contractors" | "gecol" | "hlc" | "permits_hse" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "dismantle" | "car_dispatcher" | "financial_advances" | "incidents" | "lessons_learned";
+        RegisterKey: "procurement" | "contractors" | "gecol" | "hlc" | "permits_hse" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "dismantle" | "car_dispatcher" | "financial_advances" | "incidents" | "lessons_learned" | "invoices";
         RegisterField: {
             code: string;
             label_en: string;
@@ -16486,6 +16735,8 @@ export interface components {
                 label_ar?: string | null;
                 /** @description 0.12.5. Functional groups of the value (for example CW, TE; closed for an action status). */
                 groups?: string[];
+                /** @description 0.15.244. The colour set for the value in Settings, Lists (#RRGGBB); null when none. Display only. */
+                colour?: string | null;
             }[];
         };
         /** @description 0.12.5 (Q104). The list catalogue a list field reads. */
@@ -16725,6 +16976,10 @@ export interface components {
         /** @enum {string} */
         RegisterRecordState: "entry" | "in_review" | "in_approval" | "approved" | "voided";
         RegisterRecord: {
+            /** @description 0.15.260. Values this record shows from another register by the rules of `derive.rules`, keyed by the rule output. Only the configured value, never the source record. */
+            derived?: {
+                [key: string]: unknown;
+            };
             /** @description 0.15.90. GECOL and HLC records only: the Contractor company from Procurement by Site ID (read only, never stored on the record). HLC: the company of the Procurement record it links to; otherwise the company of the latest approved Procurement record of the site that names one. Absent when none. `external_party` of a GECOL or HLC record stays what the approval rules use (the party the record itself is approved for). */
             procurement_contractor?: components["schemas"]["ExternalPartyRef"];
             /** @description 0.15.83. Read only. The evidence of the record: its mandatory document slots (the same rules as the Site Master cell `docs`). Absent when the record needs no document. */
@@ -17216,6 +17471,18 @@ export interface components {
             /** @enum {string} */
             accent?: "default" | "teal" | "blue" | "violet" | "green" | "orange" | "red" | "amber";
         };
+        /** @description 0.15.231 (0242): the personal sidebar (proposal item 4). `hidden` the screens the menu does not show, `order` their order inside their heading (a screen the list does not name keeps the organization order, after the named ones), `badge_style` how the count badges draw (full = the number, dot = a dot, none = no badge), `pins` the pinned shortcuts on top (at most 20). A menu key is a short lowercase id (the entries of the side menu; an unknown key is ignored). */
+        UiNav: {
+            hidden?: string[];
+            order?: string[];
+            /** @enum {string} */
+            badge_style?: "full" | "dot" | "none";
+            pins?: string[];
+        };
+        UiPrefsSelf: components["schemas"]["UiPrefs"] & {
+            /** @description 0.15.231 (0242): the personal sidebar. Never an organization default; a `ui_prefs` body without it keeps the stored sidebar, and a body that names only `sidebar` keeps the stored appearance dimensions. While `identity.allow_user_choice` is false a sidebar-only change stays allowed. */
+            sidebar?: components["schemas"]["UiNav"];
+        };
         /** @description 0.15.41. Settings, Identity & themes (setting `ui.identity`, migration 0130). */
         UiIdentity: {
             default_brand: components["schemas"]["UiBrand"];
@@ -17291,6 +17558,27 @@ export interface components {
             animation: boolean;
             default_locale: ("en" | "ar") | null;
             support_links: components["schemas"]["SupportLink"][];
+        };
+        /** @description 0.15.193. The download lock categories (setting `security.download_locks`, migration 0293). */
+        DownloadLocks: {
+            /** @description true: the blank template download answers 403 `download_locked`. */
+            templates: boolean;
+            /** @description true: the single uploaded file download answers 403 `download_locked` (the on-screen preview uses the same route). */
+            uploaded_files: boolean;
+            /** @description true: a generated library document download or print answers 403 `download_locked` (`purpose=view` stays open). */
+            generated_documents: boolean;
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+            /** @description The ETag value. */
+            version: number;
+            /** @description A System Admin only. */
+            can_edit: boolean;
+        };
+        DownloadLocksInput: components["schemas"]["WithReason"] & {
+            templates: boolean;
+            uploaded_files: boolean;
+            generated_documents: boolean;
         };
         /** @description 0.15.190. The admin lock keys (setting `security.locks`, migration 0290). */
         SecurityLocks: {
@@ -17414,6 +17702,32 @@ export interface components {
         MailNotificationKindsInput: components["schemas"]["WithReason"] & {
             /** @description Notification kinds that are also mailed to the person. An empty list keeps every notification in-app. */
             kinds: string[];
+        };
+        MailPolicyInput: {
+            enabled: boolean;
+            /** @enum {string} */
+            mode: "internal_only" | "internal_external";
+            internal_domains: string[];
+            kinds: {
+                [key: string]: {
+                    enabled: boolean;
+                    /** @enum {string} */
+                    mode: "inherit" | "internal_only" | "internal_external";
+                };
+            };
+        };
+        /** @description 0.15.261. The setting `mail.policy`. */
+        MailPolicy: components["schemas"]["MailPolicyInput"] & {
+            version: number;
+            /** @description The security lock; while on, no external mail is sent. */
+            block_public_sharing: boolean;
+            catalogue: {
+                kind: string;
+                recommended: boolean;
+            }[];
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
         };
         /** @description 0.14.2 (Q441). The setting `mail.notification_kinds` and the kinds it may name. */
         MailNotificationKinds: {
@@ -17729,6 +18043,40 @@ export interface components {
                     label_ar: string;
                 }[];
             };
+        };
+        DeriveRule: {
+            key: string;
+            enabled: boolean;
+            /** @description The register that shows the value. */
+            target_register: string;
+            /** @description The name of the value in `RegisterRecord.derived`. */
+            output: string;
+            /** @description Another register. */
+            source_register: string;
+            /** @description `external_party` (the company of the source record) or a field code of the source register. */
+            source: string;
+            /** @description A field of the target register that holds the record id or entity id of the source record; null = match by site only. */
+            link_field: string | null;
+            /** @description With a link field: when the link is empty, fall back to the latest approved source record of the same site (default false; HLC keeps it). */
+            site_fallback?: boolean;
+        };
+        DeriveRulesInput: {
+            rules: components["schemas"]["DeriveRule"][];
+        };
+        /** @description 0.15.260. Seed: the GECOL and HLC contractor from Procurement (the rules that were hard-coded). */
+        DeriveRules: components["schemas"]["DeriveRulesInput"] & {
+            version: number;
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+            registers: {
+                register_key: string;
+                fields: {
+                    code: string;
+                    label_en: string;
+                    label_ar?: string | null;
+                }[];
+            }[];
         };
         GecolOrderWarningsInput: {
             enabled: boolean;
@@ -19541,7 +19889,7 @@ export interface components {
             revoked_count: number;
         };
         /** @enum {string} */
-        NotificationKind: "task_assigned" | "task_returned" | "task_approved" | "approval_due" | "reassigned" | "absence_alert" | "idle_task_alert" | "no_holder" | "holiday_tentative" | "delegation" | "mfa_exemption" | "template_updated" | "import_batch" | "system" | "mention" | "followed_change" | "task_rejected" | "no_eligible_holder" | "register_assigned" | "register_rejected" | "gate_closed_again" | "sla_negative_duration" | "email_change_requested" | "email_change_decided" | "security_alert" | "snag_raised" | "snag_review" | "snag_rejected" | "snag_closed" | "levels_converted" | "permit_transferred" | "phone_change_requested" | "phone_change_decided" | "security_notice" | "site_region_moved" | "assignment_request" | "data_reset_request";
+        NotificationKind: "task_assigned" | "task_returned" | "task_approved" | "approval_due" | "reassigned" | "absence_alert" | "idle_task_alert" | "no_holder" | "holiday_tentative" | "delegation" | "mfa_exemption" | "template_updated" | "import_batch" | "system" | "mention" | "followed_change" | "task_rejected" | "no_eligible_holder" | "register_assigned" | "register_rejected" | "gate_closed_again" | "sla_negative_duration" | "email_change_requested" | "email_change_decided" | "security_alert" | "snag_raised" | "snag_review" | "snag_rejected" | "snag_closed" | "levels_converted" | "permit_transferred" | "phone_change_requested" | "phone_change_decided" | "security_notice" | "site_region_moved" | "assignment_request" | "data_reset_request" | "alert_rule";
         Notification: {
             /** Format: uuid */
             id: string;
@@ -29842,6 +30190,90 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
         };
     };
+    getAlertRules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The rules and the catalogue. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertRulesResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    createAlertRule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AlertRuleInput"] & components["schemas"]["WithReason"];
+            };
+        };
+        responses: {
+            /** @description Created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertRuleSaved"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    updateAlertRule: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AlertRuleInput"] & components["schemas"]["WithReason"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertRuleSaved"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
     getUiFeaturesSetting: {
         parameters: {
             query?: never;
@@ -32011,6 +32443,62 @@ export interface operations {
             429: components["responses"]["TooManyRequests"];
         };
     };
+    getDownloadLocks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The download locks. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DownloadLocks"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setDownloadLocks: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DownloadLocksInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DownloadLocks"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
     getSecurityLocks: {
         parameters: {
             query?: never;
@@ -32635,6 +33123,33 @@ export interface operations {
         };
     };
     listIssueOrderOptions: {
+        parameters: {
+            query?: {
+                site_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The orders. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["WarehouseOrderOption"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listChangeControlOrderOptions: {
         parameters: {
             query?: {
                 site_id?: string;
@@ -33382,6 +33897,62 @@ export interface operations {
             428: components["responses"]["PreconditionRequired"];
         };
     };
+    getDeriveRules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The setting. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeriveRules"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setDeriveRules: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"] & components["schemas"]["DeriveRulesInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeriveRules"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
     getDashboardSettings: {
         parameters: {
             query?: never;
@@ -33516,6 +34087,62 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+        };
+    };
+    getMailPolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The setting. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MailPolicy"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setMailPolicy: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"] & components["schemas"]["MailPolicyInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MailPolicy"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
         };
     };
     getMailNotificationKinds: {
@@ -35522,6 +36149,32 @@ export interface operations {
                     "application/json": components["schemas"]["PageEnvelope"] & {
                         items?: components["schemas"]["ImportRow"][];
                     };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    downloadImportBatchErrorReport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Import batch. */
+                batch_id: components["parameters"]["BatchId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The workbook. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
                 };
             };
             401: components["responses"]["Unauthorized"];

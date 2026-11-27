@@ -3,7 +3,7 @@ import { api } from './client';
 import type { components } from './schema';
 import { useUiFeatures } from './uiFeatures';
 
-/** Contract 0.15.270 (migration 0370): the Data hub landing page. */
+/** Contract 0.15.270 (migration 0400): the Data hub landing page. */
 export type DataHubSummary = components['schemas']['DataHubSummary'];
 export type DataHubBatch = components['schemas']['DataHubBatch'];
 export type DataHubTemplateChange = components['schemas']['DataHubTemplateChange'];
@@ -17,7 +17,7 @@ export const HUB_VIEWS: readonly HubView[] = ['cards', 'rows', 'table', 'compact
 export const HUB_WIDGETS: readonly HubWidget[] = ['quick_bar', 'batches', 'template_changes', 'recent', 'health', 'admin'];
 export const HUB_SCREENS: readonly HubScreen[] = ['templates', 'uploads', 'exports', 'master_import'];
 
-/** The look before anything is saved (the seed of migration 0370). */
+/** The look before anything is saved (the seed of migration 0400). */
 export const DATA_HUB_SEED: UiDataHub = {
   widgets: { quick_bar: true, batches: true, template_changes: true, recent: true, health: true, admin: true },
   badge: true,
