@@ -10,6 +10,7 @@ import { dispatchOf } from './warehouseData';
 const B = API_BASE;
 const W = () => db().wh;
 const tag = (v: number) => ({ headers: { ETag: `"${v}"` } });
+const SEQ_EDITS = new Map<string, Record<string, unknown>>();
 const admin = () => viewer()?.key === 'pm';
 const has = (q: string, ...s: (string | null | undefined)[]) => !q || s.join(' ').toLowerCase().includes(q.toLowerCase());
 const stale = (req: Request, v: number) => {
@@ -132,7 +133,22 @@ export const warehouseHandlers = [
     const g = guard(); if (g) return g;
     const seq = (key: string, record_type: string | null, form_kind: string | null, region_id: number | null, pattern: string) =>
       ({ key, record_type, form_kind, region_id, region_code: region_id ? 'TR' : null, pattern, reset: 'yearly', next_value: 1, next_preview: pattern.replace('{REGION}', 'TR').replace('{YYYY}', '2026').replace('{SEQ:4}', '0001'), last_issued: null, last_issued_at: null, is_active: true, version: 1, updated_at: '2026-11-04T08:00:00Z' });
-    return HttpResponse.json({ items: [seq('DN-CW-TR', 'cw_dn', 'dn', 1, 'DN-CW-{REGION}-{YYYY}-{SEQ:4}'), seq('RN-CW-TR', 'cw_rn', 'rn', 1, 'RN-CW-{REGION}-{YYYY}-{SEQ:4}'), seq('PL-WH', 'pl', null, null, 'PL-WH-{YYYY}-{SEQ:4}')] });
+    const base = [seq('DN-CW-TR', 'cw_dn', 'dn', 1, 'DN-CW-{REGION}-{YYYY}-{SEQ:4}'), seq('RN-CW-TR', 'cw_rn', 'rn', 1, 'RN-CW-{REGION}-{YYYY}-{SEQ:4}'), seq('PL-WH', 'pl', null, null, 'PL-WH-{YYYY}-{SEQ:4}')];
+    return HttpResponse.json({ items: base.map((s) => ({ ...s, ...(SEQ_EDITS.get(s.key) ?? {}) })) });
+  }),
+  http.patch(`${B}/number-sequences/:key`, async ({ params, request }) => {
+    const g = guard(); if (g) return g;
+    if (!admin()) return problem(403, 'forbidden', 'Not allowed');
+    const b = (await request.json()) as Record<string, unknown>;
+    if (typeof b.reason !== 'string' || b.reason.trim().length < 3) return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '/reason', code: 'required' }] });
+    if (b.pattern !== undefined && !/\{SEQ:[1-9]\}/.test(String(b.pattern))) return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '/pattern', code: 'invalid' }] });
+    const { reason: _r, ...rest } = b; void _r;
+    const key = String(params.key), cur = SEQ_EDITS.get(key) ?? {};
+    const version = ((cur.version as number | undefined) ?? 1) + 1;
+    const next = { ...cur, ...rest, version };
+    if (rest.pattern !== undefined) (next as Record<string, unknown>).next_preview = String(rest.pattern).replace('{REGION}', 'TR').replace('{YYYY}', '2026').replace('{SEQ:4}', '0001');
+    SEQ_EDITS.set(key, next);
+    return HttpResponse.json({ key, ...next });
   }),
   // Contract 0.13.1 (Q270): a quarantine exit is a pending document that holds its quantity; L2 approves it in the register (not mocked here).
   http.post(`${B}/warehouse/quarantine-exits`, async ({ request }) => {

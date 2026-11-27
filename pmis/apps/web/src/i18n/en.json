@@ -1158,6 +1158,7 @@
     "section_documents_types": "Document types",
     "section_documents_forms": "Form templates",
     "section_documents_archive": "Archive",
+    "section_documents_numbering": "Numbering",
     "section_data_counts": "GECOL / HLC counts",
     "section_screens_motion": "Motion"
   },
@@ -6433,5 +6434,22 @@
     "preview": "Preview of a dialog opening",
     "replay": "Replay",
     "link_display": "Tables (Display) settings"
+  },
+  "seq": {
+    "title": "Numbering sequences",
+    "note": "The next number of each document type and form. A change applies to the numbers issued from now on; issued numbers never change.",
+    "col_key": "Key",
+    "col_for": "Numbers",
+    "col_pattern": "Pattern",
+    "col_reset": "Reset",
+    "col_next": "Next value",
+    "col_preview": "Next number",
+    "col_active": "Active",
+    "reset_yearly": "Every year",
+    "reset_never": "Never",
+    "edit_title": "Sequence {{key}}",
+    "pattern_help": "Tokens {REGION}, {YYYY}, {YY} and {SEQ:n} (once). Characters A-Z 0-9 - / _ .",
+    "next_help": "A whole number from 1. The database refuses a value that would repeat a number already issued.",
+    "region_code": "Region code"
   }
 }
