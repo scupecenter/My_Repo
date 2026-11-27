@@ -35,6 +35,16 @@ export function useReverseMovement() {
   });
 }
 export const useConfigGaps = () => useQuery({ queryKey: ['wh-gaps'], queryFn: () => api.get<WarehouseConfigGaps>('/warehouse/config-gaps') });
+/** D58: the WL vendor of each region (the Setting tblRegionVendor) and its save; the gaps list refreshes with it. */
+export type RegionVendor = { region_id: number; region_name: string; wl_vendor: 'Cambium' | 'Intracom' | null; version: number };
+export const useRegionVendors = (enabled = true) => useQuery({ queryKey: ['wh-region-vendors'], enabled, queryFn: () => api.get<List<RegionVendor>>('/warehouse/region-vendors') });
+export function useSaveRegionVendor() {
+  const qc = useQueryClient();
+  return useMutation<unknown, ApiError, { region_id: number; version: number; wl_vendor: 'Cambium' | 'Intracom' | null; reason: string }>({
+    mutationFn: ({ region_id, version, wl_vendor, reason }) => api.put(`/warehouse/region-vendors/${region_id}`, { body: { wl_vendor, reason }, ...(version > 0 ? { version } : {}) }),
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ['wh-region-vendors'] }); void qc.invalidateQueries({ queryKey: ['wh-gaps'] }); },
+  });
+}
 export const useAsBuiltItems = (f: { section: string; include_inactive: boolean }) =>
   useQuery({ queryKey: ['asbuilt-items', f], queryFn: () => api.get<List<AsBuiltItem>>('/as-built/items', { query: f }) });
 
