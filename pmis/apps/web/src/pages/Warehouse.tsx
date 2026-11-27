@@ -17,6 +17,7 @@ import { decodeFilter, encodeFilter } from '@/api/views';
 import { useToast } from '@/components/Toast';
 import { hasGrant, isAdmin } from '@/lib/perm';
 import { registerErrorMessage } from '@/lib/registerErrors';
+import { DateInput } from '@/components/DateInput';
 
 type Tab = 'items' | 'movements' | 'stock' | 'dispatch' | 'gaps';
 type Dlg = { mode: 'new' } | { mode: 'edit' | 'off' | 'del'; item: WarehouseItem } | null;
@@ -155,7 +156,9 @@ function Items() {
                     <option value="" />{['true', 'false'].map((b) => <option key={b} value={b}>{t(b === 'true' ? 'wh.yes' : 'wh.no')}</option>)}
                   </select>
                 ) : (
-                  <input className="input mt-1 font-normal" type={c.data_type === 'number' ? 'number' : c.data_type === 'date' ? 'date' : 'text'} step="any" data-testid={`wh-f-cv-${c.code}`} value={cv[c.code] ?? ''} onChange={(e) => setCv((x) => ({ ...x, [c.code]: e.target.value }))} />
+                  c.data_type === 'date'
+                    ? <DateInput className="input mt-1 font-normal" data-testid={`wh-f-cv-${c.code}`} value={cv[c.code] ?? ''} onChange={(e) => setCv((x) => ({ ...x, [c.code]: e.target.value }))} />
+                    : <input className="input mt-1 font-normal" type={c.data_type === 'number' ? 'number' : 'text'} step="any" data-testid={`wh-f-cv-${c.code}`} value={cv[c.code] ?? ''} onChange={(e) => setCv((x) => ({ ...x, [c.code]: e.target.value }))} />
                 )}
               </label>
             ))}
@@ -245,7 +248,7 @@ function MovementEdit({ recordId, doc, onClose }: { recordId: string; doc: strin
       error={upd.isError ? registerErrorMessage(t, upd.error) : null}
       withReason={false} onSubmit={() => cur && upd.mutate({ record: cur, patch: { data: f } }, { onSuccess: () => { toast(t('wh.mv_saved'), 'ok'); onClose(); } })}>
       <label className="block text-sm font-semibold">{t('wh.mv_doc_date')}
-        <input type="date" className="input mt-1 font-normal" data-testid="wh-mv-edit-date" value={val('doc_date')} onChange={(e) => setF({ ...f, doc_date: e.target.value })} /></label>
+        <DateInput className="input mt-1 font-normal" data-testid="wh-mv-edit-date" value={val('doc_date')} onChange={(e) => setF({ ...f, doc_date: e.target.value })} /></label>
       <label className="block text-sm font-semibold">{t('wh.mv_remark')}
         <input className="input mt-1 font-normal" data-testid="wh-mv-edit-remark" value={val('remark')} onChange={(e) => setF({ ...f, remark: e.target.value })} /></label>
       <p className="text-xs text-mute">{t('wh.mv_lines_note')}</p>

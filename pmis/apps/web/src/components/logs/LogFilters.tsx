@@ -5,6 +5,7 @@ import { useRegions } from '@/api/sites';
 import { PeoplePicker } from '@/components/PeoplePicker';
 import { SitePicker } from '@/components/RegisterFields';
 import { ActiveChips, type Chip } from '@/components/TableKit';
+import { DateInput } from '@/components/DateInput';
 
 export const ENTITY_TYPES = ['task', 'register_record', 'site', 'user', 'role', 'setting', 'template', 'document'];
 export const ACTIONS = ['task.submit', 'task.approve', 'task.reject', 'task.update', 'record.update', 'record.approve', 'user.session_revoked', 'settings.update', 'document.download', 'export.create', 'audit_log.read'];
@@ -44,8 +45,8 @@ export function LogFilters({ kind, f, set }: { kind: 'audit' | 'field'; f: LogFi
             ? <L k="logs.f_search"><input className="input" data-testid="f-q" placeholder={t('logs.f_search_hint')} value={f.q} onChange={(e) => up({ q: e.target.value })} /></L>
             : <L k="logs.f_field"><input className="input" dir="ltr" data-testid="f-field" placeholder="planned_date" value={f.field} onChange={(e) => up({ field: e.target.value })} /></L>}
         </div>
-        <L k="logs.f_from"><input type="date" className="input" data-testid="f-from" value={f.from} onChange={(e) => up({ from: e.target.value })} /></L>
-        <L k="logs.f_to"><input type="date" className="input" data-testid="f-to" value={f.to} onChange={(e) => up({ to: e.target.value })} /></L>
+        <L k="logs.f_from"><DateInput className="input" data-testid="f-from" value={f.from} onChange={(e) => up({ from: e.target.value })} /></L>
+        <L k="logs.f_to"><DateInput className="input" data-testid="f-to" value={f.to} onChange={(e) => up({ to: e.target.value })} /></L>
         <L k="logs.f_via"><select className="input" data-testid="f-via" value={f.via} onChange={(e) => up({ via: e.target.value })}><option value="">{t('common.all')}</option>{VIAS.map((v) => <option key={v} value={v}>{t(`logs.via_${v}`)}</option>)}</select></L>
         <button type="button" className="btn" data-testid="f-more" aria-expanded={open} onClick={() => setOpen(!open)}>{t(open ? 'logs.f_less' : 'logs.f_more')}</button>
       </div>
