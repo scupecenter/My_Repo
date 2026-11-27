@@ -248,10 +248,10 @@ export function Shell() {
                 {session.data?.auth_method === 'local'
                   ? <Popover.Close asChild><button className="btn w-full justify-start" data-testid="user-menu-change-password" onClick={() => nav('/change-password')}><Lock size={14} />{t('top.change_password')}</button></Popover.Close>
                   : <p className="p-2 text-sm text-mute">{t('top.no_password')}</p>}
+                <Popover.Close asChild><button className="btn mt-1 w-full justify-start border-t border-line" data-testid="user-menu-signout" onClick={() => { void (async () => { const n = await fieldPendingCount(me.data?.user.id); if (n > 0 && !window.confirm(t('field.signout_warn', { count: n }))) return; logout.mutate(undefined, { onSuccess: () => { void wipeFieldData(); void qc.invalidateQueries({ queryKey: ['session'] }); nav('/login'); } }); })(); }}><LogOut size={14} aria-hidden />{t('top.sign_out')}</button></Popover.Close>
               </Popover.Content>
             </Popover.Portal>
           </Popover.Root>
-          <button className="btn" data-testid="topbar-signout" aria-label={t('top.sign_out')} onClick={() => { void (async () => { const n = await fieldPendingCount(me.data?.user.id); if (n > 0 && !window.confirm(t('field.signout_warn', { count: n }))) return; logout.mutate(undefined, { onSuccess: () => { void wipeFieldData(); void qc.invalidateQueries({ queryKey: ['session'] }); nav('/login'); } }); })(); }}><LogOut size={16} /></button>
         </header>
         {HYBRID && <div role="status" data-testid="hybrid-banner" className="border-b border-line bg-waitBg px-4 py-1 text-xs text-waitInk">{t('hybrid.banner')}</div>}
         <AutoHints />
