@@ -186,6 +186,24 @@ BEGIN
   RETURN jsonb_build_object('id', p_id, 'deleted', true, 'hidden', true);
 END $$;
 
+-- The open locks for the lock lists (record and column), optionally of one kind. A definer function: the application role has no table rights on the targets (movements, plans).
+CREATE OR REPLACE FUNCTION ent_lock_list(p_kind text) RETURNS jsonb
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+  SELECT jsonb_build_object(
+    'records', coalesce((SELECT jsonb_agg(to_jsonb(x) ORDER BY x.locked_at DESC) FROM (
+      SELECT l.id::text AS id, l.target_kind AS kind, l.target_id::text AS target_id, l.reason, l.locked_at::text AS locked_at, u.display_name AS locked_by,
+        CASE l.target_kind WHEN 'wh_item' THEN (SELECT i.item_code FROM public.warehouse_items i WHERE i.id = l.target_id)
+          WHEN 'wh_movement' THEN (SELECT m.doc_no FROM public.wh_movements m WHERE m.id = l.target_id)
+          WHEN 'daily_plan' THEN (SELECT p.plan_date::text FROM public.daily_plans p WHERE p.id = l.target_id)
+          WHEN 'daily_plan_row' THEN (SELECT p.plan_date::text FROM public.daily_plan_rows r JOIN public.daily_plans p ON p.id = r.plan_id WHERE r.id = l.target_id) END AS label
+      FROM public.entity_locks l LEFT JOIN public.users u ON u.id = l.locked_by
+      WHERE l.unlocked_at IS NULL AND (p_kind IS NULL OR l.target_kind = p_kind) ORDER BY l.locked_at DESC LIMIT 500) x), '[]'::jsonb),
+    'columns', coalesce((SELECT jsonb_agg(to_jsonb(y) ORDER BY y.locked_at DESC) FROM (
+      SELECT c.id::text AS id, c.target_kind AS kind, c.field_code AS field, c.reason, c.locked_at::text AS locked_at, u.display_name AS locked_by
+      FROM public.entity_column_locks c LEFT JOIN public.users u ON u.id = c.locked_by
+      WHERE c.unlocked_at IS NULL AND (p_kind IS NULL OR c.target_kind = p_kind) ORDER BY c.locked_at DESC LIMIT 500) y), '[]'::jsonb))
+$$;
+
 DO $$
 BEGIN
   ALTER TABLE entity_locks OWNER TO pmis_definer;
@@ -194,10 +212,14 @@ BEGIN
   ALTER FUNCTION ent_lock_check(text, uuid, jsonb) OWNER TO pmis_definer;
   ALTER FUNCTION ent_lock_set(text, uuid, boolean, text) OWNER TO pmis_definer;
   ALTER FUNCTION ent_column_lock_set(text, text, boolean, text) OWNER TO pmis_definer;
+  ALTER FUNCTION ent_lock_list(text) OWNER TO pmis_definer;
   REVOKE ALL ON FUNCTION ent_lock_require(text, uuid), ent_lock_check(text, uuid, jsonb), ent_lock_set(text, uuid, boolean, text), ent_column_lock_set(text, text, boolean, text) FROM PUBLIC;
+  REVOKE ALL ON FUNCTION ent_lock_list(text) FROM PUBLIC;
+  GRANT EXECUTE ON FUNCTION ent_lock_list(text) TO pmis_definer;
   GRANT EXECUTE ON FUNCTION ent_lock_require(text, uuid), ent_lock_check(text, uuid, jsonb), ent_lock_set(text, uuid, boolean, text), ent_column_lock_set(text, text, boolean, text) TO pmis_definer;
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'pmis_app') THEN
     GRANT SELECT ON entity_locks, entity_column_locks TO pmis_app;
+    GRANT EXECUTE ON FUNCTION ent_lock_list(text) TO pmis_app;
     GRANT EXECUTE ON FUNCTION ent_lock_require(text, uuid), ent_lock_check(text, uuid, jsonb), ent_lock_set(text, uuid, boolean, text), ent_column_lock_set(text, text, boolean, text) TO pmis_app;
   END IF;
 END $$;

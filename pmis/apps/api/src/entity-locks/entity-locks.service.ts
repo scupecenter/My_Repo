@@ -44,19 +44,8 @@ export class EntityLocksService {
   /** Open locks (record and column), optionally of one kind. A lock whose target no longer exists is not listed. */
   async list(kindRaw: unknown): Promise<{ records: unknown[]; columns: unknown[] }> {
     const kind = kindRaw === undefined || kindRaw === "" ? null : parse(kindSchema, kindRaw);
-    const records = await this.db.tx.$queryRaw<unknown[]>(Prisma.sql`
-      SELECT l.id::text, l.target_kind AS kind, l.target_id::text AS target_id, l.reason, l.locked_at::text AS locked_at, u.display_name AS locked_by,
-        CASE l.target_kind WHEN 'wh_item' THEN (SELECT i.item_code FROM warehouse_items i WHERE i.id = l.target_id)
-          WHEN 'wh_movement' THEN (SELECT m.doc_no FROM wh_movements m WHERE m.id = l.target_id)
-          WHEN 'daily_plan' THEN (SELECT p.plan_date::text FROM daily_plans p WHERE p.id = l.target_id)
-          WHEN 'daily_plan_row' THEN (SELECT p.plan_date::text FROM daily_plan_rows r JOIN daily_plans p ON p.id = r.plan_id WHERE r.id = l.target_id) END AS label
-      FROM entity_locks l LEFT JOIN users u ON u.id = l.locked_by
-      WHERE l.unlocked_at IS NULL AND (${kind}::text IS NULL OR l.target_kind = ${kind}::text) ORDER BY l.locked_at DESC LIMIT 500`);
-    const columns = await this.db.tx.$queryRaw<unknown[]>(Prisma.sql`
-      SELECT c.id::text, c.target_kind AS kind, c.field_code AS field, c.reason, c.locked_at::text AS locked_at, u.display_name AS locked_by
-      FROM entity_column_locks c LEFT JOIN users u ON u.id = c.locked_by
-      WHERE c.unlocked_at IS NULL AND (${kind}::text IS NULL OR c.target_kind = ${kind}::text) ORDER BY c.locked_at DESC LIMIT 500`);
-    return { records, columns };
+    const r = await this.db.tx.$queryRaw<{ j: { records: unknown[]; columns: unknown[] } }[]>(Prisma.sql`SELECT ent_lock_list(${kind}::text) AS j`);
+    return r[0]!.j;
   }
 
   async setLock(auth: AuthContext, kindRaw: string, idRaw: string, rawBody: unknown, locked: boolean): Promise<{ kind: string; id: string; locked: boolean }> {
