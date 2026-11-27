@@ -29,7 +29,8 @@ for (const locale of ['en', 'ar'] as const) {
     await page.goto('/sites?layout=list');
     await page.getByTestId('site-row-TR101').click();
     await expect(page.getByTestId('task-grid-toolbar')).toBeVisible();
-    await expect(page.getByTestId('site-layout-list')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByTestId('site-view')).toContainText(/List|قائمة/);
+    await page.getByTestId('site-view').click();
     await page.getByTestId('site-layout-timeline').click();
     await expect(page.getByTestId('task-row')).toBeVisible();
   });
