@@ -1,4 +1,4 @@
--- 0189_dash_ops_scurve (dashboard proposals item 2, owner approval 2026-11-26). Mirror: db/sql/188_dash_ops_scurve.sql (kept identical).
+-- 0198_dash_ops_scurve (dashboard proposals item 2, owner approval 2026-11-26). Mirror: db/sql/197_dash_ops_scurve.sql (kept identical).
 --
 -- Additive: one card code, ops_scurve, is added to the dashboard settings catalogue (migration 0108), so the progress curve card
 -- (planned vs actual of the saved weekly Project Status snapshots, the weekly velocity and the 100% forecast) can be shown, hidden
