@@ -18,8 +18,9 @@ DECLARE def text;
 BEGIN
   def := pg_get_functiondef('public.mail_kind_catalogue()'::regprocedure);
   IF position('''expiry_radar''' IN def) = 0 THEN
-    IF position(E'\n  ]) WITH ORDINALITY' IN def) = 0 THEN RAISE EXCEPTION 'mail_kind_catalogue: the end of the kind list was not found'; END IF;
-    def := replace(def, E'\n  ]) WITH ORDINALITY', E',\n    ''expiry_radar'', ''approval_digest'', ''weekly_digest''\n  ]) WITH ORDINALITY');
+    -- the end of the kind list, whatever the indentation of the migration that wrote the function last (0149 uses two spaces, 0340 six)
+    IF def !~ E'\\n\\s*\\]\\) WITH ORDINALITY' THEN RAISE EXCEPTION 'mail_kind_catalogue: the end of the kind list was not found'; END IF;
+    def := regexp_replace(def, E'(\\n\\s*)\\]\\) WITH ORDINALITY', E',\\1  ''expiry_radar'', ''approval_digest'', ''weekly_digest''\\1]) WITH ORDINALITY');
     EXECUTE def;
   END IF;
 END $$;

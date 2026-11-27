@@ -41,7 +41,7 @@ import type { RegisterDefinition, RegisterRecord } from "@/api/types";
 import { TemplateExportMenu } from "@/components/TemplateExportMenu";
 import { PmDuePanel } from "@/components/PmDuePanel";
 import { ViewAnalytics } from "@/components/ViewAnalytics";
-import { ViewMenu, type ViewOption } from "@/components/ViewMenu";
+import { LayoutPanel, type ViewOption } from "@/components/LayoutPanel";
 import { useRememberedView } from "@/lib/viewPreference";
 import { GridCellEditor, INLINE_TYPES } from "@/components/GridCellEditor";
 import { FieldValue } from "@/components/FieldValue";
@@ -58,11 +58,13 @@ import { fieldLabel, showValue } from "@/components/RegisterFields";
 import { RegisterDrawer, STATE_TONE, TRIAGE_TONE } from "@/components/RegisterDrawer";
 import {
   ALL_CAP,
+  BY_STATE,
   defaultBoardBy,
   layoutsOf,
   RegisterBoard,
   RegisterMap,
   RegisterWide,
+  statusFields,
   type RegisterLane,
   type RegisterLayout,
 } from "@/components/RegisterViews";
@@ -70,13 +72,12 @@ import { useToast } from "@/components/Toast";
 import { BatchEditBar } from "@/components/BatchEditBar";
 import { useBatchEdit } from "@/lib/useBatchEdit";
 import { MoreMenu, PageHeader } from "@/components/PageHeader";
-import { DisplayMenu, displayAttrs, PastedChip, ROWNO_COL, RowNo, SearchBox, ShownFooter, TableCount, TableToolbar } from "@/components/TableStandard";
+import { displayAttrs, PastedChip, ROWNO_COL, RowNo, SearchBox, ShownFooter, TableCount, TableToolbar } from "@/components/TableStandard";
 import type { CountedPage } from "@/api/types";
 import {
   ActiveChips,
   BulkBar,
   ColumnMenu,
-  DensityToggle,
   Empty,
   gxRow,
   HeaderRow,
@@ -689,13 +690,28 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
             <ViewAnalytics def={def} records={real} total={total} />
           </span>
         }
-        switcher={
-          <ViewMenu
+        layout={
+          /* V1: one Layout panel — the view switcher, the board's grouping and swimlanes while the board is on, and the Display options of the
+             table layouts (list and wide table) */
+          <LayoutPanel
             testid="register-view"
-            title={t("view.title")}
-            value={view === "grid" ? "grid" : layout}
-            options={viewOptions}
-            onChange={pickView}
+            views={{ value: view === "grid" ? "grid" : layout, options: viewOptions, onChange: pickView }}
+            options={view === "vertical" && layout === "board" ? (
+              <>
+                <label className="flex items-center gap-2 text-sm"><span className="text-mute">{t("regviews.board_by")}</span>
+                  <select className="input w-auto py-1" data-testid="register-board-by" value={boardBy} onChange={(e) => setParams({ board_by: e.target.value === defaultBoardBy(def) ? "" : e.target.value })}>
+                    {statusFields(def).map((f) => <option key={f.code} value={f.code}>{fieldLabel(f, i18n.language)}</option>)}
+                    <option value={BY_STATE}>{t("regviews.by_state")}</option>
+                  </select>
+                </label>
+                <label className="flex items-center gap-2 text-sm"><span className="text-mute">{t("board.swimlane")}</span>
+                  <select className="input w-auto py-1" data-testid="register-board-lane" value={lane} onChange={(e) => setParams({ lane: e.target.value === "none" ? "" : e.target.value })}>
+                    {(def.record_types?.length ? ["none", "region", "type"] : ["none", "region"]).map((l) => <option key={l} value={l}>{l === "type" ? t("regviews.lane_type") : t(`board.lane_${l}`)}</option>)}
+                  </select>
+                </label>
+              </>
+            ) : undefined}
+            table={view === "vertical" && (layout === "list" || layout === "wide") ? tbl : undefined}
           />
         }
         primary={
@@ -708,9 +724,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
             {t("registers.new")}
           </button>
         }
-        density={view === "vertical" ? <DensityToggle api={tbl} /> : undefined}
         columns={view === "vertical" ? <ColumnMenu api={tbl} label={label} /> : undefined}
-        display={view === "vertical" ? <DisplayMenu api={tbl} /> : undefined}
         exporter={
             <TemplateExportMenu
               testid="register-tools"
@@ -965,9 +979,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
               def={def}
               records={real}
               by={boardBy}
-              onBy={(x) => setParams({ board_by: x === defaultBoardBy(def) ? "" : x })}
               lane={lane}
-              onLane={(x) => setParams({ lane: x === "none" ? "" : x })}
               regionName={(id) => rname(id as number | null)}
               onOpen={setRecord}
               partial={partial}

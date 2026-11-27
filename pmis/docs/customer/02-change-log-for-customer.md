@@ -15,7 +15,7 @@
 - NestJS مع PostgreSQL على **خادم داخلي، وليس سحابة**.
 - الدخول بـ Microsoft 365 لموظفي Company فقط؛ التحقق الثنائي عبر Entra لاحقاً.
 - ألوان ERPNext (frappe-ui 1.0.2) بخط Cairo؛ وخط الإنجاز (pipeline) بأسلوب لوحة المتابعة القديمة.
-- **الإطلاق:** تجربة في طرابلس أسبوعين، ثم تشغيل موازٍ مع الـMaster شهراً.
+- **الإطلاق:** تجربة في منطقة واحدة أسبوعين، ثم تشغيل موازٍ مع الـMaster شهراً.
 - أُنجز في P0: فريق الوكلاء، والمواصفات (69 مهمة، 92 قصة، القواعد، الأسئلة المفتوحة)، ومخطط البيانات (75 نموذجاً) وربط أعمدة الـMaster الـ187، ورموز التصميم والنموذج الأولي، ثم في 2026-10-25: عشر وثائق قرارات معمارية (ADR 0001–0010)، وعقد API الإصدار 0.1، وتقرير بوابة P0.
 
 ## ب. الأدوار والمستخدمون والتفويض
@@ -109,7 +109,7 @@
 - NestJS with PostgreSQL on an **internal server, never cloud**.
 - Microsoft 365 sign-in for Company employees only; two-factor authentication through Entra later.
 - ERPNext colours (frappe-ui 1.0.2) with the Cairo font; the pipeline component follows the style of the previous dashboard.
-- **Rollout:** a 2-week pilot in Tripoli, then a 1-month parallel run with the Master.
+- **Rollout:** a 2-week pilot in one region, then a 1-month parallel run with the Master.
 - Delivered in P0: the agent team; the specification (69 tasks, 92 stories, rules, open questions); the data model (75 models) with the mapping of all 187 Master columns; design tokens and the prototype; then on 2026-10-25 ten architecture decision records (ADR 0001–0010), API contract v0.1 and the P0 gate report.
 
 ## B. Roles, users and delegation

@@ -50,8 +50,9 @@ function Card({ c, region, column, onOpenAction }: { c: SiteBoardCard; region: s
   );
 }
 
-/** `query` holds the filters of the Site Master list (the F3 tree as `filter`), so the board and the list show the same sites. */
-export function SitesBoard({ query, swimlane, onSwimlane }: { query: Record<string, string | undefined>; swimlane: Swimlane; onSwimlane: (s: Swimlane) => void }) {
+/** `query` holds the filters of the Site Master list (the F3 tree as `filter`), so the board and the list show the same sites. The swimlane is
+ *  chosen in the screen's Layout panel (decision V1); the board only draws it. */
+export function SitesBoard({ query, swimlane }: { query: Record<string, string | undefined>; swimlane: Swimlane }) {
   const { t, i18n } = useTranslation();
   const regions = useRegions();
   const q = useSitesBoard({ ...query, swimlane });
@@ -96,11 +97,6 @@ export function SitesBoard({ query, swimlane, onSwimlane }: { query: Record<stri
   return (
     <section className="space-y-2" data-testid="sites-board" aria-label={t('board.sites_title')}>
       <div className="flex flex-wrap items-center gap-2">
-        <label className="flex items-center gap-2 text-sm"><span className="text-mute">{t('board.swimlane')}</span>
-          <select className="input w-auto py-1" data-testid="sites-board-swimlane" value={swimlane} onChange={(e) => onSwimlane(e.target.value as Swimlane)}>
-            {SWIMLANES.map((s) => <option key={s} value={s}>{t(`board.lane_${s}`)}</option>)}
-          </select>
-        </label>
         <span className="text-sm text-mute" data-testid="sites-board-total">{t('sites.count', { count: b?.total ?? 0 })}</span>
         <span className="ms-auto text-xs text-mute" data-testid="sites-board-note">{t('board.sites_drop_note')}</span>
       </div>
