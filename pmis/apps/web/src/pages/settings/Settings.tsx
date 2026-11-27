@@ -38,6 +38,7 @@ import { DashboardSettings } from './DashboardSettings';
 import { GoalsSettings } from './GoalsSettings';
 import { Identity } from './Identity';
 import { SecurityLocks } from './SecurityLocks';
+import { OpsLimits } from './OpsLimits';
 import { SupportAccess } from './SupportAccess';
 import { NewDeviceCode } from './NewDeviceCode';
 import { DisplaySettings } from './DisplaySettings';
@@ -64,7 +65,7 @@ export const SETTINGS_TABS: readonly SettingsTab[] = [
   // Notification policy + Mail kinds (admin only): both are what is sent to people
   { key: 'alerts', sections: [{ key: 'policy' }, { key: 'mail', adminOnly: true }, { key: 'rules', adminOnly: true }] },
   // DLP months is a data-protection rule, so it moved here from SLA
-  { key: 'security', sections: [{ key: 'staff' }, { key: 'retention' }, { key: 'dlp' }, { key: 'locks' }, { key: 'support' }, { key: 'newdevice' }] },
+  { key: 'security', sections: [{ key: 'staff' }, { key: 'retention' }, { key: 'dlp' }, { key: 'locks' }, { key: 'limits' }, { key: 'support' }, { key: 'newdevice' }] },
   // Screens: what users see by default (Dashboard, Display menu of the tables, My Work Daily Plan)
   { key: 'screens', sections: [{ key: 'dashboard' }, { key: 'tables' }, { key: 'daily-plan' }, { key: 'goals' }, { key: 'pm-schedules' }, { key: 'motion' }, { key: 'login' }, { key: 'interface' }] },
   { key: 'identity', sections: [] },
@@ -138,12 +139,36 @@ function LegacyRedirect({ to }: { to: string }) {
   return <Navigate to={{ pathname: `/admin/settings/${to}`, search, hash }} replace />;
 }
 
+/** The first page of Settings (review item 11): every tab with its sections, so nobody has to guess where a setting lives. System-admin-only sections are hidden from others. */
+function SettingsIndex() {
+  const { t } = useTranslation();
+  const me = useMe(true);
+  return (
+    <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" data-testid="settings-index">
+      {SETTINGS_TABS.map((tab) => {
+        const sections = tab.sections.filter((s) => !s.adminOnly || me.data?.is_system_admin);
+        return (
+          <div key={tab.key} className="card space-y-2 p-4" data-testid={`settings-index-${tab.key}`}>
+            <h2 className="font-bold"><NavLink to={`/admin/settings/${tab.key}`} className="hover:underline">{t(`settings.tab_${tab.key}`)}</NavLink></h2>
+            <p className="text-xs text-mute">{t(`settings.index_${tab.key}`)}</p>
+            {sections.length > 0 && (
+              <ul className="flex flex-wrap gap-1">
+                {sections.map((s) => <li key={s.key}><NavLink to={`/admin/settings/${tab.key}/${s.key}`} data-testid={`settings-index-${tab.key}-${s.key}`} className="btn px-2 py-1 text-xs">{t(`settings.section_${tab.key}_${s.key}`)}</NavLink></li>)}
+              </ul>
+            )}
+          </div>
+        );
+      })}
+    </section>
+  );
+}
+
 /** Mounted at `admin/settings/*`. */
 export function SettingsRoutes() {
   return (
     <Routes>
       <Route element={<Layout />}>
-        <Route index element={<Navigate to="sla" replace />} />
+        <Route index element={<SettingsIndex />} />
         <Route path="identity" element={<Identity />} />
         <Route path="screens" element={<TabFrame tab="screens" />}>
           <Route index element={<Navigate to="dashboard" replace />} />
@@ -211,6 +236,7 @@ export function SettingsRoutes() {
           <Route path="retention" element={<Retention />} />
           <Route path="dlp" element={<Dlp />} />
           <Route path="locks" element={<SecurityLocks />} />
+          <Route path="limits" element={<OpsLimits />} />
           <Route path="support" element={<SupportAccess />} />
           <Route path="newdevice" element={<NewDeviceCode />} />
         </Route>

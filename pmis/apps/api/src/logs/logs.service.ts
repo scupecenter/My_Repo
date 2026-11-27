@@ -18,6 +18,7 @@ import { attachmentHeader } from '../documents/naming';
 import { FilterCatalogService } from '../views/filter-catalog.service';
 import { applyContext, jobContext, parseDevice } from './context';
 import { WorkbookInput, activityWorkbook } from './activity-workbook';
+import { limit } from '../ops/ops-limits';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const TS_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}:?\d{2})$/;
@@ -28,7 +29,6 @@ const SEC_EVENTS = ['sign_in_started', 'sign_in_succeeded', 'callback_account_mi
 /** "Online" = real activity inside this window (contract ActiveSession.status). */
 export const PRESENCE_MINUTES = 5;
 /** Rows per log export file (owner answer Q170): a larger export is refused with 422 `too_many_rows`, never cut. */
-export const EXPORT_MAX_ROWS = 100_000;
 const SEVERITIES = ['info', 'low', 'medium', 'high', 'critical'] as const;
 
 type UserRef = { id: string; display_name: string; employee_id: string | null } | null;
@@ -158,8 +158,10 @@ interface JobRow { id: string; requested_by: string; scope: { kind?: string; fil
 export class LogsService {
   private readonly log = new Logger('Logs');
   private readonly running = new Set<Promise<void>>();
-  /** The cap per export file (EXPORT_MAX_ROWS; a test lowers it instead of writing 100 000 rows). */
-  exportMaxRows = EXPORT_MAX_ROWS;
+  private exportMaxRowsOverride: number | undefined;
+  /** The cap per export file: the export.max_rows limit (Settings > Security > Limits). A test sets it instead of writing 100 000 rows. */
+  get exportMaxRows(): number { return this.exportMaxRowsOverride ?? limit('export.max_rows'); }
+  set exportMaxRows(v: number) { this.exportMaxRowsOverride = v; }
 
   constructor(
     private readonly db: DbService,

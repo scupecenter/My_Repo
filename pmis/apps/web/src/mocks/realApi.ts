@@ -388,6 +388,9 @@ export const REAL_API_AUTH_USERS = [
   // Contract 0.15.97 (migration 0197; apps/api: settings): the sign-in page settings and its public read (Settings, Screens, Login page).
   ['get', '/settings/login-page'],
   ['put', '/settings/login-page'],
+  // Contract 0.15.262 (migration 0402; apps/api: settings): the operational limits (Settings, Security, Limits).
+  ['get', '/settings/ops-limits'],
+  ['put', '/settings/ops-limits'],
   ['get', '/settings/login-page/public'],
   // Contract 0.15.190 (migration 0290; apps/api: settings): the admin lock keys (Settings, Security, Lock keys).
   ['get', '/settings/security-locks'],
