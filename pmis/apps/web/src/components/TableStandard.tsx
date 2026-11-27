@@ -1,4 +1,5 @@
 import * as Popover from '@radix-ui/react-popover';
+import { useDownloadGate } from '@/lib/downloadGate';
 import { Copy, Download, Search, SlidersHorizontal } from 'lucide-react';
 import type { ClipboardEvent, ReactNode } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
@@ -17,7 +18,7 @@ import { Tip } from './Tip';
  */
 export type TableNoun = 'sites' | 'records' | 'issues' | 'tasks' | 'items' | 'documents';
 
-export function TableToolbar({ testid, views, search, filter, extra, count, switcher, columns, density, display, exporter, primary, more, kind = 'grid' }: {
+export function TableToolbar({ testid, views, search, filter, extra, count, switcher, layout, columns, density, display, exporter, primary, more, kind = 'grid' }: {
   testid: string;
   /** `grid` = a table with columns (columns and density are part of the standard); `list` = a master-detail card list (Approvals), where they do not apply */
   kind?: 'grid' | 'list';
@@ -29,6 +30,9 @@ export function TableToolbar({ testid, views, search, filter, extra, count, swit
   count: ReactNode;
   /** the layouts of the screen (Map, Board, Wide table, Timeline), where they apply */
   switcher?: ReactNode;
+  /** the unified Layout panel (decision V1): the view switcher, the current view's options and the Display options in one place. A screen that
+   *  passes it no longer passes `density` or `display`: the panel carries them, so the panel counts as both in the standard's data flags. */
+  layout?: ReactNode;
   columns?: ReactNode;
   density?: ReactNode;
   display?: ReactNode;
@@ -40,7 +44,8 @@ export function TableToolbar({ testid, views, search, filter, extra, count, swit
   return (
     <div role="toolbar" className="mb-3 flex flex-wrap items-center gap-2" data-testid={testid} data-table-standard={kind}
       data-has-search={search ? '' : undefined} data-has-filter={filter ? '' : undefined} data-has-views={views ? '' : undefined}
-      data-has-columns={columns ? '' : undefined} data-has-density={density ? '' : undefined} data-has-display={display ? '' : undefined}
+      data-has-columns={columns ? '' : undefined} data-has-density={density || layout ? '' : undefined} data-has-display={display || layout ? '' : undefined}
+      data-has-layout={layout ? '' : undefined}
       data-has-export={exporter ? '' : undefined}>
       {views}
       {search}
@@ -49,6 +54,7 @@ export function TableToolbar({ testid, views, search, filter, extra, count, swit
       <span className="ms-auto flex flex-wrap items-center gap-2">
         {count}
         {switcher}
+        {layout}
         {primary}
         {columns}
         {density}
@@ -295,6 +301,7 @@ export const toCsv = (head: string[], rows: unknown[][]) => [head, ...rows].map(
  * server's filtered set, every page loaded), as a UTF-8 CSV with a BOM so Excel reads Arabic. The download stays in the browser.
  */
 export function ExportCsvButton({ testid, name, head, rows }: { testid: string; name: string; head: string[]; rows: () => unknown[][] }) {
+  const gate = useDownloadGate();
   const { t } = useTranslation();
   const go = () => {
     const blob = new Blob(['﻿', toCsv(head, rows())], { type: 'text/csv;charset=utf-8' });
@@ -307,7 +314,7 @@ export function ExportCsvButton({ testid, name, head, rows }: { testid: string; 
   };
   return (
     <Tip text={t('tstd.export_view')}>
-      <button type="button" className="btn" data-testid={testid} aria-label={t('tstd.export_view')} onClick={go}><Download size={16} /></button>
+      <button type="button" className="btn" data-testid={testid} aria-label={t('tstd.export_view')} disabled={gate.exportLocked} title={gate.note(gate.exportLocked)} onClick={go}><Download size={16} /></button>
     </Tip>
   );
 }

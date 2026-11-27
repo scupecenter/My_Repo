@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Layout } from './navLayout';
 import { applySidebarOverlay, sanitizeUiNav } from './sidebarPrefs';
 
-/** 0242 (owner approval 2026-11-27, the PM-platforms proposal item 4): the personal sidebar overlay. */
+/** 0242 (owner approval 2026-11-27, the improvement proposal item 4): the personal sidebar overlay. */
 
 const layout = (): Layout => ({
   headings: [

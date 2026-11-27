@@ -38,7 +38,9 @@ for (const c of CASES) {
     await expect(page).toHaveURL(/layout=board/);
     await expect(page.getByTestId('register-board')).toHaveAttribute('data-by', 'order_status');
     await expect(page.getByTestId('board-col-Open')).toBeVisible();
+    await page.getByTestId('register-view').click(); // the board's grouping lives in the Layout panel (V1)
     await page.getByTestId('register-board-by').selectOption('state');
+    await page.keyboard.press('Escape');
     await expect(page.getByTestId('board-col-approved')).toBeVisible();
     // a card opens the record drawer
     await page.locator('[data-testid^="board-record-"]').first().click();
