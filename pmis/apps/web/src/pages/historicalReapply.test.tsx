@@ -59,7 +59,7 @@ describe('the Master import run screen: re-apply with direct approval (0.15.36)'
     await waitFor(() => expect(body).not.toBeNull());
     expect(body).toEqual({ mode: 'submit', reason: 'Load the Master again',
       historical_load: { reason: 'Historical tasks are final', approve_directly: true, registers: true, reapply: true } });
-    expect(await screen.findByText(/Re-applied: 4 task\(s\) approved directly, 1 earlier batch\(es\) discarded/)).toBeInTheDocument();
+    expect(await screen.findByText(/Re-applied: 4 tasks approved directly, 1 earlier batch\(es\) discarded/)).toBeInTheDocument();
   });
 
   it('a plain apply refused because the file was already applied offers the re-apply in the dialog', async () => {
@@ -102,8 +102,8 @@ describe('the Master import run screen: re-apply with direct approval (0.15.36)'
     expect(await screen.findByTestId('mi-applied-before')).toBeInTheDocument();
     expect(screen.queryByTestId('mi-reapply')).not.toBeInTheDocument();   // the waiver is closed
     for (const k of ['applied_before', 'reapply', 'reapply_title', 'reapply_note', 'reapply_offer', 'reapplied_toast']) {
-      expect((en.mi as Record<string, string>)[k]).toBeTruthy();
-      expect((ar.mi as Record<string, string>)[k]).toBeTruthy();
+      expect((en.mi as Record<string, string>)[k] ?? (en.mi as Record<string, string>)[`${k}_other`]).toBeTruthy();
+      expect((ar.mi as Record<string, string>)[k] ?? (ar.mi as Record<string, string>)[`${k}_other`]).toBeTruthy();
     }
     await i18n.changeLanguage('ar');
     try {

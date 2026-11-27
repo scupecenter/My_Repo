@@ -9,3 +9,6 @@
 /pmis/apps/web/                @scupecenter
 /pmis/infra/                   @scupecenter
 /.github/                      @scupecenter
+/pmis/tools/                  @scupecenter
+/pmis/docs/ops/                @scupecenter
+/pmis/THIRD_PARTY_NOTICES.md   @scupecenter

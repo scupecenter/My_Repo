@@ -64,7 +64,7 @@ describe('P7 in the Warehouse screen', () => {
     show('/warehouse');
     expect(await screen.findByTestId('wh-provisional-CBL-FEED')).toHaveTextContent('Internal provisional code');
     expect(screen.queryByTestId('wh-provisional-ANT-900')).not.toBeInTheDocument();
-    expect(screen.getByTestId('wh-need-pending-ANT-900')).toHaveTextContent('1 need(s) pending configuration');
+    expect(screen.getByTestId('wh-need-pending-ANT-900')).toHaveTextContent('1 need pending configuration');
     expect(screen.queryByTestId('wh-need-pending-RRU-3')).not.toBeInTheDocument();
     const u = userEvent.setup();
     await u.click(screen.getByTestId('wh-tab-gaps'));
