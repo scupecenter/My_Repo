@@ -6283,12 +6283,12 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * The Media gallery settings (0.15.291)
+         * The Media gallery settings (0.15.292)
          * @description Every signed-in user may read them (the gallery screen uses them). `can_edit` is true for a System Admin or an all-regions delegate of `settings` edit. `thumbnails_available` is false when the server cannot make thumbnails (the gallery then shows type icons).
          */
         get: operations["getMediaSettings"];
         /**
-         * Set the Media gallery settings (reason, step-up, If-Match, audited) (0.15.291)
+         * Set the Media gallery settings (reason, step-up, If-Match, audited) (0.15.292)
          * @description A System Admin, or a delegate of `settings` edit for all regions. A reason (3+ characters), a step-up and `If-Match` are required. Unknown keys and invalid values are 422; saving the values in force is 409 `invalid_transition`. Audited `media_gallery_update` with before and after.
          */
         put: operations["setMediaSettings"];
@@ -6307,7 +6307,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * The images the caller may see, newest first (0.15.291)
+         * The images the caller may see, newest first (0.15.292)
          * @description Reads `document_files` (through their slots) and `snag_photos` live; nothing is copied. Visibility is the owning slot's. The scope (kinds, registers, excluded codes,
          *     images only) comes from the setting `media.gallery`. `status` is `current` (default), `withdrawn` (only when the setting allows it) or `pending_evidence`.
          *     `has_thumbnail` says whether `.../thumbnail` can answer; `link` names the record the item belongs to.
@@ -6328,7 +6328,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The filter values of the gallery for the caller (0.15.291) */
+        /** The filter values of the gallery for the caller (0.15.292) */
         get: operations["getMediaFacets"];
         put?: never;
         post?: never;
@@ -6346,7 +6346,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * A thumbnail of one gallery item (0.15.291)
+         * A thumbnail of one gallery item (0.15.292)
          * @description Made from the stored original on the first request (EXIF orientation applied, metadata removed) and kept beside it. 404 when the item is not visible to the caller; 415 `thumbnail_unsupported` for a file type without a thumbnail; 503 `thumbnails_unavailable` when thumbnails are off or the maker is not installed.
          */
         get: operations["getMediaThumbnail"];
@@ -17994,7 +17994,7 @@ export interface components {
             format: "webp" | "jpeg";
             max_source_mb: number;
         };
-        /** @description 0.15.291. Setting `media.gallery` (migration 0396). */
+        /** @description 0.15.292. Setting `media.gallery` (migration 0396). */
         MediaSettings: {
             enabled: boolean;
             snag_photos: boolean;
@@ -18349,6 +18349,7 @@ export interface components {
             contractor_scorecard: components["schemas"]["DashboardOpsScorecard"];
             quality: components["schemas"]["DashboardOpsQuality"];
             approvals: components["schemas"]["DashboardOpsApprovals"];
+            changes_meetings: components["schemas"]["DashboardOpsChangesMeetings"];
         };
         /** @description 0.15.106: procurement and materials (dashboard proposals item 1). */
         DashboardOpsProcurement: {
@@ -18487,6 +18488,37 @@ export interface components {
             }[] | null;
             /** @description The waiting tasks with no ball-in-court role (a group holds them, or nobody yet). */
             unassigned: number | null;
+        };
+        /** @description 0.15.205 (item 8): the pending change requests and the overdue meeting actions. */
+        DashboardOpsChangesMeetings: {
+            /** @description False when the caller has neither the change control nor the meetings view. */
+            available: boolean;
+            changes: {
+                /** @description False without the change control view; every figure is then null. */
+                available: boolean;
+                /** @description Change requests with status requested. */
+                pending: number | null;
+                /** @description Change requests approved and not yet applied. */
+                approved_not_applied: number | null;
+                /** @description The pending change requests per kind, most first. */
+                by_kind: {
+                    /** @enum {string} */
+                    kind: "scope_change" | "date_change" | "suspension" | "resumption" | "other";
+                    count: number;
+                }[] | null;
+                pending_aging: components["schemas"]["DashboardOpsAging"] | null;
+            };
+            actions: {
+                /** @description False without the meetings view; every figure is then null. */
+                available: boolean;
+                /** @description Meeting actions open or in progress. */
+                open: number | null;
+                /** @description Open actions whose due date is before today. */
+                overdue: number | null;
+                /** @description Open actions with no due date. */
+                no_due_date: number | null;
+                overdue_aging: components["schemas"]["DashboardOpsAging"] | null;
+            };
         };
         /** @description 0.15.203 (item 6): the open snags and NCRs of the in-scope sites, the average closure age of each and the first-time acceptance rate. */
         DashboardOpsQuality: {
