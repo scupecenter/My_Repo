@@ -1,6 +1,6 @@
 # Appearance profiles (items 1-3 of the PM-platforms proposal)
 
-Owner approval 2026-11-27 (WhatsApp, "implement the whole proposal"). Migration 0241, contract 0.15.132.
+Owner approval 2026-11-27 (WhatsApp, "implement the whole proposal"). Migration 0241, contract 0.15.191.
 
 ## What a profile is
 

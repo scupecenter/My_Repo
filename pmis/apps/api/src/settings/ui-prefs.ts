@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /**
- * The appearance dimensions (owner approval 2026-11-27, the PM-platforms proposal items 1-3; migration 0241, contract 0.15.132).
+ * The appearance dimensions (owner approval 2026-11-27, the PM-platforms proposal items 1-3; migration 0241, contract 0.15.191).
  * The same list lives in the database (ui_pref_options()): keep the two in sync. `accent` `default` = the accent of the design.
  */
 export const UI_PREF_OPTIONS = {
