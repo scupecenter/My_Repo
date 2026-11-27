@@ -6322,6 +6322,19 @@
     "closing": "This task closes the milestone",
     "closing_chip": "Closing task"
   },
+  "acqLocation": {
+    "title": "Site location from the selected candidate",
+    "candidate": "Candidate",
+    "site": "Site now",
+    "reason": "Site coordinates from the selected acquisition candidate",
+    "fill": "Propose these coordinates for the site",
+    "cancel": "Cancel",
+    "replace": "Yes, propose the candidate's coordinates",
+    "differs": "The site has other coordinates: review",
+    "confirm": "The site already has other coordinates. Propose the candidate's instead? The site keeps its values until the change is approved.",
+    "failed": "The proposal was not accepted. Check your rights or the values.",
+    "note": "This opens a Change Control proposal, the same as Site identity. Nothing changes on the site until it is approved. The address is shown for reference only."
+  },
   "studio": {
     "title": "Workflow Studio",
     "crumb_settings": "Settings",
