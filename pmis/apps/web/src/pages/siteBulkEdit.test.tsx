@@ -29,7 +29,7 @@ describe('Site Master wide table: bulk edit', () => {
     const dlg = await screen.findByTestId('bulk-edit');
     await userEvent.selectOptions(within(dlg).getByTestId('bulk-edit-field'), '78');
     const input = within(dlg).getByTestId('bulk-edit-value');
-    expect(input).toHaveAttribute('type', 'date');
+    expect(input).toHaveAttribute('placeholder', 'YYYY-MM-DD'); // the shared date field
     await userEvent.type(input, '2026-05-01');
     expect(within(dlg).getByTestId('bulk-edit-preview')).toHaveTextContent('2 sites will change, 1 skipped');
     expect(within(dlg).getByTestId('bulk-edit-skip-locked')).toBeTruthy();

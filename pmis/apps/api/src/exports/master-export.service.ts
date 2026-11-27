@@ -20,7 +20,7 @@ import { loadRegisterMaps, type RegisterMap } from '../master-import/register-sh
 import { RegistersService } from '../registers/registers.service';
 import { SitesService } from '../sites/sites.service';
 import {
-  BLANK_MASTER_OWNER, MASTER_FIRST_DATA_ROW, MASTER_SHEET, MASTER_SHEET_PARTS, NON_REGISTER, NOT_IN_MASTER, PART_KEYS, PART_LABELS, columnPart, masterHeaderRows, padMasterColumns, partSheet,
+  BLANK_MASTER_OWNER, MASTER_FIRST_DATA_ROW, MASTER_SHEET, MASTER_SHEET_PARTS, NON_REGISTER, PART_KEYS, PART_LABELS, columnPart, masterHeaderRows, padMasterColumns, partSheet,
   registerLayout, SheetWriter, workbookWriter, type MasterColumn, type PartKey, type RegisterSheetColumn, type TplCol,
 } from './master-layout';
 
@@ -136,13 +136,12 @@ export class MasterExportService {
   }
 
   // ------------------------------------------------------------------ parts and their columns
-  /** Every part of the Master export, in dialog order (Car Dispatcher and Financial Advances are not part of the Master). */
+  /** Every part of the Master export, in dialog order (the five registers with no Master columns write their own sheet: contract 0.15.310). */
   private async catalogue(): Promise<PartInfo[]> {
     const defs = new Map((await this.db.tx.$queryRaw<{ register_key: string; name_en: string; name_ar: string | null; module_key: string; site_scoped: boolean }[]>(Prisma.sql`
       SELECT register_key, name_en, name_ar, module_key, site_scoped FROM register_definitions WHERE is_active AND enabled`)).map((d) => [d.register_key, d]));
     const out: PartInfo[] = [];
     for (const key of PART_KEYS) {
-      if (NOT_IN_MASTER.includes(key)) continue;
       const fixed = PART_LABELS[key];
       if (fixed) {
         out.push({ key, label_en: fixed[0], label_ar: fixed[1], module: key === 'project_status' ? 'dashboard' : 'sites', register: null, site_scoped: true, map: undefined });
@@ -266,9 +265,6 @@ export class MasterExportService {
       // the Master values are the live read model (site_master_values); there is no history to rebuild an earlier day from (contract 0.15.34)
       throw problems.validation([{ path: '/as_of', code: 'as_of_unsupported', message: 'Only today can be exported: past values are not kept.' }]);
     }
-    const asked = [...(body.parts ?? []), ...(body.view ? [body.view.source] : [])];
-    const outside = asked.filter((k) => NOT_IN_MASTER.includes(k));
-    if (outside.length) throw problems.validation(outside.map((k) => ({ path: `/parts/${k}`, code: 'not_in_master', message: 'This register is not part of the Master-format export.' })));
 
     const cat = await this.catalogue();
     const info = new Map(cat.map((p) => [p.key, p]));
