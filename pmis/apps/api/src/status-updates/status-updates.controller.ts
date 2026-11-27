@@ -14,6 +14,11 @@ export class StatusUpdatesController {
     return this.svc.list(auth, q);
   }
 
+  @Get('region-health')
+  regionHealth() {
+    return this.svc.regionHealth();
+  }
+
   @Post()
   @HttpCode(201)
   async post(@Auth() auth: AuthContext, @Body() body: unknown, @Res({ passthrough: true }) res: Response) {

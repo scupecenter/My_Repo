@@ -24,6 +24,10 @@ const SITES = Number(process.env.LOAD_SITES ?? 1000);
 // Think time between two requests of one user (a person reads the page before the next click); each user starts at a random point inside it.
 const THINK_MS = Number(process.env.LOAD_THINK_MS ?? 10_000);
 const POOL = Number(process.env.LOAD_POOL ?? 10);
+// Share of sites with the late-prone dates (100 = the original synthetic pattern, about a quarter of the tasks late; 20 = about 5% late, closer to a real project).
+// The /dashboard cache TTL in ms for the run (30000 = the API default; 0 = off, to see the cost without it).
+const CACHE_MS = process.env.LOAD_CACHE_MS ?? '30000';
+const LATE_PCT = Number(process.env.LOAD_LATE_PCT ?? 100);
 const MIX = ['/dashboard', '/dashboard/site-map', '/project-status?group_by=region', '/sites?limit=50', '/search?q=PF', '/me/profile'] as const;
 
 let app: NestExpressApplication;
@@ -34,12 +38,13 @@ const pct = (xs: number[], p: number): number => xs[Math.min(xs.length - 1, Math
 
 describe.skipIf(!ON)('load test: 100 users, 1000 sites', () => {
   beforeAll(async () => {
+    process.env.DASHBOARD_CACHE_TTL_MS = CACHE_MS;
     const url = new URL(process.env.TEST_DATABASE_URL_DASHPERF as string);
     url.searchParams.set('connection_limit', String(POOL));
     app = await startApp({ databaseUrl: url.toString() });
     db = await superDbDash(true);
     await db.query(readFileSync(join(__dirname, 'dash-seed.sql'), 'utf8'));
-    await db.query(`SELECT dash_seed_sites(${SITES}, 'PF')`);
+    await db.query(`SELECT dash_seed_sites(${SITES}, 'PF', ${LATE_PCT})`);
     await db.query('ANALYZE');
     const grants: [string, string][] = [['dashboard', 'view'], ['issues', 'view'], ['sites', 'view']];
     for (let i = 0; i < USERS; i++) users.push(await actor(app, db, { regions: i % 5 === 0 ? null : [1 + (i % 7), 1 + ((i + 3) % 7)], grants }));

@@ -165,6 +165,7 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/reports/time-in-state'],
   ['get', '/reports/workload'],
   ['get', '/status-updates'],
+  ['get', '/status-updates/region-health'], // 0.15.241, item 12
   ['post', '/status-updates'],
   ['patch', '/status-updates/:id'],
   // Contract 0.7.2: the main dashboard, Project Status and the weight sets (apps/api: dashboard; migration 0039).
@@ -273,6 +274,8 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/admin/log-integrity/runs'],
   ['get', '/admin/log-integrity/runs/:id'],
   ['get', '/health'],
+  // Contract 0.15.300 (no migration; apps/api: security): the browser's Content-Security-Policy violation report (SEC-3). The browser posts it, the screens never do.
+  ['post', '/csp-report'],
   // Contract 0.11.1: the documents follow-up of Q130 to Q132 (apps/api: sites, documents, qc; migration 0047). The site's custom fields (near_airport),
   // document slots on register records, QC snags and the photos of their fix.
   ['patch', '/sites/:id'],
@@ -394,6 +397,12 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/settings/login-page'],
   ['put', '/settings/login-page'],
   ['get', '/settings/login-page/public'],
+  // Contract 0.15.292: the media gallery (apps/api: media; migration 0396).
+  ['get', '/media/settings'],
+  ['put', '/media/settings'],
+  ['get', '/media/items'],
+  ['get', '/media/facets'],
+  ['get', '/media/items/:kind/:id/thumbnail'],
   // Contract 0.15.190 (migration 0290; apps/api: settings): the admin lock keys (Settings, Security, Lock keys).
   ['get', '/settings/security-locks'],
   ['put', '/settings/security-locks'],
@@ -445,6 +454,9 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/registers/issues/order-options'],
   ['get', '/registers/change_control/order-options'],
   ['get', '/registers/quality/order-options'],
+  ['get', '/registers/financial_advances/advance-options'],
+  ['get', '/registers/invoices/order-options'],
+  ['get', '/registers/invoices/supplier-options'],
   ['get', '/settings/register-state'],
   ['put', '/settings/register-state/:key'],
   ['get', '/registers/issues/risk-options'],
