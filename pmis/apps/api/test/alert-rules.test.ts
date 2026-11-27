@@ -189,3 +189,78 @@ describe('alert rules (0342)', () => {
     await db.query('ROLLBACK');
   });
 });
+
+describe('kpi_threshold alert rules (0348)', () => {
+  const kpiRule = (code: string, over: Record<string, unknown> = {}): Record<string, unknown> => rule(code, {
+    kind: 'kpi_threshold', params: { kpi: 'sla_breach', op: 'above', value: 5 },
+    title_en: '{{kpi}} above {{threshold}}', title_ar: '{{kpi}} فوق {{threshold}}',
+    body_en: 'The value is {{value}}.', body_ar: 'القيمة {{value}}.', ...over,
+  });
+
+  it('validates the kpi_threshold params: a catalogue KPI, above or below, the own threshold a number 0..100000', async () => {
+    const fails = async (r: Record<string, unknown>, re: RegExp): Promise<void> => {
+      await db.query('BEGIN');
+      await beginAs(db, adminId);
+      await expect(save(r, 'try an invalid kpi rule')).rejects.toThrow(re);
+      await db.query('ROLLBACK');
+    };
+    await fails(kpiRule(`${PREFIX}-kpi-bad`, { params: { kpi: 'not_a_kpi', op: 'above', value: 5 } }), /\/params\/kpi/);
+    await fails(kpiRule(`${PREFIX}-kpi-op`, { params: { kpi: 'sla_breach', op: 'equals', value: 5 } }), /\/params\/op/);
+    await fails(kpiRule(`${PREFIX}-kpi-val`, { params: { kpi: 'sla_breach', op: 'above', value: 'high' } }), /\/params\/value/);
+    await fails(kpiRule(`${PREFIX}-kpi-neg`, { params: { kpi: 'sla_breach', op: 'above', value: -1 } }), /\/params\/value/);
+  });
+
+  it('fires when the live value crosses the own threshold, fills kpi, value and threshold, links the dashboard, and dedupes per day', async () => {
+    await db.query('BEGIN');
+    await beginAs(db, adminId);
+    const code = `${PREFIX}-kpi`;
+    const made = await save(kpiRule(code), 'add the kpi rule');
+    const ruleId = made.rows[0].j.id as string;
+    // below the threshold: no fire; a null (pending) value: no fire
+    expect((await db.query(`SELECT alert_rules_kpi_run('{"sla_breach": 3}'::jsonb, '2031-03-07'::date) AS n`)).rows[0].n).toBe(0);
+    expect((await db.query(`SELECT alert_rules_kpi_run('{"sla_breach": null}'::jsonb, '2031-03-07'::date) AS n`)).rows[0].n).toBe(0);
+    // above the threshold: one fire, the placeholders of the notification are filled
+    const n = (await db.query(`SELECT alert_rules_kpi_run('{"sla_breach": 7.5}'::jsonb, '2031-03-07'::date) AS n`)).rows[0].n as number;
+    expect(n).toBeGreaterThan(0);
+    expect(await targetFires(ruleId, 'day:2031-03-07', 'sla_breach')).toBe(1);
+    const note = await db.query(`SELECT title, body, link FROM notifications WHERE kind = 'alert_rule' AND user_id = $1 AND link = '/dashboard' ORDER BY id DESC LIMIT 1`, [adminId]);
+    expect(note.rows[0].title).toContain('SLA breaches');
+    expect(note.rows[0].title).toContain('5');
+    expect(note.rows[0].body).toContain('7.5');
+    expect(note.rows[0].title).not.toContain('{{');
+    // a second run of the same day adds nothing; the next day fires again
+    await db.query(`SELECT alert_rules_kpi_run('{"sla_breach": 9}'::jsonb, '2031-03-07'::date) AS n`);
+    expect(await targetFires(ruleId, 'day:2031-03-07', 'sla_breach')).toBe(1);
+    await db.query(`SELECT alert_rules_kpi_run('{"sla_breach": 9}'::jsonb, '2031-03-08'::date) AS n`);
+    expect(await targetFires(ruleId, 'day:2031-03-08', 'sla_breach')).toBe(1);
+    await db.query('ROLLBACK');
+  });
+
+  it('a locked rule takes no edit and cannot be disabled until the unlock alone, and a locked rule still fires', async () => {
+    await db.query('BEGIN');
+    await beginAs(db, adminId);
+    const code = `${PREFIX}-lock`;
+    const made = await save(kpiRule(code, { locked: true }), 'add the locked rule');
+    const ruleId = made.rows[0].j.id as string;
+    const row = (await db.query('SELECT locked FROM alert_rules WHERE id = $1', [ruleId])).rows[0];
+    expect(row.locked).toBe(true);
+    // a locked rule still fires
+    await db.query(`SELECT alert_rules_kpi_run('{"sla_breach": 9}'::jsonb, '2031-03-09'::date) AS n`);
+    expect(await targetFires(ruleId, 'day:2031-03-09', 'sla_breach')).toBe(1);
+    // an edit and a disable are both refused rule_locked (each rejection aborts to the savepoint, the transaction goes on)
+    await db.query('SAVEPOINT sp1');
+    await expect(save(kpiRule(code, { title_en: 'changed', locked: true }), 'edit a locked rule', ruleId, 1)).rejects.toThrow(/rule_locked/);
+    await db.query('ROLLBACK TO SAVEPOINT sp1');
+    await expect(save(kpiRule(code, { enabled: false, locked: true }), 'disable a locked rule', ruleId, 1)).rejects.toThrow(/rule_locked/);
+    await db.query('ROLLBACK TO SAVEPOINT sp1');
+    // the unlock must change nothing else
+    await expect(save(kpiRule(code, { title_en: 'changed', locked: false }), 'unlock with an edit', ruleId, 1)).rejects.toThrow(/rule_locked/);
+    await db.query('ROLLBACK TO SAVEPOINT sp1');
+    // the unlock alone goes through, then edits are free again
+    const un = await save(kpiRule(code, { locked: false }), 'unlock the rule', ruleId, 1);
+    expect(un.rows[0].j.version).toBe(2);
+    const upd = await save(kpiRule(code, { title_en: 'now it changes' }), 'edit after unlock', ruleId, 2);
+    expect(upd.rows[0].j.version).toBe(3);
+    await db.query('ROLLBACK');
+  });
+});

@@ -31,6 +31,7 @@ const ruleSchema = z.object({
   body_ar: z.string().max(2000),
   link: z.string().max(200).nullish(),
   enabled: z.boolean().optional(),
+  locked: z.boolean().optional(),
 }).strict();
 
 // Create and update send the whole rule (the database checks every field on both); the code is chosen at create and fixed once the rule exists.
@@ -39,7 +40,7 @@ const bodySchema = z.intersection(ruleSchema, z.object({ reason }));
 interface RuleRow {
   id: string; code: string; kind: string; params: Record<string, unknown>; audience: Record<string, unknown>;
   title_en: string; title_ar: string; body_en: string; body_ar: string;
-  link: string | null; enabled: boolean; version: number; created_at: string; updated_at: string;
+  link: string | null; enabled: boolean; locked: boolean; version: number; created_at: string; updated_at: string;
 }
 
 @Injectable()
@@ -56,14 +57,18 @@ export class AlertRulesService {
     const rules = (await this.db.tx.$queryRaw<{ j: RuleRow[] }[]>(Prisma.sql`SELECT alert_rules_json() AS j`))[0]!.j;
     const registers = await this.db.tx.$queryRaw<{ register_key: string; name_en: string; name_ar: string | null; module_key: string }[]>(Prisma.sql`
       SELECT register_key, name_en, name_ar, module_key FROM register_definitions WHERE is_active ORDER BY sort_order`);
+    const kpis = (await this.db.tx.$queryRaw<{ k: { code: string; label_en: string; label_ar: string; unit: string; direction: string }[] }[]>(Prisma.sql`
+      SELECT dashboard_settings_catalogue() -> 'kpis' AS k`))[0]!.k;
     return {
       rules,
       catalogue: {
         kinds: [
           { kind: 'weekly_status_missing', params: [] },
           { kind: 'record_idle', params: ['register_key', 'state', 'days'] },
+          { kind: 'kpi_threshold', params: ['kpi', 'op', 'value'] },
           { kind: 'link_orphans', params: ['register_key', 'field_code', 'min_rows'] },
         ],
+        kpis,
         audiences: ['system_admin', 'module'],
         registers,
         modules: MODULES.map((m) => ({ key: m.key, name_en: m.name_en })),
