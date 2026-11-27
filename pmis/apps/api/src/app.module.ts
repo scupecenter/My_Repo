@@ -19,11 +19,13 @@ import { ImportBatchesController, TemplatesController } from './templates/templa
 import { TemplatesService } from './templates/templates.service';
 import { UploadInterceptor } from './templates/upload.interceptor';
 import { RegistersController } from './registers/registers.controller';
+import { RegisterLinksController } from './registers/register-links.controller';
 import { RegisterColumnsController, RegisterStateController } from './registers/register-columns.controller';
 import { RegisterRulesController } from './registers/register-rules.controller';
 import { RegisterRulesService } from './registers/register-rules.service';
 import { RegisterColumnsService } from './registers/register-columns.service';
 import { RegistersService } from './registers/registers.service';
+import { RegisterLinksService } from './registers/register-links.service';
 // P5 (migration 0057): the list catalogue
 import { ListCataloguesController } from './registers/list-catalogues.controller';
 import { ListCataloguesService } from './registers/list-catalogues.service';
