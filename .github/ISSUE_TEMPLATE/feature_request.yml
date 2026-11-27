@@ -1,0 +1,15 @@
+name: Feature request
+description: A change or an addition
+labels: [enhancement]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: What is needed and why
+    validations:
+      required: true
+  - type: textarea
+    id: where
+    attributes:
+      label: Where it applies
+      description: Every register and screen it should cover, and what Settings it needs.
