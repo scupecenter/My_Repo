@@ -34,4 +34,17 @@ owner's repositories and keys. Record it separately if it is run on a server.
 
 ## Entries
 
-No drill has been run yet. The first drill is due within one quarter of the first nightly backup.
+### 2026-11-27, logical drill on the local demo instance (not a server drill)
+
+Run with `infra/backup/drill-logical.sh` (pg_dump custom format, restore into a scratch database, row counts compared table by table). It proves the
+dump and restore path and the data survive the round trip. It does not prove the owner's pgBackRest and restic repositories, the keys, or the RTO on
+the production host: those drills are still due before go-live.
+
+- Date and operator: 2026-11-27, build agent
+- Server and scratch location: local demo instance, PostgreSQL 16, scratch database `drill_<timestamp>` created and dropped by the script
+- Source database: the 1000-site load-test database (229 tables)
+- Dump 8.3 MB; dump under 1 s; restore 3 s (2 vCPU box)
+- Tables compared (row counts): 229; mismatches: 0
+- Result: pass
+
+No server drill has been run yet. The first server drill is due within one quarter of the first nightly backup, and before go-live.

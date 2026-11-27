@@ -101,6 +101,7 @@ describe('My Work > Daily Plan', () => {
     stubClipboard();
     renderApp(<App />, { route: `/my-work/daily-plan?date=${DAY}` });
     await screen.findByTestId('daily-plan-row-TR101');
+    await u.click(await screen.findByTestId('more-menu')); // P10: Export and Copy for email live in the More menu
     await waitFor(() => expect(screen.getByTestId('daily-plan-copy')).toBeEnabled());
     await u.click(screen.getByTestId('daily-plan-copy'));
     await waitFor(() => expect(written).toHaveLength(1));
@@ -126,7 +127,8 @@ describe('My Work > Daily Plan', () => {
     vi.stubGlobal('fetch', (input: RequestInfo | URL, init?: RequestInit) => { calls.push(String(input)); return real(input, init); });
     renderApp(<App />, { route: `/my-work/daily-plan?date=${DAY}` });
     await screen.findByTestId('daily-plan-row-TR101');
-    await u.click(screen.getByTestId('daily-plan-export'));
+    await u.click(await screen.findByTestId('more-menu'));
+    await u.click(await screen.findByTestId('daily-plan-export'));
     await waitFor(() => expect(calls.some((c) => c.includes('/daily-plans/export'))).toBe(true));
     const url = new URL(calls.find((c) => c.includes('/daily-plans/export'))!, 'http://x');
     expect(url.searchParams.get('date')).toBe(DAY);
@@ -175,10 +177,26 @@ describe('Settings > My Work > Daily Plan', () => {
     expect(screen.getByTestId('dps-hour')).toHaveValue('16');
   });
 
+  it('P10: Export, Copy for email and Settings share one More menu; no loose buttons in the toolbar', async () => {
+    await signIn('pm');
+    const u = userEvent.setup();
+    renderApp(<App />, { route: `/my-work/daily-plan?date=${DAY}` });
+    await screen.findByTestId('daily-plan-row-TR101');
+    expect(screen.queryByTestId('daily-plan-export')).toBeNull();
+    expect(screen.queryByTestId('daily-plan-copy')).toBeNull();
+    expect(screen.queryByTestId('daily-plan-settings-link')).toBeNull();
+    await u.click(screen.getByTestId('more-menu'));
+    expect(await screen.findByTestId('daily-plan-export')).toBeInTheDocument();
+    expect(screen.getByTestId('daily-plan-copy')).toBeInTheDocument();
+    expect(screen.getByTestId('more-screen-settings')).toBeInTheDocument();
+    expect(screen.getAllByTestId('screen-settings-link')).toHaveLength(1); // one gear, not a gear plus a header link
+  });
+
   it('the screen links to its settings for a System Admin only', async () => {
     await signIn('engineer');
     renderApp(<App />, { route: `/my-work/daily-plan?date=${DAY}` });
     expect(await screen.findByTestId('page-daily-plan')).toBeInTheDocument();
     expect(screen.queryByTestId('daily-plan-settings-link')).toBeNull();
+    expect(screen.queryByTestId('screen-settings-link')).toBeNull();
   });
 });

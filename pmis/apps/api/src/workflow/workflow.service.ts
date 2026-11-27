@@ -67,12 +67,20 @@ const commentSchema = z
   .object({ body: z.string().trim().min(1).max(4000), mention_user_ids: z.array(z.guid()).max(20).optional() })
   .strict();
 
+export interface CommentReactionDto {
+  emoji: string;
+  count: number;
+  mine: boolean;
+}
+
 export interface CommentDto {
   id: string;
   author: UserRefDto;
   body: string;
   is_rejection_note: boolean;
   mentions: UserRefDto[];
+  reactions: CommentReactionDto[];
+  resolved: { at: Date; by: UserRefDto } | null;
   created_at: Date;
 }
 
@@ -279,20 +287,68 @@ export class WorkflowService {
     };
   }
 
-  async commentDtos(rows: { id: string; author_id: string; body: string; is_rejection_note: boolean; created_at: Date }[]): Promise<CommentDto[]> {
+  async commentDtos(
+    rows: { id: string; author_id: string; body: string; is_rejection_note: boolean; created_at: Date; resolved_at?: Date | null; resolved_by?: string | null }[],
+    actorId?: string | null,
+  ): Promise<CommentDto[]> {
     if (rows.length === 0) return [];
-    const mentions = await this.db.tx.$queryRaw<{ comment_id: string; user_id: string }[]>(
-      Prisma.sql`SELECT comment_id::text AS comment_id, user_id::text AS user_id FROM comment_mentions WHERE comment_id = ANY(${rows.map((r) => r.id)}::uuid[])`);
-    const refs = await this.view.userRefs([...new Set([...rows.map((r) => r.author_id), ...mentions.map((m) => m.user_id)])]);
+    const ids = rows.map((r) => r.id);
+    const [mentions, reactions] = await Promise.all([
+      this.db.tx.$queryRaw<{ comment_id: string; user_id: string }[]>(
+        Prisma.sql`SELECT comment_id::text AS comment_id, user_id::text AS user_id FROM comment_mentions WHERE comment_id = ANY(${ids}::uuid[])`),
+      this.db.tx.$queryRaw<{ comment_id: string; emoji: string; user_id: string }[]>(
+        Prisma.sql`SELECT comment_id::text AS comment_id, emoji, user_id::text AS user_id FROM comment_reactions WHERE comment_id = ANY(${ids}::uuid[])`),
+    ]);
+    const refs = await this.view.userRefs([
+      ...new Set([...rows.map((r) => r.author_id), ...mentions.map((m) => m.user_id), ...rows.map((r) => r.resolved_by).filter((x): x is string => !!x)]),
+    ]);
     const unknown: UserRefDto = { id: '00000000-0000-0000-0000-000000000000', display_name: 'Unknown', employee_id: null };
-    return rows.map((r) => ({
-      id: r.id,
-      author: refs.get(r.author_id) ?? unknown,
-      body: r.body,
-      is_rejection_note: r.is_rejection_note,
-      mentions: mentions.filter((m) => m.comment_id === r.id).map((m) => refs.get(m.user_id)).filter((x): x is UserRefDto => !!x),
-      created_at: r.created_at,
-    }));
+    const me = actorId ?? null;
+    return rows.map((r) => {
+      const mine = reactions.filter((x) => x.comment_id === r.id);
+      const byEmoji = new Map<string, { count: number; mine: boolean }>();
+      for (const x of mine) {
+        const cur = byEmoji.get(x.emoji) ?? { count: 0, mine: false };
+        cur.count += 1;
+        if (x.user_id === me) cur.mine = true;
+        byEmoji.set(x.emoji, cur);
+      }
+      return {
+        id: r.id,
+        author: refs.get(r.author_id) ?? unknown,
+        body: r.body,
+        is_rejection_note: r.is_rejection_note,
+        mentions: mentions.filter((m) => m.comment_id === r.id).map((m) => refs.get(m.user_id)).filter((x): x is UserRefDto => !!x),
+        reactions: [...byEmoji.entries()].map(([emoji, v]) => ({ emoji, count: v.count, mine: v.mine })),
+        resolved: r.resolved_at ? { at: r.resolved_at, by: (r.resolved_by && refs.get(r.resolved_by)) || unknown } : null,
+        created_at: r.created_at,
+      };
+    });
+  }
+
+  async react(auth: AuthContext, commentId: string, emoji: string, on: boolean): Promise<void> {
+    void auth;
+    try {
+      await this.db.tx.$executeRaw(
+        on
+          ? Prisma.sql`SELECT comment_react(${commentId}::uuid, ${emoji}::text)`
+          : Prisma.sql`SELECT comment_unreact(${commentId}::uuid, ${emoji}::text)`);
+    } catch (e) {
+      const p = mapDbError(e);
+      if (p) throw p;
+      throw e;
+    }
+  }
+
+  async setResolved(auth: AuthContext, commentId: string, resolved: boolean): Promise<void> {
+    void auth;
+    try {
+      await this.db.tx.$executeRaw(Prisma.sql`SELECT comment_set_resolved(${commentId}::uuid, ${resolved}::boolean)`);
+    } catch (e) {
+      const p = mapDbError(e);
+      if (p) throw p;
+      throw e;
+    }
   }
 
   async comments(auth: AuthContext, taskId: string, q: Record<string, unknown>): Promise<{ items: CommentDto[]; page: { limit: number; next_cursor: string | null } }> {
@@ -300,12 +356,12 @@ export class WorkflowService {
     const limit = parseLimit(oneParam(q, 'limit'));
     const cursor = decodeTypedCursor(oneParam(q, 'cursor'), ['ts', 'uuid']);
     const after = cursor ? Prisma.sql`AND (c.created_at, c.id) > (${cursor[0] as string}::timestamptz, ${cursor[1] as string}::uuid)` : Prisma.empty;
-    const rows = await this.db.tx.$queryRaw<{ id: string; author_id: string; body: string; is_rejection_note: boolean; created_at: Date; ts: string }[]>(Prisma.sql`
-      SELECT c.id::text AS id, c.author_id::text AS author_id, c.body, c.is_rejection_note, c.created_at, ${Prisma.raw(TS_TEXT('c.created_at'))} AS ts
+    const rows = await this.db.tx.$queryRaw<{ id: string; author_id: string; body: string; is_rejection_note: boolean; created_at: Date; resolved_at: Date | null; resolved_by: string | null; ts: string }[]>(Prisma.sql`
+      SELECT c.id::text AS id, c.author_id::text AS author_id, c.body, c.is_rejection_note, c.created_at, c.resolved_at, c.resolved_by::text, ${Prisma.raw(TS_TEXT('c.created_at'))} AS ts
       FROM comments c WHERE c.task_id = ${taskId}::uuid ${after} ORDER BY c.created_at, c.id LIMIT ${limit + 1}`);
     const page = rows.slice(0, limit);
     const last = page[page.length - 1];
-    return { items: await this.commentDtos(page), page: { limit, next_cursor: rows.length > limit && last ? encodeCursor([last.ts, last.id]) : null } };
+    return { items: await this.commentDtos(page, auth.user.id), page: { limit, next_cursor: rows.length > limit && last ? encodeCursor([last.ts, last.id]) : null } };
   }
 
   async addComment(auth: AuthContext, taskId: string, rawBody: unknown): Promise<CommentDto> {
@@ -322,9 +378,9 @@ export class WorkflowService {
       if (p) throw p;
       throw e;
     }
-    const rows = await this.db.tx.$queryRaw<{ id: string; author_id: string; body: string; is_rejection_note: boolean; created_at: Date }[]>(
-      Prisma.sql`SELECT id::text AS id, author_id::text AS author_id, body, is_rejection_note, created_at FROM comments WHERE id = ${id}::uuid`);
-    const [dto] = await this.commentDtos(rows);
+    const rows = await this.db.tx.$queryRaw<{ id: string; author_id: string; body: string; is_rejection_note: boolean; created_at: Date; resolved_at: Date | null; resolved_by: string | null }[]>(
+      Prisma.sql`SELECT id::text AS id, author_id::text AS author_id, body, is_rejection_note, created_at, resolved_at, resolved_by::text FROM comments WHERE id = ${id}::uuid`);
+    const [dto] = await this.commentDtos(rows, auth.user.id);
     if (!dto) throw new ProblemException(500, 'internal_error', {});
     return dto;
   }

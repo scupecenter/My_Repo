@@ -34,6 +34,8 @@ describe('FieldValue', () => {
     expect(screen.getByTestId('fv')).toHaveTextContent('in 3 days');
     expect(screen.getByTestId('fv')).toHaveAttribute('title', plus3);
     expect(screen.getByTestId('fv')).toHaveAttribute('data-rel-days', '3');
+    // the relative plus absolute text truncates inside its cell instead of overflowing onto the neighbour (RTL overlap, 2026-11-27)
+    expect(screen.getByTestId('fv').className).toContain('truncate');
   });
   it('marks a past date late and leaves far dates absolute', () => {
     const f = { code: 'due', label_en: 'Due', type: 'date' } as RegisterField;

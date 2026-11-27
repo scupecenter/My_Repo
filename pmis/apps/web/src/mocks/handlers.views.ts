@@ -11,13 +11,13 @@ import { uid } from './ids';
 
 const B = API_BASE;
 type Row = SavedView & { owner_key: string; audience_in: SavedViewAudience };
-type State = { views: Row[]; drafts: Map<string, Draft & { owner: string; payload: Record<string, unknown> }> };
+type State = { views: Row[]; pins: string[]; drafts: Map<string, Draft & { owner: string; payload: Record<string, unknown> }> };
 const states = new WeakMap<Db, State>();
 const omit = <T extends object>(o: T, ...keys: string[]) => Object.fromEntries(Object.entries(o).filter(([k]) => !keys.includes(k)));
 const S = (): State => {
   const d = db();
   let s = states.get(d);
-  if (!s) { s = { views: [], drafts: new Map() }; states.set(d, s); }
+  if (!s) { s = { views: [], pins: [], drafts: new Map() }; states.set(d, s); }
   return s;
 };
 const me = () => viewer()!;
@@ -271,6 +271,30 @@ export const viewsHandlers = [
   }),
 
   // ---- drafts (Q115): the caller's own; never a submission
+  // 0.15.245 (item 16): home pins. Personal, at most 12, the read check of the view applies; inactive views drop out.
+  http.get(`${B}/me/home-pins`, () => {
+    const g = guard(); if (g) return g;
+    const items = S().pins.map((id) => S().views.find((v) => v.id === id)).filter((v): v is Row => !!v && v.is_active && canRead(v))
+      .map((v, i) => ({ view_id: v.id, name: v.name, screen_key: v.screen_key, filters: v.filters, position: i + 1 }));
+    return HttpResponse.json({ items });
+  }),
+  http.post(`${B}/saved-views/:id/pin`, ({ params }) => {
+    const g = guard(); if (g) return g;
+    const id = String(params.id);
+    const v = S().views.find((x) => x.id === id);
+    if (!v || !v.is_active || !canRead(v)) return problem(404, 'not_found', 'Not found');
+    if (!S().pins.includes(id)) {
+      if (S().pins.length >= 12) return invalid('/view', 'too_many');
+      S().pins.push(id);
+    }
+    return HttpResponse.json({ view_id: id, pinned_home: true });
+  }),
+  http.post(`${B}/saved-views/:id/unpin`, ({ params }) => {
+    const g = guard(); if (g) return g;
+    const id = String(params.id);
+    S().pins = S().pins.filter((x) => x !== id);
+    return HttpResponse.json({ view_id: id, pinned_home: false });
+  }),
   http.get(`${B}/me/drafts`, () => {
     const g = guard(); if (g) return g;
     const items = [...S().drafts.values()].filter((d) => d.owner === me().key).map((d) => omit(d, 'owner', 'payload'));

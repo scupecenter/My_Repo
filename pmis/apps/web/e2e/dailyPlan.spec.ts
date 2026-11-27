@@ -45,6 +45,7 @@ for (const c of CASES) {
     await expect(page.getByTestId('daily-plan-shown-date')).toContainText('2026-11-23');
     await expect(page.getByTestId('daily-plan-th-access_valid')).toBeVisible();
 
+    await page.getByTestId('more-menu').click();
     await page.getByTestId('daily-plan-copy').click();
     const readClip = (type: string) => page.evaluate((t) => (window as unknown as { __clip?: Record<string, string> }).__clip?.[t] ?? '', type);
     await expect.poll(() => readClip('text/html'), { timeout: 10_000 }).toContain('<table');
