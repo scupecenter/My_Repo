@@ -77,6 +77,7 @@ import { PmSchedulesController } from './registers/pm-schedules.controller';
 import { PmSchedulesService } from './registers/pm-schedules.service';
 import { DashboardController } from './dashboard/dashboard.controller';
 import { DashboardService } from './dashboard/dashboard.service';
+import { DashboardCacheInvalidator, DashboardCacheService } from './dashboard/dashboard-cache.service';
 import { DashboardSettingsController } from './dashboard/dashboard-settings.controller';
 import { DashboardSettingsService } from './dashboard/dashboard-settings.service';
 import { GoalsController } from './dashboard/goals.controller';
@@ -270,7 +271,9 @@ export function appModuleFor(config: AppConfig) {
       DataResetService, MaintenanceService, // 0.15.62 (0146)
       LibraryMenuService, // 0.15.70 (0151, W5)
       DataHubService, // 0.15.311 (0400)
+      DashboardCacheService, // short cache of the /dashboard figures (30 s, scope-keyed)
       { provide: APP_GUARD, useClass: SessionGuard },
+      { provide: APP_INTERCEPTOR, useClass: DashboardCacheInvalidator }, // before TxInterceptor: clears the dashboard cache after a configuration write has committed
       { provide: APP_INTERCEPTOR, useClass: TxInterceptor },
       { provide: APP_INTERCEPTOR, useClass: ExportLockInterceptor }, // 0.15.190 (0290): after TxInterceptor, so the lock is read inside the request transaction
       { provide: APP_FILTER, useClass: ProblemFilter },
