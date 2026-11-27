@@ -52,7 +52,7 @@ export function DataHubSettings() {
               {HUB_VIEWS.map((x: HubView) => (
                 <button key={x} type="button" role="radio" aria-checked={v.default_view[k] === x} data-testid={`dh-view-${k}-${x}`} title={t(`dhs.view_${x}`)}
                   onClick={() => setF({ ...v, default_view: { ...v.default_view, [k]: x } })}
-                  className={`btn px-2 py-1 text-xs ${v.default_view[k] === x ? 'bg-accent text-accentInk' : ''}`}>{t(`dhs.view_${x}`)}</button>
+                  className={`btn px-2 py-1 text-xs ${v.default_view[k] === x ? 'btn-accent' : ''}`}>{t(`dhs.view_${x}`)}</button>
               ))}
             </div>
             <FieldErr errs={errs} path={`/sections/data_hub/default_view/${k}`} />

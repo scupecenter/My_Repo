@@ -38,6 +38,7 @@ test('data hub: landing, quick download (audited), settings hide a widget, EN an
   await expect(page.getByTestId('page-dh-settings')).toBeVisible();
   await page.getByTestId('dh-widget-template_changes').uncheck();
   await page.getByTestId('dh-view-templates-rows').click();
+  await page.waitForTimeout(400); // let the pill finish its colour transition before the screenshot
   await page.screenshot({ path: 'test-results/walk-datahub-settings-en.png', fullPage: true });
   await page.getByTestId('dh-save').click();
   await page.getByTestId('dh-dialog').getByRole('textbox').fill('Walkthrough: hide template changes');
