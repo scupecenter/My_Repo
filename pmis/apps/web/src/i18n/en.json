@@ -2866,7 +2866,10 @@
     "p_weekly_summary": "Weekly summary, week of {{x}}",
     "p_waits_approval": "{{x}} waits for your approval",
     "p_returned_note": "{{x}} was returned with a note",
-    "p_nobody_level": "{{x}}: nobody can act on the {{y}} level."
+    "p_nobody_level": "{{x}}: nobody can act on the {{y}} level.",
+    "t_a_new_site_was_approved": "A new site was approved",
+    "p_sla_escalation": "SLA escalation: {{x}}",
+    "p_reminder": "Reminder: {{x}}"
   },
   "tis": {
     "tab": "Time",

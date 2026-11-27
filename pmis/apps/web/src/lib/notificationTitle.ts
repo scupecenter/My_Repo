@@ -4,6 +4,7 @@
 import type { TFunction } from 'i18next';
 
 const EXACT: Record<string, string> = {
+  "A new site was approved": "t_a_new_site_was_approved",
   "No holder for a task level": "t_no_holder_for_a_task_level",
   "No holder for a register level": "t_no_holder_for_a_register_level",
   "No holder for a snag level": "t_no_holder_for_a_snag_level",
@@ -59,6 +60,8 @@ const EXACT: Record<string, string> = {
 };
 
 const PATTERNS: [RegExp, string][] = [
+  [/^SLA escalation: (.+)$/, 'p_sla_escalation'],
+  [/^Reminder: (.+)$/, 'p_reminder'],
   [/^A site moved to your region: (.+)$/, 'p_site_moved_region'],
   [/^Absence recorded: (.+)$/, 'p_absence_recorded'],
   [/^Weekly summary, week of (.+)$/, 'p_weekly_summary'],
@@ -76,4 +79,11 @@ export function notificationTitle(title: string, lang: string, t: TFunction): st
     if (m) return t(`inbox.${k}`, { x: m[1], y: m[2] ?? '' });
   }
   return title;
+}
+
+/** True when a literal the server writes (whole title, or the fixed part of a title with a code or name after it) has a mapping. Used by the CI guard. */
+export function isMappedTitleLiteral(lit: string): boolean {
+  const l = lit.trim();
+  if (EXACT[l]) return true;
+  return PATTERNS.some(([re]) => re.test(`${l} x`) || re.test(`${l}x`) || re.test(l));
 }
