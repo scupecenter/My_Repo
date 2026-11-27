@@ -39,9 +39,9 @@ Source: CLAUDE.md, "Role assignment is many-to-many"; AU-10.
 - ASSUMPTION: the levels are ordered view < entry < review < approve < admin, and a higher level includes the lower ones.
 
 ## MX-03 Region-scoped holders
-- **Given** a cell that holds "CW Reviewers Tripoli" and "CW Reviewers Benghazi"
-  **When** a task for a Tripoli site arrives
-  **Then** it is routed only to the holders whose visibility includes Tripoli (VI-02).
+- **Given** a cell that holds "CW Reviewers Region A" and "CW Reviewers Region B"
+  **When** a task for a Region A site arrives
+  **Then** it is routed only to the holders whose visibility includes Region A (VI-02).
 - **Given** a task that no holder can see
   **When** it is routed
   **Then** it goes to the System Admins with the alert "no eligible holder".

@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Bell, Check, X } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { notificationTitle } from '@/lib/notificationTitle';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '@/api/client';
 import { useNotifications } from '@/api/hooks';
@@ -19,7 +20,7 @@ const WIDTH: Record<string, string> = { narrow: 'w-80', medium: 'w-[26rem]', wid
 type Row = { id: string; title: string; kind: string; read_at?: string | null; link?: string | null; entity_type?: string | null; entity_id?: string | null };
 
 export function NotificationBell({ count }: { count: number }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const qc = useQueryClient();
   const n = useNotifications(true);
   const nav = useNavigate();
@@ -51,7 +52,7 @@ export function NotificationBell({ count }: { count: number }) {
       {rows.map((x) => (
         <button key={x.id} data-testid={`bell-item-${x.id}`} onClick={() => go(x)} className={`flex w-full items-center gap-2 rounded-md p-2 text-start text-sm hover:bg-hover ${x.read_at ? 'text-mute' : 'font-semibold'}`}>
           {!x.read_at && <span className="h-2 w-2 shrink-0 rounded-full bg-accent" aria-hidden />}
-          <span className="min-w-0 flex-1">{x.title}</span>
+          <span className="min-w-0 flex-1">{notificationTitle(x.title, i18n.language, t)}</span>
           {isPriority(x.kind, ui.inbox.priority_kinds) && <span className="chip px-1.5 py-0 text-[10px]" data-testid={`bell-priority-${x.id}`}>{t('inbox.tab_priority')}</span>}
         </button>
       ))}

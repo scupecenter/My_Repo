@@ -109,6 +109,6 @@ describe('a big New sites batch in the background', () => {
     );
     renderApp(<Routed />, { route: `/templates/batches/${ID}` });
     expect(await screen.findByTestId('batch-progress-run-failed')).toHaveTextContent('The background processing stopped after 101 of 469 rows.');
-    expect(screen.getByTestId('batch-progress-run-errors')).toHaveTextContent('1 row(s) failed');
+    expect(screen.getByTestId('batch-progress-run-errors')).toHaveTextContent('1 row failed');
   }, 30_000);
 });

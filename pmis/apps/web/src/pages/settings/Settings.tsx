@@ -4,6 +4,7 @@ import { Calendar } from './Calendar';
 import { DocumentLibrary } from './DocumentLibrary';
 import { FormTemplates } from './FormTemplates';
 import { ArchiveSettings } from './ArchiveSettings';
+import { DocumentSearchIndex } from './DocumentSearchIndex';
 import { Notifications } from './Notifications';
 import { Retention } from './Retention';
 import { Dlp, Freeze, Idle } from './Rules';
@@ -61,7 +62,7 @@ export const SETTINGS_TABS: readonly SettingsTab[] = [
   // Lists (the dropdown catalogues, old ddl tab) now sit next to the register columns that use them
   { key: 'registers', sections: [{ key: 'columns' }, { key: 'lists' }, { key: 'contractors' }, { key: 'gecol' }, { key: 'derive' }, { key: 'team-scope' }, { key: 'issue-map' }, { key: 'recycle', adminOnly: true }] },
   // W5: the Document Library section is now named Document types (the old documents/library route redirects); Form templates and Archive are new
-  { key: 'documents', sections: [{ key: 'types' }, { key: 'forms' }, { key: 'archive' }, { key: 'numbering' }] },
+  { key: 'documents', sections: [{ key: 'types' }, { key: 'forms' }, { key: 'archive' }, { key: 'numbering' }, { key: 'search', adminOnly: true }] },
   { key: 'data', sections: [{ key: 'imports' }, { key: 'historical' }, { key: 'counts', adminOnly: true }, { key: 'export' }, { key: 'reset', adminOnly: true }] },
   // Notification policy + Mail kinds (admin only): both are what is sent to people
   { key: 'alerts', sections: [{ key: 'policy' }, { key: 'mail', adminOnly: true }, { key: 'rules', adminOnly: true }] },
@@ -199,6 +200,7 @@ export function SettingsRoutes() {
           <Route path="forms" element={<FormTemplates />} />
           <Route path="archive" element={<ArchiveSettings />} />
           <Route path="numbering" element={<NumberSequences />} />
+          <Route path="search" element={<DocumentSearchIndex />} />
         </Route>
         <Route path="data" element={<TabFrame tab="data" />}>
           <Route index element={<Navigate to="imports" replace />} />
