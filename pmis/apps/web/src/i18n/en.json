@@ -2281,6 +2281,9 @@
     "order_other_site": "The order belongs to another site than this receipt.",
     "order_choice_required": "The site has several active orders for this part: choose one.",
     "no_active_order": "The site has no approved, active Procurement order for this part.",
+    "order_required": "Settings require this invoice to name its Procurement order.",
+    "unknown_rule": "This register has no such rule.",
+    "supplier_required": "Settings require an invoice to name its supplier company.",
     "order_not_active": "This order is not approved and active for this part and site.",
     "in_house_no_order": "In-house work has no Procurement order.",
     "in_house_no_contractor": "In-house work names the internal team, not a contractor.",
@@ -4489,6 +4492,12 @@
     "red": "Needs upload. Documents: {{missing}} missing, {{rejected}} rejected, {{expired}} expired. Upload needed ({{approved}} of {{need}} approved).",
     "yellow": "Pending approval. Documents uploaded, waiting for review or approval ({{approved}} of {{need}} approved).",
     "green": "Approved. Documents approved ({{approved}} of {{need}})."
+  },
+  "regrules": {
+    "title": "Register rules",
+    "note": "Rules the database enforces for one register, for example that an invoice must name its Procurement order. Every change needs a reason and is audited.",
+    "saved": "Rule saved",
+    "change_title": "Change: {{rule}}"
   },
   "regstate": {
     "title": "Register state",
