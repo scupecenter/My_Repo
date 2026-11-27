@@ -14,8 +14,8 @@ for (const locale of ['en', 'ar'] as const) {
     await expect(page).toHaveURL(/layout=board/);
     await page.getByTestId('nav-sites').click();
     await page.getByTestId('site-row-TR101').click();
-    await page.getByTestId('site-view').click();
-    await expect(page.getByTestId('site-view-panel')).toBeVisible();
+    await page.getByTestId('site-layout').click();
+    await expect(page.getByTestId('site-layout-panel')).toBeVisible();
     if (process.env.SHOT_DIR) await page.screenshot({ path: `${process.env.SHOT_DIR}/viewmenu-site-${locale}.png` });
     await page.getByTestId('site-layout-timeline').click();
     await expect(page.getByTestId('task-row')).toBeVisible();

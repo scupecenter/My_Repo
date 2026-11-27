@@ -48,8 +48,8 @@ describe("filter pilot", () => {
   it("narrows the user list by a tree", async () => {
     const u = await makeUser(db, { status: "active" });
     await makeUser(db, { status: "active" });
-    const all = await admin.api.call("get", `/users?limit=200`);
-    expect(all.status).toBe(200);
+    // No unfiltered list call here: it adds nothing to this test and its cost grows with every user the other suites leave in the shared
+    // database (about 60 s with 8000 users, because the list joins per-row sign-in and 2FA lookups before it pages), which hit the 30 s limit.
     const res = await admin.api.call(
       "get",
       `/users?${tree("email", "contains", u.email)}`,

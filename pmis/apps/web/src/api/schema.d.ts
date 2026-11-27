@@ -5791,6 +5791,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/register-state": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Every register with its enabled and locked state (disabled registers included)
+         * @description 0.15.138 (migration 0381). System Admin or a delegate of `fields.edit` for all regions. Disabled registers are listed so they can be switched back on.
+         */
+        get: operations["listRegisterStates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/register-state/{register_key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A register key (see `GET /registers`). */
+                register_key: components["parameters"]["RegisterKeyAny"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Enable, disable and lock or unlock a whole register
+         * @description 0.15.138 (migration 0381). Disabling HIDES the register (no record, step, template or history is touched; enabling restores it). Locking keeps it readable
+         *     but refuses a new record and every change to a record (screen, upload, workflow step, derive, QC snag of the register) with 403 `register_locked`; System
+         *     Admins, the Settings data reset and the migration role are exempt (like the record and column locks of 0103). A reason is required; the change is audited
+         *     with before and after. Same gate as renaming a register: no permission is widened.
+         */
+        put: operations["setRegisterState"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/structural-freeze": {
         parameters: {
             query?: never;
@@ -12135,6 +12181,20 @@ export interface components {
             /** @description 0.12.6 (Q18): the existing assignments this row overlaps (dates, region and module). */
             conflicts?: string[];
         };
+        RegisterState: {
+            register_key: string;
+            name_en: string;
+            name_ar?: string | null;
+            module_key?: string;
+            enabled: boolean;
+            locked: boolean;
+            reason?: string | null;
+            /** Format: date-time */
+            changed_at?: string | null;
+            version: number;
+            /** @description Current records that are not voided. */
+            records: number;
+        };
         Reason: string;
         /** @description Typed confirmation of a dangerous action (0.2.5). Must equal the target code or name named by the operation; a mismatch is 422 `confirmation_mismatch`. Optional: omitted means no typed check. */
         ConfirmText: string;
@@ -12178,7 +12238,7 @@ export interface components {
          * @description Part key. Every register key used by `/registers` (including `dismantle`), plus the four non-register parts.
          * @enum {string}
          */
-        ExportPartKey: "procurement" | "contractors" | "gecol" | "hlc" | "permits_hse" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "dismantle" | "car_dispatcher" | "financial_advances" | "incidents" | "lessons_learned" | "invoices" | "sites" | "milestones" | "tasks" | "project_status" | "rf_design" | "acquisition";
+        ExportPartKey: "procurement" | "contractors" | "gecol" | "hlc" | "permits_hse" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "dismantle" | "car_dispatcher" | "financial_advances" | "incidents" | "lessons_learned" | "invoices" | "deliverables" | "sites" | "milestones" | "tasks" | "project_status" | "rf_design" | "acquisition";
         ExportPart: {
             key: components["schemas"]["ExportPartKey"];
             label_en: string;
@@ -16937,7 +16997,7 @@ export interface components {
             required_missing?: number | null;
         };
         /** @enum {string} */
-        RegisterKey: "procurement" | "contractors" | "gecol" | "hlc" | "permits_hse" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "dismantle" | "car_dispatcher" | "financial_advances" | "incidents" | "lessons_learned" | "invoices";
+        RegisterKey: "procurement" | "contractors" | "gecol" | "hlc" | "permits_hse" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "dismantle" | "car_dispatcher" | "financial_advances" | "incidents" | "lessons_learned" | "invoices" | "deliverables";
         RegisterField: {
             code: string;
             label_en: string;
@@ -20074,13 +20134,13 @@ export interface components {
             host?: string | null;
         };
         /** @enum {string} */
-        SecurityAlertRule: "failed_sign_ins" | "failed_sign_ins_ip" | "new_ip" | "large_export" | "admin_set_changed" | "retention_reduced" | "alert_settings_weakened" | "audit_integrity_failure" | "malware_upload" | "break_glass_used" | "backup_missing";
+        SecurityAlertRule: "failed_sign_ins" | "failed_sign_ins_ip" | "new_ip" | "large_export" | "admin_set_changed" | "retention_reduced" | "alert_settings_weakened" | "audit_integrity_failure" | "malware_upload" | "break_glass_used" | "backup_missing" | "backup_late" | "job_failed";
         /**
          * @description `info` (0.12.3): a new address inside a trusted network.
          * @enum {string}
          */
         AlertSeverity: "info" | "low" | "medium" | "high" | "critical";
-        /** @description Severity per configurable rule (0.12.3, Q168). Defaults: failed_sign_ins medium, failed_sign_ins_ip medium, new_ip low, large_export medium, admin_set_changed high, alert_settings_weakened high, malware_upload high, break_glass_used critical, backup_missing high (0.15.130). */
+        /** @description Severity per configurable rule (0.12.3, Q168). Defaults: failed_sign_ins medium, failed_sign_ins_ip medium, new_ip low, large_export medium, admin_set_changed high, alert_settings_weakened high, malware_upload high, break_glass_used critical, backup_missing high (0.15.130), backup_late high and job_failed medium (0.15.350). */
         AlertSeverityMap: {
             failed_sign_ins?: components["schemas"]["AlertSeverity"];
             failed_sign_ins_ip?: components["schemas"]["AlertSeverity"];
@@ -20091,6 +20151,8 @@ export interface components {
             malware_upload?: components["schemas"]["AlertSeverity"];
             break_glass_used?: components["schemas"]["AlertSeverity"];
             backup_missing?: components["schemas"]["AlertSeverity"];
+            backup_late?: components["schemas"]["AlertSeverity"];
+            job_failed?: components["schemas"]["AlertSeverity"];
         };
         SecurityAlert: {
             /** Format: uuid */
@@ -32041,6 +32103,76 @@ export interface operations {
             412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    listRegisterStates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The registers. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["RegisterState"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setRegisterState: {
+        parameters: {
+            query?: never;
+            header?: {
+                "If-Match"?: string;
+            };
+            path: {
+                /** @description A register key (see `GET /registers`). */
+                register_key: components["parameters"]["RegisterKeyAny"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    enabled?: boolean;
+                    locked?: boolean;
+                    reason: components["schemas"]["Reason"];
+                };
+            };
+        };
+        responses: {
+            /** @description The new state. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        register_key: string;
+                        enabled: boolean;
+                        locked: boolean;
+                        reason?: string | null;
+                        /** Format: date-time */
+                        changed_at?: string | null;
+                        version: number;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     getStructuralFreeze: {
