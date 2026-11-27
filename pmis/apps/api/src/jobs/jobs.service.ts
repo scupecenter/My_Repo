@@ -243,7 +243,7 @@ export class JobsService implements OnApplicationBootstrap, OnModuleDestroy {
     return n;
   }
 
-  /** 0366 (P3): in-app notice to the entry holders when a register template gets a new version; the setting is templates.change_notice. */
+  /** 0367 (P3): in-app notice to the entry holders when a register template gets a new version; the setting is templates.change_notice. */
   private async templateChanges(): Promise<number> {
     const n = await this.runs.run('template_change_notice', async (tx) => Number((await tx.$queryRaw<{ n: number }[]>`SELECT template_change_notify() AS n`)[0]?.n ?? 0));
     if (n === null) {

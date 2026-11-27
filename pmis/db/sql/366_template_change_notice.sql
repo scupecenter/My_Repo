@@ -1,4 +1,4 @@
--- 0366 (P3): "the template changed" notice, IN-APP ONLY. Additive: one setting and one function; no table, no record, no permission changes.
+-- 0367 (P3): "the template changed" notice, IN-APP ONLY. Additive: one setting and one function; no table, no record, no permission changes.
 --
 -- WHAT. template_change_notify() writes an in-app notice to the people who hold the ENTRY level (Matrix level 1) of a register when its template has a new version
 -- (a column added, removed or renamed; tpl_sync already issues the version). The notice says which version is current and how many columns were added, removed or renamed,
