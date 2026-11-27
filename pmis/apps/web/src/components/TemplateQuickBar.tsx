@@ -29,7 +29,7 @@ export function TemplateQuickBar({ testid = 'quickbar' }: { testid?: string }) {
   const [busy, setBusy] = useState(false);
   const [upload, setUpload] = useState<Template | null>(null);
   const nameOf = (x: { name_en: string; name_ar?: string | null }) => (i18n.language === 'ar' && x.name_ar) || x.name_en;
-  const list = useMemo(() => (templates.data ?? []).filter((x) => x.is_active && (x.register_key || x.stream || x.template_kind)), [templates.data]);
+  const list = useMemo(() => (templates.data ?? []).filter((x) => x.template_id && x.is_active && (x.register_key || x.stream || x.template_kind)), [templates.data]);
   const tpl = list.find((x) => x.template_id === tplId);
   const tplOptions: ComboOption[] = list.map((x) => ({ id: x.template_id, label: nameOf(x), hint: t(`dhub.kind_${x.template_kind ?? (x.stream ? 'stream' : 'register')}`) + ` · v${x.current_version}`, search: x.name_en }));
   const actions: ComboOption[] = tpl ? [
