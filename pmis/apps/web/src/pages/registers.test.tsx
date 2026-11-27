@@ -271,11 +271,11 @@ describe('Template entry', () => {
     await uploadThroughDialog(u, 'filled.xlsx');
     await screen.findByTestId('page-register-batch');
     await waitFor(() => expect(screen.getByTestId('batch-count-held')).toHaveTextContent('1 held'));
-    expect(screen.getByTestId('batch-held')).toHaveTextContent('1 row(s) wait for the previous version');
+    expect(screen.getByTestId('batch-held')).toHaveTextContent('1 row waits for the previous version');
     expect(screen.getByTestId('batch-decision-5')).toHaveTextContent('Held: previous version open');
     await u.click(screen.getByTestId('batch-submit'));
     await waitFor(() => expect(screen.getByTestId('batch-status')).toHaveTextContent('In approval'));
-    expect(screen.getByTestId('batch-outcome-held')).toHaveTextContent('1 row(s) are held');
+    expect(screen.getByTestId('batch-outcome-held')).toHaveTextContent('1 row is held');
     await u.click(await screen.findByTestId('batch-approve-all'));
     await waitFor(() => expect(screen.getByTestId('batch-status')).toHaveTextContent('Partly approved'));
     expect(screen.getByTestId('batch-decision-5')).toHaveTextContent('Held: previous version open');   // untouched

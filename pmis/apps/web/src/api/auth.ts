@@ -47,6 +47,13 @@ export function useTwoFactorSignIn() {
   });
 }
 
+/** Second step with a passkey (0.15.194) instead of the code: the server's challenge, then the browser's answer. The pending-sign-in cookie travels by itself. */
+export const usePasskeySignInOptions = () => useMutation<{ available: boolean; options: Record<string, unknown> | null }, ApiError, void>({ gcTime: 0, mutationFn: () => api.post('/auth/local/2fa/passkey/options') });
+export function usePasskeySignIn() {
+  const adopt = useAdoptSession();
+  return useMutation<Session, ApiError, { response: Record<string, unknown> }>({ mutationFn: (body) => api.post<Session>('/auth/local/2fa/passkey', { body }), onSuccess: adopt });
+}
+
 /** Second step of a sign-in from a new browser (0.15.192): the 6-digit code mailed to the account. */
 export function useDeviceCodeSignIn() {
   const adopt = useAdoptSession();

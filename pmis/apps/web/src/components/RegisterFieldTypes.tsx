@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { api } from '@/api/client';
 import { usePicker } from '@/api/sites';
 import type { Page, RecordRefs, RegisterField, RegisterFieldColumn, SiteListItem } from '@/api/types';
+import { DateInput } from '@/components/DateInput';
 
 /**
  * Contract 0.12.5 (work package P5): the inputs of the new register field types. Values are ids, as the API stores them; `refs` (RegisterRecord.refs)
@@ -128,7 +129,7 @@ function Cell({ col, value, onChange, id, ctx, lang }: { col: RegisterFieldColum
   const { t } = useTranslation();
   const aria = label(lang, col);
   switch (col.type) {
-    case 'date': return <input type="date" aria-label={aria} data-testid={id} className="input mono" value={(value as string) ?? ''} onChange={(e) => onChange(e.target.value)} />;
+    case 'date': return <DateInput aria-label={aria} data-testid={id} className="input mono" value={(value as string) ?? ''} onChange={(e) => onChange(e.target.value)} />;
     case 'number': return <input type="number" aria-label={aria} data-testid={id} className="input mono" value={(value as number | string) ?? ''} onChange={(e) => onChange(e.target.value === '' ? '' : Number(e.target.value))} />;
     case 'yes_no': return <input type="checkbox" aria-label={aria} data-testid={id} checked={value === true} onChange={(e) => onChange(e.target.checked)} />;
     case 'user': return <CellUser id={id} value={value} onChange={onChange} ctx={ctx} />;

@@ -263,7 +263,7 @@ The template is matched by its own headers. The file's columns are one letter to
 - `tblStaff` and `tblHolidays` are empty: nothing for the staff registry or the work calendar.
 - `tblStaffRole` holds the same 15 values as the `role_aliases` seed of 0060.
 - `tblRegion` uses the "X Area" forms that `region_aliases` already maps.
-- `tblRegionVendor` has 7 regions with the vendor column empty.
+- `tblRegionVendor` lists the regions with the vendor column empty.
 
 ### 2.3 Every column with no target today
 
@@ -292,7 +292,7 @@ The fix needs no code. The System Admin adds custom fields to the register (CLAU
 | P2 | Work calendar (holidays, weekend) | Settings → Work calendar | owner (the file's holiday table is empty) | owner data |
 | P3 | Staff registry, users, local accounts | Staff registry template, Users & Roles | owner (the file's Staff table is empty) | owner data |
 | P4 | Roles and role aliases | Roles & Responsibilities; mapping screen (`import-aliases`) | owner (Q356) | owner data |
-| P5 | Responsibility Matrix: L1 and L2 of stages 1 to 4, and of the rows RF & Design, Acquisition, Permits & HSE, Procurement, GECOL, HLC, As-Built and Risk, in each of the 7 regions | Matrix screen | owner | owner data |
+| P5 | Responsibility Matrix: L1 and L2 of stages 1 to 4, and of the rows RF & Design, Acquisition, Permits & HSE, Procurement, GECOL, HLC, As-Built and Risk, in each region | Matrix screen | owner | owner data |
 | P6 | List values: confirm the pending lists; resolve the out-of-list values of 5.3 (add, alias or correct) | Settings → Lists | owner (Q293, Q464) | owner data |
 | P7 | Custom fields for the columns of 2.3, then re-issue the templates | Settings → Fields | owner says which to keep | config |
 | P8 | Mapping of Master AR / AS | mapping screen (`tpl_mapping_save`) | Q467 | decision |
@@ -342,8 +342,8 @@ Why registers come before the Master:
 
 | Item | Does this file fill it? |
 |---|---|
-| Q272 region codes of the six other regions | **Partly.** Each region's Site IDs share one two-letter prefix (one exception in Middle), and Tripoli's prefix is the seeded TR. This is a proposal for the owner to confirm, not a fact. |
-| Q277 need quantities and WL vendor per region | **No.** `tblRegionVendor` lists the 7 regions with no vendor. The As-Built WL Vendor per site shows one dominant vendor per region, which can be offered to the owner as a proposal. |
+| Q272 region codes of the other regions | **Partly.** Each region's Site IDs share one two-letter prefix (one exception), and one region's prefix is already seeded. This is a proposal for the owner to confirm, not a fact. |
+| Q277 need quantities and WL vendor per region | **No.** `tblRegionVendor` lists the regions with no vendor. The As-Built WL Vendor per site shows one dominant vendor per region, which can be offered to the owner as a proposal. |
 | Q278 manufacturer codes | No (no WH sheet) |
 | Q279 BOQ source | No (As-Built CW quantities are empty) |
 | Q261 snag catalogue | No (no Quality sheet) |

@@ -92,7 +92,7 @@ Short answers are fine, for example: `default`, `yes`, `no`, `option 2`, or a se
 
 ### Q10
 
-**Region names.** The Master stores "Tripoli Area", "Middle Area" and so on. CLAUDE.md uses "Tripoli", "Middle" and so on.
+**Region names.** The Master stores each as "<region> Area"; the rules use the short name.
 
 **Proposed default / question:** Store a region code with an English and an Arabic label. Import maps "X Area" → X.
 

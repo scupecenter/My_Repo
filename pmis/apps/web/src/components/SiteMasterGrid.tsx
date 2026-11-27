@@ -2,6 +2,7 @@ import { EvidenceDot, type EvidenceDotData } from "./EvidenceDot";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { SiteMasterMenuItem } from "@/api/siteMaster";
+import { DateInput } from "@/components/DateInput";
 
 export interface SiteMasterGridRow {
   id: string;
@@ -725,22 +726,37 @@ export function SiteMasterGrid({
                       }}
                     >
                       {isEditing && target ? (
-                        <input
-                          autoFocus
-                          type={target.field ? "date" : "text"}
-                          aria-label={col.header}
-                          data-testid={`${testid}-input-${row.site_code}-${ord}`}
-                          className="h-6 w-full bg-transparent text-xs outline-none"
-                          value={editing.draft}
-                          onChange={(e) =>
-                            setEditing({ ...editing, draft: e.target.value })
-                          }
-                          onBlur={commit}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") commit();
-                            if (e.key === "Escape") setEditing(null);
-                          }}
-                        />
+                        target.field ? (
+                          <DateInput
+                            autoFocus
+                            picker={false}
+                            aria-label={col.header}
+                            data-testid={`${testid}-input-${row.site_code}-${ord}`}
+                            className="h-6 w-full bg-transparent text-xs outline-none"
+                            value={editing.draft}
+                            onChange={(e) => setEditing({ ...editing, draft: e.target.value })}
+                            onBlur={commit}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") commit();
+                              if (e.key === "Escape") setEditing(null);
+                            }}
+                          />
+                        ) : (
+                          <input
+                            autoFocus
+                            type="text"
+                            aria-label={col.header}
+                            data-testid={`${testid}-input-${row.site_code}-${ord}`}
+                            className="h-6 w-full bg-transparent text-xs outline-none"
+                            value={editing.draft}
+                            onChange={(e) => setEditing({ ...editing, draft: e.target.value })}
+                            onBlur={commit}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") commit();
+                              if (e.key === "Escape") setEditing(null);
+                            }}
+                          />
+                        )
                       ) : (
                         <>
                           {renderCell(ord, value(ord, index, row))}
