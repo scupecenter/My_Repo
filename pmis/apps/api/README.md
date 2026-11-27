@@ -28,7 +28,7 @@ Document files and zip exports (ADR 0008): `STORAGE_DIR` (local disk, the defaul
 ## Tests
 
 `test/global-setup.ts` creates two fresh databases (`pmis_api_test` and `pmis_api_test_solo`, names overridable with `TEST_DB_NAME`),
-applies `prisma/migrations/0*/migration.sql` as the superuser, then `../../db/sql/app_grants.sql`, seeds the 7 regions, bootstraps an
+applies `prisma/migrations/0*/migration.sql` as the superuser, then `../../db/sql/app_grants.sql`, seeds the regions, bootstraps an
 admin with `idm_bootstrap_admin`, and drops both afterwards (`TEST_KEEP_DB=1` keeps them). The API under test connects as `pmis_app`.
 
 ```
