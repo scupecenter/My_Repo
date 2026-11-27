@@ -72,6 +72,7 @@ info:
     - 0.15.292 (2026-11-27): the central Media gallery (owner decisions GAL-1 and LIB-1, 2026-11-27; migration 0396, mirror `db/sql/395_media_gallery.sql`). Additive. New `GET/PUT /media/settings` (setting `media.gallery`; read by every signed-in user, changed by a System Admin or an all-regions delegate of `settings` edit with a reason, a step-up and If-Match, audited `media_gallery_update`), `GET /media/items` (keyset page of the images of `document_files` and `snag_photos` that the caller may already see, with filters), `GET /media/facets` and `GET /media/items/{kind}/{id}/thumbnail` (made on first request, kept beside the original; 404 for an item the caller may not see). No new table and no new storage: the gallery reads the owning slot's rows, so visibility is the slot's (Documents view in the region, the register's module, and the Quality module for a snag photo). A withdrawn or rejected item is hidden, never deleted. New `ErrorCode` values `thumbnail_unsupported`, `thumbnails_unavailable`. No permission, visibility or authentication change.
     - 0.15.97 (2026-11-27): the sign-in page settings (owner request 2026-11-26; migration 0197). Additive. New `GET/PUT /settings/login-page` (`getLoginPage`, `setLoginPage`; setting `ui.login_page`): the sign-in page announcement (English and Arabic, kind info or maintenance, both texts empty hides it), the background animation switch, the default language of the signed-out pages and up to five support links ({label_en, label_ar, url}; http(s) or mailto only). Every signed-in user reads the state (the post-login splash shows `server_version` from it); a System Admin or a delegate of `settings` edit for all regions changes it with a reason, a step-up and If-Match (audited `login_page_update`, before and after). New `GET /settings/login-page/public` (`getLoginPagePublic`, no session): ONLY what the sign-in page renders (announcement, animation, default_locale, support_links) - no version, no audit data, nothing about users; cached 30 seconds and rate limited per address. No permission, visibility or authentication change.
     - 0.15.96 (2026-11-27): responsibility-matrix coverage screen (CHANGELOG MatrixCoverage; no migration). Additive and read only. `GET /matrix/coverage` (`getMatrixCoverage`, System Admin or an all-region delegate of the matrix): for each active stage and enabled register row and each of the seven regions, whether the matrix cell has an actor, so empty cells show before a task or record stalls. Settings > Workflow > Coverage.
+    - 0.15.241 (2026-11-27): region health on the dashboard and the Weekly status page (owner request 2026-11-27, item 12 of the 2026-11-27 batch; migration 0341, mirror `db/sql/340_region_health.sql`; CHANGELOG RegionHealth). Additive. New `GET /status-updates/region-health` (`getRegionHealth`): one row per region the caller may view on `sites` (all seven when unrestricted), with the current working week's region update of the Weekly status (`health`, `summary`, `author`, `updated_at`) or `missing_update` true when the region has not posted this week; read only. The dashboard card catalogue gains `region_health` ("Region health"), shown at the end of a tab until the tab layout names it (migration 0108 rule). No table, no permission change.
     - 0.15.95 (2026-11-27): Issue log and Quality record link to a Procurement order (migration 0195; CHANGELOG IssueQualityOrderLink). Additive. New optional field `procurement_order_id` on `issues` and `quality`; when set, the contractor (`external_party`) is taken from the order (a different typed `external_party_id` is refused, 422 `contractor_from_order`; `order_not_active`, `order_other_site`, `invalid`), so the contractor performance view sees the issue and the inspection. `GET /registers/issues/order-options` and `GET /registers/quality/order-options` list the orders (own module view plus Procurement view).
     - 0.15.311 (2026-11-27): the Data hub (owner approval 2026-11-27; migration 0400, mirror `db/sql/399_data_hub.sql`; CHANGELOG DataHub). Additive: new `GET /data-hub/summary` (batches waiting for the caller, recent template changes, the caller's last template downloads; read only, same visibility as the batch list and the template catalogue); `UiFeatures` and `UiFeaturesPatch` gain `data_hub` (`UiDataHub`: widget switches, the Uploads & batches badge, the default view of each hub list). A stored value without the section takes the seed. No permission change.
     - 0.15.251 (2026-11-27): the notification panel joins `ui.features` as the section `panel` (migration 0282, mirror `db/sql/281_ui_panel.sql`; CHANGELOG UiPanel). Additive: `UiFeatures` and `UiFeaturesPatch` gain `panel` (`UiPanel`: `mode` popover or side_panel, `width`, `show_tabs`); a stored value without the section takes the seed (popover). No new path.
@@ -16321,6 +16322,20 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '422': {$ref: '#/components/responses/Unprocessable'}
+  /status-updates/region-health:
+    get:
+      tags: [status-updates]
+      operationId: getRegionHealth
+      summary: Region health of the current week (0.15.241, item 12)
+      description: One row per region the caller may view on `sites` (all seven when unrestricted). `health`, `summary`, `author` and `updated_at` come from the region's Weekly status update of the current working week (it opens on Sunday); they are null and `missing_update` is true when the region has not posted this week. Read only.
+      responses:
+        '200':
+          description: Region health.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RegionHealthBoard'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
   /status-updates/{update_id}:
     parameters:
     - {name: update_id, in: path, required: true, schema: {type: string, format: uuid}}
@@ -27036,6 +27051,22 @@ components:
         created_at: {type: string, format: date-time}
         updated_at: {type: string, format: date-time}
         editable: {type: boolean, description: 'true for the author until the end of the week.'}
+    RegionHealth:
+      type: object
+      required: [region_id, health, summary, author, updated_at, missing_update]
+      properties:
+        region_id: {type: integer, minimum: 1, maximum: 7}
+        health: {type: [string, 'null'], enum: [on_track, at_risk, off_track, null]}
+        summary: {type: [string, 'null']}
+        author: {oneOf: [{$ref: '#/components/schemas/UserRef'}, {type: 'null'}]}
+        updated_at: {type: [string, 'null'], format: date-time}
+        missing_update: {type: boolean, description: 'true when the region has not posted its Weekly status update of the current working week.'}
+    RegionHealthBoard:
+      type: object
+      required: [week_start, items]
+      properties:
+        week_start: {type: string, format: date, description: 'The Sunday that opens the current working week.'}
+        items: {type: array, items: {$ref: '#/components/schemas/RegionHealth'}}
     NotificationPreference:
       type: object
       required: [kind, in_app, email]

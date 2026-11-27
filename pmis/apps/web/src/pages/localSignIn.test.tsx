@@ -275,7 +275,7 @@ describe('hybrid mode list', () => {
       'GET /notifications', 'POST /notifications/read-all', 'POST /notifications/:id/read', 'POST /notifications/:id/unread', 'POST /notifications/:id/snooze',
       'GET /me/follows', 'PUT /sites/:id/follow', 'DELETE /sites/:id/follow', 'PUT /registers/:key/records/:id/follow', 'DELETE /registers/:key/records/:id/follow',
       'GET /registers/:key/records/:id/comments', 'POST /registers/:key/records/:id/comments', 'GET /tasks/:id/time-in-state', 'GET /tasks/:id/blocked-by',
-      'GET /reports/time-in-state', 'GET /reports/workload', 'GET /status-updates', 'POST /status-updates', 'PATCH /status-updates/:id',
+      'GET /reports/time-in-state', 'GET /reports/workload', 'GET /status-updates', 'GET /status-updates/region-health', 'POST /status-updates', 'PATCH /status-updates/:id',
       // contract 0.7.2: the main dashboard, Project Status, weight sets
       'GET /dashboard', 'GET /dashboard/export', 'GET /project-status', 'GET /project-status/snapshots',
       'GET /settings/weight-sets', 'POST /settings/weight-sets', 'GET /settings/weight-sets/:id', 'PUT /settings/weight-sets/:id', 'POST /settings/weight-sets/:id/preview', 'POST /settings/weight-sets/:id/publish',

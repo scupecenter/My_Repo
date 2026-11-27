@@ -165,6 +165,7 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/reports/time-in-state'],
   ['get', '/reports/workload'],
   ['get', '/status-updates'],
+  ['get', '/status-updates/region-health'], // 0.15.241, item 12
   ['post', '/status-updates'],
   ['patch', '/status-updates/:id'],
   // Contract 0.7.2: the main dashboard, Project Status and the weight sets (apps/api: dashboard; migration 0039).

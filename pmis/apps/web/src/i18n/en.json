@@ -3083,7 +3083,10 @@
     "only_leads": "Only a lead of this region (the reassign right), or a System Admin, writes its update. An author edits only until the week ends.",
     "empty": "No status updates yet",
     "empty_lead": "Write the first update of the week.",
-    "empty_hint": "Leads publish one update per region or team each week."
+    "empty_hint": "Leads publish one update per region or team each week.",
+    "health_board": "Region health",
+    "missing_update": "Missing update",
+    "missing_hint": "No update posted for this week yet."
   },
   "dash": {
     "tabs": {
@@ -3520,6 +3523,11 @@
       "empty": "No saved snapshots yet: the curve appears after the first weekly snapshot.",
       "chart_label": "Progress curve: {{list}}",
       "basis": "{{n}} saved weekly snapshots, values frozen at their dates."
+    },
+    "region_health": {
+      "title": "Region health",
+      "open": "Open the Weekly status",
+      "week": "Week of {{date}}"
     }
   },
   "docs": {

@@ -10617,6 +10617,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/status-updates/region-health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Region health of the current week (0.15.241, item 12)
+         * @description One row per region the caller may view on `sites` (all seven when unrestricted). `health`, `summary`, `author` and `updated_at` come from the region's Weekly status update of the current working week (it opens on Sunday); they are null and `missing_update` is true when the region has not posted this week. Read only.
+         */
+        get: operations["getRegionHealth"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/status-updates/{update_id}": {
         parameters: {
             query?: never;
@@ -20986,6 +21006,25 @@ export interface components {
             updated_at: string;
             /** @description true for the author until the end of the week. */
             editable: boolean;
+        };
+        RegionHealth: {
+            region_id: number;
+            /** @enum {string|null} */
+            health: "on_track" | "at_risk" | "off_track" | null;
+            summary: string | null;
+            author: components["schemas"]["UserRef"] | null;
+            /** Format: date-time */
+            updated_at: string | null;
+            /** @description true when the region has not posted its Weekly status update of the current working week. */
+            missing_update: boolean;
+        };
+        RegionHealthBoard: {
+            /**
+             * Format: date
+             * @description The Sunday that opens the current working week.
+             */
+            week_start: string;
+            items: components["schemas"]["RegionHealth"][];
         };
         NotificationPreference: {
             kind: components["schemas"]["NotificationKind"];
@@ -41066,6 +41105,28 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             422: components["responses"]["Unprocessable"];
+        };
+    };
+    getRegionHealth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Region health. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegionHealthBoard"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     editStatusUpdate: {
