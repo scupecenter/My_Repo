@@ -16,6 +16,7 @@ const rule = z.object({
   source_register: code,
   source: code,
   link_field: code.nullable(),
+  site_fallback: z.boolean().optional(),
 }).strict();
 const putSchema = z.object({ reason: z.string().trim().min(3).max(1000), rules: z.array(rule).max(60) }).strict();
 

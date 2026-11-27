@@ -23388,7 +23388,8 @@ components:
         output: { type: string, pattern: '^[a-z][a-z0-9_]{0,40}$', description: 'The name of the value in `RegisterRecord.derived`.' }
         source_register: { type: string, description: 'Another register.' }
         source: { type: string, description: '`external_party` (the company of the source record) or a field code of the source register.' }
-        link_field: { type: [string, 'null'], description: 'A field of the target register that holds the entity record id of the source record; null = match by site only.' }
+        link_field: { type: [string, 'null'], description: 'A field of the target register that holds the record id or entity id of the source record; null = match by site only.' }
+        site_fallback: { type: boolean, description: 'With a link field: when the link is empty, fall back to the latest approved source record of the same site (default false; HLC keeps it).' }
     DeriveRulesInput:
       type: object
       required: [rules]

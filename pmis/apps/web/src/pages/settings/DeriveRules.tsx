@@ -61,6 +61,11 @@ export function DeriveRulesScreen() {
               {fieldsOf(r.target_register).map((f) => <option key={f.code} value={f.code}>{lbl(f)}</option>)}
             </select>
           </label>
+          {r.link_field && (
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" data-testid={`derive-fallback-${i}`} checked={r.site_fallback === true} onChange={(e) => edit(i, { site_fallback: e.target.checked })} />{t('deriveRules.site_fallback')}
+            </label>
+          )}
           <button type="button" className="btn btn-ghost text-sm" data-testid={`derive-remove-${i}`} onClick={() => setDraft(cur.filter((_, j) => j !== i))}><X size={14} />{t('deriveRules.remove')}</button>
         </fieldset>
       ))}

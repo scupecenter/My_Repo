@@ -17328,8 +17328,10 @@ export interface components {
             source_register: string;
             /** @description `external_party` (the company of the source record) or a field code of the source register. */
             source: string;
-            /** @description A field of the target register that holds the entity record id of the source record; null = match by site only. */
+            /** @description A field of the target register that holds the record id or entity id of the source record; null = match by site only. */
             link_field: string | null;
+            /** @description With a link field: when the link is empty, fall back to the latest approved source record of the same site (default false; HLC keeps it). */
+            site_fallback?: boolean;
         };
         DeriveRulesInput: {
             rules: components["schemas"]["DeriveRule"][];

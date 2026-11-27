@@ -4698,6 +4698,7 @@
     "source": "Value",
     "source_party": "The company of the source record",
     "link": "Link field in the target record",
+    "site_fallback": "When the link is empty, use the latest approved record of the same site",
     "link_none": "Match by site only",
     "add": "Add a rule",
     "remove": "Remove",

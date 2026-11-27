@@ -28,7 +28,7 @@ const gecolJson = () => {
 
 const deriveSeed = () => ({ version: 1, rules: [
   { key: 'gecol_procurement_contractor', enabled: true, target_register: 'gecol', output: 'procurement_contractor', source_register: 'procurement', source: 'external_party', link_field: null },
-  { key: 'hlc_procurement_contractor', enabled: true, target_register: 'hlc', output: 'procurement_contractor', source_register: 'procurement', source: 'external_party', link_field: 'procurement_record_id' },
+  { key: 'hlc_procurement_contractor', enabled: true, target_register: 'hlc', output: 'procurement_contractor', source_register: 'procurement', source: 'external_party', link_field: 'procurement_record_id', site_fallback: true },
 ] as Record<string, unknown>[] });
 const deriveCfg = () => ((db().cfg as { deriveRules?: ReturnType<typeof deriveSeed> }).deriveRules ??= deriveSeed());
 const deriveJson = () => {

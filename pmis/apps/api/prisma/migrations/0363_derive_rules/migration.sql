@@ -13,10 +13,7 @@
 
 INSERT INTO settings (key, value, description, updated_at)
 VALUES ('derive.rules',
-        '{"version": 0, "rules": [
-           {"key": "gecol_procurement_contractor", "enabled": true, "target_register": "gecol", "output": "procurement_contractor", "source_register": "procurement", "source": "external_party", "link_field": null},
-           {"key": "hlc_procurement_contractor", "enabled": true, "target_register": "hlc", "output": "procurement_contractor", "source_register": "procurement", "source": "external_party", "link_field": "procurement_record_id"}
-         ]}'::jsonb,
+        '{"version": 0, "rules": [{"key": "gecol_procurement_contractor", "enabled": true, "target_register": "gecol", "output": "procurement_contractor", "source_register": "procurement", "source": "external_party", "link_field": null, "site_fallback": false}, {"key": "hlc_procurement_contractor", "enabled": true, "target_register": "hlc", "output": "procurement_contractor", "source_register": "procurement", "source": "external_party", "link_field": "procurement_record_id", "site_fallback": true}, {"key": "car_dispatcher_procurement_contractor", "enabled": true, "target_register": "car_dispatcher", "output": "procurement_contractor", "source_register": "procurement", "source": "external_party", "link_field": "procurement_record_id", "site_fallback": false}, {"key": "car_dispatcher_procurement_pr_no", "enabled": true, "target_register": "car_dispatcher", "output": "procurement_pr_no", "source_register": "procurement", "source": "pr_no", "link_field": "procurement_record_id", "site_fallback": false}, {"key": "financial_advances_procurement_contractor", "enabled": true, "target_register": "financial_advances", "output": "procurement_contractor", "source_register": "procurement", "source": "external_party", "link_field": "procurement_record_id", "site_fallback": false}, {"key": "financial_advances_procurement_pr_no", "enabled": true, "target_register": "financial_advances", "output": "procurement_pr_no", "source_register": "procurement", "source": "pr_no", "link_field": "procurement_record_id", "site_fallback": false}, {"key": "warehouse_procurement_contractor", "enabled": true, "target_register": "warehouse", "output": "procurement_contractor", "source_register": "procurement", "source": "external_party", "link_field": "procurement_order_id", "site_fallback": false}, {"key": "warehouse_procurement_pr_no", "enabled": true, "target_register": "warehouse", "output": "procurement_pr_no", "source_register": "procurement", "source": "pr_no", "link_field": "procurement_order_id", "site_fallback": false}, {"key": "quality_procurement_contractor", "enabled": true, "target_register": "quality", "output": "procurement_contractor", "source_register": "procurement", "source": "external_party", "link_field": "procurement_order_id", "site_fallback": false}, {"key": "quality_procurement_pr_no", "enabled": true, "target_register": "quality", "output": "procurement_pr_no", "source_register": "procurement", "source": "pr_no", "link_field": "procurement_order_id", "site_fallback": false}, {"key": "issues_procurement_contractor", "enabled": true, "target_register": "issues", "output": "procurement_contractor", "source_register": "procurement", "source": "external_party", "link_field": "procurement_order_id", "site_fallback": false}, {"key": "issues_procurement_pr_no", "enabled": true, "target_register": "issues", "output": "procurement_pr_no", "source_register": "procurement", "source": "pr_no", "link_field": "procurement_order_id", "site_fallback": false}, {"key": "gecol_procurement_pr_no", "enabled": true, "target_register": "gecol", "output": "procurement_pr_no", "source_register": "procurement", "source": "pr_no", "link_field": null, "site_fallback": false}, {"key": "hlc_procurement_pr_no", "enabled": true, "target_register": "hlc", "output": "procurement_pr_no", "source_register": "procurement", "source": "pr_no", "link_field": "procurement_record_id", "site_fallback": true}]}'::jsonb,
         'Cross-register derive rules: a value a register shows from another register, computed on read, only the configured value (see migration 0363).',
         now())
 ON CONFLICT (key) DO NOTHING;
@@ -53,18 +50,18 @@ BEGIN
         SELECT s.id, p.id AS pid, p.name, p.type::text AS ptype INTO src
           FROM public.register_records s JOIN public.external_parties p ON p.id = s.external_party_id
           WHERE s.register_key = rule ->> 'source_register' AND s.is_current AND s.state = 'approved' AND s.voided_at IS NULL
-            AND ((coalesce(rule ->> 'link_field', '') <> '' AND (rec.data ->> (rule ->> 'link_field')) ~ '^[0-9a-f-]{36}$' AND s.id::text = rec.data ->> (rule ->> 'link_field'))
-                 OR (rec.site_id IS NOT NULL AND s.site_id = rec.site_id))
-          ORDER BY (coalesce(rule ->> 'link_field', '') <> '' AND s.id::text = rec.data ->> (rule ->> 'link_field')) DESC, s.approved_at DESC NULLS LAST, s.id LIMIT 1;
+            AND ((coalesce(rule ->> 'link_field', '') <> '' AND (rec.data ->> (rule ->> 'link_field')) ~ '^[0-9a-f-]{36}$' AND (s.id::text = rec.data ->> (rule ->> 'link_field') OR s.entity_id::text = rec.data ->> (rule ->> 'link_field')))
+                 OR ((coalesce(rule ->> 'link_field', '') = '' OR coalesce((rule ->> 'site_fallback')::boolean, false)) AND rec.site_id IS NOT NULL AND s.site_id = rec.site_id))
+          ORDER BY (coalesce(rule ->> 'link_field', '') <> '' AND (s.id::text = rec.data ->> (rule ->> 'link_field') OR s.entity_id::text = rec.data ->> (rule ->> 'link_field'))) DESC, s.approved_at DESC NULLS LAST, s.id LIMIT 1;
         IF src.id IS NOT NULL THEN val := jsonb_build_object('id', src.pid::text, 'name', src.name, 'type', src.ptype); END IF;
       ELSE
         SELECT s.id, s.data -> (rule ->> 'source') AS v INTO src
           FROM public.register_records s
           WHERE s.register_key = rule ->> 'source_register' AND s.is_current AND s.state = 'approved' AND s.voided_at IS NULL
             AND coalesce(s.data ->> (rule ->> 'source'), '') <> ''
-            AND ((coalesce(rule ->> 'link_field', '') <> '' AND (rec.data ->> (rule ->> 'link_field')) ~ '^[0-9a-f-]{36}$' AND s.id::text = rec.data ->> (rule ->> 'link_field'))
-                 OR (rec.site_id IS NOT NULL AND s.site_id = rec.site_id))
-          ORDER BY (coalesce(rule ->> 'link_field', '') <> '' AND s.id::text = rec.data ->> (rule ->> 'link_field')) DESC, s.approved_at DESC NULLS LAST, s.id LIMIT 1;
+            AND ((coalesce(rule ->> 'link_field', '') <> '' AND (rec.data ->> (rule ->> 'link_field')) ~ '^[0-9a-f-]{36}$' AND (s.id::text = rec.data ->> (rule ->> 'link_field') OR s.entity_id::text = rec.data ->> (rule ->> 'link_field')))
+                 OR ((coalesce(rule ->> 'link_field', '') = '' OR coalesce((rule ->> 'site_fallback')::boolean, false)) AND rec.site_id IS NOT NULL AND s.site_id = rec.site_id))
+          ORDER BY (coalesce(rule ->> 'link_field', '') <> '' AND (s.id::text = rec.data ->> (rule ->> 'link_field') OR s.entity_id::text = rec.data ->> (rule ->> 'link_field'))) DESC, s.approved_at DESC NULLS LAST, s.id LIMIT 1;
         IF src.id IS NOT NULL THEN val := src.v; END IF;
       END IF;
       IF val IS NOT NULL THEN
@@ -104,7 +101,7 @@ BEGIN
     IF jsonb_typeof(r) <> 'object' THEN errs := errs || public.reg_err_item('/rules/' || i, 'invalid', 'A rule is an object.');
     ELSE
       FOR kk IN SELECT jsonb_object_keys(r) LOOP
-        IF kk NOT IN ('key', 'enabled', 'target_register', 'output', 'source_register', 'source', 'link_field') THEN errs := errs || public.reg_err_item('/rules/' || i || '/' || kk, 'unknown_key', 'Unknown key.'); END IF;
+        IF kk NOT IN ('key', 'enabled', 'target_register', 'output', 'source_register', 'source', 'link_field', 'site_fallback') THEN errs := errs || public.reg_err_item('/rules/' || i || '/' || kk, 'unknown_key', 'Unknown key.'); END IF;
       END LOOP;
       IF coalesce(r ->> 'key', '') !~ '^[a-z][a-z0-9_]{0,59}$' THEN errs := errs || public.reg_err_item('/rules/' || i || '/key', 'invalid', 'A lower-case code.');
       ELSIF (r ->> 'key') = ANY (keys) THEN errs := errs || public.reg_err_item('/rules/' || i || '/key', 'duplicate', 'Rule keys are unique.');
@@ -116,6 +113,7 @@ BEGIN
       IF coalesce(r ->> 'output', '') !~ '^[a-z][a-z0-9_]{0,40}$' THEN errs := errs || public.reg_err_item('/rules/' || i || '/output', 'invalid', 'A lower-case name.');
       ELSIF (r ->> 'target_register') || '.' || (r ->> 'output') = ANY (outs) THEN errs := errs || public.reg_err_item('/rules/' || i || '/output', 'duplicate', 'This register already has this output.');
       ELSE outs := outs || ((r ->> 'target_register') || '.' || (r ->> 'output')); END IF;
+      IF r ? 'site_fallback' AND jsonb_typeof(r -> 'site_fallback') <> 'boolean' THEN errs := errs || public.reg_err_item('/rules/' || i || '/site_fallback', 'invalid', 'true or false.'); END IF;
       IF coalesce(r ->> 'source', '') <> 'external_party' AND NOT EXISTS (SELECT 1 FROM public.register_fields f WHERE f.register_key = r ->> 'source_register' AND f.code = r ->> 'source' AND f.is_active) THEN
         errs := errs || public.reg_err_item('/rules/' || i || '/source', 'unknown_field', 'external_party or a field of the source register.');
       END IF;
