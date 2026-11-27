@@ -304,7 +304,10 @@ describe('the scope of a request (0.15.71)', () => {
     };
     const whole = await count('parts=procurement');
     const tripoli = await count('parts=procurement&regions=1');
-    const nowhere = await count('parts=procurement&regions=999');
+    const nowhere = await count('parts=procurement&from=2100-01-01&to=2100-12-31');
+    const unknownRegion = await admin1.api.call('get', '/settings/data-reset/plan?parts=procurement&regions=999');
+    expect(unknownRegion.status).toBe(422);
+    expect(unknownRegion.body.code).toBe('validation_failed');
     const rows = (r: { body: { plan?: unknown; tables?: { table: string; delete: number }[] } }, t: string) =>
       (r.body.tables ?? []).find((x) => x.table === t)?.delete ?? 0;
     expect(rows(whole, 'procurement_records')).toBe(1);

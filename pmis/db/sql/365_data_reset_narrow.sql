@@ -30,11 +30,11 @@ DECLARE regs int[]; bats uuid[]; d_from date; d_to date; k text; bad text;
 BEGIN
   IF p_narrow IS NULL OR p_narrow = 'null'::jsonb THEN RETURN NULL; END IF;
   IF jsonb_typeof(p_narrow) <> 'object' THEN
-    RAISE EXCEPTION 'reset-project-data: narrow must be an object' USING ERRCODE = 'invalid_parameter_value';
+    PERFORM public.data_reset_err(422, 'validation_failed', 'narrow must be an object');
   END IF;
   FOR k IN SELECT jsonb_object_keys(p_narrow) LOOP
     IF k NOT IN ('regions', 'batches', 'from', 'to') THEN
-      RAISE EXCEPTION 'reset-project-data: unknown narrow key: %', left(k, 40) USING ERRCODE = 'invalid_parameter_value';
+      PERFORM public.data_reset_err(422, 'validation_failed', format('unknown narrow key: %s', left(k, 40)));
     END IF;
   END LOOP;
   BEGIN
@@ -43,19 +43,19 @@ BEGIN
     d_from := nullif(p_narrow ->> 'from', '')::date;
     d_to := nullif(p_narrow ->> 'to', '')::date;
   EXCEPTION WHEN others THEN
-    RAISE EXCEPTION 'reset-project-data: narrow has a value of the wrong kind (regions: ids, batches: ids, from/to: YYYY-MM-DD)' USING ERRCODE = 'invalid_parameter_value';
+    PERFORM public.data_reset_err(422, 'validation_failed', 'narrow has a value of the wrong kind (regions: ids, batches: ids, from/to: YYYY-MM-DD)');
   END;
   IF cardinality(regs) > 50 OR cardinality(bats) > 50 THEN
-    RAISE EXCEPTION 'reset-project-data: at most 50 regions and 50 batches' USING ERRCODE = 'invalid_parameter_value';
+    PERFORM public.data_reset_err(422, 'validation_failed', 'at most 50 regions and 50 batches');
   END IF;
   IF cardinality(regs) = 0 AND cardinality(bats) = 0 AND d_from IS NULL AND d_to IS NULL THEN RETURN NULL; END IF;
   IF d_from IS NOT NULL AND d_to IS NOT NULL AND d_from > d_to THEN
-    RAISE EXCEPTION 'reset-project-data: the period starts after it ends' USING ERRCODE = 'invalid_parameter_value';
+    PERFORM public.data_reset_err(422, 'validation_failed', 'the period starts after it ends');
   END IF;
   SELECT string_agg(x::text, ', ') INTO bad FROM unnest(regs) x WHERE NOT EXISTS (SELECT 1 FROM public.regions r WHERE r.id = x);
-  IF bad IS NOT NULL THEN RAISE EXCEPTION 'reset-project-data: unknown region: %', bad USING ERRCODE = 'invalid_parameter_value'; END IF;
+  IF bad IS NOT NULL THEN PERFORM public.data_reset_err(422, 'validation_failed', format('unknown region: %s', bad)); END IF;
   SELECT string_agg(x::text, ', ') INTO bad FROM unnest(bats) x WHERE NOT EXISTS (SELECT 1 FROM public.import_batches b WHERE b.id = x);
-  IF bad IS NOT NULL THEN RAISE EXCEPTION 'reset-project-data: unknown import batch: %', bad USING ERRCODE = 'invalid_parameter_value'; END IF;
+  IF bad IS NOT NULL THEN PERFORM public.data_reset_err(422, 'validation_failed', format('unknown import batch: %s', bad)); END IF;
   RETURN jsonb_strip_nulls(jsonb_build_object('version', 1, 'regions', to_jsonb(regs), 'batches', to_jsonb(bats), 'from', d_from, 'to', d_to));
 END $$;
 
@@ -66,13 +66,12 @@ DECLARE n jsonb := public.data_reset_narrow_norm(p_narrow); c text[]; bad text;
 BEGIN
   IF n IS NOT NULL THEN
     IF p_parts IS NULL THEN
-      RAISE EXCEPTION 'reset-project-data: a narrowing needs chosen parts, not everything' USING ERRCODE = 'invalid_parameter_value';
+      PERFORM public.data_reset_err(422, 'validation_failed', 'a narrowing needs chosen parts, not everything');
     END IF;
     c := public.data_reset_closure(p_parts);
     SELECT string_agg(x, ', ' ORDER BY x) INTO bad FROM unnest(c) x WHERE x <> ALL (public.data_reset_narrowable());
     IF bad IS NOT NULL THEN
-      RAISE EXCEPTION 'reset-project-data: these parts cannot be narrowed (their data does not follow a single register record): %', bad
-        USING ERRCODE = 'invalid_parameter_value';
+      PERFORM public.data_reset_err(422, 'validation_failed', format('these parts cannot be narrowed (their data does not follow a single register record): %s', bad));
     END IF;
   END IF;
   PERFORM set_config('pmis.reset_narrow', coalesce(n::text, ''), true);
