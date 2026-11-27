@@ -14,6 +14,23 @@ import { Sites } from './Sites';
 /** P10 (contract 0.12.12, owner answers Q115 and Q117): saved views on the server for every list screen, sharing, and server-side drafts. */
 const options = () => within(screen.getByTestId('views-select')).getAllByRole('option').map((o) => o.textContent);
 
+describe('saved views as tabs', () => {
+  it('shows the default view and each saved view as a tab, and arrow keys move between them', async () => {
+    await signIn('pm');
+    const u = userEvent.setup();
+    renderApp(<Sites />, { route: '/sites?layout=list' });
+    await screen.findByTestId('sites-list');
+    const tabs = await screen.findByTestId('views-tabs');
+    const all = within(tabs).getAllByRole('tab');
+    expect(all[0]).toHaveAttribute('aria-selected', 'true');
+    if (all.length > 1) {
+      all[0]!.focus();
+      await u.keyboard('{ArrowRight}');
+      await waitFor(() => expect(within(tabs).getAllByRole('tab')[1]).toHaveAttribute('aria-selected', 'true'));
+    }
+  });
+});
+
 describe('saved views on the list screens', () => {
   it('saves the filters and the columns of the Site Register, and applies both again', async () => {
     await signIn('pm');
