@@ -3324,7 +3324,17 @@
       "scorecard_col_level": "المستوى",
       "scorecard_col_delay": "التأخير (يوم)",
       "scorecard_col_snags": "ملاحظات متأخرة",
-      "scorecard_col_quality": "فحوصات راسبة"
+      "scorecard_col_quality": "فحوصات راسبة",
+      "quality_title": "الجودة: الـSnag والـNCR",
+      "quality_hint": "الـSnag والـNCR المفتوحة في المواقع ضمن النطاق، ومتوسط عمر الإغلاق، ونسبة القبول من أول مرة. قراءة فقط.",
+      "open_quality": "سجل الجودة",
+      "unavailable_quality": "لا تملك صلاحية عرض الجودة، لذا يبقى هذا القسم مخفيًا.",
+      "quality_snags_open": "Snag مفتوحة",
+      "quality_snags_note": "{{closed}} مغلقة · {{returned}} مرتجعة مفتوحة",
+      "quality_ncrs_open": "NCR مفتوحة",
+      "quality_ncrs_note": "{{closed}} مغلقة",
+      "quality_avg_close": "متوسط الإغلاق",
+      "quality_first_pass": "القبول من أول مرة"
     },
     "scurve": {
       "title": "منحنى التقدم",
