@@ -15422,14 +15422,23 @@ export interface components {
             enabled: boolean;
             days: number;
         };
+        /** @description 0.15.250. The inbox tabs and which notification kinds count as priority. */
+        UiInbox: {
+            tabs_enabled: boolean;
+            /** @enum {string} */
+            default_tab: "all" | "priority" | "mentions" | "tasks" | "approvals" | "system";
+            priority_kinds: ("mention" | "followed_change" | "task_assigned" | "task_returned" | "task_rejected" | "task_approved" | "approval_due" | "reassigned" | "absence_alert" | "idle_task_alert" | "no_holder" | "system")[];
+        };
         /** @description 0.15.185. The sections of the interface features setting; every section is complete. */
         UiFeatures: {
             avatars: components["schemas"]["UiAvatars"];
             new_badge: components["schemas"]["UiNewBadge"];
+            inbox: components["schemas"]["UiInbox"];
         };
         UiFeaturesPatch: {
             avatars?: components["schemas"]["UiAvatars"];
             new_badge?: components["schemas"]["UiNewBadge"];
+            inbox?: components["schemas"]["UiInbox"];
         };
         UiFeaturesSetting: {
             sections: components["schemas"]["UiFeatures"];
