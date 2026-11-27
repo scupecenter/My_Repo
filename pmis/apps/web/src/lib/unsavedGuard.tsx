@@ -43,7 +43,9 @@ export function UnsavedGuardProvider({ children }: { children: ReactNode }) {
   const live = useCallback(() => [...sources.current.values()].filter((s) => s.dirty && enabledFor(s.scope)), [enabledFor]);
   const askLeave = useCallback((list: GuardSource[], proceed: () => void) => {
     const dirty = list.filter((s) => s.dirty && enabledFor(s.scope));
-    if (!dirty.length) proceed(); else setPending({ sources: dirty, proceed });
+    if (!dirty.length) proceed();
+    // the user already answered: the navigation inside `proceed` (a drawer moving to another row, a dialog closing) must not ask again
+    else setPending({ sources: dirty, proceed: () => { skip.current = true; try { proceed(); } finally { skip.current = false; } } });
   }, [enabledFor]);
   const api = useMemo<Api>(() => ({
     askLeave, enabledFor,
