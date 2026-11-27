@@ -242,7 +242,8 @@
       "people": "People",
       "contractors": "Contractors",
       "tasks": "Tasks",
-      "warehouse_items": "Warehouse items"
+      "warehouse_items": "Warehouse items",
+      "snags": "QC snags"
     },
     "site_list": "Site ID in list",
     "site_list_found": "{{count}} found",

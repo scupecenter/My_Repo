@@ -12344,7 +12344,7 @@ export interface components {
             }[];
         };
         /** @enum {string} */
-        SearchType: "sites" | "registers" | "documents" | "meetings" | "people" | "contractors" | "tasks" | "warehouse_items";
+        SearchType: "sites" | "registers" | "documents" | "meetings" | "people" | "contractors" | "tasks" | "warehouse_items" | "snags";
         SearchHit: {
             id: string;
             /** @description Shown as is. `match_ranges` are offsets (UTF-16 code units, start inclusive, end exclusive) into this text. */

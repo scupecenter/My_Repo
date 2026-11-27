@@ -242,7 +242,8 @@
       "people": "الأشخاص",
       "contractors": "المقاولون",
       "tasks": "المهام",
-      "warehouse_items": "أصناف المخزن"
+      "warehouse_items": "أصناف المخزن",
+      "snags": "ملاحظات الجودة"
     },
     "site_list": "أرقام المواقع في القائمة",
     "site_list_found": "عُثر على {{count}}",
