@@ -39,9 +39,13 @@ ALTER TABLE data_reset_archives FORCE ROW LEVEL SECURITY;
 ALTER TABLE data_reset_archives OWNER TO pmis_reset_owner;
 REVOKE ALL ON data_reset_archives FROM PUBLIC;
 GRANT ALL ON data_reset_archives TO pmis_reset_owner;
+GRANT SELECT, INSERT, UPDATE ON data_reset_archives TO pmis_definer;
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'data_reset_archives' AND policyname = 'data_reset_archives_owner') THEN
     CREATE POLICY data_reset_archives_owner ON data_reset_archives FOR ALL TO pmis_reset_owner USING (true) WITH CHECK (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'data_reset_archives' AND policyname = 'data_reset_archives_door') THEN
+    CREATE POLICY data_reset_archives_door ON data_reset_archives FOR ALL TO pmis_definer USING (true) WITH CHECK (true);
   END IF;
 END $$;
 
