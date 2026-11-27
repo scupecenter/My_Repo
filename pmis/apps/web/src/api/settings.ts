@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { api, ApiError, downloadFile, type RequestOptions } from './client';
-import type { PasskeyItem, PasskeySetting, MyPasskeys, AlertRuleInput, AlertRuleSaved, AlertRulesResponse, IssueStoppedRowList, IssueTaskMapItem, IssueTaskMapList,
+import type { DashboardTargetPolicy, PasskeyItem, PasskeySetting, MyPasskeys, AlertRuleInput, AlertRuleSaved, AlertRulesResponse, IssueStoppedRowList, IssueTaskMapItem, IssueTaskMapList,
   ActiveSession, ActOnBehalfRequest, DownloadLocks, UiAsset, UiPublicIdentity, Calendar, CalendarConfirmation, MailNotificationKinds, ImportsSettings, ContractorPerformanceReport, ContractorPerformanceThresholds, ContractorPerformanceSettings, NavLayoutSetting, UiIdentity, UiBrand, LoginPage, SecurityLocks, SupportAccessSetting, Delegation, LoginPagePublic, SupportLink, NavLayoutT, ContractorRules, ContractorRulesInput, GecolHlcCounts, ContractorsCompletenessReport, TeamScopeMismatchReport, DeletedUser, PurgedUser, DlpSettings, DlpVersion, DlpVersionInput, Holiday, HolidayChangeResult, HolidayInput, HolidayPatch, HolidaySummary, IdleTaskAlertSetting, Job, LogIntegrity, LogRetention, LogRetentionInput, NewDeviceCodeSetting,
   NotificationPolicy, NotificationPolicyInput, NotificationTypeDef, Page, ReassignmentAlert, SecurityLogEntry, SessionRevokeResult, SlaPublishPreview, SlaRuleSet, SlaRuleSetPublishResult, SlaRuleSetSummary, SlaTaskRule, StaffCard, StaffVisibility, StructuralFreeze,
   TaskDefinition, TeamScopeMatch, TeamScopeMatchInput, TransitionResultT, User, UserDetail, WeekendDaysResult, WeightSet, WeightSetCode, WeightSetInput, WeightSetPreview, WeightSetPublishResult, WorkflowVersion, WorkflowVersionSummary,
@@ -576,5 +576,15 @@ export const useUpdateAlertRule = () => {
   return useMutation<AlertRuleSaved, ApiError, { id: string; version: number; body: AlertRuleInput & { reason: string } }>({
     mutationFn: ({ id, version, body }) => api.put(`/settings/alert-rules/${id}`, { version, body }),
     onSettled: () => refresh(qc, 'alertRules'),
+  });
+};
+
+/** 0.15.367 (migration 0524): whether the typed dashboard targets may override the derived ones (off by default). */
+export const useDashboardTargetPolicy = () => useQuery({ queryKey: ['dash-target-policy'], queryFn: () => api.get<DashboardTargetPolicy>('/settings/dashboard-target-policy') });
+export const useSetDashboardTargetPolicy = () => {
+  const qc = useQueryClient();
+  return useMutation<DashboardTargetPolicy, ApiError, { version: number; manual_override: boolean; reason: string }>({
+    mutationFn: ({ version, ...body }) => api.put('/settings/dashboard-target-policy', { version, body }),
+    onSettled: () => refresh(qc, 'dash-target-policy', 'dashboard'),
   });
 };

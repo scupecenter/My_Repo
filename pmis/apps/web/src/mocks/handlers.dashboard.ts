@@ -236,7 +236,7 @@ export const dashboardHandlers = [
           { phase: null, sites: 5, completed: 0, in_progress: 1, not_started: 4, on_hold: 0, on_air: 0, progress_pct: 0, target_sites: 5 },
         ],
         total: { phase: null, sites: 105, completed: 16, in_progress: 51, not_started: 34, on_hold: 4, on_air: 27, progress_pct: 25.7, target_sites: 105 },
-        monthly_on_air_auto: { value: 20, remaining: 78, planned_end: '2027-03-15', months_left: 4 },
+        monthly_on_air_auto: { value: 20, source: 'derived', derived: 20, remaining: 78, planned_end: '2027-03-15', months_left: 4 },
       },
       // 0.15.205: change requests and overdue meeting actions, synthetic figures
       changes_meetings: {

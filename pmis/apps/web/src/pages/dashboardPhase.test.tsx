@@ -29,3 +29,14 @@ describe('Dashboard ops: phase scope card (0.15.367)', () => {
     expect(screen.getByTestId('dsettings-shown-pmo-ops_phase')).toBeChecked();
   }, 30_000);
 });
+
+describe('Settings > Dashboard: manual targets are an exception (0.15.367)', () => {
+  it('hides the typed targets while the override is off, and turns it on only with a reason', async () => {
+    await signIn('pm');
+    renderApp(<Routes><Route path="/settings/dashboard" element={<DashboardSettings />} /></Routes>, { route: '/settings/dashboard' });
+    expect(await screen.findByTestId('dsettings-policy-state')).toHaveTextContent('Off (default)');
+    expect(screen.getByTestId('dsettings-targets-derived')).toBeInTheDocument();
+    expect(screen.queryByTestId('dsettings-monthly-on-air')).not.toBeInTheDocument();
+    expect(screen.getByTestId('dsettings-policy-toggle')).toBeInTheDocument();
+  }, 30_000);
+});

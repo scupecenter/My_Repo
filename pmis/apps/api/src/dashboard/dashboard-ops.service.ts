@@ -7,6 +7,7 @@ import { DbService } from "../db/db.service";
 import { ContractorPerformanceService } from "../contractors/contractor-performance.service";
 import { FilterCatalogService } from "../views/filter-catalog.service";
 import { dashboardParams } from "./dashboard.service";
+import { monthlyOnAirTarget } from "./dashboard-targets";
 import {
   AgeBuckets,
   ActionDueRow,
@@ -23,7 +24,6 @@ import {
   receivePct,
   scorecardSummary,
   phaseScope,
-  autoMonthlyOnAir,
   PhaseScopeRow,
 } from "./dashboard-ops.rules";
 
@@ -644,20 +644,10 @@ export class DashboardOpsService {
         not_started: Number(r.not_started), on_hold: Number(r.on_hold), on_air: Number(r.on_air),
       })),
     );
-    const end = (
-      await this.db.tx.$queryRaw<{ planned_end: string | null; today: string }[]>(Prisma.sql`
-        SELECT max(ti.planned_date)::text AS planned_end, cal_today()::text AS today
-        FROM task_instances ti
-        JOIN task_definitions td ON td.id = ti.task_def_id
-        JOIN sites s ON s.id = ti.site_id
-        LEFT JOIN clusters c ON c.id = s.cluster_id
-        WHERE td.code = 'MS6' AND s.is_active AND s.overall_status <> 'cancelled' ${siteWhere}`)
-    )[0]!;
-    const remaining = summary.total.sites - summary.total.on_air;
-    const auto = autoMonthlyOnAir(remaining, end.planned_end, end.today);
+    const monthly = await monthlyOnAirTarget(this.db, siteWhere);
     return {
       ...summary,
-      monthly_on_air_auto: { value: auto.value, remaining, planned_end: end.planned_end, months_left: auto.months_left },
+      monthly_on_air_auto: monthly,
     };
   }
 

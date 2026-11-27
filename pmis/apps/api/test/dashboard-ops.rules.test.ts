@@ -3,6 +3,7 @@ import {
   ptwCheckGaps,
   phaseScope,
   autoMonthlyOnAir,
+  targetInForce,
   PTW_CHECK_KEYS,
   AGE_BUCKETS,
   ageBucket,
@@ -270,5 +271,15 @@ describe('phase scope (0.15.367)', () => {
     expect(autoMonthlyOnAir(30, '2026-11-01', '2026-11-27')).toEqual({ value: 30, months_left: 1 });
     expect(autoMonthlyOnAir(30, null, '2026-11-27')).toEqual({ value: null, months_left: null });
     expect(autoMonthlyOnAir(0, '2027-03-01', '2026-11-27')).toEqual({ value: null, months_left: null });
+  });
+});
+
+describe('target in force (0.15.367)', () => {
+  it('uses the typed number only while the manual override is on and the number is positive', () => {
+    expect(targetInForce(false, 4, 8)).toEqual({ value: 8, source: 'derived' });
+    expect(targetInForce(true, 4, 8)).toEqual({ value: 4, source: 'manual' });
+    expect(targetInForce(true, null, 8)).toEqual({ value: 8, source: 'derived' });
+    expect(targetInForce(true, 0, 8)).toEqual({ value: 8, source: 'derived' });
+    expect(targetInForce(false, null, null)).toEqual({ value: null, source: 'derived' });
   });
 });

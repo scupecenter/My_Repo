@@ -35,7 +35,10 @@ export function OpsPhaseCard({ ops }: { ops: Ops }) {
             <span className="chip border border-line" data-testid="dash-phase-monthly" title={t("dash.phase.monthly_hint")}>
               {t("dash.phase.monthly")}{" "}
               <b className="ms-1 tnum">{p.monthly_on_air_auto?.value ?? t("dash.phase.no_target")}</b>
-              {p.monthly_on_air_auto?.planned_end && (
+              {p.monthly_on_air_auto?.source === "manual" && (
+                <span className="chip ms-1 border border-line text-xs" data-testid="dash-phase-manual">{t("dash.phase.manual")}</span>
+              )}
+              {p.monthly_on_air_auto?.source !== "manual" && p.monthly_on_air_auto?.planned_end && (
                 <span className="ms-1 text-xs text-mute">
                   {t("dash.phase.monthly_basis", { n: p.monthly_on_air_auto.remaining, m: p.monthly_on_air_auto.months_left, d: p.monthly_on_air_auto.planned_end })}
                 </span>

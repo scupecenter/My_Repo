@@ -7829,6 +7829,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/dashboard-target-policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Whether the typed dashboard targets may override the derived ones (0.15.367)
+         * @description Every signed-in user may read it. `manual_override` is false by default, so the dashboard targets are derived from the scope. `can_edit` is true for a System Admin or a delegate of `settings` edit for all regions.
+         */
+        get: operations["getDashboardTargetPolicy"];
+        /**
+         * Turn the manual target override on or off (reason, step-up, If-Match, audited)
+         * @description A System Admin, or a delegate of `settings` edit for all regions (403 `action_forbidden` otherwise). A reason of 3 to 1000 characters, a recent step-up (403
+         *     `step_up_required`) and `If-Match` (428 / 412) are required. Saving the current value answers 409 `invalid_transition`. Audited `dashboard_target_policy_update`
+         *     with before and after. While it is off, the typed numbers of `PUT /settings/dashboard` are kept but not used.
+         */
+        put: operations["setDashboardTargetPolicy"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/goals": {
         parameters: {
             query?: never;
@@ -19049,6 +19075,21 @@ export interface components {
             /** @description The waiting tasks with no ball-in-court role (a group holds them, or nobody yet). */
             unassigned: number | null;
         };
+        /** @description 0.15.367. The target policy (setting `dashboard.target_policy`, migration 0524). */
+        DashboardTargetPolicy: {
+            /** @description False (default): the dashboard targets are derived from the scope. True: the typed numbers of Settings > Dashboard apply where set. */
+            manual_override: boolean;
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+            /** @description The ETag value. */
+            version: number;
+            /** @description A System Admin or a delegate of `settings` edit for all regions. */
+            can_edit: boolean;
+        };
+        DashboardTargetPolicyInput: components["schemas"]["WithReason"] & {
+            manual_override: boolean;
+        };
         /** @description 0.15.367: the registered, not cancelled sites per project phase (sites.project_phase) with the share on air, and the targets derived from them. Only the sites and their On-Air task are read; nothing is typed. */
         DashboardOpsPhaseScope: {
             /** @description False when the caller has no dashboard region; every figure is then null. */
@@ -19058,7 +19099,15 @@ export interface components {
             total: components["schemas"]["DashboardPhaseScopeRow"] | null;
             /** @description The monthly On-Air target derived from the scope: sites not yet on air over the months left to the latest planned date of the On-Air task (30-day months, at least one). value is null when no planned date exists or nothing is left. */
             monthly_on_air_auto: {
+                /** @description The target in force: the typed number when the manual override is on and a number is set, else the derived one (null when none can be derived). */
                 value: number | null;
+                /**
+                 * @description Where `value` comes from.
+                 * @enum {string}
+                 */
+                source: "derived" | "manual";
+                /** @description The derived value, always given, also while a manual one is in force. */
+                derived: number | null;
                 remaining: number;
                 /** Format: date */
                 planned_end: string | null;
@@ -36322,6 +36371,62 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getDashboardTargetPolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The target policy. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardTargetPolicy"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setDashboardTargetPolicy: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DashboardTargetPolicyInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardTargetPolicy"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];

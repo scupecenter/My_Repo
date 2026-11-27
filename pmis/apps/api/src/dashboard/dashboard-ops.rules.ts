@@ -395,3 +395,9 @@ export function autoMonthlyOnAir(remaining: number, plannedEnd: string | null, t
   const months = Math.max(1, Math.ceil(days / 30));
   return { value: Math.ceil(remaining / months), months_left: months };
 }
+
+/** The target in force: a typed number counts only while the manual override is on and the number is a positive whole. */
+export function targetInForce(override: boolean, manual: number | null, derived: number | null): { value: number | null; source: "derived" | "manual" } {
+  if (override && manual !== null && manual > 0) return { value: manual, source: "manual" };
+  return { value: derived, source: "derived" };
+}

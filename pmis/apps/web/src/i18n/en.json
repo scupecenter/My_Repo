@@ -3273,6 +3273,7 @@
       "draft_note": "A factor marked draft is not yet approved by the owner."
     },
     "phase": {
+      "manual": "typed (override)",
       "title": "Phase scope",
       "hint": "Registered sites per project phase (cancelled sites left out) and how many are on air. Every figure and target is computed from the sites; nothing is typed.",
       "none": "No phase recorded",
@@ -5109,6 +5110,16 @@
     }
   },
   "dashSettings": {
+    "tp_title": "Manual targets (exception)",
+    "tp_note": "Targets are derived from the scope: a phase target is its site count, the monthly On-Air target comes from the sites left and the planned dates. Nobody types them. Turn this on only when a typed number must replace the derived one.",
+    "tp_on": "On: the typed numbers below apply where set.",
+    "tp_off": "Off (default): all targets are derived from the scope.",
+    "tp_turn_on": "Allow typed targets",
+    "tp_turn_off": "Back to derived targets",
+    "tp_readonly": "Only an administrator can change this.",
+    "tp_confirm_on": "The typed targets will replace the derived ones. A reason is required and the change is audited.",
+    "tp_confirm_off": "The dashboard will use the derived targets again. The typed numbers are kept but not used.",
+    "targets_derived": "Targets are derived from the scope. The typed numbers are hidden and unused while manual targets are off.",
     "title": "Dashboard",
     "note": "Global settings of the dashboard: targets, KPI thresholds, and the cards each tab shows and their order. Every save needs a reason, is audited and is versioned. Each user's own layout and saved filters stay in the browser.",
     "targets": "Targets",
