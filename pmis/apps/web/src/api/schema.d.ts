@@ -5798,6 +5798,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/pm-schedules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The preventive-maintenance schedules the caller may see (0.15.161)
+         * @description 0.15.161. Schedules kept in the settings table as `pm.schedules`. A schedule says: every `every` weeks or months create a DRAFT record in register `register_key`
+         *     (for `site_id`, with the field values in `data`). `next_due` is the next date a draft is due; `today` is the calendar day of the system. A schedule never creates
+         *     anything by itself. A caller sees the schedules of the registers the caller may view; an administrator with `admin.settings` edit sees all of them.
+         */
+        get: operations["getPmSchedules"];
+        /**
+         * Save the schedules (reason, If-Match, audited, versioned)
+         * @description 0.15.161. System Admin, or a delegation of `admin.settings` edit for all regions (403 `action_forbidden` otherwise). The body replaces the whole list; the run
+         *     history of a schedule (`last_generated_at`, `last_record_id`) is kept by the database. Field errors (422 `validation_failed`): `unknown_key`, `invalid`,
+         *     `duplicate`, `unknown_register`, `unknown_site`, `required` (a site is needed), `too_many`. One audit row per save.
+         */
+        put: operations["setPmSchedules"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pm-schedules/{schedule_id}/generate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create the draft of a due schedule, as the caller (0.15.161)
+         * @description 0.15.161. Saves ONE draft record (state `entry`) in the schedule's register through the register's own create path, as the caller: the register's rights, region
+         *     rules and field rules apply unchanged (no permission is widened). Then the next due date moves past today in steps of the schedule (never a backlog).
+         *     404 when the schedule does not exist or the caller may not view its register; 409 `invalid_transition` when the schedule is switched off or not due yet.
+         *     Errors of the register (403, 422) are returned as they are.
+         */
+        post: operations["generatePmScheduleDraft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/kanban-wip": {
         parameters: {
             query?: never;
@@ -6237,6 +6288,28 @@ export interface paths {
          *     (view) and the Warehouse module; the receipts the caller cannot see are not listed.
          */
         get: operations["listProcurementOrderReceipts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/registers/{register_key}/{entity_id}/related": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The records linked to a register record, in both directions (0.15.224)
+         * @description 0.15.224. Read only. The current, not voided records this record names (`direction` `to`) and the records that name it (`direction` `from`), grouped by register and link field.
+         *     Needs the view right of `register_key`; each group is listed only when the caller also holds the view right of the other register in the record's region. A record
+         *     the caller cannot see, or an id with no current record, answers an empty list.
+         */
+        get: operations["listRelatedRecords"];
         put?: never;
         post?: never;
         delete?: never;
@@ -10314,6 +10387,58 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        PmScheduleInput: {
+            id: string;
+            name_en: string;
+            name_ar?: string | null;
+            register_key: string;
+            /**
+             * Format: uuid
+             * @description Required when the register is site scoped.
+             */
+            site_id?: string | null;
+            record_type?: string | null;
+            /** @description Field values of the draft, by field code (at most 4000 characters). */
+            data: {
+                [key: string]: unknown;
+            };
+            every: number;
+            /** @enum {string} */
+            unit: "week" | "month";
+            /** Format: date */
+            next_due: string;
+            active?: boolean;
+        };
+        PmSchedulesInput: {
+            schedules: components["schemas"]["PmScheduleInput"][];
+        };
+        PmSchedule: components["schemas"]["PmScheduleInput"] & {
+            /** Format: date-time */
+            last_generated_at?: string;
+            /** Format: uuid */
+            last_record_id?: string;
+        };
+        PmSchedules: {
+            version: number;
+            schedules: components["schemas"]["PmSchedule"][];
+            /** Format: date */
+            today: string;
+            catalogue: {
+                registers: {
+                    key: string;
+                    name_en: string;
+                    name_ar: string;
+                    site_scoped: boolean;
+                }[];
+                units: string[];
+            };
+            /** Format: date-time */
+            updated_at: string | null;
+            updated_by: {
+                id: string;
+                display_name: string;
+            } | null;
+        };
         RecycleBin: {
             retention_days: number;
             version: number;
@@ -16279,6 +16404,25 @@ export interface components {
             movement_status?: "pending" | "posted" | "cancelled";
             lines: number;
             qty: number;
+        };
+        /** @description 0.15.224. The records linked to a register record through one link field. */
+        RelatedRecordGroup: {
+            /** @enum {string} */
+            direction: "to" | "from";
+            register_key: string;
+            /** @description The link field (a key of the record data) that holds the id. */
+            field: string;
+            items: {
+                /** Format: uuid */
+                entity_id: string;
+                /** Format: uuid */
+                record_id: string;
+                record_type?: string;
+                state: string;
+                /** Format: uuid */
+                site_id?: string;
+                title: string;
+            }[];
         };
         /** @description 0.15.32 (F5). The setting `kanban.wip_limits`: the WIP limit of each milestone column of the sites board, a warning only. */
         KanbanWip: {
@@ -30421,6 +30565,94 @@ export interface operations {
             428: components["responses"]["PreconditionRequired"];
         };
     };
+    getPmSchedules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The schedules. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PmSchedules"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setPmSchedules: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"] & components["schemas"]["PmSchedulesInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PmSchedules"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    generatePmScheduleDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                schedule_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The draft was created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        record_id: string;
+                        register_key: string;
+                        /** Format: date */
+                        next_due: string | null;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
     getKanbanWip: {
         parameters: {
             query?: never;
@@ -31104,6 +31336,34 @@ export interface operations {
                 content: {
                     "application/json": {
                         items: components["schemas"]["ProcurementOrderReceipt"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listRelatedRecords: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                register_key: string;
+                entity_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The groups. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        groups: components["schemas"]["RelatedRecordGroup"][];
                     };
                 };
             };

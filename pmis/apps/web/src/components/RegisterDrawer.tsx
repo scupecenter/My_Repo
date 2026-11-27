@@ -20,6 +20,7 @@ import { DrawerFrame, DrawerTabs, panelProps, useReportDirty } from './DrawerFra
 import { DraftBar, useDraft } from './DraftBar';
 import { FollowButton } from './FollowButton';
 import { RecordDocuments } from './RecordDocuments';
+import { RelatedRecords } from './RelatedRecords';
 import { DismantleOrderSelect, DismantleRnSelect, HlcPurchaseRequests, OrderReceipts, WarehouseOrderSelect } from './P4cPanels';
 import { useRecordSlots } from '@/api/documents';
 import { Holders } from './HolderChip';
@@ -312,6 +313,7 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
           </section>
         )}
         {record && rk === 'procurement' && record.state === 'approved' && <OrderReceipts entityId={record.entity_id as string} />}
+        {record && <RelatedRecords registerKey={rk} entityId={record.entity_id as string} />}
         {record && rk === 'financial_advances' && <Balance record={record} />}
         {record && rk === 'financial_advances' && record.record_type === 'advance' && record.state === 'approved' && <TopUp record={record} onDone={onCreated} />}
         {record && rk === 'car_dispatcher' && record.record_type === 'booking' && record.state === 'approved' && <ExtendBooking record={record} onDone={onCreated} />}

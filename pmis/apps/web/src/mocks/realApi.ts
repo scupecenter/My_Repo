@@ -405,6 +405,7 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/registers/issues/order-options'],
   ['get', '/registers/quality/order-options'],
   ['get', '/registers/procurement/:entity_id/receipts'],
+  ['get', '/registers/:key/:entity_id/related'],
   ['get', '/registers/contractor-companies'],
   ['post', '/registers/hlc/legacy-migration'],
   ['get', '/registers/:key/fields'],
@@ -494,6 +495,9 @@ export const REAL_API_AUTH_USERS = [
   // (warehouse, as-built items, My Work, dashboard extras and settings, documents grid, fleet actions, invitations, admin overrides).
   ['get', '/settings/dashboard'],
   ['put', '/settings/dashboard'],
+  ['get', '/settings/pm-schedules'],
+  ['put', '/settings/pm-schedules'],
+  ['post', '/pm-schedules/:id/generate'],
   ['get', '/dashboard/extras'],
   // Contract 0.15.106 (apps/api: dashboard-ops): the operations sections after F13, first the procurement and materials card.
   ['get', '/dashboard/ops'],
