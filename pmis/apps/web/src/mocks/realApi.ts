@@ -448,6 +448,8 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/registers/issues/order-options'],
   ['get', '/registers/change_control/order-options'],
   ['get', '/registers/quality/order-options'],
+  ['get', '/settings/register-state'],
+  ['put', '/settings/register-state/:key'],
   ['get', '/registers/issues/risk-options'],
   ['get', '/registers/risks/:entity_id/issues'],
   ['get', '/registers/procurement/:entity_id/receipts'],
