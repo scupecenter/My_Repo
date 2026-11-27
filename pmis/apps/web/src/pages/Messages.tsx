@@ -148,7 +148,7 @@ export function Messages() {
         <h1 className="me-auto text-2xl font-bold">{t('nav.messages')}</h1>
         <button className="btn btn-accent" data-testid="messages-new" onClick={() => setComposing(true)}><SquarePen size={16} />{t('messages.new')}</button>
       </div>
-      <div className="card grid min-h-[60vh] overflow-hidden md:grid-cols-[22rem_1fr]">
+      <div className="card grid min-h-[calc(100dvh-9rem)] overflow-hidden md:grid-cols-[22rem_1fr]">
         <div className={`${threadId ? 'hidden md:block' : ''} border-e border-line`}>
           <div className="flex flex-wrap items-center gap-2 border-b border-line p-3">
             <SavedViews<Record<string, unknown>> screen="messages" value={{ unread: unreadOnly }} empty={{ unread: false }} onApply={(v) => setUnreadOnly(v.unread === true)} />

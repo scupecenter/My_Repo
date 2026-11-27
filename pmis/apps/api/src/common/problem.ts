@@ -19,7 +19,9 @@ export type ErrorCode =
   | 'system_field' | 'conversion_blocked' | 'conversion_unconfirmed' | 'section_not_empty'
   | 'list_parent_mismatch' | 'plan_locked' | 'freeze_active' | 'workflow_invalid' | 'master_impact_unconfirmed' | 'stale_preview' | 'invitation_invalid' | 'register_locked'
   // 0146 (0.15.62): the project data reset in Settings
-  | 'single_admin' | 'backup_missing' | 'request_expired' | 'reset_running' | 'plan_incomplete' | 'storage_not_supported' | 'quarantine_unavailable' | 'maintenance';
+  | 'single_admin' | 'backup_missing' | 'request_expired' | 'reset_running' | 'plan_incomplete' | 'storage_not_supported' | 'quarantine_unavailable' | 'maintenance'
+  // 0396 (0.15.292): the Media gallery thumbnails
+  | 'thumbnail_unsupported' | 'thumbnails_unavailable';
 
 export interface FieldError {
   path: string;

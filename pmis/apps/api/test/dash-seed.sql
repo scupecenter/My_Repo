@@ -2,11 +2,13 @@
 -- dash_seed_sites(n, prefix): n sites spread over the 7 regions, each with every task of workflow v1 at a different progress level (0 to 10 milestones
 -- done), baselines, a few issues, snags and blocked gates. Triggers are off while it loads (the calculation layer is not under test here).
 -- All dates are relative to cal_today(), so the data never depends on the weekday of the run.
-CREATE OR REPLACE FUNCTION dash_seed_sites(p_n integer, p_prefix text) RETURNS integer
+-- p_late_pct (default 100 = the original pattern, about a quarter of the tasks late): the share of sites that keep the late-prone dates; the others get on-time dates (the load test uses 20 for a realistic share, about 5% of the tasks late).
+DROP FUNCTION IF EXISTS dash_seed_sites(integer, text);
+CREATE OR REPLACE FUNCTION dash_seed_sites(p_n integer, p_prefix text, p_late_pct integer DEFAULT 100) RETURNS integer
 LANGUAGE plpgsql AS $$
 DECLARE
   wf uuid; bv uuid; today date := cal_today(); n integer := 0; i integer; lvl integer; reg integer; sid uuid; code_ text; st_date date; d0 date;
-  ver integer; party uuid;
+  ver integer; party uuid; lateish boolean;
 BEGIN
   SET LOCAL session_replication_role = replica;
   SELECT id INTO wf FROM workflow_definitions WHERE version = 1;
@@ -18,6 +20,7 @@ BEGIN
     reg := 1 + (i % 7);
     lvl := i % 11;
     code_ := p_prefix || '-' || lpad(i::text, 5, '0');
+    lateish := (i % 100) < p_late_pct;
     INSERT INTO sites (site_code, name, region_id, workflow_version_id, delivery_scenario, overall_status, scope_tower_erection, scope_site_adaption, scope_gecol_power, scope_hlc_fiber, scope_te_full, updated_at)
     VALUES (code_, 'Site ' || code_, reg, wf, CASE WHEN i % 10 = 0 THEN 'expansion' ELSE 'new_build' END::"DeliveryScenario",
             CASE WHEN i % 37 = 0 THEN 'cancelled' ELSE 'in_progress' END::"OverallStatus", 'yes', 'yes', 'yes', 'yes', 'yes', now()) RETURNING id INTO sid;
@@ -29,12 +32,12 @@ BEGIN
       CASE WHEN sd.seq = lvl + 1 THEN 1 ELSE 0 END, 3,
       CASE WHEN sd.seq <= lvl THEN today - (11 - sd.seq) * 7 - 3 END,
       CASE WHEN sd.seq <= lvl THEN today - (11 - sd.seq) * 7 - 3 END,
-      CASE WHEN sd.seq = lvl + 1 THEN today + ((i % 9) - 6) END,
+      CASE WHEN sd.seq = lvl + 1 THEN today + (CASE WHEN lateish THEN (i % 9) - 6 ELSE 20 + (i % 9) END) END,
       (SELECT r.id FROM sla_rules r WHERE r.task_def_id = td.id LIMIT 1),
       CASE WHEN sd.seq <= lvl + 1 THEN today - (11 - greatest(sd.seq - 1, 0)) * 7 - 3 END,
-      CASE WHEN sd.seq = lvl + 1 THEN today + ((i % 9) - 8) END,
+      CASE WHEN sd.seq = lvl + 1 THEN today + (CASE WHEN lateish THEN (i % 9) - 8 ELSE 18 + (i % 9) END) END,
       CASE WHEN sd.seq <= lvl THEN today - (11 - sd.seq) * 7 - 3 END,
-      CASE WHEN sd.seq <= lvl THEN (i + td.sort_order) % 9 END,
+      CASE WHEN sd.seq <= lvl THEN (CASE WHEN lateish THEN (i + td.sort_order) % 9 ELSE 0 END) END,
       CASE WHEN sd.seq <= lvl THEN (i % 4 = 0)::int ELSE 0 END,
       false, CASE WHEN td.code IN ('D2', 'D3', 'D5') THEN party END, now()
     FROM task_definitions td JOIN stage_definitions sd ON sd.id = td.stage_id WHERE td.workflow_id = wf AND td.is_active;
