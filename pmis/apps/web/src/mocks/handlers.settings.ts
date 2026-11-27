@@ -14,6 +14,7 @@ import { byId, uid } from './ids';
 import type { TableDisplaySetting } from '@/api/display';
 import { UI_FEATURES_SEED, type UiFeaturesSetting } from '@/api/uiFeatures';
 import { CALENDAR_CODES, CATALOGUE, COMPLETENESS, MAIL_KIND_CATALOGUE, MISMATCH, initCfg, GATES, MILESTONES, OPEN_TASKS, SCENARIOS, START_EVENT_CODES, TASK_DEFS, type SlaSetRec, type WeightRec } from './settingsData';
+import { newDeviceState } from './newDevice';
 
 const B = API_BASE;
 const TODAY = '2026-10-25';
@@ -256,6 +257,7 @@ const support: { enabled: boolean; max_hours: number; default_hours: number; ver
 type SupportGrant = { id: string; to: { id: string; display_name: string; employee_id: string | null }; from: { id: string; display_name: string; employee_id: string | null }; rights: string[]; valid_from: string; valid_to: string; revoked: boolean; revoked_at: string | null; reason: string };
 const supportGrants: SupportGrant[] = [];
 const SUPPORT_RIGHTS = ['templates.edit', 'fields.edit', 'documents.edit', 'warehouse.items.edit'];
+const newDeviceView = () => ({ enabled: newDeviceState.enabled, code_minutes: newDeviceState.code_minutes, include_admins: newDeviceState.include_admins, mail_ready: true, updated_at: newDeviceState.updated_at, updated_by: newDeviceState.updated_by, version: newDeviceState.version, can_edit: true });
 const supportView = () => ({ ...support, modules: ['templates', 'fields', 'lists', 'document_types', 'warehouse_items'], can_edit: true });
 const supportDto = (g: SupportGrant) => ({
   id: g.id, from_user: g.from, to_user: g.to, target_kind: 'user', target: { kind: 'user', id: g.to.id, label: g.to.display_name }, scope: 'partial', rights: g.rights, region_codes: [], module_codes: [],
@@ -712,6 +714,38 @@ export const settingsHandlers = [
     return HttpResponse.json(j, tag(j.version));
   }),
 
+  // ------------------------------------------------------------------ 0.15.192: new-device email code (System Admin only)
+  http.get(`${B}/settings/new-device-code`, () => { const g = needAdmin(); if (g) return g; const j = newDeviceView(); return HttpResponse.json(j, tag(j.version)); }),
+  http.put(`${B}/settings/new-device-code`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    const b = await body<{ enabled?: unknown; code_minutes?: unknown; include_admins?: unknown; reason?: string } & Record<string, unknown>>(request);
+    const errs: { path: string; code: string }[] = Object.keys(b).filter((k) => !['enabled', 'code_minutes', 'include_admins', 'reason'].includes(k)).map((k) => ({ path: `/${k}`, code: 'unknown_field' }));
+    if (typeof b.enabled !== 'boolean') errs.push({ path: '/enabled', code: 'required' });
+    if (typeof b.include_admins !== 'boolean') errs.push({ path: '/include_admins', code: 'required' });
+    if (typeof b.code_minutes !== 'number' || !Number.isInteger(b.code_minutes) || b.code_minutes < 5 || b.code_minutes > 30) errs.push({ path: '/code_minutes', code: 'invalid' });
+    if ((b.reason ?? '').trim().length < 3 || (b.reason ?? '').length > 1000) errs.push({ path: '/reason', code: 'required' });
+    if (errs.length) return fields(...errs);
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, newDeviceState.version); if (p) return p;
+    if (!stepUpValid()) return stepUp();
+    if (newDeviceState.enabled === b.enabled && newDeviceState.code_minutes === b.code_minutes && newDeviceState.include_admins === b.include_admins) return problem(409, 'invalid_transition', 'These are already the new-device settings.');
+    const v = viewer()!;
+    Object.assign(newDeviceState, { enabled: b.enabled, code_minutes: b.code_minutes, include_admins: b.include_admins, version: newDeviceState.version + 1, updated_at: new Date().toISOString(),
+      updated_by: { id: uid(v.employee_id ?? '9999'), display_name: v.name, employee_id: v.employee_id } });
+    const j = newDeviceView();
+    return HttpResponse.json(j, tag(j.version));
+  }),
+  http.post(`${B}/settings/new-device-code/bypass`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    const b = await body<{ user_id?: unknown; minutes?: unknown; reason?: string } & Record<string, unknown>>(request);
+    const errs: { path: string; code: string }[] = [];
+    if (typeof b.user_id !== 'string' || b.user_id.length < 8) errs.push({ path: '/user_id', code: 'invalid' });
+    if ((b.reason ?? '').trim().length < 3) errs.push({ path: '/reason', code: 'required' });
+    if (errs.length) return fields(...errs);
+    if (!stepUpValid()) return stepUp();
+    const mins = typeof b.minutes === 'number' ? b.minutes : 30;
+    return HttpResponse.json({ until: new Date(Date.now() + mins * 60_000).toISOString() });
+  }),
   // ------------------------------------------------------------------ 0.15.191: support access (System Admin only)
   http.get(`${B}/settings/support-access`, () => { const g = needAdmin(); if (g) return g; const j = supportView(); return HttpResponse.json(j, tag(j.version)); }),
   http.put(`${B}/settings/support-access`, async ({ request }) => {

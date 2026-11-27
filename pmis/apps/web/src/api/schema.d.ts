@@ -271,6 +271,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/local/2fa/device-code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Second step of a sign-in from a new browser - the 6-digit code mailed to the account (0.15.192)
+         * @description Needs the pending sign-in cookie `pmis_2fa` from `POST /auth/local/login` when it answered `next` = `device_code`. Only exists while an admin has turned the
+         *     new-device code on (it is off by default). The code works once and ends after `code_minutes`. A wrong code is 422 `invalid_code`; the fifth wrong code ends the
+         *     challenge (401 `unauthenticated`: sign in again). On success the browser is remembered for this account (a hash of the `pmis_dev` cookie), the session cookie
+         *     is set. Rate limited (429). Failures are written to the security log.
+         */
+        post: operations["localDeviceCode"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/local/2fa/enrol/start": {
         parameters: {
             query?: never;
@@ -6183,6 +6206,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/new-device-code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The new-device email code setting (System Admin only) (0.15.192)
+         * @description System Admin only (403 `action_forbidden` otherwise). `enabled` is `false` until a System Admin turns it on. `mail_ready` says whether the mail server is set up (the code is sent by email).
+         */
+        get: operations["getNewDeviceCode"];
+        /**
+         * Turn the new-device email code on or off (System Admin, reason, step-up, If-Match, audited) (0.15.192)
+         * @description System Admin only. A reason (3+ characters), a step-up (401 `step_up_required`) and `If-Match` (428 / 412) are required. Turning it on needs the mail server (409 `invalid_transition` otherwise).
+         *     `code_minutes` is 5 to 30. System Admins are outside the feature unless `include_admins` is true, so the person who can turn it off can always sign in. Saving the values already in force is 409.
+         *     Audited `new_device_code_update` with before and after. Sessions already open are not touched.
+         */
+        put: operations["setNewDeviceCode"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/new-device-code/bypass": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Let one account sign in once from any browser without the code (System Admin, reason, step-up, audited) (0.15.192)
+         * @description The recovery path. `minutes` is 1 to 60 (default 30). The bypass is used up by the account's next sign-in. Audited `new_device_bypass`. Rate limited.
+         */
+        post: operations["bypassNewDeviceCode"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/historical-waiver": {
         parameters: {
             query?: never;
@@ -11786,10 +11855,10 @@ export interface components {
             /** @constant */
             authenticated: false;
             /**
-             * @description `two_factor`: call `POST /auth/local/2fa`. `enrol`: two-factor is on but no authenticator is set up; call the enrolment endpoints.
+             * @description `two_factor`: call `POST /auth/local/2fa`. `enrol`: two-factor is on but no authenticator is set up; call the enrolment endpoints. `device_code` (0.15.192, only when an admin turned the new-device code on): call `POST /auth/local/2fa/device-code` with the code mailed to the account.
              * @enum {string}
              */
-            next: "two_factor" | "enrol";
+            next: "two_factor" | "enrol" | "device_code";
             /** Format: date-time */
             expires_at: string;
         };
@@ -17089,6 +17158,32 @@ export interface components {
             /** @description Omitted = default_hours. */
             hours?: number;
         };
+        /** @description 0.15.192. The new-device email code setting (`security.new_device_code`, migration 0292). */
+        NewDeviceCodeSetting: {
+            /** @description false until a System Admin turns it on. */
+            enabled: boolean;
+            code_minutes: number;
+            /** @description false: System Admins are outside the feature (the recovery path). */
+            include_admins: boolean;
+            /** @description Whether the mail server is set up. */
+            mail_ready: boolean;
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+            /** @description The ETag value. */
+            version: number;
+            can_edit: boolean;
+        };
+        NewDeviceCodeSettingInput: components["schemas"]["WithReason"] & {
+            enabled: boolean;
+            code_minutes: number;
+            include_admins: boolean;
+        };
+        NewDeviceBypassInput: components["schemas"]["WithReason"] & {
+            /** Format: uuid */
+            user_id: string;
+            minutes?: number;
+        };
         /** @description 0.15.1. The shared order of the side menu (setting `nav.layout`). */
         NavLayout: {
             headings: components["schemas"]["NavHeading"][];
@@ -21299,6 +21394,36 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["TwoFactorCode"];
+            };
+        };
+        responses: {
+            /** @description Signed in. */
+            200: {
+                headers: {
+                    "Set-Cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Session"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    localDeviceCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    code: string;
+                };
             };
         };
         responses: {
@@ -31768,6 +31893,94 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             422: components["responses"]["Unprocessable"];
+        };
+    };
+    getNewDeviceCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The setting. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NewDeviceCodeSetting"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setNewDeviceCode: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewDeviceCodeSettingInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NewDeviceCodeSetting"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    bypassNewDeviceCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewDeviceBypassInput"];
+            };
+        };
+        responses: {
+            /** @description Allowed until. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: date-time */
+                        until: string;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
         };
     };
     getHistoricalWaiver: {

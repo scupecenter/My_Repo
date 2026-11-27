@@ -102,7 +102,7 @@ const fresh = () => ({
   session: null as null | { account: string; linked: boolean; stepupAt: number | null; employee_id?: string; method?: 'local' | 'm365' },
   auth: {} as Record<string, Cred>,
   /** Password right, code or enrolment still to do (the cookie pmis_2fa of the real server). */
-  pending: null as null | { account: string; kind: 'two_factor' | 'enrol'; until: number },
+  pending: null as null | { account: string; kind: 'two_factor' | 'enrol' | 'device_code'; until: number },
   /** 0.9.2 self-service profile: the user's own edits (keyed by account) and the email change requests. */
   profiles: {} as Record<string, { display_name?: string; phone?: string | null; locale?: 'en' | 'ar'; theme?: 'light' | 'dark'; ui_brand?: Brand | null; ui_prefs?: Record<string, string>; email?: string; version: number }>,
   /** 0.15.41 (migration 0130): Settings, Identity & themes (setting ui.identity). */

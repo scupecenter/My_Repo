@@ -8,6 +8,7 @@ import type { AuthContext } from './auth.types';
 import { AllowIncomplete, Auth, Public } from './decorators';
 import { SessionService } from './session.service';
 import { PasswordResetService } from './password-reset.service';
+import { NewDeviceService } from '../security/new-device.service';
 
 @Controller('auth')
 export class AuthController {
@@ -16,6 +17,7 @@ export class AuthController {
     private readonly sessions: SessionService,
     private readonly twoFactor: TwoFactorService,
     private readonly resets: PasswordResetService,
+    private readonly newDevice: NewDeviceService,
   ) {}
 
   /** "Forgot password" (0162): the same answer whether or not the account exists. */
@@ -42,7 +44,8 @@ export class AuthController {
   @HttpCode(200)
   async login(@Req() req: Request, @Res({ passthrough: true }) res: Response, @Body() body: unknown): Promise<SessionBody | PendingBody> {
     if (!req.is('application/json')) throw problems.badRequest('Send the request as Content-Type: application/json.');
-    const r: LoginResult = await this.auth.login(body, req.ip ?? null, req.header('user-agent'), req.id ?? '');
+    const r: LoginResult = await this.auth.login(body, req.ip ?? null, req.header('user-agent'), req.id ?? '', this.newDevice.deviceFrom(req));
+    if (r.newDevice) this.newDevice.setDeviceCookie(res, r.newDevice);
     if (r.kind === 'pending') {
       this.twoFactor.setPendingCookie(res, r.token);
       return r.body;
@@ -58,6 +61,18 @@ export class AuthController {
   async twoFactorSignIn(@Req() req: Request, @Res({ passthrough: true }) res: Response, @Body() body: unknown): Promise<SessionBody> {
     this.needJson(req);
     const { token, body: session } = await this.auth.twoFactorSignIn(this.twoFactor.pendingTokenFrom(req), body, req.ip ?? null, req.header('user-agent'), req.id ?? '');
+    this.twoFactor.clearPendingCookie(res);
+    this.sessions.setCookie(res, token);
+    return session;
+  }
+
+  /** Second step of a sign-in from a new browser (0292): the code mailed to the account. Same pending cookie as the two-factor step. */
+  @Public()
+  @Post('local/2fa/device-code')
+  @HttpCode(200)
+  async deviceCode(@Req() req: Request, @Res({ passthrough: true }) res: Response, @Body() body: unknown): Promise<SessionBody> {
+    this.needJson(req);
+    const { token, body: session } = await this.auth.deviceCodeSignIn(this.twoFactor.pendingTokenFrom(req), body, req.ip ?? null, req.header('user-agent'), req.id ?? '');
     this.twoFactor.clearPendingCookie(res);
     this.sessions.setCookie(res, token);
     return session;
