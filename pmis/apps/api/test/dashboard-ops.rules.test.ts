@@ -191,9 +191,9 @@ describe("item 7 rules: pending approvals by role (0.15.204)", () => {
     expect(r.approve).toBe(1);
     expect(r.unassigned).toBe(1);
     expect(r.by_role.map((x) => x.role_id)).toEqual(["r1", "r2"]);
-    expect(r.by_role[0].count).toBe(2);
-    expect(r.by_role[0].oldest_days).toBe(40);
-    expect(r.by_role[0].buckets.find((b) => b.key === "over_30")?.count).toBe(1);
+    expect(r.by_role[0]?.count).toBe(2);
+    expect(r.by_role[0]?.oldest_days).toBe(40);
+    expect(r.by_role[0]?.buckets.find((b) => b.key === "over_30")?.count).toBe(1);
     expect(r.waiting.total).toBe(4);
     expect(r.waiting.oldest_days).toBe(40);
   });
