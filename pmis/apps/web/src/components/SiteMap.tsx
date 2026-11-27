@@ -9,6 +9,9 @@ import { useRegions, useSite, useSiteTasks } from '@/api/sites';
 import type { TaskSummary } from '@/api/types';
 import { DrawerFrame } from './DrawerFrame';
 import { EChart } from './EChart';
+import { ScreenSettingsLink } from './ScreenSettingsLink';
+import { TileMap } from './TileMap';
+import { tilesOn, useMapSettings } from '@/api/mapSettings';
 import { Holders } from './HolderChip';
 import { EmptyState } from './States';
 import { QuickFilter } from './TableKit';
@@ -89,6 +92,11 @@ export function SiteMap({ outer: outerIn, height = 460, testid = 'site-map' }: {
   const reduced = useReducedMotion();
   const [full, setFull] = useState(false);
   const [layout, setLayout] = useState<'map' | 'list'>('map');
+  // the tile layer (Settings > Screens > Map): on when the switch is on and a same-origin tile address is set; a person can switch back to the outline
+  const mapCfg = useMapSettings();
+  const tiles = tilesOn(mapCfg);
+  const [outline, setOutline] = useState(false);
+  const onTiles = tiles && !outline;
   const [viewKey, setViewKey] = useState(0);
   const [open, setOpen] = useState<string | null>(null);
   const d = q.data;
@@ -174,7 +182,9 @@ export function SiteMap({ outer: outerIn, height = 460, testid = 'site-map' }: {
           <button type="button" className="btn px-2 py-1 text-xs" data-testid="map-layout" aria-pressed={layout === 'list'} onClick={() => setLayout(layout === 'map' ? 'list' : 'map')}>
             {layout === 'map' ? <><List size={14} />{t('siteMap.as_list')}</> : <><MapIcon size={14} />{t('siteMap.as_map')}</>}
           </button>
+          {layout === 'map' && tiles && <button type="button" className="btn px-2 py-1 text-xs" data-testid="map-base" aria-pressed={onTiles} onClick={() => setOutline(!outline)}><MapIcon size={14} />{onTiles ? t('tileMap.show_outline') : t('tileMap.show_tiles')}</button>}
           {layout === 'map' && <button type="button" className="btn px-2 py-1 text-xs" data-testid="map-reset-view" onClick={() => setViewKey((k) => k + 1)}><RotateCcw size={14} />{t('siteMap.reset_view')}</button>}
+          <ScreenSettingsLink screen="site_map" />
           <button type="button" className="btn px-2 py-1 text-xs" data-testid="map-full" aria-pressed={full} onClick={() => setFull(!full)}>
             {full ? <><Minimize2 size={14} />{t('siteMap.exit_full')}</> : <><Maximize2 size={14} />{t('siteMap.full')}</>}
           </button>
@@ -212,8 +222,10 @@ export function SiteMap({ outer: outerIn, height = 460, testid = 'site-map' }: {
 
       {q.isLoading ? <div className="animate-pulse rounded bg-lockBg" style={{ height }} data-testid="map-loading" /> : layout === 'map' ? (
         <div className="overflow-hidden rounded border border-line" style={{ background: 'var(--map-sea)' }}>
-          <EChart build={build} renderer="canvas" height={full ? 'calc(100vh - 220px)' : height} label={summary} testid="map-chart"
-            onClick={(p) => { const id = (p.data as { site?: string } | undefined)?.site; if (id) setOpen(id); }} />
+          {onTiles
+            ? <TileMap marks={ms} cfg={mapCfg} height={full ? 'calc(100vh - 220px)' : height} label={summary} resetKey={viewKey} tip={(m) => tip(m.site)} onOpen={setOpen} />
+            : <EChart build={build} renderer="canvas" height={full ? 'calc(100vh - 220px)' : height} label={summary} testid="map-chart"
+              onClick={(p) => { const id = (p.data as { site?: string } | undefined)?.site; if (id) setOpen(id); }} />}
         </div>
       ) : (
         <div className="overflow-auto rounded border border-line" style={{ maxHeight: full ? 'calc(100vh - 220px)' : height }}>

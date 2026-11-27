@@ -10,6 +10,7 @@
 | [01-system-overview.md](01-system-overview.md) | وثيقة وصف النظام | System overview: scope, roles, workflow, visibility, registers, documents, sign-in, configuration, NFRs, rollout |
 | [02-change-log-for-customer.md](02-change-log-for-customer.md) | سجل التعديلات للعميل (منذ 2026-10-24) | Customer change log grouped by topic, with decision codes |
 | [03-architecture-and-data.md](03-architecture-and-data.md) | البنية ومخطط البيانات | Architecture, authentication, authorization/RLS, data entities, audit, backups, integrations, IT needs |
+| [06-site-map-tiles.md](06-site-map-tiles.md) | خريطة المواقع على بلاطات من خادمك | Site map on map tiles served from your own server (off by default) |
 
 ## وثائق مخططة لاحقاً | Planned later
 

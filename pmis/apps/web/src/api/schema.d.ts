@@ -16608,12 +16608,24 @@ export interface components {
             width: "narrow" | "medium" | "wide";
             show_tabs: boolean;
         };
+        /** @description 0.15.341. The site map on real tiles (Settings > Screens > Map). `enabled` is the switch (off by default); `tile_url` is empty (no tiles, the outline map stays) or a path on this server with {z}, {x} and {y}, such as /tiles/{z}/{x}/{y}.png: never another host, so the Content-Security-Policy is unchanged. Tiles are served by the customer server (self-hosted); no external account or key. */
+        UiMap: {
+            enabled: boolean;
+            tile_url: string;
+            min_zoom: number;
+            max_zoom: number;
+            attribution: string;
+            center_lat: number;
+            center_lon: number;
+            default_zoom: number;
+        };
         /** @description 0.15.185. The sections of the interface features setting; every section is complete. */
         UiFeatures: {
             avatars: components["schemas"]["UiAvatars"];
             new_badge: components["schemas"]["UiNewBadge"];
             inbox: components["schemas"]["UiInbox"];
             data_hub: components["schemas"]["UiDataHub"];
+            map: components["schemas"]["UiMap"];
             panel: components["schemas"]["UiPanel"];
         };
         UiFeaturesPatch: {
@@ -16621,6 +16633,7 @@ export interface components {
             new_badge?: components["schemas"]["UiNewBadge"];
             inbox?: components["schemas"]["UiInbox"];
             data_hub?: components["schemas"]["UiDataHub"];
+            map?: components["schemas"]["UiMap"];
             panel?: components["schemas"]["UiPanel"];
         };
         UiFeaturesSetting: {

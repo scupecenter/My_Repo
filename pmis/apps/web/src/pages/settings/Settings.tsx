@@ -50,6 +50,7 @@ import { MotionSettings } from './MotionSettings';
 import { AlertRules } from './AlertRules';
 import { LoginPageSettings } from './LoginPage';
 import { DataHubSettings } from './DataHubSettings';
+import { MapSettings } from './MapSettings';
 import { InterfaceSettings } from './InterfaceSettings';
 
 export interface SettingsSection { key: string; adminOnly?: boolean }
@@ -70,7 +71,7 @@ export const SETTINGS_TABS: readonly SettingsTab[] = [
   // DLP months is a data-protection rule, so it moved here from SLA
   { key: 'security', sections: [{ key: 'staff' }, { key: 'retention' }, { key: 'dlp' }, { key: 'locks' }, { key: 'support' }, { key: 'newdevice' }, { key: 'passkeys' }] },
   // Screens: what users see by default (Dashboard, Display menu of the tables, My Work Daily Plan)
-  { key: 'screens', sections: [{ key: 'dashboard' }, { key: 'tables' }, { key: 'daily-plan' }, { key: 'goals' }, { key: 'pm-schedules' }, { key: 'motion' }, { key: 'login' }, { key: 'interface' }, { key: 'data-hub' }] },
+  { key: 'screens', sections: [{ key: 'dashboard' }, { key: 'tables' }, { key: 'daily-plan' }, { key: 'goals' }, { key: 'pm-schedules' }, { key: 'motion' }, { key: 'login' }, { key: 'interface' }, { key: 'data-hub' }, { key: 'map' }] },
   { key: 'identity', sections: [] },
 ];
 
@@ -160,6 +161,7 @@ export function SettingsRoutes() {
           <Route path="login" element={<LoginPageSettings />} />
           <Route path="interface" element={<InterfaceSettings />} />
           <Route path="data-hub" element={<DataHubSettings />} />
+          <Route path="map" element={<MapSettings />} />
         </Route>
         <Route path="alerts" element={<TabFrame tab="alerts" />}>
           <Route index element={<Navigate to="policy" replace />} />
