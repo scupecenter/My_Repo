@@ -19,6 +19,12 @@ The system lives in `pmis/`. The binding rules are in [`pmis/CLAUDE.md`](pmis/CL
 6. **Whole coverage.** A feature covers every register and screen where it belongs, and has its Settings. The pull request lists each place covered and any place left out, with the reason.
 7. **Both languages.** New text has keys in `en.json` and `ar.json`.
 8. **Contract and types.** `npm run gen:api` (in `pmis/apps/web`) leaves no change in `src/api/schema.d.ts`.
+9. **Changing a SQL function.** Patch the stored text of the function with a marker, never rebuild it from an old body. See [`pmis/db/README.md`](pmis/db/README.md).
+10. **Dependencies.** A new package needs a license on the allowlist and a refreshed `pmis/THIRD_PARTY_NOTICES.md` ([`pmis/docs/ops/licenses.md`](pmis/docs/ops/licenses.md)).
+
+## Deploy and recovery
+
+Updating a server and recovering from a failed migration are in [`pmis/docs/ops/deploy-and-migrations.md`](pmis/docs/ops/deploy-and-migrations.md). Nobody deploys without the owner's permission.
 
 ## CI
 
