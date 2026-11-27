@@ -7,7 +7,10 @@ import { errText, FormDialog } from '@/components/FormDialog';
 import { canEditDisplayDefaults } from '@/components/TableStandard';
 import { useToast } from '@/components/Toast';
 import { fieldErrors } from '@/lib/fields';
+import { INBOX_TABS } from '@/lib/inboxPriority';
 import { FieldErr } from './Calendar';
+
+const INBOX_KINDS = ['mention', 'followed_change', 'task_assigned', 'task_returned', 'task_rejected', 'task_approved', 'approval_due', 'reassigned', 'absence_alert', 'idle_task_alert', 'no_holder', 'system'] as const;
 
 const SAMPLE = ['Ahmed Omran', 'سالم المصراتي', 'Nadia Ben Ali', 'خالد الزاوي', 'Tripoli CW Team'];
 
@@ -70,6 +73,30 @@ export function InterfaceSettings() {
           <FieldErr errs={errs} path="/sections/new_badge/days" />
         </label>
         <p className="flex items-center gap-2 text-sm" data-testid="ui-new-preview"><span className="chip bg-accentSoft px-1.5 py-0 text-[10px] uppercase tracking-wide text-accentText">{t('ui.new')}</span><span className="text-mute">{t('ui.new_preview')}</span></p>
+      </section>
+      <section className="card space-y-3 p-4" data-testid="ui-inbox">
+        <div>
+          <h2 className="font-bold">{t('ui.inbox_title')}</h2>
+          <p className="text-sm text-mute">{t('ui.inbox_note')}</p>
+        </div>
+        <label className="flex items-center gap-2 text-sm"><input type="checkbox" disabled={!can} data-testid="ui-inbox-tabs" checked={v.inbox.tabs_enabled} onChange={(e) => set('inbox', { tabs_enabled: e.target.checked })} />{t('ui.inbox_tabs')}</label>
+        <label className="block text-sm font-semibold">{t('ui.inbox_default_tab')}
+          <select className="input mt-1 w-auto font-normal" disabled={!can || !v.inbox.tabs_enabled} data-testid="ui-inbox-default" value={v.inbox.default_tab} onChange={(e) => set('inbox', { default_tab: e.target.value as UiFeatures['inbox']['default_tab'] })}>
+            {INBOX_TABS.map((x) => <option key={x} value={x}>{t(`inbox.tab_${x}`)}</option>)}
+          </select>
+          <FieldErr errs={errs} path="/sections/inbox/default_tab" />
+        </label>
+        <fieldset className="space-y-1" disabled={!can}>
+          <legend className="text-sm font-semibold">{t('ui.inbox_priority_kinds')}</legend>
+          <p className="text-xs text-mute">{t('ui.inbox_priority_note')}</p>
+          <div className="grid gap-1 sm:grid-cols-2">
+            {INBOX_KINDS.map((k) => (
+              <label key={k} className="flex items-center gap-2 text-sm"><input type="checkbox" data-testid={`ui-inbox-kind-${k}`} checked={v.inbox.priority_kinds.includes(k)}
+                onChange={(e) => set('inbox', { priority_kinds: e.target.checked ? [...v.inbox.priority_kinds, k] : v.inbox.priority_kinds.filter((x) => x !== k) })} />{t(`inbox.kind_${k}`)}</label>
+            ))}
+          </div>
+          <FieldErr errs={errs} path="/sections/inbox/priority_kinds" />
+        </fieldset>
       </section>
       {q.data.updated_by && <p className="text-xs text-mute" data-testid="ui-updated">{t('tstd.settings_updated', { name: q.data.updated_by.display_name, at: q.data.updated_at ?? '' })}</p>}
       {can ? (
