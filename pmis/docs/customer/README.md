@@ -9,6 +9,8 @@
 |---|---|---|
 | [01-system-overview.md](01-system-overview.md) | وثيقة وصف النظام | System overview: scope, roles, workflow, visibility, registers, documents, sign-in, configuration, NFRs, rollout |
 | [02-change-log-for-customer.md](02-change-log-for-customer.md) | سجل التعديلات للعميل (منذ 2026-10-24) | Customer change log grouped by topic, with decision codes |
+| [05-training-ar.md](05-training-ar.md) | مادة التدريب | Arabic training material per role |
+| [06-admin-guide-ar.md](06-admin-guide-ar.md) | دليل مدير النظام | Arabic administrator guide |
 | [03-architecture-and-data.md](03-architecture-and-data.md) | البنية ومخطط البيانات | Architecture, authentication, authorization/RLS, data entities, audit, backups, integrations, IT needs |
 | [06-site-map-tiles.md](06-site-map-tiles.md) | خريطة المواقع على بلاطات من خادمك | Site map on map tiles served from your own server (off by default) |
 
@@ -17,7 +19,6 @@
 | الوثيقة | التوقيت | Document | When |
 |---|---|---|---|
 | دليل المستخدم لكل دور | بعد P2 | User manual per role | after P2 |
-| دليل مدير النظام | بعد P2 | Admin guide | after P2 |
 | مرجع الشيفرة للمطوّرين (يُولَّد من الشيفرة) | من P1 | Developer code reference (generated from code) | from P1 |
 | دليل التشغيل (Runbook) | P3 | Operations runbook | P3 |
 
