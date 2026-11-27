@@ -126,6 +126,8 @@ test('layout panel walk: a register (procurement) chart mode, EN and AR', async 
   await page.getByTestId('register-view').click();
   await expect(page.getByTestId('register-chart-axis')).toBeVisible();
   await page.screenshot({ path: 'test-results/walk-chart-register-ar.png' });
+});
+
 test('layout panel walk: calendar view on Sites and a register, EN and AR', async ({ page }) => {
   await signIn(page);
 
