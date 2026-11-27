@@ -277,6 +277,11 @@ const OPS_CATALOGUE: { key: string; group: string; unit: string; default: number
   { key: 'prefill.max_sites', group: 'rows', unit: 'sites', default: 5000, min: 100, max: 50000 },
   { key: 'export.max_rows', group: 'exports', unit: 'rows', default: 100000, min: 1000, max: 1000000 },
   { key: 'idempotency.max_entries', group: 'exports', unit: 'entries', default: 5000, min: 500, max: 100000 },
+  { key: 'login.ip_attempts', group: 'sessions', unit: 'attempts', default: 10, min: 3, max: 100 },
+  { key: 'login.ip_window_seconds', group: 'sessions', unit: 'seconds', default: 900, min: 60, max: 86400 },
+  { key: 'login.ip_base_seconds', group: 'sessions', unit: 'seconds', default: 2, min: 1, max: 60 },
+  { key: 'login.ip_max_seconds', group: 'sessions', unit: 'seconds', default: 60, min: 5, max: 3600 },
+  { key: 'login.identifier_attempts', group: 'sessions', unit: 'attempts', default: 5, min: 3, max: 50 },
 ];
 const opsLimits: { stored: Record<string, number>; version: number; updated_at: string | null; updated_by: { id: string; display_name: string; employee_id: string | null } | null } =
   { stored: {}, version: 1, updated_at: null, updated_by: null };
