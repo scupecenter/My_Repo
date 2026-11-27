@@ -66,7 +66,7 @@ describe('Settings > Interface > Inbox tabs and priority', () => {
   it('an admin turns a kind into priority, picks the first tab, and saves the inbox section with a reason', async () => {
     await signIn('pm');
     const u = userEvent.setup();
-    const puts: { body: any }[] = [];
+    const puts: { body: { sections: { inbox: unknown } } }[] = [];
     server.events.on('request:start', async ({ request }) => { if (request.method === 'PUT' && request.url.endsWith('/settings/ui-features')) puts.push({ body: await request.clone().json() }); });
     settings();
     await screen.findByTestId('ui-inbox');
