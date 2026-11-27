@@ -102,3 +102,21 @@ BEGIN
     GRANT EXECUTE ON FUNCTION dashboard_settings_catalogue() TO pmis_app;
   END IF;
 END $$;
+
+
+-- ---------------------------------------------------------------------------------------------------------------------
+-- Data reset coverage (0152): home_view_pins is a personal display preference (KEEP, with saved_views). data_reset_plan() is
+-- an accumulating function: patch the stored text idempotently (0361 pattern), never redefine it from an old base.
+DO $$
+DECLARE def text;
+BEGIN
+  def := pg_get_functiondef('public.data_reset_plan()'::regprocedure);
+  IF position('''home_view_pins''' IN def) = 0 THEN
+    IF position('''saved_views''' IN def) = 0 THEN RAISE EXCEPTION 'data_reset_plan: the keep list anchor was not found'; END IF;
+    def := replace(def, '''saved_views''', '''saved_views'', ''home_view_pins''');
+  END IF;
+  EXECUTE def;
+END $$;
+
+-- the reset role reads every classified table and takes the share lock of a KEEP table (0152 privilege check)
+GRANT SELECT, UPDATE ON public.home_view_pins TO pmis_reset_owner;
