@@ -39,6 +39,7 @@ const deleteBody = z.object({ reason }).strict();
 const orderBody = z.object({ codes: z.array(code).min(1).max(500), reason }).strict();
 const sectionCreate = z.object({ name_en: label, name_ar: label.nullable().optional(), sort_order: z.number().int().min(0).max(100000).optional(), reason }).strict();
 const sectionPatch = z.object({ name_en: label.optional(), name_ar: label.nullable().optional(), sort_order: z.number().int().min(0).max(100000).optional(), reason }).strict();
+const stateBody = z.object({ enabled: z.boolean().optional(), locked: z.boolean().optional(), reason }).strict().refine((b) => b.enabled !== undefined || b.locked !== undefined, 'Say what to change: enabled, locked or both.');
 const renameBody = z.object({ name_en: label.optional(), name_ar: label.nullable().optional(), reason }).strict();
 
 const slug = (s: string, max: number): string => s.normalize('NFKD').replace(/[^A-Za-z0-9]+/g, ' ').trim().split(' ').filter(Boolean).map((w) => w[0]!.toUpperCase() + w.slice(1)).join('').slice(0, max);
@@ -173,5 +174,18 @@ export class RegisterColumnsService {
     const { reason: why, ...b } = parse(renameBody, raw);
     await this.access.requireAdmin('fields', 'edit');
     return this.door(Prisma.sql`SELECT admin_reg_definition_rename(${key}::text, ${JSON.stringify(b)}::jsonb, ${why}::text, ${this.optionalVersion(ifMatch)}::int) AS r`);
+  }
+
+  /** 0381: every register, disabled ones included, with its enabled and locked state (System Admin or a delegate of `fields.edit` for all regions). */
+  async states(): Promise<Json> {
+    await this.access.requireAdmin('fields', 'edit');
+    return this.door(Prisma.sql`SELECT reg_state_json() AS r`);
+  }
+
+  /** 0381: enable or disable (hide, nothing deleted) and lock or unlock one register; a reason, the ETag and the audit are the database's. */
+  async setState(key: string, ifMatch: string | undefined, raw: unknown): Promise<Json> {
+    const { reason: why, enabled, locked } = parse(stateBody, raw);
+    await this.access.requireAdmin('fields', 'edit');
+    return this.door(Prisma.sql`SELECT admin_register_state(${key}::text, ${enabled ?? null}::boolean, ${locked ?? null}::boolean, ${why}::text, ${this.optionalVersion(ifMatch)}::int) AS r`);
   }
 }

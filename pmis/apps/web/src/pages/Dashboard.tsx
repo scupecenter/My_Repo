@@ -43,6 +43,7 @@ import { OpsPermitsCard } from "./dashboardPermits";
 import { OpsReadinessCard } from "./dashboardReadiness";
 import { OpsScorecardCard } from "./dashboardScorecard";
 import { OpsQualityCard } from "./dashboardQuality";
+import { OpsApprovalsCard } from "./dashboardApprovals";
 import { useDashboardSettings } from "@/api/dashboardSettings";
 import { GoalsPanel } from "@/components/GoalsPanel";
 import { SavedViews } from "@/components/SavedViews";
@@ -1445,6 +1446,13 @@ export function Dashboard() {
                 <>
                   {/* 0.15.203 (owner approval 2026-11-26, item 6): open snags and NCR, average closure age, first-time acceptance */}
                   <OpsQualityCard ops={ops.data} />
+                </>
+              ),
+
+              ops_approvals: (
+                <>
+                  {/* 0.15.204 (owner approval 2026-11-26, item 7): tasks waiting review or approval, ages per ball-in-court role */}
+                  <OpsApprovalsCard ops={ops.data} />
                 </>
               ),
 
