@@ -3,9 +3,10 @@ import { ArrowRight, Check, Send, ShieldCheck, Trash2, Undo2 } from 'lucide-reac
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router-dom';
-import { useBatch, useBatches, useBatchRows, useDecideBatch, useParseJob, useRegisterDefs, useSubmitBatch } from '@/api/registers';
+import { downloadErrorReport, useBatch, useBatches, useBatchRows, useDecideBatch, useParseJob, useRegisterDefs, useSubmitBatch } from '@/api/registers';
 import { batchPath, type ImportBatch, type ImportBatchOutcome, type ImportRow, type RegisterDefinition } from '@/api/types';
 import { batchTotals, BatchProgress } from '@/components/BatchProgress';
+import { BatchEmpty, BatchKpiCards, BatchSkeleton, BatchStepper, BatchToolbar, filterRows, searchRows, SelectionBar, sortRows, type BatchShow, type BatchSort } from '@/components/BatchReview';
 import { useBatchValueFormat, type ShowValue } from '@/components/batchFormat';
 import { AdminApproveDialog } from '@/components/AdminApproveDialog';
 import { RejectDialog } from '@/components/RejectDialog';
@@ -17,6 +18,7 @@ import { useMe } from '@/api/hooks';
 import { isAdmin } from '@/lib/perm';
 import { registerErrorMessage } from '@/lib/registerErrors';
 import { ImportSitesPanel } from '@/components/WorkflowLocks';
+import { ScreenSettingsLink } from '@/components/ScreenSettingsLink';
 
 
 const ACTION_TONE: Record<string, string> = { create: 'bg-doneBg text-doneInk', update: 'bg-openBg text-openInk', unchanged: 'bg-lockBg text-lockInk', error: 'bg-lateBg text-lateInk' };
@@ -24,6 +26,7 @@ const DECISION_TONE: Record<string, string> = { approved: 'bg-doneBg text-doneIn
 const SENT = ['in_approval', 'partially_approved', 'approved', 'rejected', 'in_review'];
 /** One file row of a stream batch gives one batch row per touched task, so a row is identified by its number and its task. */
 export const rowId = (r: Pick<ImportRow, 'row_no' | 'task_code'>): string => (r.task_code ? `${r.row_no}-${r.task_code}` : String(r.row_no));
+const totalRowsOf = (c: ReturnType<typeof batchTotals>) => c.rows;
 const humanize = (code: string) => { const s = code.replace(/_/g, ' '); return s.charAt(0).toUpperCase() + s.slice(1); };
 
 /** The per-cell diff of one row: the field (by its label), what it was and what the file makes it. A new row lists the values it brings. */
@@ -86,8 +89,6 @@ export function RowWarnings({ row }: { row: ImportRow }) {
   );
 }
 
-const STEP_OF: Record<string, number> = { validated: 1, processing: 2, in_approval: 2, partially_approved: 2, in_review: 2, approved: 3, rejected: 3, discarded: 3, applied: 3 };
-
 /** Batch review (RE-05, RE-06): the preview with the diff per cell and the reasons per cell, then send it into the flow, and L2 approves row by row or all at once. */
 export function RegisterBatch() {
   const { t, i18n } = useTranslation();
@@ -102,8 +103,12 @@ export function RegisterBatch() {
   const siteBatch = b?.entity === 'site'; // a New sites batch (contract 0.14.0): its rows are site drafts, and a site is created when L2 approves a row
   const rows = useBatchRows(batchId, !!b && !upload);
   const submit = useSubmitBatch(), decide = useDecideBatch();
-  const [show, setShow] = useState<'all' | 'valid' | 'invalid' | 'held'>('all');
-  const [returning, setReturning] = useState<'all' | string | null>(null);
+  const [show, setShow] = useState<BatchShow>('all');
+  const [query, setQuery] = useState('');
+  const [sort, setSort] = useState<BatchSort>('row');
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [reportBusy, setReportBusy] = useState(false);
+  const [returning, setReturning] = useState<'all' | 'selected' | string | null>(null);
   const [adminOpen, setAdminOpen] = useState(false);
   const admin = isAdmin(useMe(true).data);
   const [outcome, setOutcome] = useState<(ImportBatchOutcome & { held: NonNullable<ImportBatchOutcome['held']>; failed: NonNullable<ImportBatchOutcome['failed']> }) | null>(null);
@@ -115,8 +120,9 @@ export function RegisterBatch() {
   // every number on the page comes from the server counts of the batch, never from the rows that happen to be loaded (the filters below only filter the loaded rows)
   const c = batchTotals(b?.counts ?? {});
   const validN = c.valid, invalidN = c.error, heldN = c.held, decidableN = c.create + c.update, openN = c.pending;
-  const held = all.filter((r) => (r.action === 'create' || r.action === 'update') && r.decision === 'pending_previous_approval');
-  const shown = show === 'valid' ? all.filter((r) => r.action !== 'error') : show === 'invalid' ? all.filter((r) => r.action === 'error') : show === 'held' ? held : all;
+  const held = filterRows(all, 'held');
+  const shown = sortRows(searchRows(filterRows(all, show), query), sort);
+  const tabCounts: Record<BatchShow, number> = { all: totalRowsOf(c), valid: validN, invalid: Math.max(0, invalidN - (b?.counts.duplicate ?? 0)), duplicate: b?.counts.duplicate ?? 0, held: heldN, warnings: all.filter((r) => !!r.warnings?.length).length };
   const sent = !!b && SENT.includes(b.status);
   // a big batch (a New sites file of ~500 rows) is windowed: only the rows in view are drawn
   const BIG = 300, ROW_H = 76, virtual = shown.length > BIG;
@@ -133,16 +139,25 @@ export function RegisterBatch() {
   const act = (x: ImportBatch, req: Parameters<typeof decide.mutate>[0]['req'], done?: string) =>
     decide.mutate({ batch: x, req }, { onSuccess: (r) => { ok(r.outcome); if (r.status === 'processing') toast(t('batch.processing_started')); else if (done) toast(done); }, onError: fail });
 
+  // P8: only an open row of a sent batch can be ticked; the bar sends the same row decisions as the row buttons
+  const decidingOpen = !!b && sent && (b.status === 'in_approval' || b.status === 'partially_approved');
+  const selectable = (r: ImportRow) => decidingOpen && (r.action === 'create' || r.action === 'update') && r.decision === 'pending' && !!(r.record_id || stream || siteBatch);
+  const pickable = shown.filter(selectable);
+  const picks = [...picked].filter((id) => all.some((r) => r.id === id && selectable(r)));
+  const toggle = (id: string) => setPicked((p0) => { const n = new Set(p0); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const allPicked = pickable.length > 0 && pickable.every((r) => picked.has(r.id));
+  const report = () => { setReportBusy(true); downloadErrorReport(batchId).catch(fail).finally(() => setReportBusy(false)); };
+  const clearFilters = () => { setShow('all'); setQuery(''); };
   if (batch.isError) return <div data-testid="page-register-batch"><p role="alert" className="text-lateInk">{t('regErrors.not_found')}</p>{back}</div>;
   if (b && upload) return <UploadStaging batch={b} routeId={batchId} />;
-  const step = b ? (STEP_OF[b.status] ?? 1) : 1;
   return (
     <div data-testid="page-register-batch" data-status={b?.status}>
       <div className="mb-3 flex flex-wrap items-center gap-3">
         <div className="flex-1"><h1 className="text-2xl font-bold">{t('batch.title', { name })}</h1><p className="text-mute">{b?.file_name} {b && `· ${b.template_id} v${b.template_version}`}</p></div>
+        <ScreenSettingsLink screen="batch" />
         {back}
       </div>
-      {!b ? <p className="card p-6 text-mute" data-testid="batch-parsing">{t('batch.parsing')}</p> : (
+      {!b ? <><p className="mb-2 text-mute" data-testid="batch-parsing">{t('batch.parsing')}</p><BatchSkeleton /></> : (
         <>
           {!!b.group_id && !!group.data?.items.length && (
             <nav className="mb-3 flex flex-wrap items-center gap-2 text-sm" data-testid="batch-group" aria-label={t('batch.group')}>
@@ -153,24 +168,15 @@ export function RegisterBatch() {
               ))}
             </nav>
           )}
-          <ol className="mb-3 flex flex-wrap gap-2 text-sm" data-testid="batch-steps" aria-label={t('batch.steps')}>
-            {[1, 2, 3].map((n) => (
-              <li key={n} aria-current={step === n ? 'step' : undefined} data-step={n} className={`chip ${step === n ? 'bg-accentSoft text-accentText' : step > n ? 'bg-doneBg text-doneInk' : 'bg-card2 text-mute'}`}>{n}. {t(`batch.step_${n}`)}</li>
-            ))}
-          </ol>
+          <BatchStepper batch={b} />
           {b.older_template && <OlderTemplateNote info={b.older_template} />}
           <BatchProgress batch={b} job={job} site={siteBatch} />
+          <BatchKpiCards batch={b} />
           <div className="mb-3 flex flex-wrap items-center gap-2" data-testid="batch-counts">
             <span className="chip bg-lockBg text-lockInk" data-testid="batch-status">{t(`batchStatus.${b.status}`, { defaultValue: b.status })}</span>
-            <span className="chip bg-doneBg text-doneInk" data-testid="batch-count-valid">{t('batch.valid', { count: validN })}</span>
-            <span className="chip bg-lateBg text-lateInk" data-testid="batch-count-invalid">{t('batch.invalid', { count: invalidN })}</span>
-            <span className="chip bg-card2" data-testid="batch-count-diff">{t('batch.diff', { create: b.counts.create ?? 0, update: b.counts.update ?? 0, unchanged: b.counts.unchanged ?? 0 })}</span>
-            {!!heldN && <span className="chip bg-lockBg text-lockInk" data-testid="batch-count-held">{t('batch.held_count', { count: heldN })}</span>}
             {rows.loadingMore && <span className="chip bg-card2 text-mute" role="status" data-testid="batch-loading-rows">{t('batchProgress.loading_rows', { loaded: all.length, total: totalRows })}</span>}
             {b.historical_load && <span className="chip bg-waitBg text-waitInk" data-testid="batch-historical" title={b.historical_load.reason}>{t('hw.batch_chip', { cutoff: b.historical_load.cutoff_date })}</span>}
-            <div role="tablist" className="ms-auto flex gap-1">
-              {(['all', 'valid', 'invalid', ...(heldN ? ['held'] : [])] as const).map((s) => <button key={s} role="tab" aria-selected={show === s} data-testid={`batch-show-${s}`} className={`btn px-3 py-1 text-xs ${show === s ? 'btn-primary' : ''}`} onClick={() => setShow(s as typeof show)}>{t(`batch.show_${s}`)}</button>)}
-            </div>
+
           </div>
           {b.status === 'validated' && (
             <div className="mb-3 flex flex-wrap items-center gap-3 rounded-md bg-card2 p-3 text-sm">
@@ -220,15 +226,21 @@ export function RegisterBatch() {
           {b.status === 'approved' && <p className="mb-3 rounded-md bg-doneBg p-3 text-doneInk" data-testid="batch-done">{t('batch.done')}</p>}
           {b.status === 'rejected' && <p className="mb-3 rounded-md bg-lateBg p-3 text-lateInk" data-testid="batch-rejected">{t('batch.rejected')}{b.note ? ` ${b.note}` : ''}</p>}
           {b.status === 'discarded' && <p className="mb-3 rounded-md bg-card2 p-3 text-mute" data-testid="batch-discarded">{t('batch.discarded')}</p>}
+          <BatchToolbar show={show} onShow={setShow} counts={tabCounts} query={query} onQuery={setQuery} sort={sort} onSort={setSort} onReport={report} reportBusy={reportBusy} reportable={invalidN > 0} />
+          <SelectionBar count={picks.length} busy={decide.isPending}
+            onClear={() => setPicked(new Set())}
+            onApprove={() => { const ids = picks; setPicked(new Set()); act(b, { action: 'approve', scope: 'rows', rows: ids.map((row_id) => ({ row_id, decision: 'approved' as const })) }, t('approvals.done')); }}
+            onReturn={() => setReturning('selected')} />
           <div className={`card overflow-x-auto ${virtual ? 'max-h-[70vh] overflow-y-auto' : ''}`} data-testid="batch-scroller" data-loaded={all.length} data-total={totalRows} onScroll={virtual ? v.onScroll : undefined}>
             <table className="w-full min-w-[820px] text-sm" data-testid="batch-table">
-              <thead className="bg-card2 text-mute"><tr>{['row', 'key', 'result', 'changes', 'reason', 'decision', ''].map((c) => <th key={c} className="p-2 text-start">{c ? t(`batch.col_${c}`) : ''}</th>)}</tr></thead>
+              <thead className="bg-card2 text-mute"><tr>{decidingOpen && <th className="w-8 p-2"><input type="checkbox" data-testid="batch-select-all" aria-label={t('batchReview.select_all')} checked={allPicked} disabled={!pickable.length} onChange={() => setPicked(allPicked ? new Set() : new Set(pickable.map((r) => r.id)))} /></th>}{['row', 'key', 'result', 'changes', 'reason', 'decision', ''].map((c) => <th key={c} className="p-2 text-start">{c ? t(`batch.col_${c}`) : ''}</th>)}</tr></thead>
               <tbody>
                 {virtual && v.start > 0 && <tr aria-hidden style={{ height: v.start * ROW_H }} />}
                 {visible.map((r) => {
                   const canDecide = sent && (b.status === 'in_approval' || b.status === 'partially_approved') && (r.action === 'create' || r.action === 'update');
                   return (
                     <tr key={r.id} className="border-t border-line align-top" data-testid={`batch-row-${rowId(r)}`} data-action={r.action} data-decision={r.decision} data-source={r.source_ref ?? ''}>
+                      {decidingOpen && <td className="p-2">{selectable(r) ? <input type="checkbox" data-testid={`batch-select-${rowId(r)}`} aria-label={t('batchReview.select_row', { n: r.row_no })} checked={picked.has(r.id)} onChange={() => toggle(r.id)} /> : null}</td>}
                       <td className="mono p-2">{r.source_ref && b.group_id ? r.source_ref : r.row_no}</td>
                       <td className="mono p-2 font-semibold">{r.key ?? '—'}</td>
                       <td className="p-2"><span className={`chip ${ACTION_TONE[r.action]}`}>{t(`batch.action_${r.action}`)}</span></td>
@@ -261,14 +273,16 @@ export function RegisterBatch() {
                 {virtual && v.end < shown.length && <tr aria-hidden style={{ height: (shown.length - v.end) * ROW_H }} />}
               </tbody>
             </table>
-            {rows.complete && !shown.length && <p className="p-4 text-center text-mute">{t('registers.empty')}</p>}
+            {!rows.isSuccess && !rows.isError && <BatchSkeleton />}
+            {rows.complete && !shown.length && <BatchEmpty show={show} query={query} onClear={clearFilters} />}
           </div>
           <AdminApproveDialog open={adminOpen} count={openN} busy={decide.isPending} onClose={() => setAdminOpen(false)}
             onSend={(note) => { setAdminOpen(false); act(b, { action: 'admin_approve', scope: 'all', note }, t('batch.admin_done')); }} />
-          <RejectDialog open={returning !== null} title={returning === 'all' ? t('batch.reject_all_title') : t('batch.return_row_title')} onClose={() => setReturning(null)}
+          <RejectDialog open={returning !== null} title={returning === 'all' ? t('batch.reject_all_title') : returning === 'selected' ? t('batchReview.return_selected_title', { count: picks.length }) : t('batch.return_row_title')} onClose={() => setReturning(null)}
             onSend={(note) => {
               const target = returning; setReturning(null);
               if (!target) return;
+              if (target === 'selected') { const ids = picks; setPicked(new Set()); act(b, { action: 'reject', scope: 'rows', rows: ids.map((row_id) => ({ row_id, decision: 'rejected' as const, note })), note }); return; }
               act(b, target === 'all' ? { action: 'reject', scope: 'all', note } : { action: 'reject', scope: 'rows', rows: [{ row_id: target, decision: 'rejected', note }], note });
             }} />
         </>
