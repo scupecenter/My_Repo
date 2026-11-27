@@ -205,7 +205,7 @@ export function Shell() {
           <nav aria-label="breadcrumb" data-testid="breadcrumb" className="min-w-0 text-sm text-mute">
             <ol className="flex flex-wrap items-center gap-1">
               <li><Link className="hover:text-ink" to="/my-work">{t('app.name')}</Link></li>
-              {current && groupFirst && <li className="flex gap-1"><span aria-hidden>/</span><Link className="hover:text-ink" to={groupFirst.to}>{t(`nav.group_${current.group}`)}</Link></li>}
+              {current && groupFirst && t(`nav.group_${current.group}`) !== t(`nav.${current.key}`) && <li className="flex gap-1"><span aria-hidden>/</span><Link className="hover:text-ink" to={groupFirst.to}>{t(`nav.group_${current.group}`)}</Link></li>}
               {current && <li className="flex gap-1"><span aria-hidden>/</span>{view || stream
                 ? <Link className="hover:text-ink" to={sideItems.find((i) => i.key === current.key)?.to ?? current.to}>{t(`nav.${current.key}`)}</Link>
                 : <b className="text-ink" aria-current="page">{t(`nav.${current.key}`)}</b>}</li>}
