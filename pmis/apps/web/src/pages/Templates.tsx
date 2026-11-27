@@ -1,4 +1,5 @@
 import { FileDown, FileSpreadsheet, FileUp } from 'lucide-react';
+import { useDownloadGate } from '@/lib/downloadGate';
 import { Fragment, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
@@ -27,6 +28,7 @@ const ownScreen = (k: ReturnType<typeof kindOf>): k is 'list_values' | 'holidays
  * The Site Register templates come first: the whole Master and one per stream (contract 0.11.5); then the template of each register.
  */
 export function TemplatesPage() {
+  const gate = useDownloadGate();
   const { t, i18n } = useTranslation();
   const toast = useToast();
   const nav = useNavigate();
@@ -78,8 +80,8 @@ export function TemplatesPage() {
                     <td className="p-2 text-mute">{dateOf(x.issued_at)}</td>
                     <td className="p-2">
                       <span className="flex flex-wrap gap-1">
-                        <button className="btn px-2 py-1 text-xs" data-testid={`tpl-download-${x.template_id}`} onClick={() => void down(x, false)}><FileDown size={14} />{t('registers.template_download')}</button>
-                        {!ownScreen(kind) && <button className="btn px-2 py-1 text-xs" data-testid={`tpl-prefill-${x.template_id}`} onClick={() => void down(x, true)}><FileSpreadsheet size={14} />{t('registers.template_prefill')}</button>}
+                        <button className="btn px-2 py-1 text-xs" data-testid={`tpl-download-${x.template_id}`} disabled={gate.templatesLocked} title={gate.note(gate.templatesLocked)} onClick={() => void down(x, false)}><FileDown size={14} />{t('registers.template_download')}</button>
+                        {!ownScreen(kind) && <button className="btn px-2 py-1 text-xs" data-testid={`tpl-prefill-${x.template_id}`} disabled={gate.templatesLocked} title={gate.note(gate.templatesLocked)} onClick={() => void down(x, true)}><FileSpreadsheet size={14} />{t('registers.template_prefill')}</button>}
                         {!ownScreen(kind) && <button className="btn px-2 py-1 text-xs" data-testid={`tpl-upload-${x.template_id}`} onClick={() => setUploadFor(x)}><FileUp size={14} />{t('registers.template_upload')}</button>}
                       </span>
                     </td>

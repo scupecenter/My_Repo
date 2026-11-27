@@ -1,10 +1,10 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import { AlertTriangle, ArrowRightLeft, Ban, Check, FilePlus2, HandMetal, Save, Undo2, UserMinus, X, Clock, Link2 } from 'lucide-react';
+import { AlertTriangle, ArrowRightLeft, Ban, Check, FilePlus2, GitMerge, HandMetal, Inbox, Save, Undo2, UserMinus, X, Clock, Link2 } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useSession } from '@/api/hooks';
-import { useCancelSnagRecord, useCreateRecord, useNewVersion, useRecordClaim, useRecordHistory, useRecordOp, useRecordTransfer, useRegisterRecord, useUpdateRecord, useContractorCompanies, type RecordOp } from '@/api/registers';
+import { useCancelSnagRecord, useCreateRecord, useNewVersion, useRecordClaim, useRecordHistory, useRecordOp, useRecordTriage, useRecordTransfer, useRegisterRecord, useRegisterRecords, useUpdateRecord, useContractorCompanies, type RecordOp, type TriageOp } from '@/api/registers';
 import { useMatrix } from '@/api/sites';
 import { useAddRegisterComment, useRegisterComments } from '@/api/x';
 import type { RegisterDefinition, RegisterRecord } from '@/api/types';
@@ -31,6 +31,8 @@ import { RejectDialog } from './RejectDialog';
 import { useToast } from './Toast';
 
 export const STATE_TONE: Record<string, string> = { entry: 'bg-lockBg text-lockInk', in_review: 'bg-waitBg text-waitInk', in_approval: 'bg-openBg text-openInk', approved: 'bg-doneBg text-doneInk', voided: 'bg-lateBg text-lateInk' };
+/** 0.15.240: the intake-triage states of a record of a triage-enabled register (Issue Log, Change Control). */
+export const TRIAGE_TONE: Record<string, string> = { pending: 'bg-waitBg text-waitInk', deferred: 'bg-waitBg text-waitInk', accepted: 'bg-doneBg text-doneInk', rejected: 'bg-lateBg text-lateInk', merged: 'bg-lockBg text-lockInk' };
 type Data = Record<string, unknown>;
 type SiteSel = { id: string; code: string; region_id?: number } | null;
 
@@ -82,6 +84,51 @@ function Warnings({ record, labelOf }: { record: RegisterRecord; labelOf: (code:
   );
 }
 
+/** 0.15.240: defer (note optional), reject (note) and merge (the surviving record + a note) all ask first; accept is one tap. */
+function TriageDialog({ open, op, registerKey, selfId, onClose, onSend }: { open: boolean; op: TriageOp | null; registerKey: string; selfId: string; onClose: () => void; onSend: (note: string, duplicateOf?: string) => void }) {
+  const { t } = useTranslation();
+  const [note, setNote] = useState('');
+  const [dup, setDup] = useState('');
+  const [err, setErr] = useState('');
+  const merging = op === 'merge';
+  const list = useRegisterRecords(registerKey, { q: '', region_id: '', state: '', record_type: '' }, open && merging);
+  const candidates = (list.data?.pages.flatMap((p) => p.items) ?? []).filter((r) => r.id !== selfId && r.state !== 'voided' && r.triage?.state !== 'merged' && r.triage?.state !== 'rejected');
+  const send = () => {
+    if (merging && !dup) { setErr('required'); return; }
+    if ((op === 'reject' || merging) && !note.trim()) { setErr('note'); return; }
+    onSend(note.trim(), merging ? dup : undefined);
+  };
+  return (
+    <Dialog.Root open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-[70] bg-scrim/60" />
+        <Dialog.Content data-testid="triage-dialog" className="card fixed inset-x-0 top-1/4 z-[70] mx-auto w-[min(460px,92vw)] space-y-3 p-5">
+          <Dialog.Title className="font-bold">{op ? t(`registers.triage_${op}_title`) : ''}</Dialog.Title>
+          <Dialog.Description className="sr-only">{t('registers.triage_title')}</Dialog.Description>
+          {merging && (
+            <div>
+              <label htmlFor="triage-dup" className="text-sm font-semibold">{t('registers.triage_merge_pick')} *</label>
+              <select id="triage-dup" data-testid="triage-dup" className="input" value={dup} onChange={(e) => { setDup(e.target.value); setErr(''); }}>
+                <option value="">{t('registers.choose')}</option>
+                {candidates.map((r) => <option key={r.id} value={r.id}>{[r.site_code, r.record_type?.toUpperCase(), `v${r.version_no ?? 1}`].filter(Boolean).join(' · ')}</option>)}
+              </select>
+            </div>
+          )}
+          <div>
+            <label htmlFor="triage-note" className="text-sm font-semibold">{op === 'defer' ? t('registers.triage_note_optional') : t('approvals.note')}</label>
+            <textarea id="triage-note" data-testid="triage-note" className="input min-h-24" value={note} onChange={(e) => { setNote(e.target.value); setErr(''); }} />
+          </div>
+          {err && <p role="alert" data-testid="triage-error" className="text-lateInk">{err === 'note' ? t('approvals.note_required') : t('regErrors.required', { field: t('registers.triage_merge_pick') })}</p>}
+          <div className="flex justify-end gap-2">
+            <button className="btn" onClick={onClose}>{t('common.cancel')}</button>
+            <button className={`btn ${op === 'reject' ? 'btn-danger' : 'btn-primary'}`} data-testid="triage-send" onClick={send}>{t('registers.triage_send')}</button>
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+}
+
 function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; record: RegisterRecord | null; onCreated: (id: string) => void }) {
   const { t, i18n } = useTranslation();
   const toast = useToast();
@@ -90,7 +137,7 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
   const rk = key;
   const session = useSession().data;
   const matrix = useMatrix().data;
-  const create = useCreateRecord(key), update = useUpdateRecord(key), op = useRecordOp(key), cancelSnag = useCancelSnagRecord(), claim = useRecordClaim(key), newVersion = useNewVersion(key), transfer = useRecordTransfer(key);
+  const create = useCreateRecord(key), update = useUpdateRecord(key), op = useRecordOp(key), cancelSnag = useCancelSnagRecord(), claim = useRecordClaim(key), newVersion = useNewVersion(key), transfer = useRecordTransfer(key), triageOp = useRecordTriage(key);
   const hist = useRecordHistory(key, record?.id ?? null);
   const comments = useRegisterComments(key, record?.id ?? '', !!record?.region_id);
   const addComment = useAddRegisterComment(key, record?.id ?? '');
@@ -112,6 +159,7 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
   const [tried, setTried] = useState(false);
   const [server, setServer] = useState<Record<string, FieldIssue>>({});
   const [rejecting, setRejecting] = useState(false);
+  const [triaging, setTriaging] = useState<TriageOp | null>(null);
   const [voiding, setVoiding] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [tab, setTab] = useState('data');
@@ -180,7 +228,16 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
     } else if (dirty) update.mutate({ record, patch: { data: patchData(def, record.data, typed(data)), ...(party !== (record.external_party?.id ?? '') ? { external_party_id: party || null } : {}) } }, { onSuccess: (r) => { setDirty(false); run('submit', r); }, onError: fail });
     else run('submit', record);
   };
-  const busy = create.isPending || update.isPending || op.isPending || cancelSnag.isPending || claim.isPending || newVersion.isPending || transfer.isPending;
+  const busy = create.isPending || update.isPending || op.isPending || cancelSnag.isPending || claim.isPending || newVersion.isPending || transfer.isPending || triageOp.isPending;
+  const triageState = record?.triage?.state;
+  const triageWaiting = triageState === 'pending' || triageState === 'deferred';
+  const triageRun = (o: TriageOp, note?: string, duplicateOf?: string) => {
+    if (!record) return;
+    triageOp.mutate({ record, op: o, note, duplicate_of: duplicateOf }, {
+      onSuccess: () => { toast(t('registers.triage_done')); setTriaging(null); },
+      onError: (e) => { setTriaging(null); fail(e); },
+    });
+  };
   const claimedBy = record?.ball_in_court?.claimed_by;
   const mine = claimedBy?.id === session?.user?.id;
   const canClaim = !!record && (act('review') || act('approve')) && !claimedBy && (record.ball_in_court?.holders.length ?? 0) > 1;
@@ -212,6 +269,26 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
         {record && key === 'hlc' && <HlcPurchaseRequest record={record} />}
         {record && key === 'hlc' && <HlcPurchaseRequests record={record} />}
         {record && <Warnings record={record} labelOf={labelOf} />}
+        {record && triageState && (
+          <section className={`rounded-md p-3 text-sm ${triageWaiting ? 'bg-waitBg text-waitInk' : 'bg-card2'}`} data-testid="reg-triage" aria-label={t('registers.triage_title')}>
+            <div className="mb-1 flex flex-wrap items-center gap-2 font-semibold">
+              <Inbox size={14} />{t('registers.triage_title')}
+              <span className={`chip ${TRIAGE_TONE[triageState]}`} data-testid="reg-triage-state">{t(`triageState.${triageState}`)}</span>
+            </div>
+            {triageWaiting && <p data-testid="reg-triage-hint">{t('registers.triage_hint')}</p>}
+            {!triageWaiting && record.triage?.by && <p className="text-mute" data-testid="reg-triage-by">{t('registers.triage_decision_line', { action: t(`triageState.${triageState}`), name: record.triage.by.display_name, date: record.triage.at ?? '' })}</p>}
+            {record.triage?.note && <p className="mt-1 whitespace-pre-line text-mute" data-testid="reg-triage-note">{record.triage.note}</p>}
+            {record.triage?.duplicate_of && <Link className="mt-1 inline-block font-semibold underline" data-testid="reg-triage-dup" to={`/registers/${key}?record=${record.triage.duplicate_of}`}>{t('registers.triage_duplicate_of')}</Link>}
+            {triageWaiting && act('triage') && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button className="btn btn-primary" data-testid="triage-accept" disabled={busy} onClick={() => triageRun('accept')}><Check size={16} />{t('registers.triage_accept')}</button>
+                <button className="btn" data-testid="triage-defer" disabled={busy} onClick={() => setTriaging('defer')}><Clock size={16} />{t('registers.triage_defer')}</button>
+                <button className="btn" data-testid="triage-merge" disabled={busy} onClick={() => setTriaging('merge')}><GitMerge size={16} />{t('registers.triage_merge')}</button>
+                <button className="btn btn-danger" data-testid="triage-reject" disabled={busy} onClick={() => setTriaging('reject')}><Ban size={16} />{t('registers.triage_reject')}</button>
+              </div>
+            )}
+          </section>
+        )}
         {record && act('transfer') && <p className="rounded-md bg-waitBg p-3 text-sm text-waitInk" data-testid="reg-transfer-note">{t('registers.transfer_note')}</p>}
         {record && key === 'meetings' && <LegacyConversion record={record} canEdit={act('edit')} />}
         {record?.last_return_note && record.state === 'entry' && <div className="rounded-md bg-lateBg p-3 text-sm text-lateInk" data-testid="reg-return-note">{t('approvals.returned_note', { note: record.last_return_note })}</div>}
@@ -375,6 +452,7 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
         </div>
       </footer>
       {record && <RejectDialog open={rejecting} title={t('approvals.reject_title', { site: record.site_code ?? name })} onClose={() => setRejecting(false)} onSend={(note) => run('reject', record, note)} />}
+      {record && <TriageDialog open={!!triaging} op={triaging} registerKey={key} selfId={record.id} onClose={() => setTriaging(null)} onSend={(note, dup) => triaging && triageRun(triaging, note, dup)} />}
       {record && <RejectDialog open={voiding} title={t('registers.void_title')} onClose={() => setVoiding(false)} onSend={(note) => run('void', record, note)} />}
       {record && <RejectDialog open={cancelling} title={t('registers.cancel_snag_title')} onClose={() => setCancelling(false)}
         onSend={(reason) => cancelSnag.mutate({ record, reason }, { onSuccess: () => { toast(t('registers.cancel_snag_done')); setCancelling(false); }, onError: (e) => { setCancelling(false); fail(e); } })} />}
