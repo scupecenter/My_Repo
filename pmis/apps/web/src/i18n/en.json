@@ -1173,7 +1173,8 @@
     "section_data_counts": "GECOL / HLC counts",
     "section_screens_motion": "Motion",
     "section_workflow_coverage": "Matrix coverage",
-    "section_screens_login": "Login page"
+    "section_screens_login": "Login page",
+    "section_screens_interface": "Interface"
   },
   "scopeMatch": {
     "title": "Team / scope match (Procurement)",
@@ -6630,5 +6631,30 @@
     "never": "Not changed since installation.",
     "readonly": "Only a System Admin, or a person they delegated settings to for all regions, can change this.",
     "confirm": "Save the login page settings? The change is audited with your reason and shows on the sign-in page at once."
+  },
+  "ui": {
+    "new": "New",
+    "new_hint": "Recently added feature",
+    "settings_title": "Interface features",
+    "preview": "Preview",
+    "avatars_title": "Generated avatars",
+    "avatars_note": "A coloured avatar with the initials of a person, drawn by the system (no image is stored). It shows in the top bar and beside people in lists and tables.",
+    "av_style": "Style",
+    "av_style_gradient": "Gradient",
+    "av_style_geometric": "Geometric",
+    "av_style_initials": "Plain colour",
+    "av_style_none": "None",
+    "av_shape": "Shape",
+    "av_shape_circle": "Circle",
+    "av_shape_rounded": "Rounded square",
+    "av_palette": "Colours",
+    "av_palette_varied": "Varied per person",
+    "av_palette_brand": "Accent colour only",
+    "av_in_lists": "Show avatars beside people in lists and tables",
+    "new_title": "\"New\" badge",
+    "new_note": "A small badge beside a feature that now sits next to the older way to do the same thing.",
+    "new_enabled": "Show the \"New\" badge",
+    "new_days": "Days to show it after a feature is released",
+    "new_preview": "Shown beside new features until the days have passed."
   }
 }

@@ -548,6 +548,9 @@ export const REAL_API_AUTH_USERS = [
   // Contract 0.15.64 (migration 0148, W8): the defaults of the Display menu of the site-data tables
   ['get', '/settings/table-display'],
   ['put', '/settings/table-display'],
+  // Contract 0.15.102 (migration 0196): the interface features setting
+  ['get', '/settings/ui-features'],
+  ['put', '/settings/ui-features'],
   ['get', '/settings/idle-task-alert'],
   ['put', '/settings/idle-task-alert'],
   ['get', '/settings/notification-policy/catalogue'],

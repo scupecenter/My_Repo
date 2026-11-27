@@ -89,6 +89,19 @@ export class SettingsScreensService {
     return this.one(Prisma.sql`SELECT admin_set_table_display(${JSON.stringify(rest)}::jsonb, ${reason}::text, ${version}::int) AS j`);
   }
 
+  // ------------------------------------------------------------------ interface features (migration 0280)
+  /** GET /settings/ui-features (every signed-in user: the avatars, the New badge and the other interface features read it) */
+  uiFeatures(): Promise<{ version: number }> {
+    return this.one(Prisma.sql`SELECT ui_features_json() AS j`);
+  }
+
+  /** PUT /settings/ui-features (If-Match) */
+  setUiFeatures(ifMatch: string | undefined, raw: unknown): Promise<{ version: number }> {
+    const version = parseIfMatch(ifMatch);
+    const { reason, rest } = split(raw);
+    return this.one(Prisma.sql`SELECT admin_set_ui_features(${JSON.stringify(rest)}::jsonb, ${reason}::text, ${version}::int) AS j`);
+  }
+
   // ------------------------------------------------------------------ notification policy
   /** GET /settings/notification-policy (view on admin.settings) */
   policy(): Promise<{ version: number }> {
