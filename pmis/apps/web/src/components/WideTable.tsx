@@ -6,6 +6,7 @@ import { errText } from '@/components/FormDialog';
 import { EmptyState, NoResults } from '@/components/States';
 import { displayAttrs } from '@/components/TableStandard';
 import type { Display } from '@/lib/tablePrefs';
+import { DateInput } from '@/components/DateInput';
 
 /** The editor of one cell of the wide table. */
 export type WideInput = 'date' | 'number' | 'list' | 'text' | 'boolean';
@@ -173,7 +174,9 @@ export function WideTable<R extends WideTableRow>({
                               if (kind === 'boolean') {
                                 return <input {...common} type="checkbox" className="h-4 w-4" checked={editing.draft === 'true'} onChange={(e) => setEditing({ ...editing, draft: e.target.checked ? 'true' : 'false', error: null })} onKeyDown={keys} />;
                               }
-                              return <input {...common} type={kind} step={kind === 'number' ? 'any' : undefined} className="input h-7 w-36 px-1 py-0 text-xs" value={editing.draft} onChange={(e) => setEditing({ ...editing, draft: e.target.value, error: null })} onKeyDown={keys} />;
+                              return kind === 'date'
+                                ? <DateInput {...common} picker={false} className="input h-7 w-36 px-1 py-0 text-xs" value={editing.draft} onChange={(e) => setEditing({ ...editing, draft: e.target.value, error: null })} onKeyDown={keys} />
+                                : <input {...common} type={kind} step={kind === 'number' ? 'any' : undefined} className="input h-7 w-36 px-1 py-0 text-xs" value={editing.draft} onChange={(e) => setEditing({ ...editing, draft: e.target.value, error: null })} onKeyDown={keys} />;
                             })()}
                             <button type="button" disabled={editing.pending} className="btn px-2 py-0.5 text-xs" data-testid={`wide-save-${k}-${c.key}`} onClick={() => void save(r, c, x)}>{t('common.save')}</button>
                             <button type="button" disabled={editing.pending} className="btn px-2 py-0.5 text-xs" data-testid={`wide-cancel-${k}-${c.key}`} onClick={() => setEditing(null)}>{t('common.cancel')}</button>
