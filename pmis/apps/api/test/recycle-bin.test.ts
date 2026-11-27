@@ -44,7 +44,7 @@ describe('recycle bin', () => {
     expect(ok.body.state).toBe('entry');
     const row = await db.query(`SELECT state, current_level, voided_at, void_reason FROM register_records WHERE id = $1`, [rec.id]);
     expect(row.rows[0]).toMatchObject({ state: 'entry', current_level: 1, voided_at: null, void_reason: null });
-    const audit = await db.query(`SELECT action FROM audit_log WHERE entity_id = $1 AND action IN ('register_record_void','register_record_restore') ORDER BY created_at`, [rec.id]);
+    const audit = await db.query(`SELECT action FROM audit_log WHERE entity_id = $1 AND action IN ('register_record_void','register_record_restore') ORDER BY id`, [rec.id]);
     expect(audit.rows.map((a: { action: string }) => a.action)).toEqual(['register_record_void', 'register_record_restore']);
     expect((await admin.api.call('get', '/recycle-bin')).body.items.some((i: { id: string }) => i.id === rec.id)).toBe(false);
     expect((await restore(admin.api, rec.id, ok.body.version)).status).toBe(409);         // no longer voided
