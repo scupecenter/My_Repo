@@ -22134,7 +22134,7 @@ components:
           properties:
             valid: { type: integer }
             invalid: { type: integer }
-        uploaded_at: { type: string, format: date-time, nullable: true }
+        uploaded_at: { type: [string, 'null'], format: date-time }
         progress_pct: { type: [integer, 'null'] }
     DataHubTemplateChange:
       type: object
