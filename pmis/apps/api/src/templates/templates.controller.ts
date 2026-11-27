@@ -1,3 +1,4 @@
+import { ExportAction } from '../security/export-lock';
 import { Body, Controller, Get, Headers, HttpCode, Param, Post, Query, Req, Res, StreamableFile, UploadedFile as Upload, UseInterceptors } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { createHash } from 'node:crypto';
@@ -29,6 +30,7 @@ export class TemplatesController {
     return this.templates.list(auth);
   }
 
+  @ExportAction({ category: 'templates' })
   @Get(':templateId/download')
   async download(
     @Auth() auth: AuthContext, @Param('templateId') templateId: string, @Query() q: Record<string, unknown>, @Req() req: Request, @Res({ passthrough: true }) res: Response,
@@ -76,6 +78,17 @@ export class ImportBatchesController {
     const dto = await this.imports.getBatchOrUpload(auth, id);
     res.setHeader('ETag', etagHeader(dto.version as number));
     return dto;
+  }
+
+  /** P4 (0365): the refused rows of the batch as an .xlsx to correct and upload again; the reasons are on the sheet "Errors". */
+  @Get(':id/error-report')
+  async errorReport(@Auth() auth: AuthContext, @Param('id') id: string, @Res({ passthrough: true }) res: Response): Promise<StreamableFile> {
+    const { buffer, fileName } = await this.imports.errorReport(auth, id);
+    res.setHeader('Content-Type', XLSX_MIME);
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName.replace(/[^A-Za-z0-9._-]/g, '_')}"`);
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    return new StreamableFile(buffer);
   }
 
   @Get(':id/rows')
