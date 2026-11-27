@@ -1,7 +1,7 @@
 import { Check, Eraser, Mail, RotateCcw, ShieldOff, Trash2, UserPlus, UserRoundPlus, UserX, X } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useRoles, useUsers } from '@/api/admin';
 import { useMe } from '@/api/hooks';
 import { useDeactivateUser, useDeletedUsers, useDeleteUser, usePurgeUser, useRestoreUser } from '@/api/settings';
@@ -12,7 +12,8 @@ import { AssignDialog } from '@/components/AssignDialog';
 import { InvitationsTab } from '@/components/InvitationsTab';
 import { InviteDialog } from '@/components/InviteDialog';
 import { CreateUserDialog, LocalBadges, TwoFactorBadge } from '@/components/UserDialogs';
-import { hasGrant, isAdmin } from '@/lib/perm';
+import { isAdmin } from '@/lib/perm';
+import { canDecideChanges, USERS_VIEWS, type UsersView } from '@/components/PeopleAdmin';
 import { OnlineNow } from '@/pages/OnlineNow';
 import { Departments } from '@/pages/Departments';
 import { IdBadge } from '@/components/PersonTag';
@@ -194,22 +195,17 @@ export function Users() {
   const { t, i18n } = useTranslation();
   const ar = i18n.language === 'ar';
   const me = useMe(true);
-  const loc = useLocation(), go = useNavigate();
+  const loc = useLocation();
   const search = new URLSearchParams(loc.search);
-  const [listTab, setListTab] = useState<'active' | 'deleted' | 'departments' | 'email_changes' | 'phone_changes' | 'invitations'>(search.has('email_changes') ? 'email_changes' : search.has('phone_changes') ? 'phone_changes' : 'active');
-  // Online now is the third sub-tab, beside Deleted; it keeps its own URL (/admin/online).
-  const tab: 'active' | 'deleted' | 'departments' | 'email_changes' | 'phone_changes' | 'invitations' | 'online' = loc.pathname.startsWith('/admin/online') ? 'online' : listTab;
+  // The list views (Departments, Invitations, Email and Phone changes) are tabs of the strip above (PeopleAdmin); Deleted is a Status value.
+  const rawView = search.get('view') ?? (search.has('email_changes') ? 'email_changes' : search.has('phone_changes') ? 'phone_changes' : '');
   const canList = !!me.data?.effective.nav.includes('admin.users' as never);
-  // 0.9.2: who decides email changes (the server checks again: System Admin, or a delegate holding users.edit for all regions)
-  const canDecide = isAdmin(me.data) || !!me.data?.effective.grants.some((g) => (g.action as string) === 'edit' && ['users', 'admin.users', '*'].includes(g.module_key as string) && g.region_ids === 'all');
-  const subTabs = [...(canList ? (['active', 'deleted', 'departments', 'invitations'] as const) : []), ...(canList && canDecide ? (['email_changes', 'phone_changes'] as const) : []), ...(hasGrant(me.data, 'manage_users') ? (['online'] as const) : [])];
-  const pick = (k: (typeof subTabs)[number]) => {
-    if (k === 'online') return go('/admin/online');
-    setListTab(k);
-    if (tab === 'online') go('/admin/users');
-  };
+  const canDecide = canDecideChanges(me.data);
+  const online = loc.pathname.startsWith('/admin/online');
+  const listView = canList && (USERS_VIEWS as readonly string[]).includes(rawView) && !(['email_changes', 'phone_changes'].includes(rawView) && !canDecide) ? (rawView as UsersView) : null;
   const [act, setAct] = useState<Act | null>(null);
   const [f, setF] = useState({ q: '', status: '', role_id: '' });
+  const deleted = f.status === 'deleted';
   // the + Filter tree of the screen users (the module view grant of the list applies to it as well)
   const [adv, setAdv] = useState('');
   const [sel, setSel] = useState<Record<string, User>>({});
@@ -217,23 +213,19 @@ export function Users() {
   const [creating, setCreating] = useState(false);
   const [inviting, setInviting] = useState(false);
   const canCreate = isAdmin(me.data) || !!me.data?.effective.grants.some((g) => (g.action as string) === 'create' && ['users', 'admin.users'].includes(g.module_key as string));
-  const users = useUsers({ ...f, filter: adv || undefined }), roles = useRoles();
+  const users = useUsers({ ...f, status: deleted ? '' : f.status, filter: adv || undefined }), roles = useRoles();
   const items = users.data?.items ?? [];
   const chosen = Object.values(sel);
   const toggle = (u: User) => setSel((s) => { const n = { ...s }; if (n[u.id]) delete n[u.id]; else n[u.id] = u; return n; });
   return (
     <div data-testid="page-users">
-      <h2 className="text-lg font-bold">{t('peopleAdmin.tab_users')}</h2>
-      <p className="mb-4 text-mute">{t('users.subtitle')}</p>
-      <div role="tablist" className="mb-3 flex gap-1">
-        {subTabs.map((k) => <button key={k} role="tab" aria-selected={tab === k} data-testid={`users-tab-${k}`} className={`btn ${tab === k ? 'btn-accent' : ''}`} onClick={() => pick(k)}>{t(k === 'online' ? 'nav.admin.online' : k === 'departments' ? 'dept.tab' : k === 'email_changes' ? 'emailChange.tab' : k === 'phone_changes' ? 'phoneChange.tab' : `users.tab_${k}`)}</button>)}
-      </div>
-      {tab === 'online' ? <OnlineNow embedded /> : tab === 'invitations' ? <InvitationsTab /> : tab === 'email_changes' ? <EmailChangesTab /> : tab === 'phone_changes' ? <PhoneChangesTab /> : tab === 'deleted' ? <DeletedTab /> : tab === 'departments' ? <Departments /> : <>
+      {online ? <OnlineNow embedded /> : listView === 'invitations' ? <InvitationsTab /> : listView === 'email_changes' ? <EmailChangesTab /> : listView === 'phone_changes' ? <PhoneChangesTab /> : listView === 'departments' ? <Departments /> : <>
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <input className="input max-w-64" data-testid="users-search" aria-label={t('users.search')} placeholder={t('users.search')} value={f.q} onChange={(e) => setF({ ...f, q: e.target.value })} />
         <select className="input w-auto" data-testid="users-filter-status" aria-label={t('users.status')} value={f.status} onChange={(e) => setF({ ...f, status: e.target.value })}>
           <option value="">{t('users.all_statuses')}</option>
           {['active', 'pending_assignment', 'suspended', 'disabled'].map((s) => <option key={s} value={s}>{t(`userStatus.${s}`)}</option>)}
+          <option value="deleted">{t('users.tab_deleted')}</option>
         </select>
         <select className="input w-auto" data-testid="users-filter-role" aria-label={t('users.role')} value={f.role_id} onChange={(e) => setF({ ...f, role_id: e.target.value })}>
           <option value="">{t('users.all_roles')}</option>
@@ -241,11 +233,12 @@ export function Users() {
         </select>
         <UnifiedFilter screen="users" value={decodeFilter(adv)} onChange={(tree) => setAdv(encodeFilter(tree))} onClearAll={() => setAdv('')} />
         <span className="flex-1" />
+        {!deleted && <span className="text-sm text-mute" data-testid="users-count">{t('users.count', { count: items.length })}</span>}
         {canCreate && <button className="btn" data-testid="users-invite" onClick={() => setInviting(true)}><Mail size={16} />{t('invite.open')}</button>}
         {canCreate && <button className="btn" data-testid="users-new" onClick={() => setCreating(true)}><UserRoundPlus size={16} />{t('newUser.open')}</button>}
         <button className="btn btn-accent" data-testid="users-assign" onClick={() => setDlg(true)}><UserPlus size={16} />{chosen.length ? t('users.assign_selected', { count: chosen.length }) : t('users.assign')}</button>
       </div>
-      <div className="card overflow-x-auto">
+      {deleted ? <DeletedTab /> : <div className="card overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="border-b border-line bg-card2 text-start text-mute"><tr>
             <th className="w-10 p-2" /><th className="p-2 text-start">{t('users.name')}</th><th className="p-2 text-start">{t('users.email')}</th><th className="p-2 text-start">{t('users.department')}</th><th className="p-2 text-start">{t('users.status')}</th><th className="p-2 text-start">{t('users.flags')}</th><th className="p-2" />
@@ -270,7 +263,7 @@ export function Users() {
             {users.isSuccess && !items.length && <tr><td colSpan={7} className="p-6 text-center text-mute" data-testid="users-empty">{t('users.empty')}</td></tr>}
           </tbody>
         </table>
-      </div>
+      </div>}
       </>}
       {act && <ActDialog act={act} onClose={() => setAct(null)} />}
       {inviting && <InviteDialog onClose={() => setInviting(false)} />}

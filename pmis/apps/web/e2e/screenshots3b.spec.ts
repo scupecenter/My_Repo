@@ -38,7 +38,7 @@ for (const [locale, theme] of [['en', 'light'], ['ar', 'dark']] as const) {
     await shot('online-now');
 
     await page.getByTestId('nav-admin.users').click();
-    await page.getByTestId('users-tab-deleted').click();
+    await page.getByTestId('users-filter-status').selectOption('deleted');
     await page.getByTestId('deleted-row-9001').waitFor();
     await shot('users-deleted');
   });

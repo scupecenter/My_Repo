@@ -33,6 +33,11 @@ beforeAll(async () => {
 });
 afterAll(async () => {
   await db.query(`UPDATE settings SET value = '{"default_brand": "current", "allow_user_choice": true}'::jsonb, updated_by = NULL, updated_at = now() WHERE key = 'ui.identity'`);
+  try {
+    await db.query('SET ROLE pmis_migrator');
+    await db.query(`DELETE FROM ui_assets WHERE key = 'logo'`);
+    await db.query('RESET ROLE');
+  } catch { /* the suite leaves at worst a disabled logo */ }
   await db.end();
   await app.close();
 });
@@ -45,6 +50,141 @@ const audits = () => q<{ before: any; after: any; reason: string; actor_id: stri
   `SELECT before, after, reason, actor_id::text AS actor_id FROM audit_log WHERE action = 'ui_identity_update' AND entity_id = 'ui.identity' ORDER BY id`);
 const profileTag = async (api: Api): Promise<string> => String((await api.call('get', '/me/profile')).headers.etag);
 const patchBrand = async (api: Api, ui_brand: unknown) => api.call('patch', '/me/profile', { ui_brand }, { 'If-Match': await profileTag(api) });
+
+describe('The workspace logo (0243): PUT/PATCH /settings/identity/logo and GET /ui/assets/logo', () => {
+  const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  const upload = (who: Actor, tag?: string) => {
+    let t = who.api.call('put', '/settings/identity/logo').field('reason', 'Owner approval 2026-11-27, item 5').attach('file', PNG, { filename: 'logo.png', contentType: 'image/png' });
+    if (tag !== undefined) t = t.set('If-Match', tag);
+    return t;
+  };
+  const toggle = (who: Actor, enabled: boolean, tag?: string) =>
+    who.api.call('patch', '/settings/identity/logo', { enabled, reason: 'Owner approval 2026-11-27, item 5' }, tag === undefined ? {} : { 'If-Match': tag });
+  const logoAudits = () => q<{ before: any; after: any; reason: string }>(db,
+    `SELECT before, after, reason FROM audit_log WHERE action = 'ui_asset_update' AND entity_id = 'logo' ORDER BY id`);
+
+  it('an admin uploads the logo; every signed-in user reads the state and the bytes; the identity carries it', async () => {
+    const up = await upload(admin);
+    expect(up.status).toBe(200);
+    expect(up.body).toMatchObject({ key: 'logo', mime: 'image/png', enabled: true, version: 1 });
+    const id1 = await read(plain);
+    expect(id1.status).toBe(200);
+    expect(id1.body.logo).toMatchObject({ enabled: true, version: 1 });
+    const img = await plain.api.call('get', '/ui/assets/logo').buffer(true).parse((res, cb) => {
+      const chunks: Buffer[] = [];
+      res.on('data', (c: Buffer) => chunks.push(c));
+      res.on('end', () => cb(null, Buffer.concat(chunks)));
+    });
+    expect(img.status).toBe(200);
+    expect(img.headers['content-type']).toBe('image/png');
+    expect(Buffer.compare(img.body as Buffer, PNG)).toBe(0);
+    expect(img.headers.etag).toBe('"1"');
+    // a replace bumps the version (If-Match)
+    const up2 = await upload(admin, '"1"');
+    expect(up2.status).toBe(200);
+    expect(up2.body.version).toBe(2);
+  });
+
+  it('hide keeps the row and stops the bytes; show brings them back; a no-op is a conflict; audit never carries the bytes', async () => {
+    const off = await toggle(admin, false, '"2"');
+    expect(off.status).toBe(200);
+    expect(off.body).toMatchObject({ enabled: false, version: 3 });
+    expect((await plain.api.call('get', '/ui/assets/logo')).status).toBe(404);
+    expect((await toggle(admin, false, '"3"')).status).toBe(409);
+    const on = await toggle(admin, true, '"3"');
+    expect(on.status).toBe(200);
+    expect(on.body).toMatchObject({ enabled: true, version: 4 });
+    const logs = await logoAudits();
+    expect(logs.length).toBeGreaterThanOrEqual(4);
+    expect(JSON.stringify(logs)).not.toContain('89504e');
+  });
+
+  it('refuses a non-admin, a bad type, a missing reason, a stale version and a non-logo key', async () => {
+    expect((await upload(plain)).status).toBe(403);
+    const bad = await admin.api.call('put', '/settings/identity/logo').set('If-Match', '*').field('reason', 'Owner approval 2026-11-27, item 5').attach('file', Buffer.from('x'), { filename: 'a.txt', contentType: 'text/plain' });
+    expect(bad.status).toBe(422);
+    const noReason = await admin.api.call('put', '/settings/identity/logo').attach('file', PNG, { filename: 'logo.png', contentType: 'image/png' });
+    expect(noReason.status).toBe(422);
+    expect((await upload(admin, '"1"')).status).toBe(412);
+    expect((await plain.api.call('get', '/ui/assets/unknown_key')).status).toBe(404);
+  });
+});
+
+describe('The logo outside the app (0243): sign-in pages and tab icon, closed by default', () => {
+  const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  const R = 'Owner decision 2026-11-27, logo';
+  const anon = () => new Api(app);
+  const display = (who: Actor, show_on_login: unknown, use_as_favicon: unknown, tag?: string, reason: string | undefined = R) =>
+    who.api.call('patch', '/settings/identity/logo/display', { show_on_login, use_as_favicon, ...(reason === undefined ? {} : { reason }) }, tag === undefined ? {} : { 'If-Match': tag });
+  const state = async () => (await admin.api.call('get', '/settings/identity')).body.logo;
+  const displayAudits = () => q<{ before: any; after: any; reason: string }>(db,
+    `SELECT before, after, reason FROM audit_log WHERE action = 'ui_asset_update' AND entity_id = 'logo' ORDER BY id`);
+
+  it('both places are OFF by default and the public routes answer nothing', async () => {
+    const st = await state();
+    expect(st).toMatchObject({ show_on_login: false, use_as_favicon: false });
+    const pub = await anon().call('get', '/ui/public/identity');
+    expect(pub.status).toBe(200);
+    expect(pub.body).toEqual({ login: null, favicon: null });
+    expect((await anon().call('get', '/ui/public/logo/login')).status).toBe(404);
+    expect((await anon().call('get', '/ui/public/logo/favicon')).status).toBe(404);
+    expect((await anon().call('get', '/ui/public/logo/other')).status).toBe(404);
+  });
+
+  it('an admin switches the sign-in pages on: anyone can read them, with safe headers; the tab icon stays off; audited with before and after', async () => {
+    const st = await state();
+    const res = await display(admin, true, false, `"${st.version}"`);
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ show_on_login: true, use_as_favicon: false, version: st.version + 1 });
+    const pub = await anon().call('get', '/ui/public/identity');
+    expect(pub.body).toMatchObject({ login: { version: st.version + 1, mime: 'image/png' }, favicon: null });
+    const img = await anon().call('get', '/ui/public/logo/login').buffer(true).parse((r, cb) => {
+      const chunks: Buffer[] = [];
+      r.on('data', (c: Buffer) => chunks.push(c));
+      r.on('end', () => cb(null, Buffer.concat(chunks)));
+    });
+    expect(img.status).toBe(200);
+    expect(img.headers['content-type']).toBe('image/png');
+    expect(img.headers['x-content-type-options']).toBe('nosniff');
+    expect(Buffer.compare(img.body as Buffer, PNG)).toBe(0);
+    expect((await anon().call('get', '/ui/public/logo/favicon')).status).toBe(404);
+    const logs = await displayAudits();
+    expect(logs.at(-1)).toMatchObject({ reason: R });
+    expect(JSON.stringify(logs.at(-1))).not.toContain('89504e');
+  });
+
+  it('hiding the logo closes both public places; the switches are kept; showing it opens them again', async () => {
+    let st = await state();
+    await display(admin, true, true, `"${st.version}"`);
+    st = await state();
+    const off = await admin.api.call('patch', '/settings/identity/logo', { enabled: false, reason: R }, { 'If-Match': `"${st.version}"` });
+    expect(off.status).toBe(200);
+    expect((await anon().call('get', '/ui/public/identity')).body).toEqual({ login: null, favicon: null });
+    expect((await anon().call('get', '/ui/public/logo/login')).status).toBe(404);
+    expect((await anon().call('get', '/ui/public/logo/favicon')).status).toBe(404);
+    expect(await state()).toMatchObject({ enabled: false, show_on_login: true, use_as_favicon: true });
+    st = await state();
+    await admin.api.call('patch', '/settings/identity/logo', { enabled: true, reason: R }, { 'If-Match': `"${st.version}"` });
+    expect((await anon().call('get', '/ui/public/identity')).body).toMatchObject({ login: { mime: 'image/png' }, favicon: { mime: 'image/png' } });
+    st = await state();
+    await display(admin, false, false, `"${st.version}"`);
+    expect((await anon().call('get', '/ui/public/identity')).body).toEqual({ login: null, favicon: null });
+  });
+
+  it('refuses a non-admin, a bad body, a missing reason, a stale or missing version and a change that changes nothing', async () => {
+    const st = await state();
+    const tag = `"${st.version}"`;
+    expect((await display(plain, true, false, tag)).status).toBe(403);
+    expect((await display(admin, 'yes', false, tag)).status).toBe(422);
+    expect((await display(admin, true, undefined, tag)).status).toBe(422);
+    expect((await display(admin, true, false, tag, '')).status).toBe(422);
+    expect((await display(admin, true, false, '"999"')).status).toBe(412);
+    expect((await display(admin, true, false)).status).toBe(428);
+    expect((await display(admin, false, false, tag)).status).toBe(409);
+    expect((await display(noStep, true, false, tag)).status).toBe(401);
+    expect(await state()).toMatchObject({ show_on_login: false, use_as_favicon: false, version: st.version });
+  });
+});
 
 describe('Settings, Identity & themes: GET and PUT /settings/identity', () => {
   it('every signed-in user reads the default (current, choice allowed); only a System Admin or an all-regions settings delegate may edit', async () => {
