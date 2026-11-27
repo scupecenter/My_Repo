@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { promises as fs } from 'node:fs';
 import { z } from 'zod';
@@ -39,7 +39,7 @@ const reasonBody = z.object({ reason: z.string().max(2000) }).strict();
 const approveBody = z.object({ reason: z.string().max(2000), scope_hash: z.string().regex(/^[0-9a-f]{64}$/).optional() }).strict();
 const partsQuery = z.string().regex(/^[a-z_]{2,40}(,[a-z_]{2,40}){0,63}$/).optional();
 const runBody = z.object({ confirm_text: confirm }).strict();
-const settingsBody = z.object({ reason: z.string().max(2000), request_expiry_minutes: z.unknown(), backup_max_age_hours: z.unknown() }).passthrough();
+const settingsBody = z.object({ reason: z.string().max(2000), request_expiry_minutes: z.unknown(), backup_max_age_hours: z.unknown(), cooloff_minutes: z.unknown().optional() }).passthrough();
 
 /** How long the database part of a run may take (one transaction). */
 const RUN_TIMEOUT_MS = 60 * 60 * 1000;
@@ -53,9 +53,10 @@ const RUN_TIMEOUT_MS = 60 * 60 * 1000;
  * commit, recorded on the request.
  */
 @Injectable()
-export class DataResetService {
+export class DataResetService implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly log = new Logger('DataReset');
   /** One file move at a time in this process (a retry never runs beside the first move). */
+  private cooloffTimer: NodeJS.Timeout | null = null;
   private moving: Promise<void> = Promise.resolve();
   /** Background runs of this process (the tests wait for them). */
   readonly running = new Set<Promise<void>>();
@@ -84,7 +85,30 @@ export class DataResetService {
     return v;
   }
 
+  /** The notice before the run (P6, contract 0.15.267): the page calls it with the state, a one-minute timer calls it when jobs are on. Never throws into the caller. */
+  async notifyCooloff(): Promise<number> {
+    try {
+      const rows = await this.db.client.$queryRaw<{ n: number }[]>(Prisma.sql`SELECT data_reset_cooloff_notify() AS n`);
+      return rows[0]?.n ?? 0;
+    } catch (e) {
+      this.log.warn(`cooloff notice failed: ${e instanceof Error ? e.message : 'error'}`);
+      return 0;
+    }
+  }
+
+  onApplicationBootstrap(): void {
+    if (!this.config.jobsEnabled) return;
+    this.cooloffTimer = setInterval(() => { void this.notifyCooloff(); }, 60 * 1000);
+    this.cooloffTimer.unref();
+  }
+
+  onModuleDestroy(): void {
+    if (this.cooloffTimer) clearInterval(this.cooloffTimer);
+    this.cooloffTimer = null;
+  }
+
   async state(): Promise<Json> {
+    await this.notifyCooloff();
     const r = await this.one(Prisma.sql`SELECT data_reset_state_json() AS r`);
     return { ...r, storage: this.storage() };
   }
