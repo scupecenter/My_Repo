@@ -350,7 +350,7 @@ describe('hybrid mode list', () => {
       'GET /settings/identity', 'PUT /settings/identity',
       // contract 0.15.97: Settings, Screens, Login page and its public read
       'GET /settings/login-page', 'PUT /settings/login-page', 'GET /settings/login-page/public',
-      'GET /settings/security-locks', 'PUT /settings/security-locks',
+      'GET /settings/security-locks', 'PUT /settings/security-locks', 'GET /settings/download-locks', 'PUT /settings/download-locks',
       'GET /settings/support-access', 'PUT /settings/support-access', 'GET /support-access', 'POST /support-access', 'POST /support-access/revoke-all', 'POST /support-access/:id/revoke', 'GET /settings/new-device-code', 'PUT /settings/new-device-code', 'POST /settings/new-device-code/bypass',
       // contract 0.15.232 (migration 0243): the workspace logo and where it shows outside the app
       'PUT /settings/identity/logo', 'PATCH /settings/identity/logo', 'PATCH /settings/identity/logo/display', 'GET /ui/public/identity', 'GET /ui/public/logo/:purpose', 'GET /ui/assets/:key',
