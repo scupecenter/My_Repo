@@ -9,7 +9,6 @@ const EXCLUDED: Record<string, string> = {
   // the edit state only selects the row whose edit dialog is open: the dialog is a FormDialog, which guards its own typed input
   'components/AnnotatePhoto.tsx': 'arrows and circles drawn on a photo in a short in-memory step with explicit Use and Cancel buttons; nothing typed, redrawn in seconds (follow-up if wanted)',
   'pages/settings/SiteMasterColumns.tsx': 'row selector for a FormDialog',
-  'pages/logs/AlertRules.tsx': 'row selector for a FormDialog',
   'pages/DailyPlan.tsx': 'row selector for a FormDialog',
   'pages/TemplateMapping.tsx': 'row selector for a FormDialog',
   'pages/Warehouse.tsx': 'row selector for a FormDialog; the cell editing state is the single-cell edit below',
