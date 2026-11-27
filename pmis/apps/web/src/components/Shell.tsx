@@ -13,6 +13,7 @@ import { canViewModule, hasGrant, isAdmin } from '@/lib/perm';
 import { applyLocale, applyTheme, currentLocale, currentTheme } from '@/i18n';
 import { HYBRID } from '@/lib/hybrid';
 import { loadPref, savePref as storePref } from '@/lib/localPref';
+import { applyAppearance } from '@/lib/appearance';
 import { applyBrand } from '@/lib/brands';
 import { ExportDialog } from './ExportDialog';
 import { CommandPalette } from './CommandPalette';
@@ -40,8 +41,12 @@ export function Shell() {
   const loc = useLocation();
   const qc = useQueryClient();
   const logout = useLogout();
-  const [compact, setCompact] = useState<boolean>(() => loadPref<boolean>(ICONS_KEY, false) === true);
-  const [auto, setAuto] = useState<boolean>(() => loadPref<boolean>(AUTO_KEY, false) === true);
+  // 0241: the menu style of the appearance profile is the default while the user has not switched the rail/pin in this browser
+  const menuStyle = me.data?.user.appearance?.menu_style;
+  const [compactOwn, setCompact] = useState<boolean | null>(null);
+  const [autoOwn, setAuto] = useState<boolean | null>(null);
+  const compact = compactOwn ?? loadPref<boolean | null>(ICONS_KEY, null) ?? (menuStyle === 'rail');
+  const auto = autoOwn ?? loadPref<boolean | null>(AUTO_KEY, null) ?? (menuStyle === 'autohide');
   const [hover, setHover] = useState(false);
   const [width, setWidth] = useState<number>(() => { const w = Number(loadPref(WIDTH_KEY, SIDEBAR_DEFAULT)); return Number.isFinite(w) ? Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, w)) : SIDEBAR_DEFAULT; });
   // The drawer is tied to the page it was opened on, so it closes by itself on navigation.
@@ -63,6 +68,10 @@ export function Shell() {
   // 0130: the UI design follows the signed-in user's effective design (independent of the light/dark theme)
   const userBrand = me.data?.user.brand;
   useEffect(() => { if (userBrand) applyBrand(userBrand); }, [userBrand]);
+  // 0241: the appearance profile follows the signed-in user (own choices, else the organization defaults)
+  const userAppearance = me.data?.user.appearance;
+  useEffect(() => { if (userAppearance) applyAppearance(userAppearance); }, [userAppearance]);
+
   // 0.15.42: the language and theme saved on the server follow the user to a new device
   const userTheme = me.data?.user.theme;
   const userLocale = me.data?.user.locale;

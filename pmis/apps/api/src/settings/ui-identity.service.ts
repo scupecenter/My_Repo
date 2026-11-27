@@ -7,6 +7,7 @@ import { StepUpService } from '../auth/step-up.service';
 import { parseIfMatch } from '../common/etag';
 import { parse } from '../common/zod';
 import { DbService } from '../db/db.service';
+import { uiPrefsSchema, UiPrefs } from './ui-prefs';
 
 /** The UI designs (owner decision 2026-11-19, migration 0130). `current` is today's look and the default. */
 export const UI_BRANDS = ['current', 'aljeel', 'executive', 'field', 'obsidian', 'sahara'] as const;
@@ -15,12 +16,18 @@ export type UiBrand = (typeof UI_BRANDS)[number];
 const putBody = z.object({
   default_brand: z.enum(UI_BRANDS),
   allow_user_choice: z.boolean(),
+  /** 0241: the organization appearance defaults; omitted keeps the current ones. */
+  defaults: uiPrefsSchema.optional(),
   reason: z.string().trim().min(3).max(1000),
 }).strict();
 
 export interface UiIdentityDto {
   default_brand: UiBrand;
   allow_user_choice: boolean;
+  /** 0241: the organization appearance defaults (users without a personal choice see these). */
+  defaults: UiPrefs;
+  /** 0241: the dimensions and their allowed values (ui_pref_options), so the client builds the pickers from the database. */
+  pref_options: Record<string, string[]>;
   brands: UiBrand[];
   updated_at: string | null;
   updated_by: { id: string; display_name: string; employee_id: string | null } | null;
@@ -53,6 +60,8 @@ export class UiIdentityService {
     await this.access.requireAdmin('settings', 'edit');
     const etag = parseIfMatch(ifMatch);
     await this.stepUp.require(auth);
-    return this.one(Prisma.sql`SELECT admin_set_ui_identity(${b.default_brand}::text, ${b.allow_user_choice}::boolean, ${b.reason}::text, ${etag}::int) AS r`);
+    // Omitted defaults keep the current ones (read through the same state door the GET uses).
+    const defaults = b.defaults ?? (await this.get()).defaults;
+    return this.one(Prisma.sql`SELECT admin_set_ui_identity(${b.default_brand}::text, ${b.allow_user_choice}::boolean, ${JSON.stringify(defaults)}::jsonb, ${b.reason}::text, ${etag}::int) AS r`);
   }
 }
