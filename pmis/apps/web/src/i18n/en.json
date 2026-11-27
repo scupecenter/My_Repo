@@ -722,6 +722,13 @@
     "saved": "Saved in the register",
     "new_version_note": "Saving creates a new version"
   },
+  "comment": {
+    "react": "Acknowledge",
+    "react_ack": "Acknowledged",
+    "resolve": "Mark resolved",
+    "resolved": "Resolved",
+    "reopen": "Reopen"
+  },
   "drawer": {
     "mandatory": "Mandatory",
     "drop": "Drop a file or click to upload",
@@ -989,6 +996,9 @@
     "edit": "Edit role",
     "code": "Code",
     "code_hint": "Capital letters, digits and underscore.",
+    "description_ar": "Duties (Arabic)",
+    "code_locked": "A built-in role: the platform uses its code by name, so it cannot be changed.",
+    "code_change_warning": "Changing the code does not rewrite history, saved filters or exports that already quote the old code. People keep the role; the change is audited.",
     "name": "Name",
     "name_en": "Name (English)",
     "name_ar": "Name (Arabic)",
@@ -2274,6 +2284,9 @@
     "order_other_site": "The order belongs to another site than this receipt.",
     "order_choice_required": "The site has several active orders for this part: choose one.",
     "no_active_order": "The site has no approved, active Procurement order for this part.",
+    "order_required": "Settings require this invoice to name its Procurement order.",
+    "unknown_rule": "This register has no such rule.",
+    "supplier_required": "Settings require an invoice to name its supplier company.",
     "order_not_active": "This order is not approved and active for this part and site.",
     "in_house_no_order": "In-house work has no Procurement order.",
     "in_house_no_contractor": "In-house work names the internal team, not a contractor.",
@@ -4483,6 +4496,12 @@
     "yellow": "Pending approval. Documents uploaded, waiting for review or approval ({{approved}} of {{need}} approved).",
     "green": "Approved. Documents approved ({{approved}} of {{need}})."
   },
+  "regrules": {
+    "title": "Register rules",
+    "note": "Rules the database enforces for one register, for example that an invoice must name its Procurement order. Every change needs a reason and is audited.",
+    "saved": "Rule saved",
+    "change_title": "Change: {{rule}}"
+  },
   "regstate": {
     "title": "Register state",
     "note": "Switch a whole register off (it is hidden everywhere; nothing is deleted and switching it on again restores everything) or lock it (readable, but no new record and no change, except by a System Admin). Every change needs a reason and is audited.",
@@ -4671,6 +4690,8 @@
     "import_file": "Excel file (.xlsx)",
     "reason_short": "Reason (at least 3 characters)",
     "import_submit": "Import",
+    "template_current": "Download the template with the current values",
+    "import_unchanged": "{{count}} unchanged",
     "import_done": "{{count}} values imported",
     "bind_title": "Bind this list to a register column",
     "bind_pick_register": "Choose a register",
@@ -6318,6 +6339,9 @@
     "rewire": "Rewire: remove the direct links that the new task replaces",
     "place_after": "Place after",
     "gate_after": "Gate after milestone",
+    "no_closing_warning": "Milestones with tasks but no closing task: {{codes}}. They are done only when every counting task is done. Publishing is still allowed.",
+    "gate_move": "Move the gate",
+    "gate_to": "Opens the milestone",
     "no_free_gate": "Every milestone that has a next milestone already has a gate.",
     "sla_bad": "Give both SLA values, minimum not above maximum.",
     "docs_approval_note": "Who enters and who approves this task is set in the Responsibility Matrix.",

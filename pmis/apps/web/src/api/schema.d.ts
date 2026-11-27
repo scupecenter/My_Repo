@@ -4444,6 +4444,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/register-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The editable rules of the registers and their values
+         * @description 0.15.331 (migration 0430). System Admin or a delegate of `fields.edit` for all regions. `catalogue` lists the keys that can be edited (register, key, type, default, labels), `items` the registers that have some with their current `rules`.
+         */
+        get: operations["listRegisterRules"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/register-rules/{register_key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A register key (see `GET /registers`). */
+                register_key: components["parameters"]["RegisterKeyAny"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Change rules of one register
+         * @description 0.15.331 (migration 0430). Only keys of the catalogue (422 `unknown_rule`), each with the right type (422 `invalid`). A reason is required, the ETag is checked and the change is audited with before and after.
+         */
+        put: operations["setRegisterRules"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/sla-rules": {
         parameters: {
             query?: never;
@@ -11688,6 +11731,60 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/comments/{comment_id}/reactions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Comment. */
+                comment_id: components["parameters"]["CommentId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * React to a comment (0.15.247, PM item 18)
+         * @description Adds the caller's reaction to any comment they can read, a task comment or a register-record comment (the same bar as commenting on it). The emoji travels in the body because the client path whitelist keeps non-ASCII out of URLs. 404 `not_found` for a comment the caller cannot read, so its existence is not revealed; 422 `validation_failed` for an unsupported emoji. Idempotent. Not audited.
+         */
+        put: operations["reactToComment"];
+        post?: never;
+        /**
+         * Remove the caller's reaction (0.15.247)
+         * @description Removes the caller's own reaction, named in the body like the PUT. 404 for a comment the caller cannot read. Idempotent.
+         */
+        delete: operations["unreactToComment"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/comments/{comment_id}/resolved": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Comment. */
+                comment_id: components["parameters"]["CommentId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Mark a comment resolved (0.15.247, PM item 18)
+         * @description Marks the point of the comment resolved and records who did it and when. Anyone who can read the thread may resolve, the same bar as commenting. 404 for a comment the caller cannot read. Not audited.
+         */
+        put: operations["resolveComment"];
+        post?: never;
+        /**
+         * Open a resolved comment again (0.15.247)
+         * @description Clears the resolved mark (`resolved_at` and `resolved_by` read as null again). 404 for a comment the caller cannot read.
+         */
+        delete: operations["unresolveComment"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -13252,6 +13349,8 @@ export interface components {
             reason: components["schemas"]["Reason"];
         };
         RolePatch: {
+            /** @description 0.15.500 (0500, D51). Changes the code; built-in codes are locked (422), a duplicate is 409. */
+            code?: string;
             name_en?: string;
             name_ar?: string;
             description_en?: string;
@@ -14093,8 +14192,31 @@ export interface components {
             body: string;
             is_rejection_note?: boolean;
             mentions?: components["schemas"]["UserRef"][];
+            /** @description 0.15.247. One entry per emoji used on the comment, with the count and whether the caller reacted. */
+            reactions?: components["schemas"]["CommentReaction"][];
+            resolved?: components["schemas"]["CommentResolved"];
             /** Format: date-time */
             created_at: string;
+        };
+        CommentReactionInput: {
+            /**
+             * @description 0.15.247. Starts with 👍 only.
+             * @enum {string}
+             */
+            emoji: "👍";
+        };
+        CommentReaction: {
+            /** @description 0.15.247. Starts with 👍 only. */
+            emoji: string;
+            count: number;
+            /** @description The caller reacted with this emoji. */
+            mine: boolean;
+        };
+        /** @description 0.15.247. Set while the comment is marked resolved; absent (null) while open. */
+        CommentResolved: {
+            /** Format: date-time */
+            at: string;
+            by: components["schemas"]["UserRef"];
         };
         OverrideRequest: {
             /** @enum {string} */
@@ -22798,6 +22920,8 @@ export interface components {
         RegisterKeyPath: components["schemas"]["RegisterKey"];
         /** @description Register record. */
         RegisterRecordId: string;
+        /** @description Comment. */
+        CommentId: string;
         /** @description Document Library definition. */
         DocTypeId: string;
         /** @description Template ID such as TPL-SITE. */
@@ -30277,6 +30401,92 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+        };
+    };
+    listRegisterRules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The rules. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        catalogue: {
+                            register_key: string;
+                            key: string;
+                            /** @enum {string} */
+                            type: "boolean" | "text";
+                            default?: unknown;
+                            label_en: string;
+                            label_ar?: string;
+                        }[];
+                        items: {
+                            register_key: string;
+                            name_en: string;
+                            name_ar?: string | null;
+                            rules: {
+                                [key: string]: unknown;
+                            };
+                            version: number;
+                        }[];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setRegisterRules: {
+        parameters: {
+            query?: never;
+            header?: {
+                "If-Match"?: string;
+            };
+            path: {
+                /** @description A register key (see `GET /registers`). */
+                register_key: components["parameters"]["RegisterKeyAny"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    rules: {
+                        [key: string]: boolean | string;
+                    };
+                    reason: components["schemas"]["Reason"];
+                };
+            };
+        };
+        responses: {
+            /** @description The new rules. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        register_key: string;
+                        rules: {
+                            [key: string]: unknown;
+                        };
+                        version: number;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     listSlaRules: {
@@ -38093,6 +38303,8 @@ export interface operations {
                 task_id?: string;
                 /** @description Repeated, or a comma separated list. At most 500. */
                 site_ids?: string[];
+                /** @description 0.15.320. Only for `TPL-LISTVALUES`: the code of a dropdown list. The file holds the current active values of that list (at most 5000), ready to edit and upload again. */
+                list?: string;
                 /** @description Pre-fill with the current records of the register (at most 5000 rows). */
                 prefill?: boolean;
                 /** @description Limit a pre-filled copy to one region (inside the caller's regions). */
@@ -43290,6 +43502,107 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             422: components["responses"]["Unprocessable"];
+        };
+    };
+    reactToComment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Comment. */
+                comment_id: components["parameters"]["CommentId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CommentReactionInput"];
+            };
+        };
+        responses: {
+            /** @description Reaction recorded (also when it was already there). */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    unreactToComment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Comment. */
+                comment_id: components["parameters"]["CommentId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CommentReactionInput"];
+            };
+        };
+        responses: {
+            /** @description Reaction removed (also when it was not there). */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    resolveComment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Comment. */
+                comment_id: components["parameters"]["CommentId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Resolved. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    unresolveComment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Comment. */
+                comment_id: components["parameters"]["CommentId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Open again. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
         };
     };
 }

@@ -44,4 +44,10 @@ describe('DateInput', () => {
     rerender(<DateInput data-testid="d" picker={false} value="" onChange={() => {}} />);
     expect(screen.queryByTestId('d-pick')).toBeNull();
   });
+  it('stays LTR end to end, so the calendar button keeps its place off the text in the Arabic UI', () => {
+    render(<DateInput data-testid="d" value="" onChange={() => {}} />);
+    const i = screen.getByTestId('d');
+    expect(i).toHaveAttribute('dir', 'ltr');
+    expect(i.parentElement).toHaveAttribute('dir', 'ltr');
+  });
 });

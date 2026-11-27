@@ -40,8 +40,11 @@ info:
     - 0.15.310 (2026-11-27): every register is downloadable (owner decision D48, 2026-11-27; no migration; CHANGELOG ExportAllRegisters). Additive. `GET /exports/parts` now also offers `car_dispatcher`, `financial_advances`, `incidents`, `lessons_learned` and `invoices`, and `POST /exports/master` accepts them in `parts` and as `view.source`; the 422 `not_in_master` of 0.15.34 is gone. Each writes its own sheet (Car Dispatcher, Financial Advances, Incidents, Lessons Learned, Invoices) with the register's template columns, header in row 1, no Master column. The rules are the other registers' rules: the export grant of the register's own module (no grant is seeded, so only a System Admin holds them until the owner grants them; Financial Advances and Invoices stay behind the finance grant), the export regions of that grant, voided rows left out of a full export, the field-level `in_export` switch and the personal-column rule. Settings and configuration are never exported. No schema change: `ExportPartKey` already listed the five keys.
     - 0.15.243 (2026-11-27): field quick capture for QC snags (owner request 2026-11-27; migration 0343; CHANGELOG FieldQuickCapture). Additive. The snag type photo rules `formats` list also accepts WEBM, MP4 and MOV, so a System Admin (or a Document Library configuration delegate) can let a snag type take a short field video through the existing `POST /snags/{snag_id}/photos` path; nothing is allowed by default (every type still lists only its own formats). A video has no EXIF date and is accepted with `unknown_capture_date`, like any photo without EXIF. No permission, visibility or authentication change; the photo rules, the format check and the upload limits are unchanged.
     - 0.15.248 (2026-11-27): high-contrast mode as an appearance dimension (item 19 of the 2026-11-27 batch, owner approval 2026-11-27 relayed by Main; migration 0347, mirror `db/sql/346_user_contrast.sql`; CHANGELOG HighContrast). Additive. `UiPrefs` gains `contrast` (`standard` = today's look, `high`): a personal choice (`MyProfilePatch.ui_prefs`), an organization default (`UiIdentityInput.defaults`, Settings > Identity), locked like every dimension while `identity.allow_user_choice` is false (403 `field_read_only`, `errors[0]` `{path: /ui_prefs, code: appearance_choice_locked}`), audited per dimension in `profile_updated`, resolved by `ui_effective_prefs`. The web paints `data-ui-contrast="high"`: stronger ink and line tokens only, the status colours and the designs are unchanged; `prefers-contrast: more` applies the high tokens while no choice is saved. No new column, grant, role or default changes.
+    - 0.15.320 (2026-11-27): list values export, download-edit-upload (owner decisions D54 and D55, 2026-11-27; no migration). Additive. (1) `GET /templates/TPL-LISTVALUES/download` takes `list=<catalogue code>`: the same template filled with the current active values of that list (code, labels, aliases, colour, parent value, sort order); without it the file stays empty as before. Same rights (System Admin or a delegate of `fields` edit, `download_documents` on `templates`), audited with the list code. (2) `POST /list-catalogues/{catalogue_code}/values/import` now updates a value whose code already exists (the code never changes; an empty cell leaves the value as it is; a row equal to the stored value is `unchanged`) and creates a new code, as before. The answer adds `created`, `updated` and `unchanged` next to `imported` (created plus updated). A code twice in the file is a 422 for that row. Every row applies or none does, as before. Values are never deleted or reactivated by a file.
     - 0.15.246 (2026-11-27): a soft "… is editing this record" notice (owner request 2026-11-27, item 17 of the 2026-11-27 batch; migration 0345; CHANGELOG RecordEditPresence). Additive and advisory only: nothing is locked. `POST /presence/editing` (`{kind, entity_id}`) is the editor's heartbeat (30 s; a row is stale after 2 minutes), `POST /presence/editing/stop` removes it at once, and `GET /presence/editing` (`kind`, `entity_id`) lists the other current editors of the entity (id, display name, since). Covers register records (kind `record`) and workflow tasks (kind `task`). No grant, role, permission, visibility or audit change.
+    - 0.15.331 (2026-11-27): register rules in Settings and the order's PR / PO on an invoice (migration 0430, mirror `db/sql/429_invoice_rules.sql`; decisions L1 and L2 of the relations review, on top of D58 / 0407). Additive. (1) `GET /settings/register-rules` (`listRegisterRules`) and `PUT /settings/register-rules/{register_key}` (`setRegisterRules`): the editable rules of a register (invoices: `currency`, `order_required`, `supplier_required`), System Admin or a `fields.edit` delegate, reason required, audited. (2) An invoice reads `order_pr_no` and `order_po_wo_no` from its Procurement order (derived, never typed). (3) Errors `order_required`, `supplier_required`, `unknown_rule`. The order and supplier links themselves are 0407's (`supplier_party_id`, `invoices/order-options`, `invoices/supplier-options`).
 
+    - 0.15.247 (2026-11-27): reactions on comments and a resolved flag (owner approval 2026-11-27, item 18 of the 2026-11-27 batch; migration 0346, mirror `db/sql/345_comment_reactions_resolve.sql`). Additive. New paths: `PUT`/`DELETE /comments/{comment_id}/reactions` (the emoji in the body, `👍` only, 422 `validation_failed` otherwise; a reaction of the caller on any comment they can read, a task comment or a register-record comment; idempotent both ways, 404 for a comment the caller cannot read) and `PUT`/`DELETE /comments/{comment_id}/resolved` (marks the point resolved or opens it again; records `resolved_at`/`resolved_by`). `Comment` gains `reactions` (`emoji`, `count`, `mine`) and `resolved` (`at`, `by`). The bar to react or resolve is the same as to comment: reading the thread. Not audited. No existing field or behaviour changes.
     - 0.15.240 (2026-11-27): intake triage for the Issue Log and the Change Control Log (owner request 2026-11-27; migration 0340, mirror `db/sql/339_register_triage.sql`; CHANGELOG RegisterTriage). Additive. (1) `RegisterDefinition.triage_enabled` (true for `issues` and `change_control`): a record of such a register enters an intake queue (`RegisterRecord.triage.state` `pending`) on every insert, a new version included (the old decision is cleared). (2) New `POST /registers/{register_key}/records/{record_id}/triage` (`triageRegisterRecord`): one decision of the register's Matrix L2 holders of the record's region (a System Admin only when the row has no holder, exactly like an approval): `accept` (the record proceeds to its normal flow), `defer` (stays in the queue, with a note), `reject` (note and step-up required; the record is `voided`) and `merge` (`duplicate_of`, note and step-up; the record is `voided`, links the surviving record `triage.duplicate_of`, and the decision is noted on the surviving record's comment thread). `If-Match` is the record's version; `allowed_actions` gains `triage` while a record is pending or deferred and the caller may decide. `GET /registers/{register_key}/records` takes `triage` (one of `TriageState`). (3) Audited as `register_record_triage` with before and after; `RegisterRecordStep.action` gains `triage_accept`, `triage_reject`, `triage_merge`, `triage_defer`; the creator is notified (`NotificationKind` gains `triage_decision`). No grant, role or default changes.
     - 0.15.265 (2026-11-27): the project data reset can be narrowed inside a register part (Data entry proposal P1, approved by the owner 2026-11-27; migration 0370, mirror `db/sql/369_data_reset_narrow.sql`). Additive and backward compatible: a request without `narrow` is the whole part as before. `POST /settings/data-reset/requests` takes optional `narrow` (`DataResetNarrow`: `regions`, `batches`, `from`, `to`; every given key must match): the register entities that match go, the others stay with everything that hangs off them (every version of a record, steps, documents and files, comments, drafts, links). The unit is the entity; `from`/`to` are the days the entity was first created (inclusive, Africa/Tripoli); `batches` are import batches the record came from. Only parts whose data follows one register record can be narrowed (`DataResetPart.narrowable`); a narrowing needs chosen parts (not everything) and any other part is 422. A part the chosen one takes along (procurement takes car_dispatcher and financial_advances) loses only the entities linked to the selected procurement records. The narrowing is stored in `DataResetScope.narrow` and bound into `scope_hash`/`approved_scope_hash`: an approver who saw another narrowing is 409 `scope_changed`. `GET /settings/data-reset/plan` takes `regions`, `batches`, `from`, `to` (the dry run of the narrowed scope, `DataResetPlan.narrow`). New `GET /settings/data-reset/narrow-options?part=` lists the regions and the recent import batches of the part for the picker. System Admin only, no delegation.
     - 0.15.264 (2026-11-27): `GET /custom-fields` and `GET /custom-fields/{field_id}` now have an implementation (they were documented only; the list was always empty). No migration, no schema change. Everyone signed in reads the active fields their field rules do not hide; inactive fields and the role lists are for a System Admin or an all-regions delegate of the custom fields. POST and PATCH stay documented, not built (proposal to follow).
@@ -102,6 +105,7 @@ info:
     - 0.15.82 (2026-11-26): `GET /me/tasks.ics` returns My Work (do now and late) as an iCalendar file. Needs the session like every call; same rights and region scope as `GET /me/tasks`; nothing public and no token link. No migration.
     - 0.15.81 (2026-11-26): two more UI designs, `obsidian` and `sahara` (migration 0164): `UiBrand` gains the two names (users.ui_brand, `ui.identity` default_brand, `PATCH /me/profile`). Visual only; the four existing designs, the light/dark theme and the storage are unchanged.
     - 0.15.80 (2026-11-26): what a role sees of the Dashboard (migration 0163). `Role.dashboard_tabs` (any non-empty combination of `pmo`, `cw`, `te`; default all three) and `Role.hide_messages_inbox` (default false); `RolePatch` sets them (System Admin only, 403 `delegate_forbidden` for a delegate; reason, step-up; audited as `role_dashboard_access_set`). `EffectivePermissions.dashboard_tabs` is the union over the roles held now (a System Admin or a user with no active role: all three). `GET /dashboard`, `/dashboard/extras`, `/dashboard/export` and `/project-status*` answer 403 `action_forbidden` outside the caller's tabs (`pmo` includes the others; view CW needs `cw`, view TE needs `te`, any other view or none needs `pmo`). A role that hides Messages and Inbox removes only the two menu entries of its holders (`effective.nav`); the pages and the API are unchanged. No grant, role or default changes.
+    - 0.15.500 (2026-11-27): the role code is editable (owner decision D51; migration 0500; no new route). `RolePatch.code` (`^[A-Z][A-Z0-9_]{1,40}$`; reason and step-up as for any role edit; audited as `role_code_changed` with the old and the new code). 422 `validation_failed` for a bad format or for a built-in role whose code the platform uses by name (PM, CW_TL, TE_TL and the other seeded roles, plus QC_GENERAL, FLEET_DISPATCHER, FIN_OFFICER), 409 `duplicate` when the code exists. History, saved filters and exports that quote the old code are not rewritten. `Role.description_ar` and `RoleInput.description_ar` were already in the contract; the Roles dialog now edits them.
     - 0.15.79 (2026-11-26): "Forgot password" by email: `POST /auth/local/password-reset/request` (always the same 202) and `POST /auth/local/password-reset/confirm` (one-time link, 204). Local-password accounts only; System Admins and M365 or break-glass accounts are excluded. No existing endpoint changes.
     - 0.15.78 (2026-11-25): `PATCH /users/{user_id}` also takes `display_name`; `employee_id` is now edited by the admin (4 digits, unique, audited as `user_identity`, never your own row). E-mail and phone stay on the verified request flow. No new endpoint.
     - 0.15.77 (2026-11-25): Real delete of a warehouse item that has no data (owner decision 2026-11-25): `DELETE /warehouse/items/{item_id}?reason=` (System Admin or the `warehouse_items` delegate, reason, If-Match, audited). Allowed only when no movement line (any status), serial, site quantity or As-Built link points to the item; otherwise 409 `item_in_use` and the item can only be deactivated (PATCH `is_active: false`, unchanged). The item answer carries `deletable` (read-only). Migration 0160.
@@ -6827,6 +6831,87 @@ paths:
                 properties:
                   items: { type: array, items: { $ref: '#/components/schemas/Setting' } }
         '401': { $ref: '#/components/responses/Unauthorized' }
+  /settings/register-rules:
+    get:
+      tags: [settings]
+      operationId: listRegisterRules
+      summary: The editable rules of the registers and their values
+      x-db-path: reg_rules_json
+      description: |
+        0.15.331 (migration 0430). System Admin or a delegate of `fields.edit` for all regions. `catalogue` lists the keys that can be edited (register, key, type, default, labels), `items` the registers that have some with their current `rules`.
+      responses:
+        '200':
+          description: The rules.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [catalogue, items]
+                properties:
+                  catalogue:
+                    type: array
+                    items:
+                      type: object
+                      required: [register_key, key, type, label_en]
+                      properties:
+                        register_key: { type: string }
+                        key: { type: string }
+                        type: { type: string, enum: [boolean, text] }
+                        default: {}
+                        label_en: { type: string }
+                        label_ar: { type: string }
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [register_key, name_en, rules, version]
+                      properties:
+                        register_key: { type: string }
+                        name_en: { type: string }
+                        name_ar: { type: [string, 'null'] }
+                        rules: { type: object, additionalProperties: true }
+                        version: { type: integer }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /settings/register-rules/{register_key}:
+    parameters:
+      - $ref: '#/components/parameters/RegisterKeyAny'
+    put:
+      tags: [settings]
+      operationId: setRegisterRules
+      summary: Change rules of one register
+      x-db-path: admin_register_rules
+      description: |
+        0.15.331 (migration 0430). Only keys of the catalogue (422 `unknown_rule`), each with the right type (422 `invalid`). A reason is required, the ETag is checked and the change is audited with before and after.
+      parameters:
+        - { name: If-Match, in: header, required: false, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rules, reason]
+              properties:
+                rules: { type: object, additionalProperties: { oneOf: [{ type: boolean }, { type: string }] } }
+                reason: { $ref: '#/components/schemas/Reason' }
+      responses:
+        '200':
+          description: The new rules.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [register_key, rules, version]
+                properties:
+                  register_key: { type: string }
+                  rules: { type: object, additionalProperties: true }
+                  version: { type: integer }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
   /settings/sla-rules:
     get:
       tags: [settings]
@@ -13545,6 +13630,10 @@ paths:
         schema:
           type: array
           items: {type: string, format: uuid}
+      - name: list
+        in: query
+        description: '0.15.320. Only for `TPL-LISTVALUES`: the code of a dropdown list. The file holds the current active values of that list (at most 5000), ready to edit and upload again.'
+        schema: {type: string, pattern: '^[A-Za-z][A-Za-z0-9_]{0,63}$'}
       - name: prefill
         in: query
         description: Pre-fill with the current records of the register (at most 5000 rows).
@@ -17874,6 +17963,63 @@ paths:
         '200': {description: Removed (also when there was none).}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '422': {$ref: '#/components/responses/Unprocessable'}
+  /comments/{comment_id}/reactions:
+    parameters:
+      - $ref: '#/components/parameters/CommentId'
+    put:
+      tags: [tasks]
+      operationId: reactToComment
+      summary: React to a comment (0.15.247, PM item 18)
+      description: Adds the caller's reaction to any comment they can read, a task comment or a register-record comment (the same bar as commenting on it). The emoji travels in the body because the client path whitelist keeps non-ASCII out of URLs. 404 `not_found` for a comment the caller cannot read, so its existence is not revealed; 422 `validation_failed` for an unsupported emoji. Idempotent. Not audited.
+      x-db-path: comment_react
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CommentReactionInput'}
+      responses:
+        '204': {description: Reaction recorded (also when it was already there).}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': { $ref: '#/components/responses/Unprocessable' }
+    delete:
+      tags: [tasks]
+      operationId: unreactToComment
+      summary: Remove the caller's reaction (0.15.247)
+      description: Removes the caller's own reaction, named in the body like the PUT. 404 for a comment the caller cannot read. Idempotent.
+      x-db-path: comment_unreact
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CommentReactionInput'}
+      responses:
+        '204': {description: Reaction removed (also when it was not there).}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /comments/{comment_id}/resolved:
+    parameters:
+      - $ref: '#/components/parameters/CommentId'
+    put:
+      tags: [tasks]
+      operationId: resolveComment
+      summary: Mark a comment resolved (0.15.247, PM item 18)
+      description: Marks the point of the comment resolved and records who did it and when. Anyone who can read the thread may resolve, the same bar as commenting. 404 for a comment the caller cannot read. Not audited.
+      x-db-path: comment_set_resolved
+      responses:
+        '204': {description: Resolved.}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    delete:
+      tags: [tasks]
+      operationId: unresolveComment
+      summary: Open a resolved comment again (0.15.247)
+      description: Clears the resolved mark (`resolved_at` and `resolved_by` read as null again). 404 for a comment the caller cannot read.
+      x-db-path: comment_set_resolved
+      responses:
+        '204': {description: Open again.}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
 components:
   securitySchemes:
     cookieAuth:
@@ -18050,6 +18196,12 @@ components:
       in: path
       required: true
       description: Register record.
+      schema: {type: string, format: uuid}
+    CommentId:
+      name: comment_id
+      in: path
+      required: true
+      description: Comment.
       schema: {type: string, format: uuid}
     DocTypeId:
       name: doc_type_id
@@ -19904,6 +20056,7 @@ components:
       type: object
       minProperties: 1
       properties:
+        code: { type: string, pattern: '^[A-Z][A-Z0-9_]{1,40}$', description: '0.15.500 (0500, D51). Changes the code; built-in codes are locked (422), a duplicate is 409.' }
         name_en: { type: string, minLength: 2 }
         name_ar: { type: string }
         description_en: { type: string }
@@ -20666,7 +20819,29 @@ components:
         body: { type: string }
         is_rejection_note: { type: boolean }
         mentions: { type: array, items: { $ref: '#/components/schemas/UserRef' } }
+        reactions: { type: array, items: { $ref: '#/components/schemas/CommentReaction' }, description: '0.15.247. One entry per emoji used on the comment, with the count and whether the caller reacted.' }
+        resolved: { $ref: '#/components/schemas/CommentResolved' }
         created_at: { type: string, format: date-time }
+    CommentReactionInput:
+      type: object
+      required: [emoji]
+      additionalProperties: false
+      properties:
+        emoji: { type: string, enum: ['👍'], description: '0.15.247. Starts with 👍 only.' }
+    CommentReaction:
+      type: object
+      required: [emoji, count, mine]
+      properties:
+        emoji: { type: string, description: '0.15.247. Starts with 👍 only.' }
+        count: { type: integer }
+        mine: { type: boolean, description: 'The caller reacted with this emoji.' }
+    CommentResolved:
+      type: object
+      required: [at, by]
+      description: '0.15.247. Set while the comment is marked resolved; absent (null) while open.'
+      properties:
+        at: { type: string, format: date-time }
+        by: { $ref: '#/components/schemas/UserRef' }
     OverrideRequest:
       type: object
       required: [kind, reason]

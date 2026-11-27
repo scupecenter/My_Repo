@@ -1,3 +1,4 @@
+import { ROLE_CODE_RE, isBuiltInRoleCode } from '@/lib/roleCodes';
 import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -18,7 +19,8 @@ function RoleForm({ role, onClose }: { role?: Role; onClose: () => void }) {
   const toast = useToast();
   const create = useCreateRole(), patch = useRolePatch();
   const profiles = useProfiles(), regions = useRegions(), modules = useModuleOptions();
-  const [code, setCode] = useState(''), [en, setEn] = useState(role?.name_en ?? ''), [arName, setAr] = useState(role?.name_ar ?? '');
+  const [code, setCode] = useState(role?.code ?? ''), [en, setEn] = useState(role?.name_en ?? ''), [arName, setAr] = useState(role?.name_ar ?? '');
+  const [descAr, setDescAr] = useState(role?.description_ar ?? '');
   const [desc, setDesc] = useState(role?.description_en ?? ''), [hold, setHold] = useState(role?.can_hold_matrix_levels ?? false), [active, setActive] = useState(role?.is_active ?? true);
   const [profile, setProfile] = useState(role?.default_profile_id ?? '');
   // Q165 (contract 0.12.3): who reads the whole Audit Log, and who reads it as a Team Lead. System Admin only.
@@ -29,14 +31,16 @@ function RoleForm({ role, onClose }: { role?: Role; onClose: () => void }) {
   const [hideMsg, setHideMsg] = useState(role?.hide_messages_inbox ?? false);
   const [reg, setReg] = useState<'all' | number[]>(role?.default_region_ids ?? 'all'), [mods, setMods] = useState<'all' | string[]>(role?.default_module_keys ?? 'all');
   const m = role ? patch : create;
-  const bad = tabs.length === 0 || en.trim().length < 2 || (!role && !/^[A-Z][A-Z0-9_]{1,40}$/.test(code));
+  const builtIn = !!role && isBuiltInRoleCode(role.code);
+  const bad = tabs.length === 0 || en.trim().length < 2 || (code !== (role?.code ?? '') && !ROLE_CODE_RE.test(code));
   const done = () => { toast(t('roles.saved')); onClose(); };
   return (
     <FormDialog open onClose={onClose} testid="role-dialog" wide title={role ? t('roles.edit') : t('roles.new')} disabled={bad} busy={m.isPending} error={m.isError ? errText(m.error, t) : null}
       onSubmit={(reason) => {
         if (role) {
           // Only what changed goes in the PATCH: the server writes each given default as an audited change.
-          const p: Partial<RolePatch> = { name_en: en, name_ar: arName ?? '', description_en: desc, can_hold_matrix_levels: hold, is_active: active };
+          const p: Partial<RolePatch> = { name_en: en, name_ar: arName ?? '', description_en: desc, description_ar: descAr, can_hold_matrix_levels: hold, is_active: active };
+          if (code !== role.code) (p as Record<string, unknown>).code = code;
           if ((profile || null) !== (role.default_profile_id ?? null)) p.default_profile_id = profile || null;
           if (!same(reg, role.default_region_ids ?? 'all')) p.default_region_ids = reg;
           if (!same(mods, role.default_module_keys ?? 'all')) p.default_module_keys = mods;
@@ -45,16 +49,23 @@ function RoleForm({ role, onClose }: { role?: Role; onClose: () => void }) {
           if (admin && hideMsg !== (role.hide_messages_inbox ?? false)) (p as Record<string, unknown>).hide_messages_inbox = hideMsg;
           patch.mutate({ role, reason, patch: p as Partial<Role> }, { onSuccess: done });
         } else {
-          const body: RoleInput = { code, name_en: en, name_ar: arName || undefined, description_en: desc || undefined, can_hold_matrix_levels: hold, default_profile_id: profile || null, default_region_ids: reg, default_module_keys: mods, reason };
+          const body: RoleInput = { code, name_en: en, name_ar: arName || undefined, description_en: desc || undefined, description_ar: descAr || undefined, can_hold_matrix_levels: hold, default_profile_id: profile || null, default_region_ids: reg, default_module_keys: mods, reason };
           create.mutate(body as unknown as Record<string, unknown>, { onSuccess: done });
         }
       }}>
-      {!role && <label className="block text-sm font-semibold">{t('roles.code')}<input className="input mono mt-1 font-normal" data-testid="role-code" dir="ltr" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} /><span className="text-xs font-normal text-mute">{t('roles.code_hint')}</span></label>}
+      <label className="block text-sm font-semibold">{t('roles.code')}
+        <input className="input mono mt-1 font-normal" data-testid="role-code" dir="ltr" value={code} disabled={!!role && builtIn} title={builtIn ? t('roles.code_locked') : undefined} onChange={(e) => setCode(e.target.value.toUpperCase())} />
+        <span className="text-xs font-normal text-mute">{builtIn ? t('roles.code_locked') : t('roles.code_hint')}</span>
+        {role && !builtIn && code !== role.code && <span className="mt-1 block rounded border border-warn/40 bg-warn/10 p-2 text-xs font-normal" role="note" data-testid="role-code-warning">{t('roles.code_change_warning')}</span>}
+      </label>
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="block text-sm font-semibold">{t('roles.name_en')}<input className="input mt-1 font-normal" data-testid="role-name-en" value={en} onChange={(e) => setEn(e.target.value)} /></label>
         <label className="block text-sm font-semibold">{t('roles.name_ar')}<input className="input mt-1 font-normal" data-testid="role-name-ar" dir="rtl" value={arName ?? ''} onChange={(e) => setAr(e.target.value)} /></label>
       </div>
-      <label className="block text-sm font-semibold">{t('roles.description')}<textarea className="input mt-1 font-normal" data-testid="role-desc" value={desc ?? ''} onChange={(e) => setDesc(e.target.value)} /></label>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="block text-sm font-semibold">{t('roles.description')}<textarea className="input mt-1 font-normal" data-testid="role-desc" value={desc ?? ''} onChange={(e) => setDesc(e.target.value)} /></label>
+        <label className="block text-sm font-semibold">{t('roles.description_ar')}<textarea className="input mt-1 font-normal" data-testid="role-desc-ar" dir="rtl" value={descAr} onChange={(e) => setDescAr(e.target.value)} /></label>
+      </div>
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="block text-sm font-semibold">{t('roles.default_profile')}
           <select className="input mt-1 font-normal" data-testid="role-profile" value={profile} onChange={(e) => setProfile(e.target.value)}>
