@@ -17912,7 +17912,7 @@ export interface components {
             /** @enum {string} */
             format: "webp" | "jpeg";
             max_source_mb: number;
-            /** @description Thumbnails one person may make per minute (0440, SEC-2). Only the making counts; a kept thumbnail is served freely. Above it the thumbnail route answers 429 rate_limited with Retry-After. */
+            /** @description Thumbnails one person may make per minute (0470, SEC-2). Only the making counts; a kept thumbnail is served freely. Above it the thumbnail route answers 429 rate_limited with Retry-After. */
             rate_per_min: number;
         };
         /** @description 0.15.292. Setting `media.gallery` (migration 0396). */

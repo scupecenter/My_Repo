@@ -1,5 +1,5 @@
--- 0440_media_thumb_rate: SEC-2 of the security review, a per-user limit on thumbnail generation (Settings > Documents > Media, setting media.gallery).
--- Mirror: db/sql/439_media_thumb_rate.sql (kept identical to prisma/migrations/0440_media_thumb_rate/migration.sql).
+-- 0470_media_thumb_rate: SEC-2 of the security review, a per-user limit on thumbnail generation (Settings > Documents > Media, setting media.gallery).
+-- Mirror: db/sql/469_media_thumb_rate.sql (kept identical to prisma/migrations/0470_media_thumb_rate/migration.sql).
 --
 -- One new key in the existing setting, thumbnails.rate_per_min: how many thumbnails one person may make per minute (10 to 2000, default 240).
 -- Only the making of a thumbnail counts; a thumbnail already kept beside the original is served without counting. Above the limit the API answers
