@@ -3,16 +3,16 @@ import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClie
 import { api, ApiError, downloadFile } from './client';
 import type { ImportBatch, Job, ImportBatchResult, ImportDecisionRequest, ImportRow, Page, RegisterDefinition, RegisterRecord, RegisterRecordInput, RegisterRecordPatch, RegisterRecordState, RegisterRecordStep, Template, UploadedBatch, UserRef } from './types';
 
-export type RecordFilters = { q: string; region_id: string; state: string; record_type: string; site_id?: string; /** 0.15.31 (F3): the AND/OR filter tree as JSON */ filter?: string };
+export type RecordFilters = { q: string; region_id: string; state: string; record_type: string; site_id?: string; /** 0.15.240: intake-triage state (triage-enabled registers) */ triage?: string; /** 0.15.31 (F3): the AND/OR filter tree as JSON */ filter?: string };
 export type RecordOp = 'submit' | 'review' | 'approve' | 'reject' | 'void';
 
 /** `GET /registers`: the catalogue with the fields the caller may see (the form is built from it, never hard-coded). */
 export const useRegisterDefs = () =>
   useQuery({ queryKey: ['register-defs'], staleTime: 300_000, queryFn: () => api.get<{ items: RegisterDefinition[] }>('/registers').then((r) => r.items) });
 
-export const useRegisterRecords = (key: string, f: RecordFilters) =>
+export const useRegisterRecords = (key: string, f: RecordFilters, enabled = true) =>
   useInfiniteQuery({
-    queryKey: ['register-records', key, f], initialPageParam: '' as string, placeholderData: keepPreviousData,
+    queryKey: ['register-records', key, f], enabled, initialPageParam: '' as string, placeholderData: keepPreviousData,
     queryFn: ({ pageParam }) => api.get<Page<RegisterRecord>>(`/registers/${key}/records`, { query: { ...f, limit: 100, cursor: pageParam } }),
     getNextPageParam: (last) => last.page.next_cursor ?? undefined,
   });
@@ -91,6 +91,17 @@ export function useRecordOp(key: string) {
     },
     onSuccess: (r) => qc.setQueryData(['register-record', key, r.id], r),
     onError: (_e, v, ctx) => { ctx?.rollback(); qc.setQueryData(['register-record', key, v.record.id], ctx?.before); },
+    onSettled: (_d, _e, v) => settle(qc, key, v.record.id),
+  });
+}
+
+/** 0.15.240: one intake-triage decision (accept / reject / merge as a duplicate / defer) on a record of a triage-enabled register. If-Match = record version; reject and merge need a note (and a step-up), merge also the surviving record. */
+export type TriageOp = 'accept' | 'reject' | 'merge' | 'defer';
+export function useRecordTriage(key: string) {
+  const qc = useQueryClient();
+  return useMutation<RegisterRecord, ApiError, { record: RegisterRecord; op: TriageOp; note?: string; duplicate_of?: string }>({
+    mutationFn: ({ record, op, note, duplicate_of }) => api.post(`/registers/${key}/records/${record.id}/triage`, { version: record.version, body: { action: op, ...(note ? { note } : {}), ...(duplicate_of ? { duplicate_of } : {}) } }),
+    onSuccess: (r) => qc.setQueryData(['register-record', key, r.id], r),
     onSettled: (_d, _e, v) => settle(qc, key, v.record.id),
   });
 }

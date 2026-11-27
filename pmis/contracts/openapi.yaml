@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.193
+  version: 0.15.240
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -31,6 +31,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.240 (2026-11-27): intake triage for the Issue Log and the Change Control Log (owner request 2026-11-27; migration 0340, mirror `db/sql/339_register_triage.sql`; CHANGELOG RegisterTriage). Additive. (1) `RegisterDefinition.triage_enabled` (true for `issues` and `change_control`): a record of such a register enters an intake queue (`RegisterRecord.triage.state` `pending`) on every insert, a new version included (the old decision is cleared). (2) New `POST /registers/{register_key}/records/{record_id}/triage` (`triageRegisterRecord`): one decision of the register's Matrix L2 holders of the record's region (a System Admin only when the row has no holder, exactly like an approval): `accept` (the record proceeds to its normal flow), `defer` (stays in the queue, with a note), `reject` (note and step-up required; the record is `voided`) and `merge` (`duplicate_of`, note and step-up; the record is `voided`, links the surviving record `triage.duplicate_of`, and the decision is noted on the surviving record's comment thread). `If-Match` is the record's version; `allowed_actions` gains `triage` while a record is pending or deferred and the caller may decide. `GET /registers/{register_key}/records` takes `triage` (one of `TriageState`). (3) Audited as `register_record_triage` with before and after; `RegisterRecordStep.action` gains `triage_accept`, `triage_reject`, `triage_merge`, `triage_defer`; the creator is notified (`NotificationKind` gains `triage_decision`). No grant, role or default changes.
     - 0.15.261 (2026-11-27): mail policy (migration 0364, mirror `db/sql/363_mail_policy.sql`). Additive. New `GET/PUT /settings/mail-policy` (the setting `mail.policy`: global switch, internal only or internal plus external recipients, internal domains, per kind switch and mode). `expiry_radar`, `approval_digest` and `weekly_digest` join the mail kind catalogue (still mailed only when listed in `mail.notification_kinds`). Defaults keep today's behaviour.
     - 0.15.260 (2026-11-27): cross-register derive (migration 0363, mirror `db/sql/362_derive_rules.sql`; owner approval 2026-11-27). Additive. New `GET/PUT /settings/derive-rules` (the setting `derive.rules`: which value a register shows from another register; If-Match, reason, audited; field errors `unknown_key`, `unknown_register`, `same_register`, `unknown_field`, `duplicate`, `invalid`, `too_many`). `RegisterRecord.derived` carries the derived values of the record by output name; `procurement_contractor` of GECOL and HLC is now the seeded rule and keeps its shape. A derived value is computed on read from the configured source field of the matching source record only (never the record), needs no permission on the source register, is shown only for target records the caller may read, and each person's first read of a rule in 10 minutes is audited (`derive_disclosed`). No grant, role or permission change.
     - 0.15.225 (2026-11-27): Change Control names the order and the task it affects (migration 0325; CHANGELOG ChangeControlAffected). Additive. New optional fields `procurement_order_id` (an approved, active Procurement order of the same site that the caller may see; 422 `order_not_active`, `order_other_site`, `invalid`) and `affected_task_code` (a task code of the workflow; 422 `unknown_task`), checked on a version in entry only. New `GET /registers/change_control/order-options` (the order picker; Change Control view plus Procurement view). `GET /registers/{register_key}/{entity_id}/related` also lists the change requests that name an order, so the order shows a change-pending mark. No permission change.
@@ -11691,6 +11692,10 @@ paths:
       - name: record_type
         in: query
         schema: {type: string}
+      - name: triage
+        in: query
+        description: '0.15.240: only records whose intake triage is in this state (triage-enabled registers).'
+        schema: {$ref: '#/components/schemas/TriageState'}
       - name: entity_id
         in: query
         description: All versions of one logical record.
@@ -12158,6 +12163,48 @@ paths:
       responses:
         '200':
           description: Unlocked.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RegisterRecord'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /registers/{register_key}/records/{record_id}/triage:
+    parameters:
+    - {$ref: '#/components/parameters/RegisterKeyPath'}
+    - {$ref: '#/components/parameters/RegisterRecordId'}
+    post:
+      tags: [registers]
+      operationId: triageRegisterRecord
+      summary: One intake-triage decision on a record (Issue Log, Change Control) (0.15.240)
+      description: |
+        0.15.240. A record of a triage-enabled register enters the queue `pending` on every insert and waits for one decision of the register's
+        Matrix L2 holders of the record's region (a System Admin only when the row has no holder, exactly like an approval; 403
+        `action_forbidden` / `not_eligible_holder` otherwise). `If-Match` is the record's version. The decision (`TriageRequest`):
+        `accept` lets the record proceed to its normal flow, `defer` keeps it in the queue (a note may say why), `reject` and `merge` void
+        the record (409 `invalid_transition` when already decided, or when the record is already approved) and need a note and step-up
+        (401 `step_up_required`); `merge` also names the surviving record `duplicate_of` (422 `validation_failed`, `/duplicate_of`, when it
+        is missing, the record itself, or not another live record of the same register the caller can see), links it in
+        `triage.duplicate_of` and notes the merge on the surviving record's comment thread. A record of a register without triage answers
+        404. Audited as `register_record_triage` with before and after; the creator is notified (`triage_decision`).
+      x-step-up: true
+      x-db-path: reg_triage_act
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/TriageRequest'}
+      responses:
+        '200':
+          description: The decided record.
           headers:
             ETag: {$ref: '#/components/headers/ETag'}
           content:
@@ -23040,6 +23087,7 @@ components:
         multiple_per_site: { type: boolean }
         record_types: { type: array, items: { type: string }, description: 'For example pr, po, wo for procurement.' }
         approval_levels: { type: integer, const: 2, description: 'Always 2 since 0.6.1 (L1 Data Entry, L2 Data Reviewer & Approver), from the register row of the Responsibility Matrix.' }
+        triage_enabled: { type: boolean, description: '0.15.240. Intake triage on the register (the Issue Log and the Change Control Log): new records and new versions enter the queue (`pending`) and wait for a triage decision.' }
         fields: { type: array, items: { $ref: '#/components/schemas/RegisterField' }, description: 'Base fields plus active custom fields visible to the caller.' }
         record_count: { type: integer }
         entry_scopes:
@@ -23097,7 +23145,18 @@ components:
         external_party: { $ref: '#/components/schemas/ExternalPartyRef' }
         return_count: { type: integer }
         last_return_note: { type: [string, 'null'] }
-        allowed_actions: { type: array, items: { type: string, enum: [edit, submit, review, approve, reject, void, claim, release, new_version, transfer, cancel_snag] } }
+        allowed_actions: { type: array, items: { type: string, enum: [edit, submit, review, approve, reject, void, claim, release, new_version, transfer, cancel_snag, triage] } }
+        triage:
+          type: object
+          additionalProperties: false
+          description: '0.15.240. The intake triage of a record of a triage-enabled register (absent while the record was never queued).'
+          required: [state, note, at, duplicate_of]
+          properties:
+            state: { $ref: '#/components/schemas/TriageState' }
+            note: { type: [string, 'null'] }
+            by: { $ref: '#/components/schemas/UserRef' }
+            at: { type: [string, 'null'], format: date-time }
+            duplicate_of: { type: [string, 'null'], format: uuid, description: 'For a record merged as a duplicate: the surviving record.' }
         entity_id: { type: string, format: uuid, description: 'The logical record; every version of it shares this id. The approved values are projected into the register table with the same id.' }
         version_no: { type: integer, minimum: 1, description: 'Business version of the logical record (1, 2, 3 ...). Not the ETag.' }
         supersedes_id: { type: [string, 'null'], format: uuid }
@@ -24298,7 +24357,7 @@ components:
       properties:
         id: { type: string, format: uuid }
         level: { type: integer }
-        action: { type: string, enum: [create, edit, submit, review, approve, reject, auto_skip, claim, release, new_version, void, transfer] }
+        action: { type: string, enum: [create, edit, submit, review, approve, reject, auto_skip, claim, release, new_version, void, transfer, triage_accept, triage_reject, triage_merge, triage_defer] }
         acted_by: { $ref: '#/components/schemas/UserRef' }
         note: { type: [string, 'null'] }
         before_state: { $ref: '#/components/schemas/RegisterRecordState' }
@@ -24322,6 +24381,20 @@ components:
               name: { type: string }
               type: { type: string }
               scopes: { type: [array, 'null'], items: { type: string } }
+    TriageState:
+      type: string
+      enum: [pending, accepted, deferred, rejected, merged]
+      description: '0.15.240. Intake triage: waiting (`pending`, `deferred`) or decided (`accepted`, `rejected`, `merged`).'
+    TriageRequest:
+      type: object
+      additionalProperties: false
+      required: [action]
+      description: '0.15.240: one intake-triage decision. The note is required for `reject` and `merge`; `merge` also names the surviving record.'
+      properties:
+        action: { type: string, enum: [accept, reject, merge, defer] }
+        note: { type: string, maxLength: 2000 }
+        duplicate_of: { type: string, format: uuid, description: 'With `merge`: the surviving record of the same register.' }
+        via: { $ref: '#/components/schemas/WorkflowVia' }
     RegisterRecordInput:
       type: object
       required: [data]
@@ -25811,7 +25884,7 @@ components:
     # ---------------------------------------------------------- notifications and logs
     NotificationKind:
       type: string
-      enum: [task_assigned, task_returned, task_approved, approval_due, reassigned, absence_alert, idle_task_alert, no_holder, holiday_tentative, delegation, mfa_exemption, template_updated, import_batch, system, mention, followed_change, task_rejected, no_eligible_holder, register_assigned, register_rejected, gate_closed_again, sla_negative_duration, email_change_requested, email_change_decided, security_alert, snag_raised, snag_review, snag_rejected, snag_closed, levels_converted, permit_transferred, phone_change_requested, phone_change_decided, security_notice, site_region_moved, assignment_request, data_reset_request, alert_rule]
+      enum: [task_assigned, task_returned, task_approved, approval_due, reassigned, absence_alert, idle_task_alert, no_holder, holiday_tentative, delegation, mfa_exemption, template_updated, import_batch, system, mention, followed_change, task_rejected, no_eligible_holder, register_assigned, register_rejected, gate_closed_again, sla_negative_duration, email_change_requested, email_change_decided, security_alert, snag_raised, snag_review, snag_rejected, snag_closed, levels_converted, permit_transferred, phone_change_requested, phone_change_decided, security_notice, site_region_moved, assignment_request, data_reset_request, triage_decision, alert_rule]
     Notification:
       type: object
       required: [id, kind, title, created_at, read_at]
