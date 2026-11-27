@@ -285,3 +285,17 @@ describe("dropdown lists (migration 0102)", () => {
     expect((await listOf(L)).values.map((x) => x.code).sort()).toEqual(["Alpha", "Beta"]);
   });
 });
+
+// Contract 0.15.244 (item 15 of the PM-platforms research): the colour of a list value reaches the register fields, display only.
+describe("list value colour in the register fields (0.15.244)", () => {
+  it("a coloured value of the ProcScope list shows its colour in the procurement scope options", async () => {
+    const cat = (await admin.api.call("get", "/list-catalogues/ProcScope")).body as { values: { id: string; code: string }[] };
+    const cw = cat.values.find((v) => v.code === "CW")!;
+    const r = await patch(`/list-catalogues/ProcScope/values/${cw.id}`, { colour: "#0E7490", reason: "item 15 colour reach" });
+    expect(r.status).toBe(200);
+    const regs = (await admin.api.call("get", "/registers")).body as { items: { register_key: string; fields: { code: string; options?: { value: string; colour?: string | null }[] }[] }[] };
+    const scope = regs.items.find((x) => x.register_key === "procurement")!.fields.find((f) => f.code === "scope")!;
+    expect(scope.options?.find((o) => o.value === "CW")?.colour).toBe("#0E7490");
+    await patch(`/list-catalogues/ProcScope/values/${cw.id}`, { colour: null, reason: "item 15 colour reach cleanup" });
+  });
+});
