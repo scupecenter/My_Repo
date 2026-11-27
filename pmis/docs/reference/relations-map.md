@@ -54,6 +54,7 @@ A dotted arrow is an id column with no `REFERENCES` constraint (the id is checke
 | Car dispatcher, Financial advances | Procurement order | register link | `procurement_record_id` | typed (text) |
 | Issues, snags, quality, orders, contract end | Contractor performance view (0180) | computed on read, no stored value | thresholds in setting `contractors.performance` | derived |
 | Warehouse DN / RN documents | Stock, per-site quantity, serials | posted by approved documents | `wh_movement_lines`, `warehouse_site_qty`, `warehouse_serials` | derived |
+| Register records (procurement, warehouse, dismantle, issues, quality, car dispatcher, financial advances, risks) | Related records panel (0324) | computed on read, no stored value | `record_related(register, entity)`; the link list is one VALUES list in the function | derived |
 | Register decisions, task approvals, snags | Notifications | `x_notify_watchers`, policy in setting `notifications.policy` | `notifications` | derived |
 
 ## 4. Gaps and proposals
