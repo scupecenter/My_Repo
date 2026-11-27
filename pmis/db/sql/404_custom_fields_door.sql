@@ -159,7 +159,7 @@ BEGIN
     SELECT coalesce(array_agg(t.v::uuid), '{}') INTO edt FROM jsonb_array_elements_text(CASE WHEN has_edt THEN p_input -> 'editable_by_role_ids' ELSE
       (SELECT coalesce(jsonb_agg(p.role_id), '[]'::jsonb) FROM public.field_permissions p WHERE p.field_id = fid AND p.role_id IS NOT NULL AND p.access::text = 'edit') END) AS t(v);
     -- field rules are identity data: they are written only through the existing door idm_field_permission_set (reason, the actor needs `fields` edit, nobody changes a rule
-    -- that applies to them, nobody gives more access than they have). Only the roles whose rule changes are touched; "edit" with no rule is the default and stays no rule.
+    -- that applies to them, nobody gives more access than they have). Only the roles whose rule changes are touched; A listed role gets an explicit "edit" rule, so the lists read back as they were sent.
     FOR rl IN SELECT id FROM public.roles WHERE is_active ORDER BY id LOOP
       want_acc := CASE
         WHEN cardinality(vis) = 0 AND cardinality(edt) = 0 THEN NULL
@@ -167,7 +167,7 @@ BEGIN
         WHEN cardinality(edt) > 0 AND NOT (rl.id = ANY(edt)) THEN 'read'
         ELSE 'edit' END;
       SELECT p.access::text INTO cur_acc FROM public.field_permissions p WHERE p.field_id = fid AND p.role_id = rl.id;
-      IF cur_acc IS DISTINCT FROM want_acc AND NOT (want_acc = 'edit' AND cur_acc IS NULL) THEN
+      IF cur_acc IS DISTINCT FROM want_acc THEN
         PERFORM public.idm_field_permission_set(fid, rl.id, NULL::uuid, want_acc::public."FieldAccess", btrim(p_reason));
       END IF;
     END LOOP;

@@ -59,6 +59,11 @@ beforeAll(async () => {
   );
 });
 afterAll(async () => {
+  // the fields this file wrote stay in the shared test database: switch them off so no other suite meets a required field
+  await db.query(
+    `UPDATE field_definitions SET is_active = false, required = false WHERE code LIKE $1`,
+    [`%${TAG}%`],
+  );
   await db.end();
   await app.close();
 });
