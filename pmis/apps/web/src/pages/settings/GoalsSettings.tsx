@@ -23,7 +23,7 @@ export function goalId(name: string, taken: string[]): string {
 }
 
 /**
- * Settings, Screens, Goals (contract 0.15.99): each goal counts the sites that reach a milestone task (in a region, or in all) during the current month,
+ * Settings, Screens, Goals (contract 0.15.120): each goal counts the sites that reach a milestone task (in a region, or in all) during the current month,
  * quarter or year. The progress is counted by the system and shown in the Dashboard card Goals; nobody types it. Needs admin.settings edit and a reason.
  * The fixed targets of Settings, Screens, Dashboard (sites per batch, monthly On-Air) stay there and keep feeding the On-Air counter.
  */

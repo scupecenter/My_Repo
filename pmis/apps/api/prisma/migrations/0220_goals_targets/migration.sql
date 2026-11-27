@@ -1,5 +1,5 @@
--- 0187_goals_targets: goals (targets) with automatic progress. Contract 0.15.99.
--- Mirror: db/sql/186_goals_targets.sql (kept identical to prisma/migrations/0187_goals_targets/migration.sql).
+-- 0220_goals_targets: goals (targets) with automatic progress. Contract 0.15.120.
+-- Mirror: db/sql/219_goals_targets.sql (kept identical to prisma/migrations/0220_goals_targets/migration.sql).
 --
 --   A goal says: "N sites reach milestone task X in region R during this month / quarter / year". The progress is never typed: it is counted from the approved
 --   milestone tasks (the same rule as the On-Air counter: an approved task with an actual date in the period, active, not cancelled sites, distinct sites).
@@ -64,7 +64,7 @@ BEGIN
   PERFORM public.calc_require_admin('admin.settings', true);
   PERFORM public.calc_require_reason(p_reason);
   INSERT INTO public.settings (key, value, description, updated_by, updated_at)
-    VALUES ('dashboard.goals', '{"version":0,"goals":[]}'::jsonb, 'Goals with automatic progress (migration 0187).', NULL, now()) ON CONFLICT (key) DO NOTHING;
+    VALUES ('dashboard.goals', '{"version":0,"goals":[]}'::jsonb, 'Goals with automatic progress (migration 0220).', NULL, now()) ON CONFLICT (key) DO NOTHING;
   PERFORM 1 FROM public.settings WHERE key = 'dashboard.goals' FOR UPDATE;
   cur := public.goals_json();
   v := (cur ->> 'version')::int;

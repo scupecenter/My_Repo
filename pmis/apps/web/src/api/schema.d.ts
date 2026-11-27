@@ -5862,6 +5862,55 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/login-page": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The sign-in page settings (announcement, animation, default language, support links) (0.15.97)
+         * @description Every signed-in user may read it; the settings screen and the post-login splash use it. `can_edit` is true for a System Admin or a delegate of `settings` edit for all regions. `server_version` is shown to signed-in users only.
+         */
+        get: operations["getLoginPage"];
+        /**
+         * Set the sign-in page settings (reason, step-up, If-Match, audited) (0.15.97)
+         * @description A System Admin, or a delegate of `settings` edit for all regions (403 `action_forbidden` otherwise, also for a delegate limited to some regions). A reason
+         *     (3+ characters), a step-up (401 `step_up_required`) and `If-Match` (428 / 412) are required. Unknown keys and invalid values are 422; saving the values in
+         *     force is 409 `invalid_transition`. Audited `login_page_update` with the config before and after. Nothing about the sign-in mechanism changes: this is
+         *     presentation only (announcement, background animation, default language, support links).
+         */
+        put: operations["setLoginPage"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/login-page/public": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The public sign-in page config (no session) (0.15.97)
+         * @description No session: what the signed-out pages render, and nothing else - the announcement, the background animation switch, the default language and the support
+         *     links. No version, no audit data, nothing about users. Cached 30 seconds (`Cache-Control: public, max-age=30`) and rate limited per address
+         *     (429 `rate_limited` with `Retry-After`).
+         */
+        get: operations["getLoginPagePublic"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/historical-waiver": {
         parameters: {
             query?: never;
@@ -6538,14 +6587,14 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * The goals and the catalogue of milestone tasks and regions (0.15.99)
-         * @description 0.15.99. Goals kept in the settings table as `dashboard.goals`. A goal counts sites that reach a milestone task (`metric`, a milestone task code) in a region (null = all) during the current month, quarter or year.
+         * The goals and the catalogue of milestone tasks and regions (0.15.120)
+         * @description 0.15.120. Goals kept in the settings table as `dashboard.goals`. A goal counts sites that reach a milestone task (`metric`, a milestone task code) in a region (null = all) during the current month, quarter or year.
          *     Reads need `dashboard.view` (403 `module_forbidden` otherwise).
          */
         get: operations["getGoals"];
         /**
          * Save the goals (reason, If-Match, audited, versioned)
-         * @description 0.15.99. System Admin, or a delegation of `admin.settings` edit for all regions (403 `action_forbidden` otherwise). The body replaces the whole list.
+         * @description 0.15.120. System Admin, or a delegation of `admin.settings` edit for all regions (403 `action_forbidden` otherwise). The body replaces the whole list.
          *     Field errors (422 `validation_failed`): `unknown_key`, `invalid`, `duplicate`, `unknown_metric`, `unknown_region`, `too_many`. One audit row per save.
          */
         put: operations["setGoals"];
@@ -6564,8 +6613,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Progress of every active goal (0.15.99)
-         * @description 0.15.99. Counted from approved milestone tasks (actual date in the period; active, not cancelled sites; distinct sites), as the caller: row-level security limits the sites to the regions the caller may read.
+         * Progress of every active goal (0.15.120)
+         * @description 0.15.120. Counted from approved milestone tasks (actual date in the period; active, not cancelled sites; distinct sites), as the caller: row-level security limits the sites to the regions the caller may read.
          *     `status`: achieved (100% or more), on_track (at or above the share of the period that has passed), at_risk (within 15 points below), behind. Needs `dashboard.view`.
          */
         get: operations["getGoalsProgress"];
@@ -16215,6 +16264,56 @@ export interface components {
         UiIdentityInput: components["schemas"]["WithReason"] & {
             default_brand: components["schemas"]["UiBrand"];
             allow_user_choice: boolean;
+        };
+        /** @description 0.15.97. A support link under the sign-in form. http(s) or mailto only. */
+        SupportLink: {
+            label_en: string;
+            /** @description Empty: the English label shows. */
+            label_ar: string;
+            url: string;
+        };
+        /** @description 0.15.97. Settings, Screens, Login page (setting `ui.login_page`, migration 0197). */
+        LoginPage: {
+            /** @description Both texts empty: no banner. */
+            announcement_en: string;
+            announcement_ar: string;
+            /** @enum {string} */
+            announcement_kind: "info" | "maintenance";
+            /** @description The calm telecom background animation of the signed-out pages. A visitor who prefers reduced motion never sees it. */
+            animation: boolean;
+            /** @description The language of the signed-out pages until the visitor chooses one; null: the browser default (English). */
+            default_locale: ("en" | "ar") | null;
+            support_links: components["schemas"]["SupportLink"][];
+            /** @description The system version, shown to signed-in users only (the post-login splash and this screen). */
+            server_version: string;
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+            /** @description The ETag value. */
+            version: number;
+            /** @description A System Admin or a delegate of `settings` edit for all regions. */
+            can_edit: boolean;
+        };
+        LoginPageInput: components["schemas"]["WithReason"] & {
+            announcement_en: string;
+            announcement_ar: string;
+            /** @enum {string} */
+            announcement_kind: "info" | "maintenance";
+            animation: boolean;
+            default_locale: ("en" | "ar") | null;
+            support_links: components["schemas"]["SupportLink"][];
+        };
+        /** @description 0.15.97. The public sign-in page config: ONLY what the signed-out pages render. No version, no audit data, nothing about users. */
+        LoginPagePublic: {
+            announcement: {
+                en: string;
+                ar: string;
+                /** @enum {string} */
+                kind: "info" | "maintenance";
+            } | null;
+            animation: boolean;
+            default_locale: ("en" | "ar") | null;
+            support_links: components["schemas"]["SupportLink"][];
         };
         /** @description 0.15.1. The shared order of the side menu (setting `nav.layout`). */
         NavLayout: {
@@ -30231,6 +30330,83 @@ export interface operations {
             412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getLoginPage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The login page settings. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoginPage"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setLoginPage: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginPageInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoginPage"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getLoginPagePublic: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The public sign-in page config. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoginPagePublic"];
+                };
+            };
+            429: components["responses"]["TooManyRequests"];
         };
     };
     getHistoricalWaiver: {

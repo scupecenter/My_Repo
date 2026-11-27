@@ -25,6 +25,7 @@ import { HistoricalWaiver } from './HistoricalWaiver';
 import { DataReset } from './DataReset';
 import { Imports } from './Imports';
 import { KanbanWip } from './KanbanWip';
+import { NumberSequences } from './NumberSequences';
 import { Studio } from './studio/Studio';
 import { SiteMasterColumns } from './SiteMasterColumns';
 import { DashboardSettings } from './DashboardSettings';
@@ -33,6 +34,7 @@ import { Identity } from './Identity';
 import { DisplaySettings } from './DisplaySettings';
 import { DailyPlanSettings } from './DailyPlanSettings';
 import { MotionSettings } from './MotionSettings';
+import { LoginPageSettings } from './LoginPage';
 
 export interface SettingsSection { key: string; adminOnly?: boolean }
 export interface SettingsTab { key: string; sections: SettingsSection[] }
@@ -45,14 +47,14 @@ export const SETTINGS_TABS: readonly SettingsTab[] = [
   // Lists (the dropdown catalogues, old ddl tab) now sit next to the register columns that use them
   { key: 'registers', sections: [{ key: 'columns' }, { key: 'lists' }, { key: 'contractors' }, { key: 'gecol' }, { key: 'team-scope' }, { key: 'issue-map' }] },
   // W5: the Document Library section is now named Document types (the old documents/library route redirects); Form templates and Archive are new
-  { key: 'documents', sections: [{ key: 'types' }, { key: 'forms' }, { key: 'archive' }] },
+  { key: 'documents', sections: [{ key: 'types' }, { key: 'forms' }, { key: 'archive' }, { key: 'numbering' }] },
   { key: 'data', sections: [{ key: 'imports' }, { key: 'historical' }, { key: 'counts', adminOnly: true }, { key: 'reset', adminOnly: true }] },
   // Notification policy + Mail kinds (admin only): both are what is sent to people
   { key: 'alerts', sections: [{ key: 'policy' }, { key: 'mail', adminOnly: true }] },
   // DLP months is a data-protection rule, so it moved here from SLA
   { key: 'security', sections: [{ key: 'staff' }, { key: 'retention' }, { key: 'dlp' }] },
   // Screens: what users see by default (Dashboard, Display menu of the tables, My Work Daily Plan)
-  { key: 'screens', sections: [{ key: 'dashboard' }, { key: 'tables' }, { key: 'daily-plan' }, { key: 'goals' }, { key: 'motion' }] },
+  { key: 'screens', sections: [{ key: 'dashboard' }, { key: 'tables' }, { key: 'daily-plan' }, { key: 'goals' }, { key: 'motion' }, { key: 'login' }] },
   { key: 'identity', sections: [] },
 ];
 
@@ -138,6 +140,7 @@ export function SettingsRoutes() {
           <Route path="daily-plan" element={<DailyPlanSettings />} />
           <Route path="goals" element={<GoalsSettings />} />
           <Route path="motion" element={<MotionSettings />} />
+          <Route path="login" element={<LoginPageSettings />} />
         </Route>
         <Route path="alerts" element={<TabFrame tab="alerts" />}>
           <Route index element={<Navigate to="policy" replace />} />
@@ -174,6 +177,7 @@ export function SettingsRoutes() {
           <Route path="library" element={<LegacyRedirect to="documents/types" />} />
           <Route path="forms" element={<FormTemplates />} />
           <Route path="archive" element={<ArchiveSettings />} />
+          <Route path="numbering" element={<NumberSequences />} />
         </Route>
         <Route path="data" element={<TabFrame tab="data" />}>
           <Route index element={<Navigate to="imports" replace />} />

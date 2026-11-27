@@ -5,7 +5,7 @@ import { Auth } from "../auth/decorators";
 import { etagHeader } from "../common/etag";
 import { GoalsService } from "./goals.service";
 
-/** Goals with automatic progress (contract tag `settings`, 0.15.99). */
+/** Goals with automatic progress (contract tag `settings`, 0.15.120). */
 @Controller()
 export class GoalsController {
   constructor(private readonly svc: GoalsService) {}
