@@ -30,6 +30,7 @@ import { DashboardSettings } from './DashboardSettings';
 import { Identity } from './Identity';
 import { DisplaySettings } from './DisplaySettings';
 import { DailyPlanSettings } from './DailyPlanSettings';
+import { MotionSettings } from './MotionSettings';
 
 export interface SettingsSection { key: string; adminOnly?: boolean }
 export interface SettingsTab { key: string; sections: SettingsSection[] }
@@ -49,7 +50,7 @@ export const SETTINGS_TABS: readonly SettingsTab[] = [
   // DLP months is a data-protection rule, so it moved here from SLA
   { key: 'security', sections: [{ key: 'staff' }, { key: 'retention' }, { key: 'dlp' }] },
   // Screens: what users see by default (Dashboard, Display menu of the tables, My Work Daily Plan)
-  { key: 'screens', sections: [{ key: 'dashboard' }, { key: 'tables' }, { key: 'daily-plan' }] },
+  { key: 'screens', sections: [{ key: 'dashboard' }, { key: 'tables' }, { key: 'daily-plan' }, { key: 'motion' }] },
   { key: 'identity', sections: [] },
 ];
 
@@ -133,6 +134,7 @@ export function SettingsRoutes() {
           <Route path="dashboard" element={<DashboardSettings />} />
           <Route path="tables" element={<DisplaySettings />} />
           <Route path="daily-plan" element={<DailyPlanSettings />} />
+          <Route path="motion" element={<MotionSettings />} />
         </Route>
         <Route path="alerts" element={<TabFrame tab="alerts" />}>
           <Route index element={<Navigate to="policy" replace />} />

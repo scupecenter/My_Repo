@@ -63,7 +63,7 @@ export function BatchProgress({ batch: b, job, site }: { batch: ImportBatch; job
           className="relative h-3 w-full overflow-hidden rounded-full bg-card2" data-testid="batch-progress-parsing-bar">
           {p === null
             ? <span className="absolute inset-y-0 start-0 w-1/3 animate-pulse rounded-full bg-open" data-testid="batch-progress-indeterminate" />
-            : <span className="block h-full rounded-full bg-open transition-all" style={{ width: `${p}%` }} />}
+            : <span className="block h-full rounded-full bg-open motion-fill" style={{ width: `${p}%` }} />}
         </div>
         {up && <p className="mt-2 text-xs text-mute" role="status" data-testid="batch-progress-parsing-note">{t('batchProgress.parsing_note')}</p>}
       </section>
