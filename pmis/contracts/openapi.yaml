@@ -85,6 +85,7 @@ info:
     - 0.15.185 (2026-11-27): interface features setting (migration 0280, mirror `db/sql/279_ui_features.sql`; CHANGELOG UiFeatures). Additive. `GET`/`PUT /settings/ui-features`: one guarded setting with a closed object per feature section (`UiFeatures`: `avatars` and `new_badge` now; the inbox, menu, hub and mobile sections of items 6 to 15 are added by later migrations). Read by every signed-in user; written by a System Admin or an all-regions delegate of `admin.settings` with a reason and If-Match, audited.
     - 0.15.230 (2026-11-27): appearance profiles (owner approval 2026-11-27, the improvement proposal items 1-3; migration 0241; CHANGELOG AppearanceProfiles). Additive. (1) `User` and `MyProfile` gain `ui_prefs` (the stored personal appearance choices; `{}` = the organization defaults) and `appearance` (what the user sees: own choices, else the organization defaults; `ui_effective_prefs`). `MyProfile.identity` gains `defaults` (the organization appearance defaults) and `pref_options` (the dimensions with their allowed values). (2) `MyProfilePatch` gains `ui_prefs` (`UiPrefs`, a subset of the dimensions; while `allow_user_choice` is false a value is 403 `field_read_only`, `errors[0]` `{path: /ui_prefs, code: appearance_choice_locked}`); audited per dimension in `profile_updated`. (3) `UiIdentity` gains `defaults` and `pref_options`; `UiIdentityInput` gains optional `defaults` (omitted keeps the current ones). The dimensions: `density`, `font_scale`, `radius`, `motion`, `icon_style`, `menu_style`, `accent` (`UiPrefs`).
     - 0.15.231 (2026-11-27): the personal sidebar (owner approval 2026-11-27, the improvement proposal item 4; migration 0242; CHANGELOG SidebarPrefs). Additive. `UiPrefsSelf` (the `ui_prefs` of `User`, `MyProfile` and `MyProfilePatch`) gains the key `sidebar` (`UiNav`): `hidden` (screens the menu does not show), `order` (their order inside their heading), `badge_style` (full / dot / none), `pins` (at most 20 pinned shortcuts). The organization layout and the permission filter still apply first; the overlay only hides, reorders inside a heading, restyles badges and pins. A `ui_prefs` body without `sidebar` keeps the stored one; while `identity.allow_user_choice` is false a sidebar-only change stays allowed. Audited per key in `profile_updated`.
+    - 0.15.232 (2026-11-27): the workspace logo in the identity (owner approval 2026-11-27, the improvement proposal item 5; migration 0243; CHANGELOG WorkspaceLogo). Additive. The table `ui_assets` keeps small identity images ('logo'); `UiIdentity` gains `logo` (`UiAsset`, null when none was uploaded). `GET /ui/assets/{key}` serves the bytes of an enabled asset to every signed-in user (404 otherwise). A System Admin or a delegate of `settings` edit for all regions uploads with `PUT /settings/identity/logo` (multipart `file` + `reason`, If-Match on the asset version; an upload always enables; audited `ui_asset_update`) and shows or hides it with `PATCH /settings/identity/logo` (`{enabled, reason}`; hiding keeps the row: hide never delete). The logo may also show on the sign-in pages and as the browser tab icon, both OFF by default (owner decision 2026-11-27): `UiAsset` gains `show_on_login` and `use_as_favicon`; `PATCH /settings/identity/logo/display` (`setUiLogoDisplay`, reason, step-up, If-Match, audited `ui_asset_update`) sets them; the public reads `GET /ui/public/identity` and `GET /ui/public/logo/{purpose}` (no session, 30 s cache, rate limited) answer only for an enabled logo whose purpose is on, else null / 404.
     - 0.15.92 (2026-11-27): order picker for the Car dispatcher and Financial advances (CHANGELOG OrderPickersDispatchAdvances). Additive, no migration. `GET /registers/car_dispatcher/order-options` and `GET /registers/financial_advances/order-options` list the approved, active Procurement orders for the field `procurement_record_id` (the same list as the warehouse picker); each needs its own module view, and only orders in regions where the caller also holds the Procurement view right are listed.
     - 0.15.91 (2026-11-26): warehouse receipt to Procurement order link (migration 0181; CHANGELOG WarehouseProcurementLink). Additive. A warehouse receipt (PL or OPEN) may name the approved, active Procurement order it belongs to (`procurement_order_id`); `pr_no`, `po_wo_no` and `order_contractor` are then derived from the order (read only). New `GET /registers/warehouse/order-options` (the picker) and `GET /registers/procurement/{entity_id}/receipts` (the receipts against an order). New 422 codes `receipt_only`, `order_not_active`, `order_other_site`.
     - 0.15.151 (2026-11-27): scheduled recurring Master export (migration 0251; CHANGELOG MasterExportSchedule). Additive. `GET/PUT /exports/schedules` and `DELETE /exports/schedules/{id}` (`listExportSchedules`, `saveExportSchedule`, `deleteExportSchedule`): the caller's own schedules (daily, weekly on a weekday, monthly on day 1 to 28; the whole Master or chosen parts and regions; at most 5). No job runs as a person: `GET /exports/master` (first page) starts the caller's due schedules in the caller's own request through the normal start path, so every grant check applies then; the file appears in the exports list when the owner next opens Exports. A schedule that cannot start records `last_error`.
@@ -10001,6 +10002,212 @@ paths:
             image/jpeg: {schema: {type: string, format: binary}}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '404': {$ref: '#/components/responses/NotFound'}
+  /settings/identity/logo:
+    put:
+      tags:
+      - settings
+      operationId: putUiLogo
+      summary: Upload the workspace logo (reason, step-up, If-Match, audited) (0.15.107)
+      description: 'A System Admin, or a delegate of `settings` edit for all regions (403 `action_forbidden` otherwise, also for a delegate limited to some regions). A `reason`
+
+        (3+ characters), a step-up (401 `step_up_required`) and, once a logo exists, `If-Match` on the asset `version` (428 / 412) are required. The body is the
+
+        image: PNG, JPEG, SVG or WebP, 256 KiB at most (422 `errors[0]` `{path: /file}`). An upload always enables the logo and bumps the version. Audited
+
+        `ui_asset_update` with the metadata (never the bytes) before and after.
+
+        '
+      x-step-up: true
+      x-db-path: admin_put_ui_asset
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+              - file
+              - reason
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: 'The logo image: PNG, JPEG, SVG or WebP, 256 KiB at most (422 `errors[0]` `{path: /file}`).'
+                reason:
+                  type: string
+                  minLength: 3
+                  maxLength: 1000
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UiAsset'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+    patch:
+      tags:
+      - settings
+      operationId: setUiLogoEnabled
+      summary: Show or hide the workspace logo (reason, step-up, If-Match, audited) (0.15.107)
+      description: 'Hiding keeps the row and its bytes (hide never delete): the sidebar falls back to the built-in badge until the logo is enabled again. The same rights,
+
+        reason, step-up and If-Match rules as the upload; a missing logo is 422 `errors[0]` `{path: /key, code: not_found}` and saving the state in force is 409
+
+        `invalid_transition`. Audited `ui_asset_update`.
+
+        '
+      x-step-up: true
+      x-db-path: admin_set_ui_asset_enabled
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UiAssetEnabledInput'
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UiAsset'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+  /settings/identity/logo/display:
+    patch:
+      tags: [settings]
+      operationId: setUiLogoDisplay
+      summary: Where the logo shows outside the app, the sign-in pages and the browser tab icon (reason, step-up, If-Match, audited) (0.15.232)
+      description: |
+        Both switches are off until an admin turns one on, so nothing about the logo is public by default. A switch has an effect only while the logo is enabled.
+        Same rights, reason, step-up and If-Match rules as the upload; a missing logo is 422 `errors[0]` `{path: /key, code: not_found}`, saving the values in force is
+        409 `invalid_transition`. Audited `ui_asset_update` with before and after.
+      x-step-up: true
+      x-db-path: admin_set_ui_asset_display
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/UiAssetDisplayInput'}
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/UiAsset'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /ui/public/identity:
+    get:
+      tags: [settings]
+      operationId: getUiPublicIdentity
+      summary: Which public pages show the logo (no session) (0.15.232)
+      description: |
+        No session. Only whether the sign-in pages and the tab icon use the logo, with the version for cache busting; `null` for a purpose that is off (the default). Nothing
+        about users, no audit data. Cached 30 seconds and rate limited per address (429 `rate_limited`).
+      x-db-path: ui_asset_public_state
+      responses:
+        '200':
+          description: The public identity.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/UiPublicIdentity'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /ui/public/logo/{purpose}:
+    get:
+      tags: [settings]
+      operationId: getUiPublicLogo
+      summary: The logo image for the sign-in pages or the tab icon (no session) (0.15.232)
+      description: |
+        No session. The bytes of the enabled logo, only while the admin switched this purpose on; otherwise 404. SVG is served with a sandboxing Content-Security-Policy and
+        `nosniff`. Cached 30 seconds and rate limited per address.
+      x-db-path: ui_asset_public
+      parameters:
+      - {name: purpose, in: path, required: true, schema: {type: string, enum: [login, favicon]}}
+      responses:
+        '200':
+          description: The image.
+          content:
+            image/png: {schema: {type: string, format: binary}}
+            image/jpeg: {schema: {type: string, format: binary}}
+            image/svg+xml: {schema: {type: string, format: binary}}
+            image/webp: {schema: {type: string, format: binary}}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /ui/assets/{key}:
+    get:
+      tags:
+      - settings
+      operationId: getUiAsset
+      summary: The bytes of an enabled identity image (0.15.107)
+      description: Every signed-in user may read it (the logo is the organization identity, not user data). 404 when the key is unknown or the asset is hidden. Cache with the `version` of `UiIdentity.logo` as the query `v`.
+      x-db-path: ui_asset_get
+      parameters:
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^[a-z0-9_]{1,40}$
+      responses:
+        '200':
+          description: The image.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/svg+xml:
+              schema:
+                type: string
+                format: binary
+            image/webp:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
   /settings/login-page:
     get:
       tags: [settings]
@@ -24413,10 +24620,91 @@ components:
         defaults: { $ref: '#/components/schemas/UiPrefs', description: '0.15.230 (0241): the organization appearance defaults.' }
         pref_options: { type: object, additionalProperties: { type: array, items: { type: string } }, description: '0.15.230 (0241): the dimensions with their allowed values (ui_pref_options).' }
         brands: { type: array, items: { $ref: '#/components/schemas/UiBrand' } }
+        logo:
+          oneOf:
+          - $ref: '#/components/schemas/UiAsset'
+          - type: 'null'
+          description: '0.15.232 (0243): the workspace logo (ui_asset_state). null: none was uploaded; the sidebar shows the built-in badge.'
         updated_at: { type: [string, 'null'], format: date-time }
         updated_by: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
         version: { type: integer, description: The ETag value. }
         can_edit: { type: boolean, description: 'A System Admin or a delegate of `settings` edit for all regions.' }
+    UiAsset:
+      type: object
+      description: 0.15.232 (0243). An identity image (migration 0243, table ui_assets). The bytes are served by `GET /ui/assets/{key}`; this is the metadata.
+      required:
+      - key
+      - mime
+      - enabled
+      - show_on_login
+      - use_as_favicon
+      - version
+      properties:
+        key:
+          type: string
+          pattern: ^[a-z0-9_]{1,40}$
+          description: '''logo'' today.'
+        show_on_login:
+          type: boolean
+          description: 'Shown on the sign-in pages (public). false by default; an admin turns it on in Settings > Identity.'
+        use_as_favicon:
+          type: boolean
+          description: 'Used as the browser tab icon (public). false by default.'
+        mime:
+          type: string
+          enum:
+          - image/png
+          - image/jpeg
+          - image/svg+xml
+          - image/webp
+        enabled:
+          type: boolean
+          description: 'false hides it (the row stays: hide never delete).'
+        version:
+          type: integer
+          description: The asset ETag value (If-Match on the logo endpoints).
+        updated_at:
+          type: string
+          format: date-time
+        updated_by:
+          oneOf:
+          - $ref: '#/components/schemas/UserRef'
+          - type: 'null'
+    UiAssetDisplayInput:
+      type: object
+      additionalProperties: false
+      required: [show_on_login, use_as_favicon, reason]
+      properties:
+        show_on_login: {type: boolean}
+        use_as_favicon: {type: boolean}
+        reason: {type: string, minLength: 3, maxLength: 1000}
+    UiPublicIdentity:
+      type: object
+      required: [login, favicon]
+      properties:
+        login:
+          oneOf:
+          - {$ref: '#/components/schemas/UiPublicLogo'}
+          - {type: 'null'}
+        favicon:
+          oneOf:
+          - {$ref: '#/components/schemas/UiPublicLogo'}
+          - {type: 'null'}
+    UiPublicLogo:
+      type: object
+      required: [version, mime]
+      properties:
+        version: {type: integer}
+        mime: {type: string, enum: [image/png, image/jpeg, image/svg+xml, image/webp]}
+    UiAssetEnabledInput:
+      allOf:
+      - $ref: '#/components/schemas/WithReason'
+      - type: object
+        required:
+        - enabled
+        properties:
+          enabled:
+            type: boolean
     UiIdentityInput:
       allOf:
         - $ref: '#/components/schemas/WithReason'
