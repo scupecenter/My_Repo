@@ -289,6 +289,8 @@ describe('hybrid mode list', () => {
       'GET /settings/team-scope-match', 'PUT /settings/team-scope-match',
       // contract 0.12.9: P4b contractor rules and the two reports
       'GET /settings/contractor-rules', 'PUT /settings/contractor-rules', 'GET /reports/team-scope-mismatch', 'GET /reports/contractors-completeness', 'GET /reports/gecol-hlc-counts', 'GET /reports/contractor-performance', 'GET /settings/contractor-performance', 'PUT /settings/contractor-performance',
+      // contract 0.15.242: the generic alert rules (apps/api: settings; migration 0342)
+      'GET /settings/alert-rules', 'POST /settings/alert-rules', 'PUT /settings/alert-rules/:id',
       // contract 0.9.2: the self-service profile (details, email change and its decision, password, two-factor self-service, enforced mark)
       'GET /me/profile', 'GET /me/sessions', 'POST /me/sessions/revoke-others', 'POST /me/sessions/:id/revoke', 'PATCH /me/profile', 'PATCH /me/preferences', 'POST /me/password', 'POST /me/email-change', 'DELETE /me/email-change',
       'POST /me/two-factor/enrol/start', 'POST /me/two-factor/enrol/confirm', 'POST /me/two-factor/disable',

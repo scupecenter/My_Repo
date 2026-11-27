@@ -43,6 +43,7 @@ import { DisplaySettings } from './DisplaySettings';
 import { PmSchedulesSettings } from './PmSchedulesSettings';
 import { DailyPlanSettings } from './DailyPlanSettings';
 import { MotionSettings } from './MotionSettings';
+import { AlertRules } from './AlertRules';
 import { LoginPageSettings } from './LoginPage';
 import { InterfaceSettings } from './InterfaceSettings';
 
@@ -60,7 +61,7 @@ export const SETTINGS_TABS: readonly SettingsTab[] = [
   { key: 'documents', sections: [{ key: 'types' }, { key: 'forms' }, { key: 'archive' }, { key: 'numbering' }] },
   { key: 'data', sections: [{ key: 'imports' }, { key: 'historical' }, { key: 'counts', adminOnly: true }, { key: 'export' }, { key: 'reset', adminOnly: true }] },
   // Notification policy + Mail kinds (admin only): both are what is sent to people
-  { key: 'alerts', sections: [{ key: 'policy' }, { key: 'mail', adminOnly: true }] },
+  { key: 'alerts', sections: [{ key: 'policy' }, { key: 'mail', adminOnly: true }, { key: 'rules', adminOnly: true }] },
   // DLP months is a data-protection rule, so it moved here from SLA
   { key: 'security', sections: [{ key: 'staff' }, { key: 'retention' }, { key: 'dlp' }, { key: 'locks' }, { key: 'support' }, { key: 'newdevice' }] },
   // Screens: what users see by default (Dashboard, Display menu of the tables, My Work Daily Plan)
@@ -158,6 +159,7 @@ export function SettingsRoutes() {
           <Route index element={<Navigate to="policy" replace />} />
           <Route path="policy" element={<Notifications />} />
           <Route path="mail" element={<MailKinds />} />
+          <Route path="rules" element={<AlertRules />} />
         </Route>
         <Route path="workflow" element={<TabFrame tab="workflow" />}>
           <Route index element={<Navigate to="editor" replace />} />
