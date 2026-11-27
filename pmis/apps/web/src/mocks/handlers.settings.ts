@@ -1060,6 +1060,12 @@ export const settingsHandlers = [
         if (typeof o.enabled !== 'boolean') errs.push({ path: `${path}/enabled`, code: 'invalid' });
         if (!Number.isInteger(o.days)) errs.push({ path: `${path}/days`, code: 'invalid' });
         else if ((o.days as number) < 1 || (o.days as number) > 90) errs.push({ path: `${path}/days`, code: 'out_of_range' });
+      } else if (name === 'inbox') {
+        for (const k of Object.keys(o)) if (!['tabs_enabled', 'default_tab', 'priority_kinds'].includes(k)) errs.push({ path: `${path}/${k}`, code: 'unknown_key' });
+        if (typeof o.tabs_enabled !== 'boolean') errs.push({ path: `${path}/tabs_enabled`, code: 'invalid' });
+        oneOf(o, path, 'default_tab', ['all', 'priority', 'mentions', 'tasks', 'approvals', 'system']);
+        const kinds = ['mention', 'followed_change', 'task_assigned', 'task_returned', 'task_rejected', 'task_approved', 'approval_due', 'reassigned', 'absence_alert', 'idle_task_alert', 'no_holder', 'system'];
+        if (!Array.isArray(o.priority_kinds) || o.priority_kinds.some((x) => !kinds.includes(String(x)))) errs.push({ path: `${path}/priority_kinds`, code: 'invalid' });
       } else errs.push({ path, code: 'unknown_key' });
     }
     if ((b.reason ?? '').trim().length < 3) errs.push({ path: '/reason', code: 'required' });

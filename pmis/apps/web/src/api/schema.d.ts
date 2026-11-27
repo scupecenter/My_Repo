@@ -4791,50 +4791,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/settings/alert-rules": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * The alert rules and the closed catalogues of the form
-         * @description 0.15.242 (migration 0342): System Admin. `rules` are the saved rules (code, kind, params, audience, templates, enabled, version); `catalogue` lists the closed kinds with their params, the audiences, the active registers and the modules the form offers. The database owns the validation.
-         */
-        get: operations["getAlertRules"];
-        put?: never;
-        /**
-         * Create an alert rule
-         * @description 0.15.242 (migration 0342): System Admin, a reason. Closed body (`unknown_key`): `code` (lowercase letters, digits and dashes, fixed once the rule exists, unique), `kind` (closed), `params` (closed per kind, field errors at `/params/<key>`), `audience` (`{"type":"system_admin"}` or `{"type":"module","module":"<module key>"}`), `title_en`, `title_ar`, `body_en`, `body_ar`, optional `link`, `enabled` (default true). Audited (`alert_rule_create`). Notifications only: a rule never changes a record, a state or a holder.
-         */
-        post: operations["createAlertRule"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/settings/alert-rules/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Update an alert rule
-         * @description 0.15.242 (migration 0342): System Admin, a reason and If-Match (the rule's `version`). The whole rule is sent; the `code` does not change. Audited (`alert_rule_update`, before and after).
-         */
-        put: operations["updateAlertRule"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/settings/ui-features": {
         parameters: {
             query?: never;
@@ -15442,14 +15398,27 @@ export interface components {
             palette: "brand" | "varied";
             in_lists: boolean;
         };
+        UiNewBadge: {
+            enabled: boolean;
+            days: number;
+        };
+        /** @description 0.15.250. The inbox tabs and which notification kinds count as priority. */
+        UiInbox: {
+            tabs_enabled: boolean;
+            /** @enum {string} */
+            default_tab: "all" | "priority" | "mentions" | "tasks" | "approvals" | "system";
+            priority_kinds: ("mention" | "followed_change" | "task_assigned" | "task_returned" | "task_rejected" | "task_approved" | "approval_due" | "reassigned" | "absence_alert" | "idle_task_alert" | "no_holder" | "system")[];
+        };
         /** @description 0.15.185. The sections of the interface features setting; every section is complete. */
         UiFeatures: {
             avatars: components["schemas"]["UiAvatars"];
             new_badge: components["schemas"]["UiNewBadge"];
+            inbox: components["schemas"]["UiInbox"];
         };
         UiFeaturesPatch: {
             avatars?: components["schemas"]["UiAvatars"];
             new_badge?: components["schemas"]["UiNewBadge"];
+            inbox?: components["schemas"]["UiInbox"];
         };
         UiFeaturesSetting: {
             sections: components["schemas"]["UiFeatures"];
@@ -15457,78 +15426,6 @@ export interface components {
             /** Format: date-time */
             updated_at?: string;
             updated_by?: components["schemas"]["UserRef"];
-        };
-        UiNewBadge: {
-            enabled: boolean;
-            days: number;
-        };
-        AlertRule: {
-            /** Format: uuid */
-            id: string;
-            code: string;
-            /** @enum {string} */
-            kind: "weekly_status_missing" | "record_idle";
-            params: {
-                [key: string]: unknown;
-            };
-            /** @description {"type":"system_admin"} or {"type":"module","module":"<module key>"}. */
-            audience: {
-                [key: string]: unknown;
-            };
-            title_en: string;
-            title_ar: string;
-            body_en: string;
-            body_ar: string;
-            link: string | null;
-            enabled: boolean;
-            /** @description The If-Match of PUT /settings/alert-rules/{id}. */
-            version: number;
-            /** Format: date-time */
-            created_at: string;
-            /** Format: date-time */
-            updated_at: string;
-        };
-        AlertRuleInput: {
-            code: string;
-            /** @enum {string} */
-            kind: "weekly_status_missing" | "record_idle";
-            params: {
-                [key: string]: unknown;
-            };
-            audience: {
-                [key: string]: unknown;
-            };
-            title_en: string;
-            title_ar: string;
-            body_en: string;
-            body_ar: string;
-            link?: string | null;
-            enabled?: boolean;
-        };
-        AlertRuleSaved: {
-            /** Format: uuid */
-            id: string;
-            version: number;
-        };
-        AlertRulesResponse: {
-            rules: components["schemas"]["AlertRule"][];
-            catalogue: {
-                kinds: {
-                    kind: string;
-                    params: string[];
-                }[];
-                audiences: ("system_admin" | "module")[];
-                registers: {
-                    register_key: string;
-                    name_en: string;
-                    name_ar: string | null;
-                    module_key: string;
-                }[];
-                modules: {
-                    key: string;
-                    name_en: string;
-                }[];
-            };
         };
         IdleTaskAlertSetting: {
             enabled: boolean;
@@ -19049,7 +18946,7 @@ export interface components {
             revoked_count: number;
         };
         /** @enum {string} */
-        NotificationKind: "task_assigned" | "task_returned" | "task_approved" | "approval_due" | "reassigned" | "absence_alert" | "idle_task_alert" | "no_holder" | "holiday_tentative" | "delegation" | "mfa_exemption" | "template_updated" | "import_batch" | "system" | "mention" | "followed_change" | "task_rejected" | "no_eligible_holder" | "register_assigned" | "register_rejected" | "gate_closed_again" | "sla_negative_duration" | "email_change_requested" | "email_change_decided" | "security_alert" | "snag_raised" | "snag_review" | "snag_rejected" | "snag_closed" | "levels_converted" | "permit_transferred" | "phone_change_requested" | "phone_change_decided" | "security_notice" | "site_region_moved" | "assignment_request" | "data_reset_request" | "alert_rule";
+        NotificationKind: "task_assigned" | "task_returned" | "task_approved" | "approval_due" | "reassigned" | "absence_alert" | "idle_task_alert" | "no_holder" | "holiday_tentative" | "delegation" | "mfa_exemption" | "template_updated" | "import_batch" | "system" | "mention" | "followed_change" | "task_rejected" | "no_eligible_holder" | "register_assigned" | "register_rejected" | "gate_closed_again" | "sla_negative_duration" | "email_change_requested" | "email_change_decided" | "security_alert" | "snag_raised" | "snag_review" | "snag_rejected" | "snag_closed" | "levels_converted" | "permit_transferred" | "phone_change_requested" | "phone_change_decided" | "security_notice" | "site_region_moved" | "assignment_request" | "data_reset_request";
         Notification: {
             /** Format: uuid */
             id: string;
@@ -29127,90 +29024,6 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["Unprocessable"];
-        };
-    };
-    getAlertRules: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The rules and the catalogue. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AlertRulesResponse"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-        };
-    };
-    createAlertRule: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AlertRuleInput"] & components["schemas"]["WithReason"];
-            };
-        };
-        responses: {
-            /** @description Created. */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AlertRuleSaved"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            422: components["responses"]["Unprocessable"];
-        };
-    };
-    updateAlertRule: {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description The ETag last read. */
-                "If-Match": components["parameters"]["IfMatch"];
-            };
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AlertRuleInput"] & components["schemas"]["WithReason"];
-            };
-        };
-        responses: {
-            /** @description Saved. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AlertRuleSaved"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            412: components["responses"]["PreconditionFailed"];
-            422: components["responses"]["Unprocessable"];
-            428: components["responses"]["PreconditionRequired"];
         };
     };
     getUiFeaturesSetting: {
