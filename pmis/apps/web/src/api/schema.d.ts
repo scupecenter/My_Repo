@@ -18082,7 +18082,7 @@ export interface components {
          * @enum {string}
          */
         AlertSeverity: "info" | "low" | "medium" | "high" | "critical";
-        /** @description Severity per configurable rule (0.12.3, Q168). Defaults: failed_sign_ins medium, failed_sign_ins_ip medium, new_ip low, large_export medium, admin_set_changed high, alert_settings_weakened high, malware_upload high, break_glass_used critical, backup_missing high (0.15.97). */
+        /** @description Severity per configurable rule (0.12.3, Q168). Defaults: failed_sign_ins medium, failed_sign_ins_ip medium, new_ip low, large_export medium, admin_set_changed high, alert_settings_weakened high, malware_upload high, break_glass_used critical, backup_missing high (0.15.110). */
         AlertSeverityMap: {
             failed_sign_ins?: components["schemas"]["AlertSeverity"];
             failed_sign_ins_ip?: components["schemas"]["AlertSeverity"];
