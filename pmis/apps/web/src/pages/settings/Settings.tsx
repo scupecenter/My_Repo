@@ -32,6 +32,7 @@ import { SiteMasterColumns } from './SiteMasterColumns';
 import { DashboardSettings } from './DashboardSettings';
 import { Identity } from './Identity';
 import { SecurityLocks } from './SecurityLocks';
+import { SupportAccess } from './SupportAccess';
 import { DisplaySettings } from './DisplaySettings';
 import { DailyPlanSettings } from './DailyPlanSettings';
 import { MotionSettings } from './MotionSettings';
@@ -54,7 +55,7 @@ export const SETTINGS_TABS: readonly SettingsTab[] = [
   // Notification policy + Mail kinds (admin only): both are what is sent to people
   { key: 'alerts', sections: [{ key: 'policy' }, { key: 'mail', adminOnly: true }] },
   // DLP months is a data-protection rule, so it moved here from SLA
-  { key: 'security', sections: [{ key: 'staff' }, { key: 'retention' }, { key: 'dlp' }, { key: 'locks' }] },
+  { key: 'security', sections: [{ key: 'staff' }, { key: 'retention' }, { key: 'dlp' }, { key: 'locks' }, { key: 'support' }] },
   // Screens: what users see by default (Dashboard, Display menu of the tables, My Work Daily Plan)
   { key: 'screens', sections: [{ key: 'dashboard' }, { key: 'tables' }, { key: 'daily-plan' }, { key: 'motion' }, { key: 'login' }, { key: 'interface' }] },
   { key: 'identity', sections: [] },
@@ -194,6 +195,7 @@ export function SettingsRoutes() {
           <Route path="retention" element={<Retention />} />
           <Route path="dlp" element={<Dlp />} />
           <Route path="locks" element={<SecurityLocks />} />
+          <Route path="support" element={<SupportAccess />} />
         </Route>
         {Object.entries(LEGACY_SETTINGS_PATHS).map(([old, to]) => <Route key={old} path={old} element={<LegacyRedirect to={to} />} />)}
       </Route>
