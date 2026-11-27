@@ -39,8 +39,8 @@ CREATE TRIGGER b_settings_passkeys_delete BEFORE DELETE ON settings FOR EACH ROW
 CREATE TABLE auth_passkey (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id       UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
-  credential_id TEXT NOT NULL UNIQUE CHECK (credential_id ~ '^[A-Za-z0-9_-]{16,1024}$'),
-  public_key    TEXT NOT NULL CHECK (public_key ~ '^[A-Za-z0-9_-]{16,4096}$'),
+  credential_id TEXT NOT NULL UNIQUE CHECK (credential_id ~ '^[A-Za-z0-9_-]+$' AND char_length(credential_id) BETWEEN 16 AND 1400),
+  public_key    TEXT NOT NULL CHECK (public_key ~ '^[A-Za-z0-9_-]+$' AND char_length(public_key) BETWEEN 16 AND 4096),
   sign_count    BIGINT NOT NULL DEFAULT 0 CHECK (sign_count >= 0),
   transports    TEXT[] NOT NULL DEFAULT '{}',
   device_type   TEXT NOT NULL DEFAULT 'singleDevice' CHECK (device_type IN ('singleDevice', 'multiDevice')),
