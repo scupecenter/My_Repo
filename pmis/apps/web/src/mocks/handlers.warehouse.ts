@@ -11,6 +11,7 @@ const B = API_BASE;
 const W = () => db().wh;
 const tag = (v: number) => ({ headers: { ETag: `"${v}"` } });
 const SEQ_EDITS = new Map<string, Record<string, unknown>>();
+const VENDORS = new Map<number, { v: string | null; n: number }>();
 const admin = () => viewer()?.key === 'pm';
 const has = (q: string, ...s: (string | null | undefined)[]) => !q || s.join(' ').toLowerCase().includes(q.toLowerCase());
 const stale = (req: Request, v: number) => {
@@ -127,7 +128,19 @@ export const warehouseHandlers = [
   }),
   http.get(`${B}/warehouse/region-vendors`, () => {
     const g = guard(); if (g) return g;
-    return HttpResponse.json({ items: [1, 2, 3, 4, 5, 6, 7].map((r) => ({ region_id: r, region_name: `Region ${r}`, wl_vendor: null, version: 0 })) });
+    return HttpResponse.json({ items: [1, 2, 3, 4, 5, 6, 7].map((r) => ({ region_id: r, region_name: `Region ${r}`, wl_vendor: VENDORS.get(r)?.v ?? null, version: VENDORS.get(r)?.n ?? 0 })) });
+  }),
+  http.put(`${B}/warehouse/region-vendors/:id`, async ({ params, request }) => {
+    const g = guard(); if (g) return g;
+    if (!admin()) return problem(403, 'forbidden', 'Not allowed');
+    const b = (await request.json()) as { wl_vendor?: string | null; reason?: string };
+    if (!b.reason || b.reason.trim().length < 3) return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '/reason', code: 'required' }] });
+    if (b.wl_vendor !== null && b.wl_vendor !== 'Cambium' && b.wl_vendor !== 'Intracom') return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '/wl_vendor', code: 'not_in_list' }] });
+    const id = Number(params.id), cur = VENDORS.get(id);
+    VENDORS.set(id, { v: (b.wl_vendor ?? null) as string | null, n: (cur?.n ?? 0) + 1 });
+    const gaps = W().gaps.regions_without_wl_vendor.filter((r: number) => r !== id);
+    W().gaps.regions_without_wl_vendor = b.wl_vendor ? gaps : [...gaps, id].sort();
+    return HttpResponse.json({ region_id: id, wl_vendor: b.wl_vendor ?? null, version: (cur?.n ?? 0) + 1 });
   }),
   http.get(`${B}/number-sequences`, () => {
     const g = guard(); if (g) return g;

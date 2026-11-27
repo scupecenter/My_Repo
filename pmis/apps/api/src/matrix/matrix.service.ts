@@ -50,6 +50,16 @@ export interface MatrixRowDto {
   used_levels: number[]; holders: HolderDto[]; region_ids_with_cells: number[]; task_counts?: { not_submitted: number; in_flight: number };
   preview: { single_level: boolean; skips: SkipCaseDto[] }; cells: CellDto[];
 }
+export type CoverageStatus = 'ok' | 'empty' | 'no_active_holder';
+export interface MatrixCoverageRow {
+  kind: string; code: string; name_en: string; name_ar: string | null; module: string; gaps: number;
+  cells: { region_id: number; level_code: 'L1' | 'L2'; source: 'region' | 'default' | 'none'; assignees: number; holders: number; status: CoverageStatus }[];
+}
+export interface MatrixCoverageDto {
+  workflow_version: number; as_of: string; regions: { id: number; code: string; name_en: string; name_ar: string | null }[];
+  summary: { cells: number; ok: number; empty: number; no_active_holder: number }; rows: MatrixCoverageRow[];
+}
+interface CoverageSqlRow { kind: string; code: string; name_en: string; name_ar: string | null; module: string; ord: number; region_id: number; level: number; source: 'region' | 'default' | 'none'; assignees: number; holders: number }
 export interface MatrixDto { workflow_version: number; version: number; stages: MatrixRowDto[] }
 
 interface BaseRow { key: string; stage_id: string | null; code: string; kind: 'stage' | 'register' | 'dismantle'; name_en: string; name_ar: string | null; approval_levels: number }
@@ -277,5 +287,77 @@ export class MatrixService {
     if (!wf) throw problems.notFound('There is no published workflow version.');
     await this.db.tx.$queryRaw(Prisma.sql`SELECT matrix_delete_cell(${version}::int, ${id.data}::uuid, ${why}::text)`);
     return this.read(wf, undefined);
+  }
+
+  /**
+   * GET /matrix/coverage (0.15.94): which cells of the active workflow have nobody to act. Read only. For every stage row and register row, every region and
+   * both levels (L1, L2), the cell that decides is found as the engine finds it (region cell before the default cell, `wf_cell` and `reg_cell_row`), and the
+   * people it reaches are counted as `wf_eligible` counts them: named active users, active roles through current assignments with enough level, the region and
+   * the module of the row, and members of active groups. `empty` = the deciding cell has no assignee or there is no cell; `no_active_holder` = it names
+   * someone but nobody active can act. System Admin or a delegate of the matrix (the counts read assignments of every region).
+   */
+  async coverage(auth: AuthContext, q: Query): Promise<MatrixCoverageDto> {
+    void auth;
+    if (!(await this.access.isAdmin('matrix', 'view')) && !(await this.access.isAdmin('matrix', 'edit'))) {
+      throw new ProblemException(403, 'action_forbidden', { detail: 'A System Admin or a delegate of the Responsibility Matrix is needed.' });
+    }
+    const wv = oneParam(q, 'workflow_version');
+    if (wv !== undefined && !/^[1-9][0-9]{0,8}$/.test(wv)) throw problems.validation([{ path: '/workflow_version', code: 'invalid', message: 'workflow_version is a positive integer.' }]);
+    const wf = await this.workflowOf(wv ? Number(wv) : undefined);
+    if (!wf) throw problems.notFound('The workflow version does not exist.');
+    const tx = this.db.tx;
+    const regions = await tx.$queryRaw<{ id: number; code: string; name_en: string; name_ar: string | null }[]>(Prisma.sql`SELECT id, code, name_en, name_ar FROM regions ORDER BY id`);
+    const rows = await tx.$queryRaw<CoverageSqlRow[]>(Prisma.sql`
+      WITH rw AS (
+        SELECT s.id AS stage_id, NULL::text AS register_key, s.code, 'stage' AS kind, s.name_en, s.name_ar, 'sites' AS module, s.seq AS ord
+        FROM stage_definitions s WHERE s.workflow_id = ${wf.id}::uuid AND s.is_active
+        UNION ALL
+        SELECT NULL::uuid, m.register_key, m.register_key, m.kind, m.name_en, m.name_ar, m.module_key, 1000 + m.sort_order
+        FROM register_definitions m WHERE m.is_active AND m.enabled
+      ), lv AS (SELECT 1 AS level, 'entry' AS need UNION ALL SELECT 3, 'approve'),
+      g AS (
+        SELECT rw.*, r.id AS region_id, lv.level, lv.need,
+          (SELECT c.id FROM matrix_cells c
+            WHERE c.level = lv.level AND c.task_def_id IS NULL AND c.retired_at IS NULL AND (c.region_id IS NULL OR c.region_id = r.id)
+              AND ((rw.stage_id IS NOT NULL AND c.stage_id = rw.stage_id) OR (rw.register_key IS NOT NULL AND c.register_key = rw.register_key))
+            ORDER BY (c.region_id IS NOT NULL) DESC, c.id LIMIT 1) AS cell_id
+        FROM rw CROSS JOIN regions r CROSS JOIN lv
+      )
+      SELECT g.kind, g.code, g.name_en, g.name_ar, g.module, g.ord, g.region_id, g.level,
+        CASE WHEN g.cell_id IS NULL THEN 'none' WHEN c.region_id IS NULL THEN 'default' ELSE 'region' END AS source,
+        coalesce((SELECT count(*) FROM matrix_cell_assignees a WHERE a.cell_id = g.cell_id), 0)::int AS assignees,
+        (SELECT count(DISTINCT x.uid) FROM (
+          SELECT a.ref_id AS uid FROM matrix_cell_assignees a JOIN users u ON u.id = a.ref_id AND u.deleted_at IS NULL AND u.status::text = 'active'
+            WHERE a.cell_id = g.cell_id AND a.kind = 'user'
+          UNION ALL
+          SELECT ua.user_id FROM matrix_cell_assignees a
+            JOIN roles ro ON ro.id = a.ref_id AND ro.is_active AND ro.can_hold_matrix_levels
+            JOIN user_role_assignments ua ON ua.role_id = ro.id AND ua.valid_from <= now() AND (ua.valid_to IS NULL OR ua.valid_to > now())
+            JOIN users u ON u.id = ua.user_id AND u.deleted_at IS NULL AND u.status::text = 'active'
+            WHERE a.cell_id = g.cell_id AND a.kind = 'role' AND ua.permission_level >= g.need::"PermissionLevel"
+              AND (ua.all_regions OR EXISTS (SELECT 1 FROM user_role_assignment_regions rr WHERE rr.assignment_id = ua.id AND rr.region_id = g.region_id))
+              AND (ua.all_modules OR EXISTS (SELECT 1 FROM user_role_assignment_modules mm WHERE mm.assignment_id = ua.id AND mm.module_key = g.module))
+          UNION ALL
+          SELECT gm.user_id FROM matrix_cell_assignees a
+            JOIN groups gr ON gr.id = a.ref_id AND gr.is_active
+            JOIN group_members gm ON gm.group_id = gr.id
+            JOIN users u ON u.id = gm.user_id AND u.deleted_at IS NULL AND u.status::text = 'active'
+            WHERE a.cell_id = g.cell_id AND a.kind = 'group'
+        ) x)::int AS holders
+      FROM g LEFT JOIN matrix_cells c ON c.id = g.cell_id
+      ORDER BY g.ord, g.code COLLATE "C", g.region_id, g.level`);
+    const byRow = new Map<string, MatrixCoverageRow>();
+    const summary = { cells: 0, ok: 0, empty: 0, no_active_holder: 0 };
+    for (const r of rows) {
+      const key = `${r.kind}:${r.code}`;
+      const row = byRow.get(key) ?? { kind: r.kind, code: r.code, name_en: r.name_en, name_ar: r.name_ar, module: r.module, gaps: 0, cells: [] };
+      const status: CoverageStatus = r.assignees === 0 ? 'empty' : r.holders === 0 ? 'no_active_holder' : 'ok';
+      row.cells.push({ region_id: r.region_id, level_code: r.level === 1 ? 'L1' : 'L2', source: r.source, assignees: r.assignees, holders: r.holders, status });
+      if (status !== 'ok') row.gaps += 1;
+      summary.cells += 1;
+      summary[status] += 1;
+      byRow.set(key, row);
+    }
+    return { workflow_version: wf.version, as_of: new Date().toISOString(), regions, summary, rows: [...byRow.values()] };
   }
 }
