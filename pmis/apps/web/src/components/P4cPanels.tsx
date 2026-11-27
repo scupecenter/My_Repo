@@ -1,7 +1,7 @@
 import { CheckCircle2, Clock, Eye } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useDismantleOrders, useOrderReceipts, useWarehouseOrders, useHlcLegacyMigration, useSetHlcPurchaseRequests, type HlcLegacyMigration } from '@/api/p4c';
+import { useIssueRisks, useRiskIssues, useDismantleOrders, useDismantleRns, useOrderReceipts, useWarehouseOrders, useHlcLegacyMigration, useSetHlcPurchaseRequests, type HlcLegacyMigration } from '@/api/p4c';
 import type { RegisterRecord } from '@/api/types';
 import { registerErrorMessage } from '@/lib/registerErrors';
 import { errText, FormDialog } from './FormDialog';
@@ -95,6 +95,33 @@ export function DismantleOrderSelect({ siteId, part, value, onChange, editable, 
   );
 }
 
+/** 0321: the signed Warehouse RN that closes a Dismantle part (optional); the RN reference is then read from the RN. */
+export function DismantleRnSelect({ siteId, part, value, onChange, editable, invalid }: {
+  siteId: string | null | undefined; part: string | null | undefined; value: unknown; onChange: (v: string | null) => void; editable: boolean; invalid?: boolean;
+}) {
+  const { t } = useTranslation();
+  const q = useDismantleRns(siteId, part, editable);
+  const items = q.data ?? [];
+  const cur = typeof value === 'string' ? value : '';
+  const chosen = items.find((i) => i.entity_id === cur);
+  const label = (i: (typeof items)[number]) => `${i.doc_no ?? i.entity_id.slice(0, 8)}${i.doc_date ? ` · ${i.doc_date}` : ''}`;
+  return (
+    <div data-testid="reg-dismantle-rn">
+      {editable
+        ? (
+          <select id="reg-field-closing_rn_id" data-testid="reg-field-closing_rn_id" className="input" aria-invalid={invalid || undefined} value={cur}
+            onChange={(e) => onChange(e.target.value || null)} disabled={!siteId || !part}>
+            <option value="">{!siteId || !part ? t('p4c.order_site_first') : items.length ? t('p4c.rn_none') : t('p4c.rn_no_options')}</option>
+            {items.map((i) => <option key={i.entity_id} value={i.entity_id}>{label(i)}</option>)}
+            {cur && !chosen && <option value={cur}>{cur.slice(0, 8)}</option>}
+          </select>
+        )
+        : <div className="font-semibold" data-testid="reg-view-closing_rn_id">{chosen ? label(chosen) : cur ? cur.slice(0, 8) : '—'}</div>}
+      {cur && <p className="text-sm text-mute" data-testid="reg-dismantle-rn-ref">{t('p4c.rn_ref_from_rn')}</p>}
+    </div>
+  );
+}
+
 /** 0181: the Procurement order of a warehouse receipt (optional); PR No., PO / WO No. and the contractor shown below it come from the order. */
 export function WarehouseOrderSelect({ siteId, value, onChange, editable, invalid, registerKey = 'warehouse', field = 'procurement_order_id' }: {
   registerKey?: 'warehouse' | 'car_dispatcher' | 'financial_advances' | 'issues' | 'quality'; field?: string;
@@ -142,6 +169,55 @@ export function OrderReceipts({ entityId }: { entityId: string }) {
                 <span>{r.doc_date ?? ''}</span>
                 <span className="text-mute">{r.movement_status ?? r.state}</span>
                 <span>{t('p4c.receipts_qty', { lines: r.lines, qty: r.qty })}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+    </section>
+  );
+}
+
+/** 0322: the risk an Issue realises (optional picker). */
+export function IssueRiskSelect({ value, onChange, editable, invalid }: { value: unknown; onChange: (v: string | null) => void; editable: boolean; invalid?: boolean }) {
+  const { t } = useTranslation();
+  const q = useIssueRisks(editable);
+  const items = q.data ?? [];
+  const cur = typeof value === 'string' ? value : '';
+  const chosen = items.find((i) => i.entity_id === cur);
+  const label = (i: (typeof items)[number]) => `${i.risk_id ?? i.entity_id.slice(0, 8)}${i.statement ? ` · ${i.statement}` : ''}`;
+  return (
+    <div data-testid="reg-issue-risk">
+      {editable
+        ? (
+          <select id="reg-field-risk_entity_id" data-testid="reg-field-risk_entity_id" className="input" aria-invalid={invalid || undefined} value={cur} onChange={(e) => onChange(e.target.value || null)}>
+            <option value="">{t('p4c.issue_no_risk')}</option>
+            {items.map((i) => <option key={i.entity_id} value={i.entity_id}>{label(i)}</option>)}
+            {cur && !chosen && <option value={cur}>{cur.slice(0, 8)}</option>}
+          </select>
+        )
+        : <div className="font-semibold" data-testid="reg-view-risk_entity_id">{chosen ? label(chosen) : cur ? cur.slice(0, 8) : '—'}</div>}
+    </div>
+  );
+}
+
+/** 0322: the issues that came from a risk, on the risk page. */
+export function RiskIssues({ entityId }: { entityId: string }) {
+  const { t } = useTranslation();
+  const q = useRiskIssues(entityId);
+  const items = q.data ?? [];
+  if (q.isError) return null;
+  return (
+    <section aria-labelledby="rs-risk-issues" data-testid="reg-section-risk-issues" className="space-y-2">
+      <h3 id="rs-risk-issues" className="font-semibold">{t('p4c.risk_issues_title')}</h3>
+      {items.length === 0
+        ? <p className="text-sm text-mute" data-testid="reg-risk-issues-empty">{t('p4c.risk_issues_none')}</p>
+        : (
+          <ul className="space-y-1 text-sm" data-testid="reg-risk-issues">
+            {items.map((r) => (
+              <li key={r.record_id} className="flex flex-wrap gap-x-3" data-testid={`reg-risk-issue-${r.record_id}`}>
+                <span className="font-semibold">{r.pending_issue ?? r.record_id.slice(0, 8)}</span>
+                <span>{r.raised_date ?? ''}</span>
+                <span className="text-mute">{r.issue_status ?? r.state}</span>
               </li>
             ))}
           </ul>
