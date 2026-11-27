@@ -228,6 +228,7 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/me/sessions/revoke-others'],
   ['post', '/me/sessions/:id/revoke'],
   ['patch', '/me/profile'],
+  ['get', '/admin/document-search-index'],
   ['patch', '/me/preferences'],
   ['post', '/me/password'],
   ['post', '/me/email-change'],

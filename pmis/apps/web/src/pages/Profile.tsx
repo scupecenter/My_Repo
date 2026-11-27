@@ -18,7 +18,7 @@ import { CodeField, codeComplete, codeErrorText, digitsOnly, QrCode, RecoveryCod
 import { ruleKey } from '@/lib/passwordRules';
 import { fmtDateTime } from '@/lib/time';
 import { BRANDS, type Brand } from '@/lib/brands';
-import { APPEARANCE_OPTIONS, APPEARANCE_PRESETS, sanitizeAppearance, type Appearance, type AppearanceKey, paint } from '@/lib/appearance';
+import { APPEARANCE_DEFAULTS, APPEARANCE_OPTIONS, APPEARANCE_PRESETS, sanitizeAppearance, type Appearance, type AppearanceKey, paint } from '@/lib/appearance';
 import { applySidebarOverlay, BADGE_STYLES, sanitizeUiNav, type UiNav } from '@/lib/sidebarPrefs';
 import { resolveLayout, type Layout } from '@/lib/navLayout';
 import { visibleNavItems } from '@/lib/visibleNav';
@@ -245,7 +245,8 @@ function AppearanceSection({ p }: { p: MyProfile }) {
             <label key={k} className="block text-sm font-semibold">{dimLabel(k)}
               <select className="input mt-1 font-normal" data-testid={`pf-ap-${k}`} disabled={!choice}
                 value={draft[k] ?? ''} onChange={(e) => setDraft({ ...draft, [k]: e.target.value === '' ? undefined : e.target.value })}>
-                <option value="">{t('appearance.org_default', { name: t(`appearance.opt.${k}.${p.identity.defaults?.[k] ?? 'standard'}`) })}</option>
+                {/* the org default of a dimension without a saved org value is the dimension's built-in standard (APPEARANCE_DEFAULTS), not a literal 'standard' that some dimensions do not have */}
+                <option value="">{t('appearance.org_default', { name: t(`appearance.opt.${k}.${p.identity.defaults?.[k] ?? APPEARANCE_DEFAULTS[k]}`) })}</option>
                 {APPEARANCE_OPTIONS[k].map((v) => <option key={v} value={v}>{t(`appearance.opt.${k}.${v}`)}</option>)}
               </select>
             </label>

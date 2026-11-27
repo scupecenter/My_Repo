@@ -12,7 +12,8 @@ Generated from the production dependencies of `apps/api` and `apps/web` with `li
 
 - `jszip@3.10.2` is offered under `(MIT OR GPL-3.0-or-later)`. We use it under the MIT terms.
 - `pako@1.0.11` is `(MIT AND Zlib)`, both permissive.
-- `buffers@0.1.1` (through `exceljs` > `unzipper` > `binary`) declares no license in its package. It is listed here so the owner can decide: keep it, or replace the chain. The gate excludes this exact version by name.
+- `buffers@0.1.1` (through `exceljs` > `unzipper` > `binary`, API only, not in the web app) declares no license in its package: no license field, no license file, none in the registry record. Allowed by the owner (decision D56, 2026-11-27) as a reviewed exception. The gate skips this exact version by name. To review later: alternatives to `exceljs` (or a newer `unzipper` chain) that remove the package.
+- `duck@0.1.12` (through `mammoth` > `lop`, API only) declares the license `BSD` without saying which. Its LICENSE file is the 2-clause BSD text (copyright notice, the two conditions and the disclaimer), so it is permissive. The gate skips this exact version by name; a new version is checked again.
 - `big-integer` is `Unlicense` (public domain). `chainsaw` is declared `MIT*` (MIT, from the README).
 
 ## apps/api (production dependencies)
