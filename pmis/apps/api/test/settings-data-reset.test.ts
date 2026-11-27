@@ -424,9 +424,9 @@ describe('the waiting period after the approval (migration 0372, contract 0.15.2
   });
 
   it('a request inherits the wait; the approval sets run_after and both admins are told; the run is 409 cooloff_active until then; the notice before the run is sent once', async () => {
-    await backupRow();
+    // no backup row is written here: a later test of this file relies on there being none (the request says it needs none)
     expect((await putSettings({ cooloff_minutes: 60 })).status).toBe(200);
-    const r = await post(admin1, '/requests', { reason: 'Waiting period synthetic test', confirm_text: phrase, parts: ['procurement'], archive: 'none' });
+    const r = await post(admin1, '/requests', { reason: 'Waiting period synthetic test', confirm_text: phrase, parts: ['procurement'], archive: 'none', require_backup: false, no_backup_confirm: 'NO BACKUP' });
     expect(r.status).toBe(201);
     const id = r.body.id as string;
     expect(r.body.cooloff).toMatchObject({ minutes: 60, run_after: null, active: false });
