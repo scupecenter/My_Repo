@@ -18,14 +18,14 @@ import { isAdmin } from '@/lib/perm';
 import { registerErrorMessage } from '@/lib/registerErrors';
 import { ExportDialog, ExportViewButton } from '@/components/ExportDialog';
 import { TemplateExportMenu } from '@/components/TemplateExportMenu';
-import { ViewMenu, type ViewOption } from '@/components/ViewMenu';
+import { LayoutPanel, type ViewOption } from '@/components/LayoutPanel';
 import { useRememberedView } from '@/lib/viewPreference';
 import { SavedViews } from '@/components/SavedViews';
 import { UnifiedFilter, type ExtraField } from '@/components/UnifiedFilter';
 import { decodeFilter, encodeFilter, type FilterTree } from '@/api/views';
 import { MoreMenu, PageHeader } from '@/components/PageHeader';
-import { bareHeader, DisplayMenu, displayAttrs, GroupBands, PastedChip, ROWNO_COL, RowNo, SearchBox, ShownFooter, TableCount, TableToolbar, WRAP_EXTRA } from '@/components/TableStandard';
-import { BulkBar, ColumnMenu, DensityToggle, Empty, gxRow, HeaderRow, pin, SEL_W, SelectBox, StatusChip, tracks, totalWidth, Trunc, useAutoFit, useTablePrefs } from '@/components/TableKit';
+import { bareHeader, displayAttrs, GroupBands, PastedChip, ROWNO_COL, RowNo, SearchBox, ShownFooter, TableCount, TableToolbar, WRAP_EXTRA } from '@/components/TableStandard';
+import { BulkBar, ColumnMenu, Empty, gxRow, HeaderRow, pin, SEL_W, SelectBox, StatusChip, tracks, totalWidth, Trunc, useAutoFit, useTablePrefs } from '@/components/TableKit';
 import { Tip } from '@/components/Tip';
 import type { FitSample } from '@/lib/tablePrefs';
 import { useToast } from '@/components/Toast';
@@ -364,9 +364,17 @@ export function Sites() {
           {activeFilters > 0 && <span className="chip bg-accentSoft text-accentText" data-testid="toolbar-active-filters">{t('states.filters')} {activeFilters}</span>}
           <TableCount testid="sites-count" noun="sites" total={counts.total} filtered={counts.filtered} active={activeFilters > 0} selected={picked.size} onClear={clearAll} />
         </span>}
-        switcher={<ViewMenu testid="sites-view" title={t('view.title')} value={asMap ? 'map' : asTimeline ? 'timeline' : asBoard ? 'board' : asWide ? 'wide' : layout === 'grid' ? 'grid' : 'list'} options={viewOptions} onChange={pickView} />}
-        density={<DensityToggle api={tbl} />}
-        display={<DisplayMenu api={tbl} />}
+        layout={/* V1: one Layout panel — the view switcher, the current view's options (the board's swimlanes) and the Display options of the table views */
+          <LayoutPanel testid="sites-view"
+          views={{ value: asMap ? 'map' : asTimeline ? 'timeline' : asBoard ? 'board' : asWide ? 'wide' : layout === 'grid' ? 'grid' : 'list', options: viewOptions, onChange: pickView }}
+          options={asBoard ? (
+            <label className="flex items-center gap-2 text-sm"><span className="text-mute">{t('board.swimlane')}</span>
+              <select className="input w-auto py-1" data-testid="sites-board-swimlane" value={lane} onChange={(e) => setParams({ lane: e.target.value === 'none' ? '' : e.target.value })}>
+                {SWIMLANES.map((s) => <option key={s} value={s}>{t(`board.lane_${s}`)}</option>)}
+              </select>
+            </label>
+          ) : undefined}
+          table={asBoard || asMap || asTimeline ? undefined : tbl} />}
         columns={<ColumnMenu api={tbl} label={label} />}
         exporter={menuTpl ? <TemplateExportMenu testid="sites-tools" exportTestid="sites-export-view" source="sites" filters={viewFilters} columns={SITE_COLUMNS} hasTemplate
           onBlank={() => void downloadTemplate(menuTpl.template_id).then((n) => toast(t('grid.downloaded', { name: n })), (e) => toast(registerErrorMessage(t, e), 'err'))}
@@ -380,7 +388,7 @@ export function Sites() {
         <Navigate to="/registers/dismantle" replace />
       ) : asBoard ? (
         // F5: the same filters as the list (the F3 tree included); stage, bucket and stream are list views and do not apply to the board
-        <SitesBoard swimlane={lane} onSwimlane={(x) => setParams({ lane: x === 'none' ? '' : x })}
+        <SitesBoard swimlane={lane}
           query={{ q: f.q || undefined, region_id: f.region_id || undefined, scenario: f.scenario || undefined, overall_status: f.overall_status || undefined, ...extra }} />
       ) : asTimeline ? (
         // Item 7: read only, the same filters as the list
