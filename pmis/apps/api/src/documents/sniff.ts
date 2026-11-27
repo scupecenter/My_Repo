@@ -7,10 +7,11 @@ import { unzipSync } from 'fflate';
 export type RejectReason = 'empty' | 'executable' | 'archive' | 'macro' | 'script' | 'html' | 'unknown_type' | 'format_not_allowed' | 'too_many_files';
 
 export interface Sniffed {
-  /** Canonical lower-case extension: pdf, jpg, png, heic, gif, webp, tiff, xlsx, docx, pptx, eml, msg, svg. */
+  /** Canonical lower-case extension: pdf, jpg, png, heic, gif, webp, tiff, xlsx, docx, pptx, eml, msg, svg, webm, mp4, mov. */
   ext: string;
   mime: string;
   image: boolean;
+  video: boolean;
 }
 
 export type SniffResult = ({ ok: true } & Sniffed) | { ok: false; reason: RejectReason; detail: string };
@@ -29,8 +30,14 @@ const MIME: Record<string, string> = {
   eml: 'message/rfc822',
   msg: 'application/vnd.ms-outlook',
   svg: 'image/svg+xml',
+  webm: 'video/webm',
+  mp4: 'video/mp4',
+  mov: 'video/quicktime',
 };
 const IMAGE = new Set(['jpg', 'png', 'gif', 'webp', 'tiff', 'heic', 'svg']);
+// Item 14 (2026-11-27): short field videos (Procore Quick Capture); a video is never an image.
+const VIDEO = new Set(['webm', 'mp4', 'mov']);
+const MP4_BRANDS = new Set(['isom', 'iso2', 'iso5', 'mp41', 'mp42', 'avc1', 'mmp4', 'm4v ', 'qt  ']);
 
 export const mimeOfExt = (ext: string): string => MIME[ext] ?? 'application/octet-stream';
 /** jpeg and jpg are one format. */
@@ -39,7 +46,7 @@ export const canonicalExt = (ext: string): string => {
   return e === 'jpeg' ? 'jpg' : e === 'tif' ? 'tiff' : e;
 };
 
-const ok = (ext: string): SniffResult => ({ ok: true, ext, mime: MIME[ext] ?? 'application/octet-stream', image: IMAGE.has(ext) });
+const ok = (ext: string): SniffResult => ({ ok: true, ext, mime: MIME[ext] ?? 'application/octet-stream', image: IMAGE.has(ext), video: VIDEO.has(ext) });
 const no = (reason: RejectReason, detail: string): SniffResult => ({ ok: false, reason, detail });
 
 const startsWith = (b: Buffer, sig: number[], at = 0): boolean => b.length >= at + sig.length && sig.every((x, i) => b[at + i] === x);
@@ -99,6 +106,8 @@ export function sniff(data: Buffer, fileName = ''): SniffResult {
   if (ascii(data, 0, 4) === 'RIFF' && ascii(data, 8, 12) === 'WEBP') return ok('webp');
   if (startsWith(data, [0x49, 0x49, 0x2a, 0x00]) || startsWith(data, [0x4d, 0x4d, 0x00, 0x2a])) return ok('tiff');
   if (ascii(data, 4, 8) === 'ftyp' && HEIC_BRANDS.has(ascii(data, 8, 12).toLowerCase())) return ok('heic');
+  if (startsWith(data, [0x1a, 0x45, 0xdf, 0xa3])) return ok('webm');
+  if (ascii(data, 4, 8) === 'ftyp' && MP4_BRANDS.has(ascii(data, 8, 12).toLowerCase())) return ascii(data, 8, 12).toLowerCase() === 'qt  ' ? ok('mov') : ok('mp4');
   if (startsWith(data, [0x50, 0x4b, 0x03, 0x04]) || startsWith(data, [0x50, 0x4b, 0x05, 0x06])) return sniffZip(data);
   if (ascii(data, 0, 4) === 'Rar!' || startsWith(data, [0x37, 0x7a, 0xbc, 0xaf]) || startsWith(data, [0x1f, 0x8b]) || ascii(data, 0, 3) === 'BZh' ||
       startsWith(data, [0xfd, 0x37, 0x7a, 0x58, 0x5a]) || ascii(data, 257, 262) === 'ustar') {
