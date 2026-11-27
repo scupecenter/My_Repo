@@ -465,6 +465,15 @@
     "carried": "{{n}} sites carried over"
   },
   "panel": {
+    "move": "Move the panel",
+    "move_hint": "Drag, or use the arrow keys",
+    "pin": "Pin (dock) the panel",
+    "unpin": "Unpin the panel",
+    "float": "Float the panel",
+    "anchor_end-top": "Panel at the top, end side",
+    "anchor_end-bottom": "Panel at the bottom, end side",
+    "anchor_start-top": "Panel at the top, start side",
+    "anchor_start-bottom": "Panel at the bottom, start side",
     "tab_all": "All",
     "tab_unread": "Unread",
     "tab_priority": "Priority"
@@ -3902,7 +3911,9 @@
       "icon_style": "Icon weight",
       "menu_style": "Side menu",
       "accent": "Accent colour",
-      "contrast": "Contrast"
+      "contrast": "Contrast",
+      "inbox_panel": "Notification panel",
+      "inbox_anchor": "Floating panel corner"
     },
     "opt": {
       "density": {
@@ -3947,6 +3958,17 @@
       "contrast": {
         "standard": "Standard",
         "high": "High"
+      },
+      "inbox_panel": {
+        "overlay": "Overlay (default)",
+        "floating": "Floating window",
+        "docked": "Docked at the edge"
+      },
+      "inbox_anchor": {
+        "end-top": "End, top",
+        "end-bottom": "End, bottom",
+        "start-top": "Start, top",
+        "start-bottom": "Start, bottom"
       }
     }
   },
