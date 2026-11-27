@@ -18,6 +18,7 @@ import { tripoliToday } from "@/lib/today";
 import { sumOf, weightIssues } from "@/lib/weights";
 import { FieldErr } from "./Calendar";
 import { QueryError, QueryFallback } from "@/components/States";
+import { DateInput } from '@/components/DateInput';
 
 const CODES: WeightSetCode[] = [
   "project_status",
@@ -149,8 +150,7 @@ function Publish({
     >
       <label className="block text-sm font-semibold">
         {t("slaSet.effective_date")}
-        <input
-          type="date"
+        <DateInput
           min={tripoliToday()}
           className="input mt-1 font-normal"
           data-testid="weights-publish-date"

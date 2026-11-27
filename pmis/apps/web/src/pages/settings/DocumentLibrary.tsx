@@ -13,6 +13,7 @@ import { useSnagTypes } from '@/api/qc';
 import { useStartEvents } from '@/api/settings';
 import { fieldErrors } from '@/lib/fields';
 import { tripoliToday } from '@/lib/today';
+import { DateInput } from '@/components/DateInput';
 
 const KINDS = ['scanned_document', 'photo', 'email', 'report', 'excel_template', 'generated_form'] as const;
 const FORM_KINDS = ['dn', 'rn', 'pac', 'fac', 'snag_list'] as const;
@@ -182,7 +183,7 @@ function Publish({ id, onClose }: { id: string; onClose: () => void }) {
         <label className="flex items-start gap-2"><input type="radio" name="apply" data-testid="doc-apply-new" checked={apply === 'new_only'} onChange={() => setApply('new_only')} /><span><b>{t('docs.lib.apply_new')}</b><br /><span className="text-mute">{t('docs.lib.apply_new_help')}</span></span></label>
         <label className="flex items-start gap-2"><input type="radio" name="apply" data-testid="doc-apply-open" checked={apply === 'open_too'} onChange={() => setApply('open_too')} /><span><b>{t('docs.lib.apply_open')}</b><br /><span className="text-mute" data-testid="doc-open-count">{t('docs.lib.apply_open_help', { count: d.open_task_count ?? 0 })}</span></span></label>
       </fieldset>
-      <label className="text-sm font-semibold">{t('docs.lib.effective')}<input type="date" className="input mt-1 font-normal" data-testid="doc-effective" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
+      <label className="text-sm font-semibold">{t('docs.lib.effective')}<DateInput className="input mt-1 font-normal" data-testid="doc-effective" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
     </FormDialog>
   );
 }
