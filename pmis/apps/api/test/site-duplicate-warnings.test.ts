@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { startApp, superDb } from './helpers';
 import { Actor, actor } from './wf-helpers';
 
-/** Migration 0185: a site that looks like an existing one gets a warning (name, coordinates, similar Site ID), never an error. Region 7 is the working region. */
+/** Migration 0202: a site that looks like an existing one gets a warning (name, coordinates, similar Site ID), never an error. Region 7 is the working region. */
 let app: NestExpressApplication;
 let db: PgClient;
 const R = 7;
