@@ -7765,7 +7765,11 @@
     "kind_weekly_status_missing": "Weekly status missing",
     "kind_record_idle": "Record idle in a state",
     "kind_weekly_status_missing_help": "Fires for every region without a Weekly status update of the current working week. Placeholders: {{region}}.",
-    "kind_record_idle_help": "Fires for every current record of the register in the state for at least the days. Placeholders: {{record}}, {{state}}, {{days}}."
+    "kind_record_idle_help": "Fires for every current record of the register in the state for at least the days. Placeholders: {{record}}, {{state}}, {{days}}.",
+    "col_locked": "Locked", "kpi": "KPI", "op": "Comparison", "op_above": "above", "op_below": "below", "value": "Threshold",
+    "locked": "Locked (no edits until unlocked)",
+    "kind_kpi_threshold": "KPI crosses a threshold",
+    "kind_kpi_threshold_help": "Fires when the live KPI of the dashboard crosses the rule's own threshold. Placeholders: {{kpi}}, {{value}}, {{threshold}}."
   },
   "rel": {
     "today": "today",
