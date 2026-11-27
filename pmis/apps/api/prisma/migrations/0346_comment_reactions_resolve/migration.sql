@@ -1,4 +1,4 @@
--- 0346: reactions on comments (a 👍 "acknowledged") and marking a comment resolved (PM-platforms proposal item 18,
+-- 0346: reactions on comments (a 👍 "acknowledged") and marking a comment resolved (item 18 of the 2026-11-27 batch,
 -- owner approval 2026-11-27 relayed by Main). Mirror of this file: pmis/db/sql/345_comment_reactions_resolve.sql (identical content).
 --
 -- WHY. On a construction project a comment often needs only an acknowledgement, not a reply, and an open point needs a clear
