@@ -6118,6 +6118,8 @@
     "max": "Largest"
   },
   "tstd": {
+    "empty": "Nothing to show.",
+    "search_table": "Search this table",
     "count_all": "{{total}} {{noun}}",
     "count_of": "<b>{{filtered}}</b> of {{total}} {{noun}}",
     "count_of_plain": "{{filtered}} of {{total}} {{noun}}",
@@ -6689,6 +6691,10 @@
     "actual": "Actual"
   },
   "siteActivity": {
+    "c_entity": "Entity",
+    "c_action": "Action",
+    "c_actor": "Who",
+    "c_at": "When",
     "tab": "Activity",
     "empty": "No activity recorded for this site.",
     "system": "System",

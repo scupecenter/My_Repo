@@ -6186,6 +6186,8 @@
     "max": "الأكبر"
   },
   "tstd": {
+    "empty": "لا يوجد ما يُعرض.",
+    "search_table": "ابحث في هذا الجدول",
     "count_all": "{{total}} {{noun}}",
     "count_of": "<b>{{filtered}}</b> من {{total}} {{noun}}",
     "count_of_plain": "{{filtered}} من {{total}} {{noun}}",
@@ -6757,6 +6759,10 @@
     "actual": "الفعلي"
   },
   "siteActivity": {
+    "c_entity": "الكيان",
+    "c_action": "الإجراء",
+    "c_actor": "الفاعل",
+    "c_at": "الوقت",
     "tab": "النشاط",
     "empty": "لا نشاط مسجّل لهذا الموقع.",
     "system": "النظام",
