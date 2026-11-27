@@ -1234,6 +1234,7 @@
     "section_my-work_daily-plan": "Daily Plan",
     "section_documents_types": "Document types",
     "section_documents_forms": "Form templates",
+    "section_documents_search": "Search index",
     "section_documents_archive": "Archive",
     "section_documents_numbering": "Numbering",
     "section_data_counts": "GECOL / HLC counts",
@@ -6723,6 +6724,18 @@
     "preview_frame": "Template preview",
     "preview_missing": "No value for: {{list}}",
     "unknown": "Not a known path: {{list}}"
+  },
+  "dsi": {
+    "title": "Document search index",
+    "note": "Global search finds words inside uploaded PDF and Word (DOCX) files, not only file names. The text is read in the background every few minutes from files that passed the virus scan, so a new upload becomes searchable shortly after. Old files are indexed the same way. Results respect your documents permission and regions. Images, spreadsheets and other formats are searched by name only.",
+    "indexed": "Indexed files",
+    "pending": "Waiting to be indexed",
+    "empty": "No text found",
+    "unsupported": "Name only (format not read)",
+    "too_large": "Too large (over 25 MB)",
+    "failed": "Could not be read (retried daily)",
+    "last": "Last indexed: {{at}}",
+    "never": "Nothing indexed yet."
   },
   "as": {
     "title": "Archive",
