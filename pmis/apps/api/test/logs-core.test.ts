@@ -111,6 +111,13 @@ describe('field-level change log', () => {
     expect(hist.body.items.length).toBeGreaterThanOrEqual(2); // the create and the edit, newest first
     expect(hist.body.items[0].new_value).toBe('GP-CHANGED');
     expect((await api.call('get', '/audit-log/field-history?entity_type=register_record')).status).toBe(422);
+    // 0.15.92: without `field` the whole record comes back (the History tab): every changed field of the create and the edit, newest first, grouped by audit_id
+    const whole = await api.call('get', `/audit-log/field-history?entity_type=register_record&entity_id=${logical}`);
+    expect(whole.status).toBe(200);
+    const wf = whole.body.items.map((i: { field: string }) => i.field);
+    expect(wf).toContain('pr_no');
+    expect(whole.body.items.find((i: { field: string }) => i.field === 'pr_no')).toMatchObject({ new_value: 'GP-CHANGED', old_value: rec.data.pr_no });
+    expect(whole.body.items.every((i: { audit_id: number }) => typeof i.audit_id === 'number')).toBe(true);
     expect((await lastAudit('audit_log.field_changes_read')).actor_id).toBeTruthy();
   });
 

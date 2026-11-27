@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.93
+  version: 0.15.94
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -33,6 +33,7 @@ info:
     ## Versions
     - 0.15.92 (2026-11-27): order picker for the Car dispatcher and Financial advances (CHANGELOG OrderPickersDispatchAdvances). Additive, no migration. `GET /registers/car_dispatcher/order-options` and `GET /registers/financial_advances/order-options` list the approved, active Procurement orders for the field `procurement_record_id` (the same list as the warehouse picker); each needs its own module view, and only orders in regions where the caller also holds the Procurement view right are listed.
     - 0.15.91 (2026-11-26): warehouse receipt to Procurement order link (migration 0181; CHANGELOG WarehouseProcurementLink). Additive. A warehouse receipt (PL or OPEN) may name the approved, active Procurement order it belongs to (`procurement_order_id`); `pr_no`, `po_wo_no` and `order_contractor` are then derived from the order (read only). New `GET /registers/warehouse/order-options` (the picker) and `GET /registers/procurement/{entity_id}/receipts` (the receipts against an order). New 422 codes `receipt_only`, `order_not_active`, `order_other_site`.
+    - 0.15.94 (2026-11-26): `GET /audit-log/field-history` takes `field` as optional (item 2 of the 2026-11-26 review; no migration). Additive. Without `field` it returns every field change of the record (a register record by its logical `entity_id`, a task by its task id), newest first, at most 200: the field diff of the History tab. Changes of a field the caller may not see are left out (a `hidden` field rule, and the amounts of Financial Advances for a caller who may not see amounts); the reader rules (decision B4) and the audit of the read are unchanged. `entity_type` and `entity_id` stay required (422).
     - 0.15.93 (2026-11-26): global search also reads tasks and warehouse items (owner approval 2026-11-26; no migration). Additive. `SearchType` gains `tasks` (the tasks of the sites the caller may view, same Site Register right and regions as the site list; the hit opens `/sites/{id}?task={task_id}`) and `warehouse_items` (needs `warehouse` view, as `GET /warehouse/items`; items are global). Read only, a group the caller may not read is left out as before.
     - 0.15.89 (2026-11-26): contractor performance view (migration 0180; CHANGELOG ContractorPerformance). Additive and read only. (1) `GET /reports/contractor-performance` (`getContractorPerformance`): one row per active contractor, computed on read from the delay days of its issues, its snags, its quality results, its Procurement orders and its contract end; nothing is typed or stored. (2) `GET/PUT /settings/contractor-performance` (`getContractorPerformanceThresholds`, `setContractorPerformanceThresholds`): the amber and red thresholds and the least sample, audited as `contractor_performance_thresholds_update`. No table, no permission change.
     - 0.15.85 (2026-11-26): the dashboard issues section gains two read-only breakdowns (migration 0172; issue work package 3). `DashboardIssues` gains `by_category` and `by_reason`: the open issues of the section grouped by the stored IssueCategory / BlockerReason list code, each row with the code (null when the field is empty), the list labels, the count of issues and the count of distinct sites (the same two measures as `by_owner`, Q36). The labels follow Settings > Lists; a hidden or renamed value keeps counting under its new label, a code no longer in the list counts under the code itself. Nothing existing changes and no permission or visibility changes.
@@ -5754,11 +5755,11 @@ paths:
       tags: [audit]
       operationId: getFieldHistory
       summary: History of one field of one record, newest first (at most 200 changes)
-      description: Same keys and reader rules as `GET /audit-log/field-changes`; the three parameters are required (422 otherwise). Audited.
+      description: Same keys and reader rules as `GET /audit-log/field-changes`; `entity_type` and `entity_id` are required (422 otherwise). Without `field` (0.15.94) every field change of the record is returned, newest first, at most 200, minus the fields the caller may not see (a hidden field rule; Financial Advances amounts). Audited.
       parameters:
         - { name: entity_type, in: query, required: true, schema: { type: string } }
         - { name: entity_id, in: query, required: true, schema: { type: string } }
-        - { name: field, in: query, required: true, schema: { type: string } }
+        - { name: field, in: query, required: false, schema: { type: string } }
       responses:
         '200':
           description: Changes.
