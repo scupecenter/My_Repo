@@ -22397,18 +22397,16 @@ components:
       required: [advances, invoices]
       properties:
         advances:
-          type: object
-          nullable: true
+          type: [object, 'null']
           description: Null when the caller cannot view the financial_advances module.
           required: [open_count, overdue_count, open_amount]
           properties:
             open_count: { type: integer, minimum: 0, description: 'Latest advances whose state is not settled, closed or cancelled.' }
             overdue_count: { type: integer, minimum: 0, description: 'Disbursed and unsettled for more than settle_warn_days.' }
-            open_amount: { type: number, nullable: true, description: 'Total open balance of the advances the caller may see amounts of (fin_amounts_visible); null when the rule shows the caller no amounts.' }
+            open_amount: { type: [number, 'null'], description: 'Total open balance of the advances the caller may see amounts of (fin_amounts_visible); null when the rule shows the caller no amounts.' }
             currency: { type: string, example: LYD }
         invoices:
-          type: object
-          nullable: true
+          type: [object, 'null']
           description: Null when the caller cannot view the invoices module.
           required: [open_count, by_state, aging, overdue_count]
           properties:
