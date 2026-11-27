@@ -174,7 +174,9 @@ export function sessionBody(): Session {
 }
 
 function initIdentity() {
-  return { default_brand: 'current' as Brand, allow_user_choice: true, defaults: {} as Record<string, string>, pref_options: APPEARANCE_OPTIONS as unknown as Record<string, string[]>, version: 1, updated_at: null as string | null, updated_by: null as null | { id: string; display_name: string; employee_id: string | null } };
+  return { default_brand: 'current' as Brand, allow_user_choice: true, defaults: {} as Record<string, string>, pref_options: APPEARANCE_OPTIONS as unknown as Record<string, string[]>, version: 1, updated_at: null as string | null, updated_by: null as null | { id: string; display_name: string; employee_id: string | null },
+    /** 0243: the workspace logo metadata (ui_assets); the bytes live in uiAssetBytes (not persisted). */
+    logo: null as null | { key: string; mime: string; enabled: boolean; version: number; updated_at: string; updated_by: { id: string; display_name: string; employee_id: string | null } | null } };
 }
 function initLoginPage() {
   return {
@@ -193,6 +195,10 @@ export const loginPagePublic = () => {
     animation: c.animation, default_locale: c.default_locale, support_links: c.support_links,
   };
 };
+/** 0243: the bytes of the identity images (ui_assets); the mock keeps them in memory only. */
+const uiAssetBytes = new Map<string, { mime: string; bytes: Uint8Array }>();
+export const putUiAssetBytes = (key: string, mime: string, bytes: Uint8Array) => { uiAssetBytes.set(key, { mime, bytes }); };
+export const uiAssetBytesOf = (key: string) => uiAssetBytes.get(key);
 /** 0.15.41: the identity settings (older saved mock states have none). */
 export const identity = () => (db().identity ??= initIdentity());
 /** The design a user sees: their own while the admin allows a choice, else the organization default (ui_effective_brand). */

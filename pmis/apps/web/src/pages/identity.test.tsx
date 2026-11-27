@@ -89,6 +89,74 @@ describe('Settings > Identity & themes', () => {
   });
 });
 
+describe('Settings > Identity > Workspace logo (0243)', () => {
+  const png = () => new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], 'logo.png', { type: 'image/png' });
+  const upload = async (u: ReturnType<typeof userEvent.setup>) => {
+    await u.upload(screen.getByTestId('identity-logo-file'), png());
+    expect(await screen.findByTestId('identity-logo-confirm-upload')).toBeInTheDocument();
+    await u.type(screen.getByTestId('identity-logo-dialog-reason'), 'Owner approval 2026-11-27, item 5');
+    await u.click(screen.getByTestId('identity-logo-dialog-submit'));
+  };
+
+  it('uploads the logo with a reason, shows it in the sidebar, hides and restores it (never deletes)', async () => {
+    await signIn('pm');
+    await api.post('/__mock/step-up');
+    const u = userEvent.setup();
+    settings();
+    expect(await screen.findByTestId('identity-logo-badge')).toBeInTheDocument();
+    expect(screen.getByTestId('identity-logo-state')).toHaveTextContent('No logo uploaded');
+    await upload(u);
+    await waitFor(() => expect(screen.getByTestId('identity-logo-preview')).toBeInTheDocument());
+    expect(screen.getByTestId('identity-logo-state')).toHaveTextContent('Uploaded by');
+    const s = await api.get<UiIdentity>('/settings/identity');
+    expect(s.logo).toMatchObject({ key: 'logo', mime: 'image/png', enabled: true, version: 1 });
+    // the sidebar shows it instead of the badge
+    renderApp(<App />, { route: '/my-work' });
+    expect((await screen.findAllByTestId('sidebar-logo')).length).toBeGreaterThan(0);
+    // hide: the row stays, the bytes answer 404, the badge is back
+    await u.click(screen.getByTestId('identity-logo-hide'));
+    await u.type(await screen.findByTestId('identity-logo-dialog-reason'), 'Hide it for now');
+    await u.click(screen.getByTestId('identity-logo-dialog-submit'));
+    await waitFor(() => expect(screen.getByTestId('identity-logo-state')).toHaveTextContent('hidden'));
+    expect((await api.get<UiIdentity>('/settings/identity')).logo).toMatchObject({ enabled: false, version: 2 });
+    expect(await errCode(api.get('/ui/assets/logo'))).toBe('404:not_found');
+    // show again
+    await u.click(screen.getByTestId('identity-logo-show'));
+    await u.type(await screen.findByTestId('identity-logo-dialog-reason'), 'Show it again');
+    await u.click(screen.getByTestId('identity-logo-dialog-submit'));
+    await waitFor(() => expect((screen.getByTestId('identity-logo-preview'))).toBeInTheDocument());
+    expect((await api.get<UiIdentity>('/settings/identity')).logo).toMatchObject({ enabled: true, version: 3 });
+  });
+
+  it('is read-only for a non-admin; the API refuses the upload and the toggle', async () => {
+    await signIn('engineer');
+    settings();
+    expect(await screen.findByTestId('identity-logo-badge')).toBeInTheDocument();
+    expect(screen.queryByTestId('identity-logo-choose')).toBeNull();
+    const f = new FormData();
+    f.append('file', png());
+    f.append('reason', 'Not mine to change');
+    expect(await errCode(api.put('/settings/identity/logo', { body: f }))).toBe('403:action_forbidden');
+    expect(await errCode(api.patch('/settings/identity/logo', { version: 1, body: { enabled: false, reason: 'Not mine to change' } }))).toBe('403:action_forbidden');
+  });
+
+  it('validates the file, the reason and the version; a no-op toggle is a conflict', async () => {
+    await signIn('pm');
+    await api.post('/__mock/step-up');
+    const bad = new FormData();
+    bad.append('file', new File([new Uint8Array([1])], 'notes.txt', { type: 'text/plain' }));
+    bad.append('reason', 'A wrong file type');
+    expect(await errCode(api.put('/settings/identity/logo', { body: bad }))).toBe('422:validation_failed');
+    const f = new FormData();
+    f.append('file', png());
+    f.append('reason', 'The first logo');
+    const up = await api.put<{ version: number }>('/settings/identity/logo', { body: f });
+    expect(up.version).toBe(1);
+    expect(await errCode(api.patch('/settings/identity/logo', { version: 1, body: { enabled: true, reason: 'Already shown' } }))).toBe('409:invalid_transition');
+    expect(await errCode(api.patch('/settings/identity/logo', { version: 9, body: { enabled: false, reason: 'A stale version' } }))).toBe('412:precondition_failed');
+  });
+});
+
 describe('My profile > Appearance', () => {
   it('offers the organization default and the four designs, and saves a personal design', async () => {
     await signIn('pm');

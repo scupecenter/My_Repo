@@ -8,6 +8,7 @@ import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { api } from '@/api/client';
 import { useLogout, useMe, useNotifications, useSession } from '@/api/hooks';
 import { useMenuCounts, useUnreadTotal } from '@/api/msg';
+import { useUiIdentity } from '@/api/settings';
 import { useOpenAlertCount } from '@/api/logs';
 import { isAdmin } from '@/lib/perm';
 import { notificationTarget } from '@/lib/x';
@@ -15,6 +16,7 @@ import { applyLocale, applyTheme, currentLocale, currentTheme } from '@/i18n';
 import { HYBRID } from '@/lib/hybrid';
 import { loadPref, savePref as storePref } from '@/lib/localPref';
 import { applyAppearance } from '@/lib/appearance';
+import { API_BASE } from '@/api/client';
 import { sanitizeUiNav, type UiNav } from '@/lib/sidebarPrefs';
 import { useUpdateMyProfile } from '@/api/profile';
 import { applyBrand } from '@/lib/brands';
@@ -31,6 +33,7 @@ import { SIDEBAR_DEFAULT, SIDEBAR_MAX, SIDEBAR_MIN, SidebarBody, SidebarSplitter
 
 export { NAV };
 const WIDTH_KEY = 'pmis.nav.width';
+const LOGO_KEY = 'pmis.identity.logo';
 const ICONS_KEY = 'pmis.nav.icons';
 /** The menu hides by itself (a narrow rail that opens on hover) unless it is pinned; kept in the browser like the width and the icons-only choice. */
 const AUTO_KEY = 'pmis.nav.auto';
@@ -73,6 +76,16 @@ export function Shell() {
   useEffect(() => { if (userBrand) applyBrand(userBrand); }, [userBrand]);
   // 0241: the appearance profile follows the signed-in user (own choices, else the organization defaults)
   const userAppearance = me.data?.user.appearance;
+  // 0243: the workspace logo of the identity replaces the built-in badge; nothing changes without an enabled logo.
+  // ui_identity_state is readable by every signed-in user; the last seen state is cached so a reload does not flash the badge.
+  const ident = useUiIdentity();
+  useEffect(() => {
+    if (ident.data) storePref(LOGO_KEY, ident.data.logo?.enabled ? { version: ident.data.logo.version } : null);
+  }, [ident.data]);
+  const logo: { version: number } | null = ident.data ? (ident.data.logo?.enabled ? { version: ident.data.logo.version } : null) : loadPref(LOGO_KEY, null);
+  const brandMark = logo
+    ? <img src={`${API_BASE}/ui/assets/logo?v=${logo.version}`} alt="" data-testid="sidebar-logo" className="h-8 w-8 shrink-0 rounded-md object-contain" />
+    : <span className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-accent text-accentInk">G</span>;
   useEffect(() => { if (userAppearance) applyAppearance(userAppearance); }, [userAppearance]);
 
   // 0242 (proposal item 4): the personal sidebar of the profile. The pins of a browser that had them only locally
@@ -142,7 +155,7 @@ export function Shell() {
   const groupFirst = current ? sideItems.find((i) => i.group === current.group) : undefined;
   const brand = (
     <div className="flex items-center gap-2 px-4 py-4 font-bold">
-      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-accent text-accentInk">G</span>{!rail && t('app.name')}
+      {brandMark}{!rail && t('app.name')}
       {!rail && <button className="btn ms-auto hidden min-h-8 min-w-8 md:inline-flex" data-testid="sidebar-pin" aria-pressed={!auto} aria-label={t(auto ? 'nav.pin_menu' : 'nav.autohide_menu')} title={t(auto ? 'nav.pin_menu' : 'nav.autohide_menu')} onClick={togglePin}>{auto ? <PinOff size={16} aria-hidden /> : <Pin size={16} aria-hidden />}</button>}
     </div>
   );
@@ -186,7 +199,7 @@ export function Shell() {
           <button className="absolute inset-0 bg-scrim" aria-label={t('nav.close_menu')} tabIndex={-1} onClick={() => setDrawer(false)} />
           <div role="dialog" aria-modal="true" aria-label={t('nav.sidebar_label')} data-testid="sidebar-drawer" className="absolute inset-y-0 start-0 flex w-72 max-w-[85vw] flex-col border-e border-line bg-card">
             <div className="flex items-center justify-between pe-2">
-              <div className="flex items-center gap-2 px-4 py-4 font-bold"><span className="grid h-8 w-8 place-items-center rounded-md bg-accent text-accentInk">G</span>{t('app.name')}</div>
+              <div className="flex items-center gap-2 px-4 py-4 font-bold">{brandMark}{t('app.name')}</div>
               <button ref={closeRef} className="btn min-h-11 min-w-11" data-testid="drawer-close" aria-label={t('nav.close_menu')} onClick={() => setDrawer(false)}><X size={16} aria-hidden /></button>
             </div>
             <SidebarBody items={sideItems} compact={false} unread={unread} alerts={alerts} counts={counts} activeKey={activeKey} onNavigate={() => setDrawer(false)} side={side} onPinsChange={savePins} />

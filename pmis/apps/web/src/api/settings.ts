@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tansta
 import { api, ApiError, downloadFile, type RequestOptions } from './client';
 import type { AlertRuleInput, AlertRuleSaved, AlertRulesResponse, IssueStoppedRowList, IssueTaskMapItem, IssueTaskMapList,
   ActiveSession, ActOnBehalfRequest, Calendar, CalendarConfirmation, MailNotificationKinds, ImportsSettings, ContractorPerformanceReport, ContractorPerformanceThresholds, ContractorPerformanceSettings, NavLayoutSetting, UiIdentity, UiBrand, LoginPage, SecurityLocks, SupportAccessSetting, Delegation, LoginPagePublic, SupportLink, NavLayoutT, ContractorRules, ContractorRulesInput, GecolHlcCounts, ContractorsCompletenessReport, TeamScopeMismatchReport, DeletedUser, PurgedUser, DlpSettings, DlpVersion, DlpVersionInput, Holiday, HolidayChangeResult, HolidayInput, HolidayPatch, HolidaySummary, IdleTaskAlertSetting, Job, LogIntegrity, LogRetention, LogRetentionInput, NewDeviceCodeSetting,
-  NotificationPolicy, NotificationPolicyInput, NotificationTypeDef, Page, ReassignmentAlert, SecurityLogEntry, SessionRevokeResult, SlaPublishPreview, SlaRuleSet, SlaRuleSetPublishResult, SlaRuleSetSummary, SlaTaskRule, StaffCard, StaffVisibility, StructuralFreeze,
+  UiAsset, NotificationPolicy, NotificationPolicyInput, NotificationTypeDef, Page, ReassignmentAlert, SecurityLogEntry, SessionRevokeResult, SlaPublishPreview, SlaRuleSet, SlaRuleSetPublishResult, SlaRuleSetSummary, SlaTaskRule, StaffCard, StaffVisibility, StructuralFreeze,
   TaskDefinition, TeamScopeMatch, TeamScopeMatchInput, TransitionResultT, User, UserDetail, WeekendDaysResult, WeightSet, WeightSetCode, WeightSetInput, WeightSetPreview, WeightSetPublishResult, WorkflowVersion, WorkflowVersionSummary,
 } from './types';
 
@@ -144,6 +144,27 @@ export const useSetNewDeviceCode = () => {
 };
 export const useBypassNewDevice = () =>
   useMutation<{ until: string }, ApiError, { user_id: string; minutes?: number; reason: string }>({ mutationFn: (body) => api.post('/settings/new-device-code/bypass', { body }) });
+
+/** 0.15.232 (migration 0243): the workspace logo of the identity. Uploading always enables it; hiding keeps the row (hide never delete). */
+export const usePutUiLogo = () => {
+  const qc = useQueryClient();
+  return useMutation<UiAsset, ApiError, { file: File; reason: string; version: number | null }>({
+    mutationFn: ({ file, reason, version }) => {
+      const f = new FormData();
+      f.append('file', file);
+      f.append('reason', reason);
+      return api.put('/settings/identity/logo', version === null ? { body: f } : { body: f, version });
+    },
+    onSettled: () => refresh(qc, 'ui-identity', 'me', 'my-profile'),
+  });
+};
+export const useSetUiLogoEnabled = () => {
+  const qc = useQueryClient();
+  return useMutation<UiAsset, ApiError, { version: number; enabled: boolean; reason: string }>({
+    mutationFn: ({ version, ...body }) => api.patch('/settings/identity/logo', { version, body }),
+    onSettled: () => refresh(qc, 'ui-identity', 'me', 'my-profile'),
+  });
+};
 export const useImportsSettings = () => useQuery({ queryKey: ['imports-settings'], queryFn: () => api.get<ImportsSettings>('/settings/imports') });
 export const useSetImportsSettings = () => {
   const qc = useQueryClient();

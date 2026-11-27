@@ -399,6 +399,9 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/settings/new-device-code'],
   ['put', '/settings/new-device-code'],
   ['post', '/settings/new-device-code/bypass'],
+  ['put', '/settings/identity/logo'],
+  ['patch', '/settings/identity/logo'],
+  ['get', '/ui/assets/:key'],
   // Contract 0.15.4 (migration 0085; apps/api: sites, master-import, templates): the per-site workflow locks (one site, many sites) and the status of the sites of
   // an import (missing data per site). The new site fields ride on the paths above.
   ['post', '/sites/workflow-locks'],

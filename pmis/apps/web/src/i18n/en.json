@@ -5839,7 +5839,20 @@
     "choice_off": "Everyone sees this design.",
     "defaults_title": "Organization appearance defaults",
     "defaults_note": "The appearance of everyone without a personal choice. An empty field keeps the built-in standard.",
-    "defaults_builtin": "Built-in standard ({{name}})"
+    "defaults_builtin": "Built-in standard ({{name}})",
+    "logo_title": "Workspace logo",
+    "logo_note": "Shown in the sidebar instead of the built-in badge. PNG, JPEG, SVG or WebP, 256 KiB at most.",
+    "logo_none": "No logo uploaded; the built-in badge shows.",
+    "logo_hidden": "The logo is hidden; the built-in badge shows. Hiding keeps the file.",
+    "logo_upload": "Upload logo",
+    "logo_replace": "Replace logo",
+    "logo_hide": "Hide logo",
+    "logo_show": "Show logo",
+    "logo_confirm_upload": "The logo shows in the sidebar for everyone. The change is audited with your reason.",
+    "logo_confirm_hide": "The logo disappears from the sidebar; the built-in badge shows. The file is kept. The change is audited with your reason.",
+    "logo_confirm_show": "The logo shows in the sidebar again. The change is audited with your reason.",
+    "logo_updated": "Uploaded by {{name}} on {{when}}",
+    "logo_alt": "Workspace logo"
   },
   "studioPanel": {
     "open": "Show the pending changes",

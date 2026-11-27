@@ -106,6 +106,7 @@ export type SecurityLocks = S['SecurityLocks'];
 export type SupportAccessSetting = S['SupportAccessSetting'];
 export type NewDeviceCodeSetting = S['NewDeviceCodeSetting'];
 export type UiIdentity = S['UiIdentity'];
+export type UiAsset = S['UiAsset'];
 export type UiBrand = S['UiBrand'];
 export type LoginPage = S['LoginPage'];
 export type LoginPagePublic = S['LoginPagePublic'];
