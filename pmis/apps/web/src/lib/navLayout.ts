@@ -17,6 +17,8 @@ export interface Layout { headings: NavHead[] }
 /** The names the Site Register heading had before it was called Site Master (stored in layouts saved at the time). */
 const LEGACY_SITE_NAME = /^\s*(site\s?360|سايت\s?360|الموقع\s?360|ماستر المواقع)\s*$/i;
 export const DEFAULT_GROUPS = ['home', 'work', 'site_register', 'registers', 'data', 'library', 'admin', 'logs'] as const;
+/** Groups that are only a label over their screens (no /menu/:id page of their own): Site Master, Registers & Logs, Logs & monitoring (Ahmed's decision 2026-11-27). */
+export const NO_PAGE_GROUPS: readonly string[] = ['site_register', 'registers', 'logs'];
 export const OTHER_ID = 'other';
 export const NAME_MAX = 60;
 export const MAX_MAIN = 30;

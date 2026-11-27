@@ -5,7 +5,7 @@ import { Link, NavLink, useLocation } from 'react-router-dom';
 import { useNavLayout } from '@/api/settings';
 import { ICONS, ICON_PROPS } from '@/lib/icons';
 import { loadPref, savePref } from '@/lib/localPref';
-import { headingIcon, headingName, keysOf, resolveLayout, type NavHead, type NavSub } from '@/lib/navLayout';
+import { headingIcon, headingName, keysOf, NO_PAGE_GROUPS, resolveLayout, type NavHead, type NavSub } from '@/lib/navLayout';
 import { applySidebarOverlay, sanitizeUiNav, type UiNav } from '@/lib/sidebarPrefs';
 import { SITE_MASTER_SUBMENUS } from '@/lib/siteMasterMenus';
 import { NavLayoutEditor } from './NavLayoutEditor';
@@ -195,7 +195,7 @@ export function SidebarBody({ items, compact, unread, alerts = 0, counts = {}, a
     if (!visible.length) return null;
     // "Site Master" is a top-level group with no page of its own: its first child is "Site 360°" (the register), then the six sub-menus (Ahmed's decision, 2026-11-27).
     // A heading with one screen and nothing else is still drawn as that single row (Dashboard has its own first row above and is not in any heading).
-    const siteGroup = !sub && h.id === 'site_register';
+    const siteGroup = !sub && NO_PAGE_GROUPS.includes(h.id);
     const solo = !sub && h.children.length === 1 && h.id === 'home';
     const open = compact || solo || !collapsed.includes(h.id);
     const hasActive = visible.some((k) => k === activeKey) || (visible.includes('sites') && loc.pathname.startsWith('/sites'));

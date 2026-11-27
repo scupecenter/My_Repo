@@ -111,15 +111,14 @@ describe('Sidebar tree (N1-N12)', () => {
     await waitFor(() => expect(screen.getByTestId('nav-approvals')).toHaveTextContent(/\d/));
   });
 
-  it('a parent heading opens its own page: Registers lists its screens as cards, the arrow still opens and closes the list', async () => {
+  it('Registers and Logs are labels with sub-menus only (no page of their own); the arrow opens and closes the list; an old /menu link opens the first screen', async () => {
     const u = userEvent.setup();
-    renderApp(<Routes><Route element={<Shell />}><Route path="/menu/:id" element={<MenuGroup />} /><Route path="*" element={<div />} /></Route></Routes>, { route: '/my-work' });
-    await screen.findByTestId('nav-group-open-registers');
-    await u.click(screen.getByTestId('nav-group-open-registers'));
-    const page = await screen.findByTestId('page-menu-group');
-    expect(page).toHaveAttribute('data-group', 'registers');
-    expect(within(page).getByTestId('menu-card-warehouse')).toHaveAttribute('href', '/warehouse');
-    expect(within(page).getByTestId('menu-card-gecol')).toBeInTheDocument();
+    renderApp(<Routes><Route element={<Shell />}><Route path="/menu/:id" element={<MenuGroup />} /><Route path="*" element={<div data-testid="elsewhere" />} /></Route></Routes>, { route: '/my-work' });
+    await screen.findByTestId('nav-group-name-registers');
+    expect(screen.queryByTestId('nav-group-open-registers')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('nav-group-open-logs')).not.toBeInTheDocument();
+    expect(screen.getByTestId('nav-group-registers')).toContainElement(screen.getByTestId('nav-warehouse'));
+    expect(screen.getByTestId('nav-warehouse')).toHaveAttribute('href', '/warehouse');
     await u.click(screen.getByTestId('nav-group-toggle-logs'));
     expect(screen.getByTestId('nav-group-toggle-logs')).toHaveAttribute('aria-expanded', 'false');
   });
