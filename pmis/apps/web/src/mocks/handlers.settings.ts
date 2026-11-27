@@ -8,6 +8,7 @@ import { weightIssues } from '@/lib/weights';
 import { NAV_SIDE } from '@/lib/navLayout';
 import { db, identity, loginPage, loginPagePublic, save, stepUpValid, viewer } from './db';
 import { BRANDS, isBrand } from '@/lib/brands';
+import { APPEARANCE_OPTIONS } from '../lib/appearance';
 import { guard, page, problem, stepUp } from './handlers';
 import { byId, uid } from './ids';
 import type { TableDisplaySetting } from '@/api/display';
@@ -384,6 +385,7 @@ const DASH_CATALOGUE = {
     { code: 'regions', label_en: 'Regions', label_ar: 'المناطق' },
     { code: 'ops_procurement', label_en: 'Procurement and materials', label_ar: 'المشتريات والمواد' },
     { code: 'ops_scurve', label_en: 'Progress curve: planned vs actual, velocity and forecast', label_ar: 'منحنى التقدم: المخطط مقابل الفعلي والسرعة والتوقع' },
+    { code: 'ops_permits_hse', label_en: 'Permits and HSE: status, validity, stop-work and PTW checks', label_ar: 'التصاريح والسلامة: الحالة والصلاحية وإيقاف العمل وفحوصات تصاريح العمل' },
   ],
 };
 const dashSeedThresholds = Object.fromEntries(DASH_CATALOGUE.kpis.map((k) => [k.code, { green: k.default_green, amber: k.default_amber }]));
@@ -622,18 +624,27 @@ export const settingsHandlers = [
   http.get(`${B}/settings/identity`, () => { const g = guard(); if (g) return g; const j = identityView(); return HttpResponse.json(j, tag(j.version)); }),
   http.put(`${B}/settings/identity`, async ({ request }) => {
     const g = needAdmin(); if (g) return g;
-    const b = await body<{ default_brand?: unknown; allow_user_choice?: unknown; reason?: string } & Record<string, unknown>>(request);
-    const errs: { path: string; code: string }[] = Object.keys(b).filter((k) => !['default_brand', 'allow_user_choice', 'reason'].includes(k)).map((k) => ({ path: `/${k}`, code: 'unknown_field' }));
+    const b = await body<{ default_brand?: unknown; allow_user_choice?: unknown; defaults?: unknown; reason?: string } & Record<string, unknown>>(request);
+    const errs: { path: string; code: string }[] = Object.keys(b).filter((k) => !['default_brand', 'allow_user_choice', 'defaults', 'reason'].includes(k)).map((k) => ({ path: `/${k}`, code: 'unknown_field' }));
     if (!isBrand(b.default_brand)) errs.push({ path: '/default_brand', code: 'invalid' });
     if (typeof b.allow_user_choice !== 'boolean') errs.push({ path: '/allow_user_choice', code: 'required' });
     if ((b.reason ?? '').trim().length < 3 || (b.reason ?? '').length > 1000) errs.push({ path: '/reason', code: 'required' });
+    if (b.defaults !== undefined) {
+      const d = b.defaults;
+      if (d === null || typeof d !== 'object' || Array.isArray(d)) errs.push({ path: '/defaults', code: 'invalid' });
+      else for (const [k, v] of Object.entries(d)) {
+        const opts = (APPEARANCE_OPTIONS as Record<string, readonly string[]>)[k];
+        if (!opts || typeof v !== 'string' || !opts.includes(v)) { errs.push({ path: '/defaults', code: 'invalid' }); break; }
+      }
+    }
     if (errs.length) return fields(...errs);
     if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
     const p = ver(request, identity().version); if (p) return p;
     if (!stepUpValid()) return stepUp();
-    if (identity().default_brand === b.default_brand && identity().allow_user_choice === b.allow_user_choice) return problem(409, 'invalid_transition', 'These are already the identity settings.');
+    const nextDefaults = (b.defaults as Record<string, string> | undefined) ?? identity().defaults;
+    if (identity().default_brand === b.default_brand && identity().allow_user_choice === b.allow_user_choice && JSON.stringify(nextDefaults) === JSON.stringify(identity().defaults)) return problem(409, 'invalid_transition', 'These are already the identity settings.');
     const v = viewer()!;
-    Object.assign(identity(), { default_brand: b.default_brand, allow_user_choice: b.allow_user_choice, version: identity().version + 1, updated_at: new Date().toISOString(),
+    Object.assign(identity(), { default_brand: b.default_brand, allow_user_choice: b.allow_user_choice, defaults: nextDefaults, version: identity().version + 1, updated_at: new Date().toISOString(),
       updated_by: { id: uid(v.employee_id ?? '9999'), display_name: v.name, employee_id: v.employee_id } }); save();
     const j = identityView();
     return HttpResponse.json(j, tag(j.version));
@@ -1057,6 +1068,12 @@ export const settingsHandlers = [
         if (typeof o.enabled !== 'boolean') errs.push({ path: `${path}/enabled`, code: 'invalid' });
         if (!Number.isInteger(o.days)) errs.push({ path: `${path}/days`, code: 'invalid' });
         else if ((o.days as number) < 1 || (o.days as number) > 90) errs.push({ path: `${path}/days`, code: 'out_of_range' });
+      } else if (name === 'inbox') {
+        for (const k of Object.keys(o)) if (!['tabs_enabled', 'default_tab', 'priority_kinds'].includes(k)) errs.push({ path: `${path}/${k}`, code: 'unknown_key' });
+        if (typeof o.tabs_enabled !== 'boolean') errs.push({ path: `${path}/tabs_enabled`, code: 'invalid' });
+        oneOf(o, path, 'default_tab', ['all', 'priority', 'mentions', 'tasks', 'approvals', 'system']);
+        const kinds = ['mention', 'followed_change', 'task_assigned', 'task_returned', 'task_rejected', 'task_approved', 'approval_due', 'reassigned', 'absence_alert', 'idle_task_alert', 'no_holder', 'system'];
+        if (!Array.isArray(o.priority_kinds) || o.priority_kinds.some((x) => !kinds.includes(String(x)))) errs.push({ path: `${path}/priority_kinds`, code: 'invalid' });
       } else errs.push({ path, code: 'unknown_key' });
     }
     if ((b.reason ?? '').trim().length < 3) errs.push({ path: '/reason', code: 'required' });

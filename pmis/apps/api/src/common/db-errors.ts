@@ -235,6 +235,13 @@ export function mapDbError(e: unknown): ProblemException | null {
           errors: [{ path: '/ui_brand', code: 'brand_choice_locked', message: 'The administrator does not allow a personal design.' }],
         });
       }
+      // 0241: a personal appearance while the admin set one design for everyone
+      if (/ui_prefs_locked/.test(msg)) {
+        return new ProblemException(403, 'field_read_only', {
+          detail: 'The administrator set one design for everyone, so you cannot choose your own appearance.',
+          errors: [{ path: '/ui_prefs', code: 'appearance_choice_locked', message: 'The administrator does not allow a personal appearance.' }],
+        });
+      }
       if (/cannot be changed on your own account/i.test(msg)) {
         return new ProblemException(403, 'field_read_only', { detail: 'This field is managed by an administrator.' });
       }
@@ -371,7 +378,7 @@ export function mapDbError(e: unknown): ProblemException | null {
         });
       }
       if (/profile: /i.test(msg)) {
-        const field = /profile: (display_name|phone|locale|theme|ui_brand)/.exec(msg)?.[1];
+        const field = /profile: (display_name|phone|locale|theme|ui_brand|ui_prefs)/.exec(msg)?.[1];
         return new ProblemException(422, 'validation_failed', { detail: 'A profile value is not valid.', errors: field ? [{ path: `/${field}`, code: 'invalid' }] : [] });
       }
       if (/two-factor is not on for this user/i.test(msg)) return new ProblemException(409, 'invalid_transition', { detail: 'Two-factor is not on for this user: there is nothing to reset.' });

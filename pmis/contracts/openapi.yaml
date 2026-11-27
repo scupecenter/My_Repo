@@ -32,6 +32,7 @@ info:
 
     ## Versions
     - 0.15.134 (2026-11-27): the Incidents & Security register (owner approval 2026-11-26; migration 0183): one register for safety incidents, near-misses and security events at sites (theft, vandalism, damaged equipment), with a cause/reason dropdown that also records a day with no execution because of bad weather (owner 2026-11-27). Additive. Register key `incidents` in `/registers` and `/registers/{key}` records with its own fields and the standard two levels, the Dropdown lists IncidentType, IncidentSeverity and IncidentCause in Settings, the module `incidents` in the permissions grid (no grant seeded), the nav key in the catalogue, the template TPL-INCIDENTS and the master export part. Existing registers and data are untouched.
+    - 0.15.200 (2026-11-27): the dashboard follow-up sections, permits and HSE (owner approval 2026-11-26, dashboard proposals item 3; migration 0301). Additive and read only. `GET /dashboard/ops` gains the section `permits_hse` (`DashboardOpsPermitsHse`), over the permit records of the active, not cancelled sites: the status mix, the permits waiting for approval (status Applied), the sites with no permit record, the approved dated permits expiring within the next 14 calendar days and the expired ones, the open stop-work orders (not yet lifted), and the safety checks of the open PTWs (permit type beginning PTW, status Applied or Approved). A check counts as covered only when it is Done or N/A; the section reports the open PTWs with at least one gap and the gaps per check. The incident side of item 3 lands with the Incidents register. The dashboard settings catalogue gains the card `ops_permits_hse`. No grant, role or permission change.
     - 0.15.222 (2026-11-27): additive (migration 0322; CHANGELOG IssueRiskLink). An Issue can name the Risk it realises: new optional field `risk_entity_id` on `issues` (the entity id of a Risks record the caller may see; needs the Risks view right in the risk's region; field errors `risk_not_available`, `invalid`). `GET /registers/issues/risk-options` lists the risks; `GET /registers/risks/{entity_id}/issues` lists the issues that realise a risk (needs the Risks and Issues modules; only the regions of the Issues view right).
     - 0.15.160 (2026-11-27): goals with automatic progress (migration 0260; CHANGELOG Goals). Additive. `GET`/`PUT /settings/goals` (`getGoals`, `setGoals`) and `GET /goals/progress` (`getGoalsProgress`). Progress is counted from approved milestone tasks, as the On-Air counter does; no permission is widened.
     - 0.15.224 (2026-11-27): related records of a register record (migration 0324; CHANGELOG RelatedRecords). Additive and read only. New `GET /registers/{register_key}/{entity_id}/related` (`listRelatedRecords`): the current records linked to this record in both directions (`direction` `to`: the record this one names; `from`: records that name this one), grouped by register and link field (procurement order, Procurement request, risk, closing receipt). A group is listed only when the caller holds the view right of that register in that record's region (the responsibility matrix decides); nothing is stored and no permission changes.
@@ -48,7 +49,9 @@ info:
     - 0.15.97 (2026-11-27): the sign-in page settings (owner request 2026-11-26; migration 0197). Additive. New `GET/PUT /settings/login-page` (`getLoginPage`, `setLoginPage`; setting `ui.login_page`): the sign-in page announcement (English and Arabic, kind info or maintenance, both texts empty hides it), the background animation switch, the default language of the signed-out pages and up to five support links ({label_en, label_ar, url}; http(s) or mailto only). Every signed-in user reads the state (the post-login splash shows `server_version` from it); a System Admin or a delegate of `settings` edit for all regions changes it with a reason, a step-up and If-Match (audited `login_page_update`, before and after). New `GET /settings/login-page/public` (`getLoginPagePublic`, no session): ONLY what the sign-in page renders (announcement, animation, default_locale, support_links) - no version, no audit data, nothing about users; cached 30 seconds and rate limited per address. No permission, visibility or authentication change.
     - 0.15.96 (2026-11-27): responsibility-matrix coverage screen (CHANGELOG MatrixCoverage; no migration). Additive and read only. `GET /matrix/coverage` (`getMatrixCoverage`, System Admin or an all-region delegate of the matrix): for each active stage and enabled register row and each of the seven regions, whether the matrix cell has an actor, so empty cells show before a task or record stalls. Settings > Workflow > Coverage.
     - 0.15.95 (2026-11-27): Issue log and Quality record link to a Procurement order (migration 0195; CHANGELOG IssueQualityOrderLink). Additive. New optional field `procurement_order_id` on `issues` and `quality`; when set, the contractor (`external_party`) is taken from the order (a different typed `external_party_id` is refused, 422 `contractor_from_order`; `order_not_active`, `order_other_site`, `invalid`), so the contractor performance view sees the issue and the inspection. `GET /registers/issues/order-options` and `GET /registers/quality/order-options` list the orders (own module view plus Procurement view).
+    - 0.15.250 (2026-11-27): inbox tabs and priority join `ui.features` as the section `inbox` (migration 0281, mirror `db/sql/280_ui_inbox.sql`; CHANGELOG UiInbox). Additive: `UiFeatures` and `UiFeaturesPatch` gain `inbox` (`UiInbox`: `tabs_enabled`, `default_tab`, `priority_kinds`); a stored value without the section takes the seed. No new path.
     - 0.15.185 (2026-11-27): interface features setting (migration 0280, mirror `db/sql/279_ui_features.sql`; CHANGELOG UiFeatures). Additive. `GET`/`PUT /settings/ui-features`: one guarded setting with a closed object per feature section (`UiFeatures`: `avatars` and `new_badge` now; the inbox, menu, hub and mobile sections of items 6 to 15 are added by later migrations). Read by every signed-in user; written by a System Admin or an all-regions delegate of `admin.settings` with a reason and If-Match, audited.
+    - 0.15.230 (2026-11-27): appearance profiles (owner approval 2026-11-27, the PM-platforms proposal items 1-3; migration 0241; CHANGELOG AppearanceProfiles). Additive. (1) `User` and `MyProfile` gain `ui_prefs` (the stored personal appearance choices; `{}` = the organization defaults) and `appearance` (what the user sees: own choices, else the organization defaults; `ui_effective_prefs`). `MyProfile.identity` gains `defaults` (the organization appearance defaults) and `pref_options` (the dimensions with their allowed values). (2) `MyProfilePatch` gains `ui_prefs` (`UiPrefs`, a subset of the dimensions; while `allow_user_choice` is false a value is 403 `field_read_only`, `errors[0]` `{path: /ui_prefs, code: appearance_choice_locked}`); audited per dimension in `profile_updated`. (3) `UiIdentity` gains `defaults` and `pref_options`; `UiIdentityInput` gains optional `defaults` (omitted keeps the current ones). The dimensions: `density`, `font_scale`, `radius`, `motion`, `icon_style`, `menu_style`, `accent` (`UiPrefs`).
     - 0.15.92 (2026-11-27): order picker for the Car dispatcher and Financial advances (CHANGELOG OrderPickersDispatchAdvances). Additive, no migration. `GET /registers/car_dispatcher/order-options` and `GET /registers/financial_advances/order-options` list the approved, active Procurement orders for the field `procurement_record_id` (the same list as the warehouse picker); each needs its own module view, and only orders in regions where the caller also holds the Procurement view right are listed.
     - 0.15.91 (2026-11-26): warehouse receipt to Procurement order link (migration 0181; CHANGELOG WarehouseProcurementLink). Additive. A warehouse receipt (PL or OPEN) may name the approved, active Procurement order it belongs to (`procurement_order_id`); `pr_no`, `po_wo_no` and `order_contractor` are then derived from the order (read only). New `GET /registers/warehouse/order-options` (the picker) and `GET /registers/procurement/{entity_id}/receipts` (the receipts against an order). New 422 codes `receipt_only`, `order_not_active`, `order_other_site`.
     - 0.15.152 (2026-11-27): "who approves?" simulation (migration 0252; CHANGELOG MatrixSimulate). Additive and read only. `GET /matrix/simulate` (`simulateMatrix`): for a site and a stage task or register, who would hold L1 and L2 (deciding cell, rule, active holders and how each reaches the level, and the admin-path fallback when nobody holds it). System Admin or a delegate of the matrix; writes nothing.
@@ -18068,10 +18071,11 @@ components:
         locale: { type: string, enum: [en, ar] }
         theme: { type: string, enum: [light, dark] }
         ui_brand: { oneOf: [{ $ref: '#/components/schemas/UiBrand' }, { type: 'null' }], description: '0.15.41. The personal UI design; null goes back to the organization default. While `identity.allow_user_choice` is false a non-null value is 403 `field_read_only` (`errors[0]` `{path: /ui_brand, code: brand_choice_locked}`); null stays allowed. Audited in `profile_updated`.' }
+        ui_prefs: { $ref: '#/components/schemas/UiPrefs', description: '0.15.230 (0241). The personal appearance choices; a subset of the dimensions. While `identity.allow_user_choice` is false a value is 403 `field_read_only` (`errors[0]` `{path: /ui_prefs, code: appearance_choice_locked}`). Audited per dimension in `profile_updated`.' }
     MyProfile:
       type: object
       description: '0.9.2. The "My profile" page.'
-      required: [id, display_name, email, employee_id, phone, locale, theme, ui_brand, brand, identity, status, auth_method, local_sign_in, editable_fields, admin_owned, two_factor, email_change, phone_change, version]
+      required: [id, display_name, email, employee_id, phone, locale, theme, ui_brand, brand, ui_prefs, appearance, identity, status, auth_method, local_sign_in, editable_fields, admin_owned, two_factor, email_change, phone_change, version]
       properties:
         id: { type: string, format: uuid }
         display_name: { type: string }
@@ -18082,6 +18086,8 @@ components:
         theme: { type: string, enum: [light, dark] }
         ui_brand: { oneOf: [{ $ref: '#/components/schemas/UiBrand' }, { type: 'null' }], description: '0.15.41. The stored personal design (null = the organization default).' }
         brand: { allOf: [{ $ref: '#/components/schemas/UiBrand' }], description: '0.15.41. The design the user sees.' }
+        ui_prefs: { $ref: '#/components/schemas/UiPrefs', description: '0.15.230 (0241). The stored personal appearance choices; empty = the organization defaults.' }
+        appearance: { $ref: '#/components/schemas/UiPrefs', description: '0.15.230 (0241). The appearance the user sees (ui_effective_prefs): own choices, else the organization defaults.' }
         identity:
           type: object
           description: '0.15.41. The organization default and whether a personal design is allowed (drives the Appearance control).'
@@ -18089,10 +18095,12 @@ components:
           properties:
             default_brand: { $ref: '#/components/schemas/UiBrand' }
             allow_user_choice: { type: boolean }
+            defaults: { $ref: '#/components/schemas/UiPrefs', description: '0.15.230 (0241): the organization appearance defaults.' }
+            pref_options: { type: object, additionalProperties: { type: array, items: { type: string } }, description: '0.15.230 (0241): the dimensions with their allowed values (ui_pref_options).' }
         status: { $ref: '#/components/schemas/UserStatus' }
         auth_method: { type: string, enum: [local, m365, break_glass] }
         local_sign_in: { type: boolean }
-        editable_fields: { type: array, items: { type: string, enum: [display_name, locale, theme, ui_brand] } }
+        editable_fields: { type: array, items: { type: string, enum: [display_name, locale, theme, ui_brand, ui_prefs] } }
         admin_owned:
           type: object
           required: [roles, teams, region_ids, department, manager]
@@ -18183,6 +18191,8 @@ components:
             theme: { type: string, enum: [light, dark] }
             ui_brand: { oneOf: [{ $ref: '#/components/schemas/UiBrand' }, { type: 'null' }], description: '0.15.41. The personal UI design the user chose; null = follow the organization default (`GET /settings/identity`).' }
             brand: { allOf: [{ $ref: '#/components/schemas/UiBrand' }], description: '0.15.41. The design the user sees: `ui_brand` while the admin allows a personal choice and one is set, else the organization default. Independent of `theme`.' }
+            ui_prefs: { $ref: '#/components/schemas/UiPrefs', description: '0.15.230 (0241). The stored personal appearance choices; empty = the organization defaults.' }
+            appearance: { $ref: '#/components/schemas/UiPrefs', description: '0.15.230 (0241). The appearance the user sees (ui_effective_prefs): own choices, else the organization defaults.' }
             is_break_glass: { type: boolean }
             phone: { type: [string, 'null'], description: '0.3.0. E.164; a local sign-in identifier.' }
             local_sign_in: { type: boolean, description: '0.3.0. The account can sign in with a password.' }
@@ -21427,19 +21437,33 @@ components:
       properties:
         enabled: { type: boolean }
         days: { type: integer, minimum: 1, maximum: 90 }
+    UiInbox:
+      type: object
+      description: '0.15.250. The inbox tabs and which notification kinds count as priority.'
+      additionalProperties: false
+      required: [tabs_enabled, default_tab, priority_kinds]
+      properties:
+        tabs_enabled: { type: boolean }
+        default_tab: { type: string, enum: [all, priority, mentions, tasks, approvals, system] }
+        priority_kinds:
+          type: array
+          maxItems: 12
+          items: { type: string, enum: [mention, followed_change, task_assigned, task_returned, task_rejected, task_approved, approval_due, reassigned, absence_alert, idle_task_alert, no_holder, system] }
     UiFeatures:
       type: object
       description: '0.15.185. The sections of the interface features setting; every section is complete.'
-      required: [avatars, new_badge]
+      required: [avatars, new_badge, inbox]
       properties:
         avatars: { $ref: '#/components/schemas/UiAvatars' }
         new_badge: { $ref: '#/components/schemas/UiNewBadge' }
+        inbox: { $ref: '#/components/schemas/UiInbox' }
     UiFeaturesPatch:
       type: object
       additionalProperties: false
       properties:
         avatars: { $ref: '#/components/schemas/UiAvatars' }
         new_badge: { $ref: '#/components/schemas/UiNewBadge' }
+        inbox: { $ref: '#/components/schemas/UiInbox' }
     UiFeaturesSetting:
       type: object
       required: [sections, version]
@@ -22769,6 +22793,18 @@ components:
       type: string
       enum: [current, aljeel, executive, field, obsidian, sahara]
       description: '0.15.81 (0164): `obsidian` (near-black sidebar, gold accent) and `sahara` (sand page, emerald accent) added; visual only. 0.15.41. A UI design: `current` is the look of the system before 0.15.41 (the default); `aljeel` the company brand; `executive` a light sidebar; `field` high contrast with larger type for site teams. A design changes the sidebar, the accent, the page background, lines and type size only, never the status colours.'
+    UiPrefs:
+      type: object
+      description: '0.15.230 (0241): the appearance dimensions and their allowed values (the database list `ui_pref_options()` is the source). A subset may be sent; each key holds one of its values. `accent` `default` = the accent of the design.'
+      additionalProperties: false
+      properties:
+        density: { type: string, enum: [comfortable, standard, compact] }
+        font_scale: { type: string, enum: [small, standard, large] }
+        radius: { type: string, enum: [sharp, standard, rounded] }
+        motion: { type: string, enum: [full, reduced] }
+        icon_style: { type: string, enum: [light, regular, bold] }
+        menu_style: { type: string, enum: [default, rail, autohide] }
+        accent: { type: string, enum: [default, teal, blue, violet, green, orange, red, amber] }
     UiIdentity:
       type: object
       description: '0.15.41. Settings, Identity & themes (setting `ui.identity`, migration 0130).'
@@ -22776,6 +22812,8 @@ components:
       properties:
         default_brand: { $ref: '#/components/schemas/UiBrand' }
         allow_user_choice: { type: boolean, description: 'true: each user may choose their own design in My profile; false: everyone sees `default_brand`.' }
+        defaults: { $ref: '#/components/schemas/UiPrefs', description: '0.15.230 (0241): the organization appearance defaults.' }
+        pref_options: { type: object, additionalProperties: { type: array, items: { type: string } }, description: '0.15.230 (0241): the dimensions with their allowed values (ui_pref_options).' }
         brands: { type: array, items: { $ref: '#/components/schemas/UiBrand' } }
         updated_at: { type: [string, 'null'], format: date-time }
         updated_by: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
@@ -22789,6 +22827,7 @@ components:
           properties:
             default_brand: { $ref: '#/components/schemas/UiBrand' }
             allow_user_choice: { type: boolean }
+            defaults: { $ref: '#/components/schemas/UiPrefs', description: '0.15.230 (0241): the organization appearance defaults; omitted keeps the current ones.' }
     SupportLink:
       type: object
       description: '0.15.97. A support link under the sign-in form. http(s) or mailto only.'
@@ -22990,7 +23029,7 @@ components:
     DashboardOps:
       type: object
       description: '0.15.106: the follow-up sections of the dashboard (owner approval 2026-11-26).'
-      required: [as_of, scope_regions, procurement]
+      required: [as_of, scope_regions, procurement, permits_hse]
       properties:
         as_of: {type: string, format: date-time}
         scope_regions:
@@ -22998,6 +23037,7 @@ components:
           items: {$ref: '#/components/schemas/RegionId'}
           description: The regions the figures cover (null = every region).
         procurement: {$ref: '#/components/schemas/DashboardOpsProcurement'}
+        permits_hse: {$ref: '#/components/schemas/DashboardOpsPermitsHse'}
     DashboardOpsProcurement:
       type: object
       description: '0.15.106: procurement and materials (dashboard proposals item 1).'
@@ -23060,6 +23100,43 @@ components:
               sites: {type: integer}
               missing_lines: {type: integer}
               missing_qty: {type: number}
+    DashboardOpsPermitsHse:
+      type: object
+      description: '0.15.200: permits and HSE (dashboard proposals item 3).'
+      required: [available, total, by_status, waiting, sites_without_permit, expiring_14, expired, stop_work_active, ptw]
+      properties:
+        available: {type: boolean, description: False when the caller may not see the Permits and HSE register; the other fields are then null.}
+        total: {type: [integer, 'null'], description: 'The permit records of the active, not cancelled sites.'}
+        by_status:
+          type: [array, 'null']
+          description: The status mix, the most frequent first; (none) gathers the blank statuses.
+          items:
+            type: object
+            required: [status, count]
+            properties:
+              status: {type: string}
+              count: {type: integer}
+        waiting: {type: [integer, 'null'], description: Permits with status Applied.}
+        sites_without_permit: {type: [integer, 'null'], description: 'The active, not cancelled sites with no permit record at all.'}
+        expiring_14: {type: [integer, 'null'], description: The approved dated permits whose validity ends within the next 30 calendar days.}
+        expired: {type: [integer, 'null'], description: The approved dated permits whose validity has passed.}
+        stop_work_active: {type: [integer, 'null'], description: Stop-work orders not yet lifted.}
+        ptw:
+          type: [object, 'null']
+          description: The safety checks of the open PTWs (permit type beginning PTW, status Applied or Approved). A check counts as covered only when it is Done or N/A.
+          required: [open, with_gaps, gaps]
+          properties:
+            open: {type: integer}
+            with_gaps: {type: integer, description: The open PTWs missing at least one check.}
+            gaps:
+              type: array
+              description: The gaps per check, only the checks that are missing somewhere.
+              items:
+                type: object
+                required: [key, count]
+                properties:
+                  key: {type: string, enum: [jsa_tra, toolbox_talk, work_at_height, lifting_plan, loto, rescue_plan]}
+                  count: {type: integer}
     DashboardTabLayout:
       type: object
       required: [order, hidden]
