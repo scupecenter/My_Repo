@@ -2,7 +2,7 @@ import type { Client as PgClient } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { makeUser, superDb } from './helpers';
 import { regCell } from './reg-helpers';
-import { addAssignment, newRole } from './wf-helpers';
+import { addAssignment, makeSite, newRole } from './wf-helpers';
 
 /**
  * Migration 0360 (A3): expiry_radar_notify(). In-app notice to the Matrix holders of a register when a date that ends something is within a lead time of the
@@ -27,9 +27,9 @@ const today = async (): Promise<string> => day(0);
 
 async function permit(data: Record<string, unknown>, o: { state?: string; current?: boolean } = {}): Promise<string> {
   const r = await db.query(
-    `INSERT INTO register_records (entity_id, version_no, register_key, region_id, state, is_current, data, approved_at, current_level)
-     VALUES (gen_random_uuid(), 1, 'permits_hse', $1, $2, $3, $4::jsonb, now(), 3) RETURNING id`,
-    [REGION, o.state ?? 'approved', o.current ?? true, JSON.stringify(data)],
+    `INSERT INTO register_records (entity_id, version_no, register_key, site_id, region_id, state, is_current, data, approved_at, current_level)
+     VALUES (gen_random_uuid(), 1, 'permits_hse', $1, $2, $3, $4, $5::jsonb, now(), 3) RETURNING id`,
+    [(await makeSite(db, REGION, { prefix: 'EXR' })).id, REGION, o.state ?? 'approved', o.current ?? true, JSON.stringify(data)],
   );
   return r.rows[0].id as string;
 }
@@ -81,9 +81,9 @@ describe('expiry_radar_notify', () => {
     await addAssignment(db, holder.id, { roleId, regions: [REGION], modules: ['acquisition'] });
     await regCell(db, 'acquisition', REGION, 'entry', { user: [holder.id] });
     const lease = (await db.query(
-      `INSERT INTO register_records (entity_id, version_no, register_key, region_id, state, is_current, data, approved_at, current_level)
-       VALUES (gen_random_uuid(), 1, 'acquisition', $1, 'approved', true, $2::jsonb, now(), 3) RETURNING id`,
-      [REGION, JSON.stringify({ lease_expiry_date: await day(20) })])).rows[0].id as string;
+      `INSERT INTO register_records (entity_id, version_no, register_key, site_id, region_id, state, is_current, data, approved_at, current_level)
+       VALUES (gen_random_uuid(), 1, 'acquisition', $1, $2, 'approved', true, $3::jsonb, now(), 3) RETURNING id`,
+      [(await makeSite(db, REGION, { prefix: 'EXR' })).id, REGION, JSON.stringify({ lease_expiry_date: await day(20) })])).rows[0].id as string;
     expect(await today()).toMatch(/^\d{4}-\d{2}-\d{2}$/);
 
     // 20 days left and the default steps are 30, 14, 7: the 30-day notice
