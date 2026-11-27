@@ -49,7 +49,7 @@ afterAll(async () => {
 const input = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
   site_code: code(), region_id: R, name: 'Synthetic Site', name_ar: 'موقع تجريبي', delivery_scenario: 'new_build', ...over,
 });
-/** 0260: the duplicate warnings (name, coordinates, similar Site ID) come on top of the older ones; fixtures of this file reuse names, so those tests look at the older warnings only. */
+/** 0257: the duplicate warnings (name, coordinates, similar Site ID) come on top of the older ones; fixtures of this file reuse names, so those tests look at the older warnings only. */
 const withoutDup = (w: { code: string }[]): { code: string }[] => w.filter((x) => !['duplicate_name', 'close_coordinates', 'similar_site_code'].includes(x.code));
 const etag = (res: { headers: Record<string, unknown> }): string => String(res.headers.etag);
 const siteIn = async (siteCode: string): Promise<{ id: string; overall_status: string; region_id: number; name_ar: string | null; cluster_id: string | null; workflow_version_id: string } | undefined> =>
