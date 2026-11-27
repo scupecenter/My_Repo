@@ -44,6 +44,23 @@ export class SavedViewsController {
     return this.svc.import(auth, body);
   }
 
+  @Get('me/home-pins')
+  homePins() {
+    return this.svc.homePins();
+  }
+
+  @Post('saved-views/:id/pin')
+  @HttpCode(200)
+  pin(@Auth() auth: AuthContext, @Param('id') id: string) {
+    return this.svc.pin(auth, id, true);
+  }
+
+  @Post('saved-views/:id/unpin')
+  @HttpCode(200)
+  unpin(@Auth() auth: AuthContext, @Param('id') id: string) {
+    return this.svc.pin(auth, id, false);
+  }
+
   @Get('saved-views/:id')
   async get(@Auth() auth: AuthContext, @Param('id') id: string, @Res({ passthrough: true }) res: Response) {
     return this.tag(res, await this.svc.get(auth, id));
