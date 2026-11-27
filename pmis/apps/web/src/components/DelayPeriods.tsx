@@ -1,4 +1,5 @@
 import { CalendarRange, Check, Plus, X } from 'lucide-react';
+import { UnsavedGuard } from '@/lib/unsavedGuard';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAddDelayPeriod, useDecideDelayPeriod, useDelayPeriods, useVoidDelayPeriod, type DelayParty, type DelayPeriod } from '@/api/dashboard';
@@ -75,6 +76,7 @@ export function DelayPeriodsPanel({ taskId }: { taskId: string }) {
 
   return (
     <section aria-labelledby="dr-delayp" data-testid="delay-periods">
+      <UnsavedGuard scope="inline" dirty={!!(form.from_date || form.to_date || form.party || form.reason.trim() || form.evidence.trim())} label={t('delayp.title')} onSave={() => new Promise<boolean>((res) => { if (!ok || !form.party) { res(false); return; } add.mutate({ from_date: form.from_date, to_date: form.to_date, party: form.party, reason: form.reason.trim(), evidence: form.evidence.trim() || null }, { onSuccess: () => { toast(t('delayp.added')); setForm({ from_date: '', to_date: '', party: '', reason: '', evidence: '' }); res(true); }, onError: () => res(false) }); })} />
       <h3 id="dr-delayp" className="mb-1 flex items-center gap-1 font-semibold"><CalendarRange size={14} aria-hidden />{t('delayp.title')}</h3>
       <p className="mb-2 text-sm text-mute">{t('delayp.hint')}</p>
       <p className="mb-2 text-sm" data-testid="delayp-due">{d.due_date ? t('delayp.due', { date: d.due_date }) : t('delayp.no_due')}</p>

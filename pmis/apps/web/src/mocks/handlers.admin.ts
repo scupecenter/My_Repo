@@ -1,4 +1,5 @@
 // MSW handlers for phase 3a: users and roles, groups, delegation, absence and cover, exports. Synthetic data only.
+import { isBuiltInRoleCode } from '@/lib/roleCodes';
 import { http, HttpResponse } from 'msw';
 import { API_BASE } from '@/api/client';
 import type { Assignment, UserDetail } from '@/api/types';
@@ -356,6 +357,12 @@ export const adminHandlers = [
     if (request.headers.get('If-Match') !== `"${role.version ?? 1}"`) return problem(412, 'precondition_failed', 'The role changed; reload and retry');
     const { reason, ...patch } = (await request.json()) as { reason?: string; is_active?: boolean };
     const r = noReason({ reason }); if (r) return r;
+    const nc = (patch as { code?: string }).code;
+    if (nc !== undefined && nc !== role.code) {
+      if (!/^[A-Z][A-Z0-9_]{1,40}$/.test(nc)) return problem(422, 'validation_failed', 'role code must be 2 to 41 characters: A-Z, 0-9 and _, starting with a letter');
+      if (isBuiltInRoleCode(role.code)) return problem(422, 'validation_failed', `role code ${role.code} is used by the platform by name and cannot be changed`);
+      if (A().roles.some((x) => x.code === nc && x.id !== role.id)) return problem(409, 'duplicate', 'A role with this code exists');
+    }
     if (patch.is_active === false && A().assignments.some((a) => a.is_active_now && a.role.id === role.id)) return problem(409, 'role_in_use', 'The role is assigned to people');
     Object.assign(role, patch, { version: (role.version ?? 1) + 1 }); save();
     return HttpResponse.json(role, tag(role.version ?? 1));
