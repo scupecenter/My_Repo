@@ -171,7 +171,6 @@ describe('Workflow Studio', () => {
     });
   }, 60_000);
 
-<<<<<<< HEAD
   it('sets the lock mode of the draft to Open in the review screen and keeps Strict as the default (D49)', async () => {
     const u = userEvent.setup();
     await open({ lift: true });
@@ -183,7 +182,9 @@ describe('Workflow Studio', () => {
     await waitFor(async () => {
       const v2 = await api.get<{ lock_mode?: string }>('/workflow/versions/2');
       expect(v2.lock_mode).toBe('open');
-=======
+    });
+  }, 60_000);
+
   it('moves a gate to other milestones without replacing the structure by hand (D53)', async () => {
     const u = userEvent.setup();
     await open({ lift: true });
@@ -196,7 +197,6 @@ describe('Workflow Studio', () => {
     await waitFor(async () => {
       const v2 = await api.get<{ gates: { from_milestone: string; to_milestone: string }[] }>('/workflow/versions/2');
       expect(v2.gates[0]).toMatchObject({ from_milestone: 'MS2', to_milestone: 'MS1' });
->>>>>>> origin/main
     });
   }, 60_000);
 
