@@ -1,0 +1,22 @@
+# Weekly dependency update pull requests. Each one goes through the same CI and the
+# same review as any other change. Nothing is merged automatically.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /pmis/apps/api
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    labels: [dependencies]
+  - package-ecosystem: npm
+    directory: /pmis/apps/web
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    labels: [dependencies]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    labels: [dependencies]
