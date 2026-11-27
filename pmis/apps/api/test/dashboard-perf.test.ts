@@ -58,13 +58,13 @@ describe('1000 sites', () => {
 
   it('a filtered view, a past reference date, Project Status by region and by site, and the export stay under 2 seconds too', async () => {
     const day = (await db.query("SELECT (cal_today() - 30)::text AS d")).rows[0].d as string;
-    expect((await slowest(admin, `/dashboard?region_id=3&scenario=new_build`, 3)).ms).toBeLessThan(2000);
-    expect((await slowest(admin, `/dashboard?ref_date=${day}`, 3)).ms).toBeLessThan(2000);
-    expect((await slowest(admin, '/project-status?group_by=region', 3)).ms).toBeLessThan(2000);
-    const bySite = await slowest(admin, '/project-status?group_by=site', 3);
+    expect((await slowest(admin, `/dashboard?region_id=3&scenario=new_build`, 5)).ms).toBeLessThan(2000);
+    expect((await slowest(admin, `/dashboard?ref_date=${day}`, 5)).ms).toBeLessThan(2000);
+    expect((await slowest(admin, '/project-status?group_by=region', 5)).ms).toBeLessThan(2000);
+    const bySite = await slowest(admin, '/project-status?group_by=site', 5);
     expect(bySite.body.rows.length).toBeGreaterThan(900);
     expect(bySite.ms).toBeLessThan(2000);
-    expect((await slowest(admin, '/dashboard/export', 3)).ms).toBeLessThan(2000);
+    expect((await slowest(admin, '/dashboard/export', 5)).ms).toBeLessThan(2000);
   }, 180_000);
 
   it('the weekly snapshot of 1000 sites is stored in one run, and a past date with a snapshot is also fast', async () => {
