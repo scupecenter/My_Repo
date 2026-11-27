@@ -84,7 +84,18 @@ export class JobRunsService implements OnApplicationBootstrap, OnModuleDestroy {
     } catch (e) {
       const msg = e instanceof Error ? e.message.split('\n')[0] ?? 'failed' : 'failed';
       await this.finish(id, 'failed', null, msg);
+      await this.alertFailure(name, msg);
       return null;
+    }
+  }
+
+  /** 0421: a failed job raises the security alert `job_failed` (one per job and day; bell and mail to the System Admins by the alert settings). Never throws. */
+  private async alertFailure(name: string, msg: string): Promise<void> {
+    if (name === 'security_alerts') return; // the alert job itself: its failure is in job_runs and the System Log; raising from it could loop
+    try {
+      await this.db.client.$executeRaw(Prisma.sql`SELECT job_failed_alert(${name}::text, ${msg}::text)`);
+    } catch (e) {
+      this.log.warn(`job failure alert failed: ${e instanceof Error ? e.message.split('\n')[0] : 'unknown'}`);
     }
   }
 

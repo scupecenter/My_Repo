@@ -43,6 +43,51 @@ test('layout panel walk: Sites master, EN and AR, list and board', async ({ page
   await page.screenshot({ path: 'test-results/walk-layout-sites-board-ar.png' });
 });
 
+test('layout panel walk: display-only panels on My Work, Approvals, Daily Plan and Library Archive', async ({ page }) => {
+  await signIn(page);
+
+  // My Work: the display options moved into the panel; its list/board switcher stays until V7.
+  await page.goto('/my-work');
+  await expect(page.getByTestId('my-work-display')).toBeVisible({ timeout: 20000 });
+  await page.getByTestId('my-work-display').click();
+  await expect(page.getByTestId('my-work-display-display')).toBeVisible();
+  await expect(page.getByTestId('my-work-display-views')).toHaveCount(0);
+  await page.screenshot({ path: 'test-results/walk-layout-my-work-en.png' });
+  await page.keyboard.press('Escape');
+
+  // Approvals: same panel instead of the old display menu.
+  await page.goto('/approvals');
+  await expect(page.getByTestId('approvals-layout')).toBeVisible({ timeout: 20000 });
+  await page.getByTestId('approvals-layout').click();
+  await expect(page.getByTestId('approvals-layout-display')).toBeVisible();
+  await page.screenshot({ path: 'test-results/walk-layout-approvals-en.png' });
+  await page.keyboard.press('Escape');
+
+  // Daily Plan: the density switch grew into the full panel.
+  await page.goto('/my-work/daily-plan');
+  await expect(page.getByTestId('daily-plan-layout')).toBeVisible({ timeout: 20000 });
+  await page.getByTestId('daily-plan-layout').click();
+  await expect(page.getByTestId('daily-plan-layout-display')).toBeVisible();
+  await page.screenshot({ path: 'test-results/walk-layout-daily-plan-en.png' });
+  await page.keyboard.press('Escape');
+
+  // Library Archive: panel in the shared toolbar.
+  await page.goto('/library/archive/WALK');
+  await expect(page.getByTestId('lib-archive-layout')).toBeVisible({ timeout: 20000 });
+  await page.getByTestId('lib-archive-layout').click();
+  await expect(page.getByTestId('lib-archive-layout-display')).toBeVisible();
+  await page.screenshot({ path: 'test-results/walk-layout-archive-en.png' });
+  await page.keyboard.press('Escape');
+
+  // AR: the display-only panel renders right-to-left with Arabic labels.
+  await page.getByTestId('topbar-lang').click();
+  await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
+  await page.goto('/my-work');
+  await page.getByTestId('my-work-display').click();
+  await expect(page.getByTestId('my-work-display-display')).toBeVisible();
+  await page.screenshot({ path: 'test-results/walk-layout-my-work-ar.png' });
+});
+
 test('layout panel walk: a register (procurement) keeps board by/lane in the panel', async ({ page }) => {
   await signIn(page);
   await page.goto('/registers/procurement');

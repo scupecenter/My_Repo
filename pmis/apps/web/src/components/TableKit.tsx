@@ -5,8 +5,6 @@ import {
   Columns3,
   Ellipsis,
   Minus,
-  Rows3,
-  Rows4,
   Plus,
   RotateCcw,
   X,
@@ -431,27 +429,6 @@ export function HeaderRow({
         );
       })}
     </div>
-  );
-}
-
-/** One-click density switch for the toolbar (comfortable / compact), remembered per user and screen with the other column prefs. */
-export function DensityToggle({ api }: { api: TableApi }) {
-  const { t } = useTranslation();
-  const compact = api.density === "compact";
-  const next = compact ? "comfortable" : "compact";
-  return (
-    <Tip text={t(`table.${next}`)}>
-      <button
-        type="button"
-        className="btn"
-        data-testid="density-toggle"
-        aria-pressed={compact}
-        aria-label={t("table.density")}
-        onClick={() => api.setDensity(next)}
-      >
-        {compact ? <Rows4 size={16} /> : <Rows3 size={16} />}
-      </button>
-    </Tip>
   );
 }
 
