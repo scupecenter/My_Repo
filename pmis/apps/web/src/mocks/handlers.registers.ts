@@ -494,6 +494,8 @@ export const registerHandlers = [
 
   // ---- template entry (contract 0.7.0). The upload is staged at once (status `validated`); the uploader sends it into the flow (the rows become records
   // waiting for L2); L2 approves rows, returns them with a note, or approves all; a row whose record has an open version is held.
+  // Data hub landing (contract 0.15.311): nothing waits in the demo store until a batch is uploaded; the downloads list stays empty.
+  http.get(`${B}/data-hub/summary`, () => HttpResponse.json({ batches: { count: 0, items: [] }, template_changes: [], my_downloads: [] })),
   http.get(`${B}/import-batches`, ({ request }) => {
     const g = guard(); if (g) return g;
     const u = new URL(request.url).searchParams;
