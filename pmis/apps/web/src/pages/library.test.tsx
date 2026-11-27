@@ -118,7 +118,7 @@ describe('Settings > Documents and Data entry > Templates', () => {
     await signIn('pm');
     renderApp(<App />, { route: '/admin/settings/documents/library' });
     expect(await screen.findByTestId('settings-section-documents-types')).toHaveClass('btn-accent');
-    for (const k of ['forms', 'archive']) expect(await screen.findByTestId(`settings-section-documents-${k}`)).toBeInTheDocument();
+    for (const k of ['forms', 'archive', 'numbering']) expect(await screen.findByTestId(`settings-section-documents-${k}`)).toBeInTheDocument();
     expect(screen.queryByTestId('settings-section-documents-mail')).toBeNull();
     expect(screen.getByTestId('settings-section-documents-types')).toHaveTextContent('Document types');
   });
