@@ -185,6 +185,7 @@ import { ContractorsService } from './contractors/contractors.service';
 import { ContractorPerformanceService } from './contractors/contractor-performance.service';
 import { ExportsController } from './exports/exports.controller';
 import { MasterExportService } from './exports/master-export.service';
+import { ExportSchedulesService } from './exports/export-schedules.service';
 import { AbsencesController, ReassignmentController } from './reassignment/reassignment.controller';
 import { AbsencesService } from './reassignment/absences.service';
 import { DailyPlanController, DailyPlanSettingsController } from './daily-plan/daily-plan.controller';
@@ -234,7 +235,7 @@ export function appModuleFor(config: AppConfig) {
       ContractorPerformanceService,
       SavedViewsService, FilterCatalogService,
       SearchService, // 0.15.17 (F4)
-      MasterExportService, // 0.15.34
+      MasterExportService, ExportSchedulesService, // 0.15.34
       AbsencesService, ReassignmentService, // 0.15.54 (migration 0140)
       DailyPlanService, // 0.15.67 (migration 0149)
       StaffRegistryService, // 0.15.56 (0142)

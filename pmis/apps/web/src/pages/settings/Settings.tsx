@@ -19,6 +19,7 @@ import { NewBadge } from '@/components/NewBadge';
 import { ContractorRules } from './ContractorRules';
 import { ContractorPerfThresholds } from './ContractorPerfThresholds';
 import { RecycleBinScreen } from './RecycleBin';
+import { ExportSchedulesScreen } from './ExportSchedules';
 import { MatrixCoverageScreen } from './MatrixCoverage';
 import { GecolHlcCounts } from './GecolHlcCounts';
 import { Lists } from './Lists';
@@ -54,7 +55,7 @@ export const SETTINGS_TABS: readonly SettingsTab[] = [
   { key: 'registers', sections: [{ key: 'columns' }, { key: 'lists' }, { key: 'contractors' }, { key: 'gecol' }, { key: 'team-scope' }, { key: 'issue-map' }, { key: 'recycle', adminOnly: true }] },
   // W5: the Document Library section is now named Document types (the old documents/library route redirects); Form templates and Archive are new
   { key: 'documents', sections: [{ key: 'types' }, { key: 'forms' }, { key: 'archive' }, { key: 'numbering' }] },
-  { key: 'data', sections: [{ key: 'imports' }, { key: 'historical' }, { key: 'counts', adminOnly: true }, { key: 'reset', adminOnly: true }] },
+  { key: 'data', sections: [{ key: 'imports' }, { key: 'historical' }, { key: 'counts', adminOnly: true }, { key: 'export' }, { key: 'reset', adminOnly: true }] },
   // Notification policy + Mail kinds (admin only): both are what is sent to people
   { key: 'alerts', sections: [{ key: 'policy' }, { key: 'mail', adminOnly: true }] },
   // DLP months is a data-protection rule, so it moved here from SLA
@@ -193,6 +194,7 @@ export function SettingsRoutes() {
           <Route path="imports" element={<Imports />} />
           <Route path="historical" element={<HistoricalWaiver />} />
           <Route path="counts" element={<GecolHlcCounts />} />
+          <Route path="export" element={<ExportSchedulesScreen />} />
           <Route path="reset" element={<DataReset />} />
         </Route>
         <Route path="security" element={<TabFrame tab="security" />}>
