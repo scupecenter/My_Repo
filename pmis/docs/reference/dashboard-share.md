@@ -1,4 +1,4 @@
-# Dashboard share links (0546, contract 0.15.501)
+# Dashboard share links (0561, contract 0.15.402)
 
 A durable, revocable link to a read-only dashboard view, from the owner's decision of 2026-11-26 00:51.
 
@@ -25,4 +25,4 @@ Every create, open, refusal (expired or revoked) and revoke is in `audit_log` (`
 - `POST /dashboard/share-links/:id/revoke` — `{ reason }` → closes the link.
 - `GET /dashboard/shared/:token` — the envelope (`label` + `params`), counts and audits the open. 404 unknown, 410 expired or revoked.
 
-Everything goes through definer doors (`dashboard_share_create`, `dashboard_share_revoke`, `dashboard_share_resolve`) that check the right, take the reason and audit; see migration `0546_dashboard_share_links`.
+Everything goes through definer doors (`dashboard_share_create`, `dashboard_share_revoke`, `dashboard_share_resolve`) that check the right, take the reason and audit; see migration `0561_dashboard_share_links`.

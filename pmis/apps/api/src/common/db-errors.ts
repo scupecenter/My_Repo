@@ -210,7 +210,7 @@ export function mapWfError(message: string): ProblemException | null {
         errors: Array.isArray(extra.errors) ? (extra.errors as FieldError[]) : [],
       });
     case 'gone':
-      // 0546: a dashboard share link that expired or was revoked
+      // 0561: a dashboard share link that expired or was revoked
       return new ProblemException(410, 'gone', { detail: detail ?? 'This link expired or was revoked.' });
     case 'conflict':
       return new ProblemException(409, 'conflict', { detail: detail ?? 'This was already done.' });

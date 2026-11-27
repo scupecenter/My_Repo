@@ -3,7 +3,7 @@ import type { AuthContext } from '../auth/auth.types';
 import { Auth } from '../auth/decorators';
 import { DashboardSharesService } from './dashboard-shares.service';
 
-/** Dashboard share links (owner decision 2026-11-26 00:51; contract tag `dashboard`, 0.15.501). */
+/** Dashboard share links (owner decision 2026-11-26 00:51; contract tag `dashboard`, 0.15.402). */
 @Controller()
 export class DashboardSharesController {
   constructor(private readonly shares: DashboardSharesService) {}

@@ -17079,7 +17079,7 @@ paths:
   /dashboard/share-links:
     get:
       tags: [dashboard]
-      summary: '0.15.501 (0546). My dashboard share links (a System Admin sees all).'
+      summary: '0.15.402 (0561). My dashboard share links (a System Admin sees all).'
       responses:
         '200':
           description: The links.
@@ -17092,7 +17092,7 @@ paths:
                   items: { type: array, items: { $ref: '#/components/schemas/DashboardShareLink' } }
     post:
       tags: [dashboard]
-      summary: '0.15.501 (0546). Create a share link to a dashboard query. Requires dashboard.view; reason; audited as dashboard_share_created. The link grants nothing by itself: the opener needs a session and sees their own data.'
+      summary: '0.15.402 (0561). Create a share link to a dashboard query. Requires dashboard.view; reason; audited as dashboard_share_created. The link grants nothing by itself: the opener needs a session and sees their own data.'
       requestBody:
         required: true
         content:
@@ -17124,7 +17124,7 @@ paths:
   /dashboard/share-links/{id}/revoke:
     post:
       tags: [dashboard]
-      summary: '0.15.501 (0546). Revoke a share link (the creator or a System Admin; reason; audited as dashboard_share_revoked). Opening a revoked link answers 410 gone.'
+      summary: '0.15.402 (0561). Revoke a share link (the creator or a System Admin; reason; audited as dashboard_share_revoked). Opening a revoked link answers 410 gone.'
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
       requestBody:
@@ -17144,7 +17144,7 @@ paths:
   /dashboard/shared/{token}:
     get:
       tags: [dashboard]
-      summary: '0.15.501 (0546). Open a share link: the envelope (label + dashboard query) for the shared read-only view. Counts and audits the open (dashboard_share_opened); a refused open (expired or revoked) is audited as dashboard_share_refused and answers 410 gone.'
+      summary: '0.15.402 (0561). Open a share link: the envelope (label + dashboard query) for the shared read-only view. Counts and audits the open (dashboard_share_opened); a refused open (expired or revoked) is audited as dashboard_share_refused and answers 410 gone.'
       parameters:
         - { name: token, in: path, required: true, schema: { type: string } }
       responses:
@@ -28169,7 +28169,7 @@ components:
               activities: { type: object, additionalProperties: { type: number }, description: 'Activity code to progress %.' }
     DashboardShareLink:
       type: object
-      description: '0.15.501 (0546). A durable, revocable link to a read-only dashboard view. The link is only an envelope for the dashboard query: opening it needs a session and the data is the normal GET /dashboard of the opener (their own role and region visibility). Every create, open and revoke is audited.'
+      description: '0.15.402 (0561). A durable, revocable link to a read-only dashboard view. The link is only an envelope for the dashboard query: opening it needs a session and the data is the normal GET /dashboard of the opener (their own role and region visibility). Every create, open and revoke is audited.'
       required: [id, label, params, created_at, open_count]
       properties:
         id: { type: string, format: uuid }
@@ -28184,7 +28184,7 @@ components:
         mine: { type: boolean, description: 'The caller created it (they may revoke it; a System Admin revokes any).' }
     DashboardShareResolve:
       type: object
-      description: '0.15.501. The envelope of an opened share link; the web renders the dashboard with these params.'
+      description: '0.15.402. The envelope of an opened share link; the web renders the dashboard with these params.'
       required: [id, label, params]
       properties:
         id: { type: string, format: uuid }

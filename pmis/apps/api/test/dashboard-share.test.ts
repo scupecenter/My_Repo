@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { grantProfile, loggedIn, makeUser, startApp, superDb, Api } from './helpers';
 
-/** Migration 0546 (contract 0.15.501): share links for the unified dashboard view. */
+/** Migration 0561 (contract 0.15.402): share links for the unified dashboard view. */
 let app: NestExpressApplication;
 let db: Pg;
 beforeAll(async () => {
@@ -26,7 +26,7 @@ async function person(grants: [string, string][] = [['dashboard', 'view'], ['sit
 
 const params = { view: 'pmo', ref_date: '2026-11-27', region_id: '3', stream: 'UNIFIED' };
 
-describe('dashboard share links (0546)', () => {
+describe('dashboard share links (0561)', () => {
   it('create → list → resolve returns the stored parameters, audited', async () => {
     const api = await person();
     expect((await api.call('post', '/dashboard/share-links', {})).status).toBe(422);

@@ -1,4 +1,4 @@
--- 0546_dashboard_share_links: durable, revocable share links to a read-only dashboard view (owner decision 2026-11-26 00:51).
+-- 0561_dashboard_share_links: durable, revocable share links to a read-only dashboard view (owner decision 2026-11-26 00:51).
 --
 -- A link is only an envelope: it stores a label and the dashboard query (ref_date, region, cluster, scenario, stream,
 -- view). Opening it needs a signed-in user and the data is the normal GET /dashboard of THAT user, so role and region
@@ -21,7 +21,7 @@ CREATE TABLE dashboard_share_links (
   last_opened_at timestamptz
 );
 CREATE INDEX dashboard_share_links_creator ON dashboard_share_links (created_by);
-COMMENT ON TABLE dashboard_share_links IS '0546: share links to a read-only dashboard view. The link grants nothing by itself: opening needs a session and the data is scoped to the opener.';
+COMMENT ON TABLE dashboard_share_links IS '0561: share links to a read-only dashboard view. The link grants nothing by itself: opening needs a session and the data is scoped to the opener.';
 
 -- The query a link may carry: only the GET /dashboard parameters, each validated.
 CREATE OR REPLACE FUNCTION dashboard_share_params_ok(p jsonb) RETURNS boolean

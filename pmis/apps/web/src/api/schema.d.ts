@@ -11138,7 +11138,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** 0.15.501 (0546). My dashboard share links (a System Admin sees all). */
+        /** 0.15.402 (0561). My dashboard share links (a System Admin sees all). */
         get: {
             parameters: {
                 query?: never;
@@ -11162,7 +11162,7 @@ export interface paths {
             };
         };
         put?: never;
-        /** 0.15.501 (0546). Create a share link to a dashboard query. Requires dashboard.view; reason; audited as dashboard_share_created. The link grants nothing by itself: the opener needs a session and sees their own data. */
+        /** 0.15.402 (0561). Create a share link to a dashboard query. Requires dashboard.view; reason; audited as dashboard_share_created. The link grants nothing by itself: the opener needs a session and sees their own data. */
         post: {
             parameters: {
                 query?: never;
@@ -11221,7 +11221,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** 0.15.501 (0546). Revoke a share link (the creator or a System Admin; reason; audited as dashboard_share_revoked). Opening a revoked link answers 410 gone. */
+        /** 0.15.402 (0561). Revoke a share link (the creator or a System Admin; reason; audited as dashboard_share_revoked). Opening a revoked link answers 410 gone. */
         post: {
             parameters: {
                 query?: never;
@@ -11270,7 +11270,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** 0.15.501 (0546). Open a share link: the envelope (label + dashboard query) for the shared read-only view. Counts and audits the open (dashboard_share_opened); a refused open (expired or revoked) is audited as dashboard_share_refused and answers 410 gone. */
+        /** 0.15.402 (0561). Open a share link: the envelope (label + dashboard query) for the shared read-only view. Counts and audits the open (dashboard_share_opened); a refused open (expired or revoked) is audited as dashboard_share_refused and answers 410 gone. */
         get: {
             parameters: {
                 query?: never;
@@ -22002,7 +22002,7 @@ export interface components {
                 };
             }[];
         };
-        /** @description 0.15.501 (0546). A durable, revocable link to a read-only dashboard view. The link is only an envelope for the dashboard query: opening it needs a session and the data is the normal GET /dashboard of the opener (their own role and region visibility). Every create, open and revoke is audited. */
+        /** @description 0.15.402 (0561). A durable, revocable link to a read-only dashboard view. The link is only an envelope for the dashboard query: opening it needs a session and the data is the normal GET /dashboard of the opener (their own role and region visibility). Every create, open and revoke is audited. */
         DashboardShareLink: {
             /** Format: uuid */
             id: string;
@@ -22022,7 +22022,7 @@ export interface components {
             /** @description The caller created it (they may revoke it; a System Admin revokes any). */
             mine?: boolean;
         };
-        /** @description 0.15.501. The envelope of an opened share link; the web renders the dashboard with these params. */
+        /** @description 0.15.402. The envelope of an opened share link; the web renders the dashboard with these params. */
         DashboardShareResolve: {
             /** Format: uuid */
             id: string;

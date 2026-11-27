@@ -23,7 +23,7 @@ const createBody = z
 const revokeBody = z.object({ reason }).strict();
 
 /**
- * Dashboard share links (owner decision 2026-11-26 00:51, migration 0546): a durable, revocable link to a read-only
+ * Dashboard share links (owner decision 2026-11-26 00:51, migration 0561): a durable, revocable link to a read-only
  * dashboard view. The link is an envelope for the dashboard query only; opening it needs a session and the data comes
  * from the normal GET /dashboard of the opener, so role and region visibility are always the opener's own. Every write
  * and every open goes through a definer door that checks the right and audits.

@@ -6,7 +6,7 @@ import { useCreateShareLink, useResolveShareLink, useRevokeShareLink, useShareLi
 import { Dashboard } from '@/pages/Dashboard';
 import { useToast } from '@/components/Toast';
 
-/** The GET /dashboard parameters a share link may carry (contract 0.15.501). */
+/** The GET /dashboard parameters a share link may carry (contract 0.15.402). */
 const SHARE_KEYS = ['ref_date', 'region_id', 'cluster_code', 'scenario', 'stream', 'view', 'exclude_overrides'] as const;
 
 export const shareParamsOf = (sp: URLSearchParams): Record<string, string> =>

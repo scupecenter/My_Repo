@@ -13,7 +13,7 @@ export interface ShareCreateBody {
   reason: string;
 }
 
-/** Dashboard share links (0.15.501): durable, revocable envelopes for a read-only dashboard view. The opener signs in and sees their own data. */
+/** Dashboard share links (0.15.402): durable, revocable envelopes for a read-only dashboard view. The opener signs in and sees their own data. */
 export const useShareLinks = (enabled = true) =>
   useQuery({
     queryKey: ['dashboard-share-links'],
