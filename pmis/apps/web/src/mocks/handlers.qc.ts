@@ -76,7 +76,7 @@ function slotsOfRecord(key: string, id: string): DocumentSlot[] | null {
 // ---------------------------------------------------------------- Q132: snags
 const TYPES: SnagType[] = [
   { id: uid('snagtype-QC_GENERAL'), code: 'QC_GENERAL', name_en: 'General QC snag', name_ar: 'ملاحظة جودة عامة', photo_rules: { min_count: 1, shot_types: [], formats: ['JPG', 'PNG', 'HEIC'], max_size_mb: 20 }, stream: null, blocking_rule: 'always', blocks_preliminary_acceptance: true, is_active: true, version: 1 },
-  { id: uid('snagtype-CRACK'), code: 'CRACK', name_en: 'Concrete crack', name_ar: 'شرخ خرساني', photo_rules: { min_count: 2, shot_types: ['wide', 'close'], formats: ['JPG'], max_size_mb: 20 }, stream: 'CW', blocking_rule: 'by_severity', blocks_preliminary_acceptance: true, is_active: true, version: 1 },
+  { id: uid('snagtype-CRACK'), code: 'CRACK', name_en: 'Concrete crack', name_ar: 'شرخ خرساني', photo_rules: { min_count: 2, shot_types: ['wide', 'close'], formats: ['JPG', 'WEBM', 'MP4'], max_size_mb: 20 }, stream: 'CW', blocking_rule: 'by_severity', blocks_preliminary_acceptance: true, is_active: true, version: 1 },
 ];
 // ---------------------------------------------------------------- P6 (contract 0.12.4): severities (Q233) and the documents / QC settings (Q229, Q232)
 const SEVERITIES_SEED: SnagSeverity[] = [

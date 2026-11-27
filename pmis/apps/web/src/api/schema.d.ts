@@ -18622,7 +18622,7 @@ export interface components {
         PhotoRules: {
             min_count?: number;
             shot_types?: string[];
-            formats?: ("JPG" | "PNG" | "HEIC")[];
+            formats?: ("JPG" | "PNG" | "HEIC" | "WEBM" | "MP4" | "MOV")[];
             max_size_mb?: number;
         };
         DocumentPlacement: {
