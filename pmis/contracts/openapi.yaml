@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.225
+  version: 0.15.291
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -56,6 +56,7 @@ info:
     - 0.15.95 (2026-11-27): the admin alert `backup_missing` (owner approval relayed 2026-11-26). Additive, migration 0184. When no backup succeeded in the last 24 hours (the System Log rows the data reset reads) a security alert `backup_missing` (default severity high, configurable like the other rules) is raised once per calendar day by the job `backup_check` (every 6 hours) and one System Log row (source `backup_check`) is written. `SecurityAlertRule` and `AlertSeverityMap` gain `backup_missing`. No new endpoint.
 
     - 0.15.98 (2026-11-27): the dashboard follow-up sections (owner approval 2026-11-26, dashboard proposals item 1; migration 0230). Additive and read only. New `GET /dashboard/ops` (`getDashboardOps`, `DashboardOps`): the sections that follow the operations beyond F13, each part `available: false` when the caller may not see its module. First section `procurement`: the open orders (order status not one of the closing statuses of the contractor rules, as in `GET /reports/contractor-performance`), the PRs waiting for a PO/WO and the open PO/WOs, each aged in calendar days and bucketed 0-7, 8-14, 15-30, over 30, and the materials position: the receive rate (dispatched against required of `warehouse_site_qty` over the active, not cancelled sites), the count of sites with a shortage line, the top shortage lines with their contractor (the party of the site's newest open order; unattributed when none) and the shortage per contractor. No price is returned (no price is stored on a Procurement record). The dashboard settings catalogue gains the card `ops_procurement`, so the card shows, hides and orders per tab in Settings > Dashboard like every other card. No grant, role or permission change.
+    - 0.15.291 (2026-11-27): the central Media gallery (owner decisions GAL-1 and LIB-1, 2026-11-27; migration 0396, mirror `db/sql/395_media_gallery.sql`). Additive. New `GET/PUT /media/settings` (setting `media.gallery`; read by every signed-in user, changed by a System Admin or an all-regions delegate of `settings` edit with a reason, a step-up and If-Match, audited `media_gallery_update`), `GET /media/items` (keyset page of the images of `document_files` and `snag_photos` that the caller may already see, with filters), `GET /media/facets` and `GET /media/items/{kind}/{id}/thumbnail` (made on first request, kept beside the original; 404 for an item the caller may not see). No new table and no new storage: the gallery reads the owning slot's rows, so visibility is the slot's (Documents view in the region, the register's module, and the Quality module for a snag photo). A withdrawn or rejected item is hidden, never deleted. New `ErrorCode` values `thumbnail_unsupported`, `thumbnails_unavailable`. No permission, visibility or authentication change.
     - 0.15.97 (2026-11-27): the sign-in page settings (owner request 2026-11-26; migration 0197). Additive. New `GET/PUT /settings/login-page` (`getLoginPage`, `setLoginPage`; setting `ui.login_page`): the sign-in page announcement (English and Arabic, kind info or maintenance, both texts empty hides it), the background animation switch, the default language of the signed-out pages and up to five support links ({label_en, label_ar, url}; http(s) or mailto only). Every signed-in user reads the state (the post-login splash shows `server_version` from it); a System Admin or a delegate of `settings` edit for all regions changes it with a reason, a step-up and If-Match (audited `login_page_update`, before and after). New `GET /settings/login-page/public` (`getLoginPagePublic`, no session): ONLY what the sign-in page renders (announcement, animation, default_locale, support_links) - no version, no audit data, nothing about users; cached 30 seconds and rate limited per address. No permission, visibility or authentication change.
     - 0.15.96 (2026-11-27): responsibility-matrix coverage screen (CHANGELOG MatrixCoverage; no migration). Additive and read only. `GET /matrix/coverage` (`getMatrixCoverage`, System Admin or an all-region delegate of the matrix): for each active stage and enabled register row and each of the seven regions, whether the matrix cell has an actor, so empty cells show before a task or record stalls. Settings > Workflow > Coverage.
     - 0.15.95 (2026-11-27): Issue log and Quality record link to a Procurement order (migration 0195; CHANGELOG IssueQualityOrderLink). Additive. New optional field `procurement_order_id` on `issues` and `quality`; when set, the contractor (`external_party`) is taken from the order (a different typed `external_party_id` is refused, 422 `contractor_from_order`; `order_not_active`, `order_other_site`, `invalid`), so the contractor performance view sees the issue and the inspection. `GET /registers/issues/order-options` and `GET /registers/quality/order-options` list the orders (own module view plus Procurement view).
@@ -9586,6 +9587,113 @@ paths:
         '412': {$ref: '#/components/responses/PreconditionFailed'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /media/settings:
+    get:
+      tags: [media]
+      operationId: getMediaSettings
+      summary: The Media gallery settings (0.15.291)
+      description: Every signed-in user may read them (the gallery screen uses them). `can_edit` is true for a System Admin or an all-regions delegate of `settings` edit. `thumbnails_available` is false when the server cannot make thumbnails (the gallery then shows type icons).
+      x-db-path: media_gallery_state
+      responses:
+        '200':
+          description: The settings.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MediaSettings'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+    put:
+      tags: [media]
+      operationId: setMediaSettings
+      summary: Set the Media gallery settings (reason, step-up, If-Match, audited) (0.15.291)
+      description: A System Admin, or a delegate of `settings` edit for all regions. A reason (3+ characters), a step-up and `If-Match` are required. Unknown keys and invalid values are 422; saving the values in force is 409 `invalid_transition`. Audited `media_gallery_update` with before and after.
+      x-step-up: true
+      x-db-path: admin_set_media_gallery
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/MediaSettingsInput'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MediaSettings'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /media/items:
+    get:
+      tags: [media]
+      operationId: listMediaItems
+      summary: The images the caller may see, newest first (0.15.291)
+      description: |
+        Reads `document_files` (through their slots) and `snag_photos` live; nothing is copied. Visibility is the owning slot's. The scope (kinds, registers, excluded codes,
+        images only) comes from the setting `media.gallery`. `status` is `current` (default), `withdrawn` (only when the setting allows it) or `pending_evidence`.
+        `has_thumbnail` says whether `.../thumbnail` can answer; `link` names the record the item belongs to.
+      parameters:
+      - {name: source, in: query, schema: {type: string, enum: [documents, snags]}}
+      - {name: site_id, in: query, schema: {type: string, format: uuid}}
+      - {name: region_id, in: query, schema: {type: integer}}
+      - {name: register_key, in: query, schema: {type: string}}
+      - {name: doc_code, in: query, schema: {type: string}}
+      - {name: snag_type, in: query, schema: {type: string}}
+      - {name: status, in: query, schema: {type: string, enum: [current, withdrawn, pending_evidence]}}
+      - {name: uploaded_by, in: query, schema: {type: string, format: uuid}}
+      - {name: uploaded_from, in: query, schema: {type: string, format: date}}
+      - {name: uploaded_to, in: query, schema: {type: string, format: date}}
+      - {name: q, in: query, schema: {type: string}}
+      - {name: cursor, in: query, schema: {type: string}}
+      - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200}}
+      responses:
+        '200':
+          description: A page.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MediaItemPage'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /media/facets:
+    get:
+      tags: [media]
+      operationId: getMediaFacets
+      summary: The filter values of the gallery for the caller (0.15.291)
+      responses:
+        '200':
+          description: Document types with images in scope, active snag types, register keys.
+          content:
+            application/json:
+              schema: {type: object}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /media/items/{kind}/{id}/thumbnail:
+    get:
+      tags: [media]
+      operationId: getMediaThumbnail
+      summary: A thumbnail of one gallery item (0.15.291)
+      description: Made from the stored original on the first request (EXIF orientation applied, metadata removed) and kept beside it. 404 when the item is not visible to the caller; 415 `thumbnail_unsupported` for a file type without a thumbnail; 503 `thumbnails_unavailable` when thumbnails are off or the maker is not installed.
+      parameters:
+      - {name: kind, in: path, required: true, schema: {type: string, enum: [document_file, snag_photo]}}
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      - {name: size, in: query, schema: {type: string, enum: [small, medium], default: small}}
+      responses:
+        '200':
+          description: The image (webp or jpeg, as configured).
+          content:
+            image/webp: {schema: {type: string, format: binary}}
+            image/jpeg: {schema: {type: string, format: binary}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
   /settings/login-page:
     get:
       tags: [settings]
@@ -18093,6 +18201,8 @@ components:
         - quarantine_unavailable
         - maintenance
         - scope_changed
+        - thumbnail_unsupported
+        - thumbnails_unavailable
     PageEnvelope:
       type: object
       required: [items, page]
@@ -23338,6 +23448,80 @@ components:
         label_en: { type: string, minLength: 1, maxLength: 60 }
         label_ar: { type: string, maxLength: 60, description: 'Empty: the English label shows.' }
         url: { type: string, minLength: 1, maxLength: 300, pattern: '^(https?://|mailto:)' }
+    MediaThumbnails:
+      type: object
+      required: [enabled, small_px, medium_px, quality, format, max_source_mb]
+      properties:
+        enabled: { type: boolean }
+        small_px: { type: integer, minimum: 64, maximum: 512 }
+        medium_px: { type: integer, minimum: 128, maximum: 2048, description: 'Larger than small_px.' }
+        quality: { type: integer, minimum: 40, maximum: 95 }
+        format: { type: string, enum: [webp, jpeg] }
+        max_source_mb: { type: integer, minimum: 1, maximum: 200 }
+    MediaSettings:
+      type: object
+      description: '0.15.291. Setting `media.gallery` (migration 0396).'
+      required: [enabled, snag_photos, document_kinds, register_keys, include_site_documents, exclude_doc_codes, image_only, show_withdrawn, page_size, thumbnails, version, can_edit, thumbnails_available]
+      properties:
+        enabled: { type: boolean }
+        snag_photos: { type: boolean }
+        document_kinds: { type: array, maxItems: 5, items: { type: string, enum: [photo, scanned_document, email, report, excel_template] } }
+        register_keys: { type: array, maxItems: 60, items: { type: string }, description: 'Empty: every register.' }
+        include_site_documents: { type: boolean, description: 'Task and site slots (no register).' }
+        exclude_doc_codes: { type: array, maxItems: 100, items: { type: string } }
+        image_only: { type: boolean }
+        show_withdrawn: { type: boolean, description: 'Whether withdrawn and rejected items can be listed (they are never deleted).' }
+        page_size: { type: integer, minimum: 12, maximum: 200 }
+        thumbnails: { $ref: '#/components/schemas/MediaThumbnails' }
+        updated_at: { type: [string, 'null'], format: date-time }
+        updated_by: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+        version: { type: integer, description: The ETag value. }
+        can_edit: { type: boolean }
+        thumbnails_available: { type: boolean }
+    MediaSettingsInput:
+      allOf:
+        - $ref: '#/components/schemas/WithReason'
+        - type: object
+          required: [enabled, snag_photos, document_kinds, register_keys, include_site_documents, exclude_doc_codes, image_only, show_withdrawn, page_size, thumbnails]
+          properties:
+            enabled: { type: boolean }
+            snag_photos: { type: boolean }
+            document_kinds: { type: array, maxItems: 5, items: { type: string } }
+            register_keys: { type: array, maxItems: 60, items: { type: string } }
+            include_site_documents: { type: boolean }
+            exclude_doc_codes: { type: array, maxItems: 100, items: { type: string } }
+            image_only: { type: boolean }
+            show_withdrawn: { type: boolean }
+            page_size: { type: integer }
+            thumbnails: { $ref: '#/components/schemas/MediaThumbnails' }
+    MediaItem:
+      type: object
+      required: [kind, id, uploaded_at, state, mime_type, size_bytes, type, link, has_thumbnail, download_url]
+      properties:
+        kind: { type: string, enum: [document_file, snag_photo] }
+        id: { type: string, format: uuid }
+        uploaded_at: { type: string, format: date-time }
+        uploaded_by: { type: string, format: uuid }
+        state: { type: string, enum: [current, superseded, withdrawn, rejected, pending_evidence] }
+        version: { type: [integer, 'null'] }
+        slot_status: { type: [string, 'null'] }
+        snag_status: { type: [string, 'null'] }
+        mime_type: { type: string }
+        name: { type: [string, 'null'] }
+        size_bytes: { type: integer }
+        shot_type: { type: [string, 'null'] }
+        type: { type: object, required: [code, name_en], properties: { code: { type: string }, name_en: { type: string }, name_ar: { type: [string, 'null'] }, kind: { type: [string, 'null'] } } }
+        site: { type: [object, 'null'] }
+        link: { type: object, description: 'The owning record: {kind: snag|register|task|site, ...ids}.' }
+        has_thumbnail: { type: boolean }
+        download_url: { type: string }
+    MediaItemPage:
+      type: object
+      required: [enabled, items, page]
+      properties:
+        enabled: { type: boolean }
+        items: { type: array, items: { $ref: '#/components/schemas/MediaItem' } }
+        page: { type: object, required: [limit, next_cursor], properties: { limit: { type: integer }, next_cursor: { type: [string, 'null'] } } }
     LoginPage:
       type: object
       description: '0.15.97. Settings, Screens, Login page (setting `ui.login_page`, migration 0197).'
