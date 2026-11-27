@@ -84,10 +84,10 @@ The four forms bind to these records:
 | # | Form field (DN form) | Source in Workspace | Master | Fill | Proposed placeholder | Notes |
 |---|---|---|---|---|---|---|
 | 1 | DN Ref. No. | Generated form `number`, taken at generation (§6) | WH movement "Doc No." (D61) | P | `form.number` | No Prisma table (G-F01) |
-| 2 | DN Date | Date of generation, in the Africa/Tripoli timezone | WH movement "Date" | P | `form.date` | ASSUMPTION: issue date = generation date |
+| 2 | DN Date | Date of generation, in the business time zone | WH movement "Date" | P | `form.date` | ASSUMPTION: issue date = generation date |
 | 3 | Site ID | `sites.site_code` | Master B | P | `site.code` | |
 | 4 | Site Name | `sites.name` | Master D | P | `site.name` | |
-| 5 | Site Region (7 boxes: Tripoli, Middle, Zawia, WM, Sebha, Benghazi, GM) | `sites.region_id` → `regions.code`. The matching box is ticked. | Master E ("X Area", Q10) | P | `site.region_code` | Box labels match the CLAUDE.md region names |
+| 5 | Site Region (7 boxes: Region A, Middle, Region C, WM, Region D, Region B, GM) | `sites.region_id` → `regions.code`. The matching box is ticked. | Master E ("X Area", Q10) | P | `site.region_code` | Box labels match the CLAUDE.md region names |
 | 6 | Contractor Name | `procurement_records` (scope CW) `party_id` → `external_parties.name`. Contract: `GeneratedForm.contractor` | Master AJ; PR-PO J | P | `contractor.name` | ASSUMPTION: when a site has several CW orders, the latest order that is not cancelled is used |
 | 7 | Site CW PO / WO | `procurement_records.po_wo_no` (scope CW). Contract: `po_wo_ref` | PR-PO H; Master AI | P | `po_wo.number` | Same ASSUMPTION as row 6 |
 | 8 | From Warehouse | A setting holding the main store name. Contract: `GeneratedForm.warehouse` | WH is a "single main store" (WH title row; D57; BP §02) | P | `warehouse.name` | Gap G-F14: no setting key exists yet |
@@ -173,7 +173,7 @@ Serial numbers:
 | 3 | Site ID | `sites.site_code` | B | P | `site.code` | |
 | 4 | PR/PO/WO # | `procurement_records.po_wo_no` (scope CW); PR No. when no PO yet | PR-PO F/H; AI | P | `po_wo.number` | As DN row 7 |
 | 5 | Contractor Name | CW contractor (as DN row 6) | AJ | P | `contractor.name` | |
-| 6 | Site Region (boxes Tripoli, Middle, Zawya, WM, Sabha, Benghazi, GM) | `regions.code` | E | P | `site.region_code` | The PAC form spells "Zawya" and "Sabha", while CLAUDE.md and the DN form use "Zawia" and "Sebha". The template must map them by region code (G-F17, Q29) |
+| 6 | Site Region (boxes Region A, Middle, Zawya, WM, Sabha, Region B, GM) | `regions.code` | E | P | `site.region_code` | The PAC form spells "Zawya" and "Sabha", while CLAUDE.md and the DN form use "Region C" and "Region D". The template must map them by region code (G-F17, Q29) |
 | 7 | Tower Type (GF-SST / RT-GMT / RT-Pole / Other) | `sites.rt_or_gf` + `sites.tower_type` | O (RT or GF), P (Tower Type: SST, GMT, Monopole, N/A) | P | `site.tower_type_box` | The mapping is not defined (Q29) |
 | 8 | Tower Height (m) | `sites.tower_height_m` | Q | P | `site.tower_height_m` | |
 | 9 | Site Name | `sites.name` | D | P | `site.name` | |
@@ -359,7 +359,7 @@ The FAC form has no contractor signature block.
 | G-F14 | No setting for the warehouse name printed in "From / To Warehouse" | DN row 8, RN row 9 | tech-lead (setting key) |
 | G-F15 | No source form has a QR code. The PAC and FAC footers have no number or page count | all forms | design (template) |
 | G-F16 | The source forms are static HTML with `<input>` fields and fixed rows. They must be converted into templates with placeholders and repeating blocks. The `FormTemplate.placeholders` list is not yet defined (proposed names above) | all forms | design / tech-lead |
-| G-F17 | The PAC region labels read "Zawya" and "Sabha"; CLAUDE.md and the DN and RN forms read "Zawia" and "Sebha" | PAC row 6 | Q29 (template wording) |
+| G-F17 | The PAC region labels read "Zawya" and "Sabha"; CLAUDE.md and the DN and RN forms read "Region C" and "Region D" | PAC row 6 | Q29 (template wording) |
 | G-F18 | BP §05 issues one form for several sites at once, as a zip. The contract has no bulk generate | all forms | tech-lead |
 | G-F19 | BP §05 makes the data fields read-only in the prepare screen. `GeneratedFormPatch` lets `contractor_id`, `po_wo_ref`, `warehouse` and `lines` be edited | all forms | tech-lead. **ASSUMPTION:** lines stay editable for DN and RN, because the lines *are* the record. Site and contractor data change only through normal entry |
 | G-F20 | BP §05 issues Word and PDF. CLAUDE.md (newer) uses HTML templates rendered to PDF, so no change is needed. Noted for traceability | all forms | none |

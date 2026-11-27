@@ -18,6 +18,7 @@ import {
   cellValue, copyToClipboard, emailContent, EMPTY_FILTERS, filterRows, localToday, optionsOf, OVERRIDE_KEYS, OWNER_COLUMNS, type DailyPlanTab, type DpColumn, type DpFilters,
 } from '@/lib/dailyPlan';
 import type { ColDef } from '@/lib/tablePrefs';
+import { DateInput } from '@/components/DateInput';
 
 const SCREEN = 'daily-plan';
 const WIDE = new Set<DpColumn>(['planned_work', 'actual_work', 'reason', 'remark', 'sow', 'contractor', 'aat_se']);
@@ -108,7 +109,7 @@ export function DailyPlan() {
 
   return (
     <div className="space-y-3" data-testid="page-daily-plan">
-      <PageHeader title={t('dailyPlan.title')} subtitle={t('dailyPlan.subtitle')} testid="daily-plan-header"
+      <PageHeader title={t('dailyPlan.title')} subtitle={t('dailyPlan.subtitle')} testid="daily-plan-header" settings="daily_plan"
         context={canOpenSettings(me.data) ? <Link to="/admin/settings/my-work/daily-plan" className="btn px-2 py-1 text-xs" data-testid="daily-plan-settings-link"><Settings size={14} aria-hidden />{t('dailyPlan.settings')}</Link> : undefined} />
 
       <div className="flex flex-wrap items-center gap-2">
@@ -120,7 +121,7 @@ export function DailyPlan() {
         </div>
         <span className="inline-flex items-center gap-1">
           <button type="button" className="btn px-2" aria-label={t('dailyPlan.previous_day')} onClick={() => shift(-1)}><ChevronLeft size={16} className="rtl:rotate-180" aria-hidden /></button>
-          <input type="date" className="input w-auto" aria-label={t('dailyPlan.date')} data-testid="daily-plan-date" value={date} onChange={(e) => e.target.value && setParams({ date: e.target.value })} />
+          <DateInput className="input w-auto" aria-label={t('dailyPlan.date')} data-testid="daily-plan-date" value={date} onChange={(e) => e.target.value && setParams({ date: e.target.value })} />
           <button type="button" className="btn px-2" aria-label={t('dailyPlan.next_day')} onClick={() => shift(1)}><ChevronRight size={16} className="rtl:rotate-180" aria-hidden /></button>
         </span>
         <span className="text-sm text-mute" data-testid="daily-plan-shown-date">{t(isWeek ? 'week.of' : tab === 'progress' ? 'dailyPlan.progress_of' : 'dailyPlan.tomorrow_of', { date: shownDate })}</span>

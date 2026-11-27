@@ -40,7 +40,7 @@ Short answers are fine, for example: `default`, `yes`, `no`, `option 2`, or a se
 
 **The holidays table is empty.** Setting "Public Holidays" (F:G) has no rows, so every SLA currently ignores holidays.
 
-**Proposed default / question:** The admin enters the Libyan public holidays for 2026–2027 before the pilot. Until then SLA counts Fri / Sat only, and a banner warns "holiday table empty".
+**Proposed default / question:** The admin enters the public holidays for 2026–2027 before the pilot. Until then SLA counts Fri / Sat only, and a banner warns "holiday table empty".
 
 **Answer:** 
 
@@ -92,7 +92,7 @@ Short answers are fine, for example: `default`, `yes`, `no`, `option 2`, or a se
 
 ### Q10
 
-**Region names.** The Master stores "Tripoli Area", "Middle Area" and so on. CLAUDE.md uses "Tripoli", "Middle" and so on.
+**Region names.** The Master stores each as "<region> Area"; the rules use the short name.
 
 **Proposed default / question:** Store a region code with an English and an Arabic label. Import maps "X Area" → X.
 

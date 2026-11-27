@@ -26,7 +26,7 @@ export function TemplateMappingPage() {
   const tab = (TABS as readonly string[]).includes(sp.get('tab') ?? '') ? (sp.get('tab') as Tab) : 'fields';
   return (
     <div data-testid="page-template-mapping">
-      <PageHeader title={t('tmap.title')} subtitle={t('tmap.subtitle')} />
+      <PageHeader title={t('tmap.title')} subtitle={t('tmap.subtitle')} settings="template_mapping" />
       <div role="tablist" className="mb-3 flex gap-1">
         {TABS.map((x) => (
           <button key={x} role="tab" aria-selected={tab === x} data-testid={`tmap-tab-${x}`} className={`btn px-3 py-1 text-sm ${tab === x ? 'btn-primary' : ''}`}

@@ -178,6 +178,29 @@ describe('Sidebar tree (N1-N12)', () => {
     expect(screen.getByTestId('nav-no-match')).toBeInTheDocument();
   });
 
+  it('the breadcrumb names the page once when its group carries the same name', async () => {
+    app('/sites');
+    await screen.findByTestId('page-sites');
+    const bc = screen.getByTestId('breadcrumb');
+    await waitFor(() => expect(bc).toHaveTextContent('Site Master'));
+    expect(bc.textContent?.match(/Site Master/g)).toHaveLength(1);
+    cleanup();
+    app('/dashboard');
+    const bc2 = screen.getByTestId('breadcrumb');
+    await waitFor(() => expect(bc2).toHaveTextContent('Dashboard'));
+    expect(bc2.textContent?.match(/Dashboard/g)).toHaveLength(1);
+  });
+
+  it('dedupes Recent by path and cleans doubled keys out of storage', async () => {
+    const u = userEvent.setup();
+    localStorage.setItem('pmis.nav.recent', JSON.stringify(['dashboard', 'dashboard', 'approvals']));
+    app();
+    await screen.findByTestId('nav-recent-dashboard');
+    expect(screen.getAllByTestId('nav-recent-dashboard')).toHaveLength(1);
+    await u.click(screen.getByTestId('nav-approvals'));
+    await waitFor(() => expect(JSON.parse(localStorage.getItem('pmis.nav.recent') ?? '[]')).toEqual(['approvals', 'my_work', 'dashboard']));
+  });
+
   it('lists recent items without the current page', async () => {
     const u = userEvent.setup();
     app();
@@ -358,7 +381,7 @@ describe('Shared states', () => {
   });
 });
 
-/** 0242 (owner approval 2026-11-27, the PM-platforms proposal item 4): the personal sidebar of the profile. */
+/** 0242 (owner approval 2026-11-27, the improvement proposal item 4): the personal sidebar of the profile. */
 describe('the personal sidebar (0197)', () => {
   beforeEach(async () => { await signIn('pm'); });
   const seedSide = (sidebar: Record<string, unknown>) => {

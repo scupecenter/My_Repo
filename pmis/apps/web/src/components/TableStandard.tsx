@@ -1,4 +1,5 @@
 import * as Popover from '@radix-ui/react-popover';
+import { useDownloadGate } from '@/lib/downloadGate';
 import { Copy, Download, Search } from 'lucide-react';
 import type { ClipboardEvent, ReactNode } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
@@ -252,6 +253,7 @@ export const toCsv = (head: string[], rows: unknown[][]) => [head, ...rows].map(
  * server's filtered set, every page loaded), as a UTF-8 CSV with a BOM so Excel reads Arabic. The download stays in the browser.
  */
 export function ExportCsvButton({ testid, name, head, rows }: { testid: string; name: string; head: string[]; rows: () => unknown[][] }) {
+  const gate = useDownloadGate();
   const { t } = useTranslation();
   const go = () => {
     const blob = new Blob(['﻿', toCsv(head, rows())], { type: 'text/csv;charset=utf-8' });
@@ -264,7 +266,7 @@ export function ExportCsvButton({ testid, name, head, rows }: { testid: string; 
   };
   return (
     <Tip text={t('tstd.export_view')}>
-      <button type="button" className="btn" data-testid={testid} aria-label={t('tstd.export_view')} onClick={go}><Download size={16} /></button>
+      <button type="button" className="btn" data-testid={testid} aria-label={t('tstd.export_view')} disabled={gate.exportLocked} title={gate.note(gate.exportLocked)} onClick={go}><Download size={16} /></button>
     </Tip>
   );
 }

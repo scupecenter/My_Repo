@@ -49,6 +49,33 @@ describe('My profile: reach and sections', () => {
   });
 });
 
+describe('appearance form (0241)', () => {
+  it('every org-default option shows a translated label, never a raw i18n key (motion, icon, menu and accent have no literal standard)', async () => {
+    await signIn('pm');
+    renderApp(<Profile />);
+    await screen.findByTestId('profile-appearance-form');
+    const dims = ['density', 'font_scale', 'radius', 'motion', 'icon_style', 'menu_style', 'accent'];
+    for (const k of dims) {
+      const sel = screen.getByTestId(`pf-ap-${k}`);
+      const first = sel.querySelector('option');
+      expect(first?.textContent ?? '').not.toContain('appearance.opt.');
+      expect((first?.textContent ?? '').length).toBeGreaterThan(3);
+    }
+    // the built-in standard of a dimension is named, e.g. the motion default is Full
+    expect(screen.getByTestId('pf-ap-motion').querySelector('option')!.textContent).toContain('Full');
+  });
+
+  it('shows the translated labels in Arabic too', async () => {
+    await localSignIn();
+    renderApp(<Profile />, { locale: 'ar' });
+    await screen.findByTestId('profile-appearance-form');
+    for (const k of ['motion', 'icon_style', 'menu_style', 'accent']) {
+      const first = screen.getByTestId(`pf-ap-${k}`).querySelector('option');
+      expect(first?.textContent ?? '').not.toContain('appearance.opt.');
+    }
+  });
+});
+
 describe('details', () => {
   it('saves the name with the version; the phone is no longer edited here; admin-owned fields are refused', async () => {
     await localSignIn();
@@ -278,8 +305,9 @@ describe('two-factor self-service', () => {
     const u = userEvent.setup();
     renderApp(<Routes><Route path="/admin/users/:userId" element={<UserDetailPage />} /></Routes>, { route: `/admin/users/${uid('1204')}` });
     expect(await screen.findByTestId('two-factor-enforced-state')).toHaveAttribute('data-enforced', 'false');
-    await u.click(screen.getByTestId('two-factor-enforce'));
-    await u.type(screen.getByTestId('two-factor-enforce-dialog-reason'), 'Finance role');
+    // the buttons wait on the /me query (canTwoFactor), which can land after the user query under full-suite load - await them
+    await u.click(await screen.findByTestId('two-factor-enforce'));
+    await u.type(await screen.findByTestId('two-factor-enforce-dialog-reason'), 'Finance role');
     await u.click(screen.getByTestId('two-factor-enforce-dialog-submit'));
     await waitFor(() => expect(cred('engineer')!.tf!.enforced).toBe(true));
     expect(await screen.findByTestId('two-factor-enforced-state')).toHaveAttribute('data-enforced', 'true');

@@ -90,7 +90,7 @@ describe('Templates page: Site Register templates', () => {
     expect(screen.getByTestId('batch-warning-3-B6-calculated_column')).toHaveTextContent('value was not read');
     expect(screen.getByTestId('batch-cell-error-3-B8-B8:actual_date')).toHaveTextContent('locked by a closed gate');
     expect(screen.getByTestId('batch-cell-error-4-site_code')).toHaveTextContent('Unknown site');
-    expect(screen.getByTestId('batch-held')).toHaveTextContent('1 row(s) wait for their task');
+    expect(screen.getByTestId('batch-held')).toHaveTextContent('1 row waits for its task');
     expect(screen.getByTestId('batch-held-2-B5')).toHaveTextContent('waits for a predecessor');
     expect(screen.getByTestId('batch-open-task-2-B4').getAttribute('href')).toMatch(/^\/sites\/.+\?task=/);
     expect(screen.getByTestId('batch-back').getAttribute('href')).toBe('/templates');
@@ -111,8 +111,8 @@ describe('Templates page: Site Register templates', () => {
     expect(screen.queryByTestId('batch-row-approve-2-A2')).not.toBeInTheDocument();       // nothing is in the flow before the send
     await u.click(screen.getByTestId('batch-submit'));
     await waitFor(() => expect(screen.getByTestId('batch-status')).toHaveTextContent('In approval'));
-    expect(screen.getByTestId('batch-outcome-held')).toHaveTextContent('1 row(s) are held');
-    expect(screen.getByTestId('batch-approve-hint')).toHaveTextContent('1 record(s) wait for L2');
+    expect(screen.getByTestId('batch-outcome-held')).toHaveTextContent('1 row is held');
+    expect(screen.getByTestId('batch-approve-hint')).toHaveTextContent('1 record waits for L2');
     await u.click(await screen.findByTestId('batch-row-reject-2-A2'));
     await u.type(await screen.findByTestId('reject-note'), 'Wrong actual date');
     await u.click(screen.getByTestId('reject-submit'));
@@ -160,7 +160,7 @@ describe('TPL-MASTER upload', () => {
     expect(parts).toHaveTextContent('Civil Works');
     expect(parts).toHaveTextContent('Installation (TE)');
     expect(parts).toHaveTextContent('GECOL');
-    expect(screen.getByTestId('upload-warning-column_not_owned')).toHaveTextContent('3 value(s) ignored');
+    expect(screen.getByTestId('upload-warning-column_not_owned')).toHaveTextContent('3 values ignored');
     expect(screen.getByTestId('upload-warning-extra_column')).toHaveTextContent('My own notes');
     await u.click(screen.getByTestId('template-upload-open'));
     await screen.findByTestId('page-register-batch');
@@ -257,6 +257,6 @@ describe('Batch of task rows with the shapes of the real API', () => {
     expect(screen.getByTestId('batch-open-task-2-B5').getAttribute('href')).toBe('/sites/0c000000-0000-4000-8000-000000000001?task=0d000000-0000-4000-8000-000000000002');
     expect(screen.getByTestId('batch-count-held')).toHaveTextContent('1 held');
     expect(await screen.findByTestId('batch-group')).toHaveTextContent('Civil Works');
-    expect(screen.getByTestId('batch-approve-hint')).toHaveTextContent('1 record(s) wait for L2');
+    expect(screen.getByTestId('batch-approve-hint')).toHaveTextContent('1 record waits for L2');
   });
 });

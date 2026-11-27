@@ -6,7 +6,7 @@ import type { ContractorRulesInput, Holiday, NotificationPolicyInput, SecurityLo
 import { tripoliToday } from '@/lib/today';
 import { weightIssues } from '@/lib/weights';
 import { NAV_SIDE } from '@/lib/navLayout';
-import { db, identity, loginPage, loginPagePublic, save, stepUpValid, viewer } from './db';
+import { accountKeyOf, cred, db, identity, loginPage, loginPagePublic, save, stepUpValid, viewer } from './db';
 import { BRANDS, isBrand } from '@/lib/brands';
 import { APPEARANCE_OPTIONS } from '../lib/appearance';
 import { guard, page, problem, stepUp } from './handlers';
@@ -15,6 +15,7 @@ import type { TableDisplaySetting } from '@/api/display';
 import { UI_FEATURES_SEED, type UiFeaturesSetting } from '@/api/uiFeatures';
 import { CALENDAR_CODES, CATALOGUE, COMPLETENESS, MAIL_KIND_CATALOGUE, MISMATCH, initCfg, GATES, MILESTONES, OPEN_TASKS, SCENARIOS, START_EVENT_CODES, TASK_DEFS, type SlaSetRec, type WeightRec } from './settingsData';
 import { newDeviceState } from './newDevice';
+import { passkeyDto, passkeyState, type MockPasskey } from './passkeys';
 
 const B = API_BASE;
 const TODAY = '2026-10-25';
@@ -257,12 +258,17 @@ const progress = (s: Pick<WeightSet, 'activities'>) => Math.round(s.activities.r
 
 /** Q440: the confirmation state, with what stops a confirmation (the current and the next year need holidays, none tentative). A store saved before 0.14.2 starts from the seed. */
 const CC = () => (C().calConfirm ??= initCfg().calConfirm);
+const MP = () => (C().mailPolicy ??= initCfg().mailPolicy);
 const MK = () => (C().mailKinds ??= initCfg().mailKinds);
 /** 0.15.1: nav.layout (a store saved before 0.15.1 starts from the seed). */
 /** 0.15.190: the admin lock keys, kept in memory like the other small settings of the mock (both off by default). */
 const locks: { block_public_sharing: boolean; disable_export: boolean; version: number; updated_at: string | null; updated_by: { id: string; display_name: string; employee_id: string | null } | null } =
   { block_public_sharing: false, disable_export: false, version: 1, updated_at: null, updated_by: null };
 const locksView = () => ({ ...locks, can_edit: isAdmin() });
+/** 0.15.193: the download lock categories (templates, uploaded files, generated documents), in memory, all off by default. */
+export const dlocks: { templates: boolean; uploaded_files: boolean; generated_documents: boolean; version: number; updated_at: string | null; updated_by: { id: string; display_name: string; employee_id: string | null } | null } =
+  { templates: false, uploaded_files: false, generated_documents: false, version: 1, updated_at: null, updated_by: null };
+const dlocksView = () => ({ ...dlocks, can_edit: isAdmin() });
 
 /** 0.15.191: support access (off by default) and the support grants, kept in memory like the lock keys. A grant is a time-limited delegation. */
 const support: { enabled: boolean; max_hours: number; default_hours: number; version: number; updated_at: string | null; updated_by: { id: string; display_name: string; employee_id: string | null } | null } =
@@ -271,6 +277,7 @@ type SupportGrant = { id: string; to: { id: string; display_name: string; employ
 const supportGrants: SupportGrant[] = [];
 const SUPPORT_RIGHTS = ['templates.edit', 'fields.edit', 'documents.edit', 'warehouse.items.edit'];
 const newDeviceView = () => ({ enabled: newDeviceState.enabled, code_minutes: newDeviceState.code_minutes, include_admins: newDeviceState.include_admins, mail_ready: true, updated_at: newDeviceState.updated_at, updated_by: newDeviceState.updated_by, version: newDeviceState.version, can_edit: true });
+const passkeyView = () => ({ enabled: passkeyState.enabled, ready: passkeyState.ready, updated_at: passkeyState.updated_at, updated_by: passkeyState.updated_by, version: passkeyState.version, can_edit: true });
 const supportView = () => ({ ...support, modules: ['templates', 'fields', 'lists', 'document_types', 'warehouse_items'], can_edit: true });
 const supportDto = (g: SupportGrant) => ({
   id: g.id, from_user: g.from, to_user: g.to, target_kind: 'user', target: { kind: 'user', id: g.to.id, label: g.to.display_name }, scope: 'partial', rights: g.rights, region_codes: [], module_codes: [],
@@ -729,6 +736,27 @@ export const settingsHandlers = [
     return HttpResponse.json(j, tag(j.version));
   }),
 
+  // ------------------------------------------------------------------ 0.15.193: download lock categories (all off by default)
+  http.get(`${B}/settings/download-locks`, () => { const g = guard(); if (g) return g; const j = dlocksView(); return HttpResponse.json(j, tag(j.version)); }),
+  http.put(`${B}/settings/download-locks`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    const KEYS = ['templates', 'uploaded_files', 'generated_documents'] as const;
+    const b = await body<Record<string, unknown> & { reason?: string }>(request);
+    const errs: { path: string; code: string }[] = Object.keys(b).filter((k) => ![...KEYS, 'reason'].includes(k as never)).map((k) => ({ path: `/${k}`, code: 'unknown_field' }));
+    for (const k of KEYS) if (typeof b[k] !== 'boolean') errs.push({ path: `/${k}`, code: 'required' });
+    if ((b.reason ?? '').trim().length < 3 || (b.reason ?? '').length > 1000) errs.push({ path: '/reason', code: 'required' });
+    if (errs.length) return fields(...errs);
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, dlocks.version); if (p) return p;
+    if (!stepUpValid()) return stepUp();
+    if (KEYS.every((k) => dlocks[k] === b[k])) return problem(409, 'invalid_transition', 'These are already the download locks in force.');
+    const v = viewer()!;
+    Object.assign(dlocks, { templates: b.templates, uploaded_files: b.uploaded_files, generated_documents: b.generated_documents, version: dlocks.version + 1, updated_at: new Date().toISOString(),
+      updated_by: { id: uid(v.employee_id ?? '9999'), display_name: v.name, employee_id: v.employee_id } });
+    const j = dlocksView();
+    return HttpResponse.json(j, tag(j.version));
+  }),
+
   // ------------------------------------------------------------------ 0.15.192: new-device email code (System Admin only)
   http.get(`${B}/settings/new-device-code`, () => { const g = needAdmin(); if (g) return g; const j = newDeviceView(); return HttpResponse.json(j, tag(j.version)); }),
   http.put(`${B}/settings/new-device-code`, async ({ request }) => {
@@ -749,6 +777,68 @@ export const settingsHandlers = [
       updated_by: { id: uid(v.employee_id ?? '9999'), display_name: v.name, employee_id: v.employee_id } });
     const j = newDeviceView();
     return HttpResponse.json(j, tag(j.version));
+  }),
+  // ------------------------------------------------------------------ 0.15.194: passkeys (setting: System Admin only; own passkeys: any signed-in person with two-step on)
+  http.get(`${B}/settings/passkeys`, () => { const g = needAdmin(); if (g) return g; const j = passkeyView(); return HttpResponse.json(j, tag(j.version)); }),
+  http.put(`${B}/settings/passkeys`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    const b = await body<{ enabled?: unknown; reason?: string } & Record<string, unknown>>(request);
+    const errs: { path: string; code: string }[] = Object.keys(b).filter((k) => !['enabled', 'reason'].includes(k)).map((k) => ({ path: `/${k}`, code: 'unknown_field' }));
+    if (typeof b.enabled !== 'boolean') errs.push({ path: '/enabled', code: 'required' });
+    if ((b.reason ?? '').trim().length < 3 || (b.reason ?? '').length > 1000) errs.push({ path: '/reason', code: 'required' });
+    if (errs.length) return fields(...errs);
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, passkeyState.version); if (p) return p;
+    if (!stepUpValid()) return stepUp();
+    if (b.enabled && !passkeyState.ready) return problem(409, 'invalid_transition', 'The workspace web address is not set.');
+    if (passkeyState.enabled === b.enabled) return problem(409, 'invalid_transition', 'This is already the passkey setting.');
+    const v = viewer()!;
+    Object.assign(passkeyState, { enabled: b.enabled, version: passkeyState.version + 1, updated_at: new Date().toISOString(), updated_by: { id: uid(v.employee_id ?? '9999'), display_name: v.name, employee_id: v.employee_id } });
+    const j = passkeyView();
+    return HttpResponse.json(j, tag(j.version));
+  }),
+  http.get(`${B}/me/passkeys`, () => {
+    const g = guard(); if (g) return g;
+    const k = db().session!.account;
+    return HttpResponse.json({ enabled: passkeyState.enabled, ready: passkeyState.ready, can_add: !!cred(k)?.tf?.on, items: (passkeyState.items[k] ?? []).map(passkeyDto) });
+  }),
+  http.post(`${B}/me/passkeys/register/options`, () => {
+    const g = guard(); if (g) return g;
+    const k = db().session!.account;
+    if (!passkeyState.enabled || !passkeyState.ready) return problem(409, 'invalid_transition', 'Passkeys are not turned on.');
+    if (!cred(k)?.tf?.on) return problem(409, 'invalid_transition', 'Turn on two-step verification first.');
+    if (!stepUpValid()) return stepUp();
+    return HttpResponse.json({ challenge: 'AAAA', rp: { id: 'localhost', name: 'GSDN' }, user: { id: 'AAAA', name: 'user', displayName: 'user' }, pubKeyCredParams: [{ type: 'public-key', alg: -7 }], excludeCredentials: [] });
+  }),
+  http.post(`${B}/me/passkeys/register/verify`, async ({ request }) => {
+    const g = guard(); if (g) return g;
+    const k = db().session!.account;
+    const b = await body<{ label?: string; response?: { id?: string } }>(request);
+    if (!stepUpValid()) return stepUp();
+    if (typeof b.label !== 'string' || !b.label.trim() || typeof b.response?.id !== 'string') return fields({ path: '/label', code: 'required' });
+    const row: MockPasskey = { id: uid(`pk${Date.now()}`), credential_id: b.response.id, label: b.label.trim(), created_at: new Date().toISOString(), last_used_at: null, device_type: 'multiDevice', backed_up: true };
+    (passkeyState.items[k] ??= []).push(row);
+    return HttpResponse.json(passkeyDto(row));
+  }),
+  http.delete(`${B}/me/passkeys/:id`, ({ params }) => {
+    const g = guard(); if (g) return g;
+    const list = passkeyState.items[db().session!.account] ?? [];
+    const i = list.findIndex((x) => x.id === params.id);
+    if (i < 0) return problem(404, 'not_found', 'Not found');
+    list.splice(i, 1);
+    return new HttpResponse(null, { status: 204 });
+  }),
+  http.post(`${B}/users/:id/passkeys/revoke`, async ({ request, params }) => {
+    const g = needAdmin(); if (g) return g;
+    const b = await body<{ reason?: string }>(request);
+    if ((b.reason ?? '').trim().length < 3) return fields({ path: '/reason', code: 'required' });
+    if (!stepUpValid()) return stepUp();
+    const u = db().admin.users.find((x) => (x.local ? x.local.id : uid(x.employee_id)) === params.id);
+    if (!u) return problem(404, 'not_found', 'Not found');
+    const key = accountKeyOf(u);
+    const n = (passkeyState.items[key] ?? []).length;
+    delete passkeyState.items[key];
+    return HttpResponse.json({ revoked: n });
   }),
   http.post(`${B}/settings/new-device-code/bypass`, async ({ request }) => {
     const g = needAdmin(); if (g) return g;
@@ -871,6 +961,30 @@ export const settingsHandlers = [
     Object.assign(MK(), { kinds: [...(b.kinds as string[])].sort(), unknown: [], version: MK().version + 1, updated_at: new Date().toISOString(), updated_by: viewer()!.employee_id! }); save();
     const m = MK();
     return HttpResponse.json({ kinds: m.kinds, unknown_kinds: [], catalogue: MAIL_KIND_CATALOGUE, version: m.version, updated_at: m.updated_at, updated_by: ref(m.updated_by!) }, tag(m.version));
+  }),
+
+  // ------------------------------------------------------------------ 0.15.261: the mail policy (System Admin only)
+  http.get(`${B}/settings/mail-policy`, () => {
+    const g = needAdmin(); if (g) return g;
+    const m = MP();
+    return HttpResponse.json({ ...m, catalogue: MAIL_KIND_CATALOGUE, block_public_sharing: false, updated_by: m.updated_by ? ref(m.updated_by) : null }, tag(m.version));
+  }),
+  http.put(`${B}/settings/mail-policy`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    if (!stepUpValid()) return stepUp();
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, MP().version); if (p) return p;
+    const b = await body<{ reason?: string; enabled?: boolean; mode?: string; internal_domains?: string[]; kinds?: Record<string, { enabled: boolean; mode: string }> }>(request);
+    const errs: { path: string; code: string }[] = [];
+    if ((b.reason ?? '').trim().length < 3) errs.push({ path: '/reason', code: 'required' });
+    if (typeof b.enabled !== 'boolean') errs.push({ path: '/enabled', code: 'required' });
+    if (b.mode !== 'internal_only' && b.mode !== 'internal_external') errs.push({ path: '/mode', code: 'invalid' });
+    (b.internal_domains ?? []).forEach((d, i) => { if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(d)) errs.push({ path: `/internal_domains/${i}`, code: 'invalid' }); });
+    Object.keys(b.kinds ?? {}).forEach((k) => { if (!MAIL_KIND_CATALOGUE.some((c) => c.kind === k)) errs.push({ path: `/kinds/${k}`, code: 'unknown_kind' }); });
+    if (errs.length) return fields(...errs);
+    Object.assign(MP(), { enabled: b.enabled!, mode: b.mode!, internal_domains: b.internal_domains ?? [], kinds: b.kinds ?? {}, version: MP().version + 1, updated_at: new Date().toISOString(), updated_by: viewer()!.employee_id! }); save();
+    const m = MP();
+    return HttpResponse.json({ ...m, catalogue: MAIL_KIND_CATALOGUE, block_public_sharing: false, updated_by: ref(m.updated_by!) }, tag(m.version));
   }),
 
   // ------------------------------------------------------------------ SLA rule sets (0.2.6)
@@ -1124,6 +1238,25 @@ export const settingsHandlers = [
         oneOf(o, path, 'default_tab', ['all', 'priority', 'mentions', 'tasks', 'approvals', 'system']);
         const kinds = ['mention', 'followed_change', 'task_assigned', 'task_returned', 'task_rejected', 'task_approved', 'approval_due', 'reassigned', 'absence_alert', 'idle_task_alert', 'no_holder', 'system'];
         if (!Array.isArray(o.priority_kinds) || o.priority_kinds.some((x) => !kinds.includes(String(x)))) errs.push({ path: `${path}/priority_kinds`, code: 'invalid' });
+      } else if (name === 'panel') {
+        for (const k of Object.keys(o)) if (!['mode', 'width', 'show_tabs'].includes(k)) errs.push({ path: `${path}/${k}`, code: 'unknown_key' });
+        oneOf(o, path, 'mode', ['popover', 'side_panel']); oneOf(o, path, 'width', ['narrow', 'medium', 'wide']);
+        if (typeof o.show_tabs !== 'boolean') errs.push({ path: `${path}/show_tabs`, code: 'invalid' });
+      } else if (name === 'data_hub') {
+        for (const k of Object.keys(o)) if (!['widgets', 'badge', 'default_view'].includes(k)) errs.push({ path: `${path}/${k}`, code: 'unknown_key' });
+        if (typeof o.badge !== 'boolean') errs.push({ path: `${path}/badge`, code: 'invalid' });
+        const w = o.widgets as Record<string, unknown> | undefined;
+        if (!w || typeof w !== 'object') errs.push({ path: `${path}/widgets`, code: 'invalid' });
+        else for (const k of Object.keys(w)) {
+          if (!['quick_bar', 'batches', 'template_changes', 'recent', 'health', 'admin'].includes(k)) errs.push({ path: `${path}/widgets/${k}`, code: 'unknown_key' });
+          else if (typeof w[k] !== 'boolean') errs.push({ path: `${path}/widgets/${k}`, code: 'invalid' });
+        }
+        const v = o.default_view as Record<string, unknown> | undefined;
+        if (!v || typeof v !== 'object') errs.push({ path: `${path}/default_view`, code: 'invalid' });
+        else for (const k of Object.keys(v)) {
+          if (!['templates', 'uploads', 'exports', 'master_import'].includes(k)) errs.push({ path: `${path}/default_view/${k}`, code: 'unknown_key' });
+          else if (!['cards', 'rows', 'table', 'compact'].includes(String(v[k]))) errs.push({ path: `${path}/default_view/${k}`, code: 'invalid' });
+        }
       } else errs.push({ path, code: 'unknown_key' });
     }
     if ((b.reason ?? '').trim().length < 3) errs.push({ path: '/reason', code: 'required' });

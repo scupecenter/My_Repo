@@ -6,6 +6,7 @@ import { registerErrorMessage } from '@/lib/registerErrors';
 import { FormDialog } from './FormDialog';
 import { CellUser } from './RegisterFieldTypes';
 import { useToast } from './Toast';
+import { DateInput } from '@/components/DateInput';
 
 /**
  * Q111 (contract 0.12.5): a meeting saved with the old free text shows it read-only with a "Convert" action. The proposal (people and sites matched, one
@@ -63,7 +64,7 @@ export function LegacyConversion({ record, canEdit }: { record: RegisterRecord; 
                 {p.action_items.length > 0 && (
                   <div className="mt-2 grid grid-cols-2 gap-2">
                     <div><span className="text-mute">{t('legacy.owner')}</span><CellUser id="reg-legacy-owner" value={owner} onChange={(v) => setOwner(v as string | null)} /></div>
-                    <label className="text-mute">{t('legacy.due')}<input type="date" className="input mono" data-testid="reg-legacy-due" value={due} onChange={(e) => setDue(e.target.value)} /></label>
+                    <label className="text-mute">{t('legacy.due')}<DateInput className="input mono" data-testid="reg-legacy-due" value={due} onChange={(e) => setDue(e.target.value)} /></label>
                   </div>
                 )}
                 <p className="text-mute">{t('legacy.actions_note')}</p>

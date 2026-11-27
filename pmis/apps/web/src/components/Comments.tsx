@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { usePicker } from '@/api/admin';
 import type { Comment, UserPickerItem } from '@/api/types';
 import { insertMention, mentionQuery, mentionTokens, splitMentions } from '@/lib/x';
+import { DictateButton } from './DictateButton';
 
 /** The text of a comment with each `@1234` token shown as a chip. */
 export function CommentBody({ text }: { text: string }) {
@@ -34,6 +35,8 @@ export function MentionBox({ onSend, pending, label }: { onSend: (body: string, 
       <div className="flex gap-2">
         <input className="input" data-testid="comment-input" aria-label={label} aria-autocomplete="list" aria-expanded={options.length > 0} placeholder={t('mention.placeholder')} value={text}
           onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Escape' && options.length) { e.stopPropagation(); setText((x) => x.replace(/@[^\s@()]*$/, '')); } }} />
+        {/* Item 14 widened: voice capture on the comment box of every record screen (tasks and register records share this box). Renders nothing without speech recognition. */}
+        <DictateButton testid="comment-dictate" onText={(said) => setText((cur) => (cur.trim() ? `${cur.trim()} ${said}` : said))} />
         <button className="btn" data-testid="comment-send" disabled={!text.trim() || pending} onClick={send}>{t('drawer.send')}</button>
       </div>
       {options.length > 0 && (
