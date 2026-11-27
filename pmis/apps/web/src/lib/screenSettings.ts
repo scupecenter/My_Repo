@@ -18,7 +18,7 @@ export const SCREEN_SETTINGS = {
   register_contractors: { tab: 'registers', section: 'contractors' },
   contractor_reports: { tab: 'registers', section: 'contractors' },
   templates: { tab: 'data', section: 'imports' },
-  template_mapping: { tab: 'data', section: 'imports' },
+  template_mapping: { tab: 'data', section: 'mapping' },
   master_import: { tab: 'data', section: 'imports' },
   batch: { tab: 'data', section: 'imports' },
   library_forms: { tab: 'documents', section: 'forms' },
