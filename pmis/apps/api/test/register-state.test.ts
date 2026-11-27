@@ -41,14 +41,14 @@ describe('register state control', () => {
 
   it('locks: reads stay, a non-admin cannot create or change a record, a System Admin can, and the change is audited', async () => {
     const admin = await loggedIn(app, await makeAdmin(db));
-    const rec = await createRec(t, { lesson_title: 'before the lock' }).catch(() => null);
+    const rec = await createRec(t, { lesson_date: '2026-11-20', title: 'before the lock' }).catch(() => null);
     const before = await admin.call('get', '/settings/register-state');
     const ver = (before.body.items as { register_key: string; version: number }[]).find((r) => r.register_key === KEY)!.version;
     const lock = await admin.call('put', `/settings/register-state/${KEY}`, { locked: true, reason: 'freeze for audit' }, { 'If-Match': `"${ver}"` });
     expect(lock.status).toBe(200);
     expect(lock.body).toMatchObject({ register_key: KEY, locked: true, enabled: true });
     try {
-      const blocked = await t.entry.api.call('post', recPath(KEY), { site_id: t.site.id, data: { lesson_title: 'during the lock' } });
+      const blocked = await t.entry.api.call('post', recPath(KEY), { site_id: t.site.id, data: { lesson_date: '2026-11-20', title: 'during the lock' } });
       expect(blocked.status).toBe(403);
       expect(JSON.stringify(blocked.body)).toContain('register_locked');
       const read = await t.entry.api.call('get', recPath(KEY));
@@ -62,8 +62,8 @@ describe('register state control', () => {
       const un = await admin.call('put', `/settings/register-state/${KEY}`, { locked: false, reason: 'unfreeze after test' });
       expect(un.status).toBe(200);
     }
-    const ok = await t.entry.api.call('post', recPath(KEY), { site_id: t.site.id, data: { lesson_title: 'after the lock' } });
-    expect([201, 422]).toContain(ok.status);
+    const ok = await t.entry.api.call('post', recPath(KEY), { site_id: t.site.id, data: { lesson_date: '2026-11-20', title: 'after the lock' } });
+    expect(ok.status).toBe(201);
     expect(ok.status === 422 ? JSON.stringify(ok.body) : '').not.toContain('register_locked');
   });
 
