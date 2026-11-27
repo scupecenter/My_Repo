@@ -8,6 +8,7 @@ import { QueryFallback } from '@/components/States';
 import { Tip } from '@/components/Tip';
 import { useToast } from '@/components/Toast';
 import { fmtDateTime } from '@/lib/time';
+import { UnsavedGuard } from '@/lib/unsavedGuard';
 
 const GROUPS = ['sessions', 'rows', 'exports'] as const;
 const id = (key: string): string => key.replace(/\./g, '_');
@@ -39,6 +40,8 @@ export function OpsLimits() {
   const unit = (i: OpsLimitItem): string => t(`oplimits.unit_${i.unit}`);
   return (
     <section className="card space-y-5 p-4" data-testid="page-ops-limits">
+      <UnsavedGuard scope="settings" dirty={dirty && !ro} needsReason label={t('ui.guard_settings')}
+        onSave={(reason) => new Promise<boolean>((res) => set.mutate({ version: cur.version, values: values(), reason }, { onSuccess: () => { setDraft({}); res(true); }, onError: () => res(false) }))} />
       <div>
         <h2 className="flex items-center gap-2 font-bold"><Gauge size={16} aria-hidden />{t('oplimits.title')}</h2>
         <p className="text-sm text-mute">{t('oplimits.note')}</p>
