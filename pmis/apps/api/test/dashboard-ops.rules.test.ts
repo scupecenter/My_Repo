@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  ptwCheckGaps,
+  PTW_CHECK_KEYS,
   AGE_BUCKETS,
   ageBucket,
   bucketAges,
@@ -63,5 +65,26 @@ describe("dashboard ops: the materials receive rate (0.15.98)", () => {
   it("is capped at 100% and never negative", () => {
     expect(receivePct(10, 12)).toBe(100);
     expect(receivePct(10, -4)).toBe(0);
+  });
+});
+
+describe("dashboard ops: PTW safety-check gaps (0.15.200)", () => {
+  it("lists every check that is not Done or N/A, in display order", () => {
+    expect(
+      ptwCheckGaps({
+        jsa_tra: "Done",
+        toolbox_talk: "N/A",
+        work_at_height: "Pending",
+        loto: null,
+      }),
+    ).toEqual(["work_at_height", "lifting_plan", "loto", "rescue_plan"]);
+  });
+
+  it("treats no checks at all as six gaps and a full house as none", () => {
+    expect(ptwCheckGaps(null)).toHaveLength(6);
+    const full = Object.fromEntries(
+      PTW_CHECK_KEYS.map((k) => [k, "Done"]),
+    ) as Record<string, unknown>;
+    expect(ptwCheckGaps(full)).toEqual([]);
   });
 });
