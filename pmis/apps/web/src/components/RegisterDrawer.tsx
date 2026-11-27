@@ -257,7 +257,7 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
             <section key={s.id} aria-labelledby={`rs-${s.id}`} data-testid={`reg-section-${s.id}`} className="space-y-2">
               <h3 id={`rs-${s.id}`} className="font-semibold">{t(`regSections.${s.id}`, { defaultValue: s.title })}</h3>
               <div className="grid grid-cols-2 gap-3">
-                {s.fields.filter((f) => !(rk === 'warehouse' && f.code === 'procurement_order_id' && rtype !== 'pl' && rtype !== 'open') && !(rk === 'gecol' && f.code === 'contractor') && !(rk === 'procurement' && f.code === 'members') && !(rk === 'financial_advances' && f.code === 'balance')).map((f) => {
+                {s.fields.filter((f) => !(rk === 'warehouse' && f.code === 'procurement_order_id' && (!rtype || rtype === 'adj')) && !(rk === 'gecol' && f.code === 'contractor') && !(rk === 'procurement' && f.code === 'members') && !(rk === 'financial_advances' && f.code === 'balance')).map((f) => {
                   const iss = issues[f.code];
                   const show = iss && (tried || server[f.code] || dirty);
                   return (
