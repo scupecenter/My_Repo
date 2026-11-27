@@ -4791,6 +4791,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/ui-features": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Interface features (avatars, New badge) (0.15.185)
+         * @description 0.15.185 (migration 0280). Every signed-in user. Without a saved value each section takes its seed: avatars `gradient`, `circle`, `varied`, in lists; New badge on for 14 days.
+         */
+        get: operations["getUiFeaturesSetting"];
+        /**
+         * Set the interface features (Administration > Settings > Screens > Interface)
+         * @description 0.15.185 (migration 0280): System Admin or a delegate of `admin.settings` edit for all regions (403 `action_forbidden` otherwise), a reason of at least 3 characters and If-Match. Closed body: `sections` with any of the known sections, each one complete (`unknown_key` at its path, `invalid` or `out_of_range` for a value outside its list). A section not sent keeps its value. Audited (`ui_features_update`, before and after).
+         */
+        put: operations["setUiFeaturesSetting"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/idle-task-alert": {
         parameters: {
             query?: never;
@@ -14926,6 +14950,35 @@ export interface components {
         };
         TableDisplaySetting: {
             defaults: components["schemas"]["TableDisplay"];
+            version: number;
+            /** Format: date-time */
+            updated_at?: string;
+            updated_by?: components["schemas"]["UserRef"];
+        };
+        UiAvatars: {
+            /** @enum {string} */
+            style: "initials" | "gradient" | "geometric" | "none";
+            /** @enum {string} */
+            shape: "circle" | "rounded";
+            /** @enum {string} */
+            palette: "brand" | "varied";
+            in_lists: boolean;
+        };
+        UiNewBadge: {
+            enabled: boolean;
+            days: number;
+        };
+        /** @description 0.15.185. The sections of the interface features setting; every section is complete. */
+        UiFeatures: {
+            avatars: components["schemas"]["UiAvatars"];
+            new_badge: components["schemas"]["UiNewBadge"];
+        };
+        UiFeaturesPatch: {
+            avatars?: components["schemas"]["UiAvatars"];
+            new_badge?: components["schemas"]["UiNewBadge"];
+        };
+        UiFeaturesSetting: {
+            sections: components["schemas"]["UiFeatures"];
             version: number;
             /** Format: date-time */
             updated_at?: string;
@@ -28362,6 +28415,62 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TableDisplaySetting"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getUiFeaturesSetting: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Setting. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UiFeaturesSetting"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setUiFeaturesSetting: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"] & {
+                    sections: components["schemas"]["UiFeaturesPatch"];
+                };
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UiFeaturesSetting"];
                 };
             };
             401: components["responses"]["Unauthorized"];
