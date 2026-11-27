@@ -1,0 +1,125 @@
+-- 0344_home_view_pins (contract 0.15.245): pin a saved view as a card on the home dashboard (owner request 2026-11-27, item 16 of the
+-- PM-platforms research; monday dashboard widgets, Asana portfolios). Mirror: db/sql/343_home_view_pins.sql (kept identical).
+--
+-- Additive. Personal and permission-respecting: a pin is the caller's own, the pin check is the view's own read check (sv_can_read), and the
+-- counter the card shows is computed by the screen's own list endpoint for the caller. No grant, role, permission or audit change (a personal
+-- display preference, like the drafts of 0065).
+--   1. home_view_pins: one row per caller and view, at most 12 per caller, position kept for ordering.
+--   2. home_pin_view(uuid) / home_unpin_view(uuid): pin and unpin; the pin reads the view through sv_can_read (a view the caller may not
+--      read answers not_found, exactly like sv_get).
+--   3. home_pins(): the caller's pins, newest positions last, with the view's name and screen (inactive views drop out).
+--   4. dashboard_settings_catalogue gains the card `pinned_views` (kept at the end, migration 0108 rule).
+
+-- ---------------------------------------------------------------------------------------------------------------------
+-- 1. Table
+-- ---------------------------------------------------------------------------------------------------------------------
+CREATE TABLE home_view_pins (
+  user_id     uuid NOT NULL REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE,
+  view_id     uuid NOT NULL REFERENCES saved_views(id) ON UPDATE CASCADE ON DELETE CASCADE,
+  position    integer NOT NULL CHECK (position >= 1),
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, view_id)
+);
+CREATE INDEX home_view_pins_user ON home_view_pins (user_id, position);
+
+ALTER TABLE home_view_pins ENABLE ROW LEVEL SECURITY;
+ALTER TABLE home_view_pins FORCE ROW LEVEL SECURITY;
+CREATE POLICY rls_select ON home_view_pins FOR SELECT USING (app_is_seeding() OR user_id = app_actor());
+CREATE POLICY rls_seed_write ON home_view_pins FOR ALL USING (app_is_seeding()) WITH CHECK (app_is_seeding());
+
+-- ---------------------------------------------------------------------------------------------------------------------
+-- 2. Pin and unpin
+-- ---------------------------------------------------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION home_pin_view(p_view uuid) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+DECLARE a uuid := public.sv_actor(); v public.saved_views%ROWTYPE; pos integer;
+BEGIN
+  SELECT * INTO v FROM public.saved_views x WHERE x.id = p_view;
+  IF v.id IS NULL OR NOT v.is_active OR NOT public.sv_can_read(p_view, a) THEN
+    PERFORM public.sv_fail('not_found', 'The view does not exist or is not visible to you.');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.home_view_pins p WHERE p.user_id = a AND p.view_id = p_view)
+     AND (SELECT count(*) FROM public.home_view_pins p WHERE p.user_id = a) >= 12 THEN
+    PERFORM public.sv_fail('validation_failed', 'At most 12 pinned views.', '{"errors":[{"path":"/view","code":"too_many"}]}');
+  END IF;
+  pos := coalesce((SELECT max(p.position) FROM public.home_view_pins p WHERE p.user_id = a), 0) + 1;
+  INSERT INTO public.home_view_pins (user_id, view_id, position) VALUES (a, p_view, pos)
+  ON CONFLICT (user_id, view_id) DO NOTHING;
+  RETURN jsonb_build_object('view_id', p_view, 'pinned_home', true);
+END $$;
+
+CREATE OR REPLACE FUNCTION home_unpin_view(p_view uuid) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+DECLARE a uuid := public.sv_actor();
+BEGIN
+  DELETE FROM public.home_view_pins p WHERE p.user_id = a AND p.view_id = p_view;
+  RETURN jsonb_build_object('view_id', p_view, 'pinned_home', false);
+END $$;
+
+-- ---------------------------------------------------------------------------------------------------------------------
+-- 3. The caller's pins
+-- ---------------------------------------------------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION home_pins() RETURNS jsonb
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+DECLARE a uuid := public.sv_actor();
+BEGIN
+  RETURN coalesce((SELECT jsonb_agg(jsonb_build_object('view_id', v.id, 'name', v.name, 'screen_key', v.screen_key, 'filters', v.filters, 'position', p.position) ORDER BY p.position)
+  FROM public.home_view_pins p JOIN public.saved_views v ON v.id = p.view_id AND v.is_active
+  WHERE p.user_id = a AND public.sv_can_read(v.id, a)), '[]'::jsonb);
+END $$;
+
+-- ---------------------------------------------------------------------------------------------------------------------
+-- 4. The dashboard card catalogue gains `pinned_views` (kept at the end, migration 0108 rule)
+-- ---------------------------------------------------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION dashboard_settings_catalogue() RETURNS jsonb
+LANGUAGE sql IMMUTABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+  SELECT jsonb_build_object(
+    'kpis', '[
+      {"code":"sla_breach","label_en":"SLA breaches (open tasks past the maximum)","label_ar":"تجاوزات SLA (مهام مفتوحة تجاوزت الحد الأقصى)","unit":"pct","direction":"lower","default_green":5,"default_amber":10},
+      {"code":"sla_at_risk","label_en":"SLA at risk (past the warning share)","label_ar":"SLA معرّض للخطر (تجاوز نسبة الإنذار)","unit":"pct","direction":"lower","default_green":10,"default_amber":20},
+      {"code":"data_quality_gap","label_en":"Empty mandatory cells","label_ar":"خلايا إلزامية فارغة","unit":"pct","direction":"lower","default_green":2,"default_amber":5},
+      {"code":"vehicle_ready","label_en":"Vehicle-ready rate of assignments","label_ar":"نسبة جاهزية المركبة للمهام الميدانية","unit":"pct","direction":"higher","default_green":90,"default_amber":75},
+      {"code":"advances_open_after_close","label_en":"Advances open after the work closed","label_ar":"سلفيات مفتوحة بعد إغلاق العمل","unit":"count","direction":"lower","default_green":0,"default_amber":3},
+      {"code":"dismantle_pending","label_en":"Dismantle CW and TE pending","label_ar":"تفكيك CW وTE المعلّق","unit":"count","direction":"lower","default_green":0,"default_amber":5},
+      {"code":"as_built_submitted","label_en":"As-Built submitted against PAC","label_ar":"As-Built المقدَّم مقابل PAC","unit":"pct","direction":"higher","default_green":90,"default_amber":70},
+      {"code":"time_in_state_p85","label_en":"Time in state, 85th percentile","label_ar":"الزمن في الحالة، المئين 85","unit":"days","direction":"lower","default_green":10,"default_amber":20},
+      {"code":"stale_tasks","label_en":"Stale tasks (idle for N working days)","label_ar":"مهام راكدة (خاملة لعدد من أيام العمل)","unit":"pct","direction":"lower","default_green":5,"default_amber":10},
+      {"code":"on_air_vs_target","label_en":"On-Air against the monthly target","label_ar":"الربط On-Air مقابل الهدف الشهري","unit":"pct","direction":"higher","default_green":100,"default_amber":80}
+    ]'::jsonb,
+    'cards', '[
+      {"code":"site_map","label_en":"Site map","label_ar":"خريطة المواقع"},
+      {"code":"f13","label_en":"Risk matrix, data quality, decisions, swap and relocation","label_ar":"مصفوفة المخاطر وجودة البيانات والقرارات والاستبدال والنقل"},
+      {"code":"headline","label_en":"Headline KPIs","label_ar":"المؤشرات الرئيسية"},
+      {"code":"pipeline","label_en":"Milestone pipeline","label_ar":"مسار المعالم"},
+      {"code":"health_ps","label_en":"Health index and Project Status","label_ar":"مؤشر الصحة وحالة المشروع"},
+      {"code":"streams","label_en":"Streams","label_ar":"المسارات"},
+      {"code":"sla","label_en":"SLA per stage and top late tasks","label_ar":"SLA لكل مرحلة وأهم المهام المتأخرة"},
+      {"code":"gates_issues_delay","label_en":"Blocked gates, issues and delay attribution","label_ar":"البوابات المعطلة والقضايا وتوزيع التأخير"},
+      {"code":"counters","label_en":"Counters: SLA breaches and at risk, data quality, KPI colours","label_ar":"العدادات: خروقات SLA والمعرضة للخطر وجودة البيانات وألوان المؤشرات"},
+      {"code":"regions","label_en":"Regions","label_ar":"المناطق"},
+      {"code":"ops_scurve","label_en":"Progress curve: planned vs actual, velocity and forecast","label_ar":"منحنى التقدم: المخطط مقابل الفعلي والسرعة والتوقع"},
+      {"code":"ops_procurement","label_en":"Procurement and materials","label_ar":"المشتريات والمواد"},
+      {"code":"pinned_views","label_en":"Pinned views","label_ar":"العروض المثبتة"}
+    ]'::jsonb
+  )
+$$;
+
+-- ---------------------------------------------------------------------------------------------------------------------
+-- Ownership and grants (0166 pattern)
+-- ---------------------------------------------------------------------------------------------------------------------
+DO $$
+BEGIN
+  ALTER TABLE home_view_pins OWNER TO pmis_definer;
+  ALTER FUNCTION home_pin_view(uuid) OWNER TO pmis_definer;
+  ALTER FUNCTION home_unpin_view(uuid) OWNER TO pmis_definer;
+  ALTER FUNCTION home_pins() OWNER TO pmis_definer;
+  ALTER FUNCTION dashboard_settings_catalogue() OWNER TO pmis_definer;
+  REVOKE ALL ON FUNCTION home_pin_view(uuid), home_unpin_view(uuid), home_pins() FROM PUBLIC;
+  GRANT EXECUTE ON FUNCTION home_pin_view(uuid), home_unpin_view(uuid), home_pins() TO pmis_definer;
+  GRANT EXECUTE ON FUNCTION dashboard_settings_catalogue() TO pmis_definer;
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'pmis_app') THEN
+    GRANT SELECT ON home_view_pins TO pmis_app;
+    GRANT EXECUTE ON FUNCTION home_pin_view(uuid), home_unpin_view(uuid), home_pins() TO pmis_app;
+    GRANT EXECUTE ON FUNCTION dashboard_settings_catalogue() TO pmis_app;
+  END IF;
+END $$;

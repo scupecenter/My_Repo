@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.130
+  version: 0.15.245
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -31,6 +31,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.245 (2026-11-27): pin a saved view as a personal card on the home dashboard (owner request 2026-11-27, PM-platforms research item 16; monday dashboard widgets, Asana portfolios; migration 0344; CHANGELOG HomeViewPins). Additive. `POST /saved-views/{view_id}/pin` and `POST /saved-views/{view_id}/unpin` manage the caller's pins (at most 12, position kept; a view the caller may not read answers 404, exactly like `GET /saved-views/{view_id}`) and `GET /me/home-pins` (`HomeViewPin`) lists them in order (inactive views drop out). The card shows each pin with a counter the screen's own list endpoint computes for the caller, so the counts stay inside the caller's permissions; the dashboard settings catalogue gains the card `pinned_views` (Settings > Dashboard, shown by default). Personal display preference: no grant, role, permission, visibility or audit change.
     - 0.15.130 (2026-11-27): the admin alert `backup_missing` (owner approval relayed 2026-11-26). Additive, migration 0240. When no backup succeeded in the last 24 hours (the System Log rows the data reset reads) a security alert `backup_missing` (default severity high, configurable like the other rules) is raised once per calendar day by the job `backup_check` (every 6 hours) and one System Log row (source `backup_check`) is written. `SecurityAlertRule` and `AlertSeverityMap` gain `backup_missing`. No new endpoint.
     - 0.15.95 (2026-11-27): the admin alert `backup_missing` (owner approval relayed 2026-11-26). Additive, migration 0184. When no backup succeeded in the last 24 hours (the System Log rows the data reset reads) a security alert `backup_missing` (default severity high, configurable like the other rules) is raised once per calendar day by the job `backup_check` (every 6 hours) and one System Log row (source `backup_check`) is written. `SecurityAlertRule` and `AlertSeverityMap` gain `backup_missing`. No new endpoint.
     - 0.15.98 (2026-11-27): the dashboard follow-up sections (owner approval 2026-11-26, dashboard proposals item 1; migration 0230). Additive and read only. New `GET /dashboard/ops` (`getDashboardOps`, `DashboardOps`): the sections that follow the operations beyond F13, each part `available: false` when the caller may not see its module. First section `procurement`: the open orders (order status not one of the closing statuses of the contractor rules, as in `GET /reports/contractor-performance`), the PRs waiting for a PO/WO and the open PO/WOs, each aged in calendar days and bucketed 0-7, 8-14, 15-30, over 30, and the materials position: the receive rate (dispatched against required of `warehouse_site_qty` over the active, not cancelled sites), the count of sites with a shortage line, the top shortage lines with their contractor (the party of the site's newest open order; unattributed when none) and the shortage per contractor. No price is returned (no price is stored on a Procurement record). The dashboard settings catalogue gains the card `ops_procurement`, so the card shows, hides and orders per tab in Settings > Dashboard like every other card. No grant, role or permission change.
@@ -15788,6 +15789,70 @@ paths:
       responses:
         '204': {description: Discarded (also when there was none).}
         '401': {$ref: '#/components/responses/Unauthorized'}
+  /me/home-pins:
+    get:
+      tags: [saved-views]
+      operationId: getHomePins
+      summary: The caller's pinned home views (0.15.245)
+      description: >-
+        0.15.245 (migration 0344). The views the caller pinned as cards on the home dashboard, in the pin order. A pin is personal; a view
+        that was deactivated or became unreadable drops out of the list. The counter a card shows is computed by the screen's own list
+        endpoint for the caller, so it always stays inside the caller's permissions.
+      responses:
+        '200':
+          description: The caller's pinned views, in the pin order.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: '#/components/schemas/HomeViewPin'}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+  /saved-views/{view_id}/pin:
+    post:
+      tags: [saved-views]
+      operationId: pinSavedViewHome
+      summary: Pin a saved view as a card on the home dashboard (0.15.245)
+      description: >-
+        0.15.245 (migration 0344). Personal: the pin is the caller's own. A view the caller may not read answers 404, exactly like
+        `GET /saved-views/{view_id}`. At most 12 pins per caller (422 `validation_failed`, `/view` `too_many`); pinning again is a no-op.
+      parameters:
+        - {name: view_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: Pinned.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [view_id, pinned_home]
+                properties:
+                  view_id: {type: string, format: uuid}
+                  pinned_home: {type: boolean, enum: [true]}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /saved-views/{view_id}/unpin:
+    post:
+      tags: [saved-views]
+      operationId: unpinSavedViewHome
+      summary: Unpin a saved view from the home dashboard (0.15.245)
+      description: 0.15.245 (migration 0344). Removes the caller's pin; a missing pin is a no-op.
+      parameters:
+        - {name: view_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: Unpinned.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [view_id, pinned_home]
+                properties:
+                  view_id: {type: string, format: uuid}
+                  pinned_home: {type: boolean, enum: [false]}
+        '401': {$ref: '#/components/responses/Unauthorized'}
 components:
   securitySchemes:
     cookieAuth:
@@ -24028,6 +24093,17 @@ components:
         groups: {type: array, items: {type: object, required: [id, name], properties: {id: {type: string, format: uuid}, name: {type: string}}}}
         users: {type: array, items: {$ref: '#/components/schemas/UserRef'}}
         regions: {type: array, description: '0.15.31 (F3).', items: {type: object, required: [id, name_en], properties: {id: {type: integer}, name_en: {type: string}, name_ar: {type: [string, "null"]}}}}
+    HomeViewPin:
+      type: object
+      description: '0.15.245: one pinned home view (migration 0344). The card''s counter is computed by the screen''s own list endpoint for the caller.'
+      required: [view_id, name, screen_key, filters, position]
+      additionalProperties: false
+      properties:
+        view_id: {type: string, format: uuid}
+        name: {type: string, maxLength: 120, description: The view's current name.}
+        screen_key: {$ref: '#/components/schemas/SavedViewScreenKey'}
+        filters: {type: object, additionalProperties: true, description: The view's filters, scrubbed for the caller like a read of the view (hidden fields left out).}
+        position: {type: integer, minimum: 1}
     SavedView:
       type: object
       required: [id, screen_key, name, filters, columns, sort, stripped_columns, owner, owner_left, is_owner, shared, can_edit, can_share, is_active, version, imported, created_at, updated_at]

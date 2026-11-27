@@ -35,6 +35,7 @@ import {
   signed,
 } from "./dashboardBits";
 import { OpsProcurementCard } from "./dashboardOps";
+import { PinnedViewsCard } from "./dashboardPins";
 import { useDashboardSettings } from "@/api/dashboardSettings";
 import { SavedViews } from "@/components/SavedViews";
 import { UnifiedFilter } from "@/components/UnifiedFilter";
@@ -1396,6 +1397,13 @@ export function Dashboard() {
                 <>
                   {/* 0.15.98 (owner approval 2026-11-26, item 1): open PR/PO aging, receive rate and shortage per contractor */}
                   <OpsProcurementCard ops={ops.data} />
+                </>
+              ),
+
+              pinned_views: (
+                <>
+                  {/* 0.15.245 (owner request 2026-11-27, research item 16): the caller's pinned views with counters */}
+                  <PinnedViewsCard />
                 </>
               ),
 
