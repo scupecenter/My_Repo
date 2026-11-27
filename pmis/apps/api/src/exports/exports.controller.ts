@@ -1,3 +1,4 @@
+import { ExportAction } from '../security/export-lock';
 import { Body, Controller, Get, Headers, HttpCode, Param, Post, Query, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import type { AuthContext } from '../auth/auth.types';
@@ -14,6 +15,7 @@ export class ExportsController {
     return this.exports.parts(auth, q);
   }
 
+  @ExportAction()
   @Post('master')
   @HttpCode(202)
   start(@Auth() auth: AuthContext, @Body() body: unknown, @Headers('idempotency-key') key: string | undefined, @Res({ passthrough: true }) res: Response) {
@@ -28,6 +30,7 @@ export class ExportsController {
     return this.exports.list(auth, q);
   }
 
+  @ExportAction()
   @Get('master/:id/download')
   async download(@Auth() auth: AuthContext, @Param('id') id: string, @Res({ passthrough: true }) res: Response) {
     const r = await this.exports.download(auth, id);

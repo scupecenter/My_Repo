@@ -11,6 +11,7 @@ import { BRANDS, isBrand } from '@/lib/brands';
 import { guard, page, problem, stepUp } from './handlers';
 import { byId, uid } from './ids';
 import type { TableDisplaySetting } from '@/api/display';
+import { UI_FEATURES_SEED, type UiFeaturesSetting } from '@/api/uiFeatures';
 import { CALENDAR_CODES, CATALOGUE, COMPLETENESS, MAIL_KIND_CATALOGUE, MISMATCH, initCfg, GATES, MILESTONES, OPEN_TASKS, SCENARIOS, START_EVENT_CODES, TASK_DEFS, type SlaSetRec, type WeightRec } from './settingsData';
 
 const B = API_BASE;
@@ -18,6 +19,8 @@ const TODAY = '2026-10-25';
 const C = () => db().cfg;
 /** W8 (0.15.64): the defaults of the Display menu, the seed look until an admin saves them. */
 const TD = () => (C().tableDisplay ??= { defaults: { size: 'md', align: 'start', density: 'comfortable', wrap: false, zebra: true }, version: 0 } as TableDisplaySetting);
+/** 0.15.102: the interface features, the seed until an admin saves them. */
+const UF = () => (C().uiFeatures ??= { sections: structuredClone(UI_FEATURES_SEED), version: 0 } as UiFeaturesSetting);
 /** A mock store saved before 0.9.1 has no match table, one saved before 0.12.9 no catalogue: start it from the seed. */
 const SM = () => (C().scopeMatch?.catalogue ? C().scopeMatch : (C().scopeMatch = initCfg().scopeMatch));
 const CR = () => (C().contractorRules ??= initCfg().contractorRules);
@@ -241,6 +244,10 @@ const progress = (s: Pick<WeightSet, 'activities'>) => Math.round(s.activities.r
 const CC = () => (C().calConfirm ??= initCfg().calConfirm);
 const MK = () => (C().mailKinds ??= initCfg().mailKinds);
 /** 0.15.1: nav.layout (a store saved before 0.15.1 starts from the seed). */
+/** 0.15.190: the admin lock keys, kept in memory like the other small settings of the mock (both off by default). */
+const locks: { block_public_sharing: boolean; disable_export: boolean; version: number; updated_at: string | null; updated_by: { id: string; display_name: string; employee_id: string | null } | null } =
+  { block_public_sharing: false, disable_export: false, version: 1, updated_at: null, updated_by: null };
+const locksView = () => ({ ...locks, can_edit: isAdmin() });
 const identityView = () => ({ ...identity(), brands: [...BRANDS], can_edit: isAdmin() });
 /** 0.15.97: the login page settings with the system version (shown to signed-in users only). */
 const loginPageView = () => ({ ...loginPage(), server_version: '0.15.97', can_edit: isAdmin() });
@@ -611,6 +618,27 @@ export const settingsHandlers = [
     return HttpResponse.json(j, tag(j.version));
   }),
 
+  // ------------------------------------------------------------------ 0.15.190: admin lock keys (block public sharing, disable export), both off by default
+  http.get(`${B}/settings/security-locks`, () => { const g = guard(); if (g) return g; const j = locksView(); return HttpResponse.json(j, tag(j.version)); }),
+  http.put(`${B}/settings/security-locks`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    const b = await body<{ block_public_sharing?: unknown; disable_export?: unknown; reason?: string } & Record<string, unknown>>(request);
+    const errs: { path: string; code: string }[] = Object.keys(b).filter((k) => !['block_public_sharing', 'disable_export', 'reason'].includes(k)).map((k) => ({ path: `/${k}`, code: 'unknown_field' }));
+    if (typeof b.block_public_sharing !== 'boolean') errs.push({ path: '/block_public_sharing', code: 'required' });
+    if (typeof b.disable_export !== 'boolean') errs.push({ path: '/disable_export', code: 'required' });
+    if ((b.reason ?? '').trim().length < 3 || (b.reason ?? '').length > 1000) errs.push({ path: '/reason', code: 'required' });
+    if (errs.length) return fields(...errs);
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, locks.version); if (p) return p;
+    if (!stepUpValid()) return stepUp();
+    if (locks.block_public_sharing === b.block_public_sharing && locks.disable_export === b.disable_export) return problem(409, 'invalid_transition', 'These are already the lock keys in force.');
+    const v = viewer()!;
+    Object.assign(locks, { block_public_sharing: b.block_public_sharing, disable_export: b.disable_export, version: locks.version + 1, updated_at: new Date().toISOString(),
+      updated_by: { id: uid(v.employee_id ?? '9999'), display_name: v.name, employee_id: v.employee_id } });
+    const j = locksView();
+    return HttpResponse.json(j, tag(j.version));
+  }),
+
   // ------------------------------------------------------------------ 0.15.1: the shared layout of the side menu
   http.get(`${B}/settings/nav-layout`, () => { const g = guard(); if (g) return g; const j = navView(); return HttpResponse.json(j, tag(j.version)); }),
   http.put(`${B}/settings/nav-layout`, async ({ request }) => {
@@ -882,6 +910,34 @@ export const settingsHandlers = [
     if (errs.length) return fields(...errs);
     C().tableDisplay = { defaults: d as TableDisplaySetting['defaults'], version: TD().version + 1, updated_by: me(), updated_at: new Date().toISOString() }; save();
     return HttpResponse.json(TD(), tag(TD().version));
+  }),
+  // 0.15.102 (migration 0196): the interface features; read by every signed-in user, saved by an admin with a reason and If-Match
+  http.get(`${B}/settings/ui-features`, () => { const g = guard(); if (g) return g; return HttpResponse.json(UF(), tag(UF().version)); }),
+  http.put(`${B}/settings/ui-features`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    const p = ver(request, UF().version); if (p) return p;
+    const b = await body<{ sections?: Record<string, Record<string, unknown>>; reason?: string } & Record<string, unknown>>(request);
+    const errs: { path: string; code: string }[] = [];
+    for (const k of Object.keys(b)) if (k !== 'sections' && k !== 'reason') errs.push({ path: `/${k}`, code: 'unknown_key' });
+    const sec = b.sections ?? {};
+    const oneOf = (o: Record<string, unknown>, path: string, k: string, list: string[]) => { if (!list.includes(String(o[k]))) errs.push({ path: `${path}/${k}`, code: 'invalid' }); };
+    for (const [name, o] of Object.entries(sec)) {
+      const path = `/sections/${name}`;
+      if (name === 'avatars') {
+        for (const k of Object.keys(o)) if (!['style', 'shape', 'palette', 'in_lists'].includes(k)) errs.push({ path: `${path}/${k}`, code: 'unknown_key' });
+        oneOf(o, path, 'style', ['initials', 'gradient', 'geometric', 'none']); oneOf(o, path, 'shape', ['circle', 'rounded']); oneOf(o, path, 'palette', ['brand', 'varied']);
+        if (typeof o.in_lists !== 'boolean') errs.push({ path: `${path}/in_lists`, code: 'invalid' });
+      } else if (name === 'new_badge') {
+        for (const k of Object.keys(o)) if (!['enabled', 'days'].includes(k)) errs.push({ path: `${path}/${k}`, code: 'unknown_key' });
+        if (typeof o.enabled !== 'boolean') errs.push({ path: `${path}/enabled`, code: 'invalid' });
+        if (!Number.isInteger(o.days)) errs.push({ path: `${path}/days`, code: 'invalid' });
+        else if ((o.days as number) < 1 || (o.days as number) > 90) errs.push({ path: `${path}/days`, code: 'out_of_range' });
+      } else errs.push({ path, code: 'unknown_key' });
+    }
+    if ((b.reason ?? '').trim().length < 3) errs.push({ path: '/reason', code: 'required' });
+    if (errs.length) return fields(...errs);
+    C().uiFeatures = { sections: { ...UF().sections, ...sec } as UiFeaturesSetting['sections'], version: UF().version + 1, updated_by: me(), updated_at: new Date().toISOString() }; save();
+    return HttpResponse.json(UF(), tag(UF().version));
   }),
   http.get(`${B}/settings/idle-task-alert`, () => { const g = guard(); if (g) return g; return HttpResponse.json(C().idle, tag(C().idle.version)); }),
   http.put(`${B}/settings/idle-task-alert`, async ({ request }) => {

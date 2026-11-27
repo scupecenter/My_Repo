@@ -4791,6 +4791,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/ui-features": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Interface features (avatars, New badge) (0.15.185)
+         * @description 0.15.185 (migration 0280). Every signed-in user. Without a saved value each section takes its seed: avatars `gradient`, `circle`, `varied`, in lists; New badge on for 14 days.
+         */
+        get: operations["getUiFeaturesSetting"];
+        /**
+         * Set the interface features (Administration > Settings > Screens > Interface)
+         * @description 0.15.185 (migration 0280): System Admin or a delegate of `admin.settings` edit for all regions (403 `action_forbidden` otherwise), a reason of at least 3 characters and If-Match. Closed body: `sections` with any of the known sections, each one complete (`unknown_key` at its path, `invalid` or `out_of_range` for a value outside its list). A section not sent keeps its value. Audited (`ui_features_update`, before and after).
+         */
+        put: operations["setUiFeaturesSetting"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/idle-task-alert": {
         parameters: {
             query?: never;
@@ -5904,6 +5928,32 @@ export interface paths {
          */
         get: operations["getLoginPagePublic"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/security-locks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The admin lock keys, block public sharing and disable export (0.15.190)
+         * @description Every signed-in user may read it (the UI hides what is locked). `can_edit` is true for a System Admin only. Both keys are `false` until a System Admin turns one on.
+         */
+        get: operations["getSecurityLocks"];
+        /**
+         * Turn the lock keys on or off (System Admin, reason, step-up, If-Match, audited) (0.15.190)
+         * @description System Admin only (403 `action_forbidden` otherwise, a delegate included). A reason (3+ characters), a step-up (401 `step_up_required`) and `If-Match` (428 / 412)
+         *     are required. Unknown keys and non-boolean values are 422. Saving the values already in force is 409 `invalid_transition`. Audited `security_locks_update` with both keys
+         *     before and after. Reading and changing the lock keys is never locked, so an admin can always turn a lock off again.
+         */
+        put: operations["setSecurityLocks"];
         post?: never;
         delete?: never;
         options?: never;
@@ -14978,6 +15028,35 @@ export interface components {
             updated_at?: string;
             updated_by?: components["schemas"]["UserRef"];
         };
+        UiAvatars: {
+            /** @enum {string} */
+            style: "initials" | "gradient" | "geometric" | "none";
+            /** @enum {string} */
+            shape: "circle" | "rounded";
+            /** @enum {string} */
+            palette: "brand" | "varied";
+            in_lists: boolean;
+        };
+        UiNewBadge: {
+            enabled: boolean;
+            days: number;
+        };
+        /** @description 0.15.185. The sections of the interface features setting; every section is complete. */
+        UiFeatures: {
+            avatars: components["schemas"]["UiAvatars"];
+            new_badge: components["schemas"]["UiNewBadge"];
+        };
+        UiFeaturesPatch: {
+            avatars?: components["schemas"]["UiAvatars"];
+            new_badge?: components["schemas"]["UiNewBadge"];
+        };
+        UiFeaturesSetting: {
+            sections: components["schemas"]["UiFeatures"];
+            version: number;
+            /** Format: date-time */
+            updated_at?: string;
+            updated_by?: components["schemas"]["UserRef"];
+        };
         IdleTaskAlertSetting: {
             enabled: boolean;
             /** @description Default 2. */
@@ -16346,6 +16425,24 @@ export interface components {
             animation: boolean;
             default_locale: ("en" | "ar") | null;
             support_links: components["schemas"]["SupportLink"][];
+        };
+        /** @description 0.15.190. The admin lock keys (setting `security.locks`, migration 0290). */
+        SecurityLocks: {
+            /** @description true: no feature may create a public link (checked by `SecurityLocksService.assertSharingAllowed`). */
+            block_public_sharing: boolean;
+            /** @description true: every export route answers 403 `export_locked`. */
+            disable_export: boolean;
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+            /** @description The ETag value. */
+            version: number;
+            /** @description A System Admin only. */
+            can_edit: boolean;
+        };
+        SecurityLocksInput: components["schemas"]["WithReason"] & {
+            block_public_sharing: boolean;
+            disable_export: boolean;
         };
         /** @description 0.15.1. The shared order of the side menu (setting `nav.layout`). */
         NavLayout: {
@@ -28476,6 +28573,62 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
         };
     };
+    getUiFeaturesSetting: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Setting. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UiFeaturesSetting"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setUiFeaturesSetting: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"] & {
+                    sections: components["schemas"]["UiFeaturesPatch"];
+                };
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UiFeaturesSetting"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
     getIdleTaskAlertSetting: {
         parameters: {
             query?: never;
@@ -30499,6 +30652,62 @@ export interface operations {
                 };
             };
             429: components["responses"]["TooManyRequests"];
+        };
+    };
+    getSecurityLocks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The lock keys. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SecurityLocks"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setSecurityLocks: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SecurityLocksInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SecurityLocks"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
         };
     };
     getHistoricalWaiver: {

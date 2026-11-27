@@ -15,6 +15,7 @@ import { TeamScopeMatch } from './TeamScopeMatch';
 import { GecolOrderWarnings } from './GecolOrderWarnings';
 import { MailKinds } from './MailKinds';
 import { useMe } from '@/api/hooks';
+import { NewBadge } from '@/components/NewBadge';
 import { ContractorRules } from './ContractorRules';
 import { ContractorPerfThresholds } from './ContractorPerfThresholds';
 import { MatrixCoverageScreen } from './MatrixCoverage';
@@ -31,10 +32,12 @@ import { SiteMasterColumns } from './SiteMasterColumns';
 import { DashboardSettings } from './DashboardSettings';
 import { GoalsSettings } from './GoalsSettings';
 import { Identity } from './Identity';
+import { SecurityLocks } from './SecurityLocks';
 import { DisplaySettings } from './DisplaySettings';
 import { DailyPlanSettings } from './DailyPlanSettings';
 import { MotionSettings } from './MotionSettings';
 import { LoginPageSettings } from './LoginPage';
+import { InterfaceSettings } from './InterfaceSettings';
 
 export interface SettingsSection { key: string; adminOnly?: boolean }
 export interface SettingsTab { key: string; sections: SettingsSection[] }
@@ -52,9 +55,9 @@ export const SETTINGS_TABS: readonly SettingsTab[] = [
   // Notification policy + Mail kinds (admin only): both are what is sent to people
   { key: 'alerts', sections: [{ key: 'policy' }, { key: 'mail', adminOnly: true }] },
   // DLP months is a data-protection rule, so it moved here from SLA
-  { key: 'security', sections: [{ key: 'staff' }, { key: 'retention' }, { key: 'dlp' }] },
+  { key: 'security', sections: [{ key: 'staff' }, { key: 'retention' }, { key: 'dlp' }, { key: 'locks' }] },
   // Screens: what users see by default (Dashboard, Display menu of the tables, My Work Daily Plan)
-  { key: 'screens', sections: [{ key: 'dashboard' }, { key: 'tables' }, { key: 'daily-plan' }, { key: 'goals' }, { key: 'motion' }, { key: 'login' }] },
+  { key: 'screens', sections: [{ key: 'dashboard' }, { key: 'tables' }, { key: 'daily-plan' }, { key: 'goals' }, { key: 'motion' }, { key: 'login' }, { key: 'interface' }] },
   { key: 'identity', sections: [] },
 ];
 
@@ -113,7 +116,7 @@ function TabFrame({ tab }: { tab: string }) {
   return (
     <div>
       <nav className="mb-3 flex flex-wrap gap-1 border-b border-line pb-2" aria-label={t(`settings.tab_${tab}`)}>
-        {sections.map((s) => <NavLink key={s.key} to={`/admin/settings/${tab}/${s.key}`} data-testid={`settings-section-${tab}-${s.key}`} className={({ isActive }) => `btn ${isActive ? 'btn-accent' : ''}`}>{t(`settings.section_${tab}_${s.key}`)}</NavLink>)}
+        {sections.map((s) => <NavLink key={s.key} to={`/admin/settings/${tab}/${s.key}`} data-testid={`settings-section-${tab}-${s.key}`} className={({ isActive }) => `btn ${isActive ? 'btn-accent' : ''}`}>{t(`settings.section_${tab}_${s.key}`)}{tab === 'screens' && s.key === 'interface' && <NewBadge feature="interface-settings" />}</NavLink>)}
       </nav>
       <Outlet />
     </div>
@@ -141,6 +144,7 @@ export function SettingsRoutes() {
           <Route path="goals" element={<GoalsSettings />} />
           <Route path="motion" element={<MotionSettings />} />
           <Route path="login" element={<LoginPageSettings />} />
+          <Route path="interface" element={<InterfaceSettings />} />
         </Route>
         <Route path="alerts" element={<TabFrame tab="alerts" />}>
           <Route index element={<Navigate to="policy" replace />} />
@@ -191,6 +195,7 @@ export function SettingsRoutes() {
           <Route path="staff" element={<StaffVisibility />} />
           <Route path="retention" element={<Retention />} />
           <Route path="dlp" element={<Dlp />} />
+          <Route path="locks" element={<SecurityLocks />} />
         </Route>
         {Object.entries(LEGACY_SETTINGS_PATHS).map(([old, to]) => <Route key={old} path={old} element={<LegacyRedirect to={to} />} />)}
       </Route>
