@@ -470,16 +470,23 @@ export class RegistersService {
     // F3 (0.15.31): the AND/OR filter of a saved view, compiled on the server against the register's whitelist; the visibility above stays
     const adv = await this.filters.fromQuery(`register-${key}`, q);
     if (adv) conds.push(adv);
-    // W8 item 6 (0.15.68): the counts, read with the caller's rights (the visibility above and row security), before the cursor narrows the rows
-    const count = async (c: Prisma.Sql[]): Promise<number> => Number((await this.db.tx.$queryRaw<{ n: bigint }[]>(Prisma.sql`
-      SELECT count(*) AS n FROM register_records r LEFT JOIN sites s ON s.id = r.site_id LEFT JOIN task_instances ti ON ti.id = r.task_id
-      LEFT JOIN task_definitions td ON td.id = ti.task_def_id WHERE ${Prisma.join(c, ' AND ')}`))[0]?.n ?? 0);
-    const counts = { total: await count(scope), filtered: await count(conds) };
+    // W8 item 6 (0.15.68): the counts, read with the caller's rights (the visibility above and row security), before the cursor narrows the rows.
+    // D62: one pass over the register for both numbers (it used to be two full count(*) queries)
+    const JOINS = Prisma.sql`FROM register_records r LEFT JOIN sites s ON s.id = r.site_id LEFT JOIN task_instances ti ON ti.id = r.task_id LEFT JOIN task_definitions td ON td.id = ti.task_def_id`;
+    const cn = (await this.db.tx.$queryRaw<{ total: bigint; filtered: bigint }[]>(Prisma.sql`
+      SELECT count(*) FILTER (WHERE ${Prisma.join(scope, ' AND ')}) AS total, count(*) FILTER (WHERE ${Prisma.join(conds, ' AND ')}) AS filtered
+      ${JOINS} WHERE r.register_key = ${key} AND ${this.visibility(regs)}`))[0];
+    const counts = { total: Number(cn?.total ?? 0), filtered: Number(cn?.filtered ?? 0) };
     // found / not found: sites in the register's regions AND in the caller's Sites view regions (never a region where the caller cannot see sites)
     const pasted = search.kind === 'list' ? await pastedSearchResult(this.db.tx, search, siteScope(regs, await this.access.regions('sites', 'view'))) : undefined;
     if (cursor) conds.push(Prisma.sql`(r.created_at, r.id) < (${cursor[0] as string}::timestamptz, ${cursor[1] as string}::uuid)`);
-    const rows = await this.db.tx.$queryRaw<RecordRow[]>(
-      this.baseSelect(auth, Prisma.join(conds, ' AND '), Prisma.sql`ORDER BY r.created_at DESC, r.id DESC LIMIT ${limit + 1}`));
+    // D62: choose the page first (ids only, same filter, same sort), then compute the per-row workflow functions for those rows alone (the same pattern as GET /users, #408)
+    const ids = await this.db.tx.$queryRaw<{ id: string }[]>(Prisma.sql`
+      SELECT r.id::text AS id ${JOINS} WHERE ${Prisma.join(conds, ' AND ')} ORDER BY r.created_at DESC, r.id DESC LIMIT ${limit + 1}`);
+    const rows = ids.length
+      ? await this.db.tx.$queryRaw<RecordRow[]>(
+        this.baseSelect(auth, Prisma.sql`r.id = ANY(${ids.map((x) => x.id)}::uuid[])`, Prisma.sql`ORDER BY r.created_at DESC, r.id DESC`))
+      : [];
     const page = rows.slice(0, limit);
     const last = page[page.length - 1];
     return { items: await this.dtos(auth, page), page: { limit, next_cursor: rows.length > limit && last ? encodeCursor([last.ts, last.id]) : null }, counts, ...(pasted ? { search: pasted } : {}) };
