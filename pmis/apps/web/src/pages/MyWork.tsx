@@ -1,4 +1,4 @@
-import { ViewMenu, type ViewOption } from '@/components/ViewMenu';
+import { LayoutPanel, type ViewOption } from '@/components/LayoutPanel';
 import { AlertTriangle, CalendarDays, Check, Clock, Columns3, Inbox, List, Pencil } from 'lucide-react';
 import { Fragment, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -100,7 +100,7 @@ export function MyWork() {
     { id: 'list', label: t('board.list'), hint: t('view.mywork_list_hint'), icon: <List size={14} />, testid: 'my-work-layout-list' },
     { id: 'board', label: t('board.board'), hint: t('view.mywork_board_hint'), icon: <Columns3 size={14} />, testid: 'my-work-layout-board' },
   ];
-  const switcher = <ViewMenu testid="my-work-view" title={t('view.title')} value={board ? 'board' : 'list'} options={myViews} onChange={(id) => setParams({ layout: id === 'board' ? 'board' : '' })} />;
+  const switcher = <LayoutPanel testid="my-work-view" views={{ value: board ? 'board' : 'list', options: myViews, onChange: (id) => setParams({ layout: id === 'board' ? 'board' : '' }) }} />;
   let n = 0;
   return (
     <div className="space-y-4" data-testid="page-my-work">

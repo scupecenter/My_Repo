@@ -1,9 +1,9 @@
 import { expect, test } from '@playwright/test';
 import { login } from './helpers';
 
-// Item (a): the layout of My Work and of the site page is picked in one ViewMenu (the same control as Sites), in EN and AR.
+// Item (a): the layout of My Work and of the site page is picked in one Layout panel (the same control as Sites), in EN and AR.
 for (const locale of ['en', 'ar'] as const) {
-  test(`My Work and the site page use the ViewMenu (${locale})`, async ({ page }) => {
+  test(`My Work and the site page use the Layout panel (${locale})`, async ({ page }) => {
     await page.addInitScript((l) => { if (!localStorage.getItem('pmis.locale')) localStorage.setItem('pmis.locale', l); }, locale);
     await login(page, 'reviewer');
     await page.goto('/my-work');

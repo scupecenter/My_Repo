@@ -3,7 +3,7 @@ import { SiteGantt } from '@/components/SiteGantt';
 import { SiteSummaryStrip } from '@/components/SiteSummaryStrip';
 import type { TasksExportColumnCode } from '@/api/types';
 import { ArrowLeft, CalendarRange, Layers, Table2 } from 'lucide-react';
-import { ViewMenu, type ViewOption } from '@/components/ViewMenu';
+import { LayoutPanel, type ViewOption } from '@/components/LayoutPanel';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
@@ -102,7 +102,7 @@ export function Site() {
     { id: 'list', label: t('tstd.layout_list'), hint: t('view.site_list_hint'), icon: <Table2 size={14} />, testid: 'site-layout-list' },
     { id: 'timeline', label: t('tstd.layout_timeline'), hint: t('view.site_timeline_hint'), icon: <CalendarRange size={14} />, testid: 'site-layout-timeline' },
   ];
-  const switcher = <ViewMenu testid="site-view" title={t('view.title')} value={layout === 'row' ? 'timeline' : 'list'} options={siteViews} onChange={(id) => { setLayout(id === 'timeline' ? 'row' : 'list'); savePref(LAYOUT_KEY, id === 'timeline' ? 'timeline' : 'list'); }} />;
+  const switcher = <LayoutPanel testid="site-view" views={{ value: layout === 'row' ? 'timeline' : 'list', options: siteViews, onChange: (id) => { setLayout(id === 'timeline' ? 'row' : 'list'); savePref(LAYOUT_KEY, id === 'timeline' ? 'timeline' : 'list'); } }} />;
   const exporter = <ExportViewButton testid="grid-export-view" source="tasks" filters={{ site_id: siteId, ...(stage ? { stage_code: stage } : {}), ...(pq.stream ? { stream: pq.stream } : {}), ...(pq.view ? { view: pq.view } : {}), ...(sp.get('tadv') ? { filter: sp.get('tadv') } : {}) }} columns={TASK_COLUMNS} />;
   const displayMenu = <DisplayMenu api={timeline} />;
 
