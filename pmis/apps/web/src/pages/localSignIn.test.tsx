@@ -264,7 +264,7 @@ describe('hybrid mode list', () => {
       'POST /registers/:key/records/:id/claim', 'POST /registers/:key/records/:id/release', 'POST /registers/:key/records/:id/void',
       'GET /registers/:key/records/:id/history', 'GET /registers/:key/records/:id/versions', 'POST /registers/:key/records/:id/versions',
       // contract 0.7.0: approved-template entry (templates and import batches)
-      'GET /templates', 'GET /templates/:id/download', 'GET /import-batches', 'POST /import-batches', 'GET /import-batches/:id', 'GET /import-batches/:id/rows',
+      'GET /templates', 'GET /templates/:id/changes', 'GET /templates/:id/download', 'GET /import-batches', 'POST /import-batches', 'GET /import-batches/:id', 'GET /import-batches/:id/rows', 'GET /import-batches/:id/error-report',
       'POST /import-batches/:id/submit', 'POST /import-batches/:id/decisions',
       // contract 0.12.8 (P3): the legacy Master import and its comparison report, the template mapping screen and the import aliases
       'GET /master-import/runs', 'POST /master-import/runs', 'GET /master-import/runs/:id', 'GET /master-import/runs/:id/diffs', 'GET /master-import/runs/:id/export',
@@ -289,6 +289,8 @@ describe('hybrid mode list', () => {
       'GET /settings/team-scope-match', 'PUT /settings/team-scope-match',
       // contract 0.12.9: P4b contractor rules and the two reports
       'GET /settings/contractor-rules', 'PUT /settings/contractor-rules', 'GET /reports/team-scope-mismatch', 'GET /reports/contractors-completeness', 'GET /reports/gecol-hlc-counts', 'GET /reports/contractor-performance', 'GET /settings/contractor-performance', 'PUT /settings/contractor-performance',
+      // contract 0.15.242: the generic alert rules (apps/api: settings; migration 0342)
+      'GET /settings/alert-rules', 'POST /settings/alert-rules', 'PUT /settings/alert-rules/:id',
       // contract 0.9.2: the self-service profile (details, email change and its decision, password, two-factor self-service, enforced mark)
       'GET /me/profile', 'GET /me/sessions', 'POST /me/sessions/revoke-others', 'POST /me/sessions/:id/revoke', 'PATCH /me/profile', 'PATCH /me/preferences', 'POST /me/password', 'POST /me/email-change', 'DELETE /me/email-change',
       'POST /me/two-factor/enrol/start', 'POST /me/two-factor/enrol/confirm', 'POST /me/two-factor/disable',
@@ -341,7 +343,7 @@ describe('hybrid mode list', () => {
       // contract 0.14.5: the site map of the dashboard (OV-12)
       'GET /dashboard/site-map',
       // contract 0.14.6: the background threshold of batches (Settings, Imports)
-      'GET /settings/imports', 'PUT /settings/imports',
+      'GET /settings/imports', 'PUT /settings/imports', 'GET /settings/template-change-notice', 'PUT /settings/template-change-notice',
       // contract 0.15.1: the shared layout of the side menu
       'GET /settings/nav-layout', 'PUT /settings/nav-layout',
       // contract 0.15.41: Settings, Identity & themes

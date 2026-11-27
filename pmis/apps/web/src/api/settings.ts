@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { api, ApiError, downloadFile, type RequestOptions } from './client';
-import type { IssueStoppedRowList, IssueTaskMapItem, IssueTaskMapList,
-  ActiveSession, ActOnBehalfRequest, Calendar, CalendarConfirmation, MailNotificationKinds, ImportsSettings, TemplateChangeNotice, ContractorPerformanceReport, ContractorPerformanceThresholds, ContractorPerformanceSettings, NavLayoutSetting, UiIdentity, UiBrand, LoginPage, SecurityLocks, SupportAccessSetting, NewDeviceCodeSetting, Delegation, LoginPagePublic, SupportLink, NavLayoutT, ContractorRules, ContractorRulesInput, GecolHlcCounts, ContractorsCompletenessReport, TeamScopeMismatchReport, DeletedUser, PurgedUser, DlpSettings, DlpVersion, DlpVersionInput, Holiday, HolidayChangeResult, HolidayInput, HolidayPatch, HolidaySummary, IdleTaskAlertSetting, Job, LogIntegrity, LogRetention, LogRetentionInput,
+import type { AlertRuleInput, AlertRuleSaved, AlertRulesResponse, IssueStoppedRowList, IssueTaskMapItem, IssueTaskMapList,
+  ActiveSession, ActOnBehalfRequest, Calendar, CalendarConfirmation, MailNotificationKinds, ImportsSettings, TemplateChangeNotice, ContractorPerformanceReport, ContractorPerformanceThresholds, ContractorPerformanceSettings, NavLayoutSetting, UiIdentity, UiBrand, LoginPage, SecurityLocks, SupportAccessSetting, Delegation, LoginPagePublic, SupportLink, NavLayoutT, ContractorRules, ContractorRulesInput, GecolHlcCounts, ContractorsCompletenessReport, TeamScopeMismatchReport, DeletedUser, PurgedUser, DlpSettings, DlpVersion, DlpVersionInput, Holiday, HolidayChangeResult, HolidayInput, HolidayPatch, HolidaySummary, IdleTaskAlertSetting, Job, LogIntegrity, LogRetention, LogRetentionInput, NewDeviceCodeSetting,
   NotificationPolicy, NotificationPolicyInput, NotificationTypeDef, Page, ReassignmentAlert, SecurityLogEntry, SessionRevokeResult, SlaPublishPreview, SlaRuleSet, SlaRuleSetPublishResult, SlaRuleSetSummary, SlaTaskRule, StaffCard, StaffVisibility, StructuralFreeze,
   TaskDefinition, TeamScopeMatch, TeamScopeMatchInput, TransitionResultT, User, UserDetail, WeekendDaysResult, WeightSet, WeightSetCode, WeightSetInput, WeightSetPreview, WeightSetPublishResult, WorkflowVersion, WorkflowVersionSummary,
 } from './types';
@@ -492,3 +492,18 @@ export const useSaveIssueTaskMap = () => {
   });
 };
 export const useIssueStoppedRows = () => useQuery({ queryKey: ['issueStoppedRows'], queryFn: () => api.get<IssueStoppedRowList>('/issues/stopped-rows') });
+export const useAlertRules = () => useQuery({ queryKey: ['alertRules'], queryFn: () => api.get<AlertRulesResponse>('/settings/alert-rules') });
+export const useCreateAlertRule = () => {
+  const qc = useQueryClient();
+  return useMutation<AlertRuleSaved, ApiError, AlertRuleInput & { reason: string }>({
+    mutationFn: (body) => api.post('/settings/alert-rules', { body }),
+    onSettled: () => refresh(qc, 'alertRules'),
+  });
+};
+export const useUpdateAlertRule = () => {
+  const qc = useQueryClient();
+  return useMutation<AlertRuleSaved, ApiError, { id: string; version: number; body: AlertRuleInput & { reason: string } }>({
+    mutationFn: ({ id, version, body }) => api.put(`/settings/alert-rules/${id}`, { version, body }),
+    onSettled: () => refresh(qc, 'alertRules'),
+  });
+};
