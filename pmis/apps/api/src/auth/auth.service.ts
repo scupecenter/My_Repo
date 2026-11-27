@@ -17,6 +17,7 @@ import { IDLE_HOURS } from './session.service';
 import { CodeInput, TwoFactorService, TWO_FACTOR_PARAMS } from './two-factor.service';
 import { SecurityLogService } from '../logs/security-log.service';
 import { applyContext, RequestContext, UA_MAX } from '../logs/context';
+import { deviceCodeBody, NewDeviceService, newDeviceMailText } from '../security/new-device.service';
 
 /** The context of a sign-in request that has no session yet. */
 const signInCtx = (ip: string | null, userAgent: string | undefined, requestId: string, sessionId?: string): RequestContext => ({
@@ -67,13 +68,13 @@ interface LookupRow {
 /** Login answer when the password was right but a code (or enrolment) is still needed. No session exists yet. */
 export interface PendingBody {
   authenticated: false;
-  next: 'two_factor' | 'enrol';
+  next: 'two_factor' | 'enrol' | 'device_code';
   expires_at: Date;
 }
 
 export type LoginResult =
-  | { kind: 'session'; token: string; body: SessionBody }
-  | { kind: 'pending'; token: string; body: PendingBody };
+  | { kind: 'session'; token: string; body: SessionBody; newDevice?: string }
+  | { kind: 'pending'; token: string; body: PendingBody; newDevice?: string };
 
 export interface SessionBody {
   authenticated: true;
@@ -114,6 +115,7 @@ export class AuthService {
     private readonly syslog: SyslogService,
     private readonly twoFactor: TwoFactorService,
     private readonly securityLog: SecurityLogService,
+    private readonly newDevice: NewDeviceService,
   ) {}
 
   async sessionBody(auth: AuthContext, csrf = auth.session.csrfToken): Promise<SessionBody> {
@@ -139,7 +141,7 @@ export class AuthService {
    * POST /auth/local/login. Every failure is the same 401: unknown identifier, wrong password, locked, local sign-in off,
    * suspended or disabled. A dummy argon2 verify runs when nothing matched so the timing does not tell them apart.
    */
-  async login(rawBody: unknown, ip: string | null, userAgent: string | undefined, requestId: string): Promise<LoginResult> {
+  async login(rawBody: unknown, ip: string | null, userAgent: string | undefined, requestId: string, deviceCookie?: string): Promise<LoginResult> {
     const parsed = loginSchema.safeParse(rawBody);
     if (!parsed.success) throw new ProblemException(400, 'validation_failed', { detail: 'identifier and password are required.', errors: zodErrors(parsed.error) });
     const { password } = parsed.data;
@@ -162,14 +164,14 @@ export class AuthService {
       release();
     };
     try {
-      return await this.loginChecked(identifier, password, masked, ctx, ip, userAgent, requestId, failed);
+      return await this.loginChecked(identifier, password, masked, ctx, ip, userAgent, requestId, failed, deviceCookie);
     } finally {
       release();
     }
   }
 
   private async loginChecked(identifier: string, password: string, masked: string, ctx: ReturnType<typeof signInCtx>, ip: string | null,
-    userAgent: string | undefined, requestId: string, failed: () => void): Promise<LoginResult> {
+    userAgent: string | undefined, requestId: string, failed: () => void, deviceCookie?: string): Promise<LoginResult> {
 
     const rows = await this.db.client.$queryRaw<LookupRow[]>(Prisma.sql`SELECT user_id::text AS user_id, password_hash, must_change, locked_until, status::text AS status
       FROM auth_local_lookup(${identifier})`);
@@ -207,16 +209,38 @@ export class AuthService {
           await this.syslog.write('warn', 'local_sign_in_mfa_required', { identifier_hmac: masked, ip }, row.user_id, requestId);
           return { mfaRequired: true as const };
         }
+        // 0292 (opt-in, off by default): a password-only sign-in from a browser this account has not used needs an emailed code. Not for two-factor accounts.
+        let deviceId = deviceCookie;
+        let gate: Awaited<ReturnType<NewDeviceService['gate']>> | null = null;
+        if (ok && !tf?.required) {
+          deviceId = deviceId ?? this.newDevice.newDeviceId();
+          gate = await this.newDevice.gate(row.user_id, deviceId, ip, newDeviceMailText);
+          if (gate.kind === 'limited') return { deviceLimited: true as const };
+          if (gate.kind === 'challenge') {
+            await this.syslog.write('info', 'local_sign_in_device_code_sent', { identifier_hmac: masked, ip }, row.user_id, requestId);
+            return { device: true as const, token: gate.token, expiresAt: gate.expiresAt, deviceId };
+          }
+          if (gate.via === 'no_mail') await this.syslog.write('warn', 'local_sign_in_device_code_skipped', { identifier_hmac: masked, ip, reason: 'mail_unavailable' }, row.user_id, requestId);
+          if (gate.via === 'not_required') deviceId = deviceCookie;
+        }
         const next = tf?.required ? (tf.enrolled ? ('two_factor' as const) : ('enrol' as const)) : null;
         const pending = next ? await this.twoFactor.createPending(row.user_id, next, ip) : null;
         await this.syslog.write(ok ? 'info' : 'warn', !ok ? 'local_sign_in_failed' : pending ? 'local_sign_in_password_ok' : 'local_sign_in_ok',
           { identifier_hmac: masked, reason: ok ? undefined : 'bad_password', ip, ...(next ? { next } : {}) }, row.user_id, requestId);
         if (!ok) return null;
         if (pending && next) return { pending: true as const, token: pending.token, expiresAt: pending.expiresAt, next };
-        return { pending: false as const, ...(await this.sessions.create(row.user_id, 'local', ip, userAgent)) };
+        return { pending: false as const, ...(await this.sessions.create(row.user_id, 'local', ip, userAgent)), deviceId: gate && gate.kind === 'pass' && gate.via !== 'not_required' ? deviceId : undefined };
       });
     });
     this.states.invalidate(row.user_id);
+    if (created && 'deviceLimited' in created) {
+      await this.securityLog.write({ event: 'sign_in_failed', outcome: 'failure', userId: row.user_id, identifier, ctx, detail: { reason: 'device_code_rate_limited' } });
+      throw problems.rateLimited(3600);
+    }
+    if (created && 'device' in created) {
+      await this.securityLog.write({ event: 'sign_in_started', outcome: 'info', userId: row.user_id, identifier, ctx, detail: { next: 'device_code' } });
+      return { kind: 'pending', token: created.token, newDevice: created.deviceId, body: { authenticated: false, next: 'device_code', expires_at: created.expiresAt } };
+    }
     if (created && 'mfaRequired' in created) {
       await this.securityLog.write({ event: 'sign_in_failed', outcome: 'failure', userId: row.user_id, identifier, ctx, detail: { reason: 'mfa_required' } });
       throw problems.mfaRequired();
@@ -234,7 +258,7 @@ export class AuthService {
     if (!found) throw new ProblemException(500, 'internal_error', {});
     const state = await this.states.get(found.user.id, found.user.email, found.user.status);
     const auth: AuthContext = { session: found.session, user: found.user, state, ip, live: false };
-    return { kind: 'session', token: created.token, body: await this.sessionBody(auth) };
+    return { kind: 'session', token: created.token, body: await this.sessionBody(auth), ...(created.deviceId ? { newDevice: created.deviceId } : {}) };
   }
 
   /** POST /auth/local/step-up: re-enter the password. A wrong password counts toward the lockout. */
@@ -346,6 +370,38 @@ export class AuthService {
       if (out.fail === 'expired') throw problems.unauthenticated('This sign-in has expired. Enter your password again.');
       throw this.twoFactor.problem(out.fail as 'bad' | 'replay' | 'locked', false);
     }
+    return this.sessionFor(out.created.token, ip);
+  }
+
+  /**
+   * POST /auth/local/2fa/device-code (0292): the 6-digit code mailed after the password, from a browser the account has not used. Five wrong codes end the
+   * challenge; the person signs in again. The pending token is single use and expires with the code.
+   */
+  async deviceCodeSignIn(pendingToken: string | undefined, rawBody: unknown, ip: string | null, userAgent: string | undefined, requestId: string): Promise<{ token: string; body: SessionBody }> {
+    const body = deviceCodeBody.safeParse(rawBody);
+    if (!body.success) throw problems.validation([{ path: '/code', code: 'invalid' }]);
+    const ipWait = this.limiter.hit(`devcode:ip:${ip ?? 'unknown'}`, LOGIN_LIMIT_PER_IP);
+    if (ipWait) throw problems.rateLimited(ipWait);
+    const found = await this.newDevice.loadChallenge(pendingToken);
+    if (!found || !pendingToken) throw problems.unauthenticated('This sign-in has expired. Enter your password again.');
+    const userId = found.userId;
+    const userWait = this.limiter.hit(`devcode:user:${userId}`, LOGIN_LIMIT_PER_IP);
+    if (userWait) throw problems.rateLimited(userWait);
+    const out = await this.asUser(userId, async () => {
+      const r = await this.newDevice.verify(userId, pendingToken, body.data.code, ip);
+      if (r !== 'ok') return { fail: r } as const;
+      await this.syslog.write('info', 'local_sign_in_ok', { via: 'device_code', ip }, userId, requestId);
+      return { created: await this.sessions.create(userId, 'local', ip, userAgent) } as const;
+    }, signInCtx(ip, userAgent, requestId));
+    this.states.invalidate(userId);
+    if ('fail' in out) {
+      await this.securityLog.write({ event: 'sign_in_failed', outcome: 'failure', userId, ctx: signInCtx(ip, userAgent, requestId), detail: { reason: `device_code_${out.fail}` } });
+      if (out.fail === 'bad') {
+        throw new ProblemException(422, 'invalid_code', { detail: 'This code is not right.', errors: [{ path: '/code', code: 'invalid', message: 'This code is not right.' }] });
+      }
+      throw problems.unauthenticated('This sign-in has expired. Enter your password again.');
+    }
+    await this.securityLog.write({ event: 'sign_in_succeeded', outcome: 'success', userId, ctx: signInCtx(ip, userAgent, requestId, out.created.id), detail: { method: 'password_device_code' } });
     return this.sessionFor(out.created.token, ip);
   }
 

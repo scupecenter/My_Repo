@@ -15,6 +15,7 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/auth/local/step-up'],
   // Contract 0.5.0 and 0.6.0: two-factor (TOTP) for local accounts and its one-time enrolment code (apps/api: auth, users; migrations 0033, 0034).
   ['post', '/auth/local/2fa'],
+  ['post', '/auth/local/2fa/device-code'],
   ['post', '/auth/local/2fa/enrol/start'],
   ['post', '/auth/local/2fa/enrol/confirm'],
   ['post', '/auth/local/2fa/recovery-codes'],
@@ -386,6 +387,10 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/support-access'],
   ['post', '/support-access/revoke-all'],
   ['post', '/support-access/:id/revoke'],
+  // Contract 0.15.192 (migration 0292; apps/api: security): the new-device email code (Settings, Security, New-device code).
+  ['get', '/settings/new-device-code'],
+  ['put', '/settings/new-device-code'],
+  ['post', '/settings/new-device-code/bypass'],
   // Contract 0.15.4 (migration 0085; apps/api: sites, master-import, templates): the per-site workflow locks (one site, many sites) and the status of the sites of
   // an import (missing data per site). The new site fields ride on the paths above.
   ['post', '/sites/workflow-locks'],

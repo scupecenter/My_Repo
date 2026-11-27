@@ -103,6 +103,7 @@ export type ImportsSettings = S['ImportsSettings'];
 export type NavLayoutSetting = S['NavLayoutSetting'];
 export type SecurityLocks = S['SecurityLocks'];
 export type SupportAccessSetting = S['SupportAccessSetting'];
+export type NewDeviceCodeSetting = S['NewDeviceCodeSetting'];
 export type UiIdentity = S['UiIdentity'];
 export type UiBrand = S['UiBrand'];
 export type LoginPage = S['LoginPage'];

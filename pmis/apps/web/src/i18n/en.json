@@ -1201,7 +1201,8 @@
     "section_workflow_coverage": "Matrix coverage",
     "section_screens_login": "Login page",
     "section_screens_interface": "Interface",
-    "section_screens_goals": "Goals"
+    "section_screens_goals": "Goals",
+    "section_security_newdevice": "New-device code"
   },
   "scopeMatch": {
     "title": "Team / scope match (Procurement)",
@@ -6874,5 +6875,36 @@
     "remove": "Remove goal",
     "add": "Add goal",
     "save_title": "Save the goals"
+  },
+  "newdevice": {
+    "title": "New-device code",
+    "note": "When this is on, a password-only sign-in from a browser the account has not used before needs a 6-digit code sent to the account's own email. It is off until you turn it on. Nothing is deleted, sessions already open keep working, and you can turn it off at any time.",
+    "enable": "Ask for an email code on a new device",
+    "enable_note": "Not asked of people with two-step verification (their authenticator is stronger), of System Admins (unless you include them), or of accounts with no email. If the code email cannot be queued the sign-in goes through, so nobody is locked out.",
+    "no_mail": "The mail server is not set up, so this cannot be turned on yet.",
+    "minutes": "Code valid for (minutes)",
+    "include_admins": "Include System Admins",
+    "admins_note": "Leave this off so an admin can always sign in to turn the feature off or let someone in.",
+    "save": "Save settings",
+    "updated": "Last changed by {{name}} on {{when}}.",
+    "readonly": "Only a System Admin manages the new-device code.",
+    "bypass": "Let one person in without the code",
+    "bypass_note": "For someone who cannot reach their mailbox. It works for their next sign-in only, from any browser, for a few minutes.",
+    "who": "Person",
+    "who_ph": "Type 2 letters of a name",
+    "bypass_minutes": "Minutes",
+    "bypass_btn": "Allow one sign-in",
+    "bypass_until": "They can sign in once without the code until {{when}}.",
+    "confirm_set": "New-device code: {{enabled}}, valid {{minutes}} minutes. Your password is asked again and the change is written to the audit log.",
+    "confirm_bypass": "Let {{who}} sign in once without the code, for {{minutes}} minutes. It is written to the audit log.",
+    "on": "on",
+    "off_word": "off"
+  },
+  "devicecode": {
+    "title": "Check it is you",
+    "body": "This browser is new for your account. We sent a 6-digit code to your email. Enter it to finish signing in.",
+    "label": "Code from your email",
+    "hint": "6 digits. It works once and expires soon.",
+    "wrong": "The code is not correct. Check your email and try again."
   }
 }
