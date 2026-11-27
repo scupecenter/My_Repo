@@ -21,15 +21,15 @@ const base = (code: string, region: number, owner: string, contractor: string, s
 /** The synthetic work of a day: the same sites every day, with the planned and done items. */
 function seeds(): SiteSeed[] {
   return [
-    { id: '7d1a0000-0000-4000-8000-000000000001', code: 'TR101', name: 'Tripoli Port (synthetic)', region: 1, auto: base('TR101', 1, 'Libyana Towers (synthetic)', 'North Build Co (synthetic)', 'Sami Nuri'),
+    { id: '7d1a0000-0000-4000-8000-000000000001', code: 'TR101', name: 'Tripoli Port (synthetic)', region: 1, auto: base('TR101', 1, 'Libyana Towers (synthetic)', 'North Build Co (synthetic)', 'Demo User 06'),
       planned: ['B5 CW start', 'CW (PO-1001)'], actual: ['B5 CW start'] },
-    { id: '7d1a0000-0000-4000-8000-000000000002', code: 'TR102', name: 'Souq Al Juma (synthetic)', region: 1, auto: base('TR102', 1, 'Aljeel (synthetic)', 'North Build Co (synthetic)', 'Mona Fathi'),
+    { id: '7d1a0000-0000-4000-8000-000000000002', code: 'TR102', name: 'Souq Al Juma (synthetic)', region: 1, auto: base('TR102', 1, 'Aljeel (synthetic)', 'North Build Co (synthetic)', 'Demo User 02'),
       planned: ['B9 MOS'], actual: [] },
-    { id: '7d1a0000-0000-4000-8000-000000000003', code: 'BG009', name: 'Benghazi Centre (synthetic)', region: 5, auto: { ...base('BG009', 5, 'Al Madar (synthetic)', 'East Works (synthetic)', 'Ali Barka'), access_valid: 'No' },
+    { id: '7d1a0000-0000-4000-8000-000000000003', code: 'BG009', name: 'Benghazi Centre (synthetic)', region: 5, auto: { ...base('BG009', 5, 'Al Madar (synthetic)', 'East Works (synthetic)', 'Demo User 03'), access_valid: 'No' },
       planned: ['D2 TE installation'], actual: ['D2 TE installation'] },
   ];
 }
-const extraSite: SiteSeed = { id: '7d1a0000-0000-4000-8000-000000000004', code: 'TR150', name: 'Janzour (synthetic)', region: 1, auto: base('TR150', 1, 'Libyana Towers (synthetic)', 'In-House', 'Sami Nuri'), planned: [], actual: [] };
+const extraSite: SiteSeed = { id: '7d1a0000-0000-4000-8000-000000000004', code: 'TR150', name: 'Janzour (synthetic)', region: 1, auto: base('TR150', 1, 'Libyana Towers (synthetic)', 'In-House', 'Demo User 06'), planned: [], actual: [] };
 
 const plans = new Map<string, Plan>();
 let cfg: DailyPlanSettings = {

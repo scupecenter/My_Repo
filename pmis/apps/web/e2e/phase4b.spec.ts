@@ -45,10 +45,10 @@ for (const [locale, theme] of [['en', 'light'], ['ar', 'dark']] as const) {
       await page.goto('/inbox?task=10000000-0000-4000-8000-000000000001');
       await expect(page.getByTestId('task-drawer-body')).toBeVisible();
       await page.getByRole('tab', { name: locale === 'ar' ? 'التعليقات' : 'Comments' }).click();
-      await page.getByTestId('comment-input').fill('please look @sa');
+      await page.getByTestId('comment-input').fill('please look @de');
       await page.getByTestId('mention-opt-1204').click();
       await page.getByTestId('comment-send').click();
-      await expect(page.getByTestId('comment-mentions')).toContainText(`${locale === 'ar' ? 'وصلت إلى' : 'Reached'}: Sami Nuri`);
+      await expect(page.getByTestId('comment-mentions')).toContainText(`${locale === 'ar' ? 'وصلت إلى' : 'Reached'}: Demo User 06`);
       await page.getByRole('tab', { name: locale === 'ar' ? 'الزمن' : 'Time' }).click();
       await expect(page.getByTestId('tis-row-entry')).toBeVisible();
       await expect(page.getByTestId('tis-segments')).toBeVisible();

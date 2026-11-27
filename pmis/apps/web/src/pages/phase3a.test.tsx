@@ -58,7 +58,7 @@ describe('assignment edit', () => {
     await u.click(within(dlg).getByTestId('assign-mode-role'));
     await waitFor(() => expect(within(dlg).getByTestId('assign-role-select').querySelectorAll('option').length).toBeGreaterThan(3));
     await u.selectOptions(within(dlg).getByTestId('assign-role-select'), (within(dlg).getByTestId('assign-role-select').querySelectorAll('option')[3] as HTMLOptionElement).value);
-    await u.type(within(dlg).getByTestId('assign-people-search'), 'Wael');
+    await u.type(within(dlg).getByTestId('assign-people-search'), 'Demo');
     await u.click(await within(dlg).findByTestId('assign-people-opt-1211'));
     // Confirm stays off until a preview of the same selection has run.
     expect(within(dlg).getByTestId('assign-dialog-submit')).toBeDisabled();
@@ -103,7 +103,7 @@ describe('delegation', () => {
     const u = userEvent.setup();
     renderApp(<Delegation />);
     await u.click(await screen.findByTestId('deleg-new'));
-    await u.type(screen.getByTestId('deleg-to-search'), 'Ahmed');
+    await u.type(screen.getByTestId('deleg-to-search'), 'Demo');
     const own = await screen.findByTestId('deleg-to-opt-1001');
     expect(own).toBeDisabled();
     expect(screen.getByTestId('delegation-dialog-submit')).toBeDisabled();
@@ -115,7 +115,7 @@ describe('delegation', () => {
     const u = userEvent.setup();
     renderApp(<Delegation />);
     await u.click(await screen.findByTestId('deleg-new'));
-    await u.type(screen.getByTestId('deleg-to-search'), 'Ali');
+    await u.type(screen.getByTestId('deleg-to-search'), 'Demo');
     await u.click(await screen.findByTestId('deleg-to-opt-1103'));
     await u.click(screen.getByTestId('deleg-right-reassign'));
     await type('delegation-dialog-reason', 'Cover during my leave');
@@ -143,10 +143,10 @@ describe('absence and cover', () => {
     expect(screen.getByTestId('cover-sla-note')).toHaveTextContent('not reset or paused');
     await u.click(screen.getByTestId('cover-dialog-submit'));
     expect(screen.getByTestId('cover-dialog-submit')).toBeDisabled(); // nobody picked yet
-    await u.type(screen.getByTestId('cover-to-search'), 'Mona');
+    await u.type(screen.getByTestId('cover-to-search'), 'Demo');
     await waitFor(() => expect(screen.queryByTestId('cover-to-opt-1102')).not.toBeInTheDocument()); // the absent holder is not eligible
     await u.clear(screen.getByTestId('cover-to-search'));
-    await u.type(screen.getByTestId('cover-to-search'), 'Ali');
+    await u.type(screen.getByTestId('cover-to-search'), 'Demo');
     await u.click(await screen.findByTestId('cover-to-opt-1103'));
     await u.click(screen.getByTestId('cover-dialog-submit'));
     expect(await screen.findByTestId('cover-dialog-reason-error')).toBeInTheDocument(); // reason required

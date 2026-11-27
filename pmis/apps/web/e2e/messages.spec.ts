@@ -66,7 +66,7 @@ for (const locale of ['en', 'ar'] as const) {
 
     test('an employee writes to the manager, the manager replies twice: original, reply box, then newest first', async ({ page }) => {
       const subject = 'E2E: site visit question';
-      await signIn(page, locale, 'auditor'); // Ali Barka, reports to Mona Fathi
+      await signIn(page, locale, 'auditor'); // Demo User 03, reports to Demo User 02
       await page.getByTestId('nav-messages').click();
       await page.getByTestId('messages-new').click();
       await page.getByTestId('new-message-to').selectOption({ index: 1 });
@@ -77,7 +77,7 @@ for (const locale of ['en', 'ar'] as const) {
       await expect(page.getByTestId('msg-original-body')).toContainText('Please confirm.');
       await signOut(page);
 
-      await login(page, 'reviewer'); // Mona Fathi
+      await login(page, 'reviewer'); // Demo User 02
       await expect(page.getByTestId('messages-badge')).toBeVisible();
       await page.getByTestId('nav-messages').click();
       const mine = page.locator('[data-testid^="thread-subject-"]').filter({ hasText: subject });

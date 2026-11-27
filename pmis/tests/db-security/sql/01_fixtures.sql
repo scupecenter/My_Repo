@@ -172,5 +172,5 @@ INSERT INTO secsuite_ids SELECT 'TASK_BEN', t.id::text FROM task_instances t JOI
 
 -- Staff registry (migration 0142): the migration seeds nothing (Q611), so the suite loads two synthetic rows of db/seed/staff-registry.draft.csv itself.
 INSERT INTO staff_registry (employee_id, name_en, name_ar, email, phone, position, team, main_role, region, status, notes) VALUES
-  ('1103', 'Ali Barka', 'علي بركة', 'ali.barka@example.com', '+218 94 214 1226', 'RF Engineer', 'none', 'RF & Design / Acquisition Team Lead', 'Tripoli', 'active', NULL),
-  ('1104', 'Karim Zaroug', 'كريم زروق', 'karim.zaroug@example.com', '+218 91 221 1339', 'MW Engineer', 'none', 'RF & Design / Acquisition Team Lead', 'Benghazi', 'inactive', 'Left the company; deactivated, history kept');
+  ('1103', 'Demo User 03', 'مستخدم تجريبي 03', 'demo.user.03@example.com', '+218 90 000 0003', 'RF Engineer', 'none', 'RF & Design / Acquisition Team Lead', 'Tripoli', 'active', NULL),
+  ('1104', 'Demo User 04', 'مستخدم تجريبي 04', 'demo.user.04@example.com', '+218 90 000 0004', 'MW Engineer', 'none', 'RF & Design / Acquisition Team Lead', 'Benghazi', 'inactive', 'Left the company; deactivated, history kept');

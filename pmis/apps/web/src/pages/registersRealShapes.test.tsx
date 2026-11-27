@@ -45,7 +45,7 @@ describe('Matrix page with two fixed levels', () => {
     const approve = screen.getByTestId('matrix-cell-cw-3');                       // L2 is cell 3, not cell 2
     expect(screen.queryByTestId('matrix-cell-cw-2')).not.toBeInTheDocument();
     await u.click(within(approve).getByTestId('matrix-add'));
-    await u.type(await screen.findByTestId('matrix-picker-q'), 'Hana');
+    await u.type(await screen.findByTestId('matrix-picker-q'), 'Demo');
     await u.click(await screen.findByTestId('matrix-opt-user-1210'));
     await u.click(screen.getByTestId('matrix-publish'));
     await u.type(screen.getByTestId('matrix-reason'), 'CW L2 holder');
@@ -73,12 +73,12 @@ describe('Matrix page with two fixed levels', () => {
     // live: put 1102 on L2 of CW, which has her on neither level yet
     expect(screen.getByTestId('matrix-skip-cw')).toHaveTextContent('—');
     await u.click(within(screen.getByTestId('matrix-cell-cw-1')).getByTestId('matrix-add'));
-    await u.type(await screen.findByTestId('matrix-picker-q'), 'Mona');
+    await u.type(await screen.findByTestId('matrix-picker-q'), 'Demo');
     await u.click(await screen.findByTestId('matrix-opt-user-1102'));
     await u.click(within(screen.getByTestId('matrix-cell-cw-3')).getByTestId('matrix-add'));
-    await u.type(await screen.findByTestId('matrix-picker-q'), 'Mona');
+    await u.type(await screen.findByTestId('matrix-picker-q'), 'Demo');
     await u.click(await screen.findByTestId('matrix-opt-user-1102'));
-    await waitFor(() => expect(screen.getByTestId('matrix-skip-cw')).toHaveTextContent(/Mona Fathi hold L1 and L2/));
+    await waitFor(() => expect(screen.getByTestId('matrix-skip-cw')).toHaveTextContent(/Demo User 02 hold L1 and L2/));
     expect(screen.getByTestId('matrix-warn-self-cw')).toBeInTheDocument();
   }, 30_000);
 
@@ -89,7 +89,7 @@ describe('Matrix page with two fixed levels', () => {
     const u = userEvent.setup();
     await screen.findByTestId('matrix-row-te_installation');
     await u.click(within(screen.getByTestId('matrix-cell-te_installation-1')).getByTestId('matrix-add'));
-    await u.type(await screen.findByTestId('matrix-picker-q'), 'Hana');
+    await u.type(await screen.findByTestId('matrix-picker-q'), 'Demo');
     await u.click(await screen.findByTestId('matrix-both-user-1210'));
     await waitFor(() => expect(within(screen.getByTestId('matrix-cell-te_installation-1')).getByTestId('person-id-1210')).toBeInTheDocument());
     expect(within(screen.getByTestId('matrix-cell-te_installation-3')).getByTestId('person-id-1210')).toBeInTheDocument();
@@ -101,7 +101,7 @@ describe('Matrix page with two fixed levels', () => {
     await waitFor(() => expect(screen.getByTestId('matrix-dirty')).toHaveTextContent('0'));
     const row = (await api.get<Matrix>('/matrix')).stages.find((x) => x.code === 'te_installation')!;
     for (const level of [1, 3]) expect(row.cells.find((c) => c.level === level)!.assignees.map((a) => a.employee_id)).toContain('1210');
-    expect(row.cells.find((c) => c.level === 1)!.skip_preview?.map((x) => x.display_name)).toContain('Hana Zidan');
+    expect(row.cells.find((c) => c.level === 1)!.skip_preview?.map((x) => x.display_name)).toContain('Demo User 12');
   }, 30_000);
 
   it('names the level that has no holder from Problem.cells of the 422 empty_cell answer, not from errors[]', async () => {
@@ -114,7 +114,7 @@ describe('Matrix page with two fixed levels', () => {
     renderApp(<MatrixPage />, { route: '/admin/matrix' });
     const u = userEvent.setup();
     await u.click(within(await screen.findByTestId('matrix-cell-cw-1')).getByTestId('matrix-add'));
-    await u.type(await screen.findByTestId('matrix-picker-q'), 'Hana');
+    await u.type(await screen.findByTestId('matrix-picker-q'), 'Demo');
     await u.click(await screen.findByTestId('matrix-opt-user-1210'));
     await u.click(screen.getByTestId('matrix-publish'));
     await u.type(screen.getByTestId('matrix-reason'), 'Edit L1');

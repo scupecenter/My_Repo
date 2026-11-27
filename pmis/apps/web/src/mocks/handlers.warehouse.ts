@@ -184,7 +184,7 @@ export const warehouseHandlers = [
     const mvt = {
       id: uid(`wh-exit-${n}`), doc_no: `${b.exit_kind === 'returned_to_supplier' ? 'DN-SUP-WH' : 'ADJ-WH'}-2026-${String(n).padStart(4, '0')}`, record_type: b.exit_kind === 'returned_to_supplier' ? 'sup_dn' : 'adj',
       kind: 'quarantine_exit', exit_kind: b.exit_kind, exit_reason: b.reason, status: 'pending', site_id: null, site_code: null, register_record_id: uid(`wh-exit-rec-${n}`), reserved: false, version: 1, doc_no_locked: false, sequence_key: null, doc_date: '2026-11-04',
-      lines: lines.map((l) => ({ item_id: l.item_id, item_code: W().stock.find((x) => x.item_id === l.item_id)!.item_code, qty: l.qty })), created_by: { id: uid('user-pm'), display_name: 'Ahmed Salem' }, created_at: '2026-11-04T08:00:00Z', posted_at: null,
+      lines: lines.map((l) => ({ item_id: l.item_id, item_code: W().stock.find((x) => x.item_id === l.item_id)!.item_code, qty: l.qty })), created_by: { id: uid('user-pm'), display_name: 'Demo User 01' }, created_at: '2026-11-04T08:00:00Z', posted_at: null,
     } as never as (typeof W extends () => infer R ? R : never)['movements'][number];
     W().movements.push(mvt);
     return HttpResponse.json(mvt, { status: 201, ...tag(1) });
