@@ -21,7 +21,7 @@
     "@nestjs/common": "^11.2.8",
     "@nestjs/core": "^11.2.8",
     "@nestjs/platform-express": "^11.2.8",
-    "@prisma/client": "^6.19.3",
+    "@prisma/client": "^7.10.1",
     "@simplewebauthn/server": "14.1.0",
     "argon2": "^0.45.1",
     "exceljs": "^4.4.0",
