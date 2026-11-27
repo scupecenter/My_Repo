@@ -160,3 +160,9 @@ export function useAskLeave(s: GuardSource): (proceed: () => void) => void {
   const { askLeave } = useGuardApi();
   return useCallback((proceed: () => void) => askLeave([s], proceed), [askLeave, s]);
 }
+
+/** The same as useUnsavedGuard, as an element: a screen that returns early before its dirty state is known places it in its JSX. */
+export function UnsavedGuard(props: GuardSource): null {
+  useUnsavedGuard(props);
+  return null;
+}

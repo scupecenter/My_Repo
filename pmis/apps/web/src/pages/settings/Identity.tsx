@@ -1,4 +1,5 @@
 import { Lock } from 'lucide-react';
+import { UnsavedGuard } from '@/lib/unsavedGuard';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSetUiIdentity, useUiIdentity } from '@/api/settings';
@@ -118,6 +119,7 @@ export function Identity() {
       {ro
         ? <p className="text-sm text-mute" data-testid="identity-readonly">{t('identity.readonly')}</p>
         : <button className="btn btn-accent" data-testid="identity-save" disabled={!dirty} onClick={() => setOpen(true)}>{t('common.save')}</button>}
+      <UnsavedGuard scope="settings" dirty={dirty} needsReason label={t('ui.guard_settings')} onSave={(reason) => new Promise<boolean>((res) => set.mutate({ version: cur.version, default_brand: v.brand, allow_user_choice: v.allow, defaults: v.defaults, reason }, { onSuccess: () => res(true), onError: () => res(false) }))} />
       {open && (
         <FormDialog open onClose={() => setOpen(false)} testid="identity-dialog" title={t('identity.title')} busy={set.isPending} error={set.isError ? errText(set.error, t) : null}
           onSubmit={(reason) => set.mutate({ version: cur.version, default_brand: v.brand, allow_user_choice: v.allow, defaults: v.defaults, reason },
