@@ -89,9 +89,9 @@ describe('Settings > Interface > Inbox tabs and priority', () => {
 describe('Avatar component', () => {
   it('draws initials and follows the avatar setting in lists', async () => {
     await signIn('pm');
-    renderApp(<div><Avatar name="Ahmed Omran" /><Avatar name="Nadia Ben Ali" lists /><NewBadge feature="interface-settings" /></div>);
+    renderApp(<div><Avatar name="Demo Person A" /><Avatar name="Demo Person B" lists /><NewBadge feature="interface-settings" /></div>);
     const av = await screen.findAllByTestId('avatar');
-    expect(av[0]).toHaveTextContent('AO');
+    expect(av[0]).toHaveTextContent('DP');
     expect(av.length).toBe(2);
     // whether the badge shows depends on the real date; the window itself is tested in avatar.test.ts
   });

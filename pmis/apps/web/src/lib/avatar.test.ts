@@ -4,8 +4,8 @@ import { daysBetween, isNew } from './newFeatures';
 
 describe('generated avatars', () => {
   it('takes the first letter of the first two words, Latin and Arabic', () => {
-    expect(initialsOf('Ahmed Omran')).toBe('AO');
-    expect(initialsOf('  nadia   ben ali ')).toBe('NB');
+    expect(initialsOf('Demo Person A')).toBe('DP');
+    expect(initialsOf('  demo   person b ')).toBe('DP');
     expect(initialsOf('سالم المصراتي')).toBe('سا');
     expect(initialsOf('Tripoli')).toBe('TR');
     expect(initialsOf('')).toBe('?');
@@ -13,11 +13,11 @@ describe('generated avatars', () => {
     expect(initialsOf('--- ...')).toBe('?');
   });
   it('is stable for one name and uses the accent for the brand palette', () => {
-    expect(hashOf('Ahmed Omran')).toBe(hashOf('Ahmed Omran'));
-    expect(avatarLook('Ahmed Omran', 'gradient', 'varied')).toEqual(avatarLook('Ahmed Omran', 'gradient', 'varied'));
-    expect(avatarLook('Ahmed Omran', 'gradient', 'brand').background).toBe('var(--accent)');
-    expect(avatarLook('Ahmed Omran', 'gradient', 'varied').background).toContain('linear-gradient');
-    expect(avatarLook('Ahmed Omran', 'geometric', 'varied').background).toMatch(/^hsl\(/);
+    expect(hashOf('Demo Person A')).toBe(hashOf('Demo Person A'));
+    expect(avatarLook('Demo Person A', 'gradient', 'varied')).toEqual(avatarLook('Demo Person A', 'gradient', 'varied'));
+    expect(avatarLook('Demo Person A', 'gradient', 'brand').background).toBe('var(--accent)');
+    expect(avatarLook('Demo Person A', 'gradient', 'varied').background).toContain('linear-gradient');
+    expect(avatarLook('Demo Person A', 'geometric', 'varied').background).toMatch(/^hsl\(/);
   });
   it('spreads different names over several colours', () => {
     const hues = new Set(['Ali', 'Omar', 'Nadia', 'Khaled', 'Salem', 'Huda', 'Yahya', 'Mona', 'Tarek', 'Sara'].map((n) => avatarLook(n, 'initials', 'varied').hue));
