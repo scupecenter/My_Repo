@@ -89,10 +89,37 @@
       }
     }
   },
+  "dhs": {
+    "title": "إعدادات مركز البيانات", "widgets_title": "أدوات الصفحة الرئيسية", "widgets_note": "اختر ما تعرضه الصفحة الرئيسية لمركز البيانات. الأداة المخفية تُخفى فقط وتبقى صفحتها في القائمة.",
+    "widget_quick_bar": "شريط التنزيل السريع للقوالب", "widget_batches": "دفعات تحتاج إجراء", "widget_template_changes": "تغييرات القوالب", "widget_recent": "آخر عمليات الرفع والتصدير", "widget_health": "سلامة البيانات", "widget_admin": "قسم الإدارة (لمدير النظام فقط)",
+    "badge": "إظهار شارة العدد على الرفع والدفعات",
+    "views_title": "العرض الافتراضي لكل صفحة", "views_note": "أول عرض يراه المستخدم. يمكن لكل شخص اختيار عرض آخر في الصفحة ويُحفظ على جهازه.",
+    "screen_templates": "القوالب", "screen_uploads": "الرفع والدفعات", "screen_exports": "التصدير", "screen_master_import": "استيراد الماستر والمقارنة",
+    "view_cards": "بطاقات", "view_rows": "صفوف", "view_table": "جدول", "view_compact": "قائمة مضغوطة"
+  },
+  "dhub": {
+    "title": "مركز البيانات", "subtitle": "القوالب والرفع والتصدير وسلامة البيانات في مكان واحد",
+    "settings_hint": "إعدادات مركز البيانات (الأدوات وطرق العرض الافتراضية)", "all_hidden": "كل الأدوات مخفية. فعّلها من الإعدادات > الشاشات > مركز البيانات.",
+    "quick_title": "تنزيل سريع للقوالب", "pick_template": "القالب", "pick_template_ph": "اكتب للبحث عن قالب", "pick_action": "الإجراء", "pick_action_ph": "اختر إجراء", "pick_template_first": "اختر قالباً أولاً", "none_found": "لا يوجد قالب مطابق", "quick_go": "تنفيذ",
+    "act_blank": "تنزيل نسخة فارغة", "act_blank_hint": "القالب المعتمد الفارغ", "act_prefill": "تنزيل نسخة معبأة", "act_prefill_hint": "بالسجلات السارية في مناطقك", "act_upload": "رفع ملف معبأ", "act_upload_hint": "يبدأ دفعة استيراد", "act_open": "فتح صفحة القوالب", "act_open_hint": "كل القوالب والدفعات",
+    "kind_master": "الماستر", "kind_stream": "قسم", "kind_register": "سجل", "kind_sites": "مواقع جديدة", "kind_list_values": "قيم القوائم", "kind_holidays": "العطل",
+    "my_downloads": "آخر تنزيلاتك", "prefilled": "معبأة",
+    "w_batches": "دفعات تحتاج إجراء", "batches_none": "لا شيء بانتظارك.", "open_all": "فتح", "open_templates": "القوالب",
+    "act_send": "إرسال", "act_review_l2": "مراجعة", "act_returned": "معادة", "act_checking": "قيد الفحص",
+    "w_changes": "تغييرات القوالب", "changes_none": "لم يتغير أي قالب مؤخراً.", "change_diff": "{{added}} مضاف، {{removed}} محذوف، {{renamed}} معاد تسميته", "mine_old": "نسختك قديمة",
+    "w_recent": "آخر عمليات الرفع والتصدير", "recent_none": "لا توجد عمليات رفع أو تصدير بعد.", "export_row": "تصدير ({{kind}})",
+    "w_health": "سلامة البيانات", "h_held": "صفوف معلّقة", "h_diffs": "عمليات مقارنة مفتوحة", "h_integrity": "آخر فحص لسلامة السجلات",
+    "w_admin": "الإدارة", "admin_note": "تفتح شاشات الإعدادات الحالية."
+  },
   "nav": {
     "group_home": "لوحة المؤشرات",
     "group_work": "العمل",
-    "group_data": "إدخال البيانات",
+    "group_data": "مركز البيانات",
+    "data_hub": "مركز البيانات",
+    "master_import": "استيراد الماستر والمقارنة",
+    "column_mapping": "ربط الأعمدة",
+    "data_reset": "إعادة ضبط البيانات",
+    "recycle_bin": "سلة المحذوفات",
     "group_admin": "الإدارة",
     "my_work": "عملي",
     "approvals": "الموافقات",
@@ -1216,6 +1243,7 @@
     "section_workflow_coverage": "تغطية المصفوفة",
     "section_screens_login": "صفحة الدخول",
     "section_screens_interface": "الواجهة",
+    "section_screens_data-hub": "مركز البيانات",
     "section_screens_goals": "الأهداف",
     "section_security_newdevice": "رمز الجهاز الجديد",
     "section_workflow_simulate": "من يعتمد؟",
