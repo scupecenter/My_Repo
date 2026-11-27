@@ -25480,7 +25480,7 @@ components:
         view_id: {type: string, format: uuid}
         name: {type: string, maxLength: 120, description: The view's current name.}
         screen_key: {$ref: '#/components/schemas/SavedViewScreenKey'}
-        filters: {type: object, additionalProperties: true, description: The view's filters, scrubbed for the caller like a read of the view (hidden fields left out).}
+        filters: {type: object, additionalProperties: true, description: 'The view''s filters, scrubbed for the caller like a read of the view (hidden fields left out).' }
         position: {type: integer, minimum: 1}
     SavedView:
       type: object
