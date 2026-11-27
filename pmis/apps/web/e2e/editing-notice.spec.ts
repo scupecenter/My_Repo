@@ -22,6 +22,6 @@ for (const c of [{ locale: 'en', theme: 'light', suffix: 'en' }, { locale: 'ar',
     const notice = page.getByTestId('reg-editing-notice');
     await expect(notice).toBeVisible();
     await expect(notice).toContainText('Demo User 02');
-    await page.screenshot({ path: `/downloads/pres-1-notice-${c.suffix}.png`, fullPage: false });
+    await page.screenshot({ path: `test-results/pres-1-notice-${c.suffix}.png`, fullPage: false });
   });
 }
