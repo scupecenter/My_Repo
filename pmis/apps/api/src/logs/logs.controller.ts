@@ -1,3 +1,4 @@
+import { ExportAction } from '../security/export-lock';
 import { Body, Controller, Get, Headers, HttpCode, Param, Post, Put, Query, Res, StreamableFile } from '@nestjs/common';
 import type { Response } from 'express';
 import type { AuthContext } from '../auth/auth.types';
@@ -36,12 +37,14 @@ export class AuditLogController {
     return this.logs.integrity('audit', q);
   }
 
+  @ExportAction()
   @Post('exports')
   @HttpCode(202)
   export(@Auth() auth: AuthContext, @Body() body: unknown, @Headers('idempotency-key') key: string | undefined, @Res({ passthrough: true }) res: Response) {
     return this.logs.startExport(auth, 'audit_export', body ?? {}, key, (go) => res.once('finish', go));
   }
 
+  @ExportAction()
   @Get('exports/:id/download')
   async download(@Auth() auth: AuthContext, @Param('id') id: string, @Res({ passthrough: true }) res: Response) {
     const r = await this.logs.downloadExport(auth, 'audit_export', id);
@@ -65,12 +68,14 @@ export class SecurityLogController {
     return this.logs.integrity('security', q);
   }
 
+  @ExportAction()
   @Post('exports')
   @HttpCode(202)
   export(@Auth() auth: AuthContext, @Body() body: unknown, @Headers('idempotency-key') key: string | undefined, @Res({ passthrough: true }) res: Response) {
     return this.logs.startExport(auth, 'security_export', body ?? {}, key, (go) => res.once('finish', go));
   }
 
+  @ExportAction()
   @Get('exports/:id/download')
   async download(@Auth() auth: AuthContext, @Param('id') id: string, @Res({ passthrough: true }) res: Response) {
     const r = await this.logs.downloadExport(auth, 'security_export', id);
@@ -167,6 +172,7 @@ export class LogsAdminController {
   }
 
   /** JSON by default; `format=xlsx` (0.12.3, Q169) answers the workbook. */
+  @ExportAction({ whenQuery: { name: 'format', value: 'xlsx' } })
   @Get('reports/activity')
   async activity(@Auth() auth: AuthContext, @Query() q: Q, @Res({ passthrough: true }) res: Response) {
     const format = oneParam(q, 'format') ?? 'json';

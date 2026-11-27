@@ -9,7 +9,7 @@ const login = async (id?: string) => {
 
 describe('mock login rule', () => {
   it('behaves identically for found and not found identifiers', async () => {
-    const found = await login('1103'), missing = await login('9999'), phoneFound = await login('+218 94 214 1226');
+    const found = await login('1103'), missing = await login('9999'), phoneFound = await login('+218 90 000 0003');
     expect(found.status).toBe(302);
     for (const x of [missing, phoneFound]) { expect(x.status).toBe(found.status); expect(x.keys).toEqual(found.keys); expect(x.path).toBe(found.path); }
   });
@@ -17,10 +17,10 @@ describe('mock login rule', () => {
     const r = await login('1103');
     expect(r.hint).toBeNull();
     expect(r.href).not.toContain('ali.barka');
-    expect((await login('+218 94 214 1226')).href).not.toContain('ali.barka');
+    expect((await login('+218 90 000 0003')).href).not.toContain('ali.barka');
   });
   it('passes login_hint only as typed, matched or not', async () => {
-    expect((await login('ali.barka@example.com')).hint).toBe('ali.barka@example.com');
+    expect((await login('demo.user.03@example.com')).hint).toBe('demo.user.03@example.com');
     expect((await login('nobody@example.com')).hint).toBe('nobody@example.com');
   });
 });

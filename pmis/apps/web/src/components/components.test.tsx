@@ -41,7 +41,7 @@ describe('EmployeeId', () => {
 describe('Pending', () => {
   it('shows the pending state and notifies admins', async () => {
     await signIn('pending');
-    renderApp(<Pending session={{ authenticated: true, csrf_token: '', user: { id: 'u', display_name: 'Wael Saadi', employee_id: '1211' } }} />);
+    renderApp(<Pending session={{ authenticated: true, csrf_token: '', user: { id: 'u', display_name: 'Demo User 13', employee_id: '1211' } }} />);
     await userEvent.click(screen.getByTestId('pending-notify'));
     await screen.findByText('The admins were notified.');
   });
@@ -50,7 +50,7 @@ describe('Pending', () => {
     await signIn('pending');
     server.use(http.post(`${API_BASE}/me/notify-admins`, () => HttpResponse.json({ status: 429, code: 'rate_limited', title: 'Too many requests' },
       { status: 429, headers: { 'Content-Type': 'application/problem+json', 'Retry-After': '3600' } })));
-    renderApp(<Pending session={{ authenticated: true, csrf_token: '', user: { id: 'u', display_name: 'Wael Saadi', employee_id: '1211' } }} />);
+    renderApp(<Pending session={{ authenticated: true, csrf_token: '', user: { id: 'u', display_name: 'Demo User 13', employee_id: '1211' } }} />);
     await userEvent.click(screen.getByTestId('pending-notify'));
     expect(await screen.findByTestId('pending-notify-error')).toHaveTextContent('a moment ago');
     expect(screen.getByTestId('pending-notify')).not.toBeDisabled();
@@ -73,7 +73,7 @@ describe('EmployeeId on the real API (contract 0.15.60)', () => {
 describe('PersonTag hover card', () => {
   it('shows ID beside the name and hides fields per visibility payload', async () => {
     await signIn('pm');
-    renderApp(<PersonTag name="Karim Zaroug" employeeId="1104" />);
+    renderApp(<PersonTag name="Demo User 04" employeeId="1104" />);
     expect(screen.getByTestId('person-id-1104')).toHaveTextContent('1104');
     screen.getByTestId('person-id-1104').focus();
     const card = await screen.findByTestId('staff-card');

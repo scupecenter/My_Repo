@@ -11,6 +11,7 @@ import { BRANDS, isBrand } from '@/lib/brands';
 import { guard, page, problem, stepUp } from './handlers';
 import { byId, uid } from './ids';
 import type { TableDisplaySetting } from '@/api/display';
+import { UI_FEATURES_SEED, type UiFeaturesSetting } from '@/api/uiFeatures';
 import { CALENDAR_CODES, CATALOGUE, COMPLETENESS, MAIL_KIND_CATALOGUE, MISMATCH, initCfg, GATES, MILESTONES, OPEN_TASKS, SCENARIOS, START_EVENT_CODES, TASK_DEFS, type SlaSetRec, type WeightRec } from './settingsData';
 
 const B = API_BASE;
@@ -18,6 +19,8 @@ const TODAY = '2026-10-25';
 const C = () => db().cfg;
 /** W8 (0.15.64): the defaults of the Display menu, the seed look until an admin saves them. */
 const TD = () => (C().tableDisplay ??= { defaults: { size: 'md', align: 'start', density: 'comfortable', wrap: false, zebra: true }, version: 0 } as TableDisplaySetting);
+/** 0.15.102: the interface features, the seed until an admin saves them. */
+const UF = () => (C().uiFeatures ??= { sections: structuredClone(UI_FEATURES_SEED), version: 0 } as UiFeaturesSetting);
 /** A mock store saved before 0.9.1 has no match table, one saved before 0.12.9 no catalogue: start it from the seed. */
 const SM = () => (C().scopeMatch?.catalogue ? C().scopeMatch : (C().scopeMatch = initCfg().scopeMatch));
 const CR = () => (C().contractorRules ??= initCfg().contractorRules);
@@ -241,6 +244,10 @@ const progress = (s: Pick<WeightSet, 'activities'>) => Math.round(s.activities.r
 const CC = () => (C().calConfirm ??= initCfg().calConfirm);
 const MK = () => (C().mailKinds ??= initCfg().mailKinds);
 /** 0.15.1: nav.layout (a store saved before 0.15.1 starts from the seed). */
+/** 0.15.190: the admin lock keys, kept in memory like the other small settings of the mock (both off by default). */
+const locks: { block_public_sharing: boolean; disable_export: boolean; version: number; updated_at: string | null; updated_by: { id: string; display_name: string; employee_id: string | null } | null } =
+  { block_public_sharing: false, disable_export: false, version: 1, updated_at: null, updated_by: null };
+const locksView = () => ({ ...locks, can_edit: isAdmin() });
 const identityView = () => ({ ...identity(), brands: [...BRANDS], can_edit: isAdmin() });
 /** 0.15.97: the login page settings with the system version (shown to signed-in users only). */
 const loginPageView = () => ({ ...loginPage(), server_version: '0.15.97', can_edit: isAdmin() });
@@ -362,6 +369,8 @@ const DASH_CATALOGUE = {
     { code: 'sla', label_en: 'SLA per stage and top late tasks', label_ar: 'SLA لكل مرحلة' },
     { code: 'gates_issues_delay', label_en: 'Blocked gates, issues and delay attribution', label_ar: 'البوابات المعطلة والقضايا والتأخير' },
     { code: 'regions', label_en: 'Regions', label_ar: 'المناطق' },
+    { code: 'ops_procurement', label_en: 'Procurement and materials', label_ar: 'المشتريات والمواد' },
+    { code: 'ops_scurve', label_en: 'Progress curve: planned vs actual, velocity and forecast', label_ar: 'منحنى التقدم: المخطط مقابل الفعلي والسرعة والتوقع' },
   ],
 };
 const dashSeedThresholds = Object.fromEntries(DASH_CATALOGUE.kpis.map((k) => [k.code, { green: k.default_green, amber: k.default_amber }]));
@@ -385,6 +394,15 @@ const SLA_TASKS: MockSlaTask[] = [
 ];
 const slaCounts = () => ({ total: SLA_TASKS.length, set: SLA_TASKS.filter((x) => x.mode === 'set').length, none: SLA_TASKS.filter((x) => x.mode === 'none').length, undecided: SLA_TASKS.filter((x) => x.mode === 'undecided').length, in_draft: SLA_TASKS.filter((x) => x.in_draft).length });
 
+/** GET/PUT/POST /recycle-bin (contract 0.15.98): demo voided records. */
+const BIN = {
+  retention_days: 90, version: 1,
+  items: [
+    { id: '00000000-0000-4000-8000-0000000000a1', register_key: 'procurement', register_name_en: 'Procurement', register_name_ar: null, label: 'GN-0012 / Procurement v1', site_id: null, site_code: 'GN-0012', version: 4, version_no: 1, voided_at: '2026-11-20T09:00:00.000Z', voided_by: null, voided_by_name: 'Demo Admin', void_reason: 'Entered on the wrong site', restorable_until: '2027-02-18T09:00:00.000Z', blocked: null as string | null },
+    { id: '00000000-0000-4000-8000-0000000000a2', register_key: 'gecol', register_name_en: 'GECOL', register_name_ar: null, label: 'GN-0031 / GECOL v1', site_id: null, site_code: 'GN-0031', version: 3, version_no: 1, voided_at: '2026-11-22T09:00:00.000Z', voided_by: null, voided_by_name: 'Demo Admin', void_reason: 'Duplicate', restorable_until: '2027-02-20T09:00:00.000Z', blocked: 'site_slot_taken' },
+  ],
+};
+
 /** GET /matrix/coverage (contract 0.15.94): demo numbers only. */
 const MATRIX_COVERAGE = {
   workflow_version: 1,
@@ -401,8 +419,37 @@ const MATRIX_COVERAGE = {
   ],
 };
 
+/** Preventive-maintenance schedules (contract 0.15.161): the list in memory; "Create draft" only moves the next due date (the mock saves no record). */
+type MockPm = { id: string; name_en: string; name_ar?: string | null; register_key: string; site_id?: string | null; record_type?: string | null; data: Record<string, unknown>; every: number; unit: 'week' | 'month'; next_due: string; active?: boolean; last_generated_at?: string; last_record_id?: string };
+let pmState = { version: 0, schedules: [] as MockPm[], updated_at: null as string | null, updated_by: null as null | { id: string; display_name: string } };
+const PM_CATALOGUE = { registers: [{ key: 'procurement', name_en: 'Procurement', name_ar: 'المشتريات', site_scoped: false }], units: ['week', 'month'] };
+const pmView = () => ({ ...pmState, today: tripoliToday(), catalogue: PM_CATALOGUE });
+
 export const settingsHandlers = [
+  http.get(`${B}/recycle-bin`, () => { const g = guard(); if (g) return g; return HttpResponse.json(BIN, tag(BIN.version)); }),
+  http.put(`${B}/recycle-bin/retention`, async ({ request }) => { const g = guard(); if (g) return g; const b = (await request.json()) as { retention_days: number }; BIN.retention_days = b.retention_days; BIN.version += 1; return HttpResponse.json({ retention_days: BIN.retention_days, version: BIN.version }, tag(BIN.version)); }),
+  http.post(`${B}/recycle-bin/:id/restore`, ({ params }) => { const g = guard(); if (g) return g; const i = BIN.items.findIndex((x) => x.id === params.id); if (i < 0) return HttpResponse.json({ code: 'not_found' }, { status: 404 }); const [r] = BIN.items.splice(i, 1); return HttpResponse.json({ id: r!.id, register_key: r!.register_key, state: 'entry', version: r!.version + 1 }); }),
   http.get(`${B}/matrix/coverage`, () => { const g = guard(); if (g) return g; return HttpResponse.json(MATRIX_COVERAGE); }),
+  // ------------------------------------------------------------------ preventive-maintenance schedules (contract 0.15.161)
+  http.get(`${B}/settings/pm-schedules`, () => { const g = guard(); if (g) return g; return HttpResponse.json(pmView(), tag(pmState.version)); }),
+  http.put(`${B}/settings/pm-schedules`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    const b = (await request.json()) as { schedules: MockPm[] };
+    pmState = { ...pmState, version: pmState.version + 1, schedules: b.schedules.map((x) => ({ ...x, last_generated_at: pmState.schedules.find((o) => o.id === x.id)?.last_generated_at, last_record_id: pmState.schedules.find((o) => o.id === x.id)?.last_record_id })), updated_at: new Date().toISOString() };
+    return HttpResponse.json(pmView(), tag(pmState.version));
+  }),
+  http.post(`${B}/pm-schedules/:id/generate`, ({ params }) => {
+    const g = guard(); if (g) return g;
+    const x = pmState.schedules.find((o) => o.id === params.id);
+    if (!x) return problem(404, 'not_found', 'Schedule not found');
+    const today = tripoliToday();
+    if (x.active === false || x.next_due > today) return problem(409, 'invalid_transition', 'This schedule is not due.');
+    let d = new Date(`${x.next_due}T00:00:00Z`);
+    while (d.toISOString().slice(0, 10) <= today) { if (x.unit === 'week') d = new Date(d.getTime() + 7 * x.every * 86400000); else d.setUTCMonth(d.getUTCMonth() + x.every); }
+    x.next_due = d.toISOString().slice(0, 10); x.last_generated_at = new Date().toISOString(); x.last_record_id = crypto.randomUUID();
+    pmState = { ...pmState, version: pmState.version + 1 };
+    return HttpResponse.json({ record_id: x.last_record_id, register_key: x.register_key, next_due: x.next_due }, { status: 201 });
+  }),
   // ------------------------------------------------------------------ dashboard settings (F20, contract 0.15.24)
   http.get(`${B}/settings/dashboard`, () => { const g = guard(); if (g) return g; return HttpResponse.json(dashView(), tag(dashState.version)); }),
   http.put(`${B}/settings/dashboard`, async ({ request }) => {
@@ -583,6 +630,27 @@ export const settingsHandlers = [
     Object.assign(cur, { ...nxt, version: cur.version + 1, updated_at: new Date().toISOString(),
       updated_by: { id: uid(v.employee_id ?? '9999'), display_name: v.name, employee_id: v.employee_id } }); save();
     const j = loginPageView();
+    return HttpResponse.json(j, tag(j.version));
+  }),
+
+  // ------------------------------------------------------------------ 0.15.190: admin lock keys (block public sharing, disable export), both off by default
+  http.get(`${B}/settings/security-locks`, () => { const g = guard(); if (g) return g; const j = locksView(); return HttpResponse.json(j, tag(j.version)); }),
+  http.put(`${B}/settings/security-locks`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    const b = await body<{ block_public_sharing?: unknown; disable_export?: unknown; reason?: string } & Record<string, unknown>>(request);
+    const errs: { path: string; code: string }[] = Object.keys(b).filter((k) => !['block_public_sharing', 'disable_export', 'reason'].includes(k)).map((k) => ({ path: `/${k}`, code: 'unknown_field' }));
+    if (typeof b.block_public_sharing !== 'boolean') errs.push({ path: '/block_public_sharing', code: 'required' });
+    if (typeof b.disable_export !== 'boolean') errs.push({ path: '/disable_export', code: 'required' });
+    if ((b.reason ?? '').trim().length < 3 || (b.reason ?? '').length > 1000) errs.push({ path: '/reason', code: 'required' });
+    if (errs.length) return fields(...errs);
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, locks.version); if (p) return p;
+    if (!stepUpValid()) return stepUp();
+    if (locks.block_public_sharing === b.block_public_sharing && locks.disable_export === b.disable_export) return problem(409, 'invalid_transition', 'These are already the lock keys in force.');
+    const v = viewer()!;
+    Object.assign(locks, { block_public_sharing: b.block_public_sharing, disable_export: b.disable_export, version: locks.version + 1, updated_at: new Date().toISOString(),
+      updated_by: { id: uid(v.employee_id ?? '9999'), display_name: v.name, employee_id: v.employee_id } });
+    const j = locksView();
     return HttpResponse.json(j, tag(j.version));
   }),
 
@@ -857,6 +925,34 @@ export const settingsHandlers = [
     if (errs.length) return fields(...errs);
     C().tableDisplay = { defaults: d as TableDisplaySetting['defaults'], version: TD().version + 1, updated_by: me(), updated_at: new Date().toISOString() }; save();
     return HttpResponse.json(TD(), tag(TD().version));
+  }),
+  // 0.15.102 (migration 0196): the interface features; read by every signed-in user, saved by an admin with a reason and If-Match
+  http.get(`${B}/settings/ui-features`, () => { const g = guard(); if (g) return g; return HttpResponse.json(UF(), tag(UF().version)); }),
+  http.put(`${B}/settings/ui-features`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    const p = ver(request, UF().version); if (p) return p;
+    const b = await body<{ sections?: Record<string, Record<string, unknown>>; reason?: string } & Record<string, unknown>>(request);
+    const errs: { path: string; code: string }[] = [];
+    for (const k of Object.keys(b)) if (k !== 'sections' && k !== 'reason') errs.push({ path: `/${k}`, code: 'unknown_key' });
+    const sec = b.sections ?? {};
+    const oneOf = (o: Record<string, unknown>, path: string, k: string, list: string[]) => { if (!list.includes(String(o[k]))) errs.push({ path: `${path}/${k}`, code: 'invalid' }); };
+    for (const [name, o] of Object.entries(sec)) {
+      const path = `/sections/${name}`;
+      if (name === 'avatars') {
+        for (const k of Object.keys(o)) if (!['style', 'shape', 'palette', 'in_lists'].includes(k)) errs.push({ path: `${path}/${k}`, code: 'unknown_key' });
+        oneOf(o, path, 'style', ['initials', 'gradient', 'geometric', 'none']); oneOf(o, path, 'shape', ['circle', 'rounded']); oneOf(o, path, 'palette', ['brand', 'varied']);
+        if (typeof o.in_lists !== 'boolean') errs.push({ path: `${path}/in_lists`, code: 'invalid' });
+      } else if (name === 'new_badge') {
+        for (const k of Object.keys(o)) if (!['enabled', 'days'].includes(k)) errs.push({ path: `${path}/${k}`, code: 'unknown_key' });
+        if (typeof o.enabled !== 'boolean') errs.push({ path: `${path}/enabled`, code: 'invalid' });
+        if (!Number.isInteger(o.days)) errs.push({ path: `${path}/days`, code: 'invalid' });
+        else if ((o.days as number) < 1 || (o.days as number) > 90) errs.push({ path: `${path}/days`, code: 'out_of_range' });
+      } else errs.push({ path, code: 'unknown_key' });
+    }
+    if ((b.reason ?? '').trim().length < 3) errs.push({ path: '/reason', code: 'required' });
+    if (errs.length) return fields(...errs);
+    C().uiFeatures = { sections: { ...UF().sections, ...sec } as UiFeaturesSetting['sections'], version: UF().version + 1, updated_by: me(), updated_at: new Date().toISOString() }; save();
+    return HttpResponse.json(UF(), tag(UF().version));
   }),
   http.get(`${B}/settings/idle-task-alert`, () => { const g = guard(); if (g) return g; return HttpResponse.json(C().idle, tag(C().idle.version)); }),
   http.put(`${B}/settings/idle-task-alert`, async ({ request }) => {

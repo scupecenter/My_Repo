@@ -36,9 +36,9 @@ for (const locale of ['en', 'ar'] as const) {
       const before = Number(await page.getByTestId('alerts-count-absent').textContent());
       expect(before).toBeGreaterThan(0);
       await list.getByRole('listitem').first().locator('[data-testid^="alert-reassign-"]').click();
-      await page.getByTestId('cover-to-search').fill('Ali');
+      await page.getByTestId('cover-to-search').fill('Demo');
       await page.getByTestId('cover-to-opt-1103').click();
-      await page.getByTestId('cover-dialog-reason').fill('Mona is on sick leave');
+      await page.getByTestId('cover-dialog-reason').fill('The holder is on sick leave');
       await page.getByTestId('cover-dialog-submit').click();
       await expect(page.getByTestId('alerts-count-absent')).toHaveText(String(before - 1));
       await expect(page.getByTestId('toast').first()).toBeVisible();

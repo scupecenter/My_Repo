@@ -74,7 +74,7 @@ describe('POST /users (createLocalUser)', () => {
     expect(weak.body.errors[0].path).toBe('/temporary_password');
     const short = await api.call('post', '/users', newUserBody({ temporary_password: 'abc' }));
     expect(short.status).toBe(422);
-    const own = await api.call('post', '/users', newUserBody({ email: 'rania.fathi@example.test', temporary_password: 'Rania.Fathi-2026-xx' }));
+    const own = await api.call('post', '/users', newUserBody({ email: 'demo.newuser@example.test', temporary_password: 'Demo.Newuser-2026-xx' }));
     expect(own.body.code).toBe('weak_password'); // contains the email name
     expect(own.body.errors.map((e: { code: string }) => e.code)).toContain('contains_email');
 

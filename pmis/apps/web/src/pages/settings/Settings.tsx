@@ -15,8 +15,10 @@ import { TeamScopeMatch } from './TeamScopeMatch';
 import { GecolOrderWarnings } from './GecolOrderWarnings';
 import { MailKinds } from './MailKinds';
 import { useMe } from '@/api/hooks';
+import { NewBadge } from '@/components/NewBadge';
 import { ContractorRules } from './ContractorRules';
 import { ContractorPerfThresholds } from './ContractorPerfThresholds';
+import { RecycleBinScreen } from './RecycleBin';
 import { MatrixCoverageScreen } from './MatrixCoverage';
 import { GecolHlcCounts } from './GecolHlcCounts';
 import { Lists } from './Lists';
@@ -30,10 +32,13 @@ import { Studio } from './studio/Studio';
 import { SiteMasterColumns } from './SiteMasterColumns';
 import { DashboardSettings } from './DashboardSettings';
 import { Identity } from './Identity';
+import { SecurityLocks } from './SecurityLocks';
 import { DisplaySettings } from './DisplaySettings';
+import { PmSchedulesSettings } from './PmSchedulesSettings';
 import { DailyPlanSettings } from './DailyPlanSettings';
 import { MotionSettings } from './MotionSettings';
 import { LoginPageSettings } from './LoginPage';
+import { InterfaceSettings } from './InterfaceSettings';
 
 export interface SettingsSection { key: string; adminOnly?: boolean }
 export interface SettingsTab { key: string; sections: SettingsSection[] }
@@ -44,16 +49,16 @@ export const SETTINGS_TABS: readonly SettingsTab[] = [
   { key: 'sla', sections: [{ key: 'rules' }, { key: 'calendar' }, { key: 'weights' }] },
   { key: 'workflow', sections: [{ key: 'editor' }, { key: 'columns' }, { key: 'freeze' }, { key: 'idle' }, { key: 'board' }, { key: 'coverage', adminOnly: true }] },
   // Lists (the dropdown catalogues, old ddl tab) now sit next to the register columns that use them
-  { key: 'registers', sections: [{ key: 'columns' }, { key: 'lists' }, { key: 'contractors' }, { key: 'gecol' }, { key: 'team-scope' }, { key: 'issue-map' }] },
+  { key: 'registers', sections: [{ key: 'columns' }, { key: 'lists' }, { key: 'contractors' }, { key: 'gecol' }, { key: 'team-scope' }, { key: 'issue-map' }, { key: 'recycle', adminOnly: true }] },
   // W5: the Document Library section is now named Document types (the old documents/library route redirects); Form templates and Archive are new
   { key: 'documents', sections: [{ key: 'types' }, { key: 'forms' }, { key: 'archive' }, { key: 'numbering' }] },
   { key: 'data', sections: [{ key: 'imports' }, { key: 'historical' }, { key: 'counts', adminOnly: true }, { key: 'reset', adminOnly: true }] },
   // Notification policy + Mail kinds (admin only): both are what is sent to people
   { key: 'alerts', sections: [{ key: 'policy' }, { key: 'mail', adminOnly: true }] },
   // DLP months is a data-protection rule, so it moved here from SLA
-  { key: 'security', sections: [{ key: 'staff' }, { key: 'retention' }, { key: 'dlp' }] },
+  { key: 'security', sections: [{ key: 'staff' }, { key: 'retention' }, { key: 'dlp' }, { key: 'locks' }] },
   // Screens: what users see by default (Dashboard, Display menu of the tables, My Work Daily Plan)
-  { key: 'screens', sections: [{ key: 'dashboard' }, { key: 'tables' }, { key: 'daily-plan' }, { key: 'motion' }, { key: 'login' }] },
+  { key: 'screens', sections: [{ key: 'dashboard' }, { key: 'tables' }, { key: 'daily-plan' }, { key: 'pm-schedules' }, { key: 'motion' }, { key: 'login' }, { key: 'interface' }] },
   { key: 'identity', sections: [] },
 ];
 
@@ -112,7 +117,7 @@ function TabFrame({ tab }: { tab: string }) {
   return (
     <div>
       <nav className="mb-3 flex flex-wrap gap-1 border-b border-line pb-2" aria-label={t(`settings.tab_${tab}`)}>
-        {sections.map((s) => <NavLink key={s.key} to={`/admin/settings/${tab}/${s.key}`} data-testid={`settings-section-${tab}-${s.key}`} className={({ isActive }) => `btn ${isActive ? 'btn-accent' : ''}`}>{t(`settings.section_${tab}_${s.key}`)}</NavLink>)}
+        {sections.map((s) => <NavLink key={s.key} to={`/admin/settings/${tab}/${s.key}`} data-testid={`settings-section-${tab}-${s.key}`} className={({ isActive }) => `btn ${isActive ? 'btn-accent' : ''}`}>{t(`settings.section_${tab}_${s.key}`)}{tab === 'screens' && s.key === 'interface' && <NewBadge feature="interface-settings" />}</NavLink>)}
       </nav>
       <Outlet />
     </div>
@@ -137,8 +142,10 @@ export function SettingsRoutes() {
           <Route path="dashboard" element={<DashboardSettings />} />
           <Route path="tables" element={<DisplaySettings />} />
           <Route path="daily-plan" element={<DailyPlanSettings />} />
+          <Route path="pm-schedules" element={<PmSchedulesSettings />} />
           <Route path="motion" element={<MotionSettings />} />
           <Route path="login" element={<LoginPageSettings />} />
+          <Route path="interface" element={<InterfaceSettings />} />
         </Route>
         <Route path="alerts" element={<TabFrame tab="alerts" />}>
           <Route index element={<Navigate to="policy" replace />} />
@@ -164,6 +171,7 @@ export function SettingsRoutes() {
           <Route index element={<Navigate to="columns" replace />} />
           <Route path="columns" element={<RegisterColumns />} />
           <Route path="lists" element={<Lists />} />
+          <Route path="recycle" element={<RecycleBinScreen />} />
           <Route path="contractors" element={<><ContractorRules /><ContractorPerfThresholds /></>} />
           <Route path="gecol" element={<GecolOrderWarnings />} />
           <Route path="team-scope" element={<TeamScopeMatch />} />
@@ -189,6 +197,7 @@ export function SettingsRoutes() {
           <Route path="staff" element={<StaffVisibility />} />
           <Route path="retention" element={<Retention />} />
           <Route path="dlp" element={<Dlp />} />
+          <Route path="locks" element={<SecurityLocks />} />
         </Route>
         {Object.entries(LEGACY_SETTINGS_PATHS).map(([old, to]) => <Route key={old} path={old} element={<LegacyRedirect to={to} />} />)}
       </Route>
