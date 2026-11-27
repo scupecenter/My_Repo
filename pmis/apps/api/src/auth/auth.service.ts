@@ -239,7 +239,7 @@ export class AuthService {
     }
     if (created && 'device' in created) {
       await this.securityLog.write({ event: 'sign_in_started', outcome: 'info', userId: row.user_id, identifier, ctx, detail: { next: 'device_code' } });
-      return { kind: 'pending', token: created.token, newDevice: created.deviceId, body: { authenticated: false, next: 'device_code', expires_at: created.expiresAt } };
+      return { kind: 'pending', token: created.token!, newDevice: created.deviceId, body: { authenticated: false, next: 'device_code', expires_at: created.expiresAt! } };
     }
     if (created && 'mfaRequired' in created) {
       await this.securityLog.write({ event: 'sign_in_failed', outcome: 'failure', userId: row.user_id, identifier, ctx, detail: { reason: 'mfa_required' } });
