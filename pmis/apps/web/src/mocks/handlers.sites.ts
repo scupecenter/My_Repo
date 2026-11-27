@@ -235,6 +235,11 @@ export const siteHandlers = [
     const newSites = v.nav.includes('sites') && v.nav.includes('templates') && ['pm', 'reviewer'].includes(v.key) ? [{ template_id: 'TPL-NEW-SITES', name_en: 'New sites', name_ar: 'مواقع جديدة', kind: 'data_import', template_kind: 'sites', module_key: 'sites', register_key: null, stream: null, current_version: 1, issued_at: issued, is_active: true, versions }] : [];
     return HttpResponse.json({ items: [...newSites, ...site, ...registers, ...legacy] } as never);
   }),
+  // contract 0.15.203 (P3): every mock template has one version, so there is nothing to compare
+  http.get(`${B}/templates/:id/changes`, ({ params }) => {
+    const g = guard(); if (g) return g;
+    return HttpResponse.json({ template_id: String(params.id), from: null, to: 1, issued_at: '2026-10-21T08:00:00Z', reason: 'first version', added: [], removed: [], renamed: [] });
+  }),
   http.get(`${B}/templates/:id/download`, ({ params, request }) => {
     const g = guard(); if (g) return g;
     const u = new URL(request.url).searchParams, task = u.get('task_id'), prefill = u.get('prefill') === 'true' || !!u.get('site_ids');
