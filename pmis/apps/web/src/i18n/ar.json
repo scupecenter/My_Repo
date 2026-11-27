@@ -173,7 +173,8 @@
     "daily_plan": "الخطة اليومية",
     "group_library": "المكتبة",
     "library.forms": "النماذج",
-    "library.archive": "الأرشيف"
+    "library.archive": "الأرشيف",
+    "lessons_learned": "الدروس المستفادة"
   },
   "top": {
     "search": "ابحث أو انتقل إلى…",
@@ -1940,7 +1941,9 @@
     "details": "تفاصيل",
     "purchase_request": "طلب الشراء",
     "in_service": "دخول الخدمة",
-    "execution": "التنفيذ"
+    "execution": "التنفيذ",
+    "lesson": "الدرس",
+    "follow_up": "المتابعة"
   },
   "procAssign": {
     "title": "التكليف",

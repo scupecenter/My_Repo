@@ -173,7 +173,8 @@
     "daily_plan": "Daily Plan",
     "group_library": "Library",
     "library.forms": "Forms",
-    "library.archive": "Archive"
+    "library.archive": "Archive",
+    "lessons_learned": "Lessons Learned"
   },
   "top": {
     "search": "Search or jump to…",
@@ -1940,7 +1941,9 @@
     "details": "Details",
     "purchase_request": "Purchase request",
     "in_service": "In service",
-    "execution": "Execution"
+    "execution": "Execution",
+    "lesson": "Lesson",
+    "follow_up": "Follow-up"
   },
   "procAssign": {
     "title": "Assignment",

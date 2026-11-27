@@ -6,7 +6,7 @@ import type { PermitEntryType, RegisterDefinition, RegisterField } from '@/api/t
  * `GET /registers`, and `RegisterField.section` (contract 0.4.6) gives the section of each base field. The checks below
  * mirror the rules the server repeats at submit (V1 to V6), so Submit stays off until they pass.
  */
-export const REGISTER_KEYS_LIVE = ['procurement', 'contractors', 'gecol', 'hlc', 'permits_hse', 'warehouse', 'quality', 'issues', 'risks', 'change_control', 'readiness_handover', 'as_built', 'meetings', 'rf_design', 'acquisition', 'dismantle', 'car_dispatcher', 'financial_advances'] as const;
+export const REGISTER_KEYS_LIVE = ['procurement', 'contractors', 'gecol', 'hlc', 'permits_hse', 'warehouse', 'quality', 'issues', 'risks', 'change_control', 'readiness_handover', 'as_built', 'meetings', 'rf_design', 'acquisition', 'dismantle', 'car_dispatcher', 'financial_advances', 'lessons_learned'] as const;
 export const isLive = (k: string): k is (typeof REGISTER_KEYS_LIVE)[number] => (REGISTER_KEYS_LIVE as readonly string[]).includes(k);
 
 type Data = Record<string, unknown>;
@@ -17,6 +17,7 @@ const SECTION_ID: Record<string, string> = {
   'Notice and works': 'notice', Acceptance: 'acceptance', 'Meter and power-on': 'meter', Remark: 'remark', 'Status and team': 'fiber_status', 'Installation and test': 'install',
   Permit: 'permit', Validity: 'validity', 'N/A': 'na', 'PTW checks': 'ptw', 'Stop work': 'stop', 'Purchase request': 'purchase_request', 'In service': 'in_service',
   Execution: 'execution',
+  Lesson: 'lesson', 'Follow-up': 'follow_up',
 };
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'details';
 /** The id of a field section (its translated title is `regSections.<id>`); a field without a section (a custom field) is in `details`. */
