@@ -7,7 +7,7 @@ describe('generated avatars', () => {
     expect(initialsOf('Demo Person A')).toBe('DP');
     expect(initialsOf('  demo   person b ')).toBe('DP');
     expect(initialsOf('سالم المصراتي')).toBe('سا');
-    expect(initialsOf('Tripoli')).toBe('TR');
+    expect(initialsOf('Demo City')).toBe('DC');
     expect(initialsOf('')).toBe('?');
     expect(initialsOf(null)).toBe('?');
     expect(initialsOf('--- ...')).toBe('?');
