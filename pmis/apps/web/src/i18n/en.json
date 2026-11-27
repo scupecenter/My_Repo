@@ -7045,6 +7045,7 @@
     "panel_tabs": "Show the tabs (All, Unread, Priority) in the panel"
   },
   "related": {
+    "change_pending": "Change pending",
     "title": "Related records",
     "to": "Points to:",
     "from": "Named by:",
