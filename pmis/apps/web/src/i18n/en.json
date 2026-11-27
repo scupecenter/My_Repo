@@ -6322,6 +6322,13 @@
     "closing": "This task closes the milestone",
     "closing_chip": "Closing task"
   },
+  "handoverWarn": {
+    "title": "Open items on this site",
+    "counts": "Open snags: {{snags}}. Open issues: {{issues}}. Quality records not yet approved: {{quality}}.",
+    "ask": "You can still submit the handover. Do you want to continue?",
+    "cancel": "Go back",
+    "confirm": "Submit anyway"
+  },
   "studio": {
     "title": "Workflow Studio",
     "crumb_settings": "Settings",

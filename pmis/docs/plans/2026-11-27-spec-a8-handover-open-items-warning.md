@@ -1,5 +1,5 @@
 # Spec: A8 readiness_handover / O&M acceptance warning
-Status: not built (verified not merged 19:22).
+Status: built in this PR (frontend only: no migration, no contract change, so no number used). Counts: open snags and open issues from the site page counts, quality = records of the Quality register for the site not approved or voided.
 ## Requirements
 - On submit of the readiness handover (O&M acceptance), show the open snag, issue and quality counts of the site and ask for confirmation.
 - Warn, do not block: the user may confirm and continue.
