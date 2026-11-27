@@ -27,7 +27,7 @@ export const useDeleteListValue = () =>
 /** F17 follow-up: the values of one list from the approved TPL-LISTVALUES file. Every row applies or none does (the server answers 422 with the rows). */
 export const useImportListValues = () => {
   const qc = useQueryClient();
-  return useMutation<ListCatalogue & { imported?: number }, ApiError, { code: string; file: File; reason: string }>({
+  return useMutation<ListCatalogue & { imported?: number; created?: number; updated?: number; unchanged?: number }, ApiError, { code: string; file: File; reason: string }>({
     mutationFn: ({ code, file, reason }) => {
       const body = new FormData();
       body.append('file', file);
