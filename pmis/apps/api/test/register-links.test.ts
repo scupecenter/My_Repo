@@ -89,4 +89,16 @@ describe('register links (migration 0409)', () => {
     expect((opts.rows[0].j as { label: string }[]).map((o) => o.label)).toEqual([`${PREFIX}-PO1`]);
     await db.query('ROLLBACK');
   });
+
+  it('lists the linked records of a site per register (0413)', async () => {
+    await db.query('BEGIN');
+    await beginAs(db, adminId);
+    const site = await makeSite(db, REGION, { prefix: `${PREFIX}L`.toUpperCase() });
+    await insert('procurement', site.id, 'approved', { po_wo_no: `${PREFIX}-LPO1`, order_status: 'Active' });
+    const r = await db.query(`SELECT site_linked_records($1::uuid) AS j`, [site.id]);
+    const regs = r.rows[0].j as { register_key: string; count: number }[];
+    expect(Array.isArray(regs)).toBe(true);
+    expect(regs.find((x) => x.register_key === 'procurement')?.count).toBe(1);
+    await db.query('ROLLBACK');
+  });
 });

@@ -15,6 +15,7 @@ import { SiteFields } from '@/components/SiteFields';
 import { SiteIdentity } from '@/components/SiteIdentity';
 import { SitePendingChanges } from '@/components/SitePendingChanges';
 import { SiteDismantle } from '@/components/SiteDismantle';
+import { SiteLinkedRecords } from '@/components/SiteLinkedRecords';
 import { SiteSnags } from '@/components/SiteSnags';
 import { SiteMasterSources } from '@/components/SiteMasterSource';
 import { SiteApplicability } from '@/components/SiteApplicability';
@@ -69,8 +70,8 @@ export function Site() {
   const stage = sp.get('stage');
   // the Warehouse section (D6) shows only to a caller who may view the Warehouse of the site's region
   const dispatch = useSiteDispatch(siteId);
-  const tabs2 = ['master', 'documents', 'snags', 'scope', 'activity', ...(dispatch.isSuccess ? ['warehouse'] : [])];
-  const section = tabs2.includes(sp.get('tab') ?? '') ? (sp.get('tab') as 'master' | 'documents' | 'snags' | 'scope' | 'activity' | 'warehouse') : '';
+  const tabs2 = ['master', 'documents', 'snags', 'scope', 'activity', 'linked', ...(dispatch.isSuccess ? ['warehouse'] : [])];
+  const section = tabs2.includes(sp.get('tab') ?? '') ? (sp.get('tab') as 'master' | 'documents' | 'snags' | 'scope' | 'activity' | 'linked' | 'warehouse') : '';
   const docsTab = section !== ''; // a section other than the task grid
   const taskId = sp.get('task');
   const [ids, setIds] = useState<string[]>([]);
@@ -134,7 +135,7 @@ export function Site() {
           <SiteFields site={s} />
           {cp && <div className="my-3 flex items-center gap-2 rounded-lg bg-openBg p-3 text-openInk" data-testid="cluster-progress"><Layers size={16} />{t('site.cluster', { code: cp.cluster_code, at: cp.sites_at_te_pac, total: cp.sites_total })}</div>}
           <div role="tablist" aria-label={t('site.sections')} className="mt-3 flex gap-1" data-testid="site-section-tabs">
-            {([['', t('site.tasks')], ['master', t('siteMaster.src.tab')], ['documents', t('docs.tab')], ['snags', t('snags.tab')], ['scope', t('scope.tab')], ['activity', t('siteActivity.tab')], ...(dispatch.isSuccess ? [['warehouse', t('wh.site_tab')] as const] : [])] as const).map(([k, label]) => (
+            {([['', t('site.tasks')], ['master', t('siteMaster.src.tab')], ['documents', t('docs.tab')], ['snags', t('snags.tab')], ['scope', t('scope.tab')], ['activity', t('siteActivity.tab')], ['linked', t('site.linked_tab')], ...(dispatch.isSuccess ? [['warehouse', t('wh.site_tab')] as const] : [])] as const).map(([k, label]) => (
               <button key={k || 'tasks'} role="tab" aria-selected={k === section} data-testid={`site-section-${k || 'tasks'}`} onClick={() => setParam('tab', k || null)}
                 className={`rounded-md px-3 py-1 text-sm font-semibold ${k === section ? 'bg-accentSoft text-accentText' : 'text-mute hover:text-ink'}`}>{label}{k === 'snags' && (s.counts?.open_snags ?? 0) > 0 ? ` (${s.counts?.open_snags})` : ''}</button>
             ))}
@@ -144,6 +145,7 @@ export function Site() {
           {section === 'snags' && <div className="mt-3"><SiteSnags siteId={siteId} /></div>}
           {section === 'activity' && <div className="mt-3"><SiteActivity siteId={siteId} siteCode={s.site_code} /></div>}
           {section === 'scope' && <div className="mt-3"><SiteApplicability siteId={siteId} /></div>}
+          {section === 'linked' && <div className="mt-3"><SiteLinkedRecords siteId={siteId} /></div>}
           {section === 'warehouse' && <div className="mt-3"><SiteDispatchPanel siteId={siteId} /></div>}
           {!docsTab && <>
           <SitePhaseTabs phases={phases} value={phase?.code ?? ''} empty={empty} onChange={setPhase} />

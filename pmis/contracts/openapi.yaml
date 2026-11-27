@@ -35,6 +35,7 @@ info:
     - 0.15.350 (2026-11-27): two admin alerts for operations (production readiness, item 4; migration 0421, mirror `db/sql/420_ops_alerts.sql`). Additive. `SecurityAlertRule` and `AlertSeverityMap` gain `backup_late` (the database backup check found WAL archiving or a backup late; default severity high; one alert per 6 hours) and `job_failed` (a background job run failed; default medium; one alert per job and day). They use the existing alert channel (bell, and mail to the System Admins by `email_min_severity`); the severity of each is set in Settings like the other rules. `mail.notification_kinds` is unchanged. No grant, role or permission change.
     - 0.15.332 (2026-11-27): the generic link declaration (D60, phase 1; migration 0409, mirror `db/sql/408_register_links.sql`). Additive. New table `register_links` (one row per link field), `GET /registers/{key}/links` (`listRegisterLinks`) and `GET /registers/{key}/link-options/{field}` (`listRegisterLinkOptions`); `record_related` also reads the declared links; links flagged `enforce` are checked in entry. Existing links are declared with the check off.
     - 0.15.333 (2026-11-27): the link declaration learns the filters and labels of the hand-coded pickers (D60, phase 2; migration 0410, mirror `db/sql/409_register_links_filters.sql`). Additive, no new path. `GET /registers/{key}/link-options/{field}` applies the link's data filters (for example advances in disbursed or settlement, orders not cancelled) and labels items with the PO / WO No. and the contractor; the web register drawer uses it instead of the hand-coded order and advance pickers. Links stay declared with the check off.
+    - 0.15.334 (2026-11-27): the Linked records view of a site (D60, phase 3; migration 0413, mirror `db/sql/412_site_linked_records.sql`). Additive, read only. New `GET /registers/site-linked/{site_id}` (`getSiteLinkedRecords`): per enabled register the records of the site the caller can see, with the records they point to through the declared links, and a `linked` flag that marks registers with no declared link.
     - 0.15.156 (2026-11-27): Web Push for field engineers (migration 0256; CHANGELOG WebPush). Additive. (1) `GET /me/push` (`getMyPush`): whether push is on for the server (`enabled`, `public_key`) and how many of the caller's browsers are subscribed. (2) `POST /me/push/subscribe` and `POST /me/push/unsubscribe`: own browsers only; subscribe answers 409 while the server has no VAPID keys. (3) `GET /admin/web-push` (`getAdminWebPush`, System Admin): on or off and the counts. The keys come only from the environment (VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT); with any missing push is off. The push carries no title or body, only a fixed notice that opens the inbox. The bell and the e-mail are unchanged.
     - 0.15.155 (2026-11-27): search inside uploaded document contents (migration 0255; CHANGELOG DocContentSearch). Additive. (1) `SearchHit` gains the optional `snippet` (documents group only): where the words were found inside the file, else null. (2) `GET /admin/document-search-index` (`getDocumentSearchIndex`): counts of indexed, empty, unsupported, too large, failed and pending files (System Admin). Text is extracted off the request path from clean-scan PDF and DOCX files and is visible only with the documents view right in the file's region.
     - 0.15.242 (2026-11-27): generic if/then alert rules, notifications only (migration 0342, mirror `db/sql/341_alert_rules.sql`; CHANGELOG AlertRules; item 13 of the 2026-11-27 PM-platforms research). Additive. A System Admin manages the rules in Settings: `GET /settings/alert-rules` (the rules plus the closed catalogues the form offers), `POST /settings/alert-rules`, `PUT /settings/alert-rules/{id}` (If-Match, a reason, audited `alert_rule_create`/`alert_rule_update`). A rule is a closed condition kind with closed params (`weekly_status_missing`: the regions without a Weekly status update of the current working week; `record_idle` `{register_key, state, days}`: the current records of the register in the state for at least days), a closed audience (`system_admin`, or `module` with a module key: the users whose assignment reaches the module) and a title/body template in English and Arabic with placeholders. The daily job fires the enabled rules: one in-app notification per recipient, deduped by (rule, period, target), in the recipient's language; a rule never changes a record, a state or a holder. `NotificationKind` gains `alert_rule` (in-app only).
@@ -10843,6 +10844,39 @@ paths:
                 required: [items]
                 properties:
                   items: { type: array, items: { $ref: '#/components/schemas/WarehouseOrderOption' } }
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /registers/site-linked/{site_id}:
+    get:
+      tags: [registers]
+      operationId: getSiteLinkedRecords
+      summary: The records of a site per register, with the records they point to (0.15.334)
+      description: |
+        0.15.334 (D60, phase 3). For every enabled register: the count of the current records of the site the caller can see (register view and region rule), the latest ten with the records they point to through the declared links, and `linked` (false = no link is declared for the register yet). Read only.
+      parameters:
+      - {name: site_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: The registers with records at the site.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [register_key, name_en, count, linked, items]
+                      properties:
+                        register_key: {type: string}
+                        name_en: {type: string}
+                        name_ar: {type: [string, 'null']}
+                        count: {type: integer}
+                        linked: {type: boolean}
+                        items: { type: array, items: { type: object, additionalProperties: true } }
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '422': {$ref: '#/components/responses/Unprocessable'}

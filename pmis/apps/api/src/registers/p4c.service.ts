@@ -80,6 +80,13 @@ export class P4cService {
     return { items };
   }
 
+  /** GET /registers/site-linked/{site_id} (D60 phase 3): the records of a site per register with the records they point to; each register is filtered by the caller's rights. */
+  async siteLinked(auth: AuthContext, siteId: string): Promise<{ items: unknown[] }> {
+    if (!uuidSchema.safeParse(siteId).success) throw problems.validation([{ path: '/site_id', code: 'invalid', message: 'site_id is a uuid.' }]);
+    const items = await this.registers.call<unknown[]>(auth, Prisma.sql`SELECT site_linked_records(${siteId}::uuid) AS r`);
+    return { items };
+  }
+
   /** GET /registers/{key}/links (D60): the declared links of the register (field, target register, check on or off). Needs the register view. */
   async registerLinks(auth: AuthContext, key: string): Promise<{ items: unknown[] }> {
     if (!/^[a-z][a-z0-9_]{0,40}$/.test(key)) throw problems.validation([{ path: '/key', code: 'invalid', message: 'A register key.' }]);

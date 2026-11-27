@@ -56,6 +56,23 @@ export const p4cHandlers = [
     return HttpResponse.json(toRecord(r), { headers: { ETag: `"${r.version}"` } });
   }),
 
+  // D60 phase 3: the Linked records of a site (the demo groups the site's mock records by register; links are the order links of the mock declaration)
+  http.get(`${B}/registers/site-linked/:site_id`, ({ params }) => {
+    const g = guard(); if (g) return g;
+    const si = siteIndex(String(params.site_id));
+    const by = new Map<string, MockRecord[]>();
+    for (const o of R().records as MockRecord[]) { if (si !== null && o.site_index === si && o.state !== 'voided') by.set(o.register_key, [...(by.get(o.register_key) ?? []), o]); }
+    const items = [...by.entries()].map(([key, rows]) => ({
+      register_key: key, name_en: REGISTER_DEFS.find((d: { register_key: string }) => d.register_key === key)?.name_en ?? key, name_ar: null, count: rows.length, linked: !!ORDER_LINKS[key],
+      items: rows.slice(0, 10).map((o) => {
+        const target = ORDER_LINKS[key] ? (R().records as MockRecord[]).find((p) => p.entity_id === o.data[ORDER_LINKS[key]!] && p.register_key === 'procurement') : undefined;
+        return { entity_id: o.entity_id, record_id: o.id, state: o.state, title: String(o.data.po_wo_no ?? o.data.doc_no ?? o.data.pr_no ?? o.entity_id).slice(0, 40),
+          links: target ? [{ field: ORDER_LINKS[key]!, target_register: 'procurement', entity_id: target.entity_id, label: String(target.data.po_wo_no ?? target.data.pr_no ?? '') }] : [] };
+      }),
+    }));
+    return HttpResponse.json({ items });
+  }),
+
   // D60: the declared links of a register and the generic picker (the demo declares none; a test overrides them)
   http.get(`${B}/registers/:key/links`, ({ params }) => {
     const g = guard(); if (g) return g;
