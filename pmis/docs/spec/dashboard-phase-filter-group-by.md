@@ -1,6 +1,6 @@
 # Dashboard: quick filter and group-by Phase on Project Status (draft spec)
 
-Status: DRAFT-SPEC. No code in this PR. The build goes into this same PR later.
+Status: BUILT. This PR now carries the build (contract 0.15.368, no migration).
 Part 2 of the Phase scope package. Parts 1 and 3 (Phase scope card, derived targets, manual override) are in draft PR #465.
 
 ## Agreed requirements

@@ -605,3 +605,26 @@ describe('site map (OV-12, 0.14.5)', () => {
     expect(d.body).toMatchObject({ tower_owner: 'Synthetic TowerCo', tower_type: 'Monopole', tower_height_m: 30, latitude: 32.887 });
   });
 });
+
+// 0.15.368: the phase quick filter narrows the dashboard set, and Project Status groups by phase.
+describe('Dashboard phase filter and group_by=phase', () => {
+  it('narrows sites_total to the phase, lists the phases in filters and groups Project Status by phase', async () => {
+    await db.query(`UPDATE sites SET project_phase = 'Phase 1' WHERE code IN ('DASH-T1', 'DASH-T2', 'DASH-T3', 'DASH-T4')`);
+    await db.query(`UPDATE sites SET project_phase = 'Phase 2' WHERE code = 'DASH-B1'`);
+    const d = await get(admin, '?project_phase=Phase 1');
+    expect(d.headline.sites_total).toBe(4);
+    // all the measured progress sits in Phase 1, so its figure equals the whole-project one
+    expect(d.headline.project_status.progress_pct).toBeCloseTo(40.217, 2);
+    expect(d.filters.phases).toEqual(['Phase 1', 'Phase 2']);
+    const byPhase = (await admin.api.call('get', '/project-status?group_by=phase')).body as J;
+    expect(byPhase.rows.map((r: J) => r.key)).toEqual(['Phase 1']);
+    expect(byPhase.rows[0].progress_pct).toBeCloseTo(40.217, 2);
+    const filtered = (await admin.api.call('get', '/project-status?project_phase=Phase 1')).body as J;
+    expect(filtered.progress_pct).toBeCloseTo(40.217, 2);
+  });
+
+  it('rejects a malformed project_phase and an unknown group_by', async () => {
+    expect((await admin.api.call('get', `${DASH}?project_phase=${'x'.repeat(61)}`)).status).toBe(422);
+    expect((await admin.api.call('get', '/project-status?group_by=weird')).status).toBe(422);
+  });
+});

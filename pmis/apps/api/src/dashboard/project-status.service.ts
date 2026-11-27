@@ -64,7 +64,7 @@ export class ProjectStatusService {
     const excl = boolParam(q, 'exclude_overrides');
     if (regionRaw !== undefined && !/^[1-7]$/.test(regionRaw)) throw problems.validation([{ path: '/region_id', code: 'invalid', message: 'region_id is 1 to 7.' }]);
     if (siteRaw !== undefined && !uuidSchema.safeParse(siteRaw).success) throw problems.validation([{ path: '/site_id', code: 'invalid', message: 'site_id is a UUID.' }]);
-    if (!['none', 'region', 'site'].includes(group)) throw problems.validation([{ path: '/group_by', code: 'invalid', message: 'group_by is none, region or site.' }]);
+    if (!['none', 'region', 'site', 'phase'].includes(group)) throw problems.validation([{ path: '/group_by', code: 'invalid', message: 'group_by is none, region, site or phase.' }]);
     if (versionRaw !== undefined && !/^[1-9][0-9]{0,5}$/.test(versionRaw)) throw problems.validation([{ path: '/weight_set_version', code: 'invalid', message: 'weight_set_version is a positive integer.' }]);
     if (setRaw !== undefined && !uuidSchema.safeParse(setRaw).success) throw problems.validation([{ path: '/weight_set_id', code: 'invalid', message: 'weight_set_id is a UUID.' }]);
     if (versionRaw !== undefined && setRaw !== undefined) throw problems.validation([{ path: '/weight_set_id', code: 'conflict', message: 'Send weight_set_version or weight_set_id, not both.' }]);
@@ -80,8 +80,23 @@ export class ProjectStatusService {
       ws = r[0].id;
     }
     const exclude = await this.dash.excludeOverrides({ exclude_overrides: excl });
-    const rows = await this.dash.withSiteSet(q, () => this.db.tx.$queryRaw<{ r: Json }[]>(Prisma.sql`
-      SELECT dash_project_status(NULL::date, ${regionRaw ? Number(regionRaw) : null}::int, ${siteRaw ?? null}::uuid, ${group}::text, ${ws}::uuid, ${exclude}::boolean) AS r`));
+    // 0.15.368: group_by=phase runs the same engine once per phase site set (pmis.dash_sites); dash_project_status itself is unchanged
+    const phaseRows: Json[] = [];
+    const run = (g: string) => this.dash.withSiteSet(q, () => this.db.tx.$queryRaw<{ r: Json }[]>(Prisma.sql`
+      SELECT dash_project_status(NULL::date, ${regionRaw ? Number(regionRaw) : null}::int, ${siteRaw ?? null}::uuid, ${g}::text, ${ws}::uuid, ${exclude}::boolean) AS r`));
+    const rows = group === 'phase'
+      ? await (async () => {
+          const whole = await run('none');
+          for (const set of await this.dash.phaseSiteSets(q)) {
+            const one = await this.dash.withSites(set.ids, () => this.db.tx.$queryRaw<{ r: Json }[]>(Prisma.sql`
+              SELECT dash_project_status(NULL::date, ${regionRaw ? Number(regionRaw) : null}::int, ${siteRaw ?? null}::uuid, 'none'::text, ${ws}::uuid, ${exclude}::boolean) AS r`));
+            const c = (((((one[0]!.r ?? {}) as Json).ps ?? {}) as Json).card ?? {}) as Json;
+            // a phase with no measured progress yet does not get a row
+            if (((c.activities ?? []) as Json[]).length > 0) phaseRows.push({ key: set.phase, label: set.phase, progress_pct: c.progress_pct ?? 0, planned_pct: c.planned_pct ?? null, activities: c.activities ?? [] });
+          }
+          return whole;
+        })()
+      : await run(group);
     const r = rows[0]!.r;
     const meta = (r.meta ?? {}) as Json;
     const ps = (r.ps ?? {}) as Json;
@@ -113,9 +128,11 @@ export class ProjectStatusService {
       central_line: card.central_line ?? null,
       sites_in_scope: Number(ps.sites_in_scope ?? 0),
       activities: card.activities ?? [],
-      ...(group !== 'none'
-        ? { rows: ((ps.rows ?? []) as Json[]).map((x) => ({ key: x.key, label: x.label, progress_pct: x.progress_pct, planned_pct: x.planned_pct ?? null, activities: x.activities ?? {} })) }
-        : {}),
+      ...(group === 'phase'
+        ? { rows: phaseRows }
+        : group !== 'none'
+          ? { rows: ((ps.rows ?? []) as Json[]).map((x) => ({ key: x.key, label: x.label, progress_pct: x.progress_pct, planned_pct: x.planned_pct ?? null, activities: x.activities ?? {} })) }
+          : {}),
     };
   }
 

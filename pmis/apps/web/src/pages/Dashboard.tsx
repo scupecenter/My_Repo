@@ -11,6 +11,7 @@ import {
   useDashboard,
   useDashboardExtras,
   useDashboardOps,
+  useProjectStatusByPhase,
   useProjectStatusSnapshots,
   type Dashboard as Dash,
   type DashboardExtras,
@@ -538,7 +539,7 @@ function F13Panel({
 }
 
 /** What a saved view of the dashboard keeps (0.15.49): the quick parameters; the filter tree is the key `advanced`. */
-const DASH_VIEW_EMPTY = { region_id: "", cluster_code: "", scenario: "", stream: "", view: "" };
+const DASH_VIEW_EMPTY = { region_id: "", cluster_code: "", scenario: "", project_phase: "", stream: "", view: "" };
 
 export function Dashboard() {
   const gate = useDownloadGate();
@@ -568,6 +569,7 @@ export function Dashboard() {
     region_id: sp.get("region_id") ?? "",
     cluster_code: sp.get("cluster_code") ?? "",
     scenario: sp.get("scenario") ?? "",
+    project_phase: sp.get("project_phase") ?? "",
     stream: sp.get("stream") ?? "",
     view: tab === "pmo" ? (sp.get("view") ?? "") : tabView(tab),
     // 0.15.45: the unified filter tree (screen `dashboard`) goes to every dashboard endpoint as `filter`
@@ -580,6 +582,7 @@ export function Dashboard() {
   const extras = useDashboardExtras(q, !!d);
   const ops = useDashboardOps(q, !!d);
   const snaps = useProjectStatusSnapshots(!!d);
+  const psByPhase = useProjectStatusByPhase(q, !!d);
   const [exporting, setExporting] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const [format, setFormat] = useState<ExportFormat>(() => (loadPref<string>("dash.exportFormat", "xlsx") === "csv" ? "csv" : "xlsx"));
@@ -619,7 +622,7 @@ export function Dashboard() {
     setParam({ tab: next });
   };
   const activeFilters =
-    ["region_id", "cluster_code", "scenario", "stream", "view"].filter((k) =>
+    ["region_id", "cluster_code", "scenario", "project_phase", "stream", "view"].filter((k) =>
       sp.get(k),
     ).length + (q.ref_date ? 1 : 0) + (advTree ? 1 : 0);
   const name = (x: { name_en: string; name_ar?: string | null }) =>
@@ -1159,7 +1162,7 @@ export function Dashboard() {
         {/* 0.15.49: saved views of the dashboard keep the filter tree and the quick parameters (region, cluster, scenario, stream, view); the reference date is not saved */}
         <SavedViews
           screen="dashboard"
-          value={{ region_id: q.region_id ?? "", cluster_code: q.cluster_code ?? "", scenario: q.scenario ?? "", stream: q.stream ?? "", view: tab === "pmo" ? (q.view ?? "") : "", ...(advTree ? { advanced: advTree } : {}) }}
+          value={{ region_id: q.region_id ?? "", cluster_code: q.cluster_code ?? "", scenario: q.scenario ?? "", project_phase: q.project_phase ?? "", stream: q.stream ?? "", view: tab === "pmo" ? (q.view ?? "") : "", ...(advTree ? { advanced: advTree } : {}) }}
           empty={DASH_VIEW_EMPTY}
           onApply={(v) => {
             const r = v as Record<string, unknown>;
@@ -1167,6 +1170,7 @@ export function Dashboard() {
               region_id: String(r.region_id ?? ""),
               cluster_code: String(r.cluster_code ?? ""),
               scenario: String(r.scenario ?? ""),
+              project_phase: String(r.project_phase ?? ""),
               stream: String(r.stream ?? ""),
               ...(tab === "pmo" ? { view: String(r.view ?? "") } : {}),
               adv: encodeFilter(r.advanced as FilterTree | undefined),
@@ -1179,15 +1183,32 @@ export function Dashboard() {
               screen="dashboard"
               value={advTree}
               onChange={(tree) => setParam({ adv: encodeFilter(tree) })}
-              onClearAll={() => setParam({ adv: "", region_id: "", cluster_code: "", scenario: "" })}
+              onClearAll={() => setParam({ adv: "", region_id: "", cluster_code: "", scenario: "", project_phase: "" })}
               extras={[
                 { key: "region_id", label: t("dash.filters.region"), kind: "text", hidden: true, value: q.region_id ?? "", set: (v) => setParam({ region_id: v }), chip: `${t("dash.filters.region")}: ${(d?.filters.regions ?? []).map((r) => (String(r.id) === q.region_id ? (ar && r.name_ar ? r.name_ar : r.name_en) : "")).join("") || q.region_id}` },
                 { key: "cluster_code", label: t("dash.filters.cluster"), kind: "text", hidden: true, value: q.cluster_code ?? "", set: (v) => setParam({ cluster_code: v }), chip: `${t("dash.filters.cluster")}: ${q.cluster_code}` },
                 { key: "scenario", label: t("dash.filters.scenario"), kind: "text", hidden: true, value: q.scenario ?? "", set: (v) => setParam({ scenario: v }), chip: `${t("dash.filters.scenario")}: ${q.scenario ? t(`scenario.${q.scenario}`) : ""}` },
+                { key: "project_phase", label: t("dash.filters.phase"), kind: "text", hidden: true, value: q.project_phase ?? "", set: (v) => setParam({ project_phase: v }), chip: `${t("dash.filters.phase")}: ${q.project_phase}` },
               ]}
             />
           </div>
         </div>
+        <label className="text-sm font-semibold" title={t("dash.filters.phase_hint")}>
+          {t("dash.filters.phase")}
+          <select
+            className="input mt-1 w-auto font-normal"
+            data-testid="dash-filter-phase"
+            value={q.project_phase}
+            onChange={(e) => setParam({ project_phase: e.target.value })}
+          >
+            <option value="">{t("dash.filters.all_phases")}</option>
+            {(d?.filters.phases ?? []).map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </select>
+        </label>
         <label className="text-sm font-semibold">
           {t("dash.filters.stream")}
           <select
@@ -1257,6 +1278,7 @@ export function Dashboard() {
                   region_id: "",
                   cluster_code: "",
                   scenario: "",
+                  project_phase: "",
                   adv: "",
                   stream: "",
                   view: "",
@@ -2001,6 +2023,33 @@ export function Dashboard() {
                           </li>
                         ))}
                       </ul>
+                      {/* 0.15.368: the same Project Status once per project phase (group_by=phase); the quick filter and tree still narrow it */}
+                      {(psByPhase.data?.rows ?? []).length > 0 && (
+                        <details className="mt-2" data-testid="dash-ps-by-phase">
+                          <summary
+                            className="cursor-pointer text-sm text-mute"
+                            title={t("dash.ps.by_phase_hint")}
+                          >
+                            {t("dash.ps.by_phase")}
+                          </summary>
+                          <ul className="mt-2 space-y-2">
+                            {(psByPhase.data?.rows ?? []).map((r) => (
+                              <li key={r.key} data-testid={`dash-ps-phase-${r.key}`}>
+                                <div className="flex justify-between text-sm">
+                                  <span>{r.label}</span>
+                                  <b className="tnum">{pct(r.progress_pct)}</b>
+                                </div>
+                                <Bar value={r.progress_pct} tone="bg-open" />
+                                {r.planned_pct != null && (
+                                  <div className="text-xs text-mute tnum">
+                                    {t("dash.ps.phase_planned", { n: r.planned_pct.toFixed(1) })}
+                                  </div>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        </details>
+                      )}
                     </Card>
                   </div>
                 </>

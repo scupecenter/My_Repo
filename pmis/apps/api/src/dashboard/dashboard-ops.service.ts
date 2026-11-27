@@ -125,34 +125,36 @@ export class DashboardOpsService {
       (approvalsRegions === null || approvalsRegions.length > 0) &&
       (sitesRegions === null || sitesRegions.length > 0);
 
-    const orders = procOk ? await this.ordersSection(procScope, p.region_id ?? null) : null;
+    // 0.15.368: the phase quick filter narrows the site-based sections like the region filter (materials narrow through the filter tree, `adv`)
+    const phase = p.project_phase ?? null;
+    const orders = procOk ? await this.ordersSection(procScope, p.region_id ?? null, phase) : null;
     const adv = whOk ? await this.filters.fromQuery("dashboard", q) : null;
     const materials = whOk
       ? await this.materialsSection(whScope, p.region_id ?? null, adv)
       : null;
     const permits = permitsOk
-      ? await this.permitsSection(permitScope, p.region_id ?? null)
+      ? await this.permitsSection(permitScope, p.region_id ?? null, phase)
       : null;
     const gecol = gecolOk
-      ? await this.gecolSection(gecolScope, p.region_id ?? null)
+      ? await this.gecolSection(gecolScope, p.region_id ?? null, phase)
       : null;
     const hlc = hlcOk
-      ? await this.hlcSection(hlcScope, p.region_id ?? null)
+      ? await this.hlcSection(hlcScope, p.region_id ?? null, phase)
       : null;
     const score = contractorsOk
-      ? scorecardSummary((await this.perf.reportData()).items)
+      ? scorecardSummary((await this.perf.reportData(phase)).items)
       : null;
     const quality = qualityOk
-      ? await this.qualitySection(qualityScope, p.region_id ?? null)
+      ? await this.qualitySection(qualityScope, p.region_id ?? null, phase)
       : null;
     const approvals = approvalsOk
-      ? await this.approvalsSection(approvalsScope, p.region_id ?? null)
+      ? await this.approvalsSection(approvalsScope, p.region_id ?? null, phase)
       : null;
     const changes = changesOk
-      ? await this.changesSection(changeScope, p.region_id ?? null)
+      ? await this.changesSection(changeScope, p.region_id ?? null, phase)
       : null;
     const actions = meetingsOk
-      ? await this.actionsSection(meetingScope, p.region_id ?? null)
+      ? await this.actionsSection(meetingScope, p.region_id ?? null, phase)
       : null;
 
     return {
@@ -261,6 +263,7 @@ export class DashboardOpsService {
   private async gecolSection(
     scope: number[] | null,
     region: number | null,
+    phase: string[] | null = null,
   ): Promise<{
     in_scope: number;
     powered: number;
@@ -270,7 +273,8 @@ export class DashboardOpsService {
   }> {
     const where = Prisma.sql`
       ${scope === null ? Prisma.empty : Prisma.sql`AND s.region_id = ANY(${scope}::int[])`}
-      ${region ? Prisma.sql`AND s.region_id = ${region}` : Prisma.empty}`;
+      ${region ? Prisma.sql`AND s.region_id = ${region}` : Prisma.empty}
+      ${phaseSql(phase)}`;
     const counts = await this.db.tx.$queryRaw<
       { in_scope: number; powered: number; no_record: number; civil_ready_no_power: number }[]
     >(Prisma.sql`
@@ -311,6 +315,7 @@ export class DashboardOpsService {
   private async hlcSection(
     scope: number[] | null,
     region: number | null,
+    phase: string[] | null = null,
   ): Promise<{
     in_scope: number;
     in_service: number;
@@ -320,7 +325,8 @@ export class DashboardOpsService {
   }> {
     const where = Prisma.sql`
       ${scope === null ? Prisma.empty : Prisma.sql`AND s.region_id = ANY(${scope}::int[])`}
-      ${region ? Prisma.sql`AND s.region_id = ${region}` : Prisma.empty}`;
+      ${region ? Prisma.sql`AND s.region_id = ${region}` : Prisma.empty}
+      ${phaseSql(phase)}`;
     const counts = await this.db.tx.$queryRaw<
       { in_scope: number; in_service: number; no_record: number; installed_not_in_service: number }[]
     >(Prisma.sql`
@@ -358,6 +364,7 @@ export class DashboardOpsService {
   private async permitsSection(
     scope: number[] | null,
     region: number | null,
+    phase: string[] | null = null,
   ): Promise<{
     total: number;
     by_status: { status: string; count: number }[];
@@ -370,7 +377,8 @@ export class DashboardOpsService {
   }> {
     const where = Prisma.sql`
       ${scope === null ? Prisma.empty : Prisma.sql`AND p.region_id = ANY(${scope}::int[])`}
-      ${region ? Prisma.sql`AND p.region_id = ${region}` : Prisma.empty}`;
+      ${region ? Prisma.sql`AND p.region_id = ${region}` : Prisma.empty}
+      ${phaseSql(phase)}`;
     const agg = await this.db.tx.$queryRaw<
       {
         total: number;
@@ -418,7 +426,8 @@ export class DashboardOpsService {
       WHERE s.is_active AND s.overall_status <> 'cancelled'
         AND NOT EXISTS (SELECT 1 FROM permit_records p WHERE p.site_id = s.id AND p.region_id = s.region_id)
         ${scope === null ? Prisma.empty : Prisma.sql`AND s.region_id = ANY(${scope}::int[])`}
-        ${region ? Prisma.sql`AND s.region_id = ${region}` : Prisma.empty}`);
+        ${region ? Prisma.sql`AND s.region_id = ${region}` : Prisma.empty}
+        ${phaseSql(phase)}`);
     const a = agg[0] ?? {
       total: 0,
       waiting: 0,
@@ -457,6 +466,7 @@ export class DashboardOpsService {
   private async qualitySection(
     scope: number[] | null,
     region: number | null,
+    phase: string[] | null = null,
   ): Promise<{
     snags: { open: number; closed: number; avg_close_days: number | null; returned_open: number };
     ncrs: { open: number; closed: number; avg_close_days: number | null };
@@ -464,7 +474,8 @@ export class DashboardOpsService {
   }> {
     const where = (alias: string) => Prisma.sql`
       ${scope === null ? Prisma.empty : Prisma.sql`AND ${Prisma.raw(alias)}.region_id = ANY(${scope}::int[])`}
-      ${region ? Prisma.sql`AND ${Prisma.raw(alias)}.region_id = ${region}` : Prisma.empty}`;
+      ${region ? Prisma.sql`AND ${Prisma.raw(alias)}.region_id = ${region}` : Prisma.empty}
+      ${phaseSql(phase)}`;
     const snagCounts = await this.db.tx.$queryRaw<
       { open: number; closed: number; returned_open: number }[]
     >(Prisma.sql`
@@ -526,6 +537,7 @@ export class DashboardOpsService {
   private async approvalsSection(
     scope: number[] | null,
     region: number | null,
+    phase: string[] | null = null,
   ) {
     const rows = await this.db.tx.$queryRaw<ApprovalWaitRow[]>(Prisma.sql`
       SELECT t.ball_in_court_role_id::text AS role_id, r.name_en, r.name_ar,
@@ -536,7 +548,8 @@ export class DashboardOpsService {
       LEFT JOIN roles r ON r.id = t.ball_in_court_role_id
       WHERE t.state::text IN ('in_review', 'in_approval') AND s.is_active AND s.overall_status <> 'cancelled'
       ${scope === null ? Prisma.empty : Prisma.sql`AND t.region_id = ANY(${scope}::int[])`}
-      ${region ? Prisma.sql`AND t.region_id = ${region}` : Prisma.empty}`);
+      ${region ? Prisma.sql`AND t.region_id = ${region}` : Prisma.empty}
+      ${phaseSql(phase)}`);
     return approvalsByRole(rows);
   }
 
@@ -544,30 +557,33 @@ export class DashboardOpsService {
    * The change requests (0.15.205, item 8): rows of change_requests in the regions in scope (a global row, with no
    * region, is outside a regional scope like every other card), aged from request_date.
    */
-  private async changesSection(scope: number[] | null, region: number | null) {
+  private async changesSection(scope: number[] | null, region: number | null, phase: string[] | null = null) {
     const rows = await this.db.tx.$queryRaw<ChangeWaitRow[]>(Prisma.sql`
       SELECT c.kind::text AS kind, c.status::text AS status, (CURRENT_DATE - c.request_date)::int AS days
       FROM change_requests c
       WHERE c.status::text IN ('requested', 'approved')
       ${scope === null ? Prisma.empty : Prisma.sql`AND c.region_id = ANY(${scope}::int[])`}
-      ${region ? Prisma.sql`AND c.region_id = ${region}` : Prisma.empty}`);
+      ${region ? Prisma.sql`AND c.region_id = ${region}` : Prisma.empty}
+      ${phaseSiteSql(phase, 'c.site_id')}`);
     return changesSummary(rows);
   }
 
   /** The meeting actions not closed (0.15.205, item 8), by the region of their meeting; days overdue against the due date. */
-  private async actionsSection(scope: number[] | null, region: number | null) {
+  private async actionsSection(scope: number[] | null, region: number | null, phase: string[] | null = null) {
     const rows = await this.db.tx.$queryRaw<ActionDueRow[]>(Prisma.sql`
       SELECT a.status::text AS status, (CURRENT_DATE - a.due_date)::int AS days_overdue
       FROM meeting_actions a JOIN meetings m ON m.id = a.meeting_id
       WHERE a.status::text IN ('open', 'in_progress')
       ${scope === null ? Prisma.empty : Prisma.sql`AND m.region_id = ANY(${scope}::int[])`}
-      ${region ? Prisma.sql`AND m.region_id = ${region}` : Prisma.empty}`);
+      ${region ? Prisma.sql`AND m.region_id = ${region}` : Prisma.empty}
+      ${phaseSiteSql(phase, 'a.site_id')}`);
     return actionsSummary(rows);
   }
 
   private async ordersSection(
     scope: number[] | null,
     region: number | null,
+    phase: string[] | null = null,
   ): Promise<{ open_total: number; pr_wait: AgeBuckets; po_wait: AgeBuckets }> {
     const rows = await this.db.tx.$queryRaw<OrderAges[]>(Prisma.sql`
       WITH cfg AS (SELECT closed_order_statuses AS cl FROM contractor_rules LIMIT 1)
@@ -577,7 +593,8 @@ export class DashboardOpsService {
       FROM procurement_records pr
       WHERE NOT EXISTS (SELECT 1 FROM cfg, unnest(cfg.cl) x WHERE public.p4b_norm(x) = public.p4b_norm(pr.order_status))
         ${scope === null ? Prisma.empty : Prisma.sql`AND pr.region_id = ANY(${scope}::int[])`}
-        ${region ? Prisma.sql`AND pr.region_id = ${region}` : Prisma.empty}`);
+        ${region ? Prisma.sql`AND pr.region_id = ${region}` : Prisma.empty}
+        ${phaseSiteSql(phase, 'pr.site_id')}`);
     // a waiting PR has no PO/WO yet; a waiting PO is an open order with a PO/WO date
     const prWait = rows
       .filter((r) => !r.has_po && r.pr_days !== null)
@@ -696,6 +713,18 @@ export class DashboardOpsService {
       by_contractor,
     };
   }
+}
+
+/** 0.15.368: the phase quick filter narrows a query that joins `sites s` to the sites of the chosen phases (like the region filter). */
+function phaseSql(phase: string[] | null): Prisma.Sql {
+  return phase && phase.length ? Prisma.sql`AND s.project_phase = ANY(${phase}::text[])` : Prisma.empty;
+}
+
+/** 0.15.368: the same narrowing for a section that holds only a site id (no sites join): the record counts when its site is in a chosen phase. */
+function phaseSiteSql(phase: string[] | null, siteIdCol: string): Prisma.Sql {
+  return phase && phase.length
+    ? Prisma.sql`AND EXISTS (SELECT 1 FROM sites psx WHERE psx.id = ${Prisma.raw(siteIdCol)} AND psx.project_phase = ANY(${phase}::text[]))`
+    : Prisma.empty;
 }
 
 /** The intersection of two region scopes (null = every region), as in dashboard-extras.service.ts. */

@@ -244,6 +244,7 @@ info:
     - 0.1.0 (2026-10-25): first contract for P1. Breaking changes are recorded in `docs/adr/` (ADR 0001 §6).
     - 0.15.204 (2026-11-27): the dashboard follow-up sections, pending approvals bottleneck (owner approval 2026-11-26, dashboard proposals item 7; migration 0305). Additive and read only. `GET /dashboard/ops` gains the section `approvals` (`DashboardOpsApprovals`): the tasks waiting for review or approval (states in_review and in_approval, the same population as the Approvals inbox), their ages in calendar days since the level opened, split review against approve, and the same ages grouped by the ball-in-court role so the bottleneck role shows. The section needs the approvals view (and the sites view, like the inbox) and answers available false without them. The dashboard settings catalogue gains the card `ops_approvals`. No grant, role or permission change.
     - 0.15.205 (2026-11-27): the dashboard follow-up sections, change requests and overdue meeting actions (owner approval 2026-11-26, dashboard proposals item 8; migration 0306). Additive and read only. `GET /dashboard/ops` gains the section `changes_meetings` (`DashboardOpsChangesMeetings`): the change requests still pending (status requested) with their ages since the request date and a count per kind, the approved ones not yet applied, and the meeting actions not closed with the overdue ones aged by days late. Each part needs its own module view (change control, meetings) and answers `available: false` with null figures without it. No amounts.
+    - 0.15.368 (2026-11-27): the dashboard phase quick filter and the Project Status group-by phase (owner decision 2026-11-27, phase scope item 1; spec `docs/spec/dashboard-phase-filter-group-by.md`). Additive and read only. (1) `GET /dashboard`, `GET /dashboard/ops`, `GET /dashboard/extras`, `GET /dashboard/export` and `GET /project-status` accept `project_phase`, a comma-separated list of 1 to 24 values of `sites.project_phase` (each 1 to 60 characters, 422 otherwise): it keeps only the sites of those phases, narrowing like the filter tree and `region_id` and never widening anyone's data; a section row that belongs to no site (a global change request or meeting action) counts only when no phase filter is given. `DashboardFilters` gains `phases`, the distinct phase values of the sites the caller can see. (2) `GET /project-status` `group_by` gains `phase`: `rows` holds one entry per phase (`key` and `label` the phase value), computed by the same engine run once per phase site set; sites without a phase are in no row. No migration, no grant, role or permission change.
 
     ## Changes since 0.1
     - **Auth**: `GET /auth/login` accepts `identifier` (email, 4-digit employee ID or E.164 phone) and answers 302 the same way whether or not it matches; rate limited (ADR 0002 §9b). Local password sign-in stays deferred and is not in the contract.
@@ -17031,6 +17032,7 @@ paths:
       - name: region_id
         in: query
         schema: {$ref: '#/components/schemas/RegionId'}
+      - {$ref: '#/components/parameters/DashboardProjectPhase'}
       responses:
         '200':
           description: The sections.
@@ -17208,6 +17210,7 @@ paths:
         in: query
         schema: {type: string, pattern: '^[A-Z][A-Z0-9_]{1,30}$'}
         description: 'A view code from `filters.views` (CW, TE, OM; 0.11.0, Q126). Keeps the sites that have a task of the view that applies, the milestones of the view (its whole stages, or for a view of single tasks such as O&M the stages of those tasks) and the tasks of the view in the SLA and the delay attribution. Combines with `stream`. An unknown one is 422 `unknown_view`.'
+      - {$ref: '#/components/parameters/DashboardProjectPhase'}
       - name: exclude_overrides
         in: query
         schema: {type: boolean}
@@ -17285,6 +17288,7 @@ paths:
         in: query
         schema: {type: string, pattern: '^[A-Z][A-Z0-9_]{1,30}$'}
         description: Accepted as in `GET /dashboard`; the sections do not depend on it.
+      - {$ref: '#/components/parameters/DashboardProjectPhase'}
       responses:
         '200':
           description: The sections.
@@ -17360,9 +17364,10 @@ paths:
       tags: [project-status]
       operationId: getProjectStatus
       summary: Project Status (ends at HOTO) with the weight-set version used
-      description: Uses the active weight set, or `weight_set_version` / `weight_set_id` (0.2.6) to re-run with an older set for comparison. Both together, a set of another code, or an unknown `weight_set_version` is 422. Weekly snapshots are never recomputed. Since 0.15.45 `filter` (a `FilterTree`, screen `dashboard`) narrows the sites (not project wide then).
+      description: Uses the active weight set, or `weight_set_version` / `weight_set_id` (0.2.6) to re-run with an older set for comparison. Both together, a set of another code, or an unknown `weight_set_version` is 422. Weekly snapshots are never recomputed. Since 0.15.45 `filter` (a `FilterTree`, screen `dashboard`) narrows the sites (not project wide then). Since 0.15.368 `project_phase` narrows them further, and `group_by=phase` returns one row per project phase (the same engine run once per phase site set; sites without a phase are in no row).
       parameters:
       - {$ref: '#/components/parameters/DashboardFilterTree'}
+      - {$ref: '#/components/parameters/DashboardProjectPhase'}
       - name: region_id
         in: query
         schema: {$ref: '#/components/schemas/RegionId'}
@@ -17373,7 +17378,7 @@ paths:
         in: query
         schema:
           type: string
-          enum: [none, region, site]
+          enum: [none, region, site, phase]
           default: none
       - name: weight_set_version
         in: query
@@ -18234,6 +18239,12 @@ components:
       required: false
       description: '0.15.45: a `FilterTree` as one JSON string (at most 8000 characters), compiled against the screen `dashboard` of `GET /saved-views/filter-fields` (the `sites` fields) and evaluated on the sites the caller may see; it only narrows (the caller''s `dashboard.view` regions and every other filter still apply). Needs `sites.view` (403 `module_forbidden`). 422 `validation_failed` with `unknown_field` (also for a field hidden from the caller), `invalid_operator`, `invalid_value`, `too_deep` or `too_many`.'
       schema: {type: string, maxLength: 8000}
+    DashboardProjectPhase:
+      name: project_phase
+      in: query
+      required: false
+      description: '0.15.368: keep only the sites of these project phases (values of `sites.project_phase`, from `filters.phases` of `GET /dashboard`), comma-separated, 1 to 24 distinct values of 1 to 60 characters (422 `validation_failed` otherwise). It only narrows, like the filter tree: the caller''s regions, row security and every other filter still apply, and a section row that belongs to no site counts only when no phase filter is given.'
+      schema: {type: string, maxLength: 1500}
     Limit:
       name: limit
       in: query
@@ -28327,7 +28338,7 @@ components:
         activities: { type: array, items: { $ref: '#/components/schemas/ProjectStatusActivity' } }
         rows:
           type: array
-          description: Present when `group_by` is region or site.
+          description: 'Present when `group_by` is region, site or (0.15.368) phase; a phase row''s key and label are the phase value.'
           items:
             type: object
             required: [key, label, progress_pct]
@@ -28592,6 +28603,10 @@ components:
               name_ar: {type: [string, 'null']}
         clusters: {type: array, items: {type: string}}
         scenarios: {type: array, items: {$ref: '#/components/schemas/DeliveryScenario'}}
+        phases:
+          description: '0.15.368: the distinct values of `project_phase` of the sites the caller can see, for the phase quick filter.'
+          type: array
+          items: {type: string}
         streams:
           type: array
           items:
