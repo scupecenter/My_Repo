@@ -126,7 +126,7 @@ describe('Batch review with the shapes of the real API', () => {
     expect(screen.getByTestId('batch-cell-error-6-request_date')).toHaveTextContent('GECOL Request Date');
     expect(screen.getByTestId('batch-cell-error-6-survey_date')).toHaveTextContent('Cells must hold values, not formulas.');
     expect(screen.getByTestId('batch-decision-3')).toHaveTextContent('Held: previous version open');
-    expect(screen.getByTestId('batch-held')).toHaveTextContent('1 row(s) wait for the previous version');
+    expect(screen.getByTestId('batch-held')).toHaveTextContent('1 row waits for the previous version');
     expect(screen.getByTestId('batch-open-record-2').getAttribute('href')).toBe('/registers/gecol?record=a0000000-0000-4000-8000-000000000050');
     expect(screen.getByTestId('batch-count-held')).toHaveTextContent('1 held');
     await u.click(screen.getByTestId('batch-approve-all'));

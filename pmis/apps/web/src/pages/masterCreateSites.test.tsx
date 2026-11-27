@@ -48,7 +48,7 @@ describe('the Master import apply dialog: create the missing sites (0.15.73)', (
     expect(screen.getByTestId('mi-create-sites-option')).toHaveTextContent('Create the sites that are not in GSDN Workspace from the Master');
     expect(box).toBeEnabled();
     expect(box).not.toBeChecked();
-    expect(screen.getByTestId('mi-create-sites-note')).toHaveTextContent('1 Site ID(s) of this file are not in GSDN Workspace');
+    expect(screen.getByTestId('mi-create-sites-note')).toHaveTextContent('1 Site ID of this file is not in GSDN Workspace');
     expect(screen.queryByTestId('mi-create-sites-who')).not.toBeInTheDocument();
     await u.click(box);
     expect(screen.getByTestId('mi-create-sites-who')).toHaveTextContent('As a System Admin');
@@ -132,8 +132,8 @@ describe('the Master import apply dialog: create the missing sites (0.15.73)', (
     for (const k of ['create_sites', 'create_sites_hint', 'create_sites_who_admin', 'create_sites_who_holder', 'create_sites_disabled', 'create_sites_none',
       'applying_create_sites', 'applying_create_sites_staging', 'outcome_sites_title', 'outcome_sites_counts', 'outcome_sites_skipped', 'outcome_sites_batch',
       'sites_created_toast', 'reason_site_not_in_pmis_hint']) {
-      expect((en.mi as Record<string, string>)[k]).toBeTruthy();
-      expect((ar.mi as Record<string, string>)[k]).toBeTruthy();
+      expect((en.mi as Record<string, string>)[k] ?? (en.mi as Record<string, string>)[`${k}_other`]).toBeTruthy();
+      expect((ar.mi as Record<string, string>)[k] ?? (ar.mi as Record<string, string>)[`${k}_other`]).toBeTruthy();
     }
     expect((ar.mi as Record<string, string>).create_sites).toBe('أنشئ المواقع غير الموجودة في النظام من الماستر');
   });

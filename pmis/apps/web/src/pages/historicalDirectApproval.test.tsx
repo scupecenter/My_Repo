@@ -100,8 +100,8 @@ describe('the Master import apply dialog: approve directly (0.15.11)', () => {
     expect(badge).toHaveAttribute('data-kind', 'historical_direct');
     expect(badge).toHaveAttribute('title', expect.stringContaining('no L2 step'));
     for (const k of ['approve_directly', 'approve_directly_warn', 'approved_directly_toast']) {
-      expect((en.mi as Record<string, string>)[k]).toBeTruthy();
-      expect((ar.mi as Record<string, string>)[k]).toBeTruthy();
+      expect((en.mi as Record<string, string>)[k] ?? (en.mi as Record<string, string>)[`${k}_other`]).toBeTruthy();
+      expect((ar.mi as Record<string, string>)[k] ?? (ar.mi as Record<string, string>)[`${k}_other`]).toBeTruthy();
     }
     expect((ar.override as Record<string, string>).direct_title).toBeTruthy();
   });

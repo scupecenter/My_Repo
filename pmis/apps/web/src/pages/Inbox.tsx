@@ -2,11 +2,13 @@ import * as Popover from '@radix-ui/react-popover';
 import { AtSign, BellRing, CheckCheck, Clock3, ExternalLink, Eye, EyeOff, Flag, Info } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { notificationTitle } from '@/lib/notificationTitle';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import type { Notification } from '@/api/types';
 import { useInbox, useNotificationOps, type InboxFilter } from '@/api/x';
 import { errText } from '@/components/FormDialog';
 import { PageHeader, Toolbar } from '@/components/PageHeader';
+import { SavedViews } from '@/components/SavedViews';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/States';
 import { TaskDrawer } from '@/components/TaskDrawer';
 import { useToast } from '@/components/Toast';
@@ -15,6 +17,7 @@ import { tripoliToday } from '@/lib/today';
 import { useUiFeatures } from '@/api/uiFeatures';
 import { byPriority, INBOX_TABS, inTab, isPriority, type InboxTab } from '@/lib/inboxPriority';
 import { notificationTarget, snoozeDate } from '@/lib/x';
+import { DateInput } from '@/components/DateInput';
 
 const KINDS = ['mention', 'followed_change', 'task_assigned', 'task_returned', 'task_rejected', 'task_approved', 'approval_due', 'reassigned', 'absence_alert', 'idle_task_alert', 'no_holder', 'system'] as const;
 
@@ -33,7 +36,7 @@ function SnoozeMenu({ n, onPick }: { n: Notification; onPick: (until: string | n
             <button key={c} type="button" className="btn w-full justify-start" data-testid={`inbox-snooze-${c}-${n.id}`} onClick={() => pick(snoozeDate(c, today))}>{t(`inbox.snooze_${c}`)}</button>
           ))}
           <label className="block text-xs text-mute">{t('inbox.snooze_date')}
-            <input type="date" className="input mt-1" min={snoozeDate('tomorrow', today)} data-testid={`inbox-snooze-date-${n.id}`} value={date} onChange={(e) => setDate(e.target.value)} />
+            <DateInput className="input mt-1" min={snoozeDate('tomorrow', today)} data-testid={`inbox-snooze-date-${n.id}`} value={date} onChange={(e) => setDate(e.target.value)} />
           </label>
           <button type="button" className="btn w-full" data-testid={`inbox-snooze-pick-${n.id}`} disabled={!date || date < snoozeDate('tomorrow', today)} onClick={() => pick(date)}>{t('inbox.snooze_until_date')}</button>
           {n.snoozed_until && <button type="button" className="btn w-full" data-testid={`inbox-unsnooze-${n.id}`} onClick={() => pick(null)}>{t('inbox.unsnooze')}</button>}
@@ -93,6 +96,8 @@ export function Inbox() {
       <Toolbar
         settings="inbox"
         filters={<>
+          <SavedViews<Record<string, unknown>> screen="inbox" value={{ unread: filter.unread ? '1' : '', snoozed: filter.snoozed === 'hide' ? '' : filter.snoozed, kind: filter.kind, tab: tabParam ?? '' }} empty={{ unread: '', snoozed: '', kind: '', tab: '' }}
+            onApply={(v) => setF({ unread: String(v.unread ?? ''), snoozed: String(v.snoozed ?? ''), kind: String(v.kind ?? ''), tab: String(v.tab ?? ''), priority: '' })} />
           <div role="group" aria-label={t('inbox.show')} className="inline-flex overflow-hidden rounded-md border border-line">
             {([['', 'inbox.all'], ['1', 'inbox.unread']] as const).map(([v, k]) => (
               <button key={k} type="button" aria-pressed={(filter.unread ? '1' : '') === v} data-testid={`inbox-show-${v ? 'unread' : 'all'}`} onClick={() => setF({ unread: v })}
@@ -121,7 +126,7 @@ export function Inbox() {
               <li key={n.id} data-testid={`inbox-item-${n.id}`} data-read={n.read_at ? 'true' : 'false'} data-kind={n.kind} className={`flex flex-wrap items-start gap-3 p-3 ${n.read_at ? '' : 'bg-accentSoft/30'}`}>
                 <span className="mt-1 text-mute" aria-hidden>{n.kind === 'mention' ? <AtSign size={16} /> : n.kind === 'followed_change' ? <BellRing size={16} /> : <Info size={16} />}</span>
                 <div className="min-w-60 flex-1">
-                  <button type="button" className={`text-start ${n.read_at ? '' : 'font-semibold'}`} data-testid={`inbox-open-${n.id}`} onClick={() => open(n)}>{n.title}</button>
+                  <button type="button" className={`text-start ${n.read_at ? '' : 'font-semibold'}`} data-testid={`inbox-open-${n.id}`} onClick={() => open(n)}>{notificationTitle(n.title, i18n.language, t)}</button>
                   {n.body && <p className="text-sm text-mute">{n.body}</p>}
                   <p className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-mute">
                     {isPriority(n.kind, pk) && <span className="chip bg-lateBg text-lateInk" data-testid={`inbox-priority-${n.id}`}><Flag size={12} aria-hidden />{t('inbox.priority')}</span>}
