@@ -96,6 +96,15 @@ export class ContractorPerformanceService {
 
   async report(auth: AuthContext) {
     await this.access.requireModuleView(auth, 'contractors');
+    return this.reportData();
+  }
+
+  /**
+   * The report without the module gate, for surfaces that gate on their own: the scorecard section of
+   * GET /dashboard/ops (0.15.202, item 5) answers available false when the caller lacks contractors view. Same rows,
+   * same rules, so the dashboard card and this screen never disagree.
+   */
+  async reportData() {
     const th = await this.thresholdsJson();
     const t = th.thresholds;
     const rows = await this.db.tx.$queryRaw<Row[]>(Prisma.sql`

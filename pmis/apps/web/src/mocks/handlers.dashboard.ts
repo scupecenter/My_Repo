@@ -205,6 +205,21 @@ export const dashboardHandlers = [
           ],
         },
       },
+      // 0.15.202: the contractor and supplier scorecard, synthetic figures, no amounts
+      contractor_scorecard: {
+        available: true, parties: 12,
+        by_level: { ok: 7, amber: 3, red: 1, insufficient: 1 },
+        avg_delay_days: 6.4, on_time_pct: 81.2, quality_fail_pct: 4.8,
+        snags: { total: 160, open: 34, overdue: 30, returned: 12 },
+        quality: { total: 125, failed: 6 },
+        worst: [
+          { party_id: '00000000-0000-4000-8000-000000000201', name: 'A&T Global', type: 'contractor', level: 'red', delay_days: 21, snags_overdue: 12, quality_failed: 3 },
+          { party_id: '00000000-0000-4000-8000-000000000202', name: 'Delta Towers', type: 'contractor', level: 'amber', delay_days: 9, snags_overdue: 7, quality_failed: 1 },
+          { party_id: '00000000-0000-4000-8000-000000000203', name: 'Sahara Power', type: 'supplier', level: 'amber', delay_days: 5, snags_overdue: 4, quality_failed: 2 },
+          { party_id: '00000000-0000-4000-8000-000000000204', name: 'Nile Works', type: 'contractor', level: 'ok', delay_days: 2, snags_overdue: 3, quality_failed: 0 },
+          { party_id: '00000000-0000-4000-8000-000000000205', name: 'Med Links', type: 'supplier', level: 'ok', delay_days: 0, snags_overdue: 2, quality_failed: 0 },
+        ],
+      },
     });
   }),
   http.get(`${B}/dashboard/site-map`, () => {
