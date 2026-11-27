@@ -128,6 +128,7 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/templates/:id/download'],
   ['get', '/import-batches'],
   ['get', '/data-hub/summary'],
+  ['get', '/finance-hub/summary'],
   ['post', '/import-batches'],
   ['get', '/import-batches/:id'],
   ['get', '/import-batches/:id/rows'],
