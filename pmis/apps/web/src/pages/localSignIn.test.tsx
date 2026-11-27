@@ -256,7 +256,7 @@ describe('hybrid mode list', () => {
       'POST /tasks/:id/claim', 'POST /tasks/:id/release', 'GET /tasks/:id/history', 'GET /tasks/:id/comments', 'POST /tasks/:id/comments',
       'GET /approvals', 'POST /approvals/bulk',
       // contract 0.4.6: the Responsibility Matrix
-      'GET /matrix', 'PATCH /matrix',
+      'GET /matrix', 'PATCH /matrix', 'GET /matrix/coverage',
       // contract 0.4.5: registers
       'GET /registers', 'GET /registers/:key/records', 'POST /registers/:key/records', 'GET /registers/:key/records/:id', 'PATCH /registers/:key/records/:id',
       'POST /registers/:key/records/:id/submit', 'POST /registers/:key/records/:id/review', 'POST /registers/:key/records/:id/approve', 'POST /registers/:key/records/:id/reject',

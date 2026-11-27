@@ -132,7 +132,7 @@ export function Kpi({
   return to ? (
     <Link
       to={to}
-      className="card block p-4 transition-transform hover:-translate-y-0.5 hover:border-mute"
+      className="card motion-lift block p-4 hover:border-mute"
       data-testid={testid}
     >
       {body}

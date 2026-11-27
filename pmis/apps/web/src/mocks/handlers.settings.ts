@@ -384,7 +384,24 @@ const SLA_TASKS: MockSlaTask[] = [
 ];
 const slaCounts = () => ({ total: SLA_TASKS.length, set: SLA_TASKS.filter((x) => x.mode === 'set').length, none: SLA_TASKS.filter((x) => x.mode === 'none').length, undecided: SLA_TASKS.filter((x) => x.mode === 'undecided').length, in_draft: SLA_TASKS.filter((x) => x.in_draft).length });
 
+/** GET /matrix/coverage (contract 0.15.94): demo numbers only. */
+const MATRIX_COVERAGE = {
+  workflow_version: 1,
+  as_of: '2026-11-27T12:00:00.000Z',
+  regions: [{ id: 1, code: 'Tripoli', name_en: 'Tripoli', name_ar: null }, { id: 2, code: 'Middle', name_en: 'Middle', name_ar: null }],
+  summary: { cells: 8, ok: 5, empty: 2, no_active_holder: 1 },
+  rows: [
+    { kind: 'stage', code: 'MS1', name_en: 'Site acquisition', name_ar: null, module: 'sites', gaps: 1, cells: [
+      { region_id: 1, level_code: 'L1', source: 'default', assignees: 1, holders: 2, status: 'ok' }, { region_id: 1, level_code: 'L2', source: 'default', assignees: 1, holders: 1, status: 'ok' },
+      { region_id: 2, level_code: 'L1', source: 'region', assignees: 1, holders: 1, status: 'ok' }, { region_id: 2, level_code: 'L2', source: 'none', assignees: 0, holders: 0, status: 'empty' } ] },
+    { kind: 'register', code: 'gecol', name_en: 'GECOL', name_ar: null, module: 'gecol', gaps: 2, cells: [
+      { region_id: 1, level_code: 'L1', source: 'default', assignees: 1, holders: 0, status: 'no_active_holder' }, { region_id: 1, level_code: 'L2', source: 'default', assignees: 1, holders: 1, status: 'ok' },
+      { region_id: 2, level_code: 'L1', source: 'none', assignees: 0, holders: 0, status: 'empty' }, { region_id: 2, level_code: 'L2', source: 'default', assignees: 1, holders: 1, status: 'ok' } ] },
+  ],
+};
+
 export const settingsHandlers = [
+  http.get(`${B}/matrix/coverage`, () => { const g = guard(); if (g) return g; return HttpResponse.json(MATRIX_COVERAGE); }),
   // ------------------------------------------------------------------ dashboard settings (F20, contract 0.15.24)
   http.get(`${B}/settings/dashboard`, () => { const g = guard(); if (g) return g; return HttpResponse.json(dashView(), tag(dashState.version)); }),
   http.put(`${B}/settings/dashboard`, async ({ request }) => {

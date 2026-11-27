@@ -1158,7 +1158,9 @@
     "section_documents_types": "Document types",
     "section_documents_forms": "Form templates",
     "section_documents_archive": "Archive",
-    "section_data_counts": "GECOL / HLC counts"
+    "section_data_counts": "GECOL / HLC counts",
+    "section_screens_motion": "Motion",
+    "section_workflow_coverage": "Matrix coverage"
   },
   "scopeMatch": {
     "title": "Team / scope match (Procurement)",
@@ -3553,7 +3555,8 @@
     "r_none": "No sensitive changes this month.",
     "r_xlsx": "Excel workbook",
     "sev_info": "Info",
-    "fh_restore": "Restore"
+    "fh_restore": "Restore",
+    "filter_window": "The filter looked through the newest 20,000 rows you can see. Narrow the dates to search further back."
   },
   "siteIdentity": {
     "title": "Site identity",
@@ -6450,5 +6453,39 @@
     "why": "Reason for the change",
     "cancel": "Cancel",
     "save": "Save"
+  },
+  "motion": {
+    "title": "Motion",
+    "note": "One motion system for the whole app: dialogs, messages, cards, progress bars, charts and the map. This choice is saved in this browser, like the theme and the language.",
+    "auto": "Automatic",
+    "auto_note": "Follow the operating system setting for reduced motion.",
+    "reduced": "Reduced",
+    "reduced_note": "No transitions or animations anywhere, including charts and the map.",
+    "preview": "Preview of a dialog opening",
+    "replay": "Replay",
+    "link_display": "Tables (Display) settings"
+  },
+  "matrixCoverage": {
+    "title": "Matrix coverage",
+    "note": "Read only. Shows the cells of the Responsibility Matrix that nobody can act on, per row, region and level. Nothing here changes the matrix.",
+    "as_of": "As of",
+    "version": "Workflow version",
+    "summary": "{{ok}} covered, {{empty}} empty, {{nobody}} named but nobody active, of {{cells}} cells",
+    "gaps_only": "Show gaps only",
+    "region": "Region",
+    "module": "Module",
+    "all": "All",
+    "row": "Row",
+    "kind_stage": "Stage",
+    "ok": "Covered",
+    "empty": "Empty",
+    "no_active_holder": "Nobody active",
+    "source_region": "region cell",
+    "source_default": "default cell",
+    "source_none": "no cell",
+    "assignees": "named",
+    "holders": "active",
+    "none": "No gaps in this view.",
+    "open_matrix": "Open the Responsibility Matrix"
   }
 }

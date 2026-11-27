@@ -14,6 +14,7 @@ import { boolParam, oneParam, Query } from '../common/query';
 import { parse, uuidSchema } from '../common/zod';
 import { DbService } from '../db/db.service';
 import { TOP_LEVEL_KEYS } from '../permissions/catalogue';
+import { FilterCatalogService } from '../views/filter-catalog.service';
 import { ASSIGNMENT_INCLUDE, assignmentVersion, AssignmentDto, AssignmentRow, toAssignmentDto, UsersRepo } from '../users/users.repo';
 
 const LEVELS = ['view', 'entry', 'review', 'approve', 'admin'] as const;
@@ -117,6 +118,7 @@ export class AssignmentsService {
     private readonly states: UserStateService,
     private readonly idem: IdempotencyService,
     private readonly users: UsersRepo,
+    private readonly filters: FilterCatalogService,
   ) {}
 
   // ------------------------------------------------------------------------------------------------------------- reads
@@ -153,6 +155,8 @@ export class AssignmentsService {
     } else if (!includeEnded) {
       where.push(Prisma.sql`a.valid_from <= now() AND (a.valid_to IS NULL OR a.valid_to > now())`);
     }
+    const adv = await this.filters.fromQuery('assignments', q); // the + Filter tree of the screen assignments (the module view grant is checked above)
+    if (adv) where.push(Prisma.sql`(${adv})`);
     const base = Prisma.join(where, ' AND ');
     const page = cursor ? Prisma.sql`AND (u.display_name, a.id::text) > (${cursor[0] as string}, ${cursor[1] as string})` : Prisma.empty;
     const ids = await this.db.tx.$queryRaw<{ id: string; name: string }[]>(Prisma.sql`SELECT a.id::text AS id, u.display_name AS name
