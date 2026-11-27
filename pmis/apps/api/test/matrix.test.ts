@@ -39,7 +39,7 @@ interface Row { kind: string; code: string; register_key: string | null; approva
 interface MatrixBody { workflow_version: number; version: number; stages: Row[] }
 
 const REGISTER_CODES = ['site_creation', 'procurement', 'procurement_hlc', 'contractors', 'rf_design', 'acquisition', 'gecol', 'hlc', 'permits_hse', 'permits_hse_te', 'permits_hse_acq', 'permits_hse_om', 'warehouse', 'quality', 'quality_te', 'issues', 'risks', 'change_control',
-  'readiness_handover', 'as_built', 'meetings', 'deliverables', 'car_dispatcher', 'financial_advances', 'daily_plan', 'incidents', 'lessons_learned', 'invoices', 'site_contacts'];
+  'readiness_handover', 'as_built', 'meetings', 'deliverables', 'car_dispatcher', 'financial_advances', 'daily_plan', 'incidents', 'lessons_learned', 'site_contacts', 'invoices'];
 /** Built in migration 0019: the registers suite owns their level count and region cells (it changes them while this suite runs). Migration 0035 (Q90) gives them their L2 holders.
  *  quality_te: the Matrix row of the TE stream of QC snags (migration 0056, Q230), seeded as a copy of the Quality row.
  *  permits_hse_te: the Matrix row of the TE stream of Permits & HSE (migration 0050, Q90), L1 Site Engineers (TE), L2 TE Team Lead.
@@ -876,7 +876,7 @@ describe('the seed of the register rows', () => {
       await calc.query(seed);
 
       const rows = await calc.query(`SELECT count(*)::int AS n FROM register_definitions WHERE register_key = ANY($1::text[])`, [[...REGISTER_CODES, 'dismantle']]);
-      expect(rows.rows[0].n).toBe(29); // 0149: the Daily Plan row; 0183: Incidents & Security; 0184: Lessons Learned; 0185: Invoices
+      expect(rows.rows[0].n).toBe(30); // 0149: the Daily Plan row; 0183: Incidents & Security; 0184: Lessons Learned; 0185: Invoices; 0551: Site Contacts
       const back = await calc.query(`SELECT count(*)::int AS n FROM matrix_cells c JOIN matrix_cell_assignees a ON a.cell_id = c.id WHERE c.register_key = 'deliverables'`);
       expect(back.rows[0].n).toBeGreaterThanOrEqual(3);
       const kept = await calc.query(`SELECT (SELECT count(*)::int FROM matrix_cell_assignees a JOIN matrix_cells c ON c.id = a.cell_id WHERE c.register_key = 'warehouse' AND c.level = 1) AS emptied,
@@ -890,7 +890,7 @@ describe('the seed of the register rows', () => {
       const n1 = (await calc.query('SELECT count(*)::int AS n FROM matrix_cells')).rows[0].n;
       await calc.query(seed);
       expect((await calc.query('SELECT count(*)::int AS n FROM matrix_cells')).rows[0].n).toBe(n1);
-      expect((await calc.query('SELECT count(*)::int AS n FROM register_definitions')).rows[0].n).toBe(29); // 0149: the Daily Plan row; 0183: Incidents & Security; 0184: Lessons Learned; 0185: Invoices
+      expect((await calc.query('SELECT count(*)::int AS n FROM register_definitions')).rows[0].n).toBe(30); // 0149: the Daily Plan row; 0183: Incidents & Security; 0184: Lessons Learned; 0185: Invoices; 0551: Site Contacts
     } finally {
       await calc.end();
     }
