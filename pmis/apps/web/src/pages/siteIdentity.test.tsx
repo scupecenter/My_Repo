@@ -54,7 +54,7 @@ describe('Q473: Propose a change on the site page', () => {
     expect(siteProposals).toHaveLength(0);                                                   // nothing is proposed when one field is refused
     await u.type(within(form).getByTestId('site-identity-longitude'), '13.191');
     await u.click(within(form).getByTestId('site-identity-send'));
-    expect(await screen.findByText(/3 proposal\(s\) created in Change Control/)).toBeInTheDocument();
+    expect(await screen.findByText(/3 proposals created in Change Control/)).toBeInTheDocument();
     expect(siteProposals.map((p) => [p.field, p.new_value])).toEqual([['name', 'Corrected name'], ['name_ar', 'اسم مصحح'], ['coordinates', '32.887000, 13.191000']]);
     expect(siteProposals.every((p) => p.site_id === SITE && p.reason === 'spelling in the Master')).toBe(true);
     await waitFor(() => expect(screen.queryByTestId('site-identity-form')).toBeNull());
@@ -79,7 +79,7 @@ describe('Q473: Propose a change on the site page', () => {
     await u.clear(cluster);
     await u.type(cluster, 'CL-BG-1');
     await u.click(within(form).getByTestId('site-identity-send'));
-    expect(await screen.findByText(/1 proposal\(s\) created/)).toBeInTheDocument();
+    expect(await screen.findByText(/1 proposal created/)).toBeInTheDocument();
     expect(siteProposals).toEqual([expect.objectContaining({ site_id: SITE, field: 'region', old_value: 'WM / CL-WM-3', new_value: 'BG / CL-BG-1' })]);
   });
 

@@ -14,6 +14,7 @@ import { PeoplePicker } from '@/components/PeoplePicker';
 import { PersonTag } from '@/components/PersonTag';
 import { MODULES, ScopePicker } from '@/components/ScopePicker';
 import { useToast } from '@/components/Toast';
+import { RevokePasskeysDialog } from '@/components/Passkeys';
 import { EnforceTwoFactorDialog, LocalBadges, ResetPasswordDialog, SystemAdminDialog, TwoFactorBadge, TwoFactorDialog } from '@/components/UserDialogs';
 import { isAdmin } from '@/lib/perm';
 import { fmtDateTime } from '@/lib/time';
@@ -107,6 +108,7 @@ function TwoFactorAdminCard({ user, isSelf, canAdminister, onAction }: { user: U
   const noLocal = !user.local_sign_in;
   const enforced = state !== 'off' && !!user.two_factor_enforced;
   const [enf, setEnf] = useState<null | boolean>(null);
+  const [revoke, setRevoke] = useState(false);
   return (
     <section className="card p-4" data-testid="two-factor-admin-card">
       <h2 className="mb-1 flex items-center gap-2 font-bold">{state === 'off' ? <ShieldOff size={16} /> : <ShieldCheck size={16} />}{t('twoFactor.admin_title')}</h2>
@@ -122,11 +124,13 @@ function TwoFactorAdminCard({ user, isSelf, canAdminister, onAction }: { user: U
                 {state === 'pending_enrolment' && <button className="btn" data-testid="two-factor-new-code" disabled={isSelf} title={isSelf ? t('twoFactor.admin_self') : undefined} onClick={() => onAction('code')}><KeyRound size={16} />{t('twoFactor.admin_new_code')}</button>}
                 <button className="btn" data-testid="two-factor-off" disabled={isSelf} title={isSelf ? t('twoFactor.admin_self') : undefined} onClick={() => onAction('off')}><ShieldOff size={16} />{t('twoFactor.admin_turn_off')}</button>
                 <button className="btn" data-testid="two-factor-reset" disabled={isSelf} title={isSelf ? t('twoFactor.admin_self') : undefined} onClick={() => onAction('reset')}><RotateCcw size={16} />{t('twoFactor.admin_reset')}</button>
+                <button className="btn" data-testid="two-factor-passkeys-revoke" disabled={isSelf} title={isSelf ? t('twoFactor.admin_self') : undefined} onClick={() => setRevoke(true)}><KeyRound size={16} />{t('passkeys.revoke')}</button>
                 <button className="btn" data-testid="two-factor-enforce" disabled={isSelf} title={isSelf ? t('twoFactor.admin_self') : undefined} onClick={() => setEnf(!enforced)}><Lock size={16} />{t(enforced ? 'twoFactor.unenforce' : 'twoFactor.enforce')}</button>
               </>}
         </div>
       )}
       {isSelf && <p className="mt-1 text-sm text-lateInk" data-testid="two-factor-self-note">{t('twoFactor.admin_self')}</p>}
+      {revoke && <RevokePasskeysDialog user={user} onClose={() => setRevoke(false)} />}
       {enf !== null && <EnforceTwoFactorDialog user={user} enforce={enf} onClose={() => setEnf(null)} />}
     </section>
   );
