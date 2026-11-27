@@ -165,13 +165,13 @@ describe('alert rules (0342)', () => {
   it('link_orphans (0650) checks its params, fires once per link and week for dangling links and reports example ids', async () => {
     await db.query('BEGIN');
     await beginAs(db, adminId);
-    const fails = async (p: Promise<unknown>, re: RegExp) => { await db.query('SAVEPOINT s'); await expect(p).rejects.toThrow(re); await db.query('ROLLBACK TO s'); };
+    const fails = async (run: () => Promise<unknown>, re: RegExp) => { await db.query('SAVEPOINT s'); await expect(run()).rejects.toThrow(re); await db.query('ROLLBACK TO s'); };
     await db.query(`INSERT INTO register_links (register_key, field_code, target_register, same_site, label_fields, enforce, sort_order)
                     VALUES ('issues', 'orph_test_id', 'risks', false, ARRAY['title'], false, 901)`);
-    await fails(save(rule(`${PREFIX}-bo1`, { kind: 'link_orphans', params: { register_key: 'nope' } }), 'bad'), /register_key/);
-    await fails(save(rule(`${PREFIX}-bo2`, { kind: 'link_orphans', params: { field_code: 'orph_test_id' } }), 'bad'), /field_code/);
-    await fails(save(rule(`${PREFIX}-bo3`, { kind: 'link_orphans', params: { min_rows: 0 } }), 'bad'), /min_rows/);
-    await fails(save(rule(`${PREFIX}-bo4`, { kind: 'link_orphans', params: { days: 3 } }), 'bad'), /params/);
+    await fails(() => save(rule(`${PREFIX}-bo1`, { kind: 'link_orphans', params: { register_key: 'nope' } }), 'bad'), /register_key/);
+    await fails(() => save(rule(`${PREFIX}-bo2`, { kind: 'link_orphans', params: { field_code: 'orph_test_id' } }), 'bad'), /field_code/);
+    await fails(() => save(rule(`${PREFIX}-bo3`, { kind: 'link_orphans', params: { min_rows: 0 } }), 'bad'), /min_rows/);
+    await fails(() => save(rule(`${PREFIX}-bo4`, { kind: 'link_orphans', params: { days: 3 } }), 'bad'), /params/);
     const r = await save(rule(`${PREFIX}-orph`, { kind: 'link_orphans', params: { register_key: 'issues', field_code: 'orph_test_id', min_rows: 1 }, title_en: 'Dangling {{register}}.{{field}}', body_en: '{{count}} rows' }), 'add the orphans rule');
     const site = await makeSite(db, REGION, { prefix: PREFIX.toUpperCase() });
     await db.query(
