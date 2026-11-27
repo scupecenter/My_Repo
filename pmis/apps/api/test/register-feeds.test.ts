@@ -214,6 +214,24 @@ describe('Q225: a site field that changes rules goes through Change Control', ()
   });
 });
 
+describe('Issue to Risk link (0214)', () => {
+  it('an issue names a risk the caller may see; a made-up or malformed id is refused; the pickers answer', async () => {
+    const t = await team(app, db, 'issues', 'issues', R);
+    const bad = await t.entry.api.call('post', recPath('issues'), { site_id: t.site.id, data: { pending_issue: `I-${U}`, risk_entity_id: '00000000-0000-4000-8000-000000000000' } });
+    expect(bad.status, JSON.stringify(bad.body)).toBe(422);
+    expect(JSON.stringify(bad.body)).toContain('risk_not_available');
+    const junk = await t.entry.api.call('post', recPath('issues'), { site_id: t.site.id, data: { pending_issue: `I-${U}`, risk_entity_id: 'nope' } });
+    expect(junk.status).toBe(422);
+    expect(JSON.stringify(junk.body)).toContain('invalid');
+    const none = await t.entry.api.call('post', recPath('issues'), { site_id: t.site.id, data: { pending_issue: `I-${U}`, raised_date: '2026-01-05', issue_status: 'Open' } });
+    expect(none.status, JSON.stringify(none.body)).toBe(201);
+    const opts = await t.entry.api.call('get', '/registers/issues/risk-options');
+    expect([200, 403], JSON.stringify(opts.body)).toContain(opts.status);
+    const badId = await t.entry.api.call('get', '/registers/risks/not-an-id/issues');
+    expect([403, 422]).toContain(badId.status);
+  });
+});
+
 describe('the other register feeds (Q103)', () => {
   it('RF & Design fills rf_design_records and the site identity; Acquisition fills its candidates and Master T', async () => {
     const t = await team(app, db, 'rf_design', 'rf_design', R);

@@ -51,6 +51,16 @@ export class P4cController {
     return this.p4c.warehouseOrderOptions(auth, q, 'quality');
   }
 
+  @Get('issues/risk-options')
+  issueRiskOptions(@Auth() auth: AuthContext) {
+    return this.p4c.issueRiskOptions(auth);
+  }
+
+  @Get('risks/:entity_id/issues')
+  riskIssues(@Auth() auth: AuthContext, @Param('entity_id') entityId: string) {
+    return this.p4c.riskIssues(auth, entityId);
+  }
+
   @Get('procurement/:entity_id/receipts')
   orderReceipts(@Auth() auth: AuthContext, @Param('entity_id') entityId: string) {
     return this.p4c.orderReceipts(auth, entityId);

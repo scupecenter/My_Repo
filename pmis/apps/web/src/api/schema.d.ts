@@ -6206,6 +6206,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/registers/issues/risk-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The risks an Issue may name as realised (0.15.112)
+         * @description 0.15.112. Current, not voided Risks records that the caller may see (the Risks view right of the responsibility matrix, by region). Needs the Issue log module.
+         */
+        get: operations["listIssueRiskOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/registers/risks/{entity_id}/issues": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The issues that realise a risk (0.15.112)
+         * @description 0.15.112. The current, not voided Issue log records whose `risk_entity_id` is this risk, with status and dates. Needs the Risks and Issue log modules; only issues in regions where the caller holds the Issues view right are listed.
+         */
+        get: operations["listRiskRealisedIssues"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/registers/procurement/{entity_id}/receipts": {
         parameters: {
             query?: never;
@@ -16144,6 +16184,30 @@ export interface components {
             po_wo_date?: string;
             order_status?: string;
             external_party?: components["schemas"]["ExternalPartyRef"];
+        };
+        IssueRiskOption: {
+            /** Format: uuid */
+            entity_id: string;
+            /** Format: uuid */
+            record_id: string;
+            risk_id?: string;
+            statement?: string;
+            status?: string;
+            category?: string;
+            state?: string;
+        };
+        RiskRealisedIssue: {
+            /** Format: uuid */
+            entity_id: string;
+            /** Format: uuid */
+            record_id: string;
+            /** Format: uuid */
+            site_id?: string;
+            state: string;
+            pending_issue?: string;
+            issue_status?: string;
+            raised_date?: string;
+            resolution_date?: string;
         };
         /** @description 0.15.91. A warehouse receipt (PL or OPEN) against a Procurement order. */
         ProcurementOrderReceipt: {
@@ -30931,6 +30995,57 @@ export interface operations {
                 content: {
                     "application/json": {
                         items: components["schemas"]["WarehouseOrderOption"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listIssueRiskOptions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The risks. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["IssueRiskOption"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    listRiskRealisedIssues: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entity_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The issues. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["RiskRealisedIssue"][];
                     };
                 };
             };

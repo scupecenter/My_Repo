@@ -38,6 +38,20 @@ export const useWarehouseOrders = (siteId: string | null | undefined, enabled: b
     queryFn: () => api.get<{ items: S['WarehouseOrderOption'][] }>(`/registers/${key}/order-options`, { query: siteId ? { site_id: siteId } : {} }).then((r) => r.items),
   });
 
+/** GET /registers/issues/risk-options: the risks an Issue may name as realised (0214). */
+export const useIssueRisks = (enabled: boolean) =>
+  useQuery({
+    queryKey: ['issue-risks'], enabled,
+    queryFn: () => api.get<{ items: S['IssueRiskOption'][] }>('/registers/issues/risk-options').then((r) => r.items),
+  });
+
+/** GET /registers/risks/{entity_id}/issues: the issues that realise a risk (0214). */
+export const useRiskIssues = (entityId: string | null | undefined) =>
+  useQuery({
+    queryKey: ['risk-issues', entityId], enabled: !!entityId,
+    queryFn: () => api.get<{ items: S['RiskRealisedIssue'][] }>(`/registers/risks/${entityId}/issues`).then((r) => r.items),
+  });
+
 /** GET /registers/procurement/{entity_id}/receipts: the warehouse receipts against an order. */
 export const useOrderReceipts = (entityId: string | null | undefined) =>
   useQuery({

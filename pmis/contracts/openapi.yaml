@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.185
+  version: 0.15.222
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -31,6 +31,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.133 (2026-11-27): additive (migration 0214; CHANGELOG IssueRiskLink). An Issue can name the Risk it realises: new optional field `risk_entity_id` on `issues` (the entity id of a Risks record the caller may see; needs the Risks view right in the risk's region; field errors `risk_not_available`, `invalid`). `GET /registers/issues/risk-options` lists the risks; `GET /registers/risks/{entity_id}/issues` lists the issues that realise a risk (needs the Risks and Issues modules; only the regions of the Issues view right).
     - 0.15.130 (2026-11-27): the admin alert `backup_missing` (owner approval relayed 2026-11-26). Additive, migration 0240. When no backup succeeded in the last 24 hours (the System Log rows the data reset reads) a security alert `backup_missing` (default severity high, configurable like the other rules) is raised once per calendar day by the job `backup_check` (every 6 hours) and one System Log row (source `backup_check`) is written. `SecurityAlertRule` and `AlertSeverityMap` gain `backup_missing`. No new endpoint.
     - 0.15.95 (2026-11-27): the admin alert `backup_missing` (owner approval relayed 2026-11-26). Additive, migration 0184. When no backup succeeded in the last 24 hours (the System Log rows the data reset reads) a security alert `backup_missing` (default severity high, configurable like the other rules) is raised once per calendar day by the job `backup_check` (every 6 hours) and one System Log row (source `backup_check`) is written. `SecurityAlertRule` and `AlertSeverityMap` gain `backup_missing`. No new endpoint.
     - 0.15.98 (2026-11-27): the dashboard follow-up sections (owner approval 2026-11-26, dashboard proposals item 1; migration 0230). Additive and read only. New `GET /dashboard/ops` (`getDashboardOps`, `DashboardOps`): the sections that follow the operations beyond F13, each part `available: false` when the caller may not see its module. First section `procurement`: the open orders (order status not one of the closing statuses of the contractor rules, as in `GET /reports/contractor-performance`), the PRs waiting for a PO/WO and the open PO/WOs, each aged in calendar days and bucketed 0-7, 8-14, 15-30, over 30, and the materials position: the receive rate (dispatched against required of `warehouse_site_qty` over the active, not cancelled sites), the count of sites with a shortage line, the top shortage lines with their contractor (the party of the site's newest open order; unattributed when none) and the shortage per contractor. No price is returned (no price is stored on a Procurement record). The dashboard settings catalogue gains the card `ops_procurement`, so the card shows, hides and orders per tab in Settings > Dashboard like every other card. No grant, role or permission change.
@@ -9657,6 +9658,47 @@ paths:
                 required: [items]
                 properties:
                   items: { type: array, items: { $ref: '#/components/schemas/WarehouseOrderOption' } }
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /registers/issues/risk-options:
+    get:
+      tags: [registers]
+      operationId: listIssueRiskOptions
+      summary: The risks an Issue may name as realised (0.15.112)
+      description: |
+        0.15.112. Current, not voided Risks records that the caller may see (the Risks view right of the responsibility matrix, by region). Needs the Issue log module.
+      responses:
+        '200':
+          description: The risks.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/IssueRiskOption' } }
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /registers/risks/{entity_id}/issues:
+    get:
+      tags: [registers]
+      operationId: listRiskRealisedIssues
+      summary: The issues that realise a risk (0.15.112)
+      description: |
+        0.15.112. The current, not voided Issue log records whose `risk_entity_id` is this risk, with status and dates. Needs the Risks and Issue log modules; only issues in regions where the caller holds the Issues view right are listed.
+      parameters:
+      - {name: entity_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: The issues.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/RiskRealisedIssue' } }
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '422': {$ref: '#/components/responses/Unprocessable'}
@@ -21901,6 +21943,29 @@ components:
         po_wo_date: { type: string, format: date }
         order_status: { type: string }
         external_party: { $ref: '#/components/schemas/ExternalPartyRef' }
+    IssueRiskOption:
+      type: object
+      required: [entity_id, record_id]
+      properties:
+        entity_id: { type: string, format: uuid }
+        record_id: { type: string, format: uuid }
+        risk_id: { type: string }
+        statement: { type: string }
+        status: { type: string }
+        category: { type: string }
+        state: { type: string }
+    RiskRealisedIssue:
+      type: object
+      required: [entity_id, record_id, state]
+      properties:
+        entity_id: { type: string, format: uuid }
+        record_id: { type: string, format: uuid }
+        site_id: { type: string, format: uuid }
+        state: { type: string }
+        pending_issue: { type: string }
+        issue_status: { type: string }
+        raised_date: { type: string }
+        resolution_date: { type: string }
     ProcurementOrderReceipt:
       type: object
       description: '0.15.91. A warehouse receipt (PL or OPEN) against a Procurement order.'

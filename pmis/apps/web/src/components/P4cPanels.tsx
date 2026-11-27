@@ -1,7 +1,7 @@
 import { CheckCircle2, Clock, Eye } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useDismantleOrders, useOrderReceipts, useWarehouseOrders, useHlcLegacyMigration, useSetHlcPurchaseRequests, type HlcLegacyMigration } from '@/api/p4c';
+import { useIssueRisks, useRiskIssues, useDismantleOrders, useOrderReceipts, useWarehouseOrders, useHlcLegacyMigration, useSetHlcPurchaseRequests, type HlcLegacyMigration } from '@/api/p4c';
 import type { RegisterRecord } from '@/api/types';
 import { registerErrorMessage } from '@/lib/registerErrors';
 import { errText, FormDialog } from './FormDialog';
@@ -142,6 +142,55 @@ export function OrderReceipts({ entityId }: { entityId: string }) {
                 <span>{r.doc_date ?? ''}</span>
                 <span className="text-mute">{r.movement_status ?? r.state}</span>
                 <span>{t('p4c.receipts_qty', { lines: r.lines, qty: r.qty })}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+    </section>
+  );
+}
+
+/** 0214: the risk an Issue realises (optional picker). */
+export function IssueRiskSelect({ value, onChange, editable, invalid }: { value: unknown; onChange: (v: string | null) => void; editable: boolean; invalid?: boolean }) {
+  const { t } = useTranslation();
+  const q = useIssueRisks(editable);
+  const items = q.data ?? [];
+  const cur = typeof value === 'string' ? value : '';
+  const chosen = items.find((i) => i.entity_id === cur);
+  const label = (i: (typeof items)[number]) => `${i.risk_id ?? i.entity_id.slice(0, 8)}${i.statement ? ` · ${i.statement}` : ''}`;
+  return (
+    <div data-testid="reg-issue-risk">
+      {editable
+        ? (
+          <select id="reg-field-risk_entity_id" data-testid="reg-field-risk_entity_id" className="input" aria-invalid={invalid || undefined} value={cur} onChange={(e) => onChange(e.target.value || null)}>
+            <option value="">{t('p4c.issue_no_risk')}</option>
+            {items.map((i) => <option key={i.entity_id} value={i.entity_id}>{label(i)}</option>)}
+            {cur && !chosen && <option value={cur}>{cur.slice(0, 8)}</option>}
+          </select>
+        )
+        : <div className="font-semibold" data-testid="reg-view-risk_entity_id">{chosen ? label(chosen) : cur ? cur.slice(0, 8) : '—'}</div>}
+    </div>
+  );
+}
+
+/** 0214: the issues that came from a risk, on the risk page. */
+export function RiskIssues({ entityId }: { entityId: string }) {
+  const { t } = useTranslation();
+  const q = useRiskIssues(entityId);
+  const items = q.data ?? [];
+  if (q.isError) return null;
+  return (
+    <section aria-labelledby="rs-risk-issues" data-testid="reg-section-risk-issues" className="space-y-2">
+      <h3 id="rs-risk-issues" className="font-semibold">{t('p4c.risk_issues_title')}</h3>
+      {items.length === 0
+        ? <p className="text-sm text-mute" data-testid="reg-risk-issues-empty">{t('p4c.risk_issues_none')}</p>
+        : (
+          <ul className="space-y-1 text-sm" data-testid="reg-risk-issues">
+            {items.map((r) => (
+              <li key={r.record_id} className="flex flex-wrap gap-x-3" data-testid={`reg-risk-issue-${r.record_id}`}>
+                <span className="font-semibold">{r.pending_issue ?? r.record_id.slice(0, 8)}</span>
+                <span>{r.raised_date ?? ''}</span>
+                <span className="text-mute">{r.issue_status ?? r.state}</span>
               </li>
             ))}
           </ul>

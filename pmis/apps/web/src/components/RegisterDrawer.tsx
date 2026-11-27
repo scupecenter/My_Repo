@@ -20,7 +20,7 @@ import { DrawerFrame, DrawerTabs, panelProps, useReportDirty } from './DrawerFra
 import { DraftBar, useDraft } from './DraftBar';
 import { FollowButton } from './FollowButton';
 import { RecordDocuments } from './RecordDocuments';
-import { DismantleOrderSelect, HlcPurchaseRequests, OrderReceipts, WarehouseOrderSelect } from './P4cPanels';
+import { IssueRiskSelect, RiskIssues, DismantleOrderSelect, HlcPurchaseRequests, OrderReceipts, WarehouseOrderSelect } from './P4cPanels';
 import { useRecordSlots } from '@/api/documents';
 import { Holders } from './HolderChip';
 import { Balance, ExtendBooking, MembersEditor, ReadinessBadge, reservedMessage, TopUp, VehiclePicker } from './AssignmentPanels';
@@ -267,6 +267,8 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
                         {record && <FieldHistory entityType="register_record" entityId={record.entity_id} field={f.code} label={fieldLabel(f, lang)} onRestore={editable && ['text', 'number', 'date', 'yes_no'].includes(f.type) ? (v) => set(f.code, v) : undefined} />}</div>
                       {rk === 'car_dispatcher' && f.code === 'vehicle_id'
                         ? <VehiclePicker value={data.vehicle_id} onChange={(v) => set('vehicle_id', v)} from={data.from_date as string} to={data.to_date as string} vehicleType={data.required_type as string} bookingId={record?.id} disabled={!editable} invalid={!!show} />
+                        : key === 'issues' && f.code === 'risk_entity_id'
+                        ? <IssueRiskSelect value={data[f.code]} onChange={(v) => set(f.code, v)} editable={editable} invalid={!!show} />
                         : key === 'dismantle' && f.code === 'procurement_order_id'
                         ? <DismantleOrderSelect siteId={site?.id} part={rtype} value={data[f.code]} onChange={(v) => set(f.code, v)} editable={editable} invalid={!!show} />
                         : (key === 'issues' || key === 'quality') && f.code === 'procurement_order_id'
@@ -310,6 +312,7 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
           </section>
         )}
         {record && rk === 'procurement' && record.state === 'approved' && <OrderReceipts entityId={record.entity_id as string} />}
+        {record && key === 'risks' && <RiskIssues entityId={record.entity_id as string} />}
         {record && rk === 'financial_advances' && <Balance record={record} />}
         {record && rk === 'financial_advances' && record.record_type === 'advance' && record.state === 'approved' && <TopUp record={record} onDone={onCreated} />}
         {record && rk === 'car_dispatcher' && record.record_type === 'booking' && record.state === 'approved' && <ExtendBooking record={record} onDone={onCreated} />}

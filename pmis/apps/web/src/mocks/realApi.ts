@@ -400,6 +400,8 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/registers/financial_advances/order-options'],
   ['get', '/registers/issues/order-options'],
   ['get', '/registers/quality/order-options'],
+  ['get', '/registers/issues/risk-options'],
+  ['get', '/registers/risks/:entity_id/issues'],
   ['get', '/registers/procurement/:entity_id/receipts'],
   ['get', '/registers/contractor-companies'],
   ['post', '/registers/hlc/legacy-migration'],
