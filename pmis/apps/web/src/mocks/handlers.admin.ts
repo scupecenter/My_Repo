@@ -54,6 +54,10 @@ const profileBody = (p: MockProfile) => ({
   field_rules: p.field_rules.map((r) => ({ ...r, field_code: 'f', entity_type: 'site' })), changed_by: ref('1001'), changed_at: '2026-10-01T08:00:00Z',
 });
 
+/** Scheduled Master exports (contract 0.15.99): demo rows. */
+type MockSchedule = { id: string; name: string; cadence: string; weekday?: number; day_of_month?: number; spec: { parts?: string[] }; enabled: boolean; created_at: string; last_started_at: string | null; last_job_id: string | null; last_error: string | null; next_due_at: string; due: boolean };
+const SCHEDULES: MockSchedule[] = [{ id: '00000000-0000-4000-8000-0000000000b1', name: 'Weekly Master', cadence: 'weekly', weekday: 1, spec: {}, enabled: true, created_at: '2026-11-20T08:00:00.000Z', last_started_at: null, last_job_id: null, last_error: null, next_due_at: '2026-11-30T22:00:00.000Z', due: true }];
+
 export const adminHandlers = [
   // ------------------------------------------------------------------ users
   http.get(`${B}/users`, ({ request }) => {
@@ -573,6 +577,16 @@ export const adminHandlers = [
     save();
     return HttpResponse.json({ id, kind: 'master_export', status: 'queued', progress: 0, result_file_id: null, created_at: now(), finished_at: null }, { status: 202 });
   }),
+  http.get(`${B}/exports/schedules`, () => { const g = guard(); if (g) return g; return HttpResponse.json({ items: SCHEDULES }); }),
+  http.put(`${B}/exports/schedules`, async ({ request }) => {
+    const g = guard(); if (g) return g;
+    const b = (await request.json()) as { id?: string; name: string; cadence: string; weekday?: number; day_of_month?: number; spec?: { parts?: string[] }; enabled?: boolean };
+    const row = { id: b.id ?? crypto.randomUUID(), name: b.name, cadence: b.cadence, ...(b.weekday !== undefined ? { weekday: b.weekday } : {}), ...(b.day_of_month !== undefined ? { day_of_month: b.day_of_month } : {}),
+      spec: b.spec ?? {}, enabled: b.enabled !== false, created_at: new Date().toISOString(), last_started_at: null, last_job_id: null, last_error: null, next_due_at: new Date(Date.now() + 86_400_000).toISOString(), due: false };
+    const i = SCHEDULES.findIndex((x) => x.id === row.id); if (i >= 0) SCHEDULES[i] = row; else SCHEDULES.push(row);
+    return HttpResponse.json({ items: SCHEDULES });
+  }),
+  http.delete(`${B}/exports/schedules/:id`, ({ params }) => { const g = guard(); if (g) return g; const i = SCHEDULES.findIndex((x) => x.id === params.id); if (i >= 0) SCHEDULES.splice(i, 1); return HttpResponse.json({ items: SCHEDULES }); }),
   http.get(`${B}/exports/master`, () => {
     const g = guard(); if (g) return g;
     // Each poll moves a running job one step: queued -> running -> done.
