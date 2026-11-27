@@ -2997,7 +2997,9 @@
         "8_15": "8 to 15 wd",
         "16_30": "16 to 30 wd",
         "over_30": "Over 30 wd"
-      }
+      },
+      "switch": "Show open issues per",
+      "by_owner": "Per owner"
     },
     "delay": {
       "title": "Delay attribution",
@@ -3092,6 +3094,12 @@
       "late": "{{n}} late tasks",
       "issues": "{{n}} open issues",
       "decisions": "{{n}} decisions to act on now"
+    },
+    "more": "and {{n}} more",
+    "card_basis": {
+      "live": "Live, as of today",
+      "snapshot": "From the snapshot of {{date}}",
+      "computed": "Computed as of {{date}}"
     }
   },
   "docs": {
@@ -3460,6 +3468,7 @@
     "fh_open": "History of {{field}}",
     "fh_title": "History of {{field}}",
     "fh_empty": "No recorded changes.",
+    "diff_title": "Field changes",
     "online_subtitle": "Active sessions. The list refreshes every {{seconds}} seconds; refreshing never extends a session.",
     "o_user": "User",
     "o_started": "Signed in",

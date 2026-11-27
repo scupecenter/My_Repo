@@ -77,6 +77,20 @@ describe('Dashboard', () => {
     expect(screen.getByTestId('dash-delay')).toHaveTextContent('Delay attribution');
   });
 
+  it('switches the Issues card between owner, category and reason, and names the data basis of each card', async () => {
+    await signIn('pm');
+    page();
+    await screen.findByTestId('dash-issues');
+    expect(screen.getByTestId('dash-issues-by-owner')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('dash-issues-cat-chart').closest('.hidden')).not.toBeNull();
+    expect(screen.getByTestId('dash-issues-chart').closest('.hidden')).toBeNull();
+    await userEvent.click(screen.getByTestId('dash-issues-by-category'));
+    expect(screen.getByTestId('dash-issues-cat-chart').closest('.hidden')).toBeNull();
+    expect(screen.getByTestId('dash-issues-chart').closest('.hidden')).not.toBeNull();
+    expect(screen.getByTestId('dash-issues-basis')).toHaveTextContent('Live, as of today');
+    expect(screen.getByTestId('dash-delay-basis')).toBeInTheDocument();
+  });
+
   it('drills down to the Site Register with the filters of the view', async () => {
     await signIn('pm');
     const u = userEvent.setup();

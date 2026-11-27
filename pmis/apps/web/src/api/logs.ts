@@ -74,6 +74,13 @@ export const useFieldHistory = (entityType: string, entityId: string, field: str
     queryFn: () => api.get<{ items: FieldChange[] }>('/audit-log/field-history', { query: { entity_type: entityType, entity_id: entityId, field } }).then((r) => r.items),
   });
 
+/** Every field change of one record (the History tab, contract 0.15.92), newest first; fetches only when `enabled` (the caller may read the Audit Log). */
+export const useEntityChanges = (entityType: string, entityId: string | null | undefined, enabled: boolean) =>
+  useQuery({
+    queryKey: ['entity-changes', entityType, entityId], enabled: enabled && !!entityId,
+    queryFn: () => api.get<{ items: FieldChange[] }>('/audit-log/field-history', { query: { entity_type: entityType, entity_id: entityId ?? '' } }).then((r) => r.items),
+  });
+
 /** Starts a CSV export job and polls it; resolves with the downloaded file name. */
 export async function runExport(path: string, body: Record<string, unknown>) {
   const job = await api.post<Job>(path, { idempotencyKey: crypto.randomUUID(), body });

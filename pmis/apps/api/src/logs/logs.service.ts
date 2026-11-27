@@ -137,6 +137,8 @@ interface AuditRow {
   privileged: boolean; site_code: string | null; chain_seq: bigint | null;
 }
 
+const FIN_AMOUNT_FIELDS = new Set(['requested_amount', 'approved_amount', 'disbursed_amount', 'amount', 'returned_amount', 'balance']);
+
 interface FieldRow {
   id: bigint; audit_id: bigint; at: Date; at_text: string; actor_id: string | null; on_behalf_of: string | null; action: string; entity_type: string; entity_id: string | null;
   record_id: string | null; site_id: string | null; region_id: number | null; module_key: string | null; field: string; field_label_en: string | null; field_label_ar: string | null;
@@ -284,12 +286,44 @@ export class LogsService {
     return this.page(await this.fieldDtos(rows), limit, (l) => [l.at, l.id]);
   }
 
+  /**
+   * One field of one record (field given), or every field change of the record (field omitted: the History tab, contract 0.15.92), newest first, at most 200.
+   * A change of a field the caller may not see is left out (field rule `hidden`, the amounts of Financial Advances for who may not see amounts), so the
+   * list never shows a value the form itself hides. Same reader rules and audit as the other field-change reads.
+   */
   async fieldHistory(q: Query) {
     const f = filters(q, ['entity_type', 'entity_id', 'field']);
-    const errors: FieldError[] = ['entity_type', 'entity_id', 'field'].filter((k) => f[k] === undefined).map((k) => ({ path: `/${k}`, code: 'required', message: `${k} is required.` }));
+    const errors: FieldError[] = ['entity_type', 'entity_id'].filter((k) => f[k] === undefined).map((k) => ({ path: `/${k}`, code: 'required', message: `${k} is required.` }));
     if (errors.length) throw problems.validation(errors);
     const rows = await this.db.tx.$queryRaw<FieldRow[]>(Prisma.sql`SELECT c.*, log_ts_text(c.at) AS at_text FROM log_field_changes_read(${JSON.stringify(f)}::jsonb, 200) c ORDER BY c.at DESC, c.id DESC`);
-    return { items: await this.fieldDtos(rows) };
+    return { items: await this.fieldDtos(await this.visibleChanges(rows)) };
+  }
+
+  /** The rows of `rows` the caller may see: drops hidden fields (field_definitions rules) and the amounts of Financial Advances the caller may not see. */
+  private async visibleChanges(rows: FieldRow[]): Promise<FieldRow[]> {
+    if (rows.length === 0) return rows;
+    const recIds = [...new Set(rows.filter((r) => r.entity_type === 'register_record' && r.record_id && UUID_RE.test(r.record_id)).map((r) => r.record_id as string))];
+    const recs = recIds.length === 0 ? [] : await this.db.tx.$queryRaw<{ id: string; register_key: string; entity_id: string; amounts_ok: boolean }[]>(Prisma.sql`
+      SELECT r.id::text AS id, r.register_key, r.entity_id::text AS entity_id,
+        CASE WHEN r.register_key = 'financial_advances' THEN coalesce(reg_data_for(l.id, l.register_key, l.record_type, l.entity_id, l.data) ->> 'amounts_hidden', 'false') <> 'true' ELSE true END AS amounts_ok
+      FROM register_records r
+      JOIN LATERAL (SELECT x.id, x.register_key, x.record_type, x.entity_id, x.data FROM register_records x WHERE x.entity_id = r.entity_id ORDER BY x.version_no DESC LIMIT 1) l ON true
+      WHERE r.id = ANY(${recIds}::uuid[])`);
+    const rec = new Map(recs.map((r) => [r.id, r]));
+    const hidden = await this.db.tx.$queryRaw<{ entity_type: string; code: string }[]>(Prisma.sql`
+      SELECT fd.entity_type::text AS entity_type, fd.code FROM field_definitions fd
+      WHERE coalesce(app_resolve_field_access(app_actor(), fd.id)::text, 'edit') = 'hidden'`);
+    const hid = new Set(hidden.map((h) => `${h.entity_type}|${h.code}`));
+    const bare = (field: string): string => field.replace(/^(custom|values)\./, '');
+    return rows.filter((r) => {
+      const type = r.entity_type === 'task' ? 'task_instance' : r.entity_type === 'register_record' ? rec.get(r.record_id ?? '')?.register_key ?? '' : r.entity_type;
+      if (hid.has(`${type}|${r.field}`) || hid.has(`${type}|${bare(r.field)}`)) return false;
+      if (r.entity_type === 'register_record') {
+        const x = rec.get(r.record_id ?? '');
+        if (x && x.register_key === 'financial_advances' && !x.amounts_ok && FIN_AMOUNT_FIELDS.has(r.field)) return false;
+      }
+      return true;
+    });
   }
 
   // ------------------------------------------------------------------ integrity

@@ -13,6 +13,7 @@ import { cellLevel } from '@/lib/matrixLevels';
 import { defaultsFor, forEntry, forType, OWNER_NOTE, patchData, sectionsFor, typeData, typeRequired, validateRecord, visibleData, type FieldIssue } from '@/lib/registerForms';
 import { tripoliToday } from '@/lib/today';
 import { FieldHistory } from './logs/FieldHistory';
+import { ChangeDiff } from './logs/ChangeDiff';
 import { FieldInput, fieldLabel, issueText, showValue, SitePicker } from './RegisterFields';
 import { CommentsPanel } from './Comments';
 import { DrawerFrame, DrawerTabs, panelProps, useReportDirty } from './DrawerFrame';
@@ -334,6 +335,7 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
               {hist.isSuccess && !hist.data.items.length && <li className="text-mute">{t('drawer.no_history')}</li>}
               {hist.isError && <li className="text-mute">{t('registers.history_soon')}</li>}
             </ol>
+            <ChangeDiff entityType="register_record" entityId={record.entity_id} />
           </section>
         )}
       </div>
