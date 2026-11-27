@@ -255,6 +255,28 @@ describe('Settings, data reset', () => {
     expect(screen.getByTestId('settings-section-data-imports')).toBeInTheDocument();
   });
 
+  it('waiting period (0.15.267): set in the settings, inherited by the request, shown to the approver, a live countdown disables the run until run_after (EN and AR)', async () => {
+    await signIn('pm'); await stepUpDone();
+    const u = userEvent.setup();
+    page();
+    await u.click(await screen.findByTestId('dr-settings-edit'));
+    await u.selectOptions(screen.getByTestId('dr-cooloff'), '30');
+    await u.type(screen.getByTestId('dr-settings-dialog-reason'), 'Thirty minutes of waiting');
+    await u.click(screen.getByTestId('dr-settings-dialog-submit'));
+    await waitFor(() => expect(screen.getByTestId('dr-settings-cooloff')).toHaveTextContent('30 minutes'));
+    await api.post('/__mock/data-reset/request-by-other');
+    await waitFor(() => expect(screen.getByTestId('dr-cooloff-view')).toHaveTextContent('30 minutes'));
+    await u.click(screen.getByTestId('dr-approve'));
+    expect(screen.getByTestId('dr-approve-cooloff')).toHaveTextContent('waits 30 minutes');
+    await u.type(screen.getByTestId('dr-approve-dialog-reason'), 'Agreed with the owner today');
+    await u.click(screen.getByTestId('dr-approve-dialog-submit'));
+    await waitFor(() => expect(screen.getByTestId('dr-request')).toHaveAttribute('data-status', 'approved'));
+    expect(screen.getByTestId('dr-cooloff-view')).toHaveAttribute('data-active', 'true');
+    expect(screen.getByTestId('dr-cooloff-clock')).toHaveTextContent(/^0:(29|30):\d\d$/);
+    expect(screen.getByTestId('dr-run')).toBeDisabled();
+    expect(screen.getByTestId('dr-cancel')).toBeEnabled();
+  });
+
   it('has every text in English and Arabic', () => {
     expect(Object.keys(ar.dr).sort()).toEqual(Object.keys(en.dr).sort());
     for (const k of ['single_admin', 'backup_missing', 'request_expired', 'reset_running', 'storage_not_supported', 'maintenance', 'scope_changed'] as const) {
