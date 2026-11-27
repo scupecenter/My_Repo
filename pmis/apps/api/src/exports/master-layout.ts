@@ -11,12 +11,12 @@ export const PART_KEYS = [
   'sites', 'milestones', 'tasks', 'project_status',
   'procurement', 'gecol', 'hlc', 'permits_hse', 'warehouse', 'quality', 'issues', 'risks', 'change_control', 'readiness_handover', 'as_built', 'meetings', 'contractors',
   'rf_design', 'acquisition', 'dismantle', 'car_dispatcher', 'financial_advances',
-  'incidents', 'lessons_learned', 'invoices',
+  'incidents', 'lessons_learned', 'invoices', 'deliverables',
 ] as const;
 export type PartKey = (typeof PART_KEYS)[number];
 
 /** Car Dispatcher and Financial Advances have no Master sheet and no Master column (contract 0.15.0): never offered, never exported. */
-export const NOT_IN_MASTER: readonly PartKey[] = ['car_dispatcher', 'financial_advances', 'incidents', 'lessons_learned', 'invoices'];
+export const NOT_IN_MASTER: readonly PartKey[] = ['car_dispatcher', 'financial_advances', 'incidents', 'lessons_learned', 'invoices', 'deliverables'];
 /** Parts written on the Master sheet (one row per site). Dismantle also writes its register sheet. */
 export const MASTER_SHEET_PARTS: readonly PartKey[] = ['sites', 'milestones', 'tasks', 'dismantle'];
 export const NON_REGISTER: readonly PartKey[] = ['sites', 'milestones', 'tasks', 'project_status'];

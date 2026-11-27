@@ -176,6 +176,7 @@
     "library.archive": "الأرشيف",
     "lessons_learned": "الدروس المستفادة",
     "invoices": "الفواتير",
+    "deliverables": "المخرجات",
     "incidents": "الحوادث والأمن"
   },
   "top": {
@@ -1959,6 +1960,8 @@
     "follow_up": "المتابعة",
     "invoice": "الفاتورة",
     "payment": "الدفع",
+    "deliverable": "المخرج",
+    "links_section": "الروابط",
     "amount_section": "المبلغ",
     "incident": "الحادث",
     "people_damage": "الأشخاص والأضرار",
