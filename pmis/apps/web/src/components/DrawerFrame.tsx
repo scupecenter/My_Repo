@@ -25,9 +25,14 @@ const clampW = (w: number) =>
     ),
   );
 
-const Ctx = createContext<{ report: (dirty: boolean) => void }>({
+const Ctx = createContext<{ report: (dirty: boolean) => void; settle: () => void }>({
   report: () => {},
+  settle: () => {},
 });
+/** The body calls this the moment its save went through and just before it navigates (to the saved record, for instance): the navigation is then not asked about. */
+export function useDrawerSettled(): () => void {
+  return useContext(Ctx).settle;
+}
 /** A drawer body tells its frame whether it holds unsaved input, so closing or moving to another row can ask first (plan E6, R4). */
 export function useReportDirty(dirty: boolean) {
   const { report } = useContext(Ctx);
@@ -75,7 +80,9 @@ export function DrawerFrame({
     savePref(key, s);
   };
   // Decision 11: the shared guard (three choices, the setting ui.features.unsaved_guard); the body reports its dirty state through useReportDirty
-  const src: GuardSource = { scope: 'drawers', dirty: isDirty, label: name };
+  const srcRef = useRef<GuardSource>({ scope: 'drawers', dirty: false, label: name }); // one object for the life of the frame, so settle() reaches the entry every ask reads
+  const src = srcRef.current;
+  src.dirty = isDirty; src.label = name;
   useUnsavedGuard(src);
   const ask = useAskLeave(src);
   const guard = (go: () => void) => ask(go);
@@ -160,6 +167,11 @@ export function DrawerFrame({
               report: (d) => {
                 dirty.current = d;
                 setIsDirty(d);
+              },
+              settle: () => {
+                src.dirty = false;
+                dirty.current = false;
+                setIsDirty(false);
               },
             }}
           >
