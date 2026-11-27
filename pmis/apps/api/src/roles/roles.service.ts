@@ -36,6 +36,8 @@ const inputSchema = z.object({
 }).strict();
 
 const patchSchema = z.object({
+  /** 0440 (D51): the code is editable; the database checks format, uniqueness and the built-in lock, and audits role_code_changed. */
+  code: z.string().trim().regex(/^[A-Z][A-Z0-9_]{1,40}$/).optional(),
   name_en: z.string().trim().min(2).max(200).optional(),
   name_ar: z.string().trim().max(200).optional(),
   description_en: z.string().max(2000).optional(),
@@ -165,7 +167,7 @@ export class RolesService {
     const allRegions = regionsGiven ? b.default_region_ids === 'all' : cur.default_region_ids === 'all';
     const allModules = modulesGiven ? b.default_module_keys === 'all' : cur.default_module_keys === 'all';
     // idm_role_save overwrites the optional columns, so every value not in the patch is passed back unchanged.
-    await this.db.tx.$executeRaw(Prisma.sql`SELECT idm_role_save(${id}::uuid, ${cur.code}::text, ${b.name_en ?? cur.name_en}::text,
+    await this.db.tx.$executeRaw(Prisma.sql`SELECT idm_role_save(${id}::uuid, ${b.code ?? cur.code}::text, ${b.name_en ?? cur.name_en}::text,
       ${b.name_ar !== undefined ? b.name_ar : cur.name_ar}::text, ${b.description_en !== undefined ? b.description_en : cur.description_en}::text,
       ${b.description_ar !== undefined ? b.description_ar : cur.description_ar}::text, NULL::uuid, NULL::"TeamKind",
       ${b.default_profile_id !== undefined ? b.default_profile_id : cur.default_profile_id}::uuid, ${allRegions}::boolean, ${allModules}::boolean,
