@@ -718,6 +718,8 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/settings/library-archive'],
   ['put', '/settings/library-archive'],
   // Contract 0.15.401 (migration 0560): structure proposals, the change of a register's columns made from a modified template.
+  ['get', '/settings/structure-policy'],
+  ['put', '/settings/structure-policy'],
   ['get', '/structure-proposals'],
   ['post', '/structure-proposals'],
   ['post', '/structure-proposals/upload'],

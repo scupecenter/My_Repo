@@ -80,7 +80,7 @@ export const MAIL_KIND_CATALOGUE = [
   'email_change_decided', 'email_change_requested', 'followed_change', 'gate_closed_again', 'holiday_tentative', 'import_batch', 'levels_converted', 'mention',
   'no_eligible_holder', 'order_team_mismatch', 'party_type_review', 'permit_transferred', 'phone_change_decided', 'phone_change_requested', 'site_draft_approved',
   'site_draft_assigned', 'site_draft_returned', 'site_region_moved', 'sla_negative_duration', 'snag_closed', 'snag_raised', 'team_safety_cert',
-  'expiry_radar', 'approval_digest', 'weekly_digest',
+  'expiry_radar', 'approval_digest', 'weekly_digest', 'structure_proposal', 'structure_decision',
 ].map((kind, i) => ({ kind, recommended: i < 6 }));
 
 export function initCfg() {

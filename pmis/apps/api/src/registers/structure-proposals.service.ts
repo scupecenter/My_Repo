@@ -7,6 +7,7 @@ import type { AuthContext } from '../auth/auth.types';
 import { StepUpService } from '../auth/step-up.service';
 import { SyslogService } from '../auth/syslog.service';
 import { mapDbError } from '../common/db-errors';
+import { parseIfMatch } from '../common/etag';
 import { ProblemException, problems } from '../common/problem';
 import { parse, uuidSchema } from '../common/zod';
 import { DbService } from '../db/db.service';
@@ -22,6 +23,10 @@ const createBody = z.object({ register_key: z.string().min(1).max(60), rows: z.a
 const uploadBody = z.object({ reason }).strict();
 const decideBody = z.object({ action: z.enum(['approve', 'reject']), note: z.string().trim().max(1000).optional() }).strict();
 const revertBody = z.object({ reason }).strict();
+const policyBody = z.object({
+  reason, who_proposes: z.enum(['fields_editors', 'admins']).optional(), who_approves: z.enum(['admins', 'fields_editors']).optional(), two_person: z.enum(['risky_only', 'always']).optional(),
+  max_items: z.number().int().min(1).max(500).optional(), notify_approvers: z.boolean().optional(), notify_proposer: z.boolean().optional(),
+}).strict();
 
 /**
  * Data entry proposals S2 to S7 (migration 0560): a structure proposal is made from the rows of a Structure sheet (or of the system), reviewed and approved by a
@@ -45,6 +50,20 @@ export class StructureProposalsService {
       await this.db.tx.$executeRaw`ROLLBACK TO SAVEPOINT struct_prop`;
       throw p;
     }
+  }
+
+  /** GET /settings/structure-policy: the rules (setting registers.structure_change), readable by every signed-in user. */
+  async policy(): Promise<Json> {
+    return this.door(Prisma.sql`SELECT struct_policy_json() AS r`);
+  }
+
+  /** PUT /settings/structure-policy: System Admin (or a delegate of settings edit for all regions), step-up, reason, If-Match; the door validates and audits. */
+  async setPolicy(auth: AuthContext, ifMatch: string | undefined, raw: unknown): Promise<Json> {
+    await this.access.requireAdmin('settings', 'edit');
+    await this.stepUp.require(auth);
+    const version = parseIfMatch(ifMatch);
+    const { reason: why, ...cfg } = parse(policyBody, raw);
+    return this.door(Prisma.sql`SELECT admin_set_struct_policy(${JSON.stringify(cfg)}::jsonb, ${why}::text, ${version}::int) AS r`);
   }
 
   async list(q: { register_key?: string; status?: string }): Promise<Json> {

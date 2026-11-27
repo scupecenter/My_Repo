@@ -5096,7 +5096,9 @@
       "assignment_request": "A user asks for an assignment (always mailed)",
       "expiry_radar": "Expiry radar: documents about to expire",
       "approval_digest": "Daily digest of what waits for your approval",
-      "weekly_digest": "Weekly digest"
+      "weekly_digest": "Weekly digest",
+      "structure_proposal": "A structure change waits for your review",
+      "structure_decision": "Your structure proposal was decided"
     }
   },
   "dashSettings": {
@@ -5539,6 +5541,25 @@
       "gharyan": "Gharyan",
       "ghadames": "Ghadames"
     }
+  },
+  "structp": {
+    "policy_title": "Rules for structure changes",
+    "policy_note": "Who proposes, who approves, when a second person is required, the size limit and the notices.",
+    "policy_confirm": "Save the rules? The change is audited.",
+    "who_proposes": "Who can propose",
+    "who_proposes_fields_editors": "Holders of the columns edit right",
+    "who_proposes_admins": "System Admins only",
+    "who_approves": "Who can approve",
+    "who_approves_admins": "System Admins (with step-up)",
+    "who_approves_fields_editors": "Holders of the columns edit right (with step-up)",
+    "two_person": "Second person",
+    "two_person_risky_only": "Only for a type change or a hide",
+    "two_person_always": "Always",
+    "max_items": "Maximum items per proposal",
+    "notify_approvers": "Notify the approvers of a new proposal",
+    "notify_proposer": "Notify the proposer of the decision",
+    "always_note": "A type change or a hide always needs a second person, whatever is chosen here. The notices are in the app; mailing them is chosen in Settings, Alerts, Mail.",
+    "readonly": "Only a System Admin, or a holder of the Settings edit right for all regions, changes these rules."
   },
   "importsSettings": {
     "title": "Imports / Background processing",
@@ -7412,7 +7433,12 @@
     "block_system_column": "a column the system needs keeps its type, required flag and visibility",
     "block_conversion_blocked": "some values do not convert to the new type",
     "block_unknown_section": "the section does not exist",
-    "block_unknown_list": "the list does not exist or is inactive"
+    "block_unknown_list": "the list does not exist or is inactive",
+    "tab_columns": "Columns",
+    "tab_structure": "Structure changes",
+    "tab_note": "Proposals made from a modified template or by the API for this register. Review each item and its effect on the data, then approve or reject.",
+    "edit_link": "Edit the structure",
+    "edit_link_hint": "Open the structure changes of this register (Settings, Registers, Columns)"
   },
   "exportSchedules": {
     "title": "Scheduled Master export",

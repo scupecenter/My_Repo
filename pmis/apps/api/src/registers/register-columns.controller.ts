@@ -153,3 +153,23 @@ export class StructureProposalsController {
     return this.proposals.revert(auth, id, body);
   }
 }
+
+/** Migration 0562: the rules of structure-change proposals (contract tag `settings`). */
+@Controller('settings')
+export class StructurePolicyController {
+  constructor(private readonly proposals: StructureProposalsService) {}
+
+  @Get('structure-policy')
+  async get(@Res({ passthrough: true }) res: Response): Promise<Json> {
+    const r = await this.proposals.policy();
+    if (typeof r.version === 'number') res.setHeader('ETag', etagHeader(r.version));
+    return r;
+  }
+
+  @Put('structure-policy')
+  async put(@Auth() auth: AuthContext, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response): Promise<Json> {
+    const r = await this.proposals.setPolicy(auth, ifMatch, body);
+    if (typeof r.version === 'number') res.setHeader('ETag', etagHeader(r.version));
+    return r;
+  }
+}

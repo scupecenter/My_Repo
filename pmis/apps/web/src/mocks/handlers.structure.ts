@@ -25,7 +25,27 @@ function seed(): StructureProposal[] {
 }
 const list = (): StructureProposal[] => { const k = db() as unknown as object; let s = states.get(k); if (!s) { s = seed(); states.set(k, s); } return s; };
 
+// the rules of structure changes (contract 0.15.403): a System Admin changes them with a reason, If-Match and the step-up
+const pol = { who_proposes: 'fields_editors', who_approves: 'admins', two_person: 'risky_only', max_items: 200, notify_approvers: true, notify_proposer: true, version: 1, updated_at: null as string | null, updated_by: null as string | null };
+const polStates = new WeakMap<object, typeof pol>();
+const policy = (): typeof pol => { const k = db() as unknown as object; let s = polStates.get(k); if (!s) { s = { ...pol }; polStates.set(k, s); } return s; };
+const polJson = () => ({ ...policy(), can_edit: true });
+
 export const structureHandlers = [
+  http.get(`${B}/settings/structure-policy`, () => { const g = guard(); if (g) return g; return HttpResponse.json(polJson(), { headers: { ETag: `"${policy().version}"` } }); }),
+  http.put(`${B}/settings/structure-policy`, async ({ request }) => {
+    const g = guard(); if (g) return g;
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const cur = policy();
+    if (Number(request.headers.get('If-Match')!.replace(/"/g, '')) !== cur.version) return problem(412, 'precondition_failed', 'Changed by someone else; reload.');
+    if (!stepUpValid()) return stepUp();
+    const { reason, ...cfg } = (await request.json()) as Record<string, unknown>;
+    if (typeof reason !== 'string' || reason.trim().length < 3) return problem(422, 'validation_failed', 'A reason is required.');
+    const next = { ...cur, ...cfg };
+    if (JSON.stringify({ ...next, version: 0 }) === JSON.stringify({ ...cur, version: 0 })) return problem(409, 'invalid_transition', 'These values are already set.');
+    Object.assign(cur, cfg, { version: cur.version + 1, updated_at: new Date().toISOString() });
+    return HttpResponse.json(polJson(), { headers: { ETag: `"${cur.version}"` } });
+  }),
   http.get(`${B}/structure-proposals`, () => { const g = guard(); if (g) return g; return HttpResponse.json({ items: list() }); }),
   http.post(`${B}/structure-proposals/upload`, async ({ request }) => {
     const g = guard(); if (g) return g;

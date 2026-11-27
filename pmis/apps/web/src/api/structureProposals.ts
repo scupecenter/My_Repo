@@ -32,3 +32,18 @@ export const useRevertStructure = () =>
   useAct((b: { id: string; reason: string }) => api.post<StructureProposal>(`/structure-proposals/${b.id}/revert`, { body: { reason: b.reason } }));
 /** The differences of a proposal as an .xlsx. Returns the file name. */
 export const downloadStructureDifferences = (id: string): Promise<string> => downloadFile(`/structure-proposals/${id}/differences`);
+
+export type StructurePolicy = components['schemas']['StructurePolicy'];
+export type StructurePolicyInput = components['schemas']['StructurePolicyInput'];
+
+/** Contract 0.15.403 (migration 0562): the rules of structure changes (who proposes, who approves, the second person, the size limit, the two notices). Every signed-in user may read them. */
+export const useStructurePolicy = () =>
+  useQuery({ queryKey: ['structure-policy'], retry: false, refetchOnWindowFocus: false, queryFn: () => api.get<StructurePolicy>('/settings/structure-policy') });
+/** The change needs a reason, If-Match and the step-up (the dialog opens by itself). */
+export const useSetStructurePolicy = () => {
+  const qc = useQueryClient();
+  return useMutation<StructurePolicy, ApiError, { version: number } & StructurePolicyInput>({
+    mutationFn: ({ version, ...body }) => api.put<StructurePolicy>('/settings/structure-policy', { version, body }),
+    onSettled: () => { void qc.invalidateQueries({ queryKey: ['structure-policy'] }); void qc.invalidateQueries({ queryKey: ['structure-proposals'] }); },
+  });
+};

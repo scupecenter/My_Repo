@@ -64,4 +64,42 @@ describe('Settings, edit the structure through templates', () => {
     expect(await screen.findByTestId('struct-note')).toHaveTextContent(ar.struct.note);
     expect(screen.getByTestId('struct-dl-TPL-GECOL')).toHaveAttribute('aria-label', ar.struct.download);
   });
+
+  it('the rules card: every rule is shown, a change needs a reason and is saved; the keys match in Arabic', async () => {
+    await signIn('pm'); await api.post('/__mock/step-up');
+    const u = userEvent.setup();
+    page();
+    expect(await screen.findByTestId('structp-policy')).toBeInTheDocument();
+    expect(screen.getByTestId('structp-who_approves')).toHaveValue('admins');
+    expect(screen.getByTestId('structp-save')).toBeDisabled();
+    await u.selectOptions(screen.getByTestId('structp-two_person'), 'always');
+    await u.clear(screen.getByTestId('structp-max'));
+    await u.type(screen.getByTestId('structp-max'), '600');
+    expect(screen.getByTestId('structp-save')).toBeDisabled();
+    await u.clear(screen.getByTestId('structp-max'));
+    await u.type(screen.getByTestId('structp-max'), '20');
+    await u.click(screen.getByTestId('structp-notify_proposer'));
+    await u.click(screen.getByTestId('structp-save'));
+    await u.type(screen.getByTestId('structp-policy-dialog-reason'), 'Two people for every change');
+    await u.click(screen.getByTestId('structp-policy-dialog-submit'));
+    await waitFor(() => expect(screen.queryByTestId('structp-policy-dialog')).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.getByTestId('structp-max')).toHaveValue(20));
+    expect(screen.getByTestId('structp-two_person')).toHaveValue('always');
+    expect(screen.getByTestId('structp-notify_proposer')).not.toBeChecked();
+    expect(Object.keys(ar.structp).sort()).toEqual(Object.keys(en.structp).sort());
+  });
+
+  it('Settings, Registers, Columns has a Structure changes tab with the review of the register and the rules', async () => {
+    await signIn('pm');
+    const u = userEvent.setup();
+    renderApp(<Routes><Route path="/admin/settings/*" element={<SettingsRoutes />} /></Routes>, { route: '/admin/settings/registers/columns?register=gecol' });
+    await u.click(await screen.findByTestId('regcols-tab-structure'));
+    expect(await screen.findByTestId('page-structure-changes')).toBeInTheDocument();
+    expect(await screen.findByTestId('struct-p-00000000-0000-4000-8000-0000000000a1')).toBeInTheDocument();
+    expect(screen.getByTestId('structp-policy')).toBeInTheDocument();
+    await u.click(screen.getByTestId('struct-open-00000000-0000-4000-8000-0000000000a1'));
+    expect(screen.getByTestId('struct-approve')).toBeEnabled();
+    await u.click(screen.getByTestId('regcols-tab-columns'));
+    expect(await screen.findByTestId('page-register-columns')).toBeInTheDocument();
+  });
 });

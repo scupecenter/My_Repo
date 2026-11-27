@@ -8124,6 +8124,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/structure-policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The rules of structure-change proposals (registers.structure_change)
+         * @description 0.15.403 (migration 0562). Every signed-in user may read it. `who_proposes` (`fields_editors` or `admins`), `who_approves` (`admins` or `fields_editors`), `two_person` (`risky_only` or `always`; a type change or a hide always needs a second person), `max_items` (1 to 500) and the two notices.
+         */
+        get: operations["getStructurePolicy"];
+        /**
+         * Change the rules of structure-change proposals (reason, step-up, If-Match, audited)
+         * @description 0.15.403. A System Admin, or a delegate of `settings` edit for all regions (403), with the step-up (403). Only the keys given change; a reason and If-Match are required. Saving the values in force is 409 `invalid_transition`.
+         */
+        put: operations["setStructurePolicy"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/structure-proposals": {
         parameters: {
             query?: never;
@@ -11903,6 +11927,37 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @description The setting `registers.structure_change` (0.15.403). */
+        StructurePolicy: {
+            /** @enum {string} */
+            who_proposes: "fields_editors" | "admins";
+            /** @enum {string} */
+            who_approves: "admins" | "fields_editors";
+            /** @enum {string} */
+            two_person: "risky_only" | "always";
+            max_items: number;
+            notify_approvers: boolean;
+            notify_proposer: boolean;
+            /** Format: date-time */
+            updated_at?: string | null;
+            /** Format: uuid */
+            updated_by?: string | null;
+            /** @description The ETag value. */
+            version: number;
+            can_edit: boolean;
+        };
+        StructurePolicyInput: {
+            reason: string;
+            /** @enum {string} */
+            who_proposes?: "fields_editors" | "admins";
+            /** @enum {string} */
+            who_approves?: "admins" | "fields_editors";
+            /** @enum {string} */
+            two_person?: "risky_only" | "always";
+            max_items?: number;
+            notify_approvers?: boolean;
+            notify_proposer?: boolean;
+        };
         StructureProposal: {
             /** Format: uuid */
             id: string;
@@ -37025,6 +37080,62 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             422: components["responses"]["Unprocessable"];
+        };
+    };
+    getStructurePolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The setting. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StructurePolicy"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setStructurePolicy: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StructurePolicyInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StructurePolicy"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
         };
     };
     listStructureProposals: {

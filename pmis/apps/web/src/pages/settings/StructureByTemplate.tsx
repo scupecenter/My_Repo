@@ -6,6 +6,7 @@ import { downloadStructureDifferences, useDecideStructure, useRevertStructure, u
 import { errText, FormDialog } from '@/components/FormDialog';
 import { QueryFallback } from '@/components/States';
 import { Tip } from '@/components/Tip';
+import { StructurePolicyCard } from './StructurePolicyCard';
 import { useToast } from '@/components/Toast';
 import { ICONS, ICON_PROPS } from '@/lib/icons';
 import { fmtDateTime } from '@/lib/time';
@@ -41,9 +42,7 @@ export function StructureByTemplate() {
   if (!tpls.data || !props.data) return <section className="card p-4" data-testid="page-structure"><QueryFallback queries={[tpls, props]} testid="struct-loading" /></section>;
   const regs = tpls.data.filter((x) => x.template_kind === 'register');
   const pending = props.data.filter((p) => p.status === 'pending');
-  const open = props.data.find((p) => p.id === openId) ?? null;
   const nameOf = (x: { name_en: string; name_ar?: string | null }) => (ar && x.name_ar ? x.name_ar : x.name_en);
-  const when = (iso: string) => fmtDateTime(iso, i18n.language);
   return (
     <section className="space-y-3" data-testid="page-structure">
       <div className="card space-y-3 p-4">
@@ -81,13 +80,34 @@ export function StructureByTemplate() {
           </tbody>
         </table>
       </div>
+      <StructureReviewPanel items={props.data} openId={openId} setOpenId={setOpenId} />
+      <StructurePolicyCard />
+      <FormDialog open={!!file} onClose={() => setFile(null)} testid="struct-upload-dialog" title={t('struct.upload_title')} submitLabel={t('struct.upload_submit')} busy={upload.isPending} error={upload.isError ? errText(upload.error, t) : null}
+        onSubmit={(reason) => { if (file) upload.mutate({ file, reason }, { onSuccess: (p) => { toast(t('struct.uploaded')); setFile(null); setOpenId(p.id); } }); }}>
+        <p className="text-sm" data-testid="struct-upload-file"><bdi>{file?.name}</bdi></p>
+        <p className="text-sm text-mute">{t('struct.upload_hint')}</p>
+      </FormDialog>
+    </section>
+  );
+}
+
+/**
+ * The structure proposals as a list with the review under it. One component for Settings > Data > Edit through templates (all registers) and for
+ * Settings > Registers > Columns (the register shown), so the review exists once.
+ */
+export function StructureReviewPanel({ items, openId, setOpenId }: { items: StructureProposal[]; openId: string | null; setOpenId: (id: string | null) => void }) {
+  const { t, i18n } = useTranslation();
+  const when = (iso: string) => fmtDateTime(iso, i18n.language);
+  const open = items.find((p) => p.id === openId) ?? null;
+  return (
+    <>
       <div className="card space-y-2 p-4" data-testid="struct-proposals">
         <h3 className="font-bold">{t('struct.proposals')}</h3>
-        {props.data.length === 0 ? <p className="text-sm text-mute" data-testid="struct-none">{t('struct.no_proposals')}</p> : (
+        {items.length === 0 ? <p className="text-sm text-mute" data-testid="struct-none">{t('struct.no_proposals')}</p> : (
           <table className="w-full text-sm">
             <thead><tr className="text-mute"><th className="text-start">{t('struct.col_register')}</th><th className="text-start">{t('struct.col_status')}</th><th className="text-start">{t('struct.col_by')}</th><th className="text-start">{t('struct.col_at')}</th><th className="text-start">{t('struct.col_items')}</th><th /></tr></thead>
             <tbody>
-              {props.data.map((p) => (
+              {items.map((p) => (
                 <tr key={p.id} data-testid={`struct-p-${p.id}`}>
                   <td><bdi>{p.register_key}</bdi></td>
                   <td className={STATUS_CLS[p.status] ?? ''}>{t(`struct.status_${p.status}`)}{p.blocked_count > 0 && <span className="ms-1 text-bad">({t('struct.blocked_n', { n: p.blocked_count })})</span>}</td>
@@ -102,12 +122,7 @@ export function StructureByTemplate() {
         )}
       </div>
       {open && <Review p={open} onClose={() => setOpenId(null)} />}
-      <FormDialog open={!!file} onClose={() => setFile(null)} testid="struct-upload-dialog" title={t('struct.upload_title')} submitLabel={t('struct.upload_submit')} busy={upload.isPending} error={upload.isError ? errText(upload.error, t) : null}
-        onSubmit={(reason) => { if (file) upload.mutate({ file, reason }, { onSuccess: (p) => { toast(t('struct.uploaded')); setFile(null); setOpenId(p.id); } }); }}>
-        <p className="text-sm" data-testid="struct-upload-file"><bdi>{file?.name}</bdi></p>
-        <p className="text-sm text-mute">{t('struct.upload_hint')}</p>
-      </FormDialog>
-    </section>
+    </>
   );
 }
 
@@ -158,6 +173,21 @@ function Review({ p, onClose }: { p: StructureProposal; onClose: () => void }) {
         onSubmit={(reason) => revert.mutate({ id: p.id, reason }, { onSuccess: () => { toast(t('struct.reverted')); setDlg(null); onClose(); } })}>
         <p className="text-sm text-mute">{t('struct.revert_hint')}</p>
       </FormDialog>
+    </section>
+  );
+}
+
+/** Settings > Registers > Columns, tab "Structure changes": the proposals of the register shown, their review, and the rules (the same components as Data > Edit through templates). */
+export function StructureChangesTab({ register }: { register: string }) {
+  const { t } = useTranslation();
+  const props = useStructureProposals();
+  const [openId, setOpenId] = useState<string | null>(null);
+  return (
+    <section className="space-y-3" data-testid="page-structure-changes">
+      <p className="text-sm text-mute">{t('struct.tab_note')}</p>
+      {!props.data ? <div className="card p-4"><QueryFallback queries={[props]} testid="struct-tab-loading" /></div>
+        : <StructureReviewPanel items={props.data.filter((p) => p.register_key === register)} openId={openId} setOpenId={setOpenId} />}
+      <StructurePolicyCard />
     </section>
   );
 }

@@ -480,4 +480,38 @@ describe('structure by template (0560): the Structure sheet, the proposal, the r
     expect((await field('c_text'))?.label_en).not.toBe('Renamed from Excel');
     expect((await admin.api.call('get', `${SP}/${rename!.id}`)).body.status).toBe('reverted');
   });
+
+  it('the rules (0562): everyone reads them; a change needs a reason, If-Match and the step-up; the size limit, the second person and the notices follow them', async () => {
+    const PO = '/settings/structure-policy';
+    const pol = await admin.api.call('get', PO);
+    expect(pol.status).toBe(200);
+    expect(pol.body).toMatchObject({ who_proposes: 'fields_editors', who_approves: 'admins', two_person: 'risky_only', max_items: 200, notify_approvers: true, notify_proposer: true });
+    expect((await plain.api.call('get', PO)).status).toBe(200);
+    const ifm = (v: number) => ({ 'If-Match': `"${v}"` });
+    expect((await plain.api.call('put', PO, { reason: 'try it', max_items: 5 }, ifm(pol.body.version))).status).toBe(403);
+    expect((await noStep.api.call('put', PO, { reason: 'no step up', max_items: 5 }, ifm(pol.body.version))).status).toBe(403);
+    expect((await admin.api.call('put', PO, { reason: 'bad value', two_person: 'never' }, ifm(pol.body.version))).status).toBe(422);
+    expect((await admin.api.call('put', PO, { reason: 'bad size', max_items: 501 }, ifm(pol.body.version))).status).toBe(422);
+    const one = await admin.api.call('put', PO, { reason: 'one item only', max_items: 1, two_person: 'always' }, ifm(pol.body.version));
+    expect(one.status, JSON.stringify(one.body)).toBe(200);
+    expect(one.body).toMatchObject({ max_items: 1, two_person: 'always' });
+    expect((await admin.api.call('put', PO, { reason: 'stale version', max_items: 2 }, ifm(pol.body.version))).status).toBe(412);
+    expect((await admin.api.call('put', PO, { reason: 'same again', max_items: 1 }, ifm(one.body.version))).status).toBe(409);
+    expect((await q(db, `SELECT count(*)::int AS n FROM audit_log WHERE action = 'structure_policy_update'`))[0].n).toBeGreaterThan(0);
+    try {
+      const two = await admin.api.call('post', SP, { register_key: 'gecol', reason: 'two items', rows: [{ code: 'x_pol_a', label_en: 'Pol A', type: 'text' }, { code: 'x_pol_b', label_en: 'Pol B', type: 'text' }] });
+      expect(two.status).toBe(422);
+      const mk = await admin.api.call('post', SP, { register_key: 'gecol', reason: 'one item', rows: [{ code: 'x_pol_a', label_en: 'Pol A', type: 'text' }] });
+      expect(mk.status, JSON.stringify(mk.body)).toBe(201);
+      expect(mk.body.needs_two_people).toBe(true);
+      expect((await admin.api.call('post', `${SP}/${mk.body.id}/decision`, { action: 'approve', note: 'my own proposal' })).status).toBe(403);
+      const rj = await second.api.call('post', `${SP}/${mk.body.id}/decision`, { action: 'reject', note: 'Not needed for now' });
+      expect(rj.status).toBe(200);
+      const kinds = (await q(db, `SELECT kind FROM notifications WHERE kind IN ('structure_proposal', 'structure_decision')`)).map((x) => x.kind as string);
+      expect(kinds).toEqual(expect.arrayContaining(['structure_proposal', 'structure_decision']));
+    } finally {
+      const cur = await admin.api.call('get', PO);
+      await admin.api.call('put', PO, { reason: 'restore the defaults', max_items: 200, two_person: 'risky_only' }, ifm(cur.body.version));
+    }
+  });
 });
