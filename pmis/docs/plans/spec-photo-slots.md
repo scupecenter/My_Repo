@@ -3,7 +3,16 @@
 Status: DRAFT-SPEC. This PR holds the agreed details only. Code is built into this same PR later.
 
 ## Agreed requirements
-- Photo slots as named in the handover plan of PR #364 (called decision 32 in the brief).
+Decision 32, approved by the project lead 2026-11-27 10:29.
+- Add a photo field in five places that have none today:
+  1. Warehouse: material condition at receipt and at returns.
+  2. Demolition: before and after.
+  3. HOTO handover.
+  4. Field visits and daily reports.
+  5. HSE safety and incidents.
+- Configurable in Settings, per place: photos mandatory or optional, and the minimum number of photos.
+- The photos appear automatically in the Gallery (no manual step).
+- Everything already stored in the unified documents system is covered by the Gallery automatically: site and phase acceptance, QC notes, advance payment proof, invoices, minutes, site permits, delivery notices.
 
 ## Standing rules that apply
 - No isolated feature: connect it to search, filters, saved views, audit, permissions, export, the data-reset plan and Settings.
@@ -19,4 +28,4 @@ Brief from the project lead relayed 2026-11-27 11:03 (Africa/Tripoli); list name
 Migration: 0470-0489 range (assigned 2026-11-27 19:09). Take the next free number inside it at build time; re-check live before merge.
 
 ## Open details to confirm before build
-- The written definition of this decision was not found in repo docs (D32 there covers site release conditions) or memory. The project lead must give the slot list and rules before build.
+- None for the requirement itself. Per-place field names and where the Settings screen sits are decided at build, following the existing Settings pattern.
