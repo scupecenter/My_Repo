@@ -53,6 +53,7 @@ info:
     - 0.15.203 (2026-11-27): the dashboard follow-up sections, quality snags and NCR (owner approval 2026-11-26, dashboard proposals item 6; migration 0304). Additive and read only. `GET /dashboard/ops` gains the section `quality` (`DashboardOpsQuality`): the open snags and NCRs of the in-scope sites, the average closure age of each, and the first-time acceptance rate (the decided inspections whose result is Pass). The section needs the quality view and answers available false without it. The dashboard settings catalogue gains the card `ops_quality`. No grant, role or permission change.
     - 0.15.202 (2026-11-27): the dashboard follow-up sections, contractor and supplier scorecard (owner approval 2026-11-26, dashboard proposals item 5; migration 0303). Additive and read only. `GET /dashboard/ops` gains the section `contractor_scorecard` (`DashboardOpsScorecard`): the aggregate of `GET /reports/contractor-performance`, so the card and the performance screen never disagree - the counts of parties per level, the on-time rectification rate of snags, the average delay days over the delayed parties, the rejection (quality fail) rate, the snag and quality totals, and the five worst parties with their worst figures. No amounts. The section needs the contractors view and answers available false without it. The dashboard settings catalogue gains the card `ops_contractors`. No grant, role or permission change.
     - 0.15.153 (2026-11-27): "My sessions" (no migration; CHANGELOG MySessions). Additive. `GET /me/sessions` (`listMySessions`): the caller's own live sessions (device, sign-in time, last activity, IP, `is_current`); `POST /me/sessions/{session_id}/revoke` (`revokeMySession`) ends one of the caller's own other sessions (404 for anyone else's, 422 `own_session` for the current one); `POST /me/sessions/revoke-others` (`revokeMyOtherSessions`) ends every other session of the caller. Own rows only, no permission and no step-up (it only narrows access); audited and in the security log.
+    - 0.15.345 (2026-11-27): last row wins for a record that is in an upload file twice (owner approval 2026-11-27; migration 0432, mirror `db/sql/431_dup_last_row_wins.sql`). Additive. New `GET`/`PUT /settings/duplicate-rows` (setting `imports.duplicate_rows`, default `first` = unchanged behaviour; `last` = the later row wins; per-register overrides; reason, If-Match, audited `imp_duplicate_policy_update`). In `last` mode the earlier row is an error row with the code `overridden_by_later_row`, kept in the batch review and the error report; `ImportBatch.counts.overridden` counts them (inside `error`). Register templates only; master, sites, stream, list-values and holiday templates are excluded. No permission change.
     - 0.15.138 (2026-11-27): switch a whole register on or off and lock it from Settings (audit item 1 of the relations review; migration 0381). Additive. New paths `GET /settings/register-state` (`listRegisterStates`) and `PUT /settings/register-state/{register_key}` (`setRegisterState`); new schema `RegisterState`. Disabled hides (nothing touched), locked refuses new and changed records with 403 `register_locked` for non-admins; audited; System Admin gate as for the register rename. Existing behaviour is unchanged until an admin uses it.
     - 0.15.136 (2026-11-27): the Invoices register (owner approval 2026-11-27; migrations 0185 and 0380): the supplier and contractor invoices from receipt to payment, linked to the procurement record they bill. Additive. Register key `invoices` in `/registers` and `/registers/{key}` records with its own fields (invoice date, received date, due date, paid date for invoice ages) and the standard two levels, the Dropdown lists InvoiceState and InvoiceKind in Settings, the module `invoices` in the permissions grid (no grant seeded), the nav key, the template TPL-INVOICES, the master-export exclusion, the data reset part, and the order link in the Related-records panel. Existing registers and data are untouched.
     - 0.15.135 (2026-11-27): the Lessons Learned register (owner approval 2026-11-26, C3; migration 0184): one register for the lessons of the project, from an incident, a snag, a delay or any experience, with the recommendation and where it was applied. Additive. Register key `lessons_learned` in `/registers` and `/registers/{key}` records with its own fields and the standard two levels, the Dropdown list LessonCategory in Settings, the module `lessons_learned` in the permissions grid (no grant seeded), the nav key in the catalogue, the template TPL-LESSONS-LEARNED and the master export part. Existing registers and data are untouched.
@@ -9591,6 +9592,50 @@ paths:
         '409': {$ref: '#/components/responses/Conflict'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /settings/duplicate-rows:
+    get:
+      tags: [settings]
+      operationId: getDuplicateRowsSettings
+      summary: How a record that is in an upload file twice is treated (imports.duplicate_rows)
+      description: |
+        0.15.345 (migration 0432). Every signed-in user may read it. `default` is `first` (the first row of the record wins and the later rows are refused as `duplicate_in_file`, as before) or `last` (the later row wins and the earlier row is set aside as `overridden_by_later_row`, listed in the batch review and the error report, never lost). `registers` overrides the default per register key. Covers the register templates; master, sites, stream, list-values and holiday templates are not covered (the first row wins there). `can_edit` is true for a System Admin or a delegate of `settings` edit for all regions.
+      responses:
+        '200':
+          description: The setting.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DuplicateRowsSettings'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+    put:
+      tags: [settings]
+      operationId: setDuplicateRowsSettings
+      summary: Change how a duplicate row in a file is treated (reason, If-Match, audited)
+      description: |
+        0.15.345. A System Admin, or a delegate of `settings` edit for all regions (403 `action_forbidden`). A register key that does not exist is 422 (`unknown_register`), a reason and If-Match are required. Saving the values in force is 409 `invalid_transition`. Audited as `imp_duplicate_policy_update` with the values before and after.
+      x-db-path: admin_set_imp_duplicate_policy
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/DuplicateRowsSettingsInput'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DuplicateRowsSettings'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
   /settings/imports:
     get:
       tags: [settings]
@@ -21898,6 +21943,7 @@ components:
             saved: { type: integer, description: 'Rows saved without submission (draft batch).' }
             admin_approved: { type: integer, description: '0087: rows approved by a System Admin as is (flagged `admin_override`).' }
             incomplete: { type: integer, description: '0087: of those, the rows approved with missing data (flagged `incomplete`).' }
+            overridden: { type: integer, description: '0432: of the `error` rows, those set aside because a later row of the same record in the file won (`overridden_by_later_row`, setting `imports.duplicate_rows` = last). Counted inside `error`; 0 while the setting is `first`.' }
             duplicate: { type: integer, description: '0365 (P4): of the `error` rows, those refused because the same record is already in the file (`duplicate_in_file`). Counted inside `error`, shown as a category of its own.' }
         job_id: { type: [string, 'null'], description: 'Always null (a big upload reports its progress in `progress`, 0.15.3).' }
         upload_id: { type: string, format: uuid, description: '0.15.3: the upload staged in the background that produced this batch (or that this answer is, while `parsing`).' }
@@ -24268,6 +24314,25 @@ components:
               count: { type: integer }
               more: { type: boolean }
               items: { type: array, items: { $ref: '#/components/schemas/TaskSummary' } }
+    DuplicateRowsSettings:
+      type: object
+      description: '0.15.345. The setting `imports.duplicate_rows`.'
+      required: [default, registers, version, can_edit]
+      properties:
+        default: { type: string, enum: [first, last] }
+        registers: { type: object, additionalProperties: { type: string, enum: [first, last] }, description: 'Register key to mode; a register not listed uses `default`.' }
+        updated_at: { type: [string, 'null'], format: date-time }
+        updated_by: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+        version: { type: integer, description: The ETag value. }
+        can_edit: { type: boolean }
+    DuplicateRowsSettingsInput:
+      type: object
+      additionalProperties: false
+      required: [default, registers, reason]
+      properties:
+        default: { type: string, enum: [first, last] }
+        registers: { type: object, additionalProperties: { type: string, enum: [first, last] } }
+        reason: { type: string, minLength: 3, maxLength: 1000 }
     ImportsSettings:
       type: object
       description: '0.14.6. The setting `imports.async_rows`: above this number of rows a send or a decision of a batch runs in the background.'

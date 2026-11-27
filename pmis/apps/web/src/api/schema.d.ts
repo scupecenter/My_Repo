@@ -6189,6 +6189,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/duplicate-rows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * How a record that is in an upload file twice is treated (imports.duplicate_rows)
+         * @description 0.15.345 (migration 0432). Every signed-in user may read it. `default` is `first` (the first row of the record wins and the later rows are refused as `duplicate_in_file`, as before) or `last` (the later row wins and the earlier row is set aside as `overridden_by_later_row`, listed in the batch review and the error report, never lost). `registers` overrides the default per register key. Covers the register templates; master, sites, stream, list-values and holiday templates are not covered (the first row wins there). `can_edit` is true for a System Admin or a delegate of `settings` edit for all regions.
+         */
+        get: operations["getDuplicateRowsSettings"];
+        /**
+         * Change how a duplicate row in a file is treated (reason, If-Match, audited)
+         * @description 0.15.345. A System Admin, or a delegate of `settings` edit for all regions (403 `action_forbidden`). A register key that does not exist is 422 (`unknown_register`), a reason and If-Match are required. Saving the values in force is 409 `invalid_transition`. Audited as `imp_duplicate_policy_update` with the values before and after.
+         */
+        put: operations["setDuplicateRowsSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/imports": {
         parameters: {
             query?: never;
@@ -15581,6 +15605,8 @@ export interface components {
                 admin_approved?: number;
                 /** @description 0087: of those, the rows approved with missing data (flagged `incomplete`). */
                 incomplete?: number;
+                /** @description 0432: of the `error` rows, those set aside because a later row of the same record in the file won (`overridden_by_later_row`, setting `imports.duplicate_rows` = last). Counted inside `error`; 0 while the setting is `first`. */
+                overridden?: number;
                 /** @description 0365 (P4): of the `error` rows, those refused because the same record is already in the file (`duplicate_in_file`). Counted inside `error`, shown as a category of its own. */
                 duplicate?: number;
             };
@@ -18038,6 +18064,29 @@ export interface components {
                 more: boolean;
                 items: components["schemas"]["TaskSummary"][];
             }[];
+        };
+        /** @description 0.15.345. The setting `imports.duplicate_rows`. */
+        DuplicateRowsSettings: {
+            /** @enum {string} */
+            default: "first" | "last";
+            /** @description Register key to mode; a register not listed uses `default`. */
+            registers: {
+                [key: string]: "first" | "last";
+            };
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+            /** @description The ETag value. */
+            version: number;
+            can_edit: boolean;
+        };
+        DuplicateRowsSettingsInput: {
+            /** @enum {string} */
+            default: "first" | "last";
+            registers: {
+                [key: string]: "first" | "last";
+            };
+            reason: string;
         };
         /** @description 0.14.6. The setting `imports.async_rows`: above this number of rows a send or a decision of a batch runs in the background. */
         ImportsSettings: {
@@ -33192,6 +33241,62 @@ export interface operations {
             409: components["responses"]["Conflict"];
             422: components["responses"]["Unprocessable"];
             503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    getDuplicateRowsSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The setting. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DuplicateRowsSettings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setDuplicateRowsSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DuplicateRowsSettingsInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DuplicateRowsSettings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
         };
     };
     getImportsSettings: {

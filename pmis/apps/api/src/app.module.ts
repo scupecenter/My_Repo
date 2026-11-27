@@ -219,6 +219,8 @@ import { DataHubService } from './data-hub/data-hub.service';
 import { ReassignmentService } from './reassignment/reassignment.service';
 import { StaffRegistryController } from './staff-registry/staff-registry.controller';
 import { StaffRegistryService } from './staff-registry/staff-registry.service';
+import { DuplicateRowsSettingsController } from './settings/duplicate-rows-settings.controller';
+import { DuplicateRowsSettingsService } from './settings/duplicate-rows-settings.service';
 
 export function appModuleFor(config: AppConfig) {
   @Module({
@@ -232,6 +234,7 @@ export function appModuleFor(config: AppConfig) {
       MediaController, // 0.15.292 (own line: the long lines above conflict on every merge)
       PasskeySettingController, PasskeyController, // S4
       CspReportController, // SEC-3
+      DuplicateRowsSettingsController,
       ScenarioSettingsController, SiteApplicabilityController, // P1 (0052)
       MailController, HealthController,
       ListCataloguesController,
@@ -259,6 +262,7 @@ export function appModuleFor(config: AppConfig) {
       DashboardService, DashboardSettingsService, GoalsService, PmSchedulesService, SiteMapService, ProjectStatusService, DelayPeriodsService, WeightsService, TeamScopeMatchService, GecolOrderWarningsService, DeriveRulesService, MailKindsService, MailPolicyService, ImportsSettingsService, KanbanService, NavLayoutService, HistoricalWaiverService, SiteMasterService, SiteMasterColumnsService, CustomFieldsService, StructuralFreezeService, UiIdentityService, LoginPageService, SettingsScreensService, AlertRulesService, P4cService, FleetService, LogsService, SecurityLogService, JobRunsService, MailService, IntegrityService, DashboardExtrasService, DashboardOpsService, SecurityLocksService, SupportAccessService, DownloadLocksService, NewDeviceService,
       MediaService, // 0.15.292
       PasskeyService, // S4
+      DuplicateRowsSettingsService,
       ScenarioService, // P1 (0052)
       ListCataloguesService,
       // P8 mails (MailPort) go through P9's mail outbox
