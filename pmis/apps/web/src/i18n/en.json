@@ -3461,6 +3461,7 @@
     "fh_open": "History of {{field}}",
     "fh_title": "History of {{field}}",
     "fh_empty": "No recorded changes.",
+    "diff_title": "Field changes",
     "online_subtitle": "Active sessions. The list refreshes every {{seconds}} seconds; refreshing never extends a session.",
     "o_user": "User",
     "o_started": "Signed in",

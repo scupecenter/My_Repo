@@ -3581,7 +3581,7 @@ export interface paths {
         };
         /**
          * History of one field of one record, newest first (at most 200 changes)
-         * @description Same keys and reader rules as `GET /audit-log/field-changes`; the three parameters are required (422 otherwise). Audited.
+         * @description Same keys and reader rules as `GET /audit-log/field-changes`; `entity_type` and `entity_id` are required (422 otherwise). Without `field` (0.15.94) every field change of the record is returned, newest first, at most 200, minus the fields the caller may not see (a hidden field rule; Financial Advances amounts). Audited.
          */
         get: operations["getFieldHistory"];
         put?: never;
@@ -25943,7 +25943,7 @@ export interface operations {
             query: {
                 entity_type: string;
                 entity_id: string;
-                field: string;
+                field?: string;
             };
             header?: never;
             path?: never;
