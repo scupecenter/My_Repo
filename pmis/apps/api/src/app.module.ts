@@ -27,6 +27,7 @@ import { ListCataloguesController } from './registers/list-catalogues.controller
 import { ListCataloguesService } from './registers/list-catalogues.service';
 import { FollowController } from './follow/follow.controller';
 import { FollowService } from './follow/follow.service';
+import { PresenceController } from './presence/presence.controller';
 import { SavedViewsController } from './views/saved-views.controller';
 import { SavedViewsService } from './views/saved-views.service';
 import { FilterCatalogService } from './views/filter-catalog.service';
@@ -234,6 +235,7 @@ export function appModuleFor(config: AppConfig) {
       ListCataloguesController,
       MasterImportController, TemplateMappingController,
       ContractorsController,
+      PresenceController,
       SavedViewsController,
       SearchController, // 0.15.17 (F4)
       ExportsController, // 0.15.34: Master-format export

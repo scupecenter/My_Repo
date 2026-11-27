@@ -7658,6 +7658,13 @@
     "domains_note": "العنوان الذي نطاقه غير مدرج يُعد خارجياً. إن لم يُدرج أي نطاق فكل العناوين داخلية.",
     "confirm_note": "التغيير مسجّل في التدقيق ويسري على البريد التالي."
   },
+  "presence": {
+    "editing_record_one": "{{names}} يحرّر هذا السجل الآن",
+    "editing_record_other": "{{names}} يحرّرون هذا السجل الآن",
+    "editing_task_one": "{{names}} يحرّر هذه المهمة الآن",
+    "editing_task_other": "{{names}} يحرّرون هذه المهمة الآن",
+    "editing_join": "، "
+  },
   "capture": {
     "dictate": "إملاء صوتي",
     "dictate_stop": "إيقاف الإملاء",

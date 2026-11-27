@@ -7590,6 +7590,13 @@
     "domains_note": "An address whose domain is not listed is external. With no domain listed every address counts as internal.",
     "confirm_note": "The change is audited and applies to the next mail."
   },
+  "presence": {
+    "editing_record_one": "{{names}} is editing this record",
+    "editing_record_other": "{{names}} are editing this record",
+    "editing_task_one": "{{names}} is editing this task",
+    "editing_task_other": "{{names}} are editing this task",
+    "editing_join": ", "
+  },
   "capture": {
     "dictate": "Dictate",
     "dictate_stop": "Stop dictation",
