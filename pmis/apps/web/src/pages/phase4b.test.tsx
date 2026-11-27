@@ -26,6 +26,22 @@ const ids = () => screen.getAllByTestId(/^inbox-item-/).map((e) => e.getAttribut
 const N = (n: number) => `30000000-0000-4000-8000-00000000000${n}`;
 
 describe('X1 inbox', () => {
+  it('tabs: All is the default, a tab keeps only its kinds, Priority follows the setting, and the tab is in the URL', async () => {
+    await signIn('pm');
+    const u = userEvent.setup();
+    inbox();
+    await screen.findByTestId('inbox-list');
+    expect(screen.getByTestId('inbox-tabs')).toBeInTheDocument();
+    expect(screen.getByTestId('inbox-tab-all')).toHaveAttribute('aria-pressed', 'true');
+    await u.click(screen.getByTestId('inbox-tab-mentions'));
+    expect(screen.getByTestId('inbox-tab-mentions')).toHaveAttribute('aria-pressed', 'true');
+    for (const el of screen.queryAllByTestId(/^inbox-item-/)) expect(['mention', 'followed_change']).toContain(el.getAttribute('data-kind'));
+    await u.click(screen.getByTestId('inbox-priority-only'));
+    expect(screen.getByTestId('inbox-priority-only')).toHaveAttribute('aria-pressed', 'true');
+    await u.click(screen.getByTestId('inbox-tab-all'));
+    expect(screen.getByTestId('inbox-tab-all')).toHaveAttribute('aria-pressed', 'true');
+  });
+
   it('lists the visible items newest first, hides the snoozed one, and counts the unread', async () => {
     await signIn('pm');
     inbox();

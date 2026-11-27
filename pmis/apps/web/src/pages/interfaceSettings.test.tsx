@@ -62,6 +62,30 @@ describe('Settings > Interface', () => {
   });
 });
 
+describe('Settings > Interface > Inbox tabs and priority', () => {
+  it('an admin turns a kind into priority, picks the first tab, and saves the inbox section with a reason', async () => {
+    await signIn('pm');
+    const u = userEvent.setup();
+    const puts: { body: any }[] = [];
+    server.events.on('request:start', async ({ request }) => { if (request.method === 'PUT' && request.url.endsWith('/settings/ui-features')) puts.push({ body: await request.clone().json() }); });
+    settings();
+    await screen.findByTestId('ui-inbox');
+    expect(screen.getByTestId('ui-inbox-kind-mention')).toBeChecked();
+    expect(screen.getByTestId('ui-inbox-kind-system')).not.toBeChecked();
+    await u.click(screen.getByTestId('ui-inbox-kind-system'));
+    await u.click(screen.getByTestId('ui-inbox-kind-mention'));
+    await u.selectOptions(screen.getByTestId('ui-inbox-default'), 'priority');
+    await u.click(screen.getByTestId('ui-inbox-tabs'));
+    expect(screen.getByTestId('ui-inbox-default')).toBeDisabled();
+    await u.click(screen.getByTestId('ui-save'));
+    const dlg = await screen.findByTestId('ui-dialog');
+    await u.type(within(dlg).getByRole('textbox'), 'System alerts are priority');
+    await u.click(within(dlg).getByRole('button', { name: /save|confirm|submit/i }));
+    await waitFor(() => expect(puts).toHaveLength(1));
+    expect(puts[0]!.body.sections.inbox).toEqual({ tabs_enabled: false, default_tab: 'priority', priority_kinds: ['approval_due', 'task_returned', 'task_rejected', 'idle_task_alert', 'no_holder', 'absence_alert', 'system'] });
+  });
+});
+
 describe('Avatar component', () => {
   it('draws initials and follows the avatar setting in lists', async () => {
     await signIn('pm');
