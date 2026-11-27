@@ -20069,13 +20069,13 @@ export interface components {
             host?: string | null;
         };
         /** @enum {string} */
-        SecurityAlertRule: "failed_sign_ins" | "failed_sign_ins_ip" | "new_ip" | "large_export" | "admin_set_changed" | "retention_reduced" | "alert_settings_weakened" | "audit_integrity_failure" | "malware_upload" | "break_glass_used" | "backup_missing";
+        SecurityAlertRule: "failed_sign_ins" | "failed_sign_ins_ip" | "new_ip" | "large_export" | "admin_set_changed" | "retention_reduced" | "alert_settings_weakened" | "audit_integrity_failure" | "malware_upload" | "break_glass_used" | "backup_missing" | "backup_late" | "job_failed";
         /**
          * @description `info` (0.12.3): a new address inside a trusted network.
          * @enum {string}
          */
         AlertSeverity: "info" | "low" | "medium" | "high" | "critical";
-        /** @description Severity per configurable rule (0.12.3, Q168). Defaults: failed_sign_ins medium, failed_sign_ins_ip medium, new_ip low, large_export medium, admin_set_changed high, alert_settings_weakened high, malware_upload high, break_glass_used critical, backup_missing high (0.15.130). */
+        /** @description Severity per configurable rule (0.12.3, Q168). Defaults: failed_sign_ins medium, failed_sign_ins_ip medium, new_ip low, large_export medium, admin_set_changed high, alert_settings_weakened high, malware_upload high, break_glass_used critical, backup_missing high (0.15.130), backup_late high and job_failed medium (0.15.350). */
         AlertSeverityMap: {
             failed_sign_ins?: components["schemas"]["AlertSeverity"];
             failed_sign_ins_ip?: components["schemas"]["AlertSeverity"];
@@ -20086,6 +20086,8 @@ export interface components {
             malware_upload?: components["schemas"]["AlertSeverity"];
             break_glass_used?: components["schemas"]["AlertSeverity"];
             backup_missing?: components["schemas"]["AlertSeverity"];
+            backup_late?: components["schemas"]["AlertSeverity"];
+            job_failed?: components["schemas"]["AlertSeverity"];
         };
         SecurityAlert: {
             /** Format: uuid */
