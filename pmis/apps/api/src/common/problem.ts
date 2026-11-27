@@ -21,7 +21,9 @@ export type ErrorCode =
   // 0146 (0.15.62): the project data reset in Settings
   | 'single_admin' | 'backup_missing' | 'request_expired' | 'reset_running' | 'plan_incomplete' | 'storage_not_supported' | 'quarantine_unavailable' | 'maintenance'
   // 0396 (0.15.292): the Media gallery thumbnails
-  | 'thumbnail_unsupported' | 'thumbnails_unavailable';
+  | 'thumbnail_unsupported' | 'thumbnails_unavailable'
+  // 0368 (0.15.266): the archive before a project data reset
+  | 'archive_required' | 'archive_expired';
 
 export interface FieldError {
   path: string;
@@ -103,6 +105,8 @@ const TITLES: Record<string, string> = {
   request_expired: 'The request expired',
   reset_running: 'A reset is running',
   plan_incomplete: 'The reset plan does not cover every table',
+  archive_required: 'The archive of this reset is not ready',
+  archive_expired: 'The archive is no longer kept',
   storage_not_supported: 'The document store is not supported here',
   quarantine_unavailable: 'The quarantine directory cannot be made',
   maintenance: 'A project data reset is running',

@@ -6209,6 +6209,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/data-reset/requests/{request_id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Make the archive of an approved reset request (async)
+         * @description 0.15.266 (migration 0368). The System Admin who requested or approved the request, a step-up, while the request is `approved` and was made with `archive` download or keep_90 (409 `invalid_transition` otherwise; 409 `plan_incomplete`). Starts the build (an .xlsx on the current template per register with only the records the reset deletes, in every state, the files, a manifest, in one zip) and answers 202 with the request; poll `GET .../requests/{request_id}` until `archive.archive.status` is `ready` or `failed`. `POST .../run` is refused (409 `archive_required`) until the archive is ready (mode download, and downloaded once). Restore is the template upload again; the rows enter L1 then L2.
+         */
+        post: operations["makeDataResetArchive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/data-reset/requests/{request_id}/archive/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * Download the archive zip of a reset request
+         * @description 0.15.266 (migration 0368). A System Admin acting without delegation and a step-up. Every download is a security-log entry (`project_data_reset`, step `archive_download`) and an audit row. 404 when no archive is ready; 410 `archive_expired` after `keep_until`.
+         */
+        get: operations["downloadDataResetArchive"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/imports": {
         parameters: {
             query?: never;
@@ -17107,6 +17151,34 @@ export interface components {
                 detail?: string | null;
             }[];
         };
+        /** @description 0.15.266 (migration 0368). The archive chosen by the request and the state of its archive (absent `archive` on a request made before 0.15.266 means mode none). */
+        DataResetArchiveInfo: {
+            /** @enum {string} */
+            mode: "none" | "download" | "keep_90";
+            /** @description The newest archive of the request (null while none was made). */
+            archive?: {
+                /** Format: uuid */
+                id?: string;
+                /** @enum {string} */
+                status?: "building" | "ready" | "failed" | "purged";
+                bytes?: number | null;
+                sha256?: string | null;
+                /** @description Rows per register, `records`, `files`, `files_bytes`. */
+                entries?: {
+                    [key: string]: unknown;
+                };
+                error?: string | null;
+                /** Format: date-time */
+                created_at?: string;
+                /** Format: date-time */
+                ready_at?: string | null;
+                /** Format: date-time */
+                keep_until?: string | null;
+                downloads?: number;
+                /** Format: date-time */
+                first_downloaded_at?: string | null;
+            } | null;
+        };
         DataResetRequest: {
             /** Format: uuid */
             id: string;
@@ -17154,6 +17226,7 @@ export interface components {
              * @default true
              */
             require_backup: boolean;
+            archive?: components["schemas"]["DataResetArchiveInfo"];
             /** @description 0.15.71. The hash the approval bound to (always equal to `scope_hash`). */
             approved_scope_hash?: string | null;
             /** @description `audit_id` (the `project_data_reset` row on the Audit Log chain), `sessions_ended`, `deleted` (rows per table), and since 0.15.72 `require_backup`. */
@@ -33093,6 +33166,12 @@ export interface operations {
                     narrow?: components["schemas"]["DataResetNarrow"];
                     /** @description 0.15.72. Required when `require_backup` is false: the typed phrase `NO BACKUP` (`DataResetState.no_backup_phrase`; 422 `confirmation_mismatch` at `/no_backup_confirm` otherwise). Ignored when a backup is required. */
                     no_backup_confirm?: string;
+                    /**
+                     * @description 0.15.266. An archive made before the delete: `none` (as before), `download` (the run needs the archive made and downloaded once; kept 7 days at most) or `keep_90` (the run needs the archive made; kept 90 days, any number of downloads). Never changes after the request; shown to the approver, not part of `scope_hash`.
+                     * @default none
+                     * @enum {string}
+                     */
+                    archive?: "none" | "download" | "keep_90";
                 };
             };
         };
@@ -33289,6 +33368,68 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["Unprocessable"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    makeDataResetArchive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The build started; the request. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataResetRequest"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    downloadDataResetArchive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The zip (`records.xlsx`, `files/`, `manifest.csv`). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/zip": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description The archive is no longer kept. */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
             503: components["responses"]["ServiceUnavailable"];
         };
     };

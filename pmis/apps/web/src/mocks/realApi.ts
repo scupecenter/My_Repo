@@ -685,6 +685,8 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/settings/data-reset/requests/:id/cancel'],
   ['post', '/settings/data-reset/requests/:id/run'],
   ['post', '/settings/data-reset/requests/:id/retry-files'],
+  ['post', '/settings/data-reset/requests/:id/archive'],
+  ['get', '/settings/data-reset/requests/:id/archive/download'],
   // Contract 0.15.70 (migration 0151; apps/api: library): Library > Forms and Archive, Settings > Documents > Form templates and Archive (W5).
   ['get', '/library/forms'],
   ['post', '/library/forms/:id/preview'],

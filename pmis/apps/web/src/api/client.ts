@@ -138,9 +138,17 @@ export async function fetchBlob(path: string, query?: RequestOptions['query']): 
 }
 
 /** Fetch a file with the session cookie and hand it to the browser as a download. Returns the file name. */
-export async function downloadFile(path: string, query?: RequestOptions['query']): Promise<string> {
+export async function downloadFile(path: string, query?: RequestOptions['query'], retried = false): Promise<string> {
   const res = await fetch(buildUrl(path, query), { credentials: 'include' });
-  if (!res.ok) throw new ApiError(res.status, await toProblem(res));
+  if (!res.ok) {
+    const problem = await toProblem(res);
+    // a download behind a step-up (the archive of a data reset): the same one-time step-up as any request, then once more
+    if (res.status === 401 && problem.code === 'step_up_required' && stepUpHandler && !retried) {
+      pendingStepUp ??= stepUpHandler(problem).finally(() => { pendingStepUp = null; });
+      if (await pendingStepUp) return downloadFile(path, query, true);
+    }
+    throw new ApiError(res.status, problem);
+  }
   const name = parseFilename(res.headers.get('Content-Disposition'));
   const blob = await res.blob();
   if (typeof URL.createObjectURL === 'function') {

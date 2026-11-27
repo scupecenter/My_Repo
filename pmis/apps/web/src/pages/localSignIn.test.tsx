@@ -377,7 +377,7 @@ describe('hybrid mode list', () => {
       // contract 0.15.62 (migration 0146): the project data reset in Settings
       'GET /settings/data-reset', 'PUT /settings/data-reset/settings', 'POST /settings/data-reset/requests', 'GET /settings/data-reset/plan', 'GET /settings/data-reset/narrow-options', 'GET /settings/data-reset/requests/:id',
       'POST /settings/data-reset/requests/:id/approve', 'POST /settings/data-reset/requests/:id/cancel', 'POST /settings/data-reset/requests/:id/run',
-      'POST /settings/data-reset/requests/:id/retry-files',
+      'POST /settings/data-reset/requests/:id/retry-files', 'POST /settings/data-reset/requests/:id/archive', 'GET /settings/data-reset/requests/:id/archive/download',
       // contract 0.15.70 (migration 0151): the Library menu (W5)
       'GET /library/forms', 'POST /library/forms/:id/preview', 'POST /library/forms/:id/generate', 'GET /library/generated/:id/download', 'POST /library/generated/:id/void', 'GET /library/archive', 'GET /library/archive/rows', 'POST /library/archive/zip', 'GET /library/form-templates', 'POST /library/form-templates', 'GET /library/form-templates/:id/html', 'POST /library/form-templates/:id/approve', 'POST /library/form-templates/:id/retire', 'GET /settings/library-archive', 'PUT /settings/library-archive',
     ]);
