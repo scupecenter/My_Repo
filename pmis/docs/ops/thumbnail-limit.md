@@ -25,4 +25,4 @@ warning to the System Log (limit and item kind, no file name). Nothing is delete
 - The count is per API process. The API runs as one service on one server, so this is the whole count.
 - The limit is not per IP: every request is signed in, so the person is the right unit.
 
-Migration 0521 (mirror `db/sql/520_thumbnail_limit.sql`) adds the entry to the limit catalogue by patching the stored function in place; contract 0.15.361.
+Migration 0521 (mirror `db/sql/520_thumbnail_limit.sql`) adds the entry to the limit catalogue by patching the stored function in place; contract 0.15.405.
