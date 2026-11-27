@@ -407,6 +407,24 @@
     "maintenance": "A project data reset is running. Try again in a few minutes.",
     "scope_changed": "The scope is not the one you saw, or what it takes along changed. Read the request again or make a new one."
   },
+  "week": {
+    "title": "Weekly cycle plan",
+    "of": "The week of the selected day",
+    "previous": "Previous week",
+    "next": "Next week",
+    "site": "Site",
+    "state_planned": "Planned",
+    "state_done": "On target",
+    "state_below": "Below target",
+    "empty": "No sites in the plans of this week.",
+    "carry": "Carry over",
+    "carry_title": "Carry over from {{from}} to {{to}}",
+    "carry_hint": "Sites below target on this day that are not yet in the plan of the next working day. They are added there; the daily plan rules (region, lock) still apply.",
+    "carry_none": "Nothing to carry over: every site below target is already in the next plan.",
+    "carry_locked": "Day locked or no edit right",
+    "carry_do": "Carry over ({{n}})",
+    "carried": "{{n}} sites carried over"
+  },
   "common": {
     "search": "Search",
     "cancel": "Cancel",
@@ -6040,6 +6058,7 @@
     "subtitle": "Daily progress of the day and the plan of the next working day, filled from system data.",
     "tab_progress": "Progress",
     "tab_tomorrow": "Tomorrow",
+    "tab_week": "Week",
     "date": "Date",
     "previous_day": "Previous day",
     "next_day": "Next day",
