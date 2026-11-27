@@ -6,6 +6,7 @@ import { ErrorState, NoResults } from '@/components/States';
 import { Sites } from '@/pages/Sites';
 import { MenuGroup } from '@/pages/MenuGroup';
 import { renderApp, signIn } from '@/test/utils';
+import { db, save } from '@/mocks/db';
 
 /** The six sub-menus under "Site Master" (owner request 2026-11-22): the Master section is the parent entry, not a sub-menu. */
 const SUBMENU_KEYS = ['design_acq', 'sow', 'cw', 'te', 'hoto', 'om'] as const;
@@ -354,5 +355,47 @@ describe('Shared states', () => {
     await u.click(screen.getByTestId('state-error-retry'));
     expect(clear).toHaveBeenCalledOnce();
     expect(retry).toHaveBeenCalledOnce();
+  });
+});
+
+/** 0242 (owner approval 2026-11-27, the PM-platforms proposal item 4): the personal sidebar of the profile. */
+describe('the personal sidebar (0197)', () => {
+  beforeEach(async () => { await signIn('pm'); });
+  const seedSide = (sidebar: Record<string, unknown>) => {
+    db().profiles.pm = { ...(db().profiles.pm ?? { version: 1 }), ui_prefs: { sidebar }, version: db().profiles.pm?.version ?? 1 };
+    save();
+  };
+
+  it('hides and reorders the screens of the menu, and the pins of the profile sit in favourites', async () => {
+    seedSide({ hidden: ['warehouse'], order: ['inbox', 'my_work'], pins: ['approvals'] });
+    app();
+    await screen.findByTestId('nav-my_work');
+    expect(screen.queryByTestId('nav-warehouse')).not.toBeInTheDocument();
+    const work = screen.getByTestId('nav-group-work');
+    const ids = [...work.querySelectorAll('[data-testid^="nav-"]')].map((e) => e.getAttribute('data-testid'));
+    expect(ids.indexOf('nav-inbox')).toBeGreaterThan(-1);
+    expect(ids.indexOf('nav-inbox')).toBeLessThan(ids.indexOf('nav-my_work'));
+    expect(await screen.findByTestId('nav-fav-approvals')).toBeInTheDocument();
+    // the server list won over the browser cache
+    expect(JSON.parse(localStorage.getItem('pmis.nav.favs') ?? '[]')).toEqual(['approvals']);
+  });
+
+  it('badge style dot: a dot instead of the number', async () => {
+    seedSide({ badge_style: 'dot', pins: [] });
+    app();
+    await screen.findByTestId('nav-approvals');
+    const badge = await screen.findByTestId('approvals-badge');
+    await waitFor(() => expect(badge).toHaveClass('h-2', 'w-2'));
+    expect(badge.textContent).toBe('');
+  });
+
+  it('the browser-only favourites move into the profile once', async () => {
+    localStorage.setItem('pmis.nav.favs', JSON.stringify(['warehouse']));
+    app();
+    await screen.findByTestId('nav-fav-warehouse');
+    await waitFor(() => {
+      const side = db().profiles.pm?.ui_prefs?.sidebar as { pins?: string[] } | undefined;
+      expect(side?.pins).toEqual(['warehouse']);
+    });
   });
 });
