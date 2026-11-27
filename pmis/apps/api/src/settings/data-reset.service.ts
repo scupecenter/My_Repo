@@ -85,7 +85,7 @@ export class DataResetService implements OnApplicationBootstrap, OnModuleDestroy
     return v;
   }
 
-  /** The notice before the run (P6, contract 0.15.267): the page calls it with the state, a one-minute timer calls it when jobs are on. Never throws into the caller. */
+  /** The notice before the run (P6, contract 0.15.268): the page calls it with the state, a one-minute timer calls it when jobs are on. Never throws into the caller. */
   async notifyCooloff(): Promise<number> {
     try {
       const rows = await this.db.client.$queryRaw<{ n: number }[]>(Prisma.sql`SELECT data_reset_cooloff_notify() AS n`);

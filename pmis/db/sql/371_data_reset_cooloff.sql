@@ -1,4 +1,4 @@
--- 0372_data_reset_cooloff: a waiting period between the approval and the run of a project data reset (Data entry proposal P6, contract 0.15.267).
+-- 0372_data_reset_cooloff: a waiting period between the approval and the run of a project data reset (Data entry proposal P6, contract 0.15.268).
 -- Mirror: db/sql/371_data_reset_cooloff.sql (kept byte-identical). The contract of the reset is docs/ops/data-reset.md.
 --
 -- The waiting period is a setting of the reset (Settings > Data > Data reset, next to the request expiry and the backup age): immediately (0), 30 minutes,

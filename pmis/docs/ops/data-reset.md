@@ -601,7 +601,7 @@ A request can ask for an archive of what the reset deletes. The choice is made w
 - **Expiry:** an archive past its keep date is removed (the stored file, then the row is marked `purged`) the next time the reset page is read.
 - **Storage:** the archive is a stored object (encrypted) in the document store, not in the quarantine directory. The archive row survives the reset (`data_reset_archives` is KEEP in `data_reset_plan()`).
 
-## Waiting period after the approval (contract 0.15.267, migration 0372)
+## Waiting period after the approval (contract 0.15.268, migration 0372)
 
 The approval does not open the run at once. Settings > Data > Data reset has a setting "Waiting period after approval", next to the request expiry and the backup age: immediately (0), 30 minutes, 24 hours (the default) or a custom number of hours or days (up to 30 days). A request takes the value as it is when the request is made, the approver sees it in the approval dialog, and it cannot change afterwards (the guard `data_reset_rows_guard`).
 

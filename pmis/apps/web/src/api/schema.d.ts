@@ -16994,11 +16994,11 @@ export interface components {
             request_expiry_minutes: number;
             /** @description Age limit of the last successful database backup (default 24). */
             backup_max_age_hours: number;
-            /** @description 0.15.267. Waiting period between the approval and the run (default 1440; 0 = immediately). */
+            /** @description 0.15.268. Waiting period between the approval and the run (default 1440; 0 = immediately). */
             cooloff_minutes?: number;
             version: number;
         };
-        /** @description 0.15.267 (migration 0372). The waiting period of a request, inherited when it was made. */
+        /** @description 0.15.268 (migration 0372). The waiting period of a request, inherited when it was made. */
         DataResetCooloff: {
             minutes: number;
             /**
@@ -33137,7 +33137,7 @@ export interface operations {
                 "application/json": components["schemas"]["WithReason"] & {
                     request_expiry_minutes: number;
                     backup_max_age_hours: number;
-                    /** @description 0.15.267. Waiting period between the approval and the run, in minutes (default 1440). Optional: omitted keeps the current value. */
+                    /** @description 0.15.268. Waiting period between the approval and the run, in minutes (default 1440). Optional: omitted keeps the current value. */
                     cooloff_minutes?: number;
                 };
             };

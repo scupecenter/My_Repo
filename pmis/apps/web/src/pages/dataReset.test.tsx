@@ -255,7 +255,7 @@ describe('Settings, data reset', () => {
     expect(screen.getByTestId('settings-section-data-imports')).toBeInTheDocument();
   });
 
-  it('waiting period (0.15.267): set in the settings, inherited by the request, shown to the approver, a live countdown disables the run until run_after (EN and AR)', async () => {
+  it('waiting period (0.15.268): set in the settings, inherited by the request, shown to the approver, a live countdown disables the run until run_after (EN and AR)', async () => {
     await signIn('pm'); await stepUpDone();
     const u = userEvent.setup();
     page();
