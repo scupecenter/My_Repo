@@ -74,6 +74,8 @@ function AddTask({ c, milestone, onClose, onAdded }: { c: Ctx; milestone?: strin
   const [rewire, setRewire] = useState(false);
   const [code, setCode] = useState(''), [en, setEn] = useState(''), [ar, setAr] = useState('');
   const [counts, setCounts] = useState(true);
+  // D53: the closing task of the milestone can be chosen when the task is created (structure: draft versions only)
+  const [closes, setCloses] = useState(false);
   const [mn, setMn] = useState(''), [mx, setMx] = useState(''), [from, setFrom] = useState('PRED');
   // 0.15.85: the SLA is an explicit choice, never silently empty: set it, or say that this task has no SLA (with a short reason).
   const [slaChoice, setSlaChoice] = useState<'' | 'set' | 'none'>(''), [noSlaWhy, setNoSlaWhy] = useState('');
@@ -100,6 +102,8 @@ function AddTask({ c, milestone, onClose, onAdded }: { c: Ctx; milestone?: strin
         let etag = r.version?.version_etag ?? c.etag;
         const refresh = async () => { etag = (await api.get<WorkflowVersion>(`/workflow/versions/${c.v.version}`)).version_etag ?? etag; };
         try {
+          if (closes) await api.put(`${path}/closing`, { body: { closing: true, reason }, version: etag });
+          if (closes) await refresh();
           if (slaChoice === 'none') await api.put(`/settings/sla-tasks/${code}/no-sla`, { body: { no_sla: true, reason: noSlaWhy.trim() } });
           if (slaChoice === 'set') { await api.put(`${path}/sla-rule`, { body: { min_working_days: Number(mn), max_working_days: Number(mx), start_event: from, unit: 'working', calendar_code: 'default', warning_pct: null, breach_owner_role: null, escalation_role: null, pause_on_client_wait: false, reason }, version: etag }); await refresh(); }
           if (wOn) await api.put(`${path}/weight`, { body: { counts_in_weight: true, weight_value: Number(wVal), weight_group: wGroup.trim().toUpperCase(), reason }, version: etag });
@@ -132,6 +136,7 @@ function AddTask({ c, milestone, onClose, onAdded }: { c: Ctx; milestone?: strin
       <Step n={2} title={t('studio.step_what')} testid="studio-step-what">
         <NameFields code={code} setCode={setCode} en={en} setEn={setEn} ar={ar} setAr={setAr} prefix="studio-add" />
         <label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" className="h-5 w-5" data-testid="studio-add-counts" checked={counts} onChange={(e) => setCounts(e.target.checked)} />{t('studio.counts_toward')}</label>
+        <label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" className="h-5 w-5" data-testid="studio-add-closing" disabled={!c.can.struct} title={!c.can.struct ? c.can.why ?? undefined : undefined} checked={closes && c.can.struct} onChange={(e) => setCloses(e.target.checked)} />{t('studio.closes_milestone')}</label>
         <fieldset className="space-y-2" data-testid="studio-add-sla-choice">
           <legend className="text-sm font-semibold">{t('studio.sla_choice')}</legend>
           <label className="flex min-h-11 items-center gap-2 text-sm"><input type="radio" name="sla-choice" className="h-5 w-5" data-testid="studio-add-sla-set" checked={slaChoice === 'set'} onChange={() => setSlaChoice('set')} />{t('studio.sla_choice_set')}</label>
