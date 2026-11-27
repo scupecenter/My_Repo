@@ -16,7 +16,7 @@ export { staffRef, uid };
 
 /** Accounts offered on the fake Microsoft page. `linked=false` = first sign-in (needs employee ID). */
 export const ACCOUNTS: Record<string, { employee_id: string | null; name: string; email: string; status: 'active' | 'pending_assignment'; nav: string[] }> = {
-  pm: { employee_id: '1001', name: 'Demo User 01', email: 'demo.user.01@example.com', status: 'active', nav: ['my_work', 'daily_plan', 'inbox', 'workload', 'status_updates', 'approvals', 'sites', 'dashboard', 'templates', 'admin.users', 'admin.roles', 'admin.groups', 'admin.delegation', 'absence', 'admin.matrix', 'admin.settings', 'admin.security_log', 'audit', 'messages', 'announcements', 'procurement', 'gecol', 'hlc', 'permits_hse', 'dismantle', 'contractors', 'warehouse', 'quality', 'issues', 'risks', 'change_control', 'readiness', 'as_built', 'meetings', 'rf_design', 'acquisition', 'car_dispatcher', 'financial_advances', 'incidents', 'lessons_learned', 'invoices'] },
+  pm: { employee_id: '1001', name: 'Demo User 01', email: 'demo.user.01@example.com', status: 'active', nav: ['my_work', 'daily_plan', 'inbox', 'workload', 'status_updates', 'approvals', 'sites', 'dashboard', 'templates', 'admin.users', 'admin.roles', 'admin.groups', 'admin.delegation', 'absence', 'admin.matrix', 'admin.settings', 'admin.security_log', 'audit', 'messages', 'announcements', 'procurement', 'gecol', 'hlc', 'permits_hse', 'dismantle', 'contractors', 'warehouse', 'quality', 'issues', 'risks', 'change_control', 'readiness', 'as_built', 'meetings', 'rf_design', 'acquisition', 'car_dispatcher', 'financial_advances', 'incidents', 'lessons_learned', 'invoices', 'deliverables'] },
   reviewer: { employee_id: '1102', name: 'Demo User 02', email: 'demo.user.02@example.com', status: 'active', nav: ['my_work', 'daily_plan', 'inbox', 'workload', 'status_updates', 'approvals', 'sites', 'templates', 'absence', 'messages', 'procurement', 'gecol', 'hlc', 'permits_hse', 'dismantle', 'warehouse', 'as_built'] },
   auditor: { employee_id: '1103', name: 'Demo User 03', email: 'demo.user.03@example.com', status: 'active', nav: ['my_work', 'inbox', 'approvals', 'admin.security_log', 'messages'] },
   newbie: { employee_id: null, name: 'New Employee', email: 'new.employee@example.com', status: 'pending_assignment', nav: [] },
@@ -174,7 +174,9 @@ export function sessionBody(): Session {
 }
 
 function initIdentity() {
-  return { default_brand: 'current' as Brand, allow_user_choice: true, defaults: {} as Record<string, string>, pref_options: APPEARANCE_OPTIONS as unknown as Record<string, string[]>, version: 1, updated_at: null as string | null, updated_by: null as null | { id: string; display_name: string; employee_id: string | null } };
+  return { default_brand: 'current' as Brand, allow_user_choice: true, defaults: {} as Record<string, string>, pref_options: APPEARANCE_OPTIONS as unknown as Record<string, string[]>, version: 1, updated_at: null as string | null, updated_by: null as null | { id: string; display_name: string; employee_id: string | null },
+    /** 0243: the workspace logo metadata (ui_assets); the bytes live in uiAssetBytes (not persisted). */
+    logo: null as null | { key: string; mime: string; enabled: boolean; show_on_login: boolean; use_as_favicon: boolean; version: number; updated_at: string; updated_by: { id: string; display_name: string; employee_id: string | null } | null } };
 }
 function initLoginPage() {
   return {
@@ -193,6 +195,10 @@ export const loginPagePublic = () => {
     animation: c.animation, default_locale: c.default_locale, support_links: c.support_links,
   };
 };
+/** 0243: the bytes of the identity images (ui_assets); the mock keeps them in memory only. */
+const uiAssetBytes = new Map<string, { mime: string; bytes: Uint8Array }>();
+export const putUiAssetBytes = (key: string, mime: string, bytes: Uint8Array) => { uiAssetBytes.set(key, { mime, bytes }); };
+export const uiAssetBytesOf = (key: string) => uiAssetBytes.get(key);
 /** 0.15.41: the identity settings (older saved mock states have none). */
 export const identity = () => (db().identity ??= initIdentity());
 /** The design a user sees: their own while the admin allows a choice, else the organization default (ui_effective_brand). */

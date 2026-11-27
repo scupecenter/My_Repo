@@ -6,6 +6,7 @@ import { Link } from 'react-router-dom';
 import { useSession } from '@/api/hooks';
 import { useCancelSnagRecord, useCreateRecord, useNewVersion, useRecordClaim, useRecordHistory, useRecordOp, useRecordTriage, useRecordTransfer, useRegisterRecord, useRegisterRecords, useUpdateRecord, useContractorCompanies, type RecordOp, type TriageOp } from '@/api/registers';
 import { useMatrix } from '@/api/sites';
+import { EditingNotice } from './EditingNotice';
 import { useAddRegisterComment, useRegisterComments } from '@/api/x';
 import type { RegisterDefinition, RegisterRecord } from '@/api/types';
 import { registerErrorMessage, serverFieldIssues } from '@/lib/registerErrors';
@@ -22,7 +23,8 @@ import { FollowButton } from './FollowButton';
 import { RecordDocuments } from './RecordDocuments';
 import { RelatedRecords } from './RelatedRecords';
 import { SiteTaskField } from './SiteTaskField';
-import { IssueRiskSelect, RiskIssues, DismantleOrderSelect, DismantleRnSelect, HlcPurchaseRequests, OrderReceipts, WarehouseOrderSelect } from './P4cPanels';
+import { SiteGateField } from './SiteGateField';
+import { IssueRiskSelect, RiskIssues, DismantleOrderSelect, DismantleRnSelect, HlcPurchaseRequests, OrderReceipts, WarehouseOrderSelect, AdvanceSelect, SupplierSelect } from './P4cPanels';
 import { useRecordSlots } from '@/api/documents';
 import { Holders } from './HolderChip';
 import { Balance, ExtendBooking, MembersEditor, ReadinessBadge, reservedMessage, TopUp, VehiclePicker } from './AssignmentPanels';
@@ -258,6 +260,7 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
       {record && <DrawerTabs value={tab} onChange={setTab} tabs={[{ id: 'data', label: t('drawer.tab_data') }, { id: 'documents', label: t('docs.tab') }, { id: 'comments', label: t('drawer.comments') }, { id: 'history', label: t('drawer.history') }]} />}
       <div className="flex-1 space-y-4 overflow-y-auto p-4">
         <div {...panelProps('data', tab)} className="space-y-4">
+        {record && <EditingNotice kind="record" id={record.id} editing={editable} testid="reg-editing-notice" />}
         {editable && <DraftBar draft={dr} onRestore={(v) => { if (v.data && typeof v.data === 'object') setData(v.data as Data); if (typeof v.record_type === 'string') setRtype(v.record_type); setDirty(true); }} />}
         {OWNER_NOTE[key] && <p className="rounded-md bg-card2 p-3 text-sm" data-testid="reg-owner-note">{t(OWNER_NOTE[key])}</p>}
         {src && record?.site_id && (
@@ -357,12 +360,20 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
                         ? <DismantleOrderSelect siteId={site?.id} part={rtype} value={data[f.code]} onChange={(v) => set(f.code, v)} editable={editable} invalid={!!show} />
                         : key === 'dismantle' && f.code === 'closing_rn_id'
                         ? <DismantleRnSelect siteId={site?.id} part={rtype} value={data[f.code]} onChange={(v) => set(f.code, v)} editable={editable} invalid={!!show} />
-                        : ((key === 'issues' && f.code === 'blocked_gate_or_task') || (key === 'change_control' && f.code === 'affected_task_code'))
+                        : ((key === 'issues' && f.code === 'blocked_gate_or_task') || (key === 'change_control' && f.code === 'affected_task_code') || (key === 'deliverables' && f.code === 'task_code'))
                         ? <SiteTaskField id={`reg-field-${f.code}`} siteId={site?.id} value={data[f.code]} onChange={(v) => set(f.code, v)} disabled={!editable} invalid={!!show} />
+                        : key === 'deliverables' && f.code === 'gate_code'
+                        ? <SiteGateField id={`reg-field-${f.code}`} siteId={site?.id} value={data[f.code]} onChange={(v) => set(f.code, v)} disabled={!editable} invalid={!!show} />
                         : (key === 'issues' || key === 'quality' || key === 'change_control') && f.code === 'procurement_order_id'
                         ? <WarehouseOrderSelect registerKey={key} field="procurement_order_id" siteId={site?.id} value={data[f.code]} onChange={(v) => set(f.code, v)} editable={editable} invalid={!!show} />
                         : (key === 'car_dispatcher' || key === 'financial_advances') && f.code === 'procurement_record_id'
                         ? <WarehouseOrderSelect registerKey={key} field="procurement_record_id" siteId={key === 'financial_advances' ? site?.id : null} value={data[f.code]} onChange={(v) => set(f.code, v)} editable={editable} invalid={!!show} />
+                        : key === 'invoices' && f.code === 'procurement_record_id'
+                        ? <WarehouseOrderSelect registerKey="invoices" field="procurement_record_id" siteId={site?.id} value={data[f.code]} onChange={(v) => set(f.code, v)} editable={editable} invalid={!!show} />
+                        : key === 'invoices' && f.code === 'supplier_party_id'
+                        ? <SupplierSelect value={data[f.code]} onChange={(v) => set(f.code, v)} editable={editable} invalid={!!show} />
+                        : key === 'financial_advances' && f.code === 'advance_id'
+                        ? <AdvanceSelect siteId={site?.id} value={data[f.code]} onChange={(v) => set(f.code, v)} editable={editable} invalid={!!show} />
                         : key === 'warehouse' && f.code === 'procurement_order_id'
                         ? <WarehouseOrderSelect siteId={site?.id} value={data[f.code]} onChange={(v) => set(f.code, v)} editable={editable} invalid={!!show} />
                         : editable && !(key === 'dismantle' && f.code === 'closing_rn_ref' && data.closing_rn_id) ? <FieldInput field={f} value={data[f.code]} onChange={(v) => set(f.code, v)} invalid={!!show} ctx={ctx} />
@@ -473,3 +484,4 @@ export function RegisterDrawer({ def, recordId, onClose, onOpen, nav }: { def: R
     </DrawerFrame>
   );
 }
+
