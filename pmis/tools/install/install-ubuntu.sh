@@ -182,7 +182,7 @@ command -v openssl >/dev/null || apt-get install -y -qq openssl
 PREV_SERVER_NAME='' PREV_HTTPS_PORT='' PREV_HTTP_PORT='' PREV_CERT_PATH='' PREV_KEY_PATH='' PREV_DB_NAME='' PREV_DB_PORT=''
 PREV_DB_PASSWORD='' PREV_API_PORT='' PREV_LOG_HMAC_KEY='' PREV_TOTP_ENC_KEY='' PREV_FILE_ENC_KEY='' PREV_PMIS_CONTEXT_KEY=''
 PREV_STORAGE_MODE='' PREV_STORAGE_DIR='' PREV_MINIO_PORT='' PREV_MINIO_DIR='' PREV_S3_ACCESS_KEY='' PREV_S3_SECRET_KEY='' PREV_MINIO_ROOT_PASSWORD=''
-PREV_TLS_MODE='' PREV_LE_NAME=''
+PREV_TLS_MODE='' PREV_LE_NAME='' PREV_CSP_MODE=''
 if [[ -r $CONF_DIR/install.conf ]]; then
   # shellcheck disable=SC1091
   . "$CONF_DIR/install.conf"
@@ -670,6 +670,7 @@ PREV_MINIO_PORT='${MINIO_PORT:-}'
 PREV_MINIO_DIR='${MINIO_DIR:-}'
 PREV_TLS_MODE='$SAVED_TLS_MODE'
 PREV_LE_NAME='$SAVED_LE_NAME'
+PREV_CSP_MODE='$CSP_MODE'
 EOF
 umask 022
 chown root:"$SERVICE_USER" "$CONF_DIR/pmis.env"; chmod 640 "$CONF_DIR/pmis.env"; chmod 600 "$CONF_DIR/install.conf"
@@ -785,6 +786,16 @@ esac
 
 # ---------------------------------------------------------------- nginx
 say "Configuring nginx"
+# SEC-3: Content-Security-Policy. report-only (default) sends the policy as a report: nothing is blocked, and browsers send violations to the API, which logs them.
+# enforce blocks what the policy does not allow. off sends nothing. Choose with CSP_MODE=enforce (or off) on the command line; the choice is kept in install.conf.
+CSP_MODE=${CSP_MODE:-${PREV_CSP_MODE:-report-only}}
+case $CSP_MODE in report-only|enforce|off) ;; *) die "CSP_MODE must be report-only, enforce or off (got: $CSP_MODE)" ;; esac
+CSP_POLICY="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; worker-src 'self' blob:; frame-src 'self' blob:; media-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; report-uri /api/v1/csp-report"
+case $CSP_MODE in
+  report-only) CSP_DIRECTIVE="add_header Content-Security-Policy-Report-Only \"$CSP_POLICY\" always;" ;;
+  enforce)     CSP_DIRECTIVE="add_header Content-Security-Policy \"$CSP_POLICY\" always;" ;;
+  off)         CSP_DIRECTIVE='' ;;
+esac
 if (( HTTPS_PORT == 443 )); then REDIRECT_HOST='$host'; else REDIRECT_HOST="\$host:$HTTPS_PORT"; fi
 # the site as it is now, put back if nginx rejects the new one (nothing is reloaded in that case)
 SITE_BEFORE=$(mktemp)
@@ -813,6 +824,7 @@ server {
   add_header X-Frame-Options DENY always;
   add_header Referrer-Policy same-origin always;
   add_header Strict-Transport-Security "max-age=31536000" always;
+  $CSP_DIRECTIVE
 
   location /api/ {
     proxy_pass http://127.0.0.1:$API_PORT;
@@ -823,9 +835,35 @@ server {
     proxy_read_timeout 300s;   # 0074: long requests are not needed (big batches run in the background); the API ends a request transaction after 30 s
     client_max_body_size 25m;
   }
-  location /assets/ { expires 1y; add_header Cache-Control "public, immutable"; try_files \$uri =404; }
-  location = /mockServiceWorker.js { add_header Cache-Control "no-cache"; try_files \$uri =404; }
-  location = /index.html { add_header Cache-Control "no-cache"; }
+  # SEC-5: nginx drops every server-level add_header in a location that sets its own add_header, so these locations repeat the four security headers
+  # (above). Without this the main document (index.html) and the assets went out without Strict-Transport-Security.
+  location /assets/ {
+    expires 1y;
+    add_header Cache-Control "public, immutable";
+    add_header X-Content-Type-Options nosniff always;
+    add_header X-Frame-Options DENY always;
+    add_header Referrer-Policy same-origin always;
+    add_header Strict-Transport-Security "max-age=31536000" always;
+    $CSP_DIRECTIVE
+    try_files \$uri =404;
+  }
+  location = /mockServiceWorker.js {
+    add_header Cache-Control "no-cache";
+    add_header X-Content-Type-Options nosniff always;
+    add_header X-Frame-Options DENY always;
+    add_header Referrer-Policy same-origin always;
+    add_header Strict-Transport-Security "max-age=31536000" always;
+    $CSP_DIRECTIVE
+    try_files \$uri =404;
+  }
+  location = /index.html {
+    add_header Cache-Control "no-cache";
+    add_header X-Content-Type-Options nosniff always;
+    add_header X-Frame-Options DENY always;
+    add_header Referrer-Policy same-origin always;
+    add_header Strict-Transport-Security "max-age=31536000" always;
+    $CSP_DIRECTIVE
+  }
   location / { try_files \$uri /index.html; }
 }
 EOF

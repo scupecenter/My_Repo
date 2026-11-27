@@ -5,6 +5,7 @@ import { ApiError } from '@/api/client';
 import { useAddScopeException, useApplyApplicability, useGateEvents, useRevokeScopeException, useSiteApplicability } from '@/api/scenario';
 import type { SiteApplicability as Applicability } from '@/api/scenario';
 import { errText, FormDialog } from './FormDialog';
+import { StandardTable, type StdCol } from './StandardTable';
 import { useToast } from './Toast';
 
 type Dlg = null | { kind: 'apply' } | { kind: 'exception'; task_code: string } | { kind: 'revoke'; id: string; task_code: string };
@@ -31,6 +32,18 @@ export function SiteApplicability({ siteId }: { siteId: string }) {
   };
   if (q.isError) return <p role="alert" className="text-lateInk" data-testid="scope-error">{errText(q.error, t)}</p>;
   if (!a) return <p className="text-mute">{t('common.loading')}</p>;
+  type TaskRow = (typeof a.tasks)[number];
+  const appliesText = (x: TaskRow) => (x.applies === null ? '–' : x.applies ? t('scope.applies') : t('scope.na'));
+  const taskCols: StdCol<TaskRow>[] = [
+    { id: 'task', label: t('scope.col_task'), w: 120, pinned: true, text: (x) => x.task_code, cell: (x) => <span className="mono">{x.task_code}</span> },
+    { id: 'state', label: t('scope.col_state'), w: 160, text: (x) => t(`taskState.${x.state}`, { defaultValue: x.state }), cell: (x) => t(`taskState.${x.state}`, { defaultValue: x.state }) },
+    { id: 'applies', label: t('scope.col_applies'), w: 220, multi: true, text: (x) => `${appliesText(x)}${x.would_change ? ` ${t(`scope.will_${x.would_change}`)}` : ''}`,
+      cell: (x) => <>{appliesText(x)}{x.would_change ? <span className="chip ms-1 bg-openBg text-openInk">{t(`scope.will_${x.would_change}`)}</span> : null}</> },
+    { id: 'source', label: t('scope.col_source'), w: 160, text: (x) => t(`scope.src_${x.source}`), cell: (x) => <span className={`chip ${SRC_TONE[x.source] ?? ''}`} title={x.reason ?? ''}>{t(`scope.src_${x.source}`)}</span> },
+    { id: 'sla', label: t('scope.col_sla'), w: 160, text: (x) => (x.sla_measured ? '' : t('sla.not_measured')), cell: (x) => (x.sla_measured ? '' : <span className="chip bg-lockBg text-lockInk">{t('sla.not_measured')}</span>) },
+    { id: 'act', label: '', w: 150, action: true, text: () => '', cell: (x) => (x.source === 'scenario' && x.applies === false
+      ? <button className="btn px-2 py-0.5 text-xs" data-testid={`scope-exception-${x.task_code}`} onClick={() => setDlg({ kind: 'exception', task_code: x.task_code })}>{t('scope.add_exception')}</button> : null) },
+  ];
   const naByScenario = a.tasks.filter((x) => x.source === 'scenario' && x.applies === false);
   const active = a.exceptions.filter((e) => !e.revoked_at);
   const pending = a.tasks.filter((x) => x.would_change);
@@ -59,21 +72,8 @@ export function SiteApplicability({ siteId }: { siteId: string }) {
           <span className="text-sm text-mute" data-testid="scope-pending-count">{t('scope.would_change', { count: pending.length })}</span>
           <button className="btn btn-accent" data-testid="scope-apply" disabled={a.conflicts.length > 0} onClick={() => setDlg({ kind: 'apply' })}><ShieldCheck size={14} />{t('scope.apply')}</button>
         </div>
-        <table className="w-full text-sm">
-          <thead className="text-mute"><tr>{['task', 'state', 'applies', 'source', 'sla'].map((k) => <th key={k} className="p-1 text-start">{t(`scope.col_${k}`)}</th>)}<th /></tr></thead>
-          <tbody data-testid="scope-tasks">
-            {a.tasks.filter((x) => x.source !== 'none' || !x.sla_measured).map((x) => (
-              <tr key={x.task_id} className="border-t border-line" data-testid={`scope-task-${x.task_code}`} data-applies={String(x.applies)}>
-                <td className="mono p-1">{x.task_code}</td>
-                <td className="p-1">{t(`taskState.${x.state}`, { defaultValue: x.state })}</td>
-                <td className="p-1">{x.applies === null ? '–' : x.applies ? t('scope.applies') : t('scope.na')}{x.would_change ? <span className="chip ms-1 bg-openBg text-openInk">{t(`scope.will_${x.would_change}`)}</span> : null}</td>
-                <td className="p-1"><span className={`chip ${SRC_TONE[x.source] ?? ''}`} title={x.reason ?? ''}>{t(`scope.src_${x.source}`)}</span></td>
-                <td className="p-1">{x.sla_measured ? '' : <span className="chip bg-lockBg text-lockInk">{t('sla.not_measured')}</span>}</td>
-                <td className="p-1 text-end">{x.source === 'scenario' && x.applies === false && <button className="btn px-2 py-0.5 text-xs" data-testid={`scope-exception-${x.task_code}`} onClick={() => setDlg({ kind: 'exception', task_code: x.task_code })}>{t('scope.add_exception')}</button>}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div data-testid="scope-tasks"><StandardTable screen="site-scope-tasks" testid="scope-tasks-table" cols={taskCols} rows={a.tasks.filter((x) => x.source !== 'none' || !x.sla_measured)} rowId={(x) => x.task_id}
+          rowTestId={(x) => `scope-task-${x.task_code}`} rowAttrs={(x) => ({ 'data-applies': String(x.applies) })} exportName="site-scope-tasks" noun="tasks" /></div>
         {naByScenario.length === 0 && active.length === 0 && <p className="mt-2 text-sm text-mute" data-testid="scope-no-scenario-na">{t('scope.none_by_scenario')}</p>}
       </section>
 

@@ -19,6 +19,8 @@ export interface SearchHit {
   region_id: number | null;
   href: string;
   match_ranges: [number, number][];
+  /** Documents only: where the words were found inside the file contents (item 12), else null. */
+  snippet?: string | null;
 }
 export interface SearchGroup {
   type: SearchType;
@@ -39,6 +41,7 @@ interface Row {
   subtitle: string | null;
   region_id: number | null;
   href?: string;
+  snippet?: string | null;
   total: number;
 }
 
@@ -81,6 +84,7 @@ export class SearchService {
             region_id: r.region_id,
             href: r.href ?? '/',
             match_ranges: matchRanges(title, text),
+            ...(type === 'documents' ? { snippet: r.snippet ?? null } : {}),
           };
         }),
       });
@@ -160,10 +164,19 @@ export class SearchService {
       const regions = await this.access.regions('sites', 'view');
       if (regions !== null && regions.length === 0) return null;
       const reach = regions === null ? Prisma.empty : Prisma.sql`AND s.region_id = ANY(${regions}::int[])`;
+      // Content is more sensitive than a file name: it needs the documents view right (sites.documents) in the file's region, and only site documents (no register slot) are searched.
+      const docRegions = await this.access.regions('sites.documents', 'view');
+      const contentOk = docRegions === null || docRegions.length > 0;
+      const contentReach = docRegions === null ? Prisma.empty : Prisma.sql`AND s.region_id = ANY(${docRegions}::int[])`;
+      const norm = pattern.slice(1, -1).replace(/\\([\\%_])/g, '$1');
+      // Item 12: a file matches by its name or by its extracted text (document_texts, row level security like document_files). The same region reach applies.
       return tx.$queryRaw<Row[]>(Prisma.sql`SELECT f.id::text AS id, f.original_name AS title, s.site_code AS subtitle, s.region_id,
-          concat('/sites/', s.id::text) AS href, (COUNT(*) OVER())::int AS total
+          concat('/sites/', s.id::text) AS href, (COUNT(*) OVER())::int AS total,
+          CASE WHEN search_document_text(f.original_name) LIKE ${pattern} OR dt.file_id IS NULL THEN NULL
+            ELSE '...' || substr(dt.text_norm, greatest(1, strpos(dt.text_norm, ${norm}) - 40), 120) || '...' END AS snippet
         FROM document_files f JOIN document_slots sl ON sl.id = f.slot_id JOIN sites s ON s.id = sl.site_id
-        WHERE f.is_current AND s.is_active AND search_document_text(f.original_name) LIKE ${pattern} ${reach}
+        LEFT JOIN document_texts dt ON ${contentOk} AND dt.file_id = f.id AND dt.status = 'done' AND sl.register_key IS NULL ${contentReach} AND dt.text_norm LIKE ${pattern}
+        WHERE f.is_current AND s.is_active AND (search_document_text(f.original_name) LIKE ${pattern} OR dt.file_id IS NOT NULL) ${reach}
         ORDER BY f.original_name LIMIT ${limit}`);
     }
     if (type === 'meetings') {
@@ -187,11 +200,17 @@ export class SearchService {
       const regions = await this.access.regions('sites', 'view');
       if (regions !== null && regions.length === 0) return null;
       const reach = regions === null ? Prisma.empty : Prisma.sql`AND s.region_id = ANY(${regions}::int[])`;
-      return tx.$queryRaw<Row[]>(Prisma.sql`SELECT t.id::text AS id, td.code || ' - ' || td.name_en AS title, s.site_code || ' - ' || s.name AS subtitle, s.region_id,
+      // The text is normalised once per task definition and once per site (search_norm works character by character, so the parts joined by a space
+      // give the same text as the whole), not once per task instance: with 1000 sites and 63 definitions that is 1063 calls instead of 63000.
+      return tx.$queryRaw<Row[]>(Prisma.sql`WITH d AS MATERIALIZED (
+          SELECT id, code, name_en, sort_order, search_norm(code || ' ' || name_en || ' ' || coalesce(name_ar, '')) AS nt FROM task_definitions WHERE is_active),
+        s AS MATERIALIZED (
+          SELECT s.id, s.site_code, s.name, s.region_id, search_norm(s.site_code) AS nc FROM sites s WHERE s.is_active ${reach})
+        SELECT t.id::text AS id, d.code || ' - ' || d.name_en AS title, s.site_code || ' - ' || s.name AS subtitle, s.region_id,
           concat('/sites/', s.id::text, '?task=', t.id::text) AS href, (COUNT(*) OVER())::int AS total
-        FROM task_instances t JOIN task_definitions td ON td.id = t.task_def_id JOIN sites s ON s.id = t.site_id
-        WHERE s.is_active AND td.is_active AND search_norm(td.code || ' ' || td.name_en || ' ' || coalesce(td.name_ar, '') || ' ' || s.site_code) LIKE ${pattern} ${reach}
-        ORDER BY s.site_code, td.sort_order LIMIT ${limit}`);
+        FROM task_instances t JOIN d ON d.id = t.task_def_id JOIN s ON s.id = t.site_id
+        WHERE d.nt || ' ' || s.nc LIKE ${pattern}
+        ORDER BY s.site_code, d.sort_order LIMIT ${limit}`);
     }
     if (type === 'warehouse_items') {
       // Read only; the Warehouse module view is the same right as GET /warehouse/items. Items are global (no region).

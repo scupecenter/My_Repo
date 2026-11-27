@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from './client';
-import type { StateDurationsReport, BlockedBy, Comment, Follow, Notification, Page, StatusHealth, StatusUpdate, StatusUpdateInput, TaskTimeInState, TimeInStateReport, Workload } from './types';
+import type { BlockedBy, Comment, Follow, Notification, Page, RegionHealthBoard, StateDurationsReport, StatusHealth, StatusUpdate, StatusUpdateInput, TaskTimeInState, TimeInStateReport, Workload } from './types';
 
 /** Hooks of the phase 4b features X1 to X7 (contract 0.4.10 and 0.7.1). The server decides what a caller may see; nothing here widens it. */
 
@@ -62,6 +62,8 @@ export const useTimeReport = (f: InsightFilter & { group_by: 'holder' | 'team'; 
 
 // ---------------------------------------------------------------------------------------------------------------- X7 status updates
 export type StatusFilter = { scope: string; region_id: string; team: string };
+/** Region health (0.15.241, item 12): the current-week health of every visible region plus the missing-update flag. */
+export const useRegionHealth = () => useQuery({ queryKey: ['region-health'], queryFn: () => api.get<RegionHealthBoard>('/status-updates/region-health') });
 export const useStatusUpdates = (f: StatusFilter) =>
   useInfiniteQuery({
     queryKey: ['status-updates', f], initialPageParam: '' as string,

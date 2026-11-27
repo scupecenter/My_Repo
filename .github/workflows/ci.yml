@@ -189,6 +189,10 @@ jobs:
         working-directory: pmis
         run: bash -n tools/install/install-ubuntu.sh tools/install/update.sh tools/install/install-clamav.sh tools/install/install-file-backup.sh infra/backup/files-backup.sh infra/backup/files-restore.sh tools/install/install-db-backup.sh infra/backup/db-common.sh infra/backup/db-backup.sh infra/backup/db-backup-check.sh infra/backup/db-dump.sh infra/backup/db-restore.sh infra/backup/test-db-backup.sh infra/backup/test-files-backup.sh
 
+      - name: nginx site keeps the security headers (SEC-5)
+        working-directory: pmis
+        run: tools/install/test-nginx-headers.sh
+
       - name: Shellcheck (errors only)
         working-directory: pmis
         run: shellcheck --severity=error tools/install/install-ubuntu.sh tools/install/update.sh tools/install/test-le-existing.sh tools/install/install-clamav.sh tools/install/install-file-backup.sh infra/backup/files-backup.sh infra/backup/files-restore.sh tools/install/install-db-backup.sh infra/backup/db-common.sh infra/backup/db-backup.sh infra/backup/db-backup-check.sh infra/backup/db-dump.sh infra/backup/db-restore.sh infra/backup/test-db-backup.sh infra/backup/test-files-backup.sh

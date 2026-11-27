@@ -102,7 +102,7 @@ export function SidebarBody({ items, compact, unread, alerts = 0, counts = {}, a
   const [seen, setSeen] = useState<string | undefined>();
   if (activeKey && activeKey !== seen) {
     setSeen(activeKey);
-    const n = [activeKey, ...recent.filter((x) => x !== activeKey)].slice(0, RECENT_MAX);
+    const n = [...new Set([activeKey, ...recent.filter((x) => x !== activeKey)])].slice(0, RECENT_MAX);
     setRecent(n);
     savePref(K.recent, n);
   }
@@ -162,7 +162,8 @@ export function SidebarBody({ items, compact, unread, alerts = 0, counts = {}, a
   const needle = q.trim().toLowerCase();
   const matches = needle ? items.filter((i) => !hiddenSet.has(i.key) && label(i).toLowerCase().includes(needle)) : [];
   const favItems = favs.map(byKey).filter((x): x is NavItem => !!x);
-  const recentItems = recent.filter((k) => k !== activeKey).map(byKey).filter((x): x is NavItem => !!x);
+  // dedupe by path: a screen reachable under two keys (or a stale doubled key in storage) shows once
+  const recentItems = recent.filter((k) => k !== activeKey).map(byKey).filter((x): x is NavItem => !!x).filter((x, i, a) => a.findIndex((y) => y.to === x.to) === i);
 
   /** A screen of a heading. The Site Register entry "Site Master" carries the six Site Master sub-menus (no Dismantle); every other screen, Dismantle included, is a plain row (under Registers & Logs). */
   const itemNode = (k: string) => {

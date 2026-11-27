@@ -24,6 +24,14 @@ const problemJson = (status: number, code: string, errors?: { path: string; code
   HttpResponse.json({ type: 'x', title: code, status, code, ...(errors ? { errors } : {}) }, { status, headers: { 'Content-Type': 'application/problem+json' } });
 
 describe('messages', () => {
+  it('the conversation panel fills the window height instead of a fixed short strip', async () => {
+    await signIn('reviewer');
+    messagesAt();
+    await screen.findByTestId('thread-list');
+    const card = screen.getByTestId('page-messages').querySelector('.card.grid');
+    expect(card).toHaveClass('min-h-[calc(100dvh-9rem)]');
+  });
+
   it('shows the original first, the reply box directly under it, then the replies newest first, and marks the thread read', async () => {
     await signIn('reviewer');
     messagesAt(`/messages/${T1}`);
