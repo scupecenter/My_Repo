@@ -6296,6 +6296,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/registers/{register_key}/{entity_id}/related": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The records linked to a register record, in both directions (0.15.224)
+         * @description 0.15.224. Read only. The current, not voided records this record names (`direction` `to`) and the records that name it (`direction` `from`), grouped by register and link field.
+         *     Needs the view right of `register_key`; each group is listed only when the caller also holds the view right of the other register in the record's region. A record
+         *     the caller cannot see, or an id with no current record, answers an empty list.
+         */
+        get: operations["listRelatedRecords"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/registers/car_dispatcher/records/{record_id}/extend": {
         parameters: {
             query?: never;
@@ -16382,6 +16404,25 @@ export interface components {
             movement_status?: "pending" | "posted" | "cancelled";
             lines: number;
             qty: number;
+        };
+        /** @description 0.15.224. The records linked to a register record through one link field. */
+        RelatedRecordGroup: {
+            /** @enum {string} */
+            direction: "to" | "from";
+            register_key: string;
+            /** @description The link field (a key of the record data) that holds the id. */
+            field: string;
+            items: {
+                /** Format: uuid */
+                entity_id: string;
+                /** Format: uuid */
+                record_id: string;
+                record_type?: string;
+                state: string;
+                /** Format: uuid */
+                site_id?: string;
+                title: string;
+            }[];
         };
         /** @description 0.15.32 (F5). The setting `kanban.wip_limits`: the WIP limit of each milestone column of the sites board, a warning only. */
         KanbanWip: {
@@ -31295,6 +31336,34 @@ export interface operations {
                 content: {
                     "application/json": {
                         items: components["schemas"]["ProcurementOrderReceipt"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listRelatedRecords: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                register_key: string;
+                entity_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The groups. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        groups: components["schemas"]["RelatedRecordGroup"][];
                     };
                 };
             };

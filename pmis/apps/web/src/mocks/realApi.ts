@@ -405,6 +405,7 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/registers/issues/order-options'],
   ['get', '/registers/quality/order-options'],
   ['get', '/registers/procurement/:entity_id/receipts'],
+  ['get', '/registers/:key/:entity_id/related'],
   ['get', '/registers/contractor-companies'],
   ['post', '/registers/hlc/legacy-migration'],
   ['get', '/registers/:key/fields'],
