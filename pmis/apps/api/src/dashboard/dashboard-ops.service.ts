@@ -4,14 +4,24 @@ import { AccessService } from "../access/access.service";
 import type { AuthContext } from "../auth/auth.types";
 import { Query } from "../common/query";
 import { DbService } from "../db/db.service";
+import { ContractorPerformanceService } from "../contractors/contractor-performance.service";
 import { FilterCatalogService } from "../views/filter-catalog.service";
 import { dashboardParams } from "./dashboard.service";
 import {
   AgeBuckets,
+  ActionDueRow,
+  actionsSummary,
+  ApprovalWaitRow,
+  ChangeWaitRow,
+  changesSummary,
+  approvalsByRole,
   bucketAges,
+  firstPassPct,
+  meanDays,
   PTW_CHECK_KEYS,
   ptwCheckGaps,
   receivePct,
+  scorecardSummary,
 } from "./dashboard-ops.rules";
 
 interface OrderAges {
@@ -50,6 +60,19 @@ interface ShortageRow {
  *   - shortage: a warehouse site quantity with required over dispatched, on an active, not cancelled site.
  *   - contractor of a shortage line: the party of the site's newest open procurement order; lines of a site with no
  *     open order are unattributed. Amounts are not part of this section (no price is stored on a Procurement record).
+ *   - contractor scorecard (0.15.202, item 5): the aggregate of the contractor performance report — the counts per
+ *     level, the on-time rectification rate of snags, the average delay and the rejection (quality fail) rate, and
+ *     the five worst parties. No amounts. Needs contractors view, else available false.
+ *   - quality (0.15.203, item 6): the open snags and NCRs of the in-scope sites, the average closure age of each and
+ *     the first-time acceptance rate (Pass over Pass + Fail of the decided inspections; the data keeps no
+ *     re-inspection marker). Needs quality view, else available false.
+ *   - approvals (0.15.204, item 7): the tasks waiting for review or approval (the same population as the Approvals
+ *     inbox), their ages in calendar days since the level opened (falling back to the last update, as the inbox
+ *     orders), split review against approve and grouped by the ball-in-court role. Needs the approvals and the sites
+ *     view, else available false.
+ *   - changes_meetings (0.15.205, item 8): the change requests still pending (aged since the request date, per kind)
+ *     and the approved ones not applied, and the meeting actions not closed with the overdue ones aged by days late.
+ *     Each part needs its own module view (change_control, meetings), else that part answers available false.
  */
 @Injectable()
 export class DashboardOpsService {
@@ -57,6 +80,7 @@ export class DashboardOpsService {
     private readonly db: DbService,
     private readonly access: AccessService,
     private readonly filters: FilterCatalogService,
+    private readonly perf: ContractorPerformanceService,
   ) {}
 
   async get(_auth: AuthContext, q: Query): Promise<Record<string, unknown>> {
@@ -68,16 +92,38 @@ export class DashboardOpsService {
     const permitRegions = await this.access.regions("permits_hse", "view");
     const gecolRegions = await this.access.regions("gecol", "view");
     const hlcRegions = await this.access.regions("hlc", "view");
+    const contractorRegions = await this.access.regions("contractors", "view");
+    const qualityRegions = await this.access.regions("quality", "view");
+    const approvalsRegions = await this.access.regions("approvals", "view");
+    const sitesRegions = await this.access.regions("sites", "view");
+    const changeRegions = await this.access.regions("change_control", "view");
+    const meetingRegions = await this.access.regions("meetings", "view");
+    const changeScope = intersect(dash, changeRegions);
+    const meetingScope = intersect(dash, meetingRegions);
+    const changesOk = changeRegions === null || changeRegions.length > 0;
+    const meetingsOk = meetingRegions === null || meetingRegions.length > 0;
     const procScope = intersect(dash, procRegions);
     const whScope = intersect(dash, whRegions);
     const permitScope = intersect(dash, permitRegions);
     const gecolScope = intersect(dash, gecolRegions);
     const hlcScope = intersect(dash, hlcRegions);
+    const qualityScope = intersect(dash, qualityRegions);
+    const approvalsScope = intersect(
+      dash,
+      intersect(approvalsRegions, sitesRegions),
+    );
     const procOk = procRegions === null || procRegions.length > 0;
     const whOk = whRegions === null || whRegions.length > 0;
     const permitsOk = permitRegions === null || permitRegions.length > 0;
     const gecolOk = gecolRegions === null || gecolRegions.length > 0;
     const hlcOk = hlcRegions === null || hlcRegions.length > 0;
+    const contractorsOk =
+      contractorRegions === null || contractorRegions.length > 0;
+    const qualityOk =
+      qualityRegions === null || qualityRegions.length > 0;
+    const approvalsOk =
+      (approvalsRegions === null || approvalsRegions.length > 0) &&
+      (sitesRegions === null || sitesRegions.length > 0);
 
     const orders = procOk ? await this.ordersSection(procScope, p.region_id ?? null) : null;
     const adv = whOk ? await this.filters.fromQuery("dashboard", q) : null;
@@ -92,6 +138,21 @@ export class DashboardOpsService {
       : null;
     const hlc = hlcOk
       ? await this.hlcSection(hlcScope, p.region_id ?? null)
+      : null;
+    const score = contractorsOk
+      ? scorecardSummary((await this.perf.reportData()).items)
+      : null;
+    const quality = qualityOk
+      ? await this.qualitySection(qualityScope, p.region_id ?? null)
+      : null;
+    const approvals = approvalsOk
+      ? await this.approvalsSection(approvalsScope, p.region_id ?? null)
+      : null;
+    const changes = changesOk
+      ? await this.changesSection(changeScope, p.region_id ?? null)
+      : null;
+    const actions = meetingsOk
+      ? await this.actionsSection(meetingScope, p.region_id ?? null)
       : null;
 
     return {
@@ -144,6 +205,49 @@ export class DashboardOpsService {
           with_gaps: permits?.ptw.with_gaps ?? null,
           gaps: permits?.ptw.gaps ?? null,
         },
+      },
+      quality: {
+        available: qualityOk,
+        snags: quality?.snags ?? null,
+        ncrs: quality?.ncrs ?? null,
+        first_pass_pct: quality?.first_pass_pct ?? null,
+      },
+      approvals: {
+        available: approvalsOk,
+        total: approvals?.total ?? null,
+        review: approvals?.review ?? null,
+        approve: approvals?.approve ?? null,
+        waiting: approvals?.waiting ?? null,
+        by_role: approvals?.by_role ?? null,
+        unassigned: approvals?.unassigned ?? null,
+      },
+      changes_meetings: {
+        available: changesOk || meetingsOk,
+        changes: {
+          available: changesOk,
+          pending: changes?.pending ?? null,
+          approved_not_applied: changes?.approved_not_applied ?? null,
+          by_kind: changes?.by_kind ?? null,
+          pending_aging: changes?.pending_aging ?? null,
+        },
+        actions: {
+          available: meetingsOk,
+          open: actions?.open ?? null,
+          overdue: actions?.overdue ?? null,
+          no_due_date: actions?.no_due_date ?? null,
+          overdue_aging: actions?.overdue_aging ?? null,
+        },
+      },
+      contractor_scorecard: {
+        available: contractorsOk,
+        parties: score?.parties ?? null,
+        by_level: score?.by_level ?? null,
+        avg_delay_days: score?.avg_delay_days ?? null,
+        on_time_pct: score?.on_time_pct ?? null,
+        quality_fail_pct: score?.quality_fail_pct ?? null,
+        snags: score?.snags ?? null,
+        quality: score?.quality ?? null,
+        worst: score?.worst ?? null,
       },
     };
   }
@@ -342,6 +446,125 @@ export class DashboardOpsService {
   }
 
   /** The open orders with their PR and PO ages, bucketed in the rules. */
+  /**
+   * The quality position (0.15.203, item 6): the snags and NCRs of the active, not cancelled sites in scope. A snag is
+   * open while its status is open, fix_uploaded or in_review; returned_open counts the open ones returned at least
+   * once (return_count over 0). An NCR is a quality record of record type ncr; it is open while it has no closed_date.
+   * The closure ages are calendar days from raised to closed, averaged over the closed ones (meanDays). The
+   * first-time acceptance is Pass over Pass + Fail of the decided inspections (result pass or fail, case and space
+   * insensitive), one decimal; the data keeps no re-inspection marker, so a re-inspected record counts like any other.
+   */
+  private async qualitySection(
+    scope: number[] | null,
+    region: number | null,
+  ): Promise<{
+    snags: { open: number; closed: number; avg_close_days: number | null; returned_open: number };
+    ncrs: { open: number; closed: number; avg_close_days: number | null };
+    first_pass_pct: number | null;
+  }> {
+    const where = (alias: string) => Prisma.sql`
+      ${scope === null ? Prisma.empty : Prisma.sql`AND ${Prisma.raw(alias)}.region_id = ANY(${scope}::int[])`}
+      ${region ? Prisma.sql`AND ${Prisma.raw(alias)}.region_id = ${region}` : Prisma.empty}`;
+    const snagCounts = await this.db.tx.$queryRaw<
+      { open: number; closed: number; returned_open: number }[]
+    >(Prisma.sql`
+      SELECT count(*) FILTER (WHERE sn.status::text IN ('open', 'fix_uploaded', 'in_review'))::int AS open,
+             count(*) FILTER (WHERE sn.status::text = 'closed')::int AS closed,
+             count(*) FILTER (WHERE sn.status::text IN ('open', 'fix_uploaded', 'in_review') AND sn.return_count > 0)::int AS returned_open
+      FROM snags sn
+      JOIN sites s ON s.id = sn.site_id AND s.region_id = sn.region_id
+      WHERE s.is_active AND s.overall_status <> 'cancelled' AND sn.status::text <> 'cancelled' ${where('sn')}`);
+    const snagAges = await this.db.tx.$queryRaw<{ days: number | null }[]>(Prisma.sql`
+      SELECT (sn.closed_at::date - sn.raised_at::date)::int AS days
+      FROM snags sn
+      JOIN sites s ON s.id = sn.site_id AND s.region_id = sn.region_id
+      WHERE s.is_active AND s.overall_status <> 'cancelled' AND sn.status::text = 'closed'
+        AND sn.closed_at IS NOT NULL ${where('sn')}`);
+    const ncrCounts = await this.db.tx.$queryRaw<
+      { open: number; closed: number; avg_close_days: number | null }[]
+    >(Prisma.sql`
+      SELECT count(*) FILTER (WHERE q.closed_date IS NULL)::int AS open,
+             count(*) FILTER (WHERE q.closed_date IS NOT NULL)::int AS closed,
+             avg((q.closed_date - q.raised_date)::int) FILTER (WHERE q.closed_date IS NOT NULL AND q.raised_date IS NOT NULL) AS avg_close_days
+      FROM quality_inspections q
+      JOIN sites s ON s.id = q.site_id AND s.region_id = q.region_id
+      WHERE s.is_active AND s.overall_status <> 'cancelled' AND lower(btrim(q.record_type)) = 'ncr' ${where('q')}`);
+    const decided = await this.db.tx.$queryRaw<{ pass: number; fail: number }[]>(Prisma.sql`
+      SELECT count(*) FILTER (WHERE lower(btrim(q.result)) = 'pass')::int AS pass,
+             count(*) FILTER (WHERE lower(btrim(q.result)) = 'fail')::int AS fail
+      FROM quality_inspections q
+      JOIN sites s ON s.id = q.site_id AND s.region_id = q.region_id
+      WHERE s.is_active AND s.overall_status <> 'cancelled' AND lower(btrim(q.result)) IN ('pass', 'fail') ${where('q')}`);
+    const sc = snagCounts[0] ?? { open: 0, closed: 0, returned_open: 0 };
+    const nc = ncrCounts[0] ?? { open: 0, closed: 0, avg_close_days: null };
+    const dc = decided[0] ?? { pass: 0, fail: 0 };
+    return {
+      snags: {
+        open: sc.open,
+        closed: sc.closed,
+        avg_close_days: meanDays(
+          snagAges.map((r) => r.days).filter((d): d is number => d !== null),
+        ),
+        returned_open: sc.returned_open,
+      },
+      ncrs: {
+        open: nc.open,
+        closed: nc.closed,
+        avg_close_days: nc.avg_close_days === null ? null : Math.round(Number(nc.avg_close_days) * 10) / 10,
+      },
+      first_pass_pct: firstPassPct(dc.pass, dc.fail),
+    };
+  }
+
+  /**
+   * The pending approvals bottleneck (0.15.204, item 7): the tasks of the active, not cancelled sites in scope whose
+   * state is in_review or in_approval (the population of the Approvals inbox), aged in calendar days from
+   * level_opened_at (falling back to updated_at, the same fallback the inbox orders by), and grouped by the
+   * ball-in-court role (approvalsByRole). A level a group holds, or nobody holds yet, has no role and counts as
+   * unassigned.
+   */
+  private async approvalsSection(
+    scope: number[] | null,
+    region: number | null,
+  ) {
+    const rows = await this.db.tx.$queryRaw<ApprovalWaitRow[]>(Prisma.sql`
+      SELECT t.ball_in_court_role_id::text AS role_id, r.name_en, r.name_ar,
+             (CURRENT_DATE - coalesce(t.level_opened_at::date, t.updated_at::date))::int AS days,
+             t.state::text AS state
+      FROM task_instances t
+      JOIN sites s ON s.id = t.site_id AND s.region_id = t.region_id
+      LEFT JOIN roles r ON r.id = t.ball_in_court_role_id
+      WHERE t.state::text IN ('in_review', 'in_approval') AND s.is_active AND s.overall_status <> 'cancelled'
+      ${scope === null ? Prisma.empty : Prisma.sql`AND t.region_id = ANY(${scope}::int[])`}
+      ${region ? Prisma.sql`AND t.region_id = ${region}` : Prisma.empty}`);
+    return approvalsByRole(rows);
+  }
+
+  /**
+   * The change requests (0.15.205, item 8): rows of change_requests in the regions in scope (a global row, with no
+   * region, is outside a regional scope like every other card), aged from request_date.
+   */
+  private async changesSection(scope: number[] | null, region: number | null) {
+    const rows = await this.db.tx.$queryRaw<ChangeWaitRow[]>(Prisma.sql`
+      SELECT c.kind::text AS kind, c.status::text AS status, (CURRENT_DATE - c.request_date)::int AS days
+      FROM change_requests c
+      WHERE c.status::text IN ('requested', 'approved')
+      ${scope === null ? Prisma.empty : Prisma.sql`AND c.region_id = ANY(${scope}::int[])`}
+      ${region ? Prisma.sql`AND c.region_id = ${region}` : Prisma.empty}`);
+    return changesSummary(rows);
+  }
+
+  /** The meeting actions not closed (0.15.205, item 8), by the region of their meeting; days overdue against the due date. */
+  private async actionsSection(scope: number[] | null, region: number | null) {
+    const rows = await this.db.tx.$queryRaw<ActionDueRow[]>(Prisma.sql`
+      SELECT a.status::text AS status, (CURRENT_DATE - a.due_date)::int AS days_overdue
+      FROM meeting_actions a JOIN meetings m ON m.id = a.meeting_id
+      WHERE a.status::text IN ('open', 'in_progress')
+      ${scope === null ? Prisma.empty : Prisma.sql`AND m.region_id = ANY(${scope}::int[])`}
+      ${region ? Prisma.sql`AND m.region_id = ${region}` : Prisma.empty}`);
+    return actionsSummary(rows);
+  }
+
   private async ordersSection(
     scope: number[] | null,
     region: number | null,

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useImportsSettings, useSetImportsSettings } from '@/api/settings';
+import { useImportsSettings, useSetImportsSettings, useSetTemplateNoticeSettings, useTemplateNoticeSettings } from '@/api/settings';
 import { errText, FormDialog } from '@/components/FormDialog';
 import { useToast } from '@/components/Toast';
 import { fieldErrors } from '@/lib/fields';
@@ -54,6 +54,52 @@ export function Imports() {
         <FormDialog open onClose={() => setOpen(false)} testid="imports-dialog" title={t('importsSettings.title')} busy={set.isPending} error={set.isError ? errText(set.error, t) : null}
           onSubmit={(reason) => set.mutate({ version: cur.version, async_rows: n, reason }, { onSuccess: () => { toast(t('settings.audited')); setOpen(false); setDraft(null); } })}>
           <p className="text-sm text-mute" data-testid="imports-confirm">{t('importsSettings.confirm', { from: cur.async_rows, to: n })}</p>
+        </FormDialog>
+      )}
+    </section>
+  );
+}
+
+/** P3 (migration 0367): the notice of a new template version. On or off, and how many days after the version is issued people are still told. Audited, with a reason. */
+export function TemplateNoticeCard() {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const q = useTemplateNoticeSettings(), set = useSetTemplateNoticeSettings();
+  const [on, setOn] = useState<boolean | null>(null);
+  const [days, setDays] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
+  if (!q.data) return <QueryFallback queries={[q]} testid="tplnotice-loading" />;
+  const cur = q.data;
+  const enabled = on ?? cur.enabled;
+  const text = days ?? String(cur.days);
+  const n = Number(text);
+  const invalid = !/^[0-9]+$/.test(text.trim()) || n < cur.min || n > cur.max;
+  const dirty = (on !== null || days !== null) && !invalid && (enabled !== cur.enabled || n !== cur.days);
+  return (
+    <section className="card mt-4 space-y-3 p-4" data-testid="page-tplnotice-settings">
+      <h2 className="font-bold">{t('tplNoticeSettings.title')}</h2>
+      <p className="text-sm text-mute">{t('tplNoticeSettings.note')}</p>
+      <label className="flex items-center gap-2 text-sm font-semibold">
+        <input type="checkbox" data-testid="tplnotice-enabled" checked={enabled} disabled={!cur.can_edit} onChange={(e) => setOn(e.target.checked)} />
+        {t('tplNoticeSettings.enabled')}
+      </label>
+      <div>
+        <label htmlFor="tplnotice-days" className="text-sm font-semibold">{t('tplNoticeSettings.days')}</label>
+        <div className="mt-1 flex items-center gap-2">
+          <input id="tplnotice-days" className="input w-24" type="number" min={cur.min} max={cur.max} step={1} dir="ltr" data-testid="tplnotice-days" value={text} disabled={!cur.can_edit || !enabled}
+            aria-invalid={invalid} onChange={(e) => setDays(e.target.value)} />
+          <span className="text-sm text-mute">{t('tplNoticeSettings.unit')}</span>
+        </div>
+        <p className="mt-1 text-xs text-mute">{t('tplNoticeSettings.hint', { min: cur.min, max: cur.max, def: cur.default_days })}</p>
+        {invalid && <p role="alert" className="mt-1 text-sm text-lateInk" data-testid="tplnotice-error">{t('importsSettings.range', { min: cur.min, max: cur.max })}</p>}
+      </div>
+      {cur.can_edit
+        ? <button className="btn btn-accent" data-testid="tplnotice-save" disabled={!dirty} onClick={() => setOpen(true)}>{t('common.save')}</button>
+        : <p className="text-sm text-mute" data-testid="tplnotice-readonly">{t('importsSettings.readonly')}</p>}
+      {open && (
+        <FormDialog open onClose={() => setOpen(false)} testid="tplnotice-dialog" title={t('tplNoticeSettings.title')} busy={set.isPending} error={set.isError ? errText(set.error, t) : null}
+          onSubmit={(reason) => set.mutate({ version: cur.version, enabled, days: n, reason }, { onSuccess: () => { toast(t('settings.audited')); setOpen(false); setOn(null); setDays(null); } })}>
+          <p className="text-sm text-mute">{t('tplNoticeSettings.confirm', { state: enabled ? t('tplNoticeSettings.on') : t('tplNoticeSettings.off'), days: n })}</p>
         </FormDialog>
       )}
     </section>

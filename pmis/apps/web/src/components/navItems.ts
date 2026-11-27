@@ -18,6 +18,8 @@ export const NAV: { key: string; to: string; icon: Concept; group: 'home' | 'wor
   { key: 'permits_hse', to: '/registers/permits_hse', icon: 'permit', group: 'registers' },
   { key: 'incidents', to: '/registers/incidents', icon: 'issue', group: 'registers' },
   { key: 'lessons_learned', to: '/registers/lessons_learned', icon: 'handover', group: 'registers' },
+  { key: 'invoices', to: '/registers/invoices', icon: 'handover', group: 'registers' },
+  { key: 'deliverables', to: '/registers/deliverables', icon: 'handover', group: 'registers' },
   { key: 'warehouse', to: '/warehouse', icon: 'warehouse', group: 'registers' },
   { key: 'quality', to: '/registers/quality', icon: 'quality', group: 'registers' },
   { key: 'issues', to: '/registers/issues', icon: 'issue', group: 'registers' },
@@ -32,7 +34,12 @@ export const NAV: { key: string; to: string; icon: Concept; group: 'home' | 'wor
   { key: 'car_dispatcher', to: '/registers/car_dispatcher', icon: 'dismantle', group: 'registers' },
   { key: 'financial_advances', to: '/registers/financial_advances', icon: 'procurement', group: 'registers' },
   { key: 'contractor_reports', to: '/reports/contractors', icon: 'report', group: 'registers' },
+  { key: 'data_hub', to: '/data-hub', icon: 'dataHub', group: 'data' },
   { key: 'templates', to: '/templates', icon: 'document', group: 'data' },
+  { key: 'master_import', to: '/templates/master-import', icon: 'compare', group: 'data' },
+  { key: 'column_mapping', to: '/templates/mapping', icon: 'columnMap', group: 'data' },
+  { key: 'data_reset', to: '/admin/settings/data/reset', icon: 'dataReset', group: 'data' },
+  { key: 'recycle_bin', to: '/admin/settings/registers/recycle', icon: 'recycleBin', group: 'data' },
   // W5 (owner decision 2026-11-23): the main menu Library, between Data entry and Administration
   { key: 'library.forms', to: '/library/forms', icon: 'forms', group: 'library' },
   { key: 'library.archive', to: '/library/archive', icon: 'archive', group: 'library' },
@@ -63,12 +70,12 @@ export const BY_GRANT: Record<string, string> = {
   'admin.security_log': 'view_security_log', 'admin.online': 'manage_users', audit: 'view_audit', 'logs.field_changes': 'view_audit', 'logs.activity_report': 'view_audit',
 };
 /** Entries shown when the caller may use any one of these modules (0.12.9, P4b: the contractors reports and the read-only match table, Q147). */
-export const ANY_OF: Record<string, string[]> = { contractor_reports: ['procurement', 'contractors'] };
+export const ANY_OF: Record<string, string[]> = { contractor_reports: ['procurement', 'contractors'], data_hub: ['templates'], column_mapping: ['templates'] };
 /**
  * Entries opened by `view` on a module that is not a screen of the server's module list (the rule of the API: a System Admin, or view on the module; a full
  * delegation holds view on every module). The System Log (owner request 2026-11-09): GET /system-log answers 403 to anyone else (log_can_read_ops).
  */
 export const BY_MODULE_VIEW: Record<string, string> = { 'logs.system': 'admin.system_log', 'library.forms': 'sites.documents', 'library.archive': 'sites.documents' };
 /** Entries only a System Admin sees (the server answers 403 to anyone else). */
-export const ADMIN_ONLY = new Set(['logs.online', 'logs.alerts', 'logs.job_runs', 'logs.deployments', 'logs.integrity', 'logs.mail']);
+export const ADMIN_ONLY = new Set(['master_import', 'data_reset', 'recycle_bin', 'logs.online', 'logs.alerts', 'logs.job_runs', 'logs.deployments', 'logs.integrity', 'logs.mail']);
 export type NavItem = (typeof NAV)[number];

@@ -19,7 +19,7 @@ import { ImportBatchesController, TemplatesController } from './templates/templa
 import { TemplatesService } from './templates/templates.service';
 import { UploadInterceptor } from './templates/upload.interceptor';
 import { RegistersController } from './registers/registers.controller';
-import { RegisterColumnsController } from './registers/register-columns.controller';
+import { RegisterColumnsController, RegisterStateController } from './registers/register-columns.controller';
 import { RegisterColumnsService } from './registers/register-columns.service';
 import { RegistersService } from './registers/registers.service';
 // P5 (migration 0057): the list catalogue
@@ -27,6 +27,7 @@ import { ListCataloguesController } from './registers/list-catalogues.controller
 import { ListCataloguesService } from './registers/list-catalogues.service';
 import { FollowController } from './follow/follow.controller';
 import { FollowService } from './follow/follow.service';
+import { PresenceController } from './presence/presence.controller';
 import { SavedViewsController } from './views/saved-views.controller';
 import { SavedViewsService } from './views/saved-views.service';
 import { FilterCatalogService } from './views/filter-catalog.service';
@@ -44,6 +45,7 @@ import { AuthController } from './auth/auth.controller';
 import { AuthService } from './auth/auth.service';
 import { LogHmacService } from './auth/log-hmac.service';
 import { PasswordService } from './auth/password.service';
+import { CspReportController } from './security/csp-report.controller';
 import { RateLimiter } from './auth/rate-limiter';
 import { SessionGuard } from './auth/session.guard';
 import { SessionService } from './auth/session.service';
@@ -61,7 +63,11 @@ import { DocsGridService } from './documents/grid.service';
 import { DocumentsService } from './documents/documents.service';
 import { LibraryService } from './documents/library.service';
 import { StorageService } from './documents/storage.service';
+import { PushController } from './push/push.controller';
+import { PushService } from './push/push.service';
 import { StorageJobsService } from './documents/storage-jobs.service';
+import { DocumentTextController } from './documents/document-text.controller';
+import { DocumentTextService } from './documents/document-text.service';
 import { ZipService } from './documents/zip.service';
 import { LibraryMenuController } from './library/library.controller';
 import { LibraryMenuService } from './library/library.service';
@@ -74,6 +80,7 @@ import { PmSchedulesController } from './registers/pm-schedules.controller';
 import { PmSchedulesService } from './registers/pm-schedules.service';
 import { DashboardController } from './dashboard/dashboard.controller';
 import { DashboardService } from './dashboard/dashboard.service';
+import { DashboardCacheInvalidator, DashboardCacheService } from './dashboard/dashboard-cache.service';
 import { DashboardSettingsController } from './dashboard/dashboard-settings.controller';
 import { DashboardSettingsService } from './dashboard/dashboard-settings.service';
 import { GoalsController } from './dashboard/goals.controller';
@@ -92,34 +99,50 @@ import { TeamScopeMatchService } from './settings/team-scope-match.service';
 import { GecolOrderWarningsController } from './settings/gecol-order-warnings.controller';
 import { GecolOrderWarningsService } from './settings/gecol-order-warnings.service';
 import { ImportsSettingsController } from './settings/imports-settings.controller';
+import { TemplateNoticeSettingsController } from './settings/template-notice-settings.controller';
+import { TemplateNoticeSettingsService } from './settings/template-notice-settings.service';
 import { KanbanController } from './kanban/kanban.controller';
 import { KanbanService } from './kanban/kanban.service';
 import { ImportsSettingsService } from './settings/imports-settings.service';
 import { NavLayoutController } from './settings/nav-layout.controller';
 import { NavLayoutService } from './settings/nav-layout.service';
+import { DeriveRulesController } from './settings/derive-rules.controller';
+import { DeriveRulesService } from './settings/derive-rules.service';
+import { MailPolicyController } from './settings/mail-policy.controller';
+import { MailPolicyService } from './settings/mail-policy.service';
 import { MailKindsController } from './settings/mail-kinds.controller';
 import { MailKindsService } from './settings/mail-kinds.service';
 import { StructuralFreezeController } from './settings/structural-freeze.controller';
 import { StructuralFreezeService } from './settings/structural-freeze.service';
-import { UiIdentityController } from './settings/ui-identity.controller';
+import { UiAssetsController, UiIdentityController, UiPublicController } from './settings/ui-identity.controller';
 import { SecurityLocksController } from './security/security-locks.controller';
 import { SecurityLocksService } from './security/security-locks.service';
+import { DownloadLocksController } from './security/download-locks.controller';
+import { DownloadLocksService } from './security/download-locks.service';
 import { SupportAccessController } from './security/support-access.controller';
 import { SupportAccessService } from './security/support-access.service';
 import { NewDeviceController } from './security/new-device.controller';
 import { NewDeviceService } from './security/new-device.service';
+import { PasskeyController, PasskeySettingController } from './security/passkeys.controller';
+import { PasskeyService } from './security/passkeys.service';
 import { ExportLockInterceptor } from './security/export-lock';
 import { UiIdentityService } from './settings/ui-identity.service';
 import { LoginPageController } from './settings/login-page.controller';
 import { LoginPageService } from './settings/login-page.service';
+import { MediaController } from './media/media.controller';
+import { MediaService } from './media/media.service';
 import { SettingsScreensController } from './settings/settings-screens.controller';
 import { SettingsScreensService } from './settings/settings-screens.service';
+import { AlertRulesController } from './settings/alert-rules.controller';
+import { AlertRulesService } from './settings/alert-rules.service';
 import { HistoricalWaiverController } from './settings/historical-waiver.controller';
 import { HistoricalWaiverService } from './settings/historical-waiver.service';
 import { DataResetController } from './settings/data-reset.controller';
 import { DataResetService } from './settings/data-reset.service';
 import { MaintenanceService } from './settings/maintenance.service';
 import { SiteMasterController } from './site-master/site-master.controller';
+import { CustomFieldsController } from './custom-fields/custom-fields.controller';
+import { CustomFieldsService } from './custom-fields/custom-fields.service';
 import { SiteMasterColumnsController } from './site-master/site-master-columns.controller';
 import { SiteMasterColumnsService } from './site-master/site-master-columns.service';
 import { SiteMasterService } from './site-master/site-master.service';
@@ -193,6 +216,8 @@ import { AbsencesController, ReassignmentController } from './reassignment/reass
 import { AbsencesService } from './reassignment/absences.service';
 import { DailyPlanController, DailyPlanSettingsController } from './daily-plan/daily-plan.controller';
 import { DailyPlanService } from './daily-plan/daily-plan.service';
+import { DataHubController } from './data-hub/data-hub.controller';
+import { DataHubService } from './data-hub/data-hub.service';
 import { ReassignmentService } from './reassignment/reassignment.service';
 import { StaffRegistryController } from './staff-registry/staff-registry.controller';
 import { StaffRegistryService } from './staff-registry/staff-registry.service';
@@ -203,14 +228,19 @@ export function appModuleFor(config: AppConfig) {
       InvitationsController, PublicInvitationsController, // 0091: before UsersController, so /users/invitations is not read as /users/{user_id}
       AuthController, MeController, EmailChangeRequestsController, PhoneChangeRequestsController, UsersController, GroupsController, DepartmentsController, MessagesController,
       AnnouncementsController, MeAnnouncementsController, RegionsController, RolesController, PermissionsController, AssignmentsController,
-      DelegationsController, SitesController, SiteDraftsController, TasksController, WorkflowEditorController, TaskDefinitionsController, CalendarController, SlaController, IssueStoppedController, RegistersController, RecycleBinController, RegisterColumnsController, MatrixController, WarehouseController, AsBuiltItemsController, NumberSequencesController,
+      DocumentTextController, PushController, DelegationsController, SitesController, SiteDraftsController, TasksController, WorkflowEditorController, TaskDefinitionsController, CalendarController, SlaController, IssueStoppedController, RegistersController, RecycleBinController, RegisterColumnsController, MatrixController, WarehouseController, AsBuiltItemsController, NumberSequencesController, RegisterStateController,
       NotificationsController, FollowController, StatusUpdatesController, InsightsController, TemplatesController, ImportBatchesController, DocumentsController, DocumentsGridController, LibraryController, SnagsController,
-      DashboardController, DashboardSettingsController, GoalsController, PmSchedulesController, DashboardOpsController, SupportAccessController, NewDeviceController, SecurityLocksController, DelayPeriodsController, WeightsController, TeamScopeMatchController, GecolOrderWarningsController, MailKindsController, ImportsSettingsController, KanbanController, NavLayoutController, HistoricalWaiverController, SiteMasterController, SiteMasterColumnsController, StructuralFreezeController, UiIdentityController, LoginPageController, SettingsScreensController, P4cController, FleetController, AuditLogController, SecurityLogController, LogsAdminController,
+      DashboardController, DashboardSettingsController, GoalsController, PmSchedulesController, DashboardOpsController, SupportAccessController, DownloadLocksController, UiPublicController, UiAssetsController, SecurityLocksController, DelayPeriodsController, WeightsController, TeamScopeMatchController, GecolOrderWarningsController, DeriveRulesController, MailKindsController, MailPolicyController, ImportsSettingsController, KanbanController, NavLayoutController, HistoricalWaiverController, SiteMasterController, SiteMasterColumnsController, CustomFieldsController, StructuralFreezeController, UiIdentityController, LoginPageController, SettingsScreensController, AlertRulesController, P4cController, FleetController, AuditLogController, SecurityLogController, LogsAdminController, NewDeviceController,
+      MediaController, // 0.15.292 (own line: the long lines above conflict on every merge)
+      PasskeySettingController, PasskeyController, // S4
+      TemplateNoticeSettingsController,
+      CspReportController, // SEC-3
       ScenarioSettingsController, SiteApplicabilityController, // P1 (0052)
       MailController, HealthController,
       ListCataloguesController,
       MasterImportController, TemplateMappingController,
       ContractorsController,
+      PresenceController,
       SavedViewsController,
       SearchController, // 0.15.17 (F4)
       ExportsController, // 0.15.34: Master-format export
@@ -219,6 +249,7 @@ export function appModuleFor(config: AppConfig) {
       StaffRegistryController, // 0.15.56 (0142): staff registry card, visibility, edit
       DataResetController, // 0.15.62 (0146): project data reset in Settings, two System Admins
       LibraryMenuController, // 0.15.70 (0151, W5): Library > Forms and Archive
+      DataHubController, // 0.15.311 (0400): Data hub landing page
     ],
     providers: [
       { provide: APP_CONFIG, useValue: config },
@@ -227,8 +258,11 @@ export function appModuleFor(config: AppConfig) {
       AccessService, AuthService, UsersRepo, MeService, NotifyAdminsService, MySessionsService, ProfileService, EmailChangesService, PhoneChangesService, UsersService, GroupsService,
       DepartmentsService, MessagesService, AnnouncementsService, IdempotencyService, RegionsService, RolesService, PermissionsService,
       AssignmentsService, DelegationsService, SitesService, SiteLocksService, SiteDraftsService, TaskViewService, TaskDetailService, WorkflowEditorService, WorkflowService, ApprovalsService, MyWorkService, OverridesService, CalendarService, SlaService, IssueStoppedService, JobsService, RegistersService, RecycleBinService, RegisterColumnsService, MatrixService, WarehouseService, WarehouseConfigService, AsBuiltItemsService,
-      NotificationsService, FollowService, StatusUpdatesService, InsightsService, TemplatesService, ImportService, ImportJobsService, UploadInterceptor, StorageService, DocumentsService, DocsGridService, LibraryService, ZipService, StorageJobsService, SnagsService,
-      DashboardService, DashboardSettingsService, GoalsService, PmSchedulesService, SiteMapService, ProjectStatusService, DelayPeriodsService, WeightsService, TeamScopeMatchService, GecolOrderWarningsService, MailKindsService, ImportsSettingsService, KanbanService, NavLayoutService, HistoricalWaiverService, SiteMasterService, SiteMasterColumnsService, StructuralFreezeService, UiIdentityService, LoginPageService, SettingsScreensService, P4cService, FleetService, LogsService, SecurityLogService, JobRunsService, MailService, IntegrityService, DashboardExtrasService, DashboardOpsService, SecurityLocksService, SupportAccessService, NewDeviceService,
+      NotificationsService, DocumentTextService, FollowService, StatusUpdatesService, InsightsService, TemplatesService, ImportService, ImportJobsService, UploadInterceptor, StorageService, DocumentsService, DocsGridService, LibraryService, ZipService, StorageJobsService, PushService, SnagsService,
+      DashboardService, DashboardSettingsService, GoalsService, PmSchedulesService, SiteMapService, ProjectStatusService, DelayPeriodsService, WeightsService, TeamScopeMatchService, GecolOrderWarningsService, DeriveRulesService, MailKindsService, MailPolicyService, ImportsSettingsService, KanbanService, NavLayoutService, HistoricalWaiverService, SiteMasterService, SiteMasterColumnsService, CustomFieldsService, StructuralFreezeService, UiIdentityService, LoginPageService, SettingsScreensService, AlertRulesService, P4cService, FleetService, LogsService, SecurityLogService, JobRunsService, MailService, IntegrityService, DashboardExtrasService, DashboardOpsService, SecurityLocksService, SupportAccessService, DownloadLocksService, NewDeviceService,
+      MediaService, // 0.15.292
+      PasskeyService, // S4
+      TemplateNoticeSettingsService,
       ScenarioService, // P1 (0052)
       ListCataloguesService,
       // P8 mails (MailPort) go through P9's mail outbox
@@ -244,7 +278,10 @@ export function appModuleFor(config: AppConfig) {
       StaffRegistryService, // 0.15.56 (0142)
       DataResetService, MaintenanceService, // 0.15.62 (0146)
       LibraryMenuService, // 0.15.70 (0151, W5)
+      DataHubService, // 0.15.311 (0400)
+      DashboardCacheService, // short cache of the /dashboard figures (30 s, scope-keyed)
       { provide: APP_GUARD, useClass: SessionGuard },
+      { provide: APP_INTERCEPTOR, useClass: DashboardCacheInvalidator }, // before TxInterceptor: clears the dashboard cache after a configuration write has committed
       { provide: APP_INTERCEPTOR, useClass: TxInterceptor },
       { provide: APP_INTERCEPTOR, useClass: ExportLockInterceptor }, // 0.15.190 (0290): after TxInterceptor, so the lock is read inside the request transaction
       { provide: APP_FILTER, useClass: ProblemFilter },

@@ -1,4 +1,5 @@
 import { Check, Download, Link2, MonitorPlay, PencilLine, Printer, RotateCcw } from "lucide-react";
+import { useDownloadGate } from '@/lib/downloadGate';
 import { useMemo, useState, type ReactNode, Fragment } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
@@ -16,10 +17,13 @@ import {
   type ExportFormat,
 } from "@/api/dashboard";
 import type { PipelineNode } from "@/api/types";
+import { useRegions } from "@/api/sites";
+import { useRegionHealth } from "@/api/x";
 import { EChart, type Palette } from "@/components/EChart";
 import { errText } from "@/components/FormDialog";
 import { Pipeline } from "@/components/Pipeline";
 import { SiteMap } from "@/components/SiteMap";
+import { ScreenSettingsLink } from "@/components/ScreenSettingsLink";
 import { EmptyState } from "@/components/States";
 import { useToast } from "@/components/Toast";
 import { streamName } from "@/lib/streams";
@@ -39,6 +43,10 @@ import { OpsProcurementCard } from "./dashboardOps";
 import { OpsScurveCard } from "./dashboardScurve";
 import { OpsPermitsCard } from "./dashboardPermits";
 import { OpsReadinessCard } from "./dashboardReadiness";
+import { OpsScorecardCard } from "./dashboardScorecard";
+import { OpsQualityCard } from "./dashboardQuality";
+import { OpsApprovalsCard } from "./dashboardApprovals";
+import { OpsChangesCard } from "./dashboardChanges";
 import { useDashboardSettings } from "@/api/dashboardSettings";
 import { GoalsPanel } from "@/components/GoalsPanel";
 import { SavedViews } from "@/components/SavedViews";
@@ -55,6 +63,7 @@ import {
   writeRemembered,
   type DashTab,
 } from "./dashboardTabs";
+import { DateInput } from '@/components/DateInput';
 
 type DashMilestone = Dash["pipeline"]["nodes"][number];
 const STATUSES = [
@@ -530,6 +539,7 @@ function F13Panel({
 const DASH_VIEW_EMPTY = { region_id: "", cluster_code: "", scenario: "", stream: "", view: "" };
 
 export function Dashboard() {
+  const gate = useDownloadGate();
   const { t, i18n } = useTranslation();
   const ar = i18n.language === "ar";
   const [issuesBy, setIssuesBy] = useState<"owner" | "category" | "reason">("owner");
@@ -983,7 +993,7 @@ export function Dashboard() {
   if (dash.isError && !d) {
     return (
       <div data-testid="page-dashboard">
-        <h1 className="mb-3 text-2xl font-bold">{t("dash.title")}</h1>
+        <div className="mb-3 flex flex-wrap items-center gap-2"><h1 className="text-2xl font-bold">{t("dash.title")}</h1><span className="ms-auto"><ScreenSettingsLink screen="dashboard" /></span></div>
         <EmptyState
           title={
             dash.error instanceof Error &&
@@ -1092,6 +1102,7 @@ export function Dashboard() {
               {t("common.loading")}
             </span>
           )}
+          <span className="ms-auto print:hidden"><ScreenSettingsLink screen="dashboard" /></span>
         </div>
         <p className="text-mute">{t("dash.subtitle")}</p>
       </header>
@@ -1200,8 +1211,7 @@ export function Dashboard() {
         </label>
         <label className="text-sm font-semibold">
           {t("dash.ref_date")}
-          <input
-            type="date"
+          <DateInput
             className="input mt-1 w-auto font-normal"
             data-testid="dash-ref-date"
             max={today}
@@ -1290,6 +1300,8 @@ export function Dashboard() {
               <button
                 className="btn print:hidden"
                 data-testid="dash-print"
+                disabled={gate.exportLocked}
+                title={gate.note(gate.exportLocked)}
                 onClick={() => window.print()}
               >
                 <Printer size={16} />
@@ -1423,6 +1435,34 @@ export function Dashboard() {
                 <>
                   {/* 0.15.201 (owner approval 2026-11-26, item 4): GECOL/HLC readiness, the waiting sites by age, civilly ready but not electrified */}
                   <OpsReadinessCard ops={ops.data} />
+                </>
+              ),
+
+              ops_contractors: (
+                <>
+                  {/* 0.15.202 (owner approval 2026-11-26, item 5): the contractor and supplier scorecard - levels, on-time rectification, avg delay, rejection, no amounts */}
+                  <OpsScorecardCard ops={ops.data} />
+                </>
+              ),
+
+              ops_quality: (
+                <>
+                  {/* 0.15.203 (owner approval 2026-11-26, item 6): open snags and NCR, average closure age, first-time acceptance */}
+                  <OpsQualityCard ops={ops.data} />
+                </>
+              ),
+
+              ops_approvals: (
+                <>
+                  {/* 0.15.204 (owner approval 2026-11-26, item 7): tasks waiting review or approval, ages per ball-in-court role */}
+                  <OpsApprovalsCard ops={ops.data} />
+                </>
+              ),
+
+              ops_changes: (
+                <>
+                  {/* 0.15.205 (owner approval 2026-11-26, item 8): pending change requests and overdue meeting actions */}
+                  <OpsChangesCard ops={ops.data} />
                 </>
               ),
 
@@ -2580,11 +2620,62 @@ export function Dashboard() {
                   </Card>
                 </>
               ),
+
+              region_health: <RegionHealthCard />,
             },
           )}
         </>
       )}
     </div>
+  );
+}
+
+const REGION_HEALTH_TONE: Record<string, string> = { on_track: "bg-openBg text-openInk", at_risk: "bg-waitBg text-waitInk", off_track: "bg-lateBg text-lateInk" };
+
+/** Item 12 (0.15.241): the region health card — the current-week Weekly-status health of every visible region, with the missing-update flag. */
+function RegionHealthCard() {
+  const { t, i18n } = useTranslation();
+  const q = useRegionHealth();
+  const regions = useRegions();
+  const name = (id: number) => { const r = regions.data?.find((x) => x.id === id); return (i18n.language === "ar" && r?.name_ar) || r?.name_en || String(id); };
+  return (
+    <Card title={t("dash.region_health.title")} testid="dash-region-health">
+      {!q.data ? (
+        <p className="text-mute" role="status" data-testid="dash-region-health-loading">
+          {t("common.loading")}
+        </p>
+      ) : (
+        <>
+          <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {q.data.items.map((r) => (
+              <li
+                key={r.region_id}
+                className="flex items-center gap-2 rounded-lg border border-line px-2 py-1"
+                data-testid={`dash-region-health-${r.region_id}`}
+                data-health={r.health ?? "missing"}
+              >
+                <span className="font-semibold">{name(r.region_id)}</span>
+                {r.health ? (
+                  <span className={`chip ${REGION_HEALTH_TONE[r.health]}`} data-testid={`dash-region-health-chip-${r.region_id}`}>
+                    {t(`weekly.health_${r.health}`)}
+                  </span>
+                ) : (
+                  <span className="chip bg-waitBg text-waitInk" data-testid={`dash-region-health-chip-${r.region_id}`}>
+                    {t("weekly.missing_update")}
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-sm">
+            <Link className="hover:underline" to="/status-updates" data-testid="dash-region-health-link">
+              {t("dash.region_health.open")}
+            </Link>
+            <span className="text-mute"> · {t("dash.region_health.week", { date: q.data.week_start })}</span>
+          </p>
+        </>
+      )}
+    </Card>
   );
 }
 

@@ -7,6 +7,7 @@ import { errText } from '@/components/FormDialog';
 import { ErrorState, LoadingSkeleton } from '@/components/States';
 import { useToast } from '@/components/Toast';
 import { tripoliToday } from '@/lib/today';
+import { DateInput } from '@/components/DateInput';
 
 /**
  * The form of one new value (Q118): a percentage, an effective date (today or earlier), a reason and its source (Q176). A date before the current
@@ -34,7 +35,7 @@ function AddValue({ item, onDone, openFrom, canCorrect }: { item: ManualItem; on
         <input type="number" min={0} max={100} step="0.001" inputMode="decimal" className="input mono" data-testid="manual-value" value={value} onChange={(e) => setValue(e.target.value)} required />
       </label>
       <label className="text-sm">{t('manual.effective_date')}
-        <input type="date" className="input mono" max={today} min={minDate} data-testid="manual-date" value={date} onChange={(e) => setDate(e.target.value)} required />
+        <DateInput className="input mono" max={today} min={minDate} data-testid="manual-date" value={date} onChange={(e) => setDate(e.target.value)} required />
       </label>
       <label className="text-sm">{t('manual.reason')}
         <input className="input" data-testid="manual-reason" value={reason} minLength={3} maxLength={1000} onChange={(e) => setReason(e.target.value)} required />
@@ -81,14 +82,14 @@ function SetPlan({ item, onDone }: { item: ManualItem; onDone: () => void }) {
       </div>
       {mode === 'target' ? (
         <div className="grid gap-2 sm:grid-cols-2">
-          <label className="text-sm">{t('manual.start_date')}<input type="date" className="input mono" data-testid="plan-start" value={start} max={target || undefined} onChange={(e) => setStart(e.target.value)} /></label>
-          <label className="text-sm">{t('manual.target_date')}<input type="date" className="input mono" data-testid="plan-target" value={target} min={start || undefined} onChange={(e) => setTarget(e.target.value)} required /></label>
+          <label className="text-sm">{t('manual.start_date')}<DateInput className="input mono" data-testid="plan-start" value={start} max={target || undefined} onChange={(e) => setStart(e.target.value)} /></label>
+          <label className="text-sm">{t('manual.target_date')}<DateInput className="input mono" data-testid="plan-target" value={target} min={start || undefined} onChange={(e) => setTarget(e.target.value)} required /></label>
         </div>
       ) : (
         <ol className="space-y-1" data-testid="plan-points">
           {points.map((x, i) => (
             <li key={i} className="flex flex-wrap items-end gap-2">
-              <label className="text-sm">{t('manual.point_date')}<input type="date" className="input mono" data-testid={`plan-point-date-${i}`} value={x.date} onChange={(e) => setPoints((ps) => ps.map((y, j) => (j === i ? { ...y, date: e.target.value } : y)))} /></label>
+              <label className="text-sm">{t('manual.point_date')}<DateInput className="input mono" data-testid={`plan-point-date-${i}`} value={x.date} onChange={(e) => setPoints((ps) => ps.map((y, j) => (j === i ? { ...y, date: e.target.value } : y)))} /></label>
               <label className="text-sm">{t('manual.point_pct')}<input type="number" min={0} max={100} step="0.001" className="input mono w-28" data-testid={`plan-point-pct-${i}`} value={x.pct} onChange={(e) => setPoints((ps) => ps.map((y, j) => (j === i ? { ...y, pct: e.target.value } : y)))} /></label>
               {points.length > 1 && <button type="button" className="btn px-2" aria-label={t('manual.remove_point')} onClick={() => setPoints((ps) => ps.filter((_, j) => j !== i))}>×</button>}
             </li>

@@ -239,8 +239,8 @@ describe('the scope of a request (0.15.71)', () => {
   it('the dry run of a scope counts per part and per table; the database adds the dependent parts', async () => {
     const res = await admin1.api.call('get', '/settings/data-reset/plan?parts=procurement');
     expect(res.status).toBe(200);
-    expect(res.body.scope).toMatchObject({ requested: ['procurement'], parts: ['car_dispatcher', 'financial_advances', 'procurement'],
-      added: ['car_dispatcher', 'financial_advances'], everything: false });
+    expect(res.body.scope).toMatchObject({ requested: ['procurement'], parts: ['car_dispatcher', 'financial_advances', 'invoices', 'procurement'],
+      added: ['car_dispatcher', 'financial_advances', 'invoices'], everything: false });
     const tables = new Map<string, { delete: number; keep: number }>(res.body.tables.map((t: { table: string }) => [t.table, t]));
     expect(tables.get('sites')).toMatchObject({ delete: 0 });
     expect(tables.get('procurement_records')).toMatchObject({ delete: 1 });
@@ -273,7 +273,7 @@ describe('the scope of a request (0.15.71)', () => {
     id = res.body.id;
     hash = res.body.scope_hash;
     expect(hash).toMatch(/^[0-9a-f]{64}$/);
-    expect(res.body.scope).toMatchObject({ parts: ['car_dispatcher', 'financial_advances', 'procurement'], added: ['car_dispatcher', 'financial_advances'] });
+    expect(res.body.scope).toMatchObject({ parts: ['car_dispatcher', 'financial_advances', 'invoices', 'procurement'], added: ['car_dispatcher', 'financial_advances', 'invoices'] });
     expect(res.body.plan_at_request.parts).toMatchObject({ procurement: expect.any(Number), car_dispatcher: expect.any(Number) });
     const row = await q<{ requested_parts: string[]; scope_hash: string }>(db, 'SELECT requested_parts, scope_hash FROM data_reset_requests WHERE id = $1', [id]);
     expect(row[0]).toMatchObject({ requested_parts: ['procurement'], scope_hash: hash });
@@ -293,6 +293,44 @@ describe('the scope of a request (0.15.71)', () => {
     await expect(db.query(`UPDATE data_reset_requests SET requested_parts = ARRAY['users'] WHERE id = $1`, [id])).rejects.toThrow(/never changes/);
     await expect(db.query(`UPDATE data_reset_requests SET approved_scope_hash = $2 WHERE id = $1`, [id, 'b'.repeat(64)])).rejects.toThrow(/never changes|data_reset_scope_bound/);
     const c = await post(admin1, `/requests/${id}/cancel`, { reason: 'Scope test only' }, etag(ok));
+    expect(c.status).toBe(200);
+  });
+
+  it('narrowing (migration 0370): the dry run counts only the matching records, the filter is bound into the scope hash, and parts that cannot follow one record refuse it', async () => {
+    const count = async (q2: string) => {
+      const r = await admin1.api.call('get', `/settings/data-reset/plan?${q2}`);
+      expect(r.status).toBe(200);
+      return r;
+    };
+    const whole = await count('parts=procurement');
+    const tripoli = await count('parts=procurement&regions=1');
+    const nowhere = await count('parts=procurement&from=2100-01-01&to=2100-12-31');
+    const unknownRegion = await admin1.api.call('get', '/settings/data-reset/plan?parts=procurement&regions=999');
+    expect(unknownRegion.status).toBe(422);
+    expect(unknownRegion.body.code).toBe('validation_failed');
+    const rows = (r: { body: { plan?: unknown; tables?: { table: string; delete: number }[] } }, t: string) =>
+      (r.body.tables ?? []).find((x) => x.table === t)?.delete ?? 0;
+    expect(rows(whole, 'procurement_records')).toBe(1);
+    expect(rows(tripoli, 'procurement_records')).toBe(1);
+    expect(rows(nowhere, 'procurement_records')).toBe(0);
+    expect(rows(nowhere, 'register_records')).toBe(0);
+    expect(tripoli.body.scope.narrow).toMatchObject({ regions: [1] });
+    expect(tripoli.body.scope.hash).not.toBe(whole.body.scope.hash);
+    expect((await count('parts=procurement&from=2000-01-01&to=2100-01-01')).body.tables.find((x: { table: string }) => x.table === 'procurement_records').delete).toBe(1);
+    const sitesNarrow = await admin1.api.call('get', '/settings/data-reset/plan?parts=sites&regions=1');
+    expect(sitesNarrow.status).toBeGreaterThanOrEqual(400);
+    expect(sitesNarrow.status).toBeLessThan(500);
+    const opts = await admin1.api.call('get', '/settings/data-reset/narrow-options?part=procurement');
+    expect(opts.status).toBe(200);
+    expect(opts.body.regions.length).toBeGreaterThan(0);
+    expect((await plain.api.call('get', '/settings/data-reset/narrow-options')).status).toBe(403);
+    // the request stores the filter in its scope, bound into the hash the approver approves
+    const r = await post(admin1, '/requests', { reason: 'Narrow scope synthetic test', confirm_text: phrase, parts: ['procurement'], narrow: { regions: [1] } });
+    expect(r.status).toBe(201);
+    expect(r.body.scope.narrow).toMatchObject({ regions: [1] });
+    expect(r.body.scope_hash).toBe(tripoli.body.scope.hash);
+    await expect(db.query(`UPDATE data_reset_requests SET scope = jsonb_set(scope, '{narrow}', '{"regions":[2]}') WHERE id = $1`, [r.body.id])).rejects.toThrow();
+    const c = await post(admin1, `/requests/${r.body.id}/cancel`, { reason: 'Narrow scope test only' }, etag(r));
     expect(c.status).toBe(200);
   });
 });

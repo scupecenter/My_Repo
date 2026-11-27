@@ -1,4 +1,7 @@
-import type { RegisterDefinition, RegisterField, RegisterKey, RegisterRecordStep, UserRef } from '@/api/types';
+import type { RegisterDefinition, RegisterField, RegisterKey, RegisterRecord, RegisterRecordStep, UserRef } from '@/api/types';
+
+/** A date twenty days ahead of today, so the relative-date cell (item 15) shows in the seed whatever the day is. */
+const REL_PLUS_20 = (() => { const d = new Date(); d.setDate(d.getDate() + 20); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })();
 
 /**
  * Mock register catalogue and seed rows (synthetic). Field codes, values, sections and required flags are the ones the API serves from
@@ -23,6 +26,7 @@ const procurement: RegisterDefinition = {
     F('po_wo_no', 'PO / WO No.', 'رقم أمر الشراء / العمل', 'text', 'Order', { in_list: true }), F('po_wo_date', 'PO / WO Date', 'تاريخ أمر الشراء / العمل', 'date', 'Order', { in_list: true }),
     F('team_id', 'Team', 'الفريق', 'text', 'Assignment'),
     F('order_status', 'Order Status', 'حالة الطلب', 'list', 'Status and remark', { required: true, in_list: true }),
+    { ...F('receipt_pct', 'Received', 'نسبة الاستلام', 'number', 'Status and remark', { in_list: true }), type: 'percentage' as FT, is_custom: true },
     F('remark', 'Remark', 'ملاحظات', 'text', 'Status and remark'),
   ],
 };
@@ -66,7 +70,9 @@ const permits: RegisterDefinition = {
       { value: 'CW', label_en: 'Civil Works (CW)', label_ar: 'الأعمال المدنية (CW)' }, { value: 'TE', label_en: 'Installation (TE)', label_ar: 'التركيب (TE)' },
       { value: 'ACQ', label_en: 'Acquisition / RF & Design', label_ar: 'الاستحواذ / التصميم' }, { value: 'OM', label_en: 'O&M', label_ar: 'التشغيل والصيانة' }] },
     F('applied_date', 'Applied / Requested', 'تاريخ التقديم', 'date', 'Permit'),
-    F('status', 'Status', 'الحالة', 'list', 'Permit', { required: true, in_list: true, options: ['Applied', 'Approved', 'Rejected', 'N/A'] }),
+    { ...F('status', 'Status', 'الحالة', 'list', 'Permit', { required: true, in_list: true }), options: [
+      { value: 'Applied', label_en: 'Applied', label_ar: 'مقدَّم', colour: '#d97706' }, { value: 'Approved', label_en: 'Approved', label_ar: 'معتمد', colour: '#15803d' },
+      { value: 'Rejected', label_en: 'Rejected', label_ar: 'مرفوض', colour: '#b91c1c' }, { value: 'N/A', label_en: 'N/A', label_ar: 'لا ينطبق', colour: '#6b7280' }] },
     F('has_expiry', 'Has expiry date', 'له تاريخ انتهاء', 'yes_no', 'Validity', { in_list: true }), F('valid_from', 'Valid From', 'ساري من', 'date', 'Validity', { in_list: true }), F('valid_to', 'Valid To', 'ساري حتى', 'date', 'Validity', { in_list: true }),
     F('na_reason', 'N/A Reason', 'سبب عدم الانطباق', 'text', 'N/A'), F('na_approved_by', 'N/A Approved By', 'معتمد عدم الانطباق', 'text', 'N/A', { read_only: true }),
     F('jsa_tra', 'JSA / TRA', 'JSA / TRA', 'list', 'PTW checks'), F('toolbox_talk', 'Toolbox Talk', 'Toolbox Talk', 'list', 'PTW checks'), F('work_at_height', 'Work at Height', 'العمل على المرتفعات', 'list', 'PTW checks'),
@@ -198,15 +204,52 @@ export const incidents: RegisterDefinition = {
     F('remark', 'Remark', 'ملاحظات', 'text', 'Remark'),
   ],
 };
+// Migration 0326 (Q71): Deliverables, the manual log behind the Project Status items; linked to a task and a gate of the site.
+export const deliverables: RegisterDefinition = {
+  register_key: 'deliverables', name_en: 'Deliverables', name_ar: 'المخرجات', module_key: 'deliverables', site_scoped: true, multiple_per_site: true, approval_levels: 2,
+  fields: [
+    F('deliverable_no', 'Deliverable No.', 'رقم المخرج', 'text', 'Deliverable', { required: true, in_list: true }),
+    F('deliverable_kind', 'Kind', 'النوع', 'list', 'Deliverable', { required: true, in_list: true, options: ['HLD', 'DOC', 'NMS-S', 'BILL', 'PILOT', 'NMS-I', 'NMS-A', 'TRN'] }),
+    F('title', 'Title', 'العنوان', 'text', 'Deliverable', { required: true, in_list: true }),
+    F('task_code', 'Task', 'المهمة', 'text', 'Links', { in_list: true }),
+    F('gate_code', 'Gate', 'البوابة', 'text', 'Links', { in_list: true }),
+    F('due_date', 'Due Date', 'تاريخ الاستحقاق', 'date', 'Acceptance', { in_list: true }),
+    F('submitted_date', 'Submitted Date', 'تاريخ التقديم', 'date', 'Acceptance', { in_list: true }),
+    F('accepted_date', 'Accepted Date', 'تاريخ القبول', 'date', 'Acceptance', { in_list: true }),
+    F('acceptance_ref', 'Acceptance Ref.', 'مرجع القبول', 'text', 'Acceptance', { required: true, in_list: true }),
+    F('deliverable_state', 'Deliverable state', 'حالة المخرج', 'list', 'Acceptance', { in_list: true, options: ['Planned', 'Submitted', 'Accepted', 'Rejected', 'Cancelled'] }),
+    F('remark', 'Remark', 'ملاحظات', 'text', 'Remark'),
+  ],
+};
+// Owner approval 2026-11-27 (migration 0185): Invoices, the supplier and contractor invoices from receipt to payment.
+export const invoices: RegisterDefinition = {
+  register_key: 'invoices', name_en: 'Invoices', name_ar: 'الفواتير', module_key: 'invoices', site_scoped: true, multiple_per_site: true, approval_levels: 2,
+  fields: [
+    F('invoice_no', 'Invoice No.', 'رقم الفاتورة', 'text', 'Invoice', { required: true, in_list: true }),
+    F('invoice_kind', 'Kind', 'النوع', 'list', 'Invoice', { in_list: true, options: ['Supplier', 'Contractor', 'Service', 'Other'] }),
+    F('supplier', 'Supplier / Contractor', 'المورّد / المقاول', 'text', 'Invoice', { in_list: true }),
+    F('procurement_record_id', 'Order (Procurement record)', 'الطلب (سجل المشتريات)', 'text', 'Invoice'),
+    F('invoice_date', 'Invoice Date', 'تاريخ الفاتورة', 'date', 'Invoice', { required: true, in_list: true }),
+    F('received_date', 'Received Date', 'تاريخ الاستلام', 'date', 'Invoice', { in_list: true }),
+    F('due_date', 'Due Date', 'تاريخ الاستحقاق', 'date', 'Invoice', { in_list: true }),
+    F('amount', 'Amount (LYD)', 'المبلغ (دينار)', 'number', 'Amount', { required: true, in_list: true }),
+    F('invoice_state', 'Invoice state', 'حالة الفاتورة', 'list', 'Amount', { in_list: true, options: ['Received', 'UnderReview', 'Approved', 'Paid', 'Disputed', 'Cancelled'] }),
+    F('paid_date', 'Paid Date', 'تاريخ الدفع', 'date', 'Payment', { in_list: true }),
+    F('payment_ref', 'Payment reference', 'مرجع الدفع', 'text', 'Payment'),
+    F('remark', 'Remark', 'ملاحظات', 'text', 'Remark'),
+  ],
+};
 export const REGISTER_DEFS: RegisterDefinition[] = [
   procurement, contractors, gecol, hlc, permits,
   more('warehouse', 'Warehouse', 'المخزن', 'warehouse', false, ['te_dn', 'cw_dn', 'te_rn', 'cw_rn', 'pl', 'open', 'adj']),
   more('quality', 'Quality', 'الجودة', 'quality', true, ['qc', 'snag', 'itp', 'ncr']), more('issues', 'Issue Log', 'سجل المشاكل', 'issues', true), more('risks', 'Risk Register', 'سجل المخاطر', 'risks', false),
   more('change_control', 'Change Control', 'ضبط التغيير', 'change_control', true), more('readiness_handover', 'Readiness & Handover', 'الجاهزية والتسليم', 'readiness', true),
   more('as_built', 'As-Built', 'كما نُفّذ', 'as_built', true, ['cw_part', 'te_part']), meetings,
-  more('rf_design', 'RF Design', 'تصميم RF', 'rf_design', true), more('acquisition', 'Acquisition', 'الاستحواذ', 'acquisition', true), dismantle, carDispatcher, financialAdvances, incidents, lessonsLearned,
+  more('rf_design', 'RF Design', 'تصميم RF', 'rf_design', true), more('acquisition', 'Acquisition', 'الاستحواذ', 'acquisition', true), dismantle, carDispatcher, financialAdvances, incidents, lessonsLearned, invoices, deliverables,
 ];
 /** The template of each register (contract 0.7.0: one `TPL-*` per register, issued by the database). Only these four have a sample upload in the mock. */
+// 0.15.240: intake triage on the Issue Log and the Change Control Log (RegisterDefinition.triage_enabled)
+for (const d of REGISTER_DEFS) if (d.register_key === 'issues' || d.register_key === 'change_control') d.triage_enabled = true;
 export const REGISTER_TEMPLATES: Record<string, RegisterKey> = { 'TPL-PROCUREMENT': 'procurement', 'TPL-GECOL': 'gecol', 'TPL-HLC': 'hlc', 'TPL-PERMITS': 'permits_hse' };
 /** Contract 0.11.5: one Site Register template per stream, and the whole Master (kind master). */
 export const STREAM_TEMPLATES: Record<string, 'DESIGN_ACQ' | 'CW' | 'TE' | 'CLOSURE'> = { 'TPL-DESIGN-ACQ': 'DESIGN_ACQ', 'TPL-CIVIL': 'CW', 'TPL-INSTALL': 'TE', 'TPL-CLOSURE': 'CLOSURE' };
@@ -214,6 +257,8 @@ export const TEMPLATE_OF_REGISTER: Record<string, string> = {
   procurement: 'TPL-PROCUREMENT', contractors: 'TPL-CONTRACTORS', rf_design: 'TPL-RF', acquisition: 'TPL-ACQUISITION', gecol: 'TPL-GECOL', hlc: 'TPL-HLC', permits_hse: 'TPL-PERMITS', warehouse: 'TPL-WAREHOUSE',
   quality: 'TPL-QUALITY', issues: 'TPL-ISSUES', risks: 'TPL-RISKS', change_control: 'TPL-CHANGES', readiness_handover: 'TPL-READINESS', as_built: 'TPL-AS-BUILT', meetings: 'TPL-MEETINGS', dismantle: 'TPL-DISMANTLE',
   lessons_learned: 'TPL-LESSONS-LEARNED',
+  invoices: 'TPL-INVOICES',
+  deliverables: 'TPL-DELIVERABLES',
   incidents: 'TPL-INCIDENTS',
 };
 
@@ -235,6 +280,8 @@ export type MockRecord = {
   external_party?: { id: string; name: string; type: 'cw_contractor' | 'te_vendor' | 'gecol' | 'hlc' | 'supplier' | 'landlord' | 'other' } | null;
   /** 0063 (Q150): the HLC purchase requests (Procurement entity ids) an HLC record names. */
   pr_links?: string[];
+  /** 0.15.240: the intake triage of a record of a triage-enabled register (Issue Log, Change Control). */
+  triage?: RegisterRecord['triage'];
 };
 export type MockBatchRow = {
   id: string; row_no: number; key: string; action: 'create' | 'update' | 'unchanged' | 'error'; decision: 'pending' | 'approved' | 'rejected' | 'pending_previous_approval';
@@ -283,16 +330,16 @@ const rec = (key: RegisterKey, type: string | null, site: number, state: MockRec
 export function initRegisters() {
   n = 0;
   const records: MockRecord[] = [
-    rec('procurement', 'pr', 0, 'approved', { scope: 'CW', delivery: 'Outsourced', pr_no: 'PR-2026-014', pr_date: '2026-09-02', order_status: 'Open' }, { task: { id: task(0, 4), task_code: 'B1' } }),
-    rec('procurement', 'po', 1, 'in_review', { scope: 'CW', delivery: 'Outsourced', pr_no: 'PR-2026-015', pr_date: '2026-09-05', po_wo_no: 'PO-2026-031', po_wo_date: '2026-09-12', order_status: 'Issued' }),
-    rec('procurement', 'wo', 2, 'entry', { scope: 'Site Adaption', delivery: 'In-House', po_wo_no: 'WO-2026-007', po_wo_date: '2026-09-20', order_status: 'Open' }),
+    rec('procurement', 'pr', 0, 'approved', { scope: 'CW', delivery: 'Outsourced', pr_no: 'PR-2026-014', pr_date: '2026-09-02', order_status: 'Open', receipt_pct: 80 }, { task: { id: task(0, 4), task_code: 'B1' } }),
+    rec('procurement', 'po', 1, 'in_review', { scope: 'CW', delivery: 'Outsourced', pr_no: 'PR-2026-015', pr_date: '2026-09-05', po_wo_no: 'PO-2026-031', po_wo_date: '2026-09-12', order_status: 'Issued', receipt_pct: 45 }),
+    rec('procurement', 'wo', 2, 'entry', { scope: 'Site Adaption', delivery: 'In-House', po_wo_no: 'WO-2026-007', po_wo_date: '2026-09-20', order_status: 'Open', receipt_pct: 10 }),
     rec('procurement', 'pr', 3, 'in_approval', { scope: 'Tower Erection', delivery: 'Outsourced', pr_no: 'PR-2026-019', pr_date: '2026-09-18', order_status: 'Open' }),
     rec('gecol', null, 0, 'approved', { pr_no: 'GPR-2026-002', request_date: '2026-08-10', survey_date: '2026-08-20', notice_date: '2026-09-01', installation_finish: '2026-09-25', meter_no: 'M-77120', power_on_date: '2026-10-02' }, { task: { id: task(0, 13), task_code: 'C2' } }),
     rec('gecol', null, 4, 'entry', { pr_no: 'GPR-2026-009', request_date: '2026-10-01', survey_date: '2026-10-01', notice_date: '2026-10-08' }),
     rec('hlc', null, 1, 'in_review', { pr_no: 'HPR-2026-044', hlc_approval_date: '2026-09-14', procurement_record_id: recId(14), fiber_uplink: 'Exchange Ain Zara', fiber_status: 'In Progress', internal_fiber_team: 'HLC Team 1', link_received_date: '2026-09-28', installation_date: '2026-10-05' }),
     // entered before migration 0042: the old request fields stay readable (legacy), the request is not yet in Procurement
     rec('hlc', null, 5, 'approved', { request_no: 'HLC-2026-031', request_date: '2026-08-14', fiber_status: 'Installed', installation_date: '2026-09-02', tx_link_tested_date: '2026-09-09' }),
-    rec('permits_hse', null, 0, 'approved', { permit_type: 'Access - CW', applied_date: '2026-09-01', status: 'Approved', valid_from: '2026-09-10', has_expiry: true, valid_to: '2027-03-10' }),
+    rec('permits_hse', null, 0, 'approved', { permit_type: 'Access - CW', applied_date: '2026-09-01', status: 'Approved', valid_from: '2026-09-10', has_expiry: true, valid_to: REL_PLUS_20 }),
     rec('permits_hse', null, 2, 'entry', { permit_type: 'PTW - CW', applied_date: '2026-10-10', status: 'Applied', has_expiry: true, jsa_tra: 'Done', stop_work: false }),
     rec('permits_hse', null, 3, 'approved', { permit_type: 'Civil Aviation Authority Permit', applied_date: '2026-08-01', status: 'Approved', valid_from: '2026-08-15', has_expiry: false }),
     rec('dismantle', 'cw', 0, 'approved', { rfd_date: '2026-09-15', dismantle_reason: 'Swap', work_start_date: '2026-09-20', work_end_date: '2026-09-24', closing_rn_ref: 'RN-2026-0042', closed: true }),
@@ -307,6 +354,10 @@ export function initRegisters() {
       { external_party: { id: 'e0000000-0000-4000-8000-000000000061', name: 'Desert Lift Services (synthetic)', type: 'cw_contractor' } }),
     // contract 0.13.2 (Q267): (recId(17)) an approved Quality snag record; a System Admin can cancel it if it was entered by mistake
     rec('quality', 'snag', 0, 'approved', { record_code: 'QS-2026-001', stage: 'CW QC', description: 'Grout missing at the base', severity: 'MAJOR', raised_date: '2026-10-10' }),
+    // 0.15.240: Issue Log intake triage (recId(18) waits for a decision, recId(19) was deferred, recId(20) was accepted and is in the normal flow)
+    rec('issues', null, 0, 'entry', { category: 'Quality', description: 'Cracked fence base', raised_date: '2026-10-18' }, { triage: { state: 'pending', note: null, at: null, duplicate_of: null } }),
+    rec('issues', null, 1, 'entry', { category: 'Access', description: 'The landlord blocks the gate', raised_date: '2026-10-15' }, { triage: { state: 'deferred', note: 'Wait for the site visit', by: { id: 'u-1509', display_name: 'Mona Fathi' }, at: '2026-10-16T09:00:00Z', duplicate_of: null } }),
+    rec('issues', null, 2, 'in_review', { category: 'Material', description: 'Wrong antenna delivered', raised_date: '2026-10-10' }, { triage: { state: 'accepted', note: null, by: { id: 'u-1509', display_name: 'Mona Fathi' }, at: '2026-10-11T09:00:00Z', duplicate_of: null } }),
   ];
   return { records, batches: [] as MockBatch[], seq: 100 };
 }

@@ -20,6 +20,25 @@ const ROUTES: [file: string, route: string][] = [
   ['logs/logs.controller.ts', "@Get('reports/activity')"],
 ];
 
+/** S1b (migration 0293): the downloads that are not exports of data carry a category, gated by their own switch (off by default). */
+const CATEGORY_ROUTES: [file: string, route: string, category: string][] = [
+  ['templates/templates.controller.ts', "@Get(':templateId/download')", 'templates'],
+  ['documents/documents.controller.ts', "@Get('files/:id/download')", 'uploaded_files'],
+  ['library/library.controller.ts', "@Get('library/generated/:id/download')", 'generated_documents'],
+  ['master-import/master-import.controller.ts', "@Get('runs/:id/file')", 'uploaded_files'],
+];
+
+describe('download category routes carry @ExportAction({ category })', () => {
+  for (const [file, route, category] of CATEGORY_ROUTES) {
+    it(`${file} ${route} is ${category}`, () => {
+      const lines = readFileSync(join(SRC, file), 'utf8').split('\n');
+      const i = lines.findIndex((l) => l.trim() === route);
+      expect(i).toBeGreaterThan(0);
+      expect(lines[i - 1]).toContain(`@ExportAction({ category: '${category}'`);
+    });
+  }
+});
+
 describe('export routes carry @ExportAction()', () => {
   for (const [file, route] of ROUTES) {
     it(`${file} ${route}`, () => {

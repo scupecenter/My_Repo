@@ -16,12 +16,12 @@ export { staffRef, uid };
 
 /** Accounts offered on the fake Microsoft page. `linked=false` = first sign-in (needs employee ID). */
 export const ACCOUNTS: Record<string, { employee_id: string | null; name: string; email: string; status: 'active' | 'pending_assignment'; nav: string[] }> = {
-  pm: { employee_id: '1001', name: 'Demo User 01', email: 'demo.user.01@example.com', status: 'active', nav: ['my_work', 'daily_plan', 'inbox', 'workload', 'status_updates', 'approvals', 'sites', 'dashboard', 'templates', 'admin.users', 'admin.roles', 'admin.groups', 'admin.delegation', 'absence', 'admin.matrix', 'admin.settings', 'admin.security_log', 'audit', 'messages', 'announcements', 'procurement', 'gecol', 'hlc', 'permits_hse', 'dismantle', 'contractors', 'warehouse', 'quality', 'issues', 'risks', 'change_control', 'readiness', 'as_built', 'meetings', 'rf_design', 'acquisition', 'car_dispatcher', 'financial_advances', 'incidents', 'lessons_learned'] },
+  pm: { employee_id: '1001', name: 'Demo User 01', email: 'demo.user.01@example.com', status: 'active', nav: ['my_work', 'daily_plan', 'inbox', 'workload', 'status_updates', 'approvals', 'sites', 'dashboard', 'templates', 'admin.users', 'admin.roles', 'admin.groups', 'admin.delegation', 'absence', 'admin.matrix', 'admin.settings', 'admin.security_log', 'audit', 'messages', 'announcements', 'procurement', 'gecol', 'hlc', 'permits_hse', 'dismantle', 'contractors', 'warehouse', 'quality', 'issues', 'risks', 'change_control', 'readiness', 'as_built', 'meetings', 'rf_design', 'acquisition', 'car_dispatcher', 'financial_advances', 'incidents', 'lessons_learned', 'invoices', 'deliverables'] },
   reviewer: { employee_id: '1102', name: 'Demo User 02', email: 'demo.user.02@example.com', status: 'active', nav: ['my_work', 'daily_plan', 'inbox', 'workload', 'status_updates', 'approvals', 'sites', 'templates', 'absence', 'messages', 'procurement', 'gecol', 'hlc', 'permits_hse', 'dismantle', 'warehouse', 'as_built'] },
   auditor: { employee_id: '1103', name: 'Demo User 03', email: 'demo.user.03@example.com', status: 'active', nav: ['my_work', 'inbox', 'approvals', 'admin.security_log', 'messages'] },
   newbie: { employee_id: null, name: 'New Employee', email: 'new.employee@example.com', status: 'pending_assignment', nav: [] },
-  engineer: { employee_id: '1204', name: 'Demo User 06', email: 'demo.user.06@example.com', status: 'active', nav: ['my_work', 'daily_plan', 'inbox', 'approvals', 'sites', 'status_updates', 'absence', 'messages'] },
-  pending: { employee_id: '1211', name: 'Demo User 13', email: 'demo.user.13@example.com', status: 'pending_assignment', nav: [] },
+  engineer: { employee_id: '1204', name: 'Sami Nuri', email: 'sami.nuri@example.com', status: 'active', nav: ['my_work', 'daily_plan', 'inbox', 'approvals', 'sites', 'status_updates', 'absence', 'messages'] },
+  pending: { employee_id: '1211', name: 'Wael Saadi', email: 'wael.saadi@example.com', status: 'pending_assignment', nav: [] },
 };
 
 /** Demo passwords for the synthetic accounts (README). Local sign-in only; never real secrets. */
@@ -104,10 +104,10 @@ const fresh = () => ({
   /** Password right, code or enrolment still to do (the cookie pmis_2fa of the real server). */
   pending: null as null | { account: string; kind: 'two_factor' | 'enrol' | 'device_code'; until: number },
   /** 0.9.2 self-service profile: the user's own edits (keyed by account) and the email change requests. */
-  profiles: {} as Record<string, { display_name?: string; phone?: string | null; locale?: 'en' | 'ar'; theme?: 'light' | 'dark'; ui_brand?: Brand | null; ui_prefs?: Record<string, string>; email?: string; version: number }>,
+  profiles: {} as Record<string, { display_name?: string; phone?: string | null; locale?: 'en' | 'ar'; theme?: 'light' | 'dark'; ui_brand?: Brand | null; ui_prefs?: Record<string, unknown>; email?: string; version: number }>,
   /** 0.15.41 (migration 0130): Settings, Identity & themes (setting ui.identity). */
   identity: initIdentity(),
-  /** 0.15.97 (migration 0197): Settings, Screens, Login page (setting ui.login_page). */
+  /** 0.15.97 (migration 0242): Settings, Screens, Login page (setting ui.login_page). */
   loginPage: initLoginPage(),
   emailChanges: [] as { id: string; account: string; old_email: string; new_email: string; status: 'pending' | 'approved' | 'rejected' | 'cancelled'; requested_at: string; decided_at: string | null; decision_reason: string | null; decided_by: string | null;
     /** 0.12.6 (Q158): the code "mailed" to the new address (the mock has no mail: it is always the demo code), and the check made. */
@@ -174,7 +174,9 @@ export function sessionBody(): Session {
 }
 
 function initIdentity() {
-  return { default_brand: 'current' as Brand, allow_user_choice: true, defaults: {} as Record<string, string>, pref_options: APPEARANCE_OPTIONS as unknown as Record<string, string[]>, version: 1, updated_at: null as string | null, updated_by: null as null | { id: string; display_name: string; employee_id: string | null } };
+  return { default_brand: 'current' as Brand, allow_user_choice: true, defaults: {} as Record<string, string>, pref_options: APPEARANCE_OPTIONS as unknown as Record<string, string[]>, version: 1, updated_at: null as string | null, updated_by: null as null | { id: string; display_name: string; employee_id: string | null },
+    /** 0243: the workspace logo metadata (ui_assets); the bytes live in uiAssetBytes (not persisted). */
+    logo: null as null | { key: string; mime: string; enabled: boolean; show_on_login: boolean; use_as_favicon: boolean; version: number; updated_at: string; updated_by: { id: string; display_name: string; employee_id: string | null } | null } };
 }
 function initLoginPage() {
   return {
@@ -193,20 +195,27 @@ export const loginPagePublic = () => {
     animation: c.animation, default_locale: c.default_locale, support_links: c.support_links,
   };
 };
+/** 0243: the bytes of the identity images (ui_assets); the mock keeps them in memory only. */
+const uiAssetBytes = new Map<string, { mime: string; bytes: Uint8Array }>();
+export const putUiAssetBytes = (key: string, mime: string, bytes: Uint8Array) => { uiAssetBytes.set(key, { mime, bytes }); };
+export const uiAssetBytesOf = (key: string) => uiAssetBytes.get(key);
 /** 0.15.41: the identity settings (older saved mock states have none). */
 export const identity = () => (db().identity ??= initIdentity());
 /** The design a user sees: their own while the admin allows a choice, else the organization default (ui_effective_brand). */
 export const effectiveBrand = (stored: Brand | null | undefined): Brand => (identity().allow_user_choice && stored ? stored : identity().default_brand);
-/** 0241: the appearance a user sees: their own choices while the admin allows a choice, over the organization defaults (ui_effective_prefs). */
-export const effectivePrefs = (stored: Record<string, string> | null | undefined): Record<string, string> =>
-  ({ ...identity().defaults, ...(identity().allow_user_choice ? stored ?? {} : {}) });
+/** 0241: the appearance a user sees: their own choices while the admin allows a choice, over the organization defaults (ui_effective_prefs). The dimensions only: a stored ui_prefs may also carry the personal sidebar (0197). */
+export const effectivePrefs = (stored: Record<string, unknown> | null | undefined): Record<string, string> => {
+  const out: Record<string, string> = { ...identity().defaults };
+  if (identity().allow_user_choice && stored) for (const k of Object.keys(APPEARANCE_OPTIONS)) { const v = stored[k]; if (typeof v === 'string') out[k] = v; }
+  return out;
+};
 
 export function meBody(): Me {
   const v = viewer()!;
   return {
     user: { id: uid(v.employee_id ?? '9999'), display_name: db().profiles?.[v.key]?.display_name ?? v.name, employee_id: v.employee_id, email: db().profiles?.[v.key]?.email ?? v.email, status: v.status, locale: db().profiles?.[v.key]?.locale ?? 'en', theme: db().profiles?.[v.key]?.theme ?? 'light',
       ui_brand: db().profiles?.[v.key]?.ui_brand ?? null, brand: effectiveBrand(db().profiles?.[v.key]?.ui_brand),
-      ui_prefs: db().profiles?.[v.key]?.ui_prefs ?? {}, appearance: effectivePrefs(db().profiles?.[v.key]?.ui_prefs) },
+      ui_prefs: db().profiles?.[v.key]?.ui_prefs ?? {}, appearance: effectivePrefs(db().profiles?.[v.key]?.ui_prefs), version: db().profiles?.[v.key]?.version ?? 1 },
     assignments: [], is_system_admin: v.key === 'pm',
     effective: { grants: [...v.nav.map((m) => ({ module_key: m, action: 'view' as const, region_ids: 'all' as const })), ...(v.key === 'engineer' ? [{ module_key: 'sites', action: 'create' as const, region_ids: 'all' as const }] : []), ...(v.key === 'auditor' ? [{ module_key: 'admin.security_log', action: 'view_security_log' as const, region_ids: 'all' as const }, { module_key: 'audit', action: 'view_audit' as const, region_ids: 'all' as const }] : [])], nav: v.nav, dashboard_tabs: ['pmo', 'cw', 'te'] },
   };

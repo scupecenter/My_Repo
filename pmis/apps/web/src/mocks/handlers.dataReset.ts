@@ -63,23 +63,34 @@ const CATALOGUE: P[] = [
   ['staff', 'identity', 'Staff registry and absences', 'سجل الموظفين والغيابات', [], 40],
 ];
 const IDENT = ['users', 'roles', 'staff'];
+// Contract 0.15.265: the parts a filter can follow (the database's data_reset_narrowable())
+const NARROWABLE = ['procurement', 'issues', 'risks', 'car_dispatcher', 'financial_advances'];
+type Narrow = NonNullable<DataResetScope['narrow']>;
+const narrowOf = (q: URLSearchParams): Narrow | null => {
+  const n: Narrow = {}; const r = q.get('regions'), b = q.get('batches');
+  if (r) n.regions = r.split(',').map(Number);
+  if (b) n.batches = b.split(',');
+  if (q.get('from')) n.from = q.get('from')!;
+  if (q.get('to')) n.to = q.get('to')!;
+  return Object.keys(n).length ? n : null;
+};
 const EVERYTHING = CATALOGUE.filter((c) => c[1] !== 'identity').map((c) => c[0]).sort();
 const hashOf = (parts: string[]) => [...parts].sort().join(',').split('').reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 7).toString(16).padStart(8, '0').repeat(8);
-function scopeOf(requested: string[] | null): DataResetScope {
+function scopeOf(requested: string[] | null, narrow: Narrow | null = null): DataResetScope {
   const parts = requested ? closureOf(requested, CATALOGUE.map(([code, , , , deps]) => ({ code, depends_on: deps }))) : EVERYTHING;
   const req = requested ? [...new Set(requested)].sort() : parts;
   return { version: 1, requested: req, parts, added: parts.filter((p) => !req.includes(p)), everything: EVERYTHING.every((p) => parts.includes(p)),
-    identity: parts.filter((p) => IDENT.includes(p)), hash: hashOf(parts) };
+    identity: parts.filter((p) => IDENT.includes(p)), hash: hashOf(narrow ? [...parts, JSON.stringify(narrow)] : parts), ...(narrow ? { narrow } : {}) };
 }
-function planOf(requested: string[] | null): DataResetPlan {
-  const scope = scopeOf(requested), sel = new Set(scope.parts ?? []), req = new Set(scope.requested ?? []);
+function planOf(requested: string[] | null, narrow: Narrow | null = null): DataResetPlan {
+  const scope = scopeOf(requested, narrow), sel = new Set(scope.parts ?? []), req = new Set(scope.requested ?? []);
   const tables = TABLES.map((t) => (sel.has(t.part ?? '') || (t.part === '*' && sel.has('sites')) ? t : { ...t, delete: 0, keep: t.rows }));
   return {
     scope, tables, files: sel.has('documents') ? 31 : 0,
     delete_rows: tables.reduce((n, t) => n + (t.table === 'users' ? 0 : t.delete), 0), keep_rows: tables.reduce((n, t) => n + t.keep, 0),
     accounts_to_deactivate: sel.has('users') ? 23 : 0, error: null,
     parts: CATALOGUE.map(([code, group, label_en, label_ar, deps, rows]) => ({
-      code, group, kind: group === 'identity' ? 'identity' : 'project', label_en, label_ar, depends_on: deps,
+      code, group, narrowable: NARROWABLE.includes(code), kind: group === 'identity' ? 'identity' : 'project', label_en, label_ar, depends_on: deps,
       dependents: CATALOGUE.filter((c) => c[4].includes(code)).map((c) => c[0]), rows, tables: {}, requested: req.has(code), selected: sel.has(code),
       added: sel.has(code) && !req.has(code) })),
   };
@@ -136,8 +147,12 @@ export const dataResetHandlers = [
     const raw = new URL(request.url).searchParams.get('parts');
     const parts = raw ? raw.split(',') : null;
     if (parts?.some((p) => !CATALOGUE.some((c) => c[0] === p))) return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '/parts', code: 'unknown_part' }] as never });
-    return HttpResponse.json(planOf(parts));
+    if (parts && narrowOf(new URL(request.url).searchParams) && parts.some((p) => !NARROWABLE.includes(p))) return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '/narrow', code: 'not_narrowable' }] as never });
+    return HttpResponse.json(planOf(parts, narrowOf(new URL(request.url).searchParams)));
   }),
+  http.get(`${B}/settings/data-reset/narrow-options`, () => admin() ?? HttpResponse.json({
+    regions: [{ id: 1, name_en: 'Tripoli', name_ar: 'طرابلس' }, { id: 2, name_en: 'Benghazi', name_ar: 'بنغازي' }],
+    batches: [{ id: 'b0000000-0000-4000-8000-000000000001', file_name: 'procurement-2026-11.xlsx', rows_total: 14, created_at: '2026-11-20T08:00:00Z' }] })),
   http.post(`${B}/__mock/data-reset/backup`, async ({ request }) => { st().backupOk = ((await request.json()) as { ok: boolean }).ok; return HttpResponse.json({}); }),
   http.get(`${B}/settings/data-reset`, () => admin() ?? HttpResponse.json(view())),
   http.get(`${B}/settings/data-reset/requests/:id`, ({ params }) => {
@@ -148,7 +163,7 @@ export const dataResetHandlers = [
   http.post(`${B}/settings/data-reset/requests`, async ({ request }) => {
     const g = admin(); if (g) return g;
     if (!stepUpValid()) return stepUp();
-    const b = await request.json() as { reason?: string; confirm_text?: string; parts?: string[]; require_backup?: boolean; no_backup_confirm?: string };
+    const b = await request.json() as { reason?: string; confirm_text?: string; parts?: string[]; require_backup?: boolean; no_backup_confirm?: string; narrow?: Narrow };
     const bad = reason(b, 10); if (bad) return bad;
     if (b.parts && (b.parts.length === 0 || b.parts.some((p) => !CATALOGUE.some((c) => c[0] === p)))) {
       return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '/parts', code: b.parts.length ? 'unknown_part' : 'required' }] as never });
@@ -161,6 +176,7 @@ export const dataResetHandlers = [
     const s = st();
     if (s.request) return problem(409, 'invalid_transition', 'Not possible now', { detail: 'Another data reset request is open.' });
     s.request = fresh(me(), b.reason!.trim(), s.settings.request_expiry_minutes, b.parts ?? null, need);
+    if (b.narrow) { s.request.scope = scopeOf(b.parts ?? null, b.narrow); s.request.scope_hash = s.request.scope.hash ?? null; }
     return json(s.request, 201);
   }),
   http.post(`${B}/settings/data-reset/requests/:id/approve`, async ({ params, request }) => {

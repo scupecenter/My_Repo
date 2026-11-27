@@ -52,9 +52,15 @@ A dotted arrow is an id column with no `REFERENCES` constraint (the id is checke
 | Procurement | Contractor team (`external_teams`) | id column, no constraint | `team_id` | chosen |
 | Quality inspection | Snag | id column, no constraint | `quality_inspections.snag_id` | not checked in the catalogue |
 | Car dispatcher, Financial advances | Procurement order | register link | `procurement_record_id` | typed (text) |
+| Financial advances (expense, settlement) | Advance | register link | `advance_id` | checked in entry (approved advance of the same site, 0407); disbursed rule at submit; picker `advance-options` |
+| Invoices | Procurement record | register link | `procurement_record_id` | checked in entry (0407); picker `invoices/order-options`; listed in `record_related` |
+| Invoices | Contractor company | register link | `supplier_party_id` | optional, checked against active `external_parties` (0407); fills `supplier` when empty; picker `invoices/supplier-options` |
+| HLC record | Procurement record | register link, listed in `record_related` (0407) | `procurement_record_id` (id of the Procurement version row) | derived |
 | Issues, snags, quality, orders, contract end | Contractor performance view (0180) | computed on read, no stored value | thresholds in setting `contractors.performance` | derived |
 | Warehouse DN / RN documents | Stock, per-site quantity, serials | posted by approved documents | `wh_movement_lines`, `warehouse_site_qty`, `warehouse_serials` | derived |
 | Register records (procurement, warehouse, dismantle, issues, quality, car dispatcher, financial advances, risks) | Related records panel (0324) | computed on read, no stored value | `record_related(register, entity)`; the link list is one VALUES list in the function | derived |
+| Change Control | Procurement order, task | register link, typed by pick-list | `procurement_order_id`, `affected_task_code` (0325); the order shows the change-pending mark through `record_related` | chosen |
+| Issues | Task | text field filled by a task picker | `blocked_gate_or_task` (the task code) | chosen |
 | Register decisions, task approvals, snags | Notifications | `x_notify_watchers`, policy in setting `notifications.policy` | `notifications` | derived |
 
 ## 4. Gaps and proposals

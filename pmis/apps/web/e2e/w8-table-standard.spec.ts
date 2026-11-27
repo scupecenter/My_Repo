@@ -19,8 +19,8 @@ for (const locale of ['en', 'ar'] as const) {
     await expect(page.getByTestId('site-row-TR101')).toBeVisible();
     await expect(page.getByTestId('site-row-MI102')).toBeVisible();
     await expect(page.getByTestId('sites-count-filtered')).toHaveText('2');
-    // Display: large text, remembered after a reload
-    await page.getByTestId('display-menu').click();
+    // Display: large text, remembered after a reload (the Display options live in the Layout panel, V1)
+    await page.getByTestId('sites-view').click();
     await page.getByTestId('display-size-lg').click();
     await expect(page.getByTestId('sites-list-card')).toHaveAttribute('data-tsize', 'lg');
     await page.reload();
@@ -29,7 +29,8 @@ for (const locale of ['en', 'ar'] as const) {
     await page.goto('/sites?layout=list');
     await page.getByTestId('site-row-TR101').click();
     await expect(page.getByTestId('task-grid-toolbar')).toBeVisible();
-    await expect(page.getByTestId('site-layout-list')).toHaveAttribute('aria-pressed', 'true');
+    await page.getByTestId('site-layout').click();
+    await expect(page.getByTestId('site-layout-list')).toHaveAttribute('aria-checked', 'true');
     await page.getByTestId('site-layout-timeline').click();
     await expect(page.getByTestId('task-row')).toBeVisible();
   });

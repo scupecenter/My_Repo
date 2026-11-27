@@ -113,6 +113,17 @@ equal to `scope_hash`); start and execute check again that the closure of the re
 map refuses with 409 `scope_changed`). The scope of a request never changes (row guard): a changed scope is a new request. A request without parts is
 everything. `GET /settings/data-reset/plan?parts=...` (`data_reset_dry_run`) counts a scope per part and per table without changing anything.
 
+### Narrowing a scope (migration 0370, contract 0.15.265)
+
+A scope may carry a filter (`scope.narrow`: `regions`, `batches`, `from`, `to`; every given filter must match; days are in the system time zone, first creation date). It is part of the
+`scope_hash` the approver sees and cannot change after the request. `data_reset_narrowable()` lists the parts that accept it: acquisition, car_dispatcher, deliverables,
+dismantle, financial_advances, gecol, hlc, invoices, issues, permits, procurement, readiness, rf_design, risks. The filter is entity-level: it selects whole records, and their satellite
+tables (comments, history, documents) follow the record. car_dispatcher, financial_advances and invoices follow the selected procurement records. `sites`, quality, warehouse,
+as_built, meetings and change_control, and any scope with an identity part, are refused with a clear error: their tables link to a site or a process, not to one record.
+What narrowing `sites` would take: a per-site closure map (every table keyed by site, task, gate, baseline and document), a rule for what happens to the register records
+of a kept site, and a dry run that proves no orphan is left. `GET /settings/data-reset/narrow-options?part=` lists the regions and recent import batches.
+The tests are in `tests/ops/narrow/`.
+
 ## Which way
 
 - **Two or more active System Admins:** Settings > Data > Data reset (below). Nothing is done on the server by hand; the backup is the nightly
@@ -295,6 +306,7 @@ records of the Contractors register (companies, teams, contracts) and the vehicl
 | auth_device_bypass | KEEP | New-device email code (0292): per-user bypass flags. |
 | auth_pending | KEEP | Pending sign-ins (5 minutes, single use); identity, expires by itself. |
 | user_sessions | KEEP | Rows stay; every open session is ended (revoked, reason `project_data_reset`). Safer: nobody keeps a page of deleted data open. |
+| record_edit_presence | KEEP | Transient "is editing this record" presence rows; they expire on their own (0345). |
 | email_change_requests | KEEP | Identity requests. |
 | phone_change_requests | KEEP | Identity requests. |
 | user_invitations | KEEP | Invitations (owner: keep). |
@@ -349,6 +361,8 @@ KEEP in "everything" and in every scope without the part; with the part, the act
 | sla_rules | KEEP | SLA rules. |
 | sla_rule_sets | KEEP | SLA rule set versions. |
 | sla_rule_set_items | KEEP | SLA rule set items. |
+| alert_rules | KEEP | If/then alert rules (configuration, 0342). |
+| alert_rule_fires | LOG | Alert-rule firing journal: one row per rule, period and target (0342). |
 | sla_master_columns | KEEP | SLA to Master column map (reference). |
 | work_calendars | KEEP | Calendar (weekend). |
 | holidays | KEEP | Holidays. |

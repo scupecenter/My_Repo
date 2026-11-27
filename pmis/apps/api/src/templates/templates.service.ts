@@ -192,6 +192,29 @@ export class TemplatesService {
     return { items };
   }
 
+  // ------------------------------------------------------------------ GET /templates/{id}/changes (P3)
+  /** What changed between two versions: columns added, removed or renamed (by column code). Read only. */
+  async changes(auth: AuthContext, templateId: string, fromQ: number | null, toQ: number | null): Promise<unknown> {
+    const t = await this.current(templateId);
+    if (!t || !t.is_active || !(await this.usable(t, auth))) throw problems.notFound('This template does not exist.');
+    const to = toQ ?? t.current_version;
+    const rows = await this.db.tx.$queryRaw<{ version: number; columns: { code: string; label: string }[]; published_at: Date; reason: string | null }[]>(Prisma.sql`
+      SELECT v.version, v.columns, v.published_at, v.reason FROM template_versions v WHERE v.template_def_id = ${t.id}::uuid AND v.version IN (${to}, ${fromQ ?? to - 1})`);
+    const b = rows.find((r) => r.version === to);
+    if (!b) throw problems.notFound('This version does not exist.');
+    const a = fromQ === null && to === 1 ? undefined : rows.find((r) => r.version === (fromQ ?? to - 1));
+    if (fromQ !== null && !a) throw problems.notFound('This version does not exist.');
+    const cols = (x?: { columns: { code: string; label: string }[] }) => (Array.isArray(x?.columns) ? x!.columns : []);
+    const prev = new Map(cols(a).map((c) => [c.code, c.label]));
+    const next = new Map(cols(b).map((c) => [c.code, c.label]));
+    return {
+      template_id: templateId, from: a?.version ?? null, to, issued_at: b.published_at, reason: b.reason,
+      added: a ? [...next].filter(([c]) => !prev.has(c)).map(([code, label]) => ({ code, label })) : [],
+      removed: a ? [...prev].filter(([c]) => !next.has(c)).map(([code, label]) => ({ code, label })) : [],
+      renamed: a ? [...next].filter(([c, l]) => prev.has(c) && prev.get(c) !== l).map(([code, l]) => ({ code, from_label: prev.get(code)!, to_label: l })) : [],
+    };
+  }
+
   // ------------------------------------------------------------------ GET /templates/{id}/download
   async download(auth: AuthContext, templateId: string, ip: string | null, q: Record<string, unknown>): Promise<{ buffer: Buffer; fileName: string }> {
     const t = await this.current(templateId);
@@ -561,7 +584,7 @@ export class TemplatesService {
     return s;
   }
 
-  async build(t: TemplateRow, cols: TplColumn[], rows: Record<string, unknown>[], meta: { prefill: boolean; employeeId: string | null; issuedAt: Date }): Promise<Buffer> {
+  async build(t: TemplateRow, cols: TplColumn[], rows: Record<string, unknown>[], meta: { prefill: boolean; employeeId: string | null; issuedAt: Date; extra?: (wb: ExcelJS.Workbook) => void }): Promise<Buffer> {
     return this.buildBook(t, [{ sheet: DATA_SHEET, cols, rows }], meta, []);
   }
 
@@ -627,7 +650,7 @@ export class TemplatesService {
 
   /** The approved-template workbook: the data sheet(s), an instructions sheet, a Columns sheet for the Site Register templates, the hidden lists and the hidden `_tpl`. */
   async buildBook(
-    t: TemplateRow, parts: BookPart[], meta: { prefill: boolean; employeeId: string | null; issuedAt: Date }, extraKv: [string, string | number][],
+    t: TemplateRow, parts: BookPart[], meta: { prefill: boolean; employeeId: string | null; issuedAt: Date; extra?: (wb: ExcelJS.Workbook) => void }, extraKv: [string, string | number][],
   ): Promise<Buffer> {
     const wb = new ExcelJS.Workbook();
     wb.creator = 'GSDN Workspace';
@@ -734,6 +757,7 @@ export class TemplatesService {
     lines.forEach((l, i) => { const cell = ins.getCell(i + 1, 1); cell.value = l; cell.alignment = { wrapText: true, vertical: 'top' }; });
     ins.getCell(1, 1).font = { bold: true, size: 13 };
     wb.views = [{ x: 0, y: 0, width: 12000, height: 8000, firstSheet: 0, activeTab: 0, visibility: 'visible' }];
+    meta.extra?.(wb);   // P4 (migration 0365): the error report adds its Errors sheet to the re-uploadable copy
 
     const out = await wb.xlsx.writeBuffer();
     return Buffer.from(out as ArrayBuffer);

@@ -1,7 +1,7 @@
 import { CheckCircle2, Clock, Eye } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useIssueRisks, useRiskIssues, useDismantleOrders, useDismantleRns, useOrderReceipts, useWarehouseOrders, useHlcLegacyMigration, useSetHlcPurchaseRequests, type HlcLegacyMigration } from '@/api/p4c';
+import { useIssueRisks, useRiskIssues, useDismantleOrders, useDismantleRns, useOrderReceipts, useWarehouseOrders, useAdvanceOptions, useInvoiceSuppliers, useHlcLegacyMigration, useSetHlcPurchaseRequests, type HlcLegacyMigration } from '@/api/p4c';
 import type { RegisterRecord } from '@/api/types';
 import { registerErrorMessage } from '@/lib/registerErrors';
 import { errText, FormDialog } from './FormDialog';
@@ -124,7 +124,7 @@ export function DismantleRnSelect({ siteId, part, value, onChange, editable, inv
 
 /** 0181: the Procurement order of a warehouse receipt (optional); PR No., PO / WO No. and the contractor shown below it come from the order. */
 export function WarehouseOrderSelect({ siteId, value, onChange, editable, invalid, registerKey = 'warehouse', field = 'procurement_order_id' }: {
-  registerKey?: 'warehouse' | 'car_dispatcher' | 'financial_advances' | 'issues' | 'quality'; field?: string;
+  registerKey?: 'warehouse' | 'car_dispatcher' | 'financial_advances' | 'issues' | 'quality' | 'change_control' | 'invoices'; field?: string;
   siteId: string | null | undefined; value: unknown; onChange: (v: string | null) => void; editable: boolean; invalid?: boolean;
 }) {
   const { t } = useTranslation();
@@ -146,6 +146,53 @@ export function WarehouseOrderSelect({ siteId, value, onChange, editable, invali
         )
         : <div className="font-semibold" data-testid={`reg-view-${field}`}>{chosen ? label(chosen) : cur ? cur.slice(0, 8) : '—'}</div>}
       <p className="text-sm text-mute">{t('p4c.receipt_order_hint')}</p>
+    </div>
+  );
+}
+
+/** D58: the advance an expense or settlement belongs to (`advance_id`), picked from the approved advances of the site. */
+export function AdvanceSelect({ siteId, value, onChange, editable, invalid }: { siteId: string | null | undefined; value: unknown; onChange: (v: string | null) => void; editable: boolean; invalid?: boolean }) {
+  const { t } = useTranslation();
+  const q = useAdvanceOptions(siteId, editable);
+  const items = q.data ?? [];
+  const cur = typeof value === 'string' ? value : '';
+  const label = (i: (typeof items)[number]) => [i.po_wo_no ?? i.pr_no, i.advance_kind, i.disbursed_date].filter(Boolean).join(' · ') || i.entity_id.slice(0, 8);
+  const chosen = items.find((i) => i.entity_id === cur);
+  return (
+    <div data-testid="reg-advance-select">
+      {editable
+        ? (
+          <select id="reg-field-advance_id" data-testid="reg-field-advance_id" className="input" aria-invalid={invalid || undefined} value={cur} onChange={(e) => onChange(e.target.value || null)}>
+            <option value="">{t('p4c.advance_none')}</option>
+            {items.map((i) => <option key={i.entity_id} value={i.entity_id}>{label(i)}</option>)}
+            {cur && !chosen && <option value={cur}>{cur.slice(0, 8)}</option>}
+          </select>
+        )
+        : <div className="font-semibold" data-testid="reg-view-advance_id">{chosen ? label(chosen) : cur ? cur.slice(0, 8) : '—'}</div>}
+      <p className="text-sm text-mute">{t('p4c.advance_hint')}</p>
+    </div>
+  );
+}
+
+/** D58: the company of the Contractors list an invoice names as its supplier (`supplier_party_id`). */
+export function SupplierSelect({ value, onChange, editable, invalid }: { value: unknown; onChange: (v: string | null) => void; editable: boolean; invalid?: boolean }) {
+  const { t } = useTranslation();
+  const q = useInvoiceSuppliers(editable);
+  const items = q.data ?? [];
+  const cur = typeof value === 'string' ? value : '';
+  const chosen = items.find((i) => i.id === cur);
+  return (
+    <div data-testid="reg-supplier-select">
+      {editable
+        ? (
+          <select id="reg-field-supplier_party_id" data-testid="reg-field-supplier_party_id" className="input" aria-invalid={invalid || undefined} value={cur} onChange={(e) => onChange(e.target.value || null)}>
+            <option value="">{t('p4c.supplier_none')}</option>
+            {items.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
+            {cur && !chosen && <option value={cur}>{cur.slice(0, 8)}</option>}
+          </select>
+        )
+        : <div className="font-semibold" data-testid="reg-view-supplier_party_id">{chosen ? chosen.name : cur ? cur.slice(0, 8) : '—'}</div>}
+      <p className="text-sm text-mute">{t('p4c.supplier_hint')}</p>
     </div>
   );
 }

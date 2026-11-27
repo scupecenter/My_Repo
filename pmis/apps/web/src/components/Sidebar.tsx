@@ -6,6 +6,7 @@ import { useNavLayout } from '@/api/settings';
 import { ICONS, ICON_PROPS } from '@/lib/icons';
 import { loadPref, savePref } from '@/lib/localPref';
 import { headingIcon, headingName, keysOf, resolveLayout, type NavHead, type NavSub } from '@/lib/navLayout';
+import { applySidebarOverlay, sanitizeUiNav, type UiNav } from '@/lib/sidebarPrefs';
 import { SITE_MASTER_SUBMENUS } from '@/lib/siteMasterMenus';
 import { NavLayoutEditor } from './NavLayoutEditor';
 import { SidebarRecords } from './SidebarRecords';
@@ -70,14 +71,22 @@ function SubmenuFlyout({ enabled, onNavigate, children, panel, testid = 'nav-fly
   );
 }
 
-/** Collapsible tree, favourites, recent items, filter, icon-only mode. Nav items arrive already filtered by the server's permission list. */
-export function SidebarBody({ items, compact, unread, alerts = 0, counts = {}, activeKey, onNavigate }: { items: NavItem[]; compact: boolean; unread: number; alerts?: number; /** waiting counts the API already gives (Approvals, My Work), by nav key */ counts?: Record<string, number>; activeKey: string | undefined; onNavigate?: () => void }) {
+/**
+ * Collapsible tree, favourites, recent items, filter, icon-only mode. Nav items arrive already filtered by the server's permission list.
+ * 0242 (proposal item 4): `side` is the personal sidebar of the profile (hidden, order, badge_style, pins); it hides screens, orders them
+ * inside their heading, restyles the badges and pins the shortcuts. `onPinsChange` saves the pins in the profile (the local list keeps
+ * working while the save is in flight).
+ */
+export function SidebarBody({ items, compact, unread, alerts = 0, counts = {}, activeKey, onNavigate, side, onPinsChange }: { items: NavItem[]; compact: boolean; unread: number; alerts?: number; /** waiting counts the API already gives (Approvals, My Work), by nav key */ counts?: Record<string, number>; activeKey: string | undefined; onNavigate?: () => void; side?: UiNav | null; onPinsChange?: (pins: string[]) => void }) {
   const { t, i18n } = useTranslation();
   const loc = useLocation();
   // The shared layout of the menu (contract 0.15.1): the default of the code until a System Admin saves one, or when it cannot be read.
   const navQ = useNavLayout();
   const saved = navQ.data?.layout ?? null;
-  const layout = useMemo(() => resolveLayout(saved), [saved]);
+  const nav = useMemo(() => sanitizeUiNav(side ?? {}), [side]);
+  const badgeStyle = nav.badge_style ?? 'full';
+  const hiddenSet = useMemo(() => new Set(nav.hidden ?? []), [nav]);
+  const layout = useMemo(() => applySidebarOverlay(resolveLayout(saved), nav), [saved, nav]);
   const [editing, setEditing] = useState(false);
   const [collapsed, setCollapsed] = useState<string[]>(() => loadList(K.collapsed));
   const [sitesOpen, setSitesOpen] = useState<boolean>(() => loadPref<boolean>(K.sites, true) !== false);
@@ -93,14 +102,23 @@ export function SidebarBody({ items, compact, unread, alerts = 0, counts = {}, a
   const [seen, setSeen] = useState<string | undefined>();
   if (activeKey && activeKey !== seen) {
     setSeen(activeKey);
-    const n = [activeKey, ...recent.filter((x) => x !== activeKey)].slice(0, RECENT_MAX);
+    const n = [...new Set([activeKey, ...recent.filter((x) => x !== activeKey)])].slice(0, RECENT_MAX);
     setRecent(n);
     savePref(K.recent, n);
   }
 
   const toggleGroup = (g: string) => setCollapsed((c) => { const n = c.includes(g) ? c.filter((x) => x !== g) : [...c, g]; savePref(K.collapsed, n); return n; });
   const toggleSites = () => setSitesOpen((o) => { savePref(K.sites, !o); return !o; });
-  const saveFavs = (n: string[]) => { setFavs(n); savePref(K.favs, n); };
+  // the pinned shortcuts live in the profile (0197); the local list is the boot cache, the server list wins when it arrives
+  // (state adjusted while rendering, like the recent items below)
+  const pinsKey = JSON.stringify(nav.pins ?? null);
+  const [seenPins, setSeenPins] = useState<string | null>(null);
+  if (nav.pins !== undefined && pinsKey !== seenPins) {
+    setSeenPins(pinsKey);
+    if (JSON.stringify(favs) !== pinsKey) setFavs(nav.pins);
+    savePref(K.favs, nav.pins);
+  }
+  const saveFavs = (n: string[]) => { setFavs(n); savePref(K.favs, n); onPinsChange?.(n); };
   const togglePin = (k: string) => saveFavs(favs.includes(k) ? favs.filter((x) => x !== k) : [...favs, k]);
   const move = (k: string, d: -1 | 1) => { const i = favs.indexOf(k); const j = i + d; if (i < 0 || j < 0 || j >= favs.length) return; const n = [...favs]; [n[i], n[j]] = [n[j], n[i]]; saveFavs(n); };
 
@@ -111,13 +129,13 @@ export function SidebarBody({ items, compact, unread, alerts = 0, counts = {}, a
       <>
         <Icon {...ICON_PROPS} size={18} className="shrink-0" />
         {!compact && <span className="flex-1 truncate">{label(n)}</span>}
-        {badge && n.key === 'messages' && unread > 0 && (compact
+        {badge && badgeStyle !== 'none' && n.key === 'messages' && unread > 0 && (compact || badgeStyle === 'dot'
           ? <span data-testid="messages-badge" aria-label={t('messages.unread_count', { count: unread })} className="h-2 w-2 rounded-full bg-accent" />
           : <span data-testid="messages-badge" aria-label={t('messages.unread_count', { count: unread })} className="grid h-5 min-w-5 place-items-center rounded-full bg-accent px-1 text-xs text-accentInk">{unread}</span>)}
-        {badge && (counts[n.key] ?? 0) > 0 && (compact
+        {badge && badgeStyle !== 'none' && (counts[n.key] ?? 0) > 0 && (compact || badgeStyle === 'dot'
           ? <span data-testid={`${n.key}-badge`} aria-label={t('nav.waiting_count', { count: counts[n.key] })} className="h-2 w-2 rounded-full bg-accent" />
           : <span data-testid={`${n.key}-badge`} aria-label={t('nav.waiting_count', { count: counts[n.key] })} className="grid h-5 min-w-5 place-items-center rounded-full bg-accent px-1 text-xs text-accentInk">{(counts[n.key] ?? 0) > 99 ? '99+' : counts[n.key]}</span>)}
-        {n.key === 'logs.alerts' && alerts > 0 && (compact
+        {badgeStyle !== 'none' && n.key === 'logs.alerts' && alerts > 0 && (compact || badgeStyle === 'dot'
           ? <span data-testid="alerts-badge" aria-label={t('logs.open_alerts', { count: alerts })} className="h-2 w-2 rounded-full bg-late" />
           : <span data-testid="alerts-badge" aria-label={t('logs.open_alerts', { count: alerts })} className="grid h-5 min-w-5 place-items-center rounded-full bg-late px-1 text-xs text-white">{alerts}</span>)}
       </>
@@ -142,9 +160,10 @@ export function SidebarBody({ items, compact, unread, alerts = 0, counts = {}, a
   );
 
   const needle = q.trim().toLowerCase();
-  const matches = needle ? items.filter((i) => label(i).toLowerCase().includes(needle)) : [];
+  const matches = needle ? items.filter((i) => !hiddenSet.has(i.key) && label(i).toLowerCase().includes(needle)) : [];
   const favItems = favs.map(byKey).filter((x): x is NavItem => !!x);
-  const recentItems = recent.filter((k) => k !== activeKey).map(byKey).filter((x): x is NavItem => !!x);
+  // dedupe by path: a screen reachable under two keys (or a stale doubled key in storage) shows once
+  const recentItems = recent.filter((k) => k !== activeKey).map(byKey).filter((x): x is NavItem => !!x).filter((x, i, a) => a.findIndex((y) => y.to === x.to) === i);
 
   /** A screen of a heading. The Site Register entry "Site Master" carries the six Site Master sub-menus (no Dismantle); every other screen, Dismantle included, is a plain row (under Registers & Logs). */
   const itemNode = (k: string) => {

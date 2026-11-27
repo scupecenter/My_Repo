@@ -4,6 +4,106 @@
  */
 
 export interface paths {
+    "/me/push": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Web Push status of the caller (own browsers)
+         * @description 0.15.156. `enabled` is false until the server has its VAPID keys. `this_browser` is true when the `endpoint` query matches one of the caller's subscriptions.
+         */
+        get: operations["getMyPush"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/push/subscribe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Turn on Web Push for the caller's browser
+         * @description 0.15.156. A browser that another person used is moved to the caller. 409 while push is not configured on the server.
+         */
+        post: operations["subscribeMyPush"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/push/unsubscribe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Turn off Web Push for the caller's browser
+         * @description 0.15.156. Own rows only; an endpoint that is not the caller's removes nothing.
+         */
+        post: operations["unsubscribeMyPush"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/web-push": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Web Push on or off, with counts (System Admin)
+         * @description 0.15.156. 403 for anyone but a System Admin.
+         */
+        get: operations["getAdminWebPush"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/document-search-index": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Status of the document contents search index (System Admin)
+         * @description 0.15.155. Counts of the files whose text is searchable. Indexing runs in the background every few minutes. 403 for anyone but a System Admin.
+         */
+        get: operations["getDocumentSearchIndex"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/login": {
         parameters: {
             query?: never;
@@ -223,6 +323,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/csp-report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Where browsers report Content-Security-Policy violations (SEC-3)
+         * @description Public, because a browser sends the report without the session. Accepts the legacy `application/csp-report` body and the Reporting API list
+         *     (`application/reports+json`). Logs a short sanitised line and counts per directive in memory; changes nothing. 413 above 16 KB, 429 above 30 per minute per address.
+         */
+        post: operations["reportCspViolation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/local/password-reset/confirm": {
         parameters: {
             query?: never;
@@ -288,6 +409,46 @@ export interface paths {
          *     is set. Rate limited (429). Failures are written to the security log.
          */
         post: operations["localDeviceCode"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/local/2fa/passkey/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The passkey challenge for the pending two-step sign-in (0.15.194)
+         * @description Needs the pending sign-in cookie `pmis_2fa` (`next` = `two_factor`). Answers `available` false and `options` null when passkeys are off or the account has none: the page then shows only the code. Otherwise `options` is the WebAuthn request (challenge valid 5 minutes, single use, user verification required). Rate limited (429).
+         */
+        post: operations["localPasskeyOptions"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/local/2fa/passkey": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Second step with a passkey instead of the authenticator code (0.15.194)
+         * @description Needs the pending sign-in cookie. `response` is the browser's WebAuthn assertion. Checked: single-use challenge, origin, relying party, user verification, signature, and a sign counter that moves forward (a replayed or cloned credential is refused). Failure is 401 `invalid_code` and is written to the security log (`two_factor_failed`, `via` passkey). The pending sign-in is single use. On success the session cookie is set, same as the code path.
+         */
+        post: operations["localPasskeySignIn"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4128,6 +4289,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/data-hub/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The Data hub landing page, in one call (0.15.311)
+         * @description 0.15.311. Batches waiting for the caller (count and up to 5, with why each waits), templates whose current version was issued in the last 45 days with the column diff against the version before, and the caller's last download of each template (read from the template_download audit rows of the caller only). Read only. A caller without the templates module sees no batches. The other hub widgets use the endpoints of their own screens.
+         */
+        get: operations["getDataHubSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/exports/schedules": {
         parameters: {
             query?: never;
@@ -4938,6 +5119,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/alert-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The alert rules and the closed catalogues of the form
+         * @description 0.15.242 (migration 0342): System Admin. `rules` are the saved rules (code, kind, params, audience, templates, enabled, version); `catalogue` lists the closed kinds with their params, the audiences, the active registers and the modules the form offers. The database owns the validation.
+         */
+        get: operations["getAlertRules"];
+        put?: never;
+        /**
+         * Create an alert rule
+         * @description 0.15.242 (migration 0342): System Admin, a reason. Closed body (`unknown_key`): `code` (lowercase letters, digits and dashes, fixed once the rule exists, unique), `kind` (closed), `params` (closed per kind, field errors at `/params/<key>`), `audience` (`{"type":"system_admin"}` or `{"type":"module","module":"<module key>"}`), `title_en`, `title_ar`, `body_en`, `body_ar`, optional `link`, `enabled` (default true). Audited (`alert_rule_create`). Notifications only: a rule never changes a record, a state or a holder.
+         */
+        post: operations["createAlertRule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/alert-rules/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Update an alert rule
+         * @description 0.15.242 (migration 0342): System Admin, a reason and If-Match (the rule's `version`). The whole rule is sent; the `code` does not change. Audited (`alert_rule_update`, before and after).
+         */
+        put: operations["updateAlertRule"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/ui-features": {
         parameters: {
             query?: never;
@@ -5667,6 +5892,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/register-state": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Every register with its enabled and locked state (disabled registers included)
+         * @description 0.15.138 (migration 0381). System Admin or a delegate of `fields.edit` for all regions. Disabled registers are listed so they can be switched back on.
+         */
+        get: operations["listRegisterStates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/register-state/{register_key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A register key (see `GET /registers`). */
+                register_key: components["parameters"]["RegisterKeyAny"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Enable, disable and lock or unlock a whole register
+         * @description 0.15.138 (migration 0381). Disabling HIDES the register (no record, step, template or history is touched; enabling restores it). Locking keeps it readable
+         *     but refuses a new record and every change to a record (screen, upload, workflow step, derive, QC snag of the register) with 403 `register_locked`; System
+         *     Admins, the Settings data reset and the migration role are exempt (like the record and column locks of 0103). A reason is required; the change is audited
+         *     with before and after. Same gate as renaming a register: no permission is widened.
+         */
+        put: operations["setRegisterState"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/structural-freeze": {
         parameters: {
             query?: never;
@@ -5748,6 +6019,26 @@ export interface paths {
          *     the accounts to deactivate (`users` part) and the files to move. No `parts`: everything.
          */
         get: operations["getDataResetPlan"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/data-reset/narrow-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What the reset picker offers for narrowing (System Admin only)
+         * @description 0.15.265 (migration 0370, `data_reset_narrow_options`). A System Admin acting without delegation. The regions and the 200 most recent import batches of the part (`part`), with their row counts, and the narrowable parts.
+         */
+        get: operations["getDataResetNarrowOptions"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5918,7 +6209,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/settings/imports": {
+    "/settings/template-change-notice": {
         parameters: {
             query?: never;
             header?: never;
@@ -5926,18 +6217,15 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * The background threshold of batches (imports.async_rows)
-         * @description 0.14.6. Every signed-in user may read it. A send or a decision of a batch (New sites, register, stream, and each staged batch of a Master import apply) with more
-         *     rows than `async_rows` runs in the background (202, status `processing`). `can_edit` is true for a System Admin or a delegate of `settings` edit for all regions.
+         * The notice of a new template version (templates.change_notice)
+         * @description 0.15.203 (P3). Every signed-in user may read it. `enabled`: the daily job writes an in-app notice to the entry holders of a register when its template gets a new version; `days`: how long after the version is issued a person is still told. `can_edit` is true for a System Admin or a delegate of `settings` edit for all regions.
          */
-        get: operations["getImportsSettings"];
+        get: operations["getTemplateChangeNotice"];
         /**
-         * Change the background threshold (reason, If-Match, audited)
-         * @description 0.14.6. A System Admin, or a delegate of `settings` edit for all regions (403 `action_forbidden` otherwise, also for a delegate limited to some regions). A whole number
-         *     from 10 to 500 (422 `validation_failed`, path `/async_rows`), a reason and If-Match; an unknown key is refused (422 `unknown_field`). Saving the value in force is
-         *     409 `invalid_transition`. Audited as `imports_async_rows_update` with the value, who and when before and after. The next send or decision reads the new value.
+         * Change the notice of a new template version (reason, If-Match, audited)
+         * @description 0.15.203. A System Admin, or a delegate of `settings` edit for all regions (403 `action_forbidden`). `days` 1 to 365 (422 `validation_failed`, path `/days`), a reason and If-Match. Saving the values in force is 409 `invalid_transition`. Audited as `template_change_notice_update` with the values before and after.
          */
-        put: operations["setImportsSettings"];
+        put: operations["setTemplateChangeNotice"];
         post?: never;
         delete?: never;
         options?: never;
@@ -6084,6 +6372,202 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/media/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The Media gallery settings (0.15.292)
+         * @description Every signed-in user may read them (the gallery screen uses them). `can_edit` is true for a System Admin or an all-regions delegate of `settings` edit. `thumbnails_available` is false when the server cannot make thumbnails (the gallery then shows type icons).
+         */
+        get: operations["getMediaSettings"];
+        /**
+         * Set the Media gallery settings (reason, step-up, If-Match, audited) (0.15.292)
+         * @description A System Admin, or a delegate of `settings` edit for all regions. A reason (3+ characters), a step-up and `If-Match` are required. Unknown keys and invalid values are 422; saving the values in force is 409 `invalid_transition`. Audited `media_gallery_update` with before and after.
+         */
+        put: operations["setMediaSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The images the caller may see, newest first (0.15.292)
+         * @description Reads `document_files` (through their slots) and `snag_photos` live; nothing is copied. Visibility is the owning slot's. The scope (kinds, registers, excluded codes,
+         *     images only) comes from the setting `media.gallery`. `status` is `current` (default), `withdrawn` (only when the setting allows it) or `pending_evidence`.
+         *     `has_thumbnail` says whether `.../thumbnail` can answer; `link` names the record the item belongs to.
+         */
+        get: operations["listMediaItems"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/facets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The filter values of the gallery for the caller (0.15.292) */
+        get: operations["getMediaFacets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/items/{kind}/{id}/thumbnail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A thumbnail of one gallery item (0.15.292)
+         * @description Made from the stored original on the first request (EXIF orientation applied, metadata removed) and kept beside it. 404 when the item is not visible to the caller; 415 `thumbnail_unsupported` for a file type without a thumbnail; 503 `thumbnails_unavailable` when thumbnails are off or the maker is not installed.
+         */
+        get: operations["getMediaThumbnail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/identity/logo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Upload the workspace logo (reason, step-up, If-Match, audited) (0.15.107)
+         * @description A System Admin, or a delegate of `settings` edit for all regions (403 `action_forbidden` otherwise, also for a delegate limited to some regions). A `reason`
+         *     (3+ characters), a step-up (401 `step_up_required`) and, once a logo exists, `If-Match` on the asset `version` (428 / 412) are required. The body is the
+         *     image: PNG, JPEG, SVG or WebP, 256 KiB at most (422 `errors[0]` `{path: /file}`). An upload always enables the logo and bumps the version. Audited
+         *     `ui_asset_update` with the metadata (never the bytes) before and after.
+         */
+        put: operations["putUiLogo"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Show or hide the workspace logo (reason, step-up, If-Match, audited) (0.15.107)
+         * @description Hiding keeps the row and its bytes (hide never delete): the sidebar falls back to the built-in badge until the logo is enabled again. The same rights,
+         *     reason, step-up and If-Match rules as the upload; a missing logo is 422 `errors[0]` `{path: /key, code: not_found}` and saving the state in force is 409
+         *     `invalid_transition`. Audited `ui_asset_update`.
+         */
+        patch: operations["setUiLogoEnabled"];
+        trace?: never;
+    };
+    "/settings/identity/logo/display": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Where the logo shows outside the app, the sign-in pages and the browser tab icon (reason, step-up, If-Match, audited) (0.15.232)
+         * @description Both switches are off until an admin turns one on, so nothing about the logo is public by default. A switch has an effect only while the logo is enabled.
+         *     Same rights, reason, step-up and If-Match rules as the upload; a missing logo is 422 `errors[0]` `{path: /key, code: not_found}`, saving the values in force is
+         *     409 `invalid_transition`. Audited `ui_asset_update` with before and after.
+         */
+        patch: operations["setUiLogoDisplay"];
+        trace?: never;
+    };
+    "/ui/public/identity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Which public pages show the logo (no session) (0.15.232)
+         * @description No session. Only whether the sign-in pages and the tab icon use the logo, with the version for cache busting; `null` for a purpose that is off (the default). Nothing
+         *     about users, no audit data. Cached 30 seconds and rate limited per address (429 `rate_limited`).
+         */
+        get: operations["getUiPublicIdentity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ui/public/logo/{purpose}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The logo image for the sign-in pages or the tab icon (no session) (0.15.232)
+         * @description No session. The bytes of the enabled logo, only while the admin switched this purpose on; otherwise 404. SVG is served with a sandboxing Content-Security-Policy and
+         *     `nosniff`. Cached 30 seconds and rate limited per address.
+         */
+        get: operations["getUiPublicLogo"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ui/assets/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The bytes of an enabled identity image (0.15.107)
+         * @description Every signed-in user may read it (the logo is the organization identity, not user data). 404 when the key is unknown or the asset is hidden. Cache with the `version` of `UiIdentity.logo` as the query `v`.
+         */
+        get: operations["getUiAsset"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/login-page": {
         parameters: {
             query?: never;
@@ -6126,6 +6610,34 @@ export interface paths {
          */
         get: operations["getLoginPagePublic"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/download-locks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The download lock categories, templates, uploaded files, generated documents (0.15.193)
+         * @description Every signed-in user may read it (the UI disables what is locked). `can_edit` is true for a System Admin only. All three are `false` until a System Admin turns one on.
+         */
+        get: operations["getDownloadLocks"];
+        /**
+         * Turn the download locks on or off (System Admin, reason, step-up, If-Match, audited) (0.15.193)
+         * @description System Admin only (403 `action_forbidden` otherwise, a delegate included). A reason (3+ characters), a step-up (401 `step_up_required`) and `If-Match` (428 / 412)
+         *     are required. Unknown keys and non-boolean values are 422. Saving the values already in force is 409 `invalid_transition`. Audited `download_locks_update`.
+         *     While a category is on, its route answers 403 `action_forbidden` with `errors[0].code` `download_locked`: `templates` (`GET /templates/{templateId}/download`),
+         *     `uploaded_files` (`GET /files/{id}/download`, which also feeds the on-screen preview and finished export files, and `GET /master-import/runs/{id}/file`), `generated_documents` (`GET /library/generated/{id}/download`, except
+         *     `purpose=view`). Reading and changing the locks is never locked.
+         */
+        put: operations["setDownloadLocks"];
         post?: never;
         delete?: never;
         options?: never;
@@ -6244,6 +6756,130 @@ export interface paths {
          * @description Returns how many were ended. Expired and already revoked grants and ordinary delegations are not touched.
          */
         post: operations["revokeAllSupportAccess"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/passkeys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The passkey setting (0.15.194)
+         * @description Every signed-in user reads `enabled` and `ready` (`ready` is false when `APP_BASE_URL` is not an https address, so passkeys cannot be turned on). `updated_by` is shown to a System Admin only. `enabled` is `false` until a System Admin turns it on.
+         */
+        get: operations["getPasskeys"];
+        /**
+         * Turn passkeys on or off (System Admin, reason, step-up, If-Match, audited) (0.15.194)
+         * @description System Admin only. A reason (3+ characters), a step-up (401 `step_up_required`) and `If-Match` (428 / 412) are required. Turning it on needs `ready` (409 `invalid_transition` otherwise). Saving the value already in force is 409. Turning it off stops the passkey option at sign-in and keeps every passkey row; the authenticator code is never affected. Audited `passkeys_update`.
+         */
+        put: operations["setPasskeys"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/passkeys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My passkeys (0.15.194)
+         * @description The caller's own active passkeys (never the key material). `can_add` is true only when the account has two-step verification on and enrolled.
+         */
+        get: operations["listMyPasskeys"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/passkeys/register/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start adding a passkey (step-up) (0.15.194)
+         * @description A step-up is required (401 `step_up_required`). 409 `invalid_transition` when passkeys are off, not ready, or the account has no two-step verification. The answer is the WebAuthn creation options (attestation none, user verification required); the challenge is valid 5 minutes and single use. Rate limited (429).
+         */
+        post: operations["startPasskeyRegistration"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/passkeys/register/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Finish adding a passkey (step-up) (0.15.194)
+         * @description A step-up is required. `response` is the browser's WebAuthn attestation, `label` names the passkey (1 to 80 characters). At most 10 active passkeys per account. Audited `passkey_added`. A response that does not verify, or whose challenge was used or expired, is 400 `validation_failed`.
+         */
+        post: operations["finishPasskeyRegistration"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/passkeys/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove one of my passkeys (step-up) (0.15.194)
+         * @description The caller's own passkey only (404 otherwise). The row is kept and marked revoked. Works even when passkeys are off. Audited `passkey_revoked`.
+         */
+        delete: operations["removeMyPasskey"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users/{id}/passkeys/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Revoke every passkey of one account (System Admin, reason, step-up) (0.15.194)
+         * @description The recovery for a lost device. The authenticator code keeps working. Audited `passkeys_revoked_by_admin`. Returns how many were revoked.
+         */
+        post: operations["revokeUserPasskeys"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6531,6 +7167,86 @@ export interface paths {
          * @description 0.15.95. The approved Procurement versions in force, not cancelled, that the caller can see; of the site `site_id` when it is given. Needs the Issue log module; only the orders in regions where the caller also holds the Procurement view right (the responsibility matrix) are listed, and the same right is checked when the record is saved.
          */
         get: operations["listIssueOrderOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/registers/change_control/order-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The approved, active Procurement orders a Change Control record may name (0.15.225)
+         * @description 0.15.225. The approved Procurement versions in force, not cancelled, that the caller can see; of the site `site_id` when it is given. Needs the Change Control module; only the orders in regions where the caller also holds the Procurement view right (the responsibility matrix) are listed, and the same right is checked when the record is saved.
+         */
+        get: operations["listChangeControlOrderOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/registers/financial_advances/advance-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The advances an expense or settlement may name (0.15.330)
+         * @description 0.15.330. The approved advances in the state disbursed or settlement in progress, of the site `site_id` when it is given, in the regions the caller may read. Needs the Financial Advances view right.
+         */
+        get: operations["listAdvanceOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/registers/invoices/order-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The approved, active Procurement orders an invoice may name (0.15.330)
+         * @description 0.15.330. Same list as the other order pickers; needs the Invoices module view; only the orders in regions where the caller also holds the Procurement view right.
+         */
+        get: operations["listInvoiceOrderOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/registers/invoices/supplier-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The companies an invoice may name as its supplier (0.15.330)
+         * @description 0.15.330. The active companies of the Contractors list (`id`, `name`, `type`). Needs the Invoices module view; no Procurement right is required, and nothing else about the companies is returned.
+         */
+        get: operations["listInvoiceSupplierOptions"];
         put?: never;
         post?: never;
         delete?: never;
@@ -7013,6 +7729,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/derive-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The cross-register derive rules (0.15.260)
+         * @description 0.15.260. Each rule says which value of a source register a target register shows (the source record's external party, or one field), found by a link field of the target
+         *     record, else by the same site. Reading needs the Settings screen. `registers` lists the registers and fields a rule may name.
+         */
+        get: operations["getDeriveRules"];
+        /**
+         * Save the cross-register derive rules (reason, If-Match, audited)
+         * @description 0.15.260. System Admin, or a delegation of `admin.settings` edit for all regions. Field errors: `unknown_key`, `unknown_register`, `same_register`, `unknown_field`,
+         *     `duplicate`, `invalid`, `too_many`, `required`.
+         */
+        put: operations["setDeriveRules"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/dashboard": {
         parameters: {
             query?: never;
@@ -7084,6 +7826,32 @@ export interface paths {
          */
         get: operations["getGoalsProgress"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/mail-policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The mail policy (0.15.261)
+         * @description 0.15.261. System Admin only (403 `action_forbidden` otherwise). `enabled` is the global switch, `mode` is `internal_only` or `internal_external` for every kind, `kinds` may
+         *     override it per kind. An address is external when its domain is not in `internal_domains` (empty list: every address is internal). External mail also needs the security
+         *     lock `block_public_sharing` to be off (`block_public_sharing` shows its state). Security alerts and mandatory mail are never stopped by the policy.
+         */
+        get: operations["getMailPolicy"];
+        /**
+         * Save the mail policy (System Admin, step-up, reason, If-Match, audited)
+         * @description 0.15.261. Field errors (422 `validation_failed`): `/enabled`, `/mode`, `/internal_domains[/i]`, `/kinds[/kind]` (`unknown_kind`, `invalid`), `unknown_key`. Audited as `mail_policy_update`.
+         */
+        put: operations["setMailPolicy"];
         post?: never;
         delete?: never;
         options?: never;
@@ -7706,6 +8474,39 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/registers/{register_key}/records/{record_id}/triage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * One intake-triage decision on a record (Issue Log, Change Control) (0.15.240)
+         * @description 0.15.240. A record of a triage-enabled register enters the queue `pending` on every insert and waits for one decision of the register's
+         *     Matrix L2 holders of the record's region (a System Admin only when the row has no holder, exactly like an approval; 403
+         *     `action_forbidden` / `not_eligible_holder` otherwise). `If-Match` is the record's version. The decision (`TriageRequest`):
+         *     `accept` lets the record proceed to its normal flow, `defer` keeps it in the queue (a note may say why), `reject` and `merge` void
+         *     the record (409 `invalid_transition` when already decided, or when the record is already approved) and need a note and step-up
+         *     (401 `step_up_required`); `merge` also names the surviving record `duplicate_of` (422 `validation_failed`, `/duplicate_of`, when it
+         *     is missing, the record itself, or not another live record of the same register the caller can see), links it in
+         *     `triage.duplicate_of` and notes the merge on the surviving record's comment thread. A record of a register without triage answers
+         *     404. Audited as `register_record_triage` with before and after; the creator is notified (`triage_decision`).
+         */
+        post: operations["triageRegisterRecord"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/registers/{register_key}/columns/{field_code}/lock": {
         parameters: {
             query?: never;
@@ -7991,6 +8792,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/templates/{template_id}/changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Template ID such as TPL-SITE. */
+                template_id: components["parameters"]["TemplateId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * What changed between two versions of a template (columns added, removed, renamed)
+         * @description P3 (0.15.203). Compares `template_versions.columns` by column code. `to` defaults to the current version, `from` to the version before it. Read only; a caller who may not see the template gets 404 as for `GET /templates`.
+         *     A version that was never issued (for example from > current) answers 404. The first version has nothing to compare: `from` is null and the lists are empty.
+         */
+        get: operations["getTemplateChanges"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/templates/{template_id}/download": {
         parameters: {
             query?: never;
@@ -8101,6 +8926,31 @@ export interface paths {
         };
         /** Preview: rows with action, diff and errors */
         get: operations["listImportBatchRows"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/import-batches/{batch_id}/error-report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Import batch. */
+                batch_id: components["parameters"]["BatchId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The refused rows of a batch as an .xlsx to correct and upload again (0365, P4)
+         * @description The error and duplicate rows written back in the layout of the approved template (hidden `_tpl` sheet, header row as issued) with the values the file had, so the
+         *     corrected file is uploaded as it is, plus the sheet `Errors` (row in the file, key, column, reason code, reason). The reasons are never an extra column of the Data
+         *     sheet (an upload with an extra column is refused). A New sites, stream or Master batch answers the `Errors` sheet alone. Audited as `import_batch.error_report`.
+         */
+        get: operations["downloadImportBatchErrorReport"];
         put?: never;
         post?: never;
         delete?: never;
@@ -10001,6 +10851,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/status-updates/region-health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Region health of the current week (0.15.241, item 12)
+         * @description One row per region the caller may view on `sites` (all seven when unrestricted). `health`, `summary`, `author` and `updated_at` come from the region's Weekly status update of the current working week (it opens on Sunday); they are null and `missing_update` is true when the region has not posted this week. Read only.
+         */
+        get: operations["getRegionHealth"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/status-updates/{update_id}": {
         parameters: {
             query?: never;
@@ -10774,10 +11644,68 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/presence/editing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The other current editors of an entity (0.15.246)
+         * @description 0.15.246 (migration 0345). Advisory "… is editing" presence: the editors of the entity other than the caller whose heartbeat is fresh (2 minutes). The caller themself is never listed.
+         */
+        get: operations["listEditPresence"];
+        put?: never;
+        /**
+         * The caller is editing this entity (heartbeat, 0.15.246)
+         * @description 0.15.246 (migration 0345). Upserts the caller's row and sweeps stale rows. Send every 30 seconds while the editor is open.
+         */
+        post: operations["pingEditPresence"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/presence/editing/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The caller stopped editing this entity (0.15.246)
+         * @description 0.15.246 (migration 0345). Removes the caller's row at once instead of letting it fade out.
+         */
+        post: operations["stopEditPresence"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        MyPush: {
+            enabled: boolean;
+            /** @description The VAPID public key (public by design); null while push is off. */
+            public_key: string | null;
+            count: number;
+            this_browser: boolean;
+        };
+        AdminWebPush: {
+            enabled: boolean;
+            subscriptions: number;
+            users: number;
+            /** Format: date-time */
+            last_pushed_at: string | null;
+        };
         ExportScheduleInput: {
             /** Format: uuid */
             id?: string;
@@ -11560,6 +12488,18 @@ export interface components {
             /** @description The app route to open (a relative path). */
             href: string;
             match_ranges: number[][];
+            /** @description 0.15.155. Documents group: the text around the match inside the file contents (normalised), null when the file matched by name. */
+            snippet?: string | null;
+        };
+        DocumentSearchIndex: {
+            indexed: number;
+            empty: number;
+            unsupported: number;
+            too_large: number;
+            failed: number;
+            pending: number;
+            /** Format: date-time */
+            last_extracted_at: string | null;
         };
         SearchGroup: {
             type: components["schemas"]["SearchType"];
@@ -11669,7 +12609,7 @@ export interface components {
             conflicts?: components["schemas"]["ScopeConflict"][];
         };
         /** @enum {string} */
-        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "plan_locked" | "insufficient_stock" | "item_in_use" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "invalid_code" | "invalid_enrol_code" | "enrol_code_expired" | "password_change_required" | "weak_password" | "internal_error" | "team_scope_mismatch" | "two_factor_enforced" | "scope_scenario_conflict" | "too_many_rows" | "integrity_too_large" | "mail_not_configured" | "self_approval_forbidden" | "document_rule_pending" | "file_pending_scan" | "list_not_configured" | "list_parent_mismatch" | "email_not_verified" | "batch_processing" | "vehicle_already_reserved" | "upload_processing" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "invitation_invalid" | "system_field" | "conversion_unconfirmed" | "column_in_use" | "input_already_mapped" | "field_already_mapped" | "single_admin" | "backup_missing" | "request_expired" | "reset_running" | "plan_incomplete" | "storage_not_supported" | "quarantine_unavailable" | "maintenance" | "scope_changed";
+        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "plan_locked" | "insufficient_stock" | "item_in_use" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "invalid_code" | "invalid_enrol_code" | "enrol_code_expired" | "password_change_required" | "weak_password" | "internal_error" | "team_scope_mismatch" | "two_factor_enforced" | "scope_scenario_conflict" | "too_many_rows" | "integrity_too_large" | "mail_not_configured" | "self_approval_forbidden" | "document_rule_pending" | "file_pending_scan" | "list_not_configured" | "list_parent_mismatch" | "email_not_verified" | "batch_processing" | "vehicle_already_reserved" | "upload_processing" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "invitation_invalid" | "system_field" | "conversion_unconfirmed" | "column_in_use" | "input_already_mapped" | "field_already_mapped" | "single_admin" | "backup_missing" | "request_expired" | "reset_running" | "plan_incomplete" | "storage_not_supported" | "quarantine_unavailable" | "maintenance" | "scope_changed" | "thumbnail_unsupported" | "thumbnails_unavailable";
         PageEnvelope: {
             items: unknown[];
             page: components["schemas"]["PageInfo"];
@@ -11717,6 +12657,20 @@ export interface components {
             /** @description 0.12.6 (Q18): the existing assignments this row overlaps (dates, region and module). */
             conflicts?: string[];
         };
+        RegisterState: {
+            register_key: string;
+            name_en: string;
+            name_ar?: string | null;
+            module_key?: string;
+            enabled: boolean;
+            locked: boolean;
+            reason?: string | null;
+            /** Format: date-time */
+            changed_at?: string | null;
+            version: number;
+            /** @description Current records that are not voided. */
+            records: number;
+        };
         Reason: string;
         /** @description Typed confirmation of a dangerous action (0.2.5). Must equal the target code or name named by the operation; a mismatch is 422 `confirmation_mismatch`. Optional: omitted means no typed check. */
         ConfirmText: string;
@@ -11760,7 +12714,7 @@ export interface components {
          * @description Part key. Every register key used by `/registers` (including `dismantle`), plus the four non-register parts.
          * @enum {string}
          */
-        ExportPartKey: "procurement" | "contractors" | "gecol" | "hlc" | "permits_hse" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "dismantle" | "car_dispatcher" | "financial_advances" | "incidents" | "lessons_learned" | "sites" | "milestones" | "tasks" | "project_status" | "rf_design" | "acquisition";
+        ExportPartKey: "procurement" | "contractors" | "gecol" | "hlc" | "permits_hse" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "dismantle" | "car_dispatcher" | "financial_advances" | "incidents" | "lessons_learned" | "invoices" | "deliverables" | "sites" | "milestones" | "tasks" | "project_status" | "rf_design" | "acquisition";
         ExportPart: {
             key: components["schemas"]["ExportPartKey"];
             label_en: string;
@@ -12070,8 +13024,8 @@ export interface components {
             theme?: "light" | "dark";
             /** @description 0.15.41. The personal UI design; null goes back to the organization default. While `identity.allow_user_choice` is false a non-null value is 403 `field_read_only` (`errors[0]` `{path: /ui_brand, code: brand_choice_locked}`); null stays allowed. Audited in `profile_updated`. */
             ui_brand?: components["schemas"]["UiBrand"] | null;
-            /** @description 0.15.230 (0241). The personal appearance choices; a subset of the dimensions. While `identity.allow_user_choice` is false a value is 403 `field_read_only` (`errors[0]` `{path: /ui_prefs, code: appearance_choice_locked}`). Audited per dimension in `profile_updated`. */
-            ui_prefs?: components["schemas"]["UiPrefs"];
+            /** @description 0.15.230 (0241). The personal appearance choices; a subset of the dimensions. While `identity.allow_user_choice` is false a value is 403 `field_read_only` (`errors[0]` `{path: /ui_prefs, code: appearance_choice_locked}`). Audited per dimension in `profile_updated`. 0.15.231 (0242): gains the key `sidebar` (`UiNav`, the personal sidebar); a sidebar-only change stays allowed while the appearance is locked. */
+            ui_prefs?: components["schemas"]["UiPrefsSelf"];
         };
         /** @description 0.9.2. The "My profile" page. */
         MyProfile: {
@@ -12095,8 +13049,8 @@ export interface components {
             ui_brand: components["schemas"]["UiBrand"] | null;
             /** @description 0.15.41. The design the user sees. */
             brand: components["schemas"]["UiBrand"];
-            /** @description 0.15.230 (0241). The stored personal appearance choices; empty = the organization defaults. */
-            ui_prefs: components["schemas"]["UiPrefs"];
+            /** @description 0.15.230 (0241). The stored personal appearance choices; empty = the organization defaults. 0.15.231 (0242): may carry the key `sidebar` (`UiNav`). */
+            ui_prefs: components["schemas"]["UiPrefsSelf"];
             /** @description 0.15.230 (0241). The appearance the user sees (ui_effective_prefs): own choices, else the organization defaults. */
             appearance: components["schemas"]["UiPrefs"];
             /** @description 0.15.41. The organization default and whether a personal design is allowed (drives the Appearance control). */
@@ -12174,8 +13128,8 @@ export interface components {
             ui_brand?: components["schemas"]["UiBrand"] | null;
             /** @description 0.15.41. The design the user sees: `ui_brand` while the admin allows a personal choice and one is set, else the organization default. Independent of `theme`. */
             brand?: components["schemas"]["UiBrand"];
-            /** @description 0.15.230 (0241). The stored personal appearance choices; empty = the organization defaults. */
-            ui_prefs?: components["schemas"]["UiPrefs"];
+            /** @description 0.15.230 (0241). The stored personal appearance choices; empty = the organization defaults. 0.15.231 (0242): may carry the key `sidebar` (`UiNav`). */
+            ui_prefs?: components["schemas"]["UiPrefsSelf"];
             /** @description 0.15.230 (0241). The appearance the user sees (ui_effective_prefs): own choices, else the organization defaults. */
             appearance?: components["schemas"]["UiPrefs"];
             is_break_glass?: boolean;
@@ -14527,6 +15481,25 @@ export interface components {
                 phone?: components["schemas"]["StaffFieldVisibility"];
             };
         };
+        TemplateChanges: {
+            template_id: string;
+            from: number | null;
+            to: number;
+            /** Format: date-time */
+            issued_at: string | null;
+            reason: string | null;
+            added: components["schemas"]["TemplateColumnRef"][];
+            removed: components["schemas"]["TemplateColumnRef"][];
+            renamed: {
+                code: string;
+                from_label: string;
+                to_label: string;
+            }[];
+        };
+        TemplateColumnRef: {
+            code: string;
+            label: string;
+        };
         Template: {
             /**
              * @example TPL-SITE
@@ -14781,6 +15754,8 @@ export interface components {
                 admin_approved?: number;
                 /** @description 0087: of those, the rows approved with missing data (flagged `incomplete`). */
                 incomplete?: number;
+                /** @description 0365 (P4): of the `error` rows, those refused because the same record is already in the file (`duplicate_in_file`). Counted inside `error`, shown as a category of its own. */
+                duplicate?: number;
             };
             /** @description Always null (a big upload reports its progress in `progress`, 0.15.3). */
             job_id?: string | null;
@@ -15724,16 +16699,102 @@ export interface components {
             default_tab: "all" | "priority" | "mentions" | "tasks" | "approvals" | "system";
             priority_kinds: ("mention" | "followed_change" | "task_assigned" | "task_returned" | "task_rejected" | "task_approved" | "approval_due" | "reassigned" | "absence_alert" | "idle_task_alert" | "no_holder" | "system")[];
         };
+        /** @description 0.15.311. The Data hub: which widgets of the landing page show, the badge on Uploads & batches, and the default view of each hub list screen. */
+        UiDataHub: {
+            widgets: {
+                quick_bar: boolean;
+                batches: boolean;
+                template_changes: boolean;
+                recent: boolean;
+                health: boolean;
+                admin: boolean;
+            };
+            badge: boolean;
+            default_view: {
+                /** @enum {string} */
+                templates: "cards" | "rows" | "table" | "compact";
+                /** @enum {string} */
+                uploads: "cards" | "rows" | "table" | "compact";
+                /** @enum {string} */
+                exports: "cards" | "rows" | "table" | "compact";
+                /** @enum {string} */
+                master_import: "cards" | "rows" | "table" | "compact";
+            };
+        };
+        DataHubBatch: {
+            /** Format: uuid */
+            id: string;
+            file_name: string;
+            /**
+             * @description send: the caller uploaded it and has not sent it; review_l2: the caller may approve it; returned: it came back to the caller; checking: still being staged (listed, not counted).
+             * @enum {string}
+             */
+            action: "send" | "review_l2" | "returned" | "checking";
+            status: string;
+            template_id: string;
+            template_version: number;
+            register_key?: string | null;
+            stream?: string | null;
+            counts: {
+                valid: number;
+                invalid: number;
+            };
+            /** Format: date-time */
+            uploaded_at?: string | null;
+            progress_pct?: number | null;
+        };
+        DataHubTemplateChange: {
+            template_id: string;
+            name_en: string;
+            name_ar?: string | null;
+            version: number;
+            /** Format: date-time */
+            issued_at: string;
+            reason?: string | null;
+            added: string[];
+            removed: string[];
+            renamed: string[];
+            /** @description The version of the caller last download of this template (null when never downloaded). */
+            my_version?: number | null;
+            mine_is_old: boolean;
+        };
+        DataHubDownload: {
+            template_id: string;
+            version?: number | null;
+            prefill: boolean;
+            /** Format: date-time */
+            at: string;
+        };
+        DataHubSummary: {
+            batches: {
+                count: number;
+                items: components["schemas"]["DataHubBatch"][];
+            };
+            template_changes: components["schemas"]["DataHubTemplateChange"][];
+            my_downloads: components["schemas"]["DataHubDownload"][];
+        };
+        /** @description 0.15.251. How the bell opens the notifications. */
+        UiPanel: {
+            /** @enum {string} */
+            mode: "popover" | "side_panel";
+            /** @enum {string} */
+            width: "narrow" | "medium" | "wide";
+            show_tabs: boolean;
+        };
         /** @description 0.15.185. The sections of the interface features setting; every section is complete. */
         UiFeatures: {
             avatars: components["schemas"]["UiAvatars"];
             new_badge: components["schemas"]["UiNewBadge"];
             inbox: components["schemas"]["UiInbox"];
+            data_hub: components["schemas"]["UiDataHub"];
+            panel: components["schemas"]["UiPanel"];
         };
         UiFeaturesPatch: {
             avatars?: components["schemas"]["UiAvatars"];
             new_badge?: components["schemas"]["UiNewBadge"];
             inbox?: components["schemas"]["UiInbox"];
+            data_hub?: components["schemas"]["UiDataHub"];
+            panel?: components["schemas"]["UiPanel"];
         };
         UiFeaturesSetting: {
             sections: components["schemas"]["UiFeatures"];
@@ -15741,6 +16802,74 @@ export interface components {
             /** Format: date-time */
             updated_at?: string;
             updated_by?: components["schemas"]["UserRef"];
+        };
+        AlertRule: {
+            /** Format: uuid */
+            id: string;
+            code: string;
+            /** @enum {string} */
+            kind: "weekly_status_missing" | "record_idle";
+            params: {
+                [key: string]: unknown;
+            };
+            /** @description {"type":"system_admin"} or {"type":"module","module":"<module key>"}. */
+            audience: {
+                [key: string]: unknown;
+            };
+            title_en: string;
+            title_ar: string;
+            body_en: string;
+            body_ar: string;
+            link: string | null;
+            enabled: boolean;
+            /** @description The If-Match of PUT /settings/alert-rules/{id}. */
+            version: number;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        AlertRuleInput: {
+            code: string;
+            /** @enum {string} */
+            kind: "weekly_status_missing" | "record_idle";
+            params: {
+                [key: string]: unknown;
+            };
+            audience: {
+                [key: string]: unknown;
+            };
+            title_en: string;
+            title_ar: string;
+            body_en: string;
+            body_ar: string;
+            link?: string | null;
+            enabled?: boolean;
+        };
+        AlertRuleSaved: {
+            /** Format: uuid */
+            id: string;
+            version: number;
+        };
+        AlertRulesResponse: {
+            rules: components["schemas"]["AlertRule"][];
+            catalogue: {
+                kinds: {
+                    kind: string;
+                    params: string[];
+                }[];
+                audiences: ("system_admin" | "module")[];
+                registers: {
+                    register_key: string;
+                    name_en: string;
+                    name_ar: string | null;
+                    module_key: string;
+                }[];
+                modules: {
+                    key: string;
+                    name_en: string;
+                }[];
+            };
         };
         IdleTaskAlertSetting: {
             enabled: boolean;
@@ -16043,6 +17172,8 @@ export interface components {
             selected: boolean;
             /** @description In the closure only because a chosen part takes it along. */
             added: boolean;
+            /** @description 0.15.265. The part can be narrowed to regions, batches or a period (its data follows one register record). */
+            narrowable?: boolean;
         };
         DataResetScope: {
             /** @description 1; 0 for a request made before 0.15.71 (`legacy`: everything as it was then). */
@@ -16056,8 +17187,48 @@ export interface components {
             everything?: boolean;
             /** @description The identity parts of the closure. */
             identity?: components["schemas"]["DataResetPartCode"][];
-            /** @description SHA-256 of the closure. */
+            /** @description SHA-256 of the closure (with the narrowing when there is one). */
             hash?: string;
+            /** @description 0.15.265. The narrowing of the scope (normal form), null when the whole part goes. */
+            narrow?: components["schemas"]["DataResetNarrow"] | null;
+        };
+        /** @description 0.15.265. Narrows the chosen register parts to the entities that match every given key. */
+        DataResetNarrow: {
+            /** @description Region ids (any of). */
+            regions?: number[];
+            /** @description Import batch ids (any of): the record came from the batch directly or through a row. */
+            batches?: string[];
+            /**
+             * Format: date
+             * @description First-created day, inclusive (Africa/Tripoli).
+             */
+            from?: string;
+            /**
+             * Format: date
+             * @description First-created day, inclusive (Africa/Tripoli).
+             */
+            to?: string;
+            readonly version?: number;
+        };
+        DataResetNarrowOptions: {
+            narrowable: components["schemas"]["DataResetPartCode"][];
+            regions: {
+                id: number;
+                code: string;
+                name_en: string;
+                name_ar?: string | null;
+            }[];
+            batches: {
+                /** Format: uuid */
+                id: string;
+                file_name: string;
+                register_key?: string | null;
+                rows_total: number;
+                status: string;
+                /** Format: date-time */
+                created_at: string;
+                historical_load?: boolean;
+            }[];
         };
         DataResetPlan: {
             scope: components["schemas"]["DataResetScope"];
@@ -16072,6 +17243,8 @@ export interface components {
             error?: string | null;
             /** @description 0.15.71. The catalogue in screen order, with the rows of each part and whether the scope selects it. */
             parts: components["schemas"]["DataResetPart"][];
+            /** @description 0.15.265. The narrowing the counts are for. */
+            narrow?: components["schemas"]["DataResetNarrow"] | null;
         };
         DataResetFiles: {
             total: number;
@@ -16363,7 +17536,7 @@ export interface components {
             required_missing?: number | null;
         };
         /** @enum {string} */
-        RegisterKey: "procurement" | "contractors" | "gecol" | "hlc" | "permits_hse" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "dismantle" | "car_dispatcher" | "financial_advances" | "incidents" | "lessons_learned";
+        RegisterKey: "procurement" | "contractors" | "gecol" | "hlc" | "permits_hse" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "dismantle" | "car_dispatcher" | "financial_advances" | "incidents" | "lessons_learned" | "invoices" | "deliverables";
         RegisterField: {
             code: string;
             label_en: string;
@@ -16390,6 +17563,8 @@ export interface components {
                 label_ar?: string | null;
                 /** @description 0.12.5. Functional groups of the value (for example CW, TE; closed for an action status). */
                 groups?: string[];
+                /** @description 0.15.244. The colour set for the value in Settings, Lists (#RRGGBB); null when none. Display only. */
+                colour?: string | null;
             }[];
         };
         /** @description 0.12.5 (Q104). The list catalogue a list field reads. */
@@ -16605,6 +17780,8 @@ export interface components {
              * @constant
              */
             approval_levels: 2;
+            /** @description 0.15.240. Intake triage on the register (the Issue Log and the Change Control Log): new records and new versions enter the queue (`pending`) and wait for a triage decision. */
+            triage_enabled?: boolean;
             /** @description Base fields plus active custom fields visible to the caller. */
             fields: components["schemas"]["RegisterField"][];
             record_count?: number;
@@ -16629,6 +17806,10 @@ export interface components {
         /** @enum {string} */
         RegisterRecordState: "entry" | "in_review" | "in_approval" | "approved" | "voided";
         RegisterRecord: {
+            /** @description 0.15.260. Values this record shows from another register by the rules of `derive.rules`, keyed by the rule output. Only the configured value, never the source record. */
+            derived?: {
+                [key: string]: unknown;
+            };
             /** @description 0.15.90. GECOL and HLC records only: the Contractor company from Procurement by Site ID (read only, never stored on the record). HLC: the company of the Procurement record it links to; otherwise the company of the latest approved Procurement record of the site that names one. Absent when none. `external_party` of a GECOL or HLC record stays what the approval rules use (the party the record itself is approved for). */
             procurement_contractor?: components["schemas"]["ExternalPartyRef"];
             /** @description 0.15.83. Read only. The evidence of the record: its mandatory document slots (the same rules as the Site Master cell `docs`). Absent when the record needs no document. */
@@ -16668,7 +17849,20 @@ export interface components {
             external_party?: components["schemas"]["ExternalPartyRef"];
             return_count?: number;
             last_return_note?: string | null;
-            allowed_actions?: ("edit" | "submit" | "review" | "approve" | "reject" | "void" | "claim" | "release" | "new_version" | "transfer" | "cancel_snag")[];
+            allowed_actions?: ("edit" | "submit" | "review" | "approve" | "reject" | "void" | "claim" | "release" | "new_version" | "transfer" | "cancel_snag" | "triage")[];
+            /** @description 0.15.240. The intake triage of a record of a triage-enabled register (absent while the record was never queued). */
+            triage?: {
+                state: components["schemas"]["TriageState"];
+                note: string | null;
+                by?: components["schemas"]["UserRef"];
+                /** Format: date-time */
+                at: string | null;
+                /**
+                 * Format: uuid
+                 * @description For a record merged as a duplicate: the surviving record.
+                 */
+                duplicate_of: string | null;
+            };
             /**
              * Format: uuid
              * @description The logical record; every version of it shares this id. The approved values are projected into the register table with the same id.
@@ -17079,6 +18273,26 @@ export interface components {
             version: number;
             can_edit: boolean;
         };
+        /** @description 0.15.203. The setting `templates.change_notice`. */
+        TemplateChangeNotice: {
+            enabled: boolean;
+            days: number;
+            /** @description 14 */
+            default_days: number;
+            min: number;
+            max: number;
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+            /** @description The ETag value. */
+            version: number;
+            can_edit: boolean;
+        };
+        TemplateChangeNoticeInput: {
+            enabled: boolean;
+            days: number;
+            reason: string;
+        };
         /** @description 0.15.1. A sub-heading of the side menu (under a main heading): screen keys only, no deeper level. */
         NavSubHeading: {
             /** @description Unique among all headings. */
@@ -17119,6 +18333,23 @@ export interface components {
             menu_style?: "default" | "rail" | "autohide";
             /** @enum {string} */
             accent?: "default" | "teal" | "blue" | "violet" | "green" | "orange" | "red" | "amber";
+            /**
+             * @description 0.15.248 (0347): the high-contrast mode.
+             * @enum {string}
+             */
+            contrast?: "standard" | "high";
+        };
+        /** @description 0.15.231 (0242): the personal sidebar (proposal item 4). `hidden` the screens the menu does not show, `order` their order inside their heading (a screen the list does not name keeps the organization order, after the named ones), `badge_style` how the count badges draw (full = the number, dot = a dot, none = no badge), `pins` the pinned shortcuts on top (at most 20). A menu key is a short lowercase id (the entries of the side menu; an unknown key is ignored). */
+        UiNav: {
+            hidden?: string[];
+            order?: string[];
+            /** @enum {string} */
+            badge_style?: "full" | "dot" | "none";
+            pins?: string[];
+        };
+        UiPrefsSelf: components["schemas"]["UiPrefs"] & {
+            /** @description 0.15.231 (0242): the personal sidebar. Never an organization default; a `ui_prefs` body without it keeps the stored sidebar, and a body that names only `sidebar` keeps the stored appearance dimensions. While `identity.allow_user_choice` is false a sidebar-only change stays allowed. */
+            sidebar?: components["schemas"]["UiNav"];
         };
         /** @description 0.15.41. Settings, Identity & themes (setting `ui.identity`, migration 0130). */
         UiIdentity: {
@@ -17132,6 +18363,8 @@ export interface components {
                 [key: string]: string[];
             };
             brands: components["schemas"]["UiBrand"][];
+            /** @description 0.15.232 (0243): the workspace logo (ui_asset_state). null: none was uploaded; the sidebar shows the built-in badge. */
+            logo?: components["schemas"]["UiAsset"] | null;
             /** Format: date-time */
             updated_at?: string | null;
             updated_by?: components["schemas"]["UserRef"] | null;
@@ -17139,6 +18372,41 @@ export interface components {
             version: number;
             /** @description A System Admin or a delegate of `settings` edit for all regions. */
             can_edit: boolean;
+        };
+        /** @description 0.15.232 (0243). An identity image (migration 0243, table ui_assets). The bytes are served by `GET /ui/assets/{key}`; this is the metadata. */
+        UiAsset: {
+            /** @description 'logo' today. */
+            key: string;
+            /** @description Shown on the sign-in pages (public). false by default; an admin turns it on in Settings > Identity. */
+            show_on_login: boolean;
+            /** @description Used as the browser tab icon (public). false by default. */
+            use_as_favicon: boolean;
+            /** @enum {string} */
+            mime: "image/png" | "image/jpeg" | "image/svg+xml" | "image/webp";
+            /** @description false hides it (the row stays: hide never delete). */
+            enabled: boolean;
+            /** @description The asset ETag value (If-Match on the logo endpoints). */
+            version: number;
+            /** Format: date-time */
+            updated_at?: string;
+            updated_by?: components["schemas"]["UserRef"] | null;
+        };
+        UiAssetDisplayInput: {
+            show_on_login: boolean;
+            use_as_favicon: boolean;
+            reason: string;
+        };
+        UiPublicIdentity: {
+            login: components["schemas"]["UiPublicLogo"] | null;
+            favicon: components["schemas"]["UiPublicLogo"] | null;
+        };
+        UiPublicLogo: {
+            version: number;
+            /** @enum {string} */
+            mime: "image/png" | "image/jpeg" | "image/svg+xml" | "image/webp";
+        };
+        UiAssetEnabledInput: components["schemas"]["WithReason"] & {
+            enabled: boolean;
         };
         UiIdentityInput: components["schemas"]["WithReason"] & {
             default_brand: components["schemas"]["UiBrand"];
@@ -17152,6 +18420,89 @@ export interface components {
             /** @description Empty: the English label shows. */
             label_ar: string;
             url: string;
+        };
+        MediaThumbnails: {
+            enabled: boolean;
+            small_px: number;
+            /** @description Larger than small_px. */
+            medium_px: number;
+            quality: number;
+            /** @enum {string} */
+            format: "webp" | "jpeg";
+            max_source_mb: number;
+        };
+        /** @description 0.15.292. Setting `media.gallery` (migration 0396). */
+        MediaSettings: {
+            enabled: boolean;
+            snag_photos: boolean;
+            document_kinds: ("photo" | "scanned_document" | "email" | "report" | "excel_template")[];
+            /** @description Empty: every register. */
+            register_keys: string[];
+            /** @description Task and site slots (no register). */
+            include_site_documents: boolean;
+            exclude_doc_codes: string[];
+            image_only: boolean;
+            /** @description Whether withdrawn and rejected items can be listed (they are never deleted). */
+            show_withdrawn: boolean;
+            page_size: number;
+            thumbnails: components["schemas"]["MediaThumbnails"];
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+            /** @description The ETag value. */
+            version: number;
+            can_edit: boolean;
+            thumbnails_available: boolean;
+        };
+        MediaSettingsInput: components["schemas"]["WithReason"] & {
+            enabled: boolean;
+            snag_photos: boolean;
+            document_kinds: string[];
+            register_keys: string[];
+            include_site_documents: boolean;
+            exclude_doc_codes: string[];
+            image_only: boolean;
+            show_withdrawn: boolean;
+            page_size: number;
+            thumbnails: components["schemas"]["MediaThumbnails"];
+        };
+        MediaItem: {
+            /** @enum {string} */
+            kind: "document_file" | "snag_photo";
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            uploaded_at: string;
+            /** Format: uuid */
+            uploaded_by?: string;
+            /** @enum {string} */
+            state: "current" | "superseded" | "withdrawn" | "rejected" | "pending_evidence";
+            version?: number | null;
+            slot_status?: string | null;
+            snag_status?: string | null;
+            mime_type: string;
+            name?: string | null;
+            size_bytes: number;
+            shot_type?: string | null;
+            type: {
+                code: string;
+                name_en: string;
+                name_ar?: string | null;
+                kind?: string | null;
+            };
+            site?: Record<string, never> | null;
+            /** @description The owning record: {kind: snag|register|task|site, ...ids}. */
+            link: Record<string, never>;
+            has_thumbnail: boolean;
+            download_url: string;
+        };
+        MediaItemPage: {
+            enabled: boolean;
+            items: components["schemas"]["MediaItem"][];
+            page: {
+                limit: number;
+                next_cursor: string | null;
+            };
         };
         /** @description 0.15.97. Settings, Screens, Login page (setting `ui.login_page`, migration 0197). */
         LoginPage: {
@@ -17195,6 +18546,27 @@ export interface components {
             animation: boolean;
             default_locale: ("en" | "ar") | null;
             support_links: components["schemas"]["SupportLink"][];
+        };
+        /** @description 0.15.193. The download lock categories (setting `security.download_locks`, migration 0293). */
+        DownloadLocks: {
+            /** @description true: the blank template download answers 403 `download_locked`. */
+            templates: boolean;
+            /** @description true: the single uploaded file download answers 403 `download_locked` (the on-screen preview uses the same route). */
+            uploaded_files: boolean;
+            /** @description true: a generated library document download or print answers 403 `download_locked` (`purpose=view` stays open). */
+            generated_documents: boolean;
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+            /** @description The ETag value. */
+            version: number;
+            /** @description A System Admin only. */
+            can_edit: boolean;
+        };
+        DownloadLocksInput: components["schemas"]["WithReason"] & {
+            templates: boolean;
+            uploaded_files: boolean;
+            generated_documents: boolean;
         };
         /** @description 0.15.190. The admin lock keys (setting `security.locks`, migration 0290). */
         SecurityLocks: {
@@ -17240,6 +18612,48 @@ export interface components {
             rights: ("templates.edit" | "fields.edit" | "documents.edit" | "warehouse.items.edit")[];
             /** @description Omitted = default_hours. */
             hours?: number;
+        };
+        /** @description 0.15.194. The passkey setting (`security.passkeys`, migration 0294). */
+        PasskeySetting: {
+            /** @description false until a System Admin turns it on. */
+            enabled: boolean;
+            /** @description Whether the workspace address (APP_BASE_URL, https) is set, so a relying party exists. */
+            ready: boolean;
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+            /** @description The ETag value. */
+            version: number;
+            can_edit: boolean;
+        };
+        PasskeySettingInput: components["schemas"]["WithReason"] & {
+            enabled: boolean;
+        };
+        PasskeyItem: {
+            /** Format: uuid */
+            id: string;
+            label: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            last_used_at: string | null;
+            /** @enum {string} */
+            device_type: "singleDevice" | "multiDevice";
+            backed_up: boolean;
+        };
+        MyPasskeys: {
+            enabled: boolean;
+            ready: boolean;
+            /** @description True only when the account has two-step verification on and enrolled. */
+            can_add: boolean;
+            items: components["schemas"]["PasskeyItem"][];
+        };
+        PasskeySignInOptions: {
+            available: boolean;
+            /** @description The WebAuthn request options, or null. */
+            options: {
+                [key: string]: unknown;
+            } | null;
         };
         /** @description 0.15.192. The new-device email code setting (`security.new_device_code`, migration 0292). */
         NewDeviceCodeSetting: {
@@ -17319,6 +18733,32 @@ export interface components {
             /** @description Notification kinds that are also mailed to the person. An empty list keeps every notification in-app. */
             kinds: string[];
         };
+        MailPolicyInput: {
+            enabled: boolean;
+            /** @enum {string} */
+            mode: "internal_only" | "internal_external";
+            internal_domains: string[];
+            kinds: {
+                [key: string]: {
+                    enabled: boolean;
+                    /** @enum {string} */
+                    mode: "inherit" | "internal_only" | "internal_external";
+                };
+            };
+        };
+        /** @description 0.15.261. The setting `mail.policy`. */
+        MailPolicy: components["schemas"]["MailPolicyInput"] & {
+            version: number;
+            /** @description The security lock; while on, no external mail is sent. */
+            block_public_sharing: boolean;
+            catalogue: {
+                kind: string;
+                recommended: boolean;
+            }[];
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+        };
         /** @description 0.14.2 (Q441). The setting `mail.notification_kinds` and the kinds it may name. */
         MailNotificationKinds: {
             kinds: string[];
@@ -17343,6 +18783,10 @@ export interface components {
             procurement: components["schemas"]["DashboardOpsProcurement"];
             permits_hse: components["schemas"]["DashboardOpsPermitsHse"];
             gecol_hlc: components["schemas"]["DashboardOpsGecolHlc"];
+            contractor_scorecard: components["schemas"]["DashboardOpsScorecard"];
+            quality: components["schemas"]["DashboardOpsQuality"];
+            approvals: components["schemas"]["DashboardOpsApprovals"];
+            changes_meetings: components["schemas"]["DashboardOpsChangesMeetings"];
         };
         /** @description 0.15.106: procurement and materials (dashboard proposals item 1). */
         DashboardOpsProcurement: {
@@ -17451,6 +18895,135 @@ export interface components {
             civil_ready_no_power: number | null;
             /** @description HLC only: installation_date set but not in service yet; null in the GECOL part. */
             installed_not_in_service: number | null;
+        };
+        /** @description 0.15.204 (item 7): the tasks waiting for review or approval, their ages since the level opened, and the bottleneck role. */
+        DashboardOpsApprovals: {
+            /** @description False when the caller lacks the approvals or the sites view; every figure is then null. */
+            available: boolean;
+            /** @description The waiting tasks (states in_review and in_approval, as the Approvals inbox). */
+            total: number | null;
+            /** @description The waiting tasks at a review level. */
+            review: number | null;
+            /** @description The waiting tasks at an approve level. */
+            approve: number | null;
+            waiting: components["schemas"]["DashboardOpsAging"] | null;
+            /** @description One entry per ball-in-court role, most waiting tasks first. */
+            by_role: {
+                /** Format: uuid */
+                role_id: string;
+                name_en: string;
+                name_ar: string | null;
+                /** @description The waiting tasks whose ball-in-court role is this one. */
+                count: number;
+                /** @description The age of the oldest waiting task of the role, calendar days. */
+                oldest_days: number | null;
+                buckets: {
+                    /** @enum {string} */
+                    key: "d0_7" | "d8_14" | "d15_30" | "over_30";
+                    count: number;
+                }[];
+            }[] | null;
+            /** @description The waiting tasks with no ball-in-court role (a group holds them, or nobody yet). */
+            unassigned: number | null;
+        };
+        /** @description 0.15.205 (item 8): the pending change requests and the overdue meeting actions. */
+        DashboardOpsChangesMeetings: {
+            /** @description False when the caller has neither the change control nor the meetings view. */
+            available: boolean;
+            changes: {
+                /** @description False without the change control view; every figure is then null. */
+                available: boolean;
+                /** @description Change requests with status requested. */
+                pending: number | null;
+                /** @description Change requests approved and not yet applied. */
+                approved_not_applied: number | null;
+                /** @description The pending change requests per kind, most first. */
+                by_kind: {
+                    /** @enum {string} */
+                    kind: "scope_change" | "date_change" | "suspension" | "resumption" | "other";
+                    count: number;
+                }[] | null;
+                pending_aging: components["schemas"]["DashboardOpsAging"] | null;
+            };
+            actions: {
+                /** @description False without the meetings view; every figure is then null. */
+                available: boolean;
+                /** @description Meeting actions open or in progress. */
+                open: number | null;
+                /** @description Open actions whose due date is before today. */
+                overdue: number | null;
+                /** @description Open actions with no due date. */
+                no_due_date: number | null;
+                overdue_aging: components["schemas"]["DashboardOpsAging"] | null;
+            };
+        };
+        /** @description 0.15.203 (item 6): the open snags and NCRs of the in-scope sites, the average closure age of each and the first-time acceptance rate. */
+        DashboardOpsQuality: {
+            /** @description False when the caller lacks the quality view; every figure is then null. */
+            available: boolean;
+            snags: {
+                /** @description Snags of the active, not cancelled sites whose status is open, fix_uploaded or in_review. */
+                open: number;
+                /** @description Snags of those sites whose status is closed. */
+                closed: number;
+                /** @description The mean days from raised_at to closed_at over the closed snags, one decimal; null when none closed. */
+                avg_close_days: number | null;
+                /** @description The open snags returned at least once (return_count over 0). */
+                returned_open: number;
+            } | null;
+            ncrs: {
+                /** @description Quality records of record type ncr with no closed_date. */
+                open: number;
+                /** @description Quality records of record type ncr with a closed_date. */
+                closed: number;
+                /** @description The mean days from raised_date to closed_date over the closed NCRs, one decimal; null when none closed. */
+                avg_close_days: number | null;
+            } | null;
+            /** @description The share of the decided inspections (result Pass or Fail) whose result is Pass, one decimal; null when no inspection is decided. The data keeps no re-inspection marker, so this is the acceptance rate of all decided inspections. */
+            first_pass_pct: number | null;
+        };
+        /** @description 0.15.202: the contractor and supplier scorecard (dashboard proposals item 5), the aggregate of the contractor performance report. No amounts. */
+        DashboardOpsScorecard: {
+            /** @description False when the caller may not see the contractors register; the other fields are then null. */
+            available: boolean;
+            /** @description The active parties in scope. */
+            parties: number | null;
+            /** @description The parties per overall level of the performance report. */
+            by_level: {
+                ok: number;
+                amber: number;
+                red: number;
+                insufficient: number;
+            } | null;
+            /** @description The mean delay days over the parties that have any delay, one decimal; null when nobody is delayed. */
+            avg_delay_days: number | null;
+            /** @description The share of snags not overdue (the on-time rectification rate), one decimal; null when there are no snags. */
+            on_time_pct: number | null;
+            /** @description The share of failed quality inspections (the rejection / NCR rate), one decimal; null when there are no inspections. */
+            quality_fail_pct: number | null;
+            snags: {
+                total: number;
+                open: number;
+                overdue: number;
+                returned: number;
+            } | null;
+            quality: {
+                total: number;
+                failed: number;
+            } | null;
+            /** @description The five worst parties (worst first), no amounts. */
+            worst: components["schemas"]["DashboardOpsScorecardWorst"][] | null;
+        };
+        DashboardOpsScorecardWorst: {
+            /** Format: uuid */
+            party_id: string;
+            name: string;
+            type: string;
+            /** @enum {string} */
+            level: "ok" | "amber" | "red" | "insufficient";
+            delay_days: number;
+            snags_overdue: number;
+            quality_failed: number;
         };
         DashboardTabLayout: {
             /** @description Card codes in display order. */
@@ -17564,6 +19137,40 @@ export interface components {
                 }[];
             };
         };
+        DeriveRule: {
+            key: string;
+            enabled: boolean;
+            /** @description The register that shows the value. */
+            target_register: string;
+            /** @description The name of the value in `RegisterRecord.derived`. */
+            output: string;
+            /** @description Another register. */
+            source_register: string;
+            /** @description `external_party` (the company of the source record) or a field code of the source register. */
+            source: string;
+            /** @description A field of the target register that holds the record id or entity id of the source record; null = match by site only. */
+            link_field: string | null;
+            /** @description With a link field: when the link is empty, fall back to the latest approved source record of the same site (default false; HLC keeps it). */
+            site_fallback?: boolean;
+        };
+        DeriveRulesInput: {
+            rules: components["schemas"]["DeriveRule"][];
+        };
+        /** @description 0.15.260. Seed: the GECOL and HLC contractor from Procurement (the rules that were hard-coded). */
+        DeriveRules: components["schemas"]["DeriveRulesInput"] & {
+            version: number;
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+            registers: {
+                register_key: string;
+                fields: {
+                    code: string;
+                    label_en: string;
+                    label_ar?: string | null;
+                }[];
+            }[];
+        };
         GecolOrderWarningsInput: {
             enabled: boolean;
             chains: string[][];
@@ -17588,7 +19195,7 @@ export interface components {
             id: string;
             level: number;
             /** @enum {string} */
-            action: "create" | "edit" | "submit" | "review" | "approve" | "reject" | "auto_skip" | "claim" | "release" | "new_version" | "void" | "transfer";
+            action: "create" | "edit" | "submit" | "review" | "approve" | "reject" | "auto_skip" | "claim" | "release" | "new_version" | "void" | "transfer" | "triage_accept" | "triage_reject" | "triage_merge" | "triage_defer";
             acted_by?: components["schemas"]["UserRef"];
             note?: string | null;
             before_state?: components["schemas"]["RegisterRecordState"];
@@ -17613,6 +19220,23 @@ export interface components {
                 type: string;
                 scopes: string[] | null;
             }[];
+        };
+        /**
+         * @description 0.15.240. Intake triage: waiting (`pending`, `deferred`) or decided (`accepted`, `rejected`, `merged`).
+         * @enum {string}
+         */
+        TriageState: "pending" | "accepted" | "deferred" | "rejected" | "merged";
+        /** @description 0.15.240: one intake-triage decision. The note is required for `reject` and `merge`; `merge` also names the surviving record. */
+        TriageRequest: {
+            /** @enum {string} */
+            action: "accept" | "reject" | "merge" | "defer";
+            note?: string;
+            /**
+             * Format: uuid
+             * @description With `merge`: the surviving record of the same register.
+             */
+            duplicate_of?: string;
+            via?: components["schemas"]["WorkflowVia"];
         };
         RegisterRecordInput: {
             /**
@@ -17639,7 +19263,7 @@ export interface components {
         PhotoRules: {
             min_count?: number;
             shot_types?: string[];
-            formats?: ("JPG" | "PNG" | "HEIC")[];
+            formats?: ("JPG" | "PNG" | "HEIC" | "WEBM" | "MP4" | "MOV")[];
             max_size_mb?: number;
         };
         DocumentPlacement: {
@@ -19252,13 +20876,13 @@ export interface components {
             host?: string | null;
         };
         /** @enum {string} */
-        SecurityAlertRule: "failed_sign_ins" | "failed_sign_ins_ip" | "new_ip" | "large_export" | "admin_set_changed" | "retention_reduced" | "alert_settings_weakened" | "audit_integrity_failure" | "malware_upload" | "break_glass_used" | "backup_missing";
+        SecurityAlertRule: "failed_sign_ins" | "failed_sign_ins_ip" | "new_ip" | "large_export" | "admin_set_changed" | "retention_reduced" | "alert_settings_weakened" | "audit_integrity_failure" | "malware_upload" | "break_glass_used" | "backup_missing" | "backup_late" | "job_failed";
         /**
          * @description `info` (0.12.3): a new address inside a trusted network.
          * @enum {string}
          */
         AlertSeverity: "info" | "low" | "medium" | "high" | "critical";
-        /** @description Severity per configurable rule (0.12.3, Q168). Defaults: failed_sign_ins medium, failed_sign_ins_ip medium, new_ip low, large_export medium, admin_set_changed high, alert_settings_weakened high, malware_upload high, break_glass_used critical, backup_missing high (0.15.130). */
+        /** @description Severity per configurable rule (0.12.3, Q168). Defaults: failed_sign_ins medium, failed_sign_ins_ip medium, new_ip low, large_export medium, admin_set_changed high, alert_settings_weakened high, malware_upload high, break_glass_used critical, backup_missing high (0.15.130), backup_late high and job_failed medium (0.15.350). */
         AlertSeverityMap: {
             failed_sign_ins?: components["schemas"]["AlertSeverity"];
             failed_sign_ins_ip?: components["schemas"]["AlertSeverity"];
@@ -19269,6 +20893,8 @@ export interface components {
             malware_upload?: components["schemas"]["AlertSeverity"];
             break_glass_used?: components["schemas"]["AlertSeverity"];
             backup_missing?: components["schemas"]["AlertSeverity"];
+            backup_late?: components["schemas"]["AlertSeverity"];
+            job_failed?: components["schemas"]["AlertSeverity"];
         };
         SecurityAlert: {
             /** Format: uuid */
@@ -19375,7 +21001,7 @@ export interface components {
             revoked_count: number;
         };
         /** @enum {string} */
-        NotificationKind: "task_assigned" | "task_returned" | "task_approved" | "approval_due" | "reassigned" | "absence_alert" | "idle_task_alert" | "no_holder" | "holiday_tentative" | "delegation" | "mfa_exemption" | "template_updated" | "import_batch" | "system" | "mention" | "followed_change" | "task_rejected" | "no_eligible_holder" | "register_assigned" | "register_rejected" | "gate_closed_again" | "sla_negative_duration" | "email_change_requested" | "email_change_decided" | "security_alert" | "snag_raised" | "snag_review" | "snag_rejected" | "snag_closed" | "levels_converted" | "permit_transferred" | "phone_change_requested" | "phone_change_decided" | "security_notice" | "site_region_moved" | "assignment_request" | "data_reset_request";
+        NotificationKind: "task_assigned" | "task_returned" | "task_approved" | "approval_due" | "reassigned" | "absence_alert" | "idle_task_alert" | "no_holder" | "holiday_tentative" | "delegation" | "mfa_exemption" | "template_updated" | "import_batch" | "system" | "mention" | "followed_change" | "task_rejected" | "no_eligible_holder" | "register_assigned" | "register_rejected" | "gate_closed_again" | "sla_negative_duration" | "email_change_requested" | "email_change_decided" | "security_alert" | "snag_raised" | "snag_review" | "snag_rejected" | "snag_closed" | "levels_converted" | "permit_transferred" | "phone_change_requested" | "phone_change_decided" | "security_notice" | "site_region_moved" | "assignment_request" | "data_reset_request" | "triage_decision" | "alert_rule";
         Notification: {
             /** Format: uuid */
             id: string;
@@ -19582,6 +21208,27 @@ export interface components {
                 name_en: string;
                 name_ar?: string | null;
             }[];
+        };
+        EditPresencePing: {
+            /**
+             * @description register records and workflow tasks.
+             * @enum {string}
+             */
+            kind: "record" | "task";
+            /** Format: uuid */
+            entity_id: string;
+        };
+        /** @description 0.15.246: another current editor of the entity (migration 0345). */
+        EditPresenceEditor: {
+            /** Format: uuid */
+            id: string;
+            display_name: string;
+            employee_id: string | null;
+            /**
+             * Format: date-time
+             * @description When this editing spell began.
+             */
+            since: string;
         };
         SavedView: {
             /** Format: uuid */
@@ -19829,6 +21476,25 @@ export interface components {
             updated_at: string;
             /** @description true for the author until the end of the week. */
             editable: boolean;
+        };
+        RegionHealth: {
+            region_id: number;
+            /** @enum {string|null} */
+            health: "on_track" | "at_risk" | "off_track" | null;
+            summary: string | null;
+            author: components["schemas"]["UserRef"] | null;
+            /** Format: date-time */
+            updated_at: string | null;
+            /** @description true when the region has not posted its Weekly status update of the current working week. */
+            missing_update: boolean;
+        };
+        RegionHealthBoard: {
+            /**
+             * Format: date
+             * @description The Sunday that opens the current working week.
+             */
+            week_start: string;
+            items: components["schemas"]["RegionHealth"][];
         };
         NotificationPreference: {
             kind: components["schemas"]["NotificationKind"];
@@ -21172,6 +22838,144 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    getMyPush: {
+        parameters: {
+            query?: {
+                endpoint?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The status. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyPush"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    subscribeMyPush: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uri */
+                    endpoint: string;
+                    keys: {
+                        p256dh: string;
+                        auth: string;
+                    };
+                    user_agent?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Subscribed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        count: number;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    unsubscribeMyPush: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uri */
+                    endpoint: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Done. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        removed: number;
+                        count: number;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getAdminWebPush: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The status. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminWebPush"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getDocumentSearchIndex: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The counts. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentSearchIndex"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
     authLogin: {
         parameters: {
             query?: {
@@ -21438,6 +23242,34 @@ export interface operations {
             429: components["responses"]["TooManyRequests"];
         };
     };
+    reportCspViolation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/csp-report": {
+                    [key: string]: unknown;
+                };
+                "application/reports+json": {
+                    [key: string]: unknown;
+                }[];
+            };
+        };
+        responses: {
+            /** @description Received. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
     confirmPasswordReset: {
         parameters: {
             query?: never;
@@ -21506,6 +23338,64 @@ export interface operations {
             content: {
                 "application/json": {
                     code: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Signed in. */
+            200: {
+                headers: {
+                    "Set-Cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Session"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    localPasskeyOptions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description The options, or none. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasskeySignInOptions"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    localPasskeySignIn: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    response: {
+                        [key: string]: unknown;
+                    };
                 };
             };
         };
@@ -28159,6 +30049,27 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
         };
     };
+    getDataHubSummary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The summary. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataHubSummary"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
     listExportSchedules: {
         parameters: {
             query?: never;
@@ -29655,6 +31566,90 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
         };
     };
+    getAlertRules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The rules and the catalogue. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertRulesResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    createAlertRule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AlertRuleInput"] & components["schemas"]["WithReason"];
+            };
+        };
+        responses: {
+            /** @description Created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertRuleSaved"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    updateAlertRule: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AlertRuleInput"] & components["schemas"]["WithReason"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertRuleSaved"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
     getUiFeaturesSetting: {
         parameters: {
             query?: never;
@@ -31036,6 +33031,76 @@ export interface operations {
             428: components["responses"]["PreconditionRequired"];
         };
     };
+    listRegisterStates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The registers. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["RegisterState"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setRegisterState: {
+        parameters: {
+            query?: never;
+            header?: {
+                "If-Match"?: string;
+            };
+            path: {
+                /** @description A register key (see `GET /registers`). */
+                register_key: components["parameters"]["RegisterKeyAny"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    enabled?: boolean;
+                    locked?: boolean;
+                    reason: components["schemas"]["Reason"];
+                };
+            };
+        };
+        responses: {
+            /** @description The new state. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        register_key: string;
+                        enabled: boolean;
+                        locked: boolean;
+                        reason?: string | null;
+                        /** Format: date-time */
+                        changed_at?: string | null;
+                        version: number;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
     getStructuralFreeze: {
         parameters: {
             query?: never;
@@ -31157,6 +33222,14 @@ export interface operations {
             query?: {
                 /** @description Comma-separated part codes (for example `issues,risks`). */
                 parts?: string;
+                /** @description 0.15.265. Narrow to these region ids (comma-separated). */
+                regions?: string;
+                /** @description 0.15.265. Narrow to the records that came from these import batches (comma-separated ids). */
+                batches?: string;
+                /** @description 0.15.265. Narrow to entities first created on or after this day. */
+                from?: string;
+                /** @description 0.15.265. Narrow to entities first created on or before this day. */
+                to?: string;
             };
             header?: never;
             path?: never;
@@ -31171,6 +33244,31 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DataResetPlan"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getDataResetNarrowOptions: {
+        parameters: {
+            query?: {
+                part?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The options. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataResetNarrowOptions"];
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -31234,6 +33332,7 @@ export interface operations {
                      * @default true
                      */
                     require_backup?: boolean;
+                    narrow?: components["schemas"]["DataResetNarrow"];
                     /** @description 0.15.72. Required when `require_backup` is false: the typed phrase `NO BACKUP` (`DataResetState.no_backup_phrase`; 422 `confirmation_mismatch` at `/no_backup_confirm` otherwise). Ignored when a backup is required. */
                     no_backup_confirm?: string;
                 };
@@ -31435,7 +33534,7 @@ export interface operations {
             503: components["responses"]["ServiceUnavailable"];
         };
     };
-    getImportsSettings: {
+    getTemplateChangeNotice: {
         parameters: {
             query?: never;
             header?: never;
@@ -31451,13 +33550,13 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ImportsSettings"];
+                    "application/json": components["schemas"]["TemplateChangeNotice"];
                 };
             };
             401: components["responses"]["Unauthorized"];
         };
     };
-    setImportsSettings: {
+    setTemplateChangeNotice: {
         parameters: {
             query?: never;
             header: {
@@ -31469,7 +33568,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ImportsSettingsInput"];
+                "application/json": components["schemas"]["TemplateChangeNoticeInput"];
             };
         };
         responses: {
@@ -31480,7 +33579,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ImportsSettings"];
+                    "application/json": components["schemas"]["TemplateChangeNotice"];
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -31747,6 +33846,331 @@ export interface operations {
             428: components["responses"]["PreconditionRequired"];
         };
     };
+    getMediaSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The settings. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaSettings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setMediaSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MediaSettingsInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaSettings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    listMediaItems: {
+        parameters: {
+            query?: {
+                source?: "documents" | "snags";
+                site_id?: string;
+                region_id?: number;
+                register_key?: string;
+                doc_code?: string;
+                snag_type?: string;
+                status?: "current" | "withdrawn" | "pending_evidence";
+                uploaded_by?: string;
+                uploaded_from?: string;
+                uploaded_to?: string;
+                q?: string;
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaItemPage"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getMediaFacets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Document types with images in scope, active snag types, register keys. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getMediaThumbnail: {
+        parameters: {
+            query?: {
+                size?: "small" | "medium";
+            };
+            header?: never;
+            path: {
+                kind: "document_file" | "snag_photo";
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The image (webp or jpeg, as configured). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/webp": string;
+                    "image/jpeg": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    putUiLogo: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /**
+                     * Format: binary
+                     * @description The logo image: PNG, JPEG, SVG or WebP, 256 KiB at most (422 `errors[0]` `{path: /file}`).
+                     */
+                    file: string;
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UiAsset"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    setUiLogoEnabled: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UiAssetEnabledInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UiAsset"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    setUiLogoDisplay: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UiAssetDisplayInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UiAsset"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getUiPublicIdentity: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The public identity. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UiPublicIdentity"];
+                };
+            };
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    getUiPublicLogo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                purpose: "login" | "favicon";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The image. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/png": string;
+                    "image/jpeg": string;
+                    "image/svg+xml": string;
+                    "image/webp": string;
+                };
+            };
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    getUiAsset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The image. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/png": string;
+                    "image/jpeg": string;
+                    "image/svg+xml": string;
+                    "image/webp": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
     getLoginPage: {
         parameters: {
             query?: never;
@@ -31822,6 +34246,62 @@ export interface operations {
                 };
             };
             429: components["responses"]["TooManyRequests"];
+        };
+    };
+    getDownloadLocks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The download locks. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DownloadLocks"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setDownloadLocks: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DownloadLocksInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DownloadLocks"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
         };
     };
     getSecurityLocks: {
@@ -32035,6 +34515,194 @@ export interface operations {
         };
         responses: {
             /** @description Done. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        revoked: number;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getPasskeys: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The setting. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasskeySetting"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setPasskeys: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasskeySettingInput"];
+            };
+        };
+        responses: {
+            /** @description The setting now in force. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasskeySetting"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    listMyPasskeys: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The passkeys. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyPasskeys"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    startPasskeyRegistration: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The WebAuthn creation options. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    finishPasskeyRegistration: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    label: string;
+                    response: {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description The new passkey. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasskeyItem"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    removeMyPasskey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    revokeUserPasskeys: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"];
+            };
+        };
+        responses: {
+            /** @description Revoked. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -32466,6 +35134,116 @@ export interface operations {
                 content: {
                     "application/json": {
                         items: components["schemas"]["WarehouseOrderOption"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listChangeControlOrderOptions: {
+        parameters: {
+            query?: {
+                site_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The orders. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["WarehouseOrderOption"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listAdvanceOptions: {
+        parameters: {
+            query?: {
+                site_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The options. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            [key: string]: unknown;
+                        }[];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listInvoiceOrderOptions: {
+        parameters: {
+            query?: {
+                site_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The options. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["WarehouseOrderOption"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listInvoiceSupplierOptions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The options. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            [key: string]: unknown;
+                        }[];
                     };
                 };
             };
@@ -33195,6 +35973,62 @@ export interface operations {
             428: components["responses"]["PreconditionRequired"];
         };
     };
+    getDeriveRules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The setting. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeriveRules"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setDeriveRules: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"] & components["schemas"]["DeriveRulesInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeriveRules"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
     getDashboardSettings: {
         parameters: {
             query?: never;
@@ -33329,6 +36163,62 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+        };
+    };
+    getMailPolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The setting. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MailPolicy"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setMailPolicy: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"] & components["schemas"]["MailPolicyInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MailPolicy"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
         };
     };
     getMailNotificationKinds: {
@@ -33961,6 +36851,8 @@ export interface operations {
                 region_id?: components["schemas"]["RegionId"];
                 state?: components["schemas"]["RegisterRecordState"];
                 record_type?: string;
+                /** @description 0.15.240: only records whose intake triage is in this state (triage-enabled registers). */
+                triage?: components["schemas"]["TriageState"];
                 /** @description All versions of one logical record. */
                 entity_id?: string;
                 /** @description Default false = the latest version of each logical record. */
@@ -34558,6 +37450,46 @@ export interface operations {
             428: components["responses"]["PreconditionRequired"];
         };
     };
+    triageRegisterRecord: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TriageRequest"];
+            };
+        };
+        responses: {
+            /** @description The decided record. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegisterRecord"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
     lockRegisterColumn: {
         parameters: {
             query?: never;
@@ -35127,6 +38059,34 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
         };
     };
+    getTemplateChanges: {
+        parameters: {
+            query?: {
+                from?: number;
+                to?: number;
+            };
+            header?: never;
+            path: {
+                /** @description Template ID such as TPL-SITE. */
+                template_id: components["parameters"]["TemplateId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The differences. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateChanges"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
     downloadTemplate: {
         parameters: {
             query?: {
@@ -35335,6 +38295,32 @@ export interface operations {
                     "application/json": components["schemas"]["PageEnvelope"] & {
                         items?: components["schemas"]["ImportRow"][];
                     };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    downloadImportBatchErrorReport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Import batch. */
+                batch_id: components["parameters"]["BatchId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The workbook. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -38951,6 +41937,28 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
         };
     };
+    getRegionHealth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Region health. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegionHealthBoard"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
     editStatusUpdate: {
         parameters: {
             query?: never;
@@ -40207,6 +43215,81 @@ export interface operations {
                 content?: never;
             };
             401: components["responses"]["Unauthorized"];
+        };
+    };
+    listEditPresence: {
+        parameters: {
+            query: {
+                kind: "record" | "task";
+                entity_id: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The other current editors, oldest heartbeat first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        editors: components["schemas"]["EditPresenceEditor"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    pingEditPresence: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EditPresencePing"];
+            };
+        };
+        responses: {
+            /** @description Noted. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    stopEditPresence: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EditPresencePing"];
+            };
+        };
+        responses: {
+            /** @description Removed (also when there was none). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            422: components["responses"]["Unprocessable"];
         };
     };
 }

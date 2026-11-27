@@ -57,6 +57,8 @@ function entryPermitTypes() {
   });
 }
 const rk = (r: MockRecord) => rowKey(r.register_key, r.data);
+/** 0.15.240: the registers with intake triage (the Issue Log and the Change Control Log). */
+const TRIAGE_KEYS = ['issues', 'change_control'];
 /** The scopes the viewer may enter (RegisterDefinition.entry_scopes): the scopes of the register row when they hold its L1, plus each scope whose row they hold. */
 function entryScopes(def: RegisterDefinition): string[] | undefined {
   const rows = SCOPE_ROWS[def.register_key];
@@ -135,6 +137,8 @@ function actions(r: MockRecord): RegisterRecord['allowed_actions'] {
   if (viewer()?.key === 'pm' && r.register_key === 'quality' && r.record_type === 'snag' && isCurrent(r) && !hasOpenVersion(r)) out.push('cancel_snag');
   // Q221: a permit draft whose holder no longer holds L1 of its stream row is handed over (contract 0.12.2)
   if (r.register_key === 'permits_hse' && r.state === 'entry' && !r.transferred && !canAt(row, 1, L) && r.created_by === viewer()?.employee_id) out.push('transfer');
+  // 0.15.240: the reviewer (L2 holder) decides a record waiting in the intake queue
+  if ((r.triage?.state === 'pending' || r.triage?.state === 'deferred') && canAt(row, L, L)) out.push('triage');
   // 0103 (0.15.22): a locked record is read-only for everyone but a System Admin (the `pm` account in the mock)
   if (r.locked && viewer()?.key !== 'pm') return out.filter((a) => a !== 'edit' && a !== 'submit' && a !== 'void' && a !== 'new_version');
   return out;
@@ -152,6 +156,7 @@ export function toRecord(r: MockRecord): RegisterRecord {
     id: r.id, register_key: r.register_key, record_type: r.record_type, site_id: m?.id ?? null, site_code: m?.code ?? null, region_id: (m?.region_id ?? null) as never, state: r.state, locked: r.locked === true,
     current_level: r.state === 'entry' ? 1 : r.current_level, levels_required: r.levels_required ?? levelsOf(r.register_key), ball_in_court: ball(r), data: r.data, return_count: r.return_count, last_return_note: r.last_return_note,
     allowed_actions: actions(r), created_by: { id: uid(r.created_by), display_name: r.created_by }, created_at: r.created_at, updated_at: r.updated_at, version: r.version,
+    ...(r.triage ? { triage: r.triage } : {}),
     entity_id: r.entity_id, version_no: r.version_no, supersedes_id: r.supersedes_id ?? null, is_current: isCurrent(r), source: r.source ?? 'manual', ...(r.task ? { task: r.task } : {}),
     warnings: [...warningsOf(r), ...p4cWarnings(r, R().records, gecolCfg())],
     // 0063 (Q150, Q114): the HLC purchase requests of an HLC record; the contractor of a record (derived from the order for an outsourced Dismantle part)
@@ -240,11 +245,12 @@ export const registerHandlers = [
     const tokens = [...new Set((u.get('q') ?? '').split(/[\s,;]+/).map((x) => x.trim().toUpperCase()).filter(Boolean))];
     if (tokens.length > 1000) return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '/q', code: 'too_many_codes' }] });
     const pasted = tokens.length > 1 ? tokens : null;
-    const q = pasted ? '' : (u.get('q') ?? '').trim().toLowerCase(), region = u.get('region_id'), state = u.get('state'), type = u.get('record_type'), site = u.get('site_id');
+    const q = pasted ? '' : (u.get('q') ?? '').trim().toLowerCase(), region = u.get('region_id'), state = u.get('state'), type = u.get('record_type'), site = u.get('site_id'), triage = u.get('triage');
     const limit = Math.min(Number(u.get('limit') ?? 50), 200), start = Number(u.get('cursor') ?? 0);
     const entity = u.get('entity_id'), allVersions = u.get('all_versions') === 'true';
     const all = R().records.filter((r) => r.register_key === def.register_key && (!entity || r.entity_id === entity) && (allVersions || entity || isLatest(r))).map(toRecord).filter((r) =>
       (!state || r.state === state) && (!type || r.record_type === type) && (!site || r.site_id === site) && (!region || String(r.region_id) === region)
+      && (!triage || r.triage?.state === triage)
       && (!q || `${r.site_code ?? ''} ${Object.values(r.data).filter((x) => typeof x === 'string').join(' ')}`.toLowerCase().includes(q))
       && (!pasted || pasted.includes((r.site_code ?? '').toUpperCase())));
     const items = all.slice(start, start + limit);
@@ -281,6 +287,7 @@ export const registerHandlers = [
     const id = recId(++R().seq);
     const r: MockRecord = { id, entity_id: id, version_no: 1, register_key: def.register_key, record_type: b.record_type ?? null, site_index: si, state: 'entry', current_level: 1, levels_required: levelsOf(def.register_key), data, version: 1, return_count: 0, last_return_note: null, created_by: viewer()!.employee_id ?? '9999', created_at: now, updated_at: now, steps: [] };
     if (b.external_party_id) r.external_party = companyOf(b.external_party_id) as never;
+    if (TRIAGE_KEYS.includes(def.register_key)) r.triage = { state: 'pending', note: null, at: null, duplicate_of: null };
     step(r, 'create', 1);
     linkHlc(r);
     deriveDismantle(r, R().records);
@@ -335,6 +342,39 @@ export const registerHandlers = [
     if (r.record_type !== 'snag' || !isCurrent(r) || hasOpenVersion(r)) return problem(409, 'invalid_transition', 'Only the approved version in force of a Quality snag record can be cancelled.');
     if (!stepUpValid()) return stepUp();
     r.state = 'voided'; step(r, 'void', r.current_level, body.reason!.trim()); touch(r); save();
+    return tag(r);
+  }),
+
+  // 0.15.240: one intake-triage decision (accept / reject / merge as a duplicate / defer) of the reviewer (L2)
+  http.post(`${B}/registers/:key/records/:id/triage`, async ({ params, request }) => {
+    const g = guard(); if (g) return g;
+    const r = R().records.find((x) => x.id === params.id && x.register_key === params.key);
+    if (!r) return problem(404, 'not_found', 'Record not found');
+    if (!TRIAGE_KEYS.includes(r.register_key)) return problem(404, 'not_found', 'This register has no triage.');
+    const bad = noMatch(request, r); if (bad) return bad;
+    if (!actions(r)!.includes('triage')) return problem(403, 'not_eligible_holder', 'Only the reviewer (L2) decides the intake.');
+    const b = (await request.json().catch(() => ({}))) as { action?: string; note?: string; duplicate_of?: string };
+    if (!['accept', 'reject', 'merge', 'defer'].includes(b.action ?? '')) return invalid([{ path: '/action', code: 'invalid' }]);
+    const note = (b.note ?? '').trim();
+    if ((b.action === 'reject' || b.action === 'merge') && !note) return invalid([{ path: '/note', code: 'required' }]);
+    if (b.action === 'reject' || b.action === 'merge') { if (!stepUpValid()) return stepUp(); }
+    const by = { id: uid(viewer()!.employee_id ?? '9999'), display_name: viewer()!.employee_id ?? '' }, at = new Date().toISOString();
+    if (b.action === 'merge') {
+      const d = R().records.find((x) => x.id === b.duplicate_of && x.register_key === r.register_key && x.state !== 'voided');
+      if (!d || d.id === r.id) return invalid([{ path: '/duplicate_of', code: 'invalid' }]);
+      r.triage = { state: 'merged', note, by, at, duplicate_of: d.id }; r.state = 'voided';
+      step(r, 'triage_merge', r.current_level, note);
+    } else if (b.action === 'reject') {
+      r.triage = { state: 'rejected', note, by, at, duplicate_of: null }; r.state = 'voided';
+      step(r, 'triage_reject', r.current_level, note);
+    } else if (b.action === 'defer') {
+      r.triage = { state: 'deferred', note: note || null, by, at, duplicate_of: null };
+      step(r, 'triage_defer', r.current_level, note || undefined);
+    } else {
+      r.triage = { state: 'accepted', note: note || null, by, at, duplicate_of: null };
+      step(r, 'triage_accept', r.current_level, note || undefined);
+    }
+    touch(r); save();
     return tag(r);
   }),
 
@@ -444,7 +484,7 @@ export const registerHandlers = [
     const now = new Date().toISOString(), id = recId(++R().seq);
     const ro = new Set(def.fields.filter((f) => f.read_only).map((f) => f.code));
     const v: MockRecord = { ...r, id, version_no: r.version_no + 1, supersedes_id: r.id, state: 'entry', current_level: 1, levels_required: levelsOf(r.register_key), version: 1, return_count: 0, last_return_note: null, task: null,
-      data: Object.fromEntries(Object.entries(r.data).filter(([c]) => !ro.has(c))), created_at: now, updated_at: now, created_by: viewer()!.employee_id ?? '9999', steps: [], claimed_by: undefined };
+      data: Object.fromEntries(Object.entries(r.data).filter(([c]) => !ro.has(c))), created_at: now, updated_at: now, created_by: viewer()!.employee_id ?? '9999', steps: [], claimed_by: undefined, triage: TRIAGE_KEYS.includes(r.register_key) ? { state: 'pending', note: null, at: null, duplicate_of: null } : undefined };
     step(v, 'new_version', 1);
     linkHlc(v);
     R().records.unshift(v); save();
@@ -454,6 +494,8 @@ export const registerHandlers = [
 
   // ---- template entry (contract 0.7.0). The upload is staged at once (status `validated`); the uploader sends it into the flow (the rows become records
   // waiting for L2); L2 approves rows, returns them with a note, or approves all; a row whose record has an open version is held.
+  // Data hub landing (contract 0.15.311): nothing waits in the demo store until a batch is uploaded; the downloads list stays empty.
+  http.get(`${B}/data-hub/summary`, () => HttpResponse.json({ batches: { count: 0, items: [] }, template_changes: [], my_downloads: [] })),
   http.get(`${B}/import-batches`, ({ request }) => {
     const g = guard(); if (g) return g;
     const u = new URL(request.url).searchParams;
@@ -562,6 +604,12 @@ export const registerHandlers = [
     if (!b) return problem(404, 'not_found', 'Batch not found');
     if (b.run?.state === 'running') { advanceRun(b); save(); }   // 0.14.4: the background run moves by one chunk per read
     return HttpResponse.json(toBatch(b), { headers: { ETag: `"${b.version}"` } });
+  }),
+  http.get(`${B}/import-batches/:id/error-report`, ({ params }) => {
+    const g = guard(); if (g) return g;
+    const b = R().batches.find((x) => x.id === params.id);
+    if (!b) return problem(404, 'not_found', 'Batch not found');
+    return new HttpResponse(new Uint8Array([0x50, 0x4b, 3, 4]), { headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'Content-Disposition': `attachment; filename="errors-${b.id}.xlsx"` } });
   }),
   http.get(`${B}/import-batches/:id/rows`, ({ params, request }) => {
     const g = guard(); if (g) return g;

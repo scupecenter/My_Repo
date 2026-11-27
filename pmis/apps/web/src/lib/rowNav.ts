@@ -1,4 +1,4 @@
-/** Row navigation for every grid (item 4): J and K move between rows, the same way Linear and Gmail do. Pure helpers, DOM in and out. */
+/** Row navigation for every grid (item 4): J and K move between rows, the usual list-navigation keys. Pure helpers, DOM in and out. */
 
 /** The grid a row belongs to: its closest ancestor that holds more than the row itself. */
 export function rowsOf(row: HTMLElement): HTMLElement[] {

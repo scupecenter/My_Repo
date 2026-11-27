@@ -11,6 +11,7 @@ import type { TaskDetail, TaskRegisterField } from '@/api/types';
 import { DocSlots } from './DocSlots';
 import { DraftBar, useDraft } from './DraftBar';
 import { DrawerFrame, DrawerTabs, panelProps, useReportDirty, type DrawerNav } from './DrawerFrame';
+import { EditingNotice } from './EditingNotice';
 import { CommentsPanel } from './Comments';
 import { DelayPeriodsPanel } from './DelayPeriods';
 import { Holders } from './HolderChip';
@@ -23,6 +24,7 @@ import { FieldHistory } from './logs/FieldHistory';
 import { ChangeDiff } from './logs/ChangeDiff';
 import { RejectDialog } from './RejectDialog';
 import { useToast } from './Toast';
+import { DateInput } from '@/components/DateInput';
 
 function Comments({ task }: { task: TaskDetail }) {
   const { t } = useTranslation();
@@ -109,6 +111,8 @@ function Body({ task, regFields, intent }: { task: TaskDetail; regFields: TaskRe
         {task.holder_absent && <div className="flex gap-2 rounded-md bg-waitBg p-3 text-sm text-waitInk" data-testid="drawer-absent"><UserX size={16} />{t('drawer.absent')}</div>}
 
         <div {...panelProps('data', tab)} className="space-y-4">
+        {/* item 17 widened: the same soft "… is editing" notice as the register record editor, on the task record */}
+        {edit && <EditingNotice kind="task" id={task.id} editing={edit} testid="task-editing-notice" />}
         <section aria-label={t('grid.ball')}>
           <div className="mb-1 text-sm text-mute">{t('grid.ball')}</div>
           <Holders holders={task.ball_in_court?.holders ?? []} />
@@ -124,7 +128,7 @@ function Body({ task, regFields, intent }: { task: TaskDetail; regFields: TaskRe
           {([['planned_date', 'plan', 'grid.plan'], ['actual_start', 'start', 'drawer.actual_start'], ['actual_date', 'actual', 'grid.actual']] as const).map(([f, id, label]) => (
             <div key={f}>
               <label className="block"><span className="text-mute">{t(label)}</span>
-                <input type="date" className="input mono" data-testid={`drawer-${id}-date`} disabled={!edit} value={draft[f]} onChange={(e) => setDraft((d) => ({ ...d, [f]: e.target.value }))} />
+                <DateInput className="input mono" data-testid={`drawer-${id}-date`} disabled={!edit} value={draft[f]} onChange={(e) => setDraft((d) => ({ ...d, [f]: e.target.value }))} />
               </label>
               <FieldHistory entityType="task" entityId={task.id} field={f} label={t(label)} />
             </div>
@@ -140,7 +144,7 @@ function Body({ task, regFields, intent }: { task: TaskDetail; regFields: TaskRe
             /* 0.12.0 (Q13): the Layout Submitted Date, its own field (never taken from another date) */
             <div>
               <label className="block"><span className="text-mute">{t('drawer.layout_submitted')}</span>
-                <input type="date" className="input mono" data-testid="drawer-layout-date" disabled={!edit} value={layout} onChange={(e) => setLayout(e.target.value)} />
+                <DateInput className="input mono" data-testid="drawer-layout-date" disabled={!edit} value={layout} onChange={(e) => setLayout(e.target.value)} />
               </label>
             </div>
           )}

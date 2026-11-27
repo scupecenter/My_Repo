@@ -12,7 +12,7 @@ import { FieldErr } from './Calendar';
 
 const INBOX_KINDS = ['mention', 'followed_change', 'task_assigned', 'task_returned', 'task_rejected', 'task_approved', 'approval_due', 'reassigned', 'absence_alert', 'idle_task_alert', 'no_holder', 'system'] as const;
 
-const SAMPLE = ['Ahmed Omran', 'سالم المصراتي', 'Nadia Ben Ali', 'خالد الزاوي', 'Tripoli CW Team'];
+const SAMPLE = ['Demo Person A', 'سالم المصراتي', 'Demo Person B', 'خالد الزاوي', 'Demo CW Team'];
 
 /**
  * Administration > Settings > Screens > Interface (migration 0280): the interface features in one place. Now: generated avatars (style, shape, palette, in lists)
@@ -97,6 +97,25 @@ export function InterfaceSettings() {
           </div>
           <FieldErr errs={errs} path="/sections/inbox/priority_kinds" />
         </fieldset>
+      </section>
+      <section className="card space-y-3 p-4" data-testid="ui-panel">
+        <div>
+          <h2 className="font-bold">{t('ui.panel_title')}</h2>
+          <p className="text-sm text-mute">{t('ui.panel_note')}</p>
+        </div>
+        <label className="block text-sm font-semibold">{t('ui.panel_mode')}
+          <select className="input mt-1 w-auto font-normal" disabled={!can} data-testid="ui-panel-mode" value={v.panel.mode} onChange={(e) => set('panel', { mode: e.target.value as UiFeatures['panel']['mode'] })}>
+            {(['popover', 'side_panel'] as const).map((x) => <option key={x} value={x}>{t(`ui.panel_mode_${x}`)}</option>)}
+          </select>
+          <FieldErr errs={errs} path="/sections/panel/mode" />
+        </label>
+        <label className="block text-sm font-semibold">{t('ui.panel_width')}
+          <select className="input mt-1 w-auto font-normal" disabled={!can || v.panel.mode !== 'side_panel'} data-testid="ui-panel-width" value={v.panel.width} onChange={(e) => set('panel', { width: e.target.value as UiFeatures['panel']['width'] })}>
+            {(['narrow', 'medium', 'wide'] as const).map((x) => <option key={x} value={x}>{t(`ui.panel_width_${x}`)}</option>)}
+          </select>
+          <FieldErr errs={errs} path="/sections/panel/width" />
+        </label>
+        <label className="flex items-center gap-2 text-sm"><input type="checkbox" disabled={!can || v.panel.mode !== 'side_panel'} data-testid="ui-panel-tabs" checked={v.panel.show_tabs} onChange={(e) => set('panel', { show_tabs: e.target.checked })} />{t('ui.panel_tabs')}</label>
       </section>
       {q.data.updated_by && <p className="text-xs text-mute" data-testid="ui-updated">{t('tstd.settings_updated', { name: q.data.updated_by.display_name, at: q.data.updated_at ?? '' })}</p>}
       {can ? (

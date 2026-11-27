@@ -4,6 +4,7 @@ import { ApiError } from '@/api/client';
 import { useContractorsCompleteness, useTeamScopeMismatch } from '@/api/settings';
 import { ContractorPerformance } from './ContractorPerformance';
 import { TeamScopeMatch } from './settings/TeamScopeMatch';
+import { ScreenSettingsLink } from '@/components/ScreenSettingsLink';
 
 const forbidden = (e: unknown) => e instanceof ApiError && e.status === 403;
 
@@ -16,7 +17,7 @@ export function ContractorsReports() {
   const mm = useTeamScopeMismatch(), cc = useContractorsCompleteness();
   return (
     <div className="space-y-4" data-testid="page-contractors-reports">
-      <h1 className="text-2xl font-bold">{t('contractorReports.title')}</h1>
+      <div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-bold">{t('contractorReports.title')}</h1><span className="ms-auto"><ScreenSettingsLink screen="contractor_reports" /></span></div>
 
       <ContractorPerformance />
 

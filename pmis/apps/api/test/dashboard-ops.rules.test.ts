@@ -6,6 +6,13 @@ import {
   ageBucket,
   bucketAges,
   receivePct,
+  scorecardSummary,
+  approvalsByRole,
+  changesSummary,
+  actionsSummary,
+  firstPassPct,
+  meanDays,
+  ScorecardItem,
 } from "../src/dashboard/dashboard-ops.rules";
 
 describe("dashboard ops: PR/PO aging buckets (0.15.98)", () => {
@@ -86,5 +93,163 @@ describe("dashboard ops: PTW safety-check gaps (0.15.200)", () => {
       PTW_CHECK_KEYS.map((k) => [k, "Done"]),
     ) as Record<string, unknown>;
     expect(ptwCheckGaps(full)).toEqual([]);
+  });
+});
+
+describe("dashboard ops: contractor and supplier scorecard (0.15.202)", () => {
+  const item = (
+    name: string,
+    level: "ok" | "amber" | "red" | "insufficient",
+    delay_days: number,
+    snags: { total: number; open: number; overdue: number; returned: number },
+    quality: { total: number; failed: number },
+  ): ScorecardItem => ({
+    party_id: name,
+    name,
+    type: "contractor",
+    delay_days,
+    issues_open: 0,
+    snags,
+    quality,
+    level,
+  });
+
+  it("counts the levels, averages the delay over the delayed parties only, and keeps the report order for the worst five", () => {
+    const items = [
+      item("A", "red", 20, { total: 10, open: 4, overdue: 4, returned: 1 }, { total: 8, failed: 2 }),
+      item("B", "amber", 10, { total: 10, open: 3, overdue: 2, returned: 0 }, { total: 6, failed: 0 }),
+      item("C", "ok", 0, { total: 5, open: 1, overdue: 0, returned: 0 }, { total: 4, failed: 0 }),
+      item("D", "insufficient", 0, { total: 0, open: 0, overdue: 0, returned: 0 }, { total: 0, failed: 0 }),
+      item("E", "ok", 0, { total: 0, open: 0, overdue: 0, returned: 0 }, { total: 2, failed: 0 }),
+      item("F", "ok", 0, { total: 0, open: 0, overdue: 0, returned: 0 }, { total: 0, failed: 0 }),
+    ];
+    const s = scorecardSummary(items);
+    expect(s.parties).toBe(6);
+    expect(s.by_level).toEqual({ ok: 3, amber: 1, red: 1, insufficient: 1 });
+    expect(s.avg_delay_days).toBe(15);
+    expect(s.on_time_pct).toBe(76);
+    expect(s.quality_fail_pct).toBe(10);
+    expect(s.snags).toEqual({ total: 25, open: 8, overdue: 6, returned: 1 });
+    expect(s.quality).toEqual({ total: 20, failed: 2 });
+    expect(s.worst.map((w) => w.name)).toEqual(["A", "B", "C", "D", "E"]);
+    expect(s.worst[0]).toEqual({
+      party_id: "A", name: "A", type: "contractor", level: "red",
+      delay_days: 20, snags_overdue: 4, quality_failed: 2,
+    });
+  });
+
+  it("answers nulls, not zeros, when there is nothing to average or divide", () => {
+    const s = scorecardSummary([]);
+    expect(s.parties).toBe(0);
+    expect(s.avg_delay_days).toBeNull();
+    expect(s.on_time_pct).toBeNull();
+    expect(s.quality_fail_pct).toBeNull();
+    expect(s.worst).toEqual([]);
+  });
+
+  it("rounds the rates to one decimal", () => {
+    const s = scorecardSummary([
+      item("A", "ok", 0, { total: 3, open: 0, overdue: 1, returned: 0 }, { total: 3, failed: 1 }),
+    ]);
+    expect(s.on_time_pct).toBe(66.7);
+    expect(s.quality_fail_pct).toBe(33.3);
+  });
+});
+
+describe("item 6 rules: quality (0.15.203)", () => {
+  it("meanDays averages to one decimal and is null on an empty list", () => {
+    expect(meanDays([])).toBeNull();
+    expect(meanDays([4])).toBe(4);
+    expect(meanDays([1, 2])).toBe(1.5);
+    expect(meanDays([1, 2, 2])).toBe(1.7);
+  });
+
+  it("firstPassPct is Pass over Pass + Fail, one decimal, null when nothing is decided", () => {
+    expect(firstPassPct(0, 0)).toBeNull();
+    expect(firstPassPct(9, 1)).toBe(90);
+    expect(firstPassPct(1, 2)).toBe(33.3);
+    expect(firstPassPct(3, 0)).toBe(100);
+  });
+});
+
+describe("item 7 rules: pending approvals by role (0.15.204)", () => {
+  const row = (role_id: string | null, days: number, state: string, name_en = "PM") => ({
+    role_id,
+    name_en: role_id ? name_en : null,
+    name_ar: null,
+    days,
+    state,
+  });
+
+  it("groups the waiting tasks by role, most waiting first, and counts the unassigned", () => {
+    const r = approvalsByRole([
+      row("r1", 3, "in_review", "PM"),
+      row("r1", 40, "in_approval", "PM"),
+      row("r2", 9, "in_review", "QC"),
+      row(null, 20, "in_review"),
+    ]);
+    expect(r.total).toBe(4);
+    expect(r.review).toBe(3);
+    expect(r.approve).toBe(1);
+    expect(r.unassigned).toBe(1);
+    expect(r.by_role.map((x) => x.role_id)).toEqual(["r1", "r2"]);
+    expect(r.by_role[0]?.count).toBe(2);
+    expect(r.by_role[0]?.oldest_days).toBe(40);
+    expect(r.by_role[0]?.buckets.find((b) => b.key === "over_30")?.count).toBe(1);
+    expect(r.waiting.total).toBe(4);
+    expect(r.waiting.oldest_days).toBe(40);
+  });
+
+  it("answers an empty shape when nothing waits", () => {
+    const r = approvalsByRole([]);
+    expect(r.total).toBe(0);
+    expect(r.review).toBe(0);
+    expect(r.approve).toBe(0);
+    expect(r.unassigned).toBe(0);
+    expect(r.by_role).toEqual([]);
+    expect(r.waiting.total).toBe(0);
+    expect(r.waiting.oldest_days).toBeNull();
+  });
+});
+
+describe("item 8 rules: change requests and meeting actions (0.15.205)", () => {
+  it("counts the pending change requests per kind with their ages and the approved ones not yet applied", () => {
+    const r = changesSummary([
+      { kind: "scope_change", status: "requested", days: 3 },
+      { kind: "scope_change", status: "requested", days: 40 },
+      { kind: "date_change", status: "requested", days: 10 },
+      { kind: "date_change", status: "approved", days: 90 },
+      { kind: "other", status: "rejected", days: 5 },
+      { kind: "other", status: "applied", days: 5 },
+    ]);
+    expect(r.pending).toBe(3);
+    expect(r.approved_not_applied).toBe(1);
+    expect(r.by_kind).toEqual([
+      { kind: "scope_change", count: 2 },
+      { kind: "date_change", count: 1 },
+    ]);
+    expect(r.pending_aging.oldest_days).toBe(40);
+    expect(r.pending_aging.buckets.find((b) => b.key === "over_30")?.count).toBe(1);
+  });
+
+  it("counts the open meeting actions, the overdue ones with their days late, and those without a due date", () => {
+    const r = actionsSummary([
+      { status: "open", days_overdue: 5 },
+      { status: "in_progress", days_overdue: 35 },
+      { status: "open", days_overdue: -3 },
+      { status: "open", days_overdue: null },
+      { status: "closed", days_overdue: 50 },
+      { status: "na", days_overdue: 50 },
+    ]);
+    expect(r.open).toBe(4);
+    expect(r.overdue).toBe(2);
+    expect(r.no_due_date).toBe(1);
+    expect(r.overdue_aging.oldest_days).toBe(35);
+  });
+
+  it("answers empty shapes when there is nothing", () => {
+    expect(changesSummary([]).pending).toBe(0);
+    expect(changesSummary([]).pending_aging.oldest_days).toBeNull();
+    expect(actionsSummary([]).overdue).toBe(0);
   });
 });

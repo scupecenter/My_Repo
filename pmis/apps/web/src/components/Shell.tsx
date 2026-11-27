@@ -1,33 +1,39 @@
 import * as Popover from '@radix-ui/react-popover';
 import { AutoHints } from './AutoHints';
 import { useQueryClient } from '@tanstack/react-query';
-import { Bell, Check, Download, Palette, Plus, Menu, Moon, PanelLeftClose, PanelLeftOpen, Pin, PinOff, Search, Sun, LogOut, Lock, UserRound, X } from 'lucide-react';
+import { Download, Palette, Plus, Menu, Moon, PanelLeftClose, PanelLeftOpen, Pin, PinOff, Search, Sun, LogOut, Lock, UserRound, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { api } from '@/api/client';
 import { useLogout, useMe, useNotifications, useSession } from '@/api/hooks';
 import { useMenuCounts, useUnreadTotal } from '@/api/msg';
+import { useUiIdentity } from '@/api/settings';
 import { useOpenAlertCount } from '@/api/logs';
-import { canViewModule, hasGrant, isAdmin } from '@/lib/perm';
-import { notificationTarget } from '@/lib/x';
+import { isAdmin } from '@/lib/perm';
 import { applyLocale, applyTheme, currentLocale, currentTheme } from '@/i18n';
 import { HYBRID } from '@/lib/hybrid';
 import { loadPref, savePref as storePref } from '@/lib/localPref';
 import { applyAppearance } from '@/lib/appearance';
+import { API_BASE } from '@/api/client';
+import { sanitizeUiNav, type UiNav } from '@/lib/sidebarPrefs';
+import { useUpdateMyProfile } from '@/api/profile';
 import { applyBrand } from '@/lib/brands';
 import { ExportDialog } from './ExportDialog';
 import { CommandPalette } from './CommandPalette';
 import { RowActions } from './RowActions';
+import { NotificationBell } from './NotificationPanel';
 import { ShortcutsHelp } from './ShortcutsHelp';
 import { Avatar } from './Avatar';
 import { QuickTour } from './QuickTour';
-import { firstPeopleTab, PEOPLE_KEYS, PEOPLE_TABS } from './PeopleAdmin';
-import { ADMIN_ONLY, ANY_OF, BY_GRANT, BY_MODULE_VIEW, NAV } from './navItems';
+import { PEOPLE_TABS } from './PeopleAdmin';
+import { permittedNavItems, visibleNavItems } from '@/lib/visibleNav';
+import { NAV } from './navItems';
 import { SIDEBAR_DEFAULT, SIDEBAR_MAX, SIDEBAR_MIN, SidebarBody, SidebarSplitter } from './Sidebar';
 
 export { NAV };
 const WIDTH_KEY = 'pmis.nav.width';
+const LOGO_KEY = 'pmis.identity.logo';
 const ICONS_KEY = 'pmis.nav.icons';
 /** The menu hides by itself (a narrow rail that opens on hover) unless it is pinned; kept in the browser like the width and the icons-only choice. */
 const AUTO_KEY = 'pmis.nav.auto';
@@ -70,7 +76,38 @@ export function Shell() {
   useEffect(() => { if (userBrand) applyBrand(userBrand); }, [userBrand]);
   // 0241: the appearance profile follows the signed-in user (own choices, else the organization defaults)
   const userAppearance = me.data?.user.appearance;
+  // 0243: the workspace logo of the identity replaces the built-in badge; nothing changes without an enabled logo.
+  // ui_identity_state is readable by every signed-in user; the last seen state is cached so a reload does not flash the badge.
+  const ident = useUiIdentity();
+  useEffect(() => {
+    if (ident.data) storePref(LOGO_KEY, ident.data.logo?.enabled ? { version: ident.data.logo.version } : null);
+  }, [ident.data]);
+  const logo: { version: number } | null = ident.data ? (ident.data.logo?.enabled ? { version: ident.data.logo.version } : null) : loadPref(LOGO_KEY, null);
+  const brandMark = logo
+    ? <img src={`${API_BASE}/ui/assets/logo?v=${logo.version}`} alt="" data-testid="sidebar-logo" className="h-8 w-8 shrink-0 rounded-md object-contain" />
+    : <span className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-accent text-accentInk">G</span>;
   useEffect(() => { if (userAppearance) applyAppearance(userAppearance); }, [userAppearance]);
+
+  // 0242 (proposal item 4): the personal sidebar of the profile. The pins of a browser that had them only locally
+  // (pmis.nav.favs) move into the profile once, so they follow the user to every device.
+  const side: UiNav = sanitizeUiNav(me.data?.user.ui_prefs?.sidebar ?? {});
+  const updateProfile = useUpdateMyProfile();
+  const savePins = (pins: string[]) => {
+    const v = me.data?.user.version;
+    if (v === undefined) return;
+    updateProfile.mutate({ version: Number(v), patch: { ui_prefs: { sidebar: { ...side, pins } } } });
+  };
+  const migratedPins = useRef(false);
+  useEffect(() => {
+    if (!me.data || migratedPins.current) return;
+    migratedPins.current = true;
+    const stored = me.data.user.ui_prefs?.sidebar;
+    if (stored?.pins !== undefined) return;
+    let local: string[] = [];
+    try { const raw = JSON.parse(localStorage.getItem('pmis.nav.favs') ?? '[]'); if (Array.isArray(raw)) local = raw.filter((x): x is string => typeof x === 'string'); } catch { /* nothing to move */ }
+    if (local.length) savePins(local.slice(0, 20));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [me.data?.user.id]);
 
   // 0.15.42: the language and theme saved on the server follow the user to a new device
   const userTheme = me.data?.user.theme;
@@ -83,18 +120,13 @@ export function Shell() {
 
   const allowed = new Set(me.data?.effective.nav ?? []);
   const unread = useUnreadTotal(allowed.has('messages')).data ?? 0;
-  const items = NAV.filter((n) => (BY_GRANT[n.key] ? hasGrant(me.data, BY_GRANT[n.key]) : BY_MODULE_VIEW[n.key] ? canViewModule(me.data, BY_MODULE_VIEW[n.key]) : ANY_OF[n.key] ? ANY_OF[n.key]!.some((m) => allowed.has(m)) : ADMIN_ONLY.has(n.key) ? isAdmin(me.data) : allowed.has(n.key)));
   const waiting = useMenuCounts(allowed.has('approvals'), allowed.has('my_work'));
   const counts = { approvals: waiting.approvals, my_work: waiting.my_work };
   const alerts = useOpenAlertCount(isAdmin(me.data)).data ?? 0;
   // Users, Online now, Roles, Groups, Delegation and the Matrix are tabs of one screen: one sidebar entry, opening the first allowed tab.
-  const peopleTo = firstPeopleTab(me.data);
   const inPeople = PEOPLE_TABS.some((p) => loc.pathname === p.to || loc.pathname.startsWith(`${p.to}/`));
-  const sideItems = NAV.flatMap((n) => {
-    if (n.key === 'admin.users') return peopleTo ? [{ ...n, to: peopleTo }] : [];
-    if (PEOPLE_KEYS.has(n.key)) return [];
-    return items.some((i) => i.key === n.key) ? [n] : [];
-  });
+  const sideItems = visibleNavItems(me.data);
+  const paletteItems = permittedNavItems(me.data);
   const pending = notes.data?.unread_count ?? 0;
   const current = inPeople ? NAV.find((n) => n.key === 'admin.users') : [...NAV].sort((a, b) => b.to.length - a.to.length).find((n) => loc.pathname.startsWith(n.to));
   // saved on the server (PATCH /me/preferences, 0.15.42); the cached /me is updated so the effects above do not switch it back
@@ -123,7 +155,7 @@ export function Shell() {
   const groupFirst = current ? sideItems.find((i) => i.group === current.group) : undefined;
   const brand = (
     <div className="flex items-center gap-2 px-4 py-4 font-bold">
-      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-accent text-accentInk">G</span>{!rail && t('app.name')}
+      {brandMark}{!rail && t('app.name')}
       {!rail && <button className="btn ms-auto hidden min-h-8 min-w-8 md:inline-flex" data-testid="sidebar-pin" aria-pressed={!auto} aria-label={t(auto ? 'nav.pin_menu' : 'nav.autohide_menu')} title={t(auto ? 'nav.pin_menu' : 'nav.autohide_menu')} onClick={togglePin}>{auto ? <PinOff size={16} aria-hidden /> : <Pin size={16} aria-hidden />}</button>}
     </div>
   );
@@ -157,7 +189,7 @@ export function Shell() {
         onFocus={auto ? () => setHover(true) : undefined} onBlur={auto ? (e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setHover(false); } : undefined}
         className={`side-scope ${auto ? 'fixed start-0 z-40' : 'sticky'} top-0 hidden h-screen shrink-0 flex-col border-e border-line bg-side md:flex`}>
         {brand}
-        <SidebarBody items={sideItems} compact={rail} unread={unread} alerts={alerts} counts={counts} activeKey={activeKey} />
+        <SidebarBody items={sideItems} compact={rail} unread={unread} alerts={alerts} counts={counts} activeKey={activeKey} side={side} onPinsChange={savePins} />
         {/* the sample-data label only in the pure mock build (P0 of the 2026-11-17 audit: it also showed against the real server) */}
         {!rail && import.meta.env.VITE_USE_MOCKS === 'true' && !HYBRID && <div className="border-t border-line px-4 py-3 text-xs text-faint">Synthetic data</div>}
         {!rail && <SidebarSplitter width={width} onChange={resize} asideRef={asideRef} />}
@@ -167,10 +199,10 @@ export function Shell() {
           <button className="absolute inset-0 bg-scrim" aria-label={t('nav.close_menu')} tabIndex={-1} onClick={() => setDrawer(false)} />
           <div role="dialog" aria-modal="true" aria-label={t('nav.sidebar_label')} data-testid="sidebar-drawer" className="absolute inset-y-0 start-0 flex w-72 max-w-[85vw] flex-col border-e border-line bg-card">
             <div className="flex items-center justify-between pe-2">
-              <div className="flex items-center gap-2 px-4 py-4 font-bold"><span className="grid h-8 w-8 place-items-center rounded-md bg-accent text-accentInk">G</span>{t('app.name')}</div>
+              <div className="flex items-center gap-2 px-4 py-4 font-bold">{brandMark}{t('app.name')}</div>
               <button ref={closeRef} className="btn min-h-11 min-w-11" data-testid="drawer-close" aria-label={t('nav.close_menu')} onClick={() => setDrawer(false)}><X size={16} aria-hidden /></button>
             </div>
-            <SidebarBody items={sideItems} compact={false} unread={unread} alerts={alerts} counts={counts} activeKey={activeKey} onNavigate={() => setDrawer(false)} />
+            <SidebarBody items={sideItems} compact={false} unread={unread} alerts={alerts} counts={counts} activeKey={activeKey} onNavigate={() => setDrawer(false)} side={side} onPinsChange={savePins} />
           </div>
         </div>
       )}
@@ -181,7 +213,7 @@ export function Shell() {
           <nav aria-label="breadcrumb" data-testid="breadcrumb" className="min-w-0 text-sm text-mute">
             <ol className="flex flex-wrap items-center gap-1">
               <li><Link className="hover:text-ink" to="/my-work">{t('app.name')}</Link></li>
-              {current && groupFirst && <li className="flex gap-1"><span aria-hidden>/</span><Link className="hover:text-ink" to={groupFirst.to}>{t(`nav.group_${current.group}`)}</Link></li>}
+              {current && groupFirst && t(`nav.group_${current.group}`) !== t(`nav.${current.key}`) && <li className="flex gap-1"><span aria-hidden>/</span><Link className="hover:text-ink" to={groupFirst.to}>{t(`nav.group_${current.group}`)}</Link></li>}
               {current && <li className="flex gap-1"><span aria-hidden>/</span>{view || stream
                 ? <Link className="hover:text-ink" to={sideItems.find((i) => i.key === current.key)?.to ?? current.to}>{t(`nav.${current.key}`)}</Link>
                 : <b className="text-ink" aria-current="page">{t(`nav.${current.key}`)}</b>}</li>}
@@ -224,7 +256,7 @@ export function Shell() {
       <ShortcutsHelp />
       <RowActions />
       {me.data?.user.id && <QuickTour userId={me.data.user.id} />}
-      <CommandPalette open={palette} onOpenChange={setPalette} items={items.map((i) => ({ key: i.key, to: i.to }))} />
+      <CommandPalette open={palette} onOpenChange={setPalette} items={paletteItems.map((i) => ({ key: i.key, to: i.to }))} />
     </div>
   );
 }
@@ -249,41 +281,6 @@ function QuickCreate({ me, allowed }: { me: ReturnType<typeof useMe>['data']; al
       <Popover.Portal>
         <Popover.Content align="end" sideOffset={6} data-testid="quick-create-menu" className="card z-50 w-56 p-2">
           {items.map((i) => <Popover.Close asChild key={i.key}><button className="btn w-full justify-start" data-testid={`qc-${i.key}`} onClick={() => nav(i.to)}><Plus size={14} />{i.label}</button></Popover.Close>)}
-        </Popover.Content>
-      </Popover.Portal>
-    </Popover.Root>
-  );
-}
-
-function NotificationBell({ count }: { count: number }) {
-  const { t } = useTranslation();
-  const qc = useQueryClient();
-  const n = useNotifications(true);
-  const nav = useNavigate();
-  const [open, setOpen] = useState(false);
-  const readAll = () => api.post<void>('/notifications/read-all').then(() => qc.invalidateQueries({ queryKey: ['notifications'] }));
-  const go = (x: { id: string; read_at?: string | null; link?: string | null; entity_type?: string | null; entity_id?: string | null }) => {
-    setOpen(false);
-    if (!x.read_at) void api.post(`/notifications/${x.id}/read`).then(() => qc.invalidateQueries({ queryKey: ['notifications'] }), () => {});
-    const to = notificationTarget(x);
-    if (to) nav(to);
-  };
-  return (
-    <Popover.Root open={open} onOpenChange={setOpen}>
-      <Popover.Trigger asChild>
-        <button className="btn relative" data-testid="topbar-bell" aria-label={t('top.notifications')}>
-          <Bell size={16} />
-          {count > 0 && <span data-testid="bell-count" className="absolute -top-2 -end-2 grid h-5 min-w-5 place-items-center rounded-full bg-late px-1 text-xs text-lateOn">{count}</span>}
-        </button>
-      </Popover.Trigger>
-      <Popover.Portal>
-        <Popover.Content align="end" sideOffset={6} data-testid="bell-panel" className="card z-50 w-80 p-2">
-          <button className="btn mb-2 w-full" onClick={() => void readAll()}><Check size={14} />{t('top.mark_all_read')}</button>
-          {(n.data?.items ?? []).length === 0 && <p className="p-2 text-mute">{t('top.no_notifications')}</p>}
-          {n.data?.items.slice(0, 8).map((x) => (
-            <button key={x.id} data-testid={`bell-item-${x.id}`} onClick={() => go(x)} className={`block w-full rounded-md p-2 text-start text-sm hover:bg-hover ${x.read_at ? 'text-mute' : 'font-semibold'}`}>{x.title}</button>
-          ))}
-          <Link to="/inbox" data-testid="bell-open-inbox" onClick={() => setOpen(false)} className="mt-1 block rounded-md p-2 text-center text-sm font-semibold text-link hover:bg-hover">{t('top.open_inbox')}</Link>
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>

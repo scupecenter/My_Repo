@@ -1,23 +1,31 @@
-import { KeyRound, Lock, Mail, Palette, Phone, ShieldCheck, ShieldOff, UserRound } from 'lucide-react';
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { ChevronDown, ChevronUp, Eye, EyeOff, KeyRound, Lock, Mail, Palette, PanelLeft, Phone, ShieldCheck, ShieldOff, UserRound } from 'lucide-react';
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { fieldErrors } from '@/api/auth';
 import { ApiError } from '@/api/client';
-import { useSession } from '@/api/hooks';
+import { useMe, useSession } from '@/api/hooks';
 import type { TwoFactorEnrolment } from '@/api/types';
 import {
   type MyProfile, useCancelEmailChange, useCancelPhoneChange, useChangeMyPassword, useEndMyOtherSessions, useEndMySession, useMyProfile, useMySessions, useRequestEmailChange, useRequestPhoneChange,
   useResendEmailCode, useSelfDisableTwoFactor, useSelfEnrolConfirm, useSelfEnrolStart, useUpdateMyProfile, useVerifyEmailChange,
 } from '@/api/profile';
 import { errText } from '@/components/FormDialog';
+import { PushSection } from '@/components/PushSection';
 import { PageHeader } from '@/components/PageHeader';
 import { ErrorState, LoadingSkeleton } from '@/components/States';
 import { useToast } from '@/components/Toast';
+import { MyPasskeysSection } from '@/components/Passkeys';
 import { CodeField, codeComplete, codeErrorText, digitsOnly, QrCode, RecoveryCodesView, TwoFactorCard } from '@/components/TwoFactor';
 import { ruleKey } from '@/lib/passwordRules';
 import { fmtDateTime } from '@/lib/time';
 import { BRANDS, type Brand } from '@/lib/brands';
-import { APPEARANCE_OPTIONS, APPEARANCE_PRESETS, type Appearance, type AppearanceKey, paint } from '@/lib/appearance';
+import { APPEARANCE_DEFAULTS, APPEARANCE_OPTIONS, APPEARANCE_PRESETS, sanitizeAppearance, type Appearance, type AppearanceKey, paint } from '@/lib/appearance';
+import { applySidebarOverlay, BADGE_STYLES, sanitizeUiNav, type UiNav } from '@/lib/sidebarPrefs';
+import { resolveLayout, type Layout } from '@/lib/navLayout';
+import { visibleNavItems } from '@/lib/visibleNav';
+import { useNavLayout } from '@/api/settings';
+import { useQueryClient } from '@tanstack/react-query';
+import type { Me } from '@/api/types';
 import { applyTheme, currentTheme } from '@/i18n';
 import { savePref as storePref } from '@/lib/localPref';
 
@@ -54,11 +62,13 @@ export function Profile() {
       <div className="grid gap-4 lg:grid-cols-2">
         <Details key={p.version} p={p} />
         <AppearanceSection key={`ap-${p.version}`} p={p} />
+        <SidebarSection key={`sb-${p.version}`} p={p} />
         <EmailSection p={p} />
         <PhoneSection p={p} />
         <PasswordSection p={p} />
         <TwoFactorSection p={p} />
         <MySessionsSection />
+        <PushSection />
       </div>
     </div>
   );
@@ -184,7 +194,7 @@ function AppearanceSection({ p }: { p: MyProfile }) {
   const toast = useToast();
   const save = useUpdateMyProfile();
   const choice = p.identity.allow_user_choice;
-  const [draft, setDraft] = useState<Appearance>({ ...p.ui_prefs });
+  const [draft, setDraft] = useState<Appearance>(() => sanitizeAppearance(p.ui_prefs));
   const [theme, setTheme] = useState<'light' | 'dark'>(p.theme);
   // the live preview: paint the draft over the organization defaults; on leave without Apply the saved set comes back
   const shown: Appearance = { ...(p.identity.defaults ?? {}), ...draft };
@@ -197,7 +207,7 @@ function AppearanceSection({ p }: { p: MyProfile }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(shown), theme]);
   const patch: { ui_prefs?: Appearance; theme?: 'light' | 'dark' } = {
-    ...(JSON.stringify(draft) !== JSON.stringify(p.ui_prefs) ? { ui_prefs: draft } : {}),
+    ...(JSON.stringify(draft) !== JSON.stringify(sanitizeAppearance(p.ui_prefs)) ? { ui_prefs: draft } : {}),
     ...(theme !== p.theme ? { theme } : {}),
   };
   const dirty = Object.keys(patch).length > 0;
@@ -212,7 +222,7 @@ function AppearanceSection({ p }: { p: MyProfile }) {
       toast(t('profile.saved'));
     } });
   };
-  const revert = () => { setDraft({ ...p.ui_prefs }); setTheme(p.theme); };
+  const revert = () => { setDraft(sanitizeAppearance(p.ui_prefs)); setTheme(p.theme); };
   const preset = (name: keyof typeof APPEARANCE_PRESETS) => {
     const pr = APPEARANCE_PRESETS[name];
     setDraft({ ...pr.prefs });
@@ -237,7 +247,8 @@ function AppearanceSection({ p }: { p: MyProfile }) {
             <label key={k} className="block text-sm font-semibold">{dimLabel(k)}
               <select className="input mt-1 font-normal" data-testid={`pf-ap-${k}`} disabled={!choice}
                 value={draft[k] ?? ''} onChange={(e) => setDraft({ ...draft, [k]: e.target.value === '' ? undefined : e.target.value })}>
-                <option value="">{t('appearance.org_default', { name: t(`appearance.opt.${k}.${p.identity.defaults?.[k] ?? 'standard'}`) })}</option>
+                {/* the org default of a dimension without a saved org value is the dimension's built-in standard (APPEARANCE_DEFAULTS), not a literal 'standard' that some dimensions do not have */}
+                <option value="">{t('appearance.org_default', { name: t(`appearance.opt.${k}.${p.identity.defaults?.[k] ?? APPEARANCE_DEFAULTS[k]}`) })}</option>
                 {APPEARANCE_OPTIONS[k].map((v) => <option key={v} value={v}>{t(`appearance.opt.${k}.${v}`)}</option>)}
               </select>
             </label>
@@ -248,6 +259,122 @@ function AppearanceSection({ p }: { p: MyProfile }) {
         <div className="flex justify-end gap-2">
           <button type="button" className="btn" data-testid="pf-ap-revert" disabled={!dirty || save.isPending} onClick={revert}>{t('appearance.revert')}</button>
           <button type="submit" className="btn btn-accent" data-testid="pf-ap-apply" disabled={!dirty || !choice || save.isPending}>{t('appearance.apply')}</button>
+        </div>
+      </form>
+    </Section>
+  );
+}
+
+/**
+ * 0242 (proposal item 4): the personal sidebar. The user chooses what their menu shows, the order of the screens inside their
+ * heading and the badge style; the pinned shortcuts are managed on the menu itself (the star). Every edit previews at once in
+ * the menu (the draft is written into the cached /me); Apply saves through PATCH /me/profile (audited per key in profile_updated),
+ * Revert returns to the saved set. The organization layout and the server's permission list still apply first.
+ */
+function SidebarSection({ p }: { p: MyProfile }) {
+  const { t, i18n } = useTranslation();
+  const toast = useToast();
+  const qc = useQueryClient();
+  const me = useMe(true);
+  const save = useUpdateMyProfile();
+  const navQ = useNavLayout();
+  /** Drops the empty parts, so a back-to-default choice stores nothing. */
+  const tidy = (n: UiNav): UiNav => {
+    const o: UiNav = {};
+    if (n.badge_style) o.badge_style = n.badge_style;
+    if (n.hidden?.length) o.hidden = n.hidden;
+    if (n.order?.length) o.order = n.order;
+    if (n.pins?.length) o.pins = n.pins;
+    return o;
+  };
+  const saved = sanitizeUiNav(p.ui_prefs.sidebar ?? {});
+  const [draft, setDraftRaw] = useState<UiNav>(saved);
+  const setDraft = (n: UiNav) => setDraftRaw(tidy(n));
+  const draftKey = JSON.stringify(draft);
+  const dirty = draftKey !== JSON.stringify(tidy(saved));
+
+  // the live preview: the cached /me carries the draft, so the menu draws it at once; on leave without Apply the saved set comes back
+  useEffect(() => {
+    qc.setQueryData<Me | undefined>(['me'], (d) => (d ? { ...d, user: { ...d.user, ui_prefs: { ...d.user.ui_prefs, sidebar: draft } } } : d));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftKey]);
+  useEffect(() => () => {
+    qc.setQueryData<Me | undefined>(['me'], (d) => (d ? { ...d, user: { ...d.user, ui_prefs: { ...d.user.ui_prefs, sidebar: saved } } } : d));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const items = useMemo(() => visibleNavItems(me.data), [me.data]);
+  const byKey = useMemo(() => new Map(items.map((i) => [i.key, i])), [items]);
+  const base = useMemo(() => resolveLayout(navQ.data?.layout ?? null), [navQ.data?.layout]);
+  const grouped = useMemo(() => applySidebarOverlay(base, { order: draft.order }), [base, draft.order]);
+  const flatKeys = (l: Layout): string[] => l.headings.flatMap((h) => h.children.flatMap((c) => (typeof c === 'string' ? [c] : c.children)));
+  const visibleOrder = useMemo(() => flatKeys(grouped).filter((k) => byKey.has(k)), [grouped, byKey]);
+  const hiddenSet = new Set(draft.hidden ?? []);
+
+  const move = (groupKeys: string[], k: string, d: -1 | 1) => {
+    const i = groupKeys.indexOf(k);
+    const j = i + d;
+    if (i < 0 || j < 0 || j >= groupKeys.length) return;
+    const gk = [...groupKeys];
+    [gk[i], gk[j]] = [gk[j], gk[i]];
+    const inGroup = new Set(groupKeys);
+    const it = gk[Symbol.iterator]();
+    setDraft({ ...draft, order: visibleOrder.map((x) => (inGroup.has(x) ? it.next().value! : x)) });
+  };
+  const toggleHide = (k: string) => {
+    const h = new Set(draft.hidden ?? []);
+    if (h.has(k)) h.delete(k); else h.add(k);
+    setDraft({ ...draft, hidden: [...h] });
+  };
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    if (!dirty || save.isPending) return;
+    save.mutate({ version: p.version, patch: { ui_prefs: { sidebar: tidy(draft) } } }, { onSuccess: () => toast(t('profile.saved')) });
+  };
+  const label = (k: string) => t(k === 'sites' ? 'nav.sites_all' : `nav.${k}`);
+  const groupName = (id: string, en: string, ar: string) => (id === 'other' ? t('navEdit.other') : i18n.language === 'ar' ? ar : en);
+
+  return (
+    <Section id="sidebar" icon={<PanelLeft size={18} aria-hidden />} title={t('nav_side.title')}>
+      <p className="text-sm text-mute">{t('nav_side.subtitle')}</p>
+      <form onSubmit={submit} className="space-y-3" noValidate data-testid="profile-sidebar-form">
+        <label className="block text-sm font-semibold">{t('nav_side.badges')}
+          <select className="input mt-1 font-normal" data-testid="pf-sb-badge" value={draft.badge_style ?? 'full'} onChange={(e) => setDraft({ ...draft, badge_style: e.target.value === 'full' ? undefined : (e.target.value as UiNav['badge_style']) })}>
+            {BADGE_STYLES.map((b) => <option key={b} value={b}>{t(`nav_side.badge_${b}`)}</option>)}
+          </select>
+        </label>
+        <div className="space-y-3">
+          {grouped.headings.map((h) => {
+            const keys = h.children.flatMap((c) => (typeof c === 'string' ? [c] : c.children)).filter((k) => byKey.has(k));
+            if (!keys.length) return null;
+            return (
+              <div key={h.id} data-testid={`pf-sb-group-${h.id}`}>
+                <div className="px-1 text-xs font-semibold text-mute">{groupName(h.id, h.name_en, h.name_ar)}</div>
+                <ul className="mt-1 divide-y divide-line rounded-md border border-line">
+                  {keys.map((k, i) => {
+                    const off = hiddenSet.has(k);
+                    return (
+                      <li key={k} className={`flex items-center gap-1 px-2 py-1.5 text-sm ${off ? 'text-faint' : ''}`} data-testid={`pf-sb-item-${k}`}>
+                        <span className={`flex-1 truncate ${off ? 'line-through' : ''}`}>{label(k)}</span>
+                        <button type="button" data-testid={`pf-sb-up-${k}`} disabled={i === 0} aria-label={`${t('nav.move_up')}: ${label(k)}`} onClick={() => move(keys, k, -1)} className="rounded-md p-1 text-faint hover:bg-hover hover:text-ink disabled:opacity-30"><ChevronUp size={14} aria-hidden /></button>
+                        <button type="button" data-testid={`pf-sb-down-${k}`} disabled={i === keys.length - 1} aria-label={`${t('nav.move_down')}: ${label(k)}`} onClick={() => move(keys, k, 1)} className="rounded-md p-1 text-faint hover:bg-hover hover:text-ink disabled:opacity-30"><ChevronDown size={14} aria-hidden /></button>
+                        <button type="button" data-testid={`pf-sb-hide-${k}`} aria-pressed={off} aria-label={`${t(off ? 'nav_side.show' : 'nav_side.hide')}: ${label(k)}`} title={t(off ? 'nav_side.show' : 'nav_side.hide')} onClick={() => toggleHide(k)} className="rounded-md p-1 text-faint hover:bg-hover hover:text-ink">
+                          {off ? <EyeOff size={14} aria-hidden /> : <Eye size={14} aria-hidden />}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            );
+          })}
+        </div>
+        <p className="text-xs text-mute" data-testid="pf-sb-preview-note">{t('nav_side.note')}</p>
+        <Err id="pf-sb-error" msg={save.isError ? (save.error.status === 412 ? t('profile.err_stale') : errText(save.error, t)) : null} />
+        <div className="flex justify-end gap-2">
+          <button type="button" className="btn" data-testid="pf-sb-reset" disabled={!draftKey || draftKey === '{}' || save.isPending} onClick={() => setDraft({ pins: draft.pins })}>{t('nav_side.reset')}</button>
+          <button type="button" className="btn" data-testid="pf-sb-revert" disabled={!dirty || save.isPending} onClick={() => setDraftRaw(saved)}>{t('appearance.revert')}</button>
+          <button type="submit" className="btn btn-accent" data-testid="pf-sb-apply" disabled={!dirty || save.isPending}>{t('appearance.apply')}</button>
         </div>
       </form>
     </Section>
@@ -479,6 +606,7 @@ function TwoFactorSection({ p }: { p: MyProfile }) {
             </div>}
       {tf.can_enable && mode === 'idle' && <p className="text-xs text-mute">{t('profile.tf_enable_note')}</p>}
       {tf.state === 'on' && local && mode === 'idle' && <TwoFactorCard session={session.data} />}
+      {tf.state === 'on' && local && mode === 'idle' && <MyPasskeysSection />}
     </Section>
   );
 }

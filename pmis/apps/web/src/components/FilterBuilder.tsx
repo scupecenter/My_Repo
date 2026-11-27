@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { ChoiceList } from './ChoiceList';
 import { type FilterCondition, type FilterField, type FilterOperator, type FilterSubGroup, type FilterTree, type FilterValue } from '@/api/views';
+import { DateInput } from '@/components/DateInput';
 
 /**
  * F3 (contract 0.15.31): the AND/OR filter builder of a list screen. Groups are combined with AND or OR, two levels at most (the root group
@@ -132,7 +133,7 @@ function ValueEditor({ c, f, onChange, id, screen }: { c: FilterCondition; f: Fi
           {rel
             ? <input type="number" min={-3650} max={3650} className="input w-20" aria-label={t('filterBuilder.offset_label')} data-testid={`${id}-${sub}-offset`}
                 value={(v as { offset?: number }).offset ?? 0} onChange={(e) => set({ rel: 'today', offset: Number(e.target.value) })} />
-            : <input type="date" className="input w-40" aria-label={aria} data-testid={`${id}-${sub}`} value={typeof v === 'string' ? v : ''} onChange={(e) => set(e.target.value)} />}
+            : <DateInput className="input w-40" aria-label={aria} data-testid={`${id}-${sub}`} value={typeof v === 'string' ? v : ''} onChange={(e) => set(e.target.value)} />}
         </span>
       );
     };

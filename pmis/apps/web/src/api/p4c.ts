@@ -13,6 +13,8 @@ export type HlcLegacyMigration = S['HlcLegacyMigration'];
 export type DismantleOrderOption = S['DismantleOrderOption'];
 export type GecolOrderWarnings = S['GecolOrderWarnings'];
 export type GecolOrderWarningsInput = S['GecolOrderWarningsInput'];
+export type DeriveRules = S['DeriveRules'];
+export type DeriveRule = S['DeriveRule'];
 
 /** PUT /registers/hlc/records/{id}/purchase-requests (If-Match = record version). */
 export function useSetHlcPurchaseRequests() {
@@ -39,10 +41,24 @@ export const useDismantleRns = (siteId: string | null | undefined, part: string 
   });
 
 /** GET /registers/warehouse/order-options: the approved, active orders a PL / OPEN receipt may name (of the site when it has one). */
-export const useWarehouseOrders = (siteId: string | null | undefined, enabled: boolean, key: 'warehouse' | 'car_dispatcher' | 'financial_advances' | 'issues' | 'quality' = 'warehouse') =>
+export const useWarehouseOrders = (siteId: string | null | undefined, enabled: boolean, key: 'warehouse' | 'car_dispatcher' | 'financial_advances' | 'issues' | 'quality' | 'change_control' | 'invoices' = 'warehouse') =>
   useQuery({
     queryKey: ['warehouse-orders', key, siteId ?? null], enabled,
     queryFn: () => api.get<{ items: S['WarehouseOrderOption'][] }>(`/registers/${key}/order-options`, { query: siteId ? { site_id: siteId } : {} }).then((r) => r.items),
+  });
+
+/** GET /registers/financial_advances/advance-options: the advances an expense or settlement may name (D58). */
+export const useAdvanceOptions = (siteId: string | null | undefined, enabled: boolean) =>
+  useQuery({
+    queryKey: ['advance-options', siteId ?? null], enabled,
+    queryFn: () => api.get<{ items: { entity_id: string; advance_state?: string; advance_kind?: string; disbursed_date?: string; po_wo_no?: string; pr_no?: string }[] }>('/registers/financial_advances/advance-options', { query: siteId ? { site_id: siteId } : {} }).then((r) => r.items),
+  });
+
+/** GET /registers/invoices/supplier-options: the companies an invoice may name as its supplier (D58). */
+export const useInvoiceSuppliers = (enabled: boolean) =>
+  useQuery({
+    queryKey: ['invoice-suppliers'], enabled,
+    queryFn: () => api.get<{ items: { id: string; name: string; type?: string }[] }>('/registers/invoices/supplier-options').then((r) => r.items),
   });
 
 /** GET /registers/issues/risk-options: the risks an Issue may name as realised (0322). */
@@ -88,5 +104,15 @@ export function useSetGecolOrderWarnings() {
   return useMutation<GecolOrderWarnings, ApiError, { version: number; body: GecolOrderWarningsInput & { reason: string } }>({
     mutationFn: ({ version, body }) => api.put('/settings/gecol-order-warnings', { version, body }),
     onSettled: () => void qc.invalidateQueries({ queryKey: ['gecolOrderWarnings'] }),
+  });
+}
+
+/** 0.15.260: the cross-register derive rules (Settings, Registers). */
+export const useDeriveRules = () => useQuery({ queryKey: ['deriveRules'], queryFn: () => api.get<DeriveRules>('/settings/derive-rules') });
+export function useSetDeriveRules() {
+  const qc = useQueryClient();
+  return useMutation<DeriveRules, ApiError, { version: number; body: { rules: DeriveRule[]; reason: string } }>({
+    mutationFn: ({ version, body }) => api.put('/settings/derive-rules', { version, body }),
+    onSettled: () => { void qc.invalidateQueries({ queryKey: ['deriveRules'] }); void qc.invalidateQueries({ queryKey: ['register-records'] }); },
   });
 }

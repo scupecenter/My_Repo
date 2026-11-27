@@ -11,7 +11,7 @@
 ## 1. الغرض والنطاق
 
 - **Workspace** نظام لإدارة مشروع تسليم مواقع Project (مواقع اتصالات في 7 مناطق ليبية). يحلّ محل ملف Excel «Site Master» كمرجع وحيد للبيانات، ويفرض **اعتماداً على ثلاثة مستويات** على كل مهمة. (CLAUDE.md)
-- **المناطق السبع:** Tripoli, Middle, WM, Zawia, Benghazi, GM, Sebha. (CLAUDE.md)
+- **المناطق:** تُعرَّف كبيانات رئيسية ويمكن تعديلها من الإعدادات. (CLAUDE.md)
 - **سيناريوهات التسليم:** New Build, Expansion, Hot Swap, Cold Swap, Relocation. **الحالة العامة للموقع:** Not Started, In Progress, On Hold, Completed, Cancelled. (CLAUDE.md)
 - **الاستضافة:** خادم داخلي في الشركة، وليس سحابة. (CLAUDE.md، ADR 0001)
 - **خارج النطاق حالياً:** تطبيق الجوال (مؤجل مع تصميم مسبق له)، وحوادث HSE وتسجيل الحضور (مؤجلة لتطبيق الجوال)، وسعة الفريق والشهادات (أُسقطت)، ونماذج TE المولَّدة (مؤجلة)، والدخول المحلي بكلمة مرور (مؤجل). (CLAUDE.md)
@@ -66,7 +66,7 @@
 
 ## 5. الرؤية والصلاحيات
 
-- **الافتراضي: يرى المستخدم كل شيء**، ويمكن حصره لكل مستخدم في منطقة أو أكثر من المناطق السبع ووحدات مختارة. (CLAUDE.md)
+- **الافتراضي: يرى المستخدم كل شيء**، ويمكن حصره لكل مستخدم في منطقة أو أكثر من المناطق ووحدات مختارة. (CLAUDE.md)
 - **B3 — من يحمل أكثر من دور:** صلاحيته مجموع أدواره، وكل دور محصور في مناطقه ووحداته؛ النطاقات لا تتقاطع (دور CW في طرابلس مع مراجع في الزاوية يعني CW في طرابلس ومهام المراجعة في الزاوية، وليس CW في الزاوية). (CLAUDE.md)
 - **شبكة الصلاحيات** لكل وحدة وشاشة: عرض، إنشاء، تعديل، حذف، اعتماد، تصدير، استيراد، تنزيل مستندات، الاطلاع على سجل التدقيق، إدارة. ويمكن حفظ مجموعات منها كـ«ملفات صلاحيات» تُطبَّق على إسنادات كثيرة. وقواعد **على مستوى الحقل** لإخفاء أو جعل حقول (منها المخصصة) للقراءة فقط. القائمة الجانبية تُظهر ما يحق للشخص فقط. (CLAUDE.md، ADR 0003)
 - **التفويض صلاحية عادية في الشبكة**، وتتحقق قاعدة البيانات نفسها من كل كتابة إعدادات مقابل الصلاحية الفعلية للفاعل لا مقابل علامة «مدير» ثابتة. (CLAUDE.md)
@@ -163,7 +163,7 @@
 ## 14. الإطلاق
 
 (CLAUDE.md)
-1. **تجربة في منطقة واحدة (طرابلس) لأسبوعين.**
+1. **تجربة في منطقة واحدة لأسبوعين.**
 2. **تشغيل موازٍ شهراً:** يصدّر Workspace ملفاً بصيغة Master ويقارنه تلقائياً بالـMaster الحي. **يُتقاعد الـMaster بعد شهر بلا فروقات جوهرية.**
 3. **التدريب لكل دور:** فيديوهات عربية قصيرة، ودليل داخل التطبيق عند أول استخدام، وجلسة حية لكل مجموعة أدوار، وبطل دعم من Project Support.
 4. **معايير القبول:** نجاح اختبارات المسار الحرج الشاملة (E2E)، ومطابقة 100% لتواريخ المراحل في استيراد الـMaster الحقيقي، ولا أعطال حرجة مفتوحة، وتحقيق أهداف الأداء.
@@ -185,8 +185,8 @@
 
 ## 1. Purpose and scope
 
-- **Workspace** manages the Project site-delivery project (telecom sites across 7 Libyan regions). It replaces the Excel Site Master as the system of record and puts a **3-level approval workflow** on every task. (CLAUDE.md)
-- **Regions:** Tripoli, Middle, WM, Zawia, Benghazi, GM, Sebha. **Delivery scenarios:** New Build, Expansion, Hot Swap, Cold Swap, Relocation. **Overall status:** Not Started, In Progress, On Hold, Completed, Cancelled. (CLAUDE.md)
+- **The system** manages telecom site delivery (telecom sites across several regions). It replaces the Excel Site Master as the system of record and puts a **2-level (L1 and L2) approval workflow** on every task. (CLAUDE.md)
+- **Regions:** configured as master data. **Delivery scenarios:** New Build, Expansion, Hot Swap, Cold Swap, Relocation. **Overall status:** Not Started, In Progress, On Hold, Completed, Cancelled. (CLAUDE.md)
 - **Hosting:** an internal company server, never cloud. (CLAUDE.md, ADR 0001)
 - **Out of scope for now:** the mobile app (later, designed for now), HSE incidents and clock-in (deferred to mobile), team capacity and certificates (dropped), generated TE forms (deferred), local password sign-in (deferred). (CLAUDE.md)
 
@@ -240,8 +240,8 @@ Default order (workflow definition version 1): **Site Release → PRE-CW Complet
 
 ## 5. Visibility and permissions
 
-- **Default: everything is visible.** It can be limited per user to one or more of the 7 regions and to selected modules. (CLAUDE.md)
-- **B3 — several roles:** effective permission is the union of the person's active assignments, each limited to its own regions and modules. Scopes never cross: CW in Tripoli plus a reviewer group in Zawia shows CW in Tripoli and review work in Zawia, not CW in Zawia. (CLAUDE.md)
+- **Default: everything is visible.** It can be limited per user to one or more regions and to selected modules. (CLAUDE.md)
+- **B3 — several roles:** effective permission is the union of the person's active assignments, each limited to its own regions and modules. Scopes never cross: CW in Region A plus a reviewer group in Region B shows CW in Region A and review work in Region B, not CW in Region B. (CLAUDE.md)
 - **Permission grid** per module and screen: view, create, edit, delete, approve, export, import, download documents, see the audit log, administer. Grids can be saved as named profiles and applied to many assignments. **Field-level rules** hide or make specific fields (including custom fields) read-only. Navigation shows only what the person may use. (CLAUDE.md, ADR 0003)
 - **Delegation is a plain permission grant**, and the database checks every configuration write against the actor's effective permission, not a fixed admin flag. (CLAUDE.md)
 - **Audit Log readers (B4):** System Admins and the Project Manager see all of it; each Team Lead sees entries for their own modules and regions; anyone else needs the `view_audit` grant, scoped like any other grant. Every read of the Audit Log is itself audited. (CLAUDE.md)
@@ -337,7 +337,7 @@ Every create, rename, edit, deactivate or delete of configuration is a System Ad
 ## 14. Rollout
 
 (CLAUDE.md)
-1. **Pilot on one region (Tripoli) for 2 weeks.**
+1. **Pilot on one region for 2 weeks.**
 2. **Parallel run for 1 month:** Workspace exports a Master-format file and compares it automatically with the live Master. **The Master is retired after one month without material differences.**
 3. **Training per role:** short Arabic videos, an in-app guide on first use, one live session per role group, and a Project Support champion.
 4. **Acceptance criteria:** critical-path E2E tests pass, the real Master import matches 100% of milestone dates, no open critical bugs, and the performance targets are met.

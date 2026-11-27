@@ -1,3 +1,4 @@
+import { ExportAction } from '../security/export-lock';
 import { Body, Controller, Get, Headers, HttpCode, Param, Post, Query, Req, Res, StreamableFile, UploadedFile as Upload, UseInterceptors } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { createHash } from 'node:crypto';
@@ -29,6 +30,15 @@ export class TemplatesController {
     return this.templates.list(auth);
   }
 
+  @Get(':templateId/changes')
+  changes(@Auth() auth: AuthContext, @Param('templateId') templateId: string, @Query('from') from?: string, @Query('to') to?: string) {
+    if (!/^TPL-[A-Z0-9_-]{2,40}$/.test(templateId)) throw problems.notFound('This template does not exist.');
+    const n = (v?: string): number | null => (v !== undefined && /^[1-9][0-9]{0,5}$/.test(v) ? Number(v) : null);
+    if ((from !== undefined && n(from) === null) || (to !== undefined && n(to) === null)) throw problems.validation([{ path: '/from', code: 'invalid', message: 'from and to are version numbers.' }]);
+    return this.templates.changes(auth, templateId, n(from), n(to));
+  }
+
+  @ExportAction({ category: 'templates' })
   @Get(':templateId/download')
   async download(
     @Auth() auth: AuthContext, @Param('templateId') templateId: string, @Query() q: Record<string, unknown>, @Req() req: Request, @Res({ passthrough: true }) res: Response,
@@ -76,6 +86,17 @@ export class ImportBatchesController {
     const dto = await this.imports.getBatchOrUpload(auth, id);
     res.setHeader('ETag', etagHeader(dto.version as number));
     return dto;
+  }
+
+  /** P4 (0365): the refused rows of the batch as an .xlsx to correct and upload again; the reasons are on the sheet "Errors". */
+  @Get(':id/error-report')
+  async errorReport(@Auth() auth: AuthContext, @Param('id') id: string, @Res({ passthrough: true }) res: Response): Promise<StreamableFile> {
+    const { buffer, fileName } = await this.imports.errorReport(auth, id);
+    res.setHeader('Content-Type', XLSX_MIME);
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName.replace(/[^A-Za-z0-9._-]/g, '_')}"`);
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    return new StreamableFile(buffer);
   }
 
   @Get(':id/rows')

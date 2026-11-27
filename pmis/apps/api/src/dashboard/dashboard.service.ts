@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import ExcelJS from 'exceljs';
@@ -8,6 +9,7 @@ import { boolParam, oneParam, Query } from '../common/query';
 import { DbService } from '../db/db.service';
 import { applyContext } from '../logs/context';
 import { FilterCatalogService } from '../views/filter-catalog.service';
+import { DashboardCacheService } from './dashboard-cache.service';
 import { z } from 'zod';
 import { parse } from '../common/zod';
 
@@ -77,6 +79,7 @@ export class DashboardService {
     private readonly db: DbService,
     private readonly access: AccessService,
     private readonly filterCatalog: FilterCatalogService,
+    private readonly cache: DashboardCacheService,
   ) {}
 
   /**
@@ -123,9 +126,17 @@ export class DashboardService {
     if (p.stream) await this.requireStream(p.stream);
     if (p.view) await this.requireView(p.view);
     const excl = await this.excludeOverrides(p);
-    const rows = await this.withSiteSet(q, () => this.db.tx.$queryRaw<{ r: Json }[]>(Prisma.sql`
+    // The heavy part (dash_overview, 0.9 s on 1000 sites) is shared for 30 s between callers with the same key. The key holds everything the figures depend on:
+    // the caller's dashboard and issues region scope (read live above and here, so a rights change applies at once), the filters, the view, the override flag
+    // and the site set of the filter tree. The rights checks above run on every request, before the cache is asked.
+    const issueRegions = await this.access.regions('issues', 'view');
+    const siteIds = await this.filterCatalog.siteSet(q);
+    const key = createHash('sha256').update(JSON.stringify([regions, issueRegions, p.ref_date ?? null, p.region_id ?? null, p.cluster_code ?? null, p.scenario ?? null, p.stream ?? null, p.view ?? null, excl, siteIds === null ? null : [...siteIds].sort()])).digest('hex');
+    const { value: r, computedAt } = await this.cache.getOrLoad(key, async () => {
+      const rows = await this.withSiteSet(q, () => this.db.tx.$queryRaw<{ r: Json }[]>(Prisma.sql`
       SELECT dash_overview(${p.ref_date ?? null}::date, ${p.region_id ?? null}::int, ${p.cluster_code ?? null}::text, ${p.scenario ?? null}::text, ${p.stream ?? null}::text, ${excl}::boolean, ${p.view ?? null}::text) AS r`));
-    const r = rows[0]!.r;
+      return rows[0]!.r;
+    });
     const meta = (r.meta ?? {}) as Json;
     const basis = (r.basis ?? {}) as Json;
     const milestones = (r.milestones ?? []) as Json[];
@@ -138,7 +149,7 @@ export class DashboardService {
     const variant = await this.db.tx.$queryRaw<{ v: string }[]>`SELECT dash_pipeline_variant() AS v`;
     return {
       meta: {
-        as_of: new Date().toISOString(),
+        as_of: computedAt.toISOString(), // when the figures were read (up to 30 s ago when they come from the cache)
         workflow_versions: meta.workflow_versions ?? [],
         override_flagged_count: meta.override_flagged_count ?? 0,
         historical_flagged_count: meta.historical_flagged_count ?? 0,
