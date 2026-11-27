@@ -6651,6 +6651,7 @@
     "readonly": "Only a System Admin, or a person they delegated settings to for all regions, can change this.",
     "confirm": "Save the login page settings? The change is audited with your reason and shows on the sign-in page at once."
   },
+<<<<<<< HEAD
   "ui": {
     "new": "New",
     "new_hint": "Recently added feature",
@@ -6675,5 +6676,21 @@
     "new_enabled": "Show the \"New\" badge",
     "new_days": "Days to show it after a feature is released",
     "new_preview": "Shown beside new features until the days have passed."
+=======
+  "related": {
+    "title": "Related records",
+    "to": "Points to:",
+    "from": "Named by:",
+    "register": {
+      "procurement": "Procurement",
+      "warehouse": "Warehouse",
+      "dismantle": "Dismantle",
+      "issues": "Issue log",
+      "quality": "Quality",
+      "car_dispatcher": "Car dispatcher",
+      "financial_advances": "Financial advances",
+      "risks": "Risks"
+    }
+>>>>>>> d92a4c94 (feat: related records panel on a register record (0216, contract 0.15.134))
   }
 }

@@ -45,6 +45,13 @@ export const useOrderReceipts = (entityId: string | null | undefined) =>
     queryFn: () => api.get<{ items: S['ProcurementOrderReceipt'][] }>(`/registers/procurement/${entityId}/receipts`).then((r) => r.items),
   });
 
+/** GET /registers/{key}/{entity_id}/related: the records linked to this record, both directions (0216). */
+export const useRelatedRecords = (key: string | null | undefined, entityId: string | null | undefined) =>
+  useQuery({
+    queryKey: ['related-records', key, entityId], enabled: !!key && !!entityId,
+    queryFn: () => api.get<{ groups: S['RelatedRecordGroup'][] }>(`/registers/${key}/${entityId}/related`).then((r) => r.groups),
+  });
+
 /** POST /registers/hlc/legacy-migration: the preview (dry_run) or the run (reason; the server asks for a step-up). */
 export function useHlcLegacyMigration() {
   const qc = useQueryClient();

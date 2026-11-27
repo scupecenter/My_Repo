@@ -789,6 +789,22 @@ describe("Issue log and Quality order picker (0195)", () => {
   });
 });
 
+describe("related records of a record (0216)", () => {
+  it("answers an empty list for a record with no links, refuses a bad key or id, and needs the register view right", async () => {
+    const m = await move({ ...doc("pl"), lines: [{ item_id: tower.id, qty: 1 }] });
+    expect(m.status, JSON.stringify(m.body)).toBe(201);
+    const rec = await t.entry.api.call("get", recPath("warehouse", m.body.register_record_id));
+    const ok = await t.entry.api.call("get", `/registers/warehouse/${rec.body.entity_id}/related`);
+    expect(ok.status, JSON.stringify(ok.body)).toBe(200);
+    expect(ok.body.groups).toEqual([]);
+    expect((await t.entry.api.call("get", "/registers/warehouse/not-an-id/related")).status).toBe(422);
+    expect((await t.entry.api.call("get", `/registers/Bad-Key/${rec.body.entity_id}/related`)).status).toBe(422);
+    const none = await admin.api.call("get", `/registers/warehouse/${randomUUID()}/related`);
+    expect(none.status).toBe(200);
+    expect(none.body.groups).toEqual([]);
+  });
+});
+
 describe("scope and permissions", () => {
   it("lists movements and stock by site; another region does not see the site documents, and a caller without the module or the create right is refused", async () => {
     const bySite = await t.entry.api.call(

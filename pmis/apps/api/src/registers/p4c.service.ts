@@ -67,6 +67,15 @@ export class P4cService {
     return { items };
   }
 
+  /** GET /registers/{register_key}/{entity_id}/related : the records linked to this one (the database applies the view right of each register and region). */
+  async relatedRecords(auth: AuthContext, key: string, entityId: string): Promise<{ groups: unknown[] }> {
+    if (!/^[a-z][a-z0-9_]{0,63}$/.test(key)) throw problems.validation([{ path: '/register_key', code: 'invalid', message: 'Not a register key.' }]);
+    if (!uuidSchema.safeParse(entityId).success) throw problems.validation([{ path: '/entity_id', code: 'invalid', message: 'entity_id is a uuid.' }]);
+    await this.access.requireRegions(key, 'view');
+    const groups = await this.registers.call<unknown[]>(auth, Prisma.sql`SELECT record_related(${key}::text, ${entityId}::uuid) AS r`);
+    return { groups };
+  }
+
   /** POST /registers/hlc/legacy-migration: the preview (dry_run) or the run (reason and step-up). */
   async legacyMigration(auth: AuthContext, raw: unknown): Promise<unknown> {
     const body = parse(legacySchema, raw);
