@@ -1206,7 +1206,9 @@
     "section_workflow_coverage": "Matrix coverage",
     "section_screens_login": "Login page",
     "section_screens_interface": "Interface",
-    "section_screens_goals": "Goals"
+    "section_screens_goals": "Goals",
+    "section_workflow_coverage": "Matrix coverage",
+    "section_workflow_simulate": "Who approves?"
   },
   "scopeMatch": {
     "title": "Team / scope match (Procurement)",
@@ -2069,7 +2071,9 @@
     "inline_undone": "Change undone.",
     "contractor": "Contractor",
     "contractor_company": "Contractor company",
-    "contractor_hint": "Pick from the companies with an active contract. The contract is checked against the scope at submit."
+    "contractor_hint": "Pick from the companies with an active contract. The contract is checked against the scope at submit.",
+    "prefilled": "Prefilled",
+    "prefilled_hint": "Filled from the default set in Settings; change it if it does not apply."
   },
   "regErrors": {
     "register_locked": "This is locked: only a System Admin can change it until it is unlocked.",
@@ -4244,7 +4248,12 @@
     "add_impact_tpl": "Impact: a new version of the register template is issued with this column. Files made from the old template still upload; the new column stays empty in them. Existing records keep this column empty until filled.",
     "add_impact": "Impact: existing records keep this column empty until filled. It is not in the template, so no new template version is issued.",
     "move_up": "Move {{code}} up",
-    "move_down": "Move {{code}} down"
+    "move_down": "Move {{code}} down",
+    "default_value": "Default",
+    "default_edit": "Default value of {{code}}",
+    "default_title": "Default value of {{code}}",
+    "default_note": "Prefilled on a new record and shown as prefilled; the person can change it. The server never fills it in by itself (imports and API calls are unchanged).",
+    "default_clear": "Clear the default"
   },
   "lists": {
     "colour": "Colour",
@@ -6978,5 +6987,24 @@
     "remove": "Remove goal",
     "add": "Add goal",
     "save_title": "Save the goals"
+  },
+  "matrixSimulate": {
+    "title": "Who approves?",
+    "note": "Read only. Pick a site and a stage task or a register to see who would hold L1 and L2 today: the matrix cell that decides, its rule, the people who would hold the level and how they reach it (named, role, group). Nothing is written and nobody is notified. A task cell decides before the stage cell, and a region cell before the default cell.",
+    "site_search": "Find a site",
+    "site": "Site",
+    "kind": "For",
+    "kind_task": "A stage task",
+    "kind_register": "A register",
+    "what": "Task or register",
+    "choose": "Choose",
+    "open_coverage": "Matrix coverage",
+    "source_region": "region cell",
+    "source_default": "default cell",
+    "source_none": "no cell",
+    "task_cell": "task cell",
+    "rule": "rule",
+    "nobody": "Nobody holds this level.",
+    "fallback": "Who could act through the admin path:"
   }
 }

@@ -34,6 +34,7 @@ const fieldBase = {
 };
 const createBody = z.object({ ...fieldBase, label_en: label, code, field_type: z.enum(COLUMN_TYPES), new_list: newList.optional(), reason }).strict();
 const patchBody = z.object({ field_type: z.enum(COLUMN_TYPES).optional(), is_active: z.boolean().optional(), new_list: newList.optional(), confirm_conversion: z.boolean().optional(), reason, ...fieldBase }).strict();
+const defaultBody = z.object({ value: z.union([z.string().max(2000), z.number(), z.boolean(), z.array(z.string().max(200)).max(200), z.null()]), reason }).strict();
 const deleteBody = z.object({ reason }).strict();
 const orderBody = z.object({ codes: z.array(code).min(1).max(500), reason }).strict();
 const sectionCreate = z.object({ name_en: label, name_ar: label.nullable().optional(), sort_order: z.number().int().min(0).max(100000).optional(), reason }).strict();
@@ -124,6 +125,13 @@ export class RegisterColumnsService {
     const patch: Json = { ...rest };
     if (catalogue !== undefined) patch.list_catalogue = catalogue;
     return this.door(Prisma.sql`SELECT admin_reg_field_save(${key}::text, ${field}::text, false, ${JSON.stringify(patch)}::jsonb, ${why}::text, ${version}::int, ${confirm ?? false}::boolean) AS r`);
+  }
+
+  /** 0.15.103: the default value of a column (null clears it), prefilled on a new record by the form. */
+  async setDefault(key: string, field: string, ifMatch: string | undefined, raw: unknown): Promise<Json> {
+    const b = parse(defaultBody, raw);
+    await this.access.requireAdmin('fields', 'edit');
+    return this.door(Prisma.sql`SELECT admin_reg_field_default_set(${key}::text, ${field}::text, ${JSON.stringify(b.value)}::jsonb, ${b.reason}::text, ${this.optionalVersion(ifMatch)}::int) AS r`);
   }
 
   /** Hard delete when no record ever held a value; otherwise the column is deactivated with the reason (the answer says which). */

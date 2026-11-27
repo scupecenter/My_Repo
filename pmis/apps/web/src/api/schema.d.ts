@@ -2937,6 +2937,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/matrix/simulate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Who would hold L1 and L2 for a site and a task or register (read only, admin)
+         * @description 0.15.152. Read only, nothing is written. The cell that decides is found as the engine finds it (task cell before stage cell, region cell before default cell). `holders` are the active people who would hold the level and `via` says how (`named`, `role: <name>`, `group: <name>`). When nobody holds the level, `fallback` lists who could act through the admin path (`system_admin`, or `delegate` when a delegation covers the module and the region of the site). Needs `admin.matrix` view or edit (403 otherwise).
+         */
+        get: operations["simulateMatrix"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/matrix/coverage": {
         parameters: {
             query?: never;
@@ -7080,6 +7100,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/registers/{register_key}/fields/{code}/default": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set or clear the default value of a register column
+         * @description 0.15.154. System Admin or a delegate of `fields.edit` (403 otherwise). The default is prefilled on a NEW record by the register form and shown as prefilled; the server never applies it by itself. Only simple columns (text, long text, email, phone, link, number, currency, percentage, date, yes/no, list, multi-list); 422 `not_supported` for the others, 422 `unknown_value` for a value that is not an active value of the list, and the same value rules as a record. `value` null clears it. If-Match (the column version) is optional. Audited (`register_field_default`).
+         */
+        put: operations["setRegisterFieldDefault"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/registers/{register_key}/fields-order": {
         parameters: {
             query?: never;
@@ -10565,6 +10605,38 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        MatrixSimulation: {
+            site: {
+                /** Format: uuid */
+                id: string;
+                site_code: string;
+                name: string | null;
+                region_id: number;
+            };
+            /** @enum {string} */
+            kind: "task" | "register";
+            code: string;
+            name_en: string;
+            name_ar: string | null;
+            module: string;
+            levels: {
+                /** @enum {string} */
+                level_code: "L1" | "L2";
+                /** @enum {string} */
+                source: "region" | "default" | "none";
+                task_specific: boolean;
+                rule: string | null;
+                holders: components["schemas"]["MatrixSimulationPerson"][];
+                fallback: components["schemas"]["MatrixSimulationPerson"][];
+            }[];
+        };
+        MatrixSimulationPerson: {
+            /** Format: uuid */
+            user_id: string;
+            name: string;
+            email: string;
+            via: string | string[];
+        };
         PmScheduleInput: {
             id: string;
             name_en: string;
@@ -15968,6 +16040,8 @@ export interface components {
             in_filter?: boolean;
             in_template?: boolean;
             in_export?: boolean;
+            /** @description 0.15.154. Prefilled on a new record (null or absent = none). */
+            default_value?: unknown;
             is_active: boolean;
             /** @description Protected: code or a derived rule depends on it. */
             is_system: boolean;
@@ -16088,6 +16162,8 @@ export interface components {
             /** @description 0.12.5. Only for `child_list`: the columns of a row, in order. */
             columns?: components["schemas"]["RegisterFieldColumn"][];
             in_list?: boolean;
+            /** @description 0.15.154. Prefilled on a new record by the form (absent = none). */
+            default_value?: unknown;
             is_custom?: boolean;
             /** @description 0.4.6. The form section of a base field (for example `Request`, `Validity`, `PTW checks`), in English, in the order of the fields. Absent for custom fields. */
             section?: string | null;
@@ -25705,6 +25781,35 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
         };
     };
+    simulateMatrix: {
+        parameters: {
+            query: {
+                site_id: string;
+                kind: "task" | "register";
+                /** @description The task code (kind task) or the register key (kind register). */
+                code: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The simulation. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatrixSimulation"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
     getMatrixCoverage: {
         parameters: {
             query?: {
@@ -33053,6 +33158,48 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    setRegisterFieldDefault: {
+        parameters: {
+            query?: never;
+            header?: {
+                "If-Match"?: string;
+            };
+            path: {
+                register_key: string;
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description A string, number, boolean or list of strings; null clears. */
+                    value: unknown;
+                    reason: components["schemas"]["Reason"];
+                };
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        code: string;
+                        version: number;
+                        default_value?: unknown;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["Unprocessable"];
         };
     };
