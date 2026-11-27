@@ -21,4 +21,14 @@ describe('top bar quick create', () => {
     await u.click(await screen.findByTestId('topbar-user'));
     expect(await screen.findByTestId('user-menu-appearance')).toBeInTheDocument();
   });
+  it('P7: Sign out lives in the user menu, not in the top bar, and signs out', async () => {
+    await signIn('pm');
+    renderApp(<App />, { route: '/my-work' });
+    const u = userEvent.setup();
+    await screen.findByTestId('topbar-user');
+    expect(screen.queryByTestId('topbar-signout')).toBeNull();
+    await u.click(screen.getByTestId('topbar-user'));
+    await u.click(await screen.findByTestId('user-menu-signout'));
+    expect(await screen.findByTestId('login-identifier')).toBeInTheDocument();
+  });
 });

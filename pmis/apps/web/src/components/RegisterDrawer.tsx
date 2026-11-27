@@ -7,7 +7,7 @@ import { useSession } from '@/api/hooks';
 import { useCancelSnagRecord, useCreateRecord, useNewVersion, useRecordClaim, useRecordHistory, useRecordOp, useRecordTriage, useRecordTransfer, useRegisterRecord, useRegisterRecords, useUpdateRecord, useContractorCompanies, type RecordOp, type TriageOp } from '@/api/registers';
 import { useMatrix } from '@/api/sites';
 import { EditingNotice } from './EditingNotice';
-import { useAddRegisterComment, useRegisterComments } from '@/api/x';
+import { useAddRegisterComment, useCommentReaction, useCommentResolved, useRegisterComments } from '@/api/x';
 import type { RegisterDefinition, RegisterRecord } from '@/api/types';
 import { registerErrorMessage, serverFieldIssues } from '@/lib/registerErrors';
 import { cellLevel } from '@/lib/matrixLevels';
@@ -17,7 +17,7 @@ import { FieldHistory } from './logs/FieldHistory';
 import { ChangeDiff } from './logs/ChangeDiff';
 import { FieldInput, fieldLabel, issueText, showValue, SiteCodeField, SitePicker } from './RegisterFields';
 import { CommentsPanel } from './Comments';
-import { DrawerFrame, DrawerTabs, panelProps, useReportDirty } from './DrawerFrame';
+import { DrawerFrame, DrawerTabs, panelProps, useDrawerSettled, useReportDirty } from './DrawerFrame';
 import { DraftBar, useDraft } from './DraftBar';
 import { FollowButton } from './FollowButton';
 import { RecordDocuments } from './RecordDocuments';
@@ -131,7 +131,8 @@ function TriageDialog({ open, op, registerKey, selfId, onClose, onSend }: { open
   );
 }
 
-function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; record: RegisterRecord | null; onCreated: (id: string) => void }) {
+/** The record form, tabs and actions of a register record: the body of the drawer, and (decision V5) the body of the full record page. */
+export function RegisterRecordBody({ def: rawDef, record, onCreated }: { def: RegisterDefinition; record: RegisterRecord | null; onCreated: (id: string) => void }) {
   const { t, i18n } = useTranslation();
   const toast = useToast();
   const key = rawDef.register_key;
@@ -143,6 +144,8 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
   const hist = useRecordHistory(key, record?.id ?? null);
   const comments = useRegisterComments(key, record?.id ?? '', !!record?.region_id);
   const addComment = useAddRegisterComment(key, record?.id ?? '');
+  const reactComment = useCommentReaction(['register-comments', key, record?.id ?? '']);
+  const resolveComment = useCommentResolved(['register-comments', key, record?.id ?? '']);
   // 0.12.5: a register with a file field reads the record's slots too (the slots of a record without a site come with Q228)
   const hasFile = rawDef.fields.some((f) => f.type === 'file');
   const recSlots = useRecordSlots(key, record && (record.site_id || hasFile) ? record.id : null);
@@ -166,6 +169,7 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
   const [cancelling, setCancelling] = useState(false);
   const [tab, setTab] = useState('data');
   useReportDirty(dirty);
+  const settle = useDrawerSettled();
 
   const act = (a: string) => !!record?.allowed_actions?.includes(a as never);
   const editable = !record || act('edit');
@@ -224,7 +228,7 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
     if (!record) {
       create.mutate({ site_id: site?.id, site_code: site?.code, region_id: site?.region_id, ...(rtype ? { record_type: rtype } : {}), ...(party ? { external_party_id: party } : {}), data: visibleData(def, typed(data)) }, {
         // the drawer switches to the saved record only after the submit answered, so the buttons below keep their callbacks
-        onSuccess: (r) => op.mutate({ record: r, op: 'submit' }, { onSuccess: () => { toast(t('approvals.done')); onCreated(r.id); }, onError: (e) => { fail(e); onCreated(r.id); } }),
+        onSuccess: (r) => op.mutate({ record: r, op: 'submit' }, { onSuccess: () => { toast(t('approvals.done')); settle(); onCreated(r.id); }, onError: (e) => { fail(e); settle(); onCreated(r.id); } }),
         onError: fail,
       });
     } else if (dirty) update.mutate({ record, patch: { data: patchData(def, record.data, typed(data)), ...(party !== (record.external_party?.id ?? '') ? { external_party_id: party || null } : {}) } }, { onSuccess: (r) => { setDirty(false); run('submit', r); }, onError: fail });
@@ -339,7 +343,7 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
           )}
           {sections.map((s) => (
             <section key={s.id} aria-labelledby={`rs-${s.id}`} data-testid={`reg-section-${s.id}`} className="space-y-2">
-              <h3 id={`rs-${s.id}`} className="font-semibold">{t(`regSections.${s.id}`, { defaultValue: s.title })}</h3>
+              <h3 id={`rs-${s.id}`} className="font-semibold">{t(`regSections.${s.id}`, { defaultValue: (lang === 'ar' && s.title_ar) || s.title })}</h3>
               <div className="grid grid-cols-2 gap-3">
                 {s.fields.filter((f) => !(rk === 'warehouse' && f.code === 'procurement_order_id' && (!rtype || rtype === 'adj')) && !(rk === 'gecol' && f.code === 'contractor') && !(rk === 'procurement' && f.code === 'members') && !(rk === 'financial_advances' && f.code === 'balance')).map((f) => {
                   const iss = issues[f.code];
@@ -428,7 +432,9 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
             {/* a global record (no region) has no thread yet: the server answers 422, so the box is not offered */}
             {record.region_id ? (
               <CommentsPanel items={comments.data?.items} loaded={comments.isSuccess} pending={addComment.isPending} error={addComment.isError ? registerErrorMessage(t, addComment.error) : null}
-                onSend={(body, ids) => addComment.mutate({ body, ...(ids.length ? { mention_user_ids: ids } : {}) })} />
+                onSend={(body, ids) => addComment.mutate({ body, ...(ids.length ? { mention_user_ids: ids } : {}) })}
+                onReact={(commentId, emoji, on) => reactComment.mutate({ commentId, emoji, on })}
+                onToggleResolved={(commentId, resolved) => resolveComment.mutate({ commentId, resolved })} />
             ) : <p className="text-mute" data-testid="reg-comments-global">{t('registers.comments_global')}</p>}
           </div>
         )}
@@ -478,8 +484,8 @@ export function RegisterDrawer({ def, recordId, onClose, onOpen, nav }: { def: R
   const q = useRegisterRecord(def.register_key, isNew ? null : recordId);
   return (
     <DrawerFrame name="register" testid="register-drawer" wide={640} open={!!recordId} onClose={onClose} nav={nav && !isNew ? { ids: nav, current: recordId, onGo: onOpen } : undefined}>
-      {isNew ? <Body key="new" def={def} record={null} onCreated={onOpen} />
-        : q.data ? <Body key={`${q.data.id}`} def={def} record={q.data} onCreated={onOpen} />
+      {isNew ? <RegisterRecordBody key="new" def={def} record={null} onCreated={onOpen} />
+        : q.data ? <RegisterRecordBody key={`${q.data.id}`} def={def} record={q.data} onCreated={onOpen} />
           : <div className="p-4"><Dialog.Title className="font-bold">{q.isError ? t('regErrors.not_found') : t('common.loading')}</Dialog.Title></div>}
     </DrawerFrame>
   );

@@ -13,7 +13,6 @@ import { AnnouncementResults } from './AnnouncementResults';
 import { Announcements } from './Announcements';
 import { Messages } from './Messages';
 import { UserDetailPage } from './UserDetail';
-import { Users } from './Users';
 
 const stepUpDone = () => api.post('/__mock/step-up');
 const T1 = '97000000-0000-4000-8000-000000000001'; // Demo User 03 (1103) -> Demo User 02 (1102): original + 2 replies, unread for Demo User 02
@@ -297,9 +296,10 @@ describe('departments and manager', () => {
   it('has a Departments sub-tab under Users: list, create, deactivate with a reason', async () => {
     await signIn('pm');
     const u = userEvent.setup();
-    renderApp(<Users />);
+    renderApp(<App />, { route: '/admin/users' });
     expect(await screen.findByTestId('user-dept-1103')).toHaveTextContent('RF & Design'); // department column
-    expect(screen.getAllByRole('tab').map((x) => x.getAttribute('data-testid'))).toEqual(['users-tab-active', 'users-tab-deleted', 'users-tab-departments', 'users-tab-invitations', 'users-tab-email_changes', 'users-tab-phone_changes', 'users-tab-online']);
+    // P1: one tab strip; Deleted is a Status value, Email and Phone changes sit in the Invitations menu
+    expect(screen.getAllByRole('tab').map((x) => x.getAttribute('data-testid'))).toEqual(['people-tab-users', 'people-tab-roles', 'people-tab-groups', 'people-tab-delegation', 'people-tab-matrix', 'people-tab-assignments', 'users-tab-departments', 'users-tab-invitations', 'users-tab-online']);
     await u.click(screen.getByTestId('users-tab-departments'));
     expect(await screen.findByTestId('dept-row-CIVIL')).toHaveTextContent('Civil Works');
     expect(screen.getByTestId('dept-status-LEGACY')).toHaveTextContent('Inactive');
@@ -323,6 +323,7 @@ describe('departments and manager', () => {
     await u.click(screen.getByTestId('dept-dialog-submit'));
     expect(await screen.findByTestId('dept-dialog-error')).toBeInTheDocument();
     await u.click(within(screen.getByTestId('dept-dialog')).getByText('Cancel'));
+    await u.click(await screen.findByTestId('unsaved-discard')); // Decision 11: typed input asks before the dialog closes
 
     await u.click(screen.getByTestId('dept-toggle-QA'));
     await u.type(screen.getByTestId('dept-dialog-reason'), 'Merged elsewhere');

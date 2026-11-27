@@ -1,4 +1,5 @@
 import { LifeBuoy } from 'lucide-react';
+import { UnsavedGuard } from '@/lib/unsavedGuard';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePicker } from '@/api/admin';
@@ -104,6 +105,7 @@ export function SupportAccess() {
         </ul>
       </div>
 
+      <UnsavedGuard scope="settings" dirty={dirty} needsReason label={t('ui.guard_settings')} onSave={(reason) => new Promise<boolean>((res) => set.mutate({ version: cur.version, enabled: v.enabled, max_hours: v.max, default_hours: v.def, reason }, { onSuccess: () => res(true), onError: () => res(false) }))} />
       {pending?.kind === 'set' && (
         <FormDialog open onClose={close} testid="support-dialog" title={t('supportaccess.title')} busy={set.isPending} error={err(set)}
           onSubmit={(reason) => set.mutate({ version: cur.version, enabled: v.enabled, max_hours: v.max, default_hours: v.def, reason }, { onSuccess: () => { toast(t('settings.audited')); close(); setDraft(null); } })}>
