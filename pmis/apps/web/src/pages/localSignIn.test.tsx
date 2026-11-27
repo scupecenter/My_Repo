@@ -263,6 +263,7 @@ describe('hybrid mode list', () => {
       'POST /registers/:key/records/:id/submit', 'POST /registers/:key/records/:id/review', 'POST /registers/:key/records/:id/approve', 'POST /registers/:key/records/:id/reject',
       'POST /registers/:key/records/:id/claim', 'POST /registers/:key/records/:id/release', 'POST /registers/:key/records/:id/void',
       'GET /registers/:key/records/:id/history', 'GET /registers/:key/records/:id/versions', 'POST /registers/:key/records/:id/versions',
+      'POST /registers/:key/records/:id/triage',
       // contract 0.7.0: approved-template entry (templates and import batches)
       'GET /templates', 'GET /templates/:id/download', 'GET /import-batches', 'GET /data-hub/summary', 'POST /import-batches', 'GET /import-batches/:id', 'GET /import-batches/:id/rows', 'GET /import-batches/:id/error-report',
       'POST /import-batches/:id/submit', 'POST /import-batches/:id/decisions',
