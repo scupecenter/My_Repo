@@ -262,3 +262,7 @@ export type RegionVendor = S['RegionVendor'];
 export type WarehouseConfigGaps = S['WarehouseConfigGaps'];
 export type NumberSequence = S['NumberSequence'];
 export type AsBuiltItem = S['AsBuiltItem'];
+export type AlertRule = S['AlertRule'];
+export type AlertRuleInput = S['AlertRuleInput'];
+export type AlertRuleSaved = S['AlertRuleSaved'];
+export type AlertRulesResponse = S['AlertRulesResponse'];

@@ -42,6 +42,7 @@ import { OpsScurveCard } from "./dashboardScurve";
 import { OpsPermitsCard } from "./dashboardPermits";
 import { OpsReadinessCard } from "./dashboardReadiness";
 import { OpsScorecardCard } from "./dashboardScorecard";
+import { OpsQualityCard } from "./dashboardQuality";
 import { useDashboardSettings } from "@/api/dashboardSettings";
 import { GoalsPanel } from "@/components/GoalsPanel";
 import { SavedViews } from "@/components/SavedViews";
@@ -1433,6 +1434,13 @@ export function Dashboard() {
                 <>
                   {/* 0.15.202 (owner approval 2026-11-26, item 5): the contractor and supplier scorecard - levels, on-time rectification, avg delay, rejection, no amounts */}
                   <OpsScorecardCard ops={ops.data} />
+                </>
+              ),
+
+              ops_quality: (
+                <>
+                  {/* 0.15.203 (owner approval 2026-11-26, item 6): open snags and NCR, average closure age, first-time acceptance */}
+                  <OpsQualityCard ops={ops.data} />
                 </>
               ),
 

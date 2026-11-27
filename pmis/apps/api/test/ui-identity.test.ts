@@ -226,3 +226,61 @@ describe('the appearance profile: PATCH /me/profile ui_prefs and the identity de
     expect((await api.call('get', '/me')).body.user.appearance).toMatchObject({ radius: 'rounded' });
   });
 });
+
+/** 0242 (owner approval 2026-11-27, the PM-platforms proposal item 4): the personal sidebar `ui_prefs.sidebar`. */
+describe('the personal sidebar: PATCH /me/profile ui_prefs.sidebar', () => {
+  const patchPrefs = async (api: Api, ui_prefs: unknown) => api.call('patch', '/me/profile', { ui_prefs }, { 'If-Match': await profileTag(api) });
+
+  it('saves the sidebar (audited per key); keeps the dimensions on a sidebar-only body; a dimensions-only body keeps the sidebar', async () => {
+    const u = await makeUser(db, { assigned: true });
+    const api = await loggedIn(app, u);
+    expect((await patchPrefs(api, { density: 'compact' })).status).toBe(200);
+    let r = await patchPrefs(api, { sidebar: { hidden: ['logs.mail'], order: ['messages', 'inbox'], badge_style: 'dot', pins: ['messages', 'approvals'] } });
+    expect(r.status).toBe(200);
+    expect(r.body.ui_prefs).toMatchObject({ density: 'compact', sidebar: { badge_style: 'dot', pins: ['messages', 'approvals'], hidden: ['logs.mail'], order: ['messages', 'inbox'] } });
+    // the effective appearance carries the dimensions only
+    expect(r.body.appearance.sidebar).toBeUndefined();
+    // a dimensions-only body keeps the stored sidebar
+    r = await patchPrefs(api, { density: 'standard' });
+    expect(r.status).toBe(200);
+    expect(r.body.ui_prefs).toMatchObject({ density: 'standard', sidebar: { badge_style: 'dot' } });
+    // duplicates drop out of the lists
+    r = await patchPrefs(api, { sidebar: { pins: ['messages', 'messages', 'inbox'] } });
+    expect(r.body.ui_prefs.sidebar.pins).toEqual(['messages', 'inbox']);
+    // audited per key of ui_prefs
+    const a = (await db.query(`SELECT before, after FROM audit_log WHERE action = 'profile_updated' AND entity_id = $1 ORDER BY id`, [u.id])).rows;
+    expect(a).toHaveLength(4);
+    expect(a[1].after.ui_prefs.sidebar).toMatchObject({ badge_style: 'dot' });
+    expect(a[1].after.via).toBe('self_service');
+    // GET /me carries the sidebar too
+    expect((await api.call('get', '/me')).body.user.ui_prefs.sidebar).toMatchObject({ pins: ['messages', 'inbox'] });
+  });
+
+  it('checks the sidebar: an unknown key, a badge style outside the list, a bad entry, more than 20 pins are 422', async () => {
+    const u = await makeUser(db, { assigned: true });
+    const api = await loggedIn(app, u);
+    expect((await patchPrefs(api, { sidebar: { colour: 'red' } })).status).toBe(422);
+    expect((await patchPrefs(api, { sidebar: { badge_style: 'huge' } })).status).toBe(422);
+    expect((await patchPrefs(api, { sidebar: { hidden: 'messages' } })).status).toBe(422);
+    expect((await patchPrefs(api, { sidebar: { hidden: ['No Space'] } })).status).toBe(422);
+    expect((await patchPrefs(api, { sidebar: { pins: Array.from({ length: 21 }, (_, i) => `k${i}`) } })).status).toBe(422);
+    expect((await patchPrefs(api, { sidebar: 'everything' })).status).toBe(422);
+  });
+
+  it('while the admin locks the appearance, a sidebar-only change stays allowed; a dimension with it is refused and nothing changes', async () => {
+    const u = await makeUser(db, { assigned: true });
+    const api = await loggedIn(app, u);
+    const lock = await put(admin, { default_brand: 'current', allow_user_choice: false, defaults: {}, reason: REASON }, etag(await read(admin)));
+    expect(lock.status).toBe(200);
+    const r = await patchPrefs(api, { sidebar: { badge_style: 'none' } });
+    expect(r.status).toBe(200);
+    expect(r.body.ui_prefs.sidebar).toMatchObject({ badge_style: 'none' });
+    const blocked = await patchPrefs(api, { sidebar: { badge_style: 'full' }, density: 'compact' });
+    expect(blocked.status).toBe(403);
+    expect(blocked.body.errors[0]).toMatchObject({ path: '/ui_prefs', code: 'appearance_choice_locked' });
+    const stored = await q<{ ui_prefs: Record<string, unknown> }>(db, 'SELECT ui_prefs FROM users WHERE id = $1', [u.id]);
+    expect(stored[0]!.ui_prefs.sidebar).toMatchObject({ badge_style: 'none' });
+    expect(stored[0]!.ui_prefs.density).toBeUndefined();
+    await put(admin, { default_brand: 'current', allow_user_choice: true, defaults: {}, reason: REASON }, etag(await read(admin)));
+  });
+});
