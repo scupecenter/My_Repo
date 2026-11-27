@@ -6167,6 +6167,7 @@
     "changed_from": "Changed from {{value}}",
     "general": "General",
     "milestone": "Milestone",
+    "closes_milestone": "This task closes the milestone (replaces the current closing task of the milestone)",
     "counts_toward": "Counts toward the milestone",
     "save_general": "Save general",
     "move_to_ms": "Move to milestone",
