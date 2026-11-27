@@ -7188,6 +7188,8 @@
     "guard_title": "Unsaved changes",
     "guard_note": "Ask before anything with unsaved input is closed or left: the choices are Save and leave, Discard and leave, or Stay.",
     "guard_enabled": "Ask before leaving unsaved changes",
+    "guard_comment": "A comment you typed",
+    "guard_message": "A message reply you typed",
     "guard_settings": "Settings pages",
     "guard_settings_hint": "Settings pages with edited, unsaved values",
     "guard_dialogs": "Form dialogs",

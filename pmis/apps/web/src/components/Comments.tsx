@@ -1,4 +1,5 @@
 import { MessageSquare } from 'lucide-react';
+import { UnsavedGuard } from '@/lib/unsavedGuard';
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePicker } from '@/api/admin';
@@ -31,6 +32,7 @@ export function MentionBox({ onSend, pending, label }: { onSend: (body: string, 
   };
   return (
     <div className="relative mt-2">
+      <UnsavedGuard scope="composers" dirty={!!text.trim()} label={t('ui.guard_comment')} onSave={() => { send(); return true; }} />
       <div className="flex gap-2">
         <input className="input" data-testid="comment-input" aria-label={label} aria-autocomplete="list" aria-expanded={options.length > 0} placeholder={t('mention.placeholder')} value={text}
           onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Escape' && options.length) { e.stopPropagation(); setText((x) => x.replace(/@[^\s@()]*$/, '')); } }} />
