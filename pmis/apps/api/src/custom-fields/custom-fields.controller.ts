@@ -5,7 +5,7 @@ import type { AuthContext } from '../auth/auth.types';
 import { etagHeader } from '../common/etag';
 import { CustomFieldsService } from './custom-fields.service';
 
-/** The custom field definitions (contract tag `custom-fields`, 0.15.262): the reading side. */
+/** The custom field definitions (contract tag `custom-fields`, 0.15.264): the reading side. */
 @Controller('custom-fields')
 export class CustomFieldsController {
   constructor(private readonly svc: CustomFieldsService) {}

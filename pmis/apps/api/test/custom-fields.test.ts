@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { delegate, startApp, superDb } from './helpers';
 import { Actor, actor, plainAdmin } from './wf-helpers';
 
-/** GET /custom-fields and /custom-fields/{id} (contract 0.15.262): the definitions of the custom fields, with the field rules and the admin-only parts. */
+/** GET /custom-fields and /custom-fields/{id} (contract 0.15.264): the definitions of the custom fields, with the field rules and the admin-only parts. */
 let app: NestExpressApplication;
 let db: PgClient;
 let admin: Actor;
