@@ -1,6 +1,6 @@
 # Workspace logo in the identity (proposal item 5)
 
-Owner approval 2026-11-27 (the PM-platforms proposal, item 5). Migration 0243, contract 0.15.232, CHANGELOG WorkspaceLogo.
+Owner approval 2026-11-27 (the improvement proposal, item 5). Migration 0243, contract 0.15.232, CHANGELOG WorkspaceLogo.
 
 ## Decision
 The logo is organization identity, not a document: it does NOT go through the documents object storage (encryption + AV scanning machinery for user files). A small dedicated table `ui_assets` (key 'logo', mime png/jpeg/svg/webp, bytes capped at 256 KiB, enabled flag, per-row version) keeps it, written only through the audited doors `admin_put_ui_asset` / `admin_set_ui_asset_enabled` (guard trigger like settings_guarded_keys of 0072). Hide never delete: hiding disables the row; nothing is deleted.

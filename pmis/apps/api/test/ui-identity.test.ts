@@ -305,7 +305,7 @@ describe('the personal design: PATCH /me/profile ui_brand', () => {
   });
 });
 
-/** 0241 (owner approval 2026-11-27, the PM-platforms proposal items 1-3): the appearance profile `ui_prefs` and the organization appearance defaults. */
+/** 0241 (owner approval 2026-11-27, the improvement proposal items 1-3): the appearance profile `ui_prefs` and the organization appearance defaults. */
 describe('the appearance profile: PATCH /me/profile ui_prefs and the identity defaults', () => {
   const patchPrefs = async (api: Api, ui_prefs: unknown) => api.call('patch', '/me/profile', { ui_prefs }, { 'If-Match': await profileTag(api) });
 
@@ -367,7 +367,7 @@ describe('the appearance profile: PATCH /me/profile ui_prefs and the identity de
   });
 });
 
-/** 0242 (owner approval 2026-11-27, the PM-platforms proposal item 4): the personal sidebar `ui_prefs.sidebar`. */
+/** 0242 (owner approval 2026-11-27, the improvement proposal item 4): the personal sidebar `ui_prefs.sidebar`. */
 describe('the personal sidebar: PATCH /me/profile ui_prefs.sidebar', () => {
   const patchPrefs = async (api: Api, ui_prefs: unknown) => api.call('patch', '/me/profile', { ui_prefs }, { 'If-Match': await profileTag(api) });
 
