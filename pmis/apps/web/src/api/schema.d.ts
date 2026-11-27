@@ -11804,7 +11804,7 @@ export interface components {
          * @description Part key. Every register key used by `/registers` (including `dismantle`), plus the four non-register parts.
          * @enum {string}
          */
-        ExportPartKey: "procurement" | "contractors" | "gecol" | "hlc" | "permits_hse" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "dismantle" | "car_dispatcher" | "financial_advances" | "incidents" | "lessons_learned" | "sites" | "milestones" | "tasks" | "project_status" | "rf_design" | "acquisition";
+        ExportPartKey: "procurement" | "contractors" | "gecol" | "hlc" | "permits_hse" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "dismantle" | "car_dispatcher" | "financial_advances" | "incidents" | "lessons_learned" | "invoices" | "sites" | "milestones" | "tasks" | "project_status" | "rf_design" | "acquisition";
         ExportPart: {
             key: components["schemas"]["ExportPartKey"];
             label_en: string;
@@ -12114,8 +12114,8 @@ export interface components {
             theme?: "light" | "dark";
             /** @description 0.15.41. The personal UI design; null goes back to the organization default. While `identity.allow_user_choice` is false a non-null value is 403 `field_read_only` (`errors[0]` `{path: /ui_brand, code: brand_choice_locked}`); null stays allowed. Audited in `profile_updated`. */
             ui_brand?: components["schemas"]["UiBrand"] | null;
-            /** @description 0.15.230 (0241). The personal appearance choices; a subset of the dimensions. While `identity.allow_user_choice` is false a value is 403 `field_read_only` (`errors[0]` `{path: /ui_prefs, code: appearance_choice_locked}`). Audited per dimension in `profile_updated`. */
-            ui_prefs?: components["schemas"]["UiPrefs"];
+            /** @description 0.15.230 (0241). The personal appearance choices; a subset of the dimensions. While `identity.allow_user_choice` is false a value is 403 `field_read_only` (`errors[0]` `{path: /ui_prefs, code: appearance_choice_locked}`). Audited per dimension in `profile_updated`. 0.15.231 (0242): gains the key `sidebar` (`UiNav`, the personal sidebar); a sidebar-only change stays allowed while the appearance is locked. */
+            ui_prefs?: components["schemas"]["UiPrefsSelf"];
         };
         /** @description 0.9.2. The "My profile" page. */
         MyProfile: {
@@ -12139,8 +12139,8 @@ export interface components {
             ui_brand: components["schemas"]["UiBrand"] | null;
             /** @description 0.15.41. The design the user sees. */
             brand: components["schemas"]["UiBrand"];
-            /** @description 0.15.230 (0241). The stored personal appearance choices; empty = the organization defaults. */
-            ui_prefs: components["schemas"]["UiPrefs"];
+            /** @description 0.15.230 (0241). The stored personal appearance choices; empty = the organization defaults. 0.15.231 (0242): may carry the key `sidebar` (`UiNav`). */
+            ui_prefs: components["schemas"]["UiPrefsSelf"];
             /** @description 0.15.230 (0241). The appearance the user sees (ui_effective_prefs): own choices, else the organization defaults. */
             appearance: components["schemas"]["UiPrefs"];
             /** @description 0.15.41. The organization default and whether a personal design is allowed (drives the Appearance control). */
@@ -12218,8 +12218,8 @@ export interface components {
             ui_brand?: components["schemas"]["UiBrand"] | null;
             /** @description 0.15.41. The design the user sees: `ui_brand` while the admin allows a personal choice and one is set, else the organization default. Independent of `theme`. */
             brand?: components["schemas"]["UiBrand"];
-            /** @description 0.15.230 (0241). The stored personal appearance choices; empty = the organization defaults. */
-            ui_prefs?: components["schemas"]["UiPrefs"];
+            /** @description 0.15.230 (0241). The stored personal appearance choices; empty = the organization defaults. 0.15.231 (0242): may carry the key `sidebar` (`UiNav`). */
+            ui_prefs?: components["schemas"]["UiPrefsSelf"];
             /** @description 0.15.230 (0241). The appearance the user sees (ui_effective_prefs): own choices, else the organization defaults. */
             appearance?: components["schemas"]["UiPrefs"];
             is_break_glass?: boolean;
@@ -16475,7 +16475,7 @@ export interface components {
             required_missing?: number | null;
         };
         /** @enum {string} */
-        RegisterKey: "procurement" | "contractors" | "gecol" | "hlc" | "permits_hse" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "dismantle" | "car_dispatcher" | "financial_advances" | "incidents" | "lessons_learned";
+        RegisterKey: "procurement" | "contractors" | "gecol" | "hlc" | "permits_hse" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "dismantle" | "car_dispatcher" | "financial_advances" | "incidents" | "lessons_learned" | "invoices";
         RegisterField: {
             code: string;
             label_en: string;
@@ -17233,6 +17233,18 @@ export interface components {
             menu_style?: "default" | "rail" | "autohide";
             /** @enum {string} */
             accent?: "default" | "teal" | "blue" | "violet" | "green" | "orange" | "red" | "amber";
+        };
+        /** @description 0.15.231 (0242): the personal sidebar (proposal item 4). `hidden` the screens the menu does not show, `order` their order inside their heading (a screen the list does not name keeps the organization order, after the named ones), `badge_style` how the count badges draw (full = the number, dot = a dot, none = no badge), `pins` the pinned shortcuts on top (at most 20). A menu key is a short lowercase id (the entries of the side menu; an unknown key is ignored). */
+        UiNav: {
+            hidden?: string[];
+            order?: string[];
+            /** @enum {string} */
+            badge_style?: "full" | "dot" | "none";
+            pins?: string[];
+        };
+        UiPrefsSelf: components["schemas"]["UiPrefs"] & {
+            /** @description 0.15.231 (0242): the personal sidebar. Never an organization default; a `ui_prefs` body without it keeps the stored sidebar, and a body that names only `sidebar` keeps the stored appearance dimensions. While `identity.allow_user_choice` is false a sidebar-only change stays allowed. */
+            sidebar?: components["schemas"]["UiNav"];
         };
         /** @description 0.15.41. Settings, Identity & themes (setting `ui.identity`, migration 0130). */
         UiIdentity: {
