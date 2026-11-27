@@ -86,7 +86,7 @@ DECLARE def text; n text;
 BEGIN
   def := pg_get_functiondef('public.record_related(text,uuid)'::regprocedure);
   IF position('''hlc''' IN def) = 0 THEN
-    n := regexp_replace(def, '(\s*\)\s*v\(from_register, field, to_register\))', E',\n      (''hlc'',               ''procurement_record_id'', ''procurement'')\1');
+    n := regexp_replace(def, '(\s*\)\s*v\(from_register, field, to_register\))', E',\n      (''hlc'',               ''procurement_record_id'', ''procurement'')\\1');
     IF n = def THEN RAISE EXCEPTION 'record_related() has no link list to patch'; END IF;
     -- the HLC record keeps the id of a Procurement version row: match the entity or any of its version rows
     n := replace(n, 'x.entity_id = (src.data ->> l.field)::uuid', '(x.entity_id = (src.data ->> l.field)::uuid OR x.id = (src.data ->> l.field)::uuid)');
