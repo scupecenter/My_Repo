@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { useMediaSettings, useSetMediaSettings, type MediaSettings } from '@/api/media';
 import { errText, FormDialog } from '@/components/FormDialog';
 import { QueryFallback } from '@/components/States';
+import { UnsavedGuard } from '@/lib/unsavedGuard';
 import { useToast } from '@/components/Toast';
 
 const KINDS = ['photo', 'scanned_document', 'email', 'report', 'excel_template'] as const;
@@ -64,6 +65,8 @@ export function MediaSettingsScreen() {
           <label key={f} className={`chip cursor-pointer border ${v.thumbnails.format === f ? 'border-accent bg-accentSoft text-accentText' : 'border-line bg-card text-mute'}`}>
             <input type="radio" name="ms-format" className="sr-only" data-testid={`ms-format-${f}`} checked={v.thumbnails.format === f} disabled={ro} onChange={() => th({ format: f })} />{f}</label>))}</div>
       </fieldset>
+      {!ro && <UnsavedGuard scope="settings" dirty={dirty} needsReason label={t('ui.guard_settings')}
+        onSave={(reason) => new Promise<boolean>((res) => set.mutate({ version: cur.version, ...v, reason }, { onSuccess: () => { setDraft(null); setRegs(null); setExcl(null); res(true); }, onError: () => res(false) }))} />}
       {ro ? <p className="text-sm text-mute" data-testid="ms-readonly">{t('mediaSet.readonly')}</p>
         : <button className="btn btn-accent" data-testid="ms-save" disabled={!dirty} onClick={() => setOpen(true)}>{t('common.save')}</button>}
       {open && (
