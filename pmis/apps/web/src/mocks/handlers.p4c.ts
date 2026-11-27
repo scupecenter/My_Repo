@@ -54,6 +54,10 @@ export const p4cHandlers = [
     return HttpResponse.json(toRecord(r), { headers: { ETag: `"${r.version}"` } });
   }),
 
+  // D60: the declared links of a register and the generic picker (the demo declares none; a test overrides them)
+  http.get(`${B}/registers/:key/links`, () => { const g = guard(); if (g) return g; return HttpResponse.json({ items: [] }); }),
+  http.get(`${B}/registers/:key/link-options/:field`, () => { const g = guard(); if (g) return g; return HttpResponse.json({ items: [] }); }),
+
   // 0181: the picker of a warehouse receipt and the receipts against an order
   http.get(`${B}/registers/:key/order-options`, ({ request, params }) => {
     if (!['warehouse', 'car_dispatcher', 'financial_advances', 'issues', 'quality'].includes(String(params.key))) return undefined;
