@@ -44,6 +44,7 @@ import { DailyPlanSettings } from './DailyPlanSettings';
 import { MotionSettings } from './MotionSettings';
 import { AlertRules } from './AlertRules';
 import { LoginPageSettings } from './LoginPage';
+import { MediaSettingsScreen } from './MediaSettings';
 import { InterfaceSettings } from './InterfaceSettings';
 
 export interface SettingsSection { key: string; adminOnly?: boolean }
@@ -57,7 +58,7 @@ export const SETTINGS_TABS: readonly SettingsTab[] = [
   // Lists (the dropdown catalogues, old ddl tab) now sit next to the register columns that use them
   { key: 'registers', sections: [{ key: 'columns' }, { key: 'lists' }, { key: 'contractors' }, { key: 'gecol' }, { key: 'team-scope' }, { key: 'issue-map' }, { key: 'recycle', adminOnly: true }] },
   // W5: the Document Library section is now named Document types (the old documents/library route redirects); Form templates and Archive are new
-  { key: 'documents', sections: [{ key: 'types' }, { key: 'forms' }, { key: 'archive' }, { key: 'numbering' }] },
+  { key: 'documents', sections: [{ key: 'types' }, { key: 'forms' }, { key: 'archive' }, { key: 'media' }, { key: 'numbering' }] },
   { key: 'data', sections: [{ key: 'imports' }, { key: 'historical' }, { key: 'counts', adminOnly: true }, { key: 'export' }, { key: 'reset', adminOnly: true }] },
   // Notification policy + Mail kinds (admin only): both are what is sent to people
   { key: 'alerts', sections: [{ key: 'policy' }, { key: 'mail', adminOnly: true }, { key: 'rules', adminOnly: true }] },
@@ -192,6 +193,7 @@ export function SettingsRoutes() {
           <Route path="library" element={<LegacyRedirect to="documents/types" />} />
           <Route path="forms" element={<FormTemplates />} />
           <Route path="archive" element={<ArchiveSettings />} />
+          <Route path="media" element={<MediaSettingsScreen />} />
           <Route path="numbering" element={<NumberSequences />} />
         </Route>
         <Route path="data" element={<TabFrame tab="data" />}>
