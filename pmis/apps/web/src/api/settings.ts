@@ -81,6 +81,17 @@ export const useSetMailKinds = () => {
   });
 };
 
+/** 0.15.261 (migration 0364): the mail policy (global switch, internal or external recipients, per kind). System Admin only; step-up on save. */
+export type MailPolicyDoc = import('./schema').components['schemas']['MailPolicy'];
+export type MailPolicySave = import('./schema').components['schemas']['MailPolicyInput'] & { reason: string };
+export const useMailPolicy = () => useQuery({ queryKey: ['mail-policy'], retry: false, queryFn: () => api.get<MailPolicyDoc>('/settings/mail-policy') });
+export const useSetMailPolicy = () => {
+  const qc = useQueryClient();
+  return useMutation<MailPolicyDoc, ApiError, { version: number } & MailPolicySave>({
+    mutationFn: ({ version, ...body }) => api.put('/settings/mail-policy', { version, body }), onSettled: () => refresh(qc, 'mail-policy'),
+  });
+};
+
 /** 0.14.6: the background threshold of batches (imports.async_rows). Read by everyone; changed by a System Admin or an all-regions delegate of settings, with a reason. */
 /** 0.15.41 (migration 0130): Settings, Identity & themes. Saving refreshes /me so the design of the page follows at once. */
 export const useUiIdentity = () => useQuery({ queryKey: ['ui-identity'], queryFn: () => api.get<UiIdentity>('/settings/identity') });

@@ -32,6 +32,7 @@ info:
 
     ## Versions
     - 0.15.245 (2026-11-27): pin a saved view as a personal card on the home dashboard (owner request 2026-11-27, PM-platforms research item 16; monday dashboard widgets, Asana portfolios; migration 0344; CHANGELOG HomeViewPins). Additive. `POST /saved-views/{view_id}/pin` and `POST /saved-views/{view_id}/unpin` manage the caller's pins (at most 12, position kept; a view the caller may not read answers 404, exactly like `GET /saved-views/{view_id}`) and `GET /me/home-pins` (`HomeViewPin`) lists them in order (inactive views drop out). The card shows each pin with a counter the screen's own list endpoint computes for the caller, so the counts stay inside the caller's permissions; the dashboard settings catalogue gains the card `pinned_views` (Settings > Dashboard, shown by default). Personal display preference: no grant, role, permission, visibility or audit change.
+    - 0.15.261 (2026-11-27): mail policy (migration 0364, mirror `db/sql/363_mail_policy.sql`). Additive. New `GET/PUT /settings/mail-policy` (the setting `mail.policy`: global switch, internal only or internal plus external recipients, internal domains, per kind switch and mode). `expiry_radar`, `approval_digest` and `weekly_digest` join the mail kind catalogue (still mailed only when listed in `mail.notification_kinds`). Defaults keep today's behaviour.
     - 0.15.260 (2026-11-27): cross-register derive (migration 0363, mirror `db/sql/362_derive_rules.sql`; owner approval 2026-11-27). Additive. New `GET/PUT /settings/derive-rules` (the setting `derive.rules`: which value a register shows from another register; If-Match, reason, audited; field errors `unknown_key`, `unknown_register`, `same_register`, `unknown_field`, `duplicate`, `invalid`, `too_many`). `RegisterRecord.derived` carries the derived values of the record by output name; `procurement_contractor` of GECOL and HLC is now the seeded rule and keeps its shape. A derived value is computed on read from the configured source field of the matching source record only (never the record), needs no permission on the source register, is shown only for target records the caller may read, and each person's first read of a rule in 10 minutes is audited (`derive_disclosed`). No grant, role or permission change.
     - 0.15.225 (2026-11-27): Change Control names the order and the task it affects (migration 0325; CHANGELOG ChangeControlAffected). Additive. New optional fields `procurement_order_id` (an approved, active Procurement order of the same site that the caller may see; 422 `order_not_active`, `order_other_site`, `invalid`) and `affected_task_code` (a task code of the workflow; 422 `unknown_task`), checked on a version in entry only. New `GET /registers/change_control/order-options` (the order picker; Change Control view plus Procurement view). `GET /registers/{register_key}/{entity_id}/related` also lists the change requests that name an order, so the order shows a change-pending mark. No permission change.
     - 0.15.244 (2026-11-27): list-value colours reach the register fields (item 15 of the PM-platforms research, owner request 2026-11-27; no migration; CHANGELOG ListCellDisplay). Additive. `RegisterField.options[]` (and the child-list column options) gain the optional `colour` of the list value as set in Settings, Lists (#RRGGBB; absent when none). Display only: no permission, visibility, validation or stored-data change; a value keeps storing its code.
@@ -11102,6 +11103,56 @@ paths:
                     items: {$ref: '#/components/schemas/GoalProgress'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
+  /settings/mail-policy:
+    get:
+      tags: [settings]
+      operationId: getMailPolicy
+      summary: The mail policy (0.15.261)
+      description: |
+        0.15.261. System Admin only (403 `action_forbidden` otherwise). `enabled` is the global switch, `mode` is `internal_only` or `internal_external` for every kind, `kinds` may
+        override it per kind. An address is external when its domain is not in `internal_domains` (empty list: every address is internal). External mail also needs the security
+        lock `block_public_sharing` to be off (`block_public_sharing` shows its state). Security alerts and mandatory mail are never stopped by the policy.
+      responses:
+        '200':
+          description: The setting.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MailPolicy'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    put:
+      tags: [settings]
+      operationId: setMailPolicy
+      summary: Save the mail policy (System Admin, step-up, reason, If-Match, audited)
+      description: |
+        0.15.261. Field errors (422 `validation_failed`): `/enabled`, `/mode`, `/internal_domains[/i]`, `/kinds[/kind]` (`unknown_kind`, `invalid`), `unknown_key`. Audited as `mail_policy_update`.
+      x-step-up: true
+      x-db-path: admin_save_mail_policy
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - {$ref: '#/components/schemas/WithReason'}
+              - {$ref: '#/components/schemas/MailPolicyInput'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MailPolicy'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
   /settings/mail-notification-kinds:
     get:
       tags: [settings]
@@ -12780,6 +12831,26 @@ paths:
                     items:
                       type: array
                       items: {$ref: '#/components/schemas/ImportRow'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /import-batches/{batch_id}/error-report:
+    parameters:
+    - {$ref: '#/components/parameters/BatchId'}
+    get:
+      tags: [templates]
+      operationId: downloadImportBatchErrorReport
+      summary: 'The refused rows of a batch as an .xlsx to correct and upload again (0365, P4)'
+      description: |
+        The error and duplicate rows written back in the layout of the approved template (hidden `_tpl` sheet, header row as issued) with the values the file had, so the
+        corrected file is uploaded as it is, plus the sheet `Errors` (row in the file, key, column, reason code, reason). The reasons are never an extra column of the Data
+        sheet (an upload with an extra column is refused). A New sites, stream or Master batch answers the `Errors` sheet alone. Audited as `import_batch.error_report`.
+      responses:
+        '200':
+          description: The workbook.
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: {type: string, format: binary}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
@@ -21135,6 +21206,7 @@ components:
             saved: { type: integer, description: 'Rows saved without submission (draft batch).' }
             admin_approved: { type: integer, description: '0087: rows approved by a System Admin as is (flagged `admin_override`).' }
             incomplete: { type: integer, description: '0087: of those, the rows approved with missing data (flagged `incomplete`).' }
+            duplicate: { type: integer, description: '0365 (P4): of the `error` rows, those refused because the same record is already in the file (`duplicate_in_file`). Counted inside `error`, shown as a category of its own.' }
         job_id: { type: [string, 'null'], description: 'Always null (a big upload reports its progress in `progress`, 0.15.3).' }
         upload_id: { type: string, format: uuid, description: '0.15.3: the upload staged in the background that produced this batch (or that this answer is, while `parsing`).' }
         upload: { $ref: '#/components/schemas/ImportUploadInfo' }
@@ -23738,6 +23810,40 @@ components:
               uniqueItems: true
               items: { type: string, minLength: 2, maxLength: 60, pattern: '^[a-z][a-z0-9_]*$' }
               description: 'Notification kinds that are also mailed to the person. An empty list keeps every notification in-app.'
+    MailPolicyInput:
+      type: object
+      required: [enabled, mode, internal_domains, kinds]
+      properties:
+        enabled: { type: boolean }
+        mode: { type: string, enum: [internal_only, internal_external] }
+        internal_domains: { type: array, maxItems: 50, items: { type: string } }
+        kinds:
+          type: object
+          additionalProperties:
+            type: object
+            required: [enabled, mode]
+            properties:
+              enabled: { type: boolean }
+              mode: { type: string, enum: [inherit, internal_only, internal_external] }
+    MailPolicy:
+      description: '0.15.261. The setting `mail.policy`.'
+      allOf:
+      - {$ref: '#/components/schemas/MailPolicyInput'}
+      - type: object
+        required: [version, catalogue, block_public_sharing]
+        properties:
+          version: { type: integer, minimum: 0 }
+          block_public_sharing: { type: boolean, description: 'The security lock; while on, no external mail is sent.' }
+          catalogue:
+            type: array
+            items:
+              type: object
+              required: [kind, recommended]
+              properties:
+                kind: { type: string }
+                recommended: { type: boolean }
+          updated_at: { type: [string, 'null'], format: date-time }
+          updated_by: { anyOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
     MailNotificationKinds:
       type: object
       description: '0.14.2 (Q441). The setting `mail.notification_kinds` and the kinds it may name.'
