@@ -27,7 +27,7 @@ for (const [locale, theme] of [['en', 'light'], ['ar', 'dark']] as const) {
     await page.getByTestId(`comment-resolve-${cid}`).click();
     await expect(page.getByTestId(`comment-resolved-${cid}`)).toContainText(locale === 'ar' ? 'تم الحل' : 'Resolved');
     await expect(page.getByTestId(`comment-reopen-${cid}`)).toBeVisible();
-    await page.screenshot({ path: `/downloads/pm18-comments-${locale}.png`, fullPage: false });
+    await page.screenshot({ path: `test-results/pm18-comments-${locale}.png`, fullPage: false });
     await page.getByTestId(`comment-reopen-${cid}`).click();
     await expect(page.getByTestId(`comment-resolve-${cid}`)).toBeVisible();
   });
