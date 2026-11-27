@@ -244,6 +244,10 @@ const progress = (s: Pick<WeightSet, 'activities'>) => Math.round(s.activities.r
 const CC = () => (C().calConfirm ??= initCfg().calConfirm);
 const MK = () => (C().mailKinds ??= initCfg().mailKinds);
 /** 0.15.1: nav.layout (a store saved before 0.15.1 starts from the seed). */
+/** 0.15.190: the admin lock keys, kept in memory like the other small settings of the mock (both off by default). */
+const locks: { block_public_sharing: boolean; disable_export: boolean; version: number; updated_at: string | null; updated_by: { id: string; display_name: string; employee_id: string | null } | null } =
+  { block_public_sharing: false, disable_export: false, version: 1, updated_at: null, updated_by: null };
+const locksView = () => ({ ...locks, can_edit: isAdmin() });
 const identityView = () => ({ ...identity(), brands: [...BRANDS], can_edit: isAdmin() });
 /** 0.15.97: the login page settings with the system version (shown to signed-in users only). */
 const loginPageView = () => ({ ...loginPage(), server_version: '0.15.97', can_edit: isAdmin() });
@@ -587,6 +591,27 @@ export const settingsHandlers = [
     Object.assign(cur, { ...nxt, version: cur.version + 1, updated_at: new Date().toISOString(),
       updated_by: { id: uid(v.employee_id ?? '9999'), display_name: v.name, employee_id: v.employee_id } }); save();
     const j = loginPageView();
+    return HttpResponse.json(j, tag(j.version));
+  }),
+
+  // ------------------------------------------------------------------ 0.15.190: admin lock keys (block public sharing, disable export), both off by default
+  http.get(`${B}/settings/security-locks`, () => { const g = guard(); if (g) return g; const j = locksView(); return HttpResponse.json(j, tag(j.version)); }),
+  http.put(`${B}/settings/security-locks`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    const b = await body<{ block_public_sharing?: unknown; disable_export?: unknown; reason?: string } & Record<string, unknown>>(request);
+    const errs: { path: string; code: string }[] = Object.keys(b).filter((k) => !['block_public_sharing', 'disable_export', 'reason'].includes(k)).map((k) => ({ path: `/${k}`, code: 'unknown_field' }));
+    if (typeof b.block_public_sharing !== 'boolean') errs.push({ path: '/block_public_sharing', code: 'required' });
+    if (typeof b.disable_export !== 'boolean') errs.push({ path: '/disable_export', code: 'required' });
+    if ((b.reason ?? '').trim().length < 3 || (b.reason ?? '').length > 1000) errs.push({ path: '/reason', code: 'required' });
+    if (errs.length) return fields(...errs);
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, locks.version); if (p) return p;
+    if (!stepUpValid()) return stepUp();
+    if (locks.block_public_sharing === b.block_public_sharing && locks.disable_export === b.disable_export) return problem(409, 'invalid_transition', 'These are already the lock keys in force.');
+    const v = viewer()!;
+    Object.assign(locks, { block_public_sharing: b.block_public_sharing, disable_export: b.disable_export, version: locks.version + 1, updated_at: new Date().toISOString(),
+      updated_by: { id: uid(v.employee_id ?? '9999'), display_name: v.name, employee_id: v.employee_id } });
+    const j = locksView();
     return HttpResponse.json(j, tag(j.version));
   }),
 
