@@ -35,7 +35,7 @@ export function ResetPassword() {
   };
   return (
     <AuthShell>
-      <div className="card space-y-4 p-6 sm:p-8" data-testid="reset-card">
+      <div className="card auth-card auth-enter space-y-4 p-6 sm:p-8" data-testid="reset-card">
         {done ? (
           <div className="space-y-3" role="status" data-testid="reset-done">
             <CheckCircle2 size={32} className="text-doneInk" aria-hidden />

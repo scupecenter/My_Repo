@@ -24,7 +24,7 @@ export function ForgotPassword() {
   };
   return (
     <AuthShell>
-      <div className="card space-y-4 p-6 sm:p-8" data-testid="forgot-form-card">
+      <div className="card auth-card auth-enter space-y-4 p-6 sm:p-8" data-testid="forgot-form-card">
         {sent ? (
           <div className="space-y-3" data-testid="forgot-sent" role="status">
             <MailCheck size={32} className="text-accentText" aria-hidden />
