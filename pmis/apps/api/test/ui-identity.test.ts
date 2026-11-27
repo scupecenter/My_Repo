@@ -225,6 +225,38 @@ describe('the appearance profile: PATCH /me/profile ui_prefs and the identity de
     await put(admin, { default_brand: 'current', allow_user_choice: true, defaults: {}, reason: REASON }, etag(await read(admin)));
     expect((await api.call('get', '/me')).body.user.appearance).toMatchObject({ radius: 'rounded' });
   });
+
+  // 0347 (item 19 of the 2026-11-27 batch): `contrast` is an appearance dimension of the same framework - personal choice,
+  // organization default and the admin lock all reach it through the same doors, with no parallel path.
+  it('contrast: in the options, chosen personally, defaulted by the organization and locked with the rest', async () => {
+    const u = await makeUser(db, { assigned: true });
+    const api = await loggedIn(app, u);
+    const p = await api.call('get', '/me/profile');
+    expect(p.body.identity.pref_options.contrast).toEqual(['standard', 'high']);
+    expect(p.body.identity.defaults).toMatchObject({ contrast: 'standard' });
+    expect(p.body.appearance).toMatchObject({ contrast: 'standard' });
+    // the organization default from Settings > Identity reaches a user with no choice
+    const set = await put(admin, { default_brand: 'current', allow_user_choice: true, defaults: { contrast: 'high' }, reason: REASON }, etag(await read(admin)));
+    expect(set.status).toBe(200);
+    expect(set.body.defaults).toMatchObject({ contrast: 'high' });
+    expect((await api.call('get', '/me')).body.user.appearance).toMatchObject({ contrast: 'high' });
+    // a personal choice wins over the organization default and is audited per dimension
+    const r = await patchPrefs(api, { contrast: 'standard' });
+    expect(r.status).toBe(200);
+    expect(r.body.appearance).toMatchObject({ contrast: 'standard' });
+    const a = (await db.query(`SELECT before, after FROM audit_log WHERE action = 'profile_updated' AND entity_id = $1 ORDER BY id`, [u.id])).rows;
+    expect(a.at(-1)).toMatchObject({ before: { ui_prefs: {} }, after: { ui_prefs: { contrast: 'standard' } } });
+    expect((await patchPrefs(api, { contrast: 'neon' })).status).toBe(422);
+    // the admin lock refuses a personal contrast like every other dimension; the organization default still applies
+    const lock = await put(admin, { default_brand: 'current', allow_user_choice: false, defaults: { contrast: 'high' }, reason: REASON }, etag(await read(admin)));
+    expect(lock.status).toBe(200);
+    const blocked = await patchPrefs(api, { contrast: 'standard' });
+    expect(blocked.status).toBe(403);
+    expect(blocked.body.errors[0]).toMatchObject({ path: '/ui_prefs', code: 'appearance_choice_locked' });
+    const u2 = await makeUser(db, { assigned: true });
+    expect((await (await loggedIn(app, u2)).call('get', '/me')).body.user.appearance).toMatchObject({ contrast: 'high' });
+    await put(admin, { default_brand: 'current', allow_user_choice: true, defaults: {}, reason: REASON }, etag(await read(admin)));
+  });
 });
 
 /** 0242 (owner approval 2026-11-27, the improvement proposal item 4): the personal sidebar `ui_prefs.sidebar`. */

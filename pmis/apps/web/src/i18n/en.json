@@ -3816,7 +3816,8 @@
       "motion": "Motion",
       "icon_style": "Icon weight",
       "menu_style": "Side menu",
-      "accent": "Accent colour"
+      "accent": "Accent colour",
+      "contrast": "Contrast"
     },
     "opt": {
       "density": {
@@ -3857,6 +3858,10 @@
         "orange": "Orange",
         "red": "Red",
         "amber": "Amber"
+      },
+      "contrast": {
+        "standard": "Standard",
+        "high": "High"
       }
     }
   },
