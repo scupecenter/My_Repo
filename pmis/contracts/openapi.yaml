@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.135
+  version: 0.15.153
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -31,6 +31,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.153 (2026-11-27): "My sessions" (no migration; CHANGELOG MySessions). Additive. `GET /me/sessions` (`listMySessions`): the caller's own live sessions (device, sign-in time, last activity, IP, `is_current`); `POST /me/sessions/{session_id}/revoke` (`revokeMySession`) ends one of the caller's own other sessions (404 for anyone else's, 422 `own_session` for the current one); `POST /me/sessions/revoke-others` (`revokeMyOtherSessions`) ends every other session of the caller. Own rows only, no permission and no step-up (it only narrows access); audited and in the security log.
     - 0.15.135 (2026-11-27): the Lessons Learned register (owner approval 2026-11-26, C3; migration 0184): one register for the lessons of the project, from an incident, a snag, a delay or any experience, with the recommendation and where it was applied. Additive. Register key `lessons_learned` in `/registers` and `/registers/{key}` records with its own fields and the standard two levels, the Dropdown list LessonCategory in Settings, the module `lessons_learned` in the permissions grid (no grant seeded), the nav key in the catalogue, the template TPL-LESSONS-LEARNED and the master export part. Existing registers and data are untouched.
     - 0.15.201 (2026-11-27): the dashboard follow-up sections, GECOL and HLC readiness (owner approval 2026-11-26, dashboard proposals item 4; migration 0200). Additive and read only. `GET /dashboard/ops` gains the section `gecol_hlc` (`DashboardOpsGecolHlc`) with one part per utility (`DashboardOpsUtilityReadiness`). GECOL: the active, not cancelled sites with the GECOL scope, the powered ones (power_on_date set), the waiting ones aged since the GECOL request date in the buckets 0-7, 8-14, 15-30, over 30 calendar days, the in-scope sites with no GECOL record at all, and the civilly ready but not electrified (the CW PAC, task B13, is approved but the power is not on). HLC: the same over the HLC scope, in service when in_service_date is set, aged since the HLC record's request date or, without one, the PR date of the linked Procurement order, plus the installed lines not yet in service. Each part needs the view right of its register and answers available false without it. The dashboard settings catalogue gains the card `ops_gecol_hlc`. Corrective: `DashboardOpsProcurement.pr_wait` and `po_wait` are documented nullable, as the service has always answered when the caller may not see the Procurement register. No grant, role or permission change.
     - 0.15.154 (2026-11-27): default value per register column (migration 0254; CHANGELOG ColumnDefaults). Additive. `PUT /registers/{key}/fields/{code}/default` (`setRegisterFieldDefault`, System Admin or delegate of `fields.edit`, reason, optional If-Match; `value` null clears) validated like a record value; `RegisterColumn.default_value` and `RegisterField.default_value`. The register form prefills it on a new record and marks it as prefilled; the server never applies it by itself (imports and API calls are unchanged).
@@ -1230,6 +1231,53 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '422': { $ref: '#/components/responses/Unprocessable' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+  /me/sessions:
+    get:
+      tags: [me]
+      operationId: listMySessions
+      summary: My own live sessions (devices)
+      description: 0.15.153. Only the caller's own sessions, newest activity first (at most 50). `device` is parsed from the user agent (browser, OS, type). The current one has `is_current` true.
+      responses:
+        '200':
+          description: Sessions.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/MySession' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /me/sessions/revoke-others:
+    post:
+      tags: [me]
+      operationId: revokeMyOtherSessions
+      summary: Sign out of every other device
+      description: 0.15.153. Ends all the caller's other sessions and keeps the current one. No body.
+      responses:
+        '200':
+          description: Done.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MySessionRevokeResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /me/sessions/{session_id}/revoke:
+    post:
+      tags: [me]
+      operationId: revokeMySession
+      summary: Sign out of one of my other devices
+      description: 0.15.153. Own sessions only (404 for any other id); the current session is refused (422 `own_session`, use sign out).
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          description: Ended.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MySessionRevokeResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
   /me/profile:
     get:
       tags: [me]
@@ -16777,6 +16825,22 @@ components:
           schema: { $ref: '#/components/schemas/TransitionResult' }
 
   schemas:
+    MySession:
+      type: object
+      required: [session_id, signed_in_at, last_activity_at, ip, device, auth_method, is_current]
+      properties:
+        session_id: { type: string, format: uuid }
+        signed_in_at: { type: string, format: date-time }
+        last_activity_at: { type: string, format: date-time }
+        ip: { type: [string, 'null'] }
+        device: { oneOf: [{ $ref: '#/components/schemas/Device' }, { type: 'null' }] }
+        auth_method: { type: string }
+        is_current: { type: boolean }
+    MySessionRevokeResult:
+      type: object
+      required: [revoked_count]
+      properties:
+        revoked_count: { type: integer }
     MatrixSimulation:
       type: object
       required: [site, kind, code, name_en, name_ar, module, levels]

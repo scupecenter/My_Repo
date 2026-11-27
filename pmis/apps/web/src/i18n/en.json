@@ -6992,6 +6992,17 @@
     "add": "Add goal",
     "save_title": "Save the goals"
   },
+  "mySessions": {
+    "title": "My sessions",
+    "note": "The devices signed in as you. Sign out of any you do not recognise or no longer use. This device stays signed in; use Sign out for it.",
+    "this_device": "This device",
+    "unknown_device": "Unknown device",
+    "signed_in": "Signed in",
+    "last_active": "Last active",
+    "sign_out": "Sign out",
+    "sign_out_others": "Sign out of all other devices",
+    "ended": "Signed out."
+  },
   "matrixSimulate": {
     "title": "Who approves?",
     "note": "Read only. Pick a site and a stage task or a register to see who would hold L1 and L2 today: the matrix cell that decides, its rule, the people who would hold the level and how they reach it (named, role, group). Nothing is written and nobody is notified. A task cell decides before the stage cell, and a region cell before the default cell.",
