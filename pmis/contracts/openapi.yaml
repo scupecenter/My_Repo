@@ -38,6 +38,7 @@ info:
     - 0.15.156 (2026-11-27): Web Push for field engineers (migration 0256; CHANGELOG WebPush). Additive. (1) `GET /me/push` (`getMyPush`): whether push is on for the server (`enabled`, `public_key`) and how many of the caller's browsers are subscribed. (2) `POST /me/push/subscribe` and `POST /me/push/unsubscribe`: own browsers only; subscribe answers 409 while the server has no VAPID keys. (3) `GET /admin/web-push` (`getAdminWebPush`, System Admin): on or off and the counts. The keys come only from the environment (VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT); with any missing push is off. The push carries no title or body, only a fixed notice that opens the inbox. The bell and the e-mail are unchanged.
     - 0.15.262 (2026-11-27): the unsaved-changes guard joins `ui.features` as the section `unsaved_guard` (migration 0401, mirror `db/sql/400_ui_unsaved_guard.sql`; CHANGELOG UnsavedGuard, Decision 11). Additive: `UiFeatures` and `UiFeaturesPatch` gain `unsaved_guard` (`UiUnsavedGuard`: `enabled` and one boolean per area); a stored value without the section takes the seed (guard on everywhere). No new path.
     - 0.15.155 (2026-11-27): search inside uploaded document contents (migration 0255; CHANGELOG DocContentSearch). Additive. (1) `SearchHit` gains the optional `snippet` (documents group only): where the words were found inside the file, else null. (2) `GET /admin/document-search-index` (`getDocumentSearchIndex`): counts of indexed, empty, unsupported, too large, failed and pending files (System Admin). Text is extracted off the request path from clean-scan PDF and DOCX files and is visible only with the documents view right in the file's region.
+    - 0.15.369 (2026-11-27): the floating Inbox panel joins the appearance profile as two dimensions, `inbox_panel` (overlay, floating, docked) and `inbox_anchor` (end-top, end-bottom, start-top, start-bottom), in `UiPrefs` (migration 0526, mirror `db/sql/525_inbox_panel_mode.sql`). Additive: the same personal door, organization defaults and lock apply; no new route.
     - 0.15.242 (2026-11-27): generic if/then alert rules, notifications only (migration 0342, mirror `db/sql/341_alert_rules.sql`; CHANGELOG AlertRules; item 13 of the 2026-11-27 PM-platforms research). Additive. A System Admin manages the rules in Settings: `GET /settings/alert-rules` (the rules plus the closed catalogues the form offers), `POST /settings/alert-rules`, `PUT /settings/alert-rules/{id}` (If-Match, a reason, audited `alert_rule_create`/`alert_rule_update`). A rule is a closed condition kind with closed params (`weekly_status_missing`: the regions without a Weekly status update of the current working week; `record_idle` `{register_key, state, days}`: the current records of the register in the state for at least days), a closed audience (`system_admin`, or `module` with a module key: the users whose assignment reaches the module) and a title/body template in English and Arabic with placeholders. The daily job fires the enabled rules: one in-app notification per recipient, deduped by (rule, period, target), in the recipient's language; a rule never changes a record, a state or a holder. `NotificationKind` gains `alert_rule` (in-app only).
     - 0.15.249 (2026-11-27): kpi_threshold alert rules with editable thresholds, and enable/lock on every alert rule (owner approval 2026-11-27 relayed by Main; migration 0348, mirror `db/sql/347_kpi_threshold_alerts.sql`; CHANGELOG KpiThresholdAlerts). Additive. The generic alert rules (0.15.242) gain the third closed kind `kpi_threshold` `{kpi, op, value}`: the KPI is one of the dashboard settings catalogue, `op` is `above` or `below`, and `value` is the rule's own editable threshold (0..100000, in the unit of the KPI), independent of the dashboard green/amber bands. The daily job computes the live KPI values system-wide (the same queries the dashboard uses, no caller scope) and hands them to the database; a rule whose KPI crosses its threshold fires one in-app notification per recipient, deduped by (rule, day, kpi), with the placeholders {{kpi}}, {{value}} and {{threshold}} filled at fire time and the link defaulting to /dashboard. `AlertRule` and `AlertRuleInput` gain `locked`: while locked, a rule takes no edit and cannot be disabled - the only accepted save is the unlock itself (every other field unchanged), audited as `alert_rule_update`; a locked rule still fires. The alert-rules catalogue of `GET /settings/alert-rules` gains the KPI list the form offers. No new endpoint, grant, role or permission change.
     - 0.15.310 (2026-11-27): every register is downloadable (owner decision D48, 2026-11-27; no migration; CHANGELOG ExportAllRegisters). Additive. `GET /exports/parts` now also offers `car_dispatcher`, `financial_advances`, `incidents`, `lessons_learned` and `invoices`, and `POST /exports/master` accepts them in `parts` and as `view.source`; the 422 `not_in_master` of 0.15.34 is gone. Each writes its own sheet (Car Dispatcher, Financial Advances, Incidents, Lessons Learned, Invoices) with the register's template columns, header in row 1, no Master column. The rules are the other registers' rules: the export grant of the register's own module (no grant is seeded, so only a System Admin holds them until the owner grants them; Financial Advances and Invoices stay behind the finance grant), the export regions of that grant, voided rows left out of a full export, the field-level `in_export` switch and the personal-column rule. Settings and configuration are never exported. No schema change: `ExportPartKey` already listed the five keys.
@@ -88,6 +89,7 @@ info:
     - 0.15.96 (2026-11-27): responsibility-matrix coverage screen (CHANGELOG MatrixCoverage; no migration). Additive and read only. `GET /matrix/coverage` (`getMatrixCoverage`, System Admin or an all-region delegate of the matrix): for each active stage and enabled register row and each of the seven regions, whether the matrix cell has an actor, so empty cells show before a task or record stalls. Settings > Workflow > Coverage.
     - 0.15.241 (2026-11-27): region health on the dashboard and the Weekly status page (owner request 2026-11-27, item 12 of the 2026-11-27 batch; migration 0341, mirror `db/sql/340_region_health.sql`; CHANGELOG RegionHealth). Additive. New `GET /status-updates/region-health` (`getRegionHealth`): one row per region the caller may view on `sites` (all seven when unrestricted), with the current working week's region update of the Weekly status (`health`, `summary`, `author`, `updated_at`) or `missing_update` true when the region has not posted this week; read only. The dashboard card catalogue gains `region_health` ("Region health"), shown at the end of a tab until the tab layout names it (migration 0108 rule). No table, no permission change.
     - 0.15.95 (2026-11-27): Issue log and Quality record link to a Procurement order (migration 0195; CHANGELOG IssueQualityOrderLink). Additive. New optional field `procurement_order_id` on `issues` and `quality`; when set, the contractor (`external_party`) is taken from the order (a different typed `external_party_id` is refused, 422 `contractor_from_order`; `order_not_active`, `order_other_site`, `invalid`), so the contractor performance view sees the issue and the inspection. `GET /registers/issues/order-options` and `GET /registers/quality/order-options` list the orders (own module view plus Procurement view).
+    - 0.15.361 (2026-11-27): the Finance hub (owner decision D57, 2026-11-27; migration 0406, mirror `db/sql/405_finance_hub.sql`). Additive: new `GET /finance-hub/summary` (read-only cards over the two separate registers `financial_advances` and `invoices`, each with the visibility of its own screen; advance amounts are only totalled where `fin_amounts_visible` already shows them, so a caller who cannot see amounts gets counts and nulls); `UiFeatures` and `UiFeaturesPatch` gain `finance_hub` (`UiFinanceHub` - widget switches, after how many days a disbursed, unsettled advance warns, the two aging bounds of the open-invoice buckets). A stored value without the section takes the seed. No permission change.
     - 0.15.311 (2026-11-27): the Data hub (owner approval 2026-11-27; migration 0400, mirror `db/sql/399_data_hub.sql`; CHANGELOG DataHub). Additive: new `GET /data-hub/summary` (batches waiting for the caller, recent template changes, the caller's last template downloads; read only, same visibility as the batch list and the template catalogue); `UiFeatures` and `UiFeaturesPatch` gain `data_hub` (`UiDataHub`: widget switches, the Uploads & batches badge, the default view of each hub list). A stored value without the section takes the seed. No permission change.
     - 0.15.251 (2026-11-27): the notification panel joins `ui.features` as the section `panel` (migration 0282, mirror `db/sql/281_ui_panel.sql`; CHANGELOG UiPanel). Additive: `UiFeatures` and `UiFeaturesPatch` gain `panel` (`UiPanel`: `mode` popover or side_panel, `width`, `show_tabs`); a stored value without the section takes the seed (popover). No new path.
     - 0.15.250 (2026-11-27): inbox tabs and priority join `ui.features` as the section `inbox` (migration 0281, mirror `db/sql/280_ui_inbox.sql`; CHANGELOG UiInbox). Additive: `UiFeatures` and `UiFeaturesPatch` gain `inbox` (`UiInbox`: `tabs_enabled`, `default_tab`, `priority_kinds`); a stored value without the section takes the seed. No new path.
@@ -6672,6 +6674,19 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/DataHubSummary'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+  /finance-hub/summary:
+    get:
+      tags: [templates]
+      operationId: getFinanceHubSummary
+      summary: The Finance hub landing page, in one call (0.15.361)
+      description: 0.15.361. Read-only summary cards over the two separate registers `financial_advances` and `invoices` - open advances (count, overdue count, and the open balance total where `fin_amounts_visible` shows the caller amounts - null otherwise), and open invoices (count by state, aging buckets over the received date, count past due). Each card is null when the caller cannot view that register's module, and every row counted is a row the register screen would show the caller (same module and region visibility, latest version only). The thresholds come from the `finance_hub` section of ui.features.
+      responses:
+        '200':
+          description: The summary.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/FinanceHubSummary'}
         '401': {$ref: '#/components/responses/Unauthorized'}
   /exports/schedules:
     get:
@@ -23464,6 +23479,51 @@ components:
         version: { type: [integer, 'null'] }
         prefill: { type: boolean }
         at: { type: string, format: date-time }
+    UiFinanceHub:
+      type: object
+      description: '0.15.361. The Finance hub: which widgets of the page show, after how many days a disbursed, unsettled advance warns, and the two aging bounds of the open-invoice buckets.'
+      additionalProperties: false
+      required: [widgets, settle_warn_days, aging_days]
+      properties:
+        widgets:
+          type: object
+          additionalProperties: false
+          required: [advances, invoices, quick_links, templates]
+          properties:
+            advances: { type: boolean }
+            invoices: { type: boolean }
+            quick_links: { type: boolean }
+            templates: { type: boolean }
+        settle_warn_days: { type: integer, minimum: 1, maximum: 365 }
+        aging_days: { type: array, minItems: 2, maxItems: 2, items: { type: integer, minimum: 1, maximum: 365 } }
+    FinanceHubSummary:
+      type: object
+      required: [advances, invoices]
+      properties:
+        advances:
+          type: [object, 'null']
+          description: Null when the caller cannot view the financial_advances module.
+          required: [open_count, overdue_count, open_amount]
+          properties:
+            open_count: { type: integer, minimum: 0, description: 'Latest advances whose state is not settled, closed or cancelled.' }
+            overdue_count: { type: integer, minimum: 0, description: 'Disbursed and unsettled for more than settle_warn_days.' }
+            open_amount: { type: [number, 'null'], description: 'Total open balance of the advances the caller may see amounts of (fin_amounts_visible); null when the rule shows the caller no amounts.' }
+            currency: { type: string, example: LYD }
+        invoices:
+          type: [object, 'null']
+          description: Null when the caller cannot view the invoices module.
+          required: [open_count, by_state, aging, overdue_count]
+          properties:
+            open_count: { type: integer, minimum: 0, description: 'Latest invoices whose state is not Paid or Cancelled.' }
+            by_state: { type: object, additionalProperties: { type: integer, minimum: 0 }, description: 'Open invoices per state (Received, UnderReview, Approved, Disputed); a state with none is listed with 0.' }
+            aging:
+              type: object
+              required: [first, second, third]
+              properties:
+                first: { type: integer, minimum: 0, description: 'Received up to aging_days[0] days ago.' }
+                second: { type: integer, minimum: 0, description: 'Received aging_days[0]+1 to aging_days[1] days ago.' }
+                third: { type: integer, minimum: 0, description: 'Received more than aging_days[1] days ago.' }
+            overdue_count: { type: integer, minimum: 0, description: 'Due date past, not Paid or Cancelled.' }
     DataHubSummary:
       type: object
       required: [batches, template_changes, my_downloads]
@@ -23501,12 +23561,13 @@ components:
     UiFeatures:
       type: object
       description: '0.15.185. The sections of the interface features setting; every section is complete.'
-      required: [avatars, new_badge, inbox, panel, data_hub, unsaved_guard]
+      required: [avatars, new_badge, inbox, panel, data_hub, unsaved_guard, finance_hub]
       properties:
         avatars: { $ref: '#/components/schemas/UiAvatars' }
         new_badge: { $ref: '#/components/schemas/UiNewBadge' }
         inbox: { $ref: '#/components/schemas/UiInbox' }
         data_hub: { $ref: '#/components/schemas/UiDataHub' }
+        finance_hub: { $ref: '#/components/schemas/UiFinanceHub' }
         panel: { $ref: '#/components/schemas/UiPanel' }
         unsaved_guard: { $ref: '#/components/schemas/UiUnsavedGuard' }
     UiFeaturesPatch:
@@ -23517,6 +23578,7 @@ components:
         new_badge: { $ref: '#/components/schemas/UiNewBadge' }
         inbox: { $ref: '#/components/schemas/UiInbox' }
         data_hub: { $ref: '#/components/schemas/UiDataHub' }
+        finance_hub: { $ref: '#/components/schemas/UiFinanceHub' }
         panel: { $ref: '#/components/schemas/UiPanel' }
         unsaved_guard: { $ref: '#/components/schemas/UiUnsavedGuard' }
     UiFeaturesSetting:
@@ -25043,6 +25105,8 @@ components:
         menu_style: { type: string, enum: [default, rail, autohide] }
         accent: { type: string, enum: [default, teal, blue, violet, green, orange, red, amber] }
         contrast: { type: string, enum: [standard, high], description: '0.15.248 (0347): the high-contrast mode.' }
+        inbox_panel: { type: string, enum: [overlay, floating, docked], description: '0.15.369 (0526): the notification panel as an overlay (default), a floating window or docked at the inline-end edge.' }
+        inbox_anchor: { type: string, enum: [end-top, end-bottom, start-top, start-bottom], description: '0.15.369 (0526): the corner of the floating panel (inline sides, so it mirrors in RTL).' }
     UiNav:
       type: object
       description: '0.15.231 (0242): the personal sidebar (proposal item 4). `hidden` the screens the menu does not show, `order` their order inside their heading (a screen the list does not name keeps the organization order, after the named ones), `badge_style` how the count badges draw (full = the number, dot = a dot, none = no badge), `pins` the pinned shortcuts on top (at most 20). A menu key is a short lowercase id (the entries of the side menu; an unknown key is ignored).'
