@@ -1,4 +1,5 @@
 import { AlertTriangle, CalendarCheck, CheckCircle2, Pencil, Plus, Trash2, Upload } from 'lucide-react';
+import { UnsavedGuard } from '@/lib/unsavedGuard';
 import { Fragment, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCalendar, useCalendarConfirmation, useCreateHoliday, useDeleteHoliday, useHolidayChange, useHolidays, useImportHolidays, useSetCalendarConfirmation, useSetWeekend } from '@/api/settings';
@@ -73,6 +74,7 @@ function Confirmation() {
           <CalendarCheck size={14} />{t(next ? 'cal.official_confirm' : 'cal.official_unconfirm')}
         </button>
       )}
+      <UnsavedGuard scope="settings" dirty={!!days} needsReason label={t('ui.guard_settings')} onSave={(reason) => new Promise<boolean>((res) => set.mutate({ version: c.version, confirmed: next, reason }, { onSuccess: () => res(true), onError: () => res(false) }))} />
       {open && (
         <FormDialog open onClose={() => setOpen(false)} testid="cal-official-dialog" title={t(next ? 'cal.official_confirm_title' : 'cal.official_unconfirm_title')} busy={set.isPending} error={set.isError ? errText(set.error, t) : null}
           onSubmit={(reason) => set.mutate({ version: c.version, confirmed: next, reason }, { onSuccess: () => { toast(t('settings.audited')); setOpen(false); } })}>

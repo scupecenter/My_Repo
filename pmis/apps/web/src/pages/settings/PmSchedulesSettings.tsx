@@ -1,4 +1,5 @@
 import { Plus, Trash2 } from "lucide-react";
+import { UnsavedGuard } from '@/lib/unsavedGuard';
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
@@ -121,6 +122,7 @@ export function PmSchedulesSettings() {
         <button className="btn btn-accent" data-testid="pm-save" disabled={!draft || invalid} onClick={() => setOpen(true)}>{t("common.save")}</button>
         {draft && <button className="btn" data-testid="pm-discard" onClick={() => setDraft(null)}>{t("common.cancel")}</button>}
       </div>
+      <UnsavedGuard scope="settings" dirty={!!draft} needsReason label={t('ui.guard_settings')} onSave={(reason) => new Promise<boolean>((res) => set.mutate({ version: s.version, body: { schedules: rows.map((g) => ({ ...g, name_en: g.name_en.trim(), name_ar: g.name_ar?.trim() || null })), reason } }, { onSuccess: () => res(true), onError: () => res(false) }))} />
       <FormDialog inline open={open} onClose={() => setOpen(false)} title={t("pm.save_title")} testid="pm-save-dialog" busy={set.isPending} error={set.isError ? errText(set.error, t) : null}
         onSubmit={(reason) => set.mutate({ version: s.version, body: { schedules: rows.map((g) => ({ ...g, name_en: g.name_en.trim(), name_ar: g.name_ar?.trim() || null })), reason } },
           { onSuccess: () => { setDraft(null); setOpen(false); toast(t("settings.audited")); } })} />
