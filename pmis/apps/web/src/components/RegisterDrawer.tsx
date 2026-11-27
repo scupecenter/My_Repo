@@ -10,7 +10,7 @@ import { useAddRegisterComment, useRegisterComments } from '@/api/x';
 import type { RegisterDefinition, RegisterRecord } from '@/api/types';
 import { registerErrorMessage, serverFieldIssues } from '@/lib/registerErrors';
 import { cellLevel } from '@/lib/matrixLevels';
-import { defaultsFor, forEntry, forType, OWNER_NOTE, patchData, sectionsFor, typeData, typeRequired, validateRecord, visibleData, type FieldIssue } from '@/lib/registerForms';
+import { columnDefaults, defaultsFor, forEntry, forType, OWNER_NOTE, patchData, sectionsFor, typeData, typeRequired, validateRecord, visibleData, type FieldIssue } from '@/lib/registerForms';
 import { tripoliToday } from '@/lib/today';
 import { FieldHistory } from './logs/FieldHistory';
 import { ChangeDiff } from './logs/ChangeDiff';
@@ -106,6 +106,8 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
   const companies = useContractorCompanies(rawDef.register_key === 'procurement');
   const [site, setSite] = useState<SiteSel>(record?.site_id ? { id: record.site_id, code: record.site_code ?? '', region_id: record.region_id as number | undefined } : null);
   const [rtype, setRtype] = useState<string>(record?.record_type ?? '');
+  // 0.15.103: the columns prefilled from the admin's defaults on a new record; a column leaves the set when the person edits it
+  const [prefilled, setPrefilled] = useState<Set<string>>(() => (record ? new Set() : new Set(Object.keys(columnDefaults(rawDef)))));
   const [dirty, setDirty] = useState(false);
   const [tried, setTried] = useState(false);
   const [server, setServer] = useState<Record<string, FieldIssue>>({});
@@ -136,7 +138,7 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
   /** The values sent: those of the chosen record type only. */
   const typed = (d: Data) => (untypedRecord ? d : typeData(rawDef, rtype, d));
   const sections = sectionsFor(def, data);
-  const set = (code: string, v: unknown) => { setData((d) => ({ ...d, [code]: v })); setDirty(true); setServer((s) => { const n = { ...s }; delete n[code]; return n; }); };
+  const set = (code: string, v: unknown) => { setPrefilled((p) => { if (!p.has(code)) return p; const n = new Set(p); n.delete(code); return n; }); setData((d) => ({ ...d, [code]: v })); setDirty(true); setServer((s) => { const n = { ...s }; delete n[code]; return n; }); };
   const fail = (e: unknown) => { setServer(serverFieldIssues(e)); const m = reservedMessage(t, e) ?? registerErrorMessage(t, e); if (m) toast(m, 'err'); };
   const name = (i18n.language === 'ar' && def.name_ar) || def.name_en;
 
@@ -265,6 +267,7 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
                   return (
                     <div key={f.code} className={(f.type === 'text' && f.code === 'remark') || ['child_list', 'multi_user', 'multi_site'].includes(f.type) ? 'col-span-2' : ''}>
                       <div className="flex items-center gap-1"><label htmlFor={`reg-field-${f.code}`} className="text-sm text-mute">{fieldLabel(f, lang)}{f.required ? ' *' : ''}</label>
+                        {!record && prefilled.has(f.code) && <span className="chip bg-card2 text-[10px] text-mute" data-testid={`reg-prefilled-${f.code}`} title={t('registers.prefilled_hint')}>{t('registers.prefilled')}</span>}
                         {f.list?.status === 'pending' && <span className="chip bg-waitBg text-[10px] text-waitInk" data-testid={`reg-list-pending-${f.code}`} title={t('lists.pending_hint')}>{t('lists.pending')}</span>}
                         {record && <FieldHistory entityType="register_record" entityId={record.entity_id} field={f.code} label={fieldLabel(f, lang)} onRestore={editable && ['text', 'number', 'date', 'yes_no'].includes(f.type) ? (v) => set(f.code, v) : undefined} />}</div>
                       {rk === 'car_dispatcher' && f.code === 'vehicle_id'

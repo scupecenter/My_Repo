@@ -6,7 +6,7 @@ import type { PermitEntryType, RegisterDefinition, RegisterField } from '@/api/t
  * `GET /registers`, and `RegisterField.section` (contract 0.4.6) gives the section of each base field. The checks below
  * mirror the rules the server repeats at submit (V1 to V6), so Submit stays off until they pass.
  */
-export const REGISTER_KEYS_LIVE = ['procurement', 'contractors', 'gecol', 'hlc', 'permits_hse', 'warehouse', 'quality', 'issues', 'risks', 'change_control', 'readiness_handover', 'as_built', 'meetings', 'rf_design', 'acquisition', 'dismantle', 'car_dispatcher', 'financial_advances', 'incidents'] as const;
+export const REGISTER_KEYS_LIVE = ['procurement', 'contractors', 'gecol', 'hlc', 'permits_hse', 'warehouse', 'quality', 'issues', 'risks', 'change_control', 'readiness_handover', 'as_built', 'meetings', 'rf_design', 'acquisition', 'dismantle', 'car_dispatcher', 'financial_advances', 'incidents', 'lessons_learned'] as const;
 export const isLive = (k: string): k is (typeof REGISTER_KEYS_LIVE)[number] => (REGISTER_KEYS_LIVE as readonly string[]).includes(k);
 
 type Data = Record<string, unknown>;
@@ -17,6 +17,7 @@ const SECTION_ID: Record<string, string> = {
   'Notice and works': 'notice', Acceptance: 'acceptance', 'Meter and power-on': 'meter', Remark: 'remark', 'Status and team': 'fiber_status', 'Installation and test': 'install',
   Permit: 'permit', Validity: 'validity', 'N/A': 'na', 'PTW checks': 'ptw', 'Stop work': 'stop', 'Purchase request': 'purchase_request', 'In service': 'in_service',
   Execution: 'execution',
+  Lesson: 'lesson', 'Follow-up': 'follow_up',
   Incident: 'incident', 'People and damage': 'people_damage', Resolution: 'resolution',
 };
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'details';
@@ -142,9 +143,18 @@ export const OWNER_NOTE: Record<string, string> = { procurement: 'registers.owne
  * 0042: when the caller may enter one scope only (the HLC Fiber Team in Procurement: `entry_scopes` = ["HLC"]), that scope is preset.
  */
 export const defaultsFor = (key: string, def?: RegisterDefinition): Data => {
-  if (key === 'permits_hse') return { has_expiry: true };
+  // 0.15.103: the admin's per-column defaults (Settings > Register columns) sit under the built-in ones
+  const base: Data = { ...columnDefaults(def) };
+  if (key === 'permits_hse') return { ...base, has_expiry: true };
   const scopes = def?.entry_scopes;
-  return scopes && scopes.length === 1 ? { scope: scopes[0] } : {};
+  return scopes && scopes.length === 1 ? { ...base, scope: scopes[0] } : base;
+};
+
+/** The default values the admin set on the columns of a register (contract 0.15.103); only for a new record, shown as prefilled. */
+export const columnDefaults = (def?: RegisterDefinition): Data => {
+  const out: Data = {};
+  for (const f of def?.fields ?? []) if (f.default_value !== undefined && f.default_value !== null && !f.read_only) out[f.code] = f.default_value;
+  return out;
 };
 
 /**
