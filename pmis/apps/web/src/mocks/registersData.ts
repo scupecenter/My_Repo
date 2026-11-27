@@ -198,13 +198,31 @@ export const incidents: RegisterDefinition = {
     F('remark', 'Remark', 'ملاحظات', 'text', 'Remark'),
   ],
 };
+// Owner approval 2026-11-27 (migration 0185): Invoices, the supplier and contractor invoices from receipt to payment.
+export const invoices: RegisterDefinition = {
+  register_key: 'invoices', name_en: 'Invoices', name_ar: 'الفواتير', module_key: 'invoices', site_scoped: true, multiple_per_site: true, approval_levels: 2,
+  fields: [
+    F('invoice_no', 'Invoice No.', 'رقم الفاتورة', 'text', 'Invoice', { required: true, in_list: true }),
+    F('invoice_kind', 'Kind', 'النوع', 'list', 'Invoice', { in_list: true, options: ['Supplier', 'Contractor', 'Service', 'Other'] }),
+    F('supplier', 'Supplier / Contractor', 'المورّد / المقاول', 'text', 'Invoice', { in_list: true }),
+    F('procurement_record_id', 'Order (Procurement record)', 'الطلب (سجل المشتريات)', 'text', 'Invoice'),
+    F('invoice_date', 'Invoice Date', 'تاريخ الفاتورة', 'date', 'Invoice', { required: true, in_list: true }),
+    F('received_date', 'Received Date', 'تاريخ الاستلام', 'date', 'Invoice', { in_list: true }),
+    F('due_date', 'Due Date', 'تاريخ الاستحقاق', 'date', 'Invoice', { in_list: true }),
+    F('amount', 'Amount (LYD)', 'المبلغ (دينار)', 'number', 'Amount', { required: true, in_list: true }),
+    F('invoice_state', 'Invoice state', 'حالة الفاتورة', 'list', 'Amount', { in_list: true, options: ['Received', 'UnderReview', 'Approved', 'Paid', 'Disputed', 'Cancelled'] }),
+    F('paid_date', 'Paid Date', 'تاريخ الدفع', 'date', 'Payment', { in_list: true }),
+    F('payment_ref', 'Payment reference', 'مرجع الدفع', 'text', 'Payment'),
+    F('remark', 'Remark', 'ملاحظات', 'text', 'Remark'),
+  ],
+};
 export const REGISTER_DEFS: RegisterDefinition[] = [
   procurement, contractors, gecol, hlc, permits,
   more('warehouse', 'Warehouse', 'المخزن', 'warehouse', false, ['te_dn', 'cw_dn', 'te_rn', 'cw_rn', 'pl', 'open', 'adj']),
   more('quality', 'Quality', 'الجودة', 'quality', true, ['qc', 'snag', 'itp', 'ncr']), more('issues', 'Issue Log', 'سجل المشاكل', 'issues', true), more('risks', 'Risk Register', 'سجل المخاطر', 'risks', false),
   more('change_control', 'Change Control', 'ضبط التغيير', 'change_control', true), more('readiness_handover', 'Readiness & Handover', 'الجاهزية والتسليم', 'readiness', true),
   more('as_built', 'As-Built', 'كما نُفّذ', 'as_built', true, ['cw_part', 'te_part']), meetings,
-  more('rf_design', 'RF Design', 'تصميم RF', 'rf_design', true), more('acquisition', 'Acquisition', 'الاستحواذ', 'acquisition', true), dismantle, carDispatcher, financialAdvances, incidents, lessonsLearned,
+  more('rf_design', 'RF Design', 'تصميم RF', 'rf_design', true), more('acquisition', 'Acquisition', 'الاستحواذ', 'acquisition', true), dismantle, carDispatcher, financialAdvances, incidents, lessonsLearned, invoices,
 ];
 /** The template of each register (contract 0.7.0: one `TPL-*` per register, issued by the database). Only these four have a sample upload in the mock. */
 export const REGISTER_TEMPLATES: Record<string, RegisterKey> = { 'TPL-PROCUREMENT': 'procurement', 'TPL-GECOL': 'gecol', 'TPL-HLC': 'hlc', 'TPL-PERMITS': 'permits_hse' };
@@ -214,6 +232,7 @@ export const TEMPLATE_OF_REGISTER: Record<string, string> = {
   procurement: 'TPL-PROCUREMENT', contractors: 'TPL-CONTRACTORS', rf_design: 'TPL-RF', acquisition: 'TPL-ACQUISITION', gecol: 'TPL-GECOL', hlc: 'TPL-HLC', permits_hse: 'TPL-PERMITS', warehouse: 'TPL-WAREHOUSE',
   quality: 'TPL-QUALITY', issues: 'TPL-ISSUES', risks: 'TPL-RISKS', change_control: 'TPL-CHANGES', readiness_handover: 'TPL-READINESS', as_built: 'TPL-AS-BUILT', meetings: 'TPL-MEETINGS', dismantle: 'TPL-DISMANTLE',
   lessons_learned: 'TPL-LESSONS-LEARNED',
+  invoices: 'TPL-INVOICES',
   incidents: 'TPL-INCIDENTS',
 };
 
