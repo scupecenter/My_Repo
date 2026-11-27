@@ -436,9 +436,12 @@ export function HeaderRow({
 export function ColumnMenu({
   api,
   label,
+  density = true,
 }: {
   api: TableApi;
   label: (id: string) => string;
+  /** P4: false on a screen with the Layout panel, where Display > Density is the one place for it */
+  density?: boolean;
 }) {
   const { t } = useTranslation();
   const ico = "btn px-1.5 py-1";
@@ -527,24 +530,24 @@ export function ColumnMenu({
               );
             })}
           </ul>
-          <div
-            className="mt-3 flex items-center gap-2 border-t border-line pt-3"
-            role="radiogroup"
-            aria-label={t("table.density")}
-          >
-            {(["comfortable", "normal", "compact"] as const).map((d) => (
-              <button
-                key={d}
-                type="button"
-                role="radio"
-                aria-checked={api.density === d}
-                data-testid={`density-${d}`}
-                className={`btn ${api.density === d ? "bg-accentSoft text-accentText" : ""}`}
-                onClick={() => api.setDensity(d)}
-              >
-                {t(`table.${d}`)}
-              </button>
-            ))}
+          <div className="mt-3 flex items-center gap-2 border-t border-line pt-3">
+            {density && (
+              <div className="flex items-center gap-2" role="radiogroup" aria-label={t("table.density")}>
+                {(["comfortable", "normal", "compact"] as const).map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    role="radio"
+                    aria-checked={api.density === d}
+                    data-testid={`density-${d}`}
+                    className={`btn ${api.density === d ? "bg-accentSoft text-accentText" : ""}`}
+                    onClick={() => api.setDensity(d)}
+                  >
+                    {t(`table.${d}`)}
+                  </button>
+                ))}
+              </div>
+            )}
             <button
               type="button"
               className="btn ms-auto"

@@ -47,3 +47,6 @@ V2–V10 قرارات لاحقة بـ PRs مستقلة: التقويم، الر�
 ## الدفعة الثانية (PR2، نفس اليوم)
 
 اللوحة عمّت بقية الشاشات التي كانت على قائمة العرض أو مفتاح الكثافة: صفحة الموقع (مبدّل القائمة/الجدول الزمني دخل اللوحة في وضعي الجدول والجدول الزمني معًا، بنفس المعرّفات `site-layout-list`/`site-layout-timeline`)، الموافقات، عملي (مبدّل القائمة/اللوحة يبقى خارج اللوحة حتى V7)، الخطة اليومية (مفتاح الكثافة صار اللوحة وربح الجدول `displayAttrs` لتعمل خيارات الحجم والمحاذاة والالتفاف)، وأرشيف المكتبة. `DisplayMenu` و`DensityToggle` حُذفا نهائيًا: لا مرجع ثانيًا للوحة غير `LayoutPanel`.
+
+## P4: one place for density
+`ColumnMenu` takes `density` (default true). Screens that carry the Layout panel (Sites, Register vertical, My Work, Daily Plan, Archive, TaskGrid) pass `density={false}`: Display > Density in the panel is the only control. Screens without the panel (StandardTable users, Audit log, System log, Field changes) keep the Columns-menu density until they get the panel (item d).

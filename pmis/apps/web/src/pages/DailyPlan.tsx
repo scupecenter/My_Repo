@@ -148,7 +148,7 @@ export function DailyPlan() {
           <span className="text-sm text-mute" data-testid="daily-plan-count">{t('dailyPlan.count', { count: rows.length })}</span>
           {plans.some((p) => p.can_edit) && <button type="button" className="btn btn-accent" data-testid="daily-plan-add" onClick={() => setAdding(true)}><Plus size={16} aria-hidden />{t('dailyPlan.add_site')}</button>}
           <LayoutPanel testid="daily-plan-layout" table={table} />
-          <ColumnMenu api={table} label={(id) => t(`dailyPlan.col.${id}`)} />
+          <ColumnMenu density={false} api={table} label={(id) => t(`dailyPlan.col.${id}`)} />
           <button type="button" className="btn" data-testid="daily-plan-export" disabled={!progress.data} onClick={doExport}><Download size={16} aria-hidden />{t('dailyPlan.export')}</button>
           <button type="button" className="btn" data-testid="daily-plan-copy" disabled={!progress.data || !tomorrow.data} onClick={() => void copy()}><ClipboardCopy size={16} aria-hidden />{t('dailyPlan.copy')}</button>
         </span>

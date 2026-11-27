@@ -388,7 +388,7 @@ export function Sites() {
             </label>
           ) : undefined}
           table={asBoard || asMap || asTimeline || asCalendar ? undefined : tbl} />}
-        columns={<ColumnMenu api={tbl} label={label} />}
+        columns={<ColumnMenu density={false} api={tbl} label={label} />}
         exporter={menuTpl ? <TemplateExportMenu testid="sites-tools" exportTestid="sites-export-view" source="sites" filters={viewFilters} columns={SITE_COLUMNS} hasTemplate
           onBlank={() => void downloadTemplate(menuTpl.template_id).then((n) => toast(t('grid.downloaded', { name: n })), (e) => toast(registerErrorMessage(t, e), 'err'))}
           onFilled={() => { if (!nRows) { toast(t('sites.menu_template_none'), 'err'); return; } void downloadTemplate(menuTpl.template_id, { prefill: true, filters: viewFilters }).then((n) => toast(t('grid.downloaded', { name: n })), (e) => toast(registerErrorMessage(t, e), 'err')); }}

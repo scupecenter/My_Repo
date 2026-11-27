@@ -49,7 +49,9 @@ describe('Sites list: prefs, chips, selection', () => {
     expect(screen.getByTestId('col-toggle-code')).toBeDisabled(); // identity column is pinned
     await u.click(screen.getByTestId('col-toggle-scenario'));
     await u.click(screen.getByTestId('col-later-region'));
-    await u.click(screen.getByTestId('density-compact'));
+    await u.click(screen.getByTestId('sites-view')); // P4: density lives in the Layout panel (Display), not in the Columns menu
+    expect(screen.queryByTestId('density-compact')).toBeNull();
+    await u.click(await screen.findByTestId('display-density-compact'));
     await waitFor(() => expect(screen.queryByRole('columnheader', { name: /Scenario/ })).toBeNull());
     expect(screen.getByTestId('sites-scroll').parentElement).toHaveAttribute('data-density', 'compact');
     first.unmount();
