@@ -15,7 +15,7 @@ interface GoalsJson {
 }
 
 /**
- * Goals with automatic progress (contract 0.15.120). The list and the progress need dashboard.view (the sites counted are the ones the caller may
+ * Goals with automatic progress (contract 0.15.150). The list and the progress need dashboard.view (the sites counted are the ones the caller may
  * read, row-level security). The write goes through admin_save_goals: admin.settings edit for all regions, reason, If-Match, audited.
  */
 @Injectable()

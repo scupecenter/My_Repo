@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { login } from './helpers';
 
-// Goals (contract 0.15.120), against the mock layer: EN/light and AR/dark. Settings, Screens, Goals adds a goal and saves it with a reason; the Dashboard
+// Goals (contract 0.15.150), against the mock layer: EN/light and AR/dark. Settings, Screens, Goals adds a goal and saves it with a reason; the Dashboard
 // card Goals then shows it with its progress, and links to the sites list and back to the settings.
 const CASES = [
   { locale: 'en', theme: 'light', title: 'Goals', name: 'On-Air push' },

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-/** PUT /settings/goals body (contract 0.15.120). The database checks the same rules again and answers field errors. */
+/** PUT /settings/goals body (contract 0.15.150). The database checks the same rules again and answers field errors. */
 const goal = z
   .object({
     id: z.string().regex(/^[a-z0-9-]{3,40}$/),
