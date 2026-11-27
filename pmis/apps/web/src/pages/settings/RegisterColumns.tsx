@@ -1,11 +1,12 @@
-import { ArrowDown, ArrowUp, Eye, EyeOff, GripVertical, Pencil, Plus, Trash2, Undo2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Eye, EyeOff, GripVertical, Pencil, Plus, TextCursorInput, Trash2, Undo2 } from 'lucide-react';
 import { InlineCell } from '@/components/InlineCell';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useColumnImpact, useDeleteColumn, useDeleteSection, useRegisterColumns, useRenameRegister, useReorderColumns, useSaveSection, useUpdateColumn } from '@/api/registerColumns';
+import { useColumnImpact, useDeleteColumn, useDeleteSection, useRegisterColumns, useRenameRegister, useReorderColumns, useSaveSection, useSetColumnDefault, useUpdateColumn } from '@/api/registerColumns';
 import { useRegisterDefs } from '@/api/registers';
 import type { RegisterColumn, RegisterColumnPatch, RegisterColumnType, RegisterSection } from '@/api/types';
+import { FieldInput, showValue } from '@/components/RegisterFields';
 import { ColumnDialog, type Place } from '@/components/ColumnDialog';
 import { errText, FormDialog } from '@/components/FormDialog';
 import { useToast } from '@/components/Toast';
@@ -14,7 +15,10 @@ import { isStreamKey, STREAM_MENUS, STREAM_PREFIX, StreamColumns, type StreamMen
 
 type Dlg =
   | { k: 'add'; place?: Place } | { k: 'edit'; c: RegisterColumn } | { k: 'delete'; c: RegisterColumn } | { k: 'react'; c: RegisterColumn }
-  | { k: 'section'; s?: RegisterSection } | { k: 'section-del'; s: RegisterSection } | { k: 'rename' };
+  | { k: 'section'; s?: RegisterSection } | { k: 'section-del'; s: RegisterSection } | { k: 'rename' } | { k: 'default'; c: RegisterColumn };
+
+/** 0.15.103: the column types that can carry a default value (the database refuses the others). */
+const DEFAULTABLE = ['text', 'long_text', 'email', 'phone', 'link', 'number', 'currency', 'percentage', 'date', 'yes_no', 'list', 'multi_list'];
 
 /** Settings, register columns (contract 0.15.13): the admin adds, edits, orders, hides and removes the columns, sections and name of a register. */
 export function RegisterColumns() {
@@ -82,6 +86,9 @@ function RegisterColumnsOf() {
   const key = sp.get('register') || 'gecol';
   const setKey = (k: string) => setSp({ register: k }, { replace: true });
   const scr = useRegisterColumns(key);
+  const regDefs = useRegisterDefs();
+  const setDefault = useSetColumnDefault(key);
+  const [dval, setDval] = useState<unknown>('');
   const [dlg, setDlg] = useState<Dlg | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [name, setName] = useState({ en: '', ar: '' });
@@ -161,7 +168,7 @@ function RegisterColumnsOf() {
           <table className="w-full text-sm" data-testid="regcols-table">
             <thead className="text-mute"><tr>
               <th className="p-2 text-start">{t('regcols.code')}</th><th className="p-2 text-start">{t('regcols.label_en')}</th><th className="p-2 text-start">{t('regcols.type')}</th>
-              <th className="p-2 text-start">{t('regcols.section')}</th><th className="p-2 text-start">{t('regcols.usage')}</th><th className="p-2 text-start">{t('lists.status')}</th><th className="p-2" />
+              <th className="p-2 text-start">{t('regcols.section')}</th><th className="p-2 text-start">{t('regcols.default_value')}</th><th className="p-2 text-start">{t('regcols.usage')}</th><th className="p-2 text-start">{t('lists.status')}</th><th className="p-2" />
             </tr></thead>
             <tbody>
               {fields.map((c, i) => (
@@ -175,6 +182,19 @@ function RegisterColumnsOf() {
                     ? <InlineCell kind="select" value={c.type} display={t(`regcols.type_${c.type}`)} options={SIMPLE.map((x) => ({ value: x, label: t(`regcols.type_${x}`) }))} label={t('regcols.type')} testid={`regcols-cell-type-${c.code}`} onCommit={(v) => saveCol(c, { field_type: v as RegisterColumnType })} />
                     : t(`regcols.type_${c.type}`)}</td>
                   <td className="p-2"><InlineCell kind="select" value={c.section ?? ''} display={secName(c.section)} options={[{ value: '', label: '—' }, ...sections.map((x) => ({ value: x.name_en, label: (lang === 'ar' && x.name_ar) || x.name_en }))]} label={t('regcols.section')} testid={`regcols-cell-section-${c.code}`} onCommit={(v) => saveCol(c, { section: v || null })} /></td>
+                  <td className="p-2" data-testid={`regcols-default-${c.code}`}>
+                    {(() => { const rf = regDefs.data?.find((d) => d.register_key === key)?.fields.find((x) => x.code === c.code);
+                      const dv = (c as { default_value?: unknown }).default_value;
+                      return (
+                        <span className="inline-flex items-center gap-1">
+                          <span className={dv == null ? 'text-mute' : ''}>{dv == null || !rf ? '—' : showValue(rf, dv, lang, t)}</span>
+                          {c.is_active && DEFAULTABLE.includes(c.type) && rf && !rf.read_only
+                            ? <button type="button" className="btn btn-ghost p-1" data-testid={`regcols-default-edit-${c.code}`} aria-label={t('regcols.default_edit', { code: c.code })} title={t('regcols.default_edit', { code: c.code })}
+                                onClick={() => { setDval(dv ?? ''); setDlg({ k: 'default', c }); }}><TextCursorInput size={14} /></button>
+                            : null}
+                        </span>
+                      ); })()}
+                  </td>
                   <td className="p-2">{c.usage?.records_with_value ?? 0}</td>
                   <td className="p-2">{c.is_active ? t('regcols.active') : t('regcols.inactive')}</td>
                   <td className="whitespace-nowrap p-2 text-end">
@@ -202,6 +222,20 @@ function RegisterColumnsOf() {
         onSubmit={(reason) => dlg?.k === 'delete' && void run(async () => { const r = await del.mutateAsync({ code: dlg.c.code, reason }); toast(r.mode === 'deleted' ? t('regcols.deleted') : t('regcols.deactivated')); }, '')}>
         {impact.isLoading && <p className="text-mute">{t('common.loading')}</p>}
         {impact.data && <p data-testid="column-delete-mode">{impact.data.delete_mode === 'hard' ? t('regcols.delete_hard') : t('regcols.delete_deactivate', { count: impact.data.usage.records_with_value ?? 0 })}</p>}
+      </FormDialog>
+
+      <FormDialog inline open={dlg?.k === 'default'} onClose={close} testid="column-default" title={dlg?.k === 'default' ? t('regcols.default_title', { code: dlg.c.code }) : ''} error={err} busy={setDefault.isPending}
+        onSubmit={(reason) => dlg?.k === 'default' && void run(() => setDefault.mutateAsync({ code: dlg.c.code, version: dlg.c.version, value: dval === '' || dval === undefined ? null : dval, reason }), t('regcols.saved'))}>
+        {(() => {
+          const rf = dlg?.k === 'default' ? regDefs.data?.find((d) => d.register_key === key)?.fields.find((x) => x.code === dlg.c.code) : undefined;
+          return (
+            <div className="space-y-2">
+              <p className="text-sm text-mute">{t('regcols.default_note')}</p>
+              {rf ? <FieldInput field={{ ...rf, read_only: false }} value={dval} onChange={setDval} /> : null}
+              <button type="button" className="btn btn-ghost text-sm" data-testid="column-default-clear" onClick={() => setDval('')}>{t('regcols.default_clear')}</button>
+            </div>
+          );
+        })()}
       </FormDialog>
 
       <FormDialog inline open={dlg?.k === 'react'} onClose={close} testid="column-react" title={dlg?.k === 'react' ? t('regcols.reactivate', { code: dlg.c.code }) : ''} error={err} busy={upd.isPending}

@@ -423,6 +423,7 @@ export const REAL_API_AUTH_USERS = [
   ['put', '/registers/:key/fields-order'],
   ['get', '/registers/:key/fields/:code/impact'],
   ['patch', '/registers/:key/fields/:code'],
+  ['put', '/registers/:key/fields/:code/default'],
   ['delete', '/registers/:key/fields/:code'],
   ['post', '/registers/:key/sections'],
   ['patch', '/registers/:key/sections/:id'],

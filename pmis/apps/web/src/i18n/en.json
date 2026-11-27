@@ -2066,7 +2066,9 @@
     "inline_undone": "Change undone.",
     "contractor": "Contractor",
     "contractor_company": "Contractor company",
-    "contractor_hint": "Pick from the companies with an active contract. The contract is checked against the scope at submit."
+    "contractor_hint": "Pick from the companies with an active contract. The contract is checked against the scope at submit.",
+    "prefilled": "Prefilled",
+    "prefilled_hint": "Filled from the default set in Settings; change it if it does not apply."
   },
   "regErrors": {
     "register_locked": "This is locked: only a System Admin can change it until it is unlocked.",
@@ -4241,7 +4243,12 @@
     "add_impact_tpl": "Impact: a new version of the register template is issued with this column. Files made from the old template still upload; the new column stays empty in them. Existing records keep this column empty until filled.",
     "add_impact": "Impact: existing records keep this column empty until filled. It is not in the template, so no new template version is issued.",
     "move_up": "Move {{code}} up",
-    "move_down": "Move {{code}} down"
+    "move_down": "Move {{code}} down",
+    "default_value": "Default",
+    "default_edit": "Default value of {{code}}",
+    "default_title": "Default value of {{code}}",
+    "default_note": "Prefilled on a new record and shown as prefilled; the person can change it. The server never fills it in by itself (imports and API calls are unchanged).",
+    "default_clear": "Clear the default"
   },
   "lists": {
     "colour": "Colour",
