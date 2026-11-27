@@ -116,11 +116,12 @@ const USER_SELECT = Prisma.sql`u.id::text AS id, u.email, u.display_name, trim(u
   m.id::text AS manager_id, m.display_name AS manager_name, trim(m.employee_id) AS manager_employee_id,
   dp.id::text AS dept_id, dp.code AS dept_code, dp.name_en AS dept_name_en, dp.name_ar AS dept_name_ar,
   u.deleted_at, u.delete_reason, dby.id::text AS deleted_by_id, dby.display_name AS deleted_by_name, trim(dby.employee_id) AS deleted_by_employee_id`;
-const USER_FROM = Prisma.sql`FROM users u LEFT JOIN LATERAL auth_local_lookup(u.email) l ON true
+const USER_JOINS = Prisma.sql`LEFT JOIN LATERAL auth_local_lookup(u.email) l ON true
   LEFT JOIN LATERAL auth_totp_state(u.id) tf ON true
   LEFT JOIN LATERAL idm_mfa_exemption_state(u.id) mx ON true
   LEFT JOIN users m ON m.id = u.manager_id LEFT JOIN departments dp ON dp.id = u.department_id
   LEFT JOIN users dby ON dby.id = u.deleted_by`;
+const USER_FROM = Prisma.sql`FROM users u ${USER_JOINS}`;
 
 export const toUserDto = (r: UserDbRow): UserDto => ({
   id: r.id,
@@ -285,8 +286,12 @@ export class UsersRepo {
     if (filter.adv) where.push(Prisma.sql`(${filter.adv})`);
     const base = Prisma.join(where, ' AND ');
     const page = after ? Prisma.sql`AND (u.display_name, u.id::text) > (${after[0]}, ${after[1]})` : Prisma.empty;
-    const rows = await this.db.tx.$queryRaw<UserDbRow[]>(Prisma.sql`SELECT ${USER_SELECT} ${USER_FROM}
-      WHERE ${base} ${page} ORDER BY u.display_name, u.id::text LIMIT ${limit + 1}`);
+    // Page the user rows first and join the per-row lookups (sign-in, 2FA, MFA exemption) for that page only: the filters only
+    // reference users u (the count below runs on users alone), so the result and the sort are the same, but the cost no longer grows
+    // with the total number of users.
+    const rows = await this.db.tx.$queryRaw<UserDbRow[]>(Prisma.sql`SELECT ${USER_SELECT}
+      FROM (SELECT u.* FROM users u WHERE ${base} ${page} ORDER BY u.display_name, u.id::text LIMIT ${limit + 1}) u
+      ${USER_JOINS} ORDER BY u.display_name, u.id::text`);
     const total = await this.db.tx.$queryRaw<{ n: bigint }[]>(Prisma.sql`SELECT count(*) AS n FROM users u WHERE ${base}`);
     return { rows: rows.map(toUserDto), total: Number(total[0]?.n ?? 0) };
   }
