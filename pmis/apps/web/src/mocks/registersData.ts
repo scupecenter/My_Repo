@@ -171,13 +171,30 @@ export const financialAdvances: RegisterDefinition = {
     F('returned_amount', 'Returned (LYD)', 'المرتجع (د.ل)', 'number', 'Settlement'), F('settlement_note', 'Settlement note', 'ملاحظة التسوية', 'text', 'Settlement'),
   ],
 };
+// Owner approval 2026-11-26 (migration 0183): Incidents & Security, one register for safety incidents, near-misses and security events.
+export const incidents: RegisterDefinition = {
+  register_key: 'incidents', name_en: 'Incidents & Security', name_ar: 'الحوادث والأمن', module_key: 'incidents', site_scoped: true, multiple_per_site: true, approval_levels: 2,
+  fields: [
+    F('incident_date', 'Incident Date', 'تاريخ الحادث', 'date', 'Incident', { required: true, in_list: true }),
+    F('incident_type', 'Type', 'النوع', 'list', 'Incident', { required: true, in_list: true, options: ['Safety Incident', 'Near-Miss', 'Theft', 'Vandalism', 'Damaged Equipment'] }),
+    F('severity', 'Severity', 'الخطورة', 'list', 'Incident', { required: true, in_list: true, options: ['Minor', 'Moderate', 'Major', 'Critical'] }),
+    F('cause', 'Cause / Reason', 'السبب', 'list', 'Incident', { in_list: true, options: ['Bad Weather', 'Human Error', 'Equipment Failure', 'Unsafe Conditions', 'Other'] }),
+    F('description', 'Description', 'الوصف', 'text', 'Incident', { in_list: true }),
+    F('injured_count', 'Injured (people)', 'الجرحى (العدد)', 'number', 'People and damage', { in_list: true }),
+    F('items_affected', 'Items / Equipment Affected', 'المواد / المعدات المتضررة', 'text', 'People and damage', { in_list: true }),
+    F('root_cause', 'Root Cause', 'السبب الجذري', 'text', 'Resolution'),
+    F('corrective_action', 'Corrective Action', 'الإجراء التصحيحي', 'text', 'Resolution'),
+    F('closed_date', 'Closed Date', 'تاريخ الإغلاق', 'date', 'Resolution', { in_list: true }),
+    F('remark', 'Remark', 'ملاحظات', 'text', 'Remark'),
+  ],
+};
 export const REGISTER_DEFS: RegisterDefinition[] = [
   procurement, contractors, gecol, hlc, permits,
   more('warehouse', 'Warehouse', 'المخزن', 'warehouse', false, ['te_dn', 'cw_dn', 'te_rn', 'cw_rn', 'pl', 'open', 'adj']),
   more('quality', 'Quality', 'الجودة', 'quality', true, ['qc', 'snag', 'itp', 'ncr']), more('issues', 'Issue Log', 'سجل المشاكل', 'issues', true), more('risks', 'Risk Register', 'سجل المخاطر', 'risks', false),
   more('change_control', 'Change Control', 'ضبط التغيير', 'change_control', true), more('readiness_handover', 'Readiness & Handover', 'الجاهزية والتسليم', 'readiness', true),
   more('as_built', 'As-Built', 'كما نُفّذ', 'as_built', true, ['cw_part', 'te_part']), meetings,
-  more('rf_design', 'RF Design', 'تصميم RF', 'rf_design', true), more('acquisition', 'Acquisition', 'الاستحواذ', 'acquisition', true), dismantle, carDispatcher, financialAdvances,
+  more('rf_design', 'RF Design', 'تصميم RF', 'rf_design', true), more('acquisition', 'Acquisition', 'الاستحواذ', 'acquisition', true), dismantle, carDispatcher, financialAdvances, incidents,
 ];
 /** The template of each register (contract 0.7.0: one `TPL-*` per register, issued by the database). Only these four have a sample upload in the mock. */
 export const REGISTER_TEMPLATES: Record<string, RegisterKey> = { 'TPL-PROCUREMENT': 'procurement', 'TPL-GECOL': 'gecol', 'TPL-HLC': 'hlc', 'TPL-PERMITS': 'permits_hse' };
@@ -186,6 +203,7 @@ export const STREAM_TEMPLATES: Record<string, 'DESIGN_ACQ' | 'CW' | 'TE' | 'CLOS
 export const TEMPLATE_OF_REGISTER: Record<string, string> = {
   procurement: 'TPL-PROCUREMENT', contractors: 'TPL-CONTRACTORS', rf_design: 'TPL-RF', acquisition: 'TPL-ACQUISITION', gecol: 'TPL-GECOL', hlc: 'TPL-HLC', permits_hse: 'TPL-PERMITS', warehouse: 'TPL-WAREHOUSE',
   quality: 'TPL-QUALITY', issues: 'TPL-ISSUES', risks: 'TPL-RISKS', change_control: 'TPL-CHANGES', readiness_handover: 'TPL-READINESS', as_built: 'TPL-AS-BUILT', meetings: 'TPL-MEETINGS', dismantle: 'TPL-DISMANTLE',
+  incidents: 'TPL-INCIDENTS',
 };
 
 export type MockRecord = {

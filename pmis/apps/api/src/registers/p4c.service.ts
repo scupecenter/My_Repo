@@ -71,6 +71,22 @@ export class P4cService {
     return { items };
   }
 
+  /** GET /registers/issues/risk-options : the risks an Issue may name as realised (Issues view plus Risks view; the matrix decides the regions). */
+  async issueRiskOptions(auth: AuthContext): Promise<{ items: unknown[] }> {
+    await this.access.requireRegions('issues', 'view');
+    const items = await this.registers.call<unknown[]>(auth, Prisma.sql`SELECT issue_risk_options() AS r`);
+    return { items };
+  }
+
+  /** GET /registers/risks/{entity_id}/issues : the issues that realise one risk. */
+  async riskIssues(auth: AuthContext, entityId: string): Promise<{ items: unknown[] }> {
+    await this.access.requireRegions('risks', 'view');
+    await this.access.requireRegions('issues', 'view');
+    if (!uuidSchema.safeParse(entityId).success) throw problems.validation([{ path: '/entity_id', code: 'invalid', message: 'entity_id is a uuid.' }]);
+    const items = await this.registers.call<unknown[]>(auth, Prisma.sql`SELECT risk_realised_issues(${entityId}::uuid) AS r`);
+    return { items };
+  }
+
   /** GET /registers/procurement/{entity_id}/receipts : the warehouse receipts against an order. */
   async orderReceipts(auth: AuthContext, entityId: string): Promise<{ items: unknown[] }> {
     await this.access.requireRegions('procurement', 'view');
@@ -78,6 +94,15 @@ export class P4cService {
     if (!uuidSchema.safeParse(entityId).success) throw problems.validation([{ path: '/entity_id', code: 'invalid', message: 'entity_id is a uuid.' }]);
     const items = await this.registers.call<unknown[]>(auth, Prisma.sql`SELECT proc_order_receipts(${entityId}::uuid) AS r`);
     return { items };
+  }
+
+  /** GET /registers/{register_key}/{entity_id}/related : the records linked to this one (the database applies the view right of each register and region). */
+  async relatedRecords(auth: AuthContext, key: string, entityId: string): Promise<{ groups: unknown[] }> {
+    if (!/^[a-z][a-z0-9_]{0,63}$/.test(key)) throw problems.validation([{ path: '/register_key', code: 'invalid', message: 'Not a register key.' }]);
+    if (!uuidSchema.safeParse(entityId).success) throw problems.validation([{ path: '/entity_id', code: 'invalid', message: 'entity_id is a uuid.' }]);
+    await this.access.requireRegions(key, 'view');
+    const groups = await this.registers.call<unknown[]>(auth, Prisma.sql`SELECT record_related(${key}::text, ${entityId}::uuid) AS r`);
+    return { groups };
   }
 
   /** POST /registers/hlc/legacy-migration: the preview (dry_run) or the run (reason and step-up). */
