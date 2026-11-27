@@ -1,5 +1,5 @@
--- 0216_related_records: one reader that lists the records linked to a register record, in both directions (item 14 of the 2026-11-26 relations review).
--- Mirror: db/sql/215_related_records.sql (kept identical to prisma/migrations/0216_related_records/migration.sql).
+-- 0324_related_records: one reader that lists the records linked to a register record, in both directions (item 14 of the 2026-11-26 relations review).
+-- Mirror: db/sql/323_related_records.sql (kept identical to prisma/migrations/0324_related_records/migration.sql).
 --
 --   Registers feed each other through id fields in `data` (the relations map, section 3). This function reads those links so a record page can show
 --   "what this record points to" and "what points to this record" without any new stored value. Read only, additive: no table, no data, no permission change.

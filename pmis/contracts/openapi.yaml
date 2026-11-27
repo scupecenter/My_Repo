@@ -31,7 +31,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
-    - 0.15.134 (2026-11-27): related records of a register record (migration 0216; CHANGELOG RelatedRecords). Additive and read only. New `GET /registers/{register_key}/{entity_id}/related` (`listRelatedRecords`): the current records linked to this record in both directions (`direction` `to`: the record this one names; `from`: records that name this one), grouped by register and link field (procurement order, Procurement request, risk, closing receipt). A group is listed only when the caller holds the view right of that register in that record's region (the responsibility matrix decides); nothing is stored and no permission changes.
+    - 0.15.224 (2026-11-27): related records of a register record (migration 0324; CHANGELOG RelatedRecords). Additive and read only. New `GET /registers/{register_key}/{entity_id}/related` (`listRelatedRecords`): the current records linked to this record in both directions (`direction` `to`: the record this one names; `from`: records that name this one), grouped by register and link field (procurement order, Procurement request, risk, closing receipt). A group is listed only when the caller holds the view right of that register in that record's region (the responsibility matrix decides); nothing is stored and no permission changes.
     - 0.15.130 (2026-11-27): the admin alert `backup_missing` (owner approval relayed 2026-11-26). Additive, migration 0240. When no backup succeeded in the last 24 hours (the System Log rows the data reset reads) a security alert `backup_missing` (default severity high, configurable like the other rules) is raised once per calendar day by the job `backup_check` (every 6 hours) and one System Log row (source `backup_check`) is written. `SecurityAlertRule` and `AlertSeverityMap` gain `backup_missing`. No new endpoint.
     - 0.15.95 (2026-11-27): the admin alert `backup_missing` (owner approval relayed 2026-11-26). Additive, migration 0184. When no backup succeeded in the last 24 hours (the System Log rows the data reset reads) a security alert `backup_missing` (default severity high, configurable like the other rules) is raised once per calendar day by the job `backup_check` (every 6 hours) and one System Log row (source `backup_check`) is written. `SecurityAlertRule` and `AlertSeverityMap` gain `backup_missing`. No new endpoint.
     - 0.15.98 (2026-11-27): the dashboard follow-up sections (owner approval 2026-11-26, dashboard proposals item 1; migration 0230). Additive and read only. New `GET /dashboard/ops` (`getDashboardOps`, `DashboardOps`): the sections that follow the operations beyond F13, each part `available: false` when the caller may not see its module. First section `procurement`: the open orders (order status not one of the closing statuses of the contractor rules, as in `GET /reports/contractor-performance`), the PRs waiting for a PO/WO and the open PO/WOs, each aged in calendar days and bucketed 0-7, 8-14, 15-30, over 30, and the materials position: the receive rate (dispatched against required of `warehouse_site_qty` over the active, not cancelled sites), the count of sites with a shortage line, the top shortage lines with their contractor (the party of the site's newest open order; unattributed when none) and the shortage per contractor. No price is returned (no price is stored on a Procurement record). The dashboard settings catalogue gains the card `ops_procurement`, so the card shows, hides and orders per tab in Settings > Dashboard like every other card. No grant, role or permission change.
@@ -9688,9 +9688,9 @@ paths:
     get:
       tags: [registers]
       operationId: listRelatedRecords
-      summary: The records linked to a register record, in both directions (0.15.134)
+      summary: The records linked to a register record, in both directions (0.15.224)
       description: |
-        0.15.134. Read only. The current, not voided records this record names (`direction` `to`) and the records that name it (`direction` `from`), grouped by register and link field.
+        0.15.224. Read only. The current, not voided records this record names (`direction` `to`) and the records that name it (`direction` `from`), grouped by register and link field.
         Needs the view right of `register_key`; each group is listed only when the caller also holds the view right of the other register in the record's region. A record
         the caller cannot see, or an id with no current record, answers an empty list.
       parameters:
@@ -21944,7 +21944,7 @@ components:
         qty: { type: number }
     RelatedRecordGroup:
       type: object
-      description: '0.15.134. The records linked to a register record through one link field.'
+      description: '0.15.224. The records linked to a register record through one link field.'
       required: [direction, register_key, field, items]
       properties:
         direction: { type: string, enum: [to, from] }

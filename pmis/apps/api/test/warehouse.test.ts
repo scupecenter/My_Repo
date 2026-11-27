@@ -789,7 +789,7 @@ describe("Issue log and Quality order picker (0195)", () => {
   });
 });
 
-describe("related records of a record (0216)", () => {
+describe("related records of a record (0324)", () => {
   it("answers an empty list for a record with no links, refuses a bad key or id, and needs the register view right", async () => {
     const m = await move({ ...doc("pl"), lines: [{ item_id: tower.id, qty: 1 }] });
     expect(m.status, JSON.stringify(m.body)).toBe(201);

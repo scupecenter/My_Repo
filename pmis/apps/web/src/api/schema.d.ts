@@ -6235,8 +6235,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * The records linked to a register record, in both directions (0.15.134)
-         * @description 0.15.134. Read only. The current, not voided records this record names (`direction` `to`) and the records that name it (`direction` `from`), grouped by register and link field.
+         * The records linked to a register record, in both directions (0.15.224)
+         * @description 0.15.224. Read only. The current, not voided records this record names (`direction` `to`) and the records that name it (`direction` `from`), grouped by register and link field.
          *     Needs the view right of `register_key`; each group is listed only when the caller also holds the view right of the other register in the record's region. A record
          *     the caller cannot see, or an id with no current record, answers an empty list.
          */
@@ -16184,7 +16184,7 @@ export interface components {
             lines: number;
             qty: number;
         };
-        /** @description 0.15.134. The records linked to a register record through one link field. */
+        /** @description 0.15.224. The records linked to a register record through one link field. */
         RelatedRecordGroup: {
             /** @enum {string} */
             direction: "to" | "from";

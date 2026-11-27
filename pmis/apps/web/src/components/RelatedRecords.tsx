@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useRelatedRecords } from '@/api/p4c';
 
-/** 0216: the records this record names and the records that name it, read from the link fields (one reader on the server, nothing stored).
+/** 0324: the records this record names and the records that name it, read from the link fields (one reader on the server, nothing stored).
  *  Shown only when there is something to show; a group the caller may not read is not sent. */
 export function RelatedRecords({ registerKey, entityId }: { registerKey: string; entityId: string }) {
   const { t } = useTranslation();

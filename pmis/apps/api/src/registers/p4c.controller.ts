@@ -56,7 +56,7 @@ export class P4cController {
     return this.p4c.orderReceipts(auth, entityId);
   }
 
-  /** 0216: the records linked to this record, in both directions. */
+  /** 0324: the records linked to this record, in both directions. */
   @Get(':register_key/:entity_id/related')
   related(@Auth() auth: AuthContext, @Param('register_key') key: string, @Param('entity_id') entityId: string) {
     return this.p4c.relatedRecords(auth, key, entityId);
