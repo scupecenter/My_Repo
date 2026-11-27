@@ -10,6 +10,6 @@ dashboard.snapshot_weekday and dashboard.every_days are SQL-only settings read b
 - Rules that apply: additive migrations only, no permission widening, hide never delete, Arabic and English everywhere, everything configurable in Settings, no other platform names.
 - PR checklist when built: covered and excluded places with reasons, connections checked (registers, Settings, hub rule D55, gear, links, rights, templates), auto-fill and automation notes, Arabic changelog entry in the PR body (no CHANGELOG.md edit).
 
-## Numbering reserved (verify live against main and open PRs before use)
-- Migration: 0553 / db 552 if a seed or guard change is needed, else none
-- Contract label: 0.15.372
+## Numbering reserved (block 0570-0589 and labels 0.15.430-0.15.449 assigned by the parent, 2026-11-27 21:38; verify live against main and open PRs before use)
+- Migration: 0570 / db 569 only if a guard or seed change is needed
+- Contract label: 0.15.430
