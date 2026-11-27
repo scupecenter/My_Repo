@@ -1205,8 +1205,8 @@
     "section_screens_interface": "Interface",
     "section_screens_goals": "Goals",
     "section_security_newdevice": "New-device code",
-    "section_workflow_coverage": "Matrix coverage",
-    "section_workflow_simulate": "Who approves?"
+    "section_workflow_simulate": "Who approves?",
+    "section_alerts_rules": "Alert rules"
   },
   "scopeMatch": {
     "title": "Team / scope match (Procurement)",
@@ -7116,5 +7116,35 @@
     "rule": "rule",
     "nobody": "Nobody holds this level.",
     "fallback": "Who could act through the admin path:"
+  },
+  "alertRules": {
+    "title": "Alert rules",
+    "note": "General if/then rules, notifications only. The daily job checks each enabled rule and sends one in-app notification per recipient, in their language. A rule never changes a record, a state or a holder.",
+    "col_code": "Code",
+    "col_kind": "Condition",
+    "col_title": "Title",
+    "col_enabled": "Enabled",
+    "empty": "No alert rules yet.",
+    "new": "New rule",
+    "edit": "Edit rule",
+    "code": "Code",
+    "kind": "Condition",
+    "audience": "Audience",
+    "audience_system_admin": "System Admins",
+    "audience_module": "A module's users",
+    "module": "Module",
+    "register": "Register",
+    "state": "State",
+    "days": "Days in the state",
+    "title_en": "Title (English)",
+    "title_ar": "Title (Arabic)",
+    "body_en": "Body (English)",
+    "body_ar": "Body (Arabic)",
+    "link": "Link (optional)",
+    "enabled": "Enabled",
+    "kind_weekly_status_missing": "Weekly status missing",
+    "kind_record_idle": "Record idle in a state",
+    "kind_weekly_status_missing_help": "Fires for every region without a Weekly status update of the current working week. Placeholders: {{region}}.",
+    "kind_record_idle_help": "Fires for every current record of the register in the state for at least the days. Placeholders: {{record}}, {{state}}, {{days}}."
   }
 }
