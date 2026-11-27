@@ -115,7 +115,7 @@ everything. `GET /settings/data-reset/plan?parts=...` (`data_reset_dry_run`) cou
 
 ### Narrowing a scope (migration 0366, contract 0.15.265)
 
-A scope may carry a filter (`scope.narrow`: `regions`, `batches`, `from`, `to`; every given filter must match; days are in Africa/Tripoli, first creation date). It is part of the
+A scope may carry a filter (`scope.narrow`: `regions`, `batches`, `from`, `to`; every given filter must match; days are in the system time zone, first creation date). It is part of the
 `scope_hash` the approver sees and cannot change after the request. `data_reset_narrowable()` lists the parts that accept it: acquisition, car_dispatcher, deliverables,
 dismantle, financial_advances, gecol, hlc, invoices, issues, permits, procurement, readiness, rf_design, risks. The filter is entity-level: it selects whole records, and their satellite
 tables (comments, history, documents) follow the record. car_dispatcher, financial_advances and invoices follow the selected procurement records. `sites`, quality, warehouse,
