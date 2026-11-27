@@ -101,7 +101,7 @@ describe('The workspace logo (0243): PUT/PATCH /settings/identity/logo and GET /
 
   it('refuses a non-admin, a bad type, a missing reason, a stale version and a non-logo key', async () => {
     expect((await upload(plain)).status).toBe(403);
-    const bad = await admin.api.call('put', '/settings/identity/logo').field('reason', 'Owner approval 2026-11-27, item 5').attach('file', Buffer.from('x'), { filename: 'a.txt', contentType: 'text/plain' });
+    const bad = await admin.api.call('put', '/settings/identity/logo').set('If-Match', '*').field('reason', 'Owner approval 2026-11-27, item 5').attach('file', Buffer.from('x'), { filename: 'a.txt', contentType: 'text/plain' });
     expect(bad.status).toBe(422);
     const noReason = await admin.api.call('put', '/settings/identity/logo').attach('file', PNG, { filename: 'logo.png', contentType: 'image/png' });
     expect(noReason.status).toBe(422);
@@ -177,7 +177,7 @@ describe('The logo outside the app (0243): sign-in pages and tab icon, closed by
     expect((await display(plain, true, false, tag)).status).toBe(403);
     expect((await display(admin, 'yes', false, tag)).status).toBe(422);
     expect((await display(admin, true, undefined, tag)).status).toBe(422);
-    expect((await display(admin, true, false, tag, undefined)).status).toBe(422);
+    expect((await display(admin, true, false, tag, '')).status).toBe(422);
     expect((await display(admin, true, false, '"999"')).status).toBe(412);
     expect((await display(admin, true, false)).status).toBe(428);
     expect((await display(admin, false, false, tag)).status).toBe(409);
