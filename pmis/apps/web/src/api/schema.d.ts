@@ -15901,16 +15901,26 @@ export interface components {
             default_tab: "all" | "priority" | "mentions" | "tasks" | "approvals" | "system";
             priority_kinds: ("mention" | "followed_change" | "task_assigned" | "task_returned" | "task_rejected" | "task_approved" | "approval_due" | "reassigned" | "absence_alert" | "idle_task_alert" | "no_holder" | "system")[];
         };
+        /** @description 0.15.251. How the bell opens the notifications. */
+        UiPanel: {
+            /** @enum {string} */
+            mode: "popover" | "side_panel";
+            /** @enum {string} */
+            width: "narrow" | "medium" | "wide";
+            show_tabs: boolean;
+        };
         /** @description 0.15.185. The sections of the interface features setting; every section is complete. */
         UiFeatures: {
             avatars: components["schemas"]["UiAvatars"];
             new_badge: components["schemas"]["UiNewBadge"];
             inbox: components["schemas"]["UiInbox"];
+            panel: components["schemas"]["UiPanel"];
         };
         UiFeaturesPatch: {
             avatars?: components["schemas"]["UiAvatars"];
             new_badge?: components["schemas"]["UiNewBadge"];
             inbox?: components["schemas"]["UiInbox"];
+            panel?: components["schemas"]["UiPanel"];
         };
         UiFeaturesSetting: {
             sections: components["schemas"]["UiFeatures"];

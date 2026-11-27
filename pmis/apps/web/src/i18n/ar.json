@@ -432,6 +432,11 @@
     "carry_do": "ترحيل ({{n}})",
     "carried": "تم ترحيل {{n}} موقع"
   },
+  "panel": {
+    "tab_all": "الكل",
+    "tab_unread": "غير المقروء",
+    "tab_priority": "الأولوية"
+  },
   "common": {
     "search": "بحث",
     "cancel": "إلغاء",
@@ -7114,7 +7119,17 @@
     "inbox_tabs": "إظهار التبويبات في صفحة صندوق الوارد",
     "inbox_default_tab": "التبويب الذي يُفتح أولاً",
     "inbox_priority_kinds": "الأنواع التي تُعدّ ذات أولوية",
-    "inbox_priority_note": "الإشارات والموافقات المنتظرة ذات أولوية افتراضياً."
+    "inbox_priority_note": "الإشارات والموافقات المنتظرة ذات أولوية افتراضياً.",
+    "panel_title": "لوحة الإشعارات",
+    "panel_note": "طريقة فتح الجرس: نافذة صغيرة، أو لوحة تنزلق من الجانب مع تبويبات.",
+    "panel_mode": "يفتح الجرس",
+    "panel_mode_popover": "نافذة صغيرة",
+    "panel_mode_side_panel": "لوحة جانبية",
+    "panel_width": "عرض اللوحة",
+    "panel_width_narrow": "ضيق",
+    "panel_width_medium": "متوسط",
+    "panel_width_wide": "عريض",
+    "panel_tabs": "إظهار التبويبات (الكل، غير المقروء، الأولوية) في اللوحة"
   },
   "related": {
     "change_pending": "تغيير قيد الاعتماد",

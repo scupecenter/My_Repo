@@ -432,6 +432,11 @@
     "carry_do": "Carry over ({{n}})",
     "carried": "{{n}} sites carried over"
   },
+  "panel": {
+    "tab_all": "All",
+    "tab_unread": "Unread",
+    "tab_priority": "Priority"
+  },
   "common": {
     "search": "Search",
     "cancel": "Cancel",
@@ -7046,7 +7051,17 @@
     "inbox_tabs": "Show tabs on the Inbox page",
     "inbox_default_tab": "Tab that opens first",
     "inbox_priority_kinds": "Kinds that count as priority",
-    "inbox_priority_note": "Mentions and approvals waiting are priority by default."
+    "inbox_priority_note": "Mentions and approvals waiting are priority by default.",
+    "panel_title": "Notification panel",
+    "panel_note": "How the bell opens: a small popover, or a panel that slides in from the side with tabs.",
+    "panel_mode": "Bell opens",
+    "panel_mode_popover": "Small popover",
+    "panel_mode_side_panel": "Side panel",
+    "panel_width": "Panel width",
+    "panel_width_narrow": "Narrow",
+    "panel_width_medium": "Medium",
+    "panel_width_wide": "Wide",
+    "panel_tabs": "Show the tabs (All, Unread, Priority) in the panel"
   },
   "related": {
     "change_pending": "Change pending",
