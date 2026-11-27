@@ -76,3 +76,21 @@ export class RegisterColumnsController {
     return this.tag(res, await this.cols.rename(key, ifMatch, body));
   }
 }
+
+/** Migration 0381: switch a whole register on or off and lock it (Settings > Registers). Same gate as the register columns. */
+@Controller('settings/register-state')
+export class RegisterStateController {
+  constructor(private readonly cols: RegisterColumnsService) {}
+
+  @Get()
+  list(): Promise<Json> {
+    return this.cols.states();
+  }
+
+  @Put(':key')
+  async set(@Param('key') key: string, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response): Promise<Json> {
+    const r = await this.cols.setState(key, ifMatch, body);
+    if (typeof r.version === 'number') res.setHeader('ETag', etagHeader(r.version));
+    return r;
+  }
+}

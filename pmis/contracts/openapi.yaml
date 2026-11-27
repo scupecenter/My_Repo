@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.240
+  version: 0.15.155
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -31,8 +31,22 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.330 (2026-11-27): links and relations fixes, part 1 (D58; migration 0407, mirror `db/sql/406_links_fixes.sql`). Additive. `advance_id` of an expense or settlement is checked while the row is in entry (an approved advance of the same site; `unknown_advance`); invoices check `procurement_record_id` (`order_not_found`, `order_other_site`) and gain the optional field `supplier_party_id` (a company of the Contractors list; `unknown_company`; fills `supplier` when it is empty). New `GET /registers/financial_advances/advance-options`, `GET /registers/invoices/order-options` and `GET /registers/invoices/supplier-options` (read only, each needs its own module view). The related-records reader also lists the HLC record <-> Procurement record link. No grant, role or permission change.
+    - 0.15.350 (2026-11-27): two admin alerts for operations (production readiness, item 4; migration 0421, mirror `db/sql/420_ops_alerts.sql`). Additive. `SecurityAlertRule` and `AlertSeverityMap` gain `backup_late` (the database backup check found WAL archiving or a backup late; default severity high; one alert per 6 hours) and `job_failed` (a background job run failed; default medium; one alert per job and day). They use the existing alert channel (bell, and mail to the System Admins by `email_min_severity`); the severity of each is set in Settings like the other rules. `mail.notification_kinds` is unchanged. No grant, role or permission change.
+    - 0.15.156 (2026-11-27): Web Push for field engineers (migration 0256; CHANGELOG WebPush). Additive. (1) `GET /me/push` (`getMyPush`): whether push is on for the server (`enabled`, `public_key`) and how many of the caller's browsers are subscribed. (2) `POST /me/push/subscribe` and `POST /me/push/unsubscribe`: own browsers only; subscribe answers 409 while the server has no VAPID keys. (3) `GET /admin/web-push` (`getAdminWebPush`, System Admin): on or off and the counts. The keys come only from the environment (VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT); with any missing push is off. The push carries no title or body, only a fixed notice that opens the inbox. The bell and the e-mail are unchanged.
+    - 0.15.155 (2026-11-27): search inside uploaded document contents (migration 0255; CHANGELOG DocContentSearch). Additive. (1) `SearchHit` gains the optional `snippet` (documents group only): where the words were found inside the file, else null. (2) `GET /admin/document-search-index` (`getDocumentSearchIndex`): counts of indexed, empty, unsupported, too large, failed and pending files (System Admin). Text is extracted off the request path from clean-scan PDF and DOCX files and is visible only with the documents view right in the file's region.
+    - 0.15.242 (2026-11-27): generic if/then alert rules, notifications only (migration 0342, mirror `db/sql/341_alert_rules.sql`; CHANGELOG AlertRules; item 13 of the 2026-11-27 PM-platforms research). Additive. A System Admin manages the rules in Settings: `GET /settings/alert-rules` (the rules plus the closed catalogues the form offers), `POST /settings/alert-rules`, `PUT /settings/alert-rules/{id}` (If-Match, a reason, audited `alert_rule_create`/`alert_rule_update`). A rule is a closed condition kind with closed params (`weekly_status_missing`: the regions without a Weekly status update of the current working week; `record_idle` `{register_key, state, days}`: the current records of the register in the state for at least days), a closed audience (`system_admin`, or `module` with a module key: the users whose assignment reaches the module) and a title/body template in English and Arabic with placeholders. The daily job fires the enabled rules: one in-app notification per recipient, deduped by (rule, period, target), in the recipient's language; a rule never changes a record, a state or a holder. `NotificationKind` gains `alert_rule` (in-app only).
+    - 0.15.310 (2026-11-27): every register is downloadable (owner decision D48, 2026-11-27; no migration; CHANGELOG ExportAllRegisters). Additive. `GET /exports/parts` now also offers `car_dispatcher`, `financial_advances`, `incidents`, `lessons_learned` and `invoices`, and `POST /exports/master` accepts them in `parts` and as `view.source`; the 422 `not_in_master` of 0.15.34 is gone. Each writes its own sheet (Car Dispatcher, Financial Advances, Incidents, Lessons Learned, Invoices) with the register's template columns, header in row 1, no Master column. The rules are the other registers' rules: the export grant of the register's own module (no grant is seeded, so only a System Admin holds them until the owner grants them; Financial Advances and Invoices stay behind the finance grant), the export regions of that grant, voided rows left out of a full export, the field-level `in_export` switch and the personal-column rule. Settings and configuration are never exported. No schema change: `ExportPartKey` already listed the five keys.
+    - 0.15.243 (2026-11-27): field quick capture for QC snags (owner request 2026-11-27; migration 0343; CHANGELOG FieldQuickCapture). Additive. The snag type photo rules `formats` list also accepts WEBM, MP4 and MOV, so a System Admin (or a Document Library configuration delegate) can let a snag type take a short field video through the existing `POST /snags/{snag_id}/photos` path; nothing is allowed by default (every type still lists only its own formats). A video has no EXIF date and is accepted with `unknown_capture_date`, like any photo without EXIF. No permission, visibility or authentication change; the photo rules, the format check and the upload limits are unchanged.
+    - 0.15.248 (2026-11-27): high-contrast mode as an appearance dimension (item 19 of the 2026-11-27 batch, owner approval 2026-11-27 relayed by Main; migration 0347, mirror `db/sql/346_user_contrast.sql`; CHANGELOG HighContrast). Additive. `UiPrefs` gains `contrast` (`standard` = today's look, `high`): a personal choice (`MyProfilePatch.ui_prefs`), an organization default (`UiIdentityInput.defaults`, Settings > Identity), locked like every dimension while `identity.allow_user_choice` is false (403 `field_read_only`, `errors[0]` `{path: /ui_prefs, code: appearance_choice_locked}`), audited per dimension in `profile_updated`, resolved by `ui_effective_prefs`. The web paints `data-ui-contrast="high"`: stronger ink and line tokens only, the status colours and the designs are unchanged; `prefers-contrast: more` applies the high tokens while no choice is saved. No new column, grant, role or default changes.
+    - 0.15.246 (2026-11-27): a soft "… is editing this record" notice (owner request 2026-11-27, item 17 of the 2026-11-27 batch; migration 0345; CHANGELOG RecordEditPresence). Additive and advisory only: nothing is locked. `POST /presence/editing` (`{kind, entity_id}`) is the editor's heartbeat (30 s; a row is stale after 2 minutes), `POST /presence/editing/stop` removes it at once, and `GET /presence/editing` (`kind`, `entity_id`) lists the other current editors of the entity (id, display name, since). Covers register records (kind `record`) and workflow tasks (kind `task`). No grant, role, permission, visibility or audit change.
+
     - 0.15.240 (2026-11-27): intake triage for the Issue Log and the Change Control Log (owner request 2026-11-27; migration 0340, mirror `db/sql/339_register_triage.sql`; CHANGELOG RegisterTriage). Additive. (1) `RegisterDefinition.triage_enabled` (true for `issues` and `change_control`): a record of such a register enters an intake queue (`RegisterRecord.triage.state` `pending`) on every insert, a new version included (the old decision is cleared). (2) New `POST /registers/{register_key}/records/{record_id}/triage` (`triageRegisterRecord`): one decision of the register's Matrix L2 holders of the record's region (a System Admin only when the row has no holder, exactly like an approval): `accept` (the record proceeds to its normal flow), `defer` (stays in the queue, with a note), `reject` (note and step-up required; the record is `voided`) and `merge` (`duplicate_of`, note and step-up; the record is `voided`, links the surviving record `triage.duplicate_of`, and the decision is noted on the surviving record's comment thread). `If-Match` is the record's version; `allowed_actions` gains `triage` while a record is pending or deferred and the caller may decide. `GET /registers/{register_key}/records` takes `triage` (one of `TriageState`). (3) Audited as `register_record_triage` with before and after; `RegisterRecordStep.action` gains `triage_accept`, `triage_reject`, `triage_merge`, `triage_defer`; the creator is notified (`NotificationKind` gains `triage_decision`). No grant, role or default changes.
+    - 0.15.265 (2026-11-27): the project data reset can be narrowed inside a register part (Data entry proposal P1, approved by the owner 2026-11-27; migration 0370, mirror `db/sql/369_data_reset_narrow.sql`). Additive and backward compatible: a request without `narrow` is the whole part as before. `POST /settings/data-reset/requests` takes optional `narrow` (`DataResetNarrow`: `regions`, `batches`, `from`, `to`; every given key must match): the register entities that match go, the others stay with everything that hangs off them (every version of a record, steps, documents and files, comments, drafts, links). The unit is the entity; `from`/`to` are the days the entity was first created (inclusive, Africa/Tripoli); `batches` are import batches the record came from. Only parts whose data follows one register record can be narrowed (`DataResetPart.narrowable`); a narrowing needs chosen parts (not everything) and any other part is 422. A part the chosen one takes along (procurement takes car_dispatcher and financial_advances) loses only the entities linked to the selected procurement records. The narrowing is stored in `DataResetScope.narrow` and bound into `scope_hash`/`approved_scope_hash`: an approver who saw another narrowing is 409 `scope_changed`. `GET /settings/data-reset/plan` takes `regions`, `batches`, `from`, `to` (the dry run of the narrowed scope, `DataResetPlan.narrow`). New `GET /settings/data-reset/narrow-options?part=` lists the regions and the recent import batches of the part for the picker. System Admin only, no delegation.
+    - 0.15.264 (2026-11-27): `GET /custom-fields` and `GET /custom-fields/{field_id}` now have an implementation (they were documented only; the list was always empty). No migration, no schema change. Everyone signed in reads the active fields their field rules do not hide; inactive fields and the role lists are for a System Admin or an all-regions delegate of the custom fields. POST and PATCH stay documented, not built (proposal to follow).
+    - 0.15.226 (2026-11-27): the Deliverables register is enabled (migration 0326; Q71): site-scoped, linked to a task and a gate of the site, with the document and acceptance reference rules. Additive: `deliverables` joins `RegisterKey` and `ExportPartKey` (not in the Master sheet); no new endpoint.
     - 0.15.261 (2026-11-27): mail policy (migration 0364, mirror `db/sql/363_mail_policy.sql`). Additive. New `GET/PUT /settings/mail-policy` (the setting `mail.policy`: global switch, internal only or internal plus external recipients, internal domains, per kind switch and mode). `expiry_radar`, `approval_digest` and `weekly_digest` join the mail kind catalogue (still mailed only when listed in `mail.notification_kinds`). Defaults keep today's behaviour.
+    - 0.15.300 (2026-11-27): Content-Security-Policy report endpoint (SEC-3 of the phase 1 security review; no migration; CHANGELOG CspReport). Additive. New public `POST /csp-report`: browsers post violation reports of the policy nginx sends (report-only by default). Answers 204 with no body, accepts `application/csp-report` and `application/reports+json`, 16 KB at most, 429 above 30 per minute per address. It reads nothing from the database and changes nothing; it logs a short sanitised line. No permission change.
     - 0.15.260 (2026-11-27): cross-register derive (migration 0363, mirror `db/sql/362_derive_rules.sql`; owner approval 2026-11-27). Additive. New `GET/PUT /settings/derive-rules` (the setting `derive.rules`: which value a register shows from another register; If-Match, reason, audited; field errors `unknown_key`, `unknown_register`, `same_register`, `unknown_field`, `duplicate`, `invalid`, `too_many`). `RegisterRecord.derived` carries the derived values of the record by output name; `procurement_contractor` of GECOL and HLC is now the seeded rule and keeps its shape. A derived value is computed on read from the configured source field of the matching source record only (never the record), needs no permission on the source register, is shown only for target records the caller may read, and each person's first read of a rule in 10 minutes is audited (`derive_disclosed`). No grant, role or permission change.
     - 0.15.225 (2026-11-27): Change Control names the order and the task it affects (migration 0325; CHANGELOG ChangeControlAffected). Additive. New optional fields `procurement_order_id` (an approved, active Procurement order of the same site that the caller may see; 422 `order_not_active`, `order_other_site`, `invalid`) and `affected_task_code` (a task code of the workflow; 422 `unknown_task`), checked on a version in entry only. New `GET /registers/change_control/order-options` (the order picker; Change Control view plus Procurement view). `GET /registers/{register_key}/{entity_id}/related` also lists the change requests that name an order, so the order shows a change-pending mark. No permission change.
     - 0.15.244 (2026-11-27): list-value colours reach the register fields (item 15 of the improvement research, owner request 2026-11-27; no migration; CHANGELOG ListCellDisplay). Additive. `RegisterField.options[]` (and the child-list column options) gain the optional `colour` of the list value as set in Settings, Lists (#RRGGBB; absent when none). Display only: no permission, visibility, validation or stored-data change; a value keeps storing its code.
@@ -40,6 +54,7 @@ info:
     - 0.15.203 (2026-11-27): the dashboard follow-up sections, quality snags and NCR (owner approval 2026-11-26, dashboard proposals item 6; migration 0304). Additive and read only. `GET /dashboard/ops` gains the section `quality` (`DashboardOpsQuality`): the open snags and NCRs of the in-scope sites, the average closure age of each, and the first-time acceptance rate (the decided inspections whose result is Pass). The section needs the quality view and answers available false without it. The dashboard settings catalogue gains the card `ops_quality`. No grant, role or permission change.
     - 0.15.202 (2026-11-27): the dashboard follow-up sections, contractor and supplier scorecard (owner approval 2026-11-26, dashboard proposals item 5; migration 0303). Additive and read only. `GET /dashboard/ops` gains the section `contractor_scorecard` (`DashboardOpsScorecard`): the aggregate of `GET /reports/contractor-performance`, so the card and the performance screen never disagree - the counts of parties per level, the on-time rectification rate of snags, the average delay days over the delayed parties, the rejection (quality fail) rate, the snag and quality totals, and the five worst parties with their worst figures. No amounts. The section needs the contractors view and answers available false without it. The dashboard settings catalogue gains the card `ops_contractors`. No grant, role or permission change.
     - 0.15.153 (2026-11-27): "My sessions" (no migration; CHANGELOG MySessions). Additive. `GET /me/sessions` (`listMySessions`): the caller's own live sessions (device, sign-in time, last activity, IP, `is_current`); `POST /me/sessions/{session_id}/revoke` (`revokeMySession`) ends one of the caller's own other sessions (404 for anyone else's, 422 `own_session` for the current one); `POST /me/sessions/revoke-others` (`revokeMyOtherSessions`) ends every other session of the caller. Own rows only, no permission and no step-up (it only narrows access); audited and in the security log.
+    - 0.15.138 (2026-11-27): switch a whole register on or off and lock it from Settings (audit item 1 of the relations review; migration 0381). Additive. New paths `GET /settings/register-state` (`listRegisterStates`) and `PUT /settings/register-state/{register_key}` (`setRegisterState`); new schema `RegisterState`. Disabled hides (nothing touched), locked refuses new and changed records with 403 `register_locked` for non-admins; audited; System Admin gate as for the register rename. Existing behaviour is unchanged until an admin uses it.
     - 0.15.136 (2026-11-27): the Invoices register (owner approval 2026-11-27; migrations 0185 and 0380): the supplier and contractor invoices from receipt to payment, linked to the procurement record they bill. Additive. Register key `invoices` in `/registers` and `/registers/{key}` records with its own fields (invoice date, received date, due date, paid date for invoice ages) and the standard two levels, the Dropdown lists InvoiceState and InvoiceKind in Settings, the module `invoices` in the permissions grid (no grant seeded), the nav key, the template TPL-INVOICES, the master-export exclusion, the data reset part, and the order link in the Related-records panel. Existing registers and data are untouched.
     - 0.15.135 (2026-11-27): the Lessons Learned register (owner approval 2026-11-26, C3; migration 0184): one register for the lessons of the project, from an incident, a snag, a delay or any experience, with the recommendation and where it was applied. Additive. Register key `lessons_learned` in `/registers` and `/registers/{key}` records with its own fields and the standard two levels, the Dropdown list LessonCategory in Settings, the module `lessons_learned` in the permissions grid (no grant seeded), the nav key in the catalogue, the template TPL-LESSONS-LEARNED and the master export part. Existing registers and data are untouched.
     - 0.15.201 (2026-11-27): the dashboard follow-up sections, GECOL and HLC readiness (owner approval 2026-11-26, dashboard proposals item 4; migration 0200). Additive and read only. `GET /dashboard/ops` gains the section `gecol_hlc` (`DashboardOpsGecolHlc`) with one part per utility (`DashboardOpsUtilityReadiness`). GECOL: the active, not cancelled sites with the GECOL scope, the powered ones (power_on_date set), the waiting ones aged since the GECOL request date in the buckets 0-7, 8-14, 15-30, over 30 calendar days, the in-scope sites with no GECOL record at all, and the civilly ready but not electrified (the CW PAC, task B13, is approved but the power is not on). HLC: the same over the HLC scope, in service when in_service_date is set, aged since the HLC record's request date or, without one, the PR date of the linked Procurement order, plus the installed lines not yet in service. Each part needs the view right of its register and answers available false without it. The dashboard settings catalogue gains the card `ops_gecol_hlc`. Corrective: `DashboardOpsProcurement.pr_wait` and `po_wait` are documented nullable, as the service has always answered when the caller may not see the Procurement register. No grant, role or permission change.
@@ -59,14 +74,18 @@ info:
     - 0.15.95 (2026-11-27): the admin alert `backup_missing` (owner approval relayed 2026-11-26). Additive, migration 0184. When no backup succeeded in the last 24 hours (the System Log rows the data reset reads) a security alert `backup_missing` (default severity high, configurable like the other rules) is raised once per calendar day by the job `backup_check` (every 6 hours) and one System Log row (source `backup_check`) is written. `SecurityAlertRule` and `AlertSeverityMap` gain `backup_missing`. No new endpoint.
 
     - 0.15.98 (2026-11-27): the dashboard follow-up sections (owner approval 2026-11-26, dashboard proposals item 1; migration 0230). Additive and read only. New `GET /dashboard/ops` (`getDashboardOps`, `DashboardOps`): the sections that follow the operations beyond F13, each part `available: false` when the caller may not see its module. First section `procurement`: the open orders (order status not one of the closing statuses of the contractor rules, as in `GET /reports/contractor-performance`), the PRs waiting for a PO/WO and the open PO/WOs, each aged in calendar days and bucketed 0-7, 8-14, 15-30, over 30, and the materials position: the receive rate (dispatched against required of `warehouse_site_qty` over the active, not cancelled sites), the count of sites with a shortage line, the top shortage lines with their contractor (the party of the site's newest open order; unattributed when none) and the shortage per contractor. No price is returned (no price is stored on a Procurement record). The dashboard settings catalogue gains the card `ops_procurement`, so the card shows, hides and orders per tab in Settings > Dashboard like every other card. No grant, role or permission change.
+    - 0.15.292 (2026-11-27): the central Media gallery (owner decisions GAL-1 and LIB-1, 2026-11-27; migration 0396, mirror `db/sql/395_media_gallery.sql`). Additive. New `GET/PUT /media/settings` (setting `media.gallery`; read by every signed-in user, changed by a System Admin or an all-regions delegate of `settings` edit with a reason, a step-up and If-Match, audited `media_gallery_update`), `GET /media/items` (keyset page of the images of `document_files` and `snag_photos` that the caller may already see, with filters), `GET /media/facets` and `GET /media/items/{kind}/{id}/thumbnail` (made on first request, kept beside the original; 404 for an item the caller may not see). No new table and no new storage: the gallery reads the owning slot's rows, so visibility is the slot's (Documents view in the region, the register's module, and the Quality module for a snag photo). A withdrawn or rejected item is hidden, never deleted. New `ErrorCode` values `thumbnail_unsupported`, `thumbnails_unavailable`. No permission, visibility or authentication change.
     - 0.15.97 (2026-11-27): the sign-in page settings (owner request 2026-11-26; migration 0197). Additive. New `GET/PUT /settings/login-page` (`getLoginPage`, `setLoginPage`; setting `ui.login_page`): the sign-in page announcement (English and Arabic, kind info or maintenance, both texts empty hides it), the background animation switch, the default language of the signed-out pages and up to five support links ({label_en, label_ar, url}; http(s) or mailto only). Every signed-in user reads the state (the post-login splash shows `server_version` from it); a System Admin or a delegate of `settings` edit for all regions changes it with a reason, a step-up and If-Match (audited `login_page_update`, before and after). New `GET /settings/login-page/public` (`getLoginPagePublic`, no session): ONLY what the sign-in page renders (announcement, animation, default_locale, support_links) - no version, no audit data, nothing about users; cached 30 seconds and rate limited per address. No permission, visibility or authentication change.
     - 0.15.96 (2026-11-27): responsibility-matrix coverage screen (CHANGELOG MatrixCoverage; no migration). Additive and read only. `GET /matrix/coverage` (`getMatrixCoverage`, System Admin or an all-region delegate of the matrix): for each active stage and enabled register row and each of the seven regions, whether the matrix cell has an actor, so empty cells show before a task or record stalls. Settings > Workflow > Coverage.
+    - 0.15.241 (2026-11-27): region health on the dashboard and the Weekly status page (owner request 2026-11-27, item 12 of the 2026-11-27 batch; migration 0341, mirror `db/sql/340_region_health.sql`; CHANGELOG RegionHealth). Additive. New `GET /status-updates/region-health` (`getRegionHealth`): one row per region the caller may view on `sites` (all seven when unrestricted), with the current working week's region update of the Weekly status (`health`, `summary`, `author`, `updated_at`) or `missing_update` true when the region has not posted this week; read only. The dashboard card catalogue gains `region_health` ("Region health"), shown at the end of a tab until the tab layout names it (migration 0108 rule). No table, no permission change.
     - 0.15.95 (2026-11-27): Issue log and Quality record link to a Procurement order (migration 0195; CHANGELOG IssueQualityOrderLink). Additive. New optional field `procurement_order_id` on `issues` and `quality`; when set, the contractor (`external_party`) is taken from the order (a different typed `external_party_id` is refused, 422 `contractor_from_order`; `order_not_active`, `order_other_site`, `invalid`), so the contractor performance view sees the issue and the inspection. `GET /registers/issues/order-options` and `GET /registers/quality/order-options` list the orders (own module view plus Procurement view).
+    - 0.15.311 (2026-11-27): the Data hub (owner approval 2026-11-27; migration 0400, mirror `db/sql/399_data_hub.sql`; CHANGELOG DataHub). Additive: new `GET /data-hub/summary` (batches waiting for the caller, recent template changes, the caller's last template downloads; read only, same visibility as the batch list and the template catalogue); `UiFeatures` and `UiFeaturesPatch` gain `data_hub` (`UiDataHub`: widget switches, the Uploads & batches badge, the default view of each hub list). A stored value without the section takes the seed. No permission change.
     - 0.15.251 (2026-11-27): the notification panel joins `ui.features` as the section `panel` (migration 0282, mirror `db/sql/281_ui_panel.sql`; CHANGELOG UiPanel). Additive: `UiFeatures` and `UiFeaturesPatch` gain `panel` (`UiPanel`: `mode` popover or side_panel, `width`, `show_tabs`); a stored value without the section takes the seed (popover). No new path.
     - 0.15.250 (2026-11-27): inbox tabs and priority join `ui.features` as the section `inbox` (migration 0281, mirror `db/sql/280_ui_inbox.sql`; CHANGELOG UiInbox). Additive: `UiFeatures` and `UiFeaturesPatch` gain `inbox` (`UiInbox`: `tabs_enabled`, `default_tab`, `priority_kinds`); a stored value without the section takes the seed. No new path.
     - 0.15.185 (2026-11-27): interface features setting (migration 0280, mirror `db/sql/279_ui_features.sql`; CHANGELOG UiFeatures). Additive. `GET`/`PUT /settings/ui-features`: one guarded setting with a closed object per feature section (`UiFeatures`: `avatars` and `new_badge` now; the inbox, menu, hub and mobile sections of items 6 to 15 are added by later migrations). Read by every signed-in user; written by a System Admin or an all-regions delegate of `admin.settings` with a reason and If-Match, audited.
     - 0.15.230 (2026-11-27): appearance profiles (owner approval 2026-11-27, the improvement proposal items 1-3; migration 0241; CHANGELOG AppearanceProfiles). Additive. (1) `User` and `MyProfile` gain `ui_prefs` (the stored personal appearance choices; `{}` = the organization defaults) and `appearance` (what the user sees: own choices, else the organization defaults; `ui_effective_prefs`). `MyProfile.identity` gains `defaults` (the organization appearance defaults) and `pref_options` (the dimensions with their allowed values). (2) `MyProfilePatch` gains `ui_prefs` (`UiPrefs`, a subset of the dimensions; while `allow_user_choice` is false a value is 403 `field_read_only`, `errors[0]` `{path: /ui_prefs, code: appearance_choice_locked}`); audited per dimension in `profile_updated`. (3) `UiIdentity` gains `defaults` and `pref_options`; `UiIdentityInput` gains optional `defaults` (omitted keeps the current ones). The dimensions: `density`, `font_scale`, `radius`, `motion`, `icon_style`, `menu_style`, `accent` (`UiPrefs`).
     - 0.15.231 (2026-11-27): the personal sidebar (owner approval 2026-11-27, the improvement proposal item 4; migration 0242; CHANGELOG SidebarPrefs). Additive. `UiPrefsSelf` (the `ui_prefs` of `User`, `MyProfile` and `MyProfilePatch`) gains the key `sidebar` (`UiNav`): `hidden` (screens the menu does not show), `order` (their order inside their heading), `badge_style` (full / dot / none), `pins` (at most 20 pinned shortcuts). The organization layout and the permission filter still apply first; the overlay only hides, reorders inside a heading, restyles badges and pins. A `ui_prefs` body without `sidebar` keeps the stored one; while `identity.allow_user_choice` is false a sidebar-only change stays allowed. Audited per key in `profile_updated`.
+    - 0.15.232 (2026-11-27): the workspace logo in the identity (owner approval 2026-11-27, the improvement proposal item 5; migration 0243; CHANGELOG WorkspaceLogo). Additive. The table `ui_assets` keeps small identity images ('logo'); `UiIdentity` gains `logo` (`UiAsset`, null when none was uploaded). `GET /ui/assets/{key}` serves the bytes of an enabled asset to every signed-in user (404 otherwise). A System Admin or a delegate of `settings` edit for all regions uploads with `PUT /settings/identity/logo` (multipart `file` + `reason`, If-Match on the asset version; an upload always enables; audited `ui_asset_update`) and shows or hides it with `PATCH /settings/identity/logo` (`{enabled, reason}`; hiding keeps the row: hide never delete). The logo may also show on the sign-in pages and as the browser tab icon, both OFF by default (owner decision 2026-11-27): `UiAsset` gains `show_on_login` and `use_as_favicon`; `PATCH /settings/identity/logo/display` (`setUiLogoDisplay`, reason, step-up, If-Match, audited `ui_asset_update`) sets them; the public reads `GET /ui/public/identity` and `GET /ui/public/logo/{purpose}` (no session, 30 s cache, rate limited) answer only for an enabled logo whose purpose is on, else null / 404.
     - 0.15.92 (2026-11-27): order picker for the Car dispatcher and Financial advances (CHANGELOG OrderPickersDispatchAdvances). Additive, no migration. `GET /registers/car_dispatcher/order-options` and `GET /registers/financial_advances/order-options` list the approved, active Procurement orders for the field `procurement_record_id` (the same list as the warehouse picker); each needs its own module view, and only orders in regions where the caller also holds the Procurement view right are listed.
     - 0.15.91 (2026-11-26): warehouse receipt to Procurement order link (migration 0181; CHANGELOG WarehouseProcurementLink). Additive. A warehouse receipt (PL or OPEN) may name the approved, active Procurement order it belongs to (`procurement_order_id`); `pr_no`, `po_wo_no` and `order_contractor` are then derived from the order (read only). New `GET /registers/warehouse/order-options` (the picker) and `GET /registers/procurement/{entity_id}/receipts` (the receipts against an order). New 422 codes `receipt_only`, `order_not_active`, `order_other_site`.
     - 0.15.151 (2026-11-27): scheduled recurring Master export (migration 0251; CHANGELOG MasterExportSchedule). Additive. `GET/PUT /exports/schedules` and `DELETE /exports/schedules/{id}` (`listExportSchedules`, `saveExportSchedule`, `deleteExportSchedule`): the caller's own schedules (daily, weekly on a weekday, monthly on day 1 to 28; the whole Master or chosen parts and regions; at most 5). No job runs as a person: `GET /exports/master` (first page) starts the caller's due schedules in the caller's own request through the normal start path, so every grant check applies then; the file appears in the exports list when the owner next opens Exports. A schedule that cannot start records `last_error`.
@@ -149,6 +168,7 @@ info:
     - 0.15.0 (2026-11-07): additive. Field assignments in Procurement, the Car Dispatcher and Financial Advances (owner decisions Q495 to Q516, plan `docs/plans/2026-11-07-assignments-fleet-advances.md`; migration 0076; CHANGELOG 111). (1) Procurement is the assignment: new `ProcScope` values `Survey`, `Acquisition Visit`, `Inspection`, `Maintenance`, `Emergency` (In-House, no PR) and, in the Assignment section of `RegisterRecord.data` (register `procurement`, no Master column, the PR-PO export is unchanged): `members` (rows `{user_id, member_role: supervisor|executor, is_lead}`), `planned_start`, `planned_end`, `actual_end`, `vehicle_required` + `vehicle_not_required_reason`, `advance_required` + `advance_not_required_reason` (a "not required" answer needs its reason: 422 `reason_required` at submit) and the derived read-only `readiness` (`not_ready` is never returned; `awaiting_vehicle`, `awaiting_advance`, `awaiting_both`, `ready_to_mobilize`), `ready_date`, `open_advances_after_close`. (2) Two registers with the generic `/registers/{register_key}/records` endpoints, two levels and their own Matrix rows (empty in the seed): `car_dispatcher` (record types `vehicle`, `booking`; not site-scoped; fields in `docs/spec/registers-and-streams.md` section 3.20; derived `bookable`, `out_of_region`) and `financial_advances` (record types `advance`, `expense`, `settlement`; site-scoped; section 3.21; derived `balance`, `currency` = LYD). Permission modules `car_dispatcher` and `financial_advances`. Neither is part of the Master-format export. (3) Link rule: the L2 approval of a Procurement record with field work opens, in the same transaction and once only, one draft `booking` (when `vehicle_required`) and one draft individual `advance` per member (when `advance_required`). (4) New endpoints: `POST /registers/car_dispatcher/records/{record_id}/extend` (child booking draft), `POST /registers/financial_advances/records/{record_id}/top-up` (child advance draft: top-up and/or extension), `GET /fleet/availability` (bookable vehicles free in a date range), `GET /registers/procurement/records/{record_id}/readiness`. (5) New `ErrorCode` `vehicle_already_reserved` (409): a vehicle is never reserved for overlapping dates (database EXCLUDE constraint). An expense or settlement is never approved by its custodian (403 `self_approval_forbidden`). The amounts of Financial Advances (`requested_amount`, `approved_amount`, `disbursed_amount`, `amount`, `returned_amount`, `balance`) are absent from `data` (with `amounts_hidden: true`) for anyone but Finance, the Project Manager, the custodian and the custodian's manager (Q512); the same projection applies to search, template downloads and document contexts. (6) The workflow tasks `MOB-1` (stage 1), `MOB-2` (stage 2, after B2) and `MOB-5` (stage 5) are added without changing any milestone, gate, weight or existing SLA (`counts_toward_milestone` false, no document; SLA 2 to 3 working days from the L2 approval of the Procurement record, start event `REC:procurement`).
     - 0.15.193 (2026-11-27): download lock categories, slice S1b of the security section (Main relayed the instruction; migration 0293, mirror `db/sql/292_download_locks.sql`). Additive; all three are off by default. New paths `GET` and `PUT /settings/download-locks` (`getDownloadLocks`, `setDownloadLocks`, schemas `DownloadLocks`, `DownloadLocksInput`). System Admin only to change, with a reason, a step-up and `If-Match`, audited `download_locks_update`. A locked category answers 403 `action_forbidden`, `errors[0].code` `download_locked`, on blank template download, single uploaded file download and generated library document download or print. The web also disables every browser-built file (CSV buttons, print) while `disable_export` is on; that part is a UI guard only.
     - 0.15.190 (2026-11-27): admin lock keys, slice S1 of the security section (owner decision 2026-11-27 relayed by Main; migration 0290, mirror `db/sql/289_security_lock_keys.sql`). Additive; both locks are off by default, so nothing changes until a System Admin turns one on. New paths `GET` and `PUT /settings/security-locks` (`getSecurityLocks`, `setSecurityLocks`, schemas `SecurityLocks`, `SecurityLocksInput`). Every signed-in user reads the state; only a System Admin changes it (a `settings` delegate does not), with a reason, a step-up and `If-Match`, audited `security_locks_update`. While `disable_export` is on, every route that hands data out as a file (Master export start and download, document zip start and download, library archive zip, Master-import run report, announcement responses CSV, My Work calendar file, dashboard export, daily plan export, log exports and the activity workbook) answers 403 `action_forbidden` with `errors[0].code` `export_locked`. `block_public_sharing` is the lock a future public-link feature must check (`SecurityLocksService.assertSharingAllowed`, 403 `action_forbidden`, `errors[0].code` `sharing_locked`); there is no public link in the system today. Blank templates and uploaded documents are not exports and stay open.
+    - 0.15.194 (2026-11-27): passkeys (WebAuthn) as an optional alternative second step, slice S4 of the security section (migration 0294, mirror `db/sql/293_passkeys.sql`). Additive and off by default: nothing changes until a System Admin turns it on. New paths `GET`/`PUT /settings/passkeys`, `GET /me/passkeys`, `POST /me/passkeys/register/options`, `POST /me/passkeys/register/verify`, `DELETE /me/passkeys/{id}`, `POST /users/{id}/passkeys/revoke`, `POST /auth/local/2fa/passkey/options`, `POST /auth/local/2fa/passkey`. A passkey is added only by the account holder, next to the authenticator code (an account with two-step verification), with a step-up; it is never forced and never the only way in: the code and its recovery codes keep working. Only public data is stored; a passkey is revoked, never deleted. Needs `APP_BASE_URL` (https) so the relying party is known.
     - 0.15.192 (2026-11-27): new-device email code, slice S3 of the security section (migration 0292, mirror `db/sql/291_new_device_code.sql`). Additive and off by default: nothing changes until a System Admin turns it on. New paths `GET`/`PUT /settings/new-device-code`, `POST /settings/new-device-code/bypass`, `POST /auth/local/2fa/device-code`; `next` of the login answer may be `device_code`. Never applies to two-factor accounts, System Admins (by default) or accounts without email.
     - 0.15.191 (2026-11-27): support access, slice S2 of the security section (migration 0291, mirror `db/sql/290_support_access.sql`). Additive and off by default: nothing changes until a System Admin turns it on. A support grant is an ordinary delegation with limits (allowlisted rights, mandatory expiry, no re-delegation). New paths `GET`/`PUT /settings/support-access`, `GET`/`POST /support-access`, `POST /support-access/{delegation_id}/revoke`, `POST /support-access/revoke-all`.
     - 0.14.6 (2026-11-05): register and stream batches in the background, and the threshold in Settings (technical decision of 2026-11-05 (6), `docs/spec/technical-decisions-2026-11-04.md`; migration 0075; CHANGELOG 108). Additive. (1) `POST /import-batches/{batch_id}/submit` of a register batch (any approved register template) or of a stream batch (TPL-DESIGN-ACQ / -CW / -TE / -CL and the stream parts of a TPL-MASTER file) with more rows to send than `imports.async_rows`, and `POST /import-batches/{batch_id}/decisions` of such a batch with `approve`, `review` or `reject` (all rows or the rows listed) of more rows than the threshold, answer **202** with the batch `processing` and its `progress`, as New sites batches since 0.14.4. Every check of the request is made before the 202: the uploader, If-Match, the state, the notes of a return (422 `note_required`), the authority of the person on at least one of the rows (403 `not_eligible_holder`, nothing queued), the grid right (403), and the step-up when the send can be a self-approval (the sender holds L2 of the register row or of a task of the rows) or when the decision approves (401 `step_up_required`, nothing queued). The rows are then done in chunks (register rows 50, stream rows 25, New sites 25), each committed on its own under the same person, every row checked again by the same functions (holders, levels, documents, gates, snags, the historical-load mark and cutoff); a stream send synchronises the conditional documents of each chunk's tasks inside that chunk. A row that would need a step-up the run does not have is left as it was and counted in `progress.failed` (code `step_up_required`). At the end the batch has its usual status, its one audit row and its notices. A discard and a Save Draft batch's return stay at once (200). (2) `ImportBatchProgress` gains `action` (`approve`, `review`, `reject`; null for a send), `batch_kind` (`site`, `register`, `stream`), `decided`, `held` and `saved`. (3) `POST /master-import/runs/{run_id}/apply`: the staging stays in the request; each staged batch with more rows than the threshold is sent in the background by the same admin and the answer is **202** with the run `applied`, `outcome.batches[].queued` / `job_id` / `rows`, and the new `MasterImportRun.progress` (`MasterImportRunProgress`: the background sends of the run's batches, rows done of rows total); a smaller apply answers 200 as before (`progress` null). (4) `GET /settings/imports` and `PUT /settings/imports` (`ImportsSettings`, `ImportsSettingsInput`): the threshold `async_rows` (default 50, range 10 to 500), who changed it last and when; every signed-in user reads it; a System Admin or a delegate of `settings` edit for all regions changes it with a reason and If-Match (403 `action_forbidden` otherwise; 422 out of range or unknown key; 412 stale; 409 the same value), audited as `imports_async_rows_update` with before and after.
@@ -211,6 +231,7 @@ info:
     - 0.2.1 (2026-10-25): additive. `MatrixAssignee.employee_id` and `user_id`, documented `return_to` allowlist, `ApprovalItem.documents_summary` (ADR 0011).
     - 0.2.0 (2026-10-25): additive. No operation or schema of 0.1 was removed or renamed (ADR 0011).
     - 0.1.0 (2026-10-25): first contract for P1. Breaking changes are recorded in `docs/adr/` (ADR 0001 §6).
+    - 0.15.204 (2026-11-27): the dashboard follow-up sections, pending approvals bottleneck (owner approval 2026-11-26, dashboard proposals item 7; migration 0305). Additive and read only. `GET /dashboard/ops` gains the section `approvals` (`DashboardOpsApprovals`): the tasks waiting for review or approval (states in_review and in_approval, the same population as the Approvals inbox), their ages in calendar days since the level opened, split review against approve, and the same ages grouped by the ball-in-court role so the bottleneck role shows. The section needs the approvals view (and the sites view, like the inbox) and answers available false without them. The dashboard settings catalogue gains the card `ops_approvals`. No grant, role or permission change.
 
     ## Changes since 0.1
     - **Auth**: `GET /auth/login` accepts `identifier` (email, 4-digit employee ID or E.164 phone) and answers 302 the same way whether or not it matches; rate limited (ADR 0002 §9b). Local password sign-in stays deferred and is not in the contract.
@@ -346,6 +367,116 @@ tags:
     description: "Saved views of the list screens, shared with roles, groups, users or everyone (Q117), and the caller's server-side drafts (Q115)."
 
 paths:
+  /me/push:
+    get:
+      tags: [notifications]
+      operationId: getMyPush
+      summary: Web Push status of the caller (own browsers)
+      description: 0.15.156. `enabled` is false until the server has its VAPID keys. `this_browser` is true when the `endpoint` query matches one of the caller's subscriptions.
+      parameters:
+        - { name: endpoint, in: query, required: false, schema: { type: string, maxLength: 2048 } }
+      responses:
+        '200':
+          description: The status.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MyPush'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+  /me/push/subscribe:
+    post:
+      tags: [notifications]
+      operationId: subscribeMyPush
+      summary: Turn on Web Push for the caller's browser
+      description: 0.15.156. A browser that another person used is moved to the caller. 409 while push is not configured on the server.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [endpoint, keys]
+              properties:
+                endpoint: { type: string, format: uri, maxLength: 2048 }
+                keys:
+                  type: object
+                  additionalProperties: false
+                  required: [p256dh, auth]
+                  properties:
+                    p256dh: { type: string, minLength: 10, maxLength: 200 }
+                    auth: { type: string, minLength: 8, maxLength: 100 }
+                user_agent: { type: string, maxLength: 300 }
+      responses:
+        '200':
+          description: Subscribed.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, count]
+                properties:
+                  id: { type: string, format: uuid }
+                  count: { type: integer }
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /me/push/unsubscribe:
+    post:
+      tags: [notifications]
+      operationId: unsubscribeMyPush
+      summary: Turn off Web Push for the caller's browser
+      description: 0.15.156. Own rows only; an endpoint that is not the caller's removes nothing.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [endpoint]
+              properties:
+                endpoint: { type: string, format: uri, maxLength: 2048 }
+      responses:
+        '200':
+          description: Done.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [removed, count]
+                properties:
+                  removed: { type: integer }
+                  count: { type: integer }
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /admin/web-push:
+    get:
+      tags: [notifications]
+      operationId: getAdminWebPush
+      summary: Web Push on or off, with counts (System Admin)
+      description: 0.15.156. 403 for anyone but a System Admin.
+      responses:
+        '200':
+          description: The status.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AdminWebPush'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /admin/document-search-index:
+    get:
+      tags: [documents]
+      operationId: getDocumentSearchIndex
+      summary: Status of the document contents search index (System Admin)
+      description: 0.15.155. Counts of the files whose text is searchable. Indexing runs in the background every few minutes. 403 for anyone but a System Admin.
+      responses:
+        '200':
+          description: The counts.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DocumentSearchIndex'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
   # ------------------------------------------------------------------ auth
   /auth/login:
     get:
@@ -595,6 +726,23 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '422': { $ref: '#/components/responses/Unprocessable' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+  /csp-report:
+    post:
+      tags: [auth]
+      operationId: reportCspViolation
+      summary: Where browsers report Content-Security-Policy violations (SEC-3)
+      description: |
+        Public, because a browser sends the report without the session. Accepts the legacy `application/csp-report` body and the Reporting API list
+        (`application/reports+json`). Logs a short sanitised line and counts per directive in memory; changes nothing. 413 above 16 KB, 429 above 30 per minute per address.
+      security: []
+      requestBody:
+        required: false
+        content:
+          application/csp-report: { schema: { type: object, additionalProperties: true } }
+          application/reports+json: { schema: { type: array, items: { type: object, additionalProperties: true } } }
+      responses:
+        '204': { description: Received. }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
   /auth/local/password-reset/confirm:
     post:
       tags: [auth]
@@ -674,6 +822,58 @@ paths:
               required: [code]
               properties:
                 code: { type: string, pattern: '^[0-9]{6}$' }
+      responses:
+        '200':
+          description: Signed in.
+          headers:
+            Set-Cookie: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Session' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+  /auth/local/2fa/passkey/options:
+    post:
+      tags: [auth]
+      operationId: localPasskeyOptions
+      summary: The passkey challenge for the pending two-step sign-in (0.15.194)
+      description: |
+        Needs the pending sign-in cookie `pmis_2fa` (`next` = `two_factor`). Answers `available` false and `options` null when passkeys are off or the account has none: the page then shows only the code. Otherwise `options` is the WebAuthn request (challenge valid 5 minutes, single use, user verification required). Rate limited (429).
+      x-db-path: auth_passkey_challenge_create
+      security: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: false }
+      responses:
+        '200':
+          description: The options, or none.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PasskeySignInOptions' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+  /auth/local/2fa/passkey:
+    post:
+      tags: [auth]
+      operationId: localPasskeySignIn
+      summary: Second step with a passkey instead of the authenticator code (0.15.194)
+      description: |
+        Needs the pending sign-in cookie. `response` is the browser's WebAuthn assertion. Checked: single-use challenge, origin, relying party, user verification, signature, and a sign counter that moves forward (a replayed or cloned credential is refused). Failure is 401 `invalid_code` and is written to the security log (`two_factor_failed`, `via` passkey). The pending sign-in is single use. On success the session cookie is set, same as the code path.
+      x-db-path: auth_passkey_used
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [response]
+              properties:
+                response: { type: object, additionalProperties: true }
       responses:
         '200':
           description: Signed in.
@@ -6447,6 +6647,19 @@ paths:
         '422': { $ref: '#/components/responses/Unprocessable' }
 
   # ------------------------------------------------------------------ master export
+  /data-hub/summary:
+    get:
+      tags: [templates]
+      operationId: getDataHubSummary
+      summary: The Data hub landing page, in one call (0.15.311)
+      description: 0.15.311. Batches waiting for the caller (count and up to 5, with why each waits), templates whose current version was issued in the last 45 days with the column diff against the version before, and the caller's last download of each template (read from the template_download audit rows of the caller only). Read only. A caller without the templates module sees no batches. The other hub widgets use the endpoints of their own screens.
+      responses:
+        '200':
+          description: The summary.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DataHubSummary'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
   /exports/schedules:
     get:
       tags: [exports]
@@ -8939,6 +9152,74 @@ paths:
         '412': {$ref: '#/components/responses/PreconditionFailed'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /settings/register-state:
+    get:
+      tags: [settings]
+      operationId: listRegisterStates
+      summary: Every register with its enabled and locked state (disabled registers included)
+      x-db-path: reg_state_json
+      description: |
+        0.15.138 (migration 0381). System Admin or a delegate of `fields.edit` for all regions. Disabled registers are listed so they can be switched back on.
+      responses:
+        '200':
+          description: The registers.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/RegisterState' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /settings/register-state/{register_key}:
+    parameters:
+      - $ref: '#/components/parameters/RegisterKeyAny'
+    put:
+      tags: [settings]
+      operationId: setRegisterState
+      summary: Enable, disable and lock or unlock a whole register
+      x-db-path: admin_register_state
+      description: |
+        0.15.138 (migration 0381). Disabling HIDES the register (no record, step, template or history is touched; enabling restores it). Locking keeps it readable
+        but refuses a new record and every change to a record (screen, upload, workflow step, derive, QC snag of the register) with 403 `register_locked`; System
+        Admins, the Settings data reset and the migration role are exempt (like the record and column locks of 0103). A reason is required; the change is audited
+        with before and after. Same gate as renaming a register: no permission is widened.
+      parameters:
+        - { name: If-Match, in: header, required: false, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                enabled: { type: boolean }
+                locked: { type: boolean }
+                reason: { $ref: '#/components/schemas/Reason' }
+      responses:
+        '200':
+          description: The new state.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [register_key, enabled, locked, version]
+                properties:
+                  register_key: { type: string }
+                  enabled: { type: boolean }
+                  locked: { type: boolean }
+                  reason: { type: [string, 'null'] }
+                  changed_at: { type: [string, 'null'], format: date-time }
+                  version: { type: integer }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
   /settings/structural-freeze:
     get:
       tags: [settings]
@@ -9056,12 +9337,34 @@ paths:
         required: false
         description: Comma-separated part codes (for example `issues,risks`).
         schema: {type: string, pattern: '^[a-z_]{2,40}(,[a-z_]{2,40}){0,63}$'}
+      - {name: regions, in: query, required: false, description: '0.15.265. Narrow to these region ids (comma-separated).', schema: {type: string, pattern: '^[0-9]{1,6}(,[0-9]{1,6}){0,49}$'}}
+      - {name: batches, in: query, required: false, description: '0.15.265. Narrow to the records that came from these import batches (comma-separated ids).', schema: {type: string}}
+      - {name: from, in: query, required: false, description: '0.15.265. Narrow to entities first created on or after this day.', schema: {type: string, format: date}}
+      - {name: to, in: query, required: false, description: '0.15.265. Narrow to entities first created on or before this day.', schema: {type: string, format: date}}
       responses:
         '200':
           description: The plan of the scope.
           content:
             application/json:
               schema: {$ref: '#/components/schemas/DataResetPlan'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /settings/data-reset/narrow-options:
+    get:
+      tags: [settings]
+      operationId: getDataResetNarrowOptions
+      summary: What the reset picker offers for narrowing (System Admin only)
+      description: 0.15.265 (migration 0370, `data_reset_narrow_options`). A System Admin acting without delegation. The regions and the 200 most recent import batches of the part (`part`), with their row counts, and the narrowable parts.
+      x-db-path: data_reset_narrow_options
+      parameters:
+      - {name: part, in: query, required: false, schema: {type: string, pattern: '^[a-z_]{2,40}$'}}
+      responses:
+        '200':
+          description: The options.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DataResetNarrowOptions'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '422': {$ref: '#/components/responses/Unprocessable'}
@@ -9132,6 +9435,7 @@ paths:
                   items: {$ref: '#/components/schemas/DataResetPartCode'}
                   description: '0.15.71. The parts to reset (codes of `DataResetState.plan.parts`). Absent: everything as before (every project part, no identity part). The database adds the dependent parts; unknown codes are 422 `validation_failed` (`/parts`, `unknown_part`).'
                 require_backup: {type: boolean, default: true, description: '0.15.72. True (the default, as before): the run needs a successful database backup within `backup_max_age_hours`. False: the run skips only that check; the deleted data cannot be restored from a backup. Bound into `scope_hash`; never changes after the request.'}
+                narrow: {$ref: '#/components/schemas/DataResetNarrow'}
                 no_backup_confirm: {type: string, maxLength: 200, description: '0.15.72. Required when `require_backup` is false: the typed phrase `NO BACKUP` (`DataResetState.no_backup_phrase`; 422 `confirmation_mismatch` at `/no_backup_confirm` otherwise). Ignored when a backup is required.'}
       responses:
         '201':
@@ -9591,6 +9895,319 @@ paths:
         '412': {$ref: '#/components/responses/PreconditionFailed'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /media/settings:
+    get:
+      tags: [media]
+      operationId: getMediaSettings
+      summary: The Media gallery settings (0.15.292)
+      description: Every signed-in user may read them (the gallery screen uses them). `can_edit` is true for a System Admin or an all-regions delegate of `settings` edit. `thumbnails_available` is false when the server cannot make thumbnails (the gallery then shows type icons).
+      x-db-path: media_gallery_state
+      responses:
+        '200':
+          description: The settings.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MediaSettings'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+    put:
+      tags: [media]
+      operationId: setMediaSettings
+      summary: Set the Media gallery settings (reason, step-up, If-Match, audited) (0.15.292)
+      description: A System Admin, or a delegate of `settings` edit for all regions. A reason (3+ characters), a step-up and `If-Match` are required. Unknown keys and invalid values are 422; saving the values in force is 409 `invalid_transition`. Audited `media_gallery_update` with before and after.
+      x-step-up: true
+      x-db-path: admin_set_media_gallery
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/MediaSettingsInput'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MediaSettings'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /media/items:
+    get:
+      tags: [media]
+      operationId: listMediaItems
+      summary: The images the caller may see, newest first (0.15.292)
+      description: |
+        Reads `document_files` (through their slots) and `snag_photos` live; nothing is copied. Visibility is the owning slot's. The scope (kinds, registers, excluded codes,
+        images only) comes from the setting `media.gallery`. `status` is `current` (default), `withdrawn` (only when the setting allows it) or `pending_evidence`.
+        `has_thumbnail` says whether `.../thumbnail` can answer; `link` names the record the item belongs to.
+      parameters:
+      - {name: source, in: query, schema: {type: string, enum: [documents, snags]}}
+      - {name: site_id, in: query, schema: {type: string, format: uuid}}
+      - {name: region_id, in: query, schema: {type: integer}}
+      - {name: register_key, in: query, schema: {type: string}}
+      - {name: doc_code, in: query, schema: {type: string}}
+      - {name: snag_type, in: query, schema: {type: string}}
+      - {name: status, in: query, schema: {type: string, enum: [current, withdrawn, pending_evidence]}}
+      - {name: uploaded_by, in: query, schema: {type: string, format: uuid}}
+      - {name: uploaded_from, in: query, schema: {type: string, format: date}}
+      - {name: uploaded_to, in: query, schema: {type: string, format: date}}
+      - {name: q, in: query, schema: {type: string}}
+      - {name: cursor, in: query, schema: {type: string}}
+      - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200}}
+      responses:
+        '200':
+          description: A page.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MediaItemPage'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /media/facets:
+    get:
+      tags: [media]
+      operationId: getMediaFacets
+      summary: The filter values of the gallery for the caller (0.15.292)
+      responses:
+        '200':
+          description: Document types with images in scope, active snag types, register keys.
+          content:
+            application/json:
+              schema: {type: object}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /media/items/{kind}/{id}/thumbnail:
+    get:
+      tags: [media]
+      operationId: getMediaThumbnail
+      summary: A thumbnail of one gallery item (0.15.292)
+      description: Made from the stored original on the first request (EXIF orientation applied, metadata removed) and kept beside it. 404 when the item is not visible to the caller; 415 `thumbnail_unsupported` for a file type without a thumbnail; 503 `thumbnails_unavailable` when thumbnails are off or the maker is not installed.
+      parameters:
+      - {name: kind, in: path, required: true, schema: {type: string, enum: [document_file, snag_photo]}}
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      - {name: size, in: query, schema: {type: string, enum: [small, medium], default: small}}
+      responses:
+        '200':
+          description: The image (webp or jpeg, as configured).
+          content:
+            image/webp: {schema: {type: string, format: binary}}
+            image/jpeg: {schema: {type: string, format: binary}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /settings/identity/logo:
+    put:
+      tags:
+      - settings
+      operationId: putUiLogo
+      summary: Upload the workspace logo (reason, step-up, If-Match, audited) (0.15.107)
+      description: 'A System Admin, or a delegate of `settings` edit for all regions (403 `action_forbidden` otherwise, also for a delegate limited to some regions). A `reason`
+
+        (3+ characters), a step-up (401 `step_up_required`) and, once a logo exists, `If-Match` on the asset `version` (428 / 412) are required. The body is the
+
+        image: PNG, JPEG, SVG or WebP, 256 KiB at most (422 `errors[0]` `{path: /file}`). An upload always enables the logo and bumps the version. Audited
+
+        `ui_asset_update` with the metadata (never the bytes) before and after.
+
+        '
+      x-step-up: true
+      x-db-path: admin_put_ui_asset
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+              - file
+              - reason
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: 'The logo image: PNG, JPEG, SVG or WebP, 256 KiB at most (422 `errors[0]` `{path: /file}`).'
+                reason:
+                  type: string
+                  minLength: 3
+                  maxLength: 1000
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UiAsset'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+    patch:
+      tags:
+      - settings
+      operationId: setUiLogoEnabled
+      summary: Show or hide the workspace logo (reason, step-up, If-Match, audited) (0.15.107)
+      description: 'Hiding keeps the row and its bytes (hide never delete): the sidebar falls back to the built-in badge until the logo is enabled again. The same rights,
+
+        reason, step-up and If-Match rules as the upload; a missing logo is 422 `errors[0]` `{path: /key, code: not_found}` and saving the state in force is 409
+
+        `invalid_transition`. Audited `ui_asset_update`.
+
+        '
+      x-step-up: true
+      x-db-path: admin_set_ui_asset_enabled
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UiAssetEnabledInput'
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UiAsset'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+  /settings/identity/logo/display:
+    patch:
+      tags: [settings]
+      operationId: setUiLogoDisplay
+      summary: Where the logo shows outside the app, the sign-in pages and the browser tab icon (reason, step-up, If-Match, audited) (0.15.232)
+      description: |
+        Both switches are off until an admin turns one on, so nothing about the logo is public by default. A switch has an effect only while the logo is enabled.
+        Same rights, reason, step-up and If-Match rules as the upload; a missing logo is 422 `errors[0]` `{path: /key, code: not_found}`, saving the values in force is
+        409 `invalid_transition`. Audited `ui_asset_update` with before and after.
+      x-step-up: true
+      x-db-path: admin_set_ui_asset_display
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/UiAssetDisplayInput'}
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/UiAsset'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /ui/public/identity:
+    get:
+      tags: [settings]
+      operationId: getUiPublicIdentity
+      summary: Which public pages show the logo (no session) (0.15.232)
+      description: |
+        No session. Only whether the sign-in pages and the tab icon use the logo, with the version for cache busting; `null` for a purpose that is off (the default). Nothing
+        about users, no audit data. Cached 30 seconds and rate limited per address (429 `rate_limited`).
+      x-db-path: ui_asset_public_state
+      responses:
+        '200':
+          description: The public identity.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/UiPublicIdentity'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /ui/public/logo/{purpose}:
+    get:
+      tags: [settings]
+      operationId: getUiPublicLogo
+      summary: The logo image for the sign-in pages or the tab icon (no session) (0.15.232)
+      description: |
+        No session. The bytes of the enabled logo, only while the admin switched this purpose on; otherwise 404. SVG is served with a sandboxing Content-Security-Policy and
+        `nosniff`. Cached 30 seconds and rate limited per address.
+      x-db-path: ui_asset_public
+      parameters:
+      - {name: purpose, in: path, required: true, schema: {type: string, enum: [login, favicon]}}
+      responses:
+        '200':
+          description: The image.
+          content:
+            image/png: {schema: {type: string, format: binary}}
+            image/jpeg: {schema: {type: string, format: binary}}
+            image/svg+xml: {schema: {type: string, format: binary}}
+            image/webp: {schema: {type: string, format: binary}}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /ui/assets/{key}:
+    get:
+      tags:
+      - settings
+      operationId: getUiAsset
+      summary: The bytes of an enabled identity image (0.15.107)
+      description: Every signed-in user may read it (the logo is the organization identity, not user data). 404 when the key is unknown or the asset is hidden. Cache with the `version` of `UiIdentity.logo` as the query `v`.
+      x-db-path: ui_asset_get
+      parameters:
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^[a-z0-9_]{1,40}$
+      responses:
+        '200':
+          description: The image.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/svg+xml:
+              schema:
+                type: string
+                format: binary
+            image/webp:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
   /settings/login-page:
     get:
       tags: [settings]
@@ -9895,6 +10512,153 @@ paths:
                 required: [revoked]
                 properties:
                   revoked: { type: integer }
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /settings/passkeys:
+    get:
+      tags: [settings]
+      operationId: getPasskeys
+      summary: The passkey setting (0.15.194)
+      description: Every signed-in user reads `enabled` and `ready` (`ready` is false when `APP_BASE_URL` is not an https address, so passkeys cannot be turned on). `updated_by` is shown to a System Admin only. `enabled` is `false` until a System Admin turns it on.
+      x-db-path: passkey_state
+      responses:
+        '200':
+          description: The setting.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PasskeySetting'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+    put:
+      tags: [settings]
+      operationId: setPasskeys
+      summary: Turn passkeys on or off (System Admin, reason, step-up, If-Match, audited) (0.15.194)
+      description: |
+        System Admin only. A reason (3+ characters), a step-up (401 `step_up_required`) and `If-Match` (428 / 412) are required. Turning it on needs `ready` (409 `invalid_transition` otherwise). Saving the value already in force is 409. Turning it off stops the passkey option at sign-in and keeps every passkey row; the authenticator code is never affected. Audited `passkeys_update`.
+      x-step-up: true
+      x-db-path: admin_set_passkeys
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/PasskeySettingInput'}
+      responses:
+        '200':
+          description: The setting now in force.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PasskeySetting'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /me/passkeys:
+    get:
+      tags: [me]
+      operationId: listMyPasskeys
+      summary: My passkeys (0.15.194)
+      description: The caller's own active passkeys (never the key material). `can_add` is true only when the account has two-step verification on and enrolled.
+      x-db-path: passkey_list
+      responses:
+        '200':
+          description: The passkeys.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MyPasskeys'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+  /me/passkeys/register/options:
+    post:
+      tags: [me]
+      operationId: startPasskeyRegistration
+      summary: Start adding a passkey (step-up) (0.15.194)
+      description: A step-up is required (401 `step_up_required`). 409 `invalid_transition` when passkeys are off, not ready, or the account has no two-step verification. The answer is the WebAuthn creation options (attestation none, user verification required); the challenge is valid 5 minutes and single use. Rate limited (429).
+      x-step-up: true
+      x-db-path: auth_passkey_challenge_create
+      responses:
+        '200':
+          description: The WebAuthn creation options.
+          content:
+            application/json:
+              schema: {type: object, additionalProperties: true}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /me/passkeys/register/verify:
+    post:
+      tags: [me]
+      operationId: finishPasskeyRegistration
+      summary: Finish adding a passkey (step-up) (0.15.194)
+      description: A step-up is required. `response` is the browser's WebAuthn attestation, `label` names the passkey (1 to 80 characters). At most 10 active passkeys per account. Audited `passkey_added`. A response that does not verify, or whose challenge was used or expired, is 400 `validation_failed`.
+      x-step-up: true
+      x-db-path: passkey_add
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [label, response]
+              properties:
+                label: { type: string, minLength: 1, maxLength: 80 }
+                response: { type: object, additionalProperties: true }
+      responses:
+        '200':
+          description: The new passkey.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PasskeyItem'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /me/passkeys/{id}:
+    delete:
+      tags: [me]
+      operationId: removeMyPasskey
+      summary: Remove one of my passkeys (step-up) (0.15.194)
+      description: The caller's own passkey only (404 otherwise). The row is kept and marked revoked. Works even when passkeys are off. Audited `passkey_revoked`.
+      x-step-up: true
+      x-db-path: passkey_revoke
+      parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '204': {description: Removed.}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /users/{id}/passkeys/revoke:
+    post:
+      tags: [users]
+      operationId: revokeUserPasskeys
+      summary: Revoke every passkey of one account (System Admin, reason, step-up) (0.15.194)
+      description: The recovery for a lost device. The authenticator code keeps working. Audited `passkeys_revoked_by_admin`. Returns how many were revoked.
+      x-step-up: true
+      x-db-path: admin_passkey_revoke
+      parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WithReason'}
+      responses:
+        '200':
+          description: Revoked.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [revoked]
+                properties:
+                  revoked: { type: integer, minimum: 0 }
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '422': {$ref: '#/components/responses/Unprocessable'}
@@ -10284,6 +11048,70 @@ paths:
                 required: [items]
                 properties:
                   items: { type: array, items: { $ref: '#/components/schemas/WarehouseOrderOption' } }
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /registers/financial_advances/advance-options:
+    get:
+      tags: [registers]
+      operationId: listAdvanceOptions
+      summary: The advances an expense or settlement may name (0.15.330)
+      description: |
+        0.15.330. The approved advances in the state disbursed or settlement in progress, of the site `site_id` when it is given, in the regions the caller may read. Needs the Financial Advances view right.
+      parameters:
+      - {name: site_id, in: query, required: false, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: The options.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { type: object, additionalProperties: true } }
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /registers/invoices/order-options:
+    get:
+      tags: [registers]
+      operationId: listInvoiceOrderOptions
+      summary: The approved, active Procurement orders an invoice may name (0.15.330)
+      description: |
+        0.15.330. Same list as the other order pickers; needs the Invoices module view; only the orders in regions where the caller also holds the Procurement view right.
+      parameters:
+      - {name: site_id, in: query, required: false, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: The options.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/WarehouseOrderOption' } }
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /registers/invoices/supplier-options:
+    get:
+      tags: [registers]
+      operationId: listInvoiceSupplierOptions
+      summary: The companies an invoice may name as its supplier (0.15.330)
+      description: |
+        0.15.330. The active companies of the Contractors list (`id`, `name`, `type`). Needs the Invoices module view; no Procurement right is required, and nothing else about the companies is returned.
+      responses:
+        '200':
+          description: The options.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { type: object, additionalProperties: true } }
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '422': {$ref: '#/components/responses/Unprocessable'}
@@ -15825,6 +16653,20 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '422': {$ref: '#/components/responses/Unprocessable'}
+  /status-updates/region-health:
+    get:
+      tags: [status-updates]
+      operationId: getRegionHealth
+      summary: Region health of the current week (0.15.241, item 12)
+      description: One row per region the caller may view on `sites` (all seven when unrestricted). `health`, `summary`, `author` and `updated_at` come from the region's Weekly status update of the current working week (it opens on Sunday); they are null and `missing_update` is true when the region has not posted this week. Read only.
+      responses:
+        '200':
+          description: Region health.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RegionHealthBoard'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
   /status-updates/{update_id}:
     parameters:
     - {name: update_id, in: path, required: true, schema: {type: string, format: uuid}}
@@ -16960,6 +17802,58 @@ paths:
       responses:
         '204': {description: Discarded (also when there was none).}
         '401': {$ref: '#/components/responses/Unauthorized'}
+  /presence/editing:
+    get:
+      tags: [presence]
+      operationId: listEditPresence
+      summary: The other current editors of an entity (0.15.246)
+      description: >-
+        0.15.246 (migration 0345). Advisory "… is editing" presence: the editors of the entity other than the caller whose heartbeat is fresh
+        (2 minutes). The caller themself is never listed.
+      parameters:
+        - {name: kind, in: query, required: true, schema: {type: string, enum: [record, task]}}
+        - {name: entity_id, in: query, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: The other current editors, oldest heartbeat first.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [editors]
+                properties:
+                  editors: {type: array, items: {$ref: '#/components/schemas/EditPresenceEditor'}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+    post:
+      tags: [presence]
+      operationId: pingEditPresence
+      summary: The caller is editing this entity (heartbeat, 0.15.246)
+      description: 0.15.246 (migration 0345). Upserts the caller's row and sweeps stale rows. Send every 30 seconds while the editor is open.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/EditPresencePing'}
+      responses:
+        '200': {description: Noted.}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /presence/editing/stop:
+    post:
+      tags: [presence]
+      operationId: stopEditPresence
+      summary: The caller stopped editing this entity (0.15.246)
+      description: 0.15.246 (migration 0345). Removes the caller's row at once instead of letting it fade out.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/EditPresencePing'}
+      responses:
+        '200': {description: Removed (also when there was none).}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
 components:
   securitySchemes:
     cookieAuth:
@@ -17302,6 +18196,24 @@ components:
           schema: { $ref: '#/components/schemas/TransitionResult' }
 
   schemas:
+    MyPush:
+      type: object
+      additionalProperties: false
+      required: [enabled, public_key, count, this_browser]
+      properties:
+        enabled: { type: boolean }
+        public_key: { type: [string, 'null'], description: 'The VAPID public key (public by design); null while push is off.' }
+        count: { type: integer }
+        this_browser: { type: boolean }
+    AdminWebPush:
+      type: object
+      additionalProperties: false
+      required: [enabled, subscriptions, users, last_pushed_at]
+      properties:
+        enabled: { type: boolean }
+        subscriptions: { type: integer }
+        users: { type: integer }
+        last_pushed_at: { type: [string, 'null'], format: date-time }
     ExportScheduleInput:
       type: object
       additionalProperties: false
@@ -18132,6 +19044,19 @@ components:
         match_ranges:
           type: array
           items: { type: array, minItems: 2, maxItems: 2, items: { type: integer, minimum: 0 } }
+        snippet: { type: [string, 'null'], description: '0.15.155. Documents group: the text around the match inside the file contents (normalised), null when the file matched by name.' }
+    DocumentSearchIndex:
+      type: object
+      additionalProperties: false
+      required: [indexed, empty, unsupported, too_large, failed, pending, last_extracted_at]
+      properties:
+        indexed: { type: integer }
+        empty: { type: integer }
+        unsupported: { type: integer }
+        too_large: { type: integer }
+        failed: { type: integer }
+        pending: { type: integer }
+        last_extracted_at: { type: [string, 'null'], format: date-time }
     SearchGroup:
       type: object
       additionalProperties: false
@@ -18312,6 +19237,8 @@ components:
         - quarantine_unavailable
         - maintenance
         - scope_changed
+        - thumbnail_unsupported
+        - thumbnails_unavailable
     PageEnvelope:
       type: object
       required: [items, page]
@@ -18377,6 +19304,20 @@ components:
         code: { $ref: '#/components/schemas/ErrorCode' }
         message: { type: string }
         conflicts: { type: array, items: { type: string, format: uuid }, description: '0.12.6 (Q18): the existing assignments this row overlaps (dates, region and module).' }
+    RegisterState:
+      type: object
+      required: [register_key, name_en, enabled, locked, version, records]
+      properties:
+        register_key: { type: string }
+        name_en: { type: string }
+        name_ar: { type: [string, 'null'] }
+        module_key: { type: string }
+        enabled: { type: boolean }
+        locked: { type: boolean }
+        reason: { type: [string, 'null'] }
+        changed_at: { type: [string, 'null'], format: date-time }
+        version: { type: integer }
+        records: { type: integer, description: Current records that are not voided. }
     Reason:
       type: string
       minLength: 3
@@ -18423,7 +19364,7 @@ components:
     ExportPartKey:
       type: string
       description: Part key. Every register key used by `/registers` (including `dismantle`), plus the four non-register parts.
-      enum: [procurement, contractors, gecol, hlc, permits_hse, warehouse, quality, issues, risks, change_control, readiness_handover, as_built, meetings, dismantle, car_dispatcher, financial_advances, incidents, lessons_learned, invoices, sites, milestones, tasks, project_status, rf_design, acquisition]
+      enum: [procurement, contractors, gecol, hlc, permits_hse, warehouse, quality, issues, risks, change_control, readiness_handover, as_built, meetings, dismantle, car_dispatcher, financial_advances, incidents, lessons_learned, invoices, deliverables, sites, milestones, tasks, project_status, rf_design, acquisition]
     ExportPart:
       type: object
       required: [key, label_en, label_ar, master_sheet]
@@ -22075,6 +23016,88 @@ components:
           type: array
           maxItems: 12
           items: { type: string, enum: [mention, followed_change, task_assigned, task_returned, task_rejected, task_approved, approval_due, reassigned, absence_alert, idle_task_alert, no_holder, system] }
+    UiDataHub:
+      type: object
+      description: '0.15.311. The Data hub: which widgets of the landing page show, the badge on Uploads & batches, and the default view of each hub list screen.'
+      additionalProperties: false
+      required: [widgets, badge, default_view]
+      properties:
+        widgets:
+          type: object
+          additionalProperties: false
+          required: [quick_bar, batches, template_changes, recent, health, admin]
+          properties:
+            quick_bar: { type: boolean }
+            batches: { type: boolean }
+            template_changes: { type: boolean }
+            recent: { type: boolean }
+            health: { type: boolean }
+            admin: { type: boolean }
+        badge: { type: boolean }
+        default_view:
+          type: object
+          additionalProperties: false
+          required: [templates, uploads, exports, master_import]
+          properties:
+            templates: { type: string, enum: [cards, rows, table, compact] }
+            uploads: { type: string, enum: [cards, rows, table, compact] }
+            exports: { type: string, enum: [cards, rows, table, compact] }
+            master_import: { type: string, enum: [cards, rows, table, compact] }
+    DataHubBatch:
+      type: object
+      required: [id, file_name, action, status, template_id, template_version, counts]
+      properties:
+        id: { type: string, format: uuid }
+        file_name: { type: string }
+        action: { type: string, enum: [send, review_l2, returned, checking], description: 'send: the caller uploaded it and has not sent it; review_l2: the caller may approve it; returned: it came back to the caller; checking: still being staged (listed, not counted).' }
+        status: { type: string }
+        template_id: { type: string }
+        template_version: { type: integer }
+        register_key: { type: [string, 'null'] }
+        stream: { type: [string, 'null'] }
+        counts:
+          type: object
+          required: [valid, invalid]
+          properties:
+            valid: { type: integer }
+            invalid: { type: integer }
+        uploaded_at: { type: [string, 'null'], format: date-time }
+        progress_pct: { type: [integer, 'null'] }
+    DataHubTemplateChange:
+      type: object
+      required: [template_id, name_en, version, issued_at, added, removed, renamed, mine_is_old]
+      properties:
+        template_id: { type: string }
+        name_en: { type: string }
+        name_ar: { type: [string, 'null'] }
+        version: { type: integer }
+        issued_at: { type: string, format: date-time }
+        reason: { type: [string, 'null'] }
+        added: { type: array, items: { type: string } }
+        removed: { type: array, items: { type: string } }
+        renamed: { type: array, items: { type: string } }
+        my_version: { type: [integer, 'null'], description: 'The version of the caller last download of this template (null when never downloaded).' }
+        mine_is_old: { type: boolean }
+    DataHubDownload:
+      type: object
+      required: [template_id, prefill, at]
+      properties:
+        template_id: { type: string }
+        version: { type: [integer, 'null'] }
+        prefill: { type: boolean }
+        at: { type: string, format: date-time }
+    DataHubSummary:
+      type: object
+      required: [batches, template_changes, my_downloads]
+      properties:
+        batches:
+          type: object
+          required: [count, items]
+          properties:
+            count: { type: integer, minimum: 0 }
+            items: { type: array, maxItems: 5, items: { $ref: '#/components/schemas/DataHubBatch' } }
+        template_changes: { type: array, maxItems: 5, items: { $ref: '#/components/schemas/DataHubTemplateChange' } }
+        my_downloads: { type: array, items: { $ref: '#/components/schemas/DataHubDownload' } }
     UiPanel:
       type: object
       description: '0.15.251. How the bell opens the notifications.'
@@ -22087,11 +23110,12 @@ components:
     UiFeatures:
       type: object
       description: '0.15.185. The sections of the interface features setting; every section is complete.'
-      required: [avatars, new_badge, inbox, panel]
+      required: [avatars, new_badge, inbox, panel, data_hub]
       properties:
         avatars: { $ref: '#/components/schemas/UiAvatars' }
         new_badge: { $ref: '#/components/schemas/UiNewBadge' }
         inbox: { $ref: '#/components/schemas/UiInbox' }
+        data_hub: { $ref: '#/components/schemas/UiDataHub' }
         panel: { $ref: '#/components/schemas/UiPanel' }
     UiFeaturesPatch:
       type: object
@@ -22100,6 +23124,7 @@ components:
         avatars: { $ref: '#/components/schemas/UiAvatars' }
         new_badge: { $ref: '#/components/schemas/UiNewBadge' }
         inbox: { $ref: '#/components/schemas/UiInbox' }
+        data_hub: { $ref: '#/components/schemas/UiDataHub' }
         panel: { $ref: '#/components/schemas/UiPanel' }
     UiFeaturesSetting:
       type: object
@@ -22473,6 +23498,7 @@ components:
         requested: {type: boolean, description: 'Chosen in the scope of this plan.'}
         selected: {type: boolean, description: 'In the closure of the scope.'}
         added: {type: boolean, description: 'In the closure only because a chosen part takes it along.'}
+        narrowable: {type: boolean, description: '0.15.265. The part can be narrowed to regions, batches or a period (its data follows one register record).'}
     DataResetScope:
       type: object
       properties:
@@ -22483,7 +23509,39 @@ components:
         added: {type: array, items: {$ref: '#/components/schemas/DataResetPartCode'}}
         everything: {type: boolean, description: 'Every project part is in the closure.'}
         identity: {type: array, items: {$ref: '#/components/schemas/DataResetPartCode'}, description: 'The identity parts of the closure.'}
-        hash: {type: string, description: 'SHA-256 of the closure.'}
+        hash: {type: string, description: 'SHA-256 of the closure (with the narrowing when there is one).'}
+        narrow: {oneOf: [{$ref: '#/components/schemas/DataResetNarrow'}, {type: 'null'}], description: '0.15.265. The narrowing of the scope (normal form), null when the whole part goes.'}
+    DataResetNarrow:
+      type: object
+      additionalProperties: false
+      description: '0.15.265. Narrows the chosen register parts to the entities that match every given key.'
+      properties:
+        regions: {type: array, maxItems: 50, items: {type: integer, minimum: 1}, description: 'Region ids (any of).'}
+        batches: {type: array, maxItems: 50, items: {type: string, format: uuid}, description: 'Import batch ids (any of): the record came from the batch directly or through a row.'}
+        from: {type: string, format: date, description: 'First-created day, inclusive (Africa/Tripoli).'}
+        to: {type: string, format: date, description: 'First-created day, inclusive (Africa/Tripoli).'}
+        version: {type: integer, readOnly: true}
+    DataResetNarrowOptions:
+      type: object
+      required: [narrowable, regions, batches]
+      properties:
+        narrowable: {type: array, items: {$ref: '#/components/schemas/DataResetPartCode'}}
+        regions:
+          type: array
+          items: {type: object, required: [id, code, name_en], properties: {id: {type: integer}, code: {type: string}, name_en: {type: string}, name_ar: {type: [string, 'null']}}}
+        batches:
+          type: array
+          items:
+            type: object
+            required: [id, file_name, rows_total, status, created_at]
+            properties:
+              id: {type: string, format: uuid}
+              file_name: {type: string}
+              register_key: {type: [string, 'null']}
+              rows_total: {type: integer}
+              status: {type: string}
+              created_at: {type: string, format: date-time}
+              historical_load: {type: boolean}
     DataResetPlan:
       type: object
       required: [tables, delete_rows, keep_rows, files, parts, scope]
@@ -22496,6 +23554,7 @@ components:
         files: {type: integer, description: 'Stored files of the rows that would be deleted (moved, never deleted).'}
         error: {type: [string, 'null'], description: 'Why the plan cannot be counted (a table without a decision, a right missing); a run is then refused (409 `plan_incomplete`). The tables are empty while a run is open.'}
         parts: {type: array, items: {$ref: '#/components/schemas/DataResetPart'}, description: '0.15.71. The catalogue in screen order, with the rows of each part and whether the scope selects it.'}
+        narrow: {oneOf: [{$ref: '#/components/schemas/DataResetNarrow'}, {type: 'null'}], description: '0.15.265. The narrowing the counts are for.'}
     DataResetFiles:
       type: object
       required: [total, moved, missing, refused, pending, problems]
@@ -22784,7 +23843,7 @@ components:
     # ---------------------------------------------------------- registers (B11) and Dismantle
     RegisterKey:
       type: string
-      enum: [procurement, contractors, gecol, hlc, permits_hse, warehouse, quality, issues, risks, change_control, readiness_handover, as_built, meetings, dismantle, car_dispatcher, financial_advances, incidents, lessons_learned, invoices]
+      enum: [procurement, contractors, gecol, hlc, permits_hse, warehouse, quality, issues, risks, change_control, readiness_handover, as_built, meetings, dismantle, car_dispatcher, financial_advances, incidents, lessons_learned, invoices, deliverables]
     RegisterField:
       type: object
       required: [code, label_en, type]
@@ -23534,6 +24593,7 @@ components:
         icon_style: { type: string, enum: [light, regular, bold] }
         menu_style: { type: string, enum: [default, rail, autohide] }
         accent: { type: string, enum: [default, teal, blue, violet, green, orange, red, amber] }
+        contrast: { type: string, enum: [standard, high], description: '0.15.248 (0347): the high-contrast mode.' }
     UiNav:
       type: object
       description: '0.15.231 (0242): the personal sidebar (proposal item 4). `hidden` the screens the menu does not show, `order` their order inside their heading (a screen the list does not name keeps the organization order, after the named ones), `badge_style` how the count badges draw (full = the number, dot = a dot, none = no badge), `pins` the pinned shortcuts on top (at most 20). A menu key is a short lowercase id (the entries of the side menu; an unknown key is ignored).'
@@ -23560,10 +24620,91 @@ components:
         defaults: { $ref: '#/components/schemas/UiPrefs', description: '0.15.230 (0241): the organization appearance defaults.' }
         pref_options: { type: object, additionalProperties: { type: array, items: { type: string } }, description: '0.15.230 (0241): the dimensions with their allowed values (ui_pref_options).' }
         brands: { type: array, items: { $ref: '#/components/schemas/UiBrand' } }
+        logo:
+          oneOf:
+          - $ref: '#/components/schemas/UiAsset'
+          - type: 'null'
+          description: '0.15.232 (0243): the workspace logo (ui_asset_state). null: none was uploaded; the sidebar shows the built-in badge.'
         updated_at: { type: [string, 'null'], format: date-time }
         updated_by: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
         version: { type: integer, description: The ETag value. }
         can_edit: { type: boolean, description: 'A System Admin or a delegate of `settings` edit for all regions.' }
+    UiAsset:
+      type: object
+      description: 0.15.232 (0243). An identity image (migration 0243, table ui_assets). The bytes are served by `GET /ui/assets/{key}`; this is the metadata.
+      required:
+      - key
+      - mime
+      - enabled
+      - show_on_login
+      - use_as_favicon
+      - version
+      properties:
+        key:
+          type: string
+          pattern: ^[a-z0-9_]{1,40}$
+          description: '''logo'' today.'
+        show_on_login:
+          type: boolean
+          description: 'Shown on the sign-in pages (public). false by default; an admin turns it on in Settings > Identity.'
+        use_as_favicon:
+          type: boolean
+          description: 'Used as the browser tab icon (public). false by default.'
+        mime:
+          type: string
+          enum:
+          - image/png
+          - image/jpeg
+          - image/svg+xml
+          - image/webp
+        enabled:
+          type: boolean
+          description: 'false hides it (the row stays: hide never delete).'
+        version:
+          type: integer
+          description: The asset ETag value (If-Match on the logo endpoints).
+        updated_at:
+          type: string
+          format: date-time
+        updated_by:
+          oneOf:
+          - $ref: '#/components/schemas/UserRef'
+          - type: 'null'
+    UiAssetDisplayInput:
+      type: object
+      additionalProperties: false
+      required: [show_on_login, use_as_favicon, reason]
+      properties:
+        show_on_login: {type: boolean}
+        use_as_favicon: {type: boolean}
+        reason: {type: string, minLength: 3, maxLength: 1000}
+    UiPublicIdentity:
+      type: object
+      required: [login, favicon]
+      properties:
+        login:
+          oneOf:
+          - {$ref: '#/components/schemas/UiPublicLogo'}
+          - {type: 'null'}
+        favicon:
+          oneOf:
+          - {$ref: '#/components/schemas/UiPublicLogo'}
+          - {type: 'null'}
+    UiPublicLogo:
+      type: object
+      required: [version, mime]
+      properties:
+        version: {type: integer}
+        mime: {type: string, enum: [image/png, image/jpeg, image/svg+xml, image/webp]}
+    UiAssetEnabledInput:
+      allOf:
+      - $ref: '#/components/schemas/WithReason'
+      - type: object
+        required:
+        - enabled
+        properties:
+          enabled:
+            type: boolean
     UiIdentityInput:
       allOf:
         - $ref: '#/components/schemas/WithReason'
@@ -23582,6 +24723,80 @@ components:
         label_en: { type: string, minLength: 1, maxLength: 60 }
         label_ar: { type: string, maxLength: 60, description: 'Empty: the English label shows.' }
         url: { type: string, minLength: 1, maxLength: 300, pattern: '^(https?://|mailto:)' }
+    MediaThumbnails:
+      type: object
+      required: [enabled, small_px, medium_px, quality, format, max_source_mb]
+      properties:
+        enabled: { type: boolean }
+        small_px: { type: integer, minimum: 64, maximum: 512 }
+        medium_px: { type: integer, minimum: 128, maximum: 2048, description: 'Larger than small_px.' }
+        quality: { type: integer, minimum: 40, maximum: 95 }
+        format: { type: string, enum: [webp, jpeg] }
+        max_source_mb: { type: integer, minimum: 1, maximum: 200 }
+    MediaSettings:
+      type: object
+      description: '0.15.292. Setting `media.gallery` (migration 0396).'
+      required: [enabled, snag_photos, document_kinds, register_keys, include_site_documents, exclude_doc_codes, image_only, show_withdrawn, page_size, thumbnails, version, can_edit, thumbnails_available]
+      properties:
+        enabled: { type: boolean }
+        snag_photos: { type: boolean }
+        document_kinds: { type: array, maxItems: 5, items: { type: string, enum: [photo, scanned_document, email, report, excel_template] } }
+        register_keys: { type: array, maxItems: 60, items: { type: string }, description: 'Empty: every register.' }
+        include_site_documents: { type: boolean, description: 'Task and site slots (no register).' }
+        exclude_doc_codes: { type: array, maxItems: 100, items: { type: string } }
+        image_only: { type: boolean }
+        show_withdrawn: { type: boolean, description: 'Whether withdrawn and rejected items can be listed (they are never deleted).' }
+        page_size: { type: integer, minimum: 12, maximum: 200 }
+        thumbnails: { $ref: '#/components/schemas/MediaThumbnails' }
+        updated_at: { type: [string, 'null'], format: date-time }
+        updated_by: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+        version: { type: integer, description: The ETag value. }
+        can_edit: { type: boolean }
+        thumbnails_available: { type: boolean }
+    MediaSettingsInput:
+      allOf:
+        - $ref: '#/components/schemas/WithReason'
+        - type: object
+          required: [enabled, snag_photos, document_kinds, register_keys, include_site_documents, exclude_doc_codes, image_only, show_withdrawn, page_size, thumbnails]
+          properties:
+            enabled: { type: boolean }
+            snag_photos: { type: boolean }
+            document_kinds: { type: array, maxItems: 5, items: { type: string } }
+            register_keys: { type: array, maxItems: 60, items: { type: string } }
+            include_site_documents: { type: boolean }
+            exclude_doc_codes: { type: array, maxItems: 100, items: { type: string } }
+            image_only: { type: boolean }
+            show_withdrawn: { type: boolean }
+            page_size: { type: integer }
+            thumbnails: { $ref: '#/components/schemas/MediaThumbnails' }
+    MediaItem:
+      type: object
+      required: [kind, id, uploaded_at, state, mime_type, size_bytes, type, link, has_thumbnail, download_url]
+      properties:
+        kind: { type: string, enum: [document_file, snag_photo] }
+        id: { type: string, format: uuid }
+        uploaded_at: { type: string, format: date-time }
+        uploaded_by: { type: string, format: uuid }
+        state: { type: string, enum: [current, superseded, withdrawn, rejected, pending_evidence] }
+        version: { type: [integer, 'null'] }
+        slot_status: { type: [string, 'null'] }
+        snag_status: { type: [string, 'null'] }
+        mime_type: { type: string }
+        name: { type: [string, 'null'] }
+        size_bytes: { type: integer }
+        shot_type: { type: [string, 'null'] }
+        type: { type: object, required: [code, name_en], properties: { code: { type: string }, name_en: { type: string }, name_ar: { type: [string, 'null'] }, kind: { type: [string, 'null'] } } }
+        site: { type: [object, 'null'] }
+        link: { type: object, description: 'The owning record: {kind: snag|register|task|site, ...ids}.' }
+        has_thumbnail: { type: boolean }
+        download_url: { type: string }
+    MediaItemPage:
+      type: object
+      required: [enabled, items, page]
+      properties:
+        enabled: { type: boolean }
+        items: { type: array, items: { $ref: '#/components/schemas/MediaItem' } }
+        page: { type: object, required: [limit, next_cursor], properties: { limit: { type: integer }, next_cursor: { type: [string, 'null'] } } }
     LoginPage:
       type: object
       description: '0.15.97. Settings, Screens, Login page (setting `ui.login_page`, migration 0197).'
@@ -23698,6 +24913,48 @@ components:
             to_user_id: { type: string, format: uuid }
             rights: { type: array, minItems: 1, items: { type: string, enum: [templates.edit, fields.edit, documents.edit, warehouse.items.edit] } }
             hours: { type: integer, minimum: 1, maximum: 168, description: Omitted = default_hours. }
+    PasskeySetting:
+      type: object
+      description: '0.15.194. The passkey setting (`security.passkeys`, migration 0294).'
+      required: [enabled, ready, version, can_edit]
+      properties:
+        enabled: { type: boolean, description: 'false until a System Admin turns it on.' }
+        ready: { type: boolean, description: 'Whether the workspace address (APP_BASE_URL, https) is set, so a relying party exists.' }
+        updated_at: { type: [string, 'null'], format: date-time }
+        updated_by: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+        version: { type: integer, description: The ETag value. }
+        can_edit: { type: boolean }
+    PasskeySettingInput:
+      allOf:
+        - $ref: '#/components/schemas/WithReason'
+        - type: object
+          required: [enabled]
+          properties:
+            enabled: { type: boolean }
+    PasskeyItem:
+      type: object
+      required: [id, label, created_at, last_used_at, device_type, backed_up]
+      properties:
+        id: { type: string, format: uuid }
+        label: { type: string }
+        created_at: { type: string, format: date-time }
+        last_used_at: { type: [string, 'null'], format: date-time }
+        device_type: { type: string, enum: [singleDevice, multiDevice] }
+        backed_up: { type: boolean }
+    MyPasskeys:
+      type: object
+      required: [enabled, ready, can_add, items]
+      properties:
+        enabled: { type: boolean }
+        ready: { type: boolean }
+        can_add: { type: boolean, description: 'True only when the account has two-step verification on and enrolled.' }
+        items: { type: array, items: { $ref: '#/components/schemas/PasskeyItem' } }
+    PasskeySignInOptions:
+      type: object
+      required: [available, options]
+      properties:
+        available: { type: boolean }
+        options: { type: [object, 'null'], additionalProperties: true, description: 'The WebAuthn request options, or null.' }
     NewDeviceCodeSetting:
       type: object
       description: '0.15.192. The new-device email code setting (`security.new_device_code`, migration 0292).'
@@ -23859,7 +25116,7 @@ components:
     DashboardOps:
       type: object
       description: '0.15.106: the follow-up sections of the dashboard (owner approval 2026-11-26).'
-      required: [as_of, scope_regions, procurement, permits_hse, gecol_hlc, contractor_scorecard, quality]
+      required: [as_of, scope_regions, procurement, permits_hse, gecol_hlc, contractor_scorecard, quality, approvals]
       properties:
         as_of: {type: string, format: date-time}
         scope_regions:
@@ -23871,6 +25128,7 @@ components:
         gecol_hlc: {$ref: '#/components/schemas/DashboardOpsGecolHlc'}
         contractor_scorecard: {$ref: '#/components/schemas/DashboardOpsScorecard'}
         quality: {$ref: '#/components/schemas/DashboardOpsQuality'}
+        approvals: {$ref: '#/components/schemas/DashboardOpsApprovals'}
     DashboardOpsProcurement:
       type: object
       description: '0.15.106: procurement and materials (dashboard proposals item 1).'
@@ -23990,6 +25248,40 @@ components:
         no_record: {type: [integer, 'null'], description: In-scope sites with no record of the register at all.}
         civil_ready_no_power: {type: [integer, 'null'], description: 'GECOL only: the CW PAC (task B13) is approved but the power is not on; null in the HLC part.'}
         installed_not_in_service: {type: [integer, 'null'], description: 'HLC only: installation_date set but not in service yet; null in the GECOL part.'}
+    DashboardOpsApprovals:
+      type: object
+      description: "0.15.204 (item 7): the tasks waiting for review or approval, their ages since the level opened, and the bottleneck role."
+      required: [available, total, review, approve, waiting, by_role, unassigned]
+      properties:
+        available: {type: boolean, description: "False when the caller lacks the approvals or the sites view; every figure is then null."}
+        total: {type: [integer, 'null'], description: "The waiting tasks (states in_review and in_approval, as the Approvals inbox)."}
+        review: {type: [integer, 'null'], description: "The waiting tasks at a review level."}
+        approve: {type: [integer, 'null'], description: "The waiting tasks at an approve level."}
+        waiting:
+          anyOf:
+            - $ref: '#/components/schemas/DashboardOpsAging'
+            - type: 'null'
+        by_role:
+          type: [array, 'null']
+          items:
+            type: object
+            required: [role_id, name_en, name_ar, count, oldest_days, buckets]
+            properties:
+              role_id: {type: string, format: uuid}
+              name_en: {type: string}
+              name_ar: {type: [string, 'null']}
+              count: {type: integer, description: "The waiting tasks whose ball-in-court role is this one."}
+              oldest_days: {type: [integer, 'null'], description: "The age of the oldest waiting task of the role, calendar days."}
+              buckets:
+                type: array
+                items:
+                  type: object
+                  required: [key, count]
+                  properties:
+                    key: {type: string, enum: [d0_7, d8_14, d15_30, over_30]}
+                    count: {type: integer}
+          description: "One entry per ball-in-court role, most waiting tasks first."
+        unassigned: {type: [integer, 'null'], description: "The waiting tasks with no ball-in-court role (a group holds them, or nobody yet)."}
     DashboardOpsQuality:
       type: object
       description: "0.15.203 (item 6): the open snags and NCRs of the in-scope sites, the average closure age of each and the first-time acceptance rate."
@@ -24356,7 +25648,7 @@ components:
       properties:
         min_count: { type: integer, minimum: 0 }
         shot_types: { type: array, items: { type: string } }
-        formats: { type: array, items: { type: string, enum: [JPG, PNG, HEIC] } }
+        formats: { type: array, items: { type: string, enum: [JPG, PNG, HEIC, WEBM, MP4, MOV] } }
         max_size_mb: { type: integer }
     DocumentPlacement:
       type: object
@@ -25704,7 +26996,7 @@ components:
         host: { type: [string, 'null'] }
     SecurityAlertRule:
       type: string
-      enum: [failed_sign_ins, failed_sign_ins_ip, new_ip, large_export, admin_set_changed, retention_reduced, alert_settings_weakened, audit_integrity_failure, malware_upload, break_glass_used, backup_missing]
+      enum: [failed_sign_ins, failed_sign_ins_ip, new_ip, large_export, admin_set_changed, retention_reduced, alert_settings_weakened, audit_integrity_failure, malware_upload, break_glass_used, backup_missing, backup_late, job_failed]
     AlertSeverity:
       type: string
       enum: [info, low, medium, high, critical]
@@ -25712,7 +27004,7 @@ components:
     AlertSeverityMap:
       type: object
       additionalProperties: false
-      description: 'Severity per configurable rule (0.12.3, Q168). Defaults: failed_sign_ins medium, failed_sign_ins_ip medium, new_ip low, large_export medium, admin_set_changed high, alert_settings_weakened high, malware_upload high, break_glass_used critical, backup_missing high (0.15.130).'
+      description: 'Severity per configurable rule (0.12.3, Q168). Defaults: failed_sign_ins medium, failed_sign_ins_ip medium, new_ip low, large_export medium, admin_set_changed high, alert_settings_weakened high, malware_upload high, break_glass_used critical, backup_missing high (0.15.130), backup_late high and job_failed medium (0.15.350).'
       properties:
         failed_sign_ins: { $ref: '#/components/schemas/AlertSeverity' }
         failed_sign_ins_ip: { $ref: '#/components/schemas/AlertSeverity' }
@@ -25723,6 +27015,8 @@ components:
         malware_upload: { $ref: '#/components/schemas/AlertSeverity' }
         break_glass_used: { $ref: '#/components/schemas/AlertSeverity' }
         backup_missing: { $ref: '#/components/schemas/AlertSeverity' }
+        backup_late: { $ref: '#/components/schemas/AlertSeverity' }
+        job_failed: { $ref: '#/components/schemas/AlertSeverity' }
     SecurityAlert:
       type: object
       required: [id, at, rule, severity, summary, status]
@@ -26035,6 +27329,23 @@ components:
         groups: {type: array, items: {type: object, required: [id, name], properties: {id: {type: string, format: uuid}, name: {type: string}}}}
         users: {type: array, items: {$ref: '#/components/schemas/UserRef'}}
         regions: {type: array, description: '0.15.31 (F3).', items: {type: object, required: [id, name_en], properties: {id: {type: integer}, name_en: {type: string}, name_ar: {type: [string, "null"]}}}}
+    EditPresencePing:
+      type: object
+      additionalProperties: false
+      required: [kind, entity_id]
+      properties:
+        kind: {type: string, enum: [record, task], description: 'register records and workflow tasks.'}
+        entity_id: {type: string, format: uuid}
+    EditPresenceEditor:
+      type: object
+      description: '0.15.246: another current editor of the entity (migration 0345).'
+      required: [id, display_name, employee_id, since]
+      additionalProperties: false
+      properties:
+        id: {type: string, format: uuid}
+        display_name: {type: string}
+        employee_id: {type: [string, 'null']}
+        since: {type: string, format: date-time, description: When this editing spell began.}
     SavedView:
       type: object
       required: [id, screen_key, name, filters, columns, sort, stripped_columns, owner, owner_left, is_owner, shared, can_edit, can_share, is_active, version, imported, created_at, updated_at]
@@ -26274,6 +27585,22 @@ components:
         created_at: {type: string, format: date-time}
         updated_at: {type: string, format: date-time}
         editable: {type: boolean, description: 'true for the author until the end of the week.'}
+    RegionHealth:
+      type: object
+      required: [region_id, health, summary, author, updated_at, missing_update]
+      properties:
+        region_id: {type: integer, minimum: 1, maximum: 7}
+        health: {type: [string, 'null'], enum: [on_track, at_risk, off_track, null]}
+        summary: {type: [string, 'null']}
+        author: {oneOf: [{$ref: '#/components/schemas/UserRef'}, {type: 'null'}]}
+        updated_at: {type: [string, 'null'], format: date-time}
+        missing_update: {type: boolean, description: 'true when the region has not posted its Weekly status update of the current working week.'}
+    RegionHealthBoard:
+      type: object
+      required: [week_start, items]
+      properties:
+        week_start: {type: string, format: date, description: 'The Sunday that opens the current working week.'}
+        items: {type: array, items: {$ref: '#/components/schemas/RegionHealth'}}
     NotificationPreference:
       type: object
       required: [kind, in_app, email]

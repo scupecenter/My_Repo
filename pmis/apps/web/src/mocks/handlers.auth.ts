@@ -7,6 +7,7 @@ import { guard, problem, stepUp } from './handlers';
 import { userOf } from './handlers.admin';
 import { uid } from './ids';
 import { NEW_DEVICE_MOCK_CODE, newDeviceState } from './newDevice';
+import { passkeyState } from './passkeys';
 
 const B = API_BASE;
 const LOCK_AFTER = 5, LOCK_MS = 15 * 60_000, RATE_PER_MIN = 10;
@@ -183,6 +184,26 @@ export const authHandlers = [
     const c = cred(p.account)!;
     const r = await checkCode(c, b, c.tf!.secret);
     if (r !== 'ok') { save(); return codeProblem(r); }
+    startSession(p.account);
+    save();
+    return HttpResponse.json(sessionBody());
+  }),
+
+  // 0.15.194: a passkey instead of the code, only inside a pending two_factor sign-in and only while an admin has passkeys on.
+  http.post(`${B}/auth/local/2fa/passkey/options`, () => {
+    const p = pendingOf('two_factor');
+    if (!p) return problem(401, 'unauthenticated', 'This sign-in has expired. Enter your password again.');
+    const list = passkeyState.items[p.account] ?? [];
+    if (!passkeyState.enabled || !passkeyState.ready || !list.length) return HttpResponse.json({ available: false, options: null });
+    return HttpResponse.json({ available: true, options: { challenge: 'AAAA', rpId: 'localhost', userVerification: 'required', allowCredentials: list.map((x) => ({ id: x.credential_id, type: 'public-key' })) } });
+  }),
+  http.post(`${B}/auth/local/2fa/passkey`, async ({ request }) => {
+    const p = pendingOf('two_factor');
+    if (!p) return problem(401, 'unauthenticated', 'This sign-in has expired. Enter your password again.');
+    const b = (await request.json().catch(() => ({}))) as { response?: { id?: string } };
+    const row = (passkeyState.items[p.account] ?? []).find((x) => x.credential_id === b.response?.id);
+    if (!passkeyState.enabled || !row) return problem(401, 'invalid_code', 'The passkey was not accepted.');
+    row.last_used_at = new Date().toISOString();
     startSession(p.account);
     save();
     return HttpResponse.json(sessionBody());

@@ -187,3 +187,76 @@ export function firstPassPct(pass: number, fail: number): number | null {
   if (!(decided > 0)) return null;
   return Math.round((pass * 1000) / decided) / 10;
 }
+
+// ---------------------------------------------------------------- item 7 (0.15.204): pending approvals bottleneck
+
+export interface ApprovalWaitRow {
+  role_id: string | null;
+  name_en: string | null;
+  name_ar: string | null;
+  days: number | null;
+  state: string;
+}
+
+export interface ApprovalsByRole {
+  total: number;
+  review: number;
+  approve: number;
+  waiting: AgeBuckets;
+  by_role: {
+    role_id: string;
+    name_en: string;
+    name_ar: string | null;
+    count: number;
+    oldest_days: number | null;
+    buckets: AgeBuckets["buckets"];
+  }[];
+  unassigned: number;
+}
+
+/**
+ * The waiting tasks (states in_review and in_approval) grouped by the ball-in-court role: the counts per level kind,
+ * the overall age buckets, and per role the count, the oldest age and the buckets. Rows with no role count as
+ * unassigned (a group holds the level, or nobody yet). Most waiting tasks first, then the English name.
+ */
+export function approvalsByRole(rows: ApprovalWaitRow[]): ApprovalsByRole {
+  const byRole = new Map<string, { name_en: string; name_ar: string | null; days: number[] }>();
+  let review = 0;
+  let approve = 0;
+  let unassigned = 0;
+  const allDays: number[] = [];
+  for (const r of rows) {
+    if (r.state === "in_review") review += 1;
+    else if (r.state === "in_approval") approve += 1;
+    if (r.days !== null) allDays.push(r.days);
+    if (r.role_id === null) {
+      unassigned += 1;
+      continue;
+    }
+    const entry = byRole.get(r.role_id) ?? { name_en: r.name_en ?? "", name_ar: r.name_ar, days: [] };
+    if (r.days !== null) entry.days.push(r.days);
+    else entry.days.push(0);
+    byRole.set(r.role_id, entry);
+  }
+  const by_role = [...byRole.entries()]
+    .map(([role_id, e]) => {
+      const b = bucketAges(e.days);
+      return {
+        role_id,
+        name_en: e.name_en,
+        name_ar: e.name_ar,
+        count: e.days.length,
+        oldest_days: b.oldest_days,
+        buckets: b.buckets,
+      };
+    })
+    .sort((a, b) => b.count - a.count || a.name_en.localeCompare(b.name_en));
+  return {
+    total: rows.length,
+    review,
+    approve,
+    waiting: bucketAges(allDays),
+    by_role,
+    unassigned,
+  };
+}

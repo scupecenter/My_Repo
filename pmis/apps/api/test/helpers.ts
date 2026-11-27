@@ -33,6 +33,7 @@ export function testConfig(over: Partial<AppConfig> = {}): AppConfig {
     totpEncKey: TEST_TOTP_ENC_KEY,
     contextKey: TEST_CONTEXT_KEY,
     jobsEnabled: false,
+    webPush: { enabled: false, publicKey: '', privateKey: '', subject: '' },
     storage: { driver: 'local', localDir: TEST_STORAGE_DIR },
     fileEnc: parseMasterKeys({ FILE_ENC_KEY: TEST_FILE_ENC_KEY, FILE_ENC_KEY_ID: 'k1' }),
     scan: { mode: 'off', host: '127.0.0.1', port: 3310, timeoutMs: 5000, onFailure: 'fail_closed' },
@@ -41,6 +42,8 @@ export function testConfig(over: Partial<AppConfig> = {}): AppConfig {
 }
 
 export async function startApp(over: Partial<AppConfig> = {}): Promise<NestExpressApplication> {
+  // The /dashboard cache (30 s) is off in the suites: many of them change data straight in the database and read the dashboard again. test/dashboard-cache.test.ts sets its own value.
+  process.env.DASHBOARD_CACHE_TTL_MS ??= '0';
   const app = await createApp(testConfig(over), { logger: false });
   await app.init();
   return app;

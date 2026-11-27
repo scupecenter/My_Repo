@@ -6,6 +6,7 @@ import { errText, FormDialog } from '@/components/FormDialog';
 import { useToast } from '@/components/Toast';
 import { fieldErrors } from '@/lib/fields';
 import { QueryFallback } from '@/components/States';
+import { DateInput } from '@/components/DateInput';
 
 /**
  * Settings, historical load (contract 0.14.3, decision on owner question Q462). The one-time waiver that lets a System Admin accept the historical tasks of the
@@ -61,7 +62,7 @@ export function HistoricalWaiver() {
           onSubmit={(reason) => set.mutate({ open: true, cutoff_date: cutoff, reason }, done(t('hw.opened_toast')))}>
           <p className="text-sm text-mute">{t('hw.open_hint')}</p>
           <label className="block text-sm font-semibold">{t('hw.cutoff_label')}
-            <input type="date" className="input mt-1 font-normal" dir="ltr" data-testid="hw-cutoff-input" max={today} value={cutoff} onChange={(e) => setCutoff(e.target.value)} />
+            <DateInput className="input mt-1 font-normal" dir="ltr" data-testid="hw-cutoff-input" max={today} value={cutoff} onChange={(e) => setCutoff(e.target.value)} />
           </label>
         </FormDialog>
       )}

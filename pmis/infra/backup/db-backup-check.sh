@@ -8,7 +8,8 @@
 #   3. The weekly repository has a full backup younger than 8 days, the monthly one younger than 32 days (only when configured).
 #   4. The nightly pg_dump copy (only when DB_DUMP_RESTIC_REPOSITORY is set) is younger than BACKUP_LATE_HOURS.
 # A problem is written to the System Log (source backup, level error). The same problem is written again at most every
-# ALERT_REPEAT_SECONDS (default 21600). When the problems clear, an info row says so.
+# ALERT_REPEAT_SECONDS (default 21600). Since 0421 the same problem also raises the security alert `backup_late` (bell and mail to the
+# System Admins as the alert settings say). When the problems clear, an info row says so.
 # Exit status: 0 all good, 1 a problem was found (and logged), 2 the check itself could not run.
 set -uo pipefail
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -28,6 +29,14 @@ raise_log() {
   ctx=$(printf '{"script":"db-backup-check","stanza":"%s"}' "$DB_BACKUP_STANZA")
   db_psql -v lvl="$1" -v msg="$2" -v ctx="$ctx" >/dev/null 2>&1 <<'SQL'
 SELECT log_system_write(:'lvl'::text, 'backup', :'msg'::text, :'ctx'::jsonb, NULL, NULL);
+SQL
+}
+
+# raise_alert MESSAGE: the security alert backup_late (0421): bell and mail to the System Admins by the alert settings; one per 6 hours in the database.
+# A failure here never hides the System Log row, which is written first.
+raise_alert() {
+  db_psql -v msg="$1" >/dev/null 2>&1 <<'SQL'
+SELECT backup_late_alert(:'msg'::text);
 SQL
 }
 
@@ -130,6 +139,7 @@ MSG="Database backup check: $(IFS='; '; echo "${PROBLEMS[*]}")"
 KEY=$(printf '%s' "$MSG" | sha256sum | cut -c1-16)
 if [[ $KEY != "$LAST_KEY" ]] || (( NOW - ${LAST_AT:-0} >= ALERT_REPEAT_SECONDS )); then
   if raise_log error "$MSG"; then
+    raise_alert "$MSG" || echo "db-backup-check: could not raise the backup_late alert (migration 0421 applied?)" >&2
     printf '%s %s\n' "$KEY" "$NOW" >"$DB_CHECK_STATE"
   else
     echo "db-backup-check: could not write the System Log row" >&2

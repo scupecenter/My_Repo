@@ -6,6 +6,7 @@ import { useDeviceCodeSignIn, useEnrolConfirm, useEnrolStart, useRegenerateRecov
 import { ApiError } from '@/api/client';
 import type { Session } from '@/api/types';
 import { errText, FormDialog } from './FormDialog';
+import { PasskeyButton } from './Passkeys';
 import { useToast } from './Toast';
 
 /** Text of a failed code check. The detail of the server says when the code was already used. */
@@ -74,6 +75,7 @@ export function CodeStep({ onDone, onBack, onExpired }: { onDone: () => void; on
         : <CodeField id="two-factor-code" value={code} onChange={setCode} autoFocus />}
       {err && <p role="alert" data-testid="two-factor-error" className="text-lateInk">{err}</p>}
       <button className="btn btn-accent w-full" type="submit" data-testid="two-factor-submit" disabled={verify.isPending || !ready}>{t('twoFactor.login_submit')}</button>
+      <PasskeyButton onDone={onDone} onExpired={onExpired} />
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
         <button type="button" className="text-accent underline" data-testid="two-factor-toggle" onClick={() => { setRecovery(!recovery); setErr(''); }}>{recovery ? t('twoFactor.use_code') : t('twoFactor.use_recovery')}</button>
         <button type="button" className="text-mute underline" data-testid="two-factor-back" onClick={onBack}>{t('twoFactor.login_back')}</button>
