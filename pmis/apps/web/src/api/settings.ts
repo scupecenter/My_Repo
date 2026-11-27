@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { api, ApiError, downloadFile, type RequestOptions } from './client';
-import type { AlertRuleInput, AlertRuleSaved, AlertRulesResponse, IssueStoppedRowList, IssueTaskMapItem, IssueTaskMapList,
-  ActiveSession, ActOnBehalfRequest, Calendar, CalendarConfirmation, MailNotificationKinds, ImportsSettings, ContractorPerformanceReport, ContractorPerformanceThresholds, ContractorPerformanceSettings, NavLayoutSetting, UiIdentity, UiBrand, LoginPage, SecurityLocks, SupportAccessSetting, Delegation, LoginPagePublic, SupportLink, NavLayoutT, ContractorRules, ContractorRulesInput, GecolHlcCounts, ContractorsCompletenessReport, TeamScopeMismatchReport, DeletedUser, PurgedUser, DlpSettings, DlpVersion, DlpVersionInput, Holiday, HolidayChangeResult, HolidayInput, HolidayPatch, HolidaySummary, IdleTaskAlertSetting, Job, LogIntegrity, LogRetention, LogRetentionInput, NewDeviceCodeSetting,
+import type { PasskeyItem, PasskeySetting, MyPasskeys, AlertRuleInput, AlertRuleSaved, AlertRulesResponse, IssueStoppedRowList, IssueTaskMapItem, IssueTaskMapList,
+  ActiveSession, ActOnBehalfRequest, DownloadLocks, Calendar, CalendarConfirmation, MailNotificationKinds, ImportsSettings, ContractorPerformanceReport, ContractorPerformanceThresholds, ContractorPerformanceSettings, NavLayoutSetting, UiIdentity, UiBrand, LoginPage, SecurityLocks, SupportAccessSetting, Delegation, LoginPagePublic, SupportLink, NavLayoutT, ContractorRules, ContractorRulesInput, GecolHlcCounts, ContractorsCompletenessReport, TeamScopeMismatchReport, DeletedUser, PurgedUser, DlpSettings, DlpVersion, DlpVersionInput, Holiday, HolidayChangeResult, HolidayInput, HolidayPatch, HolidaySummary, IdleTaskAlertSetting, Job, LogIntegrity, LogRetention, LogRetentionInput, NewDeviceCodeSetting,
   NotificationPolicy, NotificationPolicyInput, NotificationTypeDef, Page, ReassignmentAlert, SecurityLogEntry, SessionRevokeResult, SlaPublishPreview, SlaRuleSet, SlaRuleSetPublishResult, SlaRuleSetSummary, SlaTaskRule, StaffCard, StaffVisibility, StructuralFreeze,
   TaskDefinition, TeamScopeMatch, TeamScopeMatchInput, TransitionResultT, User, UserDetail, WeekendDaysResult, WeightSet, WeightSetCode, WeightSetInput, WeightSetPreview, WeightSetPublishResult, WorkflowVersion, WorkflowVersionSummary,
 } from './types';
@@ -81,6 +81,17 @@ export const useSetMailKinds = () => {
   });
 };
 
+/** 0.15.261 (migration 0364): the mail policy (global switch, internal or external recipients, per kind). System Admin only; step-up on save. */
+export type MailPolicyDoc = import('./schema').components['schemas']['MailPolicy'];
+export type MailPolicySave = import('./schema').components['schemas']['MailPolicyInput'] & { reason: string };
+export const useMailPolicy = () => useQuery({ queryKey: ['mail-policy'], retry: false, queryFn: () => api.get<MailPolicyDoc>('/settings/mail-policy') });
+export const useSetMailPolicy = () => {
+  const qc = useQueryClient();
+  return useMutation<MailPolicyDoc, ApiError, { version: number } & MailPolicySave>({
+    mutationFn: ({ version, ...body }) => api.put('/settings/mail-policy', { version, body }), onSettled: () => refresh(qc, 'mail-policy'),
+  });
+};
+
 /** 0.14.6: the background threshold of batches (imports.async_rows). Read by everyone; changed by a System Admin or an all-regions delegate of settings, with a reason. */
 /** 0.15.41 (migration 0130): Settings, Identity & themes. Saving refreshes /me so the design of the page follows at once. */
 export const useUiIdentity = () => useQuery({ queryKey: ['ui-identity'], queryFn: () => api.get<UiIdentity>('/settings/identity') });
@@ -105,6 +116,14 @@ export const useSetSecurityLocks = () => {
   const qc = useQueryClient();
   return useMutation<SecurityLocks, ApiError, { version: number; block_public_sharing: boolean; disable_export: boolean; reason: string }>({
     mutationFn: ({ version, ...body }) => api.put('/settings/security-locks', { version, body }), onSettled: () => refresh(qc, 'security-locks'),
+  });
+};
+/** 0.15.193 (migration 0293): the download lock categories (setting security.download_locks): templates, uploaded files, generated documents. */
+export const useDownloadLocks = () => useQuery({ queryKey: ['download-locks'], queryFn: () => api.get<DownloadLocks>('/settings/download-locks') });
+export const useSetDownloadLocks = () => {
+  const qc = useQueryClient();
+  return useMutation<DownloadLocks, ApiError, { version: number; templates: boolean; uploaded_files: boolean; generated_documents: boolean; reason: string }>({
+    mutationFn: ({ version, ...body }) => api.put('/settings/download-locks', { version, body }), onSettled: () => refresh(qc, 'download-locks'),
   });
 };
 /** 0.15.191 (migration 0291): support access (setting security.support_access) and the support grants. System Admin only; a grant is a time-limited delegation. */
@@ -144,6 +163,26 @@ export const useSetNewDeviceCode = () => {
 };
 export const useBypassNewDevice = () =>
   useMutation<{ until: string }, ApiError, { user_id: string; minutes?: number; reason: string }>({ mutationFn: (body) => api.post('/settings/new-device-code/bypass', { body }) });
+/** 0.15.194 (migration 0294): passkeys as an alternative second step (setting security.passkeys), the own passkeys, and the admin recovery. */
+export const usePasskeySetting = () => useQuery({ queryKey: ['passkey-setting'], queryFn: () => api.get<PasskeySetting>('/settings/passkeys') });
+export const useSetPasskeys = () => {
+  const qc = useQueryClient();
+  return useMutation<PasskeySetting, ApiError, { version: number; enabled: boolean; reason: string }>({
+    mutationFn: ({ version, ...body }) => api.put('/settings/passkeys', { version, body }), onSettled: () => refresh(qc, 'passkey-setting', 'my-passkeys'),
+  });
+};
+export const useMyPasskeys = () => useQuery({ queryKey: ['my-passkeys'], queryFn: () => api.get<MyPasskeys>('/me/passkeys') });
+export const usePasskeyRegisterOptions = () => useMutation<Record<string, unknown>, ApiError, void>({ gcTime: 0, mutationFn: () => api.post('/me/passkeys/register/options') });
+export const usePasskeyRegisterVerify = () => {
+  const qc = useQueryClient();
+  return useMutation<PasskeyItem, ApiError, { label: string; response: Record<string, unknown> }>({ mutationFn: (body) => api.post('/me/passkeys/register/verify', { body }), onSettled: () => refresh(qc, 'my-passkeys') });
+};
+export const useRemovePasskey = () => {
+  const qc = useQueryClient();
+  return useMutation<void, ApiError, string>({ mutationFn: (id) => api.del(`/me/passkeys/${id}`), onSettled: () => refresh(qc, 'my-passkeys') });
+};
+export const useAdminRevokePasskeys = (userId: string) =>
+  useMutation<{ revoked: number }, ApiError, { reason: string }>({ mutationFn: (body) => api.post(`/users/${userId}/passkeys/revoke`, { body }) });
 export const useImportsSettings = () => useQuery({ queryKey: ['imports-settings'], queryFn: () => api.get<ImportsSettings>('/settings/imports') });
 export const useSetImportsSettings = () => {
   const qc = useQueryClient();

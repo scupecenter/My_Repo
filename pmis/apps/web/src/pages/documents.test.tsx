@@ -105,9 +105,9 @@ describe('Site Documents tab', () => {
     await u.click(screen.getByTestId('docs-filter-history'));
     // filters narrow the list
     await u.type(screen.getByTestId('docs-filter-doc'), 'ZZZ');
-    expect(await screen.findByTestId('docs-empty')).toBeInTheDocument();
+    expect(await screen.findByTestId('docs-table-empty')).toBeInTheDocument();
     await u.clear(screen.getByTestId('docs-filter-doc'));
-    await waitFor(() => expect(screen.queryByTestId('docs-empty')).toBeNull());
+    await waitFor(() => expect(screen.queryByTestId('docs-table-empty')).toBeNull());
     // tick a file, zip it
     const pick = (await screen.findAllByTestId(/^doc-pick-/))[0]!;
     await u.click(pick);

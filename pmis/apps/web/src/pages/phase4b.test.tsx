@@ -5,6 +5,7 @@ import { Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import { api, API_BASE, ApiError } from '@/api/client';
 import type { Page, SiteTasks } from '@/api/types';
+import type { UiFeaturesSetting } from '@/api/uiFeatures';
 import { FollowButton } from '@/components/FollowButton';
 import { MentionBox } from '@/components/Comments';
 import { Shell } from '@/components/Shell';
@@ -191,6 +192,35 @@ describe('X1 bell', () => {
     await waitFor(() => expect(screen.queryByTestId('task-drawer-body')).toBeNull());
     await u.click(screen.getByTestId('topbar-bell'));
     expect(await screen.findByTestId('bell-open-inbox')).toHaveAttribute('href', '/inbox');
+  });
+});
+
+describe('Item 8 side panel', () => {
+  const shell = () => renderApp(<Routes><Route element={<Shell />}><Route path="/inbox" element={<Inbox />} /><Route path="*" element={<div data-testid="elsewhere" />} /></Route></Routes>, { route: '/my-work' });
+
+  it('opens from the inline-end edge with tabs, filters unread and priority, closes with Escape and lands on an item', async () => {
+    await signIn('pm');
+    const u = userEvent.setup();
+    const saved = await api.put<UiFeaturesSetting>('/settings/ui-features', { version: 0, body: { sections: { panel: { mode: 'side_panel', width: 'medium', show_tabs: true } }, reason: 'Side panel' } });
+    expect(saved.sections.panel.mode).toBe('side_panel');
+    shell();
+    await screen.findByTestId('topbar-bell');
+    await new Promise((r) => setTimeout(r, 300)); // the interface setting loads in the background
+    await u.click(screen.getByTestId('topbar-bell'));
+    const panel = await screen.findByTestId('bell-panel');
+    expect(panel).toHaveAttribute('data-mode', 'side_panel');
+    expect(panel.className).toContain('end-0');
+    expect(within(panel).getByTestId('bell-tabs')).toBeInTheDocument();
+    await u.click(within(panel).getByTestId('bell-tab-unread'));
+    expect(await within(panel).findByTestId(`bell-item-${N(3)}`)).toBeInTheDocument();
+    await u.click(within(panel).getByTestId('bell-tab-priority'));
+    await waitFor(() => expect(within(panel).queryByTestId('bell-tab-priority')).toHaveAttribute('aria-selected', 'true'));
+    await u.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByTestId('bell-panel')).toBeNull());
+    await u.click(screen.getByTestId('topbar-bell'));
+    await u.click(await screen.findByTestId('bell-tab-all'));
+    await u.click(await screen.findByTestId(`bell-item-${N(3)}`));
+    expect(await screen.findByTestId('page-inbox')).toBeInTheDocument();
   });
 });
 

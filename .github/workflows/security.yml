@@ -62,6 +62,15 @@ jobs:
           fail-build: true
           severity-cutoff: high
           output-format: table
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: License allowlist (production dependencies)
+        working-directory: pmis
+        run: |
+          (cd apps/api && npm ci --ignore-scripts --omit=dev --no-audit --no-fund)
+          (cd apps/web && npm ci --ignore-scripts --omit=dev --no-audit --no-fund)
+          bash tools/check-licenses.sh
 
   iac:
     name: IaC (checkov, report only)

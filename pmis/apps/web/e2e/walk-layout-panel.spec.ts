@@ -1,0 +1,104 @@
+import { expect, test } from '@playwright/test';
+
+// Real-stack walkthrough for the unified Layout panel (V1, 2026-11-27): real API + scratch DB, no mocks. Run only with WALK=1.
+// Signs in as the bootstrap admin and walks the Layout panel on the Sites master in EN and AR, saving screenshots.
+test.skip(!process.env.WALK, 'real-stack run only');
+
+async function signIn(page: import('@playwright/test').Page) {
+  await page.goto('/login');
+  await page.getByTestId('login-identifier').fill('9001');
+  await page.getByTestId('login-password').fill('Walk-Admin-Pass-2026');
+  await page.getByTestId('login-submit').click();
+  await page.waitForURL((u) => !u.pathname.startsWith('/login'), { timeout: 20000 });
+}
+
+test('layout panel walk: Sites master, EN and AR, list and board', async ({ page }) => {
+  await signIn(page);
+
+  // EN: list view shows the display section.
+  await page.goto('/sites');
+  await expect(page.getByTestId('sites-view')).toBeVisible({ timeout: 20000 });
+  await page.getByTestId('sites-view').click();
+  await expect(page.getByTestId('sites-view-panel')).toBeVisible();
+  await expect(page.getByTestId('sites-view-views')).toBeVisible();
+  await expect(page.getByTestId('sites-view-display')).toBeVisible();
+  await page.screenshot({ path: 'test-results/walk-layout-sites-list-en.png' });
+  await page.keyboard.press('Escape');
+
+  // EN: board view shows the options section (swimlane) instead of display.
+  await page.getByTestId('sites-view').click();
+  await page.getByTestId('sites-layout-board').click();
+  await page.getByTestId('sites-view').click();
+  await expect(page.getByTestId('sites-view-options')).toBeVisible();
+  await expect(page.getByTestId('sites-board-swimlane')).toBeVisible();
+  await expect(page.getByTestId('sites-view-display')).toHaveCount(0);
+  await page.screenshot({ path: 'test-results/walk-layout-sites-board-en.png' });
+  await page.keyboard.press('Escape');
+
+  // AR: panel and page render right-to-left with Arabic labels.
+  await page.getByTestId('topbar-lang').click();
+  await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
+  await page.getByTestId('sites-view').click();
+  await expect(page.getByTestId('sites-view-panel')).toBeVisible();
+  await page.screenshot({ path: 'test-results/walk-layout-sites-board-ar.png' });
+});
+
+test('layout panel walk: display-only panels on My Work, Approvals, Daily Plan and Library Archive', async ({ page }) => {
+  await signIn(page);
+
+  // My Work: the display options moved into the panel; its list/board switcher stays until V7.
+  await page.goto('/my-work');
+  await expect(page.getByTestId('my-work-display')).toBeVisible({ timeout: 20000 });
+  await page.getByTestId('my-work-display').click();
+  await expect(page.getByTestId('my-work-display-display')).toBeVisible();
+  await expect(page.getByTestId('my-work-display-views')).toHaveCount(0);
+  await page.screenshot({ path: 'test-results/walk-layout-my-work-en.png' });
+  await page.keyboard.press('Escape');
+
+  // Approvals: same panel instead of the old display menu.
+  await page.goto('/approvals');
+  await expect(page.getByTestId('approvals-layout')).toBeVisible({ timeout: 20000 });
+  await page.getByTestId('approvals-layout').click();
+  await expect(page.getByTestId('approvals-layout-display')).toBeVisible();
+  await page.screenshot({ path: 'test-results/walk-layout-approvals-en.png' });
+  await page.keyboard.press('Escape');
+
+  // Daily Plan: the density switch grew into the full panel.
+  await page.goto('/my-work/daily-plan');
+  await expect(page.getByTestId('daily-plan-layout')).toBeVisible({ timeout: 20000 });
+  await page.getByTestId('daily-plan-layout').click();
+  await expect(page.getByTestId('daily-plan-layout-display')).toBeVisible();
+  await page.screenshot({ path: 'test-results/walk-layout-daily-plan-en.png' });
+  await page.keyboard.press('Escape');
+
+  // Library Archive: panel in the shared toolbar.
+  await page.goto('/library/archive/WALK');
+  await expect(page.getByTestId('lib-archive-layout')).toBeVisible({ timeout: 20000 });
+  await page.getByTestId('lib-archive-layout').click();
+  await expect(page.getByTestId('lib-archive-layout-display')).toBeVisible();
+  await page.screenshot({ path: 'test-results/walk-layout-archive-en.png' });
+  await page.keyboard.press('Escape');
+
+  // AR: the display-only panel renders right-to-left with Arabic labels.
+  await page.getByTestId('topbar-lang').click();
+  await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
+  await page.goto('/my-work');
+  await page.getByTestId('my-work-display').click();
+  await expect(page.getByTestId('my-work-display-display')).toBeVisible();
+  await page.screenshot({ path: 'test-results/walk-layout-my-work-ar.png' });
+});
+
+test('layout panel walk: a register (procurement) keeps board by/lane in the panel', async ({ page }) => {
+  await signIn(page);
+  await page.goto('/registers/procurement');
+  await expect(page.getByTestId('register-view')).toBeVisible({ timeout: 20000 });
+  await page.getByTestId('register-view').click();
+  await expect(page.getByTestId('register-view-panel')).toBeVisible();
+  await page.getByTestId('register-layout-board').click();
+  await page.getByTestId('register-view').click();
+  await expect(page.getByTestId('register-view-options')).toBeVisible();
+  await expect(page.getByTestId('register-board-by')).toBeVisible();
+  await expect(page.getByTestId('register-board-lane')).toBeVisible();
+  await expect(page.getByTestId('register-view-display')).toHaveCount(0);
+  await page.screenshot({ path: 'test-results/walk-layout-register-board-en.png' });
+});

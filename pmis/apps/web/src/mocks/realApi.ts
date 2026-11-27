@@ -16,6 +16,9 @@ export const REAL_API_AUTH_USERS = [
   // Contract 0.5.0 and 0.6.0: two-factor (TOTP) for local accounts and its one-time enrolment code (apps/api: auth, users; migrations 0033, 0034).
   ['post', '/auth/local/2fa'],
   ['post', '/auth/local/2fa/device-code'],
+  // Contract 0.15.194 (migration 0294; apps/api: security, auth): passkeys as an alternative second step.
+  ['post', '/auth/local/2fa/passkey/options'],
+  ['post', '/auth/local/2fa/passkey'],
   ['post', '/auth/local/2fa/enrol/start'],
   ['post', '/auth/local/2fa/enrol/confirm'],
   ['post', '/auth/local/2fa/recovery-codes'],
@@ -119,13 +122,16 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/registers/:key/records/:id/history'],
   ['get', '/registers/:key/records/:id/versions'],
   ['post', '/registers/:key/records/:id/versions'],
+  ['post', '/registers/:key/records/:id/triage'],
   // Contract 0.7.0: approved-template entry for the registers (apps/api: templates; migration 0037). The Site Register stream templates and TPL-MASTER (migration 0051, contract 0.11.3) use the same paths: no endpoint was added.
   ['get', '/templates'],
   ['get', '/templates/:id/download'],
   ['get', '/import-batches'],
+  ['get', '/data-hub/summary'],
   ['post', '/import-batches'],
   ['get', '/import-batches/:id'],
   ['get', '/import-batches/:id/rows'],
+  ['get', '/import-batches/:id/error-report'],
   ['post', '/import-batches/:id/submit'],
   ['post', '/import-batches/:id/decisions'],
   // Contract 0.12.8 (P3, migration 0060): the legacy Master import and its comparison report, the template mapping screen and the import aliases.
@@ -221,6 +227,7 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/me/sessions/revoke-others'],
   ['post', '/me/sessions/:id/revoke'],
   ['patch', '/me/profile'],
+  ['get', '/admin/document-search-index'],
   ['patch', '/me/preferences'],
   ['post', '/me/password'],
   ['post', '/me/email-change'],
@@ -363,6 +370,8 @@ export const REAL_API_AUTH_USERS = [
   // Contract 0.14.2 (settings screens, migration 0072; apps/api: calendar, settings): the official calendar confirmation (Q440) and the mail notification kinds (Q441).
   ['get', '/settings/calendar-confirmation'],
   ['put', '/settings/calendar-confirmation'],
+  ['get', '/settings/mail-policy'],
+  ['put', '/settings/mail-policy'],
   ['get', '/settings/mail-notification-kinds'],
   ['put', '/settings/mail-notification-kinds'],
   // Contract 0.14.3 (Q462, migration 0073; apps/api: settings): the one-time historical-load document waiver. The "historical load" option of the batch screens uses the
@@ -385,9 +394,18 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/settings/login-page'],
   ['put', '/settings/login-page'],
   ['get', '/settings/login-page/public'],
+  // Contract 0.15.292: the media gallery (apps/api: media; migration 0396).
+  ['get', '/media/settings'],
+  ['put', '/media/settings'],
+  ['get', '/media/items'],
+  ['get', '/media/facets'],
+  ['get', '/media/items/:kind/:id/thumbnail'],
   // Contract 0.15.190 (migration 0290; apps/api: settings): the admin lock keys (Settings, Security, Lock keys).
   ['get', '/settings/security-locks'],
   ['put', '/settings/security-locks'],
+  // Contract 0.15.193 (migration 0293; apps/api: security): the download lock categories (Settings, Security, Lock keys).
+  ['get', '/settings/download-locks'],
+  ['put', '/settings/download-locks'],
   // Contract 0.15.191 (migration 0291; apps/api: security): support access (Settings, Security, Support access).
   ['get', '/settings/support-access'],
   ['put', '/settings/support-access'],
@@ -399,6 +417,14 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/settings/new-device-code'],
   ['put', '/settings/new-device-code'],
   ['post', '/settings/new-device-code/bypass'],
+  // Contract 0.15.194 (migration 0294): the passkey setting, the own passkeys and the admin recovery.
+  ['get', '/settings/passkeys'],
+  ['put', '/settings/passkeys'],
+  ['get', '/me/passkeys'],
+  ['post', '/me/passkeys/register/options'],
+  ['post', '/me/passkeys/register/verify'],
+  ['delete', '/me/passkeys/:id'],
+  ['post', '/users/:id/passkeys/revoke'],
   // Contract 0.15.4 (migration 0085; apps/api: sites, master-import, templates): the per-site workflow locks (one site, many sites) and the status of the sites of
   // an import (missing data per site). The new site fields ride on the paths above.
   ['post', '/sites/workflow-locks'],
@@ -425,6 +451,8 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/registers/issues/order-options'],
   ['get', '/registers/change_control/order-options'],
   ['get', '/registers/quality/order-options'],
+  ['get', '/settings/register-state'],
+  ['put', '/settings/register-state/:key'],
   ['get', '/registers/issues/risk-options'],
   ['get', '/registers/risks/:entity_id/issues'],
   ['get', '/registers/procurement/:entity_id/receipts'],
@@ -451,6 +479,8 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/search/site-ids'],
   ['get', '/settings/gecol-order-warnings'],
   ['put', '/settings/gecol-order-warnings'],
+  ['get', '/settings/derive-rules'],
+  ['put', '/settings/derive-rules'],
   ['get', '/settings/structural-freeze'],
   ['put', '/settings/structural-freeze'],
   ['post', '/settings/structural-freeze/lift'],
@@ -466,6 +496,8 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/site-master/columns/:ord/type-preview'],
   ['post', '/site-master/columns/:ord/deactivate'],
   ['post', '/site-master/columns/:ord/reactivate'],
+  ['get', '/custom-fields'],
+  ['get', '/custom-fields/:id'],
   ['get', '/site-master/sites/:siteId/sources'],
   ['post', '/sites/:id/admin-edits'],
   ['get', '/sites/:id/admin-edits'],

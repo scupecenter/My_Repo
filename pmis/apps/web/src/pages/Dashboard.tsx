@@ -1,4 +1,5 @@
 import { Check, Download, Link2, MonitorPlay, PencilLine, Printer, RotateCcw } from "lucide-react";
+import { useDownloadGate } from '@/lib/downloadGate';
 import { useMemo, useState, type ReactNode, Fragment } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
@@ -20,6 +21,7 @@ import { EChart, type Palette } from "@/components/EChart";
 import { errText } from "@/components/FormDialog";
 import { Pipeline } from "@/components/Pipeline";
 import { SiteMap } from "@/components/SiteMap";
+import { ScreenSettingsLink } from "@/components/ScreenSettingsLink";
 import { EmptyState } from "@/components/States";
 import { useToast } from "@/components/Toast";
 import { streamName } from "@/lib/streams";
@@ -57,6 +59,7 @@ import {
   writeRemembered,
   type DashTab,
 } from "./dashboardTabs";
+import { DateInput } from '@/components/DateInput';
 
 type DashMilestone = Dash["pipeline"]["nodes"][number];
 const STATUSES = [
@@ -532,6 +535,7 @@ function F13Panel({
 const DASH_VIEW_EMPTY = { region_id: "", cluster_code: "", scenario: "", stream: "", view: "" };
 
 export function Dashboard() {
+  const gate = useDownloadGate();
   const { t, i18n } = useTranslation();
   const ar = i18n.language === "ar";
   const [issuesBy, setIssuesBy] = useState<"owner" | "category" | "reason">("owner");
@@ -985,7 +989,7 @@ export function Dashboard() {
   if (dash.isError && !d) {
     return (
       <div data-testid="page-dashboard">
-        <h1 className="mb-3 text-2xl font-bold">{t("dash.title")}</h1>
+        <div className="mb-3 flex flex-wrap items-center gap-2"><h1 className="text-2xl font-bold">{t("dash.title")}</h1><span className="ms-auto"><ScreenSettingsLink screen="dashboard" /></span></div>
         <EmptyState
           title={
             dash.error instanceof Error &&
@@ -1094,6 +1098,7 @@ export function Dashboard() {
               {t("common.loading")}
             </span>
           )}
+          <span className="ms-auto print:hidden"><ScreenSettingsLink screen="dashboard" /></span>
         </div>
         <p className="text-mute">{t("dash.subtitle")}</p>
       </header>
@@ -1202,8 +1207,7 @@ export function Dashboard() {
         </label>
         <label className="text-sm font-semibold">
           {t("dash.ref_date")}
-          <input
-            type="date"
+          <DateInput
             className="input mt-1 w-auto font-normal"
             data-testid="dash-ref-date"
             max={today}
@@ -1292,6 +1296,8 @@ export function Dashboard() {
               <button
                 className="btn print:hidden"
                 data-testid="dash-print"
+                disabled={gate.exportLocked}
+                title={gate.note(gate.exportLocked)}
                 onClick={() => window.print()}
               >
                 <Printer size={16} />

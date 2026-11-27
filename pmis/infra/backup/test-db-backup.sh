@@ -129,6 +129,7 @@ fi
 [[ $(sqlt "SELECT count(*) FROM system_log WHERE source='backup' AND level='error'") == 1 ]] || die "late backup did not raise a System Log row"
 late_check >/dev/null 2>&1 || true
 [[ $(sqlt "SELECT count(*) FROM system_log WHERE source='backup' AND context->>'script'='db-backup-check'") == 1 ]] || die "the same problem was logged twice"
+[[ $(sqlt "SELECT count(*) FROM security_alerts WHERE rule='backup_late'") -ge 1 ]] || die "the backup_late alert was not raised (migration 0421)"
 ok "late backup alerts once and is not repeated"
 
 run_as_pg "$HERE/db-backup-check.sh" >"$WORK/check2.out" 2>&1 || { cat "$WORK/check2.out"; die "healthy check failed"; }

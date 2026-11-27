@@ -1,5 +1,5 @@
 /*
- * Unified motion system (item 2 of the PM-platforms package). One set of durations and easings, a few named effects, and ONE reduced-motion rule.
+ * Unified motion system (item 2 of the improvement package). One set of durations and easings, a few named effects, and ONE reduced-motion rule.
  * Tokens: --motion-fast (hover, press), --motion-base (open, close, fade), --motion-slow (progress fill). Effects: .motion-fade, .motion-rise, .motion-pop,
  * .motion-lift (hover), .motion-fill (progress width), .motion-shimmer (loading). Direction aware: the rise and slide use logical offsets, so RTL mirrors.
  * Reduced motion: the OS setting or the user's choice (Settings, Screens, Motion: html[data-motion="reduced"]) turns every transition and animation off.

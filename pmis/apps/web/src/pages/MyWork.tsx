@@ -1,3 +1,4 @@
+import { LayoutPanel, type ViewOption } from '@/components/LayoutPanel';
 import { AlertTriangle, CalendarDays, Check, Clock, Columns3, Inbox, List, Pencil } from 'lucide-react';
 import { Fragment, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -13,8 +14,8 @@ import { BallSince, ExternalParty, SlaOverrun, StaleBadge } from '@/components/T
 import { TasksBoard } from '@/components/TasksBoard';
 import { SavedViews } from '@/components/SavedViews';
 import { UnifiedFilter } from '@/components/UnifiedFilter';
-import { ColumnMenu, DensityToggle, Empty, HeaderRow, pin, rowPad, totalWidth, tracks, Trunc, useTablePrefs, type TableApi } from '@/components/TableKit';
-import { DisplayMenu, displayAttrs, ExportCsvButton, PastedChip, ROWNO_COL, RowNo, SearchBox, TableCount, TableToolbar } from '@/components/TableStandard';
+import { ColumnMenu, Empty, HeaderRow, pin, rowPad, totalWidth, tracks, Trunc, useTablePrefs, type TableApi } from '@/components/TableKit';
+import { displayAttrs, ExportCsvButton, PastedChip, ROWNO_COL, RowNo, SearchBox, TableCount, TableToolbar } from '@/components/TableStandard';
 import { decodeFilter, encodeFilter, type FilterTree } from '@/api/views';
 import type { ColDef } from '@/lib/tablePrefs';
 
@@ -95,12 +96,11 @@ export function MyWork() {
   const tbl = useTablePrefs('my-work', DEFS);
   const label = (id: string) => t(LABEL[id] ?? id);
   const clearAll = () => setParams({ q: '', adv: '' });
-  const switcher = (
-    <span className="inline-flex gap-1" role="group" aria-label={t('board.layout')} data-testid="my-work-layout">
-      <button type="button" aria-pressed={!board} data-testid="my-work-layout-list" onClick={() => setParams({ layout: '' })} className={`btn px-2 py-1 text-xs ${!board ? 'btn-primary' : ''}`}><List size={14} aria-hidden />{t('board.list')}</button>
-      <button type="button" aria-pressed={board} data-testid="my-work-layout-board" onClick={() => setParams({ layout: 'board' })} className={`btn px-2 py-1 text-xs ${board ? 'btn-primary' : ''}`}><Columns3 size={14} aria-hidden />{t('board.board')}</button>
-    </span>
-  );
+  const myViews: ViewOption[] = [
+    { id: 'list', label: t('board.list'), hint: t('view.mywork_list_hint'), icon: <List size={14} />, testid: 'my-work-layout-list' },
+    { id: 'board', label: t('board.board'), hint: t('view.mywork_board_hint'), icon: <Columns3 size={14} />, testid: 'my-work-layout-board' },
+  ];
+  const switcher = <LayoutPanel testid="my-work-view" views={{ value: board ? 'board' : 'list', options: myViews, onChange: (id) => setParams({ layout: id === 'board' ? 'board' : '' }) }} />;
   let n = 0;
   return (
     <div className="space-y-4" data-testid="page-my-work">
@@ -134,8 +134,7 @@ export function MyWork() {
         count={<TableCount testid="my-work-count" noun="tasks" total={screenTotal} filtered={filtered} active={active} onClear={clearAll} />}
         switcher={switcher}
         columns={<ColumnMenu api={tbl} label={label} />}
-        density={<DensityToggle api={tbl} />}
-        display={<DisplayMenu api={tbl} />}
+        layout={<LayoutPanel testid="my-work-display" table={tbl} />}
         exporter={<ExportCsvButton testid="my-work-export" name="my-work" head={['#', t('approvals.bucket'), label('site'), t('grid.code'), label('task'), label('sla')]}
           rows={() => { let i = 0; return BUCKETS.flatMap(([k]) => (qs[k].data?.items ?? []).map((x) => [++i, t(`myWork.${k}`), x.site_code, x.task_code, (i18n.language === 'ar' && x.name_ar) || x.name_en, x.sla?.colour ?? ''])); }} />} />
       <div className="card gx overflow-auto" {...displayAttrs(tbl.display)} data-testid="my-work-table">

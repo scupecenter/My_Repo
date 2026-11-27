@@ -823,9 +823,32 @@ server {
     proxy_read_timeout 300s;   # 0074: long requests are not needed (big batches run in the background); the API ends a request transaction after 30 s
     client_max_body_size 25m;
   }
-  location /assets/ { expires 1y; add_header Cache-Control "public, immutable"; try_files \$uri =404; }
-  location = /mockServiceWorker.js { add_header Cache-Control "no-cache"; try_files \$uri =404; }
-  location = /index.html { add_header Cache-Control "no-cache"; }
+  # SEC-5: nginx drops every server-level add_header in a location that sets its own add_header, so these locations repeat the four security headers
+  # (above). Without this the main document (index.html) and the assets went out without Strict-Transport-Security.
+  location /assets/ {
+    expires 1y;
+    add_header Cache-Control "public, immutable";
+    add_header X-Content-Type-Options nosniff always;
+    add_header X-Frame-Options DENY always;
+    add_header Referrer-Policy same-origin always;
+    add_header Strict-Transport-Security "max-age=31536000" always;
+    try_files \$uri =404;
+  }
+  location = /mockServiceWorker.js {
+    add_header Cache-Control "no-cache";
+    add_header X-Content-Type-Options nosniff always;
+    add_header X-Frame-Options DENY always;
+    add_header Referrer-Policy same-origin always;
+    add_header Strict-Transport-Security "max-age=31536000" always;
+    try_files \$uri =404;
+  }
+  location = /index.html {
+    add_header Cache-Control "no-cache";
+    add_header X-Content-Type-Options nosniff always;
+    add_header X-Frame-Options DENY always;
+    add_header Referrer-Policy same-origin always;
+    add_header Strict-Transport-Security "max-age=31536000" always;
+  }
   location / { try_files \$uri /index.html; }
 }
 EOF

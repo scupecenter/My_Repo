@@ -17,7 +17,8 @@ describe('Dashboard progress curve card (dashboard proposals item 2)', () => {
   it('shows planned vs actual, the plan index, the weekly velocity and the 100% forecast of the saved snapshots', async () => {
     await signIn('pm');
     dashPage();
-    const card = await screen.findByTestId('dash-scurve');
+    // the first render of the whole Dashboard is slow under CI load (1000 ms default is not enough)
+    const card = await screen.findByTestId('dash-scurve', {}, { timeout: 8000 });
     expect(card).toHaveTextContent('Progress curve');
     expect(await screen.findByTestId('dash-scurve-actual')).toHaveTextContent('76.5%');
     expect(screen.getByTestId('dash-scurve-planned')).toHaveTextContent('90%');

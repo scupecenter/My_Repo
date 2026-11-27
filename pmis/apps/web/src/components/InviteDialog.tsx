@@ -12,6 +12,7 @@ import { PeoplePicker } from '@/components/PeoplePicker';
 import { ScopePicker, useModuleOptions } from '@/components/ScopePicker';
 import { useToast } from '@/components/Toast';
 import { fieldErrors } from '@/api/auth';
+import { DateInput } from '@/components/DateInput';
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const E164 = /^\+[1-9][0-9]{7,14}$/;
@@ -81,7 +82,7 @@ export function InviteDialog({ onClose }: { onClose: () => void }) {
               <label className="text-sm font-semibold">{t('assign.team')}
                 <select className="input mt-1 font-normal" data-testid={`invite-team-${i}`} value={r.team} onChange={(e) => upd(i, { team: e.target.value as Row['team'] })}>{TEAMS.map((l) => <option key={l} value={l}>{t(`team.${l}`)}</option>)}</select></label>
               <label className="text-sm font-semibold">{t('assign.valid_to')}
-                <input type="date" className="input mt-1 font-normal" data-testid={`invite-valid-to-${i}`} value={r.to} onChange={(e) => upd(i, { to: e.target.value })} /></label>
+                <DateInput className="input mt-1 font-normal" data-testid={`invite-valid-to-${i}`} value={r.to} onChange={(e) => upd(i, { to: e.target.value })} /></label>
             </div>
             <label className="block text-sm font-semibold">{t('assign.profile')}
               <select className="input mt-1 font-normal" data-testid={`invite-profile-${i}`} value={r.profile} onChange={(e) => upd(i, { profile: e.target.value })}><option value="">{t('assign.role_default')}</option>{(profiles.data ?? []).map((p) => <option key={p.id} value={p.id}>{p.name_en}</option>)}</select></label>
