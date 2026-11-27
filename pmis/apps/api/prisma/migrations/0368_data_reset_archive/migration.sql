@@ -195,9 +195,7 @@ BEGIN
   IF NOT FOUND THEN PERFORM public.data_reset_err(404, 'not_found', 'This request has no archive to download (not made, failed, or no longer kept).'); END IF;
   IF a.keep_until <= clock_timestamp() THEN PERFORM public.data_reset_err(410, 'archive_expired', 'The archive is no longer kept.'); END IF;
   UPDATE public.data_reset_archives SET downloads = downloads + 1, first_downloaded_at = coalesce(first_downloaded_at, clock_timestamp()) WHERE id = a.id;
-  PERFORM public.sec_log_write('project_data_reset', 'info', who.actor, NULL,
-    jsonb_build_object('step', 'archive_download', 'request_id', r.id, 'archive_id', a.id, 'sha256', a.sha256, 'bytes', a.bytes), '{}'::jsonb);
-  PERFORM public.data_reset_log('data_reset_archive_download', r.id, NULL, jsonb_build_object('archive_id', a.id, 'by', who.actor), 'archive download');
+  PERFORM public.data_reset_log('data_reset_archive_download', r.id, NULL, jsonb_build_object('archive_id', a.id, 'by', who.actor, 'sha256', a.sha256, 'bytes', a.bytes), 'archive download');  -- the audit row and the security-log entry (step archive_download)
   RETURN jsonb_build_object('storage_key', a.storage_key, 'bytes', a.bytes, 'sha256', a.sha256, 'request_id', r.id, 'archive_id', a.id);
 END $$;
 

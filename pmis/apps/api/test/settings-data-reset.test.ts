@@ -333,6 +333,46 @@ describe('the scope of a request (0.15.71)', () => {
     const c = await post(admin1, `/requests/${r.body.id}/cancel`, { reason: 'Narrow scope test only' }, etag(r));
     expect(c.status).toBe(200);
   });
+
+  it('archive before delete (migration 0368): the run is refused until the archive is made and (mode download) downloaded once; the download is System Admin only and logged', async () => {
+    await backupRow();
+    const r = await post(admin1, '/requests', { reason: 'Archive synthetic test', confirm_text: phrase, parts: ['procurement'], archive: 'download' });
+    expect(r.status).toBe(201);
+    expect(r.body.archive).toMatchObject({ mode: 'download', archive: null });
+    const id = r.body.id as string;
+    // the archive is made while the request is approved, not before
+    expect((await post(admin1, `/requests/${id}/archive`, {})).status).toBe(409);
+    const ap = await post(admin2, `/requests/${id}/approve`, { reason: 'Archive synthetic approval', scope_hash: r.body.scope_hash }, etag(r));
+    expect(ap.status).toBe(200);
+    const run1 = await post(admin1, `/requests/${id}/run`, { confirm_text: phrase }, etag(ap));
+    expect(run1.status).toBe(409);
+    expect(run1.body.code).toBe('archive_required');
+    expect((await post(plain, `/requests/${id}/archive`, {})).status).toBe(403);
+    const made = await post(admin1, `/requests/${id}/archive`, {});
+    expect(made.status).toBe(202);
+    const { DataResetArchiveService } = await import('../src/settings/data-reset-archive.service');
+    for (let i = 0; i < 400 && app.get(DataResetArchiveService).running.size > 0; i++) await Promise.all([...app.get(DataResetArchiveService).running]);
+    const got = await admin1.api.call('get', `/settings/data-reset/requests/${id}`);
+    expect(got.body.archive.archive).toMatchObject({ status: 'ready', downloads: 0 });
+    expect(got.body.archive.archive.bytes).toBeGreaterThan(0);
+    expect(got.body.archive.archive.entries.records).toBeGreaterThan(0);
+    // mode download: still refused before the first download
+    const run2 = await post(admin1, `/requests/${id}/run`, { confirm_text: phrase }, etag(got));
+    expect(run2.status).toBe(409);
+    expect(run2.body.code).toBe('archive_required');
+    expect((await plain.api.call('get', `/settings/data-reset/requests/${id}/archive/download`)).status).toBe(403);
+    expect((await adminNoStep.api.call('get', `/settings/data-reset/requests/${id}/archive/download`)).status).toBe(401);
+    const dl = await admin1.api.call('get', `/settings/data-reset/requests/${id}/archive/download`);
+    expect(dl.status).toBe(200);
+    expect(String(dl.headers['content-type'])).toContain('application/zip');
+    expect(await q(db, `SELECT 1 FROM audit_log WHERE action = 'data_reset_archive_download' AND actor_id = $1`, [admin1.user.id])).toHaveLength(1);
+    expect((await q<{ downloads: number }>(db, `SELECT downloads FROM data_reset_archives WHERE request_id = $1`, [id]))[0]!.downloads).toBe(1);
+    // the mode never changes with the request
+    await expect(db.query(`UPDATE data_reset_requests SET archive_mode = 'none' WHERE id = $1`, [id])).rejects.toThrow();
+    const last = await admin1.api.call('get', `/settings/data-reset/requests/${id}`);
+    const c = await post(admin1, `/requests/${id}/cancel`, { reason: 'Archive test only' }, etag(last));
+    expect(c.status).toBe(200);
+  });
 });
 
 describe('the guarded settings', () => {
