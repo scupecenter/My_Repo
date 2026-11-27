@@ -8,6 +8,8 @@ import {
   receivePct,
   scorecardSummary,
   approvalsByRole,
+  changesSummary,
+  actionsSummary,
   firstPassPct,
   meanDays,
   ScorecardItem,
@@ -207,5 +209,47 @@ describe("item 7 rules: pending approvals by role (0.15.204)", () => {
     expect(r.by_role).toEqual([]);
     expect(r.waiting.total).toBe(0);
     expect(r.waiting.oldest_days).toBeNull();
+  });
+});
+
+describe("item 8 rules: change requests and meeting actions (0.15.205)", () => {
+  it("counts the pending change requests per kind with their ages and the approved ones not yet applied", () => {
+    const r = changesSummary([
+      { kind: "scope_change", status: "requested", days: 3 },
+      { kind: "scope_change", status: "requested", days: 40 },
+      { kind: "date_change", status: "requested", days: 10 },
+      { kind: "date_change", status: "approved", days: 90 },
+      { kind: "other", status: "rejected", days: 5 },
+      { kind: "other", status: "applied", days: 5 },
+    ]);
+    expect(r.pending).toBe(3);
+    expect(r.approved_not_applied).toBe(1);
+    expect(r.by_kind).toEqual([
+      { kind: "scope_change", count: 2 },
+      { kind: "date_change", count: 1 },
+    ]);
+    expect(r.pending_aging.oldest_days).toBe(40);
+    expect(r.pending_aging.buckets.find((b) => b.key === "over_30")?.count).toBe(1);
+  });
+
+  it("counts the open meeting actions, the overdue ones with their days late, and those without a due date", () => {
+    const r = actionsSummary([
+      { status: "open", days_overdue: 5 },
+      { status: "in_progress", days_overdue: 35 },
+      { status: "open", days_overdue: -3 },
+      { status: "open", days_overdue: null },
+      { status: "closed", days_overdue: 50 },
+      { status: "na", days_overdue: 50 },
+    ]);
+    expect(r.open).toBe(4);
+    expect(r.overdue).toBe(2);
+    expect(r.no_due_date).toBe(1);
+    expect(r.overdue_aging.oldest_days).toBe(35);
+  });
+
+  it("answers empty shapes when there is nothing", () => {
+    expect(changesSummary([]).pending).toBe(0);
+    expect(changesSummary([]).pending_aging.oldest_days).toBeNull();
+    expect(actionsSummary([]).overdue).toBe(0);
   });
 });

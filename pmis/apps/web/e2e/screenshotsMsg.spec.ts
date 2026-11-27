@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import path from 'node:path';
-import { login } from './helpers';
+import { login, signOutViaMenu } from './helpers';
 
 // Run with: SHOTS=1 SHOTS_DIR=/some/dir npx playwright test e2e/screenshotsMsg.spec.ts
 const OUT = path.resolve(process.env.SHOTS_DIR ?? 'test-results/shots');
@@ -17,7 +17,7 @@ for (const [locale, theme] of [['en', 'light'], ['ar', 'dark']] as const) {
     await page.getByTestId('ann-popup-note').fill('Clashes with the night shift');
     await shot('announcement-popup-disagree');
     await page.getByTestId('ann-popup-submit').click();
-    await page.getByTestId('topbar-signout').click();
+    await signOutViaMenu(page);
 
     await login(page, 'reviewer');
     await page.getByTestId('nav-messages').click();
@@ -30,7 +30,7 @@ for (const [locale, theme] of [['en', 'light'], ['ar', 'dark']] as const) {
     await page.getByTestId('new-message-to').selectOption({ index: 1 });
     await shot('messages-new');
     await page.keyboard.press('Escape');
-    await page.getByTestId('topbar-signout').click();
+    await signOutViaMenu(page);
 
     await login(page, 'pm');
     await page.getByTestId('nav-announcements').click();
@@ -51,7 +51,7 @@ for (const [locale, theme] of [['en', 'light'], ['ar', 'dark']] as const) {
     await page.getByTestId('users-tab-departments').click();
     await page.getByTestId('dept-row-CIVIL').waitFor();
     await shot('departments');
-    await page.getByTestId('users-tab-active').click();
+    await page.getByTestId('people-tab-users').click();
     await page.getByTestId('user-open-1103').click();
     await page.getByTestId('org-manager-value').waitFor();
     await shot('user-org');

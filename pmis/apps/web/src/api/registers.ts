@@ -163,6 +163,12 @@ export function useNewVersion(key: string) {
 }
 
 // ---- template entry (contract 0.7.0: /templates, /import-batches)
+/** P3 (0.15.203): what changed between two versions of a template (default: the current one and the one before). */
+import type { components } from './schema';
+export type TemplateChanges = components['schemas']['TemplateChanges'];
+export const useTemplateChanges = (templateId: string, enabled = true) =>
+  useQuery({ queryKey: ['template-changes', templateId], enabled, staleTime: 60_000, queryFn: () => api.get<TemplateChanges>(`/templates/${templateId}/changes`) });
+
 export const useTemplates = () => useQuery({ queryKey: ['templates'], staleTime: 60_000, queryFn: () => api.get<{ items: Template[] }>('/templates').then((r) => r.items) });
 
 export type TemplateDownload = { prefill?: boolean; taskId?: string; siteIds?: string[]; regionId?: string; filters?: Record<string, unknown> };

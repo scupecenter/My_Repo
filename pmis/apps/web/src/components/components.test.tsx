@@ -142,6 +142,18 @@ describe('Approvals', () => {
     await waitFor(() => expect(screen.queryByTestId(`approval-row-${T(6)}`)).toBeNull());
   });
 
+  it('P3: tabs, quick filters and sort share one row; Select all sits in the list header', async () => {
+    await signIn('pm');
+    renderApp(<Approvals />);
+    await screen.findByTestId('approvals-list');
+    const tab = screen.getByTestId('approvals-tab-all');
+    expect(tab.closest('[role=tablist]')!.parentElement).toBe(screen.getByTestId('approvals-timing').parentElement);
+    expect(screen.getByTestId('approvals-sort').closest('[data-testid=approvals-timing]')).not.toBeNull();
+    const header = screen.getByTestId('approvals-list-header');
+    expect(within(header).getByTestId('approval-select-all')).toBeInTheDocument();
+    expect(header.nextElementSibling).toBe(screen.getByTestId('approvals-list'));
+  });
+
   it('bulk approve asks for one step-up then completes', async () => {
     await signIn('pm');
     renderApp(<Approvals />);

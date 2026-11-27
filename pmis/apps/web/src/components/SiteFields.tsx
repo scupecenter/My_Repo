@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { UnsavedGuard } from '@/lib/unsavedGuard';
 import { useTranslation } from 'react-i18next';
 import { useProposeSiteChange, useUpdateSite, type SiteCustomField } from '@/api/qc';
 import type { SiteDetail } from '@/api/types';
@@ -31,6 +32,7 @@ export function SiteFields({ site }: { site: SiteDetail }) {
   };
   return (
     <section className="mt-3 rounded-md border border-line p-3 text-sm" aria-label={t('siteFields.title')} data-testid="site-fields">
+      <UnsavedGuard scope="inline" dirty={!!draft} needsReason label={t('siteFields.title')} onSave={(reason) => new Promise<boolean>((res) => { if (!draft) { res(false); return; } propose.mutate({ custom: { [draft.code]: draft.value }, reason }, { onSuccess: () => { setDraft(null); res(true); }, onError: () => res(false) }); })} />
       <div className="flex flex-wrap items-center gap-4">
         <span className="font-semibold">{t('siteFields.title')}</span>
         {fields.map((f) => {

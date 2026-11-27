@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { UnsavedGuard } from '@/lib/unsavedGuard';
 import { useTranslation } from 'react-i18next';
 import { useSaveTableDisplay, useTableDisplaySetting } from '@/api/display';
 import { useMe } from '@/api/hooks';
@@ -63,6 +64,7 @@ export function DisplaySettings() {
           <button type="button" className="btn" data-testid="display-discard" disabled={!f} onClick={() => setF(null)}>{t('common.cancel')}</button>
         </div>
       ) : <p className="text-sm text-mute" data-testid="display-read-only">{t('tstd.settings_read_only')}</p>}
+      <UnsavedGuard scope="settings" dirty={!!f} needsReason label={t('ui.guard_settings')} onSave={(reason) => new Promise<boolean>((res) => save.mutate({ defaults: v, reason, version: q.data.version }, { onSuccess: () => res(true), onError: () => res(false) }))} />
       {open && (
         <FormDialog open onClose={() => setOpen(false)} testid="display-dialog" title={t('tstd.settings_title')} busy={save.isPending} error={save.isError && !Object.keys(errs).length ? errText(save.error, t) : null}
           onSubmit={(reason) => save.mutate({ defaults: v, reason, version: q.data.version }, { onSuccess: () => { toast(t('settings.audited')); setOpen(false); setF(null); } })} />

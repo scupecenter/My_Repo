@@ -3,6 +3,7 @@ import { SyslogService } from '../auth/syslog.service';
 import { APP_CONFIG, AppConfig } from '../config/config';
 import { DbService } from '../db/db.service';
 import { JobRunsService } from '../logs/job-runs.service';
+import { DashboardExtrasService } from '../dashboard/dashboard-extras.service';
 
 export const JOB_HOUR = 2;
 export const JOB_TIME_ZONE = 'Africa/Tripoli';
@@ -29,6 +30,7 @@ export interface DailyJobResult {
   expiryNotices?: number;
   /** 0362 (A9): approval digest notices written by this run */
   approvalDigests?: number;
+  templateNotices?: number;
 }
 
 /** The wall-clock parts of an instant in a time zone, and the zone's offset from UTC at that instant (milliseconds). */
@@ -77,6 +79,7 @@ export class JobsService implements OnApplicationBootstrap, OnModuleDestroy {
     private readonly syslog: SyslogService,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
     private readonly runs: JobRunsService,
+    private readonly dash: DashboardExtrasService,
   ) {}
 
   get enabled(): boolean {
@@ -135,6 +138,8 @@ export class JobsService implements OnApplicationBootstrap, OnModuleDestroy {
         if (expiring > 0) result.expiryNotices = expiring;
         const approvals = await this.approvalDigest();
         if (approvals > 0) result.approvalDigests = approvals;
+        const changed = await this.templateChanges();
+        if (changed > 0) result.templateNotices = changed;
       }
       this.lastRun = { at: new Date(), result };
       await this.runs.finish(run, result ? 'ok' : 'skipped', result ? result.slaApplied + result.reminders + (result.snapshots ?? 0) + (result.contractorAlerts ?? 0) + (result.calendarReset ?? 0) : null, null,
@@ -236,7 +241,13 @@ export class JobsService implements OnApplicationBootstrap, OnModuleDestroy {
   /** 0342: the generic alert rules, in-app notifications only; alert_rules_run finds the targets of the day and writes one notification per
    * recipient per rule per period and target (deduped), so a second run the same day adds nothing. A failure is logged and leaves the other steps alone. */
   private async alertRules(): Promise<number> {
-    const n = await this.runs.run('alert_rules', async (tx) => Number((await tx.$queryRaw<{ n: number }[]>`SELECT alert_rules_run() AS n`)[0]?.n ?? 0));
+    const n = await this.runs.run('alert_rules', async (tx) => {
+      const base = Number((await tx.$queryRaw<{ n: number }[]>`SELECT alert_rules_run() AS n`)[0]?.n ?? 0);
+      // 0348: the kpi_threshold rules compare the live system-wide KPI values with each rule's own editable threshold.
+      const values = await this.dash.kpiValuesForJob();
+      const kpi = Number((await tx.$queryRaw<{ n: number }[]>`SELECT alert_rules_kpi_run(${JSON.stringify(values)}::jsonb) AS n`)[0]?.n ?? 0);
+      return base + kpi;
+    });
     if (n === null) {
       this.log.warn('alert rules failed');
       await this.syslog.write('error', 'alert rules failed', {});
@@ -251,6 +262,17 @@ export class JobsService implements OnApplicationBootstrap, OnModuleDestroy {
     if (n === null) {
       this.log.warn('expiry radar failed');
       await this.syslog.write('error', 'expiry radar failed', {});
+      return 0;
+    }
+    return n;
+  }
+
+  /** 0367 (P3): in-app notice to the entry holders when a register template gets a new version; the setting is templates.change_notice. */
+  private async templateChanges(): Promise<number> {
+    const n = await this.runs.run('template_change_notice', async (tx) => Number((await tx.$queryRaw<{ n: number }[]>`SELECT template_change_notify() AS n`)[0]?.n ?? 0));
+    if (n === null) {
+      this.log.warn('template change notice failed');
+      await this.syslog.write('error', 'template change notice failed', {});
       return 0;
     }
     return n;
