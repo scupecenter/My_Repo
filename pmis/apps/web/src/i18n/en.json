@@ -2541,6 +2541,20 @@
     "kind_user": "person",
     "kind_mixed": "mixed holders"
   },
+  "entity_locks": {
+    "locked_badge": "Locked",
+    "lock": "Lock",
+    "unlock": "Unlock",
+    "lock_title": "Lock this record",
+    "unlock_title": "Unlock this record",
+    "lock_note": "A locked record is read-only for everyone except a System Admin. A reason is required and is kept in the audit.",
+    "unlock_note": "The record becomes editable again. A reason is required and is kept in the audit.",
+    "columns_title": "Locked columns",
+    "column_select": "Choose a column to lock",
+    "lock_column": "Lock column",
+    "unlock_column": "Unlock column",
+    "none": "No column is locked."
+  },
   "wh": {
     "title": "Warehouse",
     "tab_items": "Item master",
@@ -2550,9 +2564,9 @@
     "show_inactive": "Show inactive",
     "new_item": "New item",
     "edit": "Edit",
-    "delete": "Delete",
-    "delete_note": "This item has no data. It will be deleted for real (it cannot be undone). Use Deactivate to keep it.",
-    "delete_title": "Delete item",
+    "delete": "Hide",
+    "delete_note": "The item is hidden, not deleted: its movements, serials and history stay. It is audited with the reason, and a System Admin can show it again.",
+    "delete_title": "Hide item",
     "deactivate": "Deactivate",
     "new_title": "New item",
     "edit_title": "Edit item",
