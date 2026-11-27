@@ -220,6 +220,13 @@ export const dashboardHandlers = [
           { party_id: '00000000-0000-4000-8000-000000000205', name: 'Med Links', type: 'supplier', level: 'ok', delay_days: 0, snags_overdue: 2, quality_failed: 0 },
         ],
       },
+      // 0.15.203: quality, snags and NCR, synthetic figures
+      quality: {
+        available: true,
+        snags: { open: 34, closed: 126, avg_close_days: 9.6, returned_open: 5 },
+        ncrs: { open: 6, closed: 41, avg_close_days: 14.2 },
+        first_pass_pct: 92.4,
+      },
     });
   }),
   http.get(`${B}/dashboard/site-map`, () => {

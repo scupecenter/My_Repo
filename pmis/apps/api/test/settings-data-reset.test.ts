@@ -239,8 +239,8 @@ describe('the scope of a request (0.15.71)', () => {
   it('the dry run of a scope counts per part and per table; the database adds the dependent parts', async () => {
     const res = await admin1.api.call('get', '/settings/data-reset/plan?parts=procurement');
     expect(res.status).toBe(200);
-    expect(res.body.scope).toMatchObject({ requested: ['procurement'], parts: ['car_dispatcher', 'financial_advances', 'procurement'],
-      added: ['car_dispatcher', 'financial_advances'], everything: false });
+    expect(res.body.scope).toMatchObject({ requested: ['procurement'], parts: ['car_dispatcher', 'financial_advances', 'invoices', 'procurement'],
+      added: ['car_dispatcher', 'financial_advances', 'invoices'], everything: false });
     const tables = new Map<string, { delete: number; keep: number }>(res.body.tables.map((t: { table: string }) => [t.table, t]));
     expect(tables.get('sites')).toMatchObject({ delete: 0 });
     expect(tables.get('procurement_records')).toMatchObject({ delete: 1 });
@@ -273,7 +273,7 @@ describe('the scope of a request (0.15.71)', () => {
     id = res.body.id;
     hash = res.body.scope_hash;
     expect(hash).toMatch(/^[0-9a-f]{64}$/);
-    expect(res.body.scope).toMatchObject({ parts: ['car_dispatcher', 'financial_advances', 'procurement'], added: ['car_dispatcher', 'financial_advances'] });
+    expect(res.body.scope).toMatchObject({ parts: ['car_dispatcher', 'financial_advances', 'invoices', 'procurement'], added: ['car_dispatcher', 'financial_advances', 'invoices'] });
     expect(res.body.plan_at_request.parts).toMatchObject({ procurement: expect.any(Number), car_dispatcher: expect.any(Number) });
     const row = await q<{ requested_parts: string[]; scope_hash: string }>(db, 'SELECT requested_parts, scope_hash FROM data_reset_requests WHERE id = $1', [id]);
     expect(row[0]).toMatchObject({ requested_parts: ['procurement'], scope_hash: hash });
