@@ -2272,6 +2272,20 @@
     "processing_started": "The batch is being processed in the background. The bar shows the progress.",
     "processing_busy": "Processing…"
   },
+  "tplChanges": {
+    "button": "What changed",
+    "button_hint": "Compare v{{version}} with the version before it",
+    "title": "What changed in {{id}}",
+    "between": "v{{from}} to v{{to}}, issued {{date}}",
+    "loading": "Loading",
+    "error": "Could not load the comparison.",
+    "none": "Same columns; only a setting inside the template changed.",
+    "added": "Columns added ({{count}})",
+    "removed": "Columns removed ({{count}})",
+    "renamed": "Columns renamed ({{count}})",
+    "current_ok": "Current version. It matches the live definition of the register.",
+    "notice": "This template changed on {{date}}: {{added}} added, {{removed}} removed, {{renamed}} renamed. An old file is refused; download the current version and copy your rows into it."
+  },
   "batchReview": {
     "kpis": "Upload counts",
     "kpi_rows": "Rows checked",

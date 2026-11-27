@@ -12377,6 +12377,27 @@ paths:
                     type: array
                     items: {$ref: '#/components/schemas/Template'}
         '401': {$ref: '#/components/responses/Unauthorized'}
+  /templates/{template_id}/changes:
+    parameters:
+    - {$ref: '#/components/parameters/TemplateId'}
+    get:
+      tags: [templates]
+      operationId: getTemplateChanges
+      summary: What changed between two versions of a template (columns added, removed, renamed)
+      description: |
+        P3 (0.15.203). Compares `template_versions.columns` by column code. `to` defaults to the current version, `from` to the version before it. Read only; a caller who may not see the template gets 404 as for `GET /templates`.
+        A version that was never issued (for example from > current) answers 404. The first version has nothing to compare: `from` is null and the lists are empty.
+      parameters:
+      - {name: from, in: query, schema: {type: integer, minimum: 1}}
+      - {name: to, in: query, schema: {type: integer, minimum: 1}}
+      responses:
+        '200':
+          description: The differences.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/TemplateChanges'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
   /templates/{template_id}/download:
     parameters:
     - {$ref: '#/components/parameters/TemplateId'}
@@ -20721,6 +20742,27 @@ components:
                 email: { $ref: '#/components/schemas/StaffFieldVisibility' }
                 phone: { $ref: '#/components/schemas/StaffFieldVisibility' }
     # ---------------------------------------------------------- templates and import batches
+    TemplateChanges:
+      type: object
+      required: [template_id, from, to, issued_at, reason, added, removed, renamed]
+      properties:
+        template_id: {type: string}
+        from: {type: [integer, 'null']}
+        to: {type: integer}
+        issued_at: {type: [string, 'null'], format: date-time}
+        reason: {type: [string, 'null']}
+        added: {type: array, items: {$ref: '#/components/schemas/TemplateColumnRef'}}
+        removed: {type: array, items: {$ref: '#/components/schemas/TemplateColumnRef'}}
+        renamed:
+          type: array
+          items:
+            type: object
+            required: [code, from_label, to_label]
+            properties: {code: {type: string}, from_label: {type: string}, to_label: {type: string}}
+    TemplateColumnRef:
+      type: object
+      required: [code, label]
+      properties: {code: {type: string}, label: {type: string}}
     Template:
       type: object
       required: [template_id, name_en, kind, current_version, is_active]

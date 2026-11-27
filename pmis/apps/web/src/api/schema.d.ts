@@ -7991,6 +7991,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/templates/{template_id}/changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Template ID such as TPL-SITE. */
+                template_id: components["parameters"]["TemplateId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * What changed between two versions of a template (columns added, removed, renamed)
+         * @description P3 (0.15.203). Compares `template_versions.columns` by column code. `to` defaults to the current version, `from` to the version before it. Read only; a caller who may not see the template gets 404 as for `GET /templates`.
+         *     A version that was never issued (for example from > current) answers 404. The first version has nothing to compare: `from` is null and the lists are empty.
+         */
+        get: operations["getTemplateChanges"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/templates/{template_id}/download": {
         parameters: {
             query?: never;
@@ -14551,6 +14575,25 @@ export interface components {
                 email?: components["schemas"]["StaffFieldVisibility"];
                 phone?: components["schemas"]["StaffFieldVisibility"];
             };
+        };
+        TemplateChanges: {
+            template_id: string;
+            from: number | null;
+            to: number;
+            /** Format: date-time */
+            issued_at: string | null;
+            reason: string | null;
+            added: components["schemas"]["TemplateColumnRef"][];
+            removed: components["schemas"]["TemplateColumnRef"][];
+            renamed: {
+                code: string;
+                from_label: string;
+                to_label: string;
+            }[];
+        };
+        TemplateColumnRef: {
+            code: string;
+            label: string;
         };
         Template: {
             /**
@@ -35222,6 +35265,34 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+        };
+    };
+    getTemplateChanges: {
+        parameters: {
+            query?: {
+                from?: number;
+                to?: number;
+            };
+            header?: never;
+            path: {
+                /** @description Template ID such as TPL-SITE. */
+                template_id: components["parameters"]["TemplateId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The differences. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateChanges"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
         };
     };
     downloadTemplate: {

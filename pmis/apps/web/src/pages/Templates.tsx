@@ -8,6 +8,7 @@ import { downloadTemplate, useBatches, useTemplates } from '@/api/registers';
 import { batchPath, type ImportBatch, type Template } from '@/api/types';
 import { PageHeader } from '@/components/PageHeader';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/States';
+import { WhatChangedButton } from '@/components/TemplateChanges';
 import { TemplateUploadDialog } from '@/components/TemplateUploadDialog';
 import { useToast } from '@/components/Toast';
 import { registerErrorMessage } from '@/lib/registerErrors';
@@ -78,6 +79,7 @@ export function TemplatesPage() {
                     <td className="p-2 text-mute">{dateOf(x.issued_at)}</td>
                     <td className="p-2">
                       <span className="flex flex-wrap gap-1">
+                        {kind === 'register' && <WhatChangedButton templateId={x.template_id} version={x.current_version} />}
                         <button className="btn px-2 py-1 text-xs" data-testid={`tpl-download-${x.template_id}`} onClick={() => void down(x, false)}><FileDown size={14} />{t('registers.template_download')}</button>
                         {!ownScreen(kind) && <button className="btn px-2 py-1 text-xs" data-testid={`tpl-prefill-${x.template_id}`} onClick={() => void down(x, true)}><FileSpreadsheet size={14} />{t('registers.template_prefill')}</button>}
                         {!ownScreen(kind) && <button className="btn px-2 py-1 text-xs" data-testid={`tpl-upload-${x.template_id}`} onClick={() => setUploadFor(x)}><FileUp size={14} />{t('registers.template_upload')}</button>}
