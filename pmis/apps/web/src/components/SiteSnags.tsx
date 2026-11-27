@@ -10,7 +10,7 @@ import { DictateButton } from './DictateButton';
 import { RecordVideo } from './RecordVideo';
 import { RejectDialog } from './RejectDialog';
 import { useTablePrefs } from './TableKit';
-import { DisplayMenu, displayAttrs, ExportCsvButton, SearchBox, TableCount, TableToolbar } from './TableStandard';
+import { displayAttrs, ExportCsvButton, SearchBox, TableCount, TableToolbar } from './TableStandard';
 import { useToast } from './Toast';
 
 const STATE_TONE: Record<string, string> = { open: 'bg-lateBg text-lateInk', fix_submitted: 'bg-openBg text-openInk', in_review: 'bg-waitBg text-waitInk', closed: 'bg-doneBg text-doneInk', cancelled: 'bg-lockBg text-lockInk' };
@@ -219,7 +219,6 @@ export function SiteSnags({ siteId }: { siteId: string }) {
         search={<SearchBox value={search} onChange={setSearch} testid="site-snags-search" placeholder={t('tstd.search_table')} />}
         count={<TableCount testid="site-snags-count" noun="items" total={all.length} filtered={items.length} active={!!needle} onClear={() => setSearch('')} />}
         primary={!raising ? <button className="btn" data-testid="snag-raise" onClick={() => setRaising(true)}><Plus size={14} />{t('snags.raise')}</button> : undefined}
-        display={<DisplayMenu api={tbl} />}
         exporter={<ExportCsvButton testid="site-snags-export" name="site-snags" head={[t('snags.title'), t('snags.scope'), t('docs.c_status'), t('snags.severity')]}
           rows={() => items.map((s) => [s.title, s.scope, t(`snagState.${s.state}`), s.severity ?? ''])} />} />
       <p className="text-sm text-mute" data-testid="snag-open-count">{t('snags.open_count', { count: q.data?.open_count ?? 0 })}</p>

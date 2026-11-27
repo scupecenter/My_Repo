@@ -1,6 +1,6 @@
 import * as Popover from '@radix-ui/react-popover';
 import { ChevronDown, ChevronRight, Download, FileText, Lock, Upload, UserX } from 'lucide-react';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentProps, type KeyboardEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ApiError } from '@/api/client';
 import { downloadTemplate, useUploadBatch } from '@/api/registers';
@@ -14,9 +14,10 @@ import { Holders } from './HolderChip';
 import { OverrideBadge } from './OverrideBadge';
 import { MoreMenu } from './PageHeader';
 import { EmptyState, NoResults } from './States';
-import { ActiveChips, BulkBar, ColumnMenu, DensityToggle, Empty, HEADER_H, HeaderRow, NotApplicable, pin, QuickFilter, SelectBox, totalWidth, tracks, Trunc, useTablePrefs } from './TableKit';
-import { DisplayMenu, displayAttrs, ROWNO_COL, RowNo, SearchBox, TableCount, TableToolbar, WRAP_EXTRA } from './TableStandard';
+import { ActiveChips, BulkBar, ColumnMenu, Empty, HEADER_H, HeaderRow, NotApplicable, pin, QuickFilter, SelectBox, totalWidth, tracks, Trunc, useTablePrefs } from './TableKit';
+import { displayAttrs, ROWNO_COL, RowNo, SearchBox, TableCount, TableToolbar, WRAP_EXTRA } from './TableStandard';
 import { SavedViews } from './SavedViews';
+import { LayoutPanel } from './LayoutPanel';
 import { UnifiedFilter } from './UnifiedFilter';
 import { decodeFilter, encodeFilter, type FilterTree } from '@/api/views';
 import { fmtDate } from '@/lib/time';
@@ -99,10 +100,10 @@ export function taskMatches(x: TaskSummary, q: string, name: string): boolean {
   return x.task_code.toLowerCase().includes(n) || name.toLowerCase().includes(n) || x.name_en.toLowerCase().includes(n);
 }
 
-export function TaskGrid({ siteId, stages, onOpen, selected, onVisible, switcher, exporter }: {
+export function TaskGrid({ siteId, stages, onOpen, selected, onVisible, views, layoutTestid, exporter }: {
   siteId: string; stages: SiteTasks['stages']; onOpen: (id: string) => void; selected?: string | null; onVisible?: (ids: string[]) => void;
-  /** W8: the layout switcher (List, Timeline) and Export current view of the site page, in the shared toolbar */
-  switcher?: ReactNode; exporter?: ReactNode;
+  /** W8: the layouts of the site page (List, Timeline) in the unified Layout panel (decision V1), and Export current view, in the shared toolbar */
+  views?: ComponentProps<typeof LayoutPanel>['views']; layoutTestid?: string; exporter?: ReactNode;
 }) {
   const { t, i18n } = useTranslation();
   const toast = useToast();
@@ -261,10 +262,8 @@ export function TaskGrid({ siteId, stages, onOpen, selected, onVisible, switcher
         search={<SearchBox testid="task-grid-search" value={tq} onChange={(x) => setParam('tq', x)} placeholder={t('tstd.search_tasks')} />}
         filter={<UnifiedFilter screen="site-tasks" value={advTree} onChange={(tree) => setParam('tadv', encodeFilter(tree))} onClearAll={clearAll} />}
         count={<TableCount testid="task-grid-count" noun="tasks" total={totalTasks} filtered={shownTasks.length} active={!!(tq || tadv || quick.length || holder)} selected={picked.size} onClear={clearAll} />}
-        switcher={switcher}
+        layout={<LayoutPanel testid={layoutTestid ?? 'task-grid-layout'} views={views} table={api2} />}
         columns={<ColumnMenu api={api2} label={label} />}
-        density={<DensityToggle api={api2} />}
-        display={<DisplayMenu api={api2} />}
         exporter={exporter}
         more={<MoreMenu items={[{ id: 'reset', label: t('table.reset'), testid: 'more-reset-cols', onSelect: api2.reset }]} />} />
       <div role="toolbar" aria-label={t('table.quick')} className="mb-2 flex flex-wrap items-center gap-2" data-testid="task-grid-tools">
