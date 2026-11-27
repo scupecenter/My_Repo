@@ -3062,6 +3062,9 @@
     "p_returned_note": "{{x}} was returned with a note",
     "p_nobody_level": "{{x}}: nobody can act on the {{y}} level.",
     "t_a_new_site_was_approved": "A new site was approved",
+    "t_your_structure_proposal_was_rejected": "Your structure proposal was rejected",
+    "t_a_structure_proposal_waits_for_review": "A structure proposal waits for review",
+    "t_your_structure_proposal_was_applied": "Your structure proposal was applied",
     "p_sla_escalation": "SLA escalation: {{x}}",
     "p_reminder": "Reminder: {{x}}"
   },

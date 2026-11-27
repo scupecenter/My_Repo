@@ -3070,6 +3070,9 @@
     "p_returned_note": "أُعيد {{x}} مع ملاحظة",
     "p_nobody_level": "{{x}}: لا أحد يستطيع التصرف في مستوى {{y}}.",
     "t_a_new_site_was_approved": "تم اعتماد موقع جديد",
+    "t_your_structure_proposal_was_rejected": "تم رفض مقترح الهيكل الخاص بك",
+    "t_a_structure_proposal_waits_for_review": "مقترح هيكل بانتظار المراجعة",
+    "t_your_structure_proposal_was_applied": "تم تطبيق مقترح الهيكل الخاص بك",
     "p_sla_escalation": "تصعيد اتفاقية مستوى الخدمة: {{x}}",
     "p_reminder": "تذكير: {{x}}"
   },
