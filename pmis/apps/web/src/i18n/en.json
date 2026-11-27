@@ -6555,5 +6555,23 @@
     "never": "Not changed since installation.",
     "readonly": "Only a System Admin, or a person they delegated settings to for all regions, can change this.",
     "confirm": "Save the login page settings? The change is audited with your reason and shows on the sign-in page at once."
+  },
+  "capture": {
+    "dictate": "Dictate",
+    "dictate_stop": "Stop dictation",
+    "annotate_title": "Mark the photo",
+    "arrow": "Arrow",
+    "circle": "Circle",
+    "undo": "Undo",
+    "clear": "Clear",
+    "use_asis": "Upload as is",
+    "use_annotated": "Upload with marks",
+    "video": "Video",
+    "video_title": "Short video (up to {{seconds}}s)",
+    "video_unsupported": "This browser cannot record video here. Use the photo upload instead.",
+    "record": "Record",
+    "stop": "Stop",
+    "use_video": "Upload video",
+    "annotate": "Annotate"
   }
 }

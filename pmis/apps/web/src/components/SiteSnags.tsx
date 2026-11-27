@@ -1,10 +1,13 @@
-import { Camera, Check, Download, FileUp, Plus, Trash2, Undo2 } from 'lucide-react';
+import { Camera, Check, Download, FileUp, Pencil, Plus, Trash2, Undo2 } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ApiError } from '@/api/client';
 import { downloadDocument } from '@/api/documents';
 import { useDecideEvidence, useRaiseSnag, useSiteSnags, useSnagOp, useSnagPhoto, useSnagSeverities, useSnagTypes, useWithdrawSnagPhoto, type Snag } from '@/api/qc';
 import { taskErrorMessage } from '@/lib/taskErrors';
+import { AnnotatePhoto } from './AnnotatePhoto';
+import { DictateButton } from './DictateButton';
+import { RecordVideo } from './RecordVideo';
 import { RejectDialog } from './RejectDialog';
 import { useToast } from './Toast';
 
@@ -33,7 +36,9 @@ function SnagCard({ snag, siteId }: { snag: Snag; siteId: string }) {
   const shots = rules.shot_types ?? [];
   const [shot, setShot] = useState(shots[0] ?? '');
   const [rejecting, setRejecting] = useState(false);
+  const [annotate, setAnnotate] = useState<File | null>(null);
   const camRef = useRef<HTMLInputElement>(null);
+  const annRef = useRef<HTMLInputElement>(null);
   const can = (a: string) => (snag.allowed_actions ?? []).includes(a as never);
   const typeName = (i18n.language === 'ar' && snag.snag_type.name_ar) || snag.snag_type.name_en;
   const busy = up.isPending || del.isPending || op.isPending || ev.isPending;
@@ -48,6 +53,7 @@ function SnagCard({ snag, siteId }: { snag: Snag; siteId: string }) {
     if (rules.max_size_mb && f.size > rules.max_size_mb * MB) { toast(t('snags.err.too_large', { mb: rules.max_size_mb }), 'err'); return; }
     up.mutate({ snag, file: f, shot_type: shot || null }, { onSuccess: () => toast(t('snags.photo_added')), onError: (e) => toast(`${f.name}: ${snagError(t, e)}`, 'err') });
   };
+
   const run = (o: 'submit' | 'approve' | 'reject', note?: string) =>
     op.mutate({ snag, op: o, note }, { onSuccess: () => { setRejecting(false); toast(t(`snags.done_${o}`)); }, onError: (e) => { setRejecting(false); toast(snagError(t, e), 'err'); } });
   const photos = snag.photos ?? [];
@@ -114,6 +120,14 @@ function SnagCard({ snag, siteId }: { snag: Snag; siteId: string }) {
           <button type="button" className="btn text-sm" onClick={() => camRef.current?.click()}><Camera size={14} />{t('docs.camera')}</button>
           <input ref={camRef} type="file" accept="image/*" capture="environment" className="sr-only" tabIndex={-1} aria-hidden="true"
             onChange={(e) => { const f = e.target.files?.[0]; if (f) send(f); e.target.value = ''; }} />
+          <button type="button" className="btn text-sm" data-testid={`snag-annotate-open-${snag.id}`} title={t('capture.annotate_title')} onClick={() => annRef.current?.click()}><Pencil size={14} />{t('capture.annotate')}</button>
+          <input ref={annRef} type="file" accept="image/*" className="sr-only" tabIndex={-1} aria-hidden="true" data-testid={`snag-annotate-input-${snag.id}`}
+            onChange={(e) => { const f = e.target.files?.[0]; if (f && f.type.startsWith('image/')) setAnnotate(f); e.target.value = ''; }} />
+          <RecordVideo formats={rules.formats ?? []} testid={`snag-video-${snag.id}`} onFile={send} />
+          {annotate && (
+            <AnnotatePhoto file={annotate} testid={`snag-annotate-${snag.id}`}
+              onUse={(f) => { setAnnotate(null); send(f); }} onCancel={() => setAnnotate(null)} />
+          )}
         </div>
       )}
       {snag.state !== 'closed' && (snag.photos_missing?.length ?? 0) > 0 && can('upload') && (
@@ -167,7 +181,10 @@ function RaiseForm({ siteId, onDone }: { siteId: string; onDone: () => void }) {
           </select>
         </label>
         <label className="text-sm">{t('snags.title')}
-          <input className="input mt-1" data-testid="snag-raise-title" value={title} maxLength={200} onChange={(e) => setTitle(e.target.value)} />
+          <span className="mt-1 flex items-center gap-1">
+            <input className="input flex-1" data-testid="snag-raise-title" value={title} maxLength={200} onChange={(e) => setTitle(e.target.value)} />
+            <DictateButton testid="snag-raise-dictate" onText={(said) => setTitle((cur) => (cur.trim() ? `${cur.trim()} ${said}` : said).slice(0, 200))} />
+          </span>
         </label>
       </div>
       <label className="block text-sm">{t('snags.description')}

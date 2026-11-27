@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.97
+  version: 0.15.113
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -31,6 +31,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.113 (2026-11-27): field quick capture for QC snags (owner request 2026-11-27; migration 0215; CHANGELOG FieldQuickCapture). Additive. The snag type photo rules `formats` list also accepts WEBM, MP4 and MOV, so a System Admin (or a Document Library configuration delegate) can let a snag type take a short field video through the existing `POST /snags/{snag_id}/photos` path; nothing is allowed by default (every type still lists only its own formats). A video has no EXIF date and is accepted with `unknown_capture_date`, like any photo without EXIF. No permission, visibility or authentication change; the photo rules, the format check and the upload limits are unchanged.
     - 0.15.97 (2026-11-27): the sign-in page settings (owner request 2026-11-26; migration 0197). Additive. New `GET/PUT /settings/login-page` (`getLoginPage`, `setLoginPage`; setting `ui.login_page`): the sign-in page announcement (English and Arabic, kind info or maintenance, both texts empty hides it), the background animation switch, the default language of the signed-out pages and up to five support links ({label_en, label_ar, url}; http(s) or mailto only). Every signed-in user reads the state (the post-login splash shows `server_version` from it); a System Admin or a delegate of `settings` edit for all regions changes it with a reason, a step-up and If-Match (audited `login_page_update`, before and after). New `GET /settings/login-page/public` (`getLoginPagePublic`, no session): ONLY what the sign-in page renders (announcement, animation, default_locale, support_links) - no version, no audit data, nothing about users; cached 30 seconds and rate limited per address. No permission, visibility or authentication change.
     - 0.15.96 (2026-11-27): responsibility-matrix coverage screen (CHANGELOG MatrixCoverage; no migration). Additive and read only. `GET /matrix/coverage` (`getMatrixCoverage`, System Admin or an all-region delegate of the matrix): for each active stage and enabled register row and each of the seven regions, whether the matrix cell has an actor, so empty cells show before a task or record stalls. Settings > Workflow > Coverage.
     - 0.15.95 (2026-11-27): Issue log and Quality record link to a Procurement order (migration 0195; CHANGELOG IssueQualityOrderLink). Additive. New optional field `procurement_order_id` on `issues` and `quality`; when set, the contractor (`external_party`) is taken from the order (a different typed `external_party_id` is refused, 422 `contractor_from_order`; `order_not_active`, `order_other_site`, `invalid`), so the contractor performance view sees the issue and the inspection. `GET /registers/issues/order-options` and `GET /registers/quality/order-options` list the orders (own module view plus Procurement view).
@@ -22240,7 +22241,7 @@ components:
       properties:
         min_count: { type: integer, minimum: 0 }
         shot_types: { type: array, items: { type: string } }
-        formats: { type: array, items: { type: string, enum: [JPG, PNG, HEIC] } }
+        formats: { type: array, items: { type: string, enum: [JPG, PNG, HEIC, WEBM, MP4, MOV] } }
         max_size_mb: { type: integer }
     DocumentPlacement:
       type: object
