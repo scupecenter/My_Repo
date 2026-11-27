@@ -144,7 +144,7 @@ const reason = (b: { reason?: string }, min: number) =>
 export const dataResetHandlers = [
   http.post(`${B}/__mock/data-reset/request-by-other`, async ({ request }) => {
     const b = (await request.json().catch(() => ({}))) as { parts?: string[]; require_backup?: boolean; archive?: 'none' | 'download' | 'keep_90' } | null;
-    st().request = fresh(OTHER, 'Owner decision: start the real data load', 30, b?.parts ?? null, b?.require_backup ?? true, b?.archive ?? 'none');
+    st().request = fresh(OTHER, 'Owner decision: start the real data load', 30, b?.parts ?? null, b?.require_backup ?? true, b?.archive ?? 'none', st().settings.cooloff_minutes);
     return HttpResponse.json(st().request);
   }),
   http.get(`${B}/settings/data-reset/plan`, ({ request }) => {

@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { cleanup, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
@@ -265,6 +265,7 @@ describe('Settings, data reset', () => {
     await u.click(screen.getByTestId('dr-settings-dialog-submit'));
     await waitFor(() => expect(screen.getByTestId('dr-settings-cooloff')).toHaveTextContent('30 minutes'));
     await api.post('/__mock/data-reset/request-by-other');
+    cleanup(); page();
     await waitFor(() => expect(screen.getByTestId('dr-cooloff-view')).toHaveTextContent('30 minutes'));
     await u.click(screen.getByTestId('dr-approve'));
     expect(screen.getByTestId('dr-approve-cooloff')).toHaveTextContent('waits 30 minutes');
