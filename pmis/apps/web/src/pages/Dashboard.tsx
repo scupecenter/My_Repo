@@ -1,6 +1,8 @@
-import { Check, Download, Link2, MonitorPlay, PencilLine, Printer, RotateCcw } from "lucide-react";
+import { Check, ChevronDown, Download, Link2, MonitorPlay, PencilLine, Printer, RotateCcw, Share2 } from "lucide-react";
+import { loadPref, savePref } from "@/lib/localPref";
+import { useDashboardViewDefaults } from "@/api/settings";
 import { useDownloadGate } from '@/lib/downloadGate';
-import { useMemo, useState, type ReactNode, Fragment } from "react";
+import { useEffect, useMemo, useState, type ReactNode, Fragment } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -580,7 +582,37 @@ export function Dashboard() {
   const snaps = useProjectStatusSnapshots(!!d);
   const [exporting, setExporting] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
-  const [format, setFormat] = useState<ExportFormat>("xlsx");
+  const viewDefaults = useDashboardViewDefaults();
+  // the user's own remembered choice overrides the server-wide default (Settings, Dashboard, view defaults)
+  const [ownFormat, setOwnFormat] = useState<ExportFormat | null>(() => { const v = loadPref<string | null>("dash.exportFormat", null); return v === "csv" || v === "xlsx" ? v : null; });
+  const format: ExportFormat = ownFormat ?? (viewDefaults.data?.export_format === "csv" ? "csv" : "xlsx");
+  const setFormat = (f: ExportFormat) => setOwnFormat(f);
+  const [shareOpen, setShareOpen] = useState(false);
+  // the collapsed blocks of this user ("*" = all blocks, "!code" = one block opened again after "collapse all")
+  const ckey = collapsedKey(userId);
+  const [ownCollapsed, setOwnCollapsed] = useState<{ key: string; list: string[] } | null>(null);
+  // no own choice yet: the server-wide default applies (Settings, Dashboard, view defaults)
+  const ownList = ownCollapsed && ownCollapsed.key === ckey ? ownCollapsed.list : loadPref<string[] | null>(ckey, null);
+  const collapsed: string[] = ownList ?? (viewDefaults.data?.collapse === "closed" ? ["*"] : []);
+  const setCollapsedSaved = (next: string[]) => { setOwnCollapsed({ key: ckey, list: next }); savePref(ckey, next); };
+  const isCollapsed = (code: string) => collapsed.includes(code) || (collapsed.includes("*") && !collapsed.includes(`!${code}`));
+  const toggleBlock = (code: string) => {
+    if (collapsed.includes("*")) setCollapsedSaved(collapsed.includes(`!${code}`) ? collapsed.filter((c) => c !== `!${code}`) : [...collapsed, `!${code}`]);
+    else setCollapsedSaved(collapsed.includes(code) ? collapsed.filter((c) => c !== code) : [...collapsed, code]);
+  };
+  const blockLabel = (code: string) => {
+    const c = dashSettings.data?.catalogue.cards.find((x) => x.code === code);
+    return c ? (ar && c.label_ar) || c.label_en : code;
+  };
+  // the Share / Export menu closes on Escape and on a click outside it
+  useEffect(() => {
+    if (!shareOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setShareOpen(false); };
+    const onDown = (e: MouseEvent) => { if (!(e.target as HTMLElement | null)?.closest?.('[data-testid="dash-share-wrap"]')) setShareOpen(false); };
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("mousedown", onDown);
+    return () => { document.removeEventListener("keydown", onKey); document.removeEventListener("mousedown", onDown); };
+  }, [shareOpen]);
   // Q116: a local preview of the other pipeline style; the style in force is the setting (meta.pipeline_variant)
   const [preview, setPreview] = useState<"A" | "B" | null>(null);
   const canExport =
@@ -1255,69 +1287,97 @@ export function Dashboard() {
               {t("dash.reset")}
             </button>
           )}
-          <Link className="btn" data-testid="dash-tv" to={`/dashboard?${new URLSearchParams([...sp.entries(), ["tv", "1"]]).toString()}`}>
-            <MonitorPlay size={16} />
-            {t("dash.tv")}
-          </Link>
-          <button
-            className="btn"
-            data-testid="dash-copy-link"
-            title={t("dash.copy_link_hint")}
-            onClick={() => {
-              // the address already carries the tab and every filter; it opens after the normal sign-in and the reader's own permissions apply
-              void navigator.clipboard?.writeText(window.location.href).then(() => {
-                setLinkCopied(true);
-                window.setTimeout(() => setLinkCopied(false), 2000);
-              });
-            }}
-          >
-            {linkCopied ? <Check size={16} /> : <Link2 size={16} />}
-            {linkCopied ? t("dash.link_copied") : t("dash.copy_link")}
-          </button>
-          <Link
-            className="btn"
-            to="/dashboard/manual-items"
-            data-testid="dash-manual-link"
-          >
-            <PencilLine size={16} />
-            {t("dash.manual_link")}
-          </Link>
-          {canExport && (
-            <span className="flex items-center gap-1">
-              <select
-                className="input w-auto"
-                aria-label={t("dash.export_format")}
-                data-testid="dash-export-format"
-                value={format}
-                onChange={(e) => setFormat(e.target.value as ExportFormat)}
-              >
-                {(["xlsx", "csv"] as const).map((f) => (
-                  <option key={f} value={f}>
-                    {t(`dash.format.${f}`)}
-                  </option>
-                ))}
-              </select>
+          {/* P2: the six output buttons live in one menu; the controls and their test ids are unchanged, only closed (hidden, not removed) */}
+          <span className="relative print:hidden" data-testid="dash-share-wrap">
+            <button
+              type="button"
+              className="btn"
+              data-testid="dash-share"
+              aria-haspopup="true"
+              aria-expanded={shareOpen}
+              onClick={() => setShareOpen((o) => !o)}
+            >
+              <Share2 size={16} />
+              {t("dash.share_menu")}
+              <ChevronDown size={14} aria-hidden />
+            </button>
+            <div
+              role="group"
+              aria-label={t("dash.share_menu")}
+              data-testid="dash-share-panel"
+              className={`${shareOpen ? "flex" : "hidden"} absolute end-0 top-full z-30 mt-1 min-w-56 flex-col gap-1 rounded-lg border border-line bg-surface p-2 shadow-lg`}
+            >
+              <Link className="btn justify-start" data-testid="dash-tv" to={`/dashboard?${new URLSearchParams([...sp.entries(), ["tv", "1"]]).toString()}`}>
+                <MonitorPlay size={16} />
+                {t("dash.tv")}
+              </Link>
               <button
-                className="btn print:hidden"
-                data-testid="dash-print"
-                disabled={gate.exportLocked}
-                title={gate.note(gate.exportLocked)}
-                onClick={() => window.print()}
+                className="btn justify-start"
+                data-testid="dash-copy-link"
+                title={t("dash.copy_link_hint")}
+                onClick={() => {
+                  // the address already carries the tab and every filter; it opens after the normal sign-in and the reader's own permissions apply
+                  void navigator.clipboard?.writeText(window.location.href).then(() => {
+                    setLinkCopied(true);
+                    window.setTimeout(() => setLinkCopied(false), 2000);
+                  });
+                }}
               >
-                <Printer size={16} />
-                {t("dash.print")}
+                {linkCopied ? <Check size={16} /> : <Link2 size={16} />}
+                {linkCopied ? t("dash.link_copied") : t("dash.copy_link")}
               </button>
-              <button
-                className="btn btn-primary"
-                data-testid="dash-export"
-                disabled={exporting || !d}
-                onClick={doExport}
+              <Link
+                className="btn justify-start"
+                to="/dashboard/manual-items"
+                data-testid="dash-manual-link"
               >
-                <Download size={16} />
-                {t("dash.export")}
-              </button>
-            </span>
-          )}
+                <PencilLine size={16} />
+                {t("dash.manual_link")}
+              </Link>
+              {canExport && (
+                <>
+                  <label className="flex items-center justify-between gap-2 px-1 text-sm text-mute">
+                    {t("dash.export_format")}
+                    <select
+                      className="input w-auto"
+                      aria-label={t("dash.export_format")}
+                      data-testid="dash-export-format"
+                      value={format}
+                      onChange={(e) => {
+                        setFormat(e.target.value as ExportFormat);
+                        savePref("dash.exportFormat", e.target.value);
+                      }}
+                    >
+                      {(["xlsx", "csv"] as const).map((f) => (
+                        <option key={f} value={f}>
+                          {t(`dash.format.${f}`)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <button
+                    className="btn justify-start print:hidden"
+                    data-testid="dash-print"
+                    disabled={gate.exportLocked}
+                    title={gate.note(gate.exportLocked)}
+                    onClick={() => window.print()}
+                  >
+                    <Printer size={16} />
+                    {t("dash.print")}
+                  </button>
+                  <button
+                    className="btn btn-primary justify-start"
+                    data-testid="dash-export"
+                    disabled={exporting || !d}
+                    onClick={doExport}
+                  >
+                    <Download size={16} />
+                    {t("dash.export")}
+                  </button>
+                </>
+              )}
+            </div>
+          </span>
         </span>
         {!!basis?.snapshot_dates?.length && (
           <div
@@ -1382,6 +1442,24 @@ export function Dashboard() {
       ) : (
         <>
           {/* F20 (owner default 2026-11-15): the counters card is on the PMO tab only, until the tab's layout is saved in the settings. */}
+          <div className="flex justify-end gap-2 print:hidden" data-testid="dash-collapse-bar">
+            <button
+              type="button"
+              className="btn px-2 py-1 text-xs"
+              data-testid="dash-collapse-all"
+              onClick={() => setCollapsedSaved(["*"])}
+            >
+              {t("dash.collapse_all")}
+            </button>
+            <button
+              type="button"
+              className="btn px-2 py-1 text-xs"
+              data-testid="dash-expand-all"
+              onClick={() => setCollapsedSaved([])}
+            >
+              {t("dash.expand_all")}
+            </button>
+          </div>
           {orderBlocks(
             dashSettings.data?.tabs[tab] ??
               (tab === "pmo" ? undefined : { order: [], hidden: ["counters"] }),
@@ -2623,6 +2701,31 @@ export function Dashboard() {
 
               region_health: <RegionHealthCard />,
             },
+            (code, node) => {
+              const closed = isCollapsed(code);
+              return (
+                <section
+                  data-testid={`dash-block-${code}`}
+                  className="[&:has(>[data-blk]:empty)]:hidden"
+                >
+                  <h2 className="mb-1 print:hidden">
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-2 rounded-lg border border-line bg-surface px-3 py-1.5 text-start text-sm font-semibold"
+                      data-testid={`dash-block-toggle-${code}`}
+                      aria-expanded={!closed}
+                      onClick={() => toggleBlock(code)}
+                    >
+                      <ChevronDown size={16} aria-hidden className={closed ? "-rotate-90 rtl:rotate-90" : ""} />
+                      {blockLabel(code)}
+                    </button>
+                  </h2>
+                  <div data-blk className={`${closed ? "hidden print:block" : ""}`}>
+                    {node}
+                  </div>
+                </section>
+              );
+            },
           )}
         </>
       )}
@@ -2683,11 +2786,15 @@ function RegionHealthCard() {
 function orderBlocks(
   layout: TabLayout | undefined,
   blocks: Record<string, ReactNode>,
+  wrap?: (code: string, node: ReactNode) => ReactNode,
 ): ReactNode[] {
   return orderedVisible(layout, Object.keys(blocks)).map((code) => (
-    <Fragment key={code}>{blocks[code]}</Fragment>
+    <Fragment key={code}>{wrap ? wrap(code, blocks[code]) : blocks[code]}</Fragment>
   ));
 }
+
+/** Decision 36 item 5: the collapsed blocks of one user, remembered in this browser per user (view preference only). */
+const collapsedKey = (userId: string | undefined) => `dash.collapsed.${userId ?? "anon"}`;
 
 type DashStream = NonNullable<Dash["streams"]["items"][number]["counts"]>;
 type DelayItem = Dash["delay"]["items"][number];

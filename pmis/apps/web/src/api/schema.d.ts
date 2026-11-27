@@ -6975,6 +6975,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/dashboard-view-defaults": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The server-wide dashboard view defaults, export format and collapse state (0.15.208)
+         * @description Every signed-in user may read it. A user's own remembered choice in the browser overrides it. `can_edit` is true for a System Admin or a delegate of `settings` edit for all regions.
+         */
+        get: operations["getDashboardViewDefaults"];
+        /**
+         * Set the default export format and collapse state of the dashboard (reason, step-up, If-Match, audited)
+         * @description A System Admin, or a delegate of `settings` edit for all regions (403 `action_forbidden` otherwise). A reason of 3 to 1000 characters, a recent step-up (403
+         *     `step_up_required`) and `If-Match` (428 / 412) are required. Values outside the lists answer 422 `invalid`; saving the current values answers 409
+         *     `invalid_transition`. Audited `dashboard_view_defaults_update` with before and after.
+         */
+        put: operations["setDashboardViewDefaults"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/historical-waiver": {
         parameters: {
             query?: never;
@@ -19078,6 +19104,32 @@ export interface components {
                 no_due_date: number | null;
                 overdue_aging: components["schemas"]["DashboardOpsAging"] | null;
             };
+        };
+        /** @description 0.15.208. The server-wide dashboard view defaults (setting `dashboard.view_defaults`, migration 0510). */
+        DashboardViewDefaults: {
+            /**
+             * @description The default format of Export view.
+             * @enum {string}
+             */
+            export_format: "xlsx" | "csv";
+            /**
+             * @description Whether the dashboard sections start open or collapsed.
+             * @enum {string}
+             */
+            collapse: "open" | "closed";
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+            /** @description The ETag value. */
+            version: number;
+            /** @description A System Admin or a delegate of `settings` edit for all regions. */
+            can_edit: boolean;
+        };
+        DashboardViewDefaultsInput: components["schemas"]["WithReason"] & {
+            /** @enum {string} */
+            export_format: "xlsx" | "csv";
+            /** @enum {string} */
+            collapse: "open" | "closed";
         };
         /** @description 0.15.203 (item 6): the open snags and NCRs of the in-scope sites, the average closure age of each and the first-time acceptance rate. */
         DashboardOpsQuality: {
@@ -35014,6 +35066,62 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             422: components["responses"]["Unprocessable"];
             429: components["responses"]["TooManyRequests"];
+        };
+    };
+    getDashboardViewDefaults: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The view defaults. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardViewDefaults"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setDashboardViewDefaults: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DashboardViewDefaultsInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardViewDefaults"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
         };
     };
     getHistoricalWaiver: {
