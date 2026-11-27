@@ -1,10 +1,10 @@
-# Telecom Site Delivery Management System
+# Telecom Site Delivery Workspace
 
-A full-stack project management information system for telecom site delivery — towers, telecom equipment, and civil works — covering the complete lifecycle of a site from acquisition and design through construction, integration, acceptance, and handover.
+A full-stack workspace for managing telecom site delivery — towers, telecom equipment, and civil works — covering the complete lifecycle of a site from acquisition and design through construction, integration, acceptance, and handover.
 
 ## Overview
 
-Delivering a telecom site involves dozens of coordinated tasks across acquisition, civil works, telecom installation, power, and commissioning, each requiring evidence, approvals, and deadline tracking. This system is the single system of record for that work: it replaces spreadsheet-based tracking with a governed workflow, versioned documents, and real-time visibility across many regions and sites.
+Delivering a telecom site involves dozens of coordinated tasks across acquisition, civil works, telecom installation, power, and commissioning, each requiring evidence, approvals, and deadline tracking. The workspace is the single system of record for that work: it replaces spreadsheet-based tracking with a governed workflow, versioned documents, and real-time visibility across many regions and sites.
 
 Every task in the system moves through a multi-level review-and-approval workflow. Documents are versioned and immutable. Every change is audited. Access is scoped by region and role down to the database row level.
 
