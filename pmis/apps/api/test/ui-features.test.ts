@@ -57,13 +57,13 @@ describe('Settings > Screens > Interface (ui.features)', () => {
     expect((await put(delegateReg, { sections: { avatars: AV }, reason: 'Try it' }, etag(cur))).status).toBe(403);
     expect((await put(admin, { sections: { avatars: AV } }, etag(cur))).status).toBe(422);
     const bad = await put(admin, {
-      sections: { avatars: { style: 'cartoon', shape: 'square', palette: 'x', in_lists: 'yes', size: 1 }, new_badge: { enabled: true, days: 400 }, inbox: {} },
+      sections: { avatars: { style: 'cartoon', shape: 'square', palette: 'x', in_lists: 'yes', size: 1 }, new_badge: { enabled: true, days: 400 }, menus: {} },
       extra: 1, reason: 'Bad values',
     }, etag(cur));
     expect(bad.status).toBe(422);
     expect(codes(bad)).toEqual([
       '/extra:unknown_key', '/sections/avatars/in_lists:invalid', '/sections/avatars/palette:invalid', '/sections/avatars/shape:invalid',
-      '/sections/avatars/size:unknown_key', '/sections/avatars/style:invalid', '/sections/inbox:unknown_key', '/sections/new_badge/days:out_of_range',
+      '/sections/avatars/size:unknown_key', '/sections/avatars/style:invalid', '/sections/menus:unknown_key', '/sections/new_badge/days:out_of_range',
     ]);
     const zero = await put(admin, { sections: { new_badge: { enabled: true, days: 0 } }, reason: 'Zero days' }, etag(cur));
     expect(codes(zero)).toEqual(['/sections/new_badge/days:out_of_range']);
