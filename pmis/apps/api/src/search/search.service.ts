@@ -232,7 +232,7 @@ export class SearchService {
           si.site_code || ' - ' || sg.status::text AS subtitle, sg.region_id, concat('/sites/', sg.site_id::text, '?tab=snags') AS href, (COUNT(*) OVER())::int AS total
         FROM snags sg JOIN snag_types st ON st.id = sg.snag_type_id JOIN sites si ON si.id = sg.site_id
         WHERE si.is_active AND search_norm(st.code || ' ' || st.name_en || ' ' || coalesce(st.name_ar, '') || ' ' || sg.description || ' ' || coalesce(sg.severity, '') || ' ' || sg.scope || ' ' || sg.status::text || ' ' || si.site_code) LIKE ${pattern}
-          ${Prisma.join(reach, ' ')}
+          ${reach.length ? Prisma.join(reach, ' ') : Prisma.empty}
         ORDER BY sg.raised_at DESC, sg.id LIMIT ${limit}`);
     }
     // contractors
