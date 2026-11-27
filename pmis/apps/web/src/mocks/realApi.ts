@@ -533,6 +533,7 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/workflow/versions'],
   ['get', '/workflow/versions/:version'],
   ['put', '/workflow/versions/:version'],
+  ['put', '/workflow/versions/:version/lock-mode'],
   ['post', '/workflow/versions/:version/remove'],
   ['post', '/workflow/versions/:version/discard'],
   ['post', '/workflow/versions/:version/migrations'],
