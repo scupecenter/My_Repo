@@ -198,15 +198,14 @@ describe('export', () => {
     expect(screen.getByTestId(`export-download-${base.id}`)).toBeInTheDocument();
   });
 
-  it('the mock follows the contract: Car Dispatcher is not part of the Master, past dates are refused', async () => {
+  it('the mock follows the contract: every register is a part (finance ones behind their grant), past dates are refused', async () => {
     await signIn('pm');
-    const a = await api.post('/exports/master', { body: { parts: ['car_dispatcher'] } }).catch((e: unknown) => e);
-    expect((a as ApiError).status).toBe(422);
-    expect((a as ApiError).problem.errors?.[0]).toMatchObject({ path: '/parts/car_dispatcher', code: 'not_in_master' });
+    const a = await api.post<{ id: string }>('/exports/master', { body: { parts: ['car_dispatcher', 'incidents'] } });
+    expect(a.id).toBeTruthy();
     const b = await api.post('/exports/master', { body: { as_of: '2026-01-01' } }).catch((e: unknown) => e);
     expect((b as ApiError).problem.errors?.[0]).toMatchObject({ path: '/as_of', code: 'as_of_unsupported' });
     const parts = await api.get<{ items: { key: string }[] }>('/exports/parts');
-    expect(parts.items.map((p) => p.key)).toEqual(expect.arrayContaining(['rf_design', 'acquisition']));
+    expect(parts.items.map((p) => p.key)).toEqual(expect.arrayContaining(['rf_design', 'acquisition', 'car_dispatcher', 'financial_advances', 'incidents', 'lessons_learned', 'invoices']));
   });
 
   it('sends parts, never a view, and shows 403 denied parts', async () => {

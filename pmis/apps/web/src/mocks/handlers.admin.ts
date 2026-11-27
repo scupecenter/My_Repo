@@ -564,8 +564,6 @@ export const adminHandlers = [
     if (b.as_of && b.as_of > TODAY) return bad('/as_of', 'future_date');
     // contract 0.15.34: only today can be exported (the Master values keep no history)
     if (b.as_of && b.as_of < TODAY) return bad('/as_of', 'as_of_unsupported');
-    const outside = [...(b.parts ?? []), ...(b.view ? [b.view.source] : [])].filter((p) => p === 'car_dispatcher' || p === 'financial_advances');
-    if (outside.length) return problem(422, 'validation_failed', 'Not part of the Master', { errors: outside.map((p) => ({ path: `/parts/${p}`, code: 'not_in_master' })) });
     if (b.regions && (!b.regions.length || b.regions.some((r) => r < 1 || r > 7))) return bad('/regions', 'out_of_scope');
     const no = [...(b.parts ?? []), ...(b.view ? [b.view.source] : [])].filter((p) => denied().includes(p));
     if (no.length) return problem(403, 'action_forbidden', 'You may not export these parts', { errors: no.map((p) => ({ path: `/parts/${p}`, code: 'export_denied' })) });
@@ -621,20 +619,22 @@ export const adminHandlers = [
 ];
 
 const PARTS = ([
-  // contract 0.15.34: the sheet each part is written on, as the API names it (Car Dispatcher and Financial Advances are not part of the Master)
+  // contract 0.15.34: the sheet each part is written on, as the API names it (contract 0.15.310: the five registers with no Master columns have their own sheet)
   ['sites', 'Sites', 'المواقع', 'Master'], ['milestones', 'Milestones', 'المعالم', 'Master'], ['tasks', 'Tasks by stage', 'المهام حسب المرحلة', 'Master'], ['project_status', 'Project Status', 'حالة المشروع', 'Project Status'],
   ['procurement', 'Procurement (PR/PO/WO)', 'المشتريات', 'PR-PO'], ['gecol', 'GECOL power', 'كهرباء GECOL', 'GECOL'], ['hlc', 'HLC fiber', 'ألياف HLC', 'HLC'],
   ['permits_hse', 'Permits & HSE', 'التصاريح والسلامة', 'Permission Log'], ['warehouse', 'Warehouse', 'المخزن', 'Warehouse'], ['quality', 'Quality', 'الجودة', 'Quality Inspections'], ['issues', 'Issue Log', 'سجل المشاكل', 'Issue Log'],
   ['risks', 'Risk Register', 'سجل المخاطر', 'Risk Register'], ['change_control', 'Change Control', 'ضبط التغيير', 'Change Control'], ['readiness_handover', 'Readiness & Handover', 'الجاهزية والتسليم', 'Readiness & Handover'],
   ['as_built', 'As-Built', 'كما بُني', 'As-Built'], ['meetings', 'Meetings', 'الاجتماعات', 'Meetings'], ['contractors', 'Contractors', 'المقاولون', 'Contractors'],
   ['rf_design', 'RF & Design', 'التصميم الراديوي', 'RF & Design'], ['acquisition', 'Acquisition', 'الاستحواذ', 'Acquisition'], ['dismantle', 'Dismantle', 'الإزالة', 'Master'],
+  ['car_dispatcher', 'Car Dispatcher', 'حجز وتوزيع السيارات', 'Car Dispatcher'], ['financial_advances', 'Financial Advances', 'السلف المالية', 'Financial Advances'], ['incidents', 'Incidents', 'الحوادث', 'Incidents'],
+  ['lessons_learned', 'Lessons Learned', 'الدروس المستفادة', 'Lessons Learned'], ['invoices', 'Invoices', 'الفواتير', 'Invoices'], ['deliverables', 'Deliverables', 'المخرجات', 'Deliverables'],
 ] as const).map(([key, label_en, label_ar, master_sheet]) => ({ key, label_en, label_ar, master_sheet }));
 const COLUMNS: Record<string, string[]> = {
   sites: ['site_code', 'site_name', 'region', 'scenario', 'overall_status', 'current_stage'],
   tasks: ['site_code', 'task_code', 'task_name', 'stage', 'task_state', 'holder', 'due_date', 'sla_status', 'approved_at'],
 };
-// A reviewer lacks the export grant for the commercial registers.
-const denied = (): string[] => (viewer()?.key === 'pm' ? [] : ['procurement', 'contractors', 'warehouse']);
+// A reviewer lacks the export grant for the commercial and finance registers.
+const denied = (): string[] => (viewer()?.key === 'pm' ? [] : ['procurement', 'contractors', 'warehouse', 'financial_advances', 'invoices']);
 
 function groupBody(id: string) {
   const grp = A().groups.find((x) => x.id === id);
