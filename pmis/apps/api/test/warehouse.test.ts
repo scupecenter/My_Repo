@@ -769,6 +769,16 @@ describe("receipt to Procurement order link (0181)", () => {
     expect(junk.status).toBe(422);
     expect(JSON.stringify(junk.body)).toContain("invalid");
   });
+  it("a delivery note and a return note take the order field like a receipt (0213); an adjustment refuses it", async () => {
+    for (const type of ["cw_dn", "cw_rn"] as const) {
+      const bad = await move({ ...doc(type), site_id: site.id, procurement_order_id: randomUUID(), lines: [{ item_id: tower.id, qty: 1 }] });
+      expect(bad.status, JSON.stringify(bad.body)).toBe(422);
+      expect(JSON.stringify(bad.body), type).toContain("order_not_active");
+    }
+    const adj = await move({ ...doc("adj"), procurement_order_id: randomUUID(), lines: [{ item_id: tower.id, qty: 1 }] });
+    expect(adj.status, JSON.stringify(adj.body)).toBe(422);
+    expect(JSON.stringify(adj.body)).toContain("receipt_only");
+  });
   it("lists the order picker for a caller with the module, and refuses a bad site id", async () => {
     const ok = await t.entry.api.call("get", "/registers/warehouse/order-options");
     expect(ok.status, JSON.stringify(ok.body)).toBe(200);
