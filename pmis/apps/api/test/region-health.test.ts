@@ -7,7 +7,7 @@ import { G } from './reg-helpers';
 import { actor, plainAdmin } from './wf-helpers';
 
 /**
- * Region health (contract 0.15.241, migration 0341; item 12 of the PM-platforms research). GET /status-updates/region-health: one row per visible
+ * Region health (contract 0.15.241, migration 0341; item 12 of the 2026-11-27 batch). GET /status-updates/region-health: one row per visible
  * region, the current week's Weekly status update or the missing-update flag. Regions 4 and 5: every CI file shares one throw-away database, and
  * x-status (regions 6 and 7) and x-features (region 2) post current-week region updates of their own; 4 and 5 stay free (beforeAll sweeps them too).
  */

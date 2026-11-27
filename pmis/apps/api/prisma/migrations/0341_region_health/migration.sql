@@ -1,4 +1,4 @@
--- Region health card (contract 0.15.241; CHANGELOG RegionHealth; owner request 2026-11-27, item 12 of the PM-platforms research).
+-- Region health card (contract 0.15.241; CHANGELOG RegionHealth; owner request 2026-11-27, item 12 of the 2026-11-27 batch).
 --
 -- One new dashboard card, region_health: the current-week health of every region of the Weekly status (on track, at risk, off track) with the
 -- "missing update" flag when no region update was posted this week. Additive: the catalogue gains the card, and a card no tab layout names is shown
