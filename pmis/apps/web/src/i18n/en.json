@@ -3257,7 +3257,17 @@
       "scorecard_col_level": "Level",
       "scorecard_col_delay": "Delay (days)",
       "scorecard_col_snags": "Snags overdue",
-      "scorecard_col_quality": "Quality failed"
+      "scorecard_col_quality": "Quality failed",
+      "quality_title": "Quality: snags and NCR",
+      "quality_hint": "The open snags and NCRs of the sites in scope, the average closure age and the first-time acceptance rate. Read only.",
+      "open_quality": "Quality register",
+      "unavailable_quality": "You do not have the quality view right, so this section stays hidden.",
+      "quality_snags_open": "Snags open",
+      "quality_snags_note": "{{closed}} closed · {{returned}} returned open",
+      "quality_ncrs_open": "NCR open",
+      "quality_ncrs_note": "{{closed}} closed",
+      "quality_avg_close": "Avg closure",
+      "quality_first_pass": "First-time acceptance"
     },
     "scurve": {
       "title": "Progress curve",
