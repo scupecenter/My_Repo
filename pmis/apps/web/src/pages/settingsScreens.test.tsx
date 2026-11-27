@@ -142,6 +142,22 @@ describe('Q441: the mail notification kinds (Settings, Mail kinds)', () => {
     expect(await errCode(api.put('/settings/mail-notification-kinds', { version: 1, body: { kinds: [], reason: 'Not an admin' } }))).toBe('403:action_forbidden');
   });
 
+  it('the mail policy: defaults keep today (internal only), the API validates, saves with step-up, and only a System Admin reads it', async () => {
+    await signIn('pm');
+    const cur = await api.get<{ enabled: boolean; mode: string; internal_domains: string[]; version: number; catalogue: { kind: string }[] }>('/settings/mail-policy');
+    expect(cur).toMatchObject({ enabled: true, mode: 'internal_only', internal_domains: [] });
+    expect(cur.catalogue.map((c) => c.kind)).toEqual(expect.arrayContaining(['expiry_radar', 'approval_digest', 'weekly_digest']));
+    const ok = { enabled: true, mode: 'internal_external', internal_domains: ['example.com'], kinds: { expiry_radar: { enabled: true, mode: 'internal_only' } } };
+    expect(await errCode(api.put('/settings/mail-policy', { version: cur.version, body: { ...ok, reason: 'No step-up yet' } }))).toBe('401:step_up_required');
+    await stepUpDone();
+    const errs = await errBody(api.put('/settings/mail-policy', { version: cur.version, body: { ...ok, mode: 'all', internal_domains: ['Bad Domain'], kinds: { made_up: { enabled: true, mode: 'inherit' } }, reason: 'A bad policy' } }));
+    expect(errs).toEqual(expect.arrayContaining([expect.objectContaining({ path: '/mode' }), expect.objectContaining({ path: '/internal_domains/0' }), expect.objectContaining({ path: '/kinds/made_up', code: 'unknown_kind' })]));
+    const saved = await api.put<{ mode: string; version: number }>('/settings/mail-policy', { version: cur.version, body: { ...ok, reason: 'Allow outside mail' } });
+    expect(saved).toMatchObject({ mode: 'internal_external', version: cur.version + 1 });
+    await signIn('engineer');
+    expect(await errCode(api.get('/settings/mail-policy'))).toBe('403:action_forbidden');
+  });
+
   it('the tab is hidden from a user who is not a System Admin', async () => {
     await signIn('engineer');
     settings('calendar');

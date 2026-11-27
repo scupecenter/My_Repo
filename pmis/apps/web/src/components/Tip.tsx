@@ -9,7 +9,7 @@ export function Tip({ text, children, side = 'top' }: { text?: string | null; ch
       <Tooltip.Root>
         <Tooltip.Trigger asChild data-has-tip="">{children}</Tooltip.Trigger>
         <Tooltip.Portal>
-          <Tooltip.Content side={side} sideOffset={4} className="card z-[80] max-w-80 break-words px-2 py-1 text-xs" data-testid="tip">{text}</Tooltip.Content>
+          <Tooltip.Content side={side} sideOffset={4} className="card z-[80] max-w-80 whitespace-pre-line break-words px-2 py-1 text-xs" data-testid="tip">{text}</Tooltip.Content>
         </Tooltip.Portal>
       </Tooltip.Root>
     </Tooltip.Provider>

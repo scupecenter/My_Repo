@@ -380,7 +380,7 @@ export function Sites() {
           onBlank={() => void downloadTemplate(menuTpl.template_id).then((n) => toast(t('grid.downloaded', { name: n })), (e) => toast(registerErrorMessage(t, e), 'err'))}
           onFilled={() => { if (!nRows) { toast(t('sites.menu_template_none'), 'err'); return; } void downloadTemplate(menuTpl.template_id, { prefill: true, filters: viewFilters }).then((n) => toast(t('grid.downloaded', { name: n })), (e) => toast(registerErrorMessage(t, e), 'err')); }}
           onUpload={() => setUpMenu(true)} onBatches={() => nav('/templates')} /> : <ExportViewButton testid="sites-export-view" source="sites" filters={viewFilters} columns={SITE_COLUMNS} />}
-        more={<MoreMenu items={[
+        more={<MoreMenu settings="sites" items={[
           { id: 'export', label: t('export.open'), icon: <Download size={16} />, testid: 'sites-export', onSelect: () => setExp(true) },
           { id: 'reset', label: t('table.reset'), icon: <RotateCcw size={16} />, testid: 'sites-reset-cols', onSelect: tbl.reset },
         ]} />} />

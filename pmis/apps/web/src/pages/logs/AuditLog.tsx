@@ -134,7 +134,7 @@ export function AuditLog() {
   const check = () => { setTooLarge(false); verify.mutate('audit', { onSuccess: setRes, onError: (e) => (isTooLarge(e) ? setTooLarge(true) : toast(errText(e, t), 'err')) }); };
   return (
     <div data-testid="page-audit-log">
-      <PageHeader title={t('nav.audit')} subtitle={t('logs.audit_subtitle')} />
+      <PageHeader title={t('nav.audit')} subtitle={t('logs.audit_subtitle')} settings="audit_log" />
       <Toolbar
         filters={<SavedViews screen="audit-log" value={f} onApply={setF} empty={EMPTY_FILTER} table={tbl} />}
         count={<span className="text-sm text-mute" data-testid="audit-count">{t('logs.shown', { count: q.items.length })}</span>}

@@ -2,20 +2,24 @@ import * as Popover from '@radix-ui/react-popover';
 import { Ellipsis } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
+import type { ScreenKey } from '@/lib/screenSettings';
+import { ICONS } from '@/lib/icons';
+import { ScreenSettingsLink, useScreenSettings } from './ScreenSettingsLink';
 import { Tip } from './Tip';
 
 /** Page header (plan T1): title + context chip, optional subtitle, then the page's own tabs go below it. */
-export function PageHeader({ title, subtitle, context, testid }: { title: string; subtitle?: string; context?: ReactNode; testid?: string }) {
+export function PageHeader({ title, subtitle, context, testid, settings }: { title: string; subtitle?: string; context?: ReactNode; testid?: string; settings?: ScreenKey }) {
   return (
     <header className="mb-3" data-testid={testid}>
-      <div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-bold">{title}</h1>{context}</div>
+      <div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-bold">{title}</h1>{context}{settings && <span className="ms-auto flex items-center gap-2"><ScreenSettingsLink screen={settings} /></span>}</div>
       {subtitle && <p className="text-mute">{subtitle}</p>}
     </header>
   );
 }
 
 /** Toolbar (plan T1/T3/T5), fixed order: filters › active-filter count › count › primary action › secondary tools. Page, row and global actions stay in separate groups. */
-export function Toolbar({ filters, activeFilters = 0, count, primary, tools, activeLabel }: { filters?: ReactNode; activeFilters?: number; count?: ReactNode; tools?: ReactNode; primary?: ReactNode; activeLabel?: string }) {
+export function Toolbar({ filters, activeFilters = 0, count, primary, tools, activeLabel, settings }: { settings?: ScreenKey; filters?: ReactNode; activeFilters?: number; count?: ReactNode; tools?: ReactNode; primary?: ReactNode; activeLabel?: string }) {
   return (
     <div role="toolbar" className="mb-3 flex flex-wrap items-center gap-2">
       {filters}
@@ -24,6 +28,7 @@ export function Toolbar({ filters, activeFilters = 0, count, primary, tools, act
         {count}
         {primary}
         {tools}
+        {settings && <ScreenSettingsLink screen={settings} />}
       </span>
     </div>
   );
@@ -31,22 +36,32 @@ export function Toolbar({ filters, activeFilters = 0, count, primary, tools, act
 
 export type MoreItem = { id: string; label: string; icon?: ReactNode; onSelect: () => void; disabled?: boolean; testid: string };
 /** "More" overflow (plan T3): secondary tools live here; the primary action never does. Items keep their own data-testid. */
-export function MoreMenu({ items }: { items: MoreItem[] }) {
+export function MoreMenu({ items, settings }: { items: MoreItem[]; settings?: ScreenKey }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
-  if (!items.length) return null;
+  const nav = useNavigate();
+  const gear = useScreenSettings(settings ?? 'dashboard');
+  const showGear = !!settings && gear.allowed;
+  if (!items.length) return settings ? <ScreenSettingsLink screen={settings} /> : null;
+  // settings gear: its own button right before the "..." trigger; on narrow headers the same link is the last item of the menu
+  const Icon = ICONS.settings;
+  const all: MoreItem[] = showGear ? [...items, { id: 'screen-settings', label: `${gear.title}: ${gear.dest}`, icon: <Icon size={16} aria-hidden />, testid: 'more-screen-settings', onSelect: () => nav(gear.to) }] : items;
+  if (!all.length) return null;
   return (
+    <>
+    {settings && <ScreenSettingsLink screen={settings} narrowHidden />}
     <Popover.Root open={open} onOpenChange={setOpen}>
       <Tip text={t('table.more')}>
         <Popover.Trigger asChild><button type="button" className="btn" data-testid="more-menu" aria-label={t('table.more')}><Ellipsis size={16} /></button></Popover.Trigger>
       </Tip>
       <Popover.Portal>
         <Popover.Content align="end" sideOffset={6} role="menu" className="card z-50 min-w-48 p-1 shadow-lg" data-testid="more-panel">
-          {items.map((i) => (
-            <button key={i.id} type="button" role="menuitem" disabled={i.disabled} data-testid={i.testid} className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-start text-sm hover:bg-hover disabled:opacity-50" onClick={() => { setOpen(false); i.onSelect(); }}>{i.icon}{i.label}</button>
+          {all.map((i) => (
+            <button key={i.id} type="button" role="menuitem" disabled={i.disabled} data-testid={i.testid} className={`${i.id === 'screen-settings' ? 'sm:hidden ' : ''}flex w-full items-center gap-2 rounded px-2 py-1.5 text-start text-sm hover:bg-hover disabled:opacity-50`} onClick={() => { setOpen(false); i.onSelect(); }}>{i.icon}{i.label}</button>
           ))}
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>
+    </>
   );
 }
