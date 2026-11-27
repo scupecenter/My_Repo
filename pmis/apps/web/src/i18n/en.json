@@ -1186,6 +1186,7 @@
     "section_sla_dlp": "DLP months",
     "section_registers_columns": "Register columns",
     "section_registers_contractors": "Contractor rules",
+    "section_registers_derive": "Derived values (between registers)",
     "section_registers_gecol": "GECOL order warnings",
     "section_registers_issue-map": "Issue category by task",
     "section_registers_team-scope": "Team / scope match",
@@ -4761,6 +4762,22 @@
     "move_up": "Move {{name}} up",
     "move_down": "Move {{name}} down",
     "invalid": "Every KPI needs a green and an amber value, and green must be better than amber for that KPI's direction."
+  },
+  "deriveRules": {
+    "title": "Derived values between registers",
+    "note": "A register can show a value taken from another register (for example the contractor of a GECOL record from Procurement). Only the configured value is shown, never the source record. It is computed when the record is read and is not stored. People who may see the target record see the value even without access to the source register. Each rule is audited when it is read.",
+    "enabled": "On",
+    "target": "Shown in",
+    "output": "Name",
+    "source_register": "Taken from",
+    "source": "Value",
+    "source_party": "The company of the source record",
+    "link": "Link field in the target record",
+    "site_fallback": "When the link is empty, use the latest approved record of the same site",
+    "link_none": "Match by site only",
+    "add": "Add a rule",
+    "remove": "Remove",
+    "key": "Rule code"
   },
   "gecolOrder": {
     "title": "GECOL order warnings",
