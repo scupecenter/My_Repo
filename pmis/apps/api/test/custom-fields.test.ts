@@ -250,7 +250,8 @@ describe("POST and PATCH /custom-fields (admin_save_field)", () => {
         )
       ).status,
     ).toBe(422);
-    const { reason: _r, ...noReason } = body({ code: `r_${TAG}` });
+    const noReason: Record<string, unknown> = body({ code: `r_${TAG}` });
+    delete noReason.reason;
     expect(
       (await admin.api.call("post", "/custom-fields", noReason)).status,
     ).toBe(422);
