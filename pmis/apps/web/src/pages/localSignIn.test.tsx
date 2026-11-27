@@ -350,7 +350,7 @@ describe('hybrid mode list', () => {
       // contract 0.15.41: Settings, Identity & themes
       'GET /settings/identity', 'PUT /settings/identity',
       // contract 0.15.97: Settings, Screens, Login page and its public read
-      'GET /settings/login-page', 'PUT /settings/login-page', 'GET /settings/login-page/public',
+      'GET /settings/login-page', 'PUT /settings/login-page', 'GET /settings/ops-limits', 'PUT /settings/ops-limits', 'GET /settings/login-page/public',
       'GET /settings/security-locks', 'PUT /settings/security-locks', 'GET /settings/download-locks', 'PUT /settings/download-locks',
       'GET /settings/support-access', 'PUT /settings/support-access', 'GET /support-access', 'POST /support-access', 'POST /support-access/revoke-all', 'POST /support-access/:id/revoke', 'GET /settings/new-device-code', 'PUT /settings/new-device-code', 'POST /settings/new-device-code/bypass',
       // contract 0.15.4: the per-site workflow locks and the status of the sites of an import
