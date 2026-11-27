@@ -80,12 +80,20 @@ jobs:
 
       # global-setup.ts creates the test databases, applies prisma/migrations and
       # pmis/db/sql/app_grants.sql as the superuser, then runs the suites as pmis_app.
-      - name: Test
+      # dashboard-perf runs on its own after the suite: the parallel test files
+      # of the full run load the runner enough to make its timing budgets flake.
+      - name: Test (suite, dashboard-perf excluded)
         working-directory: pmis/apps/api
         env:
           TEST_PG_ADMIN_URL: postgresql://postgres:${{ env.CI_PG_SUPERUSER_PASSWORD }}@127.0.0.1:5432/postgres
           TEST_PG_APP_PASSWORD: ${{ env.CI_PMIS_APP_PASSWORD }}
-        run: npm test
+        run: npx vitest run --exclude test/dashboard-perf.test.ts
+      - name: Test (dashboard perf, serial)
+        working-directory: pmis/apps/api
+        env:
+          TEST_PG_ADMIN_URL: postgresql://postgres:${{ env.CI_PG_SUPERUSER_PASSWORD }}@127.0.0.1:5432/postgres
+          TEST_PG_APP_PASSWORD: ${{ env.CI_PMIS_APP_PASSWORD }}
+        run: npm run test:perf
 
   web:
     name: Web (typecheck, lint, unit tests, build, Playwright e2e)
