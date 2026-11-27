@@ -7,7 +7,7 @@
 --   register rows (register_record_id), steps, voters, locks, document slots and files, comments, drafts, levels conversions, hlc/PR links, readiness,
 --   vehicle reservations. A kept entity keeps everything that hangs off it.
 --   Only parts whose every table can follow an entity are narrowable (data_reset_narrowable()); the others are refused with their names, never half done.
---   Parts that depend on a narrowed part (procurement -> car_dispatcher, financial_advances) take only the entities linked to the selected procurement
+--   Parts that depend on a narrowed part (procurement -> car_dispatcher, financial_advances, invoices) take only the entities linked to the selected procurement
 --   records (data->>'procurement_record_id' names a record or an entity), plus those that match the filter themselves when the requester ticked them.
 --   The narrow filter is part of the scope: scope.narrow, bound by scope_hash and approved_scope_hash like the parts (a CHECK-like guard already makes the
 --   scope immutable); an approver who saw another narrowing is refused (409 scope_changed). No new table and no new column.
@@ -19,7 +19,7 @@ SELECT set_config('app.region_ids', '*', true);
 -- 1. The narrowable parts: every table of the part follows an entity (see above). Computed here as a list so the screen and the checks agree.
 CREATE OR REPLACE FUNCTION data_reset_narrowable() RETURNS text[]
 LANGUAGE sql IMMUTABLE SET search_path = pg_catalog, public, pg_temp AS $$
-  SELECT ARRAY['acquisition', 'car_dispatcher', 'deliverables', 'dismantle', 'financial_advances', 'gecol', 'hlc', 'issues', 'permits', 'procurement',
+  SELECT ARRAY['acquisition', 'car_dispatcher', 'deliverables', 'dismantle', 'financial_advances', 'gecol', 'hlc', 'invoices', 'issues', 'permits', 'procurement',
                'readiness', 'rf_design', 'risks']
 $$;
 

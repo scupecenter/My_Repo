@@ -117,8 +117,8 @@ everything. `GET /settings/data-reset/plan?parts=...` (`data_reset_dry_run`) cou
 
 A scope may carry a filter (`scope.narrow`: `regions`, `batches`, `from`, `to`; every given filter must match; days are in Africa/Tripoli, first creation date). It is part of the
 `scope_hash` the approver sees and cannot change after the request. `data_reset_narrowable()` lists the parts that accept it: acquisition, car_dispatcher, deliverables,
-dismantle, financial_advances, gecol, hlc, issues, permits, procurement, readiness, rf_design, risks. The filter is entity-level: it selects whole records, and their satellite
-tables (comments, history, documents) follow the record. car_dispatcher and financial_advances follow the selected procurement records. `sites`, quality, warehouse,
+dismantle, financial_advances, gecol, hlc, invoices, issues, permits, procurement, readiness, rf_design, risks. The filter is entity-level: it selects whole records, and their satellite
+tables (comments, history, documents) follow the record. car_dispatcher, financial_advances and invoices follow the selected procurement records. `sites`, quality, warehouse,
 as_built, meetings and change_control, and any scope with an identity part, are refused with a clear error: their tables link to a site or a process, not to one record.
 What narrowing `sites` would take: a per-site closure map (every table keyed by site, task, gate, baseline and document), a rule for what happens to the register records
 of a kept site, and a dry run that proves no orphan is left. `GET /settings/data-reset/narrow-options?part=` lists the regions and recent import batches.
