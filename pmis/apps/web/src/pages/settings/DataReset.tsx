@@ -1,11 +1,11 @@
-import { AlertOctagon, DatabaseBackup, ShieldCheck } from 'lucide-react';
+import { AlertOctagon, DatabaseBackup, ShieldCheck, X } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '@/api/client';
 import {
-  closureOf, requiresBackup, RUNNING, useApproveDataReset, useCancelDataReset, useDataReset, useDataResetPlan, useDataResetRequest, useRequestDataReset, useRetryDataResetFiles,
-  useRunDataReset, useSetDataResetSettings, type DataResetPart, type DataResetPlanTable, type DataResetRequest,
+  closureOf, narrowBody, narrowEmpty, requiresBackup, RUNNING, useDataResetNarrowOptions, useApproveDataReset, useCancelDataReset, useDataReset, useDataResetPlan, useDataResetRequest, useRequestDataReset, useRetryDataResetFiles,
+  useRunDataReset, useSetDataResetSettings, type DataResetNarrow, type DataResetPart, type DataResetPlanTable, type DataResetRequest,
 } from '@/api/dataReset';
 import { errText, FormDialog } from '@/components/FormDialog';
 import { useToast } from '@/components/Toast';
@@ -45,8 +45,13 @@ export function DataReset() {
   const [chosen, setChosen] = useState<string[]>([]);
   const [requireBackup, setRequireBackup] = useState(true);
   const [noBackupTyped, setNoBackupTyped] = useState('');
+  const [narrow, setNarrow] = useState<DataResetNarrow>({});
   const requested = mode === 'custom' ? [...chosen].sort() : null;
-  const dry = useDataResetPlan(requested, mode === 'custom' && !!s && !open);
+  const narrowable = new Set((s?.plan.parts ?? []).filter((p) => p.narrowable).map((p) => p.code));
+  // a narrowing is offered only when every chosen part can follow one record; it is dropped when the choice changes to something else
+  const canNarrow = mode === 'custom' && chosen.length > 0 && chosen.every((c) => narrowable.has(c));
+  const nb = canNarrow ? narrowBody(narrow) : undefined;
+  const dry = useDataResetPlan(requested, mode === 'custom' && !!s && !open, nb);
   const when = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleString(i18n.language === 'ar' ? 'ar' : 'en-GB', { dateStyle: 'medium', timeStyle: 'short' }) : '—');
   const close = () => setDialog(null);
 
@@ -147,6 +152,8 @@ export function DataReset() {
           <h3 className="font-bold">{t('dr.new_request')}</h3>
           <ScopePicker catalogue={catalogue} mode={mode} setMode={setMode} chosen={chosen} setChosen={setChosen} disabled={!s.can.request}
             closure={mode === 'everything' ? (s.everything ?? []) : (dry.data?.scope.parts ?? closureOf(chosen, catalogue))} />
+          {canNarrow && <NarrowPicker part={chosen.length === 1 ? chosen[0] : null} narrow={narrow} setNarrow={setNarrow} disabled={!s.can.request} />}
+          {mode === 'custom' && chosen.length > 0 && !canNarrow && !narrowEmpty(narrow) && <p className="text-sm text-lateInk" data-testid="dr-narrow-dropped">{t('dr.narrow_dropped')}</p>}
           <BackupChoice requireBackup={requireBackup} setRequireBackup={(v) => { setRequireBackup(v); setNoBackupTyped(''); }} typed={noBackupTyped} setTyped={setNoBackupTyped}
             phrase={noBackupPhrase} hours={s.settings.backup_max_age_hours} disabled={!s.can.request} />
           <label className="block text-sm font-semibold">{t('dr.reason_label')}
@@ -157,9 +164,9 @@ export function DataReset() {
           </label>
           {ask.isError && <p role="alert" className="text-sm text-lateInk" data-testid="dr-form-error">{errText(ask.error, t)}</p>}
           <button className="btn btn-danger" data-testid="dr-submit" disabled={!s.can.request || !reasonOk || !phraseOk || !scopeOk || !noBackupOk || ask.isPending}
-            onClick={() => ask.mutate({ reason: reason.trim(), confirm_text: typed, ...(requested ? { parts: requested } : {}),
+            onClick={() => ask.mutate({ reason: reason.trim(), confirm_text: typed, ...(requested ? { parts: requested } : {}), ...(nb ? { narrow: nb } : {}),
               ...(requireBackup ? {} : { require_backup: false, no_backup_confirm: noBackupTyped }) },
-              { onSuccess: () => { toast(t('dr.requested_toast')); setReason(''); setTyped(''); setMode('everything'); setChosen([]); setRequireBackup(true); setNoBackupTyped(''); } })}>
+              { onSuccess: () => { toast(t('dr.requested_toast')); setReason(''); setTyped(''); setMode('everything'); setChosen([]); setNarrow({}); setRequireBackup(true); setNoBackupTyped(''); } })}>
             {t('dr.submit')}
           </button>
         </section>
@@ -370,6 +377,7 @@ function ScopeView({ r, catalogue }: { r: DataResetRequest; catalogue: DataReset
               </li>
             ))}
           </ul>
+          {sc?.narrow && <NarrowView narrow={sc.narrow} />}
           {identity.length > 0 && <p role="alert" className="font-semibold text-lateInk" data-testid="dr-request-scope-identity">{t('dr.identity_warning', { parts: identity.join(', ') })}</p>}
           {r.scope_hash && <p className="text-xs text-mute">{t('dr.scope_hash')}: <span className="mono" dir="ltr" data-testid="dr-request-scope-hash">{r.scope_hash.slice(0, 12)}</span></p>}
         </>
@@ -422,6 +430,89 @@ function BackupView({ r, hours, testid = 'dr-request-backup' }: { r: DataResetRe
     <p role="alert" className="flex items-start gap-2 rounded-md border border-lateInk bg-lateBg p-2 text-sm font-bold text-lateInk" data-testid={testid} data-require="false">
       <AlertOctagon size={16} className="mt-0.5 shrink-0" aria-hidden />
       <span><span>{t('dr.backup_requirement')}: {t('dr.backup_not_required_value')}.</span> <span>{t('dr.no_backup_warning')}</span></span>
+    </p>
+  );
+}
+
+const dayText = (d: string | undefined, lang: string) => (d ? new Date(`${d}T00:00:00`).toLocaleDateString(lang === 'ar' ? 'ar' : 'en-GB', { dateStyle: 'medium' }) : '');
+
+/**
+ * Contract 0.15.265 (migration 0365): narrow the chosen register parts to regions, import batches and a first-created period (every given filter must match).
+ * The dry run above recounts with the filter; the filter is part of the scope the approver sees and the hash they approve.
+ */
+function NarrowPicker({ part, narrow, setNarrow, disabled }: { part: string | null; narrow: DataResetNarrow; setNarrow: (n: DataResetNarrow) => void; disabled: boolean }) {
+  const { t, i18n } = useTranslation();
+  const lang = i18n.language;
+  const opt = useDataResetNarrowOptions(part);
+  const regions = opt.data?.regions ?? [], batches = opt.data?.batches ?? [];
+  const toggle = <K extends 'regions' | 'batches'>(key: K, v: NonNullable<DataResetNarrow[K]>[number]) => {
+    const cur = ((narrow[key] ?? []) as (typeof v)[]);
+    const next = cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v];
+    setNarrow({ ...narrow, [key]: next });
+  };
+  return (
+    <fieldset className="space-y-2 rounded-md border border-line p-3" data-testid="dr-narrow" disabled={disabled}>
+      <legend className="px-1 text-sm font-semibold">{t('dr.narrow_title')}</legend>
+      <p className="text-sm text-mute">{t('dr.narrow_hint')}</p>
+      {opt.isError && <p role="alert" className="text-sm text-lateInk" data-testid="dr-narrow-error">{t('errors.generic')}</p>}
+      <div className="grid gap-3 md:grid-cols-3">
+        <div className="space-y-1 rounded-md bg-card2 p-2" data-testid="dr-narrow-regions">
+          <h4 className="text-sm font-semibold">{t('dr.narrow_regions')}</h4>
+          {regions.map((r) => (
+            <label key={r.id} className="flex items-center gap-2 text-sm">
+              <input type="checkbox" data-testid={`dr-narrow-region-${r.id}`} checked={(narrow.regions ?? []).includes(r.id)} onChange={() => toggle('regions', r.id)} />
+              <span>{lang === 'ar' && r.name_ar ? r.name_ar : r.name_en}</span>
+            </label>
+          ))}
+        </div>
+        <div className="space-y-1 rounded-md bg-card2 p-2" data-testid="dr-narrow-batches">
+          <h4 className="text-sm font-semibold">{t('dr.narrow_batches')}</h4>
+          {batches.length === 0 && <p className="text-xs text-mute">{t('dr.narrow_no_batches')}</p>}
+          <div className="max-h-40 space-y-1 overflow-y-auto">
+            {batches.map((b) => (
+              <label key={b.id} className="flex items-start gap-2 text-sm">
+                <input type="checkbox" className="mt-1" data-testid={`dr-narrow-batch-${b.id}`} checked={(narrow.batches ?? []).includes(b.id)} onChange={() => toggle('batches', b.id)} />
+                <span className="min-w-0"><span className="mono break-all text-xs" dir="ltr">{b.file_name}</span>
+                  <span className="block text-xs text-mute">{t('dr.narrow_batch_meta', { rows: b.rows_total, when: dayText(b.created_at.slice(0, 10), lang) })}</span></span>
+              </label>
+            ))}
+          </div>
+        </div>
+        <div className="space-y-2 rounded-md bg-card2 p-2" data-testid="dr-narrow-period">
+          <h4 className="text-sm font-semibold">{t('dr.narrow_period')}</h4>
+          <label className="block text-sm">{t('dr.narrow_from')}
+            <input type="date" className="input mt-1" data-testid="dr-narrow-from" value={narrow.from ?? ''} max={narrow.to ?? undefined} onChange={(e) => setNarrow({ ...narrow, from: e.target.value || undefined })} />
+          </label>
+          <label className="block text-sm">{t('dr.narrow_to')}
+            <input type="date" className="input mt-1" data-testid="dr-narrow-to" value={narrow.to ?? ''} min={narrow.from ?? undefined} onChange={(e) => setNarrow({ ...narrow, to: e.target.value || undefined })} />
+          </label>
+        </div>
+      </div>
+      {!narrowEmpty(narrow) && (
+        <div className="flex items-center justify-between gap-2 rounded-md border border-line p-2 text-sm" data-testid="dr-narrow-active">
+          <span>{t('dr.narrow_active')}</span>
+          <button type="button" className="btn btn-ghost p-1" data-testid="dr-narrow-clear" aria-label={t('dr.narrow_clear')} onClick={() => setNarrow({})}><X size={16} aria-hidden /></button>
+        </div>
+      )}
+    </fieldset>
+  );
+}
+
+/** The narrowing of a request, read-only (requester, approver, runner). */
+function NarrowView({ narrow }: { narrow: DataResetNarrow }) {
+  const { t, i18n } = useTranslation();
+  const lang = i18n.language;
+  const needNames = !!narrow.regions?.length;
+  const opt = useDataResetNarrowOptions(null, needNames || !!narrow.batches?.length);
+  const rname = (id: number) => { const r = opt.data?.regions.find((x) => x.id === id); return r ? (lang === 'ar' && r.name_ar ? r.name_ar : r.name_en) : `#${id}`; };
+  const bname = (id: string) => opt.data?.batches.find((x) => x.id === id)?.file_name ?? id.slice(0, 8);
+  const bits: string[] = [];
+  if (narrow.regions?.length) bits.push(`${t('dr.narrow_regions')}: ${narrow.regions.map(rname).join(', ')}`);
+  if (narrow.batches?.length) bits.push(`${t('dr.narrow_batches')}: ${narrow.batches.map(bname).join(', ')}`);
+  if (narrow.from || narrow.to) bits.push(`${t('dr.narrow_period')}: ${dayText(narrow.from, lang) || '…'} – ${dayText(narrow.to, lang) || '…'}`);
+  return (
+    <p className="rounded-md border border-lateInk/40 bg-lateBg p-2 font-semibold text-lateInk" data-testid="dr-request-narrow">
+      {t('dr.narrow_view')} {bits.join(' · ')}
     </p>
   );
 }
