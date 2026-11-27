@@ -263,7 +263,7 @@ const MK = () => (C().mailKinds ??= initCfg().mailKinds);
 /** 0.15.190: the admin lock keys, kept in memory like the other small settings of the mock (both off by default). */
 const locks: { block_public_sharing: boolean; disable_export: boolean; version: number; updated_at: string | null; updated_by: { id: string; display_name: string; employee_id: string | null } | null } =
   { block_public_sharing: false, disable_export: false, version: 1, updated_at: null, updated_by: null };
-/** 0.15.262: the operational limits (catalogue and defaults as ops_limits_catalogue() in migration 0402); a limit that was never saved reads as its default. */
+/** 0.15.263: the operational limits (catalogue and defaults as ops_limits_catalogue() in migration 0402); a limit that was never saved reads as its default. */
 const OPS_CATALOGUE: { key: string; group: string; unit: string; default: number; min: number; max: number }[] = [
   { key: 'session.idle_hours', group: 'sessions', unit: 'hours', default: 8, min: 1, max: 24 },
   { key: 'session.absolute_hours', group: 'sessions', unit: 'hours', default: 12, min: 1, max: 72 },
@@ -871,7 +871,7 @@ export const settingsHandlers = [
     return HttpResponse.json(supportDto(r));
   }),
 
-  // ------------------------------------------------------------------ 0.15.262: operational limits
+  // ------------------------------------------------------------------ 0.15.263: operational limits
   http.get(`${B}/settings/ops-limits`, () => { const g = guard(); if (g) return g; const j = opsView(); return HttpResponse.json(j, tag(j.version)); }),
   http.put(`${B}/settings/ops-limits`, async ({ request }) => {
     const g = needAdmin(); if (g) return g;

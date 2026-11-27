@@ -6376,12 +6376,12 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * The operational limits, with the value in force and the default of each (0.15.262)
+         * The operational limits, with the value in force and the default of each (0.15.263)
          * @description Every signed-in user may read it. `can_edit` is true for a System Admin only. A value that was never saved reads as its default.
          */
         get: operations["getOpsLimits"];
         /**
-         * Change the operational limits (System Admin, reason, step-up, If-Match, audited) (0.15.262)
+         * Change the operational limits (System Admin, reason, step-up, If-Match, audited) (0.15.263)
          * @description System Admin only (403 `action_forbidden` otherwise, a delegate included). A reason (3+ characters), a step-up (401 `step_up_required`) and `If-Match` (428 / 412)
          *     are required. `values` holds the limits that differ from their default; a key that is left out returns to its default. 422 for an unknown key, a value that is not a
          *     whole number, a value outside its range, or an absolute session length shorter than the idle limit. Saving what is already in force is 409 `invalid_transition`.
@@ -17630,7 +17630,7 @@ export interface components {
             user_id: string;
             minutes?: number;
         };
-        /** @description 0.15.262. One operational limit. */
+        /** @description 0.15.263. One operational limit. */
         OpsLimitItem: {
             /** @enum {string} */
             key: "session.idle_hours" | "session.absolute_hours" | "stepup.seconds" | "assignments.max_rows" | "import.max_rows" | "master_import.max_rows" | "register_import.max_rows" | "prefill.max_rows" | "prefill.max_sites" | "export.max_rows" | "idempotency.max_entries";
@@ -17646,7 +17646,7 @@ export interface components {
             /** @description true when no value was saved for this key. */
             is_default: boolean;
         };
-        /** @description 0.15.262. The operational limits (setting `ops.limits`, migration 0402). */
+        /** @description 0.15.263. The operational limits (setting `ops.limits`, migration 0402). */
         OpsLimits: {
             items: components["schemas"]["OpsLimitItem"][];
             /** Format: date-time */

@@ -6,7 +6,7 @@ import { api } from '@/api/client';
 import { renderApp, signIn } from '@/test/utils';
 import { SettingsRoutes } from './Settings';
 
-/** Settings, Security, Limits (migration 0402, contract 0.15.262): every limit shows its default; an admin changes one with a reason and a step-up. */
+/** Settings, Security, Limits (migration 0402, contract 0.15.263): every limit shows its default; an admin changes one with a reason and a step-up. */
 const page = (opts = {}) => renderApp(<Routes><Route path="/admin/settings/*" element={<SettingsRoutes />} /></Routes>, { route: '/admin/settings/security/limits', ...opts });
 
 describe('Settings, Limits', () => {

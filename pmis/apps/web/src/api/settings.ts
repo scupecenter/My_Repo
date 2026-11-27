@@ -163,7 +163,7 @@ export const useSetNewDeviceCode = () => {
 };
 export const useBypassNewDevice = () =>
   useMutation<{ until: string }, ApiError, { user_id: string; minutes?: number; reason: string }>({ mutationFn: (body) => api.post('/settings/new-device-code/bypass', { body }) });
-/** 0.15.262 (migration 0402): the operational limits (setting ops.limits). Read by everyone, changed by a System Admin only, with a reason and a step-up. */
+/** 0.15.263 (migration 0402): the operational limits (setting ops.limits). Read by everyone, changed by a System Admin only, with a reason and a step-up. */
 export const useOpsLimits = () => useQuery({ queryKey: ['ops-limits'], queryFn: () => api.get<OpsLimits>('/settings/ops-limits') });
 export const useSetOpsLimits = () => {
   const qc = useQueryClient();
