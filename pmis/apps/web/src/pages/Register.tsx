@@ -722,6 +722,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
         }
         more={
             <MoreMenu
+              settings={key === 'gecol' ? 'register_gecol' : key === 'issues' ? 'register_issues' : key === 'contractors' ? 'register_contractors' : 'register'}
               items={[
                 ...(key === "as_built"
                   ? [

@@ -81,6 +81,7 @@ export class DocumentsController {
     return this.docs.list(auth, q);
   }
 
+  @ExportAction({ category: 'uploaded_files' })
   @Get('files/:id/download')
   async download(@Auth() auth: AuthContext, @Param('id') id: string, @Res({ passthrough: true }) res: Response) {
     const r = await this.docs.download(auth, id);

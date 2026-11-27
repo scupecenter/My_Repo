@@ -86,6 +86,28 @@ describe('Settings > Interface > Inbox tabs and priority', () => {
   });
 });
 
+describe('Settings > Interface > Notification panel', () => {
+  it('an admin picks the side panel and its width; the width and tabs are off while the popover is chosen; saved with a reason', async () => {
+    await signIn('pm');
+    const u = userEvent.setup();
+    const puts: { body: { sections: { panel: unknown } } }[] = [];
+    server.events.on('request:start', async ({ request }) => { if (request.method === 'PUT' && request.url.endsWith('/settings/ui-features')) puts.push({ body: await request.clone().json() }); });
+    settings();
+    await screen.findByTestId('ui-panel');
+    expect(screen.getByTestId('ui-panel-width')).toBeDisabled();
+    expect(screen.getByTestId('ui-panel-tabs')).toBeDisabled();
+    await u.selectOptions(screen.getByTestId('ui-panel-mode'), 'side_panel');
+    await u.selectOptions(screen.getByTestId('ui-panel-width'), 'wide');
+    await u.click(screen.getByTestId('ui-panel-tabs'));
+    await u.click(screen.getByTestId('ui-save'));
+    const dlg = await screen.findByTestId('ui-dialog');
+    await u.type(within(dlg).getByRole('textbox'), 'Side panel for the team');
+    await u.click(within(dlg).getByRole('button', { name: /save|confirm|submit/i }));
+    await waitFor(() => expect(puts).toHaveLength(1));
+    expect(puts[0]!.body.sections.panel).toEqual({ mode: 'side_panel', width: 'wide', show_tabs: false });
+  });
+});
+
 describe('Avatar component', () => {
   it('draws initials and follows the avatar setting in lists', async () => {
     await signIn('pm');
