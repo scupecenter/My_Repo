@@ -11771,7 +11771,7 @@ export interface components {
             theme?: "light" | "dark";
             /** @description 0.15.41. The personal UI design; null goes back to the organization default. While `identity.allow_user_choice` is false a non-null value is 403 `field_read_only` (`errors[0]` `{path: /ui_brand, code: brand_choice_locked}`); null stays allowed. Audited in `profile_updated`. */
             ui_brand?: components["schemas"]["UiBrand"] | null;
-            /** @description 0.15.191 (0241). The personal appearance choices; a subset of the dimensions. While `identity.allow_user_choice` is false a value is 403 `field_read_only` (`errors[0]` `{path: /ui_prefs, code: appearance_choice_locked}`). Audited per dimension in `profile_updated`. */
+            /** @description 0.15.160 (0241). The personal appearance choices; a subset of the dimensions. While `identity.allow_user_choice` is false a value is 403 `field_read_only` (`errors[0]` `{path: /ui_prefs, code: appearance_choice_locked}`). Audited per dimension in `profile_updated`. */
             ui_prefs?: components["schemas"]["UiPrefs"];
         };
         /** @description 0.9.2. The "My profile" page. */
@@ -11796,17 +11796,17 @@ export interface components {
             ui_brand: components["schemas"]["UiBrand"] | null;
             /** @description 0.15.41. The design the user sees. */
             brand: components["schemas"]["UiBrand"];
-            /** @description 0.15.191 (0241). The stored personal appearance choices; empty = the organization defaults. */
+            /** @description 0.15.160 (0241). The stored personal appearance choices; empty = the organization defaults. */
             ui_prefs: components["schemas"]["UiPrefs"];
-            /** @description 0.15.191 (0241). The appearance the user sees (ui_effective_prefs): own choices, else the organization defaults. */
+            /** @description 0.15.160 (0241). The appearance the user sees (ui_effective_prefs): own choices, else the organization defaults. */
             appearance: components["schemas"]["UiPrefs"];
             /** @description 0.15.41. The organization default and whether a personal design is allowed (drives the Appearance control). */
             identity: {
                 default_brand: components["schemas"]["UiBrand"];
                 allow_user_choice: boolean;
-                /** @description 0.15.191 (0241): the organization appearance defaults. */
+                /** @description 0.15.160 (0241): the organization appearance defaults. */
                 defaults?: components["schemas"]["UiPrefs"];
-                /** @description 0.15.191 (0241): the dimensions with their allowed values (ui_pref_options). */
+                /** @description 0.15.160 (0241): the dimensions with their allowed values (ui_pref_options). */
                 pref_options?: {
                     [key: string]: string[];
                 };
@@ -11875,9 +11875,9 @@ export interface components {
             ui_brand?: components["schemas"]["UiBrand"] | null;
             /** @description 0.15.41. The design the user sees: `ui_brand` while the admin allows a personal choice and one is set, else the organization default. Independent of `theme`. */
             brand?: components["schemas"]["UiBrand"];
-            /** @description 0.15.191 (0241). The stored personal appearance choices; empty = the organization defaults. */
+            /** @description 0.15.160 (0241). The stored personal appearance choices; empty = the organization defaults. */
             ui_prefs?: components["schemas"]["UiPrefs"];
-            /** @description 0.15.191 (0241). The appearance the user sees (ui_effective_prefs): own choices, else the organization defaults. */
+            /** @description 0.15.160 (0241). The appearance the user sees (ui_effective_prefs): own choices, else the organization defaults. */
             appearance?: components["schemas"]["UiPrefs"];
             is_break_glass?: boolean;
             /** @description 0.3.0. E.164; a local sign-in identifier. */
@@ -16791,7 +16791,7 @@ export interface components {
          * @enum {string}
          */
         UiBrand: "current" | "aljeel" | "executive" | "field" | "obsidian" | "sahara";
-        /** @description 0.15.191 (0241): the appearance dimensions and their allowed values (the database list `ui_pref_options()` is the source). A subset may be sent; each key holds one of its values. `accent` `default` = the accent of the design. */
+        /** @description 0.15.160 (0241): the appearance dimensions and their allowed values (the database list `ui_pref_options()` is the source). A subset may be sent; each key holds one of its values. `accent` `default` = the accent of the design. */
         UiPrefs: {
             /** @enum {string} */
             density?: "comfortable" | "standard" | "compact";
@@ -16813,9 +16813,9 @@ export interface components {
             default_brand: components["schemas"]["UiBrand"];
             /** @description true: each user may choose their own design in My profile; false: everyone sees `default_brand`. */
             allow_user_choice: boolean;
-            /** @description 0.15.191 (0241): the organization appearance defaults. */
+            /** @description 0.15.160 (0241): the organization appearance defaults. */
             defaults?: components["schemas"]["UiPrefs"];
-            /** @description 0.15.191 (0241): the dimensions with their allowed values (ui_pref_options). */
+            /** @description 0.15.160 (0241): the dimensions with their allowed values (ui_pref_options). */
             pref_options?: {
                 [key: string]: string[];
             };
@@ -16831,7 +16831,7 @@ export interface components {
         UiIdentityInput: components["schemas"]["WithReason"] & {
             default_brand: components["schemas"]["UiBrand"];
             allow_user_choice: boolean;
-            /** @description 0.15.191 (0241): the organization appearance defaults; omitted keeps the current ones. */
+            /** @description 0.15.160 (0241): the organization appearance defaults; omitted keeps the current ones. */
             defaults?: components["schemas"]["UiPrefs"];
         };
         /** @description 0.15.97. A support link under the sign-in form. http(s) or mailto only. */
