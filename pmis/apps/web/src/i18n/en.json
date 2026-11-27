@@ -7030,6 +7030,7 @@
     "inbox_priority_note": "Mentions and approvals waiting are priority by default."
   },
   "related": {
+    "change_pending": "Change pending",
     "title": "Related records",
     "to": "Points to:",
     "from": "Named by:",
