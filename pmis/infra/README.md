@@ -15,7 +15,7 @@ The workflow is `.github/workflows/ci.yml` at the repository root. It runs on pu
 |---|---|---|
 | `secrets` (gitleaks 8.21.2) | Scans the working tree and the full git history, redacted | `gitleaks detect --source . --no-git --config .gitleaks.toml --redact` and `gitleaks detect --source . --config .gitleaks.toml --redact` from the repository root |
 | `sast` (semgrep 1.95.0) | Rules `p/default`, fails on ERROR severity, scans `pmis/apps` | `semgrep scan --config p/default --severity ERROR --error --exclude node_modules --exclude dist pmis/apps` |
-| `dependencies` (grype) | Scans `pmis`, fails on high or above | `grype dir:pmis --fail-on high` |
+| `dependencies` (grype) | Scans `pmis`, fails on high or above. A second step checks the license of every production dependency against an allowlist (`docs/ops/licenses.md`) | `grype dir:pmis --fail-on high` and `bash tools/check-licenses.sh` (after `npm ci --omit=dev` in `apps/api` and `apps/web`) |
 | `iac` (checkov 3.2.300) | Dockerfiles and workflows, report only (soft fail) | `checkov -d . --framework dockerfile github_actions --compact --soft-fail` |
 
 Database backup (pgBackRest, Q196): the scripts are `infra/backup/db-*.sh` and `test-db-backup.sh`; the runbook is `infra/RUNBOOK.md` section 8.

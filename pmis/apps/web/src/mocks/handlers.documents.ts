@@ -56,7 +56,7 @@ const lib = (): Doc[] => (LIB ??= [
   spec('A4', 'A4 LLD', 'A4 التصميم التفصيلي LLD', ['A4']),
   spec('B1', 'B1 PR email (outsourced only)', 'B1 بريد طلب الشراء', ['B1'], { kind: 'email', formats: ['pdf', 'jpg', 'jpeg', 'png', 'eml', 'msg'], condition_rule: { eq: ['procurement.delivery', 'outsourced'] } }),
   spec('B7_DN', 'B7 CW DN (signed scan)', 'B7 إشعار تسليم CW DN', ['B7'], { kind: 'generated_form', form_kind: 'dn' }),
-  spec('B9', 'B9 MOS proof', 'B9 إثبات MOS', ['B8', 'B9'], { kind: 'photo', formats: ['jpg', 'jpeg', 'png', 'heic'], photo_rules: { min_count: 1, formats: ['JPG', 'PNG', 'HEIC'] } }),
+  spec('B9', 'B9 MOS proof', 'B9 إثبات MOS', ['B8', 'B9'], { kind: 'photo', formats: ['jpg', 'jpeg', 'png', 'heic', 'webm'], photo_rules: { min_count: 1, formats: ['JPG', 'PNG', 'HEIC'] } }),
   draft('D16_PAC', 'TE PAC certificate (signed and scanned)', 'شهادة القبول الأولي TE PAC', ['D16']), draft('D17_HOTO', 'HOTO package (signed and scanned)', 'حزمة التسليم HOTO', ['D17']),
   draft('B15_FAC', 'CW FAC certificate (signed and scanned)', 'شهادة القبول النهائي CW FAC', ['B15'], { kind: 'generated_form', form_kind: 'fac' }),
 ]);

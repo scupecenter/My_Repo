@@ -19,6 +19,8 @@ export interface SearchHit {
   region_id: number | null;
   href: string;
   match_ranges: [number, number][];
+  /** Documents only: where the words were found inside the file contents (item 12), else null. */
+  snippet?: string | null;
 }
 export interface SearchGroup {
   type: SearchType;
@@ -39,6 +41,7 @@ interface Row {
   subtitle: string | null;
   region_id: number | null;
   href?: string;
+  snippet?: string | null;
   total: number;
 }
 
@@ -81,6 +84,7 @@ export class SearchService {
             region_id: r.region_id,
             href: r.href ?? '/',
             match_ranges: matchRanges(title, text),
+            ...(type === 'documents' ? { snippet: r.snippet ?? null } : {}),
           };
         }),
       });
@@ -160,10 +164,19 @@ export class SearchService {
       const regions = await this.access.regions('sites', 'view');
       if (regions !== null && regions.length === 0) return null;
       const reach = regions === null ? Prisma.empty : Prisma.sql`AND s.region_id = ANY(${regions}::int[])`;
+      // Content is more sensitive than a file name: it needs the documents view right (sites.documents) in the file's region, and only site documents (no register slot) are searched.
+      const docRegions = await this.access.regions('sites.documents', 'view');
+      const contentOk = docRegions === null || docRegions.length > 0;
+      const contentReach = docRegions === null ? Prisma.empty : Prisma.sql`AND s.region_id = ANY(${docRegions}::int[])`;
+      const norm = pattern.slice(1, -1).replace(/\\([\\%_])/g, '$1');
+      // Item 12: a file matches by its name or by its extracted text (document_texts, row level security like document_files). The same region reach applies.
       return tx.$queryRaw<Row[]>(Prisma.sql`SELECT f.id::text AS id, f.original_name AS title, s.site_code AS subtitle, s.region_id,
-          concat('/sites/', s.id::text) AS href, (COUNT(*) OVER())::int AS total
+          concat('/sites/', s.id::text) AS href, (COUNT(*) OVER())::int AS total,
+          CASE WHEN search_document_text(f.original_name) LIKE ${pattern} OR dt.file_id IS NULL THEN NULL
+            ELSE '...' || substr(dt.text_norm, greatest(1, strpos(dt.text_norm, ${norm}) - 40), 120) || '...' END AS snippet
         FROM document_files f JOIN document_slots sl ON sl.id = f.slot_id JOIN sites s ON s.id = sl.site_id
-        WHERE f.is_current AND s.is_active AND search_document_text(f.original_name) LIKE ${pattern} ${reach}
+        LEFT JOIN document_texts dt ON ${contentOk} AND dt.file_id = f.id AND dt.status = 'done' AND sl.register_key IS NULL ${contentReach} AND dt.text_norm LIKE ${pattern}
+        WHERE f.is_current AND s.is_active AND (search_document_text(f.original_name) LIKE ${pattern} OR dt.file_id IS NOT NULL) ${reach}
         ORDER BY f.original_name LIMIT ${limit}`);
     }
     if (type === 'meetings') {
