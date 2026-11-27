@@ -15,6 +15,7 @@ describe('Dashboard ops: power and fiber readiness card (0.15.201, item 4)', () 
   it('shows the scoped sites, the done counts, the headline waits and the aging buckets per utility', async () => {
     await signIn('pm');
     dashPage();
+    // the first render of the whole Dashboard is slow under CI load (1000 ms default is not enough)
     const card = await screen.findByTestId('dash-ops-readiness', {}, { timeout: 8000 });
     expect(card).toHaveTextContent('Power and fiber readiness');
     expect(screen.getByTestId('dash-gecol-in-scope')).toHaveTextContent('18');
