@@ -23,6 +23,12 @@ export class MatrixController {
     return this.matrix.coverage(auth, q);
   }
 
+  /** GET /matrix/simulate (0.15.100): who would hold L1 and L2 for a site and a task or register. Read only, admin only. */
+  @Get('simulate')
+  simulate(@Query() q: Record<string, unknown>) {
+    return this.matrix.simulate(q);
+  }
+
   @Patch()
   async patch(
     @Auth() auth: AuthContext, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response,

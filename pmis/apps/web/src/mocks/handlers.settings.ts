@@ -8,6 +8,7 @@ import { weightIssues } from '@/lib/weights';
 import { NAV_SIDE } from '@/lib/navLayout';
 import { db, identity, loginPage, loginPagePublic, save, stepUpValid, viewer } from './db';
 import { BRANDS, isBrand } from '@/lib/brands';
+import { APPEARANCE_OPTIONS } from '../lib/appearance';
 import { guard, page, problem, stepUp } from './handlers';
 import { byId, uid } from './ids';
 import type { TableDisplaySetting } from '@/api/display';
@@ -458,6 +459,16 @@ export const settingsHandlers = [
   http.get(`${B}/recycle-bin`, () => { const g = guard(); if (g) return g; return HttpResponse.json(BIN, tag(BIN.version)); }),
   http.put(`${B}/recycle-bin/retention`, async ({ request }) => { const g = guard(); if (g) return g; const b = (await request.json()) as { retention_days: number }; BIN.retention_days = b.retention_days; BIN.version += 1; return HttpResponse.json({ retention_days: BIN.retention_days, version: BIN.version }, tag(BIN.version)); }),
   http.post(`${B}/recycle-bin/:id/restore`, ({ params }) => { const g = guard(); if (g) return g; const i = BIN.items.findIndex((x) => x.id === params.id); if (i < 0) return HttpResponse.json({ code: 'not_found' }, { status: 404 }); const [r] = BIN.items.splice(i, 1); return HttpResponse.json({ id: r!.id, register_key: r!.register_key, state: 'entry', version: r!.version + 1 }); }),
+  http.get(`${B}/matrix/simulate`, ({ request }) => {
+    const g = guard(); if (g) return g;
+    const u = new URL(request.url); const kind = u.searchParams.get('kind') === 'register' ? 'register' : 'task'; const code = u.searchParams.get('code') ?? '';
+    const person = (n: string, via: string | string[]) => ({ user_id: '00000000-0000-4000-8000-0000000000a1', name: n, email: `${n.toLowerCase().replace(/ /g, '.')}@example.test`, via });
+    return HttpResponse.json({ site: { id: u.searchParams.get('site_id'), site_code: 'S-1', name: 'Demo', region_id: 1 }, kind, code, name_en: code, name_ar: null, module: 'sites',
+      levels: [
+        { level_code: 'L1', source: 'region', task_specific: true, rule: 'any_one', holders: [person('Sara Ali', 'role: Field engineer')], fallback: [] },
+        { level_code: 'L2', source: 'default', task_specific: false, rule: null, holders: [], fallback: [person('Admin One', 'system_admin')] },
+      ] });
+  }),
   http.get(`${B}/matrix/coverage`, () => { const g = guard(); if (g) return g; return HttpResponse.json(MATRIX_COVERAGE); }),
   // ------------------------------------------------------------------ preventive-maintenance schedules (contract 0.15.161)
   http.get(`${B}/settings/pm-schedules`, () => { const g = guard(); if (g) return g; return HttpResponse.json(pmView(), tag(pmState.version)); }),
@@ -614,18 +625,27 @@ export const settingsHandlers = [
   http.get(`${B}/settings/identity`, () => { const g = guard(); if (g) return g; const j = identityView(); return HttpResponse.json(j, tag(j.version)); }),
   http.put(`${B}/settings/identity`, async ({ request }) => {
     const g = needAdmin(); if (g) return g;
-    const b = await body<{ default_brand?: unknown; allow_user_choice?: unknown; reason?: string } & Record<string, unknown>>(request);
-    const errs: { path: string; code: string }[] = Object.keys(b).filter((k) => !['default_brand', 'allow_user_choice', 'reason'].includes(k)).map((k) => ({ path: `/${k}`, code: 'unknown_field' }));
+    const b = await body<{ default_brand?: unknown; allow_user_choice?: unknown; defaults?: unknown; reason?: string } & Record<string, unknown>>(request);
+    const errs: { path: string; code: string }[] = Object.keys(b).filter((k) => !['default_brand', 'allow_user_choice', 'defaults', 'reason'].includes(k)).map((k) => ({ path: `/${k}`, code: 'unknown_field' }));
     if (!isBrand(b.default_brand)) errs.push({ path: '/default_brand', code: 'invalid' });
     if (typeof b.allow_user_choice !== 'boolean') errs.push({ path: '/allow_user_choice', code: 'required' });
     if ((b.reason ?? '').trim().length < 3 || (b.reason ?? '').length > 1000) errs.push({ path: '/reason', code: 'required' });
+    if (b.defaults !== undefined) {
+      const d = b.defaults;
+      if (d === null || typeof d !== 'object' || Array.isArray(d)) errs.push({ path: '/defaults', code: 'invalid' });
+      else for (const [k, v] of Object.entries(d)) {
+        const opts = (APPEARANCE_OPTIONS as Record<string, readonly string[]>)[k];
+        if (!opts || typeof v !== 'string' || !opts.includes(v)) { errs.push({ path: '/defaults', code: 'invalid' }); break; }
+      }
+    }
     if (errs.length) return fields(...errs);
     if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
     const p = ver(request, identity().version); if (p) return p;
     if (!stepUpValid()) return stepUp();
-    if (identity().default_brand === b.default_brand && identity().allow_user_choice === b.allow_user_choice) return problem(409, 'invalid_transition', 'These are already the identity settings.');
+    const nextDefaults = (b.defaults as Record<string, string> | undefined) ?? identity().defaults;
+    if (identity().default_brand === b.default_brand && identity().allow_user_choice === b.allow_user_choice && JSON.stringify(nextDefaults) === JSON.stringify(identity().defaults)) return problem(409, 'invalid_transition', 'These are already the identity settings.');
     const v = viewer()!;
-    Object.assign(identity(), { default_brand: b.default_brand, allow_user_choice: b.allow_user_choice, version: identity().version + 1, updated_at: new Date().toISOString(),
+    Object.assign(identity(), { default_brand: b.default_brand, allow_user_choice: b.allow_user_choice, defaults: nextDefaults, version: identity().version + 1, updated_at: new Date().toISOString(),
       updated_by: { id: uid(v.employee_id ?? '9999'), display_name: v.name, employee_id: v.employee_id } }); save();
     const j = identityView();
     return HttpResponse.json(j, tag(j.version));
