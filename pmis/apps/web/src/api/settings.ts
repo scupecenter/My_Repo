@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { api, ApiError, downloadFile, type RequestOptions } from './client';
 import type { PasskeyItem, PasskeySetting, MyPasskeys, AlertRuleInput, AlertRuleSaved, AlertRulesResponse, IssueStoppedRowList, IssueTaskMapItem, IssueTaskMapList,
-  ActiveSession, ActOnBehalfRequest, DownloadLocks, Calendar, CalendarConfirmation, MailNotificationKinds, ImportsSettings, ContractorPerformanceReport, ContractorPerformanceThresholds, ContractorPerformanceSettings, NavLayoutSetting, UiIdentity, UiBrand, LoginPage, SecurityLocks, SupportAccessSetting, Delegation, LoginPagePublic, SupportLink, NavLayoutT, ContractorRules, ContractorRulesInput, GecolHlcCounts, ContractorsCompletenessReport, TeamScopeMismatchReport, DeletedUser, PurgedUser, DlpSettings, DlpVersion, DlpVersionInput, Holiday, HolidayChangeResult, HolidayInput, HolidayPatch, HolidaySummary, IdleTaskAlertSetting, Job, LogIntegrity, LogRetention, LogRetentionInput, NewDeviceCodeSetting,
+  ActiveSession, ActOnBehalfRequest, DownloadLocks, UiAsset, UiPublicIdentity, Calendar, CalendarConfirmation, MailNotificationKinds, ImportsSettings, ContractorPerformanceReport, ContractorPerformanceThresholds, ContractorPerformanceSettings, NavLayoutSetting, UiIdentity, UiBrand, LoginPage, SecurityLocks, SupportAccessSetting, Delegation, LoginPagePublic, SupportLink, NavLayoutT, ContractorRules, ContractorRulesInput, GecolHlcCounts, ContractorsCompletenessReport, TeamScopeMismatchReport, DeletedUser, PurgedUser, DlpSettings, DlpVersion, DlpVersionInput, Holiday, HolidayChangeResult, HolidayInput, HolidayPatch, HolidaySummary, IdleTaskAlertSetting, Job, LogIntegrity, LogRetention, LogRetentionInput, NewDeviceCodeSetting,
   NotificationPolicy, NotificationPolicyInput, NotificationTypeDef, Page, ReassignmentAlert, SecurityLogEntry, SessionRevokeResult, SlaPublishPreview, SlaRuleSet, SlaRuleSetPublishResult, SlaRuleSetSummary, SlaTaskRule, StaffCard, StaffVisibility, StructuralFreeze,
   TaskDefinition, TeamScopeMatch, TeamScopeMatchInput, TransitionResultT, User, UserDetail, WeekendDaysResult, WeightSet, WeightSetCode, WeightSetInput, WeightSetPreview, WeightSetPublishResult, WorkflowVersion, WorkflowVersionSummary,
 } from './types';
@@ -163,6 +163,37 @@ export const useSetNewDeviceCode = () => {
 };
 export const useBypassNewDevice = () =>
   useMutation<{ until: string }, ApiError, { user_id: string; minutes?: number; reason: string }>({ mutationFn: (body) => api.post('/settings/new-device-code/bypass', { body }) });
+
+/** 0.15.232 (migration 0243): the workspace logo of the identity. Uploading always enables it; hiding keeps the row (hide never delete). */
+export const usePutUiLogo = () => {
+  const qc = useQueryClient();
+  return useMutation<UiAsset, ApiError, { file: File; reason: string; version: number | null }>({
+    mutationFn: ({ file, reason, version }) => {
+      const f = new FormData();
+      f.append('file', file);
+      f.append('reason', reason);
+      return api.put('/settings/identity/logo', version === null ? { body: f } : { body: f, version });
+    },
+    onSettled: () => refresh(qc, 'ui-identity', 'me', 'my-profile'),
+  });
+};
+export const useSetUiLogoEnabled = () => {
+  const qc = useQueryClient();
+  return useMutation<UiAsset, ApiError, { version: number; enabled: boolean; reason: string }>({
+    mutationFn: ({ version, ...body }) => api.patch('/settings/identity/logo', { version, body }),
+    onSettled: () => refresh(qc, 'ui-identity', 'me', 'my-profile'),
+  });
+};
+/** 0.15.232 (0243): where the logo shows outside the app (sign-in pages, browser tab icon); both off by default. */
+export const useSetUiLogoDisplay = () => {
+  const qc = useQueryClient();
+  return useMutation<UiAsset, ApiError, { version: number; show_on_login: boolean; use_as_favicon: boolean; reason: string }>({
+    mutationFn: ({ version, ...body }) => api.patch('/settings/identity/logo/display', { version, body }),
+    onSettled: () => refresh(qc, 'ui-identity', 'me', 'my-profile', 'ui-public-identity'),
+  });
+};
+/** The public read (no session): which public pages show the logo. Both null until an admin switches one on. */
+export const useUiPublicIdentity = () => useQuery({ queryKey: ['ui-public-identity'], queryFn: () => api.get<UiPublicIdentity>('/ui/public/identity'), staleTime: 30_000, retry: 1 });
 /** 0.15.194 (migration 0294): passkeys as an alternative second step (setting security.passkeys), the own passkeys, and the admin recovery. */
 export const usePasskeySetting = () => useQuery({ queryKey: ['passkey-setting'], queryFn: () => api.get<PasskeySetting>('/settings/passkeys') });
 export const useSetPasskeys = () => {
@@ -188,6 +219,15 @@ export const useSetImportsSettings = () => {
   const qc = useQueryClient();
   return useMutation<ImportsSettings, ApiError, { version: number; async_rows: number; reason: string }>({
     mutationFn: ({ version, ...body }) => api.put('/settings/imports', { version, body }), onSettled: () => refresh(qc, 'imports-settings'),
+  });
+};
+
+/** 0.15.203 (P3): the notice of a new template version (templates.change_notice). Read by everyone; changed by a System Admin or an all-regions delegate of settings, with a reason. */
+export const useTemplateNoticeSettings = () => useQuery({ queryKey: ['template-notice-settings'], queryFn: () => api.get<TemplateChangeNotice>('/settings/template-change-notice') });
+export const useSetTemplateNoticeSettings = () => {
+  const qc = useQueryClient();
+  return useMutation<TemplateChangeNotice, ApiError, { version: number; enabled: boolean; days: number; reason: string }>({
+    mutationFn: ({ version, ...body }) => api.put('/settings/template-change-notice', { version, body }), onSettled: () => refresh(qc, 'template-notice-settings'),
   });
 };
 
@@ -504,6 +544,7 @@ export function usePublishWeights(id: string) {
 
 // 0.15.85: every task with its SLA status (Settings > SLA, "Tasks and their SLA") and the explicit "no SLA" choice
 import type { SlaTaskList } from './types';
+import type { TemplateChangeNotice } from './types';
 export const useSlaTasks = () => useQuery({ queryKey: ['slaTasks'], queryFn: () => api.get<SlaTaskList>('/settings/sla-tasks') });
 export const useSetSlaNoSla = () => {
   const qc = useQueryClient();

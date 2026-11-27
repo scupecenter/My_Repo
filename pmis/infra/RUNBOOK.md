@@ -278,6 +278,7 @@ To prove the mail path after install, run `sudo -u postgres psql -d <db> -c "SEL
 4. Restore the same day's pg_dump from the restic copy into a second scratch database and compare row counts
    (`restic restore latest --tag db-dump --target <dir>`, then `pg_restore`).
 5. Record the drill in `infra/restore-drill.md` (section "Database"). A pass needs matching rows at the target and a time within the RTO.
+6. A quick check that the dump route round-trips, on a scratch database and with no repository needed: `infra/backup/drill-logical.sh <database>` (set `PG_BIN` to the PostgreSQL client directory of the server version). It is a supplement, not the drill above.
 
 Before the first production run, the test harness runs on a throw-away cluster, never the live one. It needs root and PostgreSQL 16, uses
 cluster `pmisbk` on port 55440 and the scratch restore on port 55441:

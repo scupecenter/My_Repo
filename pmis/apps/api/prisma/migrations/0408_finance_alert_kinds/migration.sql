@@ -1,4 +1,4 @@
--- 0408_finance_alert_kinds: two financial kinds for the generic alert rules (0342), notifications only (D59; contract 0.15.331).
+-- 0408_finance_alert_kinds: two financial kinds for the generic alert rules (0342), notifications only (D59; contract 0.15.365).
 -- Mirror: db/sql/407_finance_alert_kinds.sql (kept identical to prisma/migrations/0408_finance_alert_kinds/migration.sql).
 --
 --   advance_unsettled  {days 1..365, optional}  fires for every current approved advance of the Financial Advances register that is still disbursed or in
