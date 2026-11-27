@@ -3385,6 +3385,8 @@
         "on_air_vs_target": "On-Air against the monthly target"
       }
     },
+    "collapse_all": "Collapse all",
+    "expand_all": "Expand all",
     "share_menu": "Share / Export",
     "copy_link": "Copy link",
     "link_copied": "Copied",

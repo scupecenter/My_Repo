@@ -1,7 +1,7 @@
 import { Check, ChevronDown, Download, Link2, MonitorPlay, PencilLine, Printer, RotateCcw, Share2 } from "lucide-react";
 import { loadPref, savePref } from "@/lib/localPref";
 import { useDownloadGate } from '@/lib/downloadGate';
-import { useEffect, useMemo, useState, type ReactNode, Fragment } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode, Fragment } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -582,6 +582,14 @@ export function Dashboard() {
   const [linkCopied, setLinkCopied] = useState(false);
   const [format, setFormat] = useState<ExportFormat>(() => (loadPref<string>("dash.exportFormat", "xlsx") === "csv" ? "csv" : "xlsx"));
   const [shareOpen, setShareOpen] = useState(false);
+  const shownBlocks = useRef<string[]>([]);
+  const [collapsed, setCollapsed] = useState<string[]>(() => loadPref<string[]>(collapsedKey(userId), []));
+  useEffect(() => { setCollapsed(loadPref<string[]>(collapsedKey(userId), [])); }, [userId]);
+  const setCollapsedSaved = (next: string[]) => { setCollapsed(next); savePref(collapsedKey(userId), next); };
+  const blockLabel = (code: string) => {
+    const c = dashSettings.data?.catalogue.cards.find((x) => x.code === code);
+    return c ? (ar && c.label_ar) || c.label_en : code;
+  };
   // the Share / Export menu closes on Escape and on a click outside it
   useEffect(() => {
     if (!shareOpen) return;
@@ -1420,6 +1428,24 @@ export function Dashboard() {
       ) : (
         <>
           {/* F20 (owner default 2026-11-15): the counters card is on the PMO tab only, until the tab's layout is saved in the settings. */}
+          <div className="flex justify-end gap-2 print:hidden" data-testid="dash-collapse-bar">
+            <button
+              type="button"
+              className="btn px-2 py-1 text-xs"
+              data-testid="dash-collapse-all"
+              onClick={() => setCollapsedSaved([...shownBlocks.current])}
+            >
+              {t("dash.collapse_all")}
+            </button>
+            <button
+              type="button"
+              className="btn px-2 py-1 text-xs"
+              data-testid="dash-expand-all"
+              onClick={() => setCollapsedSaved([])}
+            >
+              {t("dash.expand_all")}
+            </button>
+          </div>
           {orderBlocks(
             dashSettings.data?.tabs[tab] ??
               (tab === "pmo" ? undefined : { order: [], hidden: ["counters"] }),
@@ -2654,6 +2680,32 @@ export function Dashboard() {
 
               region_health: <RegionHealthCard />,
             },
+            (code, node) => {
+              const closed = collapsed.includes(code);
+              if (!shownBlocks.current.includes(code)) shownBlocks.current.push(code);
+              return (
+                <section
+                  data-testid={`dash-block-${code}`}
+                  className="[&:has(>[data-blk]:empty)]:hidden"
+                >
+                  <h2 className="mb-1 print:hidden">
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-2 rounded-lg border border-line bg-surface px-3 py-1.5 text-start text-sm font-semibold"
+                      data-testid={`dash-block-toggle-${code}`}
+                      aria-expanded={!closed}
+                      onClick={() => setCollapsedSaved(closed ? collapsed.filter((c) => c !== code) : [...collapsed, code])}
+                    >
+                      <ChevronDown size={16} aria-hidden className={closed ? "-rotate-90 rtl:rotate-90" : ""} />
+                      {blockLabel(code)}
+                    </button>
+                  </h2>
+                  <div data-blk className={`${closed ? "hidden print:block" : ""}`}>
+                    {node}
+                  </div>
+                </section>
+              );
+            },
           )}
         </>
       )}
@@ -2714,11 +2766,15 @@ function RegionHealthCard() {
 function orderBlocks(
   layout: TabLayout | undefined,
   blocks: Record<string, ReactNode>,
+  wrap?: (code: string, node: ReactNode) => ReactNode,
 ): ReactNode[] {
   return orderedVisible(layout, Object.keys(blocks)).map((code) => (
-    <Fragment key={code}>{blocks[code]}</Fragment>
+    <Fragment key={code}>{wrap ? wrap(code, blocks[code]) : blocks[code]}</Fragment>
   ));
 }
+
+/** Decision 36 item 5: the collapsed blocks of one user, remembered in this browser per user (view preference only). */
+const collapsedKey = (userId: string | undefined) => `dash.collapsed.${userId ?? "anon"}`;
 
 type DashStream = NonNullable<Dash["streams"]["items"][number]["counts"]>;
 type DelayItem = Dash["delay"]["items"][number];
