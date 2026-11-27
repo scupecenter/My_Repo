@@ -6,7 +6,7 @@ import { Card, pct } from "./dashboardBits";
 type Activity = NonNullable<Dashboard["headline"]["project_status"]>["activities"][number];
 
 /**
- * Compact detail table under the progress and weight cards (contract 0.15.209): the main weight headings (A1..A8) with progress,
+ * Compact detail table under the progress and weight cards (contract 0.15.366): the main weight headings (A1..A8) with progress,
  * weight and counts; the items of each heading are hidden until its button opens them (or expand all). Read only; the data is the
  * activities[].items[] that GET /dashboard and GET /project-status already return. Ordered and hidden from Settings > Dashboard.
  */

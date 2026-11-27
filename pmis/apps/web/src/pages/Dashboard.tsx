@@ -1963,7 +1963,7 @@ export function Dashboard() {
 
               ps_detail: (
                 <>
-                  {/* 0.15.209: the compact A1..A8 table, the items of each heading hidden until opened */}
+                  {/* 0.15.366: the compact A1..A8 table, the items of each heading hidden until opened */}
                   <PsDetailTable activities={ps?.activities} />
                 </>
               ),

@@ -10,7 +10,7 @@ vi.mock('@/components/EChart', () => ({ EChart: ({ label, testid }: { label: str
 const dashPage = () =>
   renderApp(<Routes><Route path="/dashboard" element={<Dashboard />} /></Routes>, { route: '/dashboard' });
 
-describe('Dashboard: Project Status detail table (0.15.209)', () => {
+describe('Dashboard: Project Status detail table (0.15.366)', () => {
   it('shows the main rows closed, opens one row, then expands and collapses all', async () => {
     await signIn('pm');
     dashPage();

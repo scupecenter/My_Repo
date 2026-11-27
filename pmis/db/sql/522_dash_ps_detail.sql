@@ -1,5 +1,5 @@
--- 0511_dash_ps_detail (contract 0.15.209): the dashboard card "Project Status detail" (the compact A1..A8 table whose items open and close;
--- approved by Ahmed 2026-11-27 20:22, relayed by the main agent). Mirror: db/sql/510_dash_ps_detail.sql (kept identical).
+-- 0523_dash_ps_detail (contract 0.15.366): the dashboard card "Project Status detail" (the compact A1..A8 table whose items open and close;
+-- approved by Ahmed 2026-11-27 20:22, relayed by the main agent). Mirror: db/sql/522_dash_ps_detail.sql (kept identical).
 --
 -- Additive: one card code, ps_detail, is added to the dashboard settings catalogue, so the card can be shown, hidden and ordered per
 -- tab in Settings > Dashboard like every other card. A card in the catalogue that no saved list names is shown at the end, so the card
