@@ -204,6 +204,8 @@ export function toAssignmentDto(a: AssignmentRow, now: Date): AssignmentDto {
 }
 
 export interface UserFilter {
+  /** The compiled + Filter tree of the screen `users` (over the alias `u`), or null. */
+  adv?: Prisma.Sql | null;
   q?: string;
   status?: string;
   roleId?: string;
@@ -269,6 +271,7 @@ export class UsersRepo {
         AND (a.valid_to IS NULL OR a.valid_to > now())
         AND (a.all_regions OR EXISTS (SELECT 1 FROM user_role_assignment_regions r WHERE r.assignment_id = a.id AND r.region_id = ${filter.regionId}::int)))`);
     }
+    if (filter.adv) where.push(Prisma.sql`(${filter.adv})`);
     const base = Prisma.join(where, ' AND ');
     const page = after ? Prisma.sql`AND (u.display_name, u.id::text) > (${after[0]}, ${after[1]})` : Prisma.empty;
     const rows = await this.db.tx.$queryRaw<UserDbRow[]>(Prisma.sql`SELECT ${USER_SELECT} ${USER_FROM}

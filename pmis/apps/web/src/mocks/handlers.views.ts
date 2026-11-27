@@ -123,7 +123,40 @@ const ARCHIVE_FIELDS: FF[] = [
   { key: 'uploaded_at', label_en: 'Upload date', label_ar: 'تاريخ الرفع', type: 'date' },
 ];
 
-const fieldsOf = (screen: string) => screen === 'library-archive' ? withGroup(ARCHIVE_FIELDS, 'fields') : screen === 'sites' || screen === 'sites-stream' ? withGroup(SITE_FIELDS, 'columns')
+/** Pilot admin lists (users, assignments): the builtin fields of the screens `users` and `assignments`. */
+const USER_FIELDS: FF[] = [
+  { key: 'display_name', label_en: 'Name', label_ar: 'الاسم', type: 'text' },
+  { key: 'email', label_en: 'Email', label_ar: 'البريد', type: 'text' },
+  { key: 'status', label_en: 'Status', label_ar: 'الحالة', type: 'enum', options: en(['pending_assignment', 'active', 'suspended', 'disabled']) },
+  { key: 'roles', label_en: 'Current roles', label_ar: 'الأدوار الحالية', type: 'text' },
+];
+const ASSIGNMENT_FIELDS: FF[] = [
+  { key: 'person', label_en: 'Person', label_ar: 'الشخص', type: 'text' },
+  { key: 'role_name', label_en: 'Role', label_ar: 'الدور', type: 'text' },
+  { key: 'permission_level', label_en: 'Level', label_ar: 'المستوى', type: 'enum', options: en(['view', 'entry', 'review', 'approve', 'admin']) },
+  { key: 'active_now', label_en: 'Active now', label_ar: 'ساري الآن', type: 'bool' },
+];
+
+const AUDIT_FILTER_FIELDS: FF[] = [
+  { key: 'at', label_en: 'Date', label_ar: 'التاريخ', type: 'date' },
+  { key: 'action', label_en: 'Action', label_ar: 'الإجراء', type: 'text' },
+  { key: 'entity_type', label_en: 'Entity type', label_ar: 'نوع الكيان', type: 'text' },
+  { key: 'is_admin_override', label_en: 'Admin override', label_ar: 'تجاوز إداري', type: 'bool' },
+];
+const SECURITY_FILTER_FIELDS: FF[] = [
+  { key: 'at', label_en: 'Date', label_ar: 'التاريخ', type: 'date' },
+  { key: 'event', label_en: 'Event', label_ar: 'الحدث', type: 'text' },
+  { key: 'outcome', label_en: 'Outcome', label_ar: 'النتيجة', type: 'text' },
+];
+
+const WH_MOVEMENT_FIELDS: FF[] = [
+  { key: 'doc_no', label_en: 'Document number', label_ar: 'رقم المستند', type: 'text' },
+  { key: 'status', label_en: 'Status', label_ar: 'الحالة', type: 'enum', options: en(['pending', 'posted', 'cancelled']) },
+  { key: 'doc_date', label_en: 'Document date', label_ar: 'تاريخ المستند', type: 'date' },
+  { key: 'site_code', label_en: 'Site ID', label_ar: 'رمز الموقع', type: 'text' },
+];
+
+const fieldsOf = (screen: string) => screen === 'warehouse-movements' ? withGroup(WH_MOVEMENT_FIELDS, 'fields') : screen === 'audit-log' ? withGroup(AUDIT_FILTER_FIELDS, 'fields') : screen === 'security-log' ? withGroup(SECURITY_FILTER_FIELDS, 'fields') : screen === 'users' ? withGroup(USER_FIELDS, 'fields') : screen === 'assignments' ? withGroup(ASSIGNMENT_FIELDS, 'fields') : screen === 'library-archive' ? withGroup(ARCHIVE_FIELDS, 'fields') : screen === 'sites' || screen === 'sites-stream' ? withGroup(SITE_FIELDS, 'columns')
   : screen === 'dashboard' ? withGroup(SITE_FIELDS.filter((f) => f.key !== 'workflow_locks'), 'columns')
   : /^site360-[a-z0-9_]+$/.test(screen) ? withGroup([...SITE_FIELDS, ...MENU_FIELDS], 'columns')
   : screen === 'site-tasks' || screen === 'tasks-board' ? withGroup(TASK_FIELDS, 'fields') : /^register-/.test(screen) ? withGroup(REGISTER_FIELDS, 'fields') : null;

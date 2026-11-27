@@ -8,6 +8,8 @@ import { errText } from '@/components/FormDialog';
 import { DeviceIcon } from '@/components/logs/bits';
 import type { DeviceInfo } from '@/api/logs';
 import { PersonTag } from '@/components/PersonTag';
+import { UnifiedFilter } from '@/components/UnifiedFilter';
+import { decodeFilter, encodeFilter } from '@/api/views';
 import { useToast } from '@/components/Toast';
 import { hasGrant, isAdmin } from '@/lib/perm';
 
@@ -36,7 +38,8 @@ export function SecurityLog() {
   const toast = useToast();
   const me = useMe(true);
   const [f, setF] = useState<SecFilter>({ from: '', to: '', event: [], outcome: '', q: '' });
-  const q = useSecurityLog(f), verify = useVerifyIntegrity();
+  const [adv, setAdv] = useState('');
+  const q = useSecurityLog(f, adv), verify = useVerifyIntegrity();
   const [res, setRes] = useState<Partial<Record<'audit' | 'security', LogIntegrity>>>({});
   const [exporting, setExporting] = useState(false);
   const admin = isAdmin(me.data), canExport = admin || hasGrant(me.data, 'export');
@@ -61,6 +64,8 @@ export function SecurityLog() {
           <select multiple size={3} className="input mt-1 font-normal" data-testid="seclog-event" value={f.event} onChange={(e) => setF({ ...f, event: [...e.target.selectedOptions].map((o) => o.value) })}>{EVENTS.map((x) => <option key={x} value={x}>{t(`seclog.ev_${x}`)}</option>)}</select></label>
         <label className="min-w-48 flex-1 text-sm font-semibold">{t('seclog.search')}<input className="input mt-1 font-normal" data-testid="seclog-q" placeholder={t('seclog.search_hint')} value={f.q} onChange={(e) => setF({ ...f, q: e.target.value })} /></label>
       </div>
+      <div><UnifiedFilter screen="security-log" value={decodeFilter(adv)} onChange={(tree) => setAdv(encodeFilter(tree))} onClearAll={() => setAdv('')} />
+        {adv && (q.data as { windowFull?: boolean } | undefined)?.windowFull && <p className="mt-1 text-xs text-mute" data-testid="seclog-filter-window">{t('logs.filter_window')}</p>}</div>
       <div className="card overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="border-b border-line bg-card2 text-mute"><tr>

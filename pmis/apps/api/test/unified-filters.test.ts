@@ -289,7 +289,7 @@ describe("screens site360-<menu> and dashboard", () => {
     expect(dash.get("sub_region")!.options!.map((o) => o.value)).toContain(
       `SRA-${TAG}`,
     );
-    for (const bad of ["site-master-nope", "site-master-", "audit-log"]) {
+    for (const bad of ["site-master-nope", "site-master-", "not-a-screen"]) {
       const res = await a.api.call(
         "get",
         `/saved-views/filter-fields?screen_key=${bad}`,

@@ -3523,7 +3523,8 @@
     "r_none": "No sensitive changes this month.",
     "r_xlsx": "Excel workbook",
     "sev_info": "Info",
-    "fh_restore": "Restore"
+    "fh_restore": "Restore",
+    "filter_window": "The filter looked through the newest 20,000 rows you can see. Narrow the dates to search further back."
   },
   "siteIdentity": {
     "title": "Site identity",

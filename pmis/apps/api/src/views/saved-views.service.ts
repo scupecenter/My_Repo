@@ -225,10 +225,20 @@ export class SavedViewsService {
   }
 
   /** The screen of a filter-fields request: it must have a filter builder and the caller must be able to open its module(s). */
-  private async requireFilterScreen(q: Record<string, unknown>): Promise<string> {
+  private async requireFilterScreen(q: Record<string, unknown>, auth?: AuthContext): Promise<string> {
     const screen = typeof q.screen_key === 'string' ? normScreen(q.screen_key) : '';
     if (!SCREEN.safeParse(screen).success || !FilterCatalogService.supports(screen)) {
       throw problems.validation([{ path: '/screen_key', code: 'invalid', message: 'This list has no filter builder.' }]);
+    }
+    const admin = FilterCatalogService.adminModuleOf(screen); // users and assignments: the module grant their own list asks for
+    if (admin) {
+      if (!auth) throw problems.validation([{ path: '/screen_key', code: 'invalid', message: 'This list has no filter builder.' }]);
+      await this.access.requireModuleView(auth, admin);
+      return screen;
+    }
+    if (screen === 'audit-log' || screen === 'security-log') {
+      await this.catalog.requireLogReader(screen); // the reader right of the log function itself
+      return screen;
     }
     const local = FilterCatalogService.modulesOf(screen); // dashboard and site-master-<menu>: two rights for the dashboard, the Site Register for the menus
     if (local) {
@@ -242,13 +252,13 @@ export class SavedViewsService {
   }
 
   /** F3: the filter fields of a list screen the caller may filter on (the whitelist, hidden fields left out). */
-  async filterFields(q: Record<string, unknown>): Promise<Record<string, unknown>> {
-    return this.catalog.describe(await this.requireFilterScreen(q));
+  async filterFields(q: Record<string, unknown>, auth?: AuthContext): Promise<Record<string, unknown>> {
+    return this.catalog.describe(await this.requireFilterScreen(q, auth));
   }
 
   /** 0.15.49: the values of one enum field that match `q` (a field whose list was cut at 500 stays reachable); the same scope and hidden-field rules as the catalogue. */
-  async filterFieldValues(field: string, q: Record<string, unknown>): Promise<Record<string, unknown>> {
-    const screen = await this.requireFilterScreen(q);
+  async filterFieldValues(field: string, q: Record<string, unknown>, auth?: AuthContext): Promise<Record<string, unknown>> {
+    const screen = await this.requireFilterScreen(q, auth);
     const text = q.q === undefined || q.q === null ? '' : typeof q.q === 'string' ? q.q : null;
     if (text === null || text.length > 100) throw problems.validation([{ path: '/q', code: 'invalid', message: 'q is a text of at most 100 characters.' }]);
     let limit = 50;

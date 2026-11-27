@@ -218,10 +218,10 @@ export const useHideStaffFields = () => {
 
 // ---------------------------------------------------------------- security log, integrity, sessions
 export type SecFilter = { from: string; to: string; event: string[]; outcome: string; q: string };
-export const useSecurityLog = (f: SecFilter) =>
+export const useSecurityLog = (f: SecFilter, adv?: string) =>
   useQuery({
-    queryKey: ['security-log', f],
-    queryFn: () => api.get<Page<SecurityLogEntry>>('/security-log', { query: { from: f.from ? `${f.from}T00:00:00Z` : '', to: f.to ? `${f.to}T23:59:59Z` : '', event: f.event.join(','), outcome: f.outcome, q: f.q } }).then((r) => r.items),
+    queryKey: ['security-log', f, adv ?? ''],
+    queryFn: () => api.get<Page<SecurityLogEntry> & { page: { filter_window?: { rows: number; full: boolean } } }>('/security-log', { query: { from: f.from ? `${f.from}T00:00:00Z` : '', to: f.to ? `${f.to}T23:59:59Z` : '', event: f.event.join(','), outcome: f.outcome, q: f.q, filter: adv || undefined } }).then((r) => Object.assign(r.items, { windowFull: r.page.filter_window?.full === true })),
   });
 export const verifyIntegrity = (log: 'audit' | 'security') => api.get<LogIntegrity>(`/${log}-log/integrity`);
 export const useVerifyIntegrity = () => useMutation<LogIntegrity, ApiError, 'audit' | 'security'>({ mutationFn: verifyIntegrity });

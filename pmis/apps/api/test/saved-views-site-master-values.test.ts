@@ -648,7 +648,7 @@ describe('GET /saved-views/filter-fields/{field}/values', () => {
     expect(text.body.errors[0]).toMatchObject({ code: 'not_enum' });
     // a Master column of another menu is unknown on this one
     expect((await values(a, 'site-master-cw', 'm:1', 'q=x')).status).toBe(422);
-    expect((await values(a, 'audit-log', 'sub_region', 'q=x')).status).toBe(
+    expect((await values(a, 'not-a-list', 'sub_region', 'q=x')).status).toBe(
       422,
     );
     expect((await values(a, 'not-a-screen', 'sub_region', 'q=x')).status).toBe(

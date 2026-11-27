@@ -11,6 +11,8 @@ import { DrawerFrame } from '@/components/DrawerFrame';
 import { errText } from '@/components/FormDialog';
 import { DeviceIcon, stamp, valueText, ViaChip, Who, deviceText } from '@/components/logs/bits';
 import { LogFilters } from '@/components/logs/LogFilters';
+import { UnifiedFilter } from '@/components/UnifiedFilter';
+import { decodeFilter, encodeFilter } from '@/api/views';
 import { LogTable } from '@/components/logs/LogTable';
 import { SavedViews } from '@/components/logs/SavedViews';
 import { PageHeader, Toolbar } from '@/components/PageHeader';
@@ -101,7 +103,8 @@ export function AuditLog() {
   const me = useMe(true);
   const regions = useRegions().data ?? [];
   const [f, setF] = useState<LogFilter>(EMPTY_FILTER);
-  const q = useAuditLog(f);
+  const [adv, setAdv] = useState('');
+  const q = useAuditLog(f, adv);
   const tbl = useTablePrefs('audit-log', DEFS);
   const [sel, setSel] = useState<AuditRow | null>(null);
   const verify = useVerifyIntegrity();
@@ -140,6 +143,8 @@ export function AuditLog() {
         </>} />
       {res && <div className="mb-3" data-testid="audit-integrity-result"><IntegrityCard r={res} /></div>}
       <LogFilters kind="audit" f={f} set={setF} />
+      <div className="mb-3"><UnifiedFilter screen="audit-log" value={decodeFilter(adv)} onChange={(tree) => setAdv(encodeFilter(tree))} onClearAll={() => setAdv('')} />
+        {adv && q.windowFull && <p className="mt-1 text-xs text-mute" data-testid="audit-filter-window">{t('logs.filter_window')}</p>}</div>
       <LogTable tbl={tbl} label={(id) => t(`logs.c_${id}`)} rows={q.items} rowId={(r) => String(r.id)} cell={cell} onOpen={setSel} activeId={sel ? String(sel.id) : null} testid="audit-table"
         loading={q.isLoading} error={q.isError} onRetry={() => void q.refetch()} hasMore={q.hasNextPage} onMore={() => void q.fetchNextPage()} loadingMore={q.isFetchingNextPage} />
       <DrawerFrame name="audit" testid="audit-drawer" open={!!sel} onClose={() => setSel(null)}>
