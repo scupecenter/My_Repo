@@ -1,6 +1,7 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { Client as PgClient } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { OpsLimitsService } from '../src/ops/ops-limits.service';
 import { OPS_LIMIT_DEFAULTS, limit, loginLimits, resetLimits } from '../src/ops/ops-limits';
 import { q } from './calc-helpers';
 import { Api, delegate, startApp, superDb } from './helpers';
@@ -128,6 +129,7 @@ describe('sign-in rate limits (migration 0563)', () => {
     expect((await put(admin, { values: { 'login.ip_base_seconds': 30, 'login.ip_max_seconds': 10 }, reason: REASON }, tag)).status).toBe(422);
     const ok = await put(admin, { values: { 'login.ip_attempts': 20, 'login.ip_window_seconds': 600, 'login.identifier_attempts': 8 }, reason: REASON }, tag);
     expect(ok.status).toBe(200);
+    await app.get(OpsLimitsService).refresh();
     expect(loginLimits()).toMatchObject({ perIp: 20, windowMs: 600_000, perIdentifier: 8, baseSeconds: 2, maxSeconds: 60 });
     await reset();
     resetLimits();
