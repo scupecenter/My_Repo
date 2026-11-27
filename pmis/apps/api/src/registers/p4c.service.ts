@@ -71,6 +71,22 @@ export class P4cService {
     return { items };
   }
 
+  /** GET /registers/financial_advances/advance-options?site_id= : the advances an expense or settlement may name (row-level security applies). */
+  async advanceOptions(auth: AuthContext, q: Record<string, unknown>): Promise<{ items: unknown[] }> {
+    await this.access.requireRegions('financial_advances', 'view');
+    const site = oneParam(q, 'site_id');
+    if (site && !uuidSchema.safeParse(site).success) throw problems.validation([{ path: '/site_id', code: 'invalid', message: 'site_id is a uuid.' }]);
+    const items = await this.registers.call<unknown[]>(auth, Prisma.sql`SELECT fa_advance_options(${site ?? null}::uuid) AS r`);
+    return { items };
+  }
+
+  /** GET /registers/invoices/supplier-options : the active companies of the Contractors list. */
+  async invoiceSupplierOptions(auth: AuthContext): Promise<{ items: unknown[] }> {
+    await this.access.requireRegions('invoices', 'view');
+    const items = await this.registers.call<unknown[]>(auth, Prisma.sql`SELECT invoice_supplier_options() AS r`);
+    return { items };
+  }
+
   /** GET /registers/issues/risk-options : the risks an Issue may name as realised (Issues view plus Risks view; the matrix decides the regions). */
   async issueRiskOptions(auth: AuthContext): Promise<{ items: unknown[] }> {
     await this.access.requireRegions('issues', 'view');
