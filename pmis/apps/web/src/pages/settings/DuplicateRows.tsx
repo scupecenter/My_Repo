@@ -39,7 +39,7 @@ export function DuplicateRowsCard() {
       <p className="text-sm text-mute">{t('dupRows.note')}</p>
       <div>
         <label htmlFor="duprows-default" className="text-sm font-semibold">{t('dupRows.default')}</label>
-        <select id="duprows-default" className="input ms-2" data-testid="duprows-default" value={mode} disabled={!cur.can_edit} onChange={(e) => setDef(e.target.value as Mode)}>
+        <select id="duprows-default" className="input ms-2 w-auto" data-testid="duprows-default" value={mode} disabled={!cur.can_edit} onChange={(e) => setDef(e.target.value as Mode)}>
           <option value="first">{t('dupRows.first')}</option>
           <option value="last">{t('dupRows.last')}</option>
         </select>
