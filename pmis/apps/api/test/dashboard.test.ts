@@ -609,8 +609,8 @@ describe('site map (OV-12, 0.14.5)', () => {
 // 0.15.368: the phase quick filter narrows the dashboard set, and Project Status groups by phase.
 describe('Dashboard phase filter and group_by=phase', () => {
   it('narrows sites_total to the phase, lists the phases in filters and groups Project Status by phase', async () => {
-    await db.query(`UPDATE sites SET project_phase = 'Phase 1' WHERE code IN ('DASH-T1', 'DASH-T2', 'DASH-T3', 'DASH-T4')`);
-    await db.query(`UPDATE sites SET project_phase = 'Phase 2' WHERE code = 'DASH-B1'`);
+    await db.query(`UPDATE sites SET project_phase = 'Phase 1' WHERE site_code IN ('DASH-T1', 'DASH-T2', 'DASH-T3', 'DASH-T4')`);
+    await db.query(`UPDATE sites SET project_phase = 'Phase 2' WHERE site_code = 'DASH-B1'`);
     const d = await get(admin, '?project_phase=Phase 1');
     expect(d.headline.sites_total).toBe(4);
     // all the measured progress sits in Phase 1, so its figure equals the whole-project one
