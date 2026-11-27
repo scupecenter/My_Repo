@@ -6,7 +6,7 @@ import { team, type Team } from "./reg-helpers";
 import { plainAdmin } from "./wf-helpers";
 
 /**
- * Goals with automatic progress (contract 0.15.150, migration 0251). Reads need dashboard.view; the write needs admin.settings edit for all regions,
+ * Goals with automatic progress (contract 0.15.160, migration 0260). Reads need dashboard.view; the write needs admin.settings edit for all regions,
  * a reason and If-Match, and is audited. The database checks the rules again (known milestone task, known region, period, whole target, unique id).
  */
 let app: NestExpressApplication;
@@ -24,7 +24,7 @@ afterAll(async () => {
 const codesOf = (body: { errors?: { code: string; path?: string }[] }): string[] =>
   (body.errors ?? []).map((e) => `${e.path}:${e.code}`).sort();
 
-describe("goals (contract 0.15.150)", () => {
+describe("goals (contract 0.15.160)", () => {
   it("lists the catalogue, writes admin-only, validates, versions, audits and counts progress", async () => {
     const admin = await plainAdmin(app, db);
     const g: Team = await team(app, db, "gecol", "gecol", 7);

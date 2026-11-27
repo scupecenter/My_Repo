@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError } from "./client";
 import type { components } from "./schema";
 
-/** Goals with automatic progress (contract 0.15.150). */
+/** Goals with automatic progress (contract 0.15.160). */
 type S = components["schemas"];
 export type Goals = S["Goals"];
 export type Goal = S["GoalInput"];

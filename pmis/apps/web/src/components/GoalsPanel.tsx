@@ -13,7 +13,7 @@ const TONE: Record<GoalProgress["status"], string> = {
 };
 
 /**
- * Dashboard card "Goals" (contract 0.15.150): every active goal with its automatic progress, the share of the period that has passed (the tick) and a
+ * Dashboard card "Goals" (contract 0.15.160): every active goal with its automatic progress, the share of the period that has passed (the tick) and a
  * status. Each goal links to the sites list it counts (region filter), and the card links to Settings, Screens, Goals for an administrator.
  */
 export function GoalsPanel() {

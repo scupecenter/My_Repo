@@ -6587,14 +6587,14 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * The goals and the catalogue of milestone tasks and regions (0.15.150)
-         * @description 0.15.150. Goals kept in the settings table as `dashboard.goals`. A goal counts sites that reach a milestone task (`metric`, a milestone task code) in a region (null = all) during the current month, quarter or year.
+         * The goals and the catalogue of milestone tasks and regions (0.15.160)
+         * @description 0.15.160. Goals kept in the settings table as `dashboard.goals`. A goal counts sites that reach a milestone task (`metric`, a milestone task code) in a region (null = all) during the current month, quarter or year.
          *     Reads need `dashboard.view` (403 `module_forbidden` otherwise).
          */
         get: operations["getGoals"];
         /**
          * Save the goals (reason, If-Match, audited, versioned)
-         * @description 0.15.150. System Admin, or a delegation of `admin.settings` edit for all regions (403 `action_forbidden` otherwise). The body replaces the whole list.
+         * @description 0.15.160. System Admin, or a delegation of `admin.settings` edit for all regions (403 `action_forbidden` otherwise). The body replaces the whole list.
          *     Field errors (422 `validation_failed`): `unknown_key`, `invalid`, `duplicate`, `unknown_metric`, `unknown_region`, `too_many`. One audit row per save.
          */
         put: operations["setGoals"];
@@ -6613,8 +6613,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Progress of every active goal (0.15.150)
-         * @description 0.15.150. Counted from approved milestone tasks (actual date in the period; active, not cancelled sites; distinct sites), as the caller: row-level security limits the sites to the regions the caller may read.
+         * Progress of every active goal (0.15.160)
+         * @description 0.15.160. Counted from approved milestone tasks (actual date in the period; active, not cancelled sites; distinct sites), as the caller: row-level security limits the sites to the regions the caller may read.
          *     `status`: achieved (100% or more), on_track (at or above the share of the period that has passed), at_risk (within 15 points below), behind. Needs `dashboard.view`.
          */
         get: operations["getGoalsProgress"];

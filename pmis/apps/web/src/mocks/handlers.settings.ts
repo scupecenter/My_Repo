@@ -376,7 +376,7 @@ let dashState = {
 };
 const dashView = () => ({ ...dashState, catalogue: DASH_CATALOGUE });
 
-/** Goals (contract 0.15.150): the list in memory; the progress is a fixed demo count against each goal. */
+/** Goals (contract 0.15.160): the list in memory; the progress is a fixed demo count against each goal. */
 const GOALS_CATALOGUE = {
   metrics: [{ code: 'MS1', label_en: 'Site acceptance', label_ar: 'قبول الموقع' }, { code: 'MS6', label_en: 'On-Air', label_ar: 'الربط On-Air' }],
   regions: [{ id: 1, code: 'Tripoli', name_en: 'Tripoli', name_ar: 'طرابلس' }, { id: 5, code: 'Benghazi', name_en: 'Benghazi', name_ar: 'بنغازي' }],
@@ -426,7 +426,7 @@ export const settingsHandlers = [
     dashState = { ...dashState, version: dashState.version + 1, targets: b.targets, thresholds: b.thresholds, tabs: b.tabs, updated_at: new Date().toISOString() };
     return HttpResponse.json(dashView(), tag(dashState.version));
   }),
-  // ------------------------------------------------------------------ goals (contract 0.15.150)
+  // ------------------------------------------------------------------ goals (contract 0.15.160)
   http.get(`${B}/settings/goals`, () => { const g = guard(); if (g) return g; return HttpResponse.json(goalsView(), tag(goalsState.version)); }),
   http.put(`${B}/settings/goals`, async ({ request }) => {
     const g = needAdmin(); if (g) return g;
