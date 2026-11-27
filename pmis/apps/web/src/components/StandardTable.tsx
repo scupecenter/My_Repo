@@ -2,13 +2,13 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/States';
 import type { ColDef } from '@/lib/tablePrefs';
-import { ColumnMenu, DensityToggle, HeaderRow, pin, rowPad, totalWidth, tracks, useTablePrefs } from './TableKit';
-import { DisplayMenu, displayAttrs, ExportCsvButton, SearchBox, TableCount, TableToolbar, type TableNoun } from './TableStandard';
+import { ColumnMenu, HeaderRow, pin, rowPad, totalWidth, tracks, useTablePrefs } from './TableKit';
+import { displayAttrs, ExportCsvButton, SearchBox, TableCount, TableToolbar, type TableNoun } from './TableStandard';
 
 /**
  * The table standard for the small tables of a detail page (the tabs of the site page, and any table with a few dozen rows that is read from one
- * request): the same toolbar as every site-data screen (search, count, columns, density, Display, export of the view), the same header row (reorder,
- * resize, hide), the same Display options and the same row look, all kept per user and screen like the big tables. Saved views and the + Filter tree
+ * request): the same toolbar as every site-data screen (search, count, columns, export of the view), the same header row (reorder,
+ * resize, hide) and the same row look, all kept per user and screen like the big tables. Saved views and the + Filter tree
  * are not part of it: a table of one site has a search and, where it needs one, its own quick filters in the `extra` slot.
  */
 export type StdCol<T> = {
@@ -81,8 +81,6 @@ export function StandardTable<T>({ screen, testid, cols, rows, rowId, rowTestId,
       count={<TableCount testid={`${testid}-count`} noun={noun} total={total ?? rows.length} filtered={needle ? shown.length : total ?? rows.length} active={!!q.trim()} onClear={() => setQ('')} />}
       primary={primary}
       columns={<ColumnMenu api={tbl} label={label} />}
-      density={<DensityToggle api={tbl} />}
-      display={<DisplayMenu api={tbl} />}
       exporter={<ExportCsvButton testid={`${testid}-export`} name={exportName} head={exportCols.map((c) => c.label)} rows={() => shown.map((r) => exportCols.map((c) => c.text(r)))} />}
       more={more} />
   );

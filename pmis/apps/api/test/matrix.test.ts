@@ -864,6 +864,11 @@ describe('the seed of the register rows', () => {
       expect(built).toBe('gecol:1:GECOL_TEAM,gecol:3:CW_TL,hlc:1:HLC_TEAM,hlc:3:CW_TL,permits_hse:1:SITE_ENG_CW,permits_hse:3:CW_TL,procurement:1:PROC_TEAM,procurement:3:CW_TL');
 
       await calc.query(`DELETE FROM matrix_cells WHERE register_key = 'deliverables'`);
+      // deleting the template cascades to its parts, and that trigger re-issues a template for every active register without one: switch the register off first (0326)
+      await calc.query(`UPDATE register_definitions SET is_active = false WHERE register_key = 'deliverables'`);
+      await calc.query(`DELETE FROM register_fields WHERE register_key = 'deliverables'`);
+      await calc.query(`DELETE FROM template_versions WHERE template_def_id IN (SELECT id FROM template_definitions WHERE register_key = 'deliverables')`);
+      await calc.query(`DELETE FROM template_definitions WHERE register_key = 'deliverables'`);   // 0326: the register has a template and fields now
       await calc.query(`DELETE FROM register_definitions WHERE register_key = 'deliverables'`);
       await calc.query(`DELETE FROM matrix_cell_assignees WHERE cell_id IN (SELECT id FROM matrix_cells WHERE register_key = 'warehouse' AND level = 1)`);
       await calc.query(`UPDATE register_definitions SET approval_levels = 2, name_en = 'Quality (edited by the admin)' WHERE register_key = 'quality'`);

@@ -6,7 +6,7 @@ A standalone, offline calculator that estimates servers (vCPU, RAM, disk), stora
 - **Open:** double-click `index.html` (any modern browser; no installation, no network needed; Cairo font is used when online, system fonts otherwise).
 - Fill the report details, pick a preset or edit the inputs; results update live. The inputs are kept in the page link (`#...`), so copying the link reproduces the sizing.
 - **Save / Load scenario (JSON)** lets you send your inputs back to us. **Keep for comparison** stores up to 3 scenarios in this browser. **Print / PDF** produces an A4 report. **Copy summary** and **Download CSV** are also available.
-- **Important:** all numbers are planning estimates based on editable coefficients. Confirm them with a load test (100 concurrent users, 1000 sites, pages under 2 s) before buying hardware.
+- **Important:** all numbers are planning estimates based on editable coefficients. Confirm them with a load test (100 concurrent users, 1000 sites, pages under 2 s) before buying hardware: the repeatable test and the first result are in `docs/ops/load-test.md` (`npm run test:load` in `apps/api`).
 - Check: `node tests/check.mjs` (needs Playwright).
 
 ## العربية
