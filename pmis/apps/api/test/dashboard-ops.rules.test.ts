@@ -6,6 +6,8 @@ import {
   ageBucket,
   bucketAges,
   receivePct,
+  scorecardSummary,
+  ScorecardItem,
 } from "../src/dashboard/dashboard-ops.rules";
 
 describe("dashboard ops: PR/PO aging buckets (0.15.98)", () => {
@@ -86,5 +88,65 @@ describe("dashboard ops: PTW safety-check gaps (0.15.200)", () => {
       PTW_CHECK_KEYS.map((k) => [k, "Done"]),
     ) as Record<string, unknown>;
     expect(ptwCheckGaps(full)).toEqual([]);
+  });
+});
+
+describe("dashboard ops: contractor and supplier scorecard (0.15.202)", () => {
+  const item = (
+    name: string,
+    level: "ok" | "amber" | "red" | "insufficient",
+    delay_days: number,
+    snags: { total: number; open: number; overdue: number; returned: number },
+    quality: { total: number; failed: number },
+  ): ScorecardItem => ({
+    party_id: name,
+    name,
+    type: "contractor",
+    delay_days,
+    issues_open: 0,
+    snags,
+    quality,
+    level,
+  });
+
+  it("counts the levels, averages the delay over the delayed parties only, and keeps the report order for the worst five", () => {
+    const items = [
+      item("A", "red", 20, { total: 10, open: 4, overdue: 4, returned: 1 }, { total: 8, failed: 2 }),
+      item("B", "amber", 10, { total: 10, open: 3, overdue: 2, returned: 0 }, { total: 6, failed: 0 }),
+      item("C", "ok", 0, { total: 5, open: 1, overdue: 0, returned: 0 }, { total: 4, failed: 0 }),
+      item("D", "insufficient", 0, { total: 0, open: 0, overdue: 0, returned: 0 }, { total: 0, failed: 0 }),
+      item("E", "ok", 0, { total: 0, open: 0, overdue: 0, returned: 0 }, { total: 2, failed: 0 }),
+      item("F", "ok", 0, { total: 0, open: 0, overdue: 0, returned: 0 }, { total: 0, failed: 0 }),
+    ];
+    const s = scorecardSummary(items);
+    expect(s.parties).toBe(6);
+    expect(s.by_level).toEqual({ ok: 3, amber: 1, red: 1, insufficient: 1 });
+    expect(s.avg_delay_days).toBe(15);
+    expect(s.on_time_pct).toBe(76);
+    expect(s.quality_fail_pct).toBe(10);
+    expect(s.snags).toEqual({ total: 25, open: 8, overdue: 6, returned: 1 });
+    expect(s.quality).toEqual({ total: 20, failed: 2 });
+    expect(s.worst.map((w) => w.name)).toEqual(["A", "B", "C", "D", "E"]);
+    expect(s.worst[0]).toEqual({
+      party_id: "A", name: "A", type: "contractor", level: "red",
+      delay_days: 20, snags_overdue: 4, quality_failed: 2,
+    });
+  });
+
+  it("answers nulls, not zeros, when there is nothing to average or divide", () => {
+    const s = scorecardSummary([]);
+    expect(s.parties).toBe(0);
+    expect(s.avg_delay_days).toBeNull();
+    expect(s.on_time_pct).toBeNull();
+    expect(s.quality_fail_pct).toBeNull();
+    expect(s.worst).toEqual([]);
+  });
+
+  it("rounds the rates to one decimal", () => {
+    const s = scorecardSummary([
+      item("A", "ok", 0, { total: 3, open: 0, overdue: 1, returned: 0 }, { total: 3, failed: 1 }),
+    ]);
+    expect(s.on_time_pct).toBe(66.7);
+    expect(s.quality_fail_pct).toBe(33.3);
   });
 });
