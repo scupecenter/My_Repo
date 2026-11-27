@@ -37,6 +37,18 @@ describe('content type by magic bytes', () => {
     ['an old Office file', Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1, 0, 0]), 'rejected:macro'],
   ])('rejects %s', (_n, b, expected) => expect(type(b)).toBe(expected));
 
+  it('knows a short field video (webm, mp4, mov), never an image', () => {
+    const webm = sniff(Buffer.concat([Buffer.from([0x1a, 0x45, 0xdf, 0xa3]), Buffer.alloc(60)]));
+    expect(webm).toMatchObject({ ok: true, ext: 'webm', mime: 'video/webm', image: false, video: true });
+    const mp4 = sniff(Buffer.concat([Buffer.from([0, 0, 0, 24]), Buffer.from('ftypisom....')]));
+    expect(mp4).toMatchObject({ ok: true, ext: 'mp4', mime: 'video/mp4', image: false, video: true });
+    const mov = sniff(Buffer.concat([Buffer.from([0, 0, 0, 24]), Buffer.from('ftypqt  ....')]));
+    expect(mov).toMatchObject({ ok: true, ext: 'mov', mime: 'video/quicktime', image: false, video: true });
+    // an HEIC photo keeps winning over the mp4 family, and binary noise stays rejected
+    expect(sniff(Buffer.concat([Buffer.from([0, 0, 0, 24]), Buffer.from('ftypheic....')]))).toMatchObject({ ok: true, ext: 'heic', video: false });
+    expect(sniff(Buffer.from([1, 2, 3, 0, 4, 5]))).toMatchObject({ ok: false });
+  });
+
   it('accepts an Outlook message only under the .msg name', () => {
     const ole = Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1, 0, 0]);
     expect(type(ole, 'mail.msg')).toBe('msg');

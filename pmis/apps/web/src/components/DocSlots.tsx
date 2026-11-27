@@ -1,11 +1,13 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import { Camera, Download, FileUp, History, Plus, Trash2 } from 'lucide-react';
+import { Camera, Download, FileUp, History, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState, type DragEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ApiError } from '@/api/client';
 import { downloadDocument, suggestSlots, taskTarget, useAddSlot, useSlotUpload, useWithdrawFile, type DocumentSlot, type SlotSuggestion, type SlotTarget } from '@/api/documents';
 import type { TaskDetail } from '@/api/types';
 import { taskErrorMessage } from '@/lib/taskErrors';
+import { AnnotatePhoto } from './AnnotatePhoto';
+import { RecordVideo } from './RecordVideo';
 import { useToast } from './Toast';
 
 const SLOT_TONE: Record<string, string> = { approved: 'bg-doneBg text-doneInk', uploaded: 'bg-openBg text-openInk', in_review: 'bg-waitBg text-waitInk', rejected: 'bg-lateBg text-lateInk', missing: 'bg-lockBg text-lockInk', not_required: 'bg-lockBg text-lockInk' };
@@ -53,7 +55,15 @@ function SlotCard({ slot, canUpload, onFile, onWithdraw, onDeclare, onAddCandida
   const [history, setHistory] = useState(false);
   const [label, setLabel] = useState('');
   const camRef = useRef<HTMLInputElement>(null);
+  const annRef = useRef<HTMLInputElement>(null);
+  const [annotate, setAnnotate] = useState<File | null>(null);
   const drop = (e: DragEvent) => { e.preventDefault(); setOver(false); const f = e.dataTransfer.files[0]; if (f && canUpload) onFile(f); };
+  // Item 14 widened to every document slot (tasks and register records): the slot's format list - set in Settings on the document
+  // definitions - is the gate. Annotate where a PNG can land, a short field video where the slot allows a video format (or lists no
+  // formats, meaning unrestricted); never on a read-only slot. The snag surface keeps its own buttons in SiteSnags.
+  const fmts = (slot.formats ?? []).map((x) => x.toLowerCase());
+  const annotateOk = fmts.length === 0 || fmts.includes('png');
+  const videoOk = fmts.length === 0 || fmts.some((f) => f === 'webm' || f === 'mp4' || f === 'mov');
   const name = (i18n.language === 'ar' && slot.name_ar) || slot.name_en;
   const current = slot.files.filter((f) => f.is_current);
   const older = slot.files.filter((f) => !f.is_current);
@@ -106,6 +116,18 @@ function SlotCard({ slot, canUpload, onFile, onWithdraw, onDeclare, onAddCandida
               <input ref={camRef} type="file" accept="image/*" capture="environment" className="sr-only" tabIndex={-1} aria-hidden="true" data-testid={`slot-camera-${slot.id}`}
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = ''; }} />
             </>
+          )}
+          {annotateOk && (
+            <>
+              <button type="button" className="btn text-sm" data-testid={`slot-annotate-open-${slot.id}`} title={t('capture.annotate_title')} onClick={() => annRef.current?.click()}><Pencil size={14} />{t('capture.annotate')}</button>
+              <input ref={annRef} type="file" accept="image/*" className="sr-only" tabIndex={-1} aria-hidden="true" data-testid={`slot-annotate-input-${slot.id}`}
+                onChange={(e) => { const f = e.target.files?.[0]; if (f && f.type.startsWith('image/')) setAnnotate(f); e.target.value = ''; }} />
+            </>
+          )}
+          {videoOk && <RecordVideo formats={fmts.length ? (slot.formats ?? []) : ['webm']} testid={`slot-video-${slot.id}`} onFile={onFile} />}
+          {annotate && (
+            <AnnotatePhoto file={annotate} testid={`slot-annotate-${slot.id}`}
+              onUse={(f) => { setAnnotate(null); onFile(f); }} onCancel={() => setAnnotate(null)} />
           )}
         </div>
       )}

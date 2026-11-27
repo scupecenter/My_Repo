@@ -35,7 +35,7 @@ const photoRules = z
   .object({
     min_count: z.number().int().min(0).max(50).optional(),
     shot_types: z.array(z.string().trim().min(1).max(40)).max(20).optional(),
-    formats: z.array(z.enum(['JPG', 'PNG', 'HEIC'])).min(1).optional(),
+    formats: z.array(z.enum(['JPG', 'PNG', 'HEIC', 'WEBM', 'MP4', 'MOV'])).min(1).optional(),
     max_size_mb: z.number().int().min(1).max(200).optional(),
   })
   .strict();
@@ -502,7 +502,7 @@ export class SnagsService {
     const sn = sniff(file.buffer, file.originalname);
     if (!sn.ok) return reject(sn.reason, sn.detail);
     const ext = sn.ext === 'jpeg' ? 'jpg' : sn.ext;
-    if (!sn.image || !rules.formats.map((f) => f.toLowerCase()).includes(ext)) reject('format_not_allowed', `Photos of this snag type are ${rules.formats.join(', ')}.`, { allowed: rules.formats });
+    if ((!sn.image && !sn.video) || !rules.formats.map((f) => f.toLowerCase()).includes(ext)) reject('format_not_allowed', `Photos of this snag type are ${rules.formats.join(', ')}.`, { allowed: rules.formats });
     const wall = ['jpg', 'tiff', 'heic'].includes(ext) ? readExifDate(file.buffer) : null;
     // Q232: the EXIF wall clock is read in Africa/Tripoli; the tolerance is the setting qc.exif_tolerance_hours (the database checks again)
     const capture = wall ? exifWallToInstant(wall) : null;
