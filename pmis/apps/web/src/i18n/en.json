@@ -173,7 +173,8 @@
     "daily_plan": "Daily Plan",
     "group_library": "Library",
     "library.forms": "Forms",
-    "library.archive": "Archive"
+    "library.archive": "Archive",
+    "incidents": "Incidents & Security"
   },
   "top": {
     "search": "Search or jump to…",
@@ -1947,7 +1948,10 @@
     "details": "Details",
     "purchase_request": "Purchase request",
     "in_service": "In service",
-    "execution": "Execution"
+    "execution": "Execution",
+    "incident": "Incident",
+    "people_damage": "People and damage",
+    "resolution": "Resolution"
   },
   "procAssign": {
     "title": "Assignment",
