@@ -15,6 +15,7 @@ export const UI_FEATURES_SEED: UiFeatures = {
     widgets: { quick_bar: true, batches: true, template_changes: true, recent: true, health: true, admin: true }, badge: true,
     default_view: { templates: 'cards', uploads: 'table', exports: 'table', master_import: 'table' },
   },
+  finance_hub: { widgets: { advances: true, invoices: true, quick_links: true, templates: true }, settle_warn_days: 30, aging_days: [30, 60] },
   inbox: { tabs_enabled: true, default_tab: 'all', priority_kinds: ['mention', 'approval_due', 'task_returned', 'task_rejected', 'idle_task_alert', 'no_holder', 'absence_alert'] },
   panel: { mode: 'popover', width: 'medium', show_tabs: true },
   field_pwa: { enabled: false, cache_hours: 24, max_queue: 50, max_photo_mb: 8, sync_seconds: 60 },

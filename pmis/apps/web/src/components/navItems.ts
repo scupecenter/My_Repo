@@ -32,6 +32,7 @@ export const NAV: { key: string; to: string; icon: Concept; group: 'home' | 'wor
   { key: 'acquisition', to: '/registers/acquisition', icon: 'acquisition', group: 'registers' },
   { key: 'contractors', to: '/registers/contractors', icon: 'contractor', group: 'registers' },
   { key: 'car_dispatcher', to: '/registers/car_dispatcher', icon: 'dismantle', group: 'registers' },
+  { key: 'finance_hub', to: '/finance-hub', icon: 'financeHub', group: 'registers' },
   { key: 'financial_advances', to: '/registers/financial_advances', icon: 'procurement', group: 'registers' },
   { key: 'contractor_reports', to: '/reports/contractors', icon: 'report', group: 'registers' },
   { key: 'data_hub', to: '/data-hub', icon: 'dataHub', group: 'data' },
@@ -72,7 +73,7 @@ export const BY_GRANT: Record<string, string> = {
   'admin.security_log': 'view_security_log', 'admin.online': 'manage_users', audit: 'view_audit', 'logs.field_changes': 'view_audit', 'logs.activity_report': 'view_audit',
 };
 /** Entries shown when the caller may use any one of these modules (0.12.9, P4b: the contractors reports and the read-only match table, Q147). */
-export const ANY_OF: Record<string, string[]> = { contractor_reports: ['procurement', 'contractors'], data_hub: ['templates'], column_mapping: ['templates'], field: ['my_work'] };
+export const ANY_OF: Record<string, string[]> = { contractor_reports: ['procurement', 'contractors'], data_hub: ['templates'], finance_hub: ['financial_advances', 'invoices'], column_mapping: ['templates'], field: ['my_work'] };
 /**
  * Entries opened by `view` on a module that is not a screen of the server's module list (the rule of the API: a System Admin, or view on the module; a full
  * delegation holds view on every module). The System Log (owner request 2026-11-09): GET /system-log answers 403 to anyone else (log_can_read_ops).

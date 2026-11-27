@@ -1,4 +1,4 @@
-import { Archive, FileSignature, CalendarCheck, Activity, BellRing, ClipboardList, GitCommitHorizontal, History, PackageCheck, BadgeCheck, BarChart3, Bell, Flag, Gauge, Cable, CalendarDays, CircleAlert, Eye, FileText, GitPullRequest, HardHat, Home, Inbox, KeyRound, Mail, ShieldAlert, Landmark, LayoutGrid, Megaphone, MessageSquare, Radio, Rocket, Ruler, ScrollText, Settings, ShieldCheck, ShoppingCart, Table2, TriangleAlert, Users, Users2, UsersRound, UserX, Warehouse, Wrench, Zap, type LucideIcon } from 'lucide-react';
+import { Archive, FileSignature, CalendarCheck, Activity, BellRing, ClipboardList, GitCommitHorizontal, History, PackageCheck, BadgeCheck, BarChart3, Bell, Flag, Gauge, Cable, CalendarDays, CircleAlert, Eye, FileText, GitPullRequest, HardHat, Home, Inbox, KeyRound, Mail, ShieldAlert, Landmark, LayoutGrid, Megaphone, MessageSquare, Radio, Link2, Wallet, Rocket, Ruler, ScrollText, Settings, ShieldCheck, ShoppingCart, Table2, TriangleAlert, Users, Users2, UsersRound, UserX, Warehouse, Wrench, Zap, type LucideIcon } from 'lucide-react';
 import { Camera, Columns3, Database, DatabaseZap, Download, FileDown, FileSpreadsheet, FileUp, GitCompare, HeartPulse, Hourglass, Layers, List, Lock, RefreshCw, Rows3, SlidersHorizontal, Trash2 } from 'lucide-react';
 
 /** One Lucide icon per concept (plan 2.12). Screens ask for a concept, never import an icon ad hoc. */
@@ -12,6 +12,8 @@ export const ICONS = {
   dataHub: Database, template: FileSpreadsheet, upload: FileUp, downloadFile: FileDown, exportData: Download, columnMap: Columns3, compare: GitCompare, dataReset: DatabaseZap,
   recycleBin: Trash2, dataHealth: HeartPulse, batches: Layers, waiting: Hourglass, locked: Lock, templateChanged: RefreshCw, viewCards: LayoutGrid, viewRows: Rows3, viewTable: Table2,
   viewCompact: List, tune: SlidersHorizontal,
+  // the Finance hub (owner decision D57, 2026-11-27)
+  financeHub: Wallet, link: Link2,
 } satisfies Record<string, LucideIcon>;
 export type Concept = keyof typeof ICONS;
 

@@ -33,7 +33,8 @@ describe('appearance profiles (0241)', () => {
 
   it('every preset fills all seven dimensions', () => {
     for (const p of Object.values(APPEARANCE_PRESETS)) {
-      for (const k of Object.keys(APPEARANCE_DEFAULTS)) expect(p.prefs).toHaveProperty(k);
+      // the look dimensions only: where the notification panel sits (inbox_*) is a working choice, not part of a look
+      for (const k of Object.keys(APPEARANCE_DEFAULTS).filter((x) => !x.startsWith('inbox_'))) expect(p.prefs).toHaveProperty(k);
     }
     expect(APPEARANCE_PRESETS.night.theme).toBe('dark');
   });

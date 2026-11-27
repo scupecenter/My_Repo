@@ -92,6 +92,19 @@
   },
   "field": {"title": "Field mode", "subtitle": "Read your tasks, photograph a snag and submit the fix, even without a signal. Actions wait on this device and are sent when the connection returns.", "off": "Field mode is off. A System Admin turns it on in Settings > Screens > Field mode.", "offline": "No connection. Your actions are kept on this device.", "stale": "Showing the copy saved at {{at}}.", "no_data": "Nothing saved on this device yet. Open this page once with a connection.", "no_rights": "Your role cannot open this part.", "pending": "{{count}} waiting to be sent", "queue_title": "Waiting to be sent", "queue_empty": "Nothing is waiting.", "queued": "Saved on this device. It will be sent when the connection returns.", "sync_now": "Send now", "synced": "{{count}} sent", "discard": "Discard", "tasks_title": "My tasks", "tasks_none": "No open tasks.", "pick_site": "Choose a site", "snags_title": "Snags to fix", "snags_none": "No open snags on this site.", "take_photo": "Take photo", "from_gallery": "From gallery", "submit_fix": "Submit fix", "photos_missing": "{{count}} photo(s) still needed before the fix can be submitted.", "s_waiting": "Waiting", "s_attention": "Needs attention", "r_earlier_failed": "An earlier action on this snag failed.", "r_already_changed": "The snag changed in the meantime.", "r_photos_missing": "Photos are missing.", "r_retries_exhausted": "Could not be sent after several tries.", "signout_warn": "{{count}} action(s) have not been sent yet. Signing out deletes them from this device. Sign out anyway?"},
   "fps": {"title": "Field mode", "note": "The narrow offline screen for site teams: read tasks, add snag photos and submit a fix. Off by default. Actions are never approved offline.", "enabled": "Turn Field mode on", "cache_hours": "Hours a saved copy is kept", "max_queue": "Most waiting actions per device", "max_photo_mb": "Largest photo (MB)", "sync_seconds": "Seconds between send attempts"},
+  "fhs": {
+    "title": "Finance hub settings",
+    "widgets_title": "Cards of the page",
+    "widgets_note": "Which cards the Finance hub shows. A card is also hidden when its register is not open to the person.",
+    "widget_advances": "Advances summary",
+    "widget_invoices": "Invoices summary",
+    "widget_quick_links": "Quick links",
+    "widget_templates": "Templates",
+    "thresholds_title": "Thresholds",
+    "thresholds_note": "When a disbursed, unsettled advance warns, and the two aging bounds of the open-invoice buckets.",
+    "settle_warn_days": "Advance warning after (days)",
+    "aging_days": "Invoice aging bounds (days)"
+  },
   "dhs": {
     "title": "Data hub settings", "widgets_title": "Landing page widgets", "widgets_note": "Choose what the Data hub landing page shows. A hidden widget is only hidden; its page stays in the menu.",
     "widget_quick_bar": "Quick template download bar", "widget_batches": "Batches needing action", "widget_template_changes": "Template changes", "widget_recent": "Recent uploads and exports", "widget_health": "Data health", "widget_admin": "Admin section (System Admin only)",
@@ -99,6 +112,42 @@
     "views_title": "Default view of each page", "views_note": "The first view people see. A person can pick another view on the page; it is kept on their device.",
     "screen_templates": "Templates", "screen_uploads": "Uploads & batches", "screen_exports": "Exports", "screen_master_import": "Master import & comparison",
     "view_cards": "Cards", "view_rows": "Rows", "view_table": "Table", "view_compact": "Compact list"
+  },
+  "fhub": {
+    "title": "Finance hub",
+    "subtitle": "Advances and invoices in one place",
+    "all_hidden": "All cards are hidden. Turn them on in Settings > Screens > Finance hub.",
+    "no_access": "No finance register is open to you.",
+    "adv_title": "Financial advances",
+    "adv_open": "Open advances",
+    "adv_overdue": "Disbursed and unsettled for over {{days}} days",
+    "adv_amount": "Open balance",
+    "amounts_hidden": "Amounts follow the register's own rule and are not shown to you.",
+    "inv_title": "Invoices",
+    "inv_open": "Open invoices",
+    "inv_overdue": "Past due date",
+    "inv_by_state": "By state",
+    "inv_aging": "Aging of the open invoices",
+    "inv_state_Received": "Received",
+    "inv_state_UnderReview": "Under review",
+    "inv_state_Approved": "Approved",
+    "inv_state_Disputed": "Disputed",
+    "inv_age_first": "Up to {{days}} days",
+    "inv_age_second": "{{from}} to {{to}} days",
+    "inv_age_third": "Over {{days}} days",
+    "links_title": "Quick links",
+    "link_adv_all": "All advance records",
+    "link_adv_open": "Advances",
+    "link_adv_expenses": "Expenses",
+    "link_adv_settlements": "Settlements", "link_adv_triage": "Advances waiting for triage",
+    "link_inv_all": "All invoices",
+    "link_inv_triage": "Invoices waiting for triage",
+    "templates_title": "Templates",
+    "templates_note": "The register templates, filled or blank, from the Templates page.",
+    "tpl_adv": "Financial advances (TPL-ADV)",
+    "tpl_inv": "Invoices (TPL-INVOICES)",
+    "open_register": "Open",
+    "open_templates": "Templates"
   },
   "dhub": {
     "title": "Data hub", "subtitle": "Templates, uploads, exports and data health in one place",
@@ -119,6 +168,7 @@
     "group_work": "Work",
     "group_data": "Data hub",
     "field": "Field mode",
+    "finance_hub": "Finance hub",
     "data_hub": "Data hub",
     "master_import": "Master import and comparison",
     "column_mapping": "Column mapping",
@@ -468,6 +518,15 @@
     "carried": "{{n}} sites carried over"
   },
   "panel": {
+    "move": "Move the panel",
+    "move_hint": "Drag, or use the arrow keys",
+    "pin": "Pin (dock) the panel",
+    "unpin": "Unpin the panel",
+    "float": "Float the panel",
+    "anchor_end-top": "Panel at the top, end side",
+    "anchor_end-bottom": "Panel at the bottom, end side",
+    "anchor_start-top": "Panel at the top, start side",
+    "anchor_start-bottom": "Panel at the bottom, start side",
     "tab_all": "All",
     "tab_unread": "Unread",
     "tab_priority": "Priority"
@@ -1158,6 +1217,7 @@
   },
   "export": {
     "open": "Export",
+    "centre": "Exports centre",
     "title": "Export",
     "body": "Excel file in the Site Master layout, limited to your regions and modules.",
     "whole": "Whole project (full Master)",
@@ -1276,6 +1336,7 @@
     "section_screens_interface": "Interface",
     "section_screens_field-mode": "Field mode",
     "section_screens_data-hub": "Data hub",
+    "section_screens_finance-hub": "Finance hub",
     "section_screens_goals": "Goals",
     "section_security_newdevice": "New-device code",
     "section_security_passkeys": "Passkeys",
@@ -3906,7 +3967,9 @@
       "icon_style": "Icon weight",
       "menu_style": "Side menu",
       "accent": "Accent colour",
-      "contrast": "Contrast"
+      "contrast": "Contrast",
+      "inbox_panel": "Notification panel",
+      "inbox_anchor": "Floating panel corner"
     },
     "opt": {
       "density": {
@@ -3951,6 +4014,17 @@
       "contrast": {
         "standard": "Standard",
         "high": "High"
+      },
+      "inbox_panel": {
+        "overlay": "Overlay (default)",
+        "floating": "Floating window",
+        "docked": "Docked at the edge"
+      },
+      "inbox_anchor": {
+        "end-top": "End, top",
+        "end-bottom": "End, bottom",
+        "start-top": "Start, top",
+        "start-bottom": "Start, bottom"
       }
     }
   },

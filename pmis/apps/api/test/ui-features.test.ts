@@ -39,6 +39,7 @@ const NB = { enabled: false, days: 30 };
 const INBOX_SEED = { tabs_enabled: true, default_tab: 'all', priority_kinds: ['mention', 'approval_due', 'task_returned', 'task_rejected', 'idle_task_alert', 'no_holder', 'absence_alert'] };
 const FIELD_SEED = { enabled: false, cache_hours: 24, max_queue: 50, max_photo_mb: 8, sync_seconds: 60 };
 const HUB_SEED = { widgets: { quick_bar: true, batches: true, template_changes: true, recent: true, health: true, admin: true }, badge: true, default_view: { templates: 'cards', uploads: 'table', exports: 'table', master_import: 'table' } };
+const FIN_SEED = { widgets: { advances: true, invoices: true, quick_links: true, templates: true }, settle_warn_days: 30, aging_days: [30, 60] };
 const GUARD_SEED = { enabled: true, settings: true, dialogs: true, drawers: true, inline: true, composers: true, navigation: true };
 const PANEL_SEED = { mode: 'popover', width: 'medium', show_tabs: true };
 const INBOX = { tabs_enabled: true, default_tab: 'priority', priority_kinds: ['mention', 'system'] };
@@ -55,6 +56,7 @@ describe('Settings > Screens > Interface (ui.features)', () => {
       field_pwa: FIELD_SEED,
       panel: PANEL_SEED,
       unsaved_guard: GUARD_SEED,
+      finance_hub: FIN_SEED,
     });
     expect(etag(res)).toBe(`"${res.body.version}"`);
   });
@@ -92,11 +94,11 @@ describe('Settings > Screens > Interface (ui.features)', () => {
     expect((await put(admin, { sections: { new_badge: NB }, reason: 'Stale' }, etag(cur))).status).toBe(412);
     const both = await put(admin, { sections: { avatars: AV, new_badge: NB }, reason: 'Both sections' }, etag(res));
     expect(both.status).toBe(200);
-    expect(both.body.sections).toEqual({ avatars: AV, new_badge: NB, inbox: INBOX_SEED, panel: PANEL_SEED, data_hub: HUB_SEED, field_pwa: FIELD_SEED, unsaved_guard: GUARD_SEED });
+    expect(both.body.sections).toEqual({ avatars: AV, new_badge: NB, inbox: INBOX_SEED, panel: PANEL_SEED, data_hub: HUB_SEED, field_pwa: FIELD_SEED, unsaved_guard: GUARD_SEED, finance_hub: FIN_SEED });
     const rows = await db.query("SELECT entity_id, before, after, reason FROM audit_log WHERE action = 'ui_features_update' ORDER BY id DESC LIMIT 1");
-    expect(rows.rows[0]).toMatchObject({ entity_id: 'ui.features', reason: 'Both sections', after: { avatars: AV, new_badge: NB, inbox: INBOX_SEED, panel: PANEL_SEED, data_hub: HUB_SEED, field_pwa: FIELD_SEED, unsaved_guard: GUARD_SEED } });
+    expect(rows.rows[0]).toMatchObject({ entity_id: 'ui.features', reason: 'Both sections', after: { avatars: AV, new_badge: NB, inbox: INBOX_SEED, panel: PANEL_SEED, data_hub: HUB_SEED, field_pwa: FIELD_SEED, unsaved_guard: GUARD_SEED, finance_hub: FIN_SEED } });
     expect(rows.rows[0].before.avatars).toEqual(AV);
-    expect((await plain.api.call('get', '/settings/ui-features')).body.sections).toEqual({ avatars: AV, new_badge: NB, inbox: INBOX_SEED, panel: PANEL_SEED, data_hub: HUB_SEED, field_pwa: FIELD_SEED, unsaved_guard: GUARD_SEED });
+    expect((await plain.api.call('get', '/settings/ui-features')).body.sections).toEqual({ avatars: AV, new_badge: NB, inbox: INBOX_SEED, panel: PANEL_SEED, data_hub: HUB_SEED, field_pwa: FIELD_SEED, unsaved_guard: GUARD_SEED, finance_hub: FIN_SEED });
     const back = await put(admin, {
       sections: { avatars: { style: 'gradient', shape: 'circle', palette: 'varied', in_lists: true }, new_badge: { enabled: true, days: 14 } }, reason: 'Back to the default',
     }, etag(both));
@@ -115,7 +117,7 @@ describe('Settings > Screens > Interface (ui.features)', () => {
     expect(ok.body.sections.inbox).toEqual(INBOX);
     expect(ok.body.sections.avatars).toEqual(cur.body.sections.avatars);
     expect((await plain.api.call('get', '/settings/ui-features')).body.sections.inbox).toEqual(INBOX);
-    const back = await put(admin, { sections: { inbox: INBOX_SEED, panel: PANEL_SEED, data_hub: HUB_SEED, field_pwa: FIELD_SEED, unsaved_guard: GUARD_SEED }, reason: 'Back to the default' }, etag(ok));
+    const back = await put(admin, { sections: { inbox: INBOX_SEED, panel: PANEL_SEED, data_hub: HUB_SEED, field_pwa: FIELD_SEED, unsaved_guard: GUARD_SEED, finance_hub: FIN_SEED }, reason: 'Back to the default' }, etag(ok));
     expect(back.status).toBe(200);
   });
 
