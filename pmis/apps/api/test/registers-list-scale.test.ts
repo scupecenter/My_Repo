@@ -45,12 +45,12 @@ const explainMs = async (sql: string): Promise<number> => {
 
 describe('registers list at scale', () => {
   it(`returns a page of 50 of ${N} records fast, in order, with counts and a cursor that continues`, async () => {
-    await admin.api.call('get', `/registers/${KEY}?limit=5`); // warm the app
+    await admin.api.call('get', `/registers/${KEY}/records?limit=5`); // warm the app
     let ms = Infinity;
-    let res = await admin.api.call('get', `/registers/${KEY}?limit=50`);
+    let res = await admin.api.call('get', `/registers/${KEY}/records?limit=50`);
     for (let i = 0; i < 3; i++) {
       const t0 = Date.now();
-      res = await admin.api.call('get', `/registers/${KEY}?limit=50`);
+      res = await admin.api.call('get', `/registers/${KEY}/records?limit=50`);
       ms = Math.min(ms, Date.now() - t0);
     }
     expect(res.status, JSON.stringify(res.body)).toBe(200);
@@ -62,7 +62,7 @@ describe('registers list at scale', () => {
     expect((res.body.counts as { filtered: number }).filtered).toBe((res.body.counts as { total: number }).total);
     const next = (res.body.page as { next_cursor: string | null }).next_cursor;
     expect(next).not.toBeNull();
-    const p2 = await admin.api.call('get', `/registers/${KEY}?limit=50&cursor=${encodeURIComponent(next as string)}`);
+    const p2 = await admin.api.call('get', `/registers/${KEY}/records?limit=50&cursor=${encodeURIComponent(next as string)}`);
     expect(p2.status).toBe(200);
     const ids2 = (p2.body.items as { id: string }[]).map((i) => i.id);
     expect(ids2).toHaveLength(50);
@@ -72,7 +72,7 @@ describe('registers list at scale', () => {
   });
 
   it('a search and a filter keep the same results and counts', async () => {
-    const res = await admin.api.call('get', `/registers/${KEY}?limit=20&q=${TAG}%2077`);
+    const res = await admin.api.call('get', `/registers/${KEY}/records?limit=20&q=${TAG}%2077`);
     expect(res.status).toBe(200);
     const f = (res.body.counts as { filtered: number }).filtered;
     expect(f).toBeGreaterThan(0);
