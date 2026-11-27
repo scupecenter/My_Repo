@@ -373,7 +373,7 @@ describe('structure by template (0560): the Structure sheet, the proposal, the r
     if (who.api.csrf) t2.set('X-CSRF-Token', who.api.csrf);
     return t2.field('reason', reasonText).attach('file', buffer, { filename: 'edited.xlsx', contentType: 'application/octet-stream' });
   };
-  const version = async (): Promise<number> => Number((await q(db, `SELECT current_version FROM template_definitions WHERE template_id = 'TPL-GECOL'`))[0].current_version);
+  const version = async (): Promise<number> => Number((await q(db, `SELECT current_version FROM template_definitions WHERE template_id = 'TPL-GECOL'`))[0]!.current_version);
 
   beforeAll(async () => { second = await plainAdmin(app, db, true); });
 
@@ -406,7 +406,7 @@ describe('structure by template (0560): the Structure sheet, the proposal, the r
     expect(res.body.summary).toMatchObject({ rename: 1, add: 1 });
     expect((await field('c_text'))?.label_en).toBe(before?.label_en);
     expect(await field('x_from_sheet')).toBeUndefined();
-    expect((await q(db, `SELECT count(*)::int AS n FROM audit_log WHERE action = 'structure_proposal_submit'`))[0].n).toBeGreaterThan(0);
+    expect((await q(db, `SELECT count(*)::int AS n FROM audit_log WHERE action = 'structure_proposal_submit'`))[0]!.n).toBeGreaterThan(0);
   });
 
   it('a sheet with no change is refused, and a file without the sheet is refused', async () => {
@@ -497,7 +497,7 @@ describe('structure by template (0560): the Structure sheet, the proposal, the r
     expect(one.body).toMatchObject({ max_items: 1, two_person: 'always' });
     expect((await admin.api.call('put', PO, { reason: 'stale version', max_items: 2 }, ifm(pol.body.version))).status).toBe(412);
     expect((await admin.api.call('put', PO, { reason: 'same again', max_items: 1 }, ifm(one.body.version))).status).toBe(409);
-    expect((await q(db, `SELECT count(*)::int AS n FROM audit_log WHERE action = 'structure_policy_update'`))[0].n).toBeGreaterThan(0);
+    expect((await q(db, `SELECT count(*)::int AS n FROM audit_log WHERE action = 'structure_policy_update'`))[0]!.n).toBeGreaterThan(0);
     try {
       const two = await admin.api.call('post', SP, { register_key: 'gecol', reason: 'two items', rows: [{ code: 'x_pol_a', label_en: 'Pol A', type: 'text' }, { code: 'x_pol_b', label_en: 'Pol B', type: 'text' }] });
       expect(two.status).toBe(422);
