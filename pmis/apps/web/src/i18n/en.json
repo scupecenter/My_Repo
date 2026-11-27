@@ -173,7 +173,8 @@
     "daily_plan": "Daily Plan",
     "group_library": "Library",
     "library.forms": "Forms",
-    "library.archive": "Archive"
+    "library.archive": "Archive",
+    "incidents": "Incidents & Security"
   },
   "top": {
     "search": "Search or jump to…",
@@ -405,7 +406,11 @@
     "storage_not_supported": "The documents are in S3/MinIO: the reset cannot move them from here.",
     "quarantine_unavailable": "The quarantine folder cannot be made in the document store. Nothing was changed.",
     "maintenance": "A project data reset is running. Try again in a few minutes.",
-    "scope_changed": "The scope is not the one you saw, or what it takes along changed. Read the request again or make a new one."
+    "scope_changed": "The scope is not the one you saw, or what it takes along changed. Read the request again or make a new one.",
+    "unknown_register": "Not a register.",
+    "unknown_site": "Not a site.",
+    "unknown_metric": "Not a milestone task.",
+    "unknown_region": "Not a region."
   },
   "week": {
     "title": "Weekly cycle plan",
@@ -1153,10 +1158,12 @@
     "section_alerts_policy": "Notification policy",
     "section_alerts_mail": "Mail kinds",
     "section_security_locks": "Lock keys",
+    "section_security_support": "Support access",
     "section_security_dlp": "DLP months",
     "section_screens_dashboard": "Dashboard",
     "section_screens_tables": "Tables (Display)",
     "section_screens_daily-plan": "My Work (Daily Plan)",
+    "section_screens_pm-schedules": "Preventive maintenance",
     "tab_ddl": "DDL",
     "tab_data": "Data",
     "tab_alerts": "Notifications",
@@ -1193,7 +1200,8 @@
     "section_screens_motion": "Motion",
     "section_workflow_coverage": "Matrix coverage",
     "section_screens_login": "Login page",
-    "section_screens_interface": "Interface"
+    "section_screens_interface": "Interface",
+    "section_screens_goals": "Goals"
   },
   "scopeMatch": {
     "title": "Team / scope match (Procurement)",
@@ -1940,7 +1948,10 @@
     "details": "Details",
     "purchase_request": "Purchase request",
     "in_service": "In service",
-    "execution": "Execution"
+    "execution": "Execution",
+    "incident": "Incident",
+    "people_damage": "People and damage",
+    "resolution": "Resolution"
   },
   "procAssign": {
     "title": "Assignment",
@@ -3171,6 +3182,20 @@
       "unattributed": "Unattributed",
       "by_contractor": "Shortage per contractor",
       "contractor_row": "{{qty}} missing · {{lines}} lines · {{sites}} sites"
+    },
+    "scurve": {
+      "title": "Progress curve",
+      "hint": "Planned against actual of the saved weekly snapshots, the weekly velocity and the date the curve reaches 100% at that velocity. Read only.",
+      "open_project_status": "Open Project Status",
+      "actual": "Actual",
+      "planned": "Planned",
+      "spi": "Plan index",
+      "velocity": "Velocity",
+      "per_week": "%/week",
+      "forecast": "100% forecast",
+      "empty": "No saved snapshots yet: the curve appears after the first weekly snapshot.",
+      "chart_label": "Progress curve: {{list}}",
+      "basis": "{{n}} saved weekly snapshots, values frozen at their dates."
     }
   },
   "docs": {
@@ -4586,6 +4611,12 @@
     "cancelled": "Cancelled",
     "no_contractor": "no contractor",
     "order_site_first": "Choose the site and the part first",
+    "issue_no_risk": "No risk (not from a risk)",
+    "risk_issues_title": "Issues from this risk",
+    "risk_issues_none": "No issue has been raised from this risk.",
+    "rn_none": "No RN linked (type the reference)",
+    "rn_no_options": "No received RN of this part on the site",
+    "rn_ref_from_rn": "The RN reference is read from the Warehouse RN and cannot be typed.",
     "no_orders": "No approved, active order for this part",
     "contractor_from_order": "Contractor (from the order): {{name}}",
     "order_choose": "{{count}} active orders: choose the one this work belongs to.",
@@ -4867,6 +4898,15 @@
       "longitude": "Longitude",
       "address": "Address",
       "rf_survey_date": "RF survey date"
+    },
+    "warn": {
+      "saved_title": "{{code}} is saved. Check these before it is sent:",
+      "similar_site_code": "Another Site ID is almost the same.",
+      "duplicate_name": "A site with this name exists.",
+      "close_coordinates": "These coordinates are within 100 metres of another site.",
+      "cluster_will_be_created": "This cluster does not exist yet: it is created in the region of the site when L2 approves.",
+      "outside_libya": "These coordinates are outside Libya. Check them.",
+      "list_other": "This value is not in the list; the list allows another value."
     }
   },
   "siteMap": {
@@ -5555,6 +5595,44 @@
     "obsidian_desc": "A near-black sidebar with a gold accent. A control-room look, best in the dark theme.",
     "sahara_desc": "A warm sand page with an emerald accent and a deep green sidebar. Calm for long reading, best in the light theme."
   },
+  "supportaccess": {
+    "title": "Support access",
+    "note": "Let a named person help with configuration for a short time. It is off until you turn it on. A grant ends by itself, you can end it at any time, and nothing is deleted. It gives edit rights only; it does not let the person see more than their own role allows.",
+    "enable": "Allow support access",
+    "enable_note": "While this is off nobody can be granted support access. Grants already made keep running until they end or you end them.",
+    "max_hours": "Longest grant (hours)",
+    "default_hours": "Usual grant (hours)",
+    "save": "Save settings",
+    "readonly": "Only a System Admin manages support access.",
+    "off": "Support access is off. Turn it on above to grant it.",
+    "grant": "Grant support access",
+    "who": "Person",
+    "who_ph": "Type 2 letters of a name",
+    "pick": "Choose a person",
+    "rights": "What they may edit",
+    "right_templates": "Templates",
+    "right_fields": "Fields and lists",
+    "right_documents": "Document types",
+    "right_warehouse": "Warehouse items",
+    "hours": "Hours",
+    "grant_btn": "Grant",
+    "grants": "Support grants",
+    "none": "No support grants yet.",
+    "until": "Until {{when}}",
+    "by": "Granted by {{name}}",
+    "state_active": "Active",
+    "state_expired": "Ended by time",
+    "state_revoked": "Revoked",
+    "revoke": "Revoke",
+    "revoke_all": "Revoke all active",
+    "revoke_all_note": "Ends every support grant that is still in force.",
+    "revoked_n": "{{n}} support grants revoked.",
+    "confirm_set": "Support access: {{enabled}}, longest {{max}} hours, usual {{def}} hours. Your password is asked again and the change is written to the audit log.",
+    "confirm_grant": "Grant {{who}} the chosen rights for {{hours}} hours. It ends by itself.",
+    "confirm_revoke": "End this support grant now.",
+    "on": "on",
+    "off_word": "off"
+  },
   "seclocks": {
     "title": "Lock keys",
     "note": "Two switches for a System Admin. Both are off until you turn one on. Nothing is deleted and no sign-in changes. You can turn a lock off again at any time.",
@@ -5846,6 +5924,34 @@
     "sla_choice_required": "Choose one: set the SLA, or say that this task has no SLA. It is never left empty.",
     "sla_none_reason": "Why has it no SLA? (short reason)",
     "sla_undecided_warning": "These tasks have no SLA decision yet: {{codes}}. You can still publish; set an SLA or mark them as having none in Settings > SLA."
+  },
+  "pm": {
+    "due_title": "Maintenance due",
+    "manage": "Manage schedules",
+    "create_draft": "Create draft",
+    "created": "Draft created. It goes through the normal review and approval.",
+    "settings_title": "Preventive maintenance",
+    "settings_note": "A schedule says: every N weeks or months a draft record is due in a register. Nothing is created by a timer. A person who may create records in that register presses Create draft, here or on the register screen, and the draft is saved as that person and goes through the normal review and approval.",
+    "none": "No schedules yet.",
+    "name_en": "Name (English)",
+    "name_ar": "Name (Arabic)",
+    "register": "Register",
+    "site": "Site",
+    "every": "Every",
+    "unit": "Unit",
+    "unit_week": "weeks",
+    "unit_month": "months",
+    "next_due": "Next due",
+    "template": "Values filled in the draft",
+    "field": "Field",
+    "value": "Value",
+    "add_field": "Add a value",
+    "remove_field": "Remove value",
+    "active": "Active",
+    "open_register": "Open the register",
+    "remove": "Remove schedule",
+    "add": "Add schedule",
+    "save_title": "Save the schedules"
   },
   "analytics": {
     "title": "Analytics of this view",
@@ -6711,5 +6817,48 @@
     "new_enabled": "Show the \"New\" badge",
     "new_days": "Days to show it after a feature is released",
     "new_preview": "Shown beside new features until the days have passed."
+  },
+  "related": {
+    "title": "Related records",
+    "to": "Points to:",
+    "from": "Named by:",
+    "register": {
+      "procurement": "Procurement",
+      "warehouse": "Warehouse",
+      "dismantle": "Dismantle",
+      "issues": "Issue log",
+      "quality": "Quality",
+      "car_dispatcher": "Car dispatcher",
+      "financial_advances": "Financial advances",
+      "risks": "Risks"
+    }
+  },
+  "goals": {
+    "title": "Goals",
+    "manage": "Manage goals",
+    "none": "No goals yet.",
+    "open_sites": "Open sites",
+    "status_achieved": "Achieved",
+    "status_on_track": "On track",
+    "status_at_risk": "At risk",
+    "status_behind": "Behind",
+    "period_month": "This month",
+    "period_quarter": "This quarter",
+    "period_year": "This year",
+    "settings_title": "Goals",
+    "settings_note": "A goal counts the sites that reach a milestone task during the current month, quarter or year. The progress is counted from approved tasks, never typed. Each goal shows in the Goals card of the Dashboard.",
+    "link_dashboard_settings": "Dashboard cards and targets",
+    "link_dashboard": "Open the Dashboard",
+    "name_en": "Name (English)",
+    "name_ar": "Name (Arabic)",
+    "metric": "Milestone task",
+    "region": "Region",
+    "all_regions": "All regions",
+    "period": "Period",
+    "target": "Target (sites)",
+    "active": "Active",
+    "remove": "Remove goal",
+    "add": "Add goal",
+    "save_title": "Save the goals"
   }
 }
