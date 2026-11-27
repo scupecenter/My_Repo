@@ -12,7 +12,7 @@ type Json = Record<string, unknown>;
 const rulesBody = z.object({ rules: z.record(z.string().regex(/^[a-z][a-z0-9_]{0,40}$/), z.union([z.boolean(), z.string().max(20)])), reason: z.string().trim().min(3).max(1000) }).strict();
 
 /**
- * Migration 0390: the per-register rules (register_definitions.rules) that the database enforces, edited from Settings > Register rules. The database lists the keys that
+ * Migration 0430: the per-register rules (register_definitions.rules) that the database enforces, edited from Settings > Register rules. The database lists the keys that
  * can be edited (register_rule_catalogue), checks the System Admin gate, the reason, the ETag and the type of each value, and audits the change.
  */
 @Injectable()

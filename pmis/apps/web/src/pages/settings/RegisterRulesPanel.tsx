@@ -6,7 +6,7 @@ import { useToast } from '@/components/Toast';
 
 type Change = { r: RegisterRules; spec: RuleSpec; value: boolean | string };
 
-/** Settings > Register rules: the rules the database enforces for a register (an invoice must name its order, the supplier must be registered, the currency). A reason is asked and the change is audited (0390). */
+/** Settings > Register rules: the rules the database enforces for a register (an invoice must name its order, the supplier company, the currency). A reason is asked and the change is audited (0430). */
 export function RegisterRulesPanel() {
   const { t, i18n } = useTranslation();
   const toast = useToast();

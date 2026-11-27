@@ -5,7 +5,7 @@ import { RegisterRulesService } from './register-rules.service';
 
 type Json = Record<string, unknown>;
 
-/** Migration 0390: the rules of a register (Settings > Register rules). Same gate as the register columns: the System Admin or a delegate of `fields.edit`. */
+/** Migration 0430: the rules of a register (Settings > Register rules). Same gate as the register columns: the System Admin or a delegate of `fields.edit`. */
 @Controller('settings/register-rules')
 export class RegisterRulesController {
   constructor(private readonly rules: RegisterRulesService) {}

@@ -9,7 +9,7 @@ import { RegisterRulesPanel } from './RegisterRulesPanel';
 const page = () => renderApp(<Routes><Route path="/x" element={<RegisterRulesPanel />} /></Routes>, { route: '/x' });
 beforeEach(() => resetRegisterRules());
 
-describe('register rules panel (0390)', () => {
+describe('register rules panel (0430)', () => {
   it('switches a rule with a reason', async () => {
     await signIn('pm');
     page();
