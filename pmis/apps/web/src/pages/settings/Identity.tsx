@@ -1,13 +1,14 @@
 import { Lock } from 'lucide-react';
 import { UnsavedGuard } from '@/lib/unsavedGuard';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useSetUiIdentity, useUiIdentity } from '@/api/settings';
+import { usePutUiLogo, useSetUiIdentity, useSetUiLogoDisplay, useSetUiLogoEnabled, useUiIdentity } from '@/api/settings';
 import { errText, FormDialog } from '@/components/FormDialog';
 import { useToast } from '@/components/Toast';
 import { BRAND_SWATCHES, BRANDS, type Brand } from '@/lib/brands';
 import { APPEARANCE_OPTIONS, type Appearance, type AppearanceKey } from '@/lib/appearance';
 import { fmtDateTime } from '@/lib/time';
+import { API_BASE } from '@/api/client';
 import { QueryFallback } from '@/components/States';
 
 /** A small picture of a design (its light tokens): a sidebar with an active entry, a page with a card, an accent button and a soft chip. */
@@ -45,8 +46,12 @@ export function Identity() {
   const { t, i18n } = useTranslation();
   const toast = useToast();
   const q = useUiIdentity(), set = useSetUiIdentity();
+  const putLogo = usePutUiLogo(), setLogo = useSetUiLogoEnabled(), setDisplay = useSetUiLogoDisplay();
+  const [display, setDisplayDraft] = useState<{ login: boolean; fav: boolean } | null>(null);
   const [draft, setDraft] = useState<{ brand: Brand; allow: boolean; defaults: Appearance } | null>(null);
   const [open, setOpen] = useState(false);
+  const [logoDialog, setLogoDialog] = useState<'upload' | 'hide' | 'show' | null>(null);
+  const logoFile = useRef<File | null>(null);
   if (!q.data) return <QueryFallback queries={[q]} testid="identity-loading" />;
   const cur = q.data;
   const v = draft ?? { brand: cur.default_brand, allow: cur.allow_user_choice, defaults: cur.defaults ?? {} };
@@ -99,6 +104,45 @@ export function Identity() {
         <input type="checkbox" className="mt-1" data-testid="identity-allow" checked={v.allow} disabled={ro} onChange={(e) => setDraft({ ...v, allow: e.target.checked })} />
         <span><span className="font-semibold">{t('identity.allow')}</span><span className="block text-xs text-mute">{t(v.allow ? 'identity.allow_on' : 'identity.allow_off')}</span></span>
       </label>
+      <fieldset data-testid="identity-logo">
+        <legend className="mb-1 text-sm font-semibold">{t('identity.logo_title')}</legend>
+        <p className="mb-2 text-xs text-mute">{t('identity.logo_note')}</p>
+        <div className="flex flex-wrap items-center gap-3">
+          {cur.logo
+            ? <img src={`${API_BASE}/ui/assets/logo?v=${cur.logo.version}`} alt={t('identity.logo_alt')} data-testid="identity-logo-preview" className="h-10 w-10 rounded-md border border-line object-contain" />
+            : <span className="grid h-10 w-10 place-items-center rounded-md bg-accent text-accentInk" data-testid="identity-logo-badge">G</span>}
+          <span className="text-sm text-mute" data-testid="identity-logo-state">
+            {!cur.logo ? t('identity.logo_none') : cur.logo.enabled ? (cur.logo.updated_by && cur.logo.updated_at ? t('identity.logo_updated', { name: cur.logo.updated_by.display_name, when: fmtDateTime(cur.logo.updated_at, ar ? 'ar' : 'en') }) : '') : t('identity.logo_hidden')}
+          </span>
+          {!ro && (
+            <>
+              <label className="btn" data-testid="identity-logo-choose">
+                {cur.logo ? t('identity.logo_replace') : t('identity.logo_upload')}
+                <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" className="hidden" data-testid="identity-logo-file"
+                  onChange={(e) => { const f = e.target.files?.[0] ?? null; if (f) { logoFile.current = f; setLogoDialog('upload'); } e.target.value = ''; }} />
+              </label>
+              {cur.logo?.enabled && <button className="btn" data-testid="identity-logo-hide" onClick={() => setLogoDialog('hide')}>{t('identity.logo_hide')}</button>}
+              {cur.logo && !cur.logo.enabled && <button className="btn" data-testid="identity-logo-show" onClick={() => setLogoDialog('show')}>{t('identity.logo_show')}</button>}
+            </>
+          )}
+        </div>
+        {cur.logo && (
+          <div className="mt-3 space-y-1" data-testid="identity-logo-public">
+            <p className="text-xs text-mute">{t('identity.logo_public_note')}</p>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" data-testid="identity-logo-login" checked={cur.logo.show_on_login} disabled={ro || !cur.logo.enabled}
+                onChange={(e) => setDisplayDraft({ login: e.target.checked, fav: cur.logo!.use_as_favicon })} />
+              {t('identity.logo_login')}
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" data-testid="identity-logo-favicon" checked={cur.logo.use_as_favicon} disabled={ro || !cur.logo.enabled}
+                onChange={(e) => setDisplayDraft({ login: cur.logo!.show_on_login, fav: e.target.checked })} />
+              {t('identity.logo_favicon')}
+            </label>
+            {!cur.logo.enabled && <p className="text-xs text-mute" data-testid="identity-logo-public-off">{t('identity.logo_public_off')}</p>}
+          </div>
+        )}
+      </fieldset>
       <div className="rounded-md bg-card2 p-3 text-sm" data-testid="identity-status-locked">
         <p className="mb-2 flex items-center gap-1 font-semibold"><Lock size={14} aria-hidden />{t('identity.status_locked')}</p>
         <div className="flex flex-wrap gap-2">
@@ -127,6 +171,27 @@ export function Identity() {
           <p className="text-sm text-mute" data-testid="identity-confirm">
             {t('identity.confirm', { name: t(`brand.${v.brand}`), choice: t(v.allow ? 'identity.choice_on' : 'identity.choice_off') })}
           </p>
+        </FormDialog>
+      )}
+      {logoDialog === 'upload' && (
+        <FormDialog open onClose={() => setLogoDialog(null)} testid="identity-logo-dialog" title={t('identity.logo_title')} busy={putLogo.isPending} error={putLogo.isError ? errText(putLogo.error, t) : null}
+          onSubmit={(reason) => { const f = logoFile.current; if (!f) return; putLogo.mutate({ file: f, reason, version: cur.logo?.version ?? null },
+            { onSuccess: () => { toast(t('settings.audited')); setLogoDialog(null); logoFile.current = null; } }); }}>
+          <p className="text-sm text-mute" data-testid="identity-logo-confirm-upload">{t('identity.logo_confirm_upload')}</p>
+        </FormDialog>
+      )}
+      {display && cur.logo && (
+        <FormDialog open onClose={() => setDisplayDraft(null)} testid="identity-logo-display-dialog" title={t('identity.logo_title')} busy={setDisplay.isPending} error={setDisplay.isError ? errText(setDisplay.error, t) : null}
+          onSubmit={(reason) => setDisplay.mutate({ version: cur.logo!.version, show_on_login: display.login, use_as_favicon: display.fav, reason },
+            { onSuccess: () => { toast(t('settings.audited')); setDisplayDraft(null); } })}>
+          <p className="text-sm text-mute" data-testid="identity-logo-confirm-display">{t(display.login || display.fav ? 'identity.logo_confirm_public_on' : 'identity.logo_confirm_public_off')}</p>
+        </FormDialog>
+      )}
+      {(logoDialog === 'hide' || logoDialog === 'show') && cur.logo && (
+        <FormDialog open onClose={() => setLogoDialog(null)} testid="identity-logo-dialog" title={t('identity.logo_title')} busy={setLogo.isPending} error={setLogo.isError ? errText(setLogo.error, t) : null}
+          onSubmit={(reason) => setLogo.mutate({ version: cur.logo!.version, enabled: logoDialog === 'show', reason },
+            { onSuccess: () => { toast(t('settings.audited')); setLogoDialog(null); } })}>
+          <p className="text-sm text-mute" data-testid="identity-logo-confirm-toggle">{t(logoDialog === 'show' ? 'identity.logo_confirm_show' : 'identity.logo_confirm_hide')}</p>
         </FormDialog>
       )}
     </section>

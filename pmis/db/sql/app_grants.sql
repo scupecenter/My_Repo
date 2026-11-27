@@ -12,6 +12,7 @@ GRANT UPDATE (last_activity_at, stepup_at, current_screen, revoked_at, revoked_b
 REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON departments, message_threads, message_participants, messages, announcements,
   announcement_targets, announcement_recipients, announcement_responses FROM pmis_app;  -- 010: only through idm_*, msg_*, ann_*
 REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON task_instances, workflow_steps, comments, task_level_actors, task_level_voters, comment_mentions FROM pmis_app;  -- 014: the approval engine writes only through wf_* functions
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON comment_reactions FROM pmis_app;  -- 0346: reactions are written only through comment_react / comment_unreact
 REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON register_records, register_steps, register_level_actors, register_level_voters, register_definitions, register_fields, register_sections, register_task_sources, procurement_records, gecol_records, hlc_records, permit_records FROM pmis_app;  -- 0019: register records and their approved projections only through reg_* functions
 REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON holidays, work_calendars, sla_rules, sla_rule_sets, sla_rule_set_items, permit_types FROM pmis_app;  -- 0017: calendar and SLA configuration only through admin_save_holiday, admin_delete_holiday, admin_save_weekend_days and the admin_*_sla_rule_set functions (audited, with a reason)
 REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON site_gate_state FROM pmis_app;  -- 0018: written only by calc_gate_watch (the calculation layer, owner pmis_definer)
@@ -120,3 +121,5 @@ GRANT SELECT (id, template_id, number, site_id, region_id, task_id, doc_type_id,
 REVOKE ALL ON task_sla_choices FROM pmis_app;  -- 0170: the explicit no-SLA choices only through admin_task_sla_none and sla_task_overview (owner pmis_definer, audited)
 REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON issue_task_map FROM pmis_app;  -- 0171: the task -> issue category map only through admin_issue_task_map_save
 REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON document_texts FROM pmis_app;  -- 0255: the file text only through document_text_put (owner pmis_definer)
+
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON push_subscriptions FROM pmis_app;  -- 0256: browsers are written only through the push_* functions
