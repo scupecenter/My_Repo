@@ -31,6 +31,13 @@ export const useDismantleOrders = (siteId: string | null | undefined, part: stri
     queryFn: () => api.get<{ items: DismantleOrderOption[] }>('/registers/dismantle/order-options', { query: { site_id: siteId!, record_type: part! } }).then((r) => r.items),
   });
 
+/** GET /registers/dismantle/rn-options: the received Warehouse RNs of the part on the site (0321). */
+export const useDismantleRns = (siteId: string | null | undefined, part: string | null | undefined, enabled: boolean) =>
+  useQuery({
+    queryKey: ['dismantle-rns', siteId, part], enabled: enabled && !!siteId && (part === 'cw' || part === 'te'),
+    queryFn: () => api.get<{ items: S['DismantleRnOption'][] }>('/registers/dismantle/rn-options', { query: { site_id: siteId!, record_type: part! } }).then((r) => r.items),
+  });
+
 /** GET /registers/warehouse/order-options: the approved, active orders a PL / OPEN receipt may name (of the site when it has one). */
 export const useWarehouseOrders = (siteId: string | null | undefined, enabled: boolean, key: 'warehouse' | 'car_dispatcher' | 'financial_advances' | 'issues' | 'quality' = 'warehouse') =>
   useQuery({
@@ -43,6 +50,13 @@ export const useOrderReceipts = (entityId: string | null | undefined) =>
   useQuery({
     queryKey: ['order-receipts', entityId], enabled: !!entityId,
     queryFn: () => api.get<{ items: S['ProcurementOrderReceipt'][] }>(`/registers/procurement/${entityId}/receipts`).then((r) => r.items),
+  });
+
+/** GET /registers/{key}/{entity_id}/related: the records linked to this record, both directions (0324). */
+export const useRelatedRecords = (key: string | null | undefined, entityId: string | null | undefined) =>
+  useQuery({
+    queryKey: ['related-records', key, entityId], enabled: !!key && !!entityId,
+    queryFn: () => api.get<{ groups: S['RelatedRecordGroup'][] }>(`/registers/${key}/${entityId}/related`).then((r) => r.groups),
   });
 
 /** POST /registers/hlc/legacy-migration: the preview (dry_run) or the run (reason; the server asks for a step-up). */
