@@ -16502,6 +16502,8 @@ export interface components {
                 label_ar?: string | null;
                 /** @description 0.12.5. Functional groups of the value (for example CW, TE; closed for an action status). */
                 groups?: string[];
+                /** @description 0.15.244. The colour set for the value in Settings, Lists (#RRGGBB); null when none. Display only. */
+                colour?: string | null;
             }[];
         };
         /** @description 0.12.5 (Q104). The list catalogue a list field reads. */
