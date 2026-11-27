@@ -11,8 +11,8 @@ Status: design only. No code in this PR yet. Reserved numbers: migration 0294+, 
 - Rate limits and an audit row on every action (register, remove, sign-in success and failure, setting change). security_log reuses existing event names with a detail field (closed CHECK set).
 - Real enforcement in the database: the sign-in door (`auth_session_create`) keeps the pass-row model of S3. A passkey assertion creates the same kind of pass row, verified server-side.
 
-## Dependency approach
-Neither `@simplewebauthn/server` nor any WebAuthn package is installed. Proposal: no new dependency. Verify with `node:crypto` only, supporting the two algorithms every platform authenticator offers (ES256, RS256), attestation `none` (we do not validate attestation statements: we only need the public key), user-presence and user-verification flags required, origin and rpId checked against server config (`APP_CONFIG`), sign counter checked for rollback. This keeps the supply chain unchanged and the verifier small enough to test fully with vectors. Alternative if Ahmed prefers a library: add `@simplewebauthn/server` (adds a dependency and a lockfile change). Default is the no-dependency path.
+## Dependency approach (decided by Main: use the vetted library)
+`@simplewebauthn/server` pinned to the exact version 14.1.0 (MIT, Node >=22 like our CI NODE_VERSION 22; works from our CommonJS build through Node 22 require of ESM, verified). It is isolated behind one thin module `src/security/webauthn.ts` (four functions) so it can be swapped. We request no attestation, require user verification, and allow ES256 and RS256 only. Vector tests use a software authenticator built in the test (wrong challenge, origin, rpId, missing UV, counter replay and rollback, bad signature, another account's key all fail).
 
 ## Data model (new tables must be classified KEEP in data_reset_plan() by an in-place patch, plus GRANT SELECT, UPDATE to pmis_reset_owner)
 - `user_passkeys`(id, user_id, credential_id unique, public_key, alg, sign_count, transports, label, created_at, last_used_at, revoked_at, revoked_by). Rows are revoked, never deleted.
