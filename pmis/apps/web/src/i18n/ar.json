@@ -174,7 +174,8 @@
     "group_library": "المكتبة",
     "library.forms": "النماذج",
     "library.archive": "الأرشيف",
-    "lessons_learned": "الدروس المستفادة"
+    "lessons_learned": "الدروس المستفادة",
+    "incidents": "الحوادث والأمن"
   },
   "top": {
     "search": "ابحث أو انتقل إلى…",
@@ -1950,7 +1951,10 @@
     "in_service": "دخول الخدمة",
     "execution": "التنفيذ",
     "lesson": "الدرس",
-    "follow_up": "المتابعة"
+    "follow_up": "المتابعة",
+    "incident": "الحادث",
+    "people_damage": "الأشخاص والأضرار",
+    "resolution": "المعالجة"
   },
   "procAssign": {
     "title": "التكليف",

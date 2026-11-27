@@ -174,7 +174,8 @@
     "group_library": "Library",
     "library.forms": "Forms",
     "library.archive": "Archive",
-    "lessons_learned": "Lessons Learned"
+    "lessons_learned": "Lessons Learned",
+    "incidents": "Incidents & Security"
   },
   "top": {
     "search": "Search or jump to…",
@@ -1950,7 +1951,10 @@
     "in_service": "In service",
     "execution": "Execution",
     "lesson": "Lesson",
-    "follow_up": "Follow-up"
+    "follow_up": "Follow-up",
+    "incident": "Incident",
+    "people_damage": "People and damage",
+    "resolution": "Resolution"
   },
   "procAssign": {
     "title": "Assignment",
