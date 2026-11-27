@@ -17,7 +17,8 @@ describe('Dashboard ops: procurement and materials card (0.15.96, item 1)', () =
   it('shows the open orders, the PR/PO aging buckets, the receive rate and the shortage per contractor', async () => {
     await signIn('pm');
     dashPage();
-    const card = await screen.findByTestId('dash-ops-procurement');
+    // the first render of the whole Dashboard in this file is slow under CI load (1000 ms default was not enough on main a7f79df2)
+    const card = await screen.findByTestId('dash-ops-procurement', {}, { timeout: 8000 });
     expect(card).toHaveTextContent('Procurement and materials');
     expect(screen.getByTestId('dash-ops-open-orders')).toHaveTextContent('14');
     expect(screen.getByTestId('dash-ops-pr-waiting')).toHaveTextContent('7');

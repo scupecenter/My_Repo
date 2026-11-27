@@ -11,7 +11,7 @@ for (const c of [{ locale: 'en' }, { locale: 'ar' }] as const) {
     await expect(page.getByTestId('inbox-priority-only')).toBeVisible();
     await page.getByTestId('page-inbox').screenshot({ path: `test-results/inbox-${c.locale}.png` });
     await page.getByTestId('inbox-priority-only').click();
-    await expect(page).toHaveURL(/priority=1/);
+    await expect(page).toHaveURL(/tab=priority/);
     await expect(page.getByTestId('inbox-priority-only')).toHaveAttribute('aria-pressed', 'true');
     const items = page.locator('[data-testid^="inbox-item-"]');
     const n = await items.count();
