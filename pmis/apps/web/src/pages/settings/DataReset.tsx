@@ -132,11 +132,11 @@ export function DataReset() {
           <ArchivePanel r={req} canMake={!!s.can.start && req.status === 'approved'} making={makeArchive.isPending} error={makeArchive.isError ? errText(makeArchive.error, t) : null}
             onMake={() => { makeArchive.reset(); makeArchive.mutate({ id: req.id }); }} when={when} />
           <dl className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 text-sm">
-            <dt>{t('dr.requested_by')}</dt><dd data-testid="dr-requested-by">{req.requested_by.display_name} · {when(req.requested_at)}</dd>
+            <dt>{t('dr.requested_by')}</dt><dd data-testid="dr-requested-by"><bdi>{req.requested_by.display_name}</bdi> · <bdi>{when(req.requested_at)}</bdi></dd>
             <dt>{t('common.reason')}</dt><dd>{req.request_reason}</dd>
-            {req.approved_by && <><dt>{t('dr.approved_by')}</dt><dd data-testid="dr-approved-by">{req.approved_by.display_name} · {when(req.approved_at)}</dd></>}
-            {(req.status === 'requested' || req.status === 'approved') && <><dt>{t('dr.expires')}</dt><dd data-testid="dr-expires">{when(req.expires_at)}</dd></>}
-            {req.run_by && <><dt>{t('dr.run_by')}</dt><dd>{req.run_by.display_name} · {when(req.run_started_at)}</dd></>}
+            {req.approved_by && <><dt>{t('dr.approved_by')}</dt><dd data-testid="dr-approved-by"><bdi>{req.approved_by.display_name}</bdi> · <bdi>{when(req.approved_at)}</bdi></dd></>}
+            {(req.status === 'requested' || req.status === 'approved') && <><dt>{t('dr.expires')}</dt><dd data-testid="dr-expires"><bdi>{when(req.expires_at)}</bdi></dd></>}
+            {req.run_by && <><dt>{t('dr.run_by')}</dt><dd><bdi>{req.run_by.display_name}</bdi> · <bdi>{when(req.run_started_at)}</bdi></dd></>}
           </dl>
           {req.status === 'requested' && !s.can.approve && <p className="text-sm text-mute" data-testid="dr-wait-other">{t('dr.wait_other')}</p>}
           {running && <p className="text-sm" data-testid="dr-progress">{req.status === 'running' ? t('dr.progress_db') : t('dr.progress_files', { done: req.files.moved + req.files.missing + req.files.refused, total: req.files.total })}</p>}
@@ -574,7 +574,7 @@ function ArchivePanel({ r, canMake, making, error, onMake, when }: {
       {a?.status === 'ready' && (
         <p data-testid="dr-archive-state">{t('dr.archive_ready', { size: Math.max(1, Math.round((a.bytes ?? 0) / 1024)), until: when(a.keep_until), count: a.downloads ?? 0 })}</p>
       )}
-      {a?.status === 'ready' && a.sha256 && <p className="text-xs text-mute">SHA-256 <span className="mono" dir="ltr" data-testid="dr-archive-sha">{a.sha256.slice(0, 12)}</span></p>}
+      {a?.status === 'ready' && a.sha256 && <p className="text-xs text-mute"><bdi dir="ltr">SHA-256</bdi> <span className="mono" dir="ltr" data-testid="dr-archive-sha">{a.sha256.slice(0, 12)}</span></p>}
       {needDownload && <p className="text-lateInk" data-testid="dr-archive-need-download">{t('dr.archive_need_download')}</p>}
       <div className="flex flex-wrap gap-2">
         {canMake && (!a || a.status === 'failed') && (
