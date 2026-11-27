@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.193
+  version: 0.15.262
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -31,6 +31,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.262 (2026-11-27): the unsaved-changes guard joins `ui.features` as the section `unsaved_guard` (migration 0401, mirror `db/sql/400_ui_unsaved_guard.sql`; CHANGELOG UnsavedGuard, Decision 11). Additive: `UiFeatures` and `UiFeaturesPatch` gain `unsaved_guard` (`UiUnsavedGuard`: `enabled` and one boolean per area); a stored value without the section takes the seed (guard on everywhere). No new path.
     - 0.15.260 (2026-11-27): cross-register derive (migration 0363, mirror `db/sql/362_derive_rules.sql`; owner approval 2026-11-27). Additive. New `GET/PUT /settings/derive-rules` (the setting `derive.rules`: which value a register shows from another register; If-Match, reason, audited; field errors `unknown_key`, `unknown_register`, `same_register`, `unknown_field`, `duplicate`, `invalid`, `too_many`). `RegisterRecord.derived` carries the derived values of the record by output name; `procurement_contractor` of GECOL and HLC is now the seeded rule and keeps its shape. A derived value is computed on read from the configured source field of the matching source record only (never the record), needs no permission on the source register, is shown only for target records the caller may read, and each person's first read of a rule in 10 minutes is audited (`derive_disclosed`). No grant, role or permission change.
     - 0.15.225 (2026-11-27): Change Control names the order and the task it affects (migration 0325; CHANGELOG ChangeControlAffected). Additive. New optional fields `procurement_order_id` (an approved, active Procurement order of the same site that the caller may see; 422 `order_not_active`, `order_other_site`, `invalid`) and `affected_task_code` (a task code of the workflow; 422 `unknown_task`), checked on a version in entry only. New `GET /registers/change_control/order-options` (the order picker; Change Control view plus Procurement view). `GET /registers/{register_key}/{entity_id}/related` also lists the change requests that name an order, so the order shows a change-pending mark. No permission change.
     - 0.15.244 (2026-11-27): list-value colours reach the register fields (item 15 of the PM-platforms research, owner request 2026-11-27; no migration; CHANGELOG ListCellDisplay). Additive. `RegisterField.options[]` (and the child-list column options) gain the optional `colour` of the list value as set in Settings, Lists (#RRGGBB; absent when none). Display only: no permission, visibility, validation or stored-data change; a value keeps storing its code.
@@ -21965,15 +21966,29 @@ components:
         mode: { type: string, enum: [popover, side_panel] }
         width: { type: string, enum: [narrow, medium, wide] }
         show_tabs: { type: boolean }
+    UiUnsavedGuard:
+      type: object
+      description: '0.15.262. The unsaved-changes guard: the master switch and one switch per area.'
+      additionalProperties: false
+      required: [enabled, settings, dialogs, drawers, inline, composers, navigation]
+      properties:
+        enabled: { type: boolean }
+        settings: { type: boolean }
+        dialogs: { type: boolean }
+        drawers: { type: boolean }
+        inline: { type: boolean }
+        composers: { type: boolean }
+        navigation: { type: boolean }
     UiFeatures:
       type: object
       description: '0.15.185. The sections of the interface features setting; every section is complete.'
-      required: [avatars, new_badge, inbox, panel]
+      required: [avatars, new_badge, inbox, panel, unsaved_guard]
       properties:
         avatars: { $ref: '#/components/schemas/UiAvatars' }
         new_badge: { $ref: '#/components/schemas/UiNewBadge' }
         inbox: { $ref: '#/components/schemas/UiInbox' }
         panel: { $ref: '#/components/schemas/UiPanel' }
+        unsaved_guard: { $ref: '#/components/schemas/UiUnsavedGuard' }
     UiFeaturesPatch:
       type: object
       additionalProperties: false
@@ -21982,6 +21997,7 @@ components:
         new_badge: { $ref: '#/components/schemas/UiNewBadge' }
         inbox: { $ref: '#/components/schemas/UiInbox' }
         panel: { $ref: '#/components/schemas/UiPanel' }
+        unsaved_guard: { $ref: '#/components/schemas/UiUnsavedGuard' }
     UiFeaturesSetting:
       type: object
       required: [sections, version]

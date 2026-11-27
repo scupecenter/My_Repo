@@ -1,7 +1,8 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ApiError } from '@/api/client';
+import { useAskLeave, useUnsavedGuard, type GuardSource } from '@/lib/unsavedGuard';
 import { InlinePanel } from './InlinePanel';
 
 /** Message for a failed call: a specific text for known problem codes, else the generic one. */
@@ -22,12 +23,20 @@ export function FormDialog({ open, onClose, title, testid, children, onSubmit, s
   const [reason, setReason] = useState('');
   const [touched, setTouched] = useState(false);
   const short = withReason && reason.trim().length < 3;
+  // Decision 11: typed input in the dialog (any field, or the reason) is guarded; closing it by Cancel, Esc or a click outside asks first
+  const [typed, setTyped] = useState(false);
+  const src: GuardSource = { scope: 'dialogs', dirty: typed && open, label: title, onSave: () => { if (short || disabled || busy) { setTouched(true); return false; } onSubmit(reason.trim()); return 'stay'; } };
+  useUnsavedGuard(src);
+  const ask = useAskLeave(src);
+  const reset = () => { setReason(''); setTouched(false); setTyped(false); };
+  useEffect(() => { if (!open) { setReason(''); setTouched(false); setTyped(false); } }, [open]);
+  const close = () => ask(() => { reset(); onClose(); });
   if (inline) return open ? <InlinePanel onClose={onClose} title={title} testid={testid} onSubmit={onSubmit} submitLabel={submitLabel} busy={busy} error={error} disabled={disabled} withReason={withReason}>{children}</InlinePanel> : null;
   return (
-    <Dialog.Root open={open} onOpenChange={(o) => { if (!o) { setReason(''); setTouched(false); onClose(); } }}>
+    <Dialog.Root open={open} onOpenChange={(o) => { if (!o) close(); }}>
       <Dialog.Portal>
         <Dialog.Overlay className="motion-overlay fixed inset-0 z-[70] bg-scrim/60" />
-        <Dialog.Content data-testid={testid} className={`motion-panel card fixed inset-x-0 top-[6vh] z-[70] mx-auto max-h-[88vh] space-y-3 overflow-y-auto p-5 ${wide ? 'w-[min(720px,94vw)]' : 'w-[min(480px,94vw)]'}`}>
+        <Dialog.Content data-testid={testid} onInput={() => setTyped(true)} className={`motion-panel card fixed inset-x-0 top-[6vh] z-[70] mx-auto max-h-[88vh] space-y-3 overflow-y-auto p-5 ${wide ? 'w-[min(720px,94vw)]' : 'w-[min(480px,94vw)]'}`}>
           <Dialog.Title className="text-lg font-bold">{title}</Dialog.Title>
           <Dialog.Description className="sr-only">{title}</Dialog.Description>
           {children}
@@ -40,7 +49,7 @@ export function FormDialog({ open, onClose, title, testid, children, onSubmit, s
           )}
           {error && <p role="alert" data-testid={`${testid}-error`} className="text-lateInk">{error}</p>}
           <div className="flex justify-end gap-2">
-            <button className="btn" onClick={onClose}>{t('common.cancel')}</button>
+            <button className="btn" onClick={close}>{t('common.cancel')}</button>
             <button className="btn btn-accent" data-testid={`${testid}-submit`} disabled={busy || disabled} onClick={() => (short ? setTouched(true) : onSubmit(reason.trim()))}>{submitLabel ?? t('common.save')}</button>
           </div>
         </Dialog.Content>
