@@ -33,6 +33,9 @@ export function ShortcutsHelp() {
           <ul className="space-y-1 text-sm">
             <li><kbd className="chip">Ctrl K</kbd> {t('shortcuts.palette')}</li>
             <li><kbd className="chip">?</kbd> {t('shortcuts.help')}</li>
+            <li data-testid="shortcut-jk"><kbd className="chip">J</kbd> <kbd className="chip">K</kbd> {t('shortcuts.rows')}</li>
+            <li data-testid="shortcut-row-open"><kbd className="chip">Enter</kbd> / <kbd className="chip">Space</kbd> {t('shortcuts.row_open')}</li>
+            <li data-testid="shortcut-context"><kbd className="chip">{t('shortcuts.right_click')}</kbd> {t('shortcuts.row_menu')}</li>
             {Object.entries(GO_KEYS).map(([k, to]) => (
               <li key={k} data-testid={`shortcut-${k}`}><kbd className="chip">g {k}</kbd> {t(`shortcuts.go_${k}`)} <span className="text-mute" dir="ltr">{to}</span></li>
             ))}

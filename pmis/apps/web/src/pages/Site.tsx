@@ -19,6 +19,8 @@ import { SiteMasterSources } from '@/components/SiteMasterSource';
 import { SiteApplicability } from '@/components/SiteApplicability';
 import { SiteDispatchPanel } from '@/components/SiteDispatch';
 import { useSiteDispatch } from '@/api/warehouse';
+import { RecordPin } from '@/components/RecordPin';
+import { siteSignature } from '@/lib/recordMemory';
 import { SitePhaseTabs } from '@/components/SitePhaseTabs';
 import { DataGapsChip, LocksChip } from '@/components/WorkflowLocks';
 import { Pipeline } from '@/components/Pipeline';
@@ -118,6 +120,7 @@ export function Site() {
             <LocksChip siteId={s.id} locked={s.workflow_locks !== false} canManage={!!s.workflow_locks_info?.can_manage} />
             <DataGapsChip count={s.data_gaps ?? 0} items={s.data_gap_items} />
             <FollowButton target={{ kind: 'site', id: s.id }} entityId={s.id} />
+            <RecordPin rec={{ kind: 'site', id: s.id, code: s.site_code, name: s.name, path: `/sites/${s.id}` }} signature={siteSignature(s)} />
             <span className={`chip ${TONE[s.overall_status]}`} data-testid="site-status">{t(`status.${s.overall_status}`)}</span>
           </div>
           <SiteSummaryStrip site={s} />
