@@ -57,9 +57,10 @@ export function Field() {
   const [queue, setQueue] = useState<FieldAction[]>([]);
   // auto-fill: the site last worked on (only its id, kept on this device)
   const siteKey = `gsdn-field-site-${me?.user.id ?? ''}`;
-  const [siteId, setSiteIdRaw] = useState<string | null>(null);
-  const setSiteId = (v: string | null) => { setSiteIdRaw(v); try { if (v) localStorage.setItem(siteKey, v); else localStorage.removeItem(siteKey); } catch { /* storage may be blocked */ } };
-  useEffect(() => { if (me) { try { setSiteIdRaw((cur) => cur ?? localStorage.getItem(siteKey)); } catch { /* ignore */ } } }, [me, siteKey]);
+  const [siteChoice, setSiteChoice] = useState<string | null | undefined>(undefined);
+  const stored = useMemo(() => { try { return me ? localStorage.getItem(siteKey) : null; } catch { return null; } }, [me, siteKey]);
+  const siteId = siteChoice === undefined ? stored : siteChoice;
+  const setSiteId = (v: string | null) => { setSiteChoice(v); try { if (v) localStorage.setItem(siteKey, v); else localStorage.removeItem(siteKey); } catch { /* storage may be blocked */ } };
   const syncing = useRef(false);
 
   const reload = useCallback(async () => { if (store) setQueue(await store.list()); }, [store]);
@@ -72,7 +73,11 @@ export function Field() {
     } finally { syncing.current = false; await reload(); }
   }, [store, qc, toast, t, reload]);
 
-  useEffect(() => { void reload(); }, [reload]);
+  useEffect(() => {
+    let live = true;
+    void store?.list().then((q) => { if (live) setQueue(q); });
+    return () => { live = false; };
+  }, [store]);
   const waiting = queue.filter((a) => a.state === 'waiting').length;
   // a sync on opening, when the connection comes back, and every few seconds while something waits
   useEffect(() => { if (cfg.enabled && online && waiting) void sync(); }, [cfg.enabled, online, waiting, sync]);
