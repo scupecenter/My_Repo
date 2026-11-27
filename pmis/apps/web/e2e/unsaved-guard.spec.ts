@@ -12,6 +12,7 @@ for (const c of [{ locale: 'en', theme: 'light' }, { locale: 'ar', theme: 'dark'
     await page.getByTestId('dept-code').fill('zz');
     await page.keyboard.press('Escape');
     await expect(page.getByTestId('unsaved-dialog')).toBeVisible();
+    await page.waitForTimeout(500);
     if (process.env.SHOT_DIR) await page.screenshot({ path: `${process.env.SHOT_DIR}/unsaved-guard-${c.locale}.png` });
     await page.getByTestId('unsaved-stay').click();
     await expect(page.getByTestId('dept-code')).toHaveValue('zz');
