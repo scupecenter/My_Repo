@@ -1,4 +1,4 @@
-import type { RegisterDefinition, RegisterField, RegisterKey, RegisterRecordStep, UserRef } from '@/api/types';
+import type { RegisterDefinition, RegisterField, RegisterKey, RegisterRecord, RegisterRecordStep, UserRef } from '@/api/types';
 
 /** A date twenty days ahead of today, so the relative-date cell (item 15) shows in the seed whatever the day is. */
 const REL_PLUS_20 = (() => { const d = new Date(); d.setDate(d.getDate() + 20); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })();
@@ -231,6 +231,8 @@ export const REGISTER_DEFS: RegisterDefinition[] = [
   more('rf_design', 'RF Design', 'تصميم RF', 'rf_design', true), more('acquisition', 'Acquisition', 'الاستحواذ', 'acquisition', true), dismantle, carDispatcher, financialAdvances, incidents, lessonsLearned, invoices,
 ];
 /** The template of each register (contract 0.7.0: one `TPL-*` per register, issued by the database). Only these four have a sample upload in the mock. */
+// 0.15.240: intake triage on the Issue Log and the Change Control Log (RegisterDefinition.triage_enabled)
+for (const d of REGISTER_DEFS) if (d.register_key === 'issues' || d.register_key === 'change_control') d.triage_enabled = true;
 export const REGISTER_TEMPLATES: Record<string, RegisterKey> = { 'TPL-PROCUREMENT': 'procurement', 'TPL-GECOL': 'gecol', 'TPL-HLC': 'hlc', 'TPL-PERMITS': 'permits_hse' };
 /** Contract 0.11.5: one Site Register template per stream, and the whole Master (kind master). */
 export const STREAM_TEMPLATES: Record<string, 'DESIGN_ACQ' | 'CW' | 'TE' | 'CLOSURE'> = { 'TPL-DESIGN-ACQ': 'DESIGN_ACQ', 'TPL-CIVIL': 'CW', 'TPL-INSTALL': 'TE', 'TPL-CLOSURE': 'CLOSURE' };
@@ -260,6 +262,8 @@ export type MockRecord = {
   external_party?: { id: string; name: string; type: 'cw_contractor' | 'te_vendor' | 'gecol' | 'hlc' | 'supplier' | 'landlord' | 'other' } | null;
   /** 0063 (Q150): the HLC purchase requests (Procurement entity ids) an HLC record names. */
   pr_links?: string[];
+  /** 0.15.240: the intake triage of a record of a triage-enabled register (Issue Log, Change Control). */
+  triage?: RegisterRecord['triage'];
 };
 export type MockBatchRow = {
   id: string; row_no: number; key: string; action: 'create' | 'update' | 'unchanged' | 'error'; decision: 'pending' | 'approved' | 'rejected' | 'pending_previous_approval';
@@ -332,6 +336,10 @@ export function initRegisters() {
       { external_party: { id: 'e0000000-0000-4000-8000-000000000061', name: 'Desert Lift Services (synthetic)', type: 'cw_contractor' } }),
     // contract 0.13.2 (Q267): (recId(17)) an approved Quality snag record; a System Admin can cancel it if it was entered by mistake
     rec('quality', 'snag', 0, 'approved', { record_code: 'QS-2026-001', stage: 'CW QC', description: 'Grout missing at the base', severity: 'MAJOR', raised_date: '2026-10-10' }),
+    // 0.15.240: Issue Log intake triage (recId(18) waits for a decision, recId(19) was deferred, recId(20) was accepted and is in the normal flow)
+    rec('issues', null, 0, 'entry', { category: 'Quality', description: 'Cracked fence base', raised_date: '2026-10-18' }, { triage: { state: 'pending', note: null, at: null, duplicate_of: null } }),
+    rec('issues', null, 1, 'entry', { category: 'Access', description: 'The landlord blocks the gate', raised_date: '2026-10-15' }, { triage: { state: 'deferred', note: 'Wait for the site visit', by: { id: 'u-1509', display_name: 'Mona Fathi' }, at: '2026-10-16T09:00:00Z', duplicate_of: null } }),
+    rec('issues', null, 2, 'in_review', { category: 'Material', description: 'Wrong antenna delivered', raised_date: '2026-10-10' }, { triage: { state: 'accepted', note: null, by: { id: 'u-1509', display_name: 'Mona Fathi' }, at: '2026-10-11T09:00:00Z', duplicate_of: null } }),
   ];
   return { records, batches: [] as MockBatch[], seq: 100 };
 }
