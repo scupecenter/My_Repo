@@ -206,7 +206,7 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/reports/contractor-performance'],
   ['get', '/settings/contractor-performance'],
   ['put', '/settings/contractor-performance'],
-  // Contract 0.15.111: the generic alert rules (apps/api: settings; migration 0202).
+  // Contract 0.15.242: the generic alert rules (apps/api: settings; migration 0342).
   ['get', '/settings/alert-rules'],
   ['post', '/settings/alert-rules'],
   ['put', '/settings/alert-rules/:id'],

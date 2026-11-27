@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { renderApp, signIn } from '@/test/utils';
 import { SettingsRoutes } from './Settings';
 
-/** Settings, Alerts, Rules (0.15.111): the seeded rule is listed, a new rule needs the required fields, and a create posts through the reason dialog. */
+/** Settings, Alerts, Rules (0.15.242): the seeded rule is listed, a new rule needs the required fields, and a create posts through the reason dialog. */
 const page = () => renderApp(<Routes><Route path="/admin/settings/*" element={<SettingsRoutes />} /></Routes>, { route: '/admin/settings/alerts/rules' });
 
 describe('Settings, alert rules', () => {

@@ -906,7 +906,7 @@ export const settingsHandlers = [
   }),
   http.get(`${B}/reports/contractors-completeness`, () => { const g = guard(); if (g) return g; return HttpResponse.json(COMPLETENESS); }),
 
-  // ------------------------------------------------------------------ alert rules (0.15.111, migration 0202): notifications only
+  // ------------------------------------------------------------------ alert rules (0.15.242, migration 0342): notifications only
   http.get(`${B}/settings/alert-rules`, () => {
     const g = needAdmin(); if (g) return g;
     return HttpResponse.json({

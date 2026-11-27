@@ -8,7 +8,7 @@ import { fieldErrors } from '@/lib/fields';
 import { QueryFallback } from '@/components/States';
 
 /**
- * Settings, Alerts, Rules (admin only): the generic if/then alert rules (contract 0.15.111, migration 0202; item 13 of the 2026-11-27
+ * Settings, Alerts, Rules (admin only): the generic if/then alert rules (contract 0.15.242, migration 0342; item 13 of the 2026-11-27
  * PM-platforms research). NOTIFICATIONS ONLY: a rule never changes a record, a state or a holder. The database owns the closed kinds,
  * params, audiences and templates; this screen only shapes the form and shows the field errors the database answers.
  */

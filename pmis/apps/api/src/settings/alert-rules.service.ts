@@ -9,7 +9,7 @@ import { parse } from '../common/zod';
 import { DbService } from '../db/db.service';
 
 /**
- * Item 13 of the PM-platforms research of 2026-11-27 (migration 0202, contract 0.15.111): the generic if/then alert rules, NOTIFICATIONS ONLY.
+ * Item 13 of the PM-platforms research of 2026-11-27 (migration 0342, contract 0.15.242): the generic if/then alert rules, NOTIFICATIONS ONLY.
  * The database owns the rules (alert_rules_json, admin_alert_rule_save): the closed kinds with their params, the closed audience, the templates,
  * the If-Match version, the reason and the audit row. The daily job (jobs.service) fires them through alert_rules_run; a fire writes one in-app
  * notification per recipient, deduped by (rule, period, target). The screen is a System Admin screen (admin.settings edit for all regions), as

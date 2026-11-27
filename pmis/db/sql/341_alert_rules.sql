@@ -1,5 +1,5 @@
--- 0202_alert_rules: generic if/then alert rules, notifications only (the PM-platforms research of 2026-11-27, item 13; contract 0.15.111; CHANGELOG AlertRules).
--- Mirror: db/sql/201_alert_rules.sql (kept identical to prisma/migrations/0202_alert_rules/migration.sql).
+-- 0342_alert_rules: generic if/then alert rules, notifications only (the PM-platforms research of 2026-11-27, item 13; contract 0.15.242; CHANGELOG AlertRules).
+-- Mirror: db/sql/341_alert_rules.sql (kept identical to prisma/migrations/0342_alert_rules/migration.sql).
 --
 -- WHAT. Generic if/then alert rules, NOTIFICATIONS ONLY (no state, owner or permission changes). A System Admin (or an all-regions admin.settings
 -- delegate) manages the rules in Settings. Each rule: a closed condition kind with closed params, a closed audience, and a title/body template in

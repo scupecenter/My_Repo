@@ -7,7 +7,7 @@ import { G } from './reg-helpers';
 import { type Actor, actor, plainAdmin } from './wf-helpers';
 
 /**
- * Migration 0202: the HTTP surface of the alert-rules Settings screen (the engine itself is covered in alert-rules.test.ts). The catalogue
+ * Migration 0342: the HTTP surface of the alert-rules Settings screen (the engine itself is covered in alert-rules.test.ts). The catalogue
  * comes with the list, create/update run through admin_alert_rule_save with If-Match, and non-admins get 403. The matrix lock serialises
  * the suite against the other register/settings suites on the shared database.
  */
@@ -47,7 +47,7 @@ const RULE = {
   enabled: false,
 };
 
-describe('alert-rules routes (0202)', () => {
+describe('alert-rules routes (0342)', () => {
   it('lists rules with the kind/register catalogue, and refuses non-admins', async () => {
     const res = await admin.api.call('get', PATH);
     expect(res.status).toBe(200);

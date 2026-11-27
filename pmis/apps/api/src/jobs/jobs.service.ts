@@ -23,7 +23,7 @@ export interface DailyJobResult {
   slaEscalations?: number;
   /** 0166: weekly digest notifications (in-app only) written by this run; only on the week's Sunday */
   digests?: number;
-  /** 0202: alert rule notifications (in-app only) written by this run */
+  /** 0342: alert rule notifications (in-app only) written by this run */
   alertRules?: number;
 }
 
@@ -225,7 +225,7 @@ export class JobsService implements OnApplicationBootstrap, OnModuleDestroy {
     return n;
   }
 
-  /** 0202: the generic alert rules, in-app notifications only; alert_rules_run finds the targets of the day and writes one notification per
+  /** 0342: the generic alert rules, in-app notifications only; alert_rules_run finds the targets of the day and writes one notification per
    * recipient per rule per period and target (deduped), so a second run the same day adds nothing. A failure is logged and leaves the other steps alone. */
   private async alertRules(): Promise<number> {
     const n = await this.runs.run('alert_rules', async (tx) => Number((await tx.$queryRaw<{ n: number }[]>`SELECT alert_rules_run() AS n`)[0]?.n ?? 0));

@@ -5,7 +5,7 @@ import { beginAs, makeAdmin, makeUser, superDb } from './helpers';
 import { addAssignment, makeSite, newRole } from './wf-helpers';
 
 /**
- * Migration 0202: the generic if/then alert rules, NOTIFICATIONS ONLY. admin_alert_rule_save manages a rule (admin.settings edit for all regions, a
+ * Migration 0342: the generic if/then alert rules, NOTIFICATIONS ONLY. admin_alert_rule_save manages a rule (admin.settings edit for all regions, a
  * reason, one audit row); alert_rules_run / alert_rule_notify write one in-app notification per recipient per rule per period and target, in the
  * recipient's language, deduped by alert_rule_fires. They change no record, state, owner or permission.
  */
@@ -34,7 +34,7 @@ const rule = (code: string, over: Record<string, unknown> = {}): Record<string, 
 const fires = async (code: string): Promise<number> =>
   Number((await db.query('SELECT count(*)::int AS n FROM alert_rule_fires f JOIN alert_rules r ON r.id = f.rule_id WHERE r.code = $1', [code])).rows[0].n);
 
-describe('alert rules (0202)', () => {
+describe('alert rules (0342)', () => {
   it('validates the closed kinds, params, audience and templates with field errors', async () => {
     const fails = async (r: Record<string, unknown>, re: RegExp): Promise<void> => {
       await db.query('BEGIN');

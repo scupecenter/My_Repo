@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.111
+  version: 0.15.242
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -31,7 +31,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
-    - 0.15.111 (2026-11-27): generic if/then alert rules, notifications only (migration 0202, mirror `db/sql/201_alert_rules.sql`; CHANGELOG AlertRules; item 13 of the 2026-11-27 PM-platforms research). Additive. A System Admin manages the rules in Settings: `GET /settings/alert-rules` (the rules plus the closed catalogues the form offers), `POST /settings/alert-rules`, `PUT /settings/alert-rules/{id}` (If-Match, a reason, audited `alert_rule_create`/`alert_rule_update`). A rule is a closed condition kind with closed params (`weekly_status_missing`: the regions without a Weekly status update of the current working week; `record_idle` `{register_key, state, days}`: the current records of the register in the state for at least days), a closed audience (`system_admin`, or `module` with a module key: the users whose assignment reaches the module) and a title/body template in English and Arabic with placeholders. The daily job fires the enabled rules: one in-app notification per recipient, deduped by (rule, period, target), in the recipient's language; a rule never changes a record, a state or a holder. `NotificationKind` gains `alert_rule` (in-app only).
+    - 0.15.242 (2026-11-27): generic if/then alert rules, notifications only (migration 0342, mirror `db/sql/341_alert_rules.sql`; CHANGELOG AlertRules; item 13 of the 2026-11-27 PM-platforms research). Additive. A System Admin manages the rules in Settings: `GET /settings/alert-rules` (the rules plus the closed catalogues the form offers), `POST /settings/alert-rules`, `PUT /settings/alert-rules/{id}` (If-Match, a reason, audited `alert_rule_create`/`alert_rule_update`). A rule is a closed condition kind with closed params (`weekly_status_missing`: the regions without a Weekly status update of the current working week; `record_idle` `{register_key, state, days}`: the current records of the register in the state for at least days), a closed audience (`system_admin`, or `module` with a module key: the users whose assignment reaches the module) and a title/body template in English and Arabic with placeholders. The daily job fires the enabled rules: one in-app notification per recipient, deduped by (rule, period, target), in the recipient's language; a rule never changes a record, a state or a holder. `NotificationKind` gains `alert_rule` (in-app only).
     - 0.15.96 (2026-11-27): responsibility-matrix coverage screen (CHANGELOG MatrixCoverage; no migration). Additive and read only. `GET /matrix/coverage` (`getMatrixCoverage`, System Admin or an all-region delegate of the matrix): for each active stage and enabled register row and each of the seven regions, whether the matrix cell has an actor, so empty cells show before a task or record stalls. Settings > Workflow > Coverage.
     - 0.15.95 (2026-11-27): Issue log and Quality record link to a Procurement order (migration 0195; CHANGELOG IssueQualityOrderLink). Additive. New optional field `procurement_order_id` on `issues` and `quality`; when set, the contractor (`external_party`) is taken from the order (a different typed `external_party_id` is refused, 422 `contractor_from_order`; `order_not_active`, `order_other_site`, `invalid`), so the contractor performance view sees the issue and the inspection. `GET /registers/issues/order-options` and `GET /registers/quality/order-options` list the orders (own module view plus Procurement view).
     - 0.15.92 (2026-11-27): order picker for the Car dispatcher and Financial advances (CHANGELOG OrderPickersDispatchAdvances). Additive, no migration. `GET /registers/car_dispatcher/order-options` and `GET /registers/financial_advances/order-options` list the approved, active Procurement orders for the field `procurement_record_id` (the same list as the warehouse picker); each needs its own module view, and only orders in regions where the caller also holds the Procurement view right are listed.
@@ -7538,7 +7538,7 @@ paths:
       operationId: getAlertRules
       summary: The alert rules and the closed catalogues of the form
       description: |
-        0.15.111 (migration 0202): System Admin. `rules` are the saved rules (code, kind, params, audience, templates, enabled, version); `catalogue` lists the closed kinds with their params, the audiences, the active registers and the modules the form offers. The database owns the validation.
+        0.15.242 (migration 0342): System Admin. `rules` are the saved rules (code, kind, params, audience, templates, enabled, version); `catalogue` lists the closed kinds with their params, the audiences, the active registers and the modules the form offers. The database owns the validation.
       x-db-path: alert_rules_json
       responses:
         '200':
@@ -7553,7 +7553,7 @@ paths:
       operationId: createAlertRule
       summary: Create an alert rule
       description: |
-        0.15.111 (migration 0202): System Admin, a reason. Closed body (`unknown_key`): `code` (lowercase letters, digits and dashes, fixed once the rule exists, unique), `kind` (closed), `params` (closed per kind, field errors at `/params/<key>`), `audience` (`{"type":"system_admin"}` or `{"type":"module","module":"<module key>"}`), `title_en`, `title_ar`, `body_en`, `body_ar`, optional `link`, `enabled` (default true). Audited (`alert_rule_create`). Notifications only: a rule never changes a record, a state or a holder.
+        0.15.242 (migration 0342): System Admin, a reason. Closed body (`unknown_key`): `code` (lowercase letters, digits and dashes, fixed once the rule exists, unique), `kind` (closed), `params` (closed per kind, field errors at `/params/<key>`), `audience` (`{"type":"system_admin"}` or `{"type":"module","module":"<module key>"}`), `title_en`, `title_ar`, `body_en`, `body_ar`, optional `link`, `enabled` (default true). Audited (`alert_rule_create`). Notifications only: a rule never changes a record, a state or a holder.
       x-db-path: admin_alert_rule_save
       requestBody:
         required: true
@@ -7578,7 +7578,7 @@ paths:
       operationId: updateAlertRule
       summary: Update an alert rule
       description: |
-        0.15.111 (migration 0202): System Admin, a reason and If-Match (the rule's `version`). The whole rule is sent; the `code` does not change. Audited (`alert_rule_update`, before and after).
+        0.15.242 (migration 0342): System Admin, a reason and If-Match (the rule's `version`). The whole rule is sent; the `code` does not change. Audited (`alert_rule_update`, before and after).
       x-db-path: admin_alert_rule_save
       parameters:
       - {name: id, in: path, required: true, schema: {type: string, format: uuid}}

@@ -4800,13 +4800,13 @@ export interface paths {
         };
         /**
          * The alert rules and the closed catalogues of the form
-         * @description 0.15.111 (migration 0202): System Admin. `rules` are the saved rules (code, kind, params, audience, templates, enabled, version); `catalogue` lists the closed kinds with their params, the audiences, the active registers and the modules the form offers. The database owns the validation.
+         * @description 0.15.242 (migration 0342): System Admin. `rules` are the saved rules (code, kind, params, audience, templates, enabled, version); `catalogue` lists the closed kinds with their params, the audiences, the active registers and the modules the form offers. The database owns the validation.
          */
         get: operations["getAlertRules"];
         put?: never;
         /**
          * Create an alert rule
-         * @description 0.15.111 (migration 0202): System Admin, a reason. Closed body (`unknown_key`): `code` (lowercase letters, digits and dashes, fixed once the rule exists, unique), `kind` (closed), `params` (closed per kind, field errors at `/params/<key>`), `audience` (`{"type":"system_admin"}` or `{"type":"module","module":"<module key>"}`), `title_en`, `title_ar`, `body_en`, `body_ar`, optional `link`, `enabled` (default true). Audited (`alert_rule_create`). Notifications only: a rule never changes a record, a state or a holder.
+         * @description 0.15.242 (migration 0342): System Admin, a reason. Closed body (`unknown_key`): `code` (lowercase letters, digits and dashes, fixed once the rule exists, unique), `kind` (closed), `params` (closed per kind, field errors at `/params/<key>`), `audience` (`{"type":"system_admin"}` or `{"type":"module","module":"<module key>"}`), `title_en`, `title_ar`, `body_en`, `body_ar`, optional `link`, `enabled` (default true). Audited (`alert_rule_create`). Notifications only: a rule never changes a record, a state or a holder.
          */
         post: operations["createAlertRule"];
         delete?: never;
@@ -4825,7 +4825,7 @@ export interface paths {
         get?: never;
         /**
          * Update an alert rule
-         * @description 0.15.111 (migration 0202): System Admin, a reason and If-Match (the rule's `version`). The whole rule is sent; the `code` does not change. Audited (`alert_rule_update`, before and after).
+         * @description 0.15.242 (migration 0342): System Admin, a reason and If-Match (the rule's `version`). The whole rule is sent; the `code` does not change. Audited (`alert_rule_update`, before and after).
          */
         put: operations["updateAlertRule"];
         post?: never;
