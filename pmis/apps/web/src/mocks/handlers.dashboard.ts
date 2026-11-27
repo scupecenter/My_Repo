@@ -217,6 +217,30 @@ export const dashboardHandlers = [
     });
   }),
 
+  // ---------------------------------------------------------------- 0.7.2: the saved weekly snapshots (frozen values; the S-curve card, dashboard proposals item 2)
+  http.get(`${B}/project-status/snapshots`, () => {
+    const g = guard(); if (g) return g;
+    if (!canUse()) return problem(403, 'module_forbidden', 'You cannot use dashboard');
+    // Synthetic weekly (Thursday) series: the plan runs ahead, the actual curve catches up lately.
+    const planned = [25, 30, 36, 42, 48, 54, 60, 66, 71, 76, 80, 84, 87, 90];
+    const actual = [22, 26, 31, 36, 41, 46, 50, 55, 60, 64, 68, 71, 74, 76.5];
+    const start = new Date('2026-08-20T00:00:00Z').getTime();
+    const items = planned.map((pl, i) => ({
+      id: `snap-${i + 1}`,
+      taken_on: new Date(start + i * 7 * 86_400_000).toISOString().slice(0, 10),
+      scope: 'project',
+      region_id: null,
+      progress_pct: actual[i],
+      planned_pct: pl,
+      spi: Math.round((actual[i]! / pl) * 1000) / 1000,
+      health_index: 80 + i,
+      weight_set: { id: 'ws-project-status-1', code: 'project_status', version: 3, effective_from: '2026-08-01', is_active: true },
+      kind: 'weekly',
+      kinds: ['weekly'],
+    }));
+    return HttpResponse.json({ items, page: { limit: 200, next_cursor: null } });
+  }),
+
   // ---------------------------------------------------------------- Q118
   http.get(`${B}/project-status/manual-items`, () => {
     const g = guard(); if (g) return g;

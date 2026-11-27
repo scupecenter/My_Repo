@@ -54,6 +54,18 @@ export const p4cHandlers = [
       .map((o: MockRecord) => ({ entity_id: o.entity_id, record_id: o.id, scope: o.data.scope, pr_no: o.data.pr_no, po_wo_no: o.data.po_wo_no, po_wo_date: o.data.po_wo_date, order_status: o.data.order_status, external_party: o.external_party ?? null }));
     return HttpResponse.json({ items });
   }),
+  http.get(`${B}/registers/issues/risk-options`, () => {
+    const g = guard(); if (g) return g;
+    const items = R().records.filter((o: MockRecord) => o.register_key === 'risks' && o.state !== 'voided')
+      .map((o: MockRecord) => ({ entity_id: o.entity_id, record_id: o.id, risk_id: o.data.risk_id, statement: o.data.risk_statement, status: o.data.status, state: o.state }));
+    return HttpResponse.json({ items });
+  }),
+  http.get(`${B}/registers/risks/:entity_id/issues`, ({ params }) => {
+    const g = guard(); if (g) return g;
+    const items = R().records.filter((o: MockRecord) => o.register_key === 'issues' && o.state !== 'voided' && o.data.risk_entity_id === params.entity_id)
+      .map((o: MockRecord) => ({ entity_id: o.entity_id, record_id: o.id, state: o.state, pending_issue: o.data.pending_issue, issue_status: o.data.issue_status, raised_date: o.data.raised_date }));
+    return HttpResponse.json({ items });
+  }),
   http.get(`${B}/registers/procurement/:entity_id/receipts`, ({ params }) => {
     const g = guard(); if (g) return g;
     const items = R().records
@@ -74,6 +86,14 @@ export const p4cHandlers = [
       order_status: o.data.order_status, external_party: o.external_party ?? null,
     }));
     return HttpResponse.json({ items });
+  }),
+
+  http.get(`${B}/registers/dismantle/rn-options`, ({ request }) => {
+    const g = guard(); if (g) return g;
+    const u = new URL(request.url).searchParams;
+    const part = u.get('record_type') ?? '';
+    if (!['cw', 'te'].includes(part) || !u.get('site_id')) return fields({ path: '/record_type', code: 'invalid' });
+    return HttpResponse.json({ items: [] });
   }),
 
   http.post(`${B}/registers/hlc/legacy-migration`, async ({ request }) => {
