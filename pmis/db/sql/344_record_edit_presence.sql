@@ -74,3 +74,21 @@ BEGIN
     GRANT EXECUTE ON FUNCTION edit_presence_ping(text, uuid), edit_presence_stop(text, uuid), edit_presence_list(text, uuid) TO pmis_app;
   END IF;
 END $$;
+
+
+-- ---------------------------------------------------------------------------------------------------------------------
+-- Data reset coverage (0152): record_edit_presence is transient runtime state with a FK only to users (KEEP, with user_sessions).
+-- data_reset_plan() is an accumulating function: patch the stored text idempotently (0361 pattern), never redefine it from an old base.
+DO $$
+DECLARE def text;
+BEGIN
+  def := pg_get_functiondef('public.data_reset_plan()'::regprocedure);
+  IF position('''record_edit_presence''' IN def) = 0 THEN
+    IF position('''user_sessions''' IN def) = 0 THEN RAISE EXCEPTION 'data_reset_plan: the keep list anchor was not found'; END IF;
+    def := replace(def, '''user_sessions''', '''user_sessions'', ''record_edit_presence''');
+  END IF;
+  EXECUTE def;
+END $$;
+
+-- the reset role reads every classified table and takes the share lock of a KEEP table (0152 privilege check)
+GRANT SELECT, UPDATE ON public.record_edit_presence TO pmis_reset_owner;

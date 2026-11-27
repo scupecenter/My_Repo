@@ -291,6 +291,7 @@ records of the Contractors register (companies, teams, contracts) and the vehicl
 | user_recovery_codes | KEEP | Two-factor recovery codes. |
 | auth_pending | KEEP | Pending sign-ins (5 minutes, single use); identity, expires by itself. |
 | user_sessions | KEEP | Rows stay; every open session is ended (revoked, reason `project_data_reset`). Safer: nobody keeps a page of deleted data open. |
+| record_edit_presence | KEEP | Transient "is editing this record" presence rows; they expire on their own (0345). |
 | email_change_requests | KEEP | Identity requests. |
 | phone_change_requests | KEEP | Identity requests. |
 | user_invitations | KEEP | Invitations (owner: keep). |
