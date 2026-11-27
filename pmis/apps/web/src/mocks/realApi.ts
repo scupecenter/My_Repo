@@ -125,6 +125,7 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/registers/:key/records/:id/triage'],
   // Contract 0.7.0: approved-template entry for the registers (apps/api: templates; migration 0037). The Site Register stream templates and TPL-MASTER (migration 0051, contract 0.11.3) use the same paths: no endpoint was added.
   ['get', '/templates'],
+  ['get', '/templates/:id/changes'],
   ['get', '/templates/:id/download'],
   ['get', '/import-batches'],
   ['get', '/data-hub/summary'],
@@ -160,6 +161,11 @@ export const REAL_API_AUTH_USERS = [
   ['delete', '/registers/:key/records/:id/follow'],
   ['get', '/registers/:key/records/:id/comments'],
   ['post', '/registers/:key/records/:id/comments'],
+  // Contract 0.15.247 (0346): a reaction and a resolved flag on any comment.
+  ['put', '/comments/:id/reactions'],
+  ['delete', '/comments/:id/reactions'],
+  ['put', '/comments/:id/resolved'],
+  ['delete', '/comments/:id/resolved'],
   ['get', '/tasks/:id/time-in-state'],
   ['get', '/tasks/:id/blocked-by'],
   ['get', '/reports/time-in-state'],
@@ -314,11 +320,6 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/warehouse/dispatch-status'],
   ['get', '/warehouse/dispatch-status/:id'],
   ['get', '/warehouse/region-vendors'],
-  ['get', '/warehouse/reorder-limits'],
-  ['put', '/warehouse/reorder-limits/:id'],
-  ['get', '/warehouse/rma'],
-  ['post', '/warehouse/rma'],
-  ['post', '/warehouse/rma/:id/status'],
   ['put', '/warehouse/region-vendors/:id'],
   ['get', '/warehouse/config-gaps'],
   // Contract 0.13.1 (follow-up B, Q270, migration 0067): the quarantine exit documents.
@@ -400,6 +401,8 @@ export const REAL_API_AUTH_USERS = [
   // Contract 0.14.6 (migration 0075; apps/api: settings): the background threshold of batches (imports.async_rows) in Settings, Imports.
   ['get', '/settings/imports'],
   ['put', '/settings/imports'],
+  ['get', '/settings/template-change-notice'],
+  ['put', '/settings/template-change-notice'],
   // Contract 0.15.1 (migration 0081; apps/api: settings): the shared layout of the side menu.
   ['get', '/settings/nav-layout'],
   ['put', '/settings/nav-layout'],
@@ -441,6 +444,12 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/me/passkeys/register/verify'],
   ['delete', '/me/passkeys/:id'],
   ['post', '/users/:id/passkeys/revoke'],
+  ['put', '/settings/identity/logo'],
+  ['patch', '/settings/identity/logo'],
+  ['patch', '/settings/identity/logo/display'],
+  ['get', '/ui/public/identity'],
+  ['get', '/ui/public/logo/:purpose'],
+  ['get', '/ui/assets/:key'],
   // Contract 0.15.4 (migration 0085; apps/api: sites, master-import, templates): the per-site workflow locks (one site, many sites) and the status of the sites of
   // an import (missing data per site). The new site fields ride on the paths above.
   ['post', '/sites/workflow-locks'],
@@ -470,6 +479,8 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/registers/financial_advances/advance-options'],
   ['get', '/registers/invoices/order-options'],
   ['get', '/registers/invoices/supplier-options'],
+  ['get', '/settings/register-rules'],
+  ['put', '/settings/register-rules/:key'],
   ['get', '/settings/register-state'],
   ['put', '/settings/register-state/:key'],
   ['get', '/registers/issues/risk-options'],
