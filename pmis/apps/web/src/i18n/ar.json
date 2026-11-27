@@ -3399,7 +3399,8 @@
       "sites": "المواقع",
       "late": "المهام المتأخرة",
       "progress": "التقدم",
-      "health": "الصحة"
+      "health": "الصحة",
+      "forecast": "الموعد المتوقع"
     },
     "snapshot_kind": {
       "weekly": "أسبوعية",

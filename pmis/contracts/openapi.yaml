@@ -33,6 +33,7 @@ info:
     ## Versions
     - 0.15.204 (2026-11-27): the dashboard follow-up sections, pending approvals bottleneck (owner approval 2026-11-26, dashboard proposals item 7; migration 0305). Additive and read only. `GET /dashboard/ops` gains the section `approvals` (`DashboardOpsApprovals`): the tasks waiting for review or approval (states in_review and in_approval, the same population as the Approvals inbox), their ages in calendar days since the level opened, split review against approve, and the same ages grouped by the ball-in-court role so the bottleneck role shows. The section needs the approvals view (and the sites view, like the inbox) and answers available false without them. The dashboard settings catalogue gains the card `ops_approvals`. No grant, role or permission change.
     - 0.15.330 (2026-11-27): links and relations fixes, part 1 (D58; migration 0407, mirror `db/sql/406_links_fixes.sql`). Additive. `advance_id` of an expense or settlement is checked while the row is in entry (an approved advance of the same site; `unknown_advance`); invoices check `procurement_record_id` (`order_not_found`, `order_other_site`) and gain the optional field `supplier_party_id` (a company of the Contractors list; `unknown_company`; fills `supplier` when it is empty). New `GET /registers/financial_advances/advance-options`, `GET /registers/invoices/order-options` and `GET /registers/invoices/supplier-options` (read only, each needs its own module view). The related-records reader also lists the HLC record <-> Procurement record link. No grant, role or permission change.
+    - 0.15.269 (2026-11-27): progress calculation standards (owner approval 2026-11-27; migrations 0540-0545; PR #458). Additive. (1) Register and LOE measure rules for weight items (0540): an item can be measured by a register record's state or as level-of-effort (excluded from plan figures). (2) Draft calibrated weight set v2 (0541, DRAFT, never auto-published). (3) Task estimated man-days and planned duration with a suggested weight in the editor (0542; `PUT /workflow/versions/{version}/tasks/{task_code}/estimate`; advice only, never auto-applied). (4) Partial credit for in-progress tasks, OFF by default (0543; `GET`/`PUT /settings/partial-credit`, System Admin). (5) Warehouse-linked central equipment items measured from central warehouse movements (0544). (6) Per-region forecast completion date on the dashboard regions card and project-status rows (0545; `DashboardRegion.forecast_date`, rows `forecast_date`). The Arabic names of all 45 weight items are backfilled (0546) and remain editable on draft sets in the weight-set editor.
     - 0.15.350 (2026-11-27): two admin alerts for operations (production readiness, item 4; migration 0421, mirror `db/sql/420_ops_alerts.sql`). Additive. `SecurityAlertRule` and `AlertSeverityMap` gain `backup_late` (the database backup check found WAL archiving or a backup late; default severity high; one alert per 6 hours) and `job_failed` (a background job run failed; default medium; one alert per job and day). They use the existing alert channel (bell, and mail to the System Admins by `email_min_severity`); the severity of each is set in Settings like the other rules. `mail.notification_kinds` is unchanged. No grant, role or permission change.
     - 0.15.156 (2026-11-27): Web Push for field engineers (migration 0256; CHANGELOG WebPush). Additive. (1) `GET /me/push` (`getMyPush`): whether push is on for the server (`enabled`, `public_key`) and how many of the caller's browsers are subscribed. (2) `POST /me/push/subscribe` and `POST /me/push/unsubscribe`: own browsers only; subscribe answers 409 while the server has no VAPID keys. (3) `GET /admin/web-push` (`getAdminWebPush`, System Admin): on or off and the counts. The keys come only from the environment (VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT); with any missing push is off. The push carries no title or body, only a fixed notice that opens the inbox. The bell and the e-mail are unchanged.
     - 0.15.155 (2026-11-27): search inside uploaded document contents (migration 0255; CHANGELOG DocContentSearch). Additive. (1) `SearchHit` gains the optional `snippet` (documents group only): where the words were found inside the file, else null. (2) `GET /admin/document-search-index` (`getDocumentSearchIndex`): counts of indexed, empty, unsupported, too large, failed and pending files (System Admin). Text is extracted off the request path from clean-scan PDF and DOCX files and is visible only with the documents view right in the file's region.
@@ -5759,6 +5760,38 @@ paths:
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '422': { $ref: '#/components/responses/Unprocessable' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /workflow/versions/{version}/tasks/{task_code}/estimate:
+    put:
+      operationId: putTaskEstimate
+      tags: [workflow]
+      summary: Estimated man-days and planned duration of a task (draft)
+      description: '0.15.269 (migration 0542, admin_wf_task_estimate): the estimated man-days and an optional planned duration (days) of a task, editable on a draft only. They feed the suggested weight shown in the editor; the suggestion is advice and is never auto-applied. Null clears the value. Needs weights.edit, a step-up and If-Match.'
+      x-db-path: admin_wf_task_estimate (app_actor_is_admin('weights', 'edit'))
+      parameters:
+        - { name: version, in: path, required: true, schema: { type: integer, minimum: 1 } }
+        - { name: task_code, in: path, required: true, schema: { type: string } }
+        - { name: If-Match, in: header, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [est_man_days, reason]
+              properties:
+                est_man_days: { type: [number, 'null'], minimum: 0, maximum: 100000 }
+                planned_duration_days: { type: [integer, 'null'], minimum: 1, maximum: 3650 }
+                reason: { type: string, minLength: 3 }
+      responses:
+        '200': { description: 'The updated task of the draft version' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
   /workflow/versions/{version}/tasks/{task_code}/closing:
     put:
       tags: [workflow]
@@ -7976,6 +8009,56 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '422': {$ref: '#/components/responses/Unprocessable'}
+  /settings/partial-credit:
+    get:
+      tags: [settings]
+      operationId: getPartialCredit
+      summary: Partial credit for in-progress tasks
+      description: '0.15.269 (migration 0543): the setting `progress.partial_credit`. When on, an applicable task that is not yet approved earns current_level/levels_required of its item fraction in the project-status calculation. System Admin only.'
+      x-db-path: progress_partial_credit_json
+      responses:
+        '200':
+          description: The setting.
+          headers:
+            ETag: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PartialCreditSettings' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    put:
+      tags: [settings]
+      operationId: putPartialCredit
+      summary: Set partial credit for in-progress tasks
+      description: '0.15.269 (migration 0543, `admin_save_progress_partial_credit`): System Admin only, a reason and If-Match (the setting version). Audited.'
+      x-db-path: admin_save_progress_partial_credit
+      parameters:
+        - { $ref: '#/components/parameters/IfMatch' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [enabled, reason]
+              properties:
+                enabled: { type: boolean }
+                reason: { type: string, minLength: 3, maxLength: 1000 }
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PartialCreditSettings' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
   /settings/alert-rules/{id}:
     put:
       tags: [settings]
@@ -27849,6 +27932,7 @@ components:
               label: { type: string }
               progress_pct: { type: number }
               planned_pct: { type: [number, 'null'] }
+              forecast_date: { type: [string, 'null'], format: date, description: '0.15.269 (migration 0545): the forecast completion date of the row; null when it cannot be forecast.' }
               activities: { type: object, additionalProperties: { type: number }, description: 'Activity code to progress %.' }
     ProjectStatusSnapshot:
       type: object
@@ -27873,6 +27957,14 @@ components:
       type: string
       enum: [A, B]
       description: '0.12.7 (Q116): A = progress rings (default), B = flat segmented track.'
+    PartialCreditSettings:
+      type: object
+      required: [enabled, version, updated_at, updated_by]
+      properties:
+        enabled: { type: boolean, description: 'Off by default.' }
+        version: { type: integer }
+        updated_at: { type: [string, 'null'], format: date-time }
+        updated_by: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
     PartialPlanIndex:
       description: '0.12.7 (Q177): Actual / Planned over the items that have a plan, with the share of the weight they cover.'
       type: object
@@ -28548,6 +28640,7 @@ components:
             completed: {type: integer}
             cancelled: {type: integer}
         progress_pct: {type: number}
+        forecast_date: {type: [string, 'null'], format: date, description: '0.15.269 (migration 0545): the forecast completion date of the region from its remaining work and recent rate; null when it cannot be forecast.'}
         health_score: {type: [number, 'null']}
         by_milestone: {type: object, additionalProperties: {type: integer}, description: 'Sites that reached each milestone, by code.'}
     DashboardExtras:

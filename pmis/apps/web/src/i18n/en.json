@@ -3391,7 +3391,8 @@
       "sites": "Sites",
       "late": "Late tasks",
       "progress": "Progress",
-      "health": "Health"
+      "health": "Health",
+      "forecast": "Forecast"
     },
     "snapshot_kind": {
       "weekly": "weekly",
