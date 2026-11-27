@@ -10,6 +10,8 @@ import { dashboardParams } from "./dashboard.service";
 import {
   AgeBuckets,
   bucketAges,
+  firstPassPct,
+  meanDays,
   PTW_CHECK_KEYS,
   ptwCheckGaps,
   receivePct,
@@ -55,6 +57,9 @@ interface ShortageRow {
  *   - contractor scorecard (0.15.202, item 5): the aggregate of the contractor performance report — the counts per
  *     level, the on-time rectification rate of snags, the average delay and the rejection (quality fail) rate, and
  *     the five worst parties. No amounts. Needs contractors view, else available false.
+ *   - quality (0.15.203, item 6): the open snags and NCRs of the in-scope sites, the average closure age of each and
+ *     the first-time acceptance rate (Pass over Pass + Fail of the decided inspections; the data keeps no
+ *     re-inspection marker). Needs quality view, else available false.
  */
 @Injectable()
 export class DashboardOpsService {
@@ -75,11 +80,13 @@ export class DashboardOpsService {
     const gecolRegions = await this.access.regions("gecol", "view");
     const hlcRegions = await this.access.regions("hlc", "view");
     const contractorRegions = await this.access.regions("contractors", "view");
+    const qualityRegions = await this.access.regions("quality", "view");
     const procScope = intersect(dash, procRegions);
     const whScope = intersect(dash, whRegions);
     const permitScope = intersect(dash, permitRegions);
     const gecolScope = intersect(dash, gecolRegions);
     const hlcScope = intersect(dash, hlcRegions);
+    const qualityScope = intersect(dash, qualityRegions);
     const procOk = procRegions === null || procRegions.length > 0;
     const whOk = whRegions === null || whRegions.length > 0;
     const permitsOk = permitRegions === null || permitRegions.length > 0;
@@ -87,6 +94,8 @@ export class DashboardOpsService {
     const hlcOk = hlcRegions === null || hlcRegions.length > 0;
     const contractorsOk =
       contractorRegions === null || contractorRegions.length > 0;
+    const qualityOk =
+      qualityRegions === null || qualityRegions.length > 0;
 
     const orders = procOk ? await this.ordersSection(procScope, p.region_id ?? null) : null;
     const adv = whOk ? await this.filters.fromQuery("dashboard", q) : null;
@@ -104,6 +113,9 @@ export class DashboardOpsService {
       : null;
     const score = contractorsOk
       ? scorecardSummary((await this.perf.reportData()).items)
+      : null;
+    const quality = qualityOk
+      ? await this.qualitySection(qualityScope, p.region_id ?? null)
       : null;
 
     return {
@@ -156,6 +168,12 @@ export class DashboardOpsService {
           with_gaps: permits?.ptw.with_gaps ?? null,
           gaps: permits?.ptw.gaps ?? null,
         },
+      },
+      quality: {
+        available: qualityOk,
+        snags: quality?.snags ?? null,
+        ncrs: quality?.ncrs ?? null,
+        first_pass_pct: quality?.first_pass_pct ?? null,
       },
       contractor_scorecard: {
         available: contractorsOk,
@@ -365,6 +383,76 @@ export class DashboardOpsService {
   }
 
   /** The open orders with their PR and PO ages, bucketed in the rules. */
+  /**
+   * The quality position (0.15.203, item 6): the snags and NCRs of the active, not cancelled sites in scope. A snag is
+   * open while its status is open, fix_uploaded or in_review; returned_open counts the open ones returned at least
+   * once (return_count over 0). An NCR is a quality record of record type ncr; it is open while it has no closed_date.
+   * The closure ages are calendar days from raised to closed, averaged over the closed ones (meanDays). The
+   * first-time acceptance is Pass over Pass + Fail of the decided inspections (result pass or fail, case and space
+   * insensitive), one decimal; the data keeps no re-inspection marker, so a re-inspected record counts like any other.
+   */
+  private async qualitySection(
+    scope: number[] | null,
+    region: number | null,
+  ): Promise<{
+    snags: { open: number; closed: number; avg_close_days: number | null; returned_open: number };
+    ncrs: { open: number; closed: number; avg_close_days: number | null };
+    first_pass_pct: number | null;
+  }> {
+    const where = (alias: string) => Prisma.sql`
+      ${scope === null ? Prisma.empty : Prisma.sql`AND ${Prisma.raw(alias)}.region_id = ANY(${scope}::int[])`}
+      ${region ? Prisma.sql`AND ${Prisma.raw(alias)}.region_id = ${region}` : Prisma.empty}`;
+    const snagCounts = await this.db.tx.$queryRaw<
+      { open: number; closed: number; returned_open: number }[]
+    >(Prisma.sql`
+      SELECT count(*) FILTER (WHERE sn.status::text IN ('open', 'fix_uploaded', 'in_review'))::int AS open,
+             count(*) FILTER (WHERE sn.status::text = 'closed')::int AS closed,
+             count(*) FILTER (WHERE sn.status::text IN ('open', 'fix_uploaded', 'in_review') AND sn.return_count > 0)::int AS returned_open
+      FROM snags sn
+      JOIN sites s ON s.id = sn.site_id AND s.region_id = sn.region_id
+      WHERE s.is_active AND s.overall_status <> 'cancelled' AND sn.status::text <> 'cancelled' ${where('sn')}`);
+    const snagAges = await this.db.tx.$queryRaw<{ days: number | null }[]>(Prisma.sql`
+      SELECT (sn.closed_at::date - sn.raised_at::date)::int AS days
+      FROM snags sn
+      JOIN sites s ON s.id = sn.site_id AND s.region_id = sn.region_id
+      WHERE s.is_active AND s.overall_status <> 'cancelled' AND sn.status::text = 'closed'
+        AND sn.closed_at IS NOT NULL ${where('sn')}`);
+    const ncrCounts = await this.db.tx.$queryRaw<
+      { open: number; closed: number; avg_close_days: number | null }[]
+    >(Prisma.sql`
+      SELECT count(*) FILTER (WHERE q.closed_date IS NULL)::int AS open,
+             count(*) FILTER (WHERE q.closed_date IS NOT NULL)::int AS closed,
+             avg((q.closed_date - q.raised_date)::int) FILTER (WHERE q.closed_date IS NOT NULL AND q.raised_date IS NOT NULL) AS avg_close_days
+      FROM quality_inspections q
+      JOIN sites s ON s.id = q.site_id AND s.region_id = q.region_id
+      WHERE s.is_active AND s.overall_status <> 'cancelled' AND lower(btrim(q.record_type)) = 'ncr' ${where('q')}`);
+    const decided = await this.db.tx.$queryRaw<{ pass: number; fail: number }[]>(Prisma.sql`
+      SELECT count(*) FILTER (WHERE lower(btrim(q.result)) = 'pass')::int AS pass,
+             count(*) FILTER (WHERE lower(btrim(q.result)) = 'fail')::int AS fail
+      FROM quality_inspections q
+      JOIN sites s ON s.id = q.site_id AND s.region_id = q.region_id
+      WHERE s.is_active AND s.overall_status <> 'cancelled' AND lower(btrim(q.result)) IN ('pass', 'fail') ${where('q')}`);
+    const sc = snagCounts[0] ?? { open: 0, closed: 0, returned_open: 0 };
+    const nc = ncrCounts[0] ?? { open: 0, closed: 0, avg_close_days: null };
+    const dc = decided[0] ?? { pass: 0, fail: 0 };
+    return {
+      snags: {
+        open: sc.open,
+        closed: sc.closed,
+        avg_close_days: meanDays(
+          snagAges.map((r) => r.days).filter((d): d is number => d !== null),
+        ),
+        returned_open: sc.returned_open,
+      },
+      ncrs: {
+        open: nc.open,
+        closed: nc.closed,
+        avg_close_days: nc.avg_close_days === null ? null : Math.round(Number(nc.avg_close_days) * 10) / 10,
+      },
+      first_pass_pct: firstPassPct(dc.pass, dc.fail),
+    };
+  }
+
   private async ordersSection(
     scope: number[] | null,
     region: number | null,

@@ -35,7 +35,7 @@ const MIME: Record<string, string> = {
   mov: 'video/quicktime',
 };
 const IMAGE = new Set(['jpg', 'png', 'gif', 'webp', 'tiff', 'heic', 'svg']);
-// Item 14 (2026-11-27): short field videos (Procore Quick Capture); a video is never an image.
+// Item 14 (2026-11-27): short field videos (item 14 of the 2026-11-27 batch); a video is never an image.
 const VIDEO = new Set(['webm', 'mp4', 'mov']);
 const MP4_BRANDS = new Set(['isom', 'iso2', 'iso5', 'mp41', 'mp42', 'avc1', 'mmp4', 'm4v ', 'qt  ']);
 

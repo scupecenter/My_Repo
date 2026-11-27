@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 /**
- * Draw arrows and circles on a photo before it uploads (item 14, Procore Quick Capture). The marks burn into a PNG copy; the original
+ * Draw arrows and circles on a photo before it uploads (item 14 of the 2026-11-27 batch). The marks burn into a PNG copy; the original
  * file is untouched. No EXIF is kept on the copy, so the server treats it as any photo without EXIF (the unknown-capture-date flag, Q132).
  * Pointer Events only, no animation (reduced-motion safe); the same drag works with touch and mouse, in both directions (RTL included).
  */

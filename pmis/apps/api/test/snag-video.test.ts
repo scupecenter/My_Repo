@@ -7,7 +7,7 @@ import { G, regCell } from './reg-helpers';
 import { type Actor, actor, makeSite } from './wf-helpers';
 
 /**
- * Item 14 of the 2026-11-27 PM-platforms research (Procore Quick Capture): a short field video uploads through the snag photo path when the
+ * Item 14 of the 2026-11-27 batch: a short field video uploads through the snag photo path when the
  * snag type lists the format (sniff learns webm / mp4 / mov; a video is never an image and carries no EXIF, so it lands with the
  * unknown-capture-date flag, per Q132). The formats list still gates: a video of a type that does not list it is refused.
  * Region 6 on the shared database; the suite makes its own snag types and sites, so parallel files cannot break it.

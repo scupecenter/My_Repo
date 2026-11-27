@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 /**
- * Voice dictation for a short field text (item 14 of the 2026-11-27 research, Procore Quick Capture): the browser's speech recognition
+ * Voice dictation for a short field text (item 14 of the 2026-11-27 batch): the browser's speech recognition
  * appends to the field, in the page's language. Renders nothing where the browser has no speech recognition. No audio leaves the usual
  * browser service choice of the device; nothing is stored by this component.
  */

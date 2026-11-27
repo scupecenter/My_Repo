@@ -16,7 +16,7 @@ import { DbService } from '../db/db.service';
 import { MailMessage, MailPort } from '../mail/mail.port';
 import { sendQuietly } from '../mail/noop-mail';
 import { UI_BRANDS, UiBrand } from '../settings/ui-identity.service';
-import { uiPrefsSchema, UiPrefs } from '../settings/ui-prefs';
+import { profileUiPrefsSchema, ProfileUiPrefs, UiPrefs } from '../settings/ui-prefs';
 import { DepartmentRef, UserRef, UsersRepo } from '../users/users.repo';
 
 /**
@@ -39,8 +39,8 @@ const profilePatchSchema = z.object({
   locale: z.enum(['en', 'ar']).optional(),
   theme: z.enum(['light', 'dark']).optional(),
   ui_brand: z.enum(UI_BRANDS).nullable().optional(),
-  /** 0241: a subset of the appearance dimensions (owner approval 2026-11-27, proposal items 1-3); each with one of ui_pref_options(). */
-  ui_prefs: uiPrefsSchema.optional(),
+  /** 0241: a subset of the appearance dimensions (owner approval 2026-11-27, proposal items 1-3); each with one of ui_pref_options(). 0197 (item 4): the key `sidebar` (the personal side menu) sits next to them. */
+  ui_prefs: profileUiPrefsSchema.optional(),
 }).strict();
 
 /** PATCH /me/preferences (the language and theme buttons of the top bar): no If-Match, the last click wins. */
@@ -119,8 +119,8 @@ export interface ProfileDto {
   ui_brand: UiBrand | null;
   /** 0130: the design the user sees (their own while the admin allows a choice, else the default). */
   brand: UiBrand;
-  /** 0241: the stored personal appearance choices; {} = the organization defaults. */
-  ui_prefs: UiPrefs;
+  /** 0241: the stored personal appearance choices; {} = the organization defaults. 0197: may carry the key `sidebar` (the personal side menu). */
+  ui_prefs: ProfileUiPrefs;
   /** 0241: the appearance the user sees (ui_effective_prefs: own choices, else the organization defaults). */
   appearance: UiPrefs;
   /** 0130: the organization default and whether a personal design is allowed (the profile shows the choice or a note). */
@@ -293,8 +293,9 @@ export class ProfileService {
         errors: [{ path: '/ui_brand', code: 'brand_choice_locked', message: 'The administrator does not allow a personal design.' }],
       });
     }
-    // 0241: a personal appearance while the admin set one design for everyone (the database refuses it too)
-    if (body.ui_prefs != null && !(await this.identity()).allow_user_choice) {
+    // 0241: a personal appearance while the admin set one design for everyone (the database refuses it too). 0197: a sidebar-only change
+    // stays allowed - the sidebar is not an appearance dimension.
+    if (body.ui_prefs != null && Object.keys(body.ui_prefs).some((k) => k !== 'sidebar') && !(await this.identity()).allow_user_choice) {
       throw new ProblemException(403, 'field_read_only', {
         detail: 'The administrator set one design for everyone, so you cannot choose your own appearance.',
         errors: [{ path: '/ui_prefs', code: 'appearance_choice_locked', message: 'The administrator does not allow a personal appearance.' }],

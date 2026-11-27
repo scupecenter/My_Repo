@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 /**
- * A short field video for a snag (item 14, Procore Quick Capture): the camera records in the browser (MediaRecorder, webm; mp4 where the
+ * A short field video for a snag (item 14 of the 2026-11-27 batch): the camera records in the browser (MediaRecorder, webm; mp4 where the
  * browser prefers it), a cap keeps the clip short, and the clip uploads through the snag photo path like any photo. Rendered only where the
  * snag type lists a video format; where the browser cannot record, the button stays but a click explains instead of failing silently.
  */
