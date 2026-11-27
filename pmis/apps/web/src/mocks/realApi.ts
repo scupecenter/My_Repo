@@ -97,6 +97,7 @@ export const REAL_API_AUTH_USERS = [
   // Contract 0.4.6: the Responsibility Matrix, stage rows and the register and Dismantle rows (apps/api: matrix; migration 0020).
   ['get', '/matrix'],
   ['patch', '/matrix'],
+  ['get', '/matrix/coverage'],
   // Contract 0.4.5: the register framework and its first four registers (apps/api: registers; migration 0019), every action the API implements.
   ['get', '/registers'],
   ['get', '/registers/:key/records'],
