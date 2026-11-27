@@ -49,6 +49,7 @@ info:
     - 0.15.300 (2026-11-27): Content-Security-Policy report endpoint (SEC-3 of the phase 1 security review; no migration; CHANGELOG CspReport). Additive. New public `POST /csp-report`: browsers post violation reports of the policy nginx sends (report-only by default). Answers 204 with no body, accepts `application/csp-report` and `application/reports+json`, 16 KB at most, 429 above 30 per minute per address. It reads nothing from the database and changes nothing; it logs a short sanitised line. No permission change.
     - 0.15.260 (2026-11-27): cross-register derive (migration 0363, mirror `db/sql/362_derive_rules.sql`; owner approval 2026-11-27). Additive. New `GET/PUT /settings/derive-rules` (the setting `derive.rules`: which value a register shows from another register; If-Match, reason, audited; field errors `unknown_key`, `unknown_register`, `same_register`, `unknown_field`, `duplicate`, `invalid`, `too_many`). `RegisterRecord.derived` carries the derived values of the record by output name; `procurement_contractor` of GECOL and HLC is now the seeded rule and keeps its shape. A derived value is computed on read from the configured source field of the matching source record only (never the record), needs no permission on the source register, is shown only for target records the caller may read, and each person's first read of a rule in 10 minutes is audited (`derive_disclosed`). No grant, role or permission change.
     - 0.15.225 (2026-11-27): Change Control names the order and the task it affects (migration 0325; CHANGELOG ChangeControlAffected). Additive. New optional fields `procurement_order_id` (an approved, active Procurement order of the same site that the caller may see; 422 `order_not_active`, `order_other_site`, `invalid`) and `affected_task_code` (a task code of the workflow; 422 `unknown_task`), checked on a version in entry only. New `GET /registers/change_control/order-options` (the order picker; Change Control view plus Procurement view). `GET /registers/{register_key}/{entity_id}/related` also lists the change requests that name an order, so the order shows a change-pending mark. No permission change.
+    - 0.15.342 (2026-11-27): logistics depth, phase 3 (migration 0413, mirror `db/sql/412_logistics_rma.sql`). Additive. Reorder limits: `GET /warehouse/reorder-limits` (optional `below=true`) and `PUT /warehouse/reorder-limits/{item_id}` (System Admin or a delegate of warehouse.items.edit for all regions, a reason, audited; null level clears). Supplier returns (RMA): `GET /warehouse/rma`, `POST /warehouse/rma` (needs the warehouse create right) and `POST /warehouse/rma/{rma_id}/status`; tracking only, the stock still leaves quarantine through the existing returned-to-supplier exit. New schemas `ReorderLimit` and `WarehouseRma`. No permission change.
     - 0.15.244 (2026-11-27): list-value colours reach the register fields (item 15 of the improvement research, owner request 2026-11-27; no migration; CHANGELOG ListCellDisplay). Additive. `RegisterField.options[]` (and the child-list column options) gain the optional `colour` of the list value as set in Settings, Lists (#RRGGBB; absent when none). Display only: no permission, visibility, validation or stored-data change; a value keeps storing its code.
     - 0.15.242 (2026-11-27): generic if/then alert rules, notifications only (migration 0342, mirror `db/sql/341_alert_rules.sql`; CHANGELOG AlertRules; item 13 of the 2026-11-27 improvement research). Additive. A System Admin manages the rules in Settings: `GET /settings/alert-rules` (the rules plus the closed catalogues the form offers), `POST /settings/alert-rules`, `PUT /settings/alert-rules/{id}` (If-Match, a reason, audited `alert_rule_create`/`alert_rule_update`). A rule is a closed condition kind with closed params (`weekly_status_missing`: the regions without a Weekly status update of the current working week; `record_idle` `{register_key, state, days}`: the current records of the register in the state for at least days), a closed audience (`system_admin`, or `module` with a module key: the users whose assignment reaches the module) and a title/body template in English and Arabic with placeholders. The daily job fires the enabled rules: one in-app notification per recipient, deduped by (rule, period, target), in the recipient's language; a rule never changes a record, a state or a holder. `NotificationKind` gains `alert_rule` (in-app only).
     - 0.15.203 (2026-11-27): the dashboard follow-up sections, quality snags and NCR (owner approval 2026-11-26, dashboard proposals item 6; migration 0304). Additive and read only. `GET /dashboard/ops` gains the section `quality` (`DashboardOpsQuality`): the open snags and NCRs of the in-scope sites, the average closure age of each, and the first-time acceptance rate (the decided inspections whose result is Pass). The section needs the quality view and answers available false without it. The dashboard settings catalogue gains the card `ops_quality`. No grant, role or permission change.
@@ -14714,6 +14715,145 @@ paths:
         '404': {$ref: '#/components/responses/NotFound'}
         '412': {$ref: '#/components/responses/PreconditionFailed'}
         '422': {$ref: '#/components/responses/Unprocessable'}
+  /warehouse/reorder-limits:
+    get:
+      tags: [warehouse]
+      operationId: listReorderLimits
+      summary: Items with a reorder limit and whether the available stock is at or under it (contract 0.15.342)
+      parameters:
+      - {name: below, in: query, required: false, schema: {type: string, enum: ['true']}, description: 'Only the items at or under their level.'}
+      responses:
+        '200':
+          description: The items that have a limit.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: '#/components/schemas/ReorderLimit'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /warehouse/reorder-limits/{item_id}:
+    parameters:
+    - {name: item_id, in: path, required: true, schema: {type: string, format: uuid}}
+    put:
+      tags: [warehouse]
+      operationId: putReorderLimit
+      summary: Set or clear the reorder limit of an item (System Admin or a delegate of warehouse.items.edit for all regions)
+      description: '`reorder_level` null clears the limit. `If-Match` is optional (the first setting has no version); a stale version answers 412. Audited with a reason.'
+      x-db-path: admin_save_reorder_limit
+      parameters:
+      - {name: If-Match, in: header, required: false, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - {$ref: '#/components/schemas/WithReason'}
+              - type: object
+                required: [reorder_level]
+                properties:
+                  reorder_level: {type: [number, 'null'], minimum: 0}
+                  reorder_qty: {type: [number, 'null'], exclusiveMinimum: 0}
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema: {type: object, additionalProperties: true}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /warehouse/rma:
+    get:
+      tags: [warehouse]
+      operationId: listWarehouseRma
+      summary: Supplier returns (RMA), newest first (contract 0.15.342)
+      parameters:
+      - {name: status, in: query, required: false, schema: {type: string, enum: [sent, replaced, credited, rejected, closed]}}
+      responses:
+        '200':
+          description: Up to 500 supplier returns.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: '#/components/schemas/WarehouseRma'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+    post:
+      tags: [warehouse]
+      operationId: createWarehouseRma
+      summary: Record a supplier return (needs the warehouse create right). Tracking only, no stock effect
+      description: 'The stock leaves quarantine through the existing "returned to supplier" quarantine exit (`POST /warehouse/quarantine-exits`); this records what the supplier does with it. `movement_id`, when given, must be such an exit. The number (`RMA-00001`...) is never reused.'
+      x-db-path: wh_rma_create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [item_id, qty, supplier, reason]
+              properties:
+                item_id: {type: string, format: uuid}
+                qty: {type: number, exclusiveMinimum: 0}
+                supplier: {type: string, minLength: 1, maxLength: 200}
+                reason: {type: string, minLength: 3, maxLength: 1000}
+                movement_id: {type: [string, 'null'], format: uuid}
+                sent_on: {type: string, format: date}
+      responses:
+        '201':
+          description: Recorded.
+          content:
+            application/json:
+              schema: {type: object, additionalProperties: true}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /warehouse/rma/{rma_id}/status:
+    parameters:
+    - {name: rma_id, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      tags: [warehouse]
+      operationId: setWarehouseRmaStatus
+      summary: Move a supplier return on (sent, then replaced, credited or rejected, then closed)
+      x-db-path: wh_rma_set_status
+      parameters:
+      - {name: If-Match, in: header, required: false, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [status]
+              properties:
+                status: {type: string, enum: [replaced, credited, rejected, closed]}
+                note: {type: string, maxLength: 1000}
+      responses:
+        '200':
+          description: Updated.
+          content:
+            application/json:
+              schema: {type: object, additionalProperties: true}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
   /warehouse/config-gaps:
     get:
       tags: [warehouse]
@@ -25788,6 +25928,40 @@ components:
         short_lines: { type: integer }
         pending_lines: { type: integer }
         lines: { type: array, items: { $ref: '#/components/schemas/SiteDispatchLine' }, description: 'Only on GET /warehouse/dispatch-status/{site_id}.' }
+    ReorderLimit:
+      type: object
+      description: '0.15.342. The reorder limit of an item and the available stock against it.'
+      required: [item_id, item_code, item_name, uom, reorder_level, reorder_qty, available, below_reorder, version]
+      properties:
+        item_id: {type: string, format: uuid}
+        item_code: {type: string}
+        item_name: {type: string}
+        uom: {type: [string, 'null']}
+        reorder_level: {type: number}
+        reorder_qty: {type: [number, 'null']}
+        available: {type: number}
+        below_reorder: {type: boolean}
+        version: {type: integer}
+    WarehouseRma:
+      type: object
+      description: '0.15.342. A supplier return (RMA): tracking only, no stock effect.'
+      required: [id, rma_no, item_id, item_code, item_name, qty, supplier, status, reason, sent_on, version]
+      properties:
+        id: {type: string, format: uuid}
+        rma_no: {type: string}
+        item_id: {type: string, format: uuid}
+        item_code: {type: string}
+        item_name: {type: string}
+        qty: {type: number}
+        supplier: {type: string}
+        status: {type: string, enum: [sent, replaced, credited, rejected, closed]}
+        reason: {type: string}
+        movement_id: {type: [string, 'null'], format: uuid}
+        sent_on: {type: string, format: date}
+        resolved_on: {type: [string, 'null'], format: date}
+        resolution_note: {type: [string, 'null']}
+        version: {type: integer}
+        created_at: {type: string, format: date-time}
     RegionVendor:
       type: object
       required: [region_id, wl_vendor, version]
