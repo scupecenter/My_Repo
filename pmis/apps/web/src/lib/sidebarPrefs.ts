@@ -2,7 +2,7 @@ import type { components } from '@/api/schema';
 import type { Layout, NavSub } from './navLayout';
 
 /**
- * The personal sidebar (owner approval 2026-11-27, the PM-platforms proposal item 4; migration 0242, contract 0.15.231).
+ * The personal sidebar (owner approval 2026-11-27, the improvement proposal item 4; migration 0242, contract 0.15.231).
  * The choices save in the profile (ui_prefs.sidebar), so they follow the user to every device; the organization layout and the
  * server's permission list still apply first, the overlay only hides screens, reorders them inside their heading, restyles the
  * badges and pins shortcuts.
