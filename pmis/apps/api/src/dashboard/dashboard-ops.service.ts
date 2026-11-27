@@ -24,6 +24,7 @@ import {
   ptwCheckGaps,
   receivePct,
   scorecardSummary,
+  compareContractors,
 } from "./dashboard-ops.rules";
 
 interface OrderAges {
@@ -149,9 +150,8 @@ export class DashboardOpsService {
     const hlc = hlcOk
       ? await this.hlcSection(hlcScope, p.region_id ?? null)
       : null;
-    const score = contractorsOk
-      ? scorecardSummary((await this.perf.reportData()).items)
-      : null;
+    const perfItems = contractorsOk ? (await this.perf.reportData()).items : null;
+    const score = perfItems ? scorecardSummary(perfItems) : null;
     const quality = qualityOk
       ? await this.qualitySection(qualityScope, p.region_id ?? null)
       : null;
@@ -233,6 +233,11 @@ export class DashboardOpsService {
         waiting: approvals?.waiting ?? null,
         by_role: approvals?.by_role ?? null,
         unassigned: approvals?.unassigned ?? null,
+      },
+      // 0.15.207 (item 10): the contractors side by side (the regions are compared by the page from the dashboard regions)
+      compare: {
+        available: contractorsOk,
+        contractors: perfItems ? compareContractors(perfItems) : null,
       },
       finance: {
         available: financeOk,

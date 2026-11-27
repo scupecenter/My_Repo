@@ -416,3 +416,34 @@ export function financeSummary(rows: AdvanceRow[]): FinanceSummary {
     },
   };
 }
+
+// ---------------------------------------------------------------- item 10 (0.15.207): comparison of regions and contractors
+
+export interface CompareContractor {
+  party_id: string;
+  name: string;
+  type: string;
+  level: ScorecardLevel;
+  delay_days: number;
+  snags_open: number;
+  snags_overdue: number;
+  quality_total: number;
+  quality_failed: number;
+  quality_fail_pct: number | null;
+}
+
+/** The parties side by side, in the report order (worst first), at most `limit`; no amounts anywhere. */
+export function compareContractors(items: ScorecardItem[], limit = 10): CompareContractor[] {
+  return items.slice(0, limit).map((it) => ({
+    party_id: it.party_id,
+    name: it.name,
+    type: it.type,
+    level: it.level,
+    delay_days: it.delay_days,
+    snags_open: it.snags.open,
+    snags_overdue: it.snags.overdue,
+    quality_total: it.quality.total,
+    quality_failed: it.quality.failed,
+    quality_fail_pct: it.quality.total > 0 ? Math.round((it.quality.failed * 1000) / it.quality.total) / 10 : null,
+  }));
+}

@@ -423,6 +423,7 @@ const DASH_CATALOGUE = {
     { code: 'ops_approvals', label_en: 'Pending approvals: waiting review or approval, ages per role', label_ar: 'الموافقات المعلقة: بانتظار المراجعة أو الاعتماد، الأعمار حسب الدور' },
     { code: 'ops_changes', label_en: 'Change requests and overdue meeting actions', label_ar: 'طلبات التغيير وبنود الاجتماعات المتأخرة' },
     { code: 'ops_finance', label_en: 'Restricted financial summary: advances and disbursed against completion', label_ar: 'ملخص مالي مقيّد: السلف والمنصرف مقابل الإنجاز' },
+    { code: 'ops_compare', label_en: 'Comparison: regions and contractors side by side', label_ar: 'مقارنة المناطق والمقاولين جنباً إلى جنب' },
   ],
 };
 const dashSeedThresholds = Object.fromEntries(DASH_CATALOGUE.kpis.map((k) => [k.code, { green: k.default_green, amber: k.default_amber }]));
