@@ -15,9 +15,9 @@ const fdate=d=>d?`<span class="mono">${esc(d)}</span>`:'<span class="mute">—</
 const PMAP={1001:'admin',1102:'approve',1103:'entry',1203:'approve',1204:'review',1205:'entry',1206:'entry',1207:'entry',1305:'approve',1306:'entry',1307:'entry',1407:'view',1508:'admin',1509:'entry'};
 USERS.forEach(u=>{if(u.role==='Site Engineers')u.role=u.sub==='CW Team Lead'?'Site Engineers (CW)':'Site Engineers (TE)';u.perm=PMAP[u.id];u.status='Active';u.team=u.id.startsWith('13')?'TE':u.id.startsWith('12')?'CW':'—';u.modules='all';if(u.regions!=='all')u.regions=[...u.regions]});
 USERS.find(u=>u.id==='1203').team='CW';USERS.find(u=>u.id==='1001').team='CW + TE';
-USERS.push({id:'1999',name:'Noor Hadi',role:'—',regions:[],c:'#6b6b6b',perm:'view',status:'Pending',team:'—',modules:[],m365:true});
-USERS.push({id:'1210',name:'Hana Zidan',role:'—',regions:[],c:'#7a6a55',perm:'view',status:'Pending',team:'—',modules:[],m365:true});
-USERS.push({id:'1211',name:'Wael Saadi',role:'—',regions:[],c:'#557a6a',perm:'view',status:'Pending',team:'—',modules:[],m365:true});
+USERS.push({id:'1999',name:'Demo User 25',role:'—',regions:[],c:'#6b6b6b',perm:'view',status:'Pending',team:'—',modules:[],m365:true});
+USERS.push({id:'1210',name:'Demo User 12',role:'—',regions:[],c:'#7a6a55',perm:'view',status:'Pending',team:'—',modules:[],m365:true});
+USERS.push({id:'1211',name:'Demo User 13',role:'—',regions:[],c:'#557a6a',perm:'view',status:'Pending',team:'—',modules:[],m365:true});
 /* role assignments: many-to-many; each row has its own permission, regions, modules, validity */
 const ROLE_PARENT={'RF Engineer':ROLES6[1],'MW Engineer':ROLES6[1],'Acquisition Team':ROLES6[1],'Power Engineer':ROLES6[2],'GECOL Power Team':ROLES6[2],'HLC Fiber Team':ROLES6[2],'Site Engineers (CW)':ROLES6[2],'Site Engineers (TE)':ROLES6[3],'HOTO Engineer':ROLES6[3],'Project Procurement Team':ROLES6[5]};
 const ROLE_LIST=[...ROLES6,...Object.keys(ROLE_PARENT)];

@@ -72,7 +72,8 @@ export function SavedViews<F>({ screen, value, onApply, empty, table, sort, onSo
   return (
     <div className="flex flex-wrap items-center gap-2" data-testid="saved-views" data-screen={screen}>
       <Bookmark size={14} aria-hidden className="text-mute" />
-      <select className="input w-auto" aria-label={t('savedViews.label')} data-testid="views-select" value={cur}
+      <ViewTabs screen={screen} cur={cur} items={items} onPick={(id) => { setCur(id); apply(items.find((x) => x.id === id)); }} />
+      <select className="input w-auto md:hidden" aria-label={t('savedViews.label')} data-testid="views-select" value={cur}
         onChange={(e) => { setCur(e.target.value); apply(items.find((x) => x.id === e.target.value)); }}>
         <option value="">{t('savedViews.default')}</option>
         {!!mine.length && <optgroup label={t('savedViews.mine')}>{mine.map((v) => <option key={v.id} value={v.id}>{v.name}{v.shared ? ` · ${t('savedViews.shared_mark')}` : ''}</option>)}</optgroup>}
@@ -93,6 +94,37 @@ export function SavedViews<F>({ screen, value, onApply, empty, table, sort, onSo
         onSave={(audience, reason) => ops.update.mutate({ view: sharing, patch: { audience, ...(reason ? { reason } : {}) } }, { onSuccess: () => { setSharing(null); toast(t('savedViews.share_saved')); }, onError: fail })} busy={ops.update.isPending} />}
       {handing && <TransferDialog view={handing} onClose={() => setHanding(null)} busy={ops.transfer.isPending}
         onSave={(owner, reason) => ops.transfer.mutate({ view: handing, owner_id: owner, reason }, { onSuccess: () => { setHanding(null); setCur(''); toast(t('savedViews.transferred')); }, onError: fail })} />}
+    </div>
+  );
+}
+
+/**
+ * Saved views as tabs (item 3, Monday and ClickUp style): the default view first, then my views, then the views shared with me. Arrow keys, Home and End move
+ * between tabs (the direction follows the page, so RTL mirrors). On a narrow screen the select above shows instead, so nothing is lost. A shared view
+ * shows its owner in the tooltip. Same state as the select: choosing a tab applies the view.
+ */
+function ViewTabs({ screen, cur, items, onPick }: { screen: string; cur: string; items: SavedView[]; onPick: (id: string) => void }) {
+  const { t } = useTranslation();
+  const tabs = [{ id: '', label: t('savedViews.default'), title: '' }, ...items.filter((v) => v.is_owner).map((v) => ({ id: v.id, label: v.name, title: v.shared ? t('savedViews.shared_mark') : '' })), ...items.filter((v) => !v.is_owner).map((v) => ({ id: v.id, label: v.name, title: v.owner.display_name }))];
+  const move = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const rtl = document.documentElement.dir === 'rtl';
+    const at = tabs.findIndex((x) => x.id === cur);
+    const next = e.key === 'Home' ? 0 : e.key === 'End' ? tabs.length - 1 : e.key === (rtl ? 'ArrowLeft' : 'ArrowRight') ? (at + 1) % tabs.length : e.key === (rtl ? 'ArrowRight' : 'ArrowLeft') ? (at - 1 + tabs.length) % tabs.length : -1;
+    if (next < 0) return;
+    e.preventDefault();
+    const id = tabs[next]!.id;
+    onPick(id);
+    requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-testid="views-tab-${screen}-${id || 'default'}"]`)?.focus());
+  };
+  return (
+    <div role="tablist" aria-label={t('savedViews.label')} data-testid="views-tabs" className="hidden max-w-full items-center gap-1 overflow-x-auto md:flex" onKeyDown={move}>
+      {tabs.map((x) => (
+        <button key={x.id || 'default'} type="button" role="tab" aria-selected={cur === x.id} tabIndex={cur === x.id ? 0 : -1} title={x.title || undefined}
+          data-testid={`views-tab-${screen}-${x.id || 'default'}`} onClick={() => onPick(x.id)}
+          className={`transition-colors motion-reduce:transition-none whitespace-nowrap rounded-md border px-3 py-1 text-sm ${cur === x.id ? 'border-accent bg-accentSoft font-semibold text-accentText' : 'border-line text-mute hover:border-mute hover:text-ink'}`}>
+          {x.label}
+        </button>
+      ))}
     </div>
   );
 }

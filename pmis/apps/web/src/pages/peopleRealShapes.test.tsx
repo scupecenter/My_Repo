@@ -26,7 +26,7 @@ describe('bulk assign by role', () => {
     await signIn('pm'); await stepUpDone();
     const u = userEvent.setup();
     const dlg = await openAssign(u);
-    await u.type(within(dlg).getByTestId('assign-people-search'), 'ar');
+    await u.type(within(dlg).getByTestId('assign-people-search'), 'Demo User 1');
     await u.click(await within(dlg).findByTestId('assign-people-add-all'));
     const n = Number(/\d+/.exec(within(dlg).getByTestId('assign-people-count').textContent ?? '')?.[0]);
     expect(n).toBeGreaterThan(1);
@@ -51,7 +51,7 @@ describe('bulk assign by role', () => {
     await signIn('pm'); await stepUpDone();
     const u = userEvent.setup();
     const dlg = await openAssign(u);
-    await u.type(within(dlg).getByTestId('assign-people-search'), 'Ahmed');
+    await u.type(within(dlg).getByTestId('assign-people-search'), 'Demo');
     await u.click(await within(dlg).findByTestId('assign-people-opt-1001'));
     await u.click(within(dlg).getByTestId('assign-preview'));
     expect(await within(dlg).findByTestId('assign-preview-fails-self_beneficiary')).toBeInTheDocument();
@@ -63,7 +63,7 @@ describe('bulk assign by role', () => {
     server.use(http.post(`${API_BASE}/assignments/bulk-assign`, () => problem(422, 'validation_failed', { errors: [{ path: '/user_ids', code: 'too_many_rows' }] })));
     const u = userEvent.setup();
     const dlg = await openAssign(u);
-    await u.type(within(dlg).getByTestId('assign-people-search'), 'Mona');
+    await u.type(within(dlg).getByTestId('assign-people-search'), 'Demo');
     await u.click(await within(dlg).findByTestId('assign-people-opt-1102'));
     await u.click(within(dlg).getByTestId('assign-preview'));
     expect(await within(dlg).findByTestId('assign-dialog-error')).toHaveTextContent('Too many rows');

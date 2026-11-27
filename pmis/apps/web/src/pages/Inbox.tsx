@@ -1,5 +1,5 @@
 import * as Popover from '@radix-ui/react-popover';
-import { AtSign, BellRing, CheckCheck, Clock3, ExternalLink, Eye, EyeOff, Info } from 'lucide-react';
+import { AtSign, BellRing, CheckCheck, Clock3, ExternalLink, Eye, EyeOff, Flag, Info } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -12,6 +12,7 @@ import { TaskDrawer } from '@/components/TaskDrawer';
 import { useToast } from '@/components/Toast';
 import { fmtDateTime } from '@/lib/time';
 import { tripoliToday } from '@/lib/today';
+import { byPriority, isPriority } from '@/lib/inboxPriority';
 import { notificationTarget, snoozeDate } from '@/lib/x';
 
 const KINDS = ['mention', 'followed_change', 'task_assigned', 'task_returned', 'task_rejected', 'task_approved', 'approval_due', 'reassigned', 'absence_alert', 'idle_task_alert', 'no_holder', 'system'] as const;
@@ -51,7 +52,10 @@ export function Inbox() {
   const setF = (kv: Record<string, string>) => setSp((p) => { const n = new URLSearchParams(p); for (const [k, v] of Object.entries(kv)) { if (v) n.set(k, v); else n.delete(k); } return n; }, { replace: true });
   const q = useInbox(filter);
   const ops = useNotificationOps();
-  const items = q.data?.pages.flatMap((p) => p.items) ?? [];
+  const priorityOnly = sp.get('priority') === '1';
+  const loaded = q.data?.pages.flatMap((p) => p.items) ?? [];
+  const priorityCount = loaded.filter((n) => isPriority(n.kind)).length;
+  const items = priorityOnly ? loaded.filter((n) => isPriority(n.kind)) : byPriority(loaded);
   const unread = q.data?.pages[0]?.unread_count ?? 0;
   const taskId = sp.get('task');
   const fail = (e: unknown) => toast(errText(e, t), 'err');
@@ -73,6 +77,9 @@ export function Inbox() {
                 className={`px-3 py-1.5 text-sm ${(filter.unread ? '1' : '') === v ? 'bg-accentSoft font-semibold text-accentText' : 'bg-card text-mute hover:bg-hover'}`}>{t(k)}</button>
             ))}
           </div>
+          <button type="button" className={`btn ${priorityOnly ? 'bg-accentSoft font-semibold text-accentText' : ''}`} aria-pressed={priorityOnly} data-testid="inbox-priority-only" onClick={() => setF({ priority: priorityOnly ? '' : '1' })}>
+            <Flag size={14} aria-hidden />{t('inbox.priority_only')}{priorityCount > 0 && <span className="chip bg-card2" data-testid="inbox-priority-count">{priorityCount}</span>}
+          </button>
           <select className="input w-auto" aria-label={t('inbox.snoozed')} data-testid="inbox-snoozed" value={filter.snoozed} onChange={(e) => setF({ snoozed: e.target.value === 'hide' ? '' : e.target.value })}>
             {(['hide', 'only', 'include'] as const).map((x) => <option key={x} value={x}>{t(`inbox.snoozed_${x}`)}</option>)}
           </select>
@@ -85,7 +92,7 @@ export function Inbox() {
       />
       {q.isLoading ? <LoadingSkeleton testid="inbox-loading" />
         : q.isError ? <ErrorState onRetry={() => void q.refetch()} testid="inbox-error" />
-        : !items.length ? <EmptyState testid="inbox-empty" title={t(filter.unread ? 'inbox.empty_unread' : 'inbox.empty')} hint={t('inbox.empty_hint')} />
+        : !items.length ? <EmptyState testid="inbox-empty" title={t(priorityOnly ? 'inbox.empty_priority' : filter.unread ? 'inbox.empty_unread' : 'inbox.empty')} hint={t('inbox.empty_hint')} />
         : (
           <ul className="card divide-y divide-line" data-testid="inbox-list">
             {items.map((n) => (
@@ -95,6 +102,7 @@ export function Inbox() {
                   <button type="button" className={`text-start ${n.read_at ? '' : 'font-semibold'}`} data-testid={`inbox-open-${n.id}`} onClick={() => open(n)}>{n.title}</button>
                   {n.body && <p className="text-sm text-mute">{n.body}</p>}
                   <p className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-mute">
+                    {isPriority(n.kind) && <span className="chip bg-lateBg text-lateInk" data-testid={`inbox-priority-${n.id}`}><Flag size={12} aria-hidden />{t('inbox.priority')}</span>}
                     <span className="chip bg-card2">{t(`inbox.kind_${n.kind}`, { defaultValue: n.kind })}</span>
                     <span>{fmtDateTime(n.created_at, i18n.language)}</span>
                     {n.snoozed_until && <span className="chip bg-waitBg text-waitInk" data-testid={`inbox-snoozed-chip-${n.id}`}>{t('inbox.snoozed_until', { date: fmtDateTime(n.snoozed_until, i18n.language) })}</span>}

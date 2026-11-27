@@ -4,7 +4,7 @@
 - Related: CLAUDE.md "Two-factor authentication", "Users & Roles screen"; stories AU-01, AU-02, AU-07, AU-08, AU-09.
 
 ## Context
-- Only Aljeel employees sign in, through Microsoft 365 (Entra ID). External parties never sign in.
+- Only Company employees sign in, through Microsoft 365 (Entra ID). External parties never sign in.
 - Each account is linked once to a 4-digit employee ID, and it stays "Pending assignment" until an admin assigns it.
 - MFA is enforced by Entra Conditional Access. The API checks the `amr` claim behind an admin toggle that is off until IT enables MFA.
 - Step-up re-authentication is required for final approval, role, matrix and group changes, delegation, deletes, and admin overrides.
@@ -20,7 +20,7 @@
    - Reason: there are no tokens in browser storage and logout is simple. Step-up and the `amr` check happen on the server, in one place.
 2. **Token validation at login.** The ID token must pass all of these checks; otherwise sign-in is refused with HTTP 401 and a System Log entry (AU-02):
    - `iss`, `aud`, signature and expiry are valid;
-   - `tid` equals the configured Aljeel tenant;
+   - `tid` equals the configured Company tenant;
    - `oid` is present.
    The user is matched on `oid` (stored as `users.m365_object_id`) and never on email.
 3. **MFA toggle.** The setting `require_mfa` (default `false`) is checked at login and at step-up. When it is on and `amr` lacks `mfa`, sign-in fails with 401 and `code = mfa_required`. The session stores the `amr` value it was created with, so the audit log can show an "MFA" chip.
@@ -54,12 +54,12 @@
 8. **Future mobile app.** It will use MSAL as a public client and send bearer access tokens for a separate API scope. The contract already declares a `bearerAuth` scheme, which is not enabled in v0.1. The `amr`, tenant and step-up rules are the same.
 9. **Logout.** Logout deletes the Redis session. Single sign-out from Entra is optional: the user can be sent on to the Entra logout URL.
 9b. **Sign-in identifier (decision 2026-10-25, hardened after security review).** `GET /auth/login?identifier=` accepts an email, a 4-digit employee ID or a phone (E.164). The API resolves it in the staff registry and keeps the resolved email server-side in the OIDC state. `login_hint` is sent to Entra only when the user typed an email (passed as typed); an employee ID or phone never becomes a hint, so the redirect never discloses a registry email. Responses are identical whether or not a match is found, and the lookup is rate-limited. On callback, if the identifier resolved to a registry row, the token's `preferred_username`/`email` must equal that row's email, or the sign-in is refused and logged. Trade-off: with an ID or phone, the user types their email (or picks their account) on the Microsoft page.
-10. **Local sign-in — superseded by ADR 0012 (owner decision 2026-10-28): built now, for accounts created in GSDN Workspace, ahead of M365.** The text below was the 2026-10-25 proposal; where it differs (a row only after a first M365 sign-in, Redis sessions), ADR 0012 wins. `POST /auth/local/login` takes `{identifier, password}`, where the identifier is a 4-digit employee ID or a registered phone number (normalised to E.164). Rules:
+10. **Local sign-in — superseded by ADR 0012 (owner decision 2026-10-28): built now, for accounts created in Workspace, ahead of M365.** The text below was the 2026-10-25 proposal; where it differs (a row only after a first M365 sign-in, Redis sessions), ADR 0012 wins. `POST /auth/local/login` takes `{identifier, password}`, where the identifier is a 4-digit employee ID or a registered phone number (normalised to E.164). Rules:
    - `local_credentials(user_id, password_hash argon2id, set_at, failed_count, locked_until, totp_secret_enc?)`; a row exists only after the user's first M365 sign-in and while the user is active in the staff registry.
    - The session created is the same server-side session as M365, with `auth_method = local`. Audit rows carry the method.
    - Lockout after 5 failures for 15 minutes, rate limit per IP and per account, generic error text (no hint whether the identifier exists).
    - Revocation: a nightly job, plus a check at every sign-in, disables local sign-in when the registry row is inactive or the user is suspended. Disabling the M365 account is detected by the same job through Microsoft Graph once IT grants `User.Read.All`; until then IT must also deactivate the registry row.
-   - `require_mfa` applies to local sign-in as PMIS TOTP; the per-user MFA exemption applies to both methods.
+   - `require_mfa` applies to local sign-in as Workspace TOTP; the per-user MFA exemption applies to both methods.
    - Step-up for a local session re-asks the password (and TOTP when required), with the same 5-minute window.
    - Risk accepted by the owner: local sign-in is outside Entra Conditional Access, so Entra MFA and device policies do not apply to it.
 

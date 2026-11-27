@@ -2721,7 +2721,10 @@
     "kind_gate_closed_again": "Gate closed again",
     "kind_sla_negative_duration": "SLA data alert",
     "kind_site_region_moved": "Site moved to your region",
-    "kind_system": "System"
+    "kind_system": "System",
+    "priority": "Priority",
+    "priority_only": "Priority only",
+    "empty_priority": "Nothing needs you right now"
   },
   "tis": {
     "tab": "Time",
@@ -3117,6 +3120,36 @@
       "live": "Live, as of today",
       "snapshot": "From the snapshot of {{date}}",
       "computed": "Computed as of {{date}}"
+    },
+    "ops": {
+      "procurement_title": "Procurement and materials",
+      "procurement_hint": "Open PR/PO aging and the materials position of the visible sites. Read only.",
+      "open_register": "Open the register",
+      "open_orders": "Open orders",
+      "pr_wait": "PRs waiting for a PO/WO",
+      "po_wait": "Open PO/WOs",
+      "aging_total": "{{n}} waiting",
+      "oldest": "oldest {{n}} days",
+      "bucket": {
+        "d0_7": "0-7 days",
+        "d8_14": "8-14 days",
+        "d15_30": "15-30 days",
+        "over_30": "over 30 days"
+      },
+      "materials_title": "Materials",
+      "unavailable_orders": "You cannot see the Procurement register, so these figures are not shown.",
+      "unavailable_materials": "You cannot see the Warehouse, so the materials position is not shown.",
+      "receive_rate": "receive rate",
+      "sites_short": "Sites short on materials",
+      "no_shortage": "No material shortage on the visible sites.",
+      "top_shortages": "The biggest missing lines",
+      "col_site": "Site",
+      "col_item": "Item",
+      "col_missing": "Missing",
+      "col_contractor": "Contractor",
+      "unattributed": "Unattributed",
+      "by_contractor": "Shortage per contractor",
+      "contractor_row": "{{qty}} missing · {{lines}} lines · {{sites}} sites"
     }
   },
   "docs": {
@@ -6323,7 +6356,11 @@
     "go_m": "Messages",
     "go_l": "Workload",
     "go_r": "Status updates",
-    "note": "Shortcuts only open pages; your permissions still apply on each page."
+    "note": "Shortcuts only move and open; your permissions still apply on each page.",
+    "rows": "Next and previous row in a table",
+    "row_open": "Open the focused row",
+    "right_click": "Right-click",
+    "row_menu": "Row menu (Shift + right-click keeps the browser menu)"
   },
   "siteSummary": {
     "title": "Site summary",
@@ -6494,6 +6531,35 @@
     "holders": "active",
     "none": "No gaps in this view.",
     "open_matrix": "Open the Responsibility Matrix"
+  },
+  "timeline": {
+    "title": "Timeline",
+    "view_hint": "Sites on a date axis, read only",
+    "hint": "Pick up to {{max}} date columns. Read only: dates change through their tasks.",
+    "columns": "Date columns",
+    "no_columns": "No date columns",
+    "empty": "No dates to draw",
+    "empty_hint": "Pick another date column or widen the filters.",
+    "today": "Today",
+    "note": "{{shown}} of {{total}} loaded sites have a date in the chosen columns ({{all}} match the filters; the first 100 are drawn)."
+  },
+  "rowActions": {
+    "label": "Row actions",
+    "open": "Open",
+    "open_tab": "Open in a new tab",
+    "select": "Select",
+    "unselect": "Unselect",
+    "copy": "Copy row",
+    "copied": "Row copied"
+  },
+  "records": {
+    "pin": "Pin",
+    "unpin": "Unpin",
+    "pinned": "Pinned records",
+    "recent": "Recent records",
+    "clear": "Clear",
+    "changed": "Changed since you last opened it",
+    "pin_full": "You can pin up to {{max}} records. Unpin one first."
   },
   "postLogin": {
     "title": "Signing you in…",

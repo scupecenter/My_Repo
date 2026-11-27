@@ -1,4 +1,4 @@
-# Plan: loading the owner's "Site Master Template" file into GSDN Workspace (2026-11-04)
+# Plan: loading the owner's "Site Master Template" file into Workspace (2026-11-04)
 
 **Update 2026-11-05 (Q462):** gap G5 (no documents for the historical tasks) is decided and built as option (c) with a stricter shape: a one-time, time-boxed, System Admin only **historical-load waiver** (migration 0073, contract 0.14.3, CHANGELOG 102; `technical-decisions-2026-11-04.md`). While it is open, the admin marks the P3 apply or a stream-template batch "accept without documents"; the mandatory-document check is skipped only for rows whose actual date is on or before a cutoff date; the tasks are flagged "Admin override", audited and left out of the SLA and on-time figures like any override; the documents can be uploaded later and clear the flag. Every other check still runs, so Q351 holds for dates, gates, predecessors and holders. Step 10 of the load order (the documents of the historical tasks) is therefore optional and can follow the load.
 
@@ -16,14 +16,14 @@
 
 ## 0. Summary
 
-1. **What the file is.** It is a cut-down, values-only copy of the Site Master: 10 sheets instead of 23, holding **real data for 469 sites**. It is not blank. It has **no formulas** in any data cell (every calculated column of the reference is either empty or a pasted value), **no `_tpl` sheet** (it is not a PMIS-issued template), one **external workbook link**, and 263 broken defined names. History stops at CW PAC: every TE, On-Air, acceptance, HOTO, closure, Dismantle and Issue column of the Master sheet is empty.
+1. **What the file is.** It is a cut-down, values-only copy of the Site Master: 10 sheets instead of 23, holding **real data for 469 sites**. It is not blank. It has **no formulas** in any data cell (every calculated column of the reference is either empty or a pasted value), **no `_tpl` sheet** (it is not a Workspace-issued template), one **external workbook link**, and 263 broken defined names. History stops at CW PAC: every TE, On-Air, acceptance, HOTO, closure, Dismantle and Issue column of the Master sheet is empty.
 2. **Can it be loaded today?** No. Five blockers, in the order they are hit:
    - B1. The upload guard refuses the package because of `xl/externalLinks/` (`xlsx-guard.ts`, reason `macros_not_allowed`).
    - B2. P3 then refuses it because typed column CL is renamed ("IP Router" instead of "Indoor IP Router"), reason `structure_mismatch`.
-   - B3. **GSDN Workspace has no way to create a site** (no `POST /sites`, no site template; Q350: P3 never creates a site). With no sites, every row is `site_not_in_pmis`.
+   - B3. **Workspace has no way to create a site** (no `POST /sites`, no site template; Q350: P3 never creates a site). With no sites, every row is `site_not_in_pmis`.
    - B4. **Stage 1 has no dates** (TSSR Submitted / Approved, LLD Approved and SAR are empty or absent), so Site Release (MS1) cannot be derived. Gate W stays closed and every PRE-CW and CW row of the Master would be held `gate_locked` (Q208).
    - B5. Historical tasks carry **no documents**, and submit requires the mandatory slots (B6 layout, B7 approval email and CW DN, B8 / B9 MOS proof, B13 PAC certificate, and others).
-3. **Recommended path:** prepare the settings (section 3.1). Create the 469 sites through a new bulk "New site" template (gap G1). Load the register sheets through GSDN Workspace-issued register templates (TPL-RF, TPL-ACQ, TPL-PRM, TPL-PO, TPL-GECOL, TPL-HLC, TPL-ASB, TPL-RSK). Each upload is one batch that goes to L2. Then load the Master sheet through the P3 legacy import: preview, comparison report, apply in `submit` mode, one batch per stream, L2 decides. During the parallel run, P3 is used in preview mode only.
+3. **Recommended path:** prepare the settings (section 3.1). Create the 469 sites through a new bulk "New site" template (gap G1). Load the register sheets through Workspace-issued register templates (TPL-RF, TPL-ACQ, TPL-PRM, TPL-PO, TPL-GECOL, TPL-HLC, TPL-ASB, TPL-RSK). Each upload is one batch that goes to L2. Then load the Master sheet through the P3 legacy import: preview, comparison report, apply in `submit` mode, one batch per stream, L2 decides. During the parallel run, P3 is used in preview mode only.
 4. **Owner questions:** Q460 to Q469 (section 6).
 
 ---
@@ -37,7 +37,7 @@
 | Size | 1.07 MB zipped, 100 package parts, 7.4 MB unzipped (inside the guard limits: 500 parts, 40 MB) |
 | Macros, ActiveX, embedded objects | None |
 | External links | **1** (`xl/externalLinks/externalLink1.xml`), pointing at an `.xlsb` copy of the Master on a user's PC. No formula and no defined name uses it (it is orphaned), but the guard refuses the whole file because the part exists. |
-| `_tpl` sheet | **Absent.** The file carries no `template_id` or `version`. It is not a PMIS-issued template, so the Templates upload rejects it (CLAUDE.md "Approved templates only"; R8). Only the admin legacy path (P3, Q1) can read it. |
+| `_tpl` sheet | **Absent.** The file carries no `template_id` or `version`. It is not a Workspace-issued template, so the Templates upload rejects it (CLAUDE.md "Approved templates only"; R8). Only the admin legacy path (P3, Q1) can read it. |
 | Hidden sheets | None. All 10 sheets are visible. |
 | Hidden columns | One filter-helper column each on RF & Design (BF), Acquisition (AE), Permission Log (Q), GECOL (W), HLC (O) and PR-PO (M). They hold `SUBTOTAL` formulas only. |
 | Sheet protection | None |
@@ -115,7 +115,7 @@
 
 ---
 
-## 2. Mapping: sheet and column to PMIS target
+## 2. Mapping: sheet and column to Workspace target
 
 Legend: **site** = `sites` column. **task X.f** = `template_task_fields` row of task X (migration 0051, 0060). **reg k.f** = `register_fields` of register k. **list** = list catalogue code (0057). **calc** = calculated, never imported. **none** = no target today.
 
@@ -151,7 +151,7 @@ Legend: **site** = `sites` column. **task X.f** = `template_task_fields` row of 
 
 ### 2.2 Register sheets (no P3 path: Q352, register sheets are checked for structure only)
 
-The target template is GSDN Workspace-issued template of the register (0037). The key is its natural key (`template_definitions.match_keys`).
+The target template is Workspace-issued template of the register (0037). The key is its natural key (`template_definitions.match_keys`).
 
 **RF & Design → TPL-RF** (`rf_design`, key Site ID):
 
@@ -320,7 +320,7 @@ The importing user needs these rights:
 | 8 | Risk Register (25) | TPL-RSK | one batch → L2 Risk |
 | 9 | **Master** (CW history, 380 sites) | P3: `POST /master-import/runs` (preview) → resolve the exceptions → `POST /master-import/runs/{id}/apply` with `mode = submit`, a reason and step-up | one group, one batch per stream (only CW has data). L1 is the caller; L2 of each stage decides row by row or all at once. Held rows (gate, predecessor) are sent again when unlocked. |
 | 10 | Documents of the historical tasks | the task slots (drag and drop), by the L1 holders | each submit includes its documents (the unit of approval is the whole task). See Q462. |
-| 11 | Parallel run (1 month) | P3 preview only (never apply), weekly, with the live Master | comparison report (`/runs/{id}/export`), each difference resolved: PMIS correct, Master correct, fixed, ignored |
+| 11 | Parallel run (1 month) | P3 preview only (never apply), weekly, with the live Master | comparison report (`/runs/{id}/export`), each difference resolved: Workspace correct, Master correct, fixed, ignored |
 
 Why registers come before the Master:
 - TI-07 says so.
@@ -336,7 +336,7 @@ Why registers come before the Master:
 
 - P3 compares only the Master sheet's typed task columns (`mi_columns` typed). Identity, scope, calc, Dismantle and Issue columns are reported as `owned_elsewhere`, `calculated` or `issue_projection`, or not compared.
 - The acceptance criterion "the real Master import matches 100% of milestone dates" (CLAUDE.md Rollout) **cannot be checked against this file**: its milestone columns (V, AW, BP, BZ and the others) are empty, because the formulas were removed. The parallel run needs the live formula Master, uploaded as it is, to P3 (Q463).
-- A site created in GSDN Workspace but absent from the uploaded file is reported `site_not_in_master`. A Site ID in the file but not in GSDN Workspace is reported `site_not_in_pmis`.
+- A site created in Workspace but absent from the uploaded file is reported `site_not_in_master`. A Site ID in the file but not in Workspace is reported `site_not_in_pmis`.
 
 ### 3.4 Owner-data items of `technical-decisions-2026-11-04.md`
 
@@ -403,7 +403,7 @@ This keeps "Approved templates only": the uploaded file is the issued template w
 | Site ID shapes | two forms: two letters + three digits (434 in the Master) and the same with a space and a suffix letter (35). One RF & Design and one Acquisition key has neither shape. |
 | Site IDs not in the Master | RF & Design 6, Acquisition 6, PR-PO 14, HLC 3, GECOL 1, As-Built 1. One Master site has no Acquisition row. |
 | PR-PO | 650 rows on 398 sites (several orders per site is normal). 393 rows have neither a PR No. nor a PO No. (for example F260, F261, F262), so the natural key is incomplete and a second upload would duplicate them. 1 duplicate site + scope + PR + PO. |
-| Site references | Uplink / backup / FN references that match no Site ID: RF & Design K 12, AW 29, AX 5; Master L 10; As-Built AW 10. Primary and Secondary MFN (AY, AZ) do not use Site IDs (428 and 295 non-matching; they are free text in GSDN Workspace). |
+| Site references | Uplink / backup / FN references that match no Site ID: RF & Design K 12, AW 29, AX 5; Master L 10; As-Built AW 10. Primary and Secondary MFN (AY, AZ) do not use Site IDs (428 and 295 non-matching; they are free text in Workspace). |
 | Region consistency | 0 sites with a different region between sheets |
 
 ### 5.2 Dates
@@ -429,13 +429,13 @@ Contract No. (Acquisition T) holds a month-year shape in 388 of 408 cells (for e
 Numbers typed as text:
 - Master Q Tower Height: 11
 - RF & Design AS Building Height: 260
-- As-Built AN RF Height: 99 (the `rf_height_note` case), AT MW Antenna Height: 221, AV RSL: 234 (a number field in GSDN Workspace), AP M-Tilt: 17
+- As-Built AN RF Height: 99 (the `rf_height_note` case), AT MW Antenna Height: 221, AV RSL: 234 (a number field in Workspace), AP M-Tilt: 17
 
 ### 5.3 Values outside their lists
 
 | Column | Count | Against | Effect |
 |---|---|---|---|
-| Master K and RF & Design J, Site Scenario | 469 and 464 (all Indoor / Outdoor) | PMIS catalogue DeliveryScenario (critical) | every RF & Design row refused until G8 |
+| Master K and RF & Design J, Site Scenario | 469 and 464 (all Indoor / Outdoor) | Workspace catalogue DeliveryScenario (critical) | every RF & Design row refused until G8 |
 | Master BF, BG, BI (adaption items) | 33 ("Existing" 32, "No need" 1) | CompletionStatus (confirmed, critical) | cell refused |
 | PR-PO E Scope | 57 ("Busbar / Grounding" 54, "Tower + Adaption" 3) | ProcScope (critical) | row refused |
 | Master P, Tower Type | 7 (two values not in `tblTowerType`) | TowerType (allows other) | warning `list_other` |
@@ -521,7 +521,7 @@ No effect on the load: P3 composes the Master headers from rows 1 to 3, and the 
 
 | # | Question | Default until answered |
 |---|---|---|
-| Q460 | **Site creation.** GSDN Workspace cannot create sites today. May we build the "New site" form and a bulk template (Q46 default: identity stored in RF & Design, one approval on the stage-1 row), and create the 469 sites from it? When the Master and RF & Design disagree on identity (section 5.5), is RF & Design the source (D46)? | Nothing is loaded. RF & Design is the identity source. |
+| Q460 | **Site creation.** Workspace cannot create sites today. May we build the "New site" form and a bulk template (Q46 default: identity stored in RF & Design, one approval on the stage-1 row), and create the 469 sites from it? When the Master and RF & Design disagree on identity (section 5.5), is RF & Design the source (D46)? | Nothing is loaded. RF & Design is the identity source. |
 | Q461 | **Stage 1 dates.** TSSR Submitted / Approved, LLD Approved and the SAR date are empty, so Site Release cannot be derived and every CW date stays held. Can you provide them per site? If not, what is the Site Release date of a site already in CW? | CW history is held, never forced. No date is invented. |
 | Q462 | **Documents of historical tasks.** Upload the scans (layout, approval email and CW DN, MOS proof, PAC certificate) per task? Or one admin "accept without document" override per task (flagged in KPIs)? Or a one-time historical waiver for tasks before a cut-off date? | The normal rule: the mandatory slots must be filled before submit. |
 | Q463 | **Which file is the authority?** This file is a 10-sheet, values-only copy with no milestone formulas. For the import and the parallel run, will you give the live 23-sheet Master as it is (formulas kept, external link broken)? May we fill the issued register templates with a conversion tool? May we rehearse the load on a non-production copy with real data? | No rehearsal on real data, and no tool-filled templates, until you agree. The parallel run waits for the live Master. |
@@ -530,7 +530,7 @@ No effect on the load: P3 composes the Master headers from rows 1 to 3, and the 
 | Q466 | **Cancelled sites.** 34 sites show "Cancelled" in S or T (27 are also cancelled in Acquisition), and 6 of them have CW dates. Create them and cancel them through Change Control (Q382), or leave them out? | Created, then cancelled through Change Control |
 | Q467 | **Master AR / AS.** Are they B6 Layout Submitted and B7 Layout Approved (task catalogue), or the STA submitted and approved dates (old mapping)? | Not loaded |
 | Q468 | **Missing register keys.** The Acquisition candidate letter (474) and the selection date (410) are blank. The GECOL PR No. and request date (241) are blank. The HLC request no. (114) is blank. The PR-PO status (629) and PO No. (650) are blank, and 146 orders with a PO date have no contractor. The Contract No. column looks like month-year in 388 cells. Can these be supplied? Or may we use a default (for example candidate "A" for the single selected candidate, selection date = contract sign-off)? | Rows refused. No default without your approval. |
-| Q469 | **Names and personal data.** Which column is the English site name and which the Arabic one? Column C (Site Owner ID) mixes ID-like values (201) and names (268). Should GSDN Workspace keep an Arabic site name? Should the landlord contacts (names, phones, e-mails) and the AAT SE names be loaded, or left out? | One name (Master D). Personal contact fields are not loaded until you confirm. |
+| Q469 | **Names and personal data.** Which column is the English site name and which the Arabic one? Column C (Site Owner ID) mixes ID-like values (201) and names (268). Should Workspace keep an Arabic site name? Should the landlord contacts (names, phones, e-mails) and the AAT SE names be loaded, or left out? | One name (Master D). Personal contact fields are not loaded until you confirm. |
 
 ---
 

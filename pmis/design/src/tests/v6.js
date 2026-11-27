@@ -12,11 +12,11 @@ const reason=async(txt='test reason')=>{await p.fill('#rsn',txt)};
 await p.goto(URL);
 /* ---- 1 sign-in lookup */
 ok('login has one lookup field and a Continue with Microsoft button',await p.locator('#lookup').count()===1&&/Continue with Microsoft/.test(await p.innerText('[data-act=m365]')));
-ok('lookup finds by email, ID and phone formats',await ev(()=>['ahmed.salem@example.com','1001','+218 91 200 1000','0912001000'].every(q=>PMIS.staffLookup(q)&&PMIS.staffLookup(q).employee_id==='1001')&&!PMIS.staffLookup('nobody@x.com')&&!PMIS.staffLookup('9999')));
+ok('lookup finds by email, ID and phone formats',await ev(()=>['demo.user.01@example.com','1001','+218 90 000 0001','0912001000'].every(q=>PMIS.staffLookup(q)&&PMIS.staffLookup(q).employee_id==='1001')&&!PMIS.staffLookup('nobody@x.com')&&!PMIS.staffLookup('9999')));
 await shot('14-login');
-await p.fill('#lookup','ahmed.salem@example.com');await p.click('[data-act=m365]');await p.waitForSelector('#empid');const foundTxt=await p.innerText('.login .box');const hint1=await ev(()=>PMIS.S.login.hint);
+await p.fill('#lookup','demo.user.01@example.com');await p.click('[data-act=m365]');await p.waitForSelector('#empid');const foundTxt=await p.innerText('.login .box');const hint1=await ev(()=>PMIS.S.login.hint);
 await p.click('[data-act=loginback]');await p.fill('#lookup','nobody@nowhere.example');await p.click('[data-act=m365]');await p.waitForSelector('#empid');const missTxt=await p.innerText('.login .box');const hint2=await ev(()=>PMIS.S.login.hint);
-ok('same screen whether the person is found or not',foundTxt===missTxt&&hint1==='ahmed.salem@example.com'&&hint2==='nobody@nowhere.example',hint1+'|'+hint2);
+ok('same screen whether the person is found or not',foundTxt===missTxt&&hint1==='demo.user.01@example.com'&&hint2==='nobody@nowhere.example',hint1+'|'+hint2);
 await p.click('[data-act=loginback]');await p.fill('#lookup','1001');await p.click('[data-act=m365]');await p.waitForSelector('#empid');const hint3=await ev(()=>PMIS.S.login.hint);
 ok('an employee ID never becomes a login_hint (no email disclosure)',hint3==='',hint3);
 await p.fill('#empid','1001');await p.click('form[data-form=idlogin] button.pri');await p.waitForSelector('.shell');ok('first-sign-in employee-ID step still signs in',/my-work/.test(p.url()));
@@ -52,7 +52,7 @@ ok('CSV import previews new, replaced and error rows',/1 new, 1 replacing an exi
 await ev(()=>PMIS.go('settings?tab=calendar'));await wait(150);await shot('15-work-calendar');
 /* ---- 3 staff registry */
 await ev(()=>PMIS.go('settings?tab=staff'));await wait(100);const rc=await p.locator('#stafflist tr').count();ok('staff list renders registry rows',rc>=25,String(rc));
-await p.fill('[data-in=stq]','Mona');await wait(100);ok('staff search filters',await p.locator('#stafflist tr').count()===1);await p.fill('[data-in=stq]','');await wait(100);
+await p.fill('[data-in=stq]','Demo User 02');await wait(100);ok('staff search filters',await p.locator('#stafflist tr').count()===1);await p.fill('[data-in=stq]','');await wait(100);
 ok('no delete action exists, only deactivate',await p.locator('#stafflist [data-act*=del]').count()===0&&await p.locator('[data-act=stactive]').count()>0);
 await p.click('[data-act=stedit]:has-text("Add employee")');for(const [k,v] of Object.entries({employee_id:'1001',position:'Tester',name_en:'New Person',name_ar:'شخص جديد',email:'new.person@example.com',phone:'+218 91 555 0100'}))await p.fill('#sf-'+k,v);await reason();await p.click('#rok2');
 ok('duplicate employee ID refused',/already exists/.test(await p.innerText('#rerr2')));await p.fill('#sf-employee_id','4321');await p.fill('#sf-email','bad');await p.click('#rok2');ok('invalid email refused',/valid email/.test(await p.innerText('#rerr2')));await p.fill('#sf-email','new.person@example.com');await p.click('#rok2');await wait(150);
@@ -78,7 +78,7 @@ await ev(()=>{PMIS.S.regRules.phone.deny=[];PMIS.S.regHide={};PMIS.signIn('1001'
 // injected markup is shown as text
 await ev(()=>{PMIS.HOL.push({id:'HX9',date:'2026-12-30',en:'<img src=x onerror="window.__x=1">',ar:'x',kind:'national',tent:false,note:'<b>n</b>'});PMIS.REG['1102'].name_en='<svg onload="window.__x=2">';PMIS.go('settings?tab=calendar')});await wait(100);
 ok('calendar escapes injected holiday names',await ev(()=>!window.__x&&!document.querySelector('#page img[src=x]')));await ev(()=>{PMIS.HOL.splice(PMIS.HOL.findIndex(h=>h.id==='HX9'),1);PMIS.go('settings?tab=staff')});await wait(100);
-ok('staff list escapes injected names',await ev(()=>!window.__x&&!document.querySelector('#page svg[onload]')));await ev(()=>{PMIS.REG['1102'].name_en='Mona Fathi'});
+ok('staff list escapes injected names',await ev(()=>!window.__x&&!document.querySelector('#page svg[onload]')));await ev(()=>{PMIS.REG['1102'].name_en='Demo User 02'});
 /* ---- 4 absence and reassignment */
 await ev(()=>PMIS.go('absence'));await wait(150);
 const ab=await ev(()=>PMIS.ABS.find(a=>a.from<=PMIS.S.date||true&&PMIS.absent(a.uid)).uid);ok('seeded absence is current',!!ab,ab);

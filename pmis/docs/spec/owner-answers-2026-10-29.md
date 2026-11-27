@@ -12,7 +12,7 @@ Answered one by one by the product owner. "Default" means the proposed default i
 | Q42 | Default: each stream lists the sites it applies to; N/A sites hidden behind a toggle. |
 | Q43 | Default: a register record that is the source of a task is approved by the task's stage row; any other record by the register row. |
 | Q44 | Default: RF & Design and Acquisition each get a register row, seeded with the stage-1 holders. |
-| Q45 | Default: approver and approval-date fields come from GSDN Workspace final approval; O&M Accepted By stays typed. |
+| Q45 | Default: approver and approval-date fields come from Workspace final approval; O&M Accepted By stays typed. |
 | Q46 | Default: new sites are created in the Site Register; identity is stored in the RF & Design record, one approval on the stage-1 row. |
 | Q47 | Default: planned Site Release is the first baseline date, entered at site creation, approved by the Project Manager with the baseline; later changes go through Change Control. |
 | Q48 | Default: add D-1 to the baseline proposal; the parallel run tags the difference "D-1 added". |
@@ -38,7 +38,7 @@ Answered one by one by the product owner. "Default" means the proposed default i
 | Q67 | Default: Power Safe is entered with D7 (Commissioning) and Uplink Ready with D10 (On-Air), stored in the Readiness record and approved with those tasks; the Power Engineer enters Power Safe. |
 | Q68 | Default: As-Built has two parts with separate approvals: the CW part with CW PAC (B13), the TE part with TE PAC (D15); Master BU and EF are computed from those approvals. |
 | Q69 | Default: records without a site are visible to anyone holding the module, whatever their regions; the Risk Register gets an optional "affected sites" field, and a materialized risk creates issues for those sites. |
-| Q70 | Default: an issue owner is an employee or an external party; for an external party the Aljeel follow-up person is shown too. |
+| Q70 | Default: an issue owner is an employee or an external party; for an external party the Company follow-up person is shown too. |
 | Q71 | Default: a "Deliverables" register with its own Matrix row; entry by Project Support, approval by the Project Manager; each unit needs an acceptance reference and a document. |
 | Q72 | Default: the daily Progress & Plan page has no approval; it is a dated log, and a repeated reason can become an issue. |
 | Q73 | Default: one Site Register template per stream with only that stream's input columns, plus the full Master template; a stream template uploaded in another stream is rejected. |
@@ -73,16 +73,16 @@ Answered one by one by the product owner. "Default" means the proposed default i
 | Q20 | Default: each form template has a configurable signatory list; each block reads a Matrix level of the owning row or a named role (for example the Project Manager); the contractor signs by hand; a level held by a group or role prints a blank name. |
 | Q21 | Default: the approved DN posts the stock issue; the uploader enters the dispatch date written on the signed DN (required, not after the upload date), used for posting, WH Serials and the TE dispatch date. |
 | Q22 | Default: the applicant enters "Qty Approved" per line in the prepare screen; it is at least the dispatched quantity and is checked at review. |
-| Q23 | Default: condition per RN line in GSDN Workspace; the Master export writes one row per condition with a suffix on the document number (`-G` good, `-F` faulty). |
+| Q23 | Default: condition per RN line in Workspace; the Master export writes one row per condition with a suffix on the document number (`-G` good, `-F` faulty). |
 | Q24 | Default: the RN header takes the dismantle contractor and order when a CW Dismantle order exists, otherwise the CW contractor and order; E2 is split into E2a (CW dismantle) and E2b (TE dismantle). |
 | Q25 | **Owner decision (narrows CLAUDE.md "any snag on the site"):** only open CW snags block the CW PAC; TE snags do not block it. By the same logic only TE snags block the TE PAC (see E6). The generated PAC pre-ticks "Accepted", the other two boxes are greyed. |
-| Q26 | **Owner decision (differs from the default):** the PAC date and the FAC date are GSDN Workspace approval dates of B13 and B15 (and of the TE PAC / FAC tasks). The form prints them blank or as "date of approval". |
+| Q26 | **Owner decision (differs from the default):** the PAC date and the FAC date are Workspace approval dates of B13 and B15 (and of the TE PAC / FAC tasks). The form prints them blank or as "date of approval". |
 | Q27 | Default: CW DLP = 3 calendar months (EDATE); FB differences of up to 2 days in the parallel run are tagged "DLP rule change". |
-| Q28 | **Owner decision (differs from the default):** the PAC acceptance checklist (34 Pass / Fail / N/A items and the measured grounding resistance) is entered in GSDN Workspace now, as part of the PAC prepare screen, and printed filled on the generated PAC. |
-| Q29 | Default: Tower Type, CW Schedule (MS3 vs its baseline: Ahead / On / Behind) and the region name are filled automatically; the region labels use GSDN Workspace names (Zawia, Sebha). |
+| Q28 | **Owner decision (differs from the default):** the PAC acceptance checklist (34 Pass / Fail / N/A items and the measured grounding resistance) is entered in Workspace now, as part of the PAC prepare screen, and printed filled on the generated PAC. |
+| Q29 | Default: Tower Type, CW Schedule (MS3 vs its baseline: Ahead / On / Behind) and the region name are filled automatically; the region labels use Workspace names (Zawia, Sebha). |
 | Q30 | **Owner decision (differs from the default):** a FAC cannot be generated before the DLP ends, nor while snags are open; the two statement boxes stay ticked by hand. |
 | Q31 | **Owner decision:** design a provisional Snag List template in the style of the approved CW forms; the owner approves it later. |
-| Q32 | **Owner decision:** the numbering pattern of each form is a setting defined and edited in GSDN Workspace (prefix, region code, year, sequence, reset rule); the owner approves the final patterns later. Seed: `{KIND}-CW-{REGION}-{YYYY}-{SEQ:4}` with DN, RN, PAC, FAC and SL. |
+| Q32 | **Owner decision:** the numbering pattern of each form is a setting defined and edited in Workspace (prefix, region code, year, sequence, reset rule); the owner approves the final patterns later. Seed: `{KIND}-CW-{REGION}-{YYYY}-{SEQ:4}` with DN, RN, PAC, FAC and SL. |
 | Q33 | **Owner decision (differs from CLAUDE.md "PAC BoQ = DN − RN"):** the PAC "Accepted Item List (BoQ)" prints the CW As-Built quantities. A non-blocking warning shows per item where the net DN − RN differs. |
 | Q34 | **Owner decision (differs from the default):** the dashboard reference date can be changed by the user, as in the legacy dashboard. |
 | Q35 | Default: health index bands green ≥ 85, amber ≥ 70, red below 70, as an admin setting, shown as draft. |
