@@ -1,6 +1,6 @@
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { api, ApiError } from './client';
-import type { Comment, CountedPage, DocumentFile, Group, Matrix, MatrixCoverage, MatrixPatch, Page, Region, Role, SiteDetail, SiteImportStatus, SiteWorkflowLocksResult, SiteDraft, SiteDraftInput, SiteListItem, SiteTasks, Stream, ViewRef, TaskDetail, TaskEntryPatch, TaskSummary, TransitionResult, UserPickerItem, WorkflowStep } from './types';
+import type { MatrixSimulation, Comment, CountedPage, DocumentFile, Group, Matrix, MatrixCoverage, MatrixPatch, Page, Region, Role, SiteDetail, SiteImportStatus, SiteWorkflowLocksResult, SiteDraft, SiteDraftInput, SiteListItem, SiteTasks, Stream, ViewRef, TaskDetail, TaskEntryPatch, TaskSummary, TransitionResult, UserPickerItem, WorkflowStep } from './types';
 
 export type SiteFilters = { q: string; region_id: string; scenario: string; overall_status: string; stage_code: string; stream?: string; view?: string; bucket?: string; coordinates?: string;
   /** 0.15.4: locked / open */ workflow_locks?: string; /** 0.15.4: with / without */ data_gaps?: string;
@@ -144,6 +144,11 @@ export function useAddComment(taskId: string) {
 }
 
 // 0.15.94: Responsibility Matrix coverage (Settings > Workflow > Matrix coverage)
+/** 0.15.100: "who approves?" for a site and a stage task or a register. Read only; runs when the three inputs are chosen. */
+export const useMatrixSimulation = (siteId: string, kind: 'task' | 'register', code: string) => useQuery({
+  queryKey: ['matrixSimulate', siteId, kind, code], enabled: !!siteId && !!code,
+  queryFn: () => api.get<MatrixSimulation>('/matrix/simulate', { query: { site_id: siteId, kind, code } }),
+});
 export const useMatrixCoverage = () => useQuery({ queryKey: ['matrixCoverage'], queryFn: () => api.get<MatrixCoverage>('/matrix/coverage') });
 export const useMatrix = () => useQuery({ queryKey: ['matrix'], queryFn: async () => ({ ...(await api.get<Matrix>('/matrix')) }) });
 /** The matrix with the override cells of one region (and the task overrides): what the screen lists so an override can be deleted (Q86). */

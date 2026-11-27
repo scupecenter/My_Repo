@@ -111,6 +111,48 @@ export function showValue(f: RegisterField, v: unknown, lang: string, t: ReturnT
   return String(v);
 }
 
+/**
+ * Sites named by their code inside a register field (item 12): the value stays the text the field always held (a site code, or a list of codes joined by ", "),
+ * so the data, the rules and the exports do not change; only the typing is replaced by a search of the Site Register. `naOption` adds "N/A" for the fields that accept it.
+ */
+export function SiteCodeField({ id, value, onChange, multi, naOption, selfCode, disabled, invalid }: {
+  id: string; value: unknown; onChange: (v: string | null) => void; multi?: boolean; naOption?: boolean; selfCode?: string | null; disabled?: boolean; invalid?: boolean;
+}) {
+  const { t } = useTranslation();
+  const [q, setQ] = useState('');
+  const codes = (typeof value === 'string' ? value : '').split(/[,;]\s*/).map((c) => c.trim()).filter(Boolean);
+  const res = useQuery({ queryKey: ['site-search', q], enabled: q.trim().length >= 2, queryFn: () => api.get<Page<SiteListItem>>('/sites', { query: { q: q.trim(), limit: 8 } }) });
+  const set = (next: string[]) => onChange(next.length ? next.join(', ') : null);
+  const full = !multi && codes.length > 0;
+  return (
+    <div className="relative" data-testid={`${id}-sitecodes`}>
+      {codes.length > 0 && (
+        <span className="flex flex-wrap items-center gap-1">
+          {codes.map((c) => (
+            <span key={c} className="chip bg-openBg text-openInk" data-testid={`${id}-chosen-${c}`}><b className="mono">{c}</b>
+              {!disabled && <button type="button" className="ms-1 text-xs" aria-label={t('common.clear')} data-testid={`${id}-remove-${c}`} onClick={() => set(codes.filter((x) => x !== c))}>×</button>}</span>
+          ))}
+        </span>
+      )}
+      {!disabled && !full && (
+        <>
+          <input id={id} data-testid={id} className="input mt-1" aria-invalid={invalid || undefined} placeholder={t('registers.site_search')} value={q} onChange={(e) => setQ(e.target.value)} />
+          {naOption && !multi && <button type="button" className="btn mt-1 px-2 py-0.5 text-xs" data-testid={`${id}-na`} onClick={() => onChange('N/A')}>N/A</button>}
+          {q.trim().length >= 2 && (
+            <ul className="card absolute inset-x-0 z-10 mt-1 max-h-48 overflow-y-auto text-sm" data-testid={`${id}-results`}>
+              {(res.data?.items ?? []).filter((s) => s.site_code !== selfCode && !codes.includes(s.site_code)).map((s) => (
+                <li key={s.id}><button type="button" data-testid={`${id}-opt-${s.site_code}`} className="w-full p-2 text-start hover:bg-hover" onClick={() => { set(multi ? [...codes, s.site_code] : [s.site_code]); setQ(''); }}><b className="mono">{s.site_code}</b> <span className="text-mute">{s.name}</span></button></li>
+              ))}
+              {res.isSuccess && !res.data.items.length && <li className="p-2 text-mute">{t('picker.none')}</li>}
+            </ul>
+          )}
+        </>
+      )}
+      {disabled && codes.length === 0 && <span>—</span>}
+    </div>
+  );
+}
+
 /** Site chooser: search the Site Register by code or name (V1: the site must exist). */
 export function SitePicker({ value, onChange, disabled, invalid }: { value: { id: string; code: string } | null; onChange: (s: { id: string; code: string; region_id: number } | null) => void; disabled?: boolean; invalid?: boolean }) {
   const { t } = useTranslation();

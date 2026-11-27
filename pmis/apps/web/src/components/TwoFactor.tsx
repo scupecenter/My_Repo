@@ -2,7 +2,7 @@ import { Check, Copy, Download, KeyRound, ShieldCheck, ShieldOff, TriangleAlert 
 import QRCode from 'qrcode';
 import { useMemo, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useEnrolConfirm, useEnrolStart, useRegenerateRecoveryCodes, useTwoFactorSignIn } from '@/api/auth';
+import { useDeviceCodeSignIn, useEnrolConfirm, useEnrolStart, useRegenerateRecoveryCodes, useTwoFactorSignIn } from '@/api/auth';
 import { ApiError } from '@/api/client';
 import type { Session } from '@/api/types';
 import { errText, FormDialog } from './FormDialog';
@@ -78,6 +78,38 @@ export function CodeStep({ onDone, onBack, onExpired }: { onDone: () => void; on
         <button type="button" className="text-accent underline" data-testid="two-factor-toggle" onClick={() => { setRecovery(!recovery); setErr(''); }}>{recovery ? t('twoFactor.use_code') : t('twoFactor.use_recovery')}</button>
         <button type="button" className="text-mute underline" data-testid="two-factor-back" onClick={onBack}>{t('twoFactor.login_back')}</button>
       </div>
+    </form>
+  );
+}
+
+/** Second step of a sign-in from a new browser (0.15.192): the 6-digit code mailed to the account. Only shown when an admin turned the new-device code on. */
+export function DeviceCodeStep({ onDone, onBack, onExpired }: { onDone: () => void; onBack: () => void; onExpired: () => void }) {
+  const { t } = useTranslation();
+  const verify = useDeviceCodeSignIn();
+  const [code, setCode] = useState('');
+  const [err, setErr] = useState('');
+  const ready = codeComplete(code);
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    if (verify.isPending || !ready) return;
+    setErr('');
+    verify.mutate({ code: digitsOnly(code) }, {
+      onSuccess: onDone,
+      onError: (x) => {
+        setCode('');
+        if (x instanceof ApiError && x.status === 401) return onExpired();
+        setErr(x instanceof ApiError && x.status === 422 ? t('devicecode.wrong') : x instanceof ApiError && x.status === 429 ? t('twoFactor.locked') : t('errors.generic'));
+      },
+    });
+  };
+  return (
+    <form onSubmit={submit} className="card w-[min(440px,100%)] space-y-4 p-6" data-testid="device-code-form">
+      <div className="flex items-center gap-2 text-lg font-bold"><span className="grid h-8 w-8 place-items-center rounded-md bg-accent text-accentInk"><ShieldCheck size={18} /></span>{t('devicecode.title')}</div>
+      <p className="text-mute">{t('devicecode.body')}</p>
+      <CodeField id="device-code" value={code} onChange={setCode} label={t('devicecode.label')} hint={t('devicecode.hint')} autoFocus />
+      {err && <p role="alert" data-testid="device-code-error" className="text-lateInk">{err}</p>}
+      <button className="btn btn-accent w-full" type="submit" data-testid="device-code-submit" disabled={verify.isPending || !ready}>{t('twoFactor.login_submit')}</button>
+      <div className="text-sm"><button type="button" className="text-mute underline" data-testid="device-code-back" onClick={onBack}>{t('twoFactor.login_back')}</button></div>
     </form>
   );
 }

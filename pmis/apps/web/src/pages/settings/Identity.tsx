@@ -5,6 +5,7 @@ import { useSetUiIdentity, useUiIdentity } from '@/api/settings';
 import { errText, FormDialog } from '@/components/FormDialog';
 import { useToast } from '@/components/Toast';
 import { BRAND_SWATCHES, BRANDS, type Brand } from '@/lib/brands';
+import { APPEARANCE_OPTIONS, type Appearance, type AppearanceKey } from '@/lib/appearance';
 import { fmtDateTime } from '@/lib/time';
 import { QueryFallback } from '@/components/States';
 
@@ -43,12 +44,12 @@ export function Identity() {
   const { t, i18n } = useTranslation();
   const toast = useToast();
   const q = useUiIdentity(), set = useSetUiIdentity();
-  const [draft, setDraft] = useState<{ brand: Brand; allow: boolean } | null>(null);
+  const [draft, setDraft] = useState<{ brand: Brand; allow: boolean; defaults: Appearance } | null>(null);
   const [open, setOpen] = useState(false);
   if (!q.data) return <QueryFallback queries={[q]} testid="identity-loading" />;
   const cur = q.data;
-  const v = draft ?? { brand: cur.default_brand, allow: cur.allow_user_choice };
-  const dirty = v.brand !== cur.default_brand || v.allow !== cur.allow_user_choice;
+  const v = draft ?? { brand: cur.default_brand, allow: cur.allow_user_choice, defaults: cur.defaults ?? {} };
+  const dirty = v.brand !== cur.default_brand || v.allow !== cur.allow_user_choice || JSON.stringify(v.defaults) !== JSON.stringify(cur.defaults ?? {});
   const ro = !cur.can_edit;
   const ar = i18n.language === 'ar';
   return (
@@ -78,6 +79,21 @@ export function Identity() {
           })}
         </div>
       </fieldset>
+      <fieldset>
+        <legend className="mb-1 text-sm font-semibold">{t('identity.defaults_title')}</legend>
+        <p className="mb-2 text-xs text-mute">{t('identity.defaults_note')}</p>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" data-testid="identity-defaults">
+          {(Object.keys(APPEARANCE_OPTIONS) as AppearanceKey[]).map((k) => (
+            <label key={k} className="block text-sm font-semibold">{t(`appearance.dim.${k}`)}
+              <select className="input mt-1 font-normal" data-testid={`identity-def-${k}`} disabled={ro}
+                value={v.defaults[k] ?? ''} onChange={(e) => setDraft({ ...v, defaults: { ...v.defaults, [k]: e.target.value === '' ? undefined : e.target.value } })}>
+                <option value="">{t('identity.defaults_builtin', { name: t(`appearance.opt.${k}.standard`) })}</option>
+                {APPEARANCE_OPTIONS[k].map((opt) => <option key={opt} value={opt}>{t(`appearance.opt.${k}.${opt}`)}</option>)}
+              </select>
+            </label>
+          ))}
+        </div>
+      </fieldset>
       <label className="flex items-start gap-2 text-sm">
         <input type="checkbox" className="mt-1" data-testid="identity-allow" checked={v.allow} disabled={ro} onChange={(e) => setDraft({ ...v, allow: e.target.checked })} />
         <span><span className="font-semibold">{t('identity.allow')}</span><span className="block text-xs text-mute">{t(v.allow ? 'identity.allow_on' : 'identity.allow_off')}</span></span>
@@ -104,7 +120,7 @@ export function Identity() {
         : <button className="btn btn-accent" data-testid="identity-save" disabled={!dirty} onClick={() => setOpen(true)}>{t('common.save')}</button>}
       {open && (
         <FormDialog open onClose={() => setOpen(false)} testid="identity-dialog" title={t('identity.title')} busy={set.isPending} error={set.isError ? errText(set.error, t) : null}
-          onSubmit={(reason) => set.mutate({ version: cur.version, default_brand: v.brand, allow_user_choice: v.allow, reason },
+          onSubmit={(reason) => set.mutate({ version: cur.version, default_brand: v.brand, allow_user_choice: v.allow, defaults: v.defaults, reason },
             { onSuccess: () => { toast(t('settings.audited')); setOpen(false); setDraft(null); } })}>
           <p className="text-sm text-mute" data-testid="identity-confirm">
             {t('identity.confirm', { name: t(`brand.${v.brand}`), choice: t(v.allow ? 'identity.choice_on' : 'identity.choice_off') })}

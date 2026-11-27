@@ -8,11 +8,13 @@ import { weightIssues } from '@/lib/weights';
 import { NAV_SIDE } from '@/lib/navLayout';
 import { db, identity, loginPage, loginPagePublic, save, stepUpValid, viewer } from './db';
 import { BRANDS, isBrand } from '@/lib/brands';
+import { APPEARANCE_OPTIONS } from '../lib/appearance';
 import { guard, page, problem, stepUp } from './handlers';
 import { byId, uid } from './ids';
 import type { TableDisplaySetting } from '@/api/display';
 import { UI_FEATURES_SEED, type UiFeaturesSetting } from '@/api/uiFeatures';
 import { CALENDAR_CODES, CATALOGUE, COMPLETENESS, MAIL_KIND_CATALOGUE, MISMATCH, initCfg, GATES, MILESTONES, OPEN_TASKS, SCENARIOS, START_EVENT_CODES, TASK_DEFS, type SlaSetRec, type WeightRec } from './settingsData';
+import { newDeviceState } from './newDevice';
 
 const B = API_BASE;
 const TODAY = '2026-10-25';
@@ -255,6 +257,7 @@ const support: { enabled: boolean; max_hours: number; default_hours: number; ver
 type SupportGrant = { id: string; to: { id: string; display_name: string; employee_id: string | null }; from: { id: string; display_name: string; employee_id: string | null }; rights: string[]; valid_from: string; valid_to: string; revoked: boolean; revoked_at: string | null; reason: string };
 const supportGrants: SupportGrant[] = [];
 const SUPPORT_RIGHTS = ['templates.edit', 'fields.edit', 'documents.edit', 'warehouse.items.edit'];
+const newDeviceView = () => ({ enabled: newDeviceState.enabled, code_minutes: newDeviceState.code_minutes, include_admins: newDeviceState.include_admins, mail_ready: true, updated_at: newDeviceState.updated_at, updated_by: newDeviceState.updated_by, version: newDeviceState.version, can_edit: true });
 const supportView = () => ({ ...support, modules: ['templates', 'fields', 'lists', 'document_types', 'warehouse_items'], can_edit: true });
 const supportDto = (g: SupportGrant) => ({
   id: g.id, from_user: g.from, to_user: g.to, target_kind: 'user', target: { kind: 'user', id: g.to.id, label: g.to.display_name }, scope: 'partial', rights: g.rights, region_codes: [], module_codes: [],
@@ -385,6 +388,7 @@ const DASH_CATALOGUE = {
     { code: 'ops_procurement', label_en: 'Procurement and materials', label_ar: 'المشتريات والمواد' },
     { code: 'ops_scurve', label_en: 'Progress curve: planned vs actual, velocity and forecast', label_ar: 'منحنى التقدم: المخطط مقابل الفعلي والسرعة والتوقع' },
     { code: 'ops_permits_hse', label_en: 'Permits and HSE: status, validity, stop-work and PTW checks', label_ar: 'التصاريح والسلامة: الحالة والصلاحية وإيقاف العمل وفحوصات تصاريح العمل' },
+    { code: 'ops_gecol_hlc', label_en: 'Power and fiber readiness: GECOL and HLC waiting sites by age', label_ar: 'جاهزية الكهرباء والألياف: مواقع GECOL وHLC المنتظرة حسب العمر' },
   ],
 };
 const dashSeedThresholds = Object.fromEntries(DASH_CATALOGUE.kpis.map((k) => [k.code, { green: k.default_green, amber: k.default_amber }]));
@@ -457,6 +461,16 @@ export const settingsHandlers = [
   http.get(`${B}/recycle-bin`, () => { const g = guard(); if (g) return g; return HttpResponse.json(BIN, tag(BIN.version)); }),
   http.put(`${B}/recycle-bin/retention`, async ({ request }) => { const g = guard(); if (g) return g; const b = (await request.json()) as { retention_days: number }; BIN.retention_days = b.retention_days; BIN.version += 1; return HttpResponse.json({ retention_days: BIN.retention_days, version: BIN.version }, tag(BIN.version)); }),
   http.post(`${B}/recycle-bin/:id/restore`, ({ params }) => { const g = guard(); if (g) return g; const i = BIN.items.findIndex((x) => x.id === params.id); if (i < 0) return HttpResponse.json({ code: 'not_found' }, { status: 404 }); const [r] = BIN.items.splice(i, 1); return HttpResponse.json({ id: r!.id, register_key: r!.register_key, state: 'entry', version: r!.version + 1 }); }),
+  http.get(`${B}/matrix/simulate`, ({ request }) => {
+    const g = guard(); if (g) return g;
+    const u = new URL(request.url); const kind = u.searchParams.get('kind') === 'register' ? 'register' : 'task'; const code = u.searchParams.get('code') ?? '';
+    const person = (n: string, via: string | string[]) => ({ user_id: '00000000-0000-4000-8000-0000000000a1', name: n, email: `${n.toLowerCase().replace(/ /g, '.')}@example.test`, via });
+    return HttpResponse.json({ site: { id: u.searchParams.get('site_id'), site_code: 'S-1', name: 'Demo', region_id: 1 }, kind, code, name_en: code, name_ar: null, module: 'sites',
+      levels: [
+        { level_code: 'L1', source: 'region', task_specific: true, rule: 'any_one', holders: [person('Sara Ali', 'role: Field engineer')], fallback: [] },
+        { level_code: 'L2', source: 'default', task_specific: false, rule: null, holders: [], fallback: [person('Admin One', 'system_admin')] },
+      ] });
+  }),
   http.get(`${B}/matrix/coverage`, () => { const g = guard(); if (g) return g; return HttpResponse.json(MATRIX_COVERAGE); }),
   // ------------------------------------------------------------------ preventive-maintenance schedules (contract 0.15.161)
   http.get(`${B}/settings/pm-schedules`, () => { const g = guard(); if (g) return g; return HttpResponse.json(pmView(), tag(pmState.version)); }),
@@ -613,18 +627,27 @@ export const settingsHandlers = [
   http.get(`${B}/settings/identity`, () => { const g = guard(); if (g) return g; const j = identityView(); return HttpResponse.json(j, tag(j.version)); }),
   http.put(`${B}/settings/identity`, async ({ request }) => {
     const g = needAdmin(); if (g) return g;
-    const b = await body<{ default_brand?: unknown; allow_user_choice?: unknown; reason?: string } & Record<string, unknown>>(request);
-    const errs: { path: string; code: string }[] = Object.keys(b).filter((k) => !['default_brand', 'allow_user_choice', 'reason'].includes(k)).map((k) => ({ path: `/${k}`, code: 'unknown_field' }));
+    const b = await body<{ default_brand?: unknown; allow_user_choice?: unknown; defaults?: unknown; reason?: string } & Record<string, unknown>>(request);
+    const errs: { path: string; code: string }[] = Object.keys(b).filter((k) => !['default_brand', 'allow_user_choice', 'defaults', 'reason'].includes(k)).map((k) => ({ path: `/${k}`, code: 'unknown_field' }));
     if (!isBrand(b.default_brand)) errs.push({ path: '/default_brand', code: 'invalid' });
     if (typeof b.allow_user_choice !== 'boolean') errs.push({ path: '/allow_user_choice', code: 'required' });
     if ((b.reason ?? '').trim().length < 3 || (b.reason ?? '').length > 1000) errs.push({ path: '/reason', code: 'required' });
+    if (b.defaults !== undefined) {
+      const d = b.defaults;
+      if (d === null || typeof d !== 'object' || Array.isArray(d)) errs.push({ path: '/defaults', code: 'invalid' });
+      else for (const [k, v] of Object.entries(d)) {
+        const opts = (APPEARANCE_OPTIONS as Record<string, readonly string[]>)[k];
+        if (!opts || typeof v !== 'string' || !opts.includes(v)) { errs.push({ path: '/defaults', code: 'invalid' }); break; }
+      }
+    }
     if (errs.length) return fields(...errs);
     if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
     const p = ver(request, identity().version); if (p) return p;
     if (!stepUpValid()) return stepUp();
-    if (identity().default_brand === b.default_brand && identity().allow_user_choice === b.allow_user_choice) return problem(409, 'invalid_transition', 'These are already the identity settings.');
+    const nextDefaults = (b.defaults as Record<string, string> | undefined) ?? identity().defaults;
+    if (identity().default_brand === b.default_brand && identity().allow_user_choice === b.allow_user_choice && JSON.stringify(nextDefaults) === JSON.stringify(identity().defaults)) return problem(409, 'invalid_transition', 'These are already the identity settings.');
     const v = viewer()!;
-    Object.assign(identity(), { default_brand: b.default_brand, allow_user_choice: b.allow_user_choice, version: identity().version + 1, updated_at: new Date().toISOString(),
+    Object.assign(identity(), { default_brand: b.default_brand, allow_user_choice: b.allow_user_choice, defaults: nextDefaults, version: identity().version + 1, updated_at: new Date().toISOString(),
       updated_by: { id: uid(v.employee_id ?? '9999'), display_name: v.name, employee_id: v.employee_id } }); save();
     const j = identityView();
     return HttpResponse.json(j, tag(j.version));
@@ -691,6 +714,38 @@ export const settingsHandlers = [
     return HttpResponse.json(j, tag(j.version));
   }),
 
+  // ------------------------------------------------------------------ 0.15.192: new-device email code (System Admin only)
+  http.get(`${B}/settings/new-device-code`, () => { const g = needAdmin(); if (g) return g; const j = newDeviceView(); return HttpResponse.json(j, tag(j.version)); }),
+  http.put(`${B}/settings/new-device-code`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    const b = await body<{ enabled?: unknown; code_minutes?: unknown; include_admins?: unknown; reason?: string } & Record<string, unknown>>(request);
+    const errs: { path: string; code: string }[] = Object.keys(b).filter((k) => !['enabled', 'code_minutes', 'include_admins', 'reason'].includes(k)).map((k) => ({ path: `/${k}`, code: 'unknown_field' }));
+    if (typeof b.enabled !== 'boolean') errs.push({ path: '/enabled', code: 'required' });
+    if (typeof b.include_admins !== 'boolean') errs.push({ path: '/include_admins', code: 'required' });
+    if (typeof b.code_minutes !== 'number' || !Number.isInteger(b.code_minutes) || b.code_minutes < 5 || b.code_minutes > 30) errs.push({ path: '/code_minutes', code: 'invalid' });
+    if ((b.reason ?? '').trim().length < 3 || (b.reason ?? '').length > 1000) errs.push({ path: '/reason', code: 'required' });
+    if (errs.length) return fields(...errs);
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, newDeviceState.version); if (p) return p;
+    if (!stepUpValid()) return stepUp();
+    if (newDeviceState.enabled === b.enabled && newDeviceState.code_minutes === b.code_minutes && newDeviceState.include_admins === b.include_admins) return problem(409, 'invalid_transition', 'These are already the new-device settings.');
+    const v = viewer()!;
+    Object.assign(newDeviceState, { enabled: b.enabled, code_minutes: b.code_minutes, include_admins: b.include_admins, version: newDeviceState.version + 1, updated_at: new Date().toISOString(),
+      updated_by: { id: uid(v.employee_id ?? '9999'), display_name: v.name, employee_id: v.employee_id } });
+    const j = newDeviceView();
+    return HttpResponse.json(j, tag(j.version));
+  }),
+  http.post(`${B}/settings/new-device-code/bypass`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    const b = await body<{ user_id?: unknown; minutes?: unknown; reason?: string } & Record<string, unknown>>(request);
+    const errs: { path: string; code: string }[] = [];
+    if (typeof b.user_id !== 'string' || b.user_id.length < 8) errs.push({ path: '/user_id', code: 'invalid' });
+    if ((b.reason ?? '').trim().length < 3) errs.push({ path: '/reason', code: 'required' });
+    if (errs.length) return fields(...errs);
+    if (!stepUpValid()) return stepUp();
+    const mins = typeof b.minutes === 'number' ? b.minutes : 30;
+    return HttpResponse.json({ until: new Date(Date.now() + mins * 60_000).toISOString() });
+  }),
   // ------------------------------------------------------------------ 0.15.191: support access (System Admin only)
   http.get(`${B}/settings/support-access`, () => { const g = needAdmin(); if (g) return g; const j = supportView(); return HttpResponse.json(j, tag(j.version)); }),
   http.put(`${B}/settings/support-access`, async ({ request }) => {

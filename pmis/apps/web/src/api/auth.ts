@@ -47,6 +47,15 @@ export function useTwoFactorSignIn() {
   });
 }
 
+/** Second step of a sign-in from a new browser (0.15.192): the 6-digit code mailed to the account. */
+export function useDeviceCodeSignIn() {
+  const adopt = useAdoptSession();
+  return useMutation<Session, ApiError, { code: string }>({
+    mutationFn: (body) => api.post<Session>('/auth/local/2fa/device-code', { body }),
+    onSuccess: adopt,
+  });
+}
+
 /** Secrets must not stay in the mutation cache (`gcTime: 0`). */
 export function useEnrolStart() {
   // Contract 0.6.0: the one-time enrolment code is needed before the QR code is shown.
