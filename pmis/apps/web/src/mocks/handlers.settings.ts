@@ -264,6 +264,26 @@ const MK = () => (C().mailKinds ??= initCfg().mailKinds);
 /** 0.15.190: the admin lock keys, kept in memory like the other small settings of the mock (both off by default). */
 const locks: { block_public_sharing: boolean; disable_export: boolean; version: number; updated_at: string | null; updated_by: { id: string; display_name: string; employee_id: string | null } | null } =
   { block_public_sharing: false, disable_export: false, version: 1, updated_at: null, updated_by: null };
+/** 0.15.312: the operational limits (catalogue and defaults as ops_limits_catalogue() in migration 0402); a limit that was never saved reads as its default. */
+const OPS_CATALOGUE: { key: string; group: string; unit: string; default: number; min: number; max: number }[] = [
+  { key: 'session.idle_hours', group: 'sessions', unit: 'hours', default: 8, min: 1, max: 24 },
+  { key: 'session.absolute_hours', group: 'sessions', unit: 'hours', default: 12, min: 1, max: 72 },
+  { key: 'stepup.seconds', group: 'sessions', unit: 'seconds', default: 300, min: 30, max: 3600 },
+  { key: 'assignments.max_rows', group: 'rows', unit: 'rows', default: 2000, min: 100, max: 50000 },
+  { key: 'import.max_rows', group: 'rows', unit: 'rows', default: 2000, min: 100, max: 50000 },
+  { key: 'master_import.max_rows', group: 'rows', unit: 'rows', default: 5000, min: 100, max: 50000 },
+  { key: 'register_import.max_rows', group: 'rows', unit: 'rows', default: 5000, min: 100, max: 50000 },
+  { key: 'prefill.max_rows', group: 'rows', unit: 'rows', default: 5000, min: 100, max: 50000 },
+  { key: 'prefill.max_sites', group: 'rows', unit: 'sites', default: 5000, min: 100, max: 50000 },
+  { key: 'export.max_rows', group: 'exports', unit: 'rows', default: 100000, min: 1000, max: 1000000 },
+  { key: 'idempotency.max_entries', group: 'exports', unit: 'entries', default: 5000, min: 500, max: 100000 },
+];
+const opsLimits: { stored: Record<string, number>; version: number; updated_at: string | null; updated_by: { id: string; display_name: string; employee_id: string | null } | null } =
+  { stored: {}, version: 1, updated_at: null, updated_by: null };
+const opsView = () => ({
+  items: OPS_CATALOGUE.map((c) => ({ ...c, value: opsLimits.stored[c.key] ?? c.default, is_default: !(c.key in opsLimits.stored) })),
+  updated_at: opsLimits.updated_at, updated_by: opsLimits.updated_by, version: opsLimits.version, can_edit: isAdmin(),
+});
 const locksView = () => ({ ...locks, can_edit: isAdmin() });
 /** 0.15.193: the download lock categories (templates, uploaded files, generated documents), in memory, all off by default. */
 export const dlocks: { templates: boolean; uploaded_files: boolean; generated_documents: boolean; version: number; updated_at: string | null; updated_by: { id: string; display_name: string; employee_id: string | null } | null } =
@@ -333,6 +353,8 @@ export function cleanNavLayout(raw: unknown): { layout: unknown; errors: { path:
 }
 /** 0.14.6: imports.async_rows (a store saved before 0.14.6 starts from the seed). */
 const IM = () => (C().imports ??= initCfg().imports);
+const TN = { enabled: true, days: 14, version: 1, updated_at: null as string | null };
+const tplNoticeView = () => ({ enabled: TN.enabled, days: TN.days, default_days: 14, min: 1, max: 365, updated_at: TN.updated_at, updated_by: null, version: TN.version, can_edit: viewer()?.key === 'admin' || !!viewer()?.nav.includes('settings') });
 const importsView = () => {
   const c = IM();
   return { async_rows: c.async_rows, default_async_rows: 50, min: 10, max: 500, updated_at: c.updated_at, updated_by: c.updated_by ? ref(c.updated_by) : null, version: c.version, can_edit: isAdmin() };
@@ -413,6 +435,7 @@ const DASH_CATALOGUE = {
     { code: 'ops_contractors', label_en: 'Contractor and supplier scorecard: levels, delay and quality', label_ar: 'بطاقة أداء المقاولين والموردين: المستويات والتأخير والجودة' },
     { code: 'ops_quality', label_en: 'Quality: open snags and NCR, closure age, first-time acceptance', label_ar: 'الجودة: الـSnag والـNCR المفتوحة وعمر الإغلاق والقبول من أول مرة' },
     { code: 'ops_approvals', label_en: 'Pending approvals: waiting review or approval, ages per role', label_ar: 'الموافقات المعلقة: بانتظار المراجعة أو الاعتماد، الأعمار حسب الدور' },
+    { code: 'ops_changes', label_en: 'Change requests and overdue meeting actions', label_ar: 'طلبات التغيير وبنود الاجتماعات المتأخرة' },
   ],
 };
 const dashSeedThresholds = Object.fromEntries(DASH_CATALOGUE.kpis.map((k) => [k.code, { green: k.default_green, amber: k.default_amber }]));
@@ -645,6 +668,23 @@ export const settingsHandlers = [
     Object.assign(IM(), { async_rows: b.async_rows as number, version: IM().version + 1, updated_at: new Date().toISOString(), updated_by: viewer()!.employee_id! }); save();
     const j = importsView();
     return HttpResponse.json(j, tag(j.version));
+  }),
+
+  // ------------------------------------------------------------------ 0.15.203 (P3): the notice of a new template version (Settings, Imports)
+  http.get(`${B}/settings/template-change-notice`, () => { const g = guard(); if (g) return g; return HttpResponse.json(tplNoticeView(), tag(TN.version)); }),
+  http.put(`${B}/settings/template-change-notice`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, TN.version); if (p) return p;
+    const b = await body<{ enabled?: unknown; days?: unknown; reason?: string }>(request);
+    const errs: { path: string; code: string }[] = [];
+    if ((b.reason ?? '').trim().length < 3) errs.push({ path: '/reason', code: 'required' });
+    if (typeof b.days !== 'number' || !Number.isInteger(b.days) || b.days < 1 || b.days > 365) errs.push({ path: '/days', code: 'out_of_range' });
+    if (typeof b.enabled !== 'boolean') errs.push({ path: '/enabled', code: 'required' });
+    if (errs.length) return fields(...errs);
+    if (TN.enabled === b.enabled && TN.days === b.days) return problem(409, 'invalid_transition', 'These values are already set.');
+    Object.assign(TN, { enabled: b.enabled as boolean, days: b.days as number, version: TN.version + 1, updated_at: new Date().toISOString() });
+    return HttpResponse.json(tplNoticeView(), tag(TN.version));
   }),
 
   // ------------------------------------------------------------------ 0.15.41: Settings, Identity & themes (the organization default UI design)
@@ -994,6 +1034,34 @@ export const settingsHandlers = [
     const a = uiAssetBytesOf(key);
     if (!a || !meta || meta.key !== key || !meta.enabled) return problem(404, 'not_found', 'The resource does not exist or is not visible to you.');
     return new HttpResponse(a.bytes, { headers: { 'Content-Type': a.mime, ETag: `"${meta.version}"` } });
+  }),
+
+  // ------------------------------------------------------------------ 0.15.312: operational limits
+  http.get(`${B}/settings/ops-limits`, () => { const g = guard(); if (g) return g; const j = opsView(); return HttpResponse.json(j, tag(j.version)); }),
+  http.put(`${B}/settings/ops-limits`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    const b = await body<{ values?: Record<string, unknown>; reason?: string } & Record<string, unknown>>(request);
+    const errs: { path: string; code: string }[] = Object.keys(b).filter((k) => !['values', 'reason'].includes(k)).map((k) => ({ path: `/${k}`, code: 'unknown_field' }));
+    if (!b.values || typeof b.values !== 'object') errs.push({ path: '/values', code: 'required' });
+    if ((b.reason ?? '').trim().length < 3 || (b.reason ?? '').length > 1000) errs.push({ path: '/reason', code: 'required' });
+    const clean: Record<string, number> = {};
+    for (const [k, v] of Object.entries(b.values ?? {})) {
+      const c = OPS_CATALOGUE.find((x) => x.key === k);
+      if (!c) errs.push({ path: `/values/${k}`, code: 'unknown' });
+      else if (typeof v !== 'number' || !Number.isInteger(v)) errs.push({ path: `/values/${k}`, code: 'invalid' });
+      else if (v < c.min || v > c.max) errs.push({ path: `/values/${k}`, code: 'out_of_range' });
+      else clean[k] = v;
+    }
+    if ((clean['session.absolute_hours'] ?? 12) < (clean['session.idle_hours'] ?? 8)) errs.push({ path: '/values/session.absolute_hours', code: 'invalid' });
+    if (errs.length) return fields(...errs);
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, opsLimits.version); if (p) return p;
+    if (!stepUpValid()) return stepUp();
+    if (JSON.stringify(Object.entries(clean).sort()) === JSON.stringify(Object.entries(opsLimits.stored).sort())) return problem(409, 'invalid_transition', 'These are already the limits in force.');
+    const v = viewer()!;
+    Object.assign(opsLimits, { stored: clean, version: opsLimits.version + 1, updated_at: new Date().toISOString(), updated_by: { id: uid(v.employee_id ?? '9999'), display_name: v.name, employee_id: v.employee_id } });
+    const j = opsView();
+    return HttpResponse.json(j, tag(j.version));
   }),
 
   // ------------------------------------------------------------------ 0.15.1: the shared layout of the side menu

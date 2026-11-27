@@ -70,7 +70,9 @@ export function FieldValue({ f, v, testid }: { f: RegisterField; v: unknown; tes
     if (d !== null && Math.abs(d) <= 60) {
       const rel = d === 0 ? t('rel.today') : d === 1 ? t('rel.tomorrow') : d === -1 ? t('rel.yesterday') : d > 0 ? t('rel.in_days', { count: d }) : t('rel.days_ago', { count: -d });
       const tone = d < 0 ? 'text-lateInk' : d === 0 ? 'text-waitInk' : 'text-mute';
-      return <span className={`whitespace-nowrap ${tone}`} title={v} data-testid={testid} data-rel-days={d}>{rel}<span className="text-mute"> · {v}</span></span>;
+      // block truncate: the relative word plus the absolute date is wider than a narrow column; without it the nowrap text overflows its
+      // cell, and in the RTL UI it spills left over the neighbouring cell's content (the full date stays in the tooltip).
+      return <span className={`block truncate ${tone}`} title={v} data-testid={testid} data-rel-days={d}>{rel}<span className="text-mute"> · {v}</span></span>;
     }
   }
   return <span data-testid={testid}>{showValue(f, v, lang, t)}</span>;

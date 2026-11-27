@@ -31,6 +31,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.204 (2026-11-27): the dashboard follow-up sections, pending approvals bottleneck (owner approval 2026-11-26, dashboard proposals item 7; migration 0305). Additive and read only. `GET /dashboard/ops` gains the section `approvals` (`DashboardOpsApprovals`): the tasks waiting for review or approval (states in_review and in_approval, the same population as the Approvals inbox), their ages in calendar days since the level opened, split review against approve, and the same ages grouped by the ball-in-court role so the bottleneck role shows. The section needs the approvals view (and the sites view, like the inbox) and answers available false without them. The dashboard settings catalogue gains the card `ops_approvals`. No grant, role or permission change.
     - 0.15.330 (2026-11-27): links and relations fixes, part 1 (D58; migration 0407, mirror `db/sql/406_links_fixes.sql`). Additive. `advance_id` of an expense or settlement is checked while the row is in entry (an approved advance of the same site; `unknown_advance`); invoices check `procurement_record_id` (`order_not_found`, `order_other_site`) and gain the optional field `supplier_party_id` (a company of the Contractors list; `unknown_company`; fills `supplier` when it is empty). New `GET /registers/financial_advances/advance-options`, `GET /registers/invoices/order-options` and `GET /registers/invoices/supplier-options` (read only, each needs its own module view). The related-records reader also lists the HLC record <-> Procurement record link. No grant, role or permission change.
     - 0.15.350 (2026-11-27): two admin alerts for operations (production readiness, item 4; migration 0421, mirror `db/sql/420_ops_alerts.sql`). Additive. `SecurityAlertRule` and `AlertSeverityMap` gain `backup_late` (the database backup check found WAL archiving or a backup late; default severity high; one alert per 6 hours) and `job_failed` (a background job run failed; default medium; one alert per job and day). They use the existing alert channel (bell, and mail to the System Admins by `email_min_severity`); the severity of each is set in Settings like the other rules. `mail.notification_kinds` is unchanged. No grant, role or permission change.
     - 0.15.332 (2026-11-27): the generic link declaration (D60, phase 1; migration 0409, mirror `db/sql/408_register_links.sql`). Additive. New table `register_links` (one row per link field), `GET /registers/{key}/links` (`listRegisterLinks`) and `GET /registers/{key}/link-options/{field}` (`listRegisterLinkOptions`); `record_related` also reads the declared links; links flagged `enforce` are checked in entry. Existing links are declared with the check off.
@@ -42,10 +43,14 @@ info:
     - 0.15.310 (2026-11-27): every register is downloadable (owner decision D48, 2026-11-27; no migration; CHANGELOG ExportAllRegisters). Additive. `GET /exports/parts` now also offers `car_dispatcher`, `financial_advances`, `incidents`, `lessons_learned` and `invoices`, and `POST /exports/master` accepts them in `parts` and as `view.source`; the 422 `not_in_master` of 0.15.34 is gone. Each writes its own sheet (Car Dispatcher, Financial Advances, Incidents, Lessons Learned, Invoices) with the register's template columns, header in row 1, no Master column. The rules are the other registers' rules: the export grant of the register's own module (no grant is seeded, so only a System Admin holds them until the owner grants them; Financial Advances and Invoices stay behind the finance grant), the export regions of that grant, voided rows left out of a full export, the field-level `in_export` switch and the personal-column rule. Settings and configuration are never exported. No schema change: `ExportPartKey` already listed the five keys.
     - 0.15.243 (2026-11-27): field quick capture for QC snags (owner request 2026-11-27; migration 0343; CHANGELOG FieldQuickCapture). Additive. The snag type photo rules `formats` list also accepts WEBM, MP4 and MOV, so a System Admin (or a Document Library configuration delegate) can let a snag type take a short field video through the existing `POST /snags/{snag_id}/photos` path; nothing is allowed by default (every type still lists only its own formats). A video has no EXIF date and is accepted with `unknown_capture_date`, like any photo without EXIF. No permission, visibility or authentication change; the photo rules, the format check and the upload limits are unchanged.
     - 0.15.248 (2026-11-27): high-contrast mode as an appearance dimension (item 19 of the 2026-11-27 batch, owner approval 2026-11-27 relayed by Main; migration 0347, mirror `db/sql/346_user_contrast.sql`; CHANGELOG HighContrast). Additive. `UiPrefs` gains `contrast` (`standard` = today's look, `high`): a personal choice (`MyProfilePatch.ui_prefs`), an organization default (`UiIdentityInput.defaults`, Settings > Identity), locked like every dimension while `identity.allow_user_choice` is false (403 `field_read_only`, `errors[0]` `{path: /ui_prefs, code: appearance_choice_locked}`), audited per dimension in `profile_updated`, resolved by `ui_effective_prefs`. The web paints `data-ui-contrast="high"`: stronger ink and line tokens only, the status colours and the designs are unchanged; `prefers-contrast: more` applies the high tokens while no choice is saved. No new column, grant, role or default changes.
+    - 0.15.320 (2026-11-27): list values export, download-edit-upload (owner decisions D54 and D55, 2026-11-27; no migration). Additive. (1) `GET /templates/TPL-LISTVALUES/download` takes `list=<catalogue code>`: the same template filled with the current active values of that list (code, labels, aliases, colour, parent value, sort order); without it the file stays empty as before. Same rights (System Admin or a delegate of `fields` edit, `download_documents` on `templates`), audited with the list code. (2) `POST /list-catalogues/{catalogue_code}/values/import` now updates a value whose code already exists (the code never changes; an empty cell leaves the value as it is; a row equal to the stored value is `unchanged`) and creates a new code, as before. The answer adds `created`, `updated` and `unchanged` next to `imported` (created plus updated). A code twice in the file is a 422 for that row. Every row applies or none does, as before. Values are never deleted or reactivated by a file.
     - 0.15.246 (2026-11-27): a soft "… is editing this record" notice (owner request 2026-11-27, item 17 of the 2026-11-27 batch; migration 0345; CHANGELOG RecordEditPresence). Additive and advisory only: nothing is locked. `POST /presence/editing` (`{kind, entity_id}`) is the editor's heartbeat (30 s; a row is stale after 2 minutes), `POST /presence/editing/stop` removes it at once, and `GET /presence/editing` (`kind`, `entity_id`) lists the other current editors of the entity (id, display name, since). Covers register records (kind `record`) and workflow tasks (kind `task`). No grant, role, permission, visibility or audit change.
+    - 0.15.331 (2026-11-27): register rules in Settings and the order's PR / PO on an invoice (migration 0430, mirror `db/sql/429_invoice_rules.sql`; decisions L1 and L2 of the relations review, on top of D58 / 0407). Additive. (1) `GET /settings/register-rules` (`listRegisterRules`) and `PUT /settings/register-rules/{register_key}` (`setRegisterRules`): the editable rules of a register (invoices: `currency`, `order_required`, `supplier_required`), System Admin or a `fields.edit` delegate, reason required, audited. (2) An invoice reads `order_pr_no` and `order_po_wo_no` from its Procurement order (derived, never typed). (3) Errors `order_required`, `supplier_required`, `unknown_rule`. The order and supplier links themselves are 0407's (`supplier_party_id`, `invoices/order-options`, `invoices/supplier-options`).
 
+    - 0.15.247 (2026-11-27): reactions on comments and a resolved flag (owner approval 2026-11-27, item 18 of the 2026-11-27 batch; migration 0346, mirror `db/sql/345_comment_reactions_resolve.sql`). Additive. New paths: `PUT`/`DELETE /comments/{comment_id}/reactions` (the emoji in the body, `👍` only, 422 `validation_failed` otherwise; a reaction of the caller on any comment they can read, a task comment or a register-record comment; idempotent both ways, 404 for a comment the caller cannot read) and `PUT`/`DELETE /comments/{comment_id}/resolved` (marks the point resolved or opens it again; records `resolved_at`/`resolved_by`). `Comment` gains `reactions` (`emoji`, `count`, `mine`) and `resolved` (`at`, `by`). The bar to react or resolve is the same as to comment: reading the thread. Not audited. No existing field or behaviour changes.
     - 0.15.240 (2026-11-27): intake triage for the Issue Log and the Change Control Log (owner request 2026-11-27; migration 0340, mirror `db/sql/339_register_triage.sql`; CHANGELOG RegisterTriage). Additive. (1) `RegisterDefinition.triage_enabled` (true for `issues` and `change_control`): a record of such a register enters an intake queue (`RegisterRecord.triage.state` `pending`) on every insert, a new version included (the old decision is cleared). (2) New `POST /registers/{register_key}/records/{record_id}/triage` (`triageRegisterRecord`): one decision of the register's Matrix L2 holders of the record's region (a System Admin only when the row has no holder, exactly like an approval): `accept` (the record proceeds to its normal flow), `defer` (stays in the queue, with a note), `reject` (note and step-up required; the record is `voided`) and `merge` (`duplicate_of`, note and step-up; the record is `voided`, links the surviving record `triage.duplicate_of`, and the decision is noted on the surviving record's comment thread). `If-Match` is the record's version; `allowed_actions` gains `triage` while a record is pending or deferred and the caller may decide. `GET /registers/{register_key}/records` takes `triage` (one of `TriageState`). (3) Audited as `register_record_triage` with before and after; `RegisterRecordStep.action` gains `triage_accept`, `triage_reject`, `triage_merge`, `triage_defer`; the creator is notified (`NotificationKind` gains `triage_decision`). No grant, role or default changes.
     - 0.15.265 (2026-11-27): the project data reset can be narrowed inside a register part (Data entry proposal P1, approved by the owner 2026-11-27; migration 0370, mirror `db/sql/369_data_reset_narrow.sql`). Additive and backward compatible: a request without `narrow` is the whole part as before. `POST /settings/data-reset/requests` takes optional `narrow` (`DataResetNarrow`: `regions`, `batches`, `from`, `to`; every given key must match): the register entities that match go, the others stay with everything that hangs off them (every version of a record, steps, documents and files, comments, drafts, links). The unit is the entity; `from`/`to` are the days the entity was first created (inclusive, Africa/Tripoli); `batches` are import batches the record came from. Only parts whose data follows one register record can be narrowed (`DataResetPart.narrowable`); a narrowing needs chosen parts (not everything) and any other part is 422. A part the chosen one takes along (procurement takes car_dispatcher and financial_advances) loses only the entities linked to the selected procurement records. The narrowing is stored in `DataResetScope.narrow` and bound into `scope_hash`/`approved_scope_hash`: an approver who saw another narrowing is 409 `scope_changed`. `GET /settings/data-reset/plan` takes `regions`, `batches`, `from`, `to` (the dry run of the narrowed scope, `DataResetPlan.narrow`). New `GET /settings/data-reset/narrow-options?part=` lists the regions and the recent import batches of the part for the picker. System Admin only, no delegation.
+    - 0.15.312 (2026-11-27): operational limits in Settings (review item 5, owner decision 35; migration 0402, mirror `db/sql/401_ops_limits.sql`). Additive; every default is the number the code used before, so nothing changes until a System Admin changes a value. New paths `GET` and `PUT /settings/ops-limits` (`getOpsLimits`, `setOpsLimits`, schemas `OpsLimits`, `OpsLimitItem`, `OpsLimitsInput`). Every signed-in user reads the catalogue and the values in force; only a System Admin changes them (a `settings` delegate does not), with a reason, a step-up and `If-Match`, audited `ops_limits_update` with the stored values before and after. Eleven limits: session idle hours (8) and absolute hours (12), step-up seconds (300, it also honours the earlier setting `stepup_max_age_seconds` until a value is saved here), and the row or entry caps of the assignments request (2000), imports (2000), Master import (5000), register import (5000), template prefill rows and sites (5000), log export (100000) and the idempotency store (5000). A key that is left out of `values` returns to its default. 422 for an unknown key, a non-integer, a value outside its range or an absolute session shorter than the idle limit.
     - 0.15.264 (2026-11-27): `GET /custom-fields` and `GET /custom-fields/{field_id}` now have an implementation (they were documented only; the list was always empty). No migration, no schema change. Everyone signed in reads the active fields their field rules do not hide; inactive fields and the role lists are for a System Admin or an all-regions delegate of the custom fields. POST and PATCH stay documented, not built (proposal to follow).
     - 0.15.226 (2026-11-27): the Deliverables register is enabled (migration 0326; Q71): site-scoped, linked to a task and a gate of the site, with the document and acceptance reference rules. Additive: `deliverables` joins `RegisterKey` and `ExportPartKey` (not in the Master sheet); no new endpoint.
     - 0.15.261 (2026-11-27): mail policy (migration 0364, mirror `db/sql/363_mail_policy.sql`). Additive. New `GET/PUT /settings/mail-policy` (the setting `mail.policy`: global switch, internal only or internal plus external recipients, internal domains, per kind switch and mode). `expiry_radar`, `approval_digest` and `weekly_digest` join the mail kind catalogue (still mailed only when listed in `mail.notification_kinds`). Defaults keep today's behaviour.
@@ -104,6 +109,7 @@ info:
     - 0.15.82 (2026-11-26): `GET /me/tasks.ics` returns My Work (do now and late) as an iCalendar file. Needs the session like every call; same rights and region scope as `GET /me/tasks`; nothing public and no token link. No migration.
     - 0.15.81 (2026-11-26): two more UI designs, `obsidian` and `sahara` (migration 0164): `UiBrand` gains the two names (users.ui_brand, `ui.identity` default_brand, `PATCH /me/profile`). Visual only; the four existing designs, the light/dark theme and the storage are unchanged.
     - 0.15.80 (2026-11-26): what a role sees of the Dashboard (migration 0163). `Role.dashboard_tabs` (any non-empty combination of `pmo`, `cw`, `te`; default all three) and `Role.hide_messages_inbox` (default false); `RolePatch` sets them (System Admin only, 403 `delegate_forbidden` for a delegate; reason, step-up; audited as `role_dashboard_access_set`). `EffectivePermissions.dashboard_tabs` is the union over the roles held now (a System Admin or a user with no active role: all three). `GET /dashboard`, `/dashboard/extras`, `/dashboard/export` and `/project-status*` answer 403 `action_forbidden` outside the caller's tabs (`pmo` includes the others; view CW needs `cw`, view TE needs `te`, any other view or none needs `pmo`). A role that hides Messages and Inbox removes only the two menu entries of its holders (`effective.nav`); the pages and the API are unchanged. No grant, role or default changes.
+    - 0.15.500 (2026-11-27): the role code is editable (owner decision D51; migration 0500; no new route). `RolePatch.code` (`^[A-Z][A-Z0-9_]{1,40}$`; reason and step-up as for any role edit; audited as `role_code_changed` with the old and the new code). 422 `validation_failed` for a bad format or for a built-in role whose code the platform uses by name (PM, CW_TL, TE_TL and the other seeded roles, plus QC_GENERAL, FLEET_DISPATCHER, FIN_OFFICER), 409 `duplicate` when the code exists. History, saved filters and exports that quote the old code are not rewritten. `Role.description_ar` and `RoleInput.description_ar` were already in the contract; the Roles dialog now edits them.
     - 0.15.79 (2026-11-26): "Forgot password" by email: `POST /auth/local/password-reset/request` (always the same 202) and `POST /auth/local/password-reset/confirm` (one-time link, 204). Local-password accounts only; System Admins and M365 or break-glass accounts are excluded. No existing endpoint changes.
     - 0.15.78 (2026-11-25): `PATCH /users/{user_id}` also takes `display_name`; `employee_id` is now edited by the admin (4 digits, unique, audited as `user_identity`, never your own row). E-mail and phone stay on the verified request flow. No new endpoint.
     - 0.15.77 (2026-11-25): Real delete of a warehouse item that has no data (owner decision 2026-11-25): `DELETE /warehouse/items/{item_id}?reason=` (System Admin or the `warehouse_items` delegate, reason, If-Match, audited). Allowed only when no movement line (any status), serial, site quantity or As-Built link points to the item; otherwise 409 `item_in_use` and the item can only be deactivated (PATCH `is_active: false`, unchanged). The item answer carries `deletable` (read-only). Migration 0160.
@@ -235,6 +241,7 @@ info:
     - 0.2.0 (2026-10-25): additive. No operation or schema of 0.1 was removed or renamed (ADR 0011).
     - 0.1.0 (2026-10-25): first contract for P1. Breaking changes are recorded in `docs/adr/` (ADR 0001 §6).
     - 0.15.204 (2026-11-27): the dashboard follow-up sections, pending approvals bottleneck (owner approval 2026-11-26, dashboard proposals item 7; migration 0305). Additive and read only. `GET /dashboard/ops` gains the section `approvals` (`DashboardOpsApprovals`): the tasks waiting for review or approval (states in_review and in_approval, the same population as the Approvals inbox), their ages in calendar days since the level opened, split review against approve, and the same ages grouped by the ball-in-court role so the bottleneck role shows. The section needs the approvals view (and the sites view, like the inbox) and answers available false without them. The dashboard settings catalogue gains the card `ops_approvals`. No grant, role or permission change.
+    - 0.15.205 (2026-11-27): the dashboard follow-up sections, change requests and overdue meeting actions (owner approval 2026-11-26, dashboard proposals item 8; migration 0306). Additive and read only. `GET /dashboard/ops` gains the section `changes_meetings` (`DashboardOpsChangesMeetings`): the change requests still pending (status requested) with their ages since the request date and a count per kind, the approved ones not yet applied, and the meeting actions not closed with the overdue ones aged by days late. Each part needs its own module view (change control, meetings) and answers `available: false` with null figures without it. No amounts.
 
     ## Changes since 0.1
     - **Auth**: `GET /auth/login` accepts `identifier` (email, 4-digit employee ID or E.164 phone) and answers 302 the same way whether or not it matches; rate limited (ADR 0002 §9b). Local password sign-in stays deferred and is not in the contract.
@@ -6828,6 +6835,87 @@ paths:
                 properties:
                   items: { type: array, items: { $ref: '#/components/schemas/Setting' } }
         '401': { $ref: '#/components/responses/Unauthorized' }
+  /settings/register-rules:
+    get:
+      tags: [settings]
+      operationId: listRegisterRules
+      summary: The editable rules of the registers and their values
+      x-db-path: reg_rules_json
+      description: |
+        0.15.331 (migration 0430). System Admin or a delegate of `fields.edit` for all regions. `catalogue` lists the keys that can be edited (register, key, type, default, labels), `items` the registers that have some with their current `rules`.
+      responses:
+        '200':
+          description: The rules.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [catalogue, items]
+                properties:
+                  catalogue:
+                    type: array
+                    items:
+                      type: object
+                      required: [register_key, key, type, label_en]
+                      properties:
+                        register_key: { type: string }
+                        key: { type: string }
+                        type: { type: string, enum: [boolean, text] }
+                        default: {}
+                        label_en: { type: string }
+                        label_ar: { type: string }
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [register_key, name_en, rules, version]
+                      properties:
+                        register_key: { type: string }
+                        name_en: { type: string }
+                        name_ar: { type: [string, 'null'] }
+                        rules: { type: object, additionalProperties: true }
+                        version: { type: integer }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /settings/register-rules/{register_key}:
+    parameters:
+      - $ref: '#/components/parameters/RegisterKeyAny'
+    put:
+      tags: [settings]
+      operationId: setRegisterRules
+      summary: Change rules of one register
+      x-db-path: admin_register_rules
+      description: |
+        0.15.331 (migration 0430). Only keys of the catalogue (422 `unknown_rule`), each with the right type (422 `invalid`). A reason is required, the ETag is checked and the change is audited with before and after.
+      parameters:
+        - { name: If-Match, in: header, required: false, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rules, reason]
+              properties:
+                rules: { type: object, additionalProperties: { oneOf: [{ type: boolean }, { type: string }] } }
+                reason: { $ref: '#/components/schemas/Reason' }
+      responses:
+        '200':
+          description: The new rules.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [register_key, rules, version]
+                properties:
+                  register_key: { type: string }
+                  rules: { type: object, additionalProperties: true }
+                  version: { type: integer }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
   /settings/sla-rules:
     get:
       tags: [settings]
@@ -9619,14 +9707,13 @@ paths:
         '409': {$ref: '#/components/responses/Conflict'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '503': {$ref: '#/components/responses/ServiceUnavailable'}
-  /settings/imports:
+  /settings/template-change-notice:
     get:
       tags: [settings]
-      operationId: getImportsSettings
-      summary: The background threshold of batches (imports.async_rows)
+      operationId: getTemplateChangeNotice
+      summary: The notice of a new template version (templates.change_notice)
       description: |
-        0.14.6. Every signed-in user may read it. A send or a decision of a batch (New sites, register, stream, and each staged batch of a Master import apply) with more
-        rows than `async_rows` runs in the background (202, status `processing`). `can_edit` is true for a System Admin or a delegate of `settings` edit for all regions.
+        0.15.203 (P3). Every signed-in user may read it. `enabled`: the daily job writes an in-app notice to the entry holders of a register when its template gets a new version; `days`: how long after the version is issued a person is still told. `can_edit` is true for a System Admin or a delegate of `settings` edit for all regions.
       responses:
         '200':
           description: The setting.
@@ -9634,24 +9721,22 @@ paths:
             ETag: {$ref: '#/components/headers/ETag'}
           content:
             application/json:
-              schema: {$ref: '#/components/schemas/ImportsSettings'}
+              schema: {$ref: '#/components/schemas/TemplateChangeNotice'}
         '401': {$ref: '#/components/responses/Unauthorized'}
     put:
       tags: [settings]
-      operationId: setImportsSettings
-      summary: Change the background threshold (reason, If-Match, audited)
+      operationId: setTemplateChangeNotice
+      summary: Change the notice of a new template version (reason, If-Match, audited)
       description: |
-        0.14.6. A System Admin, or a delegate of `settings` edit for all regions (403 `action_forbidden` otherwise, also for a delegate limited to some regions). A whole number
-        from 10 to 500 (422 `validation_failed`, path `/async_rows`), a reason and If-Match; an unknown key is refused (422 `unknown_field`). Saving the value in force is
-        409 `invalid_transition`. Audited as `imports_async_rows_update` with the value, who and when before and after. The next send or decision reads the new value.
-      x-db-path: admin_set_imports_async_rows
+        0.15.203. A System Admin, or a delegate of `settings` edit for all regions (403 `action_forbidden`). `days` 1 to 365 (422 `validation_failed`, path `/days`), a reason and If-Match. Saving the values in force is 409 `invalid_transition`. Audited as `template_change_notice_update` with the values before and after.
+      x-db-path: admin_set_template_change_notice
       parameters:
       - {$ref: '#/components/parameters/IfMatch'}
       requestBody:
         required: true
         content:
           application/json:
-            schema: {$ref: '#/components/schemas/ImportsSettingsInput'}
+            schema: {$ref: '#/components/schemas/TemplateChangeNoticeInput'}
       responses:
         '200':
           description: Saved.
@@ -9659,7 +9744,7 @@ paths:
             ETag: {$ref: '#/components/headers/ETag'}
           content:
             application/json:
-              schema: {$ref: '#/components/schemas/ImportsSettings'}
+              schema: {$ref: '#/components/schemas/TemplateChangeNotice'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '409': {$ref: '#/components/responses/Conflict'}
@@ -10740,6 +10825,54 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '429': {$ref: '#/components/responses/TooManyRequests'}
+  /settings/ops-limits:
+    get:
+      tags: [settings]
+      operationId: getOpsLimits
+      summary: The operational limits, with the value in force and the default of each (0.15.312)
+      description: Every signed-in user may read it. `can_edit` is true for a System Admin only. A value that was never saved reads as its default.
+      x-db-path: ops_limits_state
+      responses:
+        '200':
+          description: The limits.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/OpsLimits'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+    put:
+      tags: [settings]
+      operationId: setOpsLimits
+      summary: Change the operational limits (System Admin, reason, step-up, If-Match, audited) (0.15.312)
+      description: |
+        System Admin only (403 `action_forbidden` otherwise, a delegate included). A reason (3+ characters), a step-up (401 `step_up_required`) and `If-Match` (428 / 412)
+        are required. `values` holds the limits that differ from their default; a key that is left out returns to its default. 422 for an unknown key, a value that is not a
+        whole number, a value outside its range, or an absolute session length shorter than the idle limit. Saving what is already in force is 409 `invalid_transition`.
+        Audited `ops_limits_update` with the stored values before and after.
+      x-step-up: true
+      x-db-path: admin_set_ops_limits
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/OpsLimitsInput'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/OpsLimits'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
   /settings/historical-waiver:
     get:
       tags: [settings]
@@ -13596,6 +13729,27 @@ paths:
                     type: array
                     items: {$ref: '#/components/schemas/Template'}
         '401': {$ref: '#/components/responses/Unauthorized'}
+  /templates/{template_id}/changes:
+    parameters:
+    - {$ref: '#/components/parameters/TemplateId'}
+    get:
+      tags: [templates]
+      operationId: getTemplateChanges
+      summary: What changed between two versions of a template (columns added, removed, renamed)
+      description: |
+        P3 (0.15.203). Compares `template_versions.columns` by column code. `to` defaults to the current version, `from` to the version before it. Read only; a caller who may not see the template gets 404 as for `GET /templates`.
+        A version that was never issued (for example from > current) answers 404. The first version has nothing to compare: `from` is null and the lists are empty.
+      parameters:
+      - {name: from, in: query, schema: {type: integer, minimum: 1}}
+      - {name: to, in: query, schema: {type: integer, minimum: 1}}
+      responses:
+        '200':
+          description: The differences.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/TemplateChanges'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
   /templates/{template_id}/download:
     parameters:
     - {$ref: '#/components/parameters/TemplateId'}
@@ -13619,6 +13773,10 @@ paths:
         schema:
           type: array
           items: {type: string, format: uuid}
+      - name: list
+        in: query
+        description: '0.15.320. Only for `TPL-LISTVALUES`: the code of a dropdown list. The file holds the current active values of that list (at most 5000), ready to edit and upload again.'
+        schema: {type: string, pattern: '^[A-Za-z][A-Za-z0-9_]{0,63}$'}
       - name: prefill
         in: query
         description: Pre-fill with the current records of the register (at most 5000 rows).
@@ -17948,6 +18106,63 @@ paths:
         '200': {description: Removed (also when there was none).}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '422': {$ref: '#/components/responses/Unprocessable'}
+  /comments/{comment_id}/reactions:
+    parameters:
+      - $ref: '#/components/parameters/CommentId'
+    put:
+      tags: [tasks]
+      operationId: reactToComment
+      summary: React to a comment (0.15.247, PM item 18)
+      description: Adds the caller's reaction to any comment they can read, a task comment or a register-record comment (the same bar as commenting on it). The emoji travels in the body because the client path whitelist keeps non-ASCII out of URLs. 404 `not_found` for a comment the caller cannot read, so its existence is not revealed; 422 `validation_failed` for an unsupported emoji. Idempotent. Not audited.
+      x-db-path: comment_react
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CommentReactionInput'}
+      responses:
+        '204': {description: Reaction recorded (also when it was already there).}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': { $ref: '#/components/responses/Unprocessable' }
+    delete:
+      tags: [tasks]
+      operationId: unreactToComment
+      summary: Remove the caller's reaction (0.15.247)
+      description: Removes the caller's own reaction, named in the body like the PUT. 404 for a comment the caller cannot read. Idempotent.
+      x-db-path: comment_unreact
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CommentReactionInput'}
+      responses:
+        '204': {description: Reaction removed (also when it was not there).}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /comments/{comment_id}/resolved:
+    parameters:
+      - $ref: '#/components/parameters/CommentId'
+    put:
+      tags: [tasks]
+      operationId: resolveComment
+      summary: Mark a comment resolved (0.15.247, PM item 18)
+      description: Marks the point of the comment resolved and records who did it and when. Anyone who can read the thread may resolve, the same bar as commenting. 404 for a comment the caller cannot read. Not audited.
+      x-db-path: comment_set_resolved
+      responses:
+        '204': {description: Resolved.}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    delete:
+      tags: [tasks]
+      operationId: unresolveComment
+      summary: Open a resolved comment again (0.15.247)
+      description: Clears the resolved mark (`resolved_at` and `resolved_by` read as null again). 404 for a comment the caller cannot read.
+      x-db-path: comment_set_resolved
+      responses:
+        '204': {description: Open again.}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
 components:
   securitySchemes:
     cookieAuth:
@@ -18124,6 +18339,12 @@ components:
       in: path
       required: true
       description: Register record.
+      schema: {type: string, format: uuid}
+    CommentId:
+      name: comment_id
+      in: path
+      required: true
+      description: Comment.
       schema: {type: string, format: uuid}
     DocTypeId:
       name: doc_type_id
@@ -19978,6 +20199,7 @@ components:
       type: object
       minProperties: 1
       properties:
+        code: { type: string, pattern: '^[A-Z][A-Z0-9_]{1,40}$', description: '0.15.500 (0500, D51). Changes the code; built-in codes are locked (422), a duplicate is 409.' }
         name_en: { type: string, minLength: 2 }
         name_ar: { type: string }
         description_en: { type: string }
@@ -20740,7 +20962,29 @@ components:
         body: { type: string }
         is_rejection_note: { type: boolean }
         mentions: { type: array, items: { $ref: '#/components/schemas/UserRef' } }
+        reactions: { type: array, items: { $ref: '#/components/schemas/CommentReaction' }, description: '0.15.247. One entry per emoji used on the comment, with the count and whether the caller reacted.' }
+        resolved: { $ref: '#/components/schemas/CommentResolved' }
         created_at: { type: string, format: date-time }
+    CommentReactionInput:
+      type: object
+      required: [emoji]
+      additionalProperties: false
+      properties:
+        emoji: { type: string, enum: ['👍'], description: '0.15.247. Starts with 👍 only.' }
+    CommentReaction:
+      type: object
+      required: [emoji, count, mine]
+      properties:
+        emoji: { type: string, description: '0.15.247. Starts with 👍 only.' }
+        count: { type: integer }
+        mine: { type: boolean, description: 'The caller reacted with this emoji.' }
+    CommentResolved:
+      type: object
+      required: [at, by]
+      description: '0.15.247. Set while the comment is marked resolved; absent (null) while open.'
+      properties:
+        at: { type: string, format: date-time }
+        by: { $ref: '#/components/schemas/UserRef' }
     OverrideRequest:
       type: object
       required: [kind, reason]
@@ -22053,6 +22297,27 @@ components:
                 email: { $ref: '#/components/schemas/StaffFieldVisibility' }
                 phone: { $ref: '#/components/schemas/StaffFieldVisibility' }
     # ---------------------------------------------------------- templates and import batches
+    TemplateChanges:
+      type: object
+      required: [template_id, from, to, issued_at, reason, added, removed, renamed]
+      properties:
+        template_id: {type: string}
+        from: {type: [integer, 'null']}
+        to: {type: integer}
+        issued_at: {type: [string, 'null'], format: date-time}
+        reason: {type: [string, 'null']}
+        added: {type: array, items: {$ref: '#/components/schemas/TemplateColumnRef'}}
+        removed: {type: array, items: {$ref: '#/components/schemas/TemplateColumnRef'}}
+        renamed:
+          type: array
+          items:
+            type: object
+            required: [code, from_label, to_label]
+            properties: {code: {type: string}, from_label: {type: string}, to_label: {type: string}}
+    TemplateColumnRef:
+      type: object
+      required: [code, label]
+      properties: {code: {type: string}, label: {type: string}}
     Template:
       type: object
       required: [template_id, name_en, kind, current_version, is_active]
@@ -24640,6 +24905,28 @@ components:
         updated_by: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }], description: 'Who changed it last (null: the value of the installation).' }
         version: { type: integer, description: The ETag value. }
         can_edit: { type: boolean }
+    TemplateChangeNotice:
+      type: object
+      description: '0.15.203. The setting `templates.change_notice`.'
+      required: [enabled, days, default_days, min, max, version, can_edit]
+      properties:
+        enabled: { type: boolean }
+        days: { type: integer, minimum: 1, maximum: 365 }
+        default_days: { type: integer, description: '14' }
+        min: { type: integer }
+        max: { type: integer }
+        updated_at: { type: [string, 'null'], format: date-time }
+        updated_by: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+        version: { type: integer, description: The ETag value. }
+        can_edit: { type: boolean }
+    TemplateChangeNoticeInput:
+      type: object
+      additionalProperties: false
+      required: [enabled, days, reason]
+      properties:
+        enabled: { type: boolean }
+        days: { type: integer, minimum: 1, maximum: 365 }
+        reason: { type: string, minLength: 3, maxLength: 1000 }
     NavSubHeading:
       type: object
       description: '0.15.1. A sub-heading of the side menu (under a main heading): screen keys only, no deeper level.'
@@ -25079,6 +25366,36 @@ components:
           properties:
             user_id: { type: string, format: uuid }
             minutes: { type: integer, minimum: 1, maximum: 60 }
+    OpsLimitItem:
+      type: object
+      description: '0.15.312. One operational limit.'
+      required: [key, group, unit, default, min, max, value, is_default]
+      properties:
+        key: { type: string, enum: [session.idle_hours, session.absolute_hours, stepup.seconds, assignments.max_rows, import.max_rows, master_import.max_rows, register_import.max_rows, prefill.max_rows, prefill.max_sites, export.max_rows, idempotency.max_entries] }
+        group: { type: string, enum: [sessions, rows, exports] }
+        unit: { type: string, enum: [hours, seconds, rows, sites, entries] }
+        default: { type: integer }
+        min: { type: integer }
+        max: { type: integer }
+        value: { type: integer, description: The value in force. }
+        is_default: { type: boolean, description: 'true when no value was saved for this key.' }
+    OpsLimits:
+      type: object
+      description: '0.15.312. The operational limits (setting `ops.limits`, migration 0402).'
+      required: [items, version, can_edit]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/OpsLimitItem' } }
+        updated_at: { type: [string, 'null'], format: date-time }
+        updated_by: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+        version: { type: integer, description: The ETag value. }
+        can_edit: { type: boolean, description: A System Admin only. }
+    OpsLimitsInput:
+      allOf:
+        - $ref: '#/components/schemas/WithReason'
+        - type: object
+          required: [values]
+          properties:
+            values: { type: object, additionalProperties: { type: integer }, description: 'The limits that differ from their default, key to value. A key that is left out returns to its default.' }
     NavLayout:
       type: object
       description: '0.15.1. The shared order of the side menu (setting `nav.layout`).'
@@ -25210,7 +25527,7 @@ components:
     DashboardOps:
       type: object
       description: '0.15.106: the follow-up sections of the dashboard (owner approval 2026-11-26).'
-      required: [as_of, scope_regions, procurement, permits_hse, gecol_hlc, contractor_scorecard, quality, approvals]
+      required: [as_of, scope_regions, procurement, permits_hse, gecol_hlc, contractor_scorecard, quality, approvals, changes_meetings]
       properties:
         as_of: {type: string, format: date-time}
         scope_regions:
@@ -25223,6 +25540,7 @@ components:
         contractor_scorecard: {$ref: '#/components/schemas/DashboardOpsScorecard'}
         quality: {$ref: '#/components/schemas/DashboardOpsQuality'}
         approvals: {$ref: '#/components/schemas/DashboardOpsApprovals'}
+        changes_meetings: {$ref: '#/components/schemas/DashboardOpsChangesMeetings'}
     DashboardOpsProcurement:
       type: object
       description: '0.15.106: procurement and materials (dashboard proposals item 1).'
@@ -25376,6 +25694,44 @@ components:
                     count: {type: integer}
           description: "One entry per ball-in-court role, most waiting tasks first."
         unassigned: {type: [integer, 'null'], description: "The waiting tasks with no ball-in-court role (a group holds them, or nobody yet)."}
+    DashboardOpsChangesMeetings:
+      type: object
+      description: "0.15.205 (item 8): the pending change requests and the overdue meeting actions."
+      required: [available, changes, actions]
+      properties:
+        available: {type: boolean, description: "False when the caller has neither the change control nor the meetings view."}
+        changes:
+          type: object
+          required: [available, pending, approved_not_applied, by_kind, pending_aging]
+          properties:
+            available: {type: boolean, description: "False without the change control view; every figure is then null."}
+            pending: {type: [integer, 'null'], description: "Change requests with status requested."}
+            approved_not_applied: {type: [integer, 'null'], description: "Change requests approved and not yet applied."}
+            by_kind:
+              type: [array, 'null']
+              description: "The pending change requests per kind, most first."
+              items:
+                type: object
+                required: [kind, count]
+                properties:
+                  kind: {type: string, enum: [scope_change, date_change, suspension, resumption, other]}
+                  count: {type: integer}
+            pending_aging:
+              anyOf:
+                - $ref: '#/components/schemas/DashboardOpsAging'
+                - type: 'null'
+        actions:
+          type: object
+          required: [available, open, overdue, no_due_date, overdue_aging]
+          properties:
+            available: {type: boolean, description: "False without the meetings view; every figure is then null."}
+            open: {type: [integer, 'null'], description: "Meeting actions open or in progress."}
+            overdue: {type: [integer, 'null'], description: "Open actions whose due date is before today."}
+            no_due_date: {type: [integer, 'null'], description: "Open actions with no due date."}
+            overdue_aging:
+              anyOf:
+                - $ref: '#/components/schemas/DashboardOpsAging'
+                - type: 'null'
     DashboardOpsQuality:
       type: object
       description: "0.15.203 (item 6): the open snags and NCRs of the in-scope sites, the average closure age of each and the first-time acceptance rate."
