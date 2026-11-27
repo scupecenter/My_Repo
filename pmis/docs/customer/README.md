@@ -12,6 +12,7 @@
 | [05-training-ar.md](05-training-ar.md) | مادة التدريب | Arabic training material per role |
 | [06-admin-guide-ar.md](06-admin-guide-ar.md) | دليل مدير النظام | Arabic administrator guide |
 | [03-architecture-and-data.md](03-architecture-and-data.md) | البنية ومخطط البيانات | Architecture, authentication, authorization/RLS, data entities, audit, backups, integrations, IT needs |
+| [09-handover-open-items-warning.md](09-handover-open-items-warning.md) | تحذير البنود المفتوحة عند تسليم الجاهزية | Readiness handover: open items warning |
 
 ## وثائق مخططة لاحقاً | Planned later
 
