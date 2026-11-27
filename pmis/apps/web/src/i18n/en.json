@@ -6495,6 +6495,15 @@
     "none": "No gaps in this view.",
     "open_matrix": "Open the Responsibility Matrix"
   },
+  "records": {
+    "pin": "Pin",
+    "unpin": "Unpin",
+    "pinned": "Pinned records",
+    "recent": "Recent records",
+    "clear": "Clear",
+    "changed": "Changed since you last opened it",
+    "pin_full": "You can pin up to {{max}} records. Unpin one first."
+  },
   "postLogin": {
     "title": "Signing you in…",
     "note": "Preparing your workspace",
