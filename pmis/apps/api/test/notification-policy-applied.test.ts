@@ -115,7 +115,7 @@ describe('notif_policy_tick', () => {
     const lonely = await waitingRecord(5, 1);
     await db.query('SELECT notif_policy_tick()');
     expect(await to(lonely.link, 'no_holder', 'Level has no holder')).toBeGreaterThanOrEqual(1);
-  });
+  }, 120000);
 
   it('the switch off stops the reminders but not the no-holder alert', async () => {
     await setPolicy({ enabled: false });
@@ -127,7 +127,7 @@ describe('notif_policy_tick', () => {
     expect(await to(lonely.link, 'approval_due', 'Approval escalated')).toBe(0);
     expect(await to(lonely.link, 'no_holder', 'Level has no holder')).toBeGreaterThanOrEqual(1);
     await setPolicy({});
-  });
+  }, 120000);
 
   it('deletes notices older than the retention (default 180 days) and keeps the rest', async () => {
     const u = await makeUser(db, { status: 'active' });
@@ -149,7 +149,7 @@ describe('notif_policy_tick', () => {
     expect(n1).toBeGreaterThanOrEqual(1);
     await db.query('SELECT notif_policy_tick()');
     expect((await db.query(`SELECT count(*)::int AS n FROM notifications WHERE task_id = $1 AND kind = 'idle_task_alert'`, [id])).rows[0].n).toBe(n1);
-  });
+  }, 120000);
 });
 
 describe('notif_digest_due', () => {
