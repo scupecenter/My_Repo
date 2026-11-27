@@ -2937,6 +2937,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/matrix/simulate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Who would hold L1 and L2 for a site and a task or register (read only, admin)
+         * @description 0.15.152. Read only, nothing is written. The cell that decides is found as the engine finds it (task cell before stage cell, region cell before default cell). `holders` are the active people who would hold the level and `via` says how (`named`, `role: <name>`, `group: <name>`). When nobody holds the level, `fallback` lists who could act through the admin path (`system_admin`, or `delegate` when a delegation covers the module and the region of the site). Needs `admin.matrix` view or edit (403 otherwise).
+         */
+        get: operations["simulateMatrix"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/matrix/coverage": {
         parameters: {
             query?: never;
@@ -10565,6 +10585,38 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        MatrixSimulation: {
+            site: {
+                /** Format: uuid */
+                id: string;
+                site_code: string;
+                name: string | null;
+                region_id: number;
+            };
+            /** @enum {string} */
+            kind: "task" | "register";
+            code: string;
+            name_en: string;
+            name_ar: string | null;
+            module: string;
+            levels: {
+                /** @enum {string} */
+                level_code: "L1" | "L2";
+                /** @enum {string} */
+                source: "region" | "default" | "none";
+                task_specific: boolean;
+                rule: string | null;
+                holders: components["schemas"]["MatrixSimulationPerson"][];
+                fallback: components["schemas"]["MatrixSimulationPerson"][];
+            }[];
+        };
+        MatrixSimulationPerson: {
+            /** Format: uuid */
+            user_id: string;
+            name: string;
+            email: string;
+            via: string | string[];
+        };
         PmScheduleInput: {
             id: string;
             name_en: string;
@@ -25692,6 +25744,35 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    simulateMatrix: {
+        parameters: {
+            query: {
+                site_id: string;
+                kind: "task" | "register";
+                /** @description The task code (kind task) or the register key (kind register). */
+                code: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The simulation. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatrixSimulation"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
             422: components["responses"]["Unprocessable"];
         };
     };
