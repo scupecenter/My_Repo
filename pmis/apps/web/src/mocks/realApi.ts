@@ -671,6 +671,13 @@ export const REAL_API_AUTH_USERS = [
   // Contract 0.15.67 (migration 0149): My Work > Daily Plan and its settings.
   ['get', '/daily-plans'],
   ['get', '/daily-plans/export'],
+  // Contract 0.15.410 (migration 0567): history, claim and triage of a plan day; history of a warehouse item.
+  ['get', '/daily-plans/:date/regions/:regionId/history'],
+  ['get', '/daily-plans/:date/regions/:regionId/triage'],
+  ['post', '/daily-plans/:date/regions/:regionId/claim'],
+  ['delete', '/daily-plans/:date/regions/:regionId/claim'],
+  ['post', '/daily-plans/:date/regions/:regionId/triage'],
+  ['get', '/warehouse/items/:id/history'],
   ['post', '/daily-plans/:date/regions/:regionId/sites'],
   ['patch', '/daily-plans/:date/regions/:regionId/sites/:siteId'],
   ['delete', '/daily-plans/:date/regions/:regionId/sites/:siteId'],

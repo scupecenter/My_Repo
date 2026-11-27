@@ -50,6 +50,34 @@ export class DailyPlanController {
     return this.svc.lock(d, r, ifMatch);
   }
 
+  @Get(':date/regions/:regionId/history')
+  history(@Param('date') d: string, @Param('regionId') r: string) {
+    return this.svc.history(d, r);
+  }
+
+  @Get(':date/regions/:regionId/triage')
+  triage(@Param('date') d: string, @Param('regionId') r: string) {
+    return this.svc.triage(d, r);
+  }
+
+  @Post(':date/regions/:regionId/claim')
+  @HttpCode(200)
+  claim(@Param('date') d: string, @Param('regionId') r: string) {
+    return this.svc.claim(d, r, true);
+  }
+
+  @Delete(':date/regions/:regionId/claim')
+  @HttpCode(200)
+  release(@Param('date') d: string, @Param('regionId') r: string) {
+    return this.svc.claim(d, r, false);
+  }
+
+  @Post(':date/regions/:regionId/triage')
+  @HttpCode(200)
+  decide(@Param('date') d: string, @Param('regionId') r: string, @Body() body: unknown) {
+    return this.svc.decide(d, r, body);
+  }
+
   @Post(':date/regions/:regionId/unlock')
   @HttpCode(200)
   unlock(@Auth() auth: AuthContext, @Param('date') d: string, @Param('regionId') r: string, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown) {

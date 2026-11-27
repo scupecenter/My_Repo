@@ -72,6 +72,14 @@ export const warehouseHandlers = [
     W().items.push(row);
     return HttpResponse.json(row, { status: 201, ...tag(1) });
   }),
+  // 0567: the audit trail of one item (mock: one earlier edit of the name)
+  http.get(`${B}/warehouse/items/:id/history`, ({ params }) => {
+    const g = guard(); if (g) return g;
+    if (!admin()) return problem(403, 'forbidden', 'Not allowed');
+    const it = W().items.find((x) => x.id === params.id);
+    if (!it) return problem(404, 'not_found', 'Item not found');
+    return HttpResponse.json([{ id: `h-${it.id}`, at: '2026-11-01T08:00:00Z', action: 'warehouse_item_save', actor: { display_name: 'Mock admin' }, reason: 'Earlier edit', changes: [{ field: 'name_en', from: `${it.name_en ?? ''} (old)`, to: it.name_en ?? '' }] }]);
+  }),
   http.patch(`${B}/warehouse/items/:id`, async ({ params, request }) => {
     const g = guard(); if (g) return g;
     if (!admin()) return problem(403, 'forbidden', 'Not allowed');

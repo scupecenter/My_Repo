@@ -127,6 +127,29 @@ export class DailyPlanService {
     return this.one(Prisma.sql`SELECT dp_unlock(${region(r)}::integer, ${date(d)}::date, ${reason}::text, ${version}::integer) AS j`);
   }
 
+  /** Migration 0567: the audit trail of one plan day (rows changed, added, removed, locks) with the field changes. GET /daily-plans/{date}/regions/{region_id}/history */
+  history(d: string, r: string): Promise<J[]> {
+    return this.one(Prisma.sql`SELECT dp_plan_history(${region(r)}::integer, ${date(d)}::date) AS j`);
+  }
+
+  /** Migration 0567: claim and triage state of a plan day (target: region + date). */
+  triage(d: string, r: string): Promise<J> {
+    return this.one(Prisma.sql`SELECT dp_plan_triage_get(${region(r)}::integer, ${date(d)}::date) AS j`);
+  }
+
+  claim(d: string, r: string, claim: boolean): Promise<J> {
+    return this.one(Prisma.sql`SELECT dp_plan_claim(${region(r)}::integer, ${date(d)}::date, ${claim}::boolean) AS j`);
+  }
+
+  decide(d: string, r: string, body: unknown): Promise<J> {
+    const b = (body && typeof body === 'object' ? body : {}) as Record<string, unknown>;
+    const extra = Object.keys(b).filter((k) => k !== 'state' && k !== 'note');
+    if (extra.length) throw problems.validation(extra.map((k) => ({ path: `/${k}`, code: 'unknown_key', message: 'Unknown key.' })));
+    const state = typeof b.state === 'string' ? b.state : '';
+    const note = typeof b.note === 'string' ? b.note : '';
+    return this.one(Prisma.sql`SELECT dp_plan_triage(${region(r)}::integer, ${date(d)}::date, ${state}::text, ${note}::text) AS j`);
+  }
+
   /** GET /settings/daily-plan */
   settings(): Promise<{ version: number }> {
     return this.one(Prisma.sql`SELECT dp_settings_json() AS j`);

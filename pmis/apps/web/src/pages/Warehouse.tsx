@@ -8,6 +8,8 @@ import { useRegisterRecord, useUpdateRecord } from '@/api/registers';
 import { useRegions } from '@/api/sites';
 import type { StockLevel, StockMovement, WarehouseItem } from '@/api/types';
 import { useItemColumns, type ItemColumn } from '@/api/warehouseColumns';
+import { HistoryDialog } from '@/components/HistoryDialog';
+import { useItemHistory } from '@/api/history';
 import { useConfigGaps, useRegionVendors, useSaveRegionVendor, type RegionVendor, useDeleteItem, useDispatchList, useMovements, useQuarantineExit, useReverseMovement, useSaveItem, useStock, useWhItems, type QuarantineExitBody } from '@/api/warehouse';
 import { NEED_TONE } from '@/components/SiteDispatch';
 import { errText, FormDialog } from '@/components/FormDialog';
@@ -40,6 +42,8 @@ function Items() {
   const list = useWhItems({ q, include_inactive: inactive });
   const save = useSaveItem<WarehouseItem>('/warehouse/items', 'wh-items');
   const del = useDeleteItem();
+  const [hist, setHist] = useState<WarehouseItem | null>(null);
+  const histQ = useItemHistory(hist?.id ?? null);
   const [dlg, setDlg] = useState<Dlg>(null);
   const [f, setF] = useState<Form>(EMPTY);
   const cols = useItemColumns().data ?? [];
@@ -124,7 +128,7 @@ function Items() {
                 <td className="px-3 py-2">{x.serial_tracked ? t('wh.yes') : t('wh.no')}</td>
                 {cols.map((c) => <td key={c.code} className="px-3 py-2" data-testid={`wh-cv-${x.code}-${c.code}`}>{showVal(c, (x.custom ?? {})[c.code])}</td>)}
                 <td className="px-3 py-2"><span className={`chip ${x.is_active ? 'bg-doneBg text-doneInk' : 'bg-lockBg text-lockInk'}`}>{t(x.is_active ? 'wh.active' : 'wh.inactive')}</span></td>
-                <td className="px-3 py-2 text-end">{admin && x.is_active && <>
+                <td className="px-3 py-2 text-end">{admin && <><button className="btn" data-testid={`wh-history-${x.code}`} onClick={() => setHist(x)}>{t('history.open')}</button>{' '}</>}{admin && x.is_active && <>
                   <button className="btn" data-testid={`wh-edit-${x.code}`} onClick={() => open({ mode: 'edit', item: x })}>{t('wh.edit')}</button>{' '}
                   <button className="btn" data-testid={`wh-off-${x.code}`} onClick={() => open({ mode: 'off', item: x })}>{t('wh.deactivate')}</button>{x.deletable && <>{' '}<button className="btn" data-testid={`wh-del-${x.code}`} onClick={() => open({ mode: 'del', item: x })}>{t('wh.delete')}</button></>}</>}</td>
               </tr>
@@ -134,6 +138,14 @@ function Items() {
         {list.isSuccess && !items.length && <p className="p-6 text-center text-mute" data-testid="wh-empty">{t('wh.empty')}</p>}
         {list.isError && <p role="alert" className="p-6 text-center text-lateInk">{t('errors.generic')}</p>}
       </div>
+      {hist && <HistoryDialog testid="wh-history-dialog" title={t('history.title_item', { code: hist.code })} entries={histQ.data} loading={histQ.isLoading} onClose={() => setHist(null)}
+        onRestore={(e) => {
+          // Restore = the old values through the normal writer (PATCH items/:id): rights, locks, reason and audit as for any edit
+          const EDITABLE = ['name_en', 'name_ar', 'uom', 'category', 'serial_tracked'];
+          const body: Record<string, unknown> = Object.fromEntries(e.changes.filter((c) => EDITABLE.includes(c.field)).map((c) => [c.field, c.from ?? null]));
+          if (!Object.keys(body).length) return;
+          save.mutate({ item: hist, body: { ...body, reason: `Restore ${e.action} ${e.at.slice(0, 10)}` } }, { onSuccess: () => { setHist(null); toast(t('history.restored')); }, onError: (er) => toast(registerErrorMessage(t, er), 'err') });
+        }} />}
       {dlg && (
         <FormDialog open onClose={close} testid="wh-dialog" busy={save.isPending || del.isPending} error={err} onSubmit={submit}
           title={t(dlg.mode === 'new' ? 'wh.new_title' : dlg.mode === 'edit' ? 'wh.edit_title' : dlg.mode === 'del' ? 'wh.delete_title' : 'wh.deactivate_title')}
