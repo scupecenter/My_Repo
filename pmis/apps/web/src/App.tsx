@@ -11,6 +11,7 @@ import { safeNext } from '@/lib/nextPath';
 import { Home } from '@/components/Home';
 import { PeopleAdminLayout } from '@/components/PeopleAdmin';
 import { Approvals } from '@/pages/Approvals';
+import { Field } from '@/pages/Field';
 import { Inbox } from '@/pages/Inbox';
 import { StatusUpdates } from '@/pages/StatusUpdates';
 import { ContractorsReports } from '@/pages/ContractorsReports';
@@ -103,6 +104,7 @@ function gated(session: Session) {
         <Route path="my-work/daily-plan" element={<DailyPlan />} />
         <Route path="approvals" element={<Approvals />} />
         <Route path="inbox" element={<Inbox />} />
+        <Route path="field" element={<Field />} />
         <Route path="workload" element={<Workload />} />
         <Route path="reports/contractors" element={<ContractorsReports />} />
         <Route path="status-updates" element={<StatusUpdates />} />

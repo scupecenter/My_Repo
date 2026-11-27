@@ -17,6 +17,7 @@ export const UI_FEATURES_SEED: UiFeatures = {
   },
   inbox: { tabs_enabled: true, default_tab: 'all', priority_kinds: ['mention', 'approval_due', 'task_returned', 'task_rejected', 'idle_task_alert', 'no_holder', 'absence_alert'] },
   panel: { mode: 'popover', width: 'medium', show_tabs: true },
+  field_pwa: { enabled: false, cache_hours: 24, max_queue: 50, max_photo_mb: 8, sync_seconds: 60 },
 };
 
 export const useUiFeaturesSetting = (enabled = true) =>

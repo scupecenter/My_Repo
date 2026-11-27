@@ -1,10 +1,12 @@
 import { Body, Controller, Delete, Get, Headers, HttpCode, Param, Patch, Post, Put, Query, Res, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
+import { createHash } from 'node:crypto';
 import { memoryStorage } from 'multer';
 import type { AuthContext } from '../auth/auth.types';
 import { Auth } from '../auth/decorators';
 import { etagHeader } from '../common/etag';
+import { IdempotencyService } from '../common/idempotency.service';
 import { SnagsService } from './snags.service';
 
 const photoUpload = () => FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 200 * 1024 * 1024 + 1024, files: 1, fields: 10, parts: 12 } });
@@ -13,7 +15,7 @@ type Uploaded = { buffer: Buffer; originalname: string } | undefined;
 /** QC snags and the photos of their fix (tag qc; owner answers Q131 / Q132). */
 @Controller()
 export class SnagsController {
-  constructor(private readonly snags: SnagsService) {}
+  constructor(private readonly snags: SnagsService, private readonly idem: IdempotencyService) {}
 
   private tag(res: Response, r: Record<string, unknown>): Record<string, unknown> {
     res.setHeader('ETag', etagHeader(r.version as number));
@@ -82,8 +84,10 @@ export class SnagsController {
   @Post('snags/:id/photos')
   @HttpCode(201)
   @UseInterceptors(photoUpload())
-  photo(@Auth() auth: AuthContext, @Param('id') id: string, @UploadedFile() file: Uploaded, @Body() body: Record<string, unknown> | undefined) {
-    return this.snags.uploadPhoto(auth, id, file, body);
+  photo(@Auth() auth: AuthContext, @Param('id') id: string, @UploadedFile() file: Uploaded, @Body() body: Record<string, unknown> | undefined, @Headers('idempotency-key') key: string | undefined) {
+    // 0.15.340 (field PWA): a queued photo that is replayed after a lost response returns the first answer instead of a second photo
+    const sha = file ? createHash('sha256').update(file.buffer).digest('hex') : null;
+    return this.idem.run(auth.user.id, 'uploadSnagPhoto', key, { id, sha, fields: body ?? null }, () => this.snags.uploadPhoto(auth, id, file, body));
   }
 
   @Delete('snags/:id/photos/:photoId')
@@ -100,8 +104,9 @@ export class SnagsController {
 
   @Post('snags/:id/submit')
   @HttpCode(200)
-  async submit(@Auth() auth: AuthContext, @Param('id') id: string, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response) {
-    return this.tag(res, await this.snags.transition(auth, id, 'submit', ifMatch, body));
+  async submit(@Auth() auth: AuthContext, @Param('id') id: string, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Headers('idempotency-key') key: string | undefined, @Res({ passthrough: true }) res: Response) {
+    // 0.15.340 (field PWA): a queued submit replayed after a lost response returns the first answer
+    return this.tag(res, await this.idem.run(auth.user.id, 'submitSnag', key, { id, ifMatch: ifMatch ?? null, body: body ?? null }, () => this.snags.transition(auth, id, 'submit', ifMatch, body)));
   }
 
   @Post('snags/:id/review')

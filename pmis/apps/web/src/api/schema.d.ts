@@ -16226,12 +16226,21 @@ export interface components {
             width: "narrow" | "medium" | "wide";
             show_tabs: boolean;
         };
+        /** @description 0.15.340. Field mode (the installable app for site teams that keeps working without a connection). `enabled` is the switch (off by default); `cache_hours` how long the read cache of a signed-in user lives on the device; `max_queue` the most actions waiting to sync; `max_photo_mb` the largest photo the device queues; `sync_seconds` the retry interval. */
+        UiFieldPwa: {
+            enabled: boolean;
+            cache_hours: number;
+            max_queue: number;
+            max_photo_mb: number;
+            sync_seconds: number;
+        };
         /** @description 0.15.185. The sections of the interface features setting; every section is complete. */
         UiFeatures: {
             avatars: components["schemas"]["UiAvatars"];
             new_badge: components["schemas"]["UiNewBadge"];
             inbox: components["schemas"]["UiInbox"];
             data_hub: components["schemas"]["UiDataHub"];
+            field_pwa: components["schemas"]["UiFieldPwa"];
             panel: components["schemas"]["UiPanel"];
         };
         UiFeaturesPatch: {
@@ -16239,6 +16248,7 @@ export interface components {
             new_badge?: components["schemas"]["UiNewBadge"];
             inbox?: components["schemas"]["UiInbox"];
             data_hub?: components["schemas"]["UiDataHub"];
+            field_pwa?: components["schemas"]["UiFieldPwa"];
             panel?: components["schemas"]["UiPanel"];
         };
         UiFeaturesSetting: {
@@ -39420,7 +39430,9 @@ export interface operations {
     uploadSnagPhoto: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
             path: {
                 /** @description Snag. */
                 snag_id: components["parameters"]["SnagId"];
@@ -39491,6 +39503,7 @@ export interface operations {
             header: {
                 /** @description The ETag last read. */
                 "If-Match": components["parameters"]["IfMatch"];
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
             };
             path: {
                 /** @description Snag. */

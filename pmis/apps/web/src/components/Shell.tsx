@@ -9,6 +9,9 @@ import { api } from '@/api/client';
 import { useLogout, useMe, useNotifications, useSession } from '@/api/hooks';
 import { useMenuCounts, useUnreadTotal } from '@/api/msg';
 import { useOpenAlertCount } from '@/api/logs';
+import { useFieldPwaSettings } from '@/api/fieldPwa';
+import { fieldPendingCount } from '@/lib/fieldOutbox';
+import { wipeFieldData } from '@/lib/fieldPwa';
 import { isAdmin } from '@/lib/perm';
 import { applyLocale, applyTheme, currentLocale, currentTheme } from '@/i18n';
 import { HYBRID } from '@/lib/hybrid';
@@ -112,8 +115,10 @@ export function Shell() {
   const alerts = useOpenAlertCount(isAdmin(me.data)).data ?? 0;
   // Users, Online now, Roles, Groups, Delegation and the Matrix are tabs of one screen: one sidebar entry, opening the first allowed tab.
   const inPeople = PEOPLE_TABS.some((p) => loc.pathname === p.to || loc.pathname.startsWith(`${p.to}/`));
-  const sideItems = visibleNavItems(me.data);
-  const paletteItems = permittedNavItems(me.data);
+  // Field mode (0411): its menu entry shows only while a System Admin has turned it on
+  const fieldOn = useFieldPwaSettings().enabled;
+  const sideItems = visibleNavItems(me.data).filter((n) => n.key !== 'field' || fieldOn);
+  const paletteItems = permittedNavItems(me.data).filter((n) => n.key !== 'field' || fieldOn);
   const pending = notes.data?.unread_count ?? 0;
   const current = inPeople ? NAV.find((n) => n.key === 'admin.users') : [...NAV].sort((a, b) => b.to.length - a.to.length).find((n) => loc.pathname.startsWith(n.to));
   // saved on the server (PATCH /me/preferences, 0.15.42); the cached /me is updated so the effects above do not switch it back
@@ -233,7 +238,7 @@ export function Shell() {
               </Popover.Content>
             </Popover.Portal>
           </Popover.Root>
-          <button className="btn" data-testid="topbar-signout" aria-label={t('top.sign_out')} onClick={() => logout.mutate(undefined, { onSuccess: () => { void qc.invalidateQueries({ queryKey: ['session'] }); nav('/login'); } })}><LogOut size={16} /></button>
+          <button className="btn" data-testid="topbar-signout" aria-label={t('top.sign_out')} onClick={() => { void (async () => { const n = await fieldPendingCount(me.data?.user.id); if (n > 0 && !window.confirm(t('field.signout_warn', { count: n }))) return; logout.mutate(undefined, { onSuccess: () => { void wipeFieldData(); void qc.invalidateQueries({ queryKey: ['session'] }); nav('/login'); } }); })(); }}><LogOut size={16} /></button>
         </header>
         {HYBRID && <div role="status" data-testid="hybrid-banner" className="border-b border-line bg-waitBg px-4 py-1 text-xs text-waitInk">{t('hybrid.banner')}</div>}
         <AutoHints />
