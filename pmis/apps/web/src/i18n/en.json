@@ -7529,5 +7529,23 @@
     "domains": "Internal domains (comma separated)",
     "domains_note": "An address whose domain is not listed is external. With no domain listed every address counts as internal.",
     "confirm_note": "The change is audited and applies to the next mail."
+  },
+  "capture": {
+    "dictate": "Dictate",
+    "dictate_stop": "Stop dictation",
+    "annotate_title": "Mark the photo",
+    "arrow": "Arrow",
+    "circle": "Circle",
+    "undo": "Undo",
+    "clear": "Clear",
+    "use_asis": "Upload as is",
+    "use_annotated": "Upload with marks",
+    "video": "Video",
+    "video_title": "Short video (up to {{seconds}}s)",
+    "video_unsupported": "This browser cannot record video here. Use the photo upload instead.",
+    "record": "Record",
+    "stop": "Stop",
+    "use_video": "Upload video",
+    "annotate": "Annotate"
   }
 }
