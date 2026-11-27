@@ -1,4 +1,5 @@
 import { Lock } from 'lucide-react';
+import { UnsavedGuard } from '@/lib/unsavedGuard';
 import { Fragment, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCatalogue, usePolicy, useSetPolicy } from '@/api/settings';
@@ -97,6 +98,7 @@ export function Notifications() {
         <button className="btn btn-accent" data-testid="np-save" disabled={Object.keys(local).length > 0} onClick={() => setOpen(true)}>{t('common.save')}</button>
         {draft && <button className="btn" onClick={() => setDraft(null)}>{t('common.cancel')}</button>}
       </div>
+      <UnsavedGuard scope="settings" dirty={!!draft} needsReason label={t('ui.guard_settings')} onSave={(reason) => new Promise<boolean>((res) => save.mutate({ version: p.version, body: body(reason) }, { onSuccess: () => res(true), onError: () => res(false) }))} />
       {open && (
         <FormDialog open onClose={() => setOpen(false)} testid="np-dialog" title={t('np.title')} busy={save.isPending} error={save.isError ? errText(save.error, t) : null}
           onSubmit={(reason) => save.mutate({ version: p.version, body: body(reason) }, { onSuccess: () => { toast(t('settings.audited')); setOpen(false); setDraft(null); }, onError: (e) => { if (e.status === 422) setOpen(false); } })} />
