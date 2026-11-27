@@ -100,3 +100,22 @@ BEGIN
     GRANT SELECT ON public.comment_reactions TO pmis_app;
   END IF;
 END $$;
+
+
+-- ---------------------------------------------------------------------------------------------------------------------
+-- Data reset coverage (0152): comment_reactions is user data of a comment (MIXED over the comment's parts, like comment_mentions).
+-- data_reset_plan() is an accumulating function: patch the stored text idempotently (0361 pattern), never redefine it from an old base.
+DO $$
+DECLARE def text;
+BEGIN
+  def := pg_get_functiondef('public.data_reset_plan()'::regprocedure);
+  IF position('''comment_reactions''' IN def) = 0 THEN
+    IF position('c.id = t.comment_id)''),' IN def) = 0 THEN RAISE EXCEPTION 'data_reset_plan: the comment_mentions row was not found'; END IF;
+    def := replace(def, 'c.id = t.comment_id)''),',
+      'c.id = t.comment_id)''),' || chr(10) || '    (''comment_reactions'',          ''mixed'', ''*'', ''(SELECT c.parts FROM pg_temp.reset_comment c WHERE c.id = t.comment_id)''),');
+  END IF;
+  EXECUTE def;
+END $$;
+
+-- the reset role reads every classified table and deletes the rows of a MIXED table part by part (0152 privilege check)
+GRANT SELECT, DELETE ON public.comment_reactions TO pmis_reset_owner;
