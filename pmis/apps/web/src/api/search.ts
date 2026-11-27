@@ -12,6 +12,8 @@ export interface SearchHit {
   href: string;
   /** [start, end) offsets into `title` (UTF-16 code units) to highlight. */
   match_ranges: [number, number][];
+  /** Documents group: the text around the match inside the file contents; null when the file matched by name (contract 0.15.155). */
+  snippet?: string | null;
 }
 
 export interface SearchGroup {

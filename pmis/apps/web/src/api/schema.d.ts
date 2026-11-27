@@ -4,6 +4,26 @@
  */
 
 export interface paths {
+    "/admin/document-search-index": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Status of the document contents search index (System Admin)
+         * @description 0.15.155. Counts of the files whose text is searchable. Indexing runs in the background every few minutes. 403 for anyone but a System Admin.
+         */
+        get: operations["getDocumentSearchIndex"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/login": {
         parameters: {
             query?: never;
@@ -11973,6 +11993,18 @@ export interface components {
             /** @description The app route to open (a relative path). */
             href: string;
             match_ranges: number[][];
+            /** @description 0.15.155. Documents group: the text around the match inside the file contents (normalised), null when the file matched by name. */
+            snippet?: string | null;
+        };
+        DocumentSearchIndex: {
+            indexed: number;
+            empty: number;
+            unsupported: number;
+            too_large: number;
+            failed: number;
+            pending: number;
+            /** Format: date-time */
+            last_extracted_at: string | null;
         };
         SearchGroup: {
             type: components["schemas"]["SearchType"];
@@ -18484,7 +18516,7 @@ export interface components {
         PhotoRules: {
             min_count?: number;
             shot_types?: string[];
-            formats?: ("JPG" | "PNG" | "HEIC")[];
+            formats?: ("JPG" | "PNG" | "HEIC" | "WEBM" | "MP4" | "MOV")[];
             max_size_mb?: number;
         };
         DocumentPlacement: {
@@ -22017,6 +22049,28 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    getDocumentSearchIndex: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The counts. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentSearchIndex"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
     authLogin: {
         parameters: {
             query?: {
