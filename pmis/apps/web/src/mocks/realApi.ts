@@ -475,6 +475,8 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/site-master/columns/:ord/type-preview'],
   ['post', '/site-master/columns/:ord/deactivate'],
   ['post', '/site-master/columns/:ord/reactivate'],
+  ['get', '/custom-fields'],
+  ['get', '/custom-fields/:id'],
   ['get', '/site-master/sites/:siteId/sources'],
   ['post', '/sites/:id/admin-edits'],
   ['get', '/sites/:id/admin-edits'],
