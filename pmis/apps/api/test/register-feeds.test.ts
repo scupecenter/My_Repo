@@ -225,6 +225,9 @@ describe('site code references (0323)', () => {
     expect(JSON.stringify(self.body)).toContain('self_link');
     const na = await t.entry.api.call('post', recPath('rf_design'), { site_id: t.site.id, data: { backup_site: 'N/A' } });
     expect(na.status, JSON.stringify(na.body)).toBe(201);
+  });
+});
+
 describe('Issue to Risk link (0322)', () => {
   it('an issue names a risk the caller may see; a made-up or malformed id is refused; the pickers answer', async () => {
     const t = await team(app, db, 'issues', 'issues', R);
