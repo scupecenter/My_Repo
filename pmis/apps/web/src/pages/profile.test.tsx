@@ -278,8 +278,9 @@ describe('two-factor self-service', () => {
     const u = userEvent.setup();
     renderApp(<Routes><Route path="/admin/users/:userId" element={<UserDetailPage />} /></Routes>, { route: `/admin/users/${uid('1204')}` });
     expect(await screen.findByTestId('two-factor-enforced-state')).toHaveAttribute('data-enforced', 'false');
-    await u.click(screen.getByTestId('two-factor-enforce'));
-    await u.type(screen.getByTestId('two-factor-enforce-dialog-reason'), 'Finance role');
+    // the buttons wait on the /me query (canTwoFactor), which can land after the user query under full-suite load - await them
+    await u.click(await screen.findByTestId('two-factor-enforce'));
+    await u.type(await screen.findByTestId('two-factor-enforce-dialog-reason'), 'Finance role');
     await u.click(screen.getByTestId('two-factor-enforce-dialog-submit'));
     await waitFor(() => expect(cred('engineer')!.tf!.enforced).toBe(true));
     expect(await screen.findByTestId('two-factor-enforced-state')).toHaveAttribute('data-enforced', 'true');

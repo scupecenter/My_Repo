@@ -1,4 +1,4 @@
-# Appearance profiles (items 1-3 of the PM-platforms proposal)
+# Appearance profiles (items 1-3 of the improvement proposal)
 
 Owner approval 2026-11-27 (WhatsApp, "implement the whole proposal"). Migration 0241, contract 0.15.230.
 
