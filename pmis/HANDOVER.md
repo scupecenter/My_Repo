@@ -1,13 +1,10 @@
 # Workspace: Handover to the implementation developer
 
-> **ملخص بالعربي:** انتهت مرحلة P0 (التأسيس) والمرحلة P1 قيد التنفيذ على `main` بعد الدمج #48: واجهة الـAPI موجودة (العقد 0.4.9، الهجرات حتى 0030)، وتشمل تسجيل الدخول المحلي ومحرك الموافقات وسجل المواقع ومواعيد SLA والبوابات وأول أربعة سجلات (المشتريات وGECOL وHLC والتصاريح) ومصفوفة المسؤوليات. يوجد CI ومثبّت لـUbuntu. قرارات المالك بتاريخ 2026-10-31 (سجل Dismantle، عروض CW/TE/O&M، قسم المستندات) مسجلة في `docs/plans/`؛ بُني منها سجل Dismantle في الواجهة الخلفية (الهجرتان 0021 و0022) وشاشته في الويب والباقي لم يُبنَ بعد. مالك المنتج يبقى صاحب القرار في البوابات واختبار القبول ورفع البيانات الحقيقية.
+> **ملخص بالعربي (الحالة في 2026-11-27):** النظام مبني على `main` حتى الهجرة 0380 (209 هجرة) والعقد 0.15.193 على السطر 4 من `contracts/openapi.yaml` (أعلى رقم في قائمة الإصدارات 0.15.225)؛ كل ما بُني مسجل في `CHANGELOG.md` (الأحدث في الأعلى) وهو المصدر الأول للحالة. قاعدة الموافقات مستويان فقط: L1 إدخال البيانات وL2 المراجع والمعتمد (قرار المالك 2026-11-01؛ الهجرات 0032 و0035 و0050 و0054؛ العقد 0.6.1). لا يُنشر شيء على الإنتاج إلا بإذن المالك.
 
-> **الحالة 2026-11-02 (للعمل من أي مكان):** على `main` حتى PR #63: قاعدة المستويين L1 وL2 (`CLAUDE.md`)، ومراحل الواجهة 1 و2 و3 (CHANGELOG 53 و58). **قيد العمل وغير مكتمل** على الفرع `claude/tender-wright-me9od1` (commit بعنوان WIP): المرحلة 4b من X1 إلى X7 (الهجرة 0031، المرآة `db/sql/030`، العقد 0.4.10، CHANGELOG 59 لم يُكتب بعد) والهجرة 0032 لتثبيت المستويين L1/L2 (المرآة `db/sql/031`، العقد 0.4.11، CHANGELOG 60 لم يُكتب بعد). `tsc` ناجح؛ **مجموعة اختبارات الـ API لم تُشغَّل على هذه النسخة**. الخطوة التالية: شغّل `bash tools/dev-setup.sh` ثم اختبارات الـ API، أصلح ما يفشل، تحقق من تطابق المرايا بـ `cmp`، اكتب CHANGELOG 59 و60 وحدّث هذا الملف. بعدها مراحل الواجهة 4 إلى 8.
-
-> **المرحلة 4b (2026-11-02، CHANGELOG 66):** X1 إلى X7 مكتملة ومختبرة: الواجهة الخلفية (الهجرتان 0031 و0040، العقد 0.7.1) والواجهة (الوارد، المتابعة، الإشارات، الزمن، حمل العمل، محجوب بسبب، الحالة الأسبوعية) واختبارات الـAPI (`test/x-*.test.ts`) والويب (`phase4b.test.tsx`، `e2e/phase4b.spec.ts`) وحالات `tests/db-security/cases/88_x_features.sql`. المتبقي من خطة الواجهة: المراحل 4 و5 و6 و7 و8.
-
-Status on 2026-10-31: **main is at PR #48.** Phase P0 (Foundations) is complete and P1 (Core) is under way. Everything below is on `main` of this repository. Section 4 below was written in P0 and still says local passwords are deferred; local sign-in exists since migration 0010, so check the code and `CHANGELOG.md` before relying on it.
-The owner decisions of 2026-10-31 are in `docs/plans/2026-10-31-dismantle-stream-views-documents.md`. They are **decided, not yet built**.
+Status on 2026-11-27: **the system is built far beyond the first phases. Read `CHANGELOG.md` first (newest entry on top): it is the record of what exists.** On `main` there are 209 migrations (the highest is `0380_invoices_relation`) and the API contract is 0.15.193 on line 4 of `contracts/openapi.yaml` (the Versions list inside it goes up to 0.15.225). Count again before you add a migration or a contract version: open pull requests claim numbers too. Sections below were written in P0 and P1; where they disagree with `CHANGELOG.md` or the code, the code and the CHANGELOG win.
+The approval model is **two levels**: L1 Data Entry and L2 Data Reviewer & Approver (owner decision 2026-11-01, migrations 0032, 0035, 0050, 0054, contract 0.6.1). Any older text that says Entry, Review, Approve, or three levels, is out of date.
+The owner decisions of 2026-10-31 are in `docs/plans/2026-10-31-dismantle-stream-views-documents.md`; they have been built since (see `CHANGELOG.md`).
 
 ## 1. Read in this order
 1. `CLAUDE.md`: the binding rules and every owner decision. If code and this file disagree, this file wins until an ADR changes it.
@@ -72,7 +69,7 @@ The owner decisions of 2026-10-31 are in `docs/plans/2026-10-31-dismantle-stream
   - Local passwords are **deferred** (§10).
 - **Authorization:** effective permission is the union of assignments, **each limited to its own regions and modules** (B3). Today the database uses one region union per user. Per-module region sets plus the signed session context (ADR 0003 §3 and §6) are the first P1 security items.
 - **Workflow engine:**
-  - Entry → Review → Approve, with auto-skip, self-approval (B5), and rejection back one level, or back to the person who actually acted (B6).
+  - Level 1 (Data Entry) then level 2 (Reviewer & Approver), with auto-skip, self-approval (B5), and rejection back to level 1, or back to the person who actually acted (B6).
   - Level path snapshotted at first submission (B7). No-holder tasks go to admins (B10).
   - Reassignment by the lead never resets or pauses the SLA (B12b).
 - **Everything configurable is versioned and audited:** SLA, weights, workflow versions, fields, documents, templates, holidays. The structural freeze during the pilot and parallel run (B9).
@@ -102,13 +99,5 @@ The owner decisions of 2026-10-31 are in `docs/plans/2026-10-31-dismantle-stream
 - Unknown business rule → add it to `docs/spec/open-questions.md` and use a configurable default. Never invent one.
 
 ## 7. Next
-**Current state (2026-11-08):** built up to migration 0078, contract 0.15.0, `CHANGELOG.md` entry 113 (entry 111 below): field assignments in Procurement, Car Dispatcher, Financial Advances and tasks MOB-1/2/5 (decisions Q495–Q516), database, API and web screens done (PR #101).
 
-**Open follow-ups from PR #101:**
-1. ~~A real test for a conditional document-slot rule on the raw record data~~ done (changelog 113): `test/assignments-fleet.test.ts`.
-2. ~~Custodian top-up~~ closed by Q518: only Finance enters financial data.
-3. ~~The Procurement `members` list through the approved template~~ done (changelog 113, migration 0078): text `1234:supervisor:lead; 5678:executor`.
-4. ~~MOB tasks on old sites~~ closed by Q520: they stay locked until the admin opens them (intended).
-5. ~~Web: MSW mock handlers for the new endpoints~~ done (changelog 113, `mocks/handlers.fleet.ts`). The local `rk` cast stays until `schema.d.ts` is regenerated with `car_dispatcher` and `financial_advances` in `RegisterKey`.
-
-Earlier lists are superseded: every item built since is recorded in `CHANGELOG.md` (entries 43 to 113). Still planned for a later phase: the CPE / end-user installation module and the mobile app.
+There is no fixed list here any more. Open work is in the open pull requests and in the `open` (مفتوح) lines of the newest `CHANGELOG.md` entries. Still planned for a later phase: the CPE / end-user installation module and the mobile app.
