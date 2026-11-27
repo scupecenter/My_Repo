@@ -239,7 +239,7 @@ export const invoices: RegisterDefinition = {
     F('remark', 'Remark', 'ملاحظات', 'text', 'Remark'),
   ],
 };
-// Migration 0550 (C6): Site Contacts, the people a site depends on; linked to the acquisition, permit, GECOL and HLC records of the site.
+// Migration 0551 (C6): Site Contacts, the people a site depends on; linked to the acquisition, permit, GECOL and HLC records of the site.
 export const siteContacts: RegisterDefinition = {
   register_key: 'site_contacts', name_en: 'Site Contacts', name_ar: 'جهات اتصال المواقع', module_key: 'site_contacts', site_scoped: true, multiple_per_site: true, approval_levels: 2,
   fields: [

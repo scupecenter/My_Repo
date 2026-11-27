@@ -5,7 +5,7 @@ import { loggedIn, makeAdmin, startApp, superDb } from './helpers';
 import { G, Team, createRec, recPath, team } from './reg-helpers';
 import { actor } from './wf-helpers';
 
-/** Contract 0.15.520 (migration 0550): the Site Contacts register (C6). */
+/** Contract 0.15.373 (migration 0551): the Site Contacts register (C6). */
 let app: NestExpressApplication;
 let db: PgClient;
 let t: Team;

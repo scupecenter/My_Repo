@@ -1,6 +1,6 @@
--- 0550_site_contacts: the Site Contacts book (item C6, agreed 2026-11-26): the people a site depends on (landlord, municipality, security, GECOL, HLC,
+-- 0551_site_contacts: the Site Contacts book (item C6, agreed 2026-11-26): the people a site depends on (landlord, municipality, security, GECOL, HLC,
 -- contractor contacts) in one place, linked to the registers that need them (a site access request goes to several parties).
--- Mirror: db/sql/549_site_contacts.sql (kept identical to prisma/migrations/0550_site_contacts/migration.sql).
+-- Mirror: db/sql/550_site_contacts.sql (kept identical to prisma/migrations/0551_site_contacts/migration.sql).
 --
 -- What exists already and is reused (checked before building): external_parties (companies of the Contractors list: the contact points to one, no second company
 -- list), sites and regions (row scope), the register framework (records, two approval levels, Matrix row, field settings, import template, audit), the list
@@ -113,7 +113,7 @@ SELECT g.profile_id, 'site_contacts', 'view'::"PermissionAction" FROM permission
 ON CONFLICT DO NOTHING;
 
 INSERT INTO nav_item_catalogue (key, default_group, ord, added_in)
-VALUES ('site_contacts', 'registers', 36, '0550')
+VALUES ('site_contacts', 'registers', 36, '0551')
 ON CONFLICT (key) DO NOTHING;
 
 INSERT INTO template_definitions (template_id, name, name_ar, target_entity, kind, register_key, module_key, custom_entity, match_keys, sort_order)
