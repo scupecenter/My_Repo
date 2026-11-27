@@ -12,6 +12,7 @@ import {
   ActionDueRow,
   AdvanceRow,
   financeSummary,
+  type InvoiceRow,
   actionsSummary,
   ApprovalWaitRow,
   ChangeWaitRow,
@@ -594,7 +595,18 @@ export class DashboardOpsService {
              proc.id AS assignment_id, coalesce(proc.done, false) AS assignment_done,
              coalesce(adv.data ->> 'amounts_hidden', 'false') = 'true' AS amounts_hidden
       FROM adv CROSS JOIN num LEFT JOIN proc ON proc.id = adv.data ->> 'procurement_record_id'`);
-    return financeSummary(rows);
+    // 0.15.369: the invoices register (latest approved version of each invoice), in the same regions
+    const inv = await this.db.tx.$queryRaw<InvoiceRow[]>(Prisma.sql`
+      SELECT i.data ->> 'invoice_state' AS state,
+             CASE WHEN i.data ->> 'invoice_date' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN (CURRENT_DATE - (i.data ->> 'invoice_date')::date)::int END AS days_since_invoice,
+             CASE WHEN i.data ->> 'due_date' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN (CURRENT_DATE - (i.data ->> 'due_date')::date)::int END AS days_past_due
+      FROM (SELECT DISTINCT ON (r.entity_id) r.* FROM register_records r
+            WHERE r.register_key = 'invoices' AND r.state = 'approved'
+            ORDER BY r.entity_id, r.version_no DESC) i
+      WHERE true
+      ${scope === null ? Prisma.empty : Prisma.sql`AND i.region_id = ANY(${scope}::int[])`}
+      ${region ? Prisma.sql`AND i.region_id = ${region}` : Prisma.empty}`);
+    return financeSummary(rows, inv);
   }
 
   /**

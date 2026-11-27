@@ -11,6 +11,7 @@ import {
   changesSummary,
   actionsSummary,
   financeSummary,
+  invoiceAges,
   firstPassPct,
   meanDays,
   ScorecardItem,
@@ -283,6 +284,25 @@ describe("item 9 rules: restricted financial summary (0.15.206)", () => {
     expect(r.achievement.completion_pct).toBe(50);
     expect(r.achievement.disbursed_on_completed).toBe(700);
     expect(r.achievement.disbursed_on_open_work).toBe(800);
+  });
+
+  it("ages the open invoices from the invoice date and counts those past their due date (Paid and Cancelled are left out)", () => {
+    const r = invoiceAges([
+      { state: "Received", days_since_invoice: 5, days_past_due: -10 },
+      { state: "Approved", days_since_invoice: 40, days_past_due: 3 },
+      { state: "Paid", days_since_invoice: 90, days_past_due: 60 },
+      { state: "Cancelled", days_since_invoice: 70, days_past_due: 20 },
+      { state: null, days_since_invoice: null, days_past_due: null },
+    ]);
+    expect(r.open).toBe(3);
+    expect(r.overdue).toBe(1);
+    expect(r.aging.total).toBe(2);
+    expect(r.aging.oldest_days).toBe(40);
+  });
+
+  it("has no invoice figures without invoice records", () => {
+    expect(financeSummary([adv({})]).invoices).toBeNull();
+    expect(financeSummary([adv({})], [{ state: "Received", days_since_invoice: 1, days_past_due: null }]).invoices?.open).toBe(1);
   });
 
   it("counts a record with hidden amounts but adds no amount of it", () => {

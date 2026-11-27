@@ -24,7 +24,9 @@ describe('Dashboard ops: restricted financial summary card (0.15.206, item 9)', 
     expect(screen.getByTestId('dash-finance-aging')).toHaveTextContent('52');
     expect(screen.getByTestId('dash-finance-completed')).toHaveTextContent('3 (37.5%)');
     expect(screen.getByTestId('dash-finance-on-open')).toHaveTextContent('103,300');
-    expect(card).toHaveTextContent('Invoice ages are not shown');
+    expect(screen.getByTestId('dash-finance-invoices-open')).toHaveTextContent('6');
+    expect(screen.getByTestId('dash-finance-invoices-overdue')).toHaveTextContent('2');
+    expect(screen.getByTestId('dash-finance-invoices-aging')).toHaveTextContent('41');
   }, 30_000);
 
   it('is registered in Settings > Dashboard and the readers can be chosen there (off by default)', async () => {

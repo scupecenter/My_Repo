@@ -347,10 +347,36 @@ export interface AdvanceRow {
   amounts_hidden: boolean;
 }
 
+/** An invoice (latest approved version): its state and the days since the invoice date and past the due date (null when the date is not set). */
+export interface InvoiceRow {
+  state: string | null;
+  days_since_invoice: number | null;
+  days_past_due: number | null;
+}
+
+export interface InvoiceAges {
+  /** Invoices not yet Paid or Cancelled. */
+  open: number;
+  /** Open invoices whose due date is before today. */
+  overdue: number;
+  aging: AgeBuckets;
+}
+
+export const CLOSED_INVOICE_STATES: readonly string[] = ["Paid", "Cancelled"];
+
+/** Invoice ages: age = today minus the invoice date while the invoice is not Paid or Cancelled; overdue = due date before today. Derived only, nothing typed. */
+export function invoiceAges(rows: InvoiceRow[]): InvoiceAges {
+  const open = rows.filter((r) => r.state === null || !CLOSED_INVOICE_STATES.includes(r.state));
+  const ages = open.filter((r) => r.days_since_invoice !== null).map((r) => Math.max(0, r.days_since_invoice as number));
+  return { open: open.length, overdue: open.filter((r) => r.days_past_due !== null && r.days_past_due > 0).length, aging: bucketAges(ages) };
+}
+
 export interface FinanceSummary {
   advances: { total: number; open: number; hidden_amounts: number };
   amounts: { approved: number; disbursed: number; returned: number; open_disbursed: number };
   open_aging: AgeBuckets;
+  /** 0.15.369: the invoices register, when it has records. */
+  invoices: InvoiceAges | null;
   achievement: {
     assignments: number;
     completed: number;
@@ -365,10 +391,9 @@ const money = (n: number): number => Math.round(n * 100) / 100;
 /**
  * The advances (latest approved version of each): counts, the amounts of those whose amounts are not hidden (a record
  * with amounts_hidden counts but adds no amount), the age since disbursement of the open ones, and the disbursed
- * amount against the completion of the assignments the advances belong to. No invoice data exists in the system, so
- * invoice ages are not part of the summary.
+ * amount against the completion of the assignments the advances belong to, and the ages of the open invoices.
  */
-export function financeSummary(rows: AdvanceRow[]): FinanceSummary {
+export function financeSummary(rows: AdvanceRow[], invoices: InvoiceRow[] = []): FinanceSummary {
   let open = 0;
   let hidden = 0;
   const amounts = { approved: 0, disbursed: 0, returned: 0, open_disbursed: 0 };
@@ -407,6 +432,7 @@ export function financeSummary(rows: AdvanceRow[]): FinanceSummary {
       open_disbursed: money(amounts.open_disbursed),
     },
     open_aging: bucketAges(ages),
+    invoices: invoices.length > 0 ? invoiceAges(invoices) : null,
     achievement: {
       assignments: assignments.size,
       completed: done,

@@ -19248,6 +19248,14 @@ export interface components {
                 open_disbursed: number;
             } | null;
             open_aging: components["schemas"]["DashboardOpsAging"] | null;
+            /** @description 0.15.369: ages of the open invoices (state not Paid or Cancelled) from the invoices register; null when it has no approved records. */
+            invoices: {
+                /** @description Invoices not yet Paid or Cancelled. */
+                open: number;
+                /** @description Open invoices whose due date is before today. */
+                overdue: number;
+                aging: components["schemas"]["DashboardOpsAging"];
+            } | null;
             achievement: {
                 /** @description Assignments (procurement records) that have an advance. */
                 assignments: number;

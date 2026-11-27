@@ -47,6 +47,16 @@ export function OpsFinanceCard({ ops }: { ops: Ops }) {
           {f.open_aging && (
             <AgingRow label={t("dash.ops.finance_open_age")} aging={f.open_aging} testid="dash-finance-aging" />
           )}
+          {f.invoices && (
+            <div className="mt-4" data-testid="dash-finance-invoices">
+              <h4 className="mb-2 text-sm font-semibold">{t("dash.ops.finance_invoices")}</h4>
+              <div className="mb-3 flex flex-wrap gap-2 text-sm">
+                {stat(t("dash.ops.finance_invoices_open"), String(f.invoices.open), "dash-finance-invoices-open")}
+                {stat(t("dash.ops.finance_invoices_overdue"), String(f.invoices.overdue), "dash-finance-invoices-overdue")}
+              </div>
+              <AgingRow label={t("dash.ops.finance_invoices_age")} aging={f.invoices.aging} testid="dash-finance-invoices-aging" />
+            </div>
+          )}
         </section>
         <section aria-label={t("dash.ops.finance_achievement")}>
           <h4 className="mb-2 text-sm font-semibold">{t("dash.ops.finance_achievement")}</h4>

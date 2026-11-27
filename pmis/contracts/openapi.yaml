@@ -241,6 +241,7 @@ info:
     - 0.15.204 (2026-11-27): the dashboard follow-up sections, pending approvals bottleneck (owner approval 2026-11-26, dashboard proposals item 7; migration 0305). Additive and read only. `GET /dashboard/ops` gains the section `approvals` (`DashboardOpsApprovals`): the tasks waiting for review or approval (states in_review and in_approval, the same population as the Approvals inbox), their ages in calendar days since the level opened, split review against approve, and the same ages grouped by the ball-in-court role so the bottleneck role shows. The section needs the approvals view (and the sites view, like the inbox) and answers available false without them. The dashboard settings catalogue gains the card `ops_approvals`. No grant, role or permission change.
     - 0.15.205 (2026-11-27): the dashboard follow-up sections, change requests and overdue meeting actions (owner approval 2026-11-26, dashboard proposals item 8; migration 0306). Additive and read only. `GET /dashboard/ops` gains the section `changes_meetings` (`DashboardOpsChangesMeetings`): the change requests still pending (status requested) with their ages since the request date and a count per kind, the approved ones not yet applied, and the meeting actions not closed with the overdue ones aged by days late. Each part needs its own module view (change control, meetings) and answers `available: false` with null figures without it. No amounts.
     - 0.15.206 (2026-11-27): the dashboard follow-up sections, restricted financial summary (owner approval 2026-11-26, dashboard proposals item 9; migration 0307). Additive. `GET /dashboard/ops` gains the section `finance` (`DashboardOpsFinance`): the advances (counts, amounts of the records whose amounts are not hidden, age of the open ones since disbursement) and the disbursed amount against the completion of the assignments the advances belong to. It is OFF by default and only a holder of a role listed by the new setting `dashboard.finance_readers` (default Project Manager and Finance Officer) who also has the financial advances view receives figures; everyone else gets `available: false` with null figures, and the card stays hidden. It is never part of a share link or an export. New `GET/PUT /settings/dashboard-finance-readers` (`getDashboardFinanceReaders`, `setDashboardFinanceReaders`) to switch it on and choose the roles (System Admin or an all-regions delegate of settings edit, reason, step-up, If-Match, audited). Invoice ages are not part of the summary: the system holds no invoice data yet.
+    - 0.15.369 (2026-11-27): invoice ages in the restricted financial summary (Ahmed's approved follow-up of dashboard proposals item 9; no migration). Additive. `DashboardOpsFinance` gains `invoices` (`DashboardFinanceInvoices`: `open`, `overdue`, `aging`), or null when the invoices register has no approved records. Derived only from the `invoices` register (latest approved version of each, same regions): age = today minus the invoice date while the state is not Paid or Cancelled; overdue = due date before today. Same readers and visibility as the rest of the summary; nothing typed.
 
     ## Changes since 0.1
     - **Auth**: `GET /auth/login` accepts `identifier` (email, 4-digit employee ID or E.164 phone) and answers 302 the same way whether or not it matches; rate limited (ADR 0002 §9b). Local password sign-in stays deferred and is not in the contract.
@@ -25755,7 +25756,7 @@ components:
     DashboardOpsFinance:
       type: object
       description: "0.15.206 (item 9): the restricted financial summary. Only for a configured reader (setting dashboard.finance_readers); never in an export or a share link. Invoice ages are not included: no invoice data exists."
-      required: [available, advances, amounts, open_aging, achievement]
+      required: [available, advances, amounts, open_aging, invoices, achievement]
       properties:
         available: {type: boolean, description: "False unless the card is switched on, the caller holds a listed role and has the financial advances view; every figure is then null."}
         advances:
@@ -25777,6 +25778,14 @@ components:
           anyOf:
                 - $ref: '#/components/schemas/DashboardOpsAging'
                 - type: 'null'
+        invoices:
+          type: [object, 'null']
+          description: "0.15.369: ages of the open invoices (state not Paid or Cancelled) from the invoices register; null when it has no approved records."
+          required: [open, overdue, aging]
+          properties:
+            open: {type: integer, description: "Invoices not yet Paid or Cancelled."}
+            overdue: {type: integer, description: "Open invoices whose due date is before today."}
+            aging: {$ref: '#/components/schemas/DashboardOpsAging'}
         achievement:
           type: [object, 'null']
           required: [assignments, completed, completion_pct, disbursed_on_completed, disbursed_on_open_work]
