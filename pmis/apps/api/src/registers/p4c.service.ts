@@ -71,6 +71,22 @@ export class P4cService {
     return { items };
   }
 
+  /** GET /registers/issues/risk-options : the risks an Issue may name as realised (Issues view plus Risks view; the matrix decides the regions). */
+  async issueRiskOptions(auth: AuthContext): Promise<{ items: unknown[] }> {
+    await this.access.requireRegions('issues', 'view');
+    const items = await this.registers.call<unknown[]>(auth, Prisma.sql`SELECT issue_risk_options() AS r`);
+    return { items };
+  }
+
+  /** GET /registers/risks/{entity_id}/issues : the issues that realise one risk. */
+  async riskIssues(auth: AuthContext, entityId: string): Promise<{ items: unknown[] }> {
+    await this.access.requireRegions('risks', 'view');
+    await this.access.requireRegions('issues', 'view');
+    if (!uuidSchema.safeParse(entityId).success) throw problems.validation([{ path: '/entity_id', code: 'invalid', message: 'entity_id is a uuid.' }]);
+    const items = await this.registers.call<unknown[]>(auth, Prisma.sql`SELECT risk_realised_issues(${entityId}::uuid) AS r`);
+    return { items };
+  }
+
   /** GET /registers/procurement/{entity_id}/receipts : the warehouse receipts against an order. */
   async orderReceipts(auth: AuthContext, entityId: string): Promise<{ items: unknown[] }> {
     await this.access.requireRegions('procurement', 'view');

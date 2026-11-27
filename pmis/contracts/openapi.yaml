@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.160
+  version: 0.15.222
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -31,6 +31,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.222 (2026-11-27): additive (migration 0322; CHANGELOG IssueRiskLink). An Issue can name the Risk it realises: new optional field `risk_entity_id` on `issues` (the entity id of a Risks record the caller may see; needs the Risks view right in the risk's region; field errors `risk_not_available`, `invalid`). `GET /registers/issues/risk-options` lists the risks; `GET /registers/risks/{entity_id}/issues` lists the issues that realise a risk (needs the Risks and Issues modules; only the regions of the Issues view right).
     - 0.15.160 (2026-11-27): goals with automatic progress (migration 0260; CHANGELOG Goals). Additive. `GET`/`PUT /settings/goals` (`getGoals`, `setGoals`) and `GET /goals/progress` (`getGoalsProgress`). Progress is counted from approved milestone tasks, as the On-Air counter does; no permission is widened.
     - 0.15.224 (2026-11-27): related records of a register record (migration 0324; CHANGELOG RelatedRecords). Additive and read only. New `GET /registers/{register_key}/{entity_id}/related` (`listRelatedRecords`): the current records linked to this record in both directions (`direction` `to`: the record this one names; `from`: records that name this one), grouped by register and link field (procurement order, Procurement request, risk, closing receipt). A group is listed only when the caller holds the view right of that register in that record's region (the responsibility matrix decides); nothing is stored and no permission changes.
     - 0.15.161 (2026-11-27): recurring preventive-maintenance schedules that create drafts only (migration 0261; CHANGELOG PmSchedules). Additive. `GET`/`PUT /settings/pm-schedules` (`getPmSchedules`, `setPmSchedules`) and `POST /pm-schedules/{schedule_id}/generate` (`generatePmScheduleDraft`). A schedule never creates anything by itself: a person presses Create draft on a due schedule and the draft is saved through the register's own create path as that person; no permission is widened.
@@ -9915,6 +9916,47 @@ paths:
                 required: [items]
                 properties:
                   items: { type: array, items: { $ref: '#/components/schemas/WarehouseOrderOption' } }
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /registers/issues/risk-options:
+    get:
+      tags: [registers]
+      operationId: listIssueRiskOptions
+      summary: The risks an Issue may name as realised (0.15.112)
+      description: |
+        0.15.112. Current, not voided Risks records that the caller may see (the Risks view right of the responsibility matrix, by region). Needs the Issue log module.
+      responses:
+        '200':
+          description: The risks.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/IssueRiskOption' } }
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /registers/risks/{entity_id}/issues:
+    get:
+      tags: [registers]
+      operationId: listRiskRealisedIssues
+      summary: The issues that realise a risk (0.15.112)
+      description: |
+        0.15.112. The current, not voided Issue log records whose `risk_entity_id` is this risk, with status and dates. Needs the Risks and Issue log modules; only issues in regions where the caller holds the Issues view right are listed.
+      parameters:
+      - {name: entity_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: The issues.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/RiskRealisedIssue' } }
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '422': {$ref: '#/components/responses/Unprocessable'}
@@ -22439,6 +22481,29 @@ components:
         po_wo_date: { type: string, format: date }
         order_status: { type: string }
         external_party: { $ref: '#/components/schemas/ExternalPartyRef' }
+    IssueRiskOption:
+      type: object
+      required: [entity_id, record_id]
+      properties:
+        entity_id: { type: string, format: uuid }
+        record_id: { type: string, format: uuid }
+        risk_id: { type: string }
+        statement: { type: string }
+        status: { type: string }
+        category: { type: string }
+        state: { type: string }
+    RiskRealisedIssue:
+      type: object
+      required: [entity_id, record_id, state]
+      properties:
+        entity_id: { type: string, format: uuid }
+        record_id: { type: string, format: uuid }
+        site_id: { type: string, format: uuid }
+        state: { type: string }
+        pending_issue: { type: string }
+        issue_status: { type: string }
+        raised_date: { type: string }
+        resolution_date: { type: string }
     ProcurementOrderReceipt:
       type: object
       description: '0.15.91. A warehouse receipt (PL or OPEN) against a Procurement order.'
