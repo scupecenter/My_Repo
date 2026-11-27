@@ -4,7 +4,7 @@ import { SiteMasterGrid, type SiteMasterGridRow } from '@/components/SiteMasterG
 import { SiteMasterSourcePanel } from '@/components/SiteMasterSource';
 import { useRefreshSiteMasterRows, useSaveSiteMasterCell, useSiteMasterRowsPaged, useSiteMasterSections } from '@/api/siteMaster';
 import { SitesBulkEdit } from '@/components/SitesBulkEdit';
-import { CalendarRange, Columns3, Download, Grid3x3, FileDown, FilePlus2, FileUp, Map as MapIcon, Pencil, RotateCcw, Table2, TableProperties } from 'lucide-react';
+import { CalendarDays, CalendarRange, Columns3, Download, Grid3x3, FileDown, FilePlus2, FileUp, Map as MapIcon, Pencil, RotateCcw, Table2, TableProperties } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
@@ -35,6 +35,7 @@ import { MiniRail } from '@/components/Pipeline';
 import { SiteMap } from '@/components/SiteMap';
 import { SitesWideBatch } from '@/components/SitesWideBatch';
 import { SitesBoard, SWIMLANES, type Swimlane } from '@/components/SitesBoard';
+import { SitesCalendar } from '@/components/SitesCalendar';
 import { SitesTimeline } from '@/components/SitesTimeline';
 import { useVirtual } from '@/components/useVirtual';
 import { SITE_MASTER_MASTER, SITE_MASTER_NAV } from '@/lib/siteMasterMenus';
@@ -122,6 +123,11 @@ export function Sites() {
   // F5 (0.15.32): the read-only board by milestone (layout=board), with its swimlane in the URL (lane=region|contractor)
   const asBoard = sp.get('layout') === 'board';
   const asTimeline = sp.get('layout') === 'timeline';
+  // V2: the Site list on a month calendar (layout=calendar) over a Master date column chosen in the Layout panel (`calf`)
+  const asCalendar = sp.get('layout') === 'calendar';
+  const calDateCols = (siteMasterQ.data?.items.find((m) => m.key === 'master')?.columns ?? []).filter((c) => c.value_type === 'date');
+  const calField = Number(sp.get('calf') ?? '');
+  const calFieldOk = calDateCols.some((c) => c.ord === calField) ? calField : (calDateCols[0]?.ord ?? '');
   const lane = (SWIMLANES as readonly string[]).includes(sp.get('lane') ?? '') ? (sp.get('lane') as Swimlane) : 'none';
   // 0.15.4 (migration 0085): the workflow locks (locked / open) and the sites with data gaps
   const locks = ['locked', 'open'].includes(sp.get('workflow_locks') ?? '') ? (sp.get('workflow_locks') as string) : '';
@@ -151,6 +157,7 @@ export function Sites() {
     { id: 'grid', label: t('view.grid'), hint: t('view.grid_hint'), icon: <Grid3x3 size={14} />, testid: 'sites-layout-grid' },
     { id: 'board', label: t('board.board'), hint: t('view.board_hint'), icon: <Columns3 size={14} />, testid: 'sites-layout-board' },
     { id: 'timeline', label: t('timeline.title'), hint: t('timeline.view_hint'), icon: <CalendarRange size={14} />, testid: 'sites-layout-timeline' },
+    { id: 'calendar', label: t('calview.title'), hint: t('view.calendar_hint'), icon: <CalendarDays size={14} />, testid: 'sites-layout-calendar' },
     { id: 'map', label: t('sites.map'), hint: t('view.map_hint'), icon: <MapIcon size={14} />, testid: 'sites-layout' },
   ];
   const applyView = (id: string) => setParams({ layout: id === 'list' ? '' : id, sel: '' });
@@ -366,15 +373,21 @@ export function Sites() {
         </span>}
         layout={/* V1: one Layout panel — the view switcher, the current view's options (the board's swimlanes) and the Display options of the table views */
           <LayoutPanel testid="sites-view"
-          views={{ value: asMap ? 'map' : asTimeline ? 'timeline' : asBoard ? 'board' : asWide ? 'wide' : layout === 'grid' ? 'grid' : 'list', options: viewOptions, onChange: pickView }}
-          options={asBoard ? (
+          views={{ value: asMap ? 'map' : asTimeline ? 'timeline' : asCalendar ? 'calendar' : asBoard ? 'board' : asWide ? 'wide' : layout === 'grid' ? 'grid' : 'list', options: viewOptions, onChange: pickView }}
+          options={asCalendar ? (
+            <label className="flex items-center gap-2 text-sm"><span className="text-mute">{t('calview.field')}</span>
+              <select className="input w-auto py-1" data-testid="sites-calendar-field" value={calFieldOk} onChange={(e) => setParams({ calf: e.target.value })}>
+                {calDateCols.map((c) => <option key={c.ord} value={c.ord}>{(i18n.language === 'ar' && c.name_ar) || c.header}</option>)}
+              </select>
+            </label>
+          ) : asBoard ? (
             <label className="flex items-center gap-2 text-sm"><span className="text-mute">{t('board.swimlane')}</span>
               <select className="input w-auto py-1" data-testid="sites-board-swimlane" value={lane} onChange={(e) => setParams({ lane: e.target.value === 'none' ? '' : e.target.value })}>
                 {SWIMLANES.map((s) => <option key={s} value={s}>{t(`board.lane_${s}`)}</option>)}
               </select>
             </label>
           ) : undefined}
-          table={asBoard || asMap || asTimeline ? undefined : tbl} />}
+          table={asBoard || asMap || asTimeline || asCalendar ? undefined : tbl} />}
         columns={<ColumnMenu api={tbl} label={label} />}
         exporter={menuTpl ? <TemplateExportMenu testid="sites-tools" exportTestid="sites-export-view" source="sites" filters={viewFilters} columns={SITE_COLUMNS} hasTemplate
           onBlank={() => void downloadTemplate(menuTpl.template_id).then((n) => toast(t('grid.downloaded', { name: n })), (e) => toast(registerErrorMessage(t, e), 'err'))}
@@ -393,6 +406,9 @@ export function Sites() {
       ) : asTimeline ? (
         // Item 7: read only, the same filters as the list
         <SitesTimeline query={{ q: f.q || undefined, region_id: f.region_id || undefined, scenario: f.scenario || undefined, status: f.overall_status || undefined, site_code: siteCodes || undefined }} />
+      ) : asCalendar ? (
+        // V2: read only, the same filters as the list and the timeline
+        <SitesCalendar query={{ q: f.q || undefined, region_id: f.region_id || undefined, scenario: f.scenario || undefined, status: f.overall_status || undefined, site_code: siteCodes || undefined }} />
       ) : asMap ? (
         // SC-10: the same map as the dashboard; a stream sub-menu shows the sites whose current stream it is
         <SiteMap testid="sites-map" height={560} outer={{ region_id: f.region_id, scenario: f.scenario, ...(real ? { stream } : {}), ...(adv ? { filter: adv } : {}) }} />
