@@ -90,6 +90,8 @@ export function SiteMap({ outer: outerIn, height = 460, testid = 'site-map' }: {
   const [full, setFull] = useState(false);
   const [layout, setLayout] = useState<'map' | 'list'>('map');
   const [viewKey, setViewKey] = useState(0);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const listActive = LIST_KEYS.some((k) => f[k].length > 0);
   const [open, setOpen] = useState<string | null>(null);
   const d = q.data;
   const items = useMemo(() => d?.items ?? [], [d]);
@@ -184,7 +186,13 @@ export function SiteMap({ outer: outerIn, height = 460, testid = 'site-map' }: {
       {/* filters (in the URL) */}
       <div role="toolbar" aria-label={t('siteMap.filters')} className="mb-2 flex flex-wrap items-center gap-2" data-testid="map-filters">
         <input className="input w-48 py-1 text-sm" data-testid="map-search" placeholder={t('siteMap.search')} aria-label={t('siteMap.search')} value={f.q} onChange={(e) => set({ q: e.target.value })} />
-        {LIST_KEYS.map((k) => <FilterChip key={k} id={k} label={t(`siteMap.f.${k}`)} options={opts(k)} value={f[k]} onChange={(v) => set({ [k]: v } as Partial<MapFilters>)} />)}
+        {/* P2: the map card keeps the Site ID search and Late only; the other chips open with More filters (hidden, not removed; open while one is set) */}
+        <button type="button" className="btn px-2 py-0.5 text-xs" data-testid="map-more-filters" aria-expanded={moreOpen || listActive} onClick={() => setMoreOpen(!moreOpen)}>
+          {t('siteMap.more_filters')}{listActive ? ` (${LIST_KEYS.filter((k) => f[k].length > 0).length})` : ''}
+        </button>
+        <span className={`${moreOpen || listActive ? 'contents' : 'hidden'}`} data-testid="map-more-panel">
+          {LIST_KEYS.map((k) => <FilterChip key={k} id={k} label={t(`siteMap.f.${k}`)} options={opts(k)} value={f[k]} onChange={(v) => set({ [k]: v } as Partial<MapFilters>)} />)}
+        </span>
         <QuickFilter testid="map-late" on={f.late} onClick={() => set({ late: !f.late })}>{t('siteMap.late_only')}</QuickFilter>
         {nActive > 0 && <button type="button" className="btn px-2 py-0.5 text-xs" data-testid="map-clear" onClick={clear}>{t('states.clear_filters')}</button>}
       </div>

@@ -93,7 +93,7 @@ export function initCfg() {
     // 0.15.261: mail.policy (today's behaviour: on, internal only, no domain)
     mailPolicy: { enabled: true, mode: 'internal_only' as string, internal_domains: [] as string[], kinds: {} as Record<string, { enabled: boolean; mode: string }>, version: 0, updated_at: null as string | null, updated_by: null as string | null },
     // 0.14.6: imports.async_rows, the background threshold of batches (default 50, never changed in the seed)
-    imports: { async_rows: 50, version: 1, updated_at: null as string | null, updated_by: null as string | null },
+    imports: { async_rows: 50, upload_policy: 'enforce' as 'enforce' | 'accept_incomplete', policy_version: 1, policy_updated_at: null as string | null, policy_updated_by: null as string | null, version: 1, updated_at: null as string | null, updated_by: null as string | null },
     // 0.15.1: nav.layout, the shared order of the side menu (null: the default of the code)
     navLayout: { layout: null as unknown, version: 1, updated_at: null as string | null, updated_by: null as string | null },
     freeze: { active: true, starts_on: '2026-11-01', ends_on: '2027-01-31', lifted: false, lifted_at: null, lifted_by: null, lift_reason: null, blocked_operations: ['publishWorkflowVersion'], version: 1 },

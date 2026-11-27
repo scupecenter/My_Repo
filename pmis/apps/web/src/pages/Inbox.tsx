@@ -1,5 +1,5 @@
 import * as Popover from '@radix-ui/react-popover';
-import { AtSign, BellRing, CheckCheck, Clock3, ExternalLink, Eye, EyeOff, Flag, Info } from 'lucide-react';
+import { AtSign, BellRing, CheckCheck, Clock3, ExternalLink, Eye, EyeOff, Flag, Info, X } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { notificationTitle } from '@/lib/notificationTitle';
@@ -19,7 +19,6 @@ import { byPriority, INBOX_TABS, inTab, isPriority, type InboxTab } from '@/lib/
 import { notificationTarget, snoozeDate } from '@/lib/x';
 import { DateInput } from '@/components/DateInput';
 
-const KINDS = ['mention', 'followed_change', 'task_assigned', 'task_returned', 'task_rejected', 'task_approved', 'approval_due', 'reassigned', 'absence_alert', 'idle_task_alert', 'no_holder', 'system'] as const;
 
 function SnoozeMenu({ n, onPick }: { n: Notification; onPick: (until: string | null) => void }) {
   const { t } = useTranslation();
@@ -46,6 +45,18 @@ function SnoozeMenu({ n, onPick }: { n: Notification; onPick: (until: string | n
   );
 }
 
+/** P6: one Show select replaces the All/Unread buttons and the snoozed select (the kind select duplicated the tabs and is gone; a kind from a saved view shows as a removable chip). */
+const SHOW = {
+  all: { unread: false, snoozed: 'hide' },
+  unread: { unread: true, snoozed: 'hide' },
+  snoozed: { unread: false, snoozed: 'only' },
+  unread_snoozed: { unread: true, snoozed: 'only' },
+  all_incl: { unread: false, snoozed: 'include' },
+  unread_incl: { unread: true, snoozed: 'include' },
+} as const;
+type ShowKey = keyof typeof SHOW;
+const showKeyOf = (unread: boolean, snoozed: string): ShowKey => (Object.keys(SHOW) as ShowKey[]).find((k) => SHOW[k].unread === unread && SHOW[k].snoozed === snoozed) ?? 'all';
+
 /** X1: everything addressed to me in one place. Read and unread, snooze to a date, filter by kind. The server hides what the caller can no longer read. */
 export function Inbox() {
   const { t, i18n } = useTranslation();
@@ -62,6 +73,7 @@ export function Inbox() {
   const tab: InboxTab = !cfg.tabs_enabled ? (sp.get('priority') === '1' ? 'priority' : 'all')
     : (INBOX_TABS as readonly string[]).includes(tabParam ?? '') ? (tabParam as InboxTab) : sp.get('priority') === '1' ? 'priority' : cfg.default_tab;
   const priorityOnly = tab === 'priority';
+  const showValue = showKeyOf(filter.unread, filter.snoozed);
   const loaded = q.data?.pages.flatMap((p) => p.items) ?? [];
   const priorityCount = loaded.filter((n) => isPriority(n.kind, pk)).length;
   const items = tab === 'all' ? byPriority(loaded, pk) : loaded.filter((n) => inTab(tab, n.kind, pk));
@@ -98,22 +110,15 @@ export function Inbox() {
         filters={<>
           <SavedViews<Record<string, unknown>> screen="inbox" value={{ unread: filter.unread ? '1' : '', snoozed: filter.snoozed === 'hide' ? '' : filter.snoozed, kind: filter.kind, tab: tabParam ?? '' }} empty={{ unread: '', snoozed: '', kind: '', tab: '' }}
             onApply={(v) => setF({ unread: String(v.unread ?? ''), snoozed: String(v.snoozed ?? ''), kind: String(v.kind ?? ''), tab: String(v.tab ?? ''), priority: '' })} />
-          <div role="group" aria-label={t('inbox.show')} className="inline-flex overflow-hidden rounded-md border border-line">
-            {([['', 'inbox.all'], ['1', 'inbox.unread']] as const).map(([v, k]) => (
-              <button key={k} type="button" aria-pressed={(filter.unread ? '1' : '') === v} data-testid={`inbox-show-${v ? 'unread' : 'all'}`} onClick={() => setF({ unread: v })}
-                className={`px-3 py-1.5 text-sm ${(filter.unread ? '1' : '') === v ? 'bg-accentSoft font-semibold text-accentText' : 'bg-card text-mute hover:bg-hover'}`}>{t(k)}</button>
-            ))}
-          </div>
+          <label className="flex items-center gap-1 text-sm"><span className="text-mute">{t('inbox.show')}</span>
+            <select className="input w-auto" data-testid="inbox-show" value={showValue} onChange={(e) => { const m = SHOW[e.target.value as ShowKey]; setF({ unread: m.unread ? '1' : '', snoozed: m.snoozed === 'hide' ? '' : m.snoozed }); }}>
+              {(Object.keys(SHOW) as ShowKey[]).map((k) => <option key={k} value={k}>{t(`inbox.show_${k}`)}</option>)}
+            </select>
+          </label>
           {!cfg.tabs_enabled && <button type="button" className={`btn ${priorityOnly ? 'bg-accentSoft font-semibold text-accentText' : ''}`} aria-pressed={priorityOnly} data-testid="inbox-priority-only" onClick={() => setF({ priority: priorityOnly ? '' : '1' })}>
             <Flag size={14} aria-hidden />{t('inbox.priority_only')}{priorityCount > 0 && <span className="chip bg-card2" data-testid="inbox-priority-count">{priorityCount}</span>}
           </button>}
-          <select className="input w-auto" aria-label={t('inbox.snoozed')} data-testid="inbox-snoozed" value={filter.snoozed} onChange={(e) => setF({ snoozed: e.target.value === 'hide' ? '' : e.target.value })}>
-            {(['hide', 'only', 'include'] as const).map((x) => <option key={x} value={x}>{t(`inbox.snoozed_${x}`)}</option>)}
-          </select>
-          <select className="input w-auto" aria-label={t('inbox.kind')} data-testid="inbox-kind" value={filter.kind} onChange={(e) => setF({ kind: e.target.value })}>
-            <option value="">{t('inbox.all_kinds')}</option>
-            {KINDS.map((k) => <option key={k} value={k}>{t(`inbox.kind_${k}`)}</option>)}
-          </select>
+          {filter.kind && <span className="chip bg-accentSoft text-accentText" data-testid="inbox-kind-chip">{t('inbox.kind')}: {t(`inbox.kind_${filter.kind}`, { defaultValue: filter.kind })}<button type="button" className="ms-1" aria-label={t('inbox.kind_clear')} data-testid="inbox-kind-clear" onClick={() => setF({ kind: '' })}><X size={12} aria-hidden /></button></span>}
         </>}
         primary={<button type="button" className="btn btn-primary" data-testid="inbox-read-all" disabled={unread === 0 || ops.readAll.isPending} onClick={() => ops.readAll.mutate(undefined, { onSuccess: () => toast(t('inbox.all_read')), onError: fail })}><CheckCheck size={16} aria-hidden />{t('top.mark_all_read')}</button>}
       />
