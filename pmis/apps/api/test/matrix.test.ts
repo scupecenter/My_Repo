@@ -864,6 +864,7 @@ describe('the seed of the register rows', () => {
       expect(built).toBe('gecol:1:GECOL_TEAM,gecol:3:CW_TL,hlc:1:HLC_TEAM,hlc:3:CW_TL,permits_hse:1:SITE_ENG_CW,permits_hse:3:CW_TL,procurement:1:PROC_TEAM,procurement:3:CW_TL');
 
       await calc.query(`DELETE FROM matrix_cells WHERE register_key = 'deliverables'`);
+      await calc.query(`DELETE FROM template_versions WHERE template_id IN (SELECT id FROM template_definitions WHERE register_key = 'deliverables')`);
       await calc.query(`DELETE FROM template_definitions WHERE register_key = 'deliverables'`);   // 0326: the register has a template and fields now
       await calc.query(`DELETE FROM register_fields WHERE register_key = 'deliverables'`);
       await calc.query(`DELETE FROM register_definitions WHERE register_key = 'deliverables'`);

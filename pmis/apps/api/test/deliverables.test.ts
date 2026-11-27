@@ -52,8 +52,14 @@ describe('deliverables register', () => {
     const noDoc = await post(t.entry.api, 'deliverables', rec.id, 'submit', rec.version);
     expect(noDoc.status, JSON.stringify(noDoc.body)).toBe(422);
     expect(JSON.stringify(noDoc.body)).toContain('document_required');
-    // the document is a file reference (uploaded through the files endpoint); set directly here
-    await db.query(`UPDATE register_records SET data = data || '{"deliverable_file": "7d1c2a4e-5b6f-4c3d-8e9a-0b1c2d3e4f50"}'::jsonb WHERE id = $1`, [rec.id]);
+    // the document is a file of a document slot of the record (planted by the migration role, as the Meetings test does)
+    const U = Date.now().toString(36);
+    const dt = await db.query(`INSERT INTO document_types (code, name_en, updated_at) VALUES ($1, 'Deliverable', now()) RETURNING id`, [`DLV${U}`]);
+    const slot = await db.query(`INSERT INTO document_slots (site_id, region_id, doc_type_id, status, register_entity_id, register_key) VALUES ($1, $2, $3, 'uploaded', $4, 'deliverables') RETURNING id`,
+      [t.site.id, (await db.query(`SELECT region_id FROM sites WHERE id = $1`, [t.site.id])).rows[0].region_id, dt.rows[0].id, rec.entity_id]);
+    const file = await db.query(`INSERT INTO document_files (slot_id, file_group_id, original_name, stored_name, storage_key, mime_type, size_bytes, sha256, uploaded_by)
+      VALUES ($1, gen_random_uuid(), 'deliverable.pdf', 'deliverable.pdf', $2, 'application/pdf', 10, 'x', $3) RETURNING id`, [slot.rows[0].id, `dlv/${U}`, t.entry.user.id]);
+    await db.query(`UPDATE register_records SET data = data || jsonb_build_object('deliverable_file', $2::text) WHERE id = $1`, [rec.id, file.rows[0].id]);
     const cur = await t.entry.api.call('get', recPath('deliverables', rec.id));
     const done = await approveAll(t, rec.id, cur.body.version ?? rec.version);
     expect(done.state).toBe('approved');
