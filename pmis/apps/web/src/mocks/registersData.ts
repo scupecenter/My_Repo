@@ -1,5 +1,8 @@
 import type { RegisterDefinition, RegisterField, RegisterKey, RegisterRecordStep, UserRef } from '@/api/types';
 
+/** A date twenty days ahead of today, so the relative-date cell (item 15) shows in the seed whatever the day is. */
+const REL_PLUS_20 = (() => { const d = new Date(); d.setDate(d.getDate() + 20); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })();
+
 /**
  * Mock register catalogue and seed rows (synthetic). Field codes, values, sections and required flags are the ones the API serves from
  * `register_fields` (migration 0019, `GET /registers`): the real server and this mock answer the same shapes.
@@ -23,6 +26,7 @@ const procurement: RegisterDefinition = {
     F('po_wo_no', 'PO / WO No.', 'رقم أمر الشراء / العمل', 'text', 'Order', { in_list: true }), F('po_wo_date', 'PO / WO Date', 'تاريخ أمر الشراء / العمل', 'date', 'Order', { in_list: true }),
     F('team_id', 'Team', 'الفريق', 'text', 'Assignment'),
     F('order_status', 'Order Status', 'حالة الطلب', 'list', 'Status and remark', { required: true, in_list: true }),
+    { ...F('receipt_pct', 'Received', 'نسبة الاستلام', 'number', 'Status and remark', { in_list: true }), type: 'percentage' as FT, is_custom: true },
     F('remark', 'Remark', 'ملاحظات', 'text', 'Status and remark'),
   ],
 };
@@ -66,7 +70,9 @@ const permits: RegisterDefinition = {
       { value: 'CW', label_en: 'Civil Works (CW)', label_ar: 'الأعمال المدنية (CW)' }, { value: 'TE', label_en: 'Installation (TE)', label_ar: 'التركيب (TE)' },
       { value: 'ACQ', label_en: 'Acquisition / RF & Design', label_ar: 'الاستحواذ / التصميم' }, { value: 'OM', label_en: 'O&M', label_ar: 'التشغيل والصيانة' }] },
     F('applied_date', 'Applied / Requested', 'تاريخ التقديم', 'date', 'Permit'),
-    F('status', 'Status', 'الحالة', 'list', 'Permit', { required: true, in_list: true, options: ['Applied', 'Approved', 'Rejected', 'N/A'] }),
+    { ...F('status', 'Status', 'الحالة', 'list', 'Permit', { required: true, in_list: true }), options: [
+      { value: 'Applied', label_en: 'Applied', label_ar: 'مقدَّم', colour: '#d97706' }, { value: 'Approved', label_en: 'Approved', label_ar: 'معتمد', colour: '#15803d' },
+      { value: 'Rejected', label_en: 'Rejected', label_ar: 'مرفوض', colour: '#b91c1c' }, { value: 'N/A', label_en: 'N/A', label_ar: 'لا ينطبق', colour: '#6b7280' }] },
     F('has_expiry', 'Has expiry date', 'له تاريخ انتهاء', 'yes_no', 'Validity', { in_list: true }), F('valid_from', 'Valid From', 'ساري من', 'date', 'Validity', { in_list: true }), F('valid_to', 'Valid To', 'ساري حتى', 'date', 'Validity', { in_list: true }),
     F('na_reason', 'N/A Reason', 'سبب عدم الانطباق', 'text', 'N/A'), F('na_approved_by', 'N/A Approved By', 'معتمد عدم الانطباق', 'text', 'N/A', { read_only: true }),
     F('jsa_tra', 'JSA / TRA', 'JSA / TRA', 'list', 'PTW checks'), F('toolbox_talk', 'Toolbox Talk', 'Toolbox Talk', 'list', 'PTW checks'), F('work_at_height', 'Work at Height', 'العمل على المرتفعات', 'list', 'PTW checks'),
@@ -302,16 +308,16 @@ const rec = (key: RegisterKey, type: string | null, site: number, state: MockRec
 export function initRegisters() {
   n = 0;
   const records: MockRecord[] = [
-    rec('procurement', 'pr', 0, 'approved', { scope: 'CW', delivery: 'Outsourced', pr_no: 'PR-2026-014', pr_date: '2026-09-02', order_status: 'Open' }, { task: { id: task(0, 4), task_code: 'B1' } }),
-    rec('procurement', 'po', 1, 'in_review', { scope: 'CW', delivery: 'Outsourced', pr_no: 'PR-2026-015', pr_date: '2026-09-05', po_wo_no: 'PO-2026-031', po_wo_date: '2026-09-12', order_status: 'Issued' }),
-    rec('procurement', 'wo', 2, 'entry', { scope: 'Site Adaption', delivery: 'In-House', po_wo_no: 'WO-2026-007', po_wo_date: '2026-09-20', order_status: 'Open' }),
+    rec('procurement', 'pr', 0, 'approved', { scope: 'CW', delivery: 'Outsourced', pr_no: 'PR-2026-014', pr_date: '2026-09-02', order_status: 'Open', receipt_pct: 80 }, { task: { id: task(0, 4), task_code: 'B1' } }),
+    rec('procurement', 'po', 1, 'in_review', { scope: 'CW', delivery: 'Outsourced', pr_no: 'PR-2026-015', pr_date: '2026-09-05', po_wo_no: 'PO-2026-031', po_wo_date: '2026-09-12', order_status: 'Issued', receipt_pct: 45 }),
+    rec('procurement', 'wo', 2, 'entry', { scope: 'Site Adaption', delivery: 'In-House', po_wo_no: 'WO-2026-007', po_wo_date: '2026-09-20', order_status: 'Open', receipt_pct: 10 }),
     rec('procurement', 'pr', 3, 'in_approval', { scope: 'Tower Erection', delivery: 'Outsourced', pr_no: 'PR-2026-019', pr_date: '2026-09-18', order_status: 'Open' }),
     rec('gecol', null, 0, 'approved', { pr_no: 'GPR-2026-002', request_date: '2026-08-10', survey_date: '2026-08-20', notice_date: '2026-09-01', installation_finish: '2026-09-25', meter_no: 'M-77120', power_on_date: '2026-10-02' }, { task: { id: task(0, 13), task_code: 'C2' } }),
     rec('gecol', null, 4, 'entry', { pr_no: 'GPR-2026-009', request_date: '2026-10-01', survey_date: '2026-10-01', notice_date: '2026-10-08' }),
     rec('hlc', null, 1, 'in_review', { pr_no: 'HPR-2026-044', hlc_approval_date: '2026-09-14', procurement_record_id: recId(14), fiber_uplink: 'Exchange Ain Zara', fiber_status: 'In Progress', internal_fiber_team: 'HLC Team 1', link_received_date: '2026-09-28', installation_date: '2026-10-05' }),
     // entered before migration 0042: the old request fields stay readable (legacy), the request is not yet in Procurement
     rec('hlc', null, 5, 'approved', { request_no: 'HLC-2026-031', request_date: '2026-08-14', fiber_status: 'Installed', installation_date: '2026-09-02', tx_link_tested_date: '2026-09-09' }),
-    rec('permits_hse', null, 0, 'approved', { permit_type: 'Access - CW', applied_date: '2026-09-01', status: 'Approved', valid_from: '2026-09-10', has_expiry: true, valid_to: '2027-03-10' }),
+    rec('permits_hse', null, 0, 'approved', { permit_type: 'Access - CW', applied_date: '2026-09-01', status: 'Approved', valid_from: '2026-09-10', has_expiry: true, valid_to: REL_PLUS_20 }),
     rec('permits_hse', null, 2, 'entry', { permit_type: 'PTW - CW', applied_date: '2026-10-10', status: 'Applied', has_expiry: true, jsa_tra: 'Done', stop_work: false }),
     rec('permits_hse', null, 3, 'approved', { permit_type: 'Civil Aviation Authority Permit', applied_date: '2026-08-01', status: 'Approved', valid_from: '2026-08-15', has_expiry: false }),
     rec('dismantle', 'cw', 0, 'approved', { rfd_date: '2026-09-15', dismantle_reason: 'Swap', work_start_date: '2026-09-20', work_end_date: '2026-09-24', closing_rn_ref: 'RN-2026-0042', closed: true }),

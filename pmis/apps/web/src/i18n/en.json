@@ -7051,6 +7051,7 @@
     "inbox_priority_note": "Mentions and approvals waiting are priority by default."
   },
   "related": {
+    "change_pending": "Change pending",
     "title": "Related records",
     "to": "Points to:",
     "from": "Named by:",
@@ -7183,5 +7184,17 @@
     "kind_record_idle": "Record idle in a state",
     "kind_weekly_status_missing_help": "Fires for every region without a Weekly status update of the current working week. Placeholders: {{region}}.",
     "kind_record_idle_help": "Fires for every current record of the register in the state for at least the days. Placeholders: {{record}}, {{state}}, {{days}}."
+  },
+  "rel": {
+    "today": "today",
+    "tomorrow": "tomorrow",
+    "yesterday": "yesterday",
+    "in_days": "in {{count}} days",
+    "in_days_one": "in {{count}} day",
+    "days_ago": "{{count}} days ago",
+    "days_ago_one": "{{count}} day ago"
+  },
+  "cells": {
+    "progress": "Progress"
   }
 }
