@@ -198,6 +198,18 @@ export const xHandlers = [
     if (r && !/^[1-7]$/.test(r)) return invalid('/region_id');
     return HttpResponse.json(workload(r ? Number(r) : null));
   }),
+  http.get(`${B}/reports/state-durations`, ({ request }) => {
+    const g = guard(); if (g) return g;
+    if (!['pm', 'reviewer'].includes(viewer()?.key ?? '')) return problem(403, 'module_forbidden', 'You cannot use reports');
+    const q = new URL(request.url).searchParams;
+    const entity = q.get('entity_type');
+    if (entity !== 'task' && entity !== 'register_record') return invalid('/entity_type');
+    const region = q.get('region_id');
+    const rows = entity === 'task'
+      ? [{ region_id: 1, group_key: 'execution', state: 'entry', count: 12, median_working_days: 2, p85_working_days: 5 }, { region_id: 2, group_key: 'execution', state: 'approve', count: 7, median_working_days: 1, p85_working_days: 3 }]
+      : [{ region_id: 1, group_key: 'procurement', state: 'review', count: 9, median_working_days: 3, p85_working_days: 8 }];
+    return HttpResponse.json({ entity_type: entity, items: rows.filter((r) => !region || String(r.region_id) === region) });
+  }),
   http.get(`${B}/reports/time-in-state`, ({ request }) => {
     const g = guard(); if (g) return g;
     if (!['pm', 'reviewer'].includes(viewer()?.key ?? '')) return problem(403, 'module_forbidden', 'You cannot use reports');

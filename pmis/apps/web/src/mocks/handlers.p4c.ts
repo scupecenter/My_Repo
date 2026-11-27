@@ -88,6 +88,14 @@ export const p4cHandlers = [
     return HttpResponse.json({ items });
   }),
 
+  http.get(`${B}/registers/dismantle/rn-options`, ({ request }) => {
+    const g = guard(); if (g) return g;
+    const u = new URL(request.url).searchParams;
+    const part = u.get('record_type') ?? '';
+    if (!['cw', 'te'].includes(part) || !u.get('site_id')) return fields({ path: '/record_type', code: 'invalid' });
+    return HttpResponse.json({ items: [] });
+  }),
+
   http.post(`${B}/registers/hlc/legacy-migration`, async ({ request }) => {
     const g = guard(); if (g) return g;
     if (!isAdmin()) return problem(403, 'action_forbidden', 'You need administer on procurement.');

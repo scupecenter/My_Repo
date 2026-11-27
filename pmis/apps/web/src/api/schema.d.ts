@@ -5798,6 +5798,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/pm-schedules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The preventive-maintenance schedules the caller may see (0.15.161)
+         * @description 0.15.161. Schedules kept in the settings table as `pm.schedules`. A schedule says: every `every` weeks or months create a DRAFT record in register `register_key`
+         *     (for `site_id`, with the field values in `data`). `next_due` is the next date a draft is due; `today` is the calendar day of the system. A schedule never creates
+         *     anything by itself. A caller sees the schedules of the registers the caller may view; an administrator with `admin.settings` edit sees all of them.
+         */
+        get: operations["getPmSchedules"];
+        /**
+         * Save the schedules (reason, If-Match, audited, versioned)
+         * @description 0.15.161. System Admin, or a delegation of `admin.settings` edit for all regions (403 `action_forbidden` otherwise). The body replaces the whole list; the run
+         *     history of a schedule (`last_generated_at`, `last_record_id`) is kept by the database. Field errors (422 `validation_failed`): `unknown_key`, `invalid`,
+         *     `duplicate`, `unknown_register`, `unknown_site`, `required` (a site is needed), `too_many`. One audit row per save.
+         */
+        put: operations["setPmSchedules"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pm-schedules/{schedule_id}/generate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create the draft of a due schedule, as the caller (0.15.161)
+         * @description 0.15.161. Saves ONE draft record (state `entry`) in the schedule's register through the register's own create path, as the caller: the register's rights, region
+         *     rules and field rules apply unchanged (no permission is widened). Then the next due date moves past today in steps of the schedule (never a backlog).
+         *     404 when the schedule does not exist or the caller may not view its register; 409 `invalid_transition` when the schedule is switched off or not due yet.
+         *     Errors of the register (403, 422) are returned as they are.
+         */
+        post: operations["generatePmScheduleDraft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/kanban-wip": {
         parameters: {
             query?: never;
@@ -5961,6 +6012,97 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/support-access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The support access setting (System Admin only) (0.15.191)
+         * @description System Admin only (403 `action_forbidden` otherwise). `enabled` is `false` until a System Admin turns it on. `modules` lists the modules a support grant may touch.
+         */
+        get: operations["getSupportAccess"];
+        /**
+         * Turn support access on or off and set its limits (System Admin, reason, step-up, If-Match, audited) (0.15.191)
+         * @description System Admin only. A reason (3+ characters), a step-up (401 `step_up_required`) and `If-Match` (428 / 412) are required. `max_hours` is 1 to 168, `default_hours` is 1 to `max_hours`.
+         *     Saving the values already in force is 409 `invalid_transition`. Audited `support_access_update` with before and after. Turning it off does not revoke grants already made.
+         */
+        put: operations["setSupportAccess"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/support-access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The support grants, newest first, with their state (System Admin only) (0.15.191)
+         * @description A support grant is a delegation whose reason starts with `[support-access] `. `state` is active, expired (by itself at `valid_to`) or revoked. At most 200.
+         */
+        get: operations["listSupportAccess"];
+        put?: never;
+        /**
+         * Give a user a few write rights for a limited time (System Admin, step-up, reason, rate limited) (0.15.191)
+         * @description System Admin only. Refused (409 `invalid_transition`) while support access is off. Creates an ordinary delegation (`idm_delegate`) with an expiry of now plus `hours` (default
+         *     `default_hours`, at most `max_hours`), no re-delegation and all regions. `rights` are from `templates.edit`, `fields.edit`, `documents.edit`, `warehouse.items.edit` (anything else is 422).
+         *     The target must be an active user other than the caller (422). At most 10 grants a minute (429 `rate_limited`). Audited as `delegation_created` with the reason prefixed `[support-access] `.
+         */
+        post: operations["grantSupportAccess"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/support-access/{delegation_id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * End one support grant now (System Admin, step-up, reason) (0.15.191)
+         * @description 404 for a delegation that is not a support grant, 409 `invalid_transition` when it is already revoked. Audited as `delegation_revoked`.
+         */
+        post: operations["revokeSupportAccess"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/support-access/revoke-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * End every support grant still in force (System Admin, step-up, reason) (0.15.191)
+         * @description Returns how many were ended. Expired and already revoked grants and ordinary delegations are not touched.
+         */
+        post: operations["revokeAllSupportAccess"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/historical-waiver": {
         parameters: {
             query?: never;
@@ -6080,6 +6222,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/registers/dismantle/rn-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The received Warehouse RNs that can close a Dismantle part (0.15.110)
+         * @description 0.15.110. Current, not voided, Received Warehouse RNs of the part (`record_type` cw gives cw_rn, te gives te_rn) on the site, in the regions where the caller holds the Warehouse view right (the responsibility matrix). Needs the Dismantle module.
+         */
+        get: operations["listDismantleRnOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/registers/dismantle/order-options": {
         parameters: {
             query?: never;
@@ -6172,9 +6334,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * The approved, active Procurement orders a warehouse receipt may name (0.15.90)
-         * @description 0.15.95. The approved Procurement versions in force, not cancelled, that the caller can see; of the site `site_id` when it is given (a PL / OPEN receipt may have no site).
-         *     Needs the Issue log module; only the orders in regions where the caller also holds the Procurement view right (the responsibility matrix) are listed, and the same right is checked when a receipt is saved.
+         * The approved, active Procurement orders a Issue log record may name (0.15.95)
+         * @description 0.15.95. The approved Procurement versions in force, not cancelled, that the caller can see; of the site `site_id` when it is given. Needs the Issue log module; only the orders in regions where the caller also holds the Procurement view right (the responsibility matrix) are listed, and the same right is checked when the record is saved.
          */
         get: operations["listIssueOrderOptions"];
         put?: never;
@@ -6193,9 +6354,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * The approved, active Procurement orders a warehouse receipt may name (0.15.90)
-         * @description 0.15.95. The approved Procurement versions in force, not cancelled, that the caller can see; of the site `site_id` when it is given (a PL / OPEN receipt may have no site).
-         *     Needs the Quality module; only the orders in regions where the caller also holds the Procurement view right (the responsibility matrix) are listed, and the same right is checked when a receipt is saved.
+         * The approved, active Procurement orders a Quality record may name (0.15.95)
+         * @description 0.15.95. The approved Procurement versions in force, not cancelled, that the caller can see; of the site `site_id` when it is given. Needs the Quality module; only the orders in regions where the caller also holds the Procurement view right (the responsibility matrix) are listed, and the same right is checked when the record is saved.
          */
         get: operations["listQualityOrderOptions"];
         put?: never;
@@ -6255,10 +6415,32 @@ export interface paths {
         };
         /**
          * The warehouse receipts against a Procurement order (0.15.91)
-         * @description 0.15.91. The current, not voided PL / OPEN receipts whose `procurement_order_id` is this order, with the number of lines and the total quantity. Needs the Procurement module
+         * @description 0.15.91 (0.15.111: every document type except an adjustment). The current, not voided warehouse documents whose `procurement_order_id` is this order, with the number of lines and the total quantity. Needs the Procurement module
          *     (view) and the Warehouse module; the receipts the caller cannot see are not listed.
          */
         get: operations["listProcurementOrderReceipts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/registers/{register_key}/{entity_id}/related": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The records linked to a register record, in both directions (0.15.224)
+         * @description 0.15.224. Read only. The current, not voided records this record names (`direction` `to`) and the records that name it (`direction` `from`), grouped by register and link field.
+         *     Needs the view right of `register_key`; each group is listed only when the caller also holds the view right of the other register in the record's region. A record
+         *     the caller cannot see, or an id with no current record, answers an empty list.
+         */
+        get: operations["listRelatedRecords"];
         put?: never;
         post?: never;
         delete?: never;
@@ -6691,6 +6873,66 @@ export interface paths {
          */
         put: operations["setMailNotificationKinds"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/recycle-bin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Voided register records that can still be restored (System Admin)
+         * @description 0.15.150. The records voided inside the retention window (newest first, at most 500). `blocked` is `open_version_exists` or `site_slot_taken` when a restore would break a rule. 403 for anyone but a System Admin.
+         */
+        get: operations["getRecycleBin"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/recycle-bin/retention": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set the retention of the recycle bin (System Admin)
+         * @description 0.15.150. Days a voided record can be restored, 30 to 730. Needs If-Match and a reason; audited as `recycle_bin_retention_update`.
+         */
+        put: operations["setRecycleBinRetention"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/recycle-bin/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore a voided register record to a draft (System Admin)
+         * @description 0.15.150. Only a voided record inside the retention window; it returns as `entry`, level 1, and goes through the workflow again. Refused when a newer open version exists or the site already has another record in a one-per-site register. Needs If-Match (the record version), a reason and a step-up. Audited as `register_record_restore`.
+         */
+        post: operations["restoreRegisterRecord"];
         delete?: never;
         options?: never;
         head?: never;
@@ -10276,6 +10518,85 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        PmScheduleInput: {
+            id: string;
+            name_en: string;
+            name_ar?: string | null;
+            register_key: string;
+            /**
+             * Format: uuid
+             * @description Required when the register is site scoped.
+             */
+            site_id?: string | null;
+            record_type?: string | null;
+            /** @description Field values of the draft, by field code (at most 4000 characters). */
+            data: {
+                [key: string]: unknown;
+            };
+            every: number;
+            /** @enum {string} */
+            unit: "week" | "month";
+            /** Format: date */
+            next_due: string;
+            active?: boolean;
+        };
+        PmSchedulesInput: {
+            schedules: components["schemas"]["PmScheduleInput"][];
+        };
+        PmSchedule: components["schemas"]["PmScheduleInput"] & {
+            /** Format: date-time */
+            last_generated_at?: string;
+            /** Format: uuid */
+            last_record_id?: string;
+        };
+        PmSchedules: {
+            version: number;
+            schedules: components["schemas"]["PmSchedule"][];
+            /** Format: date */
+            today: string;
+            catalogue: {
+                registers: {
+                    key: string;
+                    name_en: string;
+                    name_ar: string;
+                    site_scoped: boolean;
+                }[];
+                units: string[];
+            };
+            /** Format: date-time */
+            updated_at: string | null;
+            updated_by: {
+                id: string;
+                display_name: string;
+            } | null;
+        };
+        RecycleBin: {
+            retention_days: number;
+            version: number;
+            items: {
+                /** Format: uuid */
+                id: string;
+                register_key: string;
+                register_name_en: string;
+                register_name_ar: string | null;
+                label: string;
+                /** Format: uuid */
+                site_id: string | null;
+                site_code: string | null;
+                version: number;
+                version_no: number;
+                /** Format: date-time */
+                voided_at: string;
+                /** Format: uuid */
+                voided_by: string | null;
+                voided_by_name: string | null;
+                void_reason: string | null;
+                /** Format: date-time */
+                restorable_until: string;
+                /** @enum {string|null} */
+                blocked: "open_version_exists" | "site_slot_taken" | null;
+            }[];
+        };
         IssueStoppedRow: {
             site_code: string;
             /** Format: uuid */
@@ -16147,6 +16468,19 @@ export interface components {
                 advance_state?: string | null;
             }[];
         };
+        DismantleRnOption: {
+            /** Format: uuid */
+            entity_id: string;
+            /** Format: uuid */
+            record_id: string;
+            /** Format: uuid */
+            site_id?: string;
+            /** @enum {string} */
+            record_type?: "cw_rn" | "te_rn";
+            doc_no?: string;
+            doc_date?: string;
+            txn_status?: string;
+        };
         /** @description 0.12.11 (Q114). An approved, active Procurement order of a Dismantle part. */
         DismantleOrderOption: {
             /**
@@ -16216,7 +16550,7 @@ export interface components {
             /** Format: uuid */
             record_id: string;
             /** @enum {string} */
-            record_type: "pl" | "open";
+            record_type: "te_dn" | "cw_dn" | "te_rn" | "cw_rn" | "pl" | "open";
             state: string;
             doc_no?: string;
             doc_date?: string;
@@ -16225,6 +16559,25 @@ export interface components {
             movement_status?: "pending" | "posted" | "cancelled";
             lines: number;
             qty: number;
+        };
+        /** @description 0.15.224. The records linked to a register record through one link field. */
+        RelatedRecordGroup: {
+            /** @enum {string} */
+            direction: "to" | "from";
+            register_key: string;
+            /** @description The link field (a key of the record data) that holds the id. */
+            field: string;
+            items: {
+                /** Format: uuid */
+                entity_id: string;
+                /** Format: uuid */
+                record_id: string;
+                record_type?: string;
+                state: string;
+                /** Format: uuid */
+                site_id?: string;
+                title: string;
+            }[];
         };
         /** @description 0.15.32 (F5). The setting `kanban.wip_limits`: the WIP limit of each milestone column of the sites board, a warning only. */
         KanbanWip: {
@@ -16460,6 +16813,33 @@ export interface components {
         SecurityLocksInput: components["schemas"]["WithReason"] & {
             block_public_sharing: boolean;
             disable_export: boolean;
+        };
+        /** @description 0.15.191. The support access setting (`security.support_access`, migration 0291). */
+        SupportAccessSetting: {
+            /** @description false until a System Admin turns it on. */
+            enabled: boolean;
+            max_hours: number;
+            default_hours: number;
+            /** @description The modules a support grant may touch. */
+            modules: string[];
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+            /** @description The ETag value. */
+            version: number;
+            can_edit: boolean;
+        };
+        SupportAccessSettingInput: components["schemas"]["WithReason"] & {
+            enabled: boolean;
+            max_hours: number;
+            default_hours: number;
+        };
+        SupportAccessGrantInput: components["schemas"]["WithReason"] & {
+            /** Format: uuid */
+            to_user_id: string;
+            rights: ("templates.edit" | "fields.edit" | "documents.edit" | "warehouse.items.edit")[];
+            /** @description Omitted = default_hours. */
+            hours?: number;
         };
         /** @description 0.15.1. The shared order of the side menu (setting `nav.layout`). */
         NavLayout: {
@@ -17675,7 +18055,7 @@ export interface components {
         SiteDraftWarning: {
             field: string;
             /** @enum {string} */
-            code: "cluster_will_be_created" | "outside_libya" | "list_other";
+            code: "cluster_will_be_created" | "outside_libya" | "list_other" | "similar_site_code" | "duplicate_name" | "close_coordinates";
             message: string;
         };
         SiteDraftDecision: {
@@ -30367,6 +30747,94 @@ export interface operations {
             428: components["responses"]["PreconditionRequired"];
         };
     };
+    getPmSchedules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The schedules. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PmSchedules"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setPmSchedules: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"] & components["schemas"]["PmSchedulesInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PmSchedules"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    generatePmScheduleDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                schedule_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The draft was created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        record_id: string;
+                        register_key: string;
+                        /** Format: date */
+                        next_due: string | null;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
     getKanbanWip: {
         parameters: {
             query?: never;
@@ -30668,6 +31136,176 @@ export interface operations {
             428: components["responses"]["PreconditionRequired"];
         };
     };
+    getSupportAccess: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The setting. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupportAccessSetting"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setSupportAccess: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SupportAccessSettingInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupportAccessSetting"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    listSupportAccess: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Support grants. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["Delegation"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    grantSupportAccess: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SupportAccessGrantInput"];
+            };
+        };
+        responses: {
+            /** @description Granted. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Delegation"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    revokeSupportAccess: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                delegation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"];
+            };
+        };
+        responses: {
+            /** @description Revoked. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Delegation"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    revokeAllSupportAccess: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"];
+            };
+        };
+        responses: {
+            /** @description Done. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        revoked: number;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
     getHistoricalWaiver: {
         parameters: {
             query?: never;
@@ -30832,6 +31470,34 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HlcLegacyMigration"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listDismantleRnOptions: {
+        parameters: {
+            query: {
+                site_id: string;
+                record_type: "cw" | "te";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The RNs. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["DismantleRnOption"][];
+                    };
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -31073,6 +31739,34 @@ export interface operations {
                 content: {
                     "application/json": {
                         items: components["schemas"]["ProcurementOrderReceipt"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listRelatedRecords: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                register_key: string;
+                entity_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The groups. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        groups: components["schemas"]["RelatedRecordGroup"][];
                     };
                 };
             };
@@ -31779,6 +32473,109 @@ export interface operations {
             412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getRecycleBin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The bin. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecycleBin"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setRecycleBinRetention: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    retention_days: number;
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The new retention. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        retention_days: number;
+                        version: number;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    restoreRegisterRecord: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The restored record. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        register_key: string;
+                        /** @enum {string} */
+                        state: "entry";
+                        version: number;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     listRegisters: {

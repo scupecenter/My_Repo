@@ -248,6 +248,18 @@ const MK = () => (C().mailKinds ??= initCfg().mailKinds);
 const locks: { block_public_sharing: boolean; disable_export: boolean; version: number; updated_at: string | null; updated_by: { id: string; display_name: string; employee_id: string | null } | null } =
   { block_public_sharing: false, disable_export: false, version: 1, updated_at: null, updated_by: null };
 const locksView = () => ({ ...locks, can_edit: isAdmin() });
+
+/** 0.15.191: support access (off by default) and the support grants, kept in memory like the lock keys. A grant is a time-limited delegation. */
+const support: { enabled: boolean; max_hours: number; default_hours: number; version: number; updated_at: string | null; updated_by: { id: string; display_name: string; employee_id: string | null } | null } =
+  { enabled: false, max_hours: 72, default_hours: 24, version: 1, updated_at: null, updated_by: null };
+type SupportGrant = { id: string; to: { id: string; display_name: string; employee_id: string | null }; from: { id: string; display_name: string; employee_id: string | null }; rights: string[]; valid_from: string; valid_to: string; revoked: boolean; revoked_at: string | null; reason: string };
+const supportGrants: SupportGrant[] = [];
+const SUPPORT_RIGHTS = ['templates.edit', 'fields.edit', 'documents.edit', 'warehouse.items.edit'];
+const supportView = () => ({ ...support, modules: ['templates', 'fields', 'lists', 'document_types', 'warehouse_items'], can_edit: true });
+const supportDto = (g: SupportGrant) => ({
+  id: g.id, from_user: g.from, to_user: g.to, target_kind: 'user', target: { kind: 'user', id: g.to.id, label: g.to.display_name }, scope: 'partial', rights: g.rights, region_codes: [], module_codes: [],
+  allow_redelegate: false, valid_from: g.valid_from, valid_to: g.valid_to, state: g.revoked ? 'revoked' : new Date(g.valid_to) <= new Date() ? 'expired' : 'active', reason: g.reason, revoked_at: g.revoked_at,
+});
 const identityView = () => ({ ...identity(), brands: [...BRANDS], can_edit: isAdmin() });
 /** 0.15.97: the login page settings with the system version (shown to signed-in users only). */
 const loginPageView = () => ({ ...loginPage(), server_version: '0.15.97', can_edit: isAdmin() });
@@ -370,6 +382,7 @@ const DASH_CATALOGUE = {
     { code: 'gates_issues_delay', label_en: 'Blocked gates, issues and delay attribution', label_ar: 'البوابات المعطلة والقضايا والتأخير' },
     { code: 'regions', label_en: 'Regions', label_ar: 'المناطق' },
     { code: 'ops_procurement', label_en: 'Procurement and materials', label_ar: 'المشتريات والمواد' },
+    { code: 'ops_scurve', label_en: 'Progress curve: planned vs actual, velocity and forecast', label_ar: 'منحنى التقدم: المخطط مقابل الفعلي والسرعة والتوقع' },
   ],
 };
 const dashSeedThresholds = Object.fromEntries(DASH_CATALOGUE.kpis.map((k) => [k.code, { green: k.default_green, amber: k.default_amber }]));
@@ -393,6 +406,15 @@ const SLA_TASKS: MockSlaTask[] = [
 ];
 const slaCounts = () => ({ total: SLA_TASKS.length, set: SLA_TASKS.filter((x) => x.mode === 'set').length, none: SLA_TASKS.filter((x) => x.mode === 'none').length, undecided: SLA_TASKS.filter((x) => x.mode === 'undecided').length, in_draft: SLA_TASKS.filter((x) => x.in_draft).length });
 
+/** GET/PUT/POST /recycle-bin (contract 0.15.98): demo voided records. */
+const BIN = {
+  retention_days: 90, version: 1,
+  items: [
+    { id: '00000000-0000-4000-8000-0000000000a1', register_key: 'procurement', register_name_en: 'Procurement', register_name_ar: null, label: 'GN-0012 / Procurement v1', site_id: null, site_code: 'GN-0012', version: 4, version_no: 1, voided_at: '2026-11-20T09:00:00.000Z', voided_by: null, voided_by_name: 'Demo Admin', void_reason: 'Entered on the wrong site', restorable_until: '2027-02-18T09:00:00.000Z', blocked: null as string | null },
+    { id: '00000000-0000-4000-8000-0000000000a2', register_key: 'gecol', register_name_en: 'GECOL', register_name_ar: null, label: 'GN-0031 / GECOL v1', site_id: null, site_code: 'GN-0031', version: 3, version_no: 1, voided_at: '2026-11-22T09:00:00.000Z', voided_by: null, voided_by_name: 'Demo Admin', void_reason: 'Duplicate', restorable_until: '2027-02-20T09:00:00.000Z', blocked: 'site_slot_taken' },
+  ],
+};
+
 /** GET /matrix/coverage (contract 0.15.94): demo numbers only. */
 const MATRIX_COVERAGE = {
   workflow_version: 1,
@@ -409,8 +431,37 @@ const MATRIX_COVERAGE = {
   ],
 };
 
+/** Preventive-maintenance schedules (contract 0.15.161): the list in memory; "Create draft" only moves the next due date (the mock saves no record). */
+type MockPm = { id: string; name_en: string; name_ar?: string | null; register_key: string; site_id?: string | null; record_type?: string | null; data: Record<string, unknown>; every: number; unit: 'week' | 'month'; next_due: string; active?: boolean; last_generated_at?: string; last_record_id?: string };
+let pmState = { version: 0, schedules: [] as MockPm[], updated_at: null as string | null, updated_by: null as null | { id: string; display_name: string } };
+const PM_CATALOGUE = { registers: [{ key: 'procurement', name_en: 'Procurement', name_ar: 'المشتريات', site_scoped: false }], units: ['week', 'month'] };
+const pmView = () => ({ ...pmState, today: tripoliToday(), catalogue: PM_CATALOGUE });
+
 export const settingsHandlers = [
+  http.get(`${B}/recycle-bin`, () => { const g = guard(); if (g) return g; return HttpResponse.json(BIN, tag(BIN.version)); }),
+  http.put(`${B}/recycle-bin/retention`, async ({ request }) => { const g = guard(); if (g) return g; const b = (await request.json()) as { retention_days: number }; BIN.retention_days = b.retention_days; BIN.version += 1; return HttpResponse.json({ retention_days: BIN.retention_days, version: BIN.version }, tag(BIN.version)); }),
+  http.post(`${B}/recycle-bin/:id/restore`, ({ params }) => { const g = guard(); if (g) return g; const i = BIN.items.findIndex((x) => x.id === params.id); if (i < 0) return HttpResponse.json({ code: 'not_found' }, { status: 404 }); const [r] = BIN.items.splice(i, 1); return HttpResponse.json({ id: r!.id, register_key: r!.register_key, state: 'entry', version: r!.version + 1 }); }),
   http.get(`${B}/matrix/coverage`, () => { const g = guard(); if (g) return g; return HttpResponse.json(MATRIX_COVERAGE); }),
+  // ------------------------------------------------------------------ preventive-maintenance schedules (contract 0.15.161)
+  http.get(`${B}/settings/pm-schedules`, () => { const g = guard(); if (g) return g; return HttpResponse.json(pmView(), tag(pmState.version)); }),
+  http.put(`${B}/settings/pm-schedules`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    const b = (await request.json()) as { schedules: MockPm[] };
+    pmState = { ...pmState, version: pmState.version + 1, schedules: b.schedules.map((x) => ({ ...x, last_generated_at: pmState.schedules.find((o) => o.id === x.id)?.last_generated_at, last_record_id: pmState.schedules.find((o) => o.id === x.id)?.last_record_id })), updated_at: new Date().toISOString() };
+    return HttpResponse.json(pmView(), tag(pmState.version));
+  }),
+  http.post(`${B}/pm-schedules/:id/generate`, ({ params }) => {
+    const g = guard(); if (g) return g;
+    const x = pmState.schedules.find((o) => o.id === params.id);
+    if (!x) return problem(404, 'not_found', 'Schedule not found');
+    const today = tripoliToday();
+    if (x.active === false || x.next_due > today) return problem(409, 'invalid_transition', 'This schedule is not due.');
+    let d = new Date(`${x.next_due}T00:00:00Z`);
+    while (d.toISOString().slice(0, 10) <= today) { if (x.unit === 'week') d = new Date(d.getTime() + 7 * x.every * 86400000); else d.setUTCMonth(d.getUTCMonth() + x.every); }
+    x.next_due = d.toISOString().slice(0, 10); x.last_generated_at = new Date().toISOString(); x.last_record_id = crypto.randomUUID();
+    pmState = { ...pmState, version: pmState.version + 1 };
+    return HttpResponse.json({ record_id: x.last_record_id, register_key: x.register_key, next_due: x.next_due }, { status: 201 });
+  }),
   // ------------------------------------------------------------------ dashboard settings (F20, contract 0.15.24)
   http.get(`${B}/settings/dashboard`, () => { const g = guard(); if (g) return g; return HttpResponse.json(dashView(), tag(dashState.version)); }),
   http.put(`${B}/settings/dashboard`, async ({ request }) => {
@@ -613,6 +664,70 @@ export const settingsHandlers = [
       updated_by: { id: uid(v.employee_id ?? '9999'), display_name: v.name, employee_id: v.employee_id } });
     const j = locksView();
     return HttpResponse.json(j, tag(j.version));
+  }),
+
+  // ------------------------------------------------------------------ 0.15.191: support access (System Admin only)
+  http.get(`${B}/settings/support-access`, () => { const g = needAdmin(); if (g) return g; const j = supportView(); return HttpResponse.json(j, tag(j.version)); }),
+  http.put(`${B}/settings/support-access`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    const b = await body<{ enabled?: unknown; max_hours?: unknown; default_hours?: unknown; reason?: string } & Record<string, unknown>>(request);
+    const errs: { path: string; code: string }[] = Object.keys(b).filter((k) => !['enabled', 'max_hours', 'default_hours', 'reason'].includes(k)).map((k) => ({ path: `/${k}`, code: 'unknown_field' }));
+    if (typeof b.enabled !== 'boolean') errs.push({ path: '/enabled', code: 'required' });
+    const okH = (n: unknown): n is number => typeof n === 'number' && Number.isInteger(n) && n >= 1 && n <= 168;
+    if (!okH(b.max_hours)) errs.push({ path: '/max_hours', code: 'invalid' });
+    if (!okH(b.default_hours) || (okH(b.max_hours) && b.default_hours > b.max_hours)) errs.push({ path: '/default_hours', code: 'invalid' });
+    if ((b.reason ?? '').trim().length < 3 || (b.reason ?? '').length > 1000) errs.push({ path: '/reason', code: 'required' });
+    if (errs.length) return fields(...errs);
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, support.version); if (p) return p;
+    if (!stepUpValid()) return stepUp();
+    if (support.enabled === b.enabled && support.max_hours === b.max_hours && support.default_hours === b.default_hours) return problem(409, 'invalid_transition', 'These are already the support access settings.');
+    const v = viewer()!;
+    Object.assign(support, { enabled: b.enabled, max_hours: b.max_hours, default_hours: b.default_hours, version: support.version + 1, updated_at: new Date().toISOString(),
+      updated_by: { id: uid(v.employee_id ?? '9999'), display_name: v.name, employee_id: v.employee_id } });
+    const j = supportView();
+    return HttpResponse.json(j, tag(j.version));
+  }),
+  http.get(`${B}/support-access`, () => { const g = needAdmin(); if (g) return g; return HttpResponse.json({ items: [...supportGrants].reverse().map(supportDto) }); }),
+  http.post(`${B}/support-access`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    const b = await body<{ to_user_id?: unknown; rights?: unknown; hours?: unknown; reason?: string } & Record<string, unknown>>(request);
+    const errs: { path: string; code: string }[] = Object.keys(b).filter((k) => !['to_user_id', 'rights', 'hours', 'reason'].includes(k)).map((k) => ({ path: `/${k}`, code: 'unknown_field' }));
+    if (typeof b.to_user_id !== 'string' || b.to_user_id.length < 8) errs.push({ path: '/to_user_id', code: 'invalid' });
+    if (!Array.isArray(b.rights) || b.rights.length === 0 || !b.rights.every((r) => SUPPORT_RIGHTS.includes(r as string))) errs.push({ path: '/rights', code: 'not_allowed' });
+    const hours = b.hours === undefined ? support.default_hours : b.hours;
+    if (typeof hours !== 'number' || !Number.isInteger(hours) || hours < 1 || hours > support.max_hours) errs.push({ path: '/hours', code: 'invalid' });
+    if ((b.reason ?? '').trim().length < 3 || (b.reason ?? '').length > 900) errs.push({ path: '/reason', code: 'required' });
+    if (errs.length) return fields(...errs);
+    if (!stepUpValid()) return stepUp();
+    if (!support.enabled) return problem(409, 'invalid_transition', 'Support access is switched off.');
+    const v = viewer()!;
+    const me = { id: uid(v.employee_id ?? '9999'), display_name: v.name, employee_id: v.employee_id };
+    const now = new Date();
+    const row: SupportGrant = { id: `sg-${supportGrants.length + 1}-${now.getTime()}`, to: { id: b.to_user_id as string, display_name: 'Support user', employee_id: null }, from: me, rights: b.rights as string[],
+      valid_from: now.toISOString(), valid_to: new Date(now.getTime() + (hours as number) * 3_600_000).toISOString(), revoked: false, revoked_at: null, reason: `[support-access] ${(b.reason as string).trim()}` };
+    supportGrants.push(row);
+    return HttpResponse.json(supportDto(row), { status: 201 });
+  }),
+  http.post(`${B}/support-access/revoke-all`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    const b = await body<{ reason?: string } & Record<string, unknown>>(request);
+    if ((b.reason ?? '').trim().length < 3) return fields({ path: '/reason', code: 'required' });
+    if (!stepUpValid()) return stepUp();
+    let n = 0;
+    for (const r of supportGrants) if (!r.revoked && new Date(r.valid_to) > new Date()) { r.revoked = true; r.revoked_at = new Date().toISOString(); n += 1; }
+    return HttpResponse.json({ revoked: n });
+  }),
+  http.post(`${B}/support-access/:id/revoke`, async ({ request, params }) => {
+    const g = needAdmin(); if (g) return g;
+    const b = await body<{ reason?: string } & Record<string, unknown>>(request);
+    if ((b.reason ?? '').trim().length < 3) return fields({ path: '/reason', code: 'required' });
+    if (!stepUpValid()) return stepUp();
+    const r = supportGrants.find((x) => x.id === params.id);
+    if (!r) return problem(404, 'not_found', 'No such support grant');
+    if (r.revoked) return problem(409, 'invalid_transition', 'The support grant is already revoked.');
+    r.revoked = true; r.revoked_at = new Date().toISOString();
+    return HttpResponse.json(supportDto(r));
   }),
 
   // ------------------------------------------------------------------ 0.15.1: the shared layout of the side menu
