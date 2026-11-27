@@ -48,6 +48,24 @@ export interface StatusUpdateDto extends Omit<Row, 'author_id' | 'ts'> {
   author: UserRefDto;
 }
 
+/** Region health (contract 0.15.110, item 12): one row per visible region; the update fields are null when nothing was posted this week. */
+export interface RegionHealthDto {
+  region_id: number;
+  health: string | null;
+  summary: string | null;
+  author: UserRefDto | null;
+  updated_at: Date | null;
+  missing_update: boolean;
+}
+
+interface RegionHealthRow {
+  region_id: number;
+  health: string;
+  summary: string;
+  author_id: string;
+  updated_at: Date;
+}
+
 /** X7: weekly status updates. Reads follow the Sites regions of the caller; writes go through x_status_post / x_status_edit (lead only, audited). */
 @Injectable()
 export class StatusUpdatesService {
@@ -102,6 +120,30 @@ export class StatusUpdatesService {
     const page = rows.slice(0, limit);
     const last = page[page.length - 1];
     return { items: await this.dtos(page), page: { limit, next_cursor: rows.length > limit && last ? encodeCursor([last.week_start, last.ts, last.id]) : null } };
+  }
+
+  /** GET /status-updates/region-health (contract 0.15.110): the current-week region updates of the Weekly status, one row per visible region. */
+  async regionHealth(): Promise<{ week_start: string; items: RegionHealthDto[] }> {
+    const regions = await this.access.requireRegions('sites', 'view');
+    const all = [1, 2, 3, 4, 5, 6, 7];
+    const visible = regions === null ? all : all.filter((r) => regions.includes(r));
+    // The week opens on Sunday (the weekend is Friday and Saturday, migration 0031).
+    const ws = await this.db.tx.$queryRaw<{ ws: string }[]>`SELECT ((public.cal_today() - extract(dow FROM public.cal_today())::int)::date)::text AS ws`;
+    const week_start = ws[0]!.ws;
+    if (!visible.length) return { week_start, items: [] };
+    const rows = await this.db.tx.$queryRaw<RegionHealthRow[]>(Prisma.sql`
+      SELECT DISTINCT ON (u.region_id) u.region_id, u.health, u.summary, u.author_id::text, u.updated_at
+      FROM status_updates u
+      WHERE u.scope = 'region' AND u.week_start = ${week_start}::date AND u.region_id = ANY(${visible}::int[])
+      ORDER BY u.region_id, u.created_at DESC, u.id DESC`);
+    const refs = await this.view.userRefs(rows.map((r) => r.author_id));
+    const byRegion = new Map(rows.map((r) => [r.region_id, r]));
+    const items: RegionHealthDto[] = visible.map((region_id) => {
+      const r = byRegion.get(region_id);
+      if (!r) return { region_id, health: null, summary: null, author: null, updated_at: null, missing_update: true };
+      return { region_id, health: r.health, summary: r.summary, author: refs.get(r.author_id) ?? null, updated_at: r.updated_at, missing_update: false };
+    });
+    return { week_start, items };
   }
 
   private async one(auth: AuthContext, id: string): Promise<StatusUpdateDto> {

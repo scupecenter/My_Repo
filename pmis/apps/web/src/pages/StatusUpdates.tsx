@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useMe } from '@/api/hooks';
 import { useRegions } from '@/api/sites';
 import type { StatusHealth, StatusUpdate } from '@/api/types';
-import { useStatusOps, useStatusUpdates, type StatusFilter } from '@/api/x';
+import { useRegionHealth, useStatusOps, useStatusUpdates, type StatusFilter } from '@/api/x';
 import { errText, FormDialog } from '@/components/FormDialog';
 import { PageHeader, Toolbar } from '@/components/PageHeader';
 import { PersonTag } from '@/components/PersonTag';
@@ -14,6 +14,34 @@ import { canReassign } from '@/lib/x';
 
 const HEALTH = ['on_track', 'at_risk', 'off_track'] as const;
 const TONE: Record<StatusHealth, string> = { on_track: 'bg-openBg text-openInk', at_risk: 'bg-waitBg text-waitInk', off_track: 'bg-lateBg text-lateInk' };
+
+/** Item 12 (0.15.110): the region health board — the current-week health of every visible region, with the "missing update" flag. */
+export function RegionHealthBoard() {
+  const { t, i18n } = useTranslation();
+  const q = useRegionHealth();
+  const regions = useRegions();
+  const name = (id: number) => { const r = regions.data?.find((x) => x.id === id); return (i18n.language === 'ar' && r?.name_ar) || r?.name_en || String(id); };
+  if (q.isError) return <ErrorState onRetry={() => void q.refetch()} testid="region-health-error" />;
+  if (!q.data) return <LoadingSkeleton testid="region-health-loading" />;
+  return (
+    <section className="mb-4" aria-label={t('weekly.health_board')} data-testid="region-health-board">
+      <h2 className="mb-1 text-sm font-semibold text-mute">{t('weekly.health_board')} · <span className="mono">{q.data.week_start}</span></h2>
+      <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {q.data.items.map((r) => (
+          <li key={r.region_id} className="card p-3" data-testid={`region-health-${r.region_id}`} data-health={r.health ?? 'missing'}>
+            <div className="flex items-center gap-2">
+              <b>{name(r.region_id)}</b>
+              {r.health
+                ? <span className={`chip ${TONE[r.health as StatusHealth]}`} data-testid={`region-health-chip-${r.region_id}`}>{t(`weekly.health_${r.health}`)}</span>
+                : <span className="chip bg-waitBg text-waitInk" data-testid={`region-health-chip-${r.region_id}`}>{t('weekly.missing_update')}</span>}
+            </div>
+            <p className="mt-1 line-clamp-2 text-sm text-mute" data-testid={`region-health-summary-${r.region_id}`}>{r.summary ?? t('weekly.missing_hint')}</p>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
 
 /** Create or edit: a region or a team, how it is going, and a few lines. Edit changes only the health and the summary (the week and the scope stay). */
 function UpdateDialog({ edit, onClose }: { edit: StatusUpdate | null; onClose: () => void }) {
@@ -85,6 +113,7 @@ export function StatusUpdates() {
   return (
     <div data-testid="page-status-updates">
       <PageHeader title={t('weekly.title')} subtitle={t('weekly.subtitle')} />
+      <RegionHealthBoard />
       <Toolbar
         filters={<>
           <select className="input w-auto" aria-label={t('weekly.scope')} data-testid="status-filter-scope" value={f.scope} onChange={(e) => setF({ ...f, scope: e.target.value, team: e.target.value === 'region' ? '' : f.team })}>

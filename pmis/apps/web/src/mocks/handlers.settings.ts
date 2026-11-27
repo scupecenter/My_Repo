@@ -360,6 +360,7 @@ const DASH_CATALOGUE = {
     { code: 'sla', label_en: 'SLA per stage and top late tasks', label_ar: 'SLA لكل مرحلة' },
     { code: 'gates_issues_delay', label_en: 'Blocked gates, issues and delay attribution', label_ar: 'البوابات المعطلة والقضايا والتأخير' },
     { code: 'regions', label_en: 'Regions', label_ar: 'المناطق' },
+    { code: 'region_health', label_en: 'Region health', label_ar: 'صحة المناطق' },
   ],
 };
 const dashSeedThresholds = Object.fromEntries(DASH_CATALOGUE.kpis.map((k) => [k.code, { green: k.default_green, amber: k.default_amber }]));

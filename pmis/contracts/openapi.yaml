@@ -32,6 +32,7 @@ info:
 
     ## Versions
     - 0.15.96 (2026-11-27): responsibility-matrix coverage screen (CHANGELOG MatrixCoverage; no migration). Additive and read only. `GET /matrix/coverage` (`getMatrixCoverage`, System Admin or an all-region delegate of the matrix): for each active stage and enabled register row and each of the seven regions, whether the matrix cell has an actor, so empty cells show before a task or record stalls. Settings > Workflow > Coverage.
+    - 0.15.110 (2026-11-27): region health on the dashboard and the Weekly status page (owner request 2026-11-27, item 12 of the PM-platforms research; migration 0200, mirror `db/sql/199_region_health.sql`; CHANGELOG RegionHealth). Additive. New `GET /status-updates/region-health` (`getRegionHealth`): one row per region the caller may view on `sites` (all seven when unrestricted), with the current working week's region update of the Weekly status (`health`, `summary`, `author`, `updated_at`) or `missing_update` true when the region has not posted this week; read only. The dashboard card catalogue gains `region_health` ("Region health"), shown at the end of a tab until the tab layout names it (migration 0108 rule). No table, no permission change.
     - 0.15.95 (2026-11-27): Issue log and Quality record link to a Procurement order (migration 0195; CHANGELOG IssueQualityOrderLink). Additive. New optional field `procurement_order_id` on `issues` and `quality`; when set, the contractor (`external_party`) is taken from the order (a different typed `external_party_id` is refused, 422 `contractor_from_order`; `order_not_active`, `order_other_site`, `invalid`), so the contractor performance view sees the issue and the inspection. `GET /registers/issues/order-options` and `GET /registers/quality/order-options` list the orders (own module view plus Procurement view).
     - 0.15.92 (2026-11-27): order picker for the Car dispatcher and Financial advances (CHANGELOG OrderPickersDispatchAdvances). Additive, no migration. `GET /registers/car_dispatcher/order-options` and `GET /registers/financial_advances/order-options` list the approved, active Procurement orders for the field `procurement_record_id` (the same list as the warehouse picker); each needs its own module view, and only orders in regions where the caller also holds the Procurement view right are listed.
     - 0.15.91 (2026-11-26): warehouse receipt to Procurement order link (migration 0181; CHANGELOG WarehouseProcurementLink). Additive. A warehouse receipt (PL or OPEN) may name the approved, active Procurement order it belongs to (`procurement_order_id`); `pr_no`, `po_wo_no` and `order_contractor` are then derived from the order (read only). New `GET /registers/warehouse/order-options` (the picker) and `GET /registers/procurement/{entity_id}/receipts` (the receipts against an order). New 422 codes `receipt_only`, `order_not_active`, `order_other_site`.
@@ -14584,6 +14585,20 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '422': {$ref: '#/components/responses/Unprocessable'}
+  /status-updates/region-health:
+    get:
+      tags: [status-updates]
+      operationId: getRegionHealth
+      summary: Region health of the current week (0.15.110, item 12)
+      description: One row per region the caller may view on `sites` (all seven when unrestricted). `health`, `summary`, `author` and `updated_at` come from the region's Weekly status update of the current working week (it opens on Sunday); they are null and `missing_update` is true when the region has not posted this week. Read only.
+      responses:
+        '200':
+          description: Region health.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RegionHealthBoard'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
   /status-updates/{update_id}:
     parameters:
     - {name: update_id, in: path, required: true, schema: {type: string, format: uuid}}
@@ -24037,6 +24052,22 @@ components:
         created_at: {type: string, format: date-time}
         updated_at: {type: string, format: date-time}
         editable: {type: boolean, description: 'true for the author until the end of the week.'}
+    RegionHealth:
+      type: object
+      required: [region_id, health, summary, author, updated_at, missing_update]
+      properties:
+        region_id: {type: integer, minimum: 1, maximum: 7}
+        health: {type: [string, 'null'], enum: [on_track, at_risk, off_track, null]}
+        summary: {type: [string, 'null']}
+        author: {oneOf: [{$ref: '#/components/schemas/UserRef'}, {type: 'null'}]}
+        updated_at: {type: [string, 'null'], format: date-time}
+        missing_update: {type: boolean, description: 'true when the region has not posted its Weekly status update of the current working week.'}
+    RegionHealthBoard:
+      type: object
+      required: [week_start, items]
+      properties:
+        week_start: {type: string, format: date, description: 'The Sunday that opens the current working week.'}
+        items: {type: array, items: {$ref: '#/components/schemas/RegionHealth'}}
     NotificationPreference:
       type: object
       required: [kind, in_app, email]
