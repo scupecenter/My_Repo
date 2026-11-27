@@ -722,6 +722,13 @@
     "saved": "Saved in the register",
     "new_version_note": "Saving creates a new version"
   },
+  "comment": {
+    "react": "Acknowledge",
+    "react_ack": "Acknowledged",
+    "resolve": "Mark resolved",
+    "resolved": "Resolved",
+    "reopen": "Reopen"
+  },
   "drawer": {
     "mandatory": "Mandatory",
     "drop": "Drop a file or click to upload",
@@ -878,6 +885,8 @@
     "ended": "Assignments ended.",
     "tab_active": "Users",
     "tab_invitations": "Invitations",
+    "count": "{{count}} users",
+    "tab_more": "More",
     "tab_deleted": "Deleted",
     "deactivate": "Deactivate",
     "reactivate": "Reactivate",
@@ -989,6 +998,9 @@
     "edit": "Edit role",
     "code": "Code",
     "code_hint": "Capital letters, digits and underscore.",
+    "description_ar": "Duties (Arabic)",
+    "code_locked": "A built-in role: the platform uses its code by name, so it cannot be changed.",
+    "code_change_warning": "Changing the code does not rewrite history, saved filters or exports that already quote the old code. People keep the role; the change is audited.",
     "name": "Name",
     "name_en": "Name (English)",
     "name_ar": "Name (Arabic)",
@@ -1215,6 +1227,7 @@
     "section_security_dlp": "DLP months",
     "section_screens_dashboard": "Dashboard",
     "section_screens_tables": "Tables (Display)",
+    "section_screens_records": "Records",
     "section_screens_daily-plan": "My Work (Daily Plan)",
     "section_screens_pm-schedules": "Preventive maintenance",
     "tab_ddl": "DDL",
@@ -1262,7 +1275,18 @@
     "section_security_newdevice": "New-device code",
     "section_security_passkeys": "Passkeys",
     "section_workflow_simulate": "Who approves?",
-    "section_alerts_rules": "Alert rules"
+    "section_alerts_rules": "Alert rules",
+    "section_security_limits": "Limits",
+    "index_sla": "Rules, calendar and weights that set due dates and scoring.",
+    "index_workflow": "The workflow editor, columns, freezes, idle alerts and board.",
+    "index_registers": "Register columns, lists, contractors and the issue map.",
+    "index_documents": "Document types, form templates, the archive and numbering.",
+    "index_data": "Imports, historical data, counts, exports and reset.",
+    "index_alerts": "Who is told what: policy, mail, alert rules.",
+    "index_security": "Staff visibility, retention, DLP, locks, limits, support access and new-device checks.",
+    "index_screens": "What people see by default on each screen.",
+    "index_identity": "Name, logo and design of the workspace.",
+    "tab_all": "All settings"
   },
   "scopeMatch": {
     "title": "Team / scope match (Procurement)",
@@ -2273,6 +2297,9 @@
     "order_other_site": "The order belongs to another site than this receipt.",
     "order_choice_required": "The site has several active orders for this part: choose one.",
     "no_active_order": "The site has no approved, active Procurement order for this part.",
+    "order_required": "Settings require this invoice to name its Procurement order.",
+    "unknown_rule": "This register has no such rule.",
+    "supplier_required": "Settings require an invoice to name its supplier company.",
     "order_not_active": "This order is not approved and active for this part and site.",
     "in_house_no_order": "In-house work has no Procurement order.",
     "in_house_no_contractor": "In-house work names the internal team, not a contractor.",
@@ -2377,6 +2404,31 @@
     "open_site": "Open site",
     "processing_started": "The batch is being processed in the background. The bar shows the progress.",
     "processing_busy": "Processing…"
+  },
+  "tplChanges": {
+    "button": "What changed",
+    "button_hint": "Compare v{{version}} with the version before it",
+    "title": "What changed in {{id}}",
+    "between": "v{{from}} to v{{to}}, issued {{date}}",
+    "loading": "Loading",
+    "error": "Could not load the comparison.",
+    "none": "Same columns; only a setting inside the template changed.",
+    "added": "Columns added ({{count}})",
+    "removed": "Columns removed ({{count}})",
+    "renamed": "Columns renamed ({{count}})",
+    "current_ok": "Current version. It matches the live definition of the register.",
+    "notice": "This template changed on {{date}}: {{added}} added, {{removed}} removed, {{renamed}} renamed. An old file is refused; download the current version and copy your rows into it."
+  },
+  "tplNoticeSettings": {
+    "title": "Imports / Template change notice",
+    "note": "When the columns of a register template change, a new version is issued. People who hold the entry level of that register get a notice in the bell so an old file is no surprise. Nothing is deleted: old versions stay and the Templates page shows what changed.",
+    "enabled": "Tell the entry holders when a template changes",
+    "days": "Keep telling people for",
+    "unit": "days after the new version",
+    "hint": "A whole number from {{min}} to {{max}}. The default is {{def}}.",
+    "confirm": "Set the template change notice to {{state}}, for {{days}} days after a new version.",
+    "on": "on",
+    "off": "off"
   },
   "batchReview": {
     "kpis": "Upload counts",
@@ -2888,6 +2940,13 @@
     "snoozed_hide": "Hide snoozed",
     "snoozed_only": "Only snoozed",
     "snoozed_include": "Include snoozed",
+    "show_all": "All (snoozed hidden)",
+    "show_unread": "Unread",
+    "show_snoozed": "Snoozed only",
+    "show_unread_snoozed": "Unread, snoozed only",
+    "show_all_incl": "All, with snoozed",
+    "show_unread_incl": "Unread, with snoozed",
+    "kind_clear": "Clear the kind filter",
     "kind": "Kind",
     "all_kinds": "All kinds",
     "open": "Open",
@@ -3385,6 +3444,7 @@
         "on_air_vs_target": "On-Air against the monthly target"
       }
     },
+    "share_menu": "Share / Export",
     "copy_link": "Copy link",
     "link_copied": "Copied",
     "copy_link_hint": "Copy the address of this view with its filters. Whoever opens it signs in first and sees only what their own role allows.",
@@ -3509,7 +3569,25 @@
       "approvals_review": "Review",
       "approvals_approve": "Approve",
       "approvals_unassigned": "No role",
-      "approvals_oldest": "oldest {{n}}d"
+      "approvals_oldest": "oldest {{n}}d",
+      "changes_title": "Change requests and overdue meeting actions",
+      "changes_hint": "Pending change requests aged since the request date, and meeting actions past their due date. Read only.",
+      "open_changes": "Change control",
+      "open_meetings": "Meetings",
+      "unavailable_changes": "You do not have the change control view right, so this part stays hidden.",
+      "unavailable_actions": "You do not have the meetings view right, so this part stays hidden.",
+      "changes_pending": "Pending changes",
+      "changes_approved": "Approved, not applied",
+      "changes_part": "Change requests",
+      "actions_part": "Meeting actions",
+      "actions_open": "Open actions",
+      "actions_overdue": "Overdue",
+      "actions_no_due": "No due date",
+      "kind_scope_change": "Scope",
+      "kind_date_change": "Date",
+      "kind_suspension": "Suspension",
+      "kind_resumption": "Resumption",
+      "kind_other": "Other"
     },
     "scurve": {
       "title": "Progress curve",
@@ -3524,6 +3602,11 @@
       "empty": "No saved snapshots yet: the curve appears after the first weekly snapshot.",
       "chart_label": "Progress curve: {{list}}",
       "basis": "{{n}} saved weekly snapshots, values frozen at their dates."
+    },
+    "pins": {
+      "title": "Pinned views",
+      "hint": "Your pinned views; the counter is what you may see there.",
+      "empty": "No pinned views yet. Pin a view from its screen with the pin button."
     },
     "region_health": {
       "title": "Region health",
@@ -4439,6 +4522,12 @@
     "yellow": "Pending approval. Documents uploaded, waiting for review or approval ({{approved}} of {{need}} approved).",
     "green": "Approved. Documents approved ({{approved}} of {{need}})."
   },
+  "regrules": {
+    "title": "Register rules",
+    "note": "Rules the database enforces for one register, for example that an invoice must name its Procurement order. Every change needs a reason and is audited.",
+    "saved": "Rule saved",
+    "change_title": "Change: {{rule}}"
+  },
   "regstate": {
     "title": "Register state",
     "note": "Switch a whole register off (it is hidden everywhere; nothing is deleted and switching it on again restores everything) or lock it (readable, but no new record and no change, except by a System Admin). Every change needs a reason and is audited.",
@@ -4627,6 +4716,8 @@
     "import_file": "Excel file (.xlsx)",
     "reason_short": "Reason (at least 3 characters)",
     "import_submit": "Import",
+    "template_current": "Download the template with the current values",
+    "import_unchanged": "{{count}} unchanged",
     "import_done": "{{count}} values imported",
     "bind_title": "Bind this list to a register column",
     "bind_pick_register": "Choose a register",
@@ -5258,7 +5349,11 @@
     "transfer": "Hand over",
     "transfer_title": "Hand over “{{name}}”",
     "transfer_hint": "The new owner must be active and hold the right to share views.",
-    "transferred": "View handed over"
+    "transferred": "View handed over",
+    "pin_home": "Pin to home",
+    "unpin_home": "Unpin from home",
+    "pinned_home": "Pinned to the home dashboard",
+    "unpinned_home": "Unpinned from the home dashboard"
   },
   "draft": {
     "found": "You have an unsaved draft from {{at}}.",
@@ -5407,6 +5502,7 @@
     "filters": "Map filters",
     "search": "Site ID or name",
     "no_options": "No values",
+    "more_filters": "More filters",
     "late_only": "Late only",
     "outer_note": "The dashboard filters above (region, cluster, scenario, stream) also apply to the map.",
     "legend": "Legend",
@@ -6169,7 +6265,26 @@
     "choice_off": "Everyone sees this design.",
     "defaults_title": "Organization appearance defaults",
     "defaults_note": "The appearance of everyone without a personal choice. An empty field keeps the built-in standard.",
-    "defaults_builtin": "Built-in standard ({{name}})"
+    "defaults_builtin": "Built-in standard ({{name}})",
+    "logo_title": "Workspace logo",
+    "logo_note": "Shown in the sidebar instead of the built-in badge. PNG, JPEG, SVG or WebP, 256 KiB at most.",
+    "logo_none": "No logo uploaded; the built-in badge shows.",
+    "logo_hidden": "The logo is hidden; the built-in badge shows. Hiding keeps the file.",
+    "logo_upload": "Upload logo",
+    "logo_replace": "Replace logo",
+    "logo_hide": "Hide logo",
+    "logo_show": "Show logo",
+    "logo_confirm_upload": "The logo shows in the sidebar for everyone. The change is audited with your reason.",
+    "logo_confirm_hide": "The logo disappears from the sidebar; the built-in badge shows. The file is kept. The change is audited with your reason.",
+    "logo_confirm_show": "The logo shows in the sidebar again. The change is audited with your reason.",
+    "logo_updated": "Uploaded by {{name}} on {{when}}",
+    "logo_alt": "Workspace logo",
+    "logo_public_note": "Outside the app, the logo is closed by default. Switch on where it may show; these places are public (anyone who opens the page sees it).",
+    "logo_login": "Show the logo on the sign-in pages (sign in, forgot and reset password)",
+    "logo_favicon": "Use the logo as the browser tab icon",
+    "logo_public_off": "The logo is hidden, so neither public place shows it.",
+    "logo_confirm_public_on": "The logo becomes visible to anyone who opens the selected public pages, without signing in. The change is audited with your reason.",
+    "logo_confirm_public_off": "The logo stops showing on the public pages. The file is kept. The change is audited with your reason."
   },
   "studioPanel": {
     "open": "Show the pending changes",
@@ -6255,6 +6370,9 @@
     "rewire": "Rewire: remove the direct links that the new task replaces",
     "place_after": "Place after",
     "gate_after": "Gate after milestone",
+    "no_closing_warning": "Milestones with tasks but no closing task: {{codes}}. They are done only when every counting task is done. Publishing is still allowed.",
+    "gate_move": "Move the gate",
+    "gate_to": "Opens the milestone",
     "no_free_gate": "Every milestone that has a next milestone already has a gate.",
     "sla_bad": "Give both SLA values, minimum not above maximum.",
     "docs_approval_note": "Who enters and who approves this task is set in the Responsibility Matrix.",
@@ -6454,6 +6572,18 @@
     "add": "Add schedule",
     "save_title": "Save the schedules"
   },
+  "chartv": {
+    "title": "Chart",
+    "axis": "Axis",
+    "measure": "Measure",
+    "count": "Number of rows",
+    "sum_of": "Sum of {{field}}",
+    "kind": "Drawing",
+    "bar": "Bars",
+    "pie": "Ring",
+    "empty": "No rows in this view.",
+    "label": "Chart of {{measure}} by {{axis}}"
+  },
   "analytics": {
     "title": "Analytics of this view",
     "counted": "{{n}} rows counted",
@@ -6469,6 +6599,13 @@
     "avg": "Average",
     "min": "Smallest",
     "max": "Largest"
+  },
+  "openrec": {
+    "title": "Opening a record",
+    "note": "Where a register record opens when you click its row: in the side drawer (the default) or on its own full page. A personal choice; it applies on every device you sign in from.",
+    "drawer": "Side drawer (default)",
+    "page": "Full page",
+    "back": "Back to {{name}}"
   },
   "tstd": {
     "empty": "Nothing to show.",
@@ -6983,6 +7120,7 @@
     "board_hint": "Cards by milestone or status",
     "map": "Map",
     "map_hint": "Items on the map",
+    "chart_hint": "The rows as bars or a ring, by a field you choose",
     "calendar_hint": "On a month grid, by a date you choose"
   },
   "batchedit": {
@@ -7390,6 +7528,23 @@
     "confirm": "Save the login page settings? The change is audited with your reason and shows on the sign-in page at once."
   },
   "ui": {
+    "guard_title": "Unsaved changes",
+    "guard_note": "Ask before anything with unsaved input is closed or left: the choices are Save and leave, Discard and leave, or Stay.",
+    "guard_enabled": "Ask before leaving unsaved changes",
+    "guard_comment": "A comment you typed",
+    "guard_message": "A message reply you typed",
+    "guard_settings": "Settings pages",
+    "guard_settings_hint": "Settings pages with edited, unsaved values",
+    "guard_dialogs": "Form dialogs",
+    "guard_dialogs_hint": "Dialogs with typed input",
+    "guard_drawers": "Side drawers",
+    "guard_drawers_hint": "Task and record drawers",
+    "guard_inline": "Inline edits",
+    "guard_inline_hint": "Site details and cells edited in place",
+    "guard_composers": "Comments and messages",
+    "guard_composers_hint": "Text typed but not sent",
+    "guard_navigation": "Leaving the page",
+    "guard_navigation_hint": "Links, the browser Back button and closing the tab",
     "new": "New",
     "new_hint": "Recently added feature",
     "settings_title": "Interface features",
@@ -7614,6 +7769,18 @@
   "screenSettings": {
     "title": "Settings for this screen"
   },
+  "unsaved": {
+    "title": "Unsaved changes",
+    "body": "You have changes that are not saved. What do you want to do?",
+    "stay": "Stay",
+    "stay_hint": "Go back to your changes",
+    "discard": "Discard and leave",
+    "discard_hint": "Leave without saving: the changes are lost",
+    "save": "Save and leave",
+    "save_hint": "Save the changes, then leave",
+    "reason_note": "Saving a setting needs a reason (3 characters at least).",
+    "save_failed": "The changes could not be saved, so you are still here."
+  },
   "mailPolicy": {
     "title": "Mail policy",
     "note": "Who may be mailed. Notification mail goes to the person only for the kinds listed below in Mail notification kinds. Outside addresses stay off until you switch them on here.",
@@ -7626,6 +7793,53 @@
     "domains": "Internal domains (comma separated)",
     "domains_note": "An address whose domain is not listed is external. With no domain listed every address counts as internal.",
     "confirm_note": "The change is audited and applies to the next mail."
+  },
+  "oplimits": {
+    "title": "Operational limits",
+    "note": "The numbers the system keeps for itself: how long a sign-in lasts, how recent a password check must be, and how many rows one request or file may carry. Every value starts at the number the system always used, so nothing changes until you change one. Each change asks for your password again, needs a reason and is written to the audit log.",
+    "group_sessions": "Sign-in and sessions",
+    "group_rows": "Rows per request or file",
+    "group_exports": "Exports and repeated requests",
+    "session_idle_hours": "Idle sign-out",
+    "session_idle_hours_hint": "A session ends after this many hours without any activity. The person signs in again.",
+    "session_absolute_hours": "Longest session",
+    "session_absolute_hours_hint": "A session ends this many hours after sign-in, even if the person is still working. It cannot be shorter than the idle sign-out.",
+    "stepup_seconds": "Password re-check window",
+    "stepup_seconds_hint": "Sensitive actions ask for the password again when the last check is older than this. A shorter window is safer and asks more often.",
+    "assignments_max_rows": "Assignments per request",
+    "assignments_max_rows_hint": "Users times roles in one bulk assignment request. A larger request is refused with a message.",
+    "import_max_rows": "Rows per import file",
+    "import_max_rows_hint": "Data rows accepted in one template file, list file or holiday file.",
+    "master_import_max_rows": "Rows in a Master file",
+    "master_import_max_rows_hint": "Rows read from the Master sheet of one legacy import file.",
+    "register_import_max_rows": "Rows per register sheet",
+    "register_import_max_rows_hint": "Rows read from each register sheet of one Master import file.",
+    "prefill_max_rows": "Rows in a prefilled template",
+    "prefill_max_rows_hint": "Rows the system writes into a template it prefills with existing data.",
+    "prefill_max_sites": "Sites in a prefilled template",
+    "prefill_max_sites_hint": "Sites taken from the Sites list filters when a template is prefilled.",
+    "export_max_rows": "Rows per log export",
+    "export_max_rows_hint": "Audit log and security log exports are refused above this many rows; narrow the dates or export in parts.",
+    "idempotency_max_entries": "Remembered repeat-protection keys",
+    "idempotency_max_entries_hint": "How many recent requests the system remembers so a repeated click is not done twice. Older ones are dropped first.",
+    "unit_hours": "hours",
+    "unit_seconds": "seconds",
+    "unit_rows": "rows",
+    "unit_sites": "sites",
+    "unit_entries": "entries",
+    "default": "Default: {{value}} {{unit}}",
+    "range": "Allowed: {{min}} to {{max}}",
+    "custom": "Changed",
+    "reset": "Back to default",
+    "reset_all": "Reset all to defaults",
+    "updated": "Last changed by {{name}} on {{when}}.",
+    "never": "Never changed: every limit is at its default.",
+    "readonly": "Only a System Admin can change the limits.",
+    "confirm": "{{count}} limit(s) will differ from the default after this change. Your password is asked again and the change is written to the audit log.",
+    "confirm_default": "Every limit goes back to its default. Your password is asked again and the change is written to the audit log.",
+    "bad_value": "Use a whole number from {{min}} to {{max}}.",
+    "bad_session": "The longest session cannot be shorter than the idle sign-out.",
+    "in_force": "Changed"
   },
   "presence": {
     "editing_record_one": "{{names}} is editing this record",
