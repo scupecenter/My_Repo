@@ -205,6 +205,7 @@
     "lessons_learned": "Lessons Learned",
     "invoices": "Invoices",
     "deliverables": "Deliverables",
+    "site_contacts": "Site Contacts",
     "incidents": "Incidents & Security"
   },
   "top": {
@@ -2047,6 +2048,7 @@
     "payment": "Payment",
     "deliverable": "Deliverable",
     "links_section": "Links",
+    "contact_section": "Contact",
     "amount_section": "Amount",
     "incident": "Incident",
     "people_damage": "People and damage",

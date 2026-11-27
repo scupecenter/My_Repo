@@ -239,13 +239,32 @@ export const invoices: RegisterDefinition = {
     F('remark', 'Remark', 'ملاحظات', 'text', 'Remark'),
   ],
 };
+// Migration 0550 (C6): Site Contacts, the people a site depends on; linked to the acquisition, permit, GECOL and HLC records of the site.
+export const siteContacts: RegisterDefinition = {
+  register_key: 'site_contacts', name_en: 'Site Contacts', name_ar: 'جهات اتصال المواقع', module_key: 'site_contacts', site_scoped: true, multiple_per_site: true, approval_levels: 2,
+  fields: [
+    F('contact_name', 'Contact name', 'اسم جهة الاتصال', 'text', 'Contact', { required: true, in_list: true }),
+    F('contact_role', 'Role', 'الدور', 'list', 'Contact', { required: true, in_list: true, options: ['Landlord', 'Municipality', 'Security', 'GECOL', 'HLC', 'Contractor', 'Access', 'Other'] }),
+    F('organization', 'Organization', 'الجهة', 'text', 'Contact', { in_list: true }),
+    F('phone', 'Phone', 'الهاتف', 'text', 'Contact', { in_list: true }),
+    F('phone_alt', 'Second phone', 'هاتف ثانٍ', 'text', 'Contact'),
+    F('email', 'E-mail', 'البريد الإلكتروني', 'text', 'Contact', { in_list: true }),
+    F('acquisition_record_id', 'Acquisition record', 'سجل الاستحواذ', 'text', 'Links'),
+    F('permit_record_id', 'Permit record', 'سجل التصريح', 'text', 'Links'),
+    F('gecol_record_id', 'GECOL record', 'سجل GECOL', 'text', 'Links'),
+    F('hlc_record_id', 'HLC record', 'سجل HLC', 'text', 'Links'),
+    F('access_note', 'Access note', 'ملاحظة الدخول', 'text', 'Remark'),
+    F('valid_to', 'Valid to', 'صالح حتى', 'date', 'Remark', { in_list: true }),
+    F('remark', 'Remark', 'ملاحظات', 'text', 'Remark'),
+  ],
+};
 export const REGISTER_DEFS: RegisterDefinition[] = [
   procurement, contractors, gecol, hlc, permits,
   more('warehouse', 'Warehouse', 'المخزن', 'warehouse', false, ['te_dn', 'cw_dn', 'te_rn', 'cw_rn', 'pl', 'open', 'adj']),
   more('quality', 'Quality', 'الجودة', 'quality', true, ['qc', 'snag', 'itp', 'ncr']), more('issues', 'Issue Log', 'سجل المشاكل', 'issues', true), more('risks', 'Risk Register', 'سجل المخاطر', 'risks', false),
   more('change_control', 'Change Control', 'ضبط التغيير', 'change_control', true), more('readiness_handover', 'Readiness & Handover', 'الجاهزية والتسليم', 'readiness', true),
   more('as_built', 'As-Built', 'كما نُفّذ', 'as_built', true, ['cw_part', 'te_part']), meetings,
-  more('rf_design', 'RF Design', 'تصميم RF', 'rf_design', true), more('acquisition', 'Acquisition', 'الاستحواذ', 'acquisition', true), dismantle, carDispatcher, financialAdvances, incidents, lessonsLearned, invoices, deliverables,
+  more('rf_design', 'RF Design', 'تصميم RF', 'rf_design', true), more('acquisition', 'Acquisition', 'الاستحواذ', 'acquisition', true), dismantle, carDispatcher, financialAdvances, incidents, lessonsLearned, invoices, deliverables, siteContacts,
 ];
 /** The template of each register (contract 0.7.0: one `TPL-*` per register, issued by the database). Only these four have a sample upload in the mock. */
 // 0.15.240: intake triage on the Issue Log and the Change Control Log (RegisterDefinition.triage_enabled)
@@ -259,6 +278,7 @@ export const TEMPLATE_OF_REGISTER: Record<string, string> = {
   lessons_learned: 'TPL-LESSONS-LEARNED',
   invoices: 'TPL-INVOICES',
   deliverables: 'TPL-DELIVERABLES',
+  site_contacts: 'TPL-SITE-CONTACTS',
   incidents: 'TPL-INCIDENTS',
 };
 

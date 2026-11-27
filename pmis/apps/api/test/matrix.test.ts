@@ -39,7 +39,7 @@ interface Row { kind: string; code: string; register_key: string | null; approva
 interface MatrixBody { workflow_version: number; version: number; stages: Row[] }
 
 const REGISTER_CODES = ['site_creation', 'procurement', 'procurement_hlc', 'contractors', 'rf_design', 'acquisition', 'gecol', 'hlc', 'permits_hse', 'permits_hse_te', 'permits_hse_acq', 'permits_hse_om', 'warehouse', 'quality', 'quality_te', 'issues', 'risks', 'change_control',
-  'readiness_handover', 'as_built', 'meetings', 'deliverables', 'car_dispatcher', 'financial_advances', 'daily_plan', 'incidents', 'lessons_learned', 'invoices'];
+  'readiness_handover', 'as_built', 'meetings', 'deliverables', 'car_dispatcher', 'financial_advances', 'daily_plan', 'incidents', 'lessons_learned', 'invoices', 'site_contacts'];
 /** Built in migration 0019: the registers suite owns their level count and region cells (it changes them while this suite runs). Migration 0035 (Q90) gives them their L2 holders.
  *  quality_te: the Matrix row of the TE stream of QC snags (migration 0056, Q230), seeded as a copy of the Quality row.
  *  permits_hse_te: the Matrix row of the TE stream of Permits & HSE (migration 0050, Q90), L1 Site Engineers (TE), L2 TE Team Lead.
