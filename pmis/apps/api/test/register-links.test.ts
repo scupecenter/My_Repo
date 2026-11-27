@@ -25,7 +25,7 @@ afterAll(async () => {
 const insert = (key: string, siteId: string, state: string, data: Record<string, unknown>, type: string | null = null) => db.query(
   `INSERT INTO register_records (entity_id, register_key, record_type, site_id, region_id, is_global, is_current, state, current_level, levels_required, level_round, created_by, data)
    VALUES (gen_random_uuid(), $1, $2, $3, $4, false, true, $5, 1, 3, 0, $6, $7::jsonb) RETURNING id, entity_id`,
-  [key, type, siteId, REGION, adminId, state, JSON.stringify(data)]);
+  [key, type, siteId, REGION, state, adminId, JSON.stringify(data)]);
 
 describe('register links (migration 0409)', () => {
   it('declares the existing links, with the check off', async () => {
