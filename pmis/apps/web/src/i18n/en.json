@@ -605,6 +605,16 @@
     "stream_empty": "This site has no tasks in this stream.",
     "stream_na": "This phase does not apply to this site.",
     "dismantle_todo": "Dismantle has no stream in the API yet (owner decision Q41), so there are no tasks to show here.",
+    "dismantle_count": "{{count}} Dismantle records",
+    "dismantle_open": "Open in the Dismantle register",
+    "dismantle_denied": "You do not have access to the Dismantle register.",
+    "dismantle_failed": "The Dismantle records could not be loaded.",
+    "dismantle_empty": "No Dismantle records for this site yet.",
+    "dismantle_col_state": "State",
+    "dismantle_col_rfd": "RFD date",
+    "dismantle_col_start": "Work start",
+    "dismantle_col_end": "Work end",
+    "dismantle_col_engineer": "Supervising engineer",
     "phases": "Phases",
     "phase_empty": "No task of this phase applies to this site.",
     "sections": "Sections",
@@ -1158,7 +1168,9 @@
     "section_documents_types": "Document types",
     "section_documents_forms": "Form templates",
     "section_documents_archive": "Archive",
-    "section_data_counts": "GECOL / HLC counts"
+    "section_data_counts": "GECOL / HLC counts",
+    "section_screens_motion": "Motion",
+    "section_workflow_coverage": "Matrix coverage"
   },
   "scopeMatch": {
     "title": "Team / scope match (Procurement)",
@@ -6424,5 +6436,39 @@
     "why": "Reason for the change",
     "cancel": "Cancel",
     "save": "Save"
+  },
+  "motion": {
+    "title": "Motion",
+    "note": "One motion system for the whole app: dialogs, messages, cards, progress bars, charts and the map. This choice is saved in this browser, like the theme and the language.",
+    "auto": "Automatic",
+    "auto_note": "Follow the operating system setting for reduced motion.",
+    "reduced": "Reduced",
+    "reduced_note": "No transitions or animations anywhere, including charts and the map.",
+    "preview": "Preview of a dialog opening",
+    "replay": "Replay",
+    "link_display": "Tables (Display) settings"
+  },
+  "matrixCoverage": {
+    "title": "Matrix coverage",
+    "note": "Read only. Shows the cells of the Responsibility Matrix that nobody can act on, per row, region and level. Nothing here changes the matrix.",
+    "as_of": "As of",
+    "version": "Workflow version",
+    "summary": "{{ok}} covered, {{empty}} empty, {{nobody}} named but nobody active, of {{cells}} cells",
+    "gaps_only": "Show gaps only",
+    "region": "Region",
+    "module": "Module",
+    "all": "All",
+    "row": "Row",
+    "kind_stage": "Stage",
+    "ok": "Covered",
+    "empty": "Empty",
+    "no_active_holder": "Nobody active",
+    "source_region": "region cell",
+    "source_default": "default cell",
+    "source_none": "no cell",
+    "assignees": "named",
+    "holders": "active",
+    "none": "No gaps in this view.",
+    "open_matrix": "Open the Responsibility Matrix"
   }
 }

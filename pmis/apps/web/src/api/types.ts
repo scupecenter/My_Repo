@@ -49,6 +49,7 @@ export type RegisterRecordStep = S['RegisterRecordStep'];
 export type Comment = S['Comment'];
 export type Matrix = S['Matrix'];
 export type MatrixCell = S['MatrixCell'];
+export type MatrixCoverage = S['MatrixCoverage'];
 export type MatrixPatch = S['MatrixPatch'];
 export type MatrixAssignee = S['MatrixAssignee'];
 export type Role = S['Role'];

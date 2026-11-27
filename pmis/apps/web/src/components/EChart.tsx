@@ -1,3 +1,4 @@
+import { motionReduced } from '@/lib/motion';
 import { useEffect, useRef, useState } from 'react';
 import type { ChartHandle } from '@/lib/echarts';
 
@@ -55,7 +56,7 @@ export function EChart({ build, height = 220, label, testid, renderer = 'svg', o
       const c = init(el.current, renderer);
       c.on('click', (p) => click.current?.(p as { data?: unknown; seriesId?: string }));
       chart.current = c;
-      c.setOption(latest.current(readPalette(), document.documentElement.dir === 'rtl'), true);
+      c.setOption(Object.assign({}, latest.current(readPalette(), document.documentElement.dir === 'rtl'), motionReduced() ? { animation: false } : {}), true);
       if (typeof ResizeObserver !== 'undefined') {
         ro = new ResizeObserver(() => c.resize());
         ro.observe(el.current);
@@ -66,7 +67,7 @@ export function EChart({ build, height = 220, label, testid, renderer = 'svg', o
   }, []);
 
   useEffect(() => {
-    chart.current?.setOption(build(readPalette(), document.documentElement.dir === 'rtl'), true);
+    chart.current?.setOption(Object.assign({}, build(readPalette(), document.documentElement.dir === 'rtl'), motionReduced() ? { animation: false } : {}), true);
   }, [build, env]);
 
   return <div ref={el} role="img" aria-label={label} data-testid={testid} style={{ height, width: '100%', direction: 'ltr' }} />;
