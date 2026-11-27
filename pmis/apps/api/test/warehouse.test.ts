@@ -799,6 +799,15 @@ describe("Issue log and Quality order picker (0195)", () => {
   });
 });
 
+describe("Change Control order picker (0325)", () => {
+  it("serves the order picker (a caller needs the module view; a bad site id is refused)", async () => {
+    const r = await t.entry.api.call("get", "/registers/change_control/order-options?site_id=nope");
+    expect([403, 422], JSON.stringify(r.body)).toContain(r.status);
+    const ok = await admin.api.call("get", "/registers/change_control/order-options");
+    expect([200, 403], JSON.stringify(ok.body)).toContain(ok.status);
+  });
+});
+
 describe("related records of a record (0324)", () => {
   it("answers an empty list for a record with no links, refuses a bad key or id, and needs the register view right", async () => {
     const m = await move({ ...doc("pl"), lines: [{ item_id: tower.id, qty: 1 }] });

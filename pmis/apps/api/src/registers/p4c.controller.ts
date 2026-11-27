@@ -51,6 +51,12 @@ export class P4cController {
     return this.p4c.warehouseOrderOptions(auth, q, 'issues');
   }
 
+  /** F2: the same picker for Change Control (`procurement_order_id`). */
+  @Get('change_control/order-options')
+  changeControlOrderOptions(@Auth() auth: AuthContext, @Query() q: Record<string, unknown>) {
+    return this.p4c.warehouseOrderOptions(auth, q, 'change_control');
+  }
+
   @Get('quality/order-options')
   qualityOrderOptions(@Auth() auth: AuthContext, @Query() q: Record<string, unknown>) {
     return this.p4c.warehouseOrderOptions(auth, q, 'quality');

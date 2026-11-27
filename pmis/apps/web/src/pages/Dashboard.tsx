@@ -20,6 +20,7 @@ import { EChart, type Palette } from "@/components/EChart";
 import { errText } from "@/components/FormDialog";
 import { Pipeline } from "@/components/Pipeline";
 import { SiteMap } from "@/components/SiteMap";
+import { ScreenSettingsLink } from "@/components/ScreenSettingsLink";
 import { EmptyState } from "@/components/States";
 import { useToast } from "@/components/Toast";
 import { streamName } from "@/lib/streams";
@@ -40,6 +41,7 @@ import { OpsScurveCard } from "./dashboardScurve";
 import { OpsPermitsCard } from "./dashboardPermits";
 import { OpsReadinessCard } from "./dashboardReadiness";
 import { OpsScorecardCard } from "./dashboardScorecard";
+import { OpsQualityCard } from "./dashboardQuality";
 import { useDashboardSettings } from "@/api/dashboardSettings";
 import { GoalsPanel } from "@/components/GoalsPanel";
 import { SavedViews } from "@/components/SavedViews";
@@ -984,7 +986,7 @@ export function Dashboard() {
   if (dash.isError && !d) {
     return (
       <div data-testid="page-dashboard">
-        <h1 className="mb-3 text-2xl font-bold">{t("dash.title")}</h1>
+        <div className="mb-3 flex flex-wrap items-center gap-2"><h1 className="text-2xl font-bold">{t("dash.title")}</h1><span className="ms-auto"><ScreenSettingsLink screen="dashboard" /></span></div>
         <EmptyState
           title={
             dash.error instanceof Error &&
@@ -1093,6 +1095,7 @@ export function Dashboard() {
               {t("common.loading")}
             </span>
           )}
+          <span className="ms-auto print:hidden"><ScreenSettingsLink screen="dashboard" /></span>
         </div>
         <p className="text-mute">{t("dash.subtitle")}</p>
       </header>
@@ -1431,6 +1434,13 @@ export function Dashboard() {
                 <>
                   {/* 0.15.202 (owner approval 2026-11-26, item 5): the contractor and supplier scorecard - levels, on-time rectification, avg delay, rejection, no amounts */}
                   <OpsScorecardCard ops={ops.data} />
+                </>
+              ),
+
+              ops_quality: (
+                <>
+                  {/* 0.15.203 (owner approval 2026-11-26, item 6): open snags and NCR, average closure age, first-time acceptance */}
+                  <OpsQualityCard ops={ops.data} />
                 </>
               ),
 

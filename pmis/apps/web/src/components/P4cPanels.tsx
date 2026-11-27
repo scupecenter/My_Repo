@@ -124,7 +124,7 @@ export function DismantleRnSelect({ siteId, part, value, onChange, editable, inv
 
 /** 0181: the Procurement order of a warehouse receipt (optional); PR No., PO / WO No. and the contractor shown below it come from the order. */
 export function WarehouseOrderSelect({ siteId, value, onChange, editable, invalid, registerKey = 'warehouse', field = 'procurement_order_id' }: {
-  registerKey?: 'warehouse' | 'car_dispatcher' | 'financial_advances' | 'issues' | 'quality'; field?: string;
+  registerKey?: 'warehouse' | 'car_dispatcher' | 'financial_advances' | 'issues' | 'quality' | 'change_control'; field?: string;
   siteId: string | null | undefined; value: unknown; onChange: (v: string | null) => void; editable: boolean; invalid?: boolean;
 }) {
   const { t } = useTranslation();

@@ -35,7 +35,7 @@ export function LibraryArchive() {
   const ar = i18n.language === 'ar';
   return (
     <div data-testid="page-library-archive">
-      <PageHeader title={t('lib.archive_title')} subtitle={t('lib.archive_sub')} context={q.data?.can_configure ? (
+      <PageHeader title={t('lib.archive_title')} subtitle={t('lib.archive_sub')} settings="library_archive" context={q.data?.can_configure ? (
         <span className="ms-auto"><Link className="btn px-2 py-1 text-xs" to="/admin/settings/documents/archive" data-testid="lib-archive-settings">{t('lib.link_archive')}</Link></span>) : undefined} />
       <LibraryTabs />
       {!q.data ? <QueryFallback queries={[q]} /> : !q.data.groups.length ? <EmptyState testid="lib-archive-empty" title={t('lib.no_cards')} /> : (
