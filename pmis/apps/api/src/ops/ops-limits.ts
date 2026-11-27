@@ -53,7 +53,7 @@ export function resetLimits(): void {
   current = {};
 }
 
-/** The sign-in rate-limit numbers (migration 0425). The longest wait is never shorter than the first wait, whatever is stored. */
+/** The sign-in rate-limit numbers (migration 0521). The longest wait is never shorter than the first wait, whatever is stored. */
 export function loginLimits(): { perIp: number; windowMs: number; baseSeconds: number; maxSeconds: number; perIdentifier: number } {
   const base = limit('login.ip_base_seconds');
   return { perIp: limit('login.ip_attempts'), windowMs: limit('login.ip_window_seconds') * 1000, baseSeconds: base, maxSeconds: Math.max(limit('login.ip_max_seconds'), base), perIdentifier: limit('login.identifier_attempts') };

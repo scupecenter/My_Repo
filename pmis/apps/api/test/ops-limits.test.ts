@@ -116,7 +116,7 @@ describe('PUT /settings/ops-limits', () => {
   });
 });
 
-describe('sign-in rate limits (migration 0425)', () => {
+describe('sign-in rate limits (migration 0521)', () => {
   it('are in the catalogue with the old numbers, are range-checked, and loginLimits() follows a saved value', async () => {
     await reset();
     const r = await read(admin);
