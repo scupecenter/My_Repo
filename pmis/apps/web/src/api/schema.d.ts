@@ -6080,6 +6080,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/registers/dismantle/rn-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The received Warehouse RNs that can close a Dismantle part (0.15.110)
+         * @description 0.15.110. Current, not voided, Received Warehouse RNs of the part (`record_type` cw gives cw_rn, te gives te_rn) on the site, in the regions where the caller holds the Warehouse view right (the responsibility matrix). Needs the Dismantle module.
+         */
+        get: operations["listDismantleRnOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/registers/dismantle/order-options": {
         parameters: {
             query?: never;
@@ -6172,9 +6192,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * The approved, active Procurement orders a warehouse receipt may name (0.15.90)
-         * @description 0.15.95. The approved Procurement versions in force, not cancelled, that the caller can see; of the site `site_id` when it is given (a PL / OPEN receipt may have no site).
-         *     Needs the Issue log module; only the orders in regions where the caller also holds the Procurement view right (the responsibility matrix) are listed, and the same right is checked when a receipt is saved.
+         * The approved, active Procurement orders a Issue log record may name (0.15.95)
+         * @description 0.15.95. The approved Procurement versions in force, not cancelled, that the caller can see; of the site `site_id` when it is given. Needs the Issue log module; only the orders in regions where the caller also holds the Procurement view right (the responsibility matrix) are listed, and the same right is checked when the record is saved.
          */
         get: operations["listIssueOrderOptions"];
         put?: never;
@@ -6193,9 +6212,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * The approved, active Procurement orders a warehouse receipt may name (0.15.90)
-         * @description 0.15.95. The approved Procurement versions in force, not cancelled, that the caller can see; of the site `site_id` when it is given (a PL / OPEN receipt may have no site).
-         *     Needs the Quality module; only the orders in regions where the caller also holds the Procurement view right (the responsibility matrix) are listed, and the same right is checked when a receipt is saved.
+         * The approved, active Procurement orders a Quality record may name (0.15.95)
+         * @description 0.15.95. The approved Procurement versions in force, not cancelled, that the caller can see; of the site `site_id` when it is given. Needs the Quality module; only the orders in regions where the caller also holds the Procurement view right (the responsibility matrix) are listed, and the same right is checked when the record is saved.
          */
         get: operations["listQualityOrderOptions"];
         put?: never;
@@ -16193,6 +16211,19 @@ export interface components {
                 custodian_user_id?: string | null;
                 advance_state?: string | null;
             }[];
+        };
+        DismantleRnOption: {
+            /** Format: uuid */
+            entity_id: string;
+            /** Format: uuid */
+            record_id: string;
+            /** Format: uuid */
+            site_id?: string;
+            /** @enum {string} */
+            record_type?: "cw_rn" | "te_rn";
+            doc_no?: string;
+            doc_date?: string;
+            txn_status?: string;
         };
         /** @description 0.12.11 (Q114). An approved, active Procurement order of a Dismantle part. */
         DismantleOrderOption: {
@@ -30855,6 +30886,34 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HlcLegacyMigration"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listDismantleRnOptions: {
+        parameters: {
+            query: {
+                site_id: string;
+                record_type: "cw" | "te";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The RNs. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["DismantleRnOption"][];
+                    };
                 };
             };
             401: components["responses"]["Unauthorized"];

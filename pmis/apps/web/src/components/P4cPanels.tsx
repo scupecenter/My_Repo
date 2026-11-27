@@ -1,7 +1,7 @@
 import { CheckCircle2, Clock, Eye } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useDismantleOrders, useOrderReceipts, useWarehouseOrders, useHlcLegacyMigration, useSetHlcPurchaseRequests, type HlcLegacyMigration } from '@/api/p4c';
+import { useDismantleOrders, useDismantleRns, useOrderReceipts, useWarehouseOrders, useHlcLegacyMigration, useSetHlcPurchaseRequests, type HlcLegacyMigration } from '@/api/p4c';
 import type { RegisterRecord } from '@/api/types';
 import { registerErrorMessage } from '@/lib/registerErrors';
 import { errText, FormDialog } from './FormDialog';
@@ -91,6 +91,33 @@ export function DismantleOrderSelect({ siteId, part, value, onChange, editable, 
         : <div className="font-semibold" data-testid="reg-view-procurement_order_id">{chosen ? label(chosen) : cur ? cur.slice(0, 8) : '—'}</div>}
       {chosen && <p className="text-sm text-mute" data-testid="reg-dismantle-contractor">{t('p4c.contractor_from_order', { name: chosen.external_party?.name ?? t('p4c.no_contractor') })}</p>}
       {editable && items.length > 1 && !cur && <p className="text-sm text-waitInk" data-testid="reg-dismantle-choose">{t('p4c.order_choose', { count: items.length })}</p>}
+    </div>
+  );
+}
+
+/** 0321: the signed Warehouse RN that closes a Dismantle part (optional); the RN reference is then read from the RN. */
+export function DismantleRnSelect({ siteId, part, value, onChange, editable, invalid }: {
+  siteId: string | null | undefined; part: string | null | undefined; value: unknown; onChange: (v: string | null) => void; editable: boolean; invalid?: boolean;
+}) {
+  const { t } = useTranslation();
+  const q = useDismantleRns(siteId, part, editable);
+  const items = q.data ?? [];
+  const cur = typeof value === 'string' ? value : '';
+  const chosen = items.find((i) => i.entity_id === cur);
+  const label = (i: (typeof items)[number]) => `${i.doc_no ?? i.entity_id.slice(0, 8)}${i.doc_date ? ` · ${i.doc_date}` : ''}`;
+  return (
+    <div data-testid="reg-dismantle-rn">
+      {editable
+        ? (
+          <select id="reg-field-closing_rn_id" data-testid="reg-field-closing_rn_id" className="input" aria-invalid={invalid || undefined} value={cur}
+            onChange={(e) => onChange(e.target.value || null)} disabled={!siteId || !part}>
+            <option value="">{!siteId || !part ? t('p4c.order_site_first') : items.length ? t('p4c.rn_none') : t('p4c.rn_no_options')}</option>
+            {items.map((i) => <option key={i.entity_id} value={i.entity_id}>{label(i)}</option>)}
+            {cur && !chosen && <option value={cur}>{cur.slice(0, 8)}</option>}
+          </select>
+        )
+        : <div className="font-semibold" data-testid="reg-view-closing_rn_id">{chosen ? label(chosen) : cur ? cur.slice(0, 8) : '—'}</div>}
+      {cur && <p className="text-sm text-mute" data-testid="reg-dismantle-rn-ref">{t('p4c.rn_ref_from_rn')}</p>}
     </div>
   );
 }

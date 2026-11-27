@@ -3175,6 +3175,20 @@
       "unattributed": "Unattributed",
       "by_contractor": "Shortage per contractor",
       "contractor_row": "{{qty}} missing · {{lines}} lines · {{sites}} sites"
+    },
+    "scurve": {
+      "title": "Progress curve",
+      "hint": "Planned against actual of the saved weekly snapshots, the weekly velocity and the date the curve reaches 100% at that velocity. Read only.",
+      "open_project_status": "Open Project Status",
+      "actual": "Actual",
+      "planned": "Planned",
+      "spi": "Plan index",
+      "velocity": "Velocity",
+      "per_week": "%/week",
+      "forecast": "100% forecast",
+      "empty": "No saved snapshots yet: the curve appears after the first weekly snapshot.",
+      "chart_label": "Progress curve: {{list}}",
+      "basis": "{{n}} saved weekly snapshots, values frozen at their dates."
     }
   },
   "docs": {
@@ -4590,6 +4604,9 @@
     "cancelled": "Cancelled",
     "no_contractor": "no contractor",
     "order_site_first": "Choose the site and the part first",
+    "rn_none": "No RN linked (type the reference)",
+    "rn_no_options": "No received RN of this part on the site",
+    "rn_ref_from_rn": "The RN reference is read from the Warehouse RN and cannot be typed.",
     "no_orders": "No approved, active order for this part",
     "contractor_from_order": "Contractor (from the order): {{name}}",
     "order_choose": "{{count}} active orders: choose the one this work belongs to.",
