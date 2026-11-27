@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.134
+  version: 0.15.154
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -31,6 +31,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.154 (2026-11-27): default value per register column (migration 0254; CHANGELOG ColumnDefaults). Additive. `PUT /registers/{key}/fields/{code}/default` (`setRegisterFieldDefault`, System Admin or delegate of `fields.edit`, reason, optional If-Match; `value` null clears) validated like a record value; `RegisterColumn.default_value` and `RegisterField.default_value`. The register form prefills it on a new record and marks it as prefilled; the server never applies it by itself (imports and API calls are unchanged).
     - 0.15.134 (2026-11-27): the Incidents & Security register (owner approval 2026-11-26; migration 0183): one register for safety incidents, near-misses and security events at sites (theft, vandalism, damaged equipment), with a cause/reason dropdown that also records a day with no execution because of bad weather (owner 2026-11-27). Additive. Register key `incidents` in `/registers` and `/registers/{key}` records with its own fields and the standard two levels, the Dropdown lists IncidentType, IncidentSeverity and IncidentCause in Settings, the module `incidents` in the permissions grid (no grant seeded), the nav key in the catalogue, the template TPL-INCIDENTS and the master export part. Existing registers and data are untouched.
     - 0.15.222 (2026-11-27): additive (migration 0322; CHANGELOG IssueRiskLink). An Issue can name the Risk it realises: new optional field `risk_entity_id` on `issues` (the entity id of a Risks record the caller may see; needs the Risks view right in the risk's region; field errors `risk_not_available`, `invalid`). `GET /registers/issues/risk-options` lists the risks; `GET /registers/risks/{entity_id}/issues` lists the issues that realise a risk (needs the Risks and Issues modules; only the regions of the Issues view right).
     - 0.15.160 (2026-11-27): goals with automatic progress (migration 0260; CHANGELOG Goals). Additive. `GET`/`PUT /settings/goals` (`getGoals`, `setGoals`) and `GET /goals/progress` (`getGoalsProgress`). Progress is counted from approved milestone tasks, as the On-Air counter does; no permission is widened.
@@ -10958,6 +10959,44 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '422': { $ref: '#/components/responses/Unprocessable' }
+  /registers/{register_key}/fields/{code}/default:
+    put:
+      tags: [registers]
+      operationId: setRegisterFieldDefault
+      summary: Set or clear the default value of a register column
+      description: |
+        0.15.154. System Admin or a delegate of `fields.edit` (403 otherwise). The default is prefilled on a NEW record by the register form and shown as prefilled; the server never applies it by itself. Only simple columns (text, long text, email, phone, link, number, currency, percentage, date, yes/no, list, multi-list); 422 `not_supported` for the others, 422 `unknown_value` for a value that is not an active value of the list, and the same value rules as a record. `value` null clears it. If-Match (the column version) is optional. Audited (`register_field_default`).
+      parameters:
+        - { name: register_key, in: path, required: true, schema: { type: string } }
+        - { name: code, in: path, required: true, schema: { type: string } }
+        - { name: If-Match, in: header, required: false, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [value, reason]
+              properties:
+                value: { description: 'A string, number, boolean or list of strings; null clears.' }
+                reason: { $ref: '#/components/schemas/Reason' }
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [code, version]
+                properties:
+                  code: { type: string }
+                  version: { type: integer }
+                  default_value: {}
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
   /registers/{register_key}/fields-order:
     parameters:
       - $ref: '#/components/parameters/RegisterKeyAny'
@@ -21861,6 +21900,7 @@ components:
         in_filter: { type: boolean }
         in_template: { type: boolean }
         in_export: { type: boolean }
+        default_value: { description: '0.15.154. Prefilled on a new record (null or absent = none).' }
         is_active: { type: boolean }
         is_system: { type: boolean, description: 'Protected: code or a derived rule depends on it.' }
         system_reason: { type: [string, 'null'] }
@@ -22001,6 +22041,7 @@ components:
           description: '0.12.5. Only for `child_list`: the columns of a row, in order.'
           items: { $ref: '#/components/schemas/RegisterFieldColumn' }
         in_list: { type: boolean }
+        default_value: { description: '0.15.154. Prefilled on a new record by the form (absent = none).' }
         is_custom: { type: boolean }
         section: { type: [string, 'null'], description: '0.4.6. The form section of a base field (for example `Request`, `Validity`, `PTW checks`), in English, in the order of the fields. Absent for custom fields.' }
         options:
