@@ -1,3 +1,4 @@
+import { ExportAction } from '../security/export-lock';
 import { Body, Controller, Delete, Get, Headers, HttpCode, Param, Patch, Post, Put, Query, Res, StreamableFile } from '@nestjs/common';
 import type { Response } from 'express';
 import type { AuthContext } from '../auth/auth.types';
@@ -16,6 +17,7 @@ export class DailyPlanController {
     return this.svc.day(q);
   }
 
+  @ExportAction()
   @Get('export')
   async export(@Query() q: Record<string, unknown>, @Res({ passthrough: true }) res: Response): Promise<StreamableFile> {
     const { buffer, fileName } = await this.svc.export(q);

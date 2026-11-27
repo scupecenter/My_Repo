@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { api, ApiError, downloadFile, type RequestOptions } from './client';
 import type { IssueStoppedRowList, IssueTaskMapItem, IssueTaskMapList,
-  ActiveSession, ActOnBehalfRequest, Calendar, CalendarConfirmation, MailNotificationKinds, ImportsSettings, ContractorPerformanceReport, ContractorPerformanceThresholds, ContractorPerformanceSettings, NavLayoutSetting, UiIdentity, UiBrand, LoginPage, LoginPagePublic, SupportLink, NavLayoutT, ContractorRules, ContractorRulesInput, GecolHlcCounts, ContractorsCompletenessReport, TeamScopeMismatchReport, DeletedUser, PurgedUser, DlpSettings, DlpVersion, DlpVersionInput, Holiday, HolidayChangeResult, HolidayInput, HolidayPatch, HolidaySummary, IdleTaskAlertSetting, Job, LogIntegrity, LogRetention, LogRetentionInput,
+  ActiveSession, ActOnBehalfRequest, Calendar, CalendarConfirmation, MailNotificationKinds, ImportsSettings, ContractorPerformanceReport, ContractorPerformanceThresholds, ContractorPerformanceSettings, NavLayoutSetting, UiIdentity, UiBrand, LoginPage, SecurityLocks, LoginPagePublic, SupportLink, NavLayoutT, ContractorRules, ContractorRulesInput, GecolHlcCounts, ContractorsCompletenessReport, TeamScopeMismatchReport, DeletedUser, PurgedUser, DlpSettings, DlpVersion, DlpVersionInput, Holiday, HolidayChangeResult, HolidayInput, HolidayPatch, HolidaySummary, IdleTaskAlertSetting, Job, LogIntegrity, LogRetention, LogRetentionInput,
   NotificationPolicy, NotificationPolicyInput, NotificationTypeDef, Page, ReassignmentAlert, SecurityLogEntry, SessionRevokeResult, SlaPublishPreview, SlaRuleSet, SlaRuleSetPublishResult, SlaRuleSetSummary, SlaTaskRule, StaffCard, StaffVisibility, StructuralFreeze,
   TaskDefinition, TeamScopeMatch, TeamScopeMatchInput, TransitionResultT, User, UserDetail, WeekendDaysResult, WeightSet, WeightSetCode, WeightSetInput, WeightSetPreview, WeightSetPublishResult, WorkflowVersion, WorkflowVersionSummary,
 } from './types';
@@ -97,6 +97,14 @@ export const useSetLoginPage = () => {
   const qc = useQueryClient();
   return useMutation<LoginPage, ApiError, { version: number; announcement_en: string; announcement_ar: string; announcement_kind: 'info' | 'maintenance'; animation: boolean; default_locale: 'en' | 'ar' | null; support_links: SupportLink[]; reason: string }>({
     mutationFn: ({ version, ...body }) => api.put('/settings/login-page', { version, body }), onSettled: () => refresh(qc, 'login-page', 'login-page-public'),
+  });
+};
+/** 0.15.190 (migration 0290): the admin lock keys (setting security.locks). Read by everyone, changed by a System Admin only, with a reason and a step-up. */
+export const useSecurityLocks = () => useQuery({ queryKey: ['security-locks'], queryFn: () => api.get<SecurityLocks>('/settings/security-locks') });
+export const useSetSecurityLocks = () => {
+  const qc = useQueryClient();
+  return useMutation<SecurityLocks, ApiError, { version: number; block_public_sharing: boolean; disable_export: boolean; reason: string }>({
+    mutationFn: ({ version, ...body }) => api.put('/settings/security-locks', { version, body }), onSettled: () => refresh(qc, 'security-locks'),
   });
 };
 export const useImportsSettings = () => useQuery({ queryKey: ['imports-settings'], queryFn: () => api.get<ImportsSettings>('/settings/imports') });
