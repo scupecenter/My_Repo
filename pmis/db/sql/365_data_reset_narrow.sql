@@ -1,5 +1,5 @@
--- 0365_data_reset_narrow: the project data reset can be narrowed inside a register part (Data entry proposal P1, approved by the owner 2026-11-27).
--- Mirror: db/sql/364_data_reset_narrow.sql (kept byte-identical). The contract of the reset is docs/ops/data-reset.md.
+-- 0366_data_reset_narrow: the project data reset can be narrowed inside a register part (Data entry proposal P1, approved by the owner 2026-11-27).
+-- Mirror: db/sql/365_data_reset_narrow.sql (kept byte-identical). The contract of the reset is docs/ops/data-reset.md.
 --
 --   A part chosen for reset may be narrowed to the register entities that match ALL of: a region (one or more), the import batch they came from (the
 --   historical-direct batch of the record or the batch of its row), and the date the entity was first created (inclusive, Africa/Tripoli calendar days).
@@ -192,7 +192,7 @@ BEGIN
     IF position(old IN def) = 0 THEN RAISE EXCEPTION 'data_reset_plan: watches row not found'; END IF;
     def := replace(def, old, $q$'CASE WHEN public.data_reset_narrow() IS NOT NULL AND EXISTS (SELECT 1 FROM pg_temp.reset_ent e WHERE e.entity_id = t.entity_id AND e.kept) THEN ''{}''::text[] ELSE ARRAY[''notifications'', ''sites''] END || CASE$q$);
     -- marker so the patch is not applied twice
-    def := replace(def, E'\n  SELECT t, ''keep'', NULL::text,', E'\n  -- reset_narrow_applied (0365)\n  SELECT t, ''keep'', NULL::text,');
+    def := replace(def, E'\n  SELECT t, ''keep'', NULL::text,', E'\n  -- reset_narrow_applied (0366)\n  SELECT t, ''keep'', NULL::text,');
     EXECUTE def;
   END IF;
 END $$;
@@ -206,7 +206,7 @@ BEGIN
     n := E'ALTER TABLE pg_temp.reset_ent ADD PRIMARY KEY (entity_id);\n';
     IF position(n IN def) = 0 THEN RAISE EXCEPTION 'data_reset_core: reset_ent key line not found'; END IF;
     blk := $b$
-  -- NARROW (0365): a filter keeps every register entity that does not match it (parts {}, kept): its rows, steps, slots, files, comments and drafts stay.
+  -- NARROW (0366): a filter keeps every register entity that does not match it (parts {}, kept): its rows, steps, slots, files, comments and drafts stay.
   -- Selected: the entities of the requested parts that match ALL of the filter (region, import batch, first-created day); plus the entities of the parts
   -- the closure added (dependents of procurement) that are linked to a selected procurement record or entity (data->>'procurement_record_id').
   IF public.data_reset_narrow() IS NOT NULL THEN
@@ -311,4 +311,4 @@ VALUES ('data_reset_narrow_applied', 'workflow', NULL,
         jsonb_build_object('narrowable', to_jsonb(data_reset_narrowable()), 'filter', 'regions, import batches, first-created period (all must match)',
                            'binding', 'scope.narrow inside scope_hash and approved_scope_hash; the scope is immutable',
                            'doors', 'data_reset_dry_run(parts, narrow), admin_data_reset_request(..., narrow), data_reset_narrow_options(part)'),
-        'Narrowing the project data reset to region, batch or period (migration 0365, Data entry proposal P1).');
+        'Narrowing the project data reset to region, batch or period (migration 0366, Data entry proposal P1).');
