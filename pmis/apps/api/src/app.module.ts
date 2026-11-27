@@ -27,6 +27,7 @@ import { ListCataloguesController } from './registers/list-catalogues.controller
 import { ListCataloguesService } from './registers/list-catalogues.service';
 import { FollowController } from './follow/follow.controller';
 import { FollowService } from './follow/follow.service';
+import { PresenceController } from './presence/presence.controller';
 import { SavedViewsController } from './views/saved-views.controller';
 import { SavedViewsService } from './views/saved-views.service';
 import { FilterCatalogService } from './views/filter-catalog.service';
@@ -44,6 +45,7 @@ import { AuthController } from './auth/auth.controller';
 import { AuthService } from './auth/auth.service';
 import { LogHmacService } from './auth/log-hmac.service';
 import { PasswordService } from './auth/password.service';
+import { CspReportController } from './security/csp-report.controller';
 import { RateLimiter } from './auth/rate-limiter';
 import { SessionGuard } from './auth/session.guard';
 import { SessionService } from './auth/session.service';
@@ -76,6 +78,7 @@ import { PmSchedulesController } from './registers/pm-schedules.controller';
 import { PmSchedulesService } from './registers/pm-schedules.service';
 import { DashboardController } from './dashboard/dashboard.controller';
 import { DashboardService } from './dashboard/dashboard.service';
+import { DashboardCacheInvalidator, DashboardCacheService } from './dashboard/dashboard-cache.service';
 import { DashboardSettingsController } from './dashboard/dashboard-settings.controller';
 import { DashboardSettingsService } from './dashboard/dashboard-settings.service';
 import { GoalsController } from './dashboard/goals.controller';
@@ -124,6 +127,8 @@ import { ExportLockInterceptor } from './security/export-lock';
 import { UiIdentityService } from './settings/ui-identity.service';
 import { LoginPageController } from './settings/login-page.controller';
 import { LoginPageService } from './settings/login-page.service';
+import { MediaController } from './media/media.controller';
+import { MediaService } from './media/media.service';
 import { SettingsScreensController } from './settings/settings-screens.controller';
 import { SettingsScreensService } from './settings/settings-screens.service';
 import { AlertRulesController } from './settings/alert-rules.controller';
@@ -224,13 +229,16 @@ export function appModuleFor(config: AppConfig) {
       DocumentTextController, DelegationsController, SitesController, SiteDraftsController, TasksController, WorkflowEditorController, TaskDefinitionsController, CalendarController, SlaController, IssueStoppedController, RegistersController, RecycleBinController, RegisterColumnsController, MatrixController, WarehouseController, AsBuiltItemsController, NumberSequencesController, RegisterStateController,
       NotificationsController, FollowController, StatusUpdatesController, InsightsController, TemplatesController, ImportBatchesController, DocumentsController, DocumentsGridController, LibraryController, SnagsController,
       DashboardController, DashboardSettingsController, GoalsController, PmSchedulesController, DashboardOpsController, SupportAccessController, DownloadLocksController, SecurityLocksController, DelayPeriodsController, WeightsController, TeamScopeMatchController, GecolOrderWarningsController, DeriveRulesController, MailKindsController, MailPolicyController, ImportsSettingsController, KanbanController, NavLayoutController, HistoricalWaiverController, SiteMasterController, SiteMasterColumnsController, CustomFieldsController, StructuralFreezeController, UiIdentityController, LoginPageController, SettingsScreensController, AlertRulesController, P4cController, FleetController, AuditLogController, SecurityLogController, LogsAdminController, NewDeviceController,
+      MediaController, // 0.15.292 (own line: the long lines above conflict on every merge)
       PasskeySettingController, PasskeyController, // S4
       TemplateNoticeSettingsController,
+      CspReportController, // SEC-3
       ScenarioSettingsController, SiteApplicabilityController, // P1 (0052)
       MailController, HealthController,
       ListCataloguesController,
       MasterImportController, TemplateMappingController,
       ContractorsController,
+      PresenceController,
       SavedViewsController,
       SearchController, // 0.15.17 (F4)
       ExportsController, // 0.15.34: Master-format export
@@ -250,6 +258,7 @@ export function appModuleFor(config: AppConfig) {
       AssignmentsService, DelegationsService, SitesService, SiteLocksService, SiteDraftsService, TaskViewService, TaskDetailService, WorkflowEditorService, WorkflowService, ApprovalsService, MyWorkService, OverridesService, CalendarService, SlaService, IssueStoppedService, JobsService, RegistersService, RecycleBinService, RegisterColumnsService, MatrixService, WarehouseService, WarehouseConfigService, AsBuiltItemsService,
       NotificationsService, DocumentTextService, FollowService, StatusUpdatesService, InsightsService, TemplatesService, ImportService, ImportJobsService, UploadInterceptor, StorageService, DocumentsService, DocsGridService, LibraryService, ZipService, StorageJobsService, SnagsService,
       DashboardService, DashboardSettingsService, GoalsService, PmSchedulesService, SiteMapService, ProjectStatusService, DelayPeriodsService, WeightsService, TeamScopeMatchService, GecolOrderWarningsService, DeriveRulesService, MailKindsService, MailPolicyService, ImportsSettingsService, KanbanService, NavLayoutService, HistoricalWaiverService, SiteMasterService, SiteMasterColumnsService, CustomFieldsService, StructuralFreezeService, UiIdentityService, LoginPageService, SettingsScreensService, AlertRulesService, P4cService, FleetService, LogsService, SecurityLogService, JobRunsService, MailService, IntegrityService, DashboardExtrasService, DashboardOpsService, SecurityLocksService, SupportAccessService, DownloadLocksService, NewDeviceService,
+      MediaService, // 0.15.292
       PasskeyService, // S4
       TemplateNoticeSettingsService,
       ScenarioService, // P1 (0052)
@@ -268,7 +277,9 @@ export function appModuleFor(config: AppConfig) {
       DataResetService, MaintenanceService, // 0.15.62 (0146)
       LibraryMenuService, // 0.15.70 (0151, W5)
       DataHubService, // 0.15.311 (0400)
+      DashboardCacheService, // short cache of the /dashboard figures (30 s, scope-keyed)
       { provide: APP_GUARD, useClass: SessionGuard },
+      { provide: APP_INTERCEPTOR, useClass: DashboardCacheInvalidator }, // before TxInterceptor: clears the dashboard cache after a configuration write has committed
       { provide: APP_INTERCEPTOR, useClass: TxInterceptor },
       { provide: APP_INTERCEPTOR, useClass: ExportLockInterceptor }, // 0.15.190 (0290): after TxInterceptor, so the lock is read inside the request transaction
       { provide: APP_FILTER, useClass: ProblemFilter },

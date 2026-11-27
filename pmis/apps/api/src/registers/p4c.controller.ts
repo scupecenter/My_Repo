@@ -62,6 +62,24 @@ export class P4cController {
     return this.p4c.warehouseOrderOptions(auth, q, 'quality');
   }
 
+  /** D58: the advances an expense or settlement may name (`advance_id`): approved, disbursed or in settlement, of the site when it is given. */
+  @Get('financial_advances/advance-options')
+  advanceIdOptions(@Auth() auth: AuthContext, @Query() q: Record<string, unknown>) {
+    return this.p4c.advanceOptions(auth, q);
+  }
+
+  /** D58: the same order picker for the Invoices register (`procurement_record_id`). */
+  @Get('invoices/order-options')
+  invoiceOrderOptions(@Auth() auth: AuthContext, @Query() q: Record<string, unknown>) {
+    return this.p4c.warehouseOrderOptions(auth, q, 'invoices');
+  }
+
+  /** D58: the companies of the Contractors list an invoice may name as its supplier (`supplier_party_id`); needs the Invoices view. */
+  @Get('invoices/supplier-options')
+  invoiceSupplierOptions(@Auth() auth: AuthContext) {
+    return this.p4c.invoiceSupplierOptions(auth);
+  }
+
   @Get('issues/risk-options')
   issueRiskOptions(@Auth() auth: AuthContext) {
     return this.p4c.issueRiskOptions(auth);

@@ -239,6 +239,20 @@ export const xHandlers = [
     const from = Number(q.get('cursor') ? atob(q.get('cursor') as string) : 0) || 0;
     return HttpResponse.json({ items: rows.slice(from, from + limit), page: { limit, next_cursor: from + limit < rows.length ? btoa(String(from + limit)) : null } });
   }),
+  // Item 12 (0.15.241): the region health board — the current-week region updates, one row per region, missing flag otherwise.
+  http.get(`${B}/status-updates/region-health`, () => {
+    const g = guard(); if (g) return g;
+    const week = weekStartOf(tripoliToday());
+    const items = [1, 2, 3, 4, 5, 6, 7].map((region_id) => {
+      const u = db().x.statuses
+        .filter((x) => x.scope === 'region' && x.region_id === region_id && x.week_start === week)
+        .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))[0];
+      return u
+        ? { region_id, health: u.health, summary: u.summary, author: u.author, updated_at: u.updated_at, missing_update: false }
+        : { region_id, health: null, summary: null, author: null, updated_at: null, missing_update: true };
+    });
+    return HttpResponse.json({ week_start: week, items });
+  }),
   http.post(`${B}/status-updates`, async ({ request }) => {
     const g = guard(); if (g) return g;
     const b = (await request.json()) as { scope?: string; region_id?: number; team?: string; health?: string; summary?: string };
