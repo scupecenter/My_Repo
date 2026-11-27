@@ -30,7 +30,7 @@ export type StdCol<T> = {
   multi?: boolean;
 };
 
-export function StandardTable<T>({ screen, testid, cols, rows, rowId, rowTestId, rowAttrs, views, filter, rowExpand, noun = 'items', loading, error, onRetry, empty, onOpen, activeId, extra, primary, more, exportName, query, onQuery, searchTestId, hasMore, onMore, loadingMore, total, children }: {
+export function StandardTable<T>({ screen, testid, cols, rows, rowId, rowTestId, rowAttrs, views, filter, rowExpand, headTestId, noun = 'items', loading, error, onRetry, empty, onOpen, activeId, extra, primary, more, exportName, query, onQuery, searchTestId, hasMore, onMore, loadingMore, total, children }: {
   screen: string;
   testid: string;
   cols: StdCol<T>[];
@@ -51,6 +51,8 @@ export function StandardTable<T>({ screen, testid, cols, rows, rowId, rowTestId,
   views?: ReactNode;
   /** the + Filter tree of the screen, where it has one */
   filter?: ReactNode;
+  /** a test id for the header cell of a column */
+  headTestId?: (id: string) => string | undefined;
   /** a panel opened in place under a row (an inline edit); null for the rows that have none */
   rowExpand?: (r: T) => ReactNode;
   primary?: ReactNode;
@@ -99,7 +101,7 @@ export function StandardTable<T>({ screen, testid, cols, rows, rowId, rowTestId,
       {bar}
       {children}
       <div className="card overflow-x-auto" role="table" aria-label={testid} {...displayAttrs(tbl.display)}>
-        <HeaderRow api={tbl} label={label} testid={`${testid}-head`} />
+        <HeaderRow api={tbl} label={label} testid={`${testid}-head`} colTestId={headTestId} />
         <div role="rowgroup" data-testid={`${testid}-body`}>
           {shown.map((r) => {
             const id = rowId(r), on = id === activeId;

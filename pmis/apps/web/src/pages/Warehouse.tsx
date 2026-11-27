@@ -123,7 +123,7 @@ function Items() {
   ];
   return (
     <div data-testid="wh-items">
-      <StandardTable<WarehouseItem> screen="warehouse-items" testid="wh-item-table" cols={stdCols} rows={items} rowId={(x) => x.id} rowTestId={(x) => `wh-item-${x.code}`}
+      <StandardTable<WarehouseItem> headTestId={(id) => (id.startsWith('cv_') ? `wh-colh-${id.slice(3)}` : undefined)} screen="warehouse-items" testid="wh-item-table" cols={stdCols} rows={items} rowId={(x) => x.id} rowTestId={(x) => `wh-item-${x.code}`}
         loading={list.isLoading} error={list.isError} onRetry={() => void list.refetch()} empty={t('wh.empty')} exportName="warehouse-items" noun="items"
         query={q} onQuery={setQ} searchTestId="wh-search"
         views={<SavedViews<Record<string, unknown>> screen="warehouse-items" value={{ q, inactive }} empty={{ q: '', inactive: false }} onApply={(v) => { setQ(String(v.q ?? '')); setInactive(v.inactive === true); }} />}
