@@ -36,9 +36,9 @@ Source: CLAUDE.md, "Role assignment is many-to-many".
 - **Given** an assignment
   **When** it is stored
   **Then** it is one row with: user, role (a main role or a sub-role), permission level (view / entry / review / approve / admin), regions (one or more of the 7, or all), modules (one or more, or all), valid from, valid to (optional), and status.
-- **Given** a person who holds "TE Team Lead" with approve rights for all regions, and "Site Engineers (CW)" with entry rights for Tripoli
+- **Given** a person who holds "TE Team Lead" with approve rights for all regions, and "Site Engineers (CW)" with entry rights for Region A
   **When** they act
-  **Then** each role is checked against its own row. They can approve TE tasks anywhere, but can only enter data for CW tasks at Tripoli sites.
+  **Then** each role is checked against its own row. They can approve TE tasks anywhere, but can only enter data for CW tasks at Region A sites.
 - **Given** a row whose valid-to date has passed, or whose valid-from date is in the future
   **When** permissions are evaluated
   **Then** the row is ignored. No manual action is needed when it expires.
@@ -100,7 +100,7 @@ Source: CLAUDE.md, "Role assignment is many-to-many".
 
 ## AU-05 Groups
 - **Given** an admin
-  **When** they create a group (for example "CW Reviewers Tripoli") and add users to it
+  **When** they create a group (for example "CW Reviewers Region A") and add users to it
   **Then** the group can be used in any Matrix cell (MX-02).
 - **Given** a user who is deactivated
   **When** a group task is next assigned
