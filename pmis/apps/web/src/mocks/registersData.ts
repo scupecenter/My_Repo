@@ -178,6 +178,9 @@ export const lessonsLearned: RegisterDefinition = {
     F('recommendation', 'Recommendation', 'التوصية', 'text', 'Follow-up'),
     F('applied_to', 'Applied To', 'طُبّق على', 'text', 'Follow-up', { in_list: true }),
     F('closed_date', 'Closed Date', 'تاريخ الإغلاق', 'date', 'Follow-up', { in_list: true }),
+    F('remark', 'Remark', 'ملاحظات', 'text', 'Remark'),
+  ],
+};
 // Owner approval 2026-11-26 (migration 0183): Incidents & Security, one register for safety incidents, near-misses and security events.
 export const incidents: RegisterDefinition = {
   register_key: 'incidents', name_en: 'Incidents & Security', name_ar: 'الحوادث والأمن', module_key: 'incidents', site_scoped: true, multiple_per_site: true, approval_levels: 2,
