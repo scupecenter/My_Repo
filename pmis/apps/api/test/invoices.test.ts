@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { loggedIn, makeAdmin, startApp, superDb } from './helpers';
 import { Team, approveAll, createRec, post, recPath, team } from './reg-helpers';
 
-/** Contract 0.15.136 (migrations 0185, 0364): the Invoices register (owner approval 2026-11-27). */
+/** Contract 0.15.136 (migrations 0185, 0367): the Invoices register (owner approval 2026-11-27). */
 let app: NestExpressApplication;
 let db: PgClient;
 let t: Team;

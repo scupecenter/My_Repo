@@ -1,6 +1,6 @@
--- 0364_invoices_relation: the Invoices register (0185) links to the procurement record it bills. The link field procurement_record_id is listed in
+-- 0367_invoices_relation: the Invoices register (0185) links to the procurement record it bills. The link field procurement_record_id is listed in
 -- record_related() (created by 0324) so the Related-records panel shows the invoices of an order and the order of an invoice. Patched in place and
--- idempotent (never a whole redefinition), so links added by other migrations stay. Mirror: db/sql/363_invoices_relation.sql (kept identical).
+-- idempotent (never a whole redefinition), so links added by other migrations stay. Mirror: db/sql/366_invoices_relation.sql (kept identical).
 DO $$
 DECLARE def text; marker text := E'\n    ) v(from_register, field, to_register)';
 BEGIN
