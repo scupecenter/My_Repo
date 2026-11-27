@@ -52,7 +52,9 @@ export function Shell() {
   const [compactOwn, setCompact] = useState<boolean | null>(null);
   const [autoOwn, setAuto] = useState<boolean | null>(null);
   const compact = compactOwn ?? loadPref<boolean | null>(ICONS_KEY, null) ?? (menuStyle === 'rail');
-  const auto = autoOwn ?? loadPref<boolean | null>(AUTO_KEY, null) ?? (menuStyle === 'autohide');
+  // 0527: the personal choice in the profile (sidebar.mode) comes first, then this browser's pin, then the appearance profile's menu style
+  const profileMode = sanitizeUiNav(me.data?.user.ui_prefs?.sidebar ?? {}).mode;
+  const auto = autoOwn ?? (profileMode ? profileMode === 'autohide' : null) ?? loadPref<boolean | null>(AUTO_KEY, null) ?? (menuStyle === 'autohide');
   const [hover, setHover] = useState(false);
   const [width, setWidth] = useState<number>(() => { const w = Number(loadPref(WIDTH_KEY, SIDEBAR_DEFAULT)); return Number.isFinite(w) ? Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, w)) : SIDEBAR_DEFAULT; });
   // The drawer is tied to the page it was opened on, so it closes by itself on navigation.
@@ -136,7 +138,25 @@ export function Shell() {
   };
 
   const resize = (w: number) => { setWidth(w); storePref(WIDTH_KEY, w); };
-  const togglePin = () => { storePref(AUTO_KEY, !auto); setAuto(!auto); setHover(false); };
+  const togglePin = () => {
+    storePref(AUTO_KEY, !auto); setAuto(!auto); setHover(false);
+    const v = me.data?.user.version;
+    if (v !== undefined) updateProfile.mutate({ version: Number(v), patch: { ui_prefs: { sidebar: { ...side, mode: auto ? 'pinned' : 'autohide' } } } });
+  };
+  // auto-hide: Ctrl+B opens or closes the rail (not while typing in a field); a touch on the rail opens it, a touch elsewhere closes it (no hover on touch screens)
+  useEffect(() => {
+    if (!auto) return;
+    const key = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return;
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'b') { e.preventDefault(); setHover((h) => !h); }
+      else if (e.key === 'Escape') setHover(false);
+    };
+    const touch = (e: PointerEvent) => { if (e.pointerType === 'touch' && !asideRef.current?.contains(e.target as Node | null)) setHover(false); };
+    window.addEventListener('keydown', key);
+    window.addEventListener('pointerdown', touch);
+    return () => { window.removeEventListener('keydown', key); window.removeEventListener('pointerdown', touch); };
+  }, [auto]);
   /** the rail shows icons only; it opens over the page (no push) while the pointer or the keyboard is in it */
   const open = !auto || hover;
   const rail = compact || !open;
@@ -185,7 +205,7 @@ export function Shell() {
     <div className="flex min-h-screen">
       {auto && <div className="hidden shrink-0 md:block" style={{ width: 56 }} aria-hidden />}
       <aside ref={asideRef} data-testid="sidebar" data-auto={auto ? 'true' : 'false'} aria-label={t('nav.sidebar_label')} style={{ width: rail ? 56 : width }}
-        onMouseEnter={auto ? () => setHover(true) : undefined} onMouseLeave={auto ? () => setHover(false) : undefined}
+        onPointerDown={auto ? (e) => { if (e.pointerType === 'touch') setHover(true); } : undefined} onMouseEnter={auto ? () => setHover(true) : undefined} onMouseLeave={auto ? () => setHover(false) : undefined}
         onFocus={auto ? () => setHover(true) : undefined} onBlur={auto ? (e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setHover(false); } : undefined}
         className={`side-scope ${auto ? 'fixed start-0 z-40' : 'sticky'} top-0 hidden h-screen shrink-0 flex-col border-e border-line bg-side md:flex`}>
         {brand}

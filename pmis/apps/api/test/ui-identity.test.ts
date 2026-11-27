@@ -437,6 +437,18 @@ describe('the personal sidebar: PATCH /me/profile ui_prefs.sidebar', () => {
     expect((await patchPrefs(api, { sidebar: { hidden: ['No Space'] } })).status).toBe(422);
     expect((await patchPrefs(api, { sidebar: { pins: Array.from({ length: 21 }, (_, i) => `k${i}`) } })).status).toBe(422);
     expect((await patchPrefs(api, { sidebar: 'everything' })).status).toBe(422);
+    expect((await patchPrefs(api, { sidebar: { mode: 'sideways' } })).status).toBe(422);
+  });
+
+  it('0527: the personal sidebar mode (pinned or autohide) is saved and read back; another value is refused', async () => {
+    const u = await makeUser(db, { assigned: true });
+    const api = await loggedIn(app, u);
+    const r = await patchPrefs(api, { sidebar: { mode: 'autohide' } });
+    expect(r.status).toBe(200);
+    expect(r.body.ui_prefs).toMatchObject({ sidebar: { mode: 'autohide' } });
+    const back = await patchPrefs(api, { sidebar: { mode: 'pinned' } });
+    expect(back.status).toBe(200);
+    expect(back.body.ui_prefs).toMatchObject({ sidebar: { mode: 'pinned' } });
   });
 
   it('while the admin locks the appearance, a sidebar-only change stays allowed; a dimension with it is refused and nothing changes', async () => {

@@ -42,6 +42,7 @@ export const uiPrefsSchema = z.object({
  * (at most 20). A menu key is a short lowercase id; the web knows the real list and ignores a key it does not have.
  */
 export const UI_NAV_BADGE_STYLES = ['full', 'dot', 'none'] as const;
+export const UI_NAV_MODES = ['pinned', 'autohide'] as const;
 export type UiNavBadgeStyle = (typeof UI_NAV_BADGE_STYLES)[number];
 const NAV_KEY = /^[a-z0-9_.]{1,60}$/;
 const navKeyList = (max: number) => z.array(z.string().regex(NAV_KEY)).max(max);
@@ -50,6 +51,8 @@ export const uiNavSchema = z.object({
   order: navKeyList(200).optional(),
   badge_style: z.enum(UI_NAV_BADGE_STYLES).optional(),
   pins: navKeyList(20).optional(),
+  /** 0527: pinned (the menu stays open, default) or autohide (a rail that opens on hover, focus or the shortcut). */
+  mode: z.enum(UI_NAV_MODES).optional(),
 }).strict();
 export type UiNav = z.infer<typeof uiNavSchema>;
 

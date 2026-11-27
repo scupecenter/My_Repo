@@ -18468,6 +18468,11 @@ export interface components {
             /** @enum {string} */
             badge_style?: "full" | "dot" | "none";
             pins?: string[];
+            /**
+             * @description 0.15.527 (0527): pinned (the menu stays open, the default) or autohide (a rail that opens on hover, focus or Ctrl+B).
+             * @enum {string}
+             */
+            mode?: "pinned" | "autohide";
         };
         UiPrefsSelf: components["schemas"]["UiPrefs"] & {
             /** @description 0.15.231 (0242): the personal sidebar. Never an organization default; a `ui_prefs` body without it keeps the stored sidebar, and a body that names only `sidebar` keeps the stored appearance dimensions. While `identity.allow_user_choice` is false a sidebar-only change stays allowed. */

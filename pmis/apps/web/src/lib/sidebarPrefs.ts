@@ -29,6 +29,7 @@ export function sanitizeUiNav(raw: unknown): UiNav {
   const out: UiNav = {};
   const bs = r.badge_style;
   if (bs === 'full' || bs === 'dot' || bs === 'none') out.badge_style = bs;
+  if (r.mode === 'pinned' || r.mode === 'autohide') out.mode = r.mode;
   const hidden = cleanList(r.hidden, 200); if (hidden) out.hidden = hidden;
   const order = cleanList(r.order, 200); if (order) out.order = order;
   const pins = cleanList(r.pins, 20); if (pins) out.pins = pins;
