@@ -6815,6 +6815,7 @@
     "new_preview": "Shown beside new features until the days have passed."
   },
   "related": {
+    "change_pending": "Change pending",
     "title": "Related records",
     "to": "Points to:",
     "from": "Named by:",
