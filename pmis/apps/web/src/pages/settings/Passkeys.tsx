@@ -1,4 +1,5 @@
 import { Fingerprint } from 'lucide-react';
+import { UnsavedGuard } from '@/lib/unsavedGuard';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePasskeySetting, useSetPasskeys } from '@/api/settings';
@@ -38,6 +39,7 @@ export function Passkeys() {
       </label>
       {!cur.ready && <p className="text-sm text-lateInk" data-testid="passkeys-not-ready">{t('passkeys.not_ready')}</p>}
       <p className="text-xs text-mute">{t('passkeys.recovery_note')}</p>
+      <UnsavedGuard scope="settings" dirty={dirty && valid} needsReason label={t('ui.guard_settings')} onSave={(reason) => new Promise<boolean>((res) => set.mutate({ version: cur.version, enabled: v, reason }, { onSuccess: () => { setDraft(null); res(true); }, onError: () => res(false) }))} />
       <button className="btn btn-accent" data-testid="passkeys-save" disabled={!dirty || !valid || !cur.can_edit} onClick={() => setOpen(true)}>{t('passkeys.save')}</button>
       {cur.updated_at && <p className="text-xs text-mute" data-testid="passkeys-updated">{t('passkeys.updated', { name: (cur.updated_by as { display_name?: string } | null)?.display_name ?? '', when: fmtDateTime(cur.updated_at, ar ? 'ar' : 'en') })}</p>}
       {open && (
