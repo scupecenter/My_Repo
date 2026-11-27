@@ -17,7 +17,7 @@ The code of a column never changes. A column that holds values is hidden (Active
 Submit, reject, apply and undo are audited (`structure_proposal_*`, with the before and after). The table `structure_proposals` is written only by the doors (owner `pmis_definer`; no write right for the API role, see `db/sql/app_grants.sql`). The proposals screen and the doors need `fields.edit` for all regions; the approval needs a System Admin.
 
 ## Not in this slice
-Alternative names (import aliases) have no storage yet and are not in the sheet. The same tab inside the Data hub and the gear shortcut from Data entry are follow-ups.
+Alternative names (import aliases) are not stored and not in the sheet: the data upload checks the header row of the issued template exactly (D112), so an alias would change the upload contract and waits for a decision. The Data hub (admin widget) links to this screen with the number of proposals waiting; the register screen's columns menu opens the Structure changes tab of its register.
 
 ## Rules, review tab and shortcut (contract 0.15.403, migration 0562)
 

@@ -96,7 +96,7 @@ export class StructureProposalsService {
     if (!file || file.size === 0) throw problems.validation([{ path: '/file', code: 'required', message: 'Send the edited template as the form field "file".' }]);
     const ctx: Json = { file_name: file.originalname.slice(0, 200), size: file.size };
     const guard = guardXlsx(file.originalname, file.buffer);
-    if (!guard.ok) return this.reject(auth, requestId, guard.reason, guard.detail ?? 'The file is not accepted.', ctx);
+    if (!guard.ok) return this.reject(auth, requestId, guard.reason ?? 'not_xlsx', guard.detail ?? 'The file is not accepted.', ctx);
     let wb = new ExcelJS.Workbook();
     try {
       await wb.xlsx.load(file.buffer as unknown as ExcelJS.Buffer);
