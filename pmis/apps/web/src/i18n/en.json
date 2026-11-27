@@ -175,6 +175,7 @@
     "library.forms": "Forms",
     "library.archive": "Archive",
     "lessons_learned": "Lessons Learned",
+    "invoices": "Invoices",
     "incidents": "Incidents & Security"
   },
   "top": {
@@ -1956,6 +1957,9 @@
     "execution": "Execution",
     "lesson": "Lesson",
     "follow_up": "Follow-up",
+    "invoice": "Invoice",
+    "payment": "Payment",
+    "amount_section": "Amount",
     "incident": "Incident",
     "people_damage": "People and damage",
     "resolution": "Resolution"
