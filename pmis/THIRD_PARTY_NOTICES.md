@@ -14,6 +14,7 @@ Generated from the production dependencies of `apps/api` and `apps/web` with `li
 - `pako@1.0.11` is `(MIT AND Zlib)`, both permissive.
 - `buffers@0.1.1` (through `exceljs` > `unzipper` > `binary`, API only, not in the web app) declares no license in its package: no license field, no license file, none in the registry record. Allowed by the owner (decision D56, 2026-11-27) as a reviewed exception. The gate skips this exact version by name. To review later: alternatives to `exceljs` (or a newer `unzipper` chain) that remove the package.
 - `duck@0.1.12` (through `mammoth` > `lop`, API only) declares the license `BSD` without saying which. Its LICENSE file is the 2-clause BSD text (copyright notice, the two conditions and the disclaimer), so it is permissive. The gate skips this exact version by name; a new version is checked again.
+- `web-push@4.0.0` (API only, not in the web app) is `MPL-2.0`, a file-level copyleft license. It is used unmodified as a normal dependency, so the MPL-2.0 obligations stay with the package's own files and do not reach the code of this repository. Reviewed exception, recorded by exact name and version in the license gate.
 - `big-integer` is `Unlicense` (public domain). `chainsaw` is declared `MIT*` (MIT, from the README).
 
 ## apps/api (production dependencies)
