@@ -4915,6 +4915,10 @@
   "p4c": {
     "receipt_no_order": "No order (stock without an order)",
     "receipt_order_hint": "Optional. PR No., PO / WO No. and the contractor are read from the order.",
+    "advance_none": "Choose the advance",
+    "advance_hint": "Only approved advances of this site that are disbursed or being settled are listed.",
+    "supplier_none": "No company (type the name below)",
+    "supplier_hint": "Optional. Picking a company links the invoice to the Contractors list and fills the supplier name when it is empty.",
     "receipts_title": "Warehouse receipts against this order",
     "receipts_none": "No receipt names this order yet.",
     "receipts_qty": "{{lines}} line(s), quantity {{qty}}",

@@ -335,10 +335,27 @@ describe('Financial Advances', () => {
     const other = await newSite(db, R);
     const today = await dbDate(db, 'cal_today()');
     const res = await c.fin.entry.api.call('post', recPath('financial_advances'), { site_id: other.id, record_type: 'expense', data: { advance_id: dis.entity_id, expense_date: today, expense_kind: 'Fuel', amount: 5 } });
-    expect(res.status).toBe(201);
-    const sub = await post(c.fin.entry.api, 'financial_advances', res.body.id, 'submit', res.body.version);
-    expect(sub.status).toBe(422);
-    expect(sub.body.errors[0].code).toBe('advance_not_disbursed');
+    // D58 (0407): the link is checked while the row is in entry, so the advance of another site is refused at creation
+    expect(res.status).toBe(422);
+    expect(res.body.errors[0].code).toBe('unknown_advance');
+  });
+
+  it('refuses an advance_id that is not an advance, and lists the advances of the site (D58)', async () => {
+    const c = await setup();
+    const asg = await assignment(c, { vehicle_required: false, vehicle_not_required_reason: 'none', members: members(c.m1.user.id) });
+    const [a] = await children(c.fin, 'advance', asg);
+    const dis = await disburse(c, await approveAdvance(c, a!, 100), 100);
+    const today = await dbDate(db, 'cal_today()');
+    const bad = await c.fin.entry.api.call('post', recPath('financial_advances'), { site_id: c.fin.site.id, record_type: 'expense', data: { advance_id: 'not-a-uuid', expense_date: today, expense_kind: 'Fuel', amount: 5 } });
+    expect(bad.status).toBe(422);
+    expect(bad.body.errors[0].code).toBe('unknown_advance');
+    const ok = await c.fin.entry.api.call('post', recPath('financial_advances'), { site_id: c.fin.site.id, record_type: 'expense', data: { advance_id: dis.entity_id, expense_date: today, expense_kind: 'Fuel', amount: 5 } });
+    expect(ok.status).toBe(201);
+    const opts = await c.fin.entry.api.call('get', `/registers/financial_advances/advance-options?site_id=${c.fin.site.id}`);
+    expect(opts.status).toBe(200);
+    expect((opts.body.items as { entity_id: string }[]).map((i) => i.entity_id)).toContain(dis.entity_id);
+    const none = await c.viewerCar.api.call('get', '/registers/financial_advances/advance-options');
+    expect(none.status).toBe(403);
   });
 
   it('hides the amounts from users outside Finance, in the record, the search and the template (Q512)', async () => {
