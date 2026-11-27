@@ -110,6 +110,7 @@ function Layout() {
     <div data-testid="page-settings">
       <h1 className="text-2xl font-bold">{t('nav.admin.settings')}</h1>
       <nav className="my-3 flex flex-wrap gap-1" aria-label={t('nav.admin.settings')}>
+        <NavLink to="/admin/settings/all" data-testid="settings-tab-all" className={({ isActive }) => `btn ${isActive ? 'btn-accent' : ''}`}>{t('settings.tab_all')}</NavLink>
         {SETTINGS_TABS.map((tab) => <NavLink key={tab.key} to={`/admin/settings/${tab.key}`} data-testid={`settings-tab-${tab.key}`} className={({ isActive }) => `btn ${isActive ? 'btn-accent' : ''}`}>{t(`settings.tab_${tab.key}`)}</NavLink>)}
       </nav>
       <Outlet />
@@ -168,7 +169,8 @@ export function SettingsRoutes() {
   return (
     <Routes>
       <Route element={<Layout />}>
-        <Route index element={<SettingsIndex />} />
+        <Route index element={<Navigate to="sla" replace />} />
+        <Route path="all" element={<SettingsIndex />} />
         <Route path="identity" element={<Identity />} />
         <Route path="screens" element={<TabFrame tab="screens" />}>
           <Route index element={<Navigate to="dashboard" replace />} />

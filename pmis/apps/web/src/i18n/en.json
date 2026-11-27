@@ -1229,7 +1229,8 @@
     "index_alerts": "Who is told what: policy, mail, alert rules.",
     "index_security": "Staff visibility, retention, DLP, locks, limits, support access and new-device checks.",
     "index_screens": "What people see by default on each screen.",
-    "index_identity": "Name, logo and design of the workspace."
+    "index_identity": "Name, logo and design of the workspace.",
+    "tab_all": "All settings"
   },
   "scopeMatch": {
     "title": "Team / scope match (Procurement)",

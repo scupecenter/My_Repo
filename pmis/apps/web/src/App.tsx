@@ -69,7 +69,8 @@ import { SettingsRoutes } from '@/pages/settings/Settings';
 /** `/settings/...` is not a route of its own: Settings live under /admin/settings (review item 11), so the short address opens the same page instead of the placeholder. */
 export function SettingsAlias() {
   const { pathname, search, hash } = useLocation();
-  return <Navigate to={{ pathname: pathname.replace(/^\/settings/, '/admin/settings'), search, hash }} replace />;
+  const rest = pathname.replace(/^\/settings\/?/, '');
+  return <Navigate to={{ pathname: rest ? `/admin/settings/${rest}` : '/admin/settings/all', search, hash }} replace />;
 }
 
 function Soon() {

@@ -32,7 +32,7 @@ test('admin: /settings index, limits page, change, Arabic, reset; staff: read-on
   await login(page, '9001', 'Walk-Admin-Pass-2026');
   await page.goto('/settings');
   await expect(page.getByTestId('settings-index')).toBeVisible();
-  await expect(page).toHaveURL(/\/admin\/settings$/);
+  await expect(page).toHaveURL(/\/admin\/settings\/all$/);
   await expect(page.getByTestId('page-soon')).toHaveCount(0);
   await shot(page, 'en-index');
   await page.getByTestId('settings-index-security-limits').click();
