@@ -39,7 +39,7 @@ info:
     - 0.15.95 (2026-11-27): Issue log and Quality record link to a Procurement order (migration 0195; CHANGELOG IssueQualityOrderLink). Additive. New optional field `procurement_order_id` on `issues` and `quality`; when set, the contractor (`external_party`) is taken from the order (a different typed `external_party_id` is refused, 422 `contractor_from_order`; `order_not_active`, `order_other_site`, `invalid`), so the contractor performance view sees the issue and the inspection. `GET /registers/issues/order-options` and `GET /registers/quality/order-options` list the orders (own module view plus Procurement view).
     - 0.15.92 (2026-11-27): order picker for the Car dispatcher and Financial advances (CHANGELOG OrderPickersDispatchAdvances). Additive, no migration. `GET /registers/car_dispatcher/order-options` and `GET /registers/financial_advances/order-options` list the approved, active Procurement orders for the field `procurement_record_id` (the same list as the warehouse picker); each needs its own module view, and only orders in regions where the caller also holds the Procurement view right are listed.
     - 0.15.91 (2026-11-26): warehouse receipt to Procurement order link (migration 0181; CHANGELOG WarehouseProcurementLink). Additive. A warehouse receipt (PL or OPEN) may name the approved, active Procurement order it belongs to (`procurement_order_id`); `pr_no`, `po_wo_no` and `order_contractor` are then derived from the order (read only). New `GET /registers/warehouse/order-options` (the picker) and `GET /registers/procurement/{entity_id}/receipts` (the receipts against an order). New 422 codes `receipt_only`, `order_not_active`, `order_other_site`.
-    - 0.15.98 (2026-11-27): recycle bin for voided register records (migration 0186; CHANGELOG RecycleBin). Additive. (1) `GET /recycle-bin` (`getRecycleBin`): the voided records inside the retention window, with who voided, why, until when each can be restored and `blocked` when a restore is not possible. (2) `POST /recycle-bin/{id}/restore` (`restoreRegisterRecord`): returns the record to a draft (`entry`, level 1); needs If-Match, a reason and a step-up. (3) `PUT /recycle-bin/retention` (`setRecycleBinRetention`): 30 to 730 days, default 90. System Admin only; nothing is deleted.
+    - 0.15.120 (2026-11-27): recycle bin for voided register records (migration 0220; CHANGELOG RecycleBin). Additive. (1) `GET /recycle-bin` (`getRecycleBin`): the voided records inside the retention window, with who voided, why, until when each can be restored and `blocked` when a restore is not possible. (2) `POST /recycle-bin/{id}/restore` (`restoreRegisterRecord`): returns the record to a draft (`entry`, level 1); needs If-Match, a reason and a step-up. (3) `PUT /recycle-bin/retention` (`setRecycleBinRetention`): 30 to 730 days, default 90. System Admin only; nothing is deleted.
     - 0.15.94 (2026-11-26): `GET /audit-log/field-history` takes `field` as optional (item 2 of the 2026-11-26 review; no migration). Additive. Without `field` it returns every field change of the record (a register record by its logical `entity_id`, a task by its task id), newest first, at most 200: the field diff of the History tab. Changes of a field the caller may not see are left out (a `hidden` field rule, and the amounts of Financial Advances for a caller who may not see amounts); the reader rules (decision B4) and the audit of the read are unchanged. `entity_type` and `entity_id` stay required (422).
     - 0.15.93 (2026-11-26): global search also reads tasks and warehouse items (owner approval 2026-11-26; no migration). Additive. `SearchType` gains `tasks` (the tasks of the sites the caller may view, same Site Register right and regions as the site list; the hit opens `/sites/{id}?task={task_id}`) and `warehouse_items` (needs `warehouse` view, as `GET /warehouse/items`; items are global). Read only, a group the caller may not read is left out as before.
     - 0.15.89 (2026-11-26): contractor performance view (migration 0180; CHANGELOG ContractorPerformance). Additive and read only. (1) `GET /reports/contractor-performance` (`getContractorPerformance`): one row per active contractor, computed on read from the delay days of its issues, its snags, its quality results, its Procurement orders and its contract end; nothing is typed or stored. (2) `GET/PUT /settings/contractor-performance` (`getContractorPerformanceThresholds`, `setContractorPerformanceThresholds`): the amber and red thresholds and the least sample, audited as `contractor_performance_thresholds_update`. No table, no permission change.
@@ -10274,7 +10274,7 @@ paths:
       tags: [registers]
       operationId: getRecycleBin
       summary: Voided register records that can still be restored (System Admin)
-      description: 0.15.98. The records voided inside the retention window (newest first, at most 500). `blocked` is `open_version_exists` or `site_slot_taken` when a restore would break a rule. 403 for anyone but a System Admin.
+      description: 0.15.120. The records voided inside the retention window (newest first, at most 500). `blocked` is `open_version_exists` or `site_slot_taken` when a restore would break a rule. 403 for anyone but a System Admin.
       responses:
         '200':
           description: The bin.
@@ -10288,7 +10288,7 @@ paths:
       tags: [registers]
       operationId: setRecycleBinRetention
       summary: Set the retention of the recycle bin (System Admin)
-      description: 0.15.98. Days a voided record can be restored, 30 to 730. Needs If-Match and a reason; audited as `recycle_bin_retention_update`.
+      description: 0.15.120. Days a voided record can be restored, 30 to 730. Needs If-Match and a reason; audited as `recycle_bin_retention_update`.
       parameters:
         - $ref: '#/components/parameters/IfMatch'
       requestBody:
@@ -10322,7 +10322,7 @@ paths:
       tags: [registers]
       operationId: restoreRegisterRecord
       summary: Restore a voided register record to a draft (System Admin)
-      description: 0.15.98. Only a voided record inside the retention window; it returns as `entry`, level 1, and goes through the workflow again. Refused when a newer open version exists or the site already has another record in a one-per-site register. Needs If-Match (the record version), a reason and a step-up. Audited as `register_record_restore`.
+      description: 0.15.120. Only a voided record inside the retention window; it returns as `entry`, level 1, and goes through the workflow again. Refused when a newer open version exists or the site already has another record in a one-per-site register. Needs If-Match (the record version), a reason and a step-up. Audited as `register_record_restore`.
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - $ref: '#/components/parameters/IfMatch'

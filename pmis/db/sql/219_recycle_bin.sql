@@ -1,10 +1,10 @@
--- 0186: Recycle bin for voided register records (contract 0.15.98). Additive: one settings key and three functions, no table changes.
+-- 0220: Recycle bin for voided register records (contract 0.15.98). Additive: one settings key and three functions, no table changes.
 -- A voided record stays in register_records (state 'voided', voided_at); nothing is ever deleted. The bin lists the voided records inside the
 -- retention window (default 90 days, 30 to 730, Settings > Registers > Recycle bin) and a System Admin can restore one. A restored record comes back
 -- as a draft ('entry', level 1) and goes through the workflow again; its version, history and audit stay. A delegate cannot restore (System Admin only).
 
 INSERT INTO settings (key, value, description, updated_at)
-VALUES ('recycle_bin.settings', '{"retention_days": 90}'::jsonb, 'Recycle bin (0186): how many days a voided register record can be restored.', now())
+VALUES ('recycle_bin.settings', '{"retention_days": 90}'::jsonb, 'Recycle bin (0220): how many days a voided register record can be restored.', now())
 ON CONFLICT (key) DO NOTHING;
 
 CREATE OR REPLACE FUNCTION recycle_bin_json() RETURNS jsonb
