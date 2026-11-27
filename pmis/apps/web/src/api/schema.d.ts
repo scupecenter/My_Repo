@@ -6366,6 +6366,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/registers/issues/risk-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The risks an Issue may name as realised (0.15.112)
+         * @description 0.15.112. Current, not voided Risks records that the caller may see (the Risks view right of the responsibility matrix, by region). Needs the Issue log module.
+         */
+        get: operations["listIssueRiskOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/registers/risks/{entity_id}/issues": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The issues that realise a risk (0.15.112)
+         * @description 0.15.112. The current, not voided Issue log records whose `risk_entity_id` is this risk, with status and dates. Needs the Risks and Issue log modules; only issues in regions where the caller holds the Issues view right are listed.
+         */
+        get: operations["listRiskRealisedIssues"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/registers/procurement/{entity_id}/receipts": {
         parameters: {
             query?: never;
@@ -6804,6 +6844,53 @@ export interface paths {
          *     Each save writes one audit row with before and after values and the reason.
          */
         put: operations["setDashboardSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/goals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The goals and the catalogue of milestone tasks and regions (0.15.160)
+         * @description 0.15.160. Goals kept in the settings table as `dashboard.goals`. A goal counts sites that reach a milestone task (`metric`, a milestone task code) in a region (null = all) during the current month, quarter or year.
+         *     Reads need `dashboard.view` (403 `module_forbidden` otherwise).
+         */
+        get: operations["getGoals"];
+        /**
+         * Save the goals (reason, If-Match, audited, versioned)
+         * @description 0.15.160. System Admin, or a delegation of `admin.settings` edit for all regions (403 `action_forbidden` otherwise). The body replaces the whole list.
+         *     Field errors (422 `validation_failed`): `unknown_key`, `invalid`, `duplicate`, `unknown_metric`, `unknown_region`, `too_many`. One audit row per save.
+         */
+        put: operations["setGoals"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/goals/progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Progress of every active goal (0.15.160)
+         * @description 0.15.160. Counted from approved milestone tasks (actual date in the period; active, not cancelled sites; distinct sites), as the caller: row-level security limits the sites to the regions the caller may read.
+         *     `status`: achieved (100% or more), on_track (at or above the share of the period that has passed), at_risk (within 15 points below), behind. Needs `dashboard.view`.
+         */
+        get: operations["getGoalsProgress"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -16479,6 +16566,30 @@ export interface components {
             order_status?: string;
             external_party?: components["schemas"]["ExternalPartyRef"];
         };
+        IssueRiskOption: {
+            /** Format: uuid */
+            entity_id: string;
+            /** Format: uuid */
+            record_id: string;
+            risk_id?: string;
+            statement?: string;
+            status?: string;
+            category?: string;
+            state?: string;
+        };
+        RiskRealisedIssue: {
+            /** Format: uuid */
+            entity_id: string;
+            /** Format: uuid */
+            record_id: string;
+            /** Format: uuid */
+            site_id?: string;
+            state: string;
+            pending_issue?: string;
+            issue_status?: string;
+            raised_date?: string;
+            resolution_date?: string;
+        };
         /** @description 0.15.91. A warehouse receipt (PL or OPEN) against a Procurement order. */
         ProcurementOrderReceipt: {
             /** Format: uuid */
@@ -16908,6 +17019,65 @@ export interface components {
             order: string[];
             /** @description Card codes this tab does not show. */
             hidden: string[];
+        };
+        GoalInput: {
+            id: string;
+            name_en: string;
+            name_ar?: string | null;
+            /** @description A milestone task code of the catalogue. */
+            metric: string;
+            /** @description null = all regions. */
+            region_id?: number | null;
+            /** @enum {string} */
+            period: "month" | "quarter" | "year";
+            target: number;
+            active?: boolean;
+        };
+        GoalsInput: {
+            goals: components["schemas"]["GoalInput"][];
+        };
+        Goals: {
+            version: number;
+            goals: components["schemas"]["GoalInput"][];
+            catalogue: {
+                metrics: {
+                    code: string;
+                    label_en: string;
+                    label_ar: string;
+                }[];
+                regions: {
+                    id: number;
+                    code: string;
+                    name_en: string;
+                    name_ar: string;
+                }[];
+                periods: string[];
+            };
+            /** Format: date-time */
+            updated_at: string | null;
+            updated_by: {
+                id: string;
+                display_name: string;
+            } | null;
+        };
+        GoalProgress: {
+            id: string;
+            name_en: string;
+            name_ar: string | null;
+            metric: string;
+            region_id: number | null;
+            /** @enum {string} */
+            period: "month" | "quarter" | "year";
+            /** Format: date */
+            period_start: string;
+            /** Format: date */
+            period_end: string;
+            target: number;
+            actual: number;
+            percent: number;
+            expected_percent: number;
+            /** @enum {string} */
+            status: "achieved" | "on_track" | "at_risk" | "behind";
         };
         DashboardSettingsInput: {
             targets: {
@@ -31605,6 +31775,57 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
         };
     };
+    listIssueRiskOptions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The risks. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["IssueRiskOption"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    listRiskRealisedIssues: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entity_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The issues. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["RiskRealisedIssue"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
     listProcurementOrderReceipts: {
         parameters: {
             query?: never;
@@ -32302,6 +32523,86 @@ export interface operations {
             412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getGoals: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The goals. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Goals"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setGoals: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"] & components["schemas"]["GoalsInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Goals"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getGoalsProgress: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The progress. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        goals: components["schemas"]["GoalProgress"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     getMailNotificationKinds: {

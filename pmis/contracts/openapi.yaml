@@ -32,6 +32,8 @@ info:
 
     ## Versions
     - 0.15.134 (2026-11-27): the Incidents & Security register (owner approval 2026-11-26; migration 0183): one register for safety incidents, near-misses and security events at sites (theft, vandalism, damaged equipment), with a cause/reason dropdown that also records a day with no execution because of bad weather (owner 2026-11-27). Additive. Register key `incidents` in `/registers` and `/registers/{key}` records with its own fields and the standard two levels, the Dropdown lists IncidentType, IncidentSeverity and IncidentCause in Settings, the module `incidents` in the permissions grid (no grant seeded), the nav key in the catalogue, the template TPL-INCIDENTS and the master export part. Existing registers and data are untouched.
+    - 0.15.222 (2026-11-27): additive (migration 0322; CHANGELOG IssueRiskLink). An Issue can name the Risk it realises: new optional field `risk_entity_id` on `issues` (the entity id of a Risks record the caller may see; needs the Risks view right in the risk's region; field errors `risk_not_available`, `invalid`). `GET /registers/issues/risk-options` lists the risks; `GET /registers/risks/{entity_id}/issues` lists the issues that realise a risk (needs the Risks and Issues modules; only the regions of the Issues view right).
+    - 0.15.160 (2026-11-27): goals with automatic progress (migration 0260; CHANGELOG Goals). Additive. `GET`/`PUT /settings/goals` (`getGoals`, `setGoals`) and `GET /goals/progress` (`getGoalsProgress`). Progress is counted from approved milestone tasks, as the On-Air counter does; no permission is widened.
     - 0.15.224 (2026-11-27): related records of a register record (migration 0324; CHANGELOG RelatedRecords). Additive and read only. New `GET /registers/{register_key}/{entity_id}/related` (`listRelatedRecords`): the current records linked to this record in both directions (`direction` `to`: the record this one names; `from`: records that name this one), grouped by register and link field (procurement order, Procurement request, risk, closing receipt). A group is listed only when the caller holds the view right of that register in that record's region (the responsibility matrix decides); nothing is stored and no permission changes.
     - 0.15.161 (2026-11-27): recurring preventive-maintenance schedules that create drafts only (migration 0261; CHANGELOG PmSchedules). Additive. `GET`/`PUT /settings/pm-schedules` (`getPmSchedules`, `setPmSchedules`) and `POST /pm-schedules/{schedule_id}/generate` (`generatePmScheduleDraft`). A schedule never creates anything by itself: a person presses Create draft on a due schedule and the draft is saved through the register's own create path as that person; no permission is widened.
     - 0.15.221 (2026-11-27): additive (migration 0321; CHANGELOG DismantleClosingRnLink). A Dismantle part closes by naming its signed Warehouse RN: new optional field `closing_rn_id` (entity id of a received RN of the part, cw_rn / te_rn, same site; needs the Warehouse view right in the RN's region). When set, `closing_rn_ref` is read from the RN's Doc No. and cannot be typed; without a link the typed reference still works. Field errors `rn_not_available`, `rn_other_site`, `invalid`. `GET /registers/dismantle/rn-options` lists the RNs. Also corrects the descriptions of the Issue log and Quality order-options paths.
@@ -9919,6 +9921,47 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '422': {$ref: '#/components/responses/Unprocessable'}
+  /registers/issues/risk-options:
+    get:
+      tags: [registers]
+      operationId: listIssueRiskOptions
+      summary: The risks an Issue may name as realised (0.15.112)
+      description: |
+        0.15.112. Current, not voided Risks records that the caller may see (the Risks view right of the responsibility matrix, by region). Needs the Issue log module.
+      responses:
+        '200':
+          description: The risks.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/IssueRiskOption' } }
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /registers/risks/{entity_id}/issues:
+    get:
+      tags: [registers]
+      operationId: listRiskRealisedIssues
+      summary: The issues that realise a risk (0.15.112)
+      description: |
+        0.15.112. The current, not voided Issue log records whose `risk_entity_id` is this risk, with status and dates. Needs the Risks and Issue log modules; only issues in regions where the caller holds the Issues view right are listed.
+      parameters:
+      - {name: entity_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: The issues.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/RiskRealisedIssue' } }
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
   /registers/procurement/{entity_id}/receipts:
     get:
       tags: [registers]
@@ -10551,6 +10594,78 @@ paths:
         '412': {$ref: '#/components/responses/PreconditionFailed'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /settings/goals:
+    get:
+      tags: [settings]
+      operationId: getGoals
+      summary: The goals and the catalogue of milestone tasks and regions (0.15.160)
+      description: |
+        0.15.160. Goals kept in the settings table as `dashboard.goals`. A goal counts sites that reach a milestone task (`metric`, a milestone task code) in a region (null = all) during the current month, quarter or year.
+        Reads need `dashboard.view` (403 `module_forbidden` otherwise).
+      responses:
+        '200':
+          description: The goals.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Goals'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    put:
+      tags: [settings]
+      operationId: setGoals
+      summary: Save the goals (reason, If-Match, audited, versioned)
+      description: |
+        0.15.160. System Admin, or a delegation of `admin.settings` edit for all regions (403 `action_forbidden` otherwise). The body replaces the whole list.
+        Field errors (422 `validation_failed`): `unknown_key`, `invalid`, `duplicate`, `unknown_metric`, `unknown_region`, `too_many`. One audit row per save.
+      x-db-path: admin_save_goals
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - {$ref: '#/components/schemas/WithReason'}
+              - {$ref: '#/components/schemas/GoalsInput'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Goals'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /goals/progress:
+    get:
+      tags: [dashboard]
+      operationId: getGoalsProgress
+      summary: Progress of every active goal (0.15.160)
+      description: |
+        0.15.160. Counted from approved milestone tasks (actual date in the period; active, not cancelled sites; distinct sites), as the caller: row-level security limits the sites to the regions the caller may read.
+        `status`: achieved (100% or more), on_track (at or above the share of the period that has passed), at_risk (within 15 points below), behind. Needs `dashboard.view`.
+      responses:
+        '200':
+          description: The progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [goals]
+                additionalProperties: false
+                properties:
+                  goals:
+                    type: array
+                    items: {$ref: '#/components/schemas/GoalProgress'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
   /settings/mail-notification-kinds:
     get:
       tags: [settings]
@@ -22368,6 +22483,29 @@ components:
         po_wo_date: { type: string, format: date }
         order_status: { type: string }
         external_party: { $ref: '#/components/schemas/ExternalPartyRef' }
+    IssueRiskOption:
+      type: object
+      required: [entity_id, record_id]
+      properties:
+        entity_id: { type: string, format: uuid }
+        record_id: { type: string, format: uuid }
+        risk_id: { type: string }
+        statement: { type: string }
+        status: { type: string }
+        category: { type: string }
+        state: { type: string }
+    RiskRealisedIssue:
+      type: object
+      required: [entity_id, record_id, state]
+      properties:
+        entity_id: { type: string, format: uuid }
+        record_id: { type: string, format: uuid }
+        site_id: { type: string, format: uuid }
+        state: { type: string }
+        pending_issue: { type: string }
+        issue_status: { type: string }
+        raised_date: { type: string }
+        resolution_date: { type: string }
     ProcurementOrderReceipt:
       type: object
       description: '0.15.91. A warehouse receipt (PL or OPEN) against a Procurement order.'
@@ -22866,6 +23004,77 @@ components:
       properties:
         order: { type: array, maxItems: 60, items: { type: string, minLength: 1, maxLength: 60 }, description: 'Card codes in display order.' }
         hidden: { type: array, maxItems: 60, items: { type: string, minLength: 1, maxLength: 60 }, description: 'Card codes this tab does not show.' }
+    GoalInput:
+      type: object
+      required: [id, name_en, metric, period, target]
+      additionalProperties: false
+      properties:
+        id: { type: string, pattern: '^[a-z0-9-]{3,40}$' }
+        name_en: { type: string, minLength: 1, maxLength: 120 }
+        name_ar: { type: [string, 'null'], maxLength: 120 }
+        metric: { type: string, description: 'A milestone task code of the catalogue.' }
+        region_id: { type: [integer, 'null'], minimum: 1, maximum: 7, description: 'null = all regions.' }
+        period: { type: string, enum: [month, quarter, year] }
+        target: { type: integer, minimum: 1, maximum: 100000 }
+        active: { type: boolean }
+    GoalsInput:
+      type: object
+      required: [goals]
+      additionalProperties: false
+      properties:
+        goals:
+          type: array
+          maxItems: 50
+          items: {$ref: '#/components/schemas/GoalInput'}
+    Goals:
+      type: object
+      required: [version, goals, catalogue, updated_at, updated_by]
+      properties:
+        version: { type: integer }
+        goals:
+          type: array
+          items: {$ref: '#/components/schemas/GoalInput'}
+        catalogue:
+          type: object
+          required: [metrics, regions, periods]
+          properties:
+            metrics:
+              type: array
+              items:
+                type: object
+                required: [code, label_en, label_ar]
+                properties: { code: {type: string}, label_en: {type: string}, label_ar: {type: string} }
+            regions:
+              type: array
+              items:
+                type: object
+                required: [id, code, name_en, name_ar]
+                properties: { id: {type: integer}, code: {type: string}, name_en: {type: string}, name_ar: {type: string} }
+            periods:
+              type: array
+              items: {type: string}
+        updated_at: { type: [string, 'null'], format: date-time }
+        updated_by:
+          type: [object, 'null']
+          required: [id, display_name]
+          properties: { id: {type: string}, display_name: {type: string} }
+    GoalProgress:
+      type: object
+      required: [id, name_en, name_ar, metric, region_id, period, period_start, period_end, target, actual, percent, expected_percent, status]
+      properties:
+        id: { type: string }
+        name_en: { type: string }
+        name_ar: { type: [string, 'null'] }
+        metric: { type: string }
+        region_id: { type: [integer, 'null'] }
+        period: { type: string, enum: [month, quarter, year] }
+        period_start: { type: string, format: date }
+        period_end: { type: string, format: date }
+        target: { type: integer }
+        actual: { type: integer }
+        percent: { type: number }
+        expected_percent: { type: number }
+        status: { type: string, enum: [achieved, on_track, at_risk, behind] }
     DashboardSettingsInput:
       type: object
       required: [targets, thresholds, tabs]

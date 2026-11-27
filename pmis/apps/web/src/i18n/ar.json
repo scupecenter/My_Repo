@@ -408,7 +408,9 @@
     "maintenance": "إعادة تعيين بيانات المشروع قيد التنفيذ. حاول بعد دقائق.",
     "scope_changed": "النطاق ليس الذي رأيته، أو تغيّر ما يأخذه معه. اقرأ الطلب مجددًا أو قدّم طلبًا جديدًا.",
     "unknown_register": "ليس سجلًا.",
-    "unknown_site": "ليس موقعًا."
+    "unknown_site": "ليس موقعًا.",
+    "unknown_metric": "ليست مهمة معلم.",
+    "unknown_region": "ليست منطقة."
   },
   "week": {
     "title": "خطة الأسبوع الدورية",
@@ -1198,7 +1200,8 @@
     "section_screens_motion": "الحركة",
     "section_workflow_coverage": "تغطية المصفوفة",
     "section_screens_login": "صفحة الدخول",
-    "section_screens_interface": "الواجهة"
+    "section_screens_interface": "الواجهة",
+    "section_screens_goals": "الأهداف"
   },
   "scopeMatch": {
     "title": "مطابقة الفريق والنطاق (المشتريات)",
@@ -4632,6 +4635,9 @@
     "cancelled": "ملغى",
     "no_contractor": "بدون مقاول",
     "order_site_first": "اختر الموقع والجزء أولًا",
+    "issue_no_risk": "بدون خطر (ليست من خطر متحقق)",
+    "risk_issues_title": "المشاكل الناتجة عن هذا الخطر",
+    "risk_issues_none": "لم تُسجَّل أي مشكلة ناتجة عن هذا الخطر.",
     "rn_none": "بدون ربط (اكتب المرجع يدويًا)",
     "rn_no_options": "لا يوجد إيصال إرجاع مستلم لهذا الجزء في الموقع",
     "rn_ref_from_rn": "مرجع الإيصال يُقرأ من إيصال الإرجاع في المخزن ولا يُكتب يدويًا.",
@@ -6894,5 +6900,33 @@
       "financial_advances": "السلف المالية",
       "risks": "المخاطر"
     }
+  },
+  "goals": {
+    "title": "الأهداف",
+    "manage": "إدارة الأهداف",
+    "none": "لا توجد أهداف بعد.",
+    "open_sites": "فتح المواقع",
+    "status_achieved": "تحقق",
+    "status_on_track": "على المسار",
+    "status_at_risk": "معرّض للخطر",
+    "status_behind": "متأخر",
+    "period_month": "هذا الشهر",
+    "period_quarter": "هذا الربع",
+    "period_year": "هذه السنة",
+    "settings_title": "الأهداف",
+    "settings_note": "يحتسب الهدف المواقع التي تبلغ مهمة معلم خلال الشهر أو الربع أو السنة الحالية. يُحسب التقدم تلقائيًا من المهام المعتمدة ولا يُدخل يدويًا. يظهر كل هدف في بطاقة الأهداف في لوحة المتابعة.",
+    "link_dashboard_settings": "بطاقات اللوحة والأهداف الثابتة",
+    "link_dashboard": "فتح لوحة المتابعة",
+    "name_en": "الاسم (الإنجليزية)",
+    "name_ar": "الاسم (العربية)",
+    "metric": "مهمة المعلم",
+    "region": "المنطقة",
+    "all_regions": "كل المناطق",
+    "period": "الفترة",
+    "target": "الهدف (مواقع)",
+    "active": "فعّال",
+    "remove": "حذف الهدف",
+    "add": "إضافة هدف",
+    "save_title": "حفظ الأهداف"
   }
 }
